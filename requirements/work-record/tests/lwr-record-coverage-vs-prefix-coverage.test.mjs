@@ -9,11 +9,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as workRecord from '../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js'
+import * as traceOwner from '../../../dist/Context/Trace/SemanticTraceSurface.js'
 
 const xTrace = {
-  item: ({ sequence, role, part }) => workRecord.item(sequence, role, part),
-  text: workRecord.textPart,
-  reasoning: workRecord.reasoningPart,
+  item: traceOwner.item,
+  text: traceOwner.textPart,
+  reasoning: traceOwner.reasoningPart,
 }
 const opening = (assignment, requirements = []) => workRecord.opening(assignment, requirements, '')
 const materialize = (
@@ -23,15 +24,11 @@ const materialize = (
   coverage,
   openingEnd = { Sequence: 0 },
   includeOpening = true,
-) =>
-  workRecord.materialize(
-    openingValue,
-    frames,
-    trace,
-    Number(coverage.Sequence),
-    Number(openingEnd.Sequence),
-    includeOpening,
-  )
+) => {
+  const gapStart = Math.max(Number(coverage.Sequence), Number(openingEnd.Sequence))
+  const gap = traceOwner.render(traceOwner.forWorkRecord(traceOwner.sliceFrom({ sequence: gapStart }, trace)))
+  return workRecord.materialize(openingValue, frames, gap, includeOpening)
+}
 
 // One full turn of two parts: user text at 0, assistant reasoning at 1, and a
 // second turn: assistant text at 2.

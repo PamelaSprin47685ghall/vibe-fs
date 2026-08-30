@@ -605,26 +605,27 @@ module CompressionSurface =
                 (unbox<obj array> value?parts)
                 |> Array.toList
                 |> List.map (fun item ->
-                    { Cursor = { Sequence = int64Value item?sequence }
+                    { Cursor = XTraceCursor.create (int64Value item?sequence)
                       Kind = text item?kind
                       ToolCallId = optionalText item?toolCallId |> Option.map ToolCallId.create })
 
         MagicTodo.effectiveOpeningFloor
             hasOpenLife
             planCommitted
-            { Sequence = openingSequence }
+            (XTraceCursor.create openingSequence)
             None
             None
             headSequence
             parts
-        |> Option.map (fun cursor -> int cursor.Sequence)
+        |> Option.map (XTraceCursor.sequence >> int)
         |> optionObj
 
     let bloggerEffectiveStart (ingestedThrough: int) (workRecordStartSequence: int) : int =
         MagicTodo.bloggerEffectiveStart
-            { IngestedThrough = { Sequence = int64 ingestedThrough } }
-            { Sequence = int64 workRecordStartSequence }
-        |> fun cursor -> int cursor.Sequence
+            (ingestedThrough |> int64 |> XTraceCursor.create |> RecordCoverage.create)
+            (workRecordStartSequence |> int64 |> XTraceCursor.create)
+        |> XTraceCursor.sequence
+        |> int
 
     let retainTodoWriteRounds (messages: obj array) : bool array =
         messages

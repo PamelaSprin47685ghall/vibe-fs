@@ -104,10 +104,32 @@ module PromptIngress =
         let root = PhysicalUserMessageId.promoteToAuthorityRoot physicalMessageId
         onAuthorityRoot |> Option.iter (fun f -> f (sessionId, root))
 
+    let private captureOpening
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (text: string)
+        : Task<Result<XTraceCaptureReceipt option, XTraceCaptureError>> =
+        task {
+            match! XTraceCapture.captureOpeningWithReceipt journal sessionId text [] with
+            | Ok receipt -> return Ok(Some receipt)
+            | Error error -> return Error error
+        }
+
     let private captureOpeningIfAny (journal: AgentJournal option) (sessionId: SessionId) (openingText: string option) =
-        match openingText with
-        | Some text -> XTraceCapture.captureOpening journal sessionId text []
-        | None -> task { () }
+        let capture =
+            match openingText with
+            | None -> Task.FromResult(Ok None)
+            | Some text -> captureOpening journal sessionId text
+
+        task {
+            match! capture with
+            | Ok None
+            | Ok (Some _) -> return ()
+            | Error (XTraceCaptureError.Refused reason) ->
+                return invalidOp $"XTrace opening capture refused: {reason}"
+            | Error (XTraceCaptureError.StorageFailed reason) ->
+                return invalidOp $"XTrace opening capture storage failed: {reason}"
+        }
 
     let private acceptHumanRoot
         (runtime: PromptDispatcher.Runtime)

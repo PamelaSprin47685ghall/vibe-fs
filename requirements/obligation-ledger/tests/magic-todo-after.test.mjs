@@ -21,15 +21,17 @@ test('WHAT[OBLIGATION-LEDGER-025] deferred prepare synchronizes the Host snapsho
   const source = readFileSync(membraneSource, 'utf8')
   const locate = source.indexOf('SessionSnapshotPort.locateToolCall callId messages')
   const prefix = source.indexOf('messages |> List.takeWhile (fun message -> message.Id <> currentRunId)')
-  const capture = source.indexOf('XTraceCapture.captureSessionMessages (Some durable) sessionId priorMessages')
+  const capture = source.indexOf('XTraceCapture.captureSessionMessagesWithReceipt (Some durable) sessionId priorMessages')
   const resolve = source.indexOf('MagicTodoLocality.resolve sessionId messages (AgentJournal.snapshot durable) callId')
   assert.ok(locate > 0, 'deferred prepare must identify the exact current provider run from the Host snapshot')
   assert.ok(prefix > locate, 'only the complete transcript before the current provider run may be synchronized')
   assert.ok(capture > prefix, 'the prior transcript must be synchronized into XTrace')
   assert.ok(resolve > capture, 'ReviewFrontier must be localized only after the synchronized XTrace snapshot is current')
+  assert.match(source, /\| Error error ->/, 'typed capture failures must remain explicit')
+  assert.match(source, /\| Ok _ -> \(\)/, 'the receipt may be discarded only after successful capture')
   assert.doesNotMatch(
     source,
-    /captureSessionMessages \(Some durable\) sessionId messages/,
+    /captureSessionMessages(?:WithReceipt)? \(Some durable\) sessionId messages/,
     'the current pending tool message must not be durably captured before its input materializes',
   )
 })

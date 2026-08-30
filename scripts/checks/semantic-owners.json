@@ -403,11 +403,7 @@
       "owner": "semantic-trace"
     },
     {
-      "path": "src/Wanxiangshu/Context/Trace/XTracePipeline.fs",
-      "owner": "semantic-trace"
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Trace/XTraceSurface.fs",
+      "path": "src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fs",
       "owner": "semantic-trace"
     },
     {
@@ -1284,10 +1280,6 @@
     },
     {
       "path": "src/Wanxiangshu/Mission/Obligation/Todo/FinalityCohort.fs",
-      "owner": "obligation-ledger"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Obligation/Todo/Lwr.fs",
       "owner": "obligation-ledger"
     },
     {

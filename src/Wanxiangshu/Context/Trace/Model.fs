@@ -24,14 +24,6 @@ type XTraceItem =
       Role: string
       Part: SemanticPart }
 
-/// COMPANION-003 / CTX-011: prefix replacement 的证明量。只在完整 Host turn
-/// 边界推进，受 Host compaction epoch 约束。
-type PrefixCoverage =
-    { HostEpochId: int64
-      CutoffExclusive: int
-      CoveredPrefixDigest: string
-      CoverableFrameCount: int }
-
 [<RequireQualifiedAccess>]
 module XTrace =
 
@@ -39,12 +31,12 @@ module XTrace =
     let sliceBetween (start: XTraceCursor) (endExclusive: XTraceCursor) (items: XTraceItem list) =
         items
         |> List.filter (fun item ->
-            item.Cursor.Sequence >= start.Sequence
-            && item.Cursor.Sequence < endExclusive.Sequence)
+            XTraceCursor.isAtOrAfter item.Cursor start
+            && XTraceCursor.isBefore item.Cursor endExclusive)
 
     /// `cursor >= start` 的全部 items（到 XTrace head）。
     let sliceFrom (start: XTraceCursor) (items: XTraceItem list) =
-        items |> List.filter (fun item -> item.Cursor.Sequence >= start.Sequence)
+        items |> List.filter (fun item -> XTraceCursor.isAtOrAfter item.Cursor start)
 
     /// 当前 head：最后一条 item 之后的位置。空轨迹为 origin。
     let head (items: XTraceItem list) : XTraceCursor =

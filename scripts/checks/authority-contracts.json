@@ -605,6 +605,38 @@
       }
     },
     {
+      "file": "src/Wanxiangshu/Context/Trace/Capture.fs",
+      "symbol": "XTraceCaptureReceipt",
+      "anchor": "type XTraceCaptureReceipt =",
+      "classification": "Authority",
+      "class": "Receipt",
+      "owner": "semantic-trace",
+      "what": "ENF-013, ENF-015",
+      "scope": "one exact semantic-trace capture attempt and its durable projection delta",
+      "freshness": "derived after the capture from before/after canonical projection heads",
+      "multiplicity": "replayable evidence; never reusable capture authority",
+      "consume": "callers may inspect or discard the typed evidence only after matching Ok",
+      "durability": "derived from durable trace state; grants no future append capability",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Context/Trace/Capture.fs",
+          "symbol": "captureReceipt",
+          "anchor": "let private captureReceipt",
+          "owner": "semantic-trace"
+        },
+        {
+          "file": "src/Wanxiangshu/Context/Trace/Capture.fs",
+          "symbol": "withoutJournalReceipt",
+          "anchor": "let private withoutJournalReceipt () =",
+          "owner": "semantic-trace"
+        }
+      ],
+      "whatOwners": {
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
       "file": "src/Wanxiangshu/Interaction/Dispatch/JoinGuardSurface.fs",
       "symbol": "ReservationCapability",
       "anchor": "type private ReservationCapability() =",

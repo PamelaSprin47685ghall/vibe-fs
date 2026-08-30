@@ -16,10 +16,10 @@ module HumanRootOpeningEvidence =
 
 /// Evidence that an AgentOwnerRoot Manager has never owned a Life before and may
 /// materialize its one migration Life from the current XTrace on first ending.
-type InitialAgentOwnerMigrationEvidence = private InitialAgentOwnerMigrationEvidence of XTraceProjectionState
+type InitialAgentOwnerMigrationEvidence = private InitialAgentOwnerMigrationEvidence of XTraceOpeningEvidence
 
 module InitialAgentOwnerMigrationEvidence =
-    let xTrace (InitialAgentOwnerMigrationEvidence xTrace) = xTrace
+    let opening (InitialAgentOwnerMigrationEvidence opening) = opening
 
 [<RequireQualifiedAccess>]
 type EndingLifeAdmission =
@@ -61,22 +61,20 @@ module ManagerLifeAdmission =
     /// same XTrace into another Life.
     let private initialAgentOwnerOrNone
         (profile: PromptAuthority.AuthorityExecutionProfile option)
-        (xTrace: XTraceProjectionState option)
+        (opening: XTraceOpeningEvidence option)
         : EndingLifeAdmission =
-        match profile, xTrace with
-        | Some active, Some trace when
-            isManagerAuthority PromptAuthority.RootAuthorityKind.AgentOwnerRoot active
-            && trace.Opening.IsSome
-            ->
-            EndingLifeAdmission.InitialAgentOwnerMigration(InitialAgentOwnerMigrationEvidence trace)
+        match profile, opening with
+        | Some active, Some evidence when
+            isManagerAuthority PromptAuthority.RootAuthorityKind.AgentOwnerRoot active ->
+            EndingLifeAdmission.InitialAgentOwnerMigration(InitialAgentOwnerMigrationEvidence evidence)
         | _ -> EndingLifeAdmission.NoLife
 
     let ending
         (lifecycle: ManagerLifeProjection)
         (profile: PromptAuthority.AuthorityExecutionProfile option)
-        (xTrace: XTraceProjectionState option)
+        (opening: XTraceOpeningEvidence option)
         : EndingLifeAdmission =
         match lifecycle.CurrentLife with
         | Some life -> EndingLifeAdmission.ExistingLife life
         | None when not (List.isEmpty lifecycle.CompletedLives) -> EndingLifeAdmission.NoLife
-        | None -> initialAgentOwnerOrNone profile xTrace
+        | None -> initialAgentOwnerOrNone profile opening

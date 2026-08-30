@@ -13,7 +13,10 @@ export const ORDERING_STEPS = Object.freeze([
   'caps.BeginPhysicalProviderAttempt',
   'caps.BindSessionStartedAt',
   'caps.ApplyStrengthReplay',
-  'caps.ApplyXTracePipeline',
+  'caps.CaptureXTraceMessages',
+  'caps.CommitStrengthTrace',
+  'caps.RefreshCompanionXTrace',
+  'caps.ApplyManagerNarrative',
   'caps.ApplyCompanion',
   'caps.ApplyXWire',
   'caps.ApplyEnforcerContinuation',
@@ -136,7 +139,11 @@ const isNormalPathCall = (lines, at, callColumn, stepIndex) => {
     if (/^(?:fun\b|function\b|\|)/.test(header)) return false
     if (/^(?:if|elif|else\b|match!?\b|try\b|with\b|for\b|while\b)/.test(header)) {
       const canonicalPrefixBranch = header === 'if prefixHorizon = PrefixPresentationHorizon.Current then'
-        && stepIndex >= 7 && stepIndex <= 9
+        && [
+          'caps.ApplyStrengthSpeculate',
+          'caps.InjectPairGuideline',
+          'caps.ProjectRequirementGrounding',
+        ].includes(ORDERING_STEPS[stepIndex])
       if (!canonicalPrefixBranch) return false
     }
     if (/^let\b/.test(header) && !/^let\s+normalTransform\b/.test(header)) return false

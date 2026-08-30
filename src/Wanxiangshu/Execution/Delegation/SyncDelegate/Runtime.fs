@@ -32,7 +32,6 @@ open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Mission.WorkRecord
@@ -84,7 +83,7 @@ type SyncDelegateRuntime
         resolveOwnerTier: SessionId -> AgentTier option,
         onDelegateReady: SessionId -> string -> unit,
         quiescence: SessionQuiescenceGate,
-        workRecordFor: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>,
+        workRecordFor: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>,
         handoff: ReusableHandoffPort,
         ?workspaceDirectory: string,
         /// Casebook draft hooks (wired from SpikePlugin → CasebookLifecycle; compile-order seam).
@@ -171,12 +170,12 @@ type SyncDelegateRuntime
     let bindChild owner child agentName =
         SessionExecutionBinding.restore owner child (Some agentName)
 
-    let xTraceHead (sessionId: SessionId) : int64 =
+    let xTraceFrontier (sessionId: SessionId) : XTraceCursor =
         AgentJournal.snapshot journal
         |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
         |> Option.bind (fun session -> session.XTrace)
-        |> Option.map XTraceProjection.head
-        |> Option.defaultValue 0L
+        |> Option.defaultValue XTraceProjection.empty
+        |> XTraceProjection.headCursor
 
     let sendDelegatePrompt (call: SyncDelegateCall) (request: SyncDelegatePromptRequest) =
         taskResult {
@@ -189,16 +188,16 @@ type SyncDelegateRuntime
             // Opening for AgentOwnerRoot, so the LWR projector would otherwise
             // return None and the bounded record would be undefined. Idempotent:
             // a reused child keeps its first invocation's Opening (PERSIST-010).
-            do!
-                XTraceCapture.captureOpening (Some journal) call.Delegate request.Charge []
-                |> TaskResultCE.ofTask
+            let! _ =
+                XTraceCapture.captureOpeningWithReceipt (Some journal) call.Delegate request.Charge []
+                |> TaskResult.mapError (fun error -> sprintf "sync delegate opening trace capture failed: %A" error)
 
             // EXEC-031: snapshot the child's XTrace head (one-past last part,
             // 0 when empty) at send. This is the inclusive start of the
             // per-invocation range; the exclusive end is the same head
             // captured at completion. All coalesced invocations in this
             // call share the same head and thus the same bounded record.
-            let startCursor = xTraceHead call.Delegate
+            let startCursor = xTraceFrontier call.Delegate |> XTraceCursor.sequence
 
             for inv in call.Invocations do
                 inv.StartCursor <- Some startCursor
@@ -269,7 +268,7 @@ type SyncDelegateRuntime
     let resolveWorkRecord
         (turnSessionId: SessionId)
         (call: SyncDelegateCall)
-        (endCursor: int64)
+        (endCursor: XTraceCursor)
         (providerRun: ProviderRunIdentity)
         =
         match call.Invocations |> List.tryHead |> Option.bind (fun inv -> inv.StartCursor) with
@@ -277,8 +276,7 @@ type SyncDelegateRuntime
         | Some startCursor ->
             projectWorkRecord
                 turnSessionId
-                { StartInclusive = { Sequence = startCursor }
-                  EndExclusive = { Sequence = endCursor } }
+                (XTraceRange.create (XTraceCursor.create startCursor) endCursor)
                 providerRun
 
     let noteInspectorIfRole (call: SyncDelegateCall) turnSessionId record =
@@ -304,13 +302,13 @@ type SyncDelegateRuntime
             // Completion marker for ManagerLife/Reviewer. HandleTurn
             // does not use Terminal to build the inspect payload;
             // the bounded WorkRecord is the invocation's parts range.
-            do! XTraceCapture.captureTerminal (Some journal) turn
-
-            // Exclusive range end = XTrace.head (one-past last part).
-            let endCursor = xTraceHead turn.SessionId
-
-            let! workRecord = resolveWorkRecord turn.SessionId call endCursor turn.ProviderRun
-            return finishCompletedCall turn.SessionId call workRecord
+            match! XTraceCapture.captureTerminalWithReceipt (Some journal) turn with
+            | Error error ->
+                store.FailCall(call, sprintf "sync delegate terminal trace capture failed: %A" error)
+                return true
+            | Ok receipt ->
+                let! workRecord = resolveWorkRecord turn.SessionId call receipt.CurrentHead turn.ProviderRun
+                return finishCompletedCall turn.SessionId call workRecord
         }
 
     let popIfAuthorityMatches

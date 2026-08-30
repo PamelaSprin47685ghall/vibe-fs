@@ -304,19 +304,19 @@ module EnforcerFrameRecovery =
             return rebuilt |> Option.defaultValue fallback
         }
 
-    /// Map chunk NextCursor (first unconsumed semantic position) → XTrace sequence
-    /// of the last COVERED part. Paired with `semanticCursorFor`'s `>`: the next
-    /// delta starts strictly after this sequence (COMPANION-003 / CTX-011).
+    /// Map chunk NextCursor (first unconsumed semantic position) → XTrace cursor
+    /// of the last COVERED part. The next delta starts strictly after this
+    /// cursor (COMPANION-003 / CTX-011).
     ///
     /// Scoped to the current reanchor generation's Turn/Part labels (HOST-006).
     /// `None` = mapping failed (empty trace, or Host cursor not present on XTrace).
     /// NEVER default to 0: silent 0 with Prev>0 stages Next≤Prev and dies at commit.
-    let lastCoveredSequence (xTrace: XTraceProjectionState) (nextCursor: SemanticCursor) : int64 option =
-        XTraceProjection.currentGenerationParts (XTraceProjection.parts xTrace)
+    let lastCoveredCursor (xTrace: XTraceProjectionState) (nextCursor: SemanticCursor) : XTraceCursor option =
+        XTraceProjection.currentGenerationSemanticParts xTrace
         |> List.tryFindBack (fun part ->
             part.Turn < nextCursor.TurnIndex
             || (part.Turn = nextCursor.TurnIndex && part.PartIndex < nextCursor.PartIndex))
-        |> Option.map (fun part -> part.Cursor.Sequence)
+        |> Option.map (fun part -> part.Cursor)
 
     /// COMPANION-011: digest of X's provider-visible prefix at the coverable cutoff.
     /// When the cutoff does not move, the previous digest is kept so a mid-turn

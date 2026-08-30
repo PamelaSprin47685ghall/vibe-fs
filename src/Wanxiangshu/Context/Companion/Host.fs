@@ -408,7 +408,10 @@ type CompanionHost
             { SessionId = SessionId.value primaryId }
             System.Threading.CancellationToken.None
             (CompanionProgram.buildDelta
-                (XTraceProjection.semanticCursorFor memory.Blog.Coverage.IngestedThroughSequence memory.XTrace)
+                (memory.Blog.Coverage.IngestedThroughSequence
+                 |> XTraceCursor.create
+                 |> RecordCoverage.create
+                 |> fun coverage -> XTraceProjection.semanticCursorAfterCoverage coverage memory.XTrace)
                 memory.Blog.Coverage.CoverableTurnCutoffExclusive
                 projection)
 

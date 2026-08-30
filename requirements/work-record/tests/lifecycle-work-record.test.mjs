@@ -9,13 +9,14 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import * as todo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
 import * as workRecord from '../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js'
+import * as traceOwner from '../../../dist/Context/Trace/SemanticTraceSurface.js'
 
 const xTrace = {
-  item: ({ sequence, role, part }) => workRecord.item(sequence, role, part),
-  text: workRecord.textPart,
-  reasoning: workRecord.reasoningPart,
-  toolCall: workRecord.toolCallPart,
-  toolResult: workRecord.toolResultPart,
+  item: traceOwner.item,
+  text: traceOwner.textPart,
+  reasoning: traceOwner.reasoningPart,
+  toolCall: (name, args) => traceOwner.toolCallPart('fixture-call', name, args),
+  toolResult: (result) => traceOwner.toolResultPart('fixture-call', result),
 }
 const opening = (assignment, requirements = []) => workRecord.opening(assignment, requirements, '')
 const materialize = (
@@ -25,15 +26,11 @@ const materialize = (
   coverage,
   openingEnd = { Sequence: 0 },
   includeOpening = true,
-) =>
-  workRecord.materialize(
-    openingValue,
-    frames,
-    trace,
-    Number(coverage.Sequence),
-    Number(openingEnd.Sequence),
-    includeOpening,
-  )
+) => {
+  const gapStart = Math.max(Number(coverage.Sequence), Number(openingEnd.Sequence))
+  const gap = traceOwner.render(traceOwner.forWorkRecord(traceOwner.sliceFrom({ sequence: gapStart }, trace)))
+  return workRecord.materialize(openingValue, frames, gap, includeOpening)
+}
 
 // 公共 fixture：trace 中 cursor 0 是 opening（Y 起点在 opening 之后，方案 4.1）
 const OPENING_END = { Sequence: 1 }
@@ -284,7 +281,10 @@ test('WHAT[WORK-RECORD-009] LWR_t1_commitment_call_result_is_constitutive_openin
   // 不得当 incidental tool 滤入 Recent work（XTrace.forOpening 保留 raw）。
   const t1Call = xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.toolCall('todowrite', '{"planComplete":true}') })
   const t1Result = xTrace.item({ sequence: 2, role: 'assistant', part: xTrace.toolResult('accepted') })
-  const openingWithT1 = workRecord.withConstitutive(opening('charge'), [t1Call, t1Result])
+  const openingWithT1 = workRecord.withConstitutive(
+    opening('charge'),
+    traceOwner.render(traceOwner.forOpening([t1Call, t1Result])),
+  )
 
   const rendered = materialize(openingWithT1, [], [], { Sequence: 0 }, OPENING_END)
 

@@ -97,11 +97,18 @@ module PluginTransforms =
 
     type private SessionTermination = SessionId -> string -> Task<Result<unit, string>>
 
+    type TraceTransformCapture =
+        { RawMessages: obj list
+          Current: XTraceProjectionState option }
+
     type NormalTransformCapabilities =
         { BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
           BindSessionStartedAt: string option -> Task<DateTimeOffset option>
           ApplyStrengthReplay: string option -> obj -> Task<StrengthReplayPlan list>
-          ApplyXTracePipeline: string option -> obj -> StrengthReplayPlan list -> Task<unit>
+          CaptureXTraceMessages: string option -> obj -> Task<TraceTransformCapture>
+          CommitStrengthTrace: string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>
+          RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
+          ApplyManagerNarrative: string option -> XTraceProjectionState option -> obj list -> obj -> Task<unit>
           ApplyCompanion: string option -> obj -> obj -> Task<unit>
           ApplyXWire: obj -> Task<PrefixPresentationHorizon>
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
@@ -137,6 +144,22 @@ module PluginTransforms =
     let private failIfReplicaDecisionLost (handled: bool) : unit =
         if not handled then
             raise (InvalidOperationException "StrengthReplica transform lost its live decision binding")
+
+    let private raiseFailClosed (fuse: string -> unit) (reason: string) : 'a =
+        fuse reason
+        raise (InvalidOperationException reason)
+
+    let private decodePromptOrigin (label: string) : PromptAuthority.PromptOrigin =
+        match label with
+        | "HumanRoot" -> PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.HumanRoot
+        | "AgentOwnerRoot" -> PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.AgentOwnerRoot
+        | "HostInternal" -> PromptAuthority.PromptOrigin.HostInternal
+        | "UnknownOrigin" -> PromptAuthority.PromptOrigin.UnknownOrigin
+        | continuation ->
+            continuation
+            |> PromptAuthority.tryParseContinuationKind
+            |> Option.map PromptAuthority.PromptOrigin.Continuation
+            |> Option.defaultValue PromptAuthority.PromptOrigin.UnknownOrigin
 
     let private determineTransformMode
         (branches: TransformBranchCapabilities)
@@ -183,18 +206,78 @@ module PluginTransforms =
           BindSessionStartedAt =
             SessionStartedAtLedger.bindSessionStartedAt journal clock terminateSession Diagnostic.emit
           ApplyStrengthReplay = StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailFuse
-          ApplyXTracePipeline =
-            fun projectionSessionIdOpt outObj strengthReplayPlans ->
+          CaptureXTraceMessages =
+            fun projectionSessionIdOpt outObj ->
                 task {
-                    do!
-                        XTracePipeline.applyPipeline
-                            journal
-                            strengthDurability
-                            strengthFailFuse
-                            scope.Sessions.Companions
-                            projectionSessionIdOpt
-                            outObj
-                            strengthReplayPlans
+                    let rawMessages = unbox<obj array> outObj?messages |> Array.toList
+
+                    match projectionSessionIdOpt with
+                    | None ->
+                        return
+                            { RawMessages = rawMessages
+                              Current = None }
+                    | Some sessionId ->
+                        let observations =
+                            rawMessages
+                            |> List.choose (fun rawMessage ->
+                                ProviderWireCapture.decodeCapturedMessage rawMessage
+                                |> Option.map (fun message ->
+                                    { Message = message
+                                      HostMessageId = ProviderWireDecode.hostMessageId rawMessage
+                                      Origin =
+                                        ProviderWireDecode.promptOriginOfMessage rawMessage
+                                        |> Option.map decodePromptOrigin }))
+
+                        match!
+                            XTraceCapture.captureObservedMessagesWithReceipt
+                                journal
+                                (SessionId.create sessionId)
+                                observations
+                        with
+                        | Ok captured ->
+                            return
+                                { RawMessages = rawMessages
+                                  Current = captured.Current }
+                        | Error(XTraceCaptureError.Refused reason)
+                        | Error(XTraceCaptureError.StorageFailed reason) ->
+                            return raiseFailClosed strengthFailFuse reason
+                }
+          CommitStrengthTrace =
+            fun projectionSessionIdOpt traceState strengthReplayPlans ->
+                match projectionSessionIdOpt with
+                | Some _ ->
+                    task {
+                        do!
+                            StrengthReplay.commitTracedAfterCapture
+                                journal
+                                strengthDurability
+                                (raiseFailClosed strengthFailFuse)
+                                traceState
+                                strengthReplayPlans
+                    }
+                | None -> Task.FromResult()
+          RefreshCompanionXTrace =
+            fun projectionSessionIdOpt traceState ->
+                let sessionId = projectionSessionIdOpt |> Option.defaultValue ""
+                let found, companion = scope.Sessions.Companions.TryGetValue sessionId
+
+                if found then
+                    traceState |> Option.iter companion.RefreshXTrace
+          ApplyManagerNarrative =
+            fun projectionSessionIdOpt traceState rawMessages outObj ->
+                task {
+                    match projectionSessionIdOpt with
+                    | Some _ ->
+                        match!
+                            ManagerNarrativeTransform.tryTransform
+                                journal
+                                projectionSessionIdOpt
+                                traceState
+                                rawMessages
+                        with
+                        | Some rewritten -> HostMessageProjection.replaceMessagesInPlace outObj rewritten
+                        | None -> ()
+                    | None -> ()
                 }
           ApplyCompanion =
             CompanionTransform.applyCompanionForOrdinaryMaterial
@@ -297,37 +380,53 @@ module PluginTransforms =
             // 3. StrengthReplay.applyBeforeXTrace
             let! strengthReplayPlans = caps.ApplyStrengthReplay projectionSessionIdOpt outObj
 
-            // 4. XTracePipeline.applyPipeline
-            do! caps.ApplyXTracePipeline projectionSessionIdOpt outObj strengthReplayPlans
+            // 4. XTraceCapture.captureObservedMessagesWithReceipt
+            let! traceCapture = caps.CaptureXTraceMessages projectionSessionIdOpt outObj
 
-            // 5. applyCompanionForOrdinaryMaterial
+            // 5. StrengthReplay.commitTracedAfterCapture
+            do!
+                caps.CommitStrengthTrace projectionSessionIdOpt
+                    traceCapture.Current
+                    strengthReplayPlans
+
+            // 6. CompanionHost.RefreshXTrace
+            caps.RefreshCompanionXTrace projectionSessionIdOpt traceCapture.Current
+
+            // 7. ManagerNarrativeTransform.tryTransform
+            do!
+                caps.ApplyManagerNarrative projectionSessionIdOpt
+                    traceCapture.Current
+                    traceCapture.RawMessages
+                    outObj
+
+            // 8. applyCompanionForOrdinaryMaterial
             do! caps.ApplyCompanion projectionSessionIdOpt inObj outObj
 
-            // 6. XWire.applyTransform. A selected prefix probe creates a
+            // 9. XWire.applyTransform. A selected prefix probe creates a
             // tentative cold horizon for this physical request; downstream
             // historical auxiliaries must not replay the old horizon into it.
             let! prefixHorizon = caps.ApplyXWire outObj
 
-            // 7. EnforcerContinuation.applyContinuation
+            // 10. EnforcerContinuation.applyContinuation
             do! caps.ApplyEnforcerContinuation projectionSessionIdOpt outObj
 
             if prefixHorizon = PrefixPresentationHorizon.Current then
-                // 8. StrengthSpeculate.tryApply
+                // 11. StrengthSpeculate.tryApply
                 do! caps.ApplyStrengthSpeculate outObj
 
-                // 9. PairProgrammingThoughtTransform.maybeInjectGuideline
+                // 12. PairProgrammingThoughtTransform.maybeInjectGuideline
                 do! caps.InjectPairGuideline projectionSessionIdOpt sessionStartedAt outObj
 
-                // 10. RequirementGroundingTransform.projectOrTerminate
+                // 13. RequirementGroundingTransform.projectOrTerminate
                 do! caps.ProjectRequirementGrounding projectionSessionIdOpt outObj
 
-            // 11. BloggerChronicleText.maybeInject
+            // 14. BloggerChronicleText.maybeInject
             caps.InjectBloggerChronicle projectionSessionIdOpt outObj
 
-            // 12. HostMessageProjection.sanitizeMessages
+            // 15. HostMessageProjection.sanitizeMessages
             caps.SanitizeMessages outObj
 
-            // 13. JudgeTool.interruptAfterSubmittedJudgement
+            // 16. JudgeTool.interruptAfterSubmittedJudgement
             do! caps.InterruptAfterSubmittedJudgement projectionSessionIdOpt
             ()
         }

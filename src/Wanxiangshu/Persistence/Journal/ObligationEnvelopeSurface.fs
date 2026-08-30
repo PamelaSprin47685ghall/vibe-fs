@@ -4,6 +4,7 @@ open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
@@ -135,7 +136,7 @@ module ObligationEnvelopeSurface =
                     session.ManagerLife
                     |> Option.bind (fun value -> value.CurrentLife)
                     |> Option.bind (fun value -> value.ProtectedPrefixEnd)
-                    |> Option.map (fun value -> box (int value.Sequence))
+                    |> Option.map (XTraceCursor.sequence >> int >> box)
                     |> Option.toObj
 
                 box

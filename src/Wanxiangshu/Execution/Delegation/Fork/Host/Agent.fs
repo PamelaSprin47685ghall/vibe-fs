@@ -317,7 +317,7 @@ module HostForkAgent =
         (run: PendingHostRun)
         (result: ForkResult)
         : Task<Result<ForkResult, string>> =
-        task {
+        taskResult {
             runtime.MarkReady(run)
 
             // COMPANION-003 / EXEC-006: the child's OpeningMaterial is the ORIGINAL
@@ -326,9 +326,14 @@ module HostForkAgent =
             // parent LWR recursively). Captured before the first prompt is sent;
             // idempotent.
             if isFirstPrompt then
-                do! XTraceCapture.captureOpening runtime.Journal childId prompt requirements
+                let! _ =
+                    XTraceCapture.captureOpeningWithReceipt runtime.Journal childId prompt requirements
+                    |> TaskResult.mapError (fun error -> sprintf "fork opening trace capture failed: %A" error)
+                ()
 
-            do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
+            do!
+                maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
+                |> TaskResultCE.ofTask
 
             if deferSend && isFirstPrompt then
                 runtime.DeferredFirstPrompts.[agentId] <-
@@ -336,7 +341,7 @@ module HostForkAgent =
                        AgentName = agentName
                        Prompt = enrichedPrompt |}
 
-                return Ok result
+                return result
             else
                 return! sendFirstPromptOutcome runtime run agentId childId agentName enrichedPrompt result
         }

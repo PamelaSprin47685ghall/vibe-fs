@@ -208,7 +208,6 @@
         "finality",
         "host-boundary",
         "provider-attempt-recovery",
-        "semantic-trace",
         "verification-system"
       ],
       "symbols": [
@@ -237,7 +236,6 @@
         "intra-participant-parallelism",
         "provider-attempt-recovery",
         "review-judgement",
-        "semantic-trace",
         "verification-system"
       ],
       "symbols": [
@@ -1088,7 +1086,7 @@
       "contract": "Finality.Contract",
       "kind": "published-contract",
       "consumers": [
-        "semantic-trace"
+        "host-boundary"
       ],
       "symbols": [
         "Wanxiangshu.Mission.Manager.OpenCode.ManagerNarrativeTransform.tryTransform"
@@ -1174,24 +1172,6 @@
       "justification": "Mission.Authority publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
     },
     {
-      "path": "src/Wanxiangshu/Mission/Obligation/Todo/Lwr.fs",
-      "owner": "obligation-ledger",
-      "node": "mission-obligation-keep",
-      "contract": "Obligation.LedgerContract",
-      "kind": "published-contract",
-      "consumers": [
-        "delegation",
-        "semantic-trace",
-        "work-record"
-      ],
-      "symbols": [
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLwr.BoundedRange",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLwr.BoundedRange.EndExclusive",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLwr.BoundedRange.StartInclusive"
-      ],
-      "justification": "Obligation.LedgerContract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
-    },
-    {
       "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs",
       "owner": "obligation-ledger",
       "node": "mission-obligation-keep",
@@ -1207,38 +1187,6 @@
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFactCodec.payloadRefOfBlobRef",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFactCodec.payloadRefs",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFactCodec.tryDecode"
-      ],
-      "justification": "MagicTodo.Surface publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs",
-      "owner": "obligation-ledger",
-      "node": "mission-obligation-keep",
-      "contract": "MagicTodo.Surface",
-      "kind": "published-contract",
-      "consumers": [
-        "semantic-trace"
-      ],
-      "symbols": [
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalityRejection",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalityRejection.Snapshot",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalityRejection.XTraceAmbiguous",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalityRejection.XTraceMissing",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalityRejection.XTraceUnavailable",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.HostToolPartId",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.InputCanonical",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.ProviderRun",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.Range",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.ReviewFrontier",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.State",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.TodowriteCallIdsInMessage",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.ToolCallId",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.ToolName",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.ToolPartOrdinal",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.XTraceRange.EndExclusive",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.XTraceRange.Start",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.resolve"
       ],
       "justification": "MagicTodo.Surface publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
     },
@@ -1740,8 +1688,7 @@
         "finality",
         "host-boundary",
         "intra-participant-parallelism",
-        "managed-session-lifecycle",
-        "semantic-trace"
+        "managed-session-lifecycle"
       ],
       "symbols": [
         "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordProjection.lifecycleWorkRecord",
@@ -1758,19 +1705,13 @@
       "contract": "WorkRecord.Model",
       "kind": "published-contract",
       "consumers": [
-        "finality",
-        "prefix-stability",
-        "semantic-trace"
+        "prefix-stability"
       ],
       "symbols": [
         "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecord.Frames",
         "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecord.Gap",
         "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecord.Opening",
-        "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordModule.render",
-        "Wanxiangshu.Mission.WorkRecord.OpeningMaterial",
-        "Wanxiangshu.Mission.WorkRecord.OpeningMaterial.AssignmentText",
-        "Wanxiangshu.Mission.WorkRecord.OpeningMaterial.AuthoritativeRequirements",
-        "Wanxiangshu.Mission.WorkRecord.OpeningMaterial.ConstitutiveBody"
+        "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordModule.render"
       ],
       "justification": "WorkRecord.Model publishes exactly these symbols to the listed owners; every unlisted sibling remains private to work-record."
     },
@@ -2874,7 +2815,6 @@
       "consumers": [
         "host-boundary",
         "managed-session-lifecycle",
-        "semantic-trace",
         "speculative-investigation"
       ],
       "symbols": [
@@ -2967,6 +2907,173 @@
         "Wanxiangshu.Strength.StrengthPrediction.P2"
       ],
       "justification": "ModelCapacity.BorrowingCapacity publishes exactly these symbols to the listed owners; every unlisted sibling remains private to execution-model-routing."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/Cursor.fs",
+      "owner": "semantic-trace",
+      "node": "semantic-trace-replayable-contract-cutover",
+      "contract": "SemanticTrace.Contract",
+      "kind": "semantic-evidence",
+      "law": "WHAT[SEMANTIC-TRACE-003]",
+      "proof": "requirements/semantic-trace/tests/x-trace.test.mjs",
+      "consumers": [
+        "behavior-diagnosis", "context-compression", "delegation", "durable-events", "finality", "obligation-ledger",
+        "prefix-stability", "review-assurance", "review-judgement", "speculative-investigation", "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Trace.RecordCoverage",
+        "Wanxiangshu.Context.Trace.RecordCoverageModule.create",
+        "Wanxiangshu.Context.Trace.RecordCoverageModule.ingestedThrough",
+        "Wanxiangshu.Context.Trace.XTraceOpeningEvidence",
+        "Wanxiangshu.Context.Trace.XTraceOpeningEvidence.AssignmentText",
+        "Wanxiangshu.Context.Trace.XTraceOpeningEvidence.AuthoritativeRequirements",
+        "Wanxiangshu.Context.Trace.XTraceOpeningEvidence.ConstitutiveBody",
+        "Wanxiangshu.Context.Trace.XTraceCursor",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.create",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.isAfter",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.isAtOrAfter",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.isBefore",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.nextCursor",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.originCursor",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.sequence",
+        "Wanxiangshu.Context.Trace.XTraceRange",
+        "Wanxiangshu.Context.Trace.XTraceRangeModule.create",
+        "Wanxiangshu.Context.Trace.XTraceRangeModule.endExclusive",
+        "Wanxiangshu.Context.Trace.XTraceRangeModule.isEmpty",
+        "Wanxiangshu.Context.Trace.XTraceRangeModule.startInclusive"
+      ],
+      "justification": "SemanticTrace.Contract publishes opaque cursor, coverage, and half-open range operations; record representation fields remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/Projection.fs",
+      "owner": "semantic-trace",
+      "node": "semantic-trace-replayable-contract-cutover",
+      "contract": "SemanticTrace.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis", "context-compression", "delegation", "durable-events", "finality", "host-boundary",
+        "obligation-ledger", "prefix-stability", "review-judgement", "speculative-investigation", "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Trace.XTraceFoldRejection",
+        "Wanxiangshu.Context.Trace.XTraceFoldRejection.CursorNotAfterHead",
+        "Wanxiangshu.Context.Trace.XTraceFoldRejection.OpeningAlreadyCaptured",
+        "Wanxiangshu.Context.Trace.XTraceFoldRejection.TerminalAlreadyCaptured",
+        "Wanxiangshu.Context.Trace.XTraceProjection.applyOpening",
+        "Wanxiangshu.Context.Trace.XTraceProjection.applyPart",
+        "Wanxiangshu.Context.Trace.XTraceProjection.applyTerminal",
+        "Wanxiangshu.Context.Trace.XTraceProjection.currentGenerationSemanticParts",
+        "Wanxiangshu.Context.Trace.XTraceProjection.empty",
+        "Wanxiangshu.Context.Trace.XTraceProjection.frontierAfter",
+        "Wanxiangshu.Context.Trace.XTraceProjection.headCursor",
+        "Wanxiangshu.Context.Trace.XTraceProjection.hostMessageIdsBeforeTurn",
+        "Wanxiangshu.Context.Trace.XTraceProjection.hasSemanticParts",
+        "Wanxiangshu.Context.Trace.XTraceProjection.latestPartCursor",
+        "Wanxiangshu.Context.Trace.XTraceProjection.latestTerminalEvidence",
+        "Wanxiangshu.Context.Trace.XTraceProjection.openingEvidence",
+        "Wanxiangshu.Context.Trace.XTraceProjection.orderedSemanticParts",
+        "Wanxiangshu.Context.Trace.XTraceProjection.partKinds",
+        "Wanxiangshu.Context.Trace.XTraceProjection.providerRunParts",
+        "Wanxiangshu.Context.Trace.XTraceProjection.rangeFrom",
+        "Wanxiangshu.Context.Trace.XTraceProjection.rangeOfPart",
+        "Wanxiangshu.Context.Trace.XTraceProjection.semanticCursorAfterCoverage",
+        "Wanxiangshu.Context.Trace.XTraceProjection.slice",
+        "Wanxiangshu.Context.Trace.XTraceProjection.terminalEvidenceForProviderRun",
+        "Wanxiangshu.Context.Trace.XTraceProjection.toolPartsForHostIdentity",
+        "Wanxiangshu.Context.Trace.XTraceProjection.toolResultParts",
+        "Wanxiangshu.Context.Trace.XTraceProjection.tryContiguousHostRange",
+        "Wanxiangshu.Context.Trace.XTraceProjection.tryOpeningHostMessageId",
+        "Wanxiangshu.Context.Trace.XTraceProjection.tryTurnOfHostMessageId",
+        "Wanxiangshu.Context.Trace.XTraceProjectionState",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Cursor",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Generation",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.HostToolPartId",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Kind",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.PartIndex",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Provenance",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Role",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.TextDigest",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.TextRef",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.ToolCallId",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.ToolName",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Turn",
+        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence",
+        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.Frontier",
+        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.TextDigest",
+        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.TextRef"
+      ],
+      "justification": "SemanticTrace.Contract publishes the opaque projection plus copied semantic/opening/terminal evidence and owner queries; append storage fields and raw refs remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/Capture.fs",
+      "owner": "semantic-trace",
+      "node": "semantic-trace-replayable-contract-cutover",
+      "contract": "SemanticTrace.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation", "dispatch-protocol", "finality", "host-boundary", "intra-participant-parallelism",
+        "obligation-ledger", "review-judgement", "speculative-investigation", "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureLastWordsWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureOpeningWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureObservedMessagesWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureProjectionWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureSessionMessagesWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureTerminalBlobWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureTerminalTextWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureTerminalWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.stableCaptureEligibility",
+        "Wanxiangshu.Context.Trace.XTraceCaptureError",
+        "Wanxiangshu.Context.Trace.XTraceCaptureError.Refused",
+        "Wanxiangshu.Context.Trace.XTraceCaptureError.StorageFailed",
+        "Wanxiangshu.Context.Trace.XTraceCaptureReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCaptureReceipt.CurrentHead",
+        "Wanxiangshu.Context.Trace.XTraceMessageCapture.Current",
+        "Wanxiangshu.Context.Trace.XTraceMessageObservation.HostMessageId",
+        "Wanxiangshu.Context.Trace.XTraceMessageObservation.Message",
+        "Wanxiangshu.Context.Trace.XTraceMessageObservation.Origin",
+        "Wanxiangshu.Context.Trace.XTraceStableCaptureEligibility",
+        "Wanxiangshu.Context.Trace.XTraceStableCaptureEligibility.Eligible"
+      ],
+      "justification": "SemanticTrace.Contract publishes typed capture decisions, failures, and receipts implemented at the append owner; raw projection mutation does not cross the contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/Materialization.fs",
+      "owner": "semantic-trace",
+      "node": "semantic-trace-replayable-contract-cutover",
+      "contract": "SemanticTrace.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "context-compression", "prefix-stability", "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Trace.XTraceMaterialization.currentProjection",
+        "Wanxiangshu.Context.Trace.XTraceMaterialization.empty",
+        "Wanxiangshu.Context.Trace.XTraceMaterialization.renderRange",
+        "Wanxiangshu.Context.Trace.XTraceMaterialization.renderWorkRecordRange"
+      ],
+      "justification": "SemanticTrace.Contract publishes canonical current-generation and bounded WorkRecord materialization; blob/ref decoding remains in the trace owner."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/TerminalReporter.fs",
+      "owner": "semantic-trace",
+      "node": "semantic-trace-replayable-contract-cutover",
+      "contract": "SemanticTrace.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality", "intra-participant-parallelism", "provider-attempt-recovery", "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Trace.TerminalReporter.completeWithEvidence",
+        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion",
+        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion.CaptureFailed",
+        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion.Published",
+        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion.RejectedEmptyOutput",
+        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion.RejectedMissingRole"
+      ],
+      "justification": "SemanticTrace.Contract publishes one typed terminal completion operation; tuple projection and event-port mechanics remain owner implementation details."
     }
   ],
   "physical_adapters": [
@@ -3465,6 +3572,7 @@
         "provider-attempt-recovery",
         "review-assurance",
         "review-judgement",
+        "semantic-trace",
         "speculative-investigation",
         "work-record"
       ],

@@ -7,7 +7,10 @@ let normalTransform value =
     // caps.BeginPhysicalProviderAttempt value
     // caps.BindSessionStartedAt value
     // caps.ApplyStrengthReplay value
-    // caps.ApplyXTracePipeline value
+    // caps.CaptureXTraceMessages value
+    // caps.CommitStrengthTrace value
+    // caps.RefreshCompanionXTrace value
+    // caps.ApplyManagerNarrative value
     // caps.ApplyCompanion value
     // caps.ApplyXWire value
     // caps.ApplyEnforcerContinuation value

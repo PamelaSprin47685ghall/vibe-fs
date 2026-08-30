@@ -13,13 +13,14 @@ module DelegationHandoffLedger =
     let private previousEnd (journal: AgentJournal) parent route =
         let projection = (AgentJournal.snapshot journal).AgentProjections
         Map.tryFind (DelegationHandoff.key parent route) projection.DelegationCompletedHandoffs
+        |> Option.map XTraceCursor.create
 
     let private traceHead (journal: AgentJournal) sessionId =
         AgentJournal.snapshot journal
         |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
         |> Option.bind (fun session -> session.XTrace)
-        |> Option.map XTraceProjection.head
-        |> Option.defaultValue 0L
+        |> Option.defaultValue XTraceProjection.empty
+        |> XTraceProjection.headCursor
 
     let prepare
         (journal: AgentJournal)
@@ -34,16 +35,16 @@ module DelegationHandoffLedger =
             let! parentRecord =
                 if handoff.IsInitial then
                     LifecycleWorkRecordProjection.lifecycleWorkRecord (Some journal) parent true
-                elif handoff.Range.StartInclusive.Sequence = handoff.Range.EndExclusive.Sequence then
+                elif XTraceRange.isEmpty handoff.Range then
                     Task.FromResult None
                 else
                     LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) parent handoff.Range
 
             return
                 { Route = route
-                  ParentStartInclusive = handoff.Range.StartInclusive
+                  ParentStartInclusive = XTraceRange.startInclusive handoff.Range
                   ParentRecord = parentRecord
-                  ParentEndExclusive = handoff.Range.EndExclusive }
+                  ParentEndExclusive = XTraceRange.endExclusive handoff.Range }
         }
 
     let checkpointCompleted
@@ -59,7 +60,7 @@ module DelegationHandoffLedger =
                     (DelegationFact.DelegationHandoffCompleted
                         {| ParentSessionId = parent
                            Route = handoff.Route
-                           ParentEndExclusive = handoff.ParentEndExclusive.Sequence |})
+                           ParentEndExclusive = XTraceCursor.sequence handoff.ParentEndExclusive |})
                     journal
 
             return appended |> Result.map ignore |> Result.mapError JournalAppendFailure.describe

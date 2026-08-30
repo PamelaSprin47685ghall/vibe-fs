@@ -554,8 +554,12 @@ module StrengthSpeculate =
         let costsAvailable = settings.Costs.IsSome
 
         let stableCaptureEligible =
-            XTraceCapture.supportsStableInsertion (Some durable) owner
-            && (rawMessages |> List.forall (ProviderWireDecode.hostMessageId >> Option.isSome))
+            rawMessages
+            |> List.map ProviderWireDecode.hostMessageId
+            |> XTraceCapture.stableCaptureEligibility (Some durable) owner
+            |> function
+                | XTraceStableCaptureEligibility.Eligible _ -> true
+                | _ -> false
 
         { IsRootWork = rootWork owner projections.AgentProjections.Associations
           RequestKind = requestKind

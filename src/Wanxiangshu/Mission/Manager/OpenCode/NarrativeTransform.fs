@@ -107,9 +107,9 @@ module ManagerNarrativeTransform =
     let private openingCursorOf (traceState: XTraceProjectionState option) (turnIndex: int) =
         traceState
         |> Option.bind (fun state ->
-            state.Parts
+            XTraceProjection.currentGenerationSemanticParts state
             |> List.tryFind (fun part -> part.Turn = turnIndex && part.PartIndex = 0)
-            |> Option.map (fun part -> part.Cursor.Sequence))
+            |> Option.map (fun part -> part.Cursor))
 
     let private narrativePartObj (part: ManagerNarrative.NarrativePart) =
         if part.Synthetic then
@@ -225,11 +225,12 @@ module ManagerNarrativeTransform =
     let private migrationCandidate (traceState: XTraceProjectionState option) (completedLives: LifeProjection list) =
         match
             traceState
-            |> Option.bind (fun state -> state.Opening |> Option.map (fun opening -> state, opening))
+            |> Option.bind (fun state ->
+                XTraceProjection.openingEvidence state |> Option.map (fun opening -> state, opening))
         with
         | Some(state, opening) when
             List.isEmpty completedLives
-            && state.Parts |> List.exists (fun part -> part.Turn <> 0)
+            && XTraceProjection.orderedSemanticParts state |> List.exists (fun part -> part.Turn <> 0)
             ->
             Some opening
         | _ -> None
@@ -279,10 +280,19 @@ module ManagerNarrativeTransform =
                 let cursor =
                     openingCursorOf traceState messageIndex
                     |> Option.defaultValue (
-                        traceState |> Option.map XTraceProjection.headSequence |> Option.defaultValue 0L
+                        traceState
+                        |> Option.bind XTraceProjection.latestPartCursor
+                        |> Option.defaultValue XTraceCursor.originCursor
                     )
 
-                let! result = ManagerLifeWorkflow.ensureOpening durable sid lifeId messageIdValue rawText cursor
+                let! result =
+                    ManagerLifeWorkflow.ensureOpening
+                        durable
+                        sid
+                        lifeId
+                        messageIdValue
+                        rawText
+                        cursor
 
                 requireWorkflowUnit result
                 return Some(rewriteMessage rawMessages messageIndex narrative)

@@ -35,7 +35,7 @@ module MagicTodoMembraneSurface =
         | 2 -> SnapshotToolPartState.Failed ""
         | _ -> SnapshotToolPartState.Pending
 
-    let private cursor (sequence: int) : XTraceCursor = { Sequence = int64 sequence }
+    let private cursor (sequence: int) : XTraceCursor = XTraceCursor.create (int64 sequence)
 
     let private localizedOf
         (callId: string)
@@ -53,9 +53,7 @@ module MagicTodoMembraneSurface =
           TodowriteCallIdsInMessage = [ ToolCallId.create callId ]
           ToolPartOrdinal = 1
           ReviewFrontier = frontier
-          Range =
-            { Start = frontier
-              EndExclusive = cursor 8 } }
+          Range = XTraceRange.create frontier (cursor 8) }
 
     let private obligationsOf (values: obj array) : ObligationList =
         if isNull values then

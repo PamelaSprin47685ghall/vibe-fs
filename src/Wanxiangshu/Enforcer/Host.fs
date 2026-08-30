@@ -48,10 +48,21 @@ module EnforcerHost =
         (projection: ProviderProjection.ProviderSemanticProjection)
         (chunk: BloggerDeltaChunk)
         : BloggerRequestContext option =
-        match EnforcerFrameRecovery.lastCoveredSequence xTrace chunk.NextCursor with
+        let previousCoverage =
+            blog.Coverage.IngestedThroughSequence
+            |> XTraceCursor.create
+            |> RecordCoverage.create
+
+        match EnforcerFrameRecovery.lastCoveredCursor xTrace chunk.NextCursor with
         | None -> None
-        | Some nextSeq when nextSeq <= blog.Coverage.IngestedThroughSequence -> None
-        | Some nextSeq ->
+        | Some nextCursor when not (XTraceCursor.isAfter nextCursor (RecordCoverage.ingestedThrough previousCoverage)) ->
+            None
+        | Some nextCursor ->
+            let previousSeq =
+                previousCoverage |> RecordCoverage.ingestedThrough |> XTraceCursor.sequence
+
+            let nextSeq = XTraceCursor.sequence nextCursor
+
             let nextDigest =
                 EnforcerFrameRecovery.coveredPrefixDigest
                     blog.Coverage.CoverableTurnCutoffExclusive
@@ -70,7 +81,7 @@ module EnforcerHost =
                               SessionId.value bloggerSessionId
                               "main"
                               BlobDigest.value deltaDigest
-                              string blog.Coverage.IngestedThroughSequence
+                              string previousSeq
                               string nextSeq ]
                     )
                 )
@@ -82,7 +93,7 @@ module EnforcerHost =
                       BloggerSessionId = bloggerSessionId
                       Items = chunk.Items
                       Toml = chunk.Toml
-                      PreviousIngestedThroughSequence = blog.Coverage.IngestedThroughSequence
+                      PreviousIngestedThroughSequence = previousSeq
                       NextIngestedThroughSequence = nextSeq
                       PreviousCoverableTurnCutoffExclusive = blog.Coverage.CoverableTurnCutoffExclusive
                       NextCoverableTurnCutoffExclusive = chunk.NextCoverableTurnCutoffExclusive

@@ -144,7 +144,7 @@ module ProjectionUpdate =
                 (ReviewProjection.recordTerminalFrontier
                     terminalRef
                     terminalDigest
-                    (XTraceProjection.headSequence xTrace + 1L))
+                    (xTrace |> XTraceProjection.headCursor |> XTraceCursor.sequence))
                 projection
         | _ -> projection
 

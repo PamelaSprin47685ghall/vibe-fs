@@ -438,10 +438,10 @@ module FinalitySurface =
                    openingUserMessageId = PhysicalUserMessageId.value life.OpeningUserMessageId
                    openingTextRef = BlobRef.value life.OpeningTextRef
                    openingTextDigest = BlobDigest.value life.OpeningTextDigest
-                   openingCursorSequence = int life.OpeningCursor.Sequence
+                   openingCursorSequence = int (XTraceCursor.sequence life.OpeningCursor)
                    protectedPrefixEnd =
                     life.ProtectedPrefixEnd
-                    |> Option.map (fun cursor -> box (int cursor.Sequence))
+                    |> Option.map (XTraceCursor.sequence >> int >> box)
                     |> Option.defaultValue null
                    activeFinality = life.ActiveFinality |> Option.map requestView |> Option.defaultValue null
                    enlistedReviewers =
@@ -725,20 +725,16 @@ module FinalitySurface =
         match authorityProfileOf authorityKind rootMessageId selectedAgent peerAgent tier with
         | Error error -> box {| ok = false; error = error |}
         | Ok profile ->
-            let xTrace =
+            let openingEvidence =
                 if isNull opening then
                     None
                 else
                     Some
-                        { XTraceProjectionState.Opening =
-                            Some
-                                { AssignmentText = str (opening?assignmentText)
-                                  AuthoritativeRequirements = []
-                                  ConstitutiveBody = "" }
-                          Parts = []
-                          Terminals = [] }
+                        { XTraceOpeningEvidence.AssignmentText = str (opening?assignmentText)
+                          AuthoritativeRequirements = []
+                          ConstitutiveBody = "" }
 
-            match ManagerLifeAdmission.ending lifecycle (Some profile) xTrace with
+            match ManagerLifeAdmission.ending lifecycle (Some profile) openingEvidence with
             | EndingLifeAdmission.ExistingLife _ -> box {| kind = "existing-life" |}
             | EndingLifeAdmission.InitialAgentOwnerMigration _ -> box {| kind = "initial-agent-owner-migration" |}
             | EndingLifeAdmission.NoLife -> box {| kind = "no-life" |}

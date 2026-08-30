@@ -172,7 +172,7 @@ module OrdinaryTurnWorkflow =
         (hasLivePty: string -> bool)
         (quiescence: SessionQuiescenceGate)
         (context: ReconciledTurnContext)
-        (completeAgent: unit -> Task<bool * bool>)
+        (completeAgent: unit -> Task<XTraceTerminalCompletion>)
         =
         task {
             let turn = context.Turn
@@ -180,16 +180,23 @@ module OrdinaryTurnWorkflow =
             let joinOutstanding =
                 TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId
 
-            let! wasAborted, terminalValid =
+            let! completion =
                 if joinOutstanding then
-                    Task.FromResult(false, false)
+                    Task.FromResult XTraceTerminalCompletion.RejectedEmptyOutput
                 else
                     completeAgent ()
+
+            let terminalValid =
+                match completion with
+                | XTraceTerminalCompletion.Published _ -> true
+                | XTraceTerminalCompletion.CaptureFailed _
+                | XTraceTerminalCompletion.RejectedMissingRole
+                | XTraceTerminalCompletion.RejectedEmptyOutput -> false
 
             if terminalValid then
                 do! recordSuccessIfValid journal turn
 
-            if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
+            if TerminalPolicy.sessionDead journal turn.SessionId then
                 return ()
             elif joinOutstanding then
                 return! applyJoinGuardNudge sessionPort eventPort journal joinGuardNudges quiescence context
@@ -208,7 +215,7 @@ module OrdinaryTurnWorkflow =
         (abortCause: AbortCause)
         (quiescence: SessionQuiescenceGate)
         (context: ReconciledTurnContext)
-        (completeAgent: unit -> Task<bool * bool>)
+        (completeAgent: unit -> Task<XTraceTerminalCompletion>)
         =
         let turn = context.Turn
 
@@ -261,7 +268,7 @@ module OrdinaryTurnWorkflow =
             InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
         | false, None ->
             let completeAgent () =
-                TerminalReporter.complete eventPort journal turn
+                TerminalReporter.completeWithEvidence eventPort journal turn
 
             handleOutcome
                 sessionPort

@@ -692,24 +692,26 @@ module FissionTool =
         =
         task {
             scope.RunStarted laneId profile.CanonicalRole directory
-            do! XTraceCapture.captureOpening scope.Journal laneId startup []
 
-            let dispatcher = PromptDispatcher.forJournal durable
+            match! XTraceCapture.captureOpeningWithReceipt scope.Journal laneId startup [] with
+            | Error _ -> return Error "fission_trace_capture_failed"
+            | Ok _ ->
+                let dispatcher = PromptDispatcher.forJournal durable
 
-            match!
-                dispatcher.SendContinuation
-                    scope.Sessions
-                    laneId
-                    startup
-                    PromptAuthority.ContinuationKind.FissionHandoff
-                    profile
-                    effectiveAgent
-                    directory
-                    PromptDispatcher.AwaitMode.Detached
-                    None
-            with
-            | Ok _ -> return Ok()
-            | Error error -> return Error error
+                match!
+                    dispatcher.SendContinuation
+                        scope.Sessions
+                        laneId
+                        startup
+                        PromptAuthority.ContinuationKind.FissionHandoff
+                        profile
+                        effectiveAgent
+                        directory
+                        PromptDispatcher.AwaitMode.Detached
+                        None
+                with
+                | Ok _ -> return Ok()
+                | Error error -> return Error error
         }
 
     let private abortLanePort (scope: ToolRuntimeScope) (laneId: SessionId) =

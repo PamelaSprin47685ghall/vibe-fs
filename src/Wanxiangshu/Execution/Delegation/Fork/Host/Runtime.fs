@@ -39,7 +39,6 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Participant.Persona.AgentRoleIdentity
-open Wanxiangshu.Mission.Obligation.Todo
 
 /// Bridges real child sessions to the existing completion mailbox.
 /// Fork / Reuse / Pty operations live in extension files (semantic split).
@@ -47,7 +46,7 @@ type HostForkRuntime
     (
         parentId: SessionId,
         sessions: ISessionHostPort,
-        childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>,
+        childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>,
         ?journal: AgentJournal,
         ?onChildCreated: string -> Role -> SessionId -> unit,
         ?onChildCreatedDir: string -> SessionId -> string option -> unit,
@@ -204,15 +203,14 @@ type HostForkRuntime
 
     let handoffPort = handoff
 
-    let xTraceHead (sessionId: SessionId) : int64 =
-        match journal with
-        | None -> 0L
-        | Some durable ->
+    let xTraceHead (sessionId: SessionId) : XTraceCursor =
+        journal
+        |> Option.bind (fun durable ->
             AgentJournal.snapshot durable
             |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
-            |> Option.bind (fun session -> session.XTrace)
-            |> Option.map XTraceProjection.head
-            |> Option.defaultValue 0L
+            |> Option.bind (fun session -> session.XTrace))
+        |> Option.defaultValue XTraceProjection.empty
+        |> XTraceProjection.headCursor
 
     let workRecordForOutcome (run: PendingHostRun) (outcome: TerminalOutcome) =
         HostForkRunLifecycle.workRecordForOutcome childWorkRecordOfRun xTraceHead run outcome

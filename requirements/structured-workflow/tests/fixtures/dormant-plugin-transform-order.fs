@@ -9,7 +9,10 @@ let normalTransform value =
         caps.BindSessionStartedAt value
         caps.ApplyStrengthReplay value
     let delayed = fun () ->
-        caps.ApplyXTracePipeline value
+        caps.CaptureXTraceMessages value
+        caps.CommitStrengthTrace value
+        caps.RefreshCompanionXTrace value
+        caps.ApplyManagerNarrative value
         caps.ApplyCompanion value
         caps.ApplyXWire value
     if false then

@@ -653,9 +653,12 @@ module MagicTodoHostHooks =
             // transport construction state durable semantic XTrace. Locality below
             // accounts for current-message parts before this call without persisting
             // the unmaterialized call itself.
-            match! XTraceCapture.captureSessionMessages (Some durable) sessionId priorMessages with
-            | Error reason -> fatalInfrastructure sessionText ("XTrace transcript-prefix capture failed: " + reason)
-            | Ok() -> ()
+            match! XTraceCapture.captureSessionMessagesWithReceipt (Some durable) sessionId priorMessages with
+            | Error error ->
+                fatalInfrastructure
+                    sessionText
+                    (sprintf "XTrace transcript-prefix capture failed: %A" error)
+            | Ok _ -> ()
 
             let locality =
                 MagicTodoLocality.resolve sessionId messages (AgentJournal.snapshot durable) callId

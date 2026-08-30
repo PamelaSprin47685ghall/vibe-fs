@@ -1,6 +1,6 @@
 // requirements/host-boundary/tests/ordered-transform.test.mjs — WHAT[HOST-BOUNDARY-019]
 //
-// OrderedTransformProof: verifies the 13-step static semantic score of
+// OrderedTransformProof: verifies the 16-step static semantic score of
 // PluginTransforms.normalTransform alongside the StrengthReplica and
 // ExplicitResumeSuppression branch isolation paths without illegal deep-dist imports.
 
@@ -12,14 +12,17 @@ import test from 'node:test'
 const root = resolve(import.meta.dirname, '../../..')
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-test('WHAT[HOST-BOUNDARY-019] PluginTransforms declares NormalTransformCapabilities record with exact 13 named fields', () => {
+test('WHAT[HOST-BOUNDARY-019] PluginTransforms declares NormalTransformCapabilities record with exact 16 named fields', () => {
   const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 
   assert.match(text, /type\s+NormalTransformCapabilities\s*=/)
   assert.match(text, /BeginPhysicalProviderAttempt:\s*string option -> obj -> Task<unit>/)
   assert.match(text, /BindSessionStartedAt:\s*string option -> Task<DateTimeOffset option>/)
   assert.match(text, /ApplyStrengthReplay:\s*string option -> obj -> Task<StrengthReplayPlan list>/)
-  assert.match(text, /ApplyXTracePipeline:\s*string option -> obj -> StrengthReplayPlan list -> Task<unit>/)
+  assert.match(text, /CaptureXTraceMessages:\s*string option -> obj -> Task<TraceTransformCapture>/)
+  assert.match(text, /CommitStrengthTrace:\s*string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>/)
+  assert.match(text, /RefreshCompanionXTrace:\s*string option -> XTraceProjectionState option -> unit/)
+  assert.match(text, /ApplyManagerNarrative:\s*string option -> XTraceProjectionState option -> obj list -> obj -> Task<unit>/)
   assert.match(text, /ApplyCompanion:\s*string option -> obj -> obj -> Task<unit>/)
   assert.match(text, /ApplyXWire:\s*obj -> Task<PrefixPresentationHorizon>/)
   assert.match(text, /ApplyEnforcerContinuation:\s*string option -> obj -> Task<unit>/)
@@ -51,14 +54,17 @@ test('WHAT[HOST-BOUNDARY-019] tentative prefix probe horizon suppresses historic
   assert.ok(groundingAt < chronicleAt, 'Blogger-only chronicle projection remains outside the WorkMain auxiliary guard')
 })
 
-test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 13-step static score in order', () => {
+test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 16-step static score in order', () => {
   const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 
   const orderingSteps = [
     'BeginPhysicalProviderAttempt',
     'BindSessionStartedAt',
     'ApplyStrengthReplay',
-    'ApplyXTracePipeline',
+    'CaptureXTraceMessages',
+    'CommitStrengthTrace',
+    'RefreshCompanionXTrace',
+    'ApplyManagerNarrative',
     'ApplyCompanion',
     'ApplyXWire',
     'ApplyEnforcerContinuation',
@@ -194,7 +200,10 @@ test('WHAT[HOST-BOUNDARY-019] ordered transform proof falsifiability check: swap
     'BeginPhysicalProviderAttempt',
     'BindSessionStartedAt',
     'ApplyStrengthReplay',
-    'ApplyXTracePipeline',
+    'CaptureXTraceMessages',
+    'CommitStrengthTrace',
+    'RefreshCompanionXTrace',
+    'ApplyManagerNarrative',
     'ApplyCompanion',
     'ApplyXWire',
     'ApplyEnforcerContinuation',
@@ -208,8 +217,11 @@ test('WHAT[HOST-BOUNDARY-019] ordered transform proof falsifiability check: swap
   const swappedOrder = [
     'BeginPhysicalProviderAttempt',
     'BindSessionStartedAt',
-    'ApplyXTracePipeline', // Swapped: 4 before 3
-    'ApplyStrengthReplay',
+    'CaptureXTraceMessages',
+    'RefreshCompanionXTrace', // Swapped: refresh before commit
+    'CommitStrengthTrace',
+    'ApplyManagerNarrative',
+    'ApplyStrengthReplay', // Also out of order with capture
     'ApplyCompanion',
     'ApplyXWire',
     'ApplyEnforcerContinuation',

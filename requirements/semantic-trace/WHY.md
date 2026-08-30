@@ -15,6 +15,7 @@
 3. **分段 Provenance 与物理标识解耦**：溯源信息按 provider run 进行分段标记；语义渲染输出保持纯净，不泄露内部 call_id 与传输标识。
 4. **稳定区间与单一数据源**：以半开区间形式提供精确的语义截面，下游的增量消费（delta）与生命周期记录（LWR gap）均同源派生自 XTrace。
 5. **未发生材料绝不入迹**：未确认的投机执行、失败的探测尝试等未定事实严禁写入 XTrace；宿主上下文压缩（compaction）绝不删除已持久化的语义历史。
+6. **Owner-owned representation**：projection state、cursor 与 append refs 不作为跨 owner 数据结构发布；消费者只获得 trace owner 计算出的稳定 semantic views、evidence、ranges、capture receipts 与 completion outcomes，避免在 15 个消费者内复制 frontier/identity 公式。
 
 ## 破坏后果
 

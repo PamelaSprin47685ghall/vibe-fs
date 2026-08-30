@@ -328,6 +328,63 @@ test('WHAT[STRUCTURED-WORKFLOW-011] foreign execution-position vocabulary is rej
   assert.ok(codes(result).includes('foreign-execution-position'))
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-011] durable semantic cursor evidence crosses the execution-position guard only by exact proof', () => {
+  const cursor = file('src/Wanxiangshu/Context/Trace/Cursor.fs')
+  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
+  const symbol = 'Wanxiangshu.Context.Trace.XTraceCursor.sequence'
+  const result = analyze({
+    files: [cursor, consumer],
+    owners: [
+      { path: cursor.path, owner: 'semantic-trace' },
+      { path: consumer.path, owner: 'consumer' },
+    ],
+    contracts: registry({
+      contracts: [
+        {
+          path: cursor.path,
+          owner: 'semantic-trace',
+          kind: 'semantic-evidence',
+          consumers: ['consumer'],
+          symbols: [symbol],
+          law: 'WHAT[SEMANTIC-TRACE-003]',
+          proof: 'requirements/semantic-trace/tests/x-trace.test.mjs',
+          justification: 'The durable semantic cursor records replay evidence and never selects executable workflow control.',
+        },
+      ],
+    }),
+    uses: [symbolUse(consumer, cursor, symbol)],
+  })
+
+  assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence fails closed without normative metadata or with symbol roots', () => {
+  const cursor = file('src/Wanxiangshu/Context/Trace/Cursor.fs')
+  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
+  const result = analyze({
+    files: [cursor, consumer],
+    owners: [
+      { path: cursor.path, owner: 'semantic-trace' },
+      { path: consumer.path, owner: 'consumer' },
+    ],
+    contracts: registry({
+      contracts: [
+        {
+          path: cursor.path,
+          owner: 'semantic-trace',
+          kind: 'semantic-evidence',
+          consumers: ['consumer'],
+          symbol_roots: ['Wanxiangshu.Context.Trace.XTraceCursor'],
+          justification: 'This malformed fixture must not weaken exact durable-evidence authorization.',
+        },
+      ],
+    }),
+  })
+
+  assert.ok(codes(result).includes('invalid-semantic-evidence-metadata'))
+  assert.ok(codes(result).includes('invalid-semantic-evidence-authorization'))
+})
+
 test('WHAT[STRUCTURED-WORKFLOW-011] immutable data fields named Cursor are not execution positions', () => {
   const provider = file('src/Wanxiangshu/Provider/Anchor.fs')
   const consumer = file('src/Wanxiangshu/Consumer/Use.fs')

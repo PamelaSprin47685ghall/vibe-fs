@@ -34,14 +34,21 @@ module BloggerMainContext =
         (xTrace: XTraceProjectionState)
         (projection: ProviderProjection.ProviderSemanticProjection)
         =
+        let ingested =
+            blog.Coverage.IngestedThroughSequence
+            |> XTraceCursor.create
+
         let effectiveIngested =
             openingFloor journal mainSessionId
-            |> Option.map (max blog.Coverage.IngestedThroughSequence)
-            |> Option.defaultValue blog.Coverage.IngestedThroughSequence
+            |> Option.map XTraceCursor.create
+            |> Option.map (fun floor ->
+                if XTraceCursor.isAfter floor ingested then floor else ingested)
+            |> Option.defaultValue ingested
+            |> RecordCoverage.create
 
         BloggerDelta.nextChunk
             BloggerDelta.DeltaLimitBytes
-            (XTraceProjection.semanticCursorFor effectiveIngested xTrace)
+            (XTraceProjection.semanticCursorAfterCoverage effectiveIngested xTrace)
             blog.Coverage.CoverableTurnCutoffExclusive
             projection.Messages
 

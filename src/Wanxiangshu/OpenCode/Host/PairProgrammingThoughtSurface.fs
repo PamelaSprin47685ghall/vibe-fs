@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host.PairProgramming
@@ -65,7 +66,7 @@ module PairProgrammingThoughtSurface =
         | Some value ->
             box
                 {| guidelines = value.Guidelines.IsSome
-                   xTrace = value.XTrace.IsSome
+                   xTrace = XTraceProjection.hasSemanticParts value.XTrace
                    blog = value.Blog.IsSome |}
 
     let private anchoredFactOf (payload: obj) : AgentFact * SessionId =

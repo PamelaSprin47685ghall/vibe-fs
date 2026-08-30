@@ -12,7 +12,6 @@ open Wanxiangshu.Strength.Persistence
 
 open System
 open System.Threading.Tasks
-open System.Collections.Generic
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
@@ -85,7 +84,12 @@ module StrengthReplay =
         |> Option.bind (fun durable ->
             AgentProjection.tryFind owner (AgentJournal.snapshot durable).AgentProjections
             |> Option.bind (fun state -> state.Blog)
-            |> Option.map (fun blog -> blog.Coverage.IngestedThroughSequence))
+            |> Option.map (fun blog ->
+                blog.Coverage.IngestedThroughSequence
+                |> XTraceCursor.create
+                |> RecordCoverage.create
+                |> RecordCoverage.ingestedThrough
+                |> XTraceCursor.sequence))
 
     let private applyRenderedPlans
         (sessionId: string)
@@ -196,9 +200,9 @@ module StrengthReplay =
 
     let private resolveObservedParts
         (durable: AgentJournal)
-        (parts: XTracePartRef list)
+        (parts: XTraceSemanticPartView list)
         : Task<Result<StrengthTraceObservedPart list, string>> =
-        let rec loop (remaining: XTracePartRef list) (acc: StrengthTraceObservedPart list) =
+        let rec loop (remaining: XTraceSemanticPartView list) (acc: StrengthTraceObservedPart list) =
             taskResult {
                 match remaining with
                 | [] -> return List.rev acc
@@ -208,7 +212,7 @@ module StrengthReplay =
                     return!
                         loop
                             tail
-                            ({ CursorSequence = part.Cursor.Sequence
+                            ({ CursorSequence = XTraceCursor.sequence part.Cursor
                                Kind = part.Kind
                                ToolName = part.ToolName
                                Body = body }
@@ -235,50 +239,26 @@ module StrengthReplay =
                   "result"
                   plan.Bundle.Digest ])
 
-    let private isContiguousFromFirst (sequences: int64 list) =
-        let first = List.head sequences
-
-        sequences
-        |> List.mapi (fun index value -> value = first + int64 index)
-        |> List.forall id
-
-    let private contiguousTraceRange (sequences: int64 list) : StrengthTraceRange option =
-        if List.isEmpty sequences then
-            None
-        elif not (isContiguousFromFirst sequences) then
-            None
-        else
-            Some
-                { StartInclusive = List.head sequences
-                  EndExclusive = List.last sequences + 1L }
-
-    let private tryStableTraceRange (plan: StrengthReplayPlan) (parts: XTracePartRef list) =
-        // DSL-MUTABLE: algorithm-scratch — expected host id set for replay verification
-        let expectedIdSet = HashSet<string>(expectedHostIds plan)
-
-        let byStableId =
-            parts
-            |> List.filter (fun part -> XTraceProjection.tryHostMessageId part |> Option.exists expectedIdSet.Contains)
-
-        let expectedCount = StrengthLifecycle.framePartCount plan.Bundle
-
-        if List.length byStableId = expectedCount && expectedCount > 0 then
-            byStableId
-            |> List.map (fun part -> part.Cursor.Sequence)
-            |> contiguousTraceRange
-        else
-            None
+    let private tryStableTraceRange
+        (plan: StrengthReplayPlan)
+        (traceState: XTraceProjectionState)
+        : StrengthTraceRange option =
+        XTraceProjection.tryContiguousHostRange (expectedHostIds plan |> Set.ofList) traceState
+        |> Option.map (fun range ->
+            ({ StartInclusive = range |> XTraceRange.startInclusive |> XTraceCursor.sequence
+               EndExclusive = range |> XTraceRange.endExclusive |> XTraceCursor.sequence }
+             : StrengthTraceRange))
 
     let private recoverPlanTraceRange
         (durable: AgentJournal)
         (plan: StrengthReplayPlan)
-        (parts: XTracePartRef list)
+        (traceState: XTraceProjectionState)
         : Task<Result<StrengthTraceRange option, string>> =
         taskResult {
-            match tryStableTraceRange plan parts with
+            match tryStableTraceRange plan traceState with
             | Some value -> return Some value
             | None ->
-                let! observed = resolveObservedParts durable parts
+                let! observed = resolveObservedParts durable (XTraceProjection.orderedSemanticParts traceState)
                 return! StrengthTraceRecovery.recoverRange plan.Bundle observed
         }
 
@@ -304,11 +284,11 @@ module StrengthReplay =
         (durable: AgentJournal)
         (durability: StrengthDurabilityPort)
         (failClosed: string -> unit)
-        (parts: XTracePartRef list)
+        (traceState: XTraceProjectionState)
         (plan: StrengthReplayPlan)
         : Task =
         task {
-            match! recoverPlanTraceRange durable plan parts with
+            match! recoverPlanTraceRange durable plan traceState with
             | Error error -> failClosed ("Strength Traced recovery failed: " + error)
             | Ok None -> failClosed "Strength Promoted frame is absent from XTrace after replay capture"
             | Ok(Some traced) -> do! appendTracedOrFailClosed durability failClosed plan traced
@@ -325,7 +305,7 @@ module StrengthReplay =
             let pending = plans |> List.filter (fun plan -> plan.ExistingTraceRange.IsNone)
 
             for plan in pending do
-                do! commitPlanTrace durable durability failClosed updated.Parts plan
+                do! commitPlanTrace durable durability failClosed updated plan
         }
 
     /// Close Promoted → Traced after XTrace capture for plans that lacked a

@@ -8,9 +8,10 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import * as todo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
 import * as opening from '../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js'
+import * as traceOwner from '../../../dist/Context/Trace/SemanticTraceSurface.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-const item = (sequence, role, part) => opening.item(sequence, role, part)
+const item = (sequence, role, part) => traceOwner.item({ sequence, role, part })
 
 test('WHAT[OBLIGATION-LEDGER-017] Pre-T1 BlindPlan does not enlarge the structural Opening floor', () => {
   const floor = todo.effectiveOpeningFloor(true, false, 1, null, null, 7, [
@@ -44,17 +45,18 @@ test('WHAT[OBLIGATION-LEDGER-016] T1 constitutive boundary is independent from t
 test('WHAT[OBLIGATION-LEDGER-016] T1 constitutive body renders in Opening, not Recent', () => {
   const openingCharge = opening.opening('Ship the bridge.', [], '')
   const constitutive = [
-    item(5, 'assistant', opening.toolCallPart('todowrite', '{"planComplete":true,"workingOn":"","obligations":[]}')),
-    item(6, 'tool', opening.toolResultPart('The Manager who will carry it is you.')),
+    item(5, 'assistant', traceOwner.toolCallPart('t1', 'todowrite', '{"planComplete":true,"workingOn":"","obligations":[]}')),
+    item(6, 'tool', traceOwner.toolResultPart('t1', 'The Manager who will carry it is you.')),
   ]
-  const withT1 = opening.withConstitutive(openingCharge, constitutive)
+  const withT1 = opening.withConstitutive(openingCharge, traceOwner.render(traceOwner.forOpening(constitutive)))
   const trace = [
-    item(1, 'user', opening.textPart('Ship the bridge.')),
+    item(1, 'user', traceOwner.textPart('Ship the bridge.')),
     ...constitutive,
-    item(8, 'assistant', opening.textPart('post-T1 labor')),
+    item(8, 'assistant', traceOwner.textPart('post-T1 labor')),
   ]
 
-  const rendered = opening.materialize(withT1, [], trace, 0, 7, true)
+  const gap = traceOwner.render(traceOwner.forWorkRecord(traceOwner.sliceFrom({ sequence: 7 }, trace)))
+  const rendered = opening.materialize(withT1, [], gap, true)
   assert.match(rendered, /^Opening\n/)
   assert.match(rendered, /Ship the bridge/)
   assert.match(rendered, /\[tool call\] todowrite/)
@@ -68,11 +70,11 @@ test('WHAT[OBLIGATION-LEDGER-016] T1 constitutive body renders in Opening, not R
 
 test('WHAT[OBLIGATION-LEDGER-016] XTrace.forOpening keeps T1 tools; forWorkRecord drops them', () => {
   const items = [
-    item(5, 'assistant', opening.toolCallPart('todowrite', '{}')),
-    item(6, 'tool', opening.toolResultPart('entrusted')),
+    item(5, 'assistant', traceOwner.toolCallPart('t1', 'todowrite', '{}')),
+    item(6, 'tool', traceOwner.toolResultPart('t1', 'entrusted')),
   ]
-  assert.equal(opening.forOpening(items).length, 2)
-  assert.equal(opening.forWorkRecord(items).length, 0)
+  assert.equal(traceOwner.forOpening(items).length, 2)
+  assert.equal(traceOwner.forWorkRecord(items).length, 0)
 })
 
 test('WHAT[OBLIGATION-LEDGER-017] static: BloggerCoordinator + CompanionTransform zero ProtectedPrefixEnd refs', () => {

@@ -2,6 +2,7 @@ namespace Wanxiangshu.Mission.Obligation.Todo
 
 open System
 open Fable.Core.JsInterop
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
@@ -95,7 +96,7 @@ module MagicTodoProjectionSurface =
                toolCallId = ToolCallId.value checkpoint.ToolCallId
                planCompleteDeclared = checkpoint.PlanCompleteDeclared
                providerInputDigest = checkpoint.ProviderInputDigest
-               reviewFrontier = int checkpoint.ReviewFrontier.Sequence
+               reviewFrontier = int (XTraceCursor.sequence checkpoint.ReviewFrontier)
                baseTodoRef = BlobRef.value checkpoint.BaseTodoRef
                baseTodoDigest = BlobDigest.value checkpoint.BaseTodoDigest
                proposedTodoRef = BlobRef.value checkpoint.ProposedTodoRef

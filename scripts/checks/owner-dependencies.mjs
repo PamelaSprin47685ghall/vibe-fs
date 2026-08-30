@@ -659,8 +659,39 @@ const useKind = (use) =>
   use.isFromPattern ? 'pattern' : use.isFromType ? 'type' : use.isFromUse ? 'use' : 'symbol'
 
 const isExecutionPosition = (edge) =>
-  EXECUTION_POSITION.test(edge.providerPath) ||
-  (edge.symbolKind !== 'FSharpField' && EXECUTION_POSITION.test(edge.symbol))
+  !(edge.symbolKind === 'FSharpUnionCase' && /(?:Rejection|Error)\.[^.]*Cursor/.test(edge.symbol)) &&
+  (EXECUTION_POSITION.test(edge.providerPath) ||
+    (edge.symbolKind !== 'FSharpField' && EXECUTION_POSITION.test(edge.symbol)))
+
+const semanticEvidenceMetadata = (entry, fail) => {
+  const lawMatch = /^WHAT\[([A-Z0-9]+(?:-[A-Z0-9]+)*)\]$/.exec(entry?.law ?? '')
+  const proof = norm(entry?.proof ?? '')
+  const proofMatch = /^requirements\/([^/]+)\/tests\/.+\.test\.mjs$/.exec(proof)
+  const proofPath = resolve(ROOT, proof)
+  const proofExists =
+    proofMatch &&
+    proof === entry.proof &&
+    !isAbsolute(entry.proof) &&
+    existsSync(proofPath) &&
+    statSync(proofPath).isFile()
+  const whatPath = proofMatch ? join(ROOT, 'requirements', proofMatch[1], 'WHAT.md') : ''
+  const lawId = lawMatch?.[1]
+  const normative =
+    proofExists &&
+    lawId &&
+    existsSync(whatPath) &&
+    new RegExp(`^##\\s+${lawId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`, 'm').test(readFileSync(whatPath, 'utf8')) &&
+    readFileSync(proofPath, 'utf8').includes(`WHAT[${lawId}]`)
+  if (!normative) {
+    fail(
+      'invalid-semantic-evidence-metadata',
+      `${entry?.path ?? ''}: semantic-evidence needs an exact normative WHAT law and existing proof that cites it`,
+      { path: entry?.path },
+    )
+    return false
+  }
+  return true
+}
 
 export function analyzeOwnerDependencies({
   compilePaths,
@@ -831,12 +862,24 @@ export function analyzeOwnerDependencies({
 
   const contractKeys = new Set()
   for (const entry of registry.contracts ?? []) {
-    if (!['published-contract', 'physical-port'].includes(entry?.kind)) {
+    if (!['published-contract', 'physical-port', 'semantic-evidence'].includes(entry?.kind)) {
       fail('invalid-contract-kind', `${entry?.path ?? ''}: illegal contract kind '${entry?.kind ?? ''}'`, { path: entry?.path })
       continue
     }
     const path = validateOwnedPath(entry, 'contract', true)
     const authorization = authorizationOf(entry, `contract ${entry?.path ?? ''}`, fail)
+    const semanticEvidence = entry.kind !== 'semantic-evidence' || semanticEvidenceMetadata(entry, fail)
+    if (
+      entry.kind === 'semantic-evidence' &&
+      authorization &&
+      (authorization.symbols.length === 0 || authorization.symbolRoots.length > 0)
+    ) {
+      fail(
+        'invalid-semantic-evidence-authorization',
+        `${entry?.path ?? ''}: semantic-evidence must authorize exact symbols and forbids symbol roots`,
+        { path: entry?.path },
+      )
+    }
     const consumers = [...new Set(entry?.consumers ?? [])]
     if (
       consumers.length === 0 ||
@@ -847,7 +890,12 @@ export function analyzeOwnerDependencies({
       })
       continue
     }
-    if (!path || !authorization) continue
+    if (
+      !path ||
+      !authorization ||
+      !semanticEvidence ||
+      (entry.kind === 'semantic-evidence' && (authorization.symbols.length === 0 || authorization.symbolRoots.length > 0))
+    ) continue
     const key = `${path}\0${entry.kind}\0${[...consumers].sort().join('\0')}\0${authorization.symbols.join('\0')}\0${authorization.symbolRoots.join('\0')}`
     if (contractKeys.has(key)) {
       fail('duplicate-contract-declaration', `${path}: exact contract declaration is duplicated`, { path })
@@ -938,13 +986,16 @@ export function analyzeOwnerDependencies({
     const entries = contractsByPath.get(edge.providerPath) ?? []
     const symbolContracts = entries.filter((entry) => authorizes(entry.authorization, edge.symbol))
     const contractEdge = symbolContracts.some((entry) => entry.consumers.has(edge.consumerOwner))
+    const semanticEvidenceEdge = symbolContracts.some(
+      (entry) => entry.kind === 'semantic-evidence' && entry.consumers.has(edge.consumerOwner),
+    )
     const physicalPortEdge = symbolContracts.some(
       (entry) => entry.kind === 'physical-port' && entry.consumers.has(edge.consumerOwner),
     )
     const adapterEdge = targetAllows(adapterEntries, edge.consumerPath, edge.providerPath, edge.symbol)
     const rootEdge = targetAllows(rootEntries, edge.consumerPath, edge.providerPath, edge.symbol)
 
-    if (isExecutionPosition(edge) && !physicalPortEdge && !adapterEdge) {
+    if (isExecutionPosition(edge) && !semanticEvidenceEdge && !physicalPortEdge && !adapterEdge) {
       fail(
         'foreign-execution-position',
         `${edge.consumerPath}:${edge.line}:${edge.column} → ${edge.providerPath}: foreign execution-position '${edge.symbol}' is forbidden`,
@@ -1086,7 +1137,7 @@ export function analyzeOwnerDependencies({
   const semanticContractEdges = strictEdges.filter((edge) =>
     (contractsByPath.get(edge.providerPath) ?? []).some(
       (entry) =>
-        entry.kind === 'published-contract' &&
+        ['published-contract', 'semantic-evidence'].includes(entry.kind) &&
         entry.consumers.has(edge.consumerOwner) &&
         authorizes(entry.authorization, edge.symbol),
     ),

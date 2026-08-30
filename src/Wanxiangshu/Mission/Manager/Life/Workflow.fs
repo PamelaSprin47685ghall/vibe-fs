@@ -72,7 +72,7 @@ module ManagerLifeWorkflow =
         (lifeId: ManagerLifeId)
         (openingUserMessageId: PhysicalUserMessageId)
         (rawText: string)
-        (openingCursorSequence: int64)
+        (openingCursor: XTraceCursor)
         : Task<Result<unit, string>> =
         task {
             match! journal.WriteBlob rawText with
@@ -88,7 +88,7 @@ module ManagerLifeWorkflow =
                                OpeningUserMessageId = openingUserMessageId
                                OpeningTextRef = blob.BlobRef
                                OpeningTextDigest = blob.BlobDigest
-                               OpeningCursorSequence = openingCursorSequence |})
+                               OpeningCursorSequence = XTraceCursor.sequence openingCursor |})
                 with
                 | Ok() -> return Ok()
                 | Error failure -> return Error(sprintf "Life opening append failed: %s" failure)
@@ -129,14 +129,7 @@ module ManagerLifeWorkflow =
         (evidence: InitialAgentOwnerMigrationEvidence)
         : Task<Result<LifeProjection option, string>> =
         taskResult {
-            let xTrace = InitialAgentOwnerMigrationEvidence.xTrace evidence
-
-            let opening =
-                match xTrace.Opening with
-                | Some value -> Ok value
-                | None -> Error "AgentOwnerRoot migration requires OpeningMaterial"
-
-            let! opening = opening
+            let opening = InitialAgentOwnerMigrationEvidence.opening evidence
             let! blob = journal.WriteBlob opening.AssignmentText
             let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
 
@@ -173,70 +166,59 @@ module ManagerLifeWorkflow =
         let profile =
             PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
 
-        let xTrace = session |> Option.bind (fun value -> value.XTrace)
+        let openingEvidence =
+            session
+            |> Option.bind (fun value -> value.XTrace)
+            |> Option.bind XTraceProjection.openingEvidence
 
-        match ManagerLifeAdmission.ending lifecycle profile xTrace with
+        match ManagerLifeAdmission.ending lifecycle profile openingEvidence with
         | EndingLifeAdmission.ExistingLife life -> Task.FromResult(Ok(Some life))
         | EndingLifeAdmission.NoLife -> Task.FromResult(Ok None)
         | EndingLifeAdmission.InitialAgentOwnerMigration evidence ->
             materializeInitialAgentOwnerLife journal sessionId evidence
 
-    let private captureTerminalIfMissing
-        (journal: AgentJournal)
-        (sessionId: SessionId)
-        (providerRun: ProviderRunIdentity)
-        (blob: BlobWriteReceipt)
-        (terminalRecorded: bool)
-        : Task<Result<unit, string>> =
-        if terminalRecorded then
-            Task.FromResult(Ok())
-        else
-            task {
-                match!
-                    AgentJournal.appendAgent
-                        (StreamId.Session sessionId)
-                        (Some providerRun)
-                        (CompanionFact.TerminalOutputCaptured
-                            {| SessionId = sessionId
-                               TextRef = blob.BlobRef
-                               TextDigest = blob.BlobDigest
-                               ProviderRun = providerRun |})
-                        journal
-                with
-                | Ok _ -> return Ok()
-                | Error failure -> return Error(JournalAppendFailure.describe failure)
-            }
+    let private captureError = function
+        | XTraceCaptureError.Refused reason -> reason
+        | XTraceCaptureError.StorageFailed reason -> reason
 
-    let private captureLastWordsIfPresent
+    let private captureBlessedTrace
         (journal: AgentJournal)
         (sessionId: SessionId)
-        (lastWords: string)
         (providerRun: ProviderRunIdentity)
         (blob: BlobWriteReceipt)
-        =
-        if not (String.IsNullOrWhiteSpace lastWords) then
-            XTraceCapture.captureLastWords (Some journal) sessionId blob.BlobRef blob.BlobDigest providerRun
-        else
-            Task.FromResult()
+        : Task<Result<unit, string>> =
+        task {
+            match!
+                XTraceCapture.captureTerminalBlobWithReceipt
+                    (Some journal)
+                    sessionId
+                    blob.BlobRef
+                    blob.BlobDigest
+                    providerRun
+            with
+            | Error error -> return Error(captureError error)
+            | Ok _ ->
+                match!
+                    XTraceCapture.captureLastWordsWithReceipt
+                        (Some journal)
+                        sessionId
+                        blob.BlobRef
+                        blob.BlobDigest
+                        providerRun
+                with
+                | Error error -> return Error(captureError error)
+                | Ok _ -> return Ok()
+        }
 
     let private completeFreshBlessedLife
         (journal: AgentJournal)
         (sessionId: SessionId)
         (life: LifeProjection)
         (blessing: BlessingEvidence)
-        (lastWords: string)
         (providerRun: ProviderRunIdentity)
         (blob: BlobWriteReceipt)
         =
         task {
-            let snapshot = AgentJournal.snapshot journal
-
-            let terminalRecorded =
-                AgentProjection.tryFind sessionId snapshot.AgentProjections
-                |> Option.bind (fun session -> session.XTrace)
-                |> Option.exists (fun state ->
-                    XTraceProjection.terminalForProviderRun providerRun state |> Option.isSome)
-
             match!
                 appendLifecycle
                     journal
@@ -250,11 +232,9 @@ module ManagerLifeWorkflow =
             with
             | Error error -> return Error error
             | Ok() ->
-                match! captureTerminalIfMissing journal sessionId providerRun blob terminalRecorded with
+                match! captureBlessedTrace journal sessionId providerRun blob with
                 | Error error -> return Error error
                 | Ok() ->
-                    do! captureLastWordsIfPresent journal sessionId lastWords providerRun blob
-
                     let authorityRoot =
                         PhysicalUserMessageId.promoteToAuthorityRoot life.OpeningUserMessageId
 
@@ -266,7 +246,6 @@ module ManagerLifeWorkflow =
         (sessionId: SessionId)
         (life: LifeProjection)
         (blessing: BlessingEvidence)
-        (lastWords: string)
         (providerRun: ProviderRunIdentity)
         (blob: BlobWriteReceipt)
         =
@@ -283,7 +262,7 @@ module ManagerLifeWorkflow =
 
         match alreadyCompleted with
         | true -> Task.FromResult(Ok BlessedLifeCompletion.AlreadyCompleted)
-        | false -> completeFreshBlessedLife journal sessionId life blessing lastWords providerRun blob
+        | false -> completeFreshBlessedLife journal sessionId life blessing providerRun blob
 
     /// GLORY-062 durable half of the second suicide. Physical terminal publish is
     /// deliberately returned to Infrastructure as a capability effect.
@@ -298,5 +277,5 @@ module ManagerLifeWorkflow =
         task {
             match! journal.WriteBlob lastWords with
             | Error error -> return Error error
-            | Ok blob -> return! completeWithBlessingBlob journal sessionId life blessing lastWords providerRun blob
+            | Ok blob -> return! completeWithBlessingBlob journal sessionId life blessing providerRun blob
         }

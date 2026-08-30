@@ -207,7 +207,7 @@ module ManagerLifecycleProjection =
                       OpeningUserMessageId = payload.OpeningUserMessageId
                       OpeningTextRef = payload.OpeningTextRef
                       OpeningTextDigest = payload.OpeningTextDigest
-                      OpeningCursor = { Sequence = payload.OpeningCursorSequence }
+                      OpeningCursor = XTraceCursor.create payload.OpeningCursorSequence
                       ProtectedPrefixEnd = None
                       ActiveFinality = None
                       EnlistedReviewers = Map.empty
@@ -234,7 +234,7 @@ module ManagerLifecycleProjection =
         | None ->
             withLife
                 { life with
-                    ProtectedPrefixEnd = Some { Sequence = payload.ProtectedPrefixEndSequence } }
+                    ProtectedPrefixEnd = Some(XTraceCursor.create payload.ProtectedPrefixEndSequence) }
                 state
 
     let private openFinalityRequest

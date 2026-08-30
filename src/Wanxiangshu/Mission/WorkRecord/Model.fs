@@ -1,22 +1,6 @@
 namespace Wanxiangshu.Mission.WorkRecord
 
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-
-open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 
 /// COMPANION-014 / GLORY-074: when Opening closes for a role.
 type CommitmentContract =
@@ -32,17 +16,6 @@ module OpeningPolicy =
 
     /// Non-Manager roles close Opening at InitialCharge (Immediate).
     let immediate = Immediate
-
-/// COMPANION-003/014: OpeningMaterial for LWR Opening section.
-///
-/// Canonical truth = preserved XTrace `[work start, OpeningBoundary)` (COMPANION-014).
-/// `AssignmentText` / requirements hold InitialCharge (OpeningPromptCaptured).
-/// `ConstitutiveBody` holds BlindPlan interval after InitialCharge through T1
-/// call/result (rendered via XTrace.forOpening); empty for Immediate.
-type OpeningMaterial =
-    { AssignmentText: string
-      AuthoritativeRequirements: string list
-      ConstitutiveBody: string }
 
 /// COMPANION-003: LWR 的唯一物化规则。
 ///
@@ -62,9 +35,9 @@ type OpeningMaterial =
 /// Opening 仍必须 captured（锚点/gap 起点）；本标志只影响渲染段。
 /// tool call/result 不得作为 raw 进入 Recent；T1 constitutive 属 Opening。
 type LifecycleWorkRecord =
-    { Opening: OpeningMaterial
+    { Opening: XTraceOpeningEvidence
       Frames: string list
-      Gap: XTraceItem list }
+      Gap: string }
 
 [<RequireQualifiedAccess>]
 module LifecycleWorkRecord =
@@ -105,40 +78,28 @@ module LifecycleWorkRecord =
             |> List.filter (System.String.IsNullOrWhiteSpace >> not)
             |> String.concat "\n\n"
 
-        let gapText = record.Gap |> XTrace.forWorkRecord |> XTrace.render
-
         let sections =
             [ section "Opening" openingBody
               section "Chronicle" framesText
-              section "Recent work" gapText ]
+              section "Recent work" record.Gap ]
             |> List.filter (fun text -> text <> "")
 
         String.concat "\n\n" sections
 
-    /// 确定性物化。gap 经 `forWorkRecord`；Opening constitutive 经 `forOpening`。
+    /// Deterministic composition of trace-owner-rendered evidence.
     /// `includeOpening`：父→子 true，子→父 false（EXEC-006）。
-    /// `openingEnd` = WorkRecordStart / OpeningBoundary（exclusive）。
     let materialize
-        (opening: OpeningMaterial)
+        (opening: XTraceOpeningEvidence)
         (frames: string list)
-        (trace: XTraceItem list)
-        (coverage: RecordCoverage)
-        (openingEnd: XTraceCursor)
+        (gap: string)
         (includeOpening: bool)
         : string =
-        let gapStart =
-            { Sequence = max coverage.IngestedThrough.Sequence openingEnd.Sequence }
-
-        let gap = XTrace.sliceFrom gapStart trace |> XTrace.forWorkRecord
-
         render
             includeOpening
             { Opening = opening
               Frames = frames
               Gap = gap }
 
-    /// Build OpeningMaterial with constitutive BlindPlan body from an XTrace slice.
-    let withConstitutive (opening: OpeningMaterial) (constitutiveItems: XTraceItem list) : OpeningMaterial =
-        let body = constitutiveItems |> XTrace.forOpening |> XTrace.render
-
-        { opening with ConstitutiveBody = body }
+    /// Attach the trace owner's canonical rendering of BlindPlan constitutive evidence.
+    let withConstitutive (opening: XTraceOpeningEvidence) (constitutiveBody: string) : XTraceOpeningEvidence =
+        { opening with ConstitutiveBody = constitutiveBody }

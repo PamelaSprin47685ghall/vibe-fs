@@ -104,7 +104,6 @@
     <Compile Include="Mission/Obligation/Todo/Surface.fs"/>
     <Compile Include="Mission/Obligation/Todo/Admission.fs"/>
     <Compile Include="Mission/WorkRecord/Model.fs"/>
-    <Compile Include="Mission/Obligation/Todo/Lwr.fs"/>
     <Compile Include="Mission/Obligation/Todo/FinalityCohort.fs"/>
     <Compile Include="Foundation/SyntheticToml.fs"/>
     <Compile Include="Foundation/LlmFacing.fs"/>
@@ -493,10 +492,10 @@
     <Compile Include="Mission/Review/Barrier/Reverify.fs"/>
     <Compile Include="Mission/Review/Judgement/Evidence.fs"/>
     <Compile Include="Mission/Review/Judgement/Continuation.fs"/>
+    <Compile Include="Context/Trace/TerminalReporter.fs"/>
     <Compile Include="Mission/Review/Judgement/Workflow.fs"/>
     <Compile Include="Mission/Review/OpenCode/TerminalAwait.fs"/>
     <Compile Include="OpenCode/Host/TerminalPolicy.fs"/>
-    <Compile Include="Context/Trace/TerminalReporter.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fs"/>
     <Compile Include="Enforcer/Continuation.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Surface.fs"/>
@@ -659,7 +658,6 @@
     <Compile Include="OpenCode/Plugin/PluginSessionWiring.fs"/>
     <Compile Include="OpenCode/Plugin/PluginRecoveryWiring.fs"/>
     <Compile Include="OpenCode/Host/BloggerChronicleText.fs"/>
-    <Compile Include="Context/Trace/XTracePipeline.fs"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fs"/>
     <Compile Include="OpenCode/Plugin/PluginHooks.fs"/>
     <Compile Include="OpenCode/Plugin/SpikePlugin.fs"/>
@@ -670,7 +668,7 @@
     <Compile Include="Persistence/Journal/ReviewJournalSurface.fs"/>
     <Compile Include="Enforcer/Guidance/TipSurface.fs"/>
     <Compile Include="Mission/WorkRecord/Surface.fs"/>
-    <Compile Include="Context/Trace/XTraceSurface.fs"/>
+    <Compile Include="Context/Trace/SemanticTraceSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs"/>
     <Compile Include="Change/Host/Surface.fs"/>
     <Compile Include="Foundation/OutcomeSurface.fs"/>

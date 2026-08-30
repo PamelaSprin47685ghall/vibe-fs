@@ -18,7 +18,7 @@ module MagicTodoLocalitySurface =
         | 2 -> Wanxiangshu.OpenCode.SnapshotToolPartState.Failed ""
         | _ -> Wanxiangshu.OpenCode.SnapshotToolPartState.Pending
 
-    let private cursor (sequence: int) : XTraceCursor = { Sequence = int64 sequence }
+    let private cursor (sequence: int) : XTraceCursor = XTraceCursor.create (int64 sequence)
 
     let private localizedOf
         (callId: string)
@@ -36,9 +36,7 @@ module MagicTodoLocalitySurface =
           TodowriteCallIdsInMessage = [ ToolCallId.create callId ]
           ToolPartOrdinal = 1
           ReviewFrontier = frontier
-          Range =
-            { Start = frontier
-              EndExclusive = cursor 8 } }
+          Range = XTraceRange.create frontier (cursor 8) }
 
     let materializeInput (callId: string) (inputCanonical: string) (state: obj) (expectedCanonical: string) : obj =
         let localized = localizedOf callId inputCanonical state

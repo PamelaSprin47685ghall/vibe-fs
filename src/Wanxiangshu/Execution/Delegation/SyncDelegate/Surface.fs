@@ -15,7 +15,6 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
@@ -320,7 +319,7 @@ module SyncDelegateSurface =
 
             let workRecordFor
                 (sessionId: SessionId)
-                (range: MagicTodoLwr.BoundedRange)
+                (range: XTraceRange)
                 (providerRun: ProviderRunIdentity)
                 =
                 LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
@@ -739,8 +738,20 @@ module SyncDelegateSurface =
             |> Option.defaultValue null
 
     let captureOwnerOpening (value: obj) (owner: string) (text: string) : Task =
-        let harness = unbox<Harness> value
-        XTraceCapture.captureOpening (Some harness.Journal) (harness.OwnerSession owner) text [] :> Task
+        task {
+            let harness = unbox<Harness> value
+
+            match!
+                XTraceCapture.captureOpeningWithReceipt
+                    (Some harness.Journal)
+                    (harness.OwnerSession owner)
+                    text
+                    []
+            with
+            | Ok _ -> ()
+            | Error error -> return raise (InvalidOperationException(sprintf "%A" error))
+        }
+        :> Task
 
     let captureOwnerDeltaPart (value: obj) (owner: string) (text: string) (providerRun: string) : Task =
         task {
@@ -749,13 +760,16 @@ module SyncDelegateSurface =
             match! harness.Journal.WriteBlob text with
             | Error error -> return raise (InvalidOperationException error)
             | Ok blob ->
-                do!
-                    XTraceCapture.captureLastWords
+                match!
+                    XTraceCapture.captureLastWordsWithReceipt
                         (Some harness.Journal)
                         (harness.OwnerSession owner)
                         blob.BlobRef
                         blob.BlobDigest
                         (ProviderRunIdentity.create providerRun)
+                with
+                | Ok _ -> ()
+                | Error error -> return raise (InvalidOperationException(sprintf "%A" error))
         }
         :> Task
 

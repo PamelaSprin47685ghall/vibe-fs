@@ -184,9 +184,9 @@ module XWire =
         taskResult {
             let! frameBodies = readFrameBodies journal frames
 
-            let opening =
+            let opening: XTraceOpeningEvidence =
                 state.XTrace
-                |> Option.bind (fun trace -> trace.Opening)
+                |> Option.bind XTraceProjection.openingEvidence
                 |> Option.defaultValue
                     { AssignmentText = ""
                       AuthoritativeRequirements = []
@@ -200,7 +200,7 @@ module XWire =
                     false
                     { Opening = opening
                       Frames = frameBodies
-                      Gap = [] }
+                      Gap = "" }
         }
 
     let private candidate
