@@ -7,14 +7,6 @@ open Wanxiangshu.Foundation.Identity
 
 type BlogText = string
 
-type BloggerCompletion =
-    { BloggerSessionId: SessionId
-      ProviderRun: ProviderRunIdentity
-      Text: BlogText
-      NextCursor: SemanticCursor
-      NextCoverableTurnCutoffExclusive: int
-      NextCoveredPrefixDigest: string }
-
 /// DSL-state-combination: domain — this durable Companion projection combines
 /// frame history, optional effective text, session identity and XTrace evidence;
 /// none of these fields is a process continuation cursor.

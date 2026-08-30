@@ -259,7 +259,7 @@ module PrefixSurface =
             else
                 Some(snapshotOfJs snapshot)
 
-        XPrefixProjection.forSnapshot value CompanionProjectionSurface.memoryPreamble memoryBody
+        XPrefixProjection.forSnapshot value CompanionPrompt.MemoryPreamble memoryBody
         |> intentToJs
 
     let private choiceOfJs (choice: obj) : XProjectionChoice =
@@ -286,7 +286,7 @@ module PrefixSurface =
             else
                 Some(snapshotOfJs committed)
 
-        XPrefixProjection.forChoice (choiceOfJs choice) value CompanionProjectionSurface.memoryPreamble memoryBody
+        XPrefixProjection.forChoice (choiceOfJs choice) value CompanionPrompt.MemoryPreamble memoryBody
         |> intentToJs
 
     let requiredBlob (choice: obj) (committed: obj) : obj =

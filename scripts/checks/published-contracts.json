@@ -581,6 +581,185 @@
       "justification": "Context.CompanionContract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to context-compression."
     },
     {
+      "path": "src/Wanxiangshu/Context/Companion/CompanionFactFold.fs",
+      "owner": "context-compression",
+      "node": "context-compression-companion-core-cutover",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.CompanionFactFold.fold"
+      ],
+      "justification": "Context.CompanionContract publishes the replayable single-event Companion fold to the canonical durable fold and keeps fold policy private."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Fact.fs",
+      "owner": "context-compression",
+      "node": "context-compression-companion-core-cutover",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "durable-events",
+        "guidance-delivery",
+        "host-boundary",
+        "prefix-stability",
+        "requirement-grounding",
+        "semantic-trace",
+        "verification-system",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.CompanionFact.CompanionBloggerClosed",
+        "Wanxiangshu.Context.Companion.CompanionFact.CompanionBloggerLinked",
+        "Wanxiangshu.Context.Companion.CompanionFact.OpeningPromptCaptured",
+        "Wanxiangshu.Context.Companion.CompanionFact.TerminalOutputCaptured",
+        "Wanxiangshu.Context.Companion.CompanionFact.XTracePartAppended",
+        "Wanxiangshu.Context.Companion.ContextFact.BlogObservationCommitted",
+        "Wanxiangshu.Context.Companion.ContextFact.BlogObservationsSquashed",
+        "Wanxiangshu.Context.Companion.ContextFact.ContextReanchored",
+        "Wanxiangshu.Context.Companion.ContextFact.PrefixRebaseCommitted"
+      ],
+      "justification": "Context.CompanionContract publishes only compiler-observed durable fact constructors; the case vocabulary and write decisions remain owner-defined."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Facts.fs",
+      "owner": "context-compression",
+      "node": "context-compression-companion-core-cutover",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "durable-events",
+        "verification-system"
+      ],
+      "symbols": [
+        "ContextDigest",
+        "ContextRef",
+        "EvidenceRef",
+        "FrozenRecordPrefixDigest",
+        "FrozenRecordPrefixRef",
+        "SelectedFrameDigests",
+        "SessionId",
+        "TextDigest",
+        "TextRef",
+        "Wanxiangshu.Context.Companion.CompanionFactCases",
+        "Wanxiangshu.Context.Companion.CompanionFactCases.CompanionBloggerClosed",
+        "Wanxiangshu.Context.Companion.CompanionFactCases.TerminalOutputCaptured",
+        "Wanxiangshu.Context.Companion.CompanionFactCases.XTracePartAppended",
+        "Wanxiangshu.Context.Companion.ContextFactCases",
+        "Wanxiangshu.Context.Companion.ContextFactCases.BlogObservationCommitted",
+        "Wanxiangshu.Context.Companion.ContextFactCases.BlogObservationsSquashed",
+        "Wanxiangshu.Context.Companion.ContextFactCases.BloggerRequestMaterialized",
+        "Wanxiangshu.Context.Companion.ContextFactCases.PrefixRebaseCommitted"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the FCS-observed durable union cases and payload fields required by canonical codecs and verification."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Host.fs",
+      "owner": "context-compression",
+      "node": "context-compression-companion-core-cutover",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.CompanionHost",
+        "Wanxiangshu.Context.Companion.CompanionHost.BloggerSession",
+        "Wanxiangshu.Context.Companion.CompanionHost.RefreshXTrace",
+        "durable",
+        "journal",
+        "restoredBloggerId",
+        "satelliteRuntime"
+      ],
+      "justification": "Context.CompanionContract exposes the typed Companion host and the exact constructor/member surface observed at final host composition."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/HostBlogger.fs",
+      "owner": "context-compression",
+      "node": "context-compression-companion-core-cutover",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.CompanionHostBlogger.tryBuildSquashContext"
+      ],
+      "justification": "Context.CompanionContract publishes the typed squash-context owner operation consumed by provider recovery; physical dispatch remains private."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Identity.fs",
+      "owner": "context-compression",
+      "node": "context-compression-companion-core-cutover",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "prefix-stability"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.CompanionIdentity.companionMemoryMessageId",
+        "Wanxiangshu.Context.Companion.CompanionIdentity.newWorkMessageId",
+        "Wanxiangshu.Context.Companion.CompanionIdentity.sealRoot"
+      ],
+      "justification": "Context.CompanionContract publishes only compiler-observed stable identity formulas to prefix selection and recovery consumers."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/JournalPort.fs",
+      "owner": "context-compression",
+      "node": "context-compression-companion-core-cutover",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.AgentJournalCompanionPort"
+      ],
+      "justification": "Context.CompanionContract publishes the concrete journal-backed Companion port only to final host composition."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Projection.fs",
+      "owner": "context-compression",
+      "node": "context-compression-companion-core-cutover",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.CompanionProjection",
+        "Wanxiangshu.Context.Companion.CompanionProjection.BloggerSessionId",
+        "Wanxiangshu.Context.Companion.CompanionProjectionModule.empty"
+      ],
+      "justification": "Context.CompanionContract publishes the opaque Companion projection shape and empty oracle required by canonical projection composition."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Prompt.fs",
+      "owner": "context-compression",
+      "node": "context-compression-companion-core-cutover",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "prefix-stability",
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.CompanionPrompt.MemoryPreamble",
+        "Wanxiangshu.Context.Companion.CompanionPrompt.Normal",
+        "Wanxiangshu.Context.Companion.CompanionPrompt.Squash",
+        "Wanxiangshu.Context.Companion.CompanionPrompt.asCommentedInstruction",
+        "Wanxiangshu.Context.Companion.CompanionPrompt.companionMemoryBlock"
+      ],
+      "justification": "Context.CompanionContract publishes exact prompt keys and render operations observed by prefix and recovery owners; JS proof exports are excluded."
+    },
+    {
       "path": "src/Wanxiangshu/Context/Companion/Model.fs",
       "owner": "context-compression",
       "node": "context-trace-companion-contract",
@@ -1233,7 +1412,6 @@
       "contract": "Mission.Authority",
       "kind": "published-contract",
       "consumers": [
-        "context-compression",
         "prefix-stability",
         "review-judgement"
       ],
@@ -1241,11 +1419,6 @@
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.TodoWriteId",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.TodoWriteIdModule.create",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.TodoWriteIdModule.value",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.TracePartAnchor.Cursor",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.TracePartAnchor.Kind",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.TracePartAnchor.ToolCallId",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.bloggerEffectiveStart",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.effectiveOpeningFloor",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.todoWriteId"
       ],
       "justification": "Mission.Authority publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
@@ -3141,6 +3314,7 @@
         "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Turn",
         "Wanxiangshu.Context.Trace.XTraceTerminalEvidence",
         "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.Frontier",
+        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.ProviderRun",
         "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.TextDigest",
         "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.TextRef"
       ],
@@ -3701,6 +3875,7 @@
         "attention-regulation",
         "change-integration",
         "concern-routing",
+        "context-compression",
         "dispatch-protocol",
         "durable-convergence",
         "durable-events",

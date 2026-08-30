@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Context.Companion
 
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Durable Companion lifecycle and XTrace facts.

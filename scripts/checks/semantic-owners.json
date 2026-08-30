@@ -287,10 +287,6 @@
       "owner": "context-compression"
     },
     {
-      "path": "src/Wanxiangshu/Context/Companion/Errors.fs",
-      "owner": "context-compression"
-    },
-    {
       "path": "src/Wanxiangshu/Context/Companion/Fact.fs",
       "owner": "context-compression"
     },
@@ -320,10 +316,6 @@
     },
     {
       "path": "src/Wanxiangshu/Context/Companion/Model.fs",
-      "owner": "context-compression"
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Companion/Program.fs",
       "owner": "context-compression"
     },
     {

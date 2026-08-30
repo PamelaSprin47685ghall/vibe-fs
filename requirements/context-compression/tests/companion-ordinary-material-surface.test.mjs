@@ -3,7 +3,7 @@
 // Verifies that CompanionTransform owns applyCompanionForOrdinaryMaterial entry point.
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import test from 'node:test'
 
@@ -15,6 +15,10 @@ test('WHAT[CONTEXT-COMPRESSION-018] CompanionTransform owns ordinary-material en
   const pt = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 
   assert.match(companion, /let\s+applyCompanionForOrdinaryMaterial/)
+  assert.equal(existsSync(resolve(root, 'src/Wanxiangshu/Context/Companion/Program.fs')), false)
+  assert.equal(existsSync(resolve(root, 'src/Wanxiangshu/Context/Companion/Errors.fs')), false)
+  assert.doesNotMatch(companion, /\b(?:CompanionProgram|CompanionContext|CompanionError|TransformRaw)\b/)
+  assert.match(companion, /replaceMessagesInPlace\s+rawOutObj\s+rawMessages/)
   assert.match(companion, /\(isExplicitResume:\s*string option -> obj -> bool\)/)
   assert.match(companion, /if isExplicitResume projectionSessionIdOpt outObj then/)
   assert.doesNotMatch(companion, /ExplicitResumeSuppression/)

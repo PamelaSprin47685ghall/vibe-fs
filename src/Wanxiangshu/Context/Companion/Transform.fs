@@ -156,7 +156,7 @@ module CompanionTransform =
                 ensureCompanion companions gate scope sessionPort journal onBloggerCreated workspaceDirectory sessionId
 
             // Host view unchanged (CTX-002). Coordinator owns all Blogger effects.
-            companion.TransformRaw rawMessages |> replaceMessagesInPlace rawOutObj
+            replaceMessagesInPlace rawOutObj rawMessages
 
             // No child until there is a real X gap. Empty fixture transforms
             // (HOST-009 positional hooks) must not require Host transport.

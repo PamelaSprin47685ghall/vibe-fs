@@ -333,10 +333,8 @@
     <Compile Include="Git/Hook/Sync.fs"/>
     <Compile Include="Git/Hook/Dispatcher.fs"/>
     <Compile Include="Git/Hook/Surface.fs"/>
-    <Compile Include="Context/Companion/Errors.fs"/>
     <Compile Include="Context/Companion/Model.fs"/>
     <Compile Include="Context/Companion/Runtime.fs"/>
-    <Compile Include="Context/Companion/Program.fs"/>
     <Compile Include="OpenCode/Tools/ToolContext.fs"/>
     <Compile Include="OpenCode/Tools/StaticTools.fs"/>
     <Compile Include="OpenCode/Tools/FileTools.fs"/>

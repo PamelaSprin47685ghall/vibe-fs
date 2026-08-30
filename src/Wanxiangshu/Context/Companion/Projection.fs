@@ -1,20 +1,8 @@
 namespace Wanxiangshu.Context.Companion
 
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Durable Companion link. Blog frames and coverage belong to `BlogProjection`.
-///
-/// The prefix epoch used to live here too — `ActivePrefixEpoch` plus a
-/// `ReplacementActive` flag, written by `switchEpoch` from a token-budget comparison.
-/// That was a second writer of prefix-epoch state, and it decided WHEN to compress by
-/// estimating context (CTX-001, CTX-002 both forbid it). `Context/Prefix/Epoch`
-/// is the single owner now, and the only things that move it are a promoted probe
-/// (CTX-012) and a reanchor (HOST-006).
-///
-/// The flag went with it. It existed because compression was opt-in per session; under
-/// docs/what/context.md a recovery slot either has a candidate or does not, so there is no state to
-/// enable.
 type CompanionProjection =
     {
         /// COMPANION-003: the companion Blogger Session Y, so a restart rebinds the

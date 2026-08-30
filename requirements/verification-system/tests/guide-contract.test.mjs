@@ -66,14 +66,24 @@ test('WHAT[VERIFICATION-SYSTEM-008] AgentProgram publishes its flow entrypoints'
   assertCallable(mod, 'Execution/Agent/Program', ['validateSession', 'runAgentFlow'])
 })
 
-test('WHAT[VERIFICATION-SYSTEM-008] CompanionProgram publishes its flow entrypoints', async () => {
-  const mod = await load('Context/Companion/Program')
+test('WHAT[VERIFICATION-SYSTEM-008] Companion has no generic program facade and keeps its direct delta owner', async () => {
+  await assert.rejects(
+    () => load('Context/Companion/Program'),
+    (error) => {
+      const message = String(error?.message ?? error)
+      return (
+        message.includes('Cannot find module') ||
+        message.includes('ERR_MODULE_NOT_FOUND') ||
+        message.includes('Failed to load') ||
+        error?.code === 'ERR_MODULE_NOT_FOUND'
+      )
+    },
+    'Context/Companion/Program must stay deleted',
+  )
 
-  // Exactly two. `shouldReplacePrefix` was the third until package X9 deleted it:
-  // it compared a token estimate against a context limit, which CTX-001 forbids
-  // outright. A reappearance here is the whole mechanism coming back.
-  assert.deepEqual(surfaceOf(mod).sort(), ['buildDelta', 'runCompanionFlow'])
-  assertCallable(mod, 'Context/Companion/Program', ['buildDelta', 'runCompanionFlow'])
+  const delta = await load('Context/Companion/Blogger/Delta')
+  assertCallable(delta, 'Context/Companion/Blogger/Delta', ['BloggerDelta_nextChunk'])
+  assert.equal(delta.BloggerDelta_DeltaLimitBytes, 200 * 1024)
 })
 
 test('WHAT[VERIFICATION-SYSTEM-008] OrchestratorProgram publishes exactly one entrypoint', async () => {

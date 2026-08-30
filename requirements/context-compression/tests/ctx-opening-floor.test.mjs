@@ -9,18 +9,11 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import * as compression from '../../../dist/Context/Companion/CompressionSurface.js'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
+import * as magicTodo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
 
-const floor = ({ hasOpenLife = true, planCommitted = false, xTraceHeadSequence = 0, legacyProtectedPrefixEnd } = {}) =>
-  compression.openingFloor({
-    hasOpenLife,
-    planCommitted,
-    openingSequence: 1,
-    xTraceHeadSequence,
-    legacyProtectedPrefixEnd,
-    parts: [],
-  })
+const floor = ({ hasOpenLife = true, planCommitted = false, xTraceHeadSequence = 0, legacyProtectedPrefixEnd, parts = [] } = {}) =>
+  magicTodo.effectiveOpeningFloor(hasOpenLife, planCommitted, 1, null, null, xTraceHeadSequence, parts)
 
 test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_pre_t1_floor_stops_after_true_opening', () => {
   assert.equal(
@@ -35,6 +28,15 @@ test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_t1_does_not_change_the_compression_f
   assert.equal(Number(floor({ planCommitted: true, xTraceHeadSequence: 17 })), 2)
 })
 
+test('WHAT[CONTEXT-COMPRESSION-020] todowrite_material_does_not_redefine_the_owned_opening_floor', () => {
+  const parts = [
+    { sequence: 8, kind: 'tool_call', toolCallId: 'todo-call-1' },
+    { sequence: 9, kind: 'tool_result', toolCallId: 'todo-call-1' },
+  ]
+
+  assert.equal(Number(floor({ xTraceHeadSequence: 20, parts })), 2)
+})
+
 test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_work_activated_is_inert_and_does_not_move_the_floor', () => {
   const without = Number(floor({ xTraceHeadSequence: 2 }))
   const withLegacy = Number(floor({ xTraceHeadSequence: 2, legacyProtectedPrefixEnd: 42 }))
@@ -45,13 +47,13 @@ test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_work_activated_is_inert_and_does_not
 
 test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_blogger_effective_start_is_max_of_record_coverage_and_floor', () => {
   assert.equal(
-    Number(compression.bloggerEffectiveStart(1, 3)),
+    Number(magicTodo.bloggerEffectiveStart(1, 3)),
     3,
     'coverage behind floor → effective start = floor',
   )
 
   assert.equal(
-    Number(compression.bloggerEffectiveStart(5, 3)),
+    Number(magicTodo.bloggerEffectiveStart(5, 3)),
     5,
     'coverage ahead of floor → effective start = record coverage',
   )

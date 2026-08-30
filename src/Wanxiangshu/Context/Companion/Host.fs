@@ -53,7 +53,6 @@ open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.OpenCode
@@ -400,35 +399,11 @@ type CompanionHost
             bloggerCreateFailed <- true
             companion.RecordBloggerClosed())
 
-    /// Exposes the canonical CompanionFlow calculation for adapters and tests.
-    member _.PreviewDelta(projection: ProviderSemanticProjection) =
-        let memory = companion.Memory
-
-        CompanionProgram.runCompanionFlow
-            { SessionId = SessionId.value primaryId }
-            System.Threading.CancellationToken.None
-            (CompanionProgram.buildDelta
-                (memory.Blog.Coverage.IngestedThroughSequence
-                 |> XTraceCursor.create
-                 |> RecordCoverage.create
-                 |> fun coverage -> XTraceProjection.semanticCursorAfterCoverage coverage memory.XTrace)
-                memory.Blog.Coverage.CoverableTurnCutoffExclusive
-                projection)
-
     member _.Memory = companion.Memory
 
     /// COMPANION-007: forward the transform-boundary XTrace refresh to the
     /// companion's in-memory mirror.
     member _.RefreshXTrace(state: XTraceProjectionState) = companion.RefreshXTrace(state)
-
-    member _.WaitInFlightAsync() = companion.WaitInFlightAsync()
-
-    /// COMPANION-005 / CTX-002: return Host messages unchanged.
-    ///
-    /// Blogger material decisions are NOT made here. BloggerCoordinator.OnMainMaterial
-    /// is the sole entry (C1). Prefix replacement stays behind a failed attempt
-    /// (CTX-012), which this hook cannot see.
-    member _.TransformRaw(messages: obj list) : obj list = messages
 
     member _.BloggerSession = lock gate (fun () -> bloggerId)
 

@@ -632,7 +632,6 @@
       "files": [
         "src/Wanxiangshu/Context/Companion/Builder.fs",
         "src/Wanxiangshu/Context/Companion/Model.fs",
-        "src/Wanxiangshu/Context/Companion/Program.fs",
         "src/Wanxiangshu/Context/Companion/Transform.fs"
       ],
       "classification": "MOVE",
@@ -660,6 +659,104 @@
       ],
       "touched_paths": [
         "src/Wanxiangshu/Context/Companion/Transform.fs"
+      ],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER"
+    },
+    {
+      "id": "context-compression-companion-core-cutover",
+      "primary_owner": "context-compression",
+      "intent": "Companion core clean cutover: durable facts and single-event fold, projection and identity algebra, compression decisions, typed host and journal adapters, and narrow JS proof surfaces; obsolete direct-program and generic-error flows are deleted.",
+      "files": [
+        "src/Wanxiangshu/Context/Companion/CompanionFactFold.fs",
+        "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Fact.fs",
+        "src/Wanxiangshu/Context/Companion/Facts.fs",
+        "src/Wanxiangshu/Context/Companion/FoldSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Host.fs",
+        "src/Wanxiangshu/Context/Companion/HostBlogger.fs",
+        "src/Wanxiangshu/Context/Companion/Identity.fs",
+        "src/Wanxiangshu/Context/Companion/JournalPort.fs",
+        "src/Wanxiangshu/Context/Companion/Projection.fs",
+        "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Prompt.fs",
+        "src/Wanxiangshu/Context/Companion/Runtime.fs",
+        "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs"
+      ],
+      "classification": "SPLIT",
+      "publishes": [
+        "Context.CompanionContract"
+      ],
+      "consumes": [
+        "DurableEvents.Contract",
+        "SemanticTrace.Contract",
+        "PrefixStability.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        },
+        {
+          "id": "context-trace-companion-contract",
+          "kind": "contract"
+        },
+        {
+          "id": "semantic-trace-replayable-contract-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "prefix-stability-cutover",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Composition/Durable/Fact.fs",
+        "src/Wanxiangshu/Composition/Durable/Fold.fs",
+        "src/Wanxiangshu/Composition/Durable/ProjectionUpdate.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs",
+        "src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/PluginSessionScope.fs"
+      ],
+      "proofs": [
+        "requirements/context-compression/tests/attempt-plan-probe-eligibility.test.mjs",
+        "requirements/context-compression/tests/companion-projection.test.mjs",
+        "requirements/context-compression/tests/companion-recovery-slot.test.mjs",
+        "requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs",
+        "requirements/context-compression/tests/ctx-opening-floor.test.mjs",
+        "requirements/context-compression/tests/ctx014.test.mjs",
+        "requirements/context-compression/tests/host-compaction-policy.test.mjs",
+        "requirements/context-compression/tests/injected-context-reanchor.test.mjs",
+        "requirements/context-compression/tests/probe-selection.test.mjs",
+        "requirements/context-compression/tests/projection-algebra-blogframes.test.mjs",
+        "requirements/context-compression/tests/recovery-slot.test.mjs",
+        "requirements/context-compression/tests/terminal-validity.test.mjs",
+        "requirements/durable-events/tests/fold-context-recovery.test.mjs"
+      ],
+      "architecture_gates": [
+        "migration-ledger.mjs",
+        "owner-dependencies.mjs",
+        "semantic-owners.mjs",
+        "js-surface-manifest.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Context/Companion/CompanionFactFold.fs",
+        "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Fact.fs",
+        "src/Wanxiangshu/Context/Companion/Facts.fs",
+        "src/Wanxiangshu/Context/Companion/FoldSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Host.fs",
+        "src/Wanxiangshu/Context/Companion/HostBlogger.fs",
+        "src/Wanxiangshu/Context/Companion/Identity.fs",
+        "src/Wanxiangshu/Context/Companion/JournalPort.fs",
+        "src/Wanxiangshu/Context/Companion/Projection.fs",
+        "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Prompt.fs",
+        "src/Wanxiangshu/Context/Companion/Runtime.fs",
+        "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs"
       ],
       "coverage_tags": [
         "CoverageE"
@@ -1733,21 +1830,6 @@
       "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
       "src/Wanxiangshu/Context/Companion/Blogger/Toml.fs",
       "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
-      "src/Wanxiangshu/Context/Companion/CompanionFactFold.fs",
-      "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
-      "src/Wanxiangshu/Context/Companion/Errors.fs",
-      "src/Wanxiangshu/Context/Companion/Fact.fs",
-      "src/Wanxiangshu/Context/Companion/Facts.fs",
-      "src/Wanxiangshu/Context/Companion/FoldSurface.fs",
-      "src/Wanxiangshu/Context/Companion/Host.fs",
-      "src/Wanxiangshu/Context/Companion/HostBlogger.fs",
-      "src/Wanxiangshu/Context/Companion/Identity.fs",
-      "src/Wanxiangshu/Context/Companion/JournalPort.fs",
-      "src/Wanxiangshu/Context/Companion/Projection.fs",
-      "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs",
-      "src/Wanxiangshu/Context/Companion/Prompt.fs",
-      "src/Wanxiangshu/Context/Companion/Runtime.fs",
-      "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs",
       "src/Wanxiangshu/Enforcer/BlogSurface.fs",
       "src/Wanxiangshu/Enforcer/Catalog.fs",
       "src/Wanxiangshu/Enforcer/ChronicleExecution.fs",

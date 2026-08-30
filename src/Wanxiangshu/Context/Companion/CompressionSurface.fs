@@ -10,9 +10,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
@@ -194,7 +191,8 @@ module CompressionSurface =
 
     let armingName (value: string) : string = value
 
-    let cursor = box {| isRecoverySlot = (fun offset -> offset % 2 <> 0) |}
+    let cursor =
+        box {| isRecoverySlot = (fun offset -> AgentPairCursor.isRecoverySlot (offsetOf offset)) |}
 
 
     let private roleResult value : Result<Role, string> =
@@ -318,16 +316,18 @@ module CompressionSurface =
     let private terminalValidityResult (value: string) : Result<unit, TerminalValidity.Rejection> =
         TerminalValidity.check value
 
+    let private terminalRejectionName rejection =
+        match rejection with
+        | TerminalValidity.Rejection.Empty -> "Empty"
+        | TerminalValidity.Rejection.XmlOnly -> "XmlOnly"
+
     let terminalValidityCheck (value: string) : obj =
         match terminalValidityResult value with
         | Ok() -> box {| ok = true |}
         | Error rejection ->
             box
                 {| ok = false
-                   error =
-                    match rejection with
-                    | TerminalValidity.Rejection.Empty -> "Empty"
-                    | TerminalValidity.Rejection.XmlOnly -> "XmlOnly" |}
+                   error = terminalRejectionName rejection |}
 
     let terminalValidityIsValid (value: string) : bool =
         match terminalValidityResult value with
@@ -336,8 +336,8 @@ module CompressionSurface =
 
     let terminalValidityDescription (value: string) : string =
         match value with
-        | "Empty" -> "empty terminal"
-        | "XmlOnly" -> "XML-only terminal"
+        | "Empty" -> TerminalValidity.describe TerminalValidity.Rejection.Empty
+        | "XmlOnly" -> TerminalValidity.describe TerminalValidity.Rejection.XmlOnly
         | _ -> "unknown terminal rejection"
 
     let terminalValidity (value: string) : obj =
@@ -346,10 +346,7 @@ module CompressionSurface =
         | Error rejection ->
             box
                 {| valid = false
-                   rejection =
-                    match rejection with
-                    | TerminalValidity.Rejection.Empty -> "Empty"
-                    | TerminalValidity.Rejection.XmlOnly -> "XmlOnly" |}
+                   rejection = terminalRejectionName rejection |}
 
     let terminalRequestOwnership (value: obj) : string =
         let requestId = BloggerRequestId.create (text value?requestId)
@@ -426,44 +423,6 @@ module CompressionSurface =
             Set.contains run handled)
         |> Option.map ProviderRunIdentity.value
         |> optionObj
-
-    let openingFloor (value: obj) : obj =
-        let hasOpenLife = not (isNullish value?hasOpenLife) && unbox<bool> value?hasOpenLife
-
-        let planCommitted =
-            not (isNullish value?planCommitted) && unbox<bool> value?planCommitted
-
-        let openingSequence = int64Value value?openingSequence
-        let headSequence = int64Value value?xTraceHeadSequence
-
-        let parts =
-            if isNullish value?parts then
-                []
-            else
-                (unbox<obj array> value?parts)
-                |> Array.toList
-                |> List.map (fun item ->
-                    { Cursor = XTraceCursor.create (int64Value item?sequence)
-                      Kind = text item?kind
-                      ToolCallId = optionalText item?toolCallId |> Option.map ToolCallId.create })
-
-        MagicTodo.effectiveOpeningFloor
-            hasOpenLife
-            planCommitted
-            (XTraceCursor.create openingSequence)
-            None
-            None
-            headSequence
-            parts
-        |> Option.map (XTraceCursor.sequence >> int)
-        |> optionObj
-
-    let bloggerEffectiveStart (ingestedThrough: int) (workRecordStartSequence: int) : int =
-        MagicTodo.bloggerEffectiveStart
-            (ingestedThrough |> int64 |> XTraceCursor.create |> RecordCoverage.create)
-            (workRecordStartSequence |> int64 |> XTraceCursor.create)
-        |> XTraceCursor.sequence
-        |> int
 
     let diagnosticEmit (operation: string) (fields: obj array) : unit =
         let pairs =

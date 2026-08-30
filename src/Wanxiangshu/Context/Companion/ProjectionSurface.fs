@@ -1,10 +1,8 @@
 namespace Wanxiangshu.Context.Companion
 
-open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Resources
