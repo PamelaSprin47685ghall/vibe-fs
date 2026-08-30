@@ -2909,6 +2909,147 @@
       "justification": "ModelCapacity.BorrowingCapacity publishes exactly these symbols to the listed owners; every unlisted sibling remains private to execution-model-routing."
     },
     {
+      "path": "src/Wanxiangshu/Context/Prefix/Candidate.fs",
+      "owner": "prefix-stability",
+      "node": "prefix-stability-cutover",
+      "contract": "PrefixStability.Contract",
+      "kind": "published-contract",
+      "law": "WHAT[PREFIX-STABILITY-003]",
+      "proof": "requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs",
+      "consumers": [
+        "capability-enforcement",
+        "context-compression",
+        "delegation",
+        "durable-events",
+        "execution-model-routing",
+        "interaction-authority",
+        "obligation-ledger",
+        "provider-attempt-recovery",
+        "provider-projection",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Prefix.PrefixProbe",
+        "Wanxiangshu.Context.Prefix.PrefixProbe.BasedOnEpochId",
+        "Wanxiangshu.Context.Prefix.PrefixProbe.Candidate",
+        "Wanxiangshu.Context.Prefix.PrefixProbe.ProbeId",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot.CoveredPrefixDigest",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot.CutoffExclusive",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot.FrozenRecordPrefixDigest",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot.FrozenRecordPrefixRef",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot.SealRoot",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot.SyntheticMessageId",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKind",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKind.BloggerMain",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKind.BloggerSquash",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKind.InteractionRepair",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKind.StrengthReplica",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKind.WorkMain",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKindModule.clearsFailureCountOnSuccess",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKindModule.label",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKindModule.mayCarryProbe",
+        "Wanxiangshu.Context.Prefix.XProjectionChoice",
+        "Wanxiangshu.Context.Prefix.XProjectionChoice.UseCommittedEpoch",
+        "Wanxiangshu.Context.Prefix.XProjectionChoice.UsePrefixProbe"
+      ],
+      "justification": "PrefixStability.Contract publishes the observed candidate identity and request-kind symbols to the listed production consumers; the cutover node binds their PREFIX-STABILITY vocabulary and proofs, and every unlisted sibling remains private to prefix-stability."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Prefix/Epoch.fs",
+      "owner": "prefix-stability",
+      "node": "prefix-stability-cutover",
+      "contract": "PrefixStability.Contract",
+      "kind": "published-contract",
+      "law": "WHAT[PREFIX-STABILITY-002]",
+      "proof": "requirements/prefix-stability/tests/prefix-epoch.test.mjs",
+      "consumers": [
+        "context-compression",
+        "durable-events",
+        "provider-attempt-recovery",
+        "semantic-trace"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Prefix.ActivePrefixEpoch",
+        "Wanxiangshu.Context.Prefix.ActivePrefixEpoch.EpochId",
+        "Wanxiangshu.Context.Prefix.ActivePrefixEpoch.ReanchoredRuns",
+        "Wanxiangshu.Context.Prefix.ActivePrefixEpoch.Snapshot",
+        "Wanxiangshu.Context.Prefix.PrefixEpochProjection.applyReanchor",
+        "Wanxiangshu.Context.Prefix.PrefixEpochProjection.applyRebase",
+        "Wanxiangshu.Context.Prefix.PrefixEpochProjection.empty",
+        "Wanxiangshu.Context.Prefix.PrefixEpochProjection.isReanchored",
+        "Wanxiangshu.Context.Prefix.PrefixFoldRejection",
+        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.CandidateNotNew",
+        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.CompactionAlreadyReanchored",
+        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.CutoffRetreated",
+        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.NonSequentialPrefixEpoch",
+        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.StalePrefixEpoch"
+      ],
+      "justification": "PrefixStability.Contract publishes the observed epoch state and fold decisions to context compression and durable aggregation; the cutover node binds the epoch proof and vocabulary."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
+      "owner": "prefix-stability",
+      "node": "prefix-stability-cutover",
+      "contract": "PrefixStability.Contract",
+      "kind": "published-contract",
+      "law": "WHAT[PREFIX-STABILITY-009]",
+      "proof": "requirements/prefix-stability/tests/projection-algebra-step5-digest.test.mjs",
+      "consumers": [
+        "context-compression",
+        "execution-model-routing",
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Prefix.NoCandidateReason",
+        "Wanxiangshu.Context.Prefix.NoCandidateReason.CoverageNotAheadOfRequest",
+        "Wanxiangshu.Context.Prefix.NoCandidateReason.CutoffProofFailed",
+        "Wanxiangshu.Context.Prefix.NoCandidateReason.NoCoverage",
+        "Wanxiangshu.Context.Prefix.NoCandidateReason.NotNewerThanCommitted",
+        "Wanxiangshu.Context.Prefix.NoCandidateReason.WouldRetreat"
+      ],
+      "justification": "PrefixStability.Contract publishes only the typed probe refusal vocabulary observed by attempt planning; the selector remains inside prefix-stability and the cutoff proof is bound to the cutover node."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Prefix/Projection.fs",
+      "owner": "prefix-stability",
+      "node": "prefix-stability-cutover",
+      "contract": "PrefixStability.Contract",
+      "kind": "published-contract",
+      "law": "WHAT[PREFIX-STABILITY-003]",
+      "proof": "requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs",
+      "consumers": [
+        "provider-projection"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Prefix.XPrefixProjection.RawPrefixMessageFacts",
+        "Wanxiangshu.Context.Prefix.XPrefixProjection.RawPrefixMessageFacts.ContainsTodoWrite",
+        "Wanxiangshu.Context.Prefix.XPrefixProjection.RawPrefixMessageFacts.ToolCallIds",
+        "Wanxiangshu.Context.Prefix.XPrefixProjection.retainTodoWriteRounds"
+      ],
+      "justification": "PrefixStability.Contract publishes the observed prefix projection decisions and todo-round retention predicate to provider projection; the attempt-plan proof is bound to the cutover node."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Prefix/Wire.fs",
+      "owner": "prefix-stability",
+      "node": "prefix-stability-cutover",
+      "contract": "PrefixStability.Contract",
+      "kind": "published-contract",
+      "law": "WHAT[PREFIX-STABILITY-001]",
+      "proof": "requirements/prefix-stability/tests/xwire-transform-surface.test.mjs",
+      "consumers": [
+        "host-boundary",
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Prefix.PrefixPresentationHorizon",
+        "Wanxiangshu.Context.Prefix.PrefixPresentationHorizon.Current",
+        "Wanxiangshu.Context.Prefix.XWire.applyTransform",
+        "Wanxiangshu.Context.Prefix.XWire.reconcileAttempt"
+      ],
+      "justification": "PrefixStability.Contract publishes the exact X-wire orchestration entry points and Current presentation horizon observed by Host composition; all other decisions remain inside prefix-stability."
+    },
+    {
       "path": "src/Wanxiangshu/Context/Trace/Cursor.fs",
       "owner": "semantic-trace",
       "node": "semantic-trace-replayable-contract-cutover",

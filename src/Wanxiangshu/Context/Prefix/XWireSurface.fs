@@ -150,7 +150,19 @@ module XWireSurface =
 
     let private sha256Hex (value: string) : string = HostDigest.sha256Hex value
 
-    // ── The transform decision (mirrors XWire.applyTransform's logic) ───────
+    let private attemptOutcomeOfJs (value: obj) : AttemptOutcome option =
+        if isNullish value then
+            None
+        else
+            match text value with
+            | "completed"
+            | "tool-calls" -> Some AttemptOutcome.Completed
+            | "completed-invalid" -> Some AttemptOutcome.CompletedInvalid
+            | "failed" -> Some AttemptOutcome.Failed
+            | "aborted" -> Some AttemptOutcome.Aborted
+            | _ -> None
+
+    // ── The transform decision (delegates to XWire's pure decisions) ───────
     //
     // Every branch delegates to the same pure production functions that
     // `applyTransform` calls. The surface extracts the async Host I/O
@@ -162,11 +174,28 @@ module XWireSurface =
     let coveredPrefixDigest (projection: obj) (cutoff: int) : string =
         let typed = semanticProjectionOfJs projection
 
-        let truncated =
-            { typed with
-                Messages = typed.Messages |> List.truncate cutoff }
+        let snapshot =
+            { CurrentProjection = typed
+              CommittedPrefix = None
+              BlogFrames = []
+              TransportMessages = Set.empty
+              HostReanchor = None }
 
-        HostDigest.sha256Hex (ProviderProjection.renderSemantic truncated)
+        ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot cutoff
+
+    let presentationHorizon (hasProbe: bool) : string =
+        match XWire.presentationHorizonForProbe hasProbe with
+        | PrefixPresentationHorizon.Current -> "Current"
+        | PrefixPresentationHorizon.TentativeCold -> "TentativeCold"
+
+    let retiredRetryMessageIds (horizon: string) (rawMessages: obj array) : string array =
+        let typedHorizon =
+            match horizon with
+            | "TentativeCold" -> PrefixPresentationHorizon.TentativeCold
+            | _ -> PrefixPresentationHorizon.Current
+
+        XWire.retryTransportRetirement typedHorizon (Array.toList rawMessages)
+        |> Set.toArray
 
     /// HOST-BOUNDARY-020/021: the X-wire transform decision.
     ///
@@ -303,17 +332,17 @@ module XWireSurface =
 
                         let currentProjection = semanticProjectionOfJs input?currentProjection
 
-                        let recomputeDigest (cutoff: int) =
-                            let truncated =
-                                { currentProjection with
-                                    Messages = currentProjection.Messages |> List.truncate cutoff }
+                        let projectionSnapshot =
+                            { CurrentProjection = currentProjection
+                              CommittedPrefix = committedSnapshot
+                              BlogFrames = []
+                              TransportMessages = Set.empty
+                              HostReanchor = None }
 
-                            HostDigest.sha256Hex (ProviderProjection.renderSemantic truncated)
+                        let recomputeDigest = ProjectionRenderer.cutoffDigest HostDigest.sha256Hex projectionSnapshot
 
-                        let probeResult =
-                            match opportunity with
-                            | RecoveryOpportunity.RecoveryAttempt ->
-                                PrefixProbeSelection.select
+                        let candidateResult =
+                            PrefixProbeSelection.select
                                     sha256Hex
                                     (SessionId.create sessionId)
                                     committedEpoch
@@ -324,7 +353,8 @@ module XWireSurface =
                                     frozenRef
                                     frozenDigest
                                     recomputeDigest
-                            | RecoveryOpportunity.OrdinaryAttempt -> Error NoCandidateReason.NoCoverage
+
+                        let probeResult = XWire.selectProbe opportunity candidateResult
 
                         // ── Prefix intent (CTX-010) ──
                         let choice, noProbeReason =
@@ -370,19 +400,14 @@ module XWireSurface =
                             // `plan.Profile.ProjectionChoice` and the outcome.
                             // We have the choice and probe result directly,
                             // so the promote decision is: Completed + has probe.
-                            let outcome =
-                                if isNullish input?outcome then
-                                    None
-                                else
-                                    Some(text input?outcome)
+                            let reconcileDecision =
+                                XWire.reconciliationDecision
+                                    true
+                                    (attemptOutcomeOfJs input?outcome)
+                                    (Result.isOk probeResult)
+                                    true
 
-                            let promoted =
-                                match outcome with
-                                | Some "completed" ->
-                                    match probeResult with
-                                    | Ok _ -> true
-                                    | Error _ -> false
-                                | _ -> false
+                            let promoted = reconcileDecision.Promoted
 
                             let probeJs =
                                 match probeResult with
@@ -428,8 +453,9 @@ module XWireSurface =
     /// HOST-BOUNDARY-021: reconcile decision — does a completed attempt promote
     /// a prefix rebase, and does a failed/aborted attempt clear the plan?
     ///
-    /// Mirrors `XWire.reconcileAttempt`'s decision logic. The production function
-    /// is async and writes a durable fact; this surface exposes the *decision*.
+    /// Delegates to the pure decision used by `XWire.reconcileAttempt`. The
+    /// production function is async and writes a durable fact; this surface
+    /// exposes that shared decision.
     ///
     /// Input fields (JS object):
     ///   hasPlan:    true when an attempt plan exists for this (session, run).
@@ -444,51 +470,33 @@ module XWireSurface =
     ///   keptPlan:  true when the plan is kept across a non-terminal reread.
     let reconcile (input: obj) : obj =
         let hasPlan = not (isNullish input?hasPlan) && (input?hasPlan |> unbox<bool>)
+        let hasProbe = not (isNullish input?hasProbe) && (input?hasProbe |> unbox<bool>)
 
-        if not hasPlan then
-            box
-                {| promoted = false
-                   cleared = false
-                   keptPlan = false |}
-        else
-            let outcome = text input?outcome
-            let hasProbe = not (isNullish input?hasProbe) && (input?hasProbe |> unbox<bool>)
+        let currentEpoch =
+            if isNullish input?currentEpoch then
+                None
+            else
+                Some(PrefixEpochId.create (int64 (text input?currentEpoch)))
 
-            let currentEpoch =
-                if isNullish input?currentEpoch then
-                    None
-                else
-                    Some(PrefixEpochId.create (int64 (text input?currentEpoch)))
+        let probeEpoch =
+            if isNullish input?probeEpoch then
+                None
+            else
+                Some(PrefixEpochId.create (int64 (text input?probeEpoch)))
 
-            let probeEpoch =
-                if isNullish input?probeEpoch then
-                    None
-                else
-                    Some(PrefixEpochId.create (int64 (text input?probeEpoch)))
+        let epochMatches =
+            match currentEpoch, probeEpoch with
+            | Some current, Some probe -> current = probe
+            | _ -> false
 
-            let epochMatches =
-                match currentEpoch, probeEpoch with
-                | Some current, Some probe -> current = probe
-                | _ -> false
+        let decision =
+            XWire.reconciliationDecision
+                hasPlan
+                (attemptOutcomeOfJs input?outcome)
+                hasProbe
+                epochMatches
 
-            match outcome with
-            | "completed"
-            | "tool-calls" ->
-                // CTX-012: only a probe based on the current epoch can promote.
-                box
-                    {| promoted = hasProbe && epochMatches
-                       cleared = true
-                       keptPlan = false |}
-            | "failed"
-            | "aborted" ->
-                // Terminal failure: clear plan, no promotion.
-                box
-                    {| promoted = false
-                       cleared = true
-                       keptPlan = false |}
-            | _ ->
-                // In-progress / unknown: keep the plan (HOST-BOUNDARY-021).
-                box
-                    {| promoted = false
-                       cleared = false
-                       keptPlan = true |}
+        box
+            {| promoted = decision.Promoted
+               cleared = decision.Cleared
+               keptPlan = decision.KeptPlan |}

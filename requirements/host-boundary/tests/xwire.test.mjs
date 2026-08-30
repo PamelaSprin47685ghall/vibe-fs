@@ -140,6 +140,15 @@ test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_frozen_prefix_body_fail_closed', () 
   assert.match(result.error, /frozen record prefix body/)
 })
 
+test('WHAT[HOST-BOUNDARY-020] XWIRE_covered_digest_mismatch_refuses_the_probe_fail_closed', () => {
+  const result = XWireSurface.transform(armedInput({ coveredDigest: 'not-the-current-prefix-digest' }))
+  assert.equal(result.ok, true)
+  assert.equal(result.consumed, true)
+  assert.equal(result.changed, false)
+  assert.match(result.noProbeReason, /^CutoffProofFailed:/)
+  assert.equal(result.probe, null)
+})
+
 // ── HOST-BOUNDARY-021: armed + material → probe renders synthetic prefix ─
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_armed_with_material_renders_synthetic_prefix', () => {

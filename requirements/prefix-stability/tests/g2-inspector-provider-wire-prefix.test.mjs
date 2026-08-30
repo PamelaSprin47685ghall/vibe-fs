@@ -105,7 +105,7 @@ test('WHAT[PREFIX-STABILITY-001] G2_inspector_Q1_Q2_Q3_provider_wire_append_only
       const question = QUESTIONS[ordinal]
       const answer = ANSWERS[ordinal]
       const pending = delegation.invoke(harness, OWNER, 'Inspector', question)
-      await waitFor(() => delegation.child(harness, OWNER, 'Inspector') !== undefined, `${question} child missing`)
+      await waitFor(() => delegation.childCount(harness) === 1, `${question} child missing`)
 
       const child = delegation.child(harness, OWNER, 'Inspector')
       childIds.push(child)

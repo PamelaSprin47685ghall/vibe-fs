@@ -10,6 +10,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as compression from '../../../dist/Context/Companion/CompressionSurface.js'
+import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 
 const floor = ({ hasOpenLife = true, planCommitted = false, xTraceHeadSequence = 0, legacyProtectedPrefixEnd } = {}) =>
   compression.openingFloor({
@@ -58,7 +59,7 @@ test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_blogger_effective_start_is_max_of_re
 
 test('WHAT[CONTEXT-COMPRESSION-020] todowrite call and matching result are retained across a Y cutoff', () => {
   assert.deepEqual(
-    compression.retainTodoWriteRounds([
+    prefix.retainTodoWriteRounds([
       { containsTodoWrite: false, callIds: [] },
       { containsTodoWrite: true, callIds: ['todo-call-1'] },
       { containsTodoWrite: false, callIds: ['todo-call-1'] },

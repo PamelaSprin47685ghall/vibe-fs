@@ -60,17 +60,6 @@ type NoCandidateReason =
 [<RequireQualifiedAccess>]
 module PrefixProbeSelection =
 
-    /// CTX-011 snapshot identity: cutoff, covered-prefix digest, FrozenRecordPrefix digest.
-    ///
-    /// Same three fields `PrefixEpochProjection` compares. Spelled once here and
-    /// consumed there would be better still, but the projection cannot depend on this
-    /// module without a cycle, so the comment carries the obligation: these must stay
-    /// in step.
-    let private sameAsCommitted (candidate: PrefixSnapshot) (committed: PrefixSnapshot) =
-        candidate.CutoffExclusive = committed.CutoffExclusive
-        && candidate.CoveredPrefixDigest = committed.CoveredPrefixDigest
-        && candidate.FrozenRecordPrefixDigest = committed.FrozenRecordPrefixDigest
-
     let private validateCoverage
         (coverableCutoff: int)
         (requestStartCutoff: int)
@@ -120,7 +109,8 @@ module PrefixProbeSelection =
               SyntheticMessageId = CompanionIdentity.companionMemoryMessageId sha256 sealRoot }
 
         match committedSnapshot with
-        | Some existing when sameAsCommitted candidate existing -> Error NoCandidateReason.NotNewerThanCommitted
+        | Some existing when PrefixSnapshot.sameIdentity candidate existing ->
+            Error NoCandidateReason.NotNewerThanCommitted
         | _ ->
             Ok
                 { ProbeId = sha256 (sealRoot + "|probe")

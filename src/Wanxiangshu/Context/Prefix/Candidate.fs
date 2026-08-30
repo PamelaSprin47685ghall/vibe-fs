@@ -32,6 +32,17 @@ type PrefixSnapshot =
       SealRoot: string
       SyntheticMessageId: string }
 
+[<RequireQualifiedAccess>]
+module PrefixSnapshot =
+
+    /// CTX-011 snapshot identity: cutoff, covered-prefix digest, FrozenRecordPrefix digest.
+    /// SealRoot and SyntheticMessageId are derived from these fields and are not
+    /// independent identity inputs.
+    let sameIdentity (a: PrefixSnapshot) (b: PrefixSnapshot) =
+        a.CutoffExclusive = b.CutoffExclusive
+        && a.CoveredPrefixDigest = b.CoveredPrefixDigest
+        && a.FrozenRecordPrefixDigest = b.FrozenRecordPrefixDigest
+
 /// CTX-010: a candidate prefix, valid for ONE provider attempt.
 ///
 /// Not session state. It exists only inside the immutable `AttemptExecutionProfile`

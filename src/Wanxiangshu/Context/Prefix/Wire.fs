@@ -76,7 +76,52 @@ type PrefixPresentationHorizon =
     | Current
     | TentativeCold
 
+type XWireReconciliationDecision =
+    { Promoted: bool
+      Cleared: bool
+      KeptPlan: bool }
+
 module XWire =
+
+    let selectProbe
+        (opportunity: RecoveryOpportunity)
+        (candidate: Result<PrefixProbe, NoCandidateReason>)
+        : Result<PrefixProbe, NoCandidateReason> =
+        match opportunity with
+        | RecoveryOpportunity.RecoveryAttempt -> candidate
+        | RecoveryOpportunity.OrdinaryAttempt -> Error NoCandidateReason.NoCoverage
+
+    let presentationHorizonForProbe (hasProbe: bool) : PrefixPresentationHorizon =
+        if hasProbe then
+            PrefixPresentationHorizon.TentativeCold
+        else
+            PrefixPresentationHorizon.Current
+
+    let reconciliationDecision
+        (hasPlan: bool)
+        (outcome: AttemptOutcome option)
+        (hasPromotableProbe: bool)
+        (probeEpochMatches: bool)
+        : XWireReconciliationDecision =
+        match hasPlan, outcome with
+        | false, _ ->
+            { Promoted = false
+              Cleared = false
+              KeptPlan = false }
+        | true, Some AttemptOutcome.Completed ->
+            { Promoted = hasPromotableProbe && probeEpochMatches
+              Cleared = true
+              KeptPlan = false }
+        | true, Some AttemptOutcome.CompletedInvalid
+        | true, Some AttemptOutcome.Failed
+        | true, Some AttemptOutcome.Aborted ->
+            { Promoted = false
+              Cleared = true
+              KeptPlan = false }
+        | true, None ->
+            { Promoted = false
+              Cleared = false
+              KeptPlan = true }
 
     let private sessionIdOfOutput (output: obj) : SessionId option =
         ProviderWireDecode.projectionSessionIdFromMessages output
@@ -169,7 +214,7 @@ module XWire =
             | _ -> None)
         |> Set.ofList
 
-    let private retryTransportRetirement (horizon: PrefixPresentationHorizon) (rawMessages: obj list) =
+    let retryTransportRetirement (horizon: PrefixPresentationHorizon) (rawMessages: obj list) =
         match horizon with
         | PrefixPresentationHorizon.Current -> Set.empty
         | PrefixPresentationHorizon.TentativeCold -> staleProviderRetryMessageIds rawMessages
@@ -312,18 +357,6 @@ module XWire =
                   ObservedCompactionRunId = "" }
         | _ -> None
 
-    let private selectCandidateForOpportunity
-        (opportunity: RecoveryOpportunity)
-        (durable: AgentJournal)
-        (sessionId: SessionId)
-        (snapshot: ProjectionSnapshot)
-        (state: SessionAgentProjection)
-        (cutoff: int)
-        =
-        match opportunity with
-        | RecoveryOpportunity.RecoveryAttempt -> candidate durable sessionId snapshot state cutoff
-        | RecoveryOpportunity.OrdinaryAttempt -> Task.FromResult(Error NoCandidateReason.NoCoverage)
-
     let private readFrozenRecordPrefixBody
         (durable: AgentJournal)
         (choice: XProjectionChoice)
@@ -432,8 +465,17 @@ module XWire =
                 |> Option.bind (fun state -> state.PrefixEpoch)
                 |> Option.defaultValue PrefixEpochProjection.empty
 
-            match AttemptPlanner.promotableProbe plan AttemptOutcome.Completed with
-            | Some probe when epoch.EpochId = probe.BasedOnEpochId ->
+            let promotableProbe = AttemptPlanner.promotableProbe plan AttemptOutcome.Completed
+
+            let decision =
+                reconciliationDecision
+                    true
+                    (Some AttemptOutcome.Completed)
+                    (Option.isSome promotableProbe)
+                    (promotableProbe |> Option.exists (fun probe -> epoch.EpochId = probe.BasedOnEpochId))
+
+            match promotableProbe, decision.Promoted with
+            | Some probe, true ->
                 let fact =
                     ContextFact.PrefixRebaseCommitted
                         {| SessionId = sessionId
@@ -650,9 +692,12 @@ module XWire =
 
                 let opportunity = RecoverySlot.opportunity arming fallback.Cursor.Offset
 
-                let! candidateResult = selectCandidateForOpportunity opportunity durable sessionId snapshot state cutoff
+                let! candidateResult =
+                    match opportunity with
+                    | RecoveryOpportunity.RecoveryAttempt -> candidate durable sessionId snapshot state cutoff
+                    | RecoveryOpportunity.OrdinaryAttempt -> Task.FromResult(Error NoCandidateReason.NoCoverage)
 
-                let selectProbe () = candidateResult
+                let selectProbeForPlan () = selectProbe opportunity candidateResult
 
                 let pendingPlan =
                     AttemptPlanner.freezePreInference
@@ -662,12 +707,13 @@ module XWire =
                         (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt)
                         ProviderRequestKind.WorkMain
                         opportunity
-                        selectProbe
+                        selectProbeForPlan
 
                 let presentationHorizon =
-                    match AttemptPlanner.pendingProbeOf pendingPlan with
-                    | Some _ -> PrefixPresentationHorizon.TentativeCold
-                    | None -> PrefixPresentationHorizon.Current
+                    pendingPlan
+                    |> AttemptPlanner.pendingProbeOf
+                    |> Option.isSome
+                    |> presentationHorizonForProbe
 
                 // `requiredBlob` is the single answer to "which blob does this choice
                 // need" — the adapter reads, never guesses (CTX-010: reading the
@@ -781,9 +827,12 @@ module XWire =
         (turn: ReconciledTurn)
         (plan: AttemptPlan)
         : Task =
-        match attemptOutcomeOfTurn turn with
-        | Some outcome -> settleAttemptPlan durable scope turn.SessionId turn.ProviderRun outcome plan
-        | None -> Task.FromResult(())
+        let outcome = attemptOutcomeOfTurn turn
+        let decision = reconciliationDecision true outcome false false
+
+        match outcome, decision.Cleared with
+        | Some settled, true -> settleAttemptPlan durable scope turn.SessionId turn.ProviderRun settled plan
+        | _ -> Task.FromResult(())
 
     let private attemptPlanForTurn (scope: PluginRuntimeScope) (turn: ReconciledTurn) =
         scope.TryAttemptPlan turn.SessionId turn.ProviderRun

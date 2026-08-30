@@ -479,16 +479,6 @@ module ProjectionSurface =
         ProjectionMessageEdit.applyRenderedPrefix (Array.toList rawMessages) (renderedPrefixOf rendered)
         |> List.toArray
 
-    /// Resolve a committed prefix snapshot into the production projection intent.
-    let prefixForSnapshot (snapshot: obj) (memoryPreamble: string) (body: string) : obj =
-        let committed =
-            if isNullish snapshot?committedPrefix then
-                None
-            else
-                Some(prefixSnapshotOf snapshot?committedPrefix)
-
-        XPrefixProjection.forSnapshot committed memoryPreamble body |> intentToJs
-
     /// Plan a JSON intent array with canonical rank and explicit conflict data.
     let plan (intents: obj array) : obj =
         match ProjectionPlanner.plan (Array.toList intents |> List.map intentOf) with

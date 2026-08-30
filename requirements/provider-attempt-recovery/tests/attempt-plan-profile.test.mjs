@@ -8,13 +8,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as compression from '../../../dist/Context/Companion/CompressionSurface.js'
+import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 import * as cursorOwner from '../../../dist/Participant/Provider/Attempt/Fallback/CursorSurface.js'
 
 const planner = compression.attemptPlanner
 const cursor = cursorOwner.cursor
-const prefix = compression
-const prefixProbe = compression.prefixProbe
-const requestKind = compression.requestKind
+const requestKind = prefix.requestKind
 const slot = compression
 
 const source = (relative) => readFileSync(new URL(`../../../${relative}`, import.meta.url), 'utf8')
@@ -30,7 +29,7 @@ const snapshotAt = (cutoff, { seal = `seal-${cutoff}` } = {}) =>
   })
 
 const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) =>
-  prefixProbe({ probeId: id, basedOnEpoch: 0, candidate: snapshotAt(cutoff) })
+  ({ probeId: id, basedOnEpoch: 0, candidate: snapshotAt(cutoff) })
 
 test('WHAT[PAR-013] FALLBACK_002_the_cursor_is_the_only_thing_that_moves_the_effective_agent', () => {
   const at = (offset) =>

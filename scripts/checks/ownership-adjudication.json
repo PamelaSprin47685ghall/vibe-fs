@@ -775,49 +775,43 @@
       {
         "path": "src/Wanxiangshu/Context/Prefix/Candidate.fs",
         "owners": [
-          "context-compression",
           "prefix-stability"
         ]
       },
       {
         "path": "src/Wanxiangshu/Context/Prefix/Epoch.fs",
         "owners": [
-          "context-compression",
           "prefix-stability"
         ]
       },
       {
         "path": "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
         "owners": [
-          "context-compression",
           "prefix-stability"
         ]
       },
       {
         "path": "src/Wanxiangshu/Context/Prefix/Projection.fs",
         "owners": [
-          "context-compression",
           "prefix-stability"
         ]
       },
       {
         "path": "src/Wanxiangshu/Context/Prefix/Surface.fs",
         "owners": [
-          "context-compression",
           "prefix-stability"
         ]
       },
       {
         "path": "src/Wanxiangshu/Context/Prefix/Wire.fs",
         "owners": [
-          "context-compression",
           "prefix-stability"
         ]
       },
       {
         "path": "src/Wanxiangshu/Context/Prefix/XWireSurface.fs",
         "owners": [
-          "context-compression",
+          "host-boundary",
           "prefix-stability"
         ]
       },

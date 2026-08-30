@@ -788,6 +788,96 @@
       "closure_evidence": "Production cutover retains exactly Cursor.fs, Model.fs, Projection.fs, Capture.fs, Materialization.fs, TerminalReporter.fs, and SemanticTraceSurface.fs; obsolete src/Wanxiangshu/Context/Trace/XTracePipeline.fs and src/Wanxiangshu/Context/Trace/XTraceSurface.fs are deleted. Semantic-trace executable proofs are green and owner-dependencies.mjs is the hard publication gate."
     },
     {
+      "id": "prefix-stability-cutover",
+      "primary_owner": "prefix-stability",
+      "intent": "Canonical prefix owner cutover: candidate identity, epoch facts, probe selection, projection, JS proof surfaces, and X-wire orchestration",
+      "files": [
+        "src/Wanxiangshu/Context/Prefix/Candidate.fs",
+        "src/Wanxiangshu/Context/Prefix/Epoch.fs",
+        "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
+        "src/Wanxiangshu/Context/Prefix/Projection.fs",
+        "src/Wanxiangshu/Context/Prefix/Surface.fs",
+        "src/Wanxiangshu/Context/Prefix/Wire.fs",
+        "src/Wanxiangshu/Context/Prefix/XWireSurface.fs"
+      ],
+      "classification": "SPLIT",
+      "publishes": [
+        "PrefixStability.Contract",
+        "PrefixStability.SurfaceContract"
+      ],
+      "consumes": [
+        "SemanticTrace.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        },
+        {
+          "id": "semantic-trace-replayable-contract-cutover",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Composition/Durable/Fold.fs",
+        "src/Wanxiangshu/Composition/Durable/ProjectionUpdate.fs",
+        "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
+        "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs",
+        "src/Wanxiangshu/Interaction/Authority/Model.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoSemanticSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/PrefixEpoch.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs",
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ToolRegistrySurface.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/PlannerSurface.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Intent.fs",
+        "src/Wanxiangshu/Strength/OpenCode/Speculate.fs",
+        "src/Wanxiangshu/Strength/Policy.fs",
+        "src/Wanxiangshu/Strength/Replica/Runtime.fs",
+        "src/Wanxiangshu/Strength/Runtime.fs",
+        "src/Wanxiangshu/Strength/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs",
+        "requirements/prefix-stability/tests/g2-inspector-provider-wire-prefix.test.mjs",
+        "requirements/prefix-stability/tests/pair-thought-anchored.test.mjs",
+        "requirements/prefix-stability/tests/pair-thought-transform.test.mjs",
+        "requirements/prefix-stability/tests/prefix-append-only-law.test.mjs",
+        "requirements/prefix-stability/tests/prefix-epoch-todo-checkpoint.test.mjs",
+        "requirements/prefix-stability/tests/prefix-epoch.test.mjs",
+        "requirements/prefix-stability/tests/projection-algebra-step5-digest.test.mjs",
+        "requirements/prefix-stability/tests/system-prompt-stability.test.mjs",
+        "requirements/prefix-stability/tests/xwire-transform-surface.test.mjs"
+      ],
+      "architecture_gates": [
+        "migration-ledger.mjs",
+        "owner-dependencies.mjs",
+        "requirement-trace.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Context/Prefix/Candidate.fs",
+        "src/Wanxiangshu/Context/Prefix/Epoch.fs",
+        "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
+        "src/Wanxiangshu/Context/Prefix/Projection.fs",
+        "src/Wanxiangshu/Context/Prefix/Surface.fs",
+        "src/Wanxiangshu/Context/Prefix/Wire.fs",
+        "src/Wanxiangshu/Context/Prefix/XWireSurface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER",
+      "closure_evidence": "PrefixStability.Contract retains exactly the seven canonical Context/Prefix owner files; the bound proof portfolio covers all PREFIX-STABILITY-001 through PREFIX-STABILITY-015 vocabulary, and owner-dependencies.mjs is the hard exact-symbol publication gate."
+    },
+    {
       "id": "strength-prediction-replica-cutover",
       "primary_owner": "strength",
       "intent": "Strength prediction & replica slice: budget allocation, prediction models, and speculation transform without foreign leaks",
@@ -1658,13 +1748,6 @@
       "src/Wanxiangshu/Context/Companion/Prompt.fs",
       "src/Wanxiangshu/Context/Companion/Runtime.fs",
       "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs",
-      "src/Wanxiangshu/Context/Prefix/Candidate.fs",
-      "src/Wanxiangshu/Context/Prefix/Epoch.fs",
-      "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
-      "src/Wanxiangshu/Context/Prefix/Projection.fs",
-      "src/Wanxiangshu/Context/Prefix/Surface.fs",
-      "src/Wanxiangshu/Context/Prefix/Wire.fs",
-      "src/Wanxiangshu/Context/Prefix/XWireSurface.fs",
       "src/Wanxiangshu/Enforcer/BlogSurface.fs",
       "src/Wanxiangshu/Enforcer/Catalog.fs",
       "src/Wanxiangshu/Enforcer/ChronicleExecution.fs",

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as frames from '../../../dist/Context/Companion/Blogger/FrameSurface.js'
-import * as compression from '../../../dist/Context/Companion/CompressionSurface.js'
+import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 import * as crash from '../../../dist/Context/Companion/Blogger/BloggerCrashSurface.js'
 
 const entry = (overrides = {}) => ({
@@ -56,7 +56,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_missing_blob_
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_digest_mismatch_fails_closed', () => {
   const rejected = frames.applyEntry(entry({ digest: 'wrong' }), frames.empty)
   assert.equal(rejected.ok, true, 'commit stores the declared digest; body validation is a separate fail-closed step')
-  const probe = compression.select({
+  const probe = prefix.select({
     session: 'ses-main',
     committedEpoch: 0,
     committedSnapshot: null,

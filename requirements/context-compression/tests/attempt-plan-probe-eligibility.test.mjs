@@ -8,9 +8,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as planner from '../../../dist/Context/Companion/CompressionSurface.js'
+import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 
 const snapshotAt = (cutoff, { seal = `seal-${cutoff}` } = {}) =>
-  planner.snapshot({
+  prefix.snapshot({
     ref: `blob-frozen-${cutoff}`,
     frozenDigest: `frozen-${cutoff}`,
     cutoff,

@@ -97,15 +97,6 @@ module PrefixEpochProjection =
           Snapshot = None
           ReanchoredRuns = Set.empty }
 
-    /// CTX-011 snapshot identity: cutoff, prefix digest, FrozenRecordPrefix digest.
-    ///
-    /// SealRoot and SyntheticMessageId are excluded because COMPANION-013 derives
-    /// both from these three; including them would make the comparison circular.
-    let private sameCandidate (a: PrefixSnapshot) (b: PrefixSnapshot) =
-        a.CutoffExclusive = b.CutoffExclusive
-        && a.CoveredPrefixDigest = b.CoveredPrefixDigest
-        && a.FrozenRecordPrefixDigest = b.FrozenRecordPrefixDigest
-
     let private rebaseSnapshot
         (nextEpoch: PrefixEpochId)
         (candidate: PrefixSnapshot)
@@ -114,7 +105,8 @@ module PrefixEpochProjection =
         match state.Snapshot with
         | Some committed when candidate.CutoffExclusive < committed.CutoffExclusive ->
             Error(PrefixFoldRejection.CutoffRetreated(committed.CutoffExclusive, candidate.CutoffExclusive))
-        | Some committed when sameCandidate candidate committed -> Error PrefixFoldRejection.CandidateNotNew
+        | Some committed when PrefixSnapshot.sameIdentity candidate committed ->
+            Error PrefixFoldRejection.CandidateNotNew
         | _ ->
             Ok
                 { state with

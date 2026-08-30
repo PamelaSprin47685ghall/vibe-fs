@@ -283,26 +283,6 @@ test('WHAT[PROVIDER-PROJECTION-002] PROJ_002_the_snapshot_is_the_attempt_local_i
   assert.equal(snapshot.committedPrefix, null, 'no committed prefix = send physical history')
 })
 
-test('WHAT[PROVIDER-PROJECTION-002] PROJ_002_the_committed_prefix_in_the_snapshot_drives_the_prefix_decision', () => {
-  const committed = {
-    frozenRecordPrefixRef: 'blob-frozen-2',
-    frozenRecordPrefixDigest: 'frozen-2',
-    cutoffExclusive: 2,
-    coveredPrefixDigest: 'prefix-2',
-    sealRoot: 'seal-2',
-    syntheticMessageId: 'synthetic-2',
-  }
-  const snapshot = stage2Snapshot([], committed)
-
-  const plan = Projection.prefixForSnapshot(snapshot, '', 'BODY')
-  assert.equal(plan.kind, 'ActivatePrefixEpoch')
-  assert.equal(plan.activation.dropLeading, 2)
-  assert.equal(plan.activation.syntheticMessageId, 'synthetic-2')
-
-  const raw = Projection.prefixForSnapshot(stage2Snapshot([]), '', 'unused')
-  assert.equal(raw.kind, 'KeepPhysicalPrefix')
-})
-
 // ── PROJ-008 step 3a: six intents — plan, order, conflict, render ──────────
 //
 // Domain skeleton only. Snapshot gains BlogFrames / TransportMessages /

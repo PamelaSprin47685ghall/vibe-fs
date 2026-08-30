@@ -18,9 +18,9 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
-/// Context-compression decision owner. Prefix candidate selection, attempt
-/// choice, recovery-slot dispatch and terminal validity share one JSON boundary;
-/// the production DUs, maps and identities do not cross into semantic tests.
+/// Context-compression decision owner. Attempt choice, recovery-slot dispatch
+/// and terminal validity cross this JSON boundary; prefix selection and epoch
+/// behavior are owned by `PrefixSurface`.
 [<RequireQualifiedAccess>]
 module CompressionSurface =
 
@@ -40,12 +40,6 @@ module CompressionSurface =
     let private optionalText (value: obj) : string option =
         if isNullish value then None else Some(text value)
 
-    let private shaOf (value: obj) : string -> string =
-        if isNullish value then
-            fun input -> "«" + input + "»"
-        else
-            unbox<string -> string> value
-
     let private snapshotOfJs (value: obj) : PrefixSnapshot =
         { FrozenRecordPrefixRef = BlobRef.create (text value?ref)
           FrozenRecordPrefixDigest = BlobDigest.create (text value?frozenDigest)
@@ -53,21 +47,6 @@ module CompressionSurface =
           CoveredPrefixDigest = text value?prefixDigest
           SealRoot = text value?sealRoot
           SyntheticMessageId = text value?syntheticId }
-
-    let private snapshotToJs (snapshot: PrefixSnapshot) : obj =
-        box
-            {| ref = BlobRef.value snapshot.FrozenRecordPrefixRef
-               frozenDigest = BlobDigest.value snapshot.FrozenRecordPrefixDigest
-               cutoff = snapshot.CutoffExclusive
-               prefixDigest = snapshot.CoveredPrefixDigest
-               sealRoot = snapshot.SealRoot
-               syntheticId = snapshot.SyntheticMessageId |}
-
-    let private probeToJs (probe: PrefixProbe) : obj =
-        box
-            {| probeId = probe.ProbeId
-               basedOnEpoch = int (PrefixEpochId.value probe.BasedOnEpochId)
-               candidate = snapshotToJs probe.Candidate |}
 
     let private probeOfJs (value: obj) : PrefixProbe =
         { ProbeId = text value?probeId
@@ -82,9 +61,6 @@ module CompressionSurface =
         | NoCandidateReason.NotNewerThanCommitted -> "NotNewerThanCommitted"
         | NoCandidateReason.CutoffProofFailed _ -> "CutoffProofFailed"
 
-    let private reasonText (reason: NoCandidateReason) =
-        PrefixProbeSelection.describeNoCandidate reason
-
     let private reasonOf (value: obj) : NoCandidateReason =
         match text value with
         | "CoverageNotAheadOfRequest" -> NoCandidateReason.CoverageNotAheadOfRequest
@@ -93,112 +69,10 @@ module CompressionSurface =
         | "CutoffProofFailed" -> NoCandidateReason.CutoffProofFailed("", "")
         | _ -> NoCandidateReason.NoCoverage
 
-    let private selectionResult (result: Result<PrefixProbe, NoCandidateReason>) : obj =
-        match result with
-        | Ok probe ->
-            let candidate = probe.Candidate
-
-            box
-                {| ok = true
-                   probeId = probe.ProbeId
-                   basedOnEpoch = int64 (PrefixEpochId.value probe.BasedOnEpochId)
-                   candidate = snapshotToJs candidate
-                   cutoff = candidate.CutoffExclusive
-                   sealRoot = candidate.SealRoot
-                   syntheticId = candidate.SyntheticMessageId |}
-        | Error reason ->
-            box
-                {| ok = false
-                   error = reasonName reason
-                   message = reasonText reason |}
-
-    /// Build a candidate from the current Companion proof, or return its named
-    /// normal no-candidate reason. `recomputeDigest` is the caller's current-X
-    /// digest oracle, not a cached value.
-    let select (value: obj) : obj =
-        let committed =
-            if isNullish value?committedSnapshot then
-                None
-            else
-                Some(snapshotOfJs value?committedSnapshot)
-
-        let recompute =
-            if isNullish value?recomputeDigest then
-                fun (_: int) -> ""
-            else
-                unbox<int -> string> value?recomputeDigest
-
-        let result =
-            PrefixProbeSelection.select
-                (shaOf value?sha256)
-                (SessionId.create (text value?session))
-                (PrefixEpochId.create (int64Value value?committedEpoch))
-                committed
-                (intValue value?coverableCutoff)
-                (text value?coveredDigest)
-                (intValue value?requestStartCutoff)
-                (BlobRef.create (
-                    if isNullish value?frozenRef then
-                        "blob-frozen-" + string (intValue value?coverableCutoff)
-                    else
-                        text value?frozenRef
-                ))
-                (BlobDigest.create (text value?frozenDigest))
-                recompute
-
-        selectionResult result
-
-    let prefixEmpty: obj = box {| epoch = 0; snapshot = null |}
-
     let private optionObj (value: 'a option) : obj =
         match value with
         | None -> null
         | Some item -> box item
-
-    let private prefixStateToJs (state: ActivePrefixEpoch) : obj =
-        box
-            {| epoch = int (PrefixEpochId.value state.EpochId)
-               snapshot = optionObj (state.Snapshot |> Option.map snapshotToJs) |}
-
-    let private prefixStateOfJs (value: obj) : ActivePrefixEpoch =
-        { EpochId = PrefixEpochId.create (int64Value value?epoch)
-          Snapshot =
-            if isNullish value?snapshot then
-                None
-            else
-                Some(snapshotOfJs value?snapshot)
-          ReanchoredRuns = Set.empty }
-
-    let private prefixRejectionName (rejection: PrefixFoldRejection) : string =
-        match rejection with
-        | PrefixFoldRejection.StalePrefixEpoch _ -> "StalePrefixEpoch"
-        | PrefixFoldRejection.NonSequentialPrefixEpoch -> "NonSequentialPrefixEpoch"
-        | PrefixFoldRejection.CutoffRetreated _ -> "CutoffRetreated"
-        | PrefixFoldRejection.CandidateNotNew -> "CandidateNotNew"
-        | PrefixFoldRejection.CompactionAlreadyReanchored _ -> "CompactionAlreadyReanchored"
-
-    let private prefixResultToJs (result: Result<ActivePrefixEpoch, PrefixFoldRejection>) : obj =
-        match result with
-        | Ok value ->
-            box
-                {| ok = true
-                   value = prefixStateToJs value |}
-        | Error rejection ->
-            box
-                {| ok = false
-                   error = prefixRejectionName rejection |}
-
-    let applyRebase (request: obj) (state: obj) : obj =
-        PrefixEpochProjection.applyRebase
-            (PrefixEpochId.create (int64Value request?previousEpoch))
-            (PrefixEpochId.create (int64Value request?nextEpoch))
-            (snapshotOfJs request?candidate)
-            (prefixStateOfJs state)
-        |> prefixResultToJs
-
-    let prefixSnapshot (value: obj) : obj = snapshotOfJs value |> snapshotToJs
-    let empty: obj = prefixEmpty
-    let snapshot (value: obj) : obj = prefixSnapshot value
 
     let private requestKindOf (value: obj) : ProviderRequestKind option =
         match text value |> fun value -> value.ToLowerInvariant() with
@@ -318,36 +192,7 @@ module CompressionSurface =
         | Error error, _
         | _, Error error -> box {| ok = false; error = error |}
 
-    let requestKindLabels: string array =
-        [| ProviderRequestKind.WorkMain
-           ProviderRequestKind.BloggerMain
-           ProviderRequestKind.BloggerSquash
-           ProviderRequestKind.InteractionRepair
-           ProviderRequestKind.StrengthReplica |]
-        |> Array.map ProviderRequestKind.label
-
-    let requestKindMayCarryProbe (kind: string) : bool =
-        requestKindOf kind
-        |> Option.map ProviderRequestKind.mayCarryProbe
-        |> Option.defaultValue false
-
-    let requestKindLabel (kind: string) : string =
-        requestKindOf kind
-        |> Option.map ProviderRequestKind.label
-        |> Option.defaultValue ""
-
     let armingName (value: string) : string = value
-
-    let requestKind =
-        box
-            {| workMain = "work-main"
-               bloggerMain = "blogger-main"
-               bloggerSquash = "blogger-squash"
-               interactionRepair = "interaction-repair"
-               strengthReplica = "strength-replica"
-               all = requestKindLabels
-               mayCarryProbe = (fun kind -> requestKindMayCarryProbe kind)
-               label = (fun kind -> requestKindLabel kind) |}
 
     let cursor = box {| isRecoverySlot = (fun offset -> offset % 2 <> 0) |}
 
@@ -469,13 +314,6 @@ module CompressionSurface =
         box
             {| plan = (fun value -> attemptPlanWithHandle value)
                promotableProbeId = (fun value outcome -> promotableProbeId value outcome) |}
-
-    /// Prefix probe fixture constructor at the owner boundary.
-    let prefixProbe (value: obj) : obj =
-        box
-            {| probeId = text value?probeId
-               basedOnEpoch = int64Value value?basedOnEpoch
-               candidate = snapshotToJs (snapshotOfJs value?candidate) |}
 
     let private terminalValidityResult (value: string) : Result<unit, TerminalValidity.Rejection> =
         TerminalValidity.check value
@@ -626,31 +464,6 @@ module CompressionSurface =
             (workRecordStartSequence |> int64 |> XTraceCursor.create)
         |> XTraceCursor.sequence
         |> int
-
-    let retainTodoWriteRounds (messages: obj array) : bool array =
-        messages
-        |> Array.toList
-        |> List.map (fun message ->
-            let containsTodoWrite =
-                not (isNullish message?containsTodoWrite)
-                && unbox<bool> message?containsTodoWrite
-
-            let callIds =
-                if isNullish message?callIds then
-                    Set.empty
-                else
-                    message?callIds
-                    |> unbox<string array>
-                    |> Array.map ToolCallId.create
-                    |> Set.ofArray
-
-            let facts: XPrefixProjection.RawPrefixMessageFacts =
-                { ContainsTodoWrite = containsTodoWrite
-                  ToolCallIds = callIds }
-
-            facts)
-        |> XPrefixProjection.retainTodoWriteRounds
-        |> List.toArray
 
     let diagnosticEmit (operation: string) (fields: obj array) : unit =
         let pairs =
