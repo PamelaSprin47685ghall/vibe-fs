@@ -260,6 +260,66 @@ module ChangeSurface =
             | WorktreeEffectStatus.Requested _ -> box "Requested"
             | WorktreeEffectStatus.Created _ -> box "Created"
 
+    /// JS-native semantic surface for the pure Requested/Created reconciliation law.
+    let worktreeReconciliationDecision
+        (job: string)
+        (identity: string)
+        (path: string)
+        (evidence: obj)
+        : obj =
+        let evidenceKind = stringField evidence [ "kind" ]
+        let recordedJob = jobId (field evidence [ "jobId" ])
+        let recordedPath = worktreePathValue (field evidence [ "path" ])
+
+        let entries () =
+            field evidence [ "entries" ]
+            |> unbox<obj array>
+            |> Array.map (fun entry ->
+                let identityValue = field entry [ "identity" ]
+
+                worktreePathValue (field entry [ "path" ]),
+                if isNullish identityValue then
+                    None
+                else
+                    Some(worktreeIdentityValue identityValue))
+            |> Array.toList
+
+        let observation =
+            match evidenceKind with
+            | "NoDurableEffect" -> WorktreeReconciliationObservation.NoDurableEffect
+            | "CreatedReceipt" -> WorktreeReconciliationObservation.CreatedReceipt(recordedJob, recordedPath)
+            | "RequestedConflict" -> WorktreeReconciliationObservation.RequestedConflict(recordedJob, recordedPath)
+            | "RequestedEntries" ->
+                WorktreeReconciliationObservation.RequestedAmbiguity(recordedJob, recordedPath, Ok(entries ()))
+            | "RequestedQueryFailure" ->
+                WorktreeReconciliationObservation.RequestedAmbiguity(
+                    recordedJob,
+                    recordedPath,
+                    Error(stringField evidence [ "error" ])
+                )
+            | unknown -> invalidArg "evidence" ("unknown worktree reconciliation evidence: " + unknown)
+
+        let decision =
+            OrchestratorProjection.decideWorktreeReconciliation
+                (ManagerJobId.create job)
+                (WorktreeIdentity.create identity)
+                (WorktreePath.create path)
+                observation
+
+        match decision with
+        | WorktreeReconciliationDecision.RequestThenCreate -> box {| kind = "RequestThenCreate" |}
+        | WorktreeReconciliationDecision.CreateAfterProvenMissing -> box {| kind = "CreateAfterProvenMissing" |}
+        | WorktreeReconciliationDecision.AdoptThenRecordCreated -> box {| kind = "AdoptThenRecordCreated" |}
+        | WorktreeReconciliationDecision.AdoptCreated -> box {| kind = "AdoptCreated" |}
+        | WorktreeReconciliationDecision.Reject failure ->
+            let reason =
+                match failure with
+                | WorktreeReconciliationFailure.DurableOwnershipConflict -> "DurableOwnershipConflict"
+                | WorktreeReconciliationFailure.WorktreeQueryFailed _ -> "WorktreeQueryFailed"
+                | WorktreeReconciliationFailure.PhysicalIdentityPathConflict -> "PhysicalIdentityPathConflict"
+
+            box {| kind = "Reject"; reason = reason |}
+
     let private foldPublishClaimed (projection: OrchestratorProjection) (managerJobId: ManagerJobId) (payload: obj) =
         match
             OrchestratorProjection.tryFind managerJobId projection

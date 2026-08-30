@@ -4,13 +4,21 @@
 // 恰一个 primary WHAT）；每个 test 只回答一个问题。
 
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-import { buildTraceGraph, packageOf, scanTestSource, whatHeadings } from '../../../scripts/lib/requirement-trace.mjs'
+import {
+  buildTraceGraph,
+  packageOf,
+  resolveExactProofTitle,
+  resolveProofLevel,
+  scanTestSource,
+  validateProofLevelRegistry,
+  whatHeadings,
+} from '../../../scripts/lib/requirement-trace.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const REQUIREMENTS = join(ROOT, 'requirements')
@@ -156,6 +164,13 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects 
   try {
     writeFileSync(whatFile, '# WHAT\n\n## FIXTURE-PACKAGE-001：contract\n')
     writeFileSync(testFile, "test('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})\n")
+
+    writeFileSync(proofFile, '| 命题 | 落点 |\n|---|---|\n| FIXTURE-PACKAGE-001 | `tests/case.test.mjs` |\n')
+    const bare = buildTraceGraph(requirements)
+    assert.equal(bare.proofEdges.length, 1)
+    assert.equal(bare.danglingProof[0].reason, 'bare test path has no exact title anchor')
+    assert.deepEqual(bare.proofMissing.map(({ id }) => id), ['FIXTURE-PACKAGE-001'])
+
     writeFileSync(proofFile, '| 命题 | 落点 |\n|---|---|\n| FIXTURE-PACKAGE-001 | `tests/case.test.mjs::WHAT[FIXTURE-PACKAGE-001] exact anchor` |\n')
     const closed = buildTraceGraph(requirements)
     assert.equal(closed.danglingProof.length, 0)
@@ -170,6 +185,16 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects 
       { line: 1, title: 'WHAT[FIXTURE-PACKAGE-001] exact anchor', state: 'active', whatId: 'FIXTURE-PACKAGE-001' },
     )
 
+    writeFileSync(testFile, [
+      "test('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})",
+      "test('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})",
+    ].join('\n') + '\n')
+    const ambiguous = buildTraceGraph(requirements)
+    assert.equal(ambiguous.danglingProof.length, 1)
+    assert.equal(ambiguous.danglingProof[0].reason, 'anchor resolves to multiple tests')
+    assert.deepEqual(ambiguous.proofMissing.map(({ id }) => id), ['FIXTURE-PACKAGE-001'])
+
+    writeFileSync(testFile, "test('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})\n")
     writeFileSync(proofFile, '| 命题 | 落点 |\n|---|---|\n| FIXTURE-PACKAGE-001 | `tests/case.test.mjs::WHAT[FIXTURE-PACKAGE-001] removed anchor` |\n')
     const dangling = buildTraceGraph(requirements)
     assert.equal(dangling.danglingProof.length, 1)
@@ -179,6 +204,39 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects 
   }
 })
 
+test('WHAT[REQUIREMENT-SYSTEM-018] exact proof-title resolution is reusable and never guesses', () => {
+  const tests = scanTestSource(
+    '<virtual>',
+    [
+      "test('WHAT[A-001] exact title', () => {})",
+      "test('WHAT[A-001] another title', () => {})",
+      "test('WHAT[A-002] exact title', () => {})",
+    ].join('\n'),
+  )
+
+  assert.deepEqual(resolveExactProofTitle(tests, 'test: WHAT[A-001] another title').map((candidate) => candidate.line), [2])
+  assert.deepEqual(resolveExactProofTitle(tests, 'another title').map((candidate) => candidate.line), [2])
+  assert.deepEqual(resolveExactProofTitle(tests, 'exact title').map((candidate) => candidate.line), [1, 3])
+  assert.deepEqual(resolveExactProofTitle(tests, 'case.test.mjs'), [])
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-018] proof levels resolve only from the independent exact registry', () => {
+  const registry = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/proof-levels.json'), 'utf8'))
+  assert.deepEqual(validateProofLevelRegistry(registry), [])
+
+  const proof = {
+    path: 'requirements/durable-events/tests/event-store-identity-collision.test.mjs',
+    title: 'WHAT[DURABLE-EVENTS-003] same_EventId_different_canonical_bytes_fail_closed',
+    what_id: 'DURABLE-EVENTS-003',
+  }
+  assert.equal(resolveProofLevel(registry, { ...proof, level: 'adapter' }), 'pure', 'a consumer cannot self-relabel a proof')
+  assert.equal(resolveProofLevel(registry, { ...proof, title: `${proof.title}_renamed` }), null)
+
+  const duplicate = structuredClone(registry)
+  duplicate.proofs.push({ ...duplicate.proofs.find((entry) => entry.path === proof.path && entry.title === proof.title), level: 'adapter' })
+  assert.equal(validateProofLevelRegistry(duplicate).some(({ code }) => code === 'PROOF_LEVEL_DUPLICATE'), true)
+  assert.equal(resolveProofLevel(duplicate, proof), null, 'ambiguous registry authority fails closed')
+})
 
 test('WHAT[REQUIREMENT-SYSTEM-018] buildTraceGraph classifies orphan / unknown / multi-primary / unproved', () => {
   const graph = buildTraceGraph(REQUIREMENTS)
@@ -191,6 +249,111 @@ test('WHAT[REQUIREMENT-SYSTEM-018] buildTraceGraph classifies orphan / unknown /
   }
   // multi-primary is only ever produced by the scanner, never by this suite.
   assert.equal(graph.multiPrimary.length, 0)
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-008] duplicate definitions retain every location and never acquire authority', () => {
+  const root = mkdtempSync(join(tmpdir(), 'requirement-trace-definitions-'))
+  const requirements = join(root, 'requirements')
+  const packageA = join(requirements, 'package-a')
+  const packageB = join(requirements, 'package-b')
+  mkdirSync(join(packageA, 'tests'), { recursive: true })
+  mkdirSync(packageB, { recursive: true })
+  try {
+    writeFileSync(join(packageA, 'WHAT.md'), '# WHAT\n## SHARED-001: first owner\n## LOCAL-001: first duplicate\n## LOCAL-001: second duplicate\n## UNIQUE-001: unique authority\n')
+    writeFileSync(join(packageA, 'HOW.md'), '# HOW\n')
+    writeFileSync(join(packageA, 'tests/case.test.mjs'), "test('WHAT[SHARED-001] ambiguous authority', () => {})\n")
+    writeFileSync(join(packageB, 'WHAT.md'), '# WHAT\n## SHARED-001: second owner\n')
+    writeFileSync(join(packageB, 'HOW.md'), '# HOW\n')
+
+    const graph = buildTraceGraph(requirements)
+    assert.deepEqual([...graph.whats.keys()], ['UNIQUE-001'])
+    assert.deepEqual(
+      graph.duplicateWhats.map(({ id, kind, definitions }) => [id, kind, definitions.map(({ package: owner, line }) => `${owner}:${line}`)]),
+      [
+        ['SHARED-001', 'multi-owner', ['package-a:2', 'package-b:2']],
+        ['LOCAL-001', 'duplicate', ['package-a:3', 'package-a:4']],
+      ],
+    )
+    assert.equal(graph.whatDefinitions.get('SHARED-001').length, 2)
+    assert.equal(graph.unknownWhat.includes('SHARED-001'), false, 'ambiguous is not unknown')
+    assert.equal(graph.edges[0].what, null, 'an ambiguous definition cannot own a proof edge')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-018] graph preserves proof portfolios and rejects orphan or multi-primary tests', () => {
+  const root = mkdtempSync(join(tmpdir(), 'requirement-trace-portfolio-'))
+  const requirements = join(root, 'requirements')
+  const packageRoot = join(requirements, 'fixture-package')
+  const tests = join(packageRoot, 'tests')
+  mkdirSync(tests, { recursive: true })
+  try {
+    writeFileSync(join(packageRoot, 'WHAT.md'), '# WHAT\n## PORTFOLIO-001: several independent proofs\n## SECOND-001: another proposition\n')
+    writeFileSync(
+      join(tests, 'case.test.mjs'),
+      [
+        "test('WHAT[PORTFOLIO-001] first proof', () => {})",
+        "test('WHAT[PORTFOLIO-001] second proof', () => {})",
+        "test('orphan proof', () => {})",
+        "test('WHAT[PORTFOLIO-001] WHAT[SECOND-001] ambiguous test owner', () => {})",
+      ].join('\n') + '\n',
+    )
+    writeFileSync(
+      join(packageRoot, 'HOW.md'),
+      [
+        '| 命题 | 落点 |',
+        '|---|---|',
+        '| PORTFOLIO-001 | `tests/case.test.mjs::WHAT[PORTFOLIO-001] first proof` |',
+        '| PORTFOLIO-001 | `tests/case.test.mjs::WHAT[PORTFOLIO-001] second proof` |',
+      ].join('\n') + '\n',
+    )
+
+    const graph = buildTraceGraph(requirements)
+    assert.deepEqual(graph.proofEdges.map(({ whatId, line }) => [whatId, line]), [
+      ['PORTFOLIO-001', 1],
+      ['PORTFOLIO-001', 2],
+    ])
+    assert.deepEqual(graph.orphans.map(({ line }) => line), [3])
+    assert.deepEqual(graph.multiPrimary.map(({ test: ownedTest }) => ownedTest.line), [4])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-018] graph resolves ownership before a five-column semantic proof cell', () => {
+  const root = mkdtempSync(join(tmpdir(), 'requirement-trace-wide-how-'))
+  const requirements = join(root, 'requirements')
+  const packageRoot = join(requirements, 'fixture-package')
+  const tests = join(packageRoot, 'tests')
+  mkdirSync(tests, { recursive: true })
+  try {
+    writeFileSync(join(packageRoot, 'WHAT.md'), '# WHAT\n## WIDE-PROOF-001: semantic law\n')
+    writeFileSync(join(tests, 'case.test.mjs'), "test('WHAT[WIDE-PROOF-001] exact semantic proof', () => {})\n")
+    writeFileSync(join(packageRoot, 'HOW.md'), [
+      '| vocabulary | owner | law | relation | proof |',
+      '|---|---|---|---|---|',
+      '| `owner.entry` | Owner / Source.fs | `WIDE-PROOF-001` | one intent → one outcome | `tests/case.test.mjs::WHAT[WIDE-PROOF-001] exact semantic proof` |',
+    ].join('\n') + '\n')
+
+    const graph = buildTraceGraph(requirements)
+    assert.equal(graph.danglingProof.length, 0)
+    assert.equal(graph.proofMissing.length, 0)
+    assert.deepEqual(graph.proofEdges.map(({ whatId, title }) => [whatId, title]), [
+      ['WIDE-PROOF-001', 'WHAT[WIDE-PROOF-001] exact semantic proof'],
+    ])
+
+    writeFileSync(join(packageRoot, 'HOW.md'), [
+      '| vocabulary | owner | law | relation | proof |',
+      '|---|---|---|---|---|',
+      '| `owner.entry` | Owner / Source.fs | no law owner | one intent → one outcome | `tests/case.test.mjs::WHAT[WIDE-PROOF-001] exact semantic proof` |',
+    ].join('\n') + '\n')
+    const titleOnly = buildTraceGraph(requirements)
+    assert.deepEqual(titleOnly.proofMissing.map(({ id }) => id), ['WIDE-PROOF-001'])
+    assert.equal(titleOnly.danglingProof[0].reason, 'test WHAT does not match PROOF proposition')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[REQUIREMENT-SYSTEM-018] graph rejects prose-only proof rows with no executable test anchor', () => {

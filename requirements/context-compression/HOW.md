@@ -32,30 +32,30 @@ DEPENDS ON:
 
 | 命题 | 落点测试 |
 |---|---|
-| CONTEXT-COMPRESSION-001 | `requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs` |
-| CONTEXT-COMPRESSION-002 | `requirements/context-compression/tests/recovery-slot.test.mjs` |
-| CONTEXT-COMPRESSION-003 | `requirements/context-compression/tests/blogger-delta.test.mjs` |
-| CONTEXT-COMPRESSION-004 | `requirements/context-compression/tests/terminal-validity.test.mjs` |
-| CONTEXT-COMPRESSION-005 | `requirements/context-compression/tests/recovery-slot.test.mjs` |
-| CONTEXT-COMPRESSION-006 | `requirements/context-compression/tests/recovery-slot.test.mjs` |
-| CONTEXT-COMPRESSION-007 | `requirements/context-compression/tests/recovery-slot.test.mjs` |
-| CONTEXT-COMPRESSION-008 | `requirements/context-compression/tests/recovery-slot.test.mjs` |
-| CONTEXT-COMPRESSION-009 | `requirements/context-compression/tests/probe-selection.test.mjs` |
-| CONTEXT-COMPRESSION-010 | `requirements/context-compression/tests/probe-selection.test.mjs` |
-| CONTEXT-COMPRESSION-011 | `requirements/context-compression/tests/blog-projection.test.mjs` |
-| CONTEXT-COMPRESSION-012 | `requirements/context-compression/tests/blogger-delta.test.mjs` |
-| CONTEXT-COMPRESSION-013 | `requirements/context-compression/tests/ctx014.test.mjs` |
-| CONTEXT-COMPRESSION-014 | `requirements/context-compression/tests/blog-projection.test.mjs` |
-| CONTEXT-COMPRESSION-015 | `requirements/context-compression/tests/blog-projection.test.mjs` |
-| CONTEXT-COMPRESSION-016 | `requirements/context-compression/tests/probe-selection.test.mjs` |
-| CONTEXT-COMPRESSION-017 | `requirements/context-compression/tests/ctx-opening-floor.test.mjs` |
-| CONTEXT-COMPRESSION-018 | `requirements/context-compression/tests/blogger-delta.test.mjs`, `requirements/context-compression/tests/companion-ordinary-material-surface.test.mjs` |
-| CONTEXT-COMPRESSION-019 | `requirements/context-compression/tests/injected-context-reanchor.test.mjs`, `requirements/host-boundary/tests/ordered-transform.test.mjs` |
-| CONTEXT-COMPRESSION-020 | `requirements/context-compression/tests/ctx-opening-floor.test.mjs` + `requirements/provider-projection/tests/projection.test.mjs` |
-| CONTEXT-COMPRESSION-021 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
-| CONTEXT-COMPRESSION-022 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
-| CONTEXT-COMPRESSION-023 | `requirements/context-compression/tests/parked-transform.test.mjs` + `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
-| CONTEXT-COMPRESSION-024 | `requirements/context-compression/tests/parked-transform.test.mjs` + `requirements/context-compression/tests/companion-recovery-slot.test.mjs` + `requirements/context-compression/tests/enforcer-cycle-convergence.test.mjs` |
+| CONTEXT-COMPRESSION-001 | `requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs::WHAT[CONTEXT-COMPRESSION-001] CTX_001_forbidden_capacity_synonyms_never_appear_in_production_source` |
+| CONTEXT-COMPRESSION-002 | `requirements/context-compression/tests/recovery-slot.test.mjs::WHAT[CONTEXT-COMPRESSION-002] FALLBACK_012_only_a_failure_advance_arms_the_next_slot` |
+| CONTEXT-COMPRESSION-003 | `requirements/context-compression/tests/blogger-delta.test.mjs::WHAT[CONTEXT-COMPRESSION-003] CTX_003_no_chunk_exceeds_the_limit` |
+| CONTEXT-COMPRESSION-004 | `requirements/context-compression/tests/terminal-validity.test.mjs::WHAT[CONTEXT-COMPRESSION-004] CTX_004_empty_terminal_is_not_a_result` |
+| CONTEXT-COMPRESSION-005 | `requirements/context-compression/tests/recovery-slot.test.mjs::WHAT[CONTEXT-COMPRESSION-005] CTX_005_Failed_and_Aborted_take_the_identical_path` |
+| CONTEXT-COMPRESSION-006 | `requirements/context-compression/tests/recovery-slot.test.mjs::WHAT[CONTEXT-COMPRESSION-006] CTX_006_recovery_needs_arming_a_primed_offset_and_material` |
+| CONTEXT-COMPRESSION-007 | `requirements/context-compression/tests/recovery-slot.test.mjs::WHAT[CONTEXT-COMPRESSION-007] CTX_007_a_failed_squash_fails_the_slot_without_sending_the_main_request` |
+| CONTEXT-COMPRESSION-008 | `requirements/context-compression/tests/recovery-slot.test.mjs::WHAT[CONTEXT-COMPRESSION-008] CTX_010_only_the_work_main_request_may_carry_a_prefix_probe` |
+| CONTEXT-COMPRESSION-009 | `requirements/context-compression/tests/probe-selection.test.mjs::WHAT[CONTEXT-COMPRESSION-009] CTX_010_the_probe_records_the_epoch_it_was_built_from` |
+| CONTEXT-COMPRESSION-010 | `requirements/context-compression/tests/probe-selection.test.mjs::WHAT[CONTEXT-COMPRESSION-010] CTX_011_no_completed_turn_yet_means_no_candidate` |
+| CONTEXT-COMPRESSION-011 | `requirements/context-compression/tests/blog-projection.test.mjs::WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_replaces_the_oldest_frames_and_leaves_the_covered_range_alone` |
+| CONTEXT-COMPRESSION-012 | `requirements/context-compression/tests/blogger-delta.test.mjs::WHAT[CONTEXT-COMPRESSION-012] CTX_013_a_small_transcript_becomes_one_chunk` |
+| CONTEXT-COMPRESSION-013 | `requirements/context-compression/tests/ctx014.test.mjs::WHAT[CONTEXT-COMPRESSION-013] CTX_014_diagnostic_emit_is_structured_and_redacted` |
+| CONTEXT-COMPRESSION-014 | `requirements/context-compression/tests/blog-projection.test.mjs::WHAT[CONTEXT-COMPRESSION-014] COMPANION_006_squash_rewrites_first_half_of_frames_permanently` |
+| CONTEXT-COMPRESSION-015 | `requirements/context-compression/tests/blog-projection.test.mjs::WHAT[CONTEXT-COMPRESSION-015] COMPANION_008_entry_appends_frame_and_advances_coverage_together` |
+| CONTEXT-COMPRESSION-016 | `requirements/context-compression/tests/probe-selection.test.mjs::WHAT[CONTEXT-COMPRESSION-016] CTX_011_the_candidate_never_swallows_the_message_being_answered` |
+| CONTEXT-COMPRESSION-017 | `requirements/context-compression/tests/ctx-opening-floor.test.mjs::WHAT[CONTEXT-COMPRESSION-017] CTX_016_t1_does_not_change_the_compression_floor` |
+| CONTEXT-COMPRESSION-018 | `requirements/context-compression/tests/companion-ordinary-material-surface.test.mjs::WHAT[CONTEXT-COMPRESSION-018] CompanionTransform owns ordinary-material entry and consumes Host suppression as a capability` |
+| CONTEXT-COMPRESSION-019 | `requirements/context-compression/tests/injected-context-reanchor.test.mjs::WHAT[CONTEXT-COMPRESSION-019] CTX_019_prefix_rebase_is_the_same_auxiliary_cold_boundary_as_host_reanchor` |
+| CONTEXT-COMPRESSION-020 | `requirements/context-compression/tests/ctx-opening-floor.test.mjs::WHAT[CONTEXT-COMPRESSION-020] todowrite call and matching result are retained across a Y cutoff` |
+| CONTEXT-COMPRESSION-021 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs::WHAT[CONTEXT-COMPRESSION-021] CTX_021_primed_blogger_main_with_frames_dispatches_squash_first` |
+| CONTEXT-COMPRESSION-022 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs::WHAT[CONTEXT-COMPRESSION-022] CTX_022_all_production_main_rebuilds_share_BloggerMainContext` |
+| CONTEXT-COMPRESSION-023 | `requirements/context-compression/tests/parked-transform.test.mjs::WHAT[CONTEXT-COMPRESSION-023] CTX_023_park_has_no_clock_or_timeout_dependency`；`requirements/context-compression/tests/companion-recovery-slot.test.mjs::WHAT[CONTEXT-COMPRESSION-023] recovery_wait_has_no_clock_or_process_local_correctness_state` |
+| CONTEXT-COMPRESSION-024 | `requirements/context-compression/tests/parked-transform.test.mjs::WHAT[CONTEXT-COMPRESSION-024] CTX_024_materialization_admission_is_cross_instance_single_flight`；`requirements/context-compression/tests/companion-recovery-slot.test.mjs::WHAT[CONTEXT-COMPRESSION-024] CTX_024_all_materialization_owners_share_admission_and_nonoverwrite_flight`；`requirements/context-compression/tests/enforcer-cycle-convergence.test.mjs::WHAT[CONTEXT-COMPRESSION-024] stale_terminal_cannot_reclaim_a_new_Blogger_request` |
 
 ## GAP
 

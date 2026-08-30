@@ -3,6 +3,8 @@ import test from 'node:test'
 import { syncDelegateLifecycle } from './support/managed-surface.mjs'
 import * as QuiescenceSurface from '../../../dist/OpenCode/Host/QuiescenceSurface.js'
 
+const accepted = { accepted: true, failure: null }
+
 const quiescence = () => {
   const gate = QuiescenceSurface.create()
   QuiescenceSurface.beginAttempt(gate, 'ses-sync')
@@ -16,7 +18,7 @@ test('WHAT[MANAGED-SESSION-004] EXEC_026_sync_delegate_reuses_session_after_full
   assert.equal(observed.prompts, 1)
   assert.equal(observed.child, 'child-1')
   const admission = quiescence()
-  assert.equal(QuiescenceSurface.tryConsume(admission.gate, admission.permit), true)
+  assert.deepEqual(QuiescenceSurface.tryConsume(admission.gate, admission.permit), accepted)
 })
 
 test('WHAT[MANAGED-SESSION-014] G6_deleted_inspector_child_retires_live_binding_but_survives_for_owner_scope_close', () => {

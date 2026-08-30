@@ -25,17 +25,17 @@ Host 层的物理展示树深度恒为 2，所有子节点物理上均直挂在 
 
 | 命题 | 落点测试 |
 |---|---|
-| SESSION-ONTOLOGY-001 | `requirements/session-ontology/tests/session-ownership-ratchet.test.mjs` |
-| SESSION-ONTOLOGY-002 | `requirements/session-ontology/tests/session-ontology-classification.test.mjs` |
-| SESSION-ONTOLOGY-003 | `requirements/session-ontology/tests/sync-delegate.test.mjs` |
-| SESSION-ONTOLOGY-004 | `requirements/session-ontology/tests/session-ontology-classification.test.mjs` |
-| SESSION-ONTOLOGY-005 | `requirements/session-ontology/tests/session-association.test.mjs` |
-| SESSION-ONTOLOGY-006 | `requirements/session-ontology/tests/session-flattening.test.mjs` |
-| SESSION-ONTOLOGY-007 | `requirements/session-ontology/tests/session-ontology-classification.test.mjs` |
-| SESSION-ONTOLOGY-008 | `requirements/session-ontology/tests/session-association.test.mjs` |
-| SESSION-ONTOLOGY-009 | `requirements/session-ontology/tests/session-association.test.mjs` |
-| SESSION-ONTOLOGY-010 | `requirements/session-ontology/tests/session-ownership-ratchet.test.mjs` |
-| SESSION-ONTOLOGY-011 | `requirements/session-ontology/tests/session-ontology-classification.test.mjs` |
-| SESSION-ONTOLOGY-012 | `requirements/session-ontology/tests/sync-delegate.test.mjs` |
-| SESSION-ONTOLOGY-013 | `requirements/session-ontology/tests/terminal-policy.test.mjs` |
-| SESSION-ONTOLOGY-014 | `requirements/session-ontology/tests/satellite-kind.test.mjs` |
+| SESSION-ONTOLOGY-001 | `requirements/session-ontology/tests/session-ownership-ratchet.test.mjs::WHAT[SESSION-ONTOLOGY-001] session_ownership_ratchet_documents_closed_kind_set` |
+| SESSION-ONTOLOGY-002 | `requirements/session-ontology/tests/session-ownership-ratchet.test.mjs::WHAT[SESSION-ONTOLOGY-002] session_ownership_ratchet_questionnaire_requires_owner_field` |
+| SESSION-ONTOLOGY-003 | `requirements/session-ontology/tests/sync-delegate.test.mjs::WHAT[SESSION-ONTOLOGY-003] HOST_008_delegate_role_maps_to_attachment` |
+| SESSION-ONTOLOGY-004 | `requirements/session-ontology/tests/session-ontology-classification.test.mjs::WHAT[SESSION-ONTOLOGY-004] HOST_008_companion_is_internal_leaf_attached` |
+| SESSION-ONTOLOGY-005 | `requirements/session-ontology/tests/session-association.test.mjs::WHAT[SESSION-ONTOLOGY-005] HOST_008_companion_cannot_serve_two_work_sessions` |
+| SESSION-ONTOLOGY-006 | `requirements/session-ontology/tests/session-flattening.test.mjs::WHAT[SESSION-ONTOLOGY-006] HOST_015_child_of_child_is_physically_parented_to_family_root` |
+| SESSION-ONTOLOGY-007 | `requirements/session-ontology/tests/session-ontology-classification.test.mjs::WHAT[SESSION-ONTOLOGY-007] HOST_008_durable_link_derives_work_and_leaf_cells` |
+| SESSION-ONTOLOGY-008 | `requirements/session-ontology/tests/session-association.test.mjs::WHAT[SESSION-ONTOLOGY-008] HOST_008_linking_records_both_directions` |
+| SESSION-ONTOLOGY-009 | `requirements/session-ontology/tests/session-association.test.mjs::WHAT[SESSION-ONTOLOGY-009] COMPANION_001_every_work_session_may_have_a_companion` |
+| SESSION-ONTOLOGY-010 | `requirements/session-ontology/tests/session-association.test.mjs::WHAT[SESSION-ONTOLOGY-010] COMPANION_001_unknown_session_is_not_a_companion` |
+| SESSION-ONTOLOGY-011 | `requirements/session-ontology/tests/session-ownership-ratchet.test.mjs::WHAT[SESSION-ONTOLOGY-011] session_ownership_ratchet_attachment_tokens_include_strength_replica` |
+| SESSION-ONTOLOGY-012 | `requirements/session-ontology/tests/sync-delegate.test.mjs::WHAT[SESSION-ONTOLOGY-012] HOST_008_root_and_attached_helpers_are_explicit` |
+| SESSION-ONTOLOGY-013 | `requirements/session-ontology/tests/terminal-policy.test.mjs::WHAT[SESSION-ONTOLOGY-013] TPOL_roleName_uses_catalog_labels_and_rejects_none` |
+| SESSION-ONTOLOGY-014 | `requirements/session-ontology/tests/satellite-kind.test.mjs::WHAT[SESSION-ONTOLOGY-014] HOST_014_satellite_kind_is_companion_only` |

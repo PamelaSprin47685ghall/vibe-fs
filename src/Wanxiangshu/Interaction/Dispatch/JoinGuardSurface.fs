@@ -31,6 +31,11 @@ module JoinGuardSurface =
                 {| outcome = "AlreadyOutstanding"
                    promptKey = null
                    reason = null |}
+        | HostJoinGuard.JoinGuardNudgeOutcome.AdmissionRejected failure ->
+            box
+                {| outcome = "Superseded"
+                   promptKey = null
+                   reason = string failure |}
         | HostJoinGuard.JoinGuardNudgeOutcome.Superseded ->
             box
                 {| outcome = "Superseded"
@@ -71,8 +76,8 @@ module JoinGuardSurface =
                     (DispatchSurface.sessionPort port)
                     journal
                     keys
-                    (fun () -> true)
-                    ignore
+                    (fun () -> Ok())
+                    (fun () -> Ok())
                     sessionId
                     (ProviderRunIdentity.create terminalProviderRun)
                     (if isNull directory then None else Some(string directory))

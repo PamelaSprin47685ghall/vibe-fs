@@ -109,10 +109,14 @@ const lifeCompleted = (requestId = REQUEST) => ({
   terminalDigest: 'digest-terminal',
 })
 
-const worldOf = (events) => {
-  const result = finality.project(events)
-  assert.equal(result.ok, true, JSON.stringify(result.error))
-  return result.world
+const project = (events) => {
+  let world = finality.emptyWorld()
+  for (const event of events) {
+    const result = finality.applyEvent(world, event)
+    assert.equal(result.ok, true, JSON.stringify(result.error))
+    world = result.world
+  }
+  return world
 }
 
 const base = (extra = []) => [lifeOpened(), workActivated(), ...extra]
@@ -120,7 +124,7 @@ const base = (extra = []) => [lifeOpened(), workActivated(), ...extra]
 // ── lifecycle projection ────────────────────────────────────────────────────
 
 test('WHAT[FINALITY-021] LifeOpened opens the first life', () => {
-  const life = finality.lifeView(worldOf([lifeOpened()]))
+  const life = finality.lifeView(project([lifeOpened()]))
   assert.equal(life.lifeId, LIFE)
   assert.equal(life.openingCursorSequence, 1)
   assert.equal(life.protectedPrefixEnd, null)
@@ -129,42 +133,42 @@ test('WHAT[FINALITY-021] LifeOpened opens the first life', () => {
 })
 
 test('WHAT[FINALITY-022] a second life cannot open while one is active', () => {
-  const result = finality.project([lifeOpened(), lifeOpened('life-2', 50)])
+  const world = project([lifeOpened()])
+  const result = finality.applyEvent(world, lifeOpened('life-2', 50))
   assert.equal(result.ok, false)
   assert.match(JSON.stringify(result.error), /GLORY-012|LifeAlreadyOpen/)
 })
 
 test('WHAT[FINALITY-008] FinalityRequested is rejected while a request is open', () => {
-  const result = finality.project(base([finalityRequested(), finalityRequested('req-2', 'call-2')]))
+  const world = project(base([finalityRequested()]))
+  const result = finality.applyEvent(world, finalityRequested('req-2', 'call-2'))
   assert.equal(result.ok, false)
   assert.match(JSON.stringify(result.error), /FinalityAlreadyActive|FinalityRequested/)
 })
 
 test('WHAT[FINALITY-008] a rejected request closes and a new suicide opens a new one', () => {
-  const result = finality.project(
+  const world = project(
     base([finalityRequested(), finalityReviewerEnlisted(), finalityRejected(), finalityRequested('req-2', 'call-2')]),
   )
-  assert.equal(result.ok, true, JSON.stringify(result.error))
-  const life = finality.lifeView(result.world)
+  const life = finality.lifeView(world)
   assert.equal(life.activeFinality.requestId, 'req-2')
   assert.equal(life.activeFinality.resolution.kind, 'open')
   assert.equal(life.lastRejectedWorkRecord, 'blob-1')
 })
 
 test('WHAT[FINALITY-016] a blessing leaves the life open until the second suicide', () => {
-  const life = finality.lifeView(worldOf(base([finalityRequested(), finalityReviewerEnlisted(), finalityBlessed()])))
+  const life = finality.lifeView(project(base([finalityRequested(), finalityReviewerEnlisted(), finalityBlessed()])))
   assert.equal(life.completed, false)
   assert.equal(life.activeFinality.resolution.kind, 'blessed')
   assert.equal(life.lastBlessing.requestId, REQUEST)
 })
 
 test('WHAT[FINALITY-017] the second suicide is the rest: LifeCompleted archives the Life', () => {
-  const result = finality.project(
+  const world = project(
     base([finalityRequested(), finalityReviewerEnlisted(), finalityBlessed(), lifeCompleted()]),
   )
-  assert.equal(result.ok, true, JSON.stringify(result.error))
-  assert.equal(finality.lifeView(result.world), null)
-  const archived = finality.archivedLivesView(result.world)
+  assert.equal(finality.lifeView(world), null)
+  const archived = finality.archivedLivesView(world)
   assert.equal(archived.length, 1)
   assert.equal(archived[0].completed, true)
   assert.equal(archived[0].completedTerminal, 'blob-terminal')
@@ -172,29 +176,29 @@ test('WHAT[FINALITY-017] the second suicide is the rest: LifeCompleted archives 
 })
 
 test('WHAT[FINALITY-017] isLifeArchived true only after life completed', () => {
-  const fresh = worldOf([])
+  const fresh = project([])
   assert.equal(finality.isLifeArchived(fresh), false)
 
-  const open = worldOf(base())
+  const open = project(base())
   assert.equal(finality.isLifeArchived(open), false)
 
-  const blessed = worldOf(base([finalityRequested(), finalityReviewerEnlisted(), finalityBlessed()]))
+  const blessed = project(base([finalityRequested(), finalityReviewerEnlisted(), finalityBlessed()]))
   assert.equal(finality.isLifeArchived(blessed), false)
 
-  const archived = worldOf(
+  const archived = project(
     base([finalityRequested(), finalityReviewerEnlisted(), finalityBlessed(), lifeCompleted()]),
   )
   assert.equal(finality.isLifeArchived(archived), true)
 })
 
 test('WHAT[FINALITY-025] legacy FinalityUndecided closes the historical request without a wound record', () => {
-  const life = finality.lifeView(worldOf(base([finalityRequested(), finalityUndecided()])))
+  const life = finality.lifeView(project(base([finalityRequested(), finalityUndecided()])))
   assert.equal(life.activeFinality.resolution.kind, 'undecided')
   assert.equal(life.lastRejectedWorkRecord, null)
 })
 
 test('WHAT[FINALITY-011] a revise closes finality without confirming the life', () => {
-  const life = finality.lifeView(worldOf(base([finalityRequested(), finalityReviewerEnlisted(), finalityRejected()])))
+  const life = finality.lifeView(project(base([finalityRequested(), finalityReviewerEnlisted(), finalityRejected()])))
   assert.equal(life.activeFinality.resolution.kind, 'rejected')
   assert.equal(life.activeFinality.resolution.rejectingReviewer, REVIEWER)
   assert.equal(life.completed, false)
@@ -210,16 +214,11 @@ test('WHAT[FINALITY-021] lifecycle history projection replays identically', () =
     finalityBlessed('req-2'),
     lifeCompleted('req-2'),
   ])
-  const direct = finality.project(history)
-  assert.equal(direct.ok, true, JSON.stringify(direct.error))
+  const online = project(history)
+  const replayed = project(history)
 
-  const replay = finality.project([])
-  assert.equal(replay.ok, true, JSON.stringify(replay.error))
-  const replayed = finality.applyEvents(replay.world, history)
-  assert.equal(replayed.ok, true, JSON.stringify(replayed.error))
-
-  assert.deepEqual(finality.lifeView(replayed.world), finality.lifeView(direct.world))
-  assert.deepEqual(finality.archivedLivesView(replayed.world), finality.archivedLivesView(direct.world))
+  assert.deepEqual(finality.lifeView(replayed), finality.lifeView(online))
+  assert.deepEqual(finality.archivedLivesView(replayed), finality.archivedLivesView(online))
 })
 
 // ── golden byte fixtures (provider-language contracts) ──────────────────────

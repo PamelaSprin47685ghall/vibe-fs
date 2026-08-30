@@ -30,7 +30,7 @@
 
 ## EFFECT-ACCOUNTING-008: typed 效果家族实例
 
-系统中的具体副作用均遵循成对的类型化事实约定：工作区创建（`WorktreeCreateRequested` / `WorktreeCreated`）、分支发布（`PublishClaimed` / `Published`）、结构化日志记录（`BloggerRequestMaterialized` / `EntryCommitted`）以及待办写入（`TodoWritePrepared` / `TodoWriteAccepted`）。
+系统中的具体副作用均遵循成对的类型化事实约定：工作区创建（`WorktreeCreateRequested` / `WorktreeCreated`）、分支发布（`PublishClaimed` / `Published`）、结构化日志记录（`BloggerRequestMaterialized` / `BlogObservationCommitted`）以及待办写入（`TodoWritePrepared` / `TodoWriteAccepted`）。
 
 ## EFFECT-ACCOUNTING-009: PublishClaimed 三分支固定判定顺序
 

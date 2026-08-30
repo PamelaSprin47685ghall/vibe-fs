@@ -654,7 +654,15 @@ module PairProgrammingThoughtTransform =
             )
         | _ -> Error "tool batch message without transcript address (HOST-013)"
 
-    let private gapsAroundAddress
+    // semantic-decorator-owner: guidance-delivery
+    // semantic-decorator-WHAT: GD-011
+    // semantic-decorator-trace-relation: R_gap_pair(address) = (gapCtor address, gapCtor address), left then right, with a pure extensional constructor
+    // semantic-decorator-proof: requirements/guidance-delivery/tests/pair-gap-constructor.test.mjs::WHAT[GD-011] PPT_gap_constructor_receives_the_same_address_exactly_twice_in_pair_order
+    // semantic-decorator-failure-policy: a constructor exception propagates immediately and prevents the second invocation
+    // semantic-decorator-cancel-policy: pure synchronous gap construction introduces no cancellation boundary
+    // semantic-decorator-deadline-policy: pure synchronous gap construction introduces no deadline
+    // semantic-decorator-retry-bound: 2
+    let internal gapsAroundAddress
         (gapCtor: TranscriptMessageAddress -> TranscriptGap)
         (message: obj)
         (errorMsg: string)

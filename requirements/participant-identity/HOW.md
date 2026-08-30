@@ -23,13 +23,13 @@ Role (Domain 枚举) ───┬──► SystemPromptId (纯函数，仅由 Ro
 
 | 命题 | 落点测试 |
 |---|---|
-| PID-001 | `requirements/participant-identity/tests/catalog.test.mjs` |
-| PID-002 | `requirements/participant-identity/tests/catalog.test.mjs` |
-| PID-003 | `requirements/participant-identity/tests/session-persona.test.mjs` |
-| PID-004 | `requirements/participant-identity/tests/persona-binding.test.mjs` |
-| PID-005 | `requirements/participant-identity/tests/session-persona.test.mjs` |
-| PID-006 | `requirements/participant-identity/tests/session-persona.test.mjs` |
-| PID-007 | `requirements/participant-identity/tests/catalog.test.mjs` |
-| PID-008 | `requirements/participant-identity/tests/session-execution-binding.test.mjs` |
-| PID-009 | `requirements/participant-identity/tests/catalog.test.mjs` |
-| PID-010 | `requirements/participant-identity/tests/session-persona.test.mjs` |
+| PID-001 | `requirements/participant-identity/tests/catalog.test.mjs::WHAT[PID-001] catalog_has_exactly_ten_canonical_roles_and_two_tiers`；`requirements/participant-identity/tests/catalog.test.mjs::WHAT[PID-001] required_names_are_exactly_ten_roles_times_two_tiers` |
+| PID-002 | `requirements/participant-identity/tests/catalog.test.mjs::WHAT[PID-002] all_legacy_bare_names_are_rejected`；`requirements/participant-identity/tests/catalog.test.mjs::WHAT[PID-002] rejection_prose_is_version_agnostic` |
+| PID-003 | `requirements/participant-identity/tests/session-persona.test.mjs::WHAT[PID-003] SessionPersona_binds_once_same_value_idempotent_different_value_rejected` |
+| PID-004 | `requirements/participant-identity/tests/persona-binding.test.mjs::WHAT[PID-004] persona_frozen_across_gate_d_events` |
+| PID-005 | `requirements/participant-identity/tests/session-persona.test.mjs::WHAT[PID-005] system_prompt_id_follows_canonical_role_not_effective_agent_tier` |
+| PID-006 | `requirements/participant-identity/tests/session-persona.test.mjs::WHAT[PID-006] binding_wire_names_are_machine_routing_identity_not_persona_self_claim` |
+| PID-007 | `requirements/participant-identity/tests/catalog.test.mjs::WHAT[PID-007] peer_is_same_role_opposite_tier_and_symmetric` |
+| PID-008 | `requirements/participant-identity/tests/session-execution-binding.test.mjs::WHAT[PID-008] root_requires_external_agent_proof_then_model_is_scheduler_owned`；`requirements/participant-identity/tests/session-execution-binding.test.mjs::WHAT[PID-008] parented_session_uses_stable_agent_lease_and_authorized_peer_only`；`requirements/participant-identity/tests/session-execution-binding.test.mjs::WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease` |
+| PID-009 | `requirements/participant-identity/tests/catalog.test.mjs::WHAT[PID-009] bookkeeper_pair_has_machine_identity_and_peer_but_no_public_role` |
+| PID-010 | `requirements/participant-identity/tests/session-persona.test.mjs::WHAT[PID-010] child_session_persona_inherits_owner_persona`；`requirements/participant-identity/tests/session-persona.test.mjs::WHAT[PID-010] child_session_persona_inherits_even_when_owner_was_not_yet_queried` |

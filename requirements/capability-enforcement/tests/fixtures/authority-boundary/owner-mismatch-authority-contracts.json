@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "methods": [],
+  "contracts": [{
+    "file": "positive-six-classes.fs",
+    "symbol": "OneShotCapability",
+    "anchor": "type OneShotCapability =",
+    "classification": "Authority",
+    "class": "Capability",
+    "owner": "finality",
+    "what": "ENF-013",
+    "whatOwners": { "ENF-013": "capability-enforcement" },
+    "scope": "exact subject and version",
+    "freshness": "current admission only",
+    "multiplicity": "declared exactly",
+    "consume": "typed Result failure",
+    "durability": "process-local",
+    "issuers": [{
+      "file": "positive-six-classes.fs",
+      "symbol": "issueOneShotCapability",
+      "anchor": "let issueOneShotCapability",
+      "owner": "capability-enforcement"
+    }]
+  }]
+}

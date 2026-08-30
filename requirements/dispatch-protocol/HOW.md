@@ -22,14 +22,14 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| DISPATCH-PROTOCOL-001 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
-| DISPATCH-PROTOCOL-002 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
-| DISPATCH-PROTOCOL-003 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
-| DISPATCH-PROTOCOL-004 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs` |
-| DISPATCH-PROTOCOL-005 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
-| DISPATCH-PROTOCOL-006 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
-| DISPATCH-PROTOCOL-007 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs` |
-| DISPATCH-PROTOCOL-008 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs` |
-| DISPATCH-PROTOCOL-009 | `requirements/dispatch-protocol/tests/fire-and-forget.test.mjs` |
-| DISPATCH-PROTOCOL-010 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
-| DISPATCH-PROTOCOL-011 | `requirements/dispatch-protocol/tests/send-format.test.mjs` |
+| DISPATCH-PROTOCOL-001 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-001] DP_001_every_send_member_lives_on_the_prompt_dispatcher_runtime` |
+| DISPATCH-PROTOCOL-002 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-002] DP_002_submit_records_the_receipt_without_resolving_the_claim`；`requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-002] DP_002_abandon_removes_the_claim_and_leaves_the_active_run_alone`；`requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-002] DP_002_claim_records_payload_digest_and_effective_agent` |
+| DISPATCH-PROTOCOL-003 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-003] DP_003_receipt_shape_distinguishes_admission_from_physical_identity` |
+| DISPATCH-PROTOCOL-004 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs::WHAT[DISPATCH-PROTOCOL-004] DP_004_physical_acceptance_is_proven_only_by_physical_message` |
+| DISPATCH-PROTOCOL-005 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-005] DP_005_prompt_key_is_deterministic_and_moves_with_every_component`；`requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-005] DP_005_claim_scope_names_exactly_session_run_origin_and_payload` |
+| DISPATCH-PROTOCOL-006 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-006] DP_006_abandon_keeps_the_claim_sequence_consumed`；`requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-006] DP_006_claim_sequence_advances_on_registration_not_on_resolution` |
+| DISPATCH-PROTOCOL-007 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs::WHAT[DISPATCH-PROTOCOL-007] DP_007_restarts_never_auto_abandon_an_unresolved_broken_tool` |
+| DISPATCH-PROTOCOL-008 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs::WHAT[DISPATCH-PROTOCOL-008] DP_008_unproven_outcome_stays_pending_never_resends` |
+| DISPATCH-PROTOCOL-009 | `requirements/dispatch-protocol/tests/fire-and-forget.test.mjs::WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_claims_and_persists_without_physical_accepted`；`requirements/dispatch-protocol/tests/fire-and-forget.test.mjs::WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_sdk_physical_id_does_not_race_chat_message_acceptance`；`requirements/dispatch-protocol/tests/fire-and-forget.test.mjs::WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_returns_even_when_session_send_task_never_settles`；`requirements/dispatch-protocol/tests/fire-and-forget.test.mjs::WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_continuation_same_claim_path`；`requirements/dispatch-protocol/tests/fire-and-forget.test.mjs::WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_await_mode_constructors_exist` |
+| DISPATCH-PROTOCOL-010 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-010] DP_010_authority_root_profile_cannot_express_a_model` |
+| DISPATCH-PROTOCOL-011 | `requirements/dispatch-protocol/tests/send-format.test.mjs::WHAT[DISPATCH-PROTOCOL-011] PROMPT_006_send_payload_carries_prompt_key_metadata` |

@@ -27,7 +27,7 @@
 
 ### 5. 静态边界防护门禁（`causal-wait-boundary`）
 
-`scripts/checks/causal-wait-boundary.mjs` 与 `tests/boundary-observation.test.mjs` 静态扫描源码，确保：
+`scripts/checks/causal-wait-boundary.mjs` 与 `requirements/causal-wait/tests/boundary-observation.test.mjs::WHAT[CAUSAL-003] Journal codec surfaces stay free of the causal-wait vocabulary` 静态扫描源码，确保：
 - Domain 与 Application 层不触碰快照读取器；
 - Fact 与 Journal 编解码器表面不包含因果等待符号；
 - Prompt 与业务决策路径不引用诊断数据；
@@ -39,11 +39,11 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| CAUSAL-001 | `requirements/causal-wait/tests/causal-wait.test.mjs` |
-| CAUSAL-002 | `requirements/causal-wait/tests/causal-wait.test.mjs` |
-| CAUSAL-003 | `requirements/causal-wait/tests/boundary-observation.test.mjs` |
-| CAUSAL-004 | `requirements/causal-wait/tests/wait-lifecycle.test.mjs` |
-| CAUSAL-005 | `requirements/causal-wait/tests/until-signal-or-deadline.test.mjs` |
-| CAUSAL-006 | `requirements/causal-wait/tests/causal-wait.test.mjs` |
-| CAUSAL-007 | `requirements/causal-wait/tests/causal-frontier.test.mjs` |
-| CAUSAL-008 | `requirements/causal-wait/tests/wait-lifecycle.test.mjs` |
+| CAUSAL-001 | `requirements/causal-wait/tests/causal-wait.test.mjs::WHAT[CAUSAL-001] RED_8_application_observer_enter_only_snapshot_via_reader` |
+| CAUSAL-002 | `requirements/causal-wait/tests/causal-wait.test.mjs::WHAT[CAUSAL-002] RED_1_active_wait_visible_after_enter` |
+| CAUSAL-003 | `requirements/causal-wait/tests/boundary-observation.test.mjs::WHAT[CAUSAL-003] Journal codec surfaces stay free of the causal-wait vocabulary` |
+| CAUSAL-004 | `requirements/causal-wait/tests/wait-lifecycle.test.mjs::WHAT[CAUSAL-004] CAUSAL_004_observer_surface_has_no_snapshot` |
+| CAUSAL-005 | `requirements/causal-wait/tests/until-signal-or-deadline.test.mjs::WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline` |
+| CAUSAL-006 | `requirements/causal-wait/tests/causal-wait.test.mjs::WHAT[CAUSAL-006] RED_2_resolve_clears_active_and_records_resolved` |
+| CAUSAL-007 | `requirements/causal-wait/tests/causal-frontier.test.mjs::WHAT[CAUSAL-007] RED_5_nested_graph_walks_to_external_frontier` |
+| CAUSAL-008 | `requirements/causal-wait/tests/wait-lifecycle.test.mjs::WHAT[CAUSAL-008] CAUSAL_008_fresh_registry_starts_empty_no_durable_state` |

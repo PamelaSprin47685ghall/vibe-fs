@@ -21,20 +21,10 @@ open Wanxiangshu.Persistence.Journal
 
 /// JS-native semantic surface for Finality laws (PR 6 exemplar).
 ///
-/// A JS test expresses history as plain events:
-///
-/// ```js
-/// const world = finality.project([
-///   { kind: 'life-opened', sessionId: 's1', lifeId: 'life-1', ... },
-///   { kind: 'finality-requested', ... },
-/// ])
-/// finality.classifyEnding(world, { callId: 'call-2', hasPlanCommitment: true })
-/// // { kind: 'wait-for-current-request' }
-/// ```
-///
-/// `world` is an opaque handle: the production fold runs inside `project`, and
-/// the F# `ProjectionSet` / `LifeProjection` / fact types never cross the
-/// boundary (JS-SEMANTIC-SURFACE-002/003/005). The JS test does not own
+/// A JS test starts with `emptyWorld()` and applies each plain lifecycle event
+/// through `applyEvent`. `world` is an opaque handle: the production fold runs
+/// once per call, and the F# `ProjectionSet` / `LifeProjection` / fact types
+/// never cross the boundary (JS-SEMANTIC-SURFACE-002/003/005). The JS test does not own
 /// `ManagerLifecycleFact`, `EventEnvelope`, `FSharpList`, or any dist module —
 /// it only speaks lifecycle vocabulary and reads JS-shaped answers.
 module FinalitySurface =
@@ -360,39 +350,25 @@ module FinalitySurface =
             |> Result.mapError (fun rejection -> sprintf "fold rejected %s: %A" eventKind rejection)
             |> Result.map (fun next -> (next, session)))
 
-    /// Fold a JS event list through the production fold, threading the
-    /// projection immutably (no mutable accumulators, no nested decisions).
-    let private foldEvents
-        (startProjection: ProjectionSet)
-        (startSession: SessionId option)
-        (events: obj list)
-        : Result<World, string> =
-        let rec loop (projection: ProjectionSet) (managerSession: SessionId option) (remaining: obj list) =
-            match remaining with
-            | [] ->
-                Ok
-                    { Projection = projection
-                      SessionId = managerSession }
-            | event :: rest ->
-                foldOneEvent projection managerSession event
-                |> Result.bind (fun (next, session) -> loop next session rest)
+    /// Create an opaque empty projection capability.
+    let emptyWorld () : obj =
+        box
+            { Projection = Fold.empty
+              SessionId = None }
 
-        loop startProjection startSession events
-
-    /// Fold JS lifecycle events through the production fold.
+    /// Apply exactly one JS lifecycle event through the production fold.
     /// Returns `{ ok: true, world }` or `{ ok: false, error }`.
-    let project (events: obj array) : obj =
-        match foldEvents Fold.empty None (List.ofArray events) with
-        | Error message -> box {| ok = false; error = message |}
-        | Ok world -> box {| ok = true; world = world |}
-
-    /// Fold more events onto an existing world (multi-step traces).
-    let applyEvents (world: obj) (events: obj array) : obj =
+    let applyEvent (world: obj) (event: obj) : obj =
         let world = asWorld world
 
-        match foldEvents world.Projection world.SessionId (List.ofArray events) with
+        match foldOneEvent world.Projection world.SessionId event with
         | Error message -> box {| ok = false; error = message |}
-        | Ok next -> box {| ok = true; world = next |}
+        | Ok (projection, sessionId) ->
+            box
+                {| ok = true
+                   world =
+                    { Projection = projection
+                      SessionId = sessionId } |}
 
     let private currentLife (world: obj) : LifeProjection option =
         let world = asWorld world
@@ -891,28 +867,25 @@ module FinalitySurface =
             Ok(OrchestratorProjection.recordTerminal jobId Wanxiangshu.Change.TerminalOutcome.Abandoned projection)
         | other -> Error $"unknown ManagerJob fact: {other}"
 
-    let private jobProjectionEvents (events: obj array) : Result<OrchestratorProjection, string> =
-        let rec loop (projection: OrchestratorProjection) (remaining: obj list) =
-            match remaining with
-            | [] -> Ok projection
-            | event :: rest ->
-                match str (event?kind) with
-                | "job-created" ->
-                    let job =
-                        {| ManagerJobId = ManagerJobId.create (str (event?jobId))
-                           ManagerSessionId = SessionId.create (str (event?managerSessionId))
-                           ManagerAgent = str (event?managerAgent)
-                           Byname = str (event?byname)
-                           WorktreeIdentity = WorktreeIdentity.create (str (event?worktreeIdentity))
-                           WorktreePath = WorktreePath.create (str (event?worktreePath))
-                           TargetRef = TargetRef.create (str (event?targetRef))
-                           TargetBranchFrozen = str (event?targetBranchFrozen) |}
+    let private foldOneJobProjectionEvent
+        (projection: OrchestratorProjection)
+        (event: obj)
+        : Result<OrchestratorProjection, string> =
+        match str (event?kind) with
+        | "job-created" ->
+            let job =
+                {| ManagerJobId = ManagerJobId.create (str (event?jobId))
+                   ManagerSessionId = SessionId.create (str (event?managerSessionId))
+                   ManagerAgent = str (event?managerAgent)
+                   Byname = str (event?byname)
+                   WorktreeIdentity = WorktreeIdentity.create (str (event?worktreeIdentity))
+                   WorktreePath = WorktreePath.create (str (event?worktreePath))
+                   TargetRef = TargetRef.create (str (event?targetRef))
+                   TargetBranchFrozen = str (event?targetBranchFrozen) |}
 
-                    loop (OrchestratorProjection.createJob job projection) rest
-                | "job-fact" -> recordJobFact projection event |> Result.bind (fun next -> loop next rest)
-                | other -> Error $"unknown ManagerJob event kind: {other}"
-
-        loop OrchestratorProjection.empty (List.ofArray events)
+            Ok(OrchestratorProjection.createJob job projection)
+        | "job-fact" -> recordJobFact projection event
+        | other -> Error $"unknown ManagerJob event kind: {other}"
 
     let private jobFactsView (job: ManagerJobProjection) =
         [ if job.CandidateReady.IsSome then
@@ -946,25 +919,31 @@ module FinalitySurface =
                targetBranchFrozen = job.TargetBranchFrozen
                facts = jobFactsView job |}
 
-    /// FINALITY-028: fold plain ManagerJob history and return only JS-native
-    /// job records and active records.
-    let jobProjection (events: obj array) : obj =
-        match jobProjectionEvents events with
+    /// Create an opaque empty ManagerJob projection capability.
+    let emptyJobProjection () : obj = box OrchestratorProjection.empty
+
+    /// Apply exactly one plain ManagerJob event through its owner projection.
+    let applyJobProjectionEvent (projection: obj) (event: obj) : obj =
+        match foldOneJobProjectionEvent (projection :?> OrchestratorProjection) event with
         | Error message -> box {| ok = false; error = message |}
-        | Ok projection ->
-            let jobs =
-                projection.Jobs
-                |> Map.toList
-                |> List.map (fun (_, job) -> jobView job)
-                |> List.toArray
+        | Ok next -> box {| ok = true; projection = box next |}
 
-            let activeJobs =
-                OrchestratorProjection.activeJobs projection |> List.map jobView |> List.toArray
+    /// Return the JS-native job and active-job views of an opaque projection.
+    let jobProjectionView (projection: obj) : obj =
+        let projection = projection :?> OrchestratorProjection
 
-            box
-                {| ok = true
-                   jobs = jobs
-                   activeJobs = activeJobs |}
+        let jobs =
+            projection.Jobs
+            |> Map.toList
+            |> List.map (fun (_, job) -> jobView job)
+            |> List.toArray
+
+        let activeJobs =
+            OrchestratorProjection.activeJobs projection |> List.map jobView |> List.toArray
+
+        box
+            {| jobs = jobs
+               activeJobs = activeJobs |}
 
     // ── ConfirmedReviewWitness & Blessing admission (FINALITY-002 / FINALITY-016) ──
 

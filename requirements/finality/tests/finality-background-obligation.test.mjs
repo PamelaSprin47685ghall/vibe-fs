@@ -1,6 +1,6 @@
 // FINALITY-027: background child or PTY present → fixed join prompt; join is a
-// Finality prerequisite. The registered FinalitySurface folds plain durable
-// handle events and exposes only the Manager's parent-visible obligation.
+// Finality prerequisite. Each plain durable handle event enters the registered
+// FinalitySurface one-event fold; it exposes only the Manager's obligation.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -20,10 +20,14 @@ const handleLinked = (ownership = 'durable-parent-handle') => ({
   ownership,
 })
 
-const worldOf = (events) => {
-  const result = finality.project(events)
-  assert.equal(result.ok, true, JSON.stringify(result.error))
-  return result.world
+const project = (events) => {
+  let world = finality.emptyWorld()
+  for (const event of events) {
+    const result = finality.applyEvent(world, event)
+    assert.equal(result.ok, true, JSON.stringify(result.error))
+    world = result.world
+  }
+  return world
 }
 
 test('WHAT[FINALITY-027] malformed handle role ownership and completion fail closed', () => {
@@ -32,26 +36,26 @@ test('WHAT[FINALITY-027] malformed handle role ownership and completion fail clo
     { ...handleLinked(), ownership: 'unknown' },
     { kind: 'handle-completed', sessionId: MANAGER, handleId: 'h1', completionKind: 'unknown' },
   ]) {
-    const result = finality.project([event])
+    const result = finality.applyEvent(finality.emptyWorld(), event)
     assert.equal(result.ok, false)
     assert.match(JSON.stringify(result.error), /unknown (role|handle ownership|handle completion kind)/)
   }
 })
 
 test('WHAT[FINALITY-027] Manager without journal or handles is never outstanding', () => {
-  assert.equal(finality.backgroundOutstanding(worldOf([]), MANAGER), false)
+  assert.equal(finality.backgroundOutstanding(project([]), MANAGER), false)
 })
 
 test('WHAT[FINALITY-027] Manager with a listable child handle has a join obligation', () => {
-  assert.equal(finality.backgroundOutstanding(worldOf([handleLinked()]), MANAGER), true)
+  assert.equal(finality.backgroundOutstanding(project([handleLinked()]), MANAGER), true)
 })
 
 test('WHAT[FINALITY-027] hidden Reviewer handles do not become a Manager join obligation', () => {
-  assert.equal(finality.backgroundOutstanding(worldOf([handleLinked('host-owned-hidden')]), MANAGER), false)
+  assert.equal(finality.backgroundOutstanding(project([handleLinked('host-owned-hidden')]), MANAGER), false)
 })
 
 test('WHAT[FINALITY-027] completed-but-unjoined handles remain outstanding until retired', () => {
-  const completed = worldOf([
+  const completed = project([
     handleLinked(),
     {
       kind: 'handle-completed',
@@ -62,7 +66,7 @@ test('WHAT[FINALITY-027] completed-but-unjoined handles remain outstanding until
   ])
   assert.equal(finality.backgroundOutstanding(completed, MANAGER), true)
 
-  const retired = worldOf([
+  const retired = project([
     handleLinked(),
     {
       kind: 'handle-completed',

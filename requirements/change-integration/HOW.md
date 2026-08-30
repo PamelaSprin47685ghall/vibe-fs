@@ -17,16 +17,16 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| CHGINT-001 | `requirements/change-integration/tests/job.test.mjs` |
-| CHGINT-002 | `requirements/change-integration/tests/git-operations.test.mjs` |
-| CHGINT-003 | `requirements/change-integration/tests/job.test.mjs` |
-| CHGINT-004 | `requirements/change-integration/tests/integration-gate.test.mjs` |
-| CHGINT-005 | `requirements/change-integration/tests/worktree-resource.test.mjs` |
-| CHGINT-006 | `requirements/change-integration/tests/job.test.mjs` |
-| CHGINT-007 | `requirements/change-integration/tests/job.test.mjs` |
-| CHGINT-008 | `requirements/change-integration/tests/git-operations.test.mjs` |
-| CHGINT-009 | `requirements/change-integration/tests/job.test.mjs` |
-| CHGINT-010 | `requirements/change-integration/tests/job.test.mjs` |
-| CHGINT-011 | `requirements/change-integration/tests/host.test.mjs` |
-| CHGINT-012 | `requirements/change-integration/tests/job.test.mjs` |
-| CHGINT-013 | `requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs` |
+| CHGINT-001 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-001] ORCH_003_a_created_job_persists_the_manager_agent_and_the_worktree_identity` |
+| CHGINT-002 | `requirements/change-integration/tests/git-operations.test.mjs::WHAT[CHGINT-002] GIT_is_dirty_true_only_on_nonempty_porcelain` |
+| CHGINT-003 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-003] ORCH_007_each_durable_fact_has_one_projection_slot` |
+| CHGINT-004 | `requirements/change-integration/tests/integration-gate.test.mjs::WHAT[CHGINT-004] GATE_acquire_and_release_round_trips` |
+| CHGINT-005 | `requirements/change-integration/tests/worktree-resource.test.mjs::WHAT[CHGINT-005] WORKTREE_create_returns_owned_resource_and_marks_path_identity` |
+| CHGINT-006 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-006] ORCH_007_projection_keeps_independent_facts_instead_of_latest_stage` |
+| CHGINT-007 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-007] ORCH_007_the_three_publish_claim_branches_are_evaluated_in_the_clause_order` |
+| CHGINT-008 | `requirements/change-integration/tests/git-operations.test.mjs::WHAT[CHGINT-008] GIT_ff_merge_happy_path_advances_to_candidate` |
+| CHGINT-009 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-009] ORCH_006_the_worktree_is_located_by_identity_and_the_path_is_only_diagnostic` |
+| CHGINT-010 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-010] ORCH_005_a_rebased_candidate_publishes_only_while_the_target_has_not_moved` |
+| CHGINT-011 | `requirements/change-integration/tests/host.test.mjs::WHAT[CHGINT-011] HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result` |
+| CHGINT-012 | `requirements/change-integration/tests/runtime.test.mjs::WHAT[CHGINT-012] ORCH_007_NeedsReview_preserves_the_active_worktree` |
+| CHGINT-013 | `requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs::WHAT[CHGINT-013] THEOREM_stale_target_on_rebased_candidate_discards_witness` |

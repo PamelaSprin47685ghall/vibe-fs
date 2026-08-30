@@ -9,6 +9,7 @@
 - **内存临时性 vs 持久真实性**：进程重启后临时内存状态（armed 标记、permit、waiter）安全消失；所有恢复决策必须由已提交的 Journal 事件与 Host 物理观察共同证明。
 - **重入普通程序 vs 协程恢复**：恢复不是恢复协程的「执行到第几步」，而是通过纯函数决策计算出合法状态后，重入普通 workflow 入口。
 - **证据严密 vs 宁缺毋滥**：面对未决、冲突或缺失的证据，系统必须显式 fail-closed 停止或等待，严禁猜测继续。
+- **抽象原则 vs 逐 effect 证明**：仅声明“先 reconcile 再重试”无法证明某个真实 Host、provider、Git、filesystem 或 process 边界已闭合。高价值 effect census 必须逐项回答谁拥有、WHAT 是什么、物理 identity 如何核对、歧义为何有限、何时绝不重试，以及从哪个普通 CE 重新进入。
 
 ## 违反边界的失败意义
 

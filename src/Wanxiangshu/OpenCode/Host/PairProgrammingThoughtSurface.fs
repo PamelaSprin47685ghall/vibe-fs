@@ -235,6 +235,62 @@ module PairProgrammingThoughtSurface =
     let canonicalText = text
     let deniedText = PairProgrammingThoughtTransform.reprimandText None
 
+    let private gapName gap =
+        match gap with
+        | TranscriptGap.Start -> "start"
+        | TranscriptGap.Before address -> "before:" + TranscriptMessageAddress.value address
+        | TranscriptGap.After address -> "after:" + TranscriptMessageAddress.value address
+
+    /// Executes the production pair constructor with an observable pure callback.
+    let gapConstructorTrace (messageId: string) : obj =
+        // DSL-MUTABLE: algorithm-scratch — exact constructor call trace within one proof invocation.
+        let mutable inputs: string list = []
+
+        let ctor address =
+            inputs <- TranscriptMessageAddress.value address :: inputs
+            TranscriptGap.After address
+
+        let message =
+            box
+                {| info = {| id = messageId; role = "assistant" |}
+                   parts = [||] |}
+
+        match PairProgrammingThoughtTransform.gapsAroundAddress ctor message "missing address" with
+        | Ok(left, right) ->
+            box
+                {| ok = true
+                   inputs = inputs |> List.rev |> List.toArray
+                   left = gapName left
+                   right = gapName right |}
+        | Error error ->
+            box
+                {| ok = false
+                   inputs = inputs |> List.rev |> List.toArray
+                   left = error
+                   right = error |}
+
+    /// Observes fail-fast behavior without weakening the production exception edge.
+    let gapConstructorFailureTrace (messageId: string) : obj =
+        // DSL-MUTABLE: algorithm-scratch — invocations before the thrown callback failure.
+        let mutable calls = 0
+        let message =
+            box
+                {| info = {| id = messageId; role = "assistant" |}
+                   parts = [||] |}
+
+        try
+            PairProgrammingThoughtTransform.gapsAroundAddress
+                (fun _ ->
+                    calls <- calls + 1
+                    invalidOp "gap-constructor-failed")
+                message
+                "missing address"
+            |> ignore
+
+            box {| calls = calls; error = "" |}
+        with error ->
+            box {| calls = calls; error = error.Message |}
+
     let stableCallId (sessionId: obj) (ordinal: int64) =
         PairProgrammingThoughtTransform.stableCallId (if isNull sessionId then None else Some(string sessionId)) ordinal
 

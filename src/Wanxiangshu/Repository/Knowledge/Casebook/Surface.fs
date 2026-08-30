@@ -15,10 +15,10 @@ open Wanxiangshu.Persistence.EventStore
 /// ])
 /// // [{ kind: 'file-read', path: 'a.txt', contentHash: 'h1' }]
 ///
-/// const view = casebook.foldEvents([
-///   { kind: 'case-captured', case: { sessionId: 's1', q: 'Q', a: 'A', observations: [] } },
-/// ])
-/// // { ok: true, cases: [{ sessionId: 's1', ... }] }
+/// const world = casebook.emptyWorld()
+/// const next = casebook.applyEvent(world,
+///   { kind: 'case-captured', case: { sessionId: 's1', q: 'Q', a: 'A', observations: [] } })
+/// // { ok: true, world: { accessCounter: 1, cases: [{ sessionId: 's1', ... }] } }
 /// ```
 ///
 /// The F# `Observation` / `CasebookEvent` / `Case` unions stay inside the
@@ -168,7 +168,7 @@ module CasebookSurface =
         | ReplayResult.Fresh -> "fresh"
         | ReplayResult.Stale -> "stale"
 
-    // ── CASE-002/007/008: fold events → Cases (JS-shaped) ────────────────────
+    // ── CASE-002/007/008: single-event projection (JS-shaped) ────────────────
 
     /// Parse a JS observations array; fails closed on the first unknown kind.
     let private observationsOfJs (value: obj) : Result<Observation list, string> =
@@ -194,26 +194,47 @@ module CasebookSurface =
         | "case-evicted" -> Ok(CasebookEvent.CaseEvicted(string (value?sessionId)))
         | other -> Error $"unknown casebook event kind: {other}"
 
-    /// Fold JS casebook events through the production projection.
-    /// Returns `{ ok: true, cases: [...] }` or `{ ok: false, error }`.
-    let foldEvents (events: obj array) : obj =
-        let rec foldAll (state: CasebookProjection.State) (remaining: obj list) =
-            match remaining with
-            | [] -> Ok state
-            | event :: rest ->
-                eventOfJs event
-                |> Result.bind (fun parsed -> foldAll (CasebookProjection.apply state parsed) rest)
+    let private stateToJs (state: CasebookProjection.State) : obj =
+        let cases =
+            state.Cases
+            |> Map.toList
+            |> List.map (fun (_, case) -> caseToJs case)
+            |> List.toArray
 
-        match foldAll CasebookProjection.emptyState (List.ofArray events) with
-        | Error message -> box {| ok = false; error = message |}
-        | Ok state ->
-            let cases =
-                state.Cases
-                |> Map.toList
-                |> List.map (fun (_, case) -> caseToJs case)
-                |> List.toArray
+        box
+            {| accessCounter = state.AccessCounter
+               cases = cases |}
 
-            box {| ok = true; cases = cases |}
+    let private stateOfJs (world: obj) : Result<CasebookProjection.State, string> =
+        let cases =
+            unbox<obj array> (world?cases)
+            |> Array.toList
+            |> List.map caseOfJs
+            |> List.fold
+                (fun accumulated item ->
+                    match accumulated, item with
+                    | Error message, _ -> Error message
+                    | _, Error message -> Error message
+                    | Ok parsed, Ok case -> Ok(Map.add case.SessionId case parsed))
+                (Ok Map.empty)
+
+        cases
+        |> Result.map (fun parsed ->
+            { AccessCounter = int64 (string (world?accessCounter))
+              Cases = parsed })
+
+    /// Return the empty JS-native projection passed to `applyEvent`.
+    let emptyWorld () : obj = stateToJs CasebookProjection.emptyState
+
+    /// Apply exactly one JS casebook event through the owner projection oracle.
+    /// Returns `{ ok: true, world }` or `{ ok: false, error }`.
+    let applyEvent (world: obj) (event: obj) : obj =
+        match stateOfJs world, eventOfJs event with
+        | Error message, _
+        | _, Error message -> box {| ok = false; error = message |}
+        | Ok state, Ok parsed ->
+            let next = CasebookProjection.apply state parsed
+            box {| ok = true; world = stateToJs next |}
 
     /// CASE-008 LRU eviction. JS Cases in, `{ kept, victims }` out.
     let evict (capacity: int) (cases: obj array) : obj =

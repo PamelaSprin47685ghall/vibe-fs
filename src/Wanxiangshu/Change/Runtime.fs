@@ -155,26 +155,104 @@ type Orchestrator
             let integration failurePrefix error =
                 OrchestratorVerdict.IntegrationFailed(jobId, sprintf "%s: %s" failurePrefix error)
 
+            let durableEffect =
+                (snapshot ()).AgentProjections.Orchestrator
+                |> OrchestratorProjection.tryWorktreeEffect identity
+
+            let! observation =
+                match durableEffect with
+                | None ->
+                    Task.FromResult WorktreeReconciliationObservation.NoDurableEffect
+                    |> TaskResultCE.ofTask
+                | Some(WorktreeEffectStatus.Created receipt) ->
+                    Task.FromResult(
+                        WorktreeReconciliationObservation.CreatedReceipt(
+                            receipt.ManagerJobId,
+                            receipt.WorktreePath
+                        )
+                    )
+                    |> TaskResultCE.ofTask
+                | Some(WorktreeEffectStatus.Requested request)
+                    when request.ManagerJobId <> jobId || request.WorktreePath <> path ->
+                    Task.FromResult(
+                        WorktreeReconciliationObservation.RequestedConflict(
+                            request.ManagerJobId,
+                            request.WorktreePath
+                        )
+                    )
+                    |> TaskResultCE.ofTask
+                | Some(WorktreeEffectStatus.Requested request) ->
+                    task {
+                        let! physical = git.ListWorktrees()
+
+                        return
+                            WorktreeReconciliationObservation.RequestedAmbiguity(
+                                request.ManagerJobId,
+                                request.WorktreePath,
+                                physical
+                            )
+                    }
+                    |> TaskResultCE.ofTask
+
+            let decision =
+                OrchestratorProjection.decideWorktreeReconciliation jobId identity path observation
+
+            let reconciliationFailure failure =
+                match failure with
+                | WorktreeReconciliationFailure.DurableOwnershipConflict ->
+                    "Durable worktree intent conflicts with the requested job or path"
+                | WorktreeReconciliationFailure.WorktreeQueryFailed error ->
+                    sprintf "Failed to query requested worktree ambiguity: %s" error
+                | WorktreeReconciliationFailure.PhysicalIdentityPathConflict ->
+                    "Physical worktree identity/path evidence conflicts with the durable request"
+
             do!
-                appendFact StreamId.Workspace requestFact
-                |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to persist worktree request")
+                match decision with
+                | WorktreeReconciliationDecision.RequestThenCreate ->
+                    appendFact StreamId.Workspace requestFact
+                    |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to persist worktree request")
+                | WorktreeReconciliationDecision.Reject failure ->
+                    Error(integration "Worktree reconciliation rejected" (reconciliationFailure failure))
+                    |> Task.FromResult
+                | _ -> Ok() |> Task.FromResult
 
             let! worktree =
-                WorktreeResource.Create(git, jobId, path)
-                |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to create worktree")
+                match decision with
+                | WorktreeReconciliationDecision.RequestThenCreate
+                | WorktreeReconciliationDecision.CreateAfterProvenMissing ->
+                    WorktreeResource.Create(git, jobId, path)
+                    |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to create worktree")
+                | WorktreeReconciliationDecision.AdoptThenRecordCreated
+                | WorktreeReconciliationDecision.AdoptCreated ->
+                    Ok(WorktreeResource.Adopt(git, identity, path)) |> Task.FromResult
+                | WorktreeReconciliationDecision.Reject failure ->
+                    Error(integration "Worktree reconciliation rejected" (reconciliationFailure failure))
+                    |> Task.FromResult
 
-            return!
+            let shouldRecordCreated =
+                match decision with
+                | WorktreeReconciliationDecision.AdoptCreated -> false
+                | _ -> true
+
+            let createdFact =
+                OrchestratorFact.WorktreeCreated
+                    {| ManagerJobId = jobId
+                       WorktreeIdentity = worktree.Identity
+                       WorktreePath = path |}
+
+            do!
+                (if shouldRecordCreated then
+                     appendFact StreamId.Workspace createdFact
+                     |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to persist worktree created")
+                 else
+                     Ok() |> Task.FromResult)
+                |> OrchestratorRuntimeDecisions.releaseWorktreeOnError worktree
+
+            if journalPort.IsSome then
+                worktree.MarkDurable()
+
+            let startManager =
                 taskResult {
-                    let createdFact =
-                        OrchestratorFact.WorktreeCreated
-                            {| ManagerJobId = jobId
-                               WorktreeIdentity = worktree.Identity
-                               WorktreePath = path |}
-
-                    do!
-                        appendFact StreamId.Workspace createdFact
-                        |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to persist worktree created")
-
                     // The Manager is forked BEFORE the job fact, because ORCH-006
                     // requires the fact to carry its SessionId. A crash here leaves a
                     // Manager with no job, which the next sweep cleans up; the reverse
@@ -203,9 +281,6 @@ type Orchestrator
                         appendFact StreamId.Workspace fact
                         |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to persist manager job")
 
-                    if journalPort.IsSome then
-                        worktree.MarkDurable()
-
                     let job =
                         { JobId = jobId
                           ManagerSessionId = managerSessionId
@@ -216,7 +291,12 @@ type Orchestrator
                     startPublication job
                     return job.Handle
                 }
-                |> OrchestratorRuntimeDecisions.releaseWorktreeOnError worktree
+
+            return!
+                if journalPort.IsSome then
+                    startManager
+                else
+                    startManager |> OrchestratorRuntimeDecisions.releaseWorktreeOnError worktree
         }
 
     member _.ForkManager

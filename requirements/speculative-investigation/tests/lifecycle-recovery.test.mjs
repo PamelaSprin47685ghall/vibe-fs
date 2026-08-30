@@ -55,6 +55,54 @@ test('WHAT[SPEC-INV-008] STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_
   assert.match(missing.error, /target anchor is absent/i)
 })
 
+test('WHAT[SPEC-INV-008] STRENGTH_008_replay_loads_each_selected_plan_once_in_decision_order_and_stops_on_load_failure', async () => {
+  const value = frame()
+  let projection = Strength.projectionEmpty()
+
+  for (const decisionId of ['d2', 'd1', 'd3']) {
+    projection = apply(projection, prepared(value, decisionId, `run-${decisionId}`))
+    projection = apply(projection, promoted(value, decisionId, `run-${decisionId}`))
+  }
+
+  projection = apply(projection, prepared(value, 'd0', 'run-d0'))
+
+  const messages = ['d3', 'd1', 'd2'].map((decisionId) => ({ id: `run-${decisionId}` }))
+  const successfulLoads = ['d3', 'd2', 'd1'].map((decisionId) => ({ decisionId, bundle: value }))
+  const replay = await Strength.lifecycleReplayPlansObserved('owner', messages, successfulLoads, projection)
+
+  assert.equal(replay.ok, true, replay.error)
+  assert.deepEqual(replay.loadedDecisionIds, ['d1', 'd2', 'd3'])
+  assert.deepEqual(replay.value.map((plan) => plan.prepared.decisionId), ['d1', 'd2', 'd3'])
+  assert.deepEqual(replay.value.map((plan) => plan.beforeMessageIndex), [1, 2, 0])
+
+  const failed = await Strength.lifecycleReplayPlansObserved('owner', messages, [
+    { decisionId: 'd1', bundle: value },
+    { decisionId: 'd2', error: 'load d2 failed' },
+    { decisionId: 'd3', bundle: value },
+  ], projection)
+  assert.equal(failed.ok, false)
+  assert.equal(failed.error, 'load d2 failed')
+  assert.deepEqual(failed.loadedDecisionIds, ['d1', 'd2'])
+
+  const unavailable = await Strength.lifecycleReplayPlansObserved('owner', messages, [
+    { decisionId: 'd1', bundle: value },
+  ], projection)
+  assert.equal(unavailable.ok, false)
+  assert.match(unavailable.error, /load unavailable.*d2/i)
+  assert.deepEqual(unavailable.loadedDecisionIds, ['d1', 'd2'])
+
+  const messagesWithoutFirstAnchor = messages.map((message) => message.id === 'run-d1' ? {} : message)
+  const missingAnchor = await Strength.lifecycleReplayPlansObserved('owner', messagesWithoutFirstAnchor, successfulLoads, projection)
+  assert.equal(missingAnchor.ok, false)
+  assert.match(missingAnchor.error, /target anchor is absent.*run-d1/i)
+  assert.deepEqual(missingAnchor.loadedDecisionIds, [])
+
+  const noneSelected = await Strength.lifecycleReplayPlansObserved('owner', messages, successfulLoads, Strength.projectionEmpty())
+  assert.equal(noneSelected.ok, true)
+  assert.deepEqual(noneSelected.value, [])
+  assert.deepEqual(noneSelected.loadedDecisionIds, [])
+})
+
 test('WHAT[SPEC-INV-006] STRENGTH_006_008_prepared_candidate_cannot_be_traced_or_raw_replayed', async () => {
   const value = frame()
   const projection = apply(Strength.projectionEmpty(), prepared(value))

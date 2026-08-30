@@ -17,7 +17,20 @@ module internal SyncDelegateWorkflow =
     type Dependencies =
         { Attached: AttachedSessionRuntime
           ResolveOwnerTier: SessionId -> AgentTier option
-          CreateChild: SessionId -> string -> string option -> Task<Result<SessionId, string>>
+          ObserveChild:
+              SessionId
+                  -> ReuseScopeId
+                  -> SyncDelegateRole
+                  -> string
+                  -> Task<Result<AttachedChildObservation, string>>
+          CreateChild:
+              SessionId
+                  -> ReuseScopeId
+                  -> SyncDelegateRole
+                  -> string
+                  -> string option
+                  -> Task<Result<SessionId, string>>
+          BindChild: SessionId -> SessionId -> string -> unit
           OnDelegateReady: SessionId -> string -> unit
           NoteInspectorPrompt: string -> string -> unit
           CleanupInspectorDraft: string -> unit
@@ -292,7 +305,9 @@ module internal SyncDelegateWorkflow =
                     role,
                     agentName,
                     deps.Directory,
+                    deps.ObserveChild,
                     deps.CreateChild,
+                    deps.BindChild,
                     deps.OnDelegateReady
                 )
 

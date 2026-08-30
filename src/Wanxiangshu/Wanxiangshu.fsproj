@@ -16,6 +16,7 @@
     <Compile Include="AssemblyInfo.fs"/>
     <Compile Include="Host/Digest.fs"/>
     <Compile Include="Foundation/Identity.fs"/>
+    <Compile Include="OpenCode/Host/SessionQuiescenceGate.fs"/>
     <Compile Include="Context/Trace/Cursor.fs"/>
     <Compile Include="Foundation/Roles.fs"/>
     <Compile Include="Foundation/RolesSurface.fs"/>
@@ -420,7 +421,6 @@
     <Compile Include="Mission/Obligation/Todo/MagicTodoMembrane.fs"/>
     <Compile Include="Interaction/Dispatch/Ingress.fs"/>
     <Compile Include="Interaction/Authority/Child.fs"/>
-    <Compile Include="OpenCode/Host/SessionQuiescenceGate.fs"/>
     <Compile Include="OpenCode/Host/QuiescenceSurface.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Wait.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Store.fs"/>
@@ -652,7 +652,6 @@
     <Compile Include="OpenCode/Host/ChatParamsHook.fs"/>
     <Compile Include="OpenCode/Host/ChatParamsSurface.fs"/>
     <Compile Include="OpenCode/Host/PluginHostInterop.fs"/>
-    <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
     <Compile Include="OpenCode/Host/ProviderSystemTransform.fs"/>
     <Compile Include="Participant/Provider/LanguageSurface.fs"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fs"/>
@@ -676,6 +675,7 @@
     <Compile Include="Change/Host/Surface.fs"/>
     <Compile Include="Foundation/OutcomeSurface.fs"/>
     <Compile Include="Interaction/Dispatch/DispatchSurface.fs"/>
+    <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
     <Compile Include="Interaction/Dispatch/JoinGuardSurface.fs"/>
     <Compile Include="Interaction/Dispatch/RecoverySurface.fs"/>
     <Compile Include="Verification/EventStoreWriterSurface.fs"/>

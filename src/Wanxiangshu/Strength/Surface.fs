@@ -1041,7 +1041,7 @@ module StrengthSurface =
 
     let lifecycleReplayPlans (owner: string) (messages: obj array) (bundle: obj) (projection: obj) : Task<obj> =
         let messageIds =
-            messages |> Array.toList |> List.map (fun value -> box (textOf value?id))
+            messages |> Array.toList |> List.map (fun value -> optionalText value?id)
 
         let load _ = Task.FromResult(Ok(bundleOf bundle))
 
@@ -1049,7 +1049,7 @@ module StrengthSurface =
             let! result =
                 StrengthLifecycle.replayPlans
                     (SessionId.create owner)
-                    (fun message -> Some(string message))
+                    id
                     messageIds
                     load
                     (projectionOf projection)
@@ -1061,6 +1061,58 @@ module StrengthSurface =
                         {| ok = true
                            value = plans |> List.map planToJs |> List.toArray |}
                 | Error error -> box {| ok = false; error = error |}
+        }
+
+    let lifecycleReplayPlansObserved
+        (owner: string)
+        (messages: obj array)
+        (loadResponses: obj array)
+        (projection: obj)
+        : Task<obj> =
+        let messageIds =
+            messages |> Array.toList |> List.map (fun value -> optionalText value?id)
+
+        // DSL-MUTABLE: algorithm-scratch — records observable load-port invocations
+        let loadedDecisionIds = ResizeArray<string>()
+
+        let load (prepared: StrengthCandidatePrepared) =
+            let decisionId = StrengthDecisionId.value prepared.DecisionId
+            loadedDecisionIds.Add(decisionId)
+
+            match
+                loadResponses
+                |> Array.tryFind (fun response -> textOf response?decisionId = decisionId)
+            with
+            | None -> Task.FromResult(Error(sprintf "Strength bundle load unavailable: decision=%s" decisionId))
+            | Some response when not (isNullish response?error) ->
+                Task.FromResult(Error(textOf response?error))
+            | Some response when isNullish response?bundle ->
+                Task.FromResult(Error(sprintf "Strength bundle load unavailable: decision=%s" decisionId))
+            | Some response -> Task.FromResult(Ok(bundleOf response?bundle))
+
+        task {
+            let! result =
+                StrengthLifecycle.replayPlans
+                    (SessionId.create owner)
+                    id
+                    messageIds
+                    load
+                    (projectionOf projection)
+
+            let loads = loadedDecisionIds.ToArray()
+
+            return
+                match result with
+                | Ok plans ->
+                    box
+                        {| ok = true
+                           value = plans |> List.map planToJs |> List.toArray
+                           loadedDecisionIds = loads |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           error = error
+                           loadedDecisionIds = loads |}
         }
 
     let lifecycleNeedsRawReplay (coveredThrough: obj) (plan: obj) : bool =

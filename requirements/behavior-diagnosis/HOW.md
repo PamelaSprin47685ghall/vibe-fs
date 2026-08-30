@@ -45,21 +45,21 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| BD-001 | `requirements/behavior-diagnosis/tests/catalog.test.mjs` |
-| BD-002 | `requirements/behavior-diagnosis/tests/catalog-validation.test.mjs` |
-| BD-003 | `requirements/behavior-diagnosis/tests/catalog-validation.test.mjs` |
-| BD-004 | `requirements/behavior-diagnosis/tests/rulebook-system-composition.test.mjs` |
-| BD-005 | `requirements/behavior-diagnosis/tests/rulebook-system-composition.test.mjs` |
-| BD-006 | `requirements/behavior-diagnosis/tests/codec.test.mjs` |
-| BD-007 | `requirements/behavior-diagnosis/tests/codec.test.mjs` |
-| BD-008 | `requirements/behavior-diagnosis/tests/codec.test.mjs` |
-| BD-009 | `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs` |
-| BD-010 | `requirements/behavior-diagnosis/tests/identity-fail-closed.test.mjs` |
-| BD-011 | `requirements/behavior-diagnosis/tests/bounds.test.mjs` |
-| BD-012 | `requirements/behavior-diagnosis/tests/observation-projection.test.mjs` |
-| BD-013 | `requirements/behavior-diagnosis/tests/coverage-birth-gate.test.mjs` |
-| BD-014 | `requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs` |
-| BD-015 | `requirements/behavior-diagnosis/tests/observation-pair.test.mjs` |
-| BD-016 | `requirements/behavior-diagnosis/tests/observation-projection.test.mjs` |
-| BD-017 | `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs` |
-| BD-018 | `requirements/behavior-diagnosis/tests/rulebook-system-composition.test.mjs` |
+| BD-001 | `requirements/behavior-diagnosis/tests/catalog.test.mjs::WHAT[BD-001] ENFORCER_170_catalog_has_exactly_120_rules` |
+| BD-002 | `requirements/behavior-diagnosis/tests/catalog.test.mjs::WHAT[BD-002] ENFORCER_170_rule_ids_are_unique` |
+| BD-003 | `requirements/behavior-diagnosis/tests/catalog-validation.test.mjs::WHAT[BD-003] ENFORCER_170_validate_accepts_packaged_catalog_n_rules` |
+| BD-004 | `requirements/behavior-diagnosis/tests/rulebook-system-composition.test.mjs::WHAT[BD-004] BEHAVIOR_DIAGNOSIS_SYSTEM_001_composed_prompt_contains_every_tip_exactly_once` |
+| BD-005 | `requirements/behavior-diagnosis/tests/rulebook-system-composition.test.mjs::WHAT[BD-005] BEHAVIOR_DIAGNOSIS_SYSTEM_003_zh_cn_leaf_load_is_complete_and_nonempty` |
+| BD-006 | `requirements/behavior-diagnosis/tests/codec.test.mjs::WHAT[BD-006] ENFORCER_023_missing_tip_fails` |
+| BD-007 | `requirements/behavior-diagnosis/tests/codec.test.mjs::WHAT[BD-007] ENFORCER_023_nonempty_unknown_tip_resolves` |
+| BD-008 | `requirements/behavior-diagnosis/tests/codec.test.mjs::WHAT[BD-008] ENFORCER_024_extra_numeric_properties_are_ignored` |
+| BD-009 | `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs::WHAT[BD-009] ENFORCER_061_exactly_one_valid_call_stops_physical_run` |
+| BD-010 | `requirements/behavior-diagnosis/tests/identity-fail-closed.test.mjs::WHAT[BD-010] ENFORCER_043_no_provable_provider_run_fails_closed` |
+| BD-011 | `requirements/behavior-diagnosis/tests/bounds.test.mjs::WHAT[BD-011] ENFORCER_043_canonical_text_over_512KiB_fails_closed` |
+| BD-012 | `requirements/behavior-diagnosis/tests/observation-projection.test.mjs::WHAT[BD-012] OBS_PROJ_002_zip_recent_tips_with_blog_frame_digests` |
+| BD-013 | `requirements/behavior-diagnosis/tests/coverage-birth-gate.test.mjs::WHAT[BD-013] ENFORCER_045_mainContext_refuses_when_next_sequence_cannot_advance` |
+| BD-014 | `requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs::WHAT[BD-014] ENFORCER_TIP_08_each_committed_cycle_records_exactly_one_tip` |
+| BD-015 | `requirements/behavior-diagnosis/tests/observation-pair.test.mjs::WHAT[BD-015] RULEBOOK_OBS_001_zip_equal_length_pairs_tip_then_frame` |
+| BD-016 | `requirements/behavior-diagnosis/tests/observation-projection.test.mjs::WHAT[BD-016] OBS_PROJ_003_squash_co_moves_tips_and_frames_as_observation` |
+| BD-017 | `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs::WHAT[BD-017] ENFORCER_066_first_pure_terminal_issues_interaction_nudge` |
+| BD-018 | `requirements/behavior-diagnosis/tests/rulebook-system-composition.test.mjs::WHAT[BD-018] BEHAVIOR_DIAGNOSIS_SYSTEM_005_rulebook_revision_freezes_system_prompt_and_tool_definitions` |

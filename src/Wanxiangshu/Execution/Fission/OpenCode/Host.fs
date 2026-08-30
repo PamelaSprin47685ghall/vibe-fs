@@ -964,7 +964,7 @@ module FissionHost =
                         journal
                         joinGuardNudges
                         (fun () -> quiescence.TryConsume idlePermit)
-                        (fun () -> quiescence.TryRelease idlePermit |> ignore)
+                        (fun () -> quiescence.TryRelease idlePermit)
                         turn.SessionId
                         turn.ProviderRun
                         turn.Directory

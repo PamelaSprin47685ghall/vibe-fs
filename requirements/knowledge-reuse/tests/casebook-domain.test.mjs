@@ -14,7 +14,12 @@ import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.j
 const read = (path, hash) => ({ kind: 'file-read', path, contentHash: hash })
 const glob = (pattern, paths) => ({ kind: 'glob-result', pattern, paths })
 
-const fold = (events) => casebook.foldEvents(events).cases
+const project = (events) =>
+  events.reduce((world, event) => {
+    const result = casebook.applyEvent(world, event)
+    assert.equal(result.ok, true, JSON.stringify(result.error))
+    return result.world
+  }, casebook.emptyWorld())
 const captured = (sessionId, q, a, observations) => ({
   kind: 'case-captured',
   case: { sessionId, q, a, observations, lastAccessOrder: 0 },
@@ -51,7 +56,7 @@ test('WHAT[KNOWLEDGE-REUSE-004] CASE004_classifyReplay_fresh_only_on_exact_norma
 })
 
 test('WHAT[KNOWLEDGE-REUSE-002] CASE002_fold_captured_and_refreshed_keeps_qa_verbatim', () => {
-  const cases = fold([
+  const { cases } = project([
     captured('s1', 'Q1', 'A1', [read('a.txt', 'h1')]),
     captured('s2', 'Q2', 'A2', [read('b.txt', 'h2')]),
     refreshed('s1', 'Q1b', 'A1b', [read('a.txt', 'h1'), read('c.txt', 'h3')]),
@@ -63,19 +68,19 @@ test('WHAT[KNOWLEDGE-REUSE-002] CASE002_fold_captured_and_refreshed_keeps_qa_ver
 })
 
 test('WHAT[KNOWLEDGE-REUSE-008] CASE008_fold_accessed_and_evicted_derives_access_order', () => {
-  const cases = fold([
+  const { cases } = project([
     captured('s1', 'Q1', 'A1', [read('a.txt', 'h1')]),
     captured('s2', 'Q2', 'A2', [read('b.txt', 'h2')]),
     accessed('s2'),
   ])
   assert.equal(cases.length, 2)
   // Evicted removes the Case (captured+evicted in one fold)
-  const combined = fold([captured('s2', 'Q2', 'A2', []), evicted('s2')])
+  const { cases: combined } = project([captured('s2', 'Q2', 'A2', []), evicted('s2')])
   assert.equal(combined.length, 0)
 })
 
 test('WHAT[KNOWLEDGE-REUSE-008] CASE008_lru_evict_keeps_most_recently_accessed', () => {
-  const cases = fold([
+  const { cases } = project([
     captured('s1', 'Q1', 'A1', []),
     captured('s2', 'Q2', 'A2', []),
     captured('s3', 'Q3', 'A3', []),

@@ -69,7 +69,12 @@ if (explain) {
   for (const id of test.whatIds) {
     const w = graph.whats.get(id)
     if (!w) {
-      print(`\nproves\n  WHAT[${id}]  — UNKNOWN proposition`)
+      const definitions = graph.whatDefinitions.get(id) ?? []
+      if (definitions.length > 1) {
+        print(`\nproves\n  WHAT[${id}]  — AMBIGUOUS proposition (${definitions.map((definition) => `${rel(definition.file)}:${definition.line}`).join(', ')})`)
+      } else {
+        print(`\nproves\n  WHAT[${id}]  — UNKNOWN proposition`)
+      }
       failed = true
       continue
     }
@@ -93,6 +98,18 @@ if (explain) {
 
 const failures = []
 const add = (file, line, code, msg) => failures.push({ file, line, code, msg })
+
+// An ID with more than one definition has no authoritative owner. Report one
+// finding containing every exact definition location; never let traversal
+// order choose a winner by overwriting the map.
+for (const conflict of graph.duplicateWhats) {
+  const scoped = conflict.definitions.filter((definition) => inScope(definition.package))
+  if (scoped.length === 0) continue
+  const first = scoped[0]
+  const locations = conflict.definitions.map((definition) => `${rel(definition.file)}:${definition.line}`).join(', ')
+  const code = conflict.kind === 'multi-owner' ? 'TRACE_MULTI_OWNER_WHAT' : 'TRACE_DUPLICATE_WHAT'
+  add(rel(first.file), first.line, code, `${conflict.id} has ${conflict.kind === 'multi-owner' ? 'multiple owners' : 'duplicate definitions'}: ${locations}; no definition is authoritative`)
+}
 
 // Every actual call site is a proof declaration, including skip/todo calls.
 // Their state changes whether they can prove a WHAT, not whether they need an
@@ -130,10 +147,9 @@ for (const what of graph.proofMissing) {
   add(rel(what.file), what.line, 'TRACE_PROOF_MISSING', `${what.id} has no HOW.md row in ${what.package}`)
 }
 
-// An explicit PROOF anchor is an executable edge, not a file existence claim.
-// A stale, ambiguous, state-ineligible, or WHAT-mismatched anchor is a hard
-// failure. Bare file references remain structural evidence for meta-verifier;
-// they do not create an invented test edge.
+// A PROOF anchor is an exact (path,title) executable edge, not a file existence
+// claim. Bare paths, stale or ambiguous titles, ineligible state, and
+// WHAT-mismatched anchors are hard failures and cannot close HOW authority.
 for (const edge of graph.danglingProof) {
   const packageName = edge.whatId ? graph.whats.get(edge.whatId)?.package : packageOf(edge.file)
   if (!inScope(packageName)) continue

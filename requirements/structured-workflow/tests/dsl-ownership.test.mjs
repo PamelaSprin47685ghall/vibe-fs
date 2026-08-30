@@ -204,6 +204,22 @@ test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_small_du_is_never_reported', (
   assert.deepEqual(scanLargeDus(src, 'Agent/Small.fs'), [])
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_taxonomy_includes_authority_and_physical_values', () => {
+  for (const classification of ['Witness', 'Capability', 'Receipt', 'PhysicalHandle']) {
+    assert.ok(DSL_CLASSES.includes(classification), `missing DSL-class ${classification}`)
+  }
+  assert.equal(new Set(DSL_CLASSES).size, DSL_CLASSES.length, 'DSL classes must be unique')
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_physical_handle_classifies_a_protocol_collision', () => {
+  const source = [
+    'module ProcessWire',
+    '/// DSL-class: PhysicalHandle — opaque PTY continuation handle.',
+    'type ContinueToken = private ContinueToken of nativeint',
+  ].join('\n')
+  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Process/Wire.fs'), [])
+})
+
 test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_exports_nine_named_gates', () => {
   assert.deepEqual(GATE_NAMES, [
     'mutable',

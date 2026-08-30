@@ -82,6 +82,7 @@ module HostJoinGuard =
     type JoinGuardNudgeOutcome =
         | Sent of PromptKey
         | AlreadyOutstanding
+        | AdmissionRejected of QuiescencePermitFailure
         | Superseded
         | NotSent
         | Failed of reason: string
@@ -134,8 +135,8 @@ module HostJoinGuard =
         (sessionPort: ISessionHostPort)
         (durable: AgentJournal)
         (nudgeKeys: HashSet<string>)
-        (physicalAdmission: unit -> bool)
-        (releaseAdmission: unit -> unit)
+        (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
+        (releaseAdmission: unit -> Result<unit, QuiescencePermitFailure>)
         (key: string)
         (sessionId: SessionId)
         (terminalProviderRun: ProviderRunIdentity)
@@ -165,7 +166,9 @@ module HostJoinGuard =
             | HostSessionNudge.IdleContinuationOutcome.Sent promptKey -> return JoinGuardNudgeOutcome.Sent promptKey
             | HostSessionNudge.IdleContinuationOutcome.AlreadyAdmitted ->
                 return JoinGuardNudgeOutcome.AlreadyOutstanding
-            | HostSessionNudge.IdleContinuationOutcome.Superseded
+            | HostSessionNudge.IdleContinuationOutcome.AdmissionRejected failure ->
+                releaseKey ()
+                return JoinGuardNudgeOutcome.AdmissionRejected failure
             | HostSessionNudge.IdleContinuationOutcome.Retired ->
                 releaseKey ()
                 return JoinGuardNudgeOutcome.Superseded
@@ -181,8 +184,8 @@ module HostJoinGuard =
         (sessionPort: ISessionHostPort)
         (durable: AgentJournal)
         (nudgeKeys: HashSet<string>)
-        (physicalAdmission: unit -> bool)
-        (releaseAdmission: unit -> unit)
+        (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
+        (releaseAdmission: unit -> Result<unit, QuiescencePermitFailure>)
         (sessionId: SessionId)
         (terminalProviderRun: ProviderRunIdentity)
         (directory: string option)
@@ -214,8 +217,8 @@ module HostJoinGuard =
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
-        (physicalAdmission: unit -> bool)
-        (releaseAdmission: unit -> unit)
+        (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
+        (releaseAdmission: unit -> Result<unit, QuiescencePermitFailure>)
         (sessionId: SessionId)
         (terminalProviderRun: ProviderRunIdentity)
         (directory: string option)

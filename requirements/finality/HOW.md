@@ -32,31 +32,31 @@ DEPENDS ON: obligation-ledger, review-assurance, participant-horizon
 
 | 命题 | 落点测试 |
 |---|---|
-| FINALITY-001 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
-| FINALITY-002 | `requirements/finality/tests/manager-finality-disposition.test.mjs`, `requirements/finality/tests/blessing-admission.test.mjs` |
-| FINALITY-003 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
-| FINALITY-004 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
-| FINALITY-005 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
-| FINALITY-006 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
-| FINALITY-007 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
-| FINALITY-008 | `requirements/finality/tests/lifecycle.test.mjs` |
-| FINALITY-009 | `requirements/finality/tests/finality-cohort-law.test.mjs` |
-| FINALITY-010 | `requirements/finality/tests/finality-cohort-law.test.mjs` |
-| FINALITY-011 | `requirements/finality/tests/lifecycle.test.mjs` |
-| FINALITY-012 | `requirements/finality/tests/lifecycle.test.mjs` |
-| FINALITY-013 | `requirements/finality/tests/lifecycle.test.mjs` |
-| FINALITY-014 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
-| FINALITY-015 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
-| FINALITY-016 | `requirements/finality/tests/lifecycle.test.mjs`, `requirements/finality/tests/blessing-admission.test.mjs` |
-| FINALITY-017 | `requirements/finality/tests/lifecycle.test.mjs` |
-| FINALITY-018 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
-| FINALITY-019 | `requirements/finality/tests/lifecycle.test.mjs` |
-| FINALITY-020 | `requirements/finality/tests/lifecycle.test.mjs` |
-| FINALITY-021 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
-| FINALITY-022 | `requirements/finality/tests/life-admission.test.mjs` |
-| FINALITY-023 | `requirements/finality/tests/rewrite-consistency.test.mjs` |
-| FINALITY-024 | `requirements/finality/tests/rewrite-consistency.test.mjs` |
-| FINALITY-025 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
-| FINALITY-026 | `requirements/finality/tests/finality-fatal-contract.test.mjs` |
-| FINALITY-027 | `requirements/finality/tests/finality-background-obligation.test.mjs` |
-| FINALITY-028 | `requirements/finality/tests/manager-job-no-resurrection.test.mjs` |
+| FINALITY-001 | `requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-001] only the Manager holds ToolPermission.Finality` |
+| FINALITY-002 | `requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-002] finality eligibility is the combination of commitment, request, and experience typing`；`requirements/finality/tests/blessing-admission.test.mjs::WHAT[FINALITY-002] finality_admission_grants_blessing_for_matching_tree_witness`；`requirements/finality/tests/blessing-admission.test.mjs::WHAT[FINALITY-002] finality_admission_rejects_stale_witness_when_tree_differs` |
+| FINALITY-003 | `requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-003] an open request resumes the same ToolCallId replay`；`requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-003] an open request with no enlisted members is recoverable`；`requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-003] a request already in motion waits for the current cohort` |
+| FINALITY-004 | `requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-004] no accepted planComplete=true commitment stays at Planning Table` |
+| FINALITY-005 | `requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-005] the rest-path suicide is a drain, not a new cohort` |
+| FINALITY-006 | `requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-006] drain outcomes are two-typed: Revision (REVISE) vs Confirmed (PERFECT)` |
+| FINALITY-007 | `requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-007] no mechanical terminal-todo completeness gate` |
+| FINALITY-008 | `requirements/finality/tests/lifecycle.test.mjs::WHAT[FINALITY-008] FinalityRequested is rejected while a request is open`；`requirements/finality/tests/lifecycle.test.mjs::WHAT[FINALITY-008] a rejected request closes and a new suicide opens a new one` |
+| FINALITY-009 | `requirements/finality/tests/finality-cohort-law.test.mjs::WHAT[FINALITY-009] roster is ungraduated history plus exactly one new`；`requirements/finality/tests/finality-cohort-law.test.mjs::WHAT[FINALITY-009] crash reentry reuses already created new slot exactly once`；`requirements/finality/tests/finality-cohort-law.test.mjs::WHAT[FINALITY-009] historical enlist order confluent for roster`；`requirements/finality/tests/finality-cohort-law.test.mjs::WHAT[FINALITY-009] replay preserves an open finality roster source` |
+| FINALITY-010 | `requirements/finality/tests/finality-cohort-law.test.mjs::WHAT[FINALITY-010] graduated reviewer excluded from roster` |
+| FINALITY-011 | `requirements/finality/tests/lifecycle.test.mjs::WHAT[FINALITY-011] a revise closes finality without confirming the life` |
+| FINALITY-012 | `requirements/finality/tests/lifecycle.test.mjs::WHAT[FINALITY-012] finality rejection renders work record as guidance comments` |
+| FINALITY-013 | `requirements/finality/tests/lifecycle.test.mjs::WHAT[FINALITY-013] finality three experiences` |
+| FINALITY-014 | `requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-014] rejection keeps the same Life and a new suicide begins fresh Finality` |
+| FINALITY-015 | `requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-015] a blessing keeps the enlisted process-review standing: no dispose` |
+| FINALITY-016 | `requirements/finality/tests/lifecycle.test.mjs::WHAT[FINALITY-016] a blessing leaves the life open until the second suicide`；`requirements/finality/tests/blessing-admission.test.mjs::WHAT[FINALITY-016] blessing_admission_requires_complete_cohort_witness` |
+| FINALITY-017 | `requirements/finality/tests/lifecycle.test.mjs::WHAT[FINALITY-017] the second suicide is the rest: LifeCompleted archives the Life`；`requirements/finality/tests/lifecycle.test.mjs::WHAT[FINALITY-017] isLifeArchived true only after life completed` |
+| FINALITY-018 | `requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-018] an open request owns the Life: Manager labor is deferred` |
+| FINALITY-019 | `requirements/finality/tests/lifecycle.test.mjs::WHAT[FINALITY-019] idle encouragement golden bytes` |
+| FINALITY-020 | `requirements/finality/tests/lifecycle.test.mjs::WHAT[FINALITY-020] rejection rendering exposes no mechanism vocabulary`；`requirements/finality/tests/lifecycle.test.mjs::WHAT[FINALITY-020] manager surface has no forbidden words` |
+| FINALITY-021 | `requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-021] disposition never derives from narrative text` |
+| FINALITY-022 | `requirements/finality/tests/life-admission.test.mjs::WHAT[FINALITY-022] unknown authority kind and tier fail closed`；`requirements/finality/tests/life-admission.test.mjs::WHAT[FINALITY-022] AgentOwner migration is admitted only before any Life history`；`requirements/finality/tests/life-admission.test.mjs::WHAT[FINALITY-022] HumanRoot opening requires the exact authority root message id` |
+| FINALITY-023 | `requirements/finality/tests/rewrite-consistency.test.mjs::WHAT[FINALITY-023] opening rewrite is byte identical across requests`；`requirements/finality/tests/rewrite-consistency.test.mjs::WHAT[FINALITY-023] opening rewrite survives a persisted rewritten message` |
+| FINALITY-024 | `requirements/finality/tests/rewrite-consistency.test.mjs::WHAT[FINALITY-024] work-time messages are never rewritten` |
+| FINALITY-025 | `requirements/finality/tests/manager-finality-disposition.test.mjs::WHAT[FINALITY-025] a completed Life replays as AlreadyCompleted, never restarts` |
+| FINALITY-026 | `requirements/finality/tests/finality-fatal-contract.test.mjs::WHAT[FINALITY-026] modern Finality has no Undecided business outcome or failure sink`；`requirements/finality/tests/finality-fatal-contract.test.mjs::WHAT[FINALITY-026] Finality infrastructure exceptions terminate through the diagnostic fuse` |
+| FINALITY-027 | `requirements/finality/tests/finality-background-obligation.test.mjs::WHAT[FINALITY-027] malformed handle role ownership and completion fail closed`；`requirements/finality/tests/finality-background-obligation.test.mjs::WHAT[FINALITY-027] Manager without journal or handles is never outstanding`；`requirements/finality/tests/finality-background-obligation.test.mjs::WHAT[FINALITY-027] Manager with a listable child handle has a join obligation`；`requirements/finality/tests/finality-background-obligation.test.mjs::WHAT[FINALITY-027] hidden Reviewer handles do not become a Manager join obligation`；`requirements/finality/tests/finality-background-obligation.test.mjs::WHAT[FINALITY-027] completed-but-unjoined handles remain outstanding until retired` |
+| FINALITY-028 | `requirements/finality/tests/manager-job-no-resurrection.test.mjs::WHAT[FINALITY-028] a terminal ManagerJob is not active and does not resume`；`requirements/finality/tests/manager-job-no-resurrection.test.mjs::WHAT[FINALITY-028] later facts cannot reopen a terminal ManagerJob`；`requirements/finality/tests/manager-job-no-resurrection.test.mjs::WHAT[FINALITY-028] replaying ManagerJobCreated cannot re-enlist a terminal job`；`requirements/finality/tests/manager-job-no-resurrection.test.mjs::WHAT[FINALITY-028] an active owned job continues on the same session and worktree` |

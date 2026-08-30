@@ -32,15 +32,15 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| GD-001 | `requirements/guidance-delivery/tests/tip-delivery-projection.test.mjs` |
-| GD-002 | `requirements/guidance-delivery/tests/tip-guidance-delivery.test.mjs` |
-| GD-003 | `requirements/guidance-delivery/tests/tip-guidance-delivery.test.mjs` |
-| GD-004 | `requirements/guidance-delivery/tests/latest-tip-nudge.test.mjs` |
-| GD-005 | `requirements/guidance-delivery/tests/tip-delivery-projection.test.mjs` |
-| GD-006 | `requirements/guidance-delivery/tests/tip-guidance-delivery.test.mjs` |
-| GD-007 | `requirements/guidance-delivery/tests/latest-tip-nudge.test.mjs` |
-| GD-008 | `requirements/guidance-delivery/tests/audience-separation.test.mjs` |
-| GD-009 | `requirements/guidance-delivery/tests/latest-tip-nudge.test.mjs` |
-| GD-010 | `requirements/guidance-delivery/tests/audience-separation.test.mjs` |
-| GD-011 | `requirements/guidance-delivery/tests/guideline-projection.test.mjs` |
-| GD-012 | `requirements/guidance-delivery/tests/pair-calibration.test.mjs` |
+| GD-001 | `requirements/guidance-delivery/tests/tip-delivery-projection.test.mjs::WHAT[GD-001] TDP_006_frontier_and_coverage_are_two_axes_not_one_bool` |
+| GD-002 | `requirements/guidance-delivery/tests/tip-guidance-delivery.test.mjs::WHAT[GD-002] ENFORCER_TIP_DELIVERY_001_first_resolve_is_full_main_md`；`requirements/guidance-delivery/tests/tip-guidance-delivery.test.mjs::WHAT[GD-002] ENFORCER_PROMPT_017_full_tip_guidance_uses_owner_session_zh_cn_rulebook` |
+| GD-003 | `requirements/guidance-delivery/tests/tip-guidance-delivery.test.mjs::WHAT[GD-003] ENFORCER_TIP_DELIVERY_002_second_resolve_same_tip_is_identity_only` |
+| GD-004 | `requirements/guidance-delivery/tests/latest-tip-nudge.test.mjs::WHAT[GD-004] ENFORCER_TIP_NUDGE_001_latest_tip_first_delivery_is_full_main_md` |
+| GD-005 | `requirements/guidance-delivery/tests/tip-delivery-projection.test.mjs::WHAT[GD-005] TDP_004_reanchor_voids_full_history_so_next_resolve_refulls`；`requirements/guidance-delivery/tests/tip-delivery-projection.test.mjs::WHAT[GD-005] TDP_005_reanchor_does_not_advance_occurrence_frontier` |
+| GD-006 | `requirements/guidance-delivery/tests/tip-guidance-delivery.test.mjs::WHAT[GD-006] ENFORCER_TIP_DELIVERY_004_blogger_session_id_resolves_owner_main`；`requirements/guidance-delivery/tests/tip-guidance-delivery.test.mjs::WHAT[GD-006] ENFORCER_TIP_DELIVERY_005_missing_tip_returns_none` |
+| GD-007 | `requirements/guidance-delivery/tests/latest-tip-nudge.test.mjs::WHAT[GD-007] ENFORCER_TIP_NUDGE_001b_latestTipNudge_is_same_bytes_as_latestTipGuidance` |
+| GD-008 | `requirements/guidance-delivery/tests/audience-separation.test.mjs::WHAT[GD-008] AUDIENCE_001_main_md_sections_never_enter_blogger_system_prompt`；`requirements/guidance-delivery/tests/audience-separation.test.mjs::WHAT[GD-008] AUDIENCE_002_corpus_level_detection_and_remediation_do_not_leak`；`requirements/guidance-delivery/tests/audience-separation.test.mjs::WHAT[GD-008] AUDIENCE_003_previous_tip_history_is_not_main_authority` |
+| GD-009 | `requirements/guidance-delivery/tests/latest-tip-nudge.test.mjs::WHAT[GD-009] CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text`；`requirements/guidance-delivery/tests/latest-tip-nudge.test.mjs::WHAT[GD-009] CTX_002_GUIDELINE_002_marker_with_nudge_is_one_instruction_plane` |
+| GD-010 | `requirements/guidance-delivery/tests/audience-separation.test.mjs::WHAT[GD-010] AUDIENCE_004_corpus_distinctness_entrusted_to_review_without_runtime_similarity_gate` |
+| GD-011 | `requirements/guidance-delivery/tests/guideline-projection.test.mjs::WHAT[GD-011] GP_001_empty_state_starts_ordinal_at_one`；`requirements/guidance-delivery/tests/guideline-projection.test.mjs::WHAT[GD-011] GP_002_apply_records_pair_and_restores_marker_bytes`；`requirements/guidance-delivery/tests/guideline-projection.test.mjs::WHAT[GD-011] GP_003_non_sequential_ordinal_is_rejected`；`requirements/guidance-delivery/tests/guideline-projection.test.mjs::WHAT[GD-011] GP_004_duplicate_call_id_is_rejected`；`requirements/guidance-delivery/tests/guideline-projection.test.mjs::WHAT[GD-011] GP_005_duplicate_placement_is_rejected`；`requirements/guidance-delivery/tests/guideline-projection.test.mjs::WHAT[GD-011] GP_006_replay_restores_pairs_oldest_first`；`requirements/guidance-delivery/tests/guideline-projection.test.mjs::WHAT[GD-011] GP_007_reanchor_retires_visible_pairs_without_deleting_durable_history`；`requirements/guidance-delivery/tests/pair-gap-constructor.test.mjs::WHAT[GD-011] PPT_gap_constructor_receives_the_same_address_exactly_twice_in_pair_order`；`requirements/guidance-delivery/tests/pair-gap-constructor.test.mjs::WHAT[GD-011] PPT_gap_constructor_failure_propagates_from_the_first_call_and_stops_the_pair` |
+| GD-012 | `requirements/guidance-delivery/tests/pair-calibration.test.mjs::WHAT[GD-012] GD_012_DELEG_022_no_estimate_means_no_dynamic_fragment`；`requirements/guidance-delivery/tests/pair-calibration.test.mjs::WHAT[GD-012] GD_012_each_new_occurrence_can_render_a_new_remaining_without_rewriting_old_text`；`requirements/guidance-delivery/tests/pair-calibration.test.mjs::WHAT[GD-012] GD_012_dynamic_fragment_is_between_tip_and_guideline_in_instruction_plane` |

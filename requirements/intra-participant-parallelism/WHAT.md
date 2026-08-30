@@ -61,3 +61,7 @@ Fission 不拥有 nudge、provider fallback/AABB 或 degeneration-guard 的恢�
 ## INTRA-PARTICIPANT-PARALLELISM-015: deterministic ring convergence
 
 Ring convergence 的顺序只由 canonical lane index/count 决定。V1 的 ring fold 从 lane `0` 按索引递增环行至 lane `N-1`，以 keyed union 合并记录，并由确定的终点 lane `N-1` 接受最终 takeover。不得持久化或读取“最后到达/最后 materialize 的 lane”来选择接管者；不同完成到达顺序必须得到同一 merge order、同一 takeover lane 与同一 aggregate。
+
+## INTRA-PARTICIPANT-PARALLELISM-016: Result traversal preserves input cardinality and order
+
+Foundation 的 `TaskResultList.traverseM` 是按输入基数有界的顺序 Result traversal，不是 retry。mapper 对每个已到达输入严格调用一次并保持输入顺序；成功时到达全部输入，首个 `Error` 原样短路且不得调用其后的输入，空输入不得调用 mapper。取消与异常沿 mapper task 传播且停止 traversal；该组合不拥有 deadline 或 recovery policy。

@@ -9,6 +9,7 @@
 `tests/proof-ladder.test.mjs` 对全局构建与测试命令链（`package.json` 中的 `format-build-test` 及 `scripts/check.mjs`）进行强约束：
 - 严格锁定第 0 层静态门禁、第 1–3 层纯逻辑与时序单元测试、第 4 层单入点物理 Long Stroke 与第 5 层 Release 构建的执行顺序。
 - 确保 `scripts/check.mjs` 中注册的所有门禁脚本路径在磁盘上真实存在，且任何门禁失败时其非零退出码均能正确向上传播（fail-closed）。
+- `scripts/checks/proof-levels.json` 独立保存精确 `(path, title, what_id) → level` 分类；共享 resolver 对缺失或重复键返回无权威结果，registry validator 阻断形状、层序与键歧义，外部登记行只能匹配该分类而不能自我改标。
 - `scripts/build.mjs` 每次调用都持有跨进程 build lock，先删除上一轮 `dist/` artifact tree，再以显式 `Debug` configuration 执行一次真实 Fable compile；compiler 成功退出后才验证 `dist` 与 Surface Manifest。源码删除因此不会留下可被 package 收走的陈旧 JS。configuration 不依赖 Fable 的 watch/one-shot 默认值。不存在 watch-daemon、source-touch barrier、ack、artifact-exists fast path 或 wall-clock freshness 猜测，因此旧 `dist` 不能冒充当前源码的编译结果。
 
 ### 2. 因果看门狗与静默监督（`e2e-watchdog-feed`）
@@ -41,16 +42,16 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| VERIFICATION-SYSTEM-001 | `requirements/verification-system/tests/proof-ladder.test.mjs` |
-| VERIFICATION-SYSTEM-002 | `requirements/verification-system/tests/proof-ladder.test.mjs` |
-| VERIFICATION-SYSTEM-003 | `requirements/verification-system/tests/physical-contract.test.mjs` |
-| VERIFICATION-SYSTEM-004 | `requirements/verification-system/tests/deadcode-scan.test.mjs` |
-| VERIFICATION-SYSTEM-005 | `requirements/verification-system/tests/walk-fail-closed.test.mjs` |
-| VERIFICATION-SYSTEM-006 | `requirements/verification-system/tests/e2e-watchdog-feed.test.mjs` |
-| VERIFICATION-SYSTEM-007 | `requirements/verification-system/tests/temporal-harness.test.mjs` |
-| VERIFICATION-SYSTEM-008 | `requirements/verification-system/tests/guide-contract.test.mjs`；`requirements/verification-system/tests/build-freshness.test.mjs` |
-| VERIFICATION-SYSTEM-009 | `requirements/verification-system/tests/integration-entry-coverage.test.mjs` |
-| VERIFICATION-SYSTEM-010 | `requirements/verification-system/tests/deadcode-scan.test.mjs` |
-| VERIFICATION-SYSTEM-011 | `requirements/verification-system/tests/coverage-gate.test.mjs` |
-| VERIFICATION-SYSTEM-012 | `requirements/verification-system/tests/no-line-count-check.test.mjs` |
-| VERIFICATION-SYSTEM-013 | `requirements/verification-system/tests/js-boundary-gate.test.mjs` |
+| VERIFICATION-SYSTEM-001 | `requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the five layers in order` |
+| VERIFICATION-SYSTEM-002 | `requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-002] l4 has exactly one e2e entry in the ladder` |
+| VERIFICATION-SYSTEM-003 | `requirements/verification-system/tests/physical-contract.test.mjs::WHAT[VERIFICATION-SYSTEM-003] sole e2e entry declares unsimulatable physical contracts` |
+| VERIFICATION-SYSTEM-004 | `requirements/verification-system/tests/deadcode-scan.test.mjs::WHAT[VERIFICATION-SYSTEM-004] deadcode_private_binding_without_any_repository_reference_is_red` |
+| VERIFICATION-SYSTEM-005 | `requirements/verification-system/tests/walk-fail-closed.test.mjs::WHAT[VERIFICATION-SYSTEM-005] walk throws on a missing root instead of returning an empty array` |
+| VERIFICATION-SYSTEM-006 | `requirements/verification-system/tests/e2e-watchdog-feed.test.mjs::WHAT[VERIFICATION-SYSTEM-006] top-level e2e tests never feed watchdog directly` |
+| VERIFICATION-SYSTEM-007 | `requirements/verification-system/tests/temporal-harness.test.mjs::WHAT[VERIFICATION-SYSTEM-007] deterministic queue enumerates races explicitly` |
+| VERIFICATION-SYSTEM-008 | `requirements/verification-system/tests/guide-contract.test.mjs::WHAT[VERIFICATION-SYSTEM-008] AgentProgram publishes its flow entrypoints`；`requirements/verification-system/tests/build-freshness.test.mjs::WHAT[VERIFICATION-SYSTEM-008] Fable build compiles once and never accepts watch-daemon freshness guesses` |
+| VERIFICATION-SYSTEM-009 | `requirements/verification-system/tests/integration-entry-coverage.test.mjs::WHAT[VERIFICATION-SYSTEM-009] integration entry coverage accepts an exact reachable set` |
+| VERIFICATION-SYSTEM-010 | `requirements/verification-system/tests/deadcode-scan.test.mjs::WHAT[VERIFICATION-SYSTEM-010] deadcode_baseline_allows_only_existing_named_debt` |
+| VERIFICATION-SYSTEM-011 | `requirements/verification-system/tests/coverage-gate.test.mjs::WHAT[VERIFICATION-SYSTEM-011] parseCoverageThreshold accepts valid positive finite numbers` |
+| VERIFICATION-SYSTEM-012 | `requirements/verification-system/tests/no-line-count-check.test.mjs::WHAT[VERIFICATION-SYSTEM-012] no line-count check wording in package or gates` |
+| VERIFICATION-SYSTEM-013 | `requirements/verification-system/tests/js-boundary-gate.test.mjs::WHAT[VERIFICATION-SYSTEM-013] product_semantic_debt_is_zero` |

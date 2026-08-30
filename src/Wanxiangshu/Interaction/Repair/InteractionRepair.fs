@@ -15,6 +15,7 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
@@ -104,7 +105,7 @@ module InteractionRepairWorkflow =
 
             match outcome with
             | HostSessionNudge.IdleContinuationOutcome.Sent _
-            | HostSessionNudge.IdleContinuationOutcome.Superseded
+            | HostSessionNudge.IdleContinuationOutcome.AdmissionRejected _
             | HostSessionNudge.IdleContinuationOutcome.AlreadyAdmitted
             | HostSessionNudge.IdleContinuationOutcome.Retired -> ()
             | HostSessionNudge.IdleContinuationOutcome.NotSent error ->
@@ -286,6 +287,12 @@ module InteractionRepairWorkflow =
         }
         :> Task
 
+    let private admitPermit
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit)
+        : Result<QuiescencePermit, QuiescencePermitFailure> =
+        quiescence.TryConsume permit |> Result.map (fun () -> permit)
+
     let private consumeThenSendBloggerAabb
         (host: IBloggerRuntimeHost)
         (quiescence: SessionQuiescenceGate)
@@ -297,8 +304,8 @@ module InteractionRepairWorkflow =
         (guaranteedFirstAabb: bool)
         (reason: string)
         : Task =
-        match context.Quiescence with
-        | Some permit when quiescence.TryConsume permit ->
+        match context.Quiescence |> Option.map (admitPermit quiescence) with
+        | Some(Ok _) ->
             sendBloggerAabbAfterPermitConsumed
                 host
                 sessionPort
@@ -308,7 +315,8 @@ module InteractionRepairWorkflow =
                 requestId
                 guaranteedFirstAabb
                 reason
-        | _ -> AsyncSupport.completedTask ()
+        | Some(Error _)
+        | None -> AsyncSupport.completedTask ()
 
     let private sendBloggerNudge
         (host: IBloggerRuntimeHost)
@@ -337,7 +345,7 @@ module InteractionRepairWorkflow =
                         BloggerRecoveryProbe.BloggerMissingToolRepairKind
                 with
                 | HostSessionNudge.IdleContinuationOutcome.Sent _
-                | HostSessionNudge.IdleContinuationOutcome.Superseded
+                | HostSessionNudge.IdleContinuationOutcome.AdmissionRejected _
                 | HostSessionNudge.IdleContinuationOutcome.AlreadyAdmitted
                 | HostSessionNudge.IdleContinuationOutcome.Retired -> ()
                 | HostSessionNudge.IdleContinuationOutcome.NotSent error

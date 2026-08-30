@@ -93,6 +93,7 @@ module McpContract =
     let cancelPayload (handle: string) : obj =
         createObj [ "handle" ==> handle; "status" ==> "cancelled" ]
 
+    /// DSL-class: ExternalSignal — Sphinx wire error projection for the external caller.
     type ErrorView =
         { Code: string
           Message: string

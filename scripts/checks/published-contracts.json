@@ -583,6 +583,20 @@
       "justification": "Context.CompanionContract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to context-compression."
     },
     {
+      "path": "src/Wanxiangshu/Context/Companion/Model.fs",
+      "owner": "context-compression",
+      "node": "context-trace-companion-contract",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.ICompanionDurablePort"
+      ],
+      "justification": "Context.CompanionContract publishes the companion durability port to host-boundary for final plugin composition; companion persistence policy remains private to context-compression."
+    },
+    {
       "path": "src/Wanxiangshu/Context/Companion/Transform.fs",
       "owner": "context-compression",
       "node": "context-trace-companion-contract",
@@ -623,6 +637,10 @@
         "host-boundary"
       ],
       "symbols": [
+        "Wanxiangshu.Execution.Session.Attachment.AttachedChildObservation",
+        "Wanxiangshu.Execution.Session.Attachment.AttachedChildObservation.Conflicting",
+        "Wanxiangshu.Execution.Session.Attachment.AttachedChildObservation.Matching",
+        "Wanxiangshu.Execution.Session.Attachment.AttachedChildObservation.Missing",
         "Wanxiangshu.Execution.Session.Attachment.AttachedSessionRuntime",
         "Wanxiangshu.Execution.Session.Attachment.AttachedSessionRuntime.Clear",
         "Wanxiangshu.Execution.Session.Attachment.AttachedSessionRuntime.GetOrCreate",
@@ -1831,6 +1849,7 @@
       "symbols": [
         "Wanxiangshu.OpenCode.IOpenCodePort",
         "Wanxiangshu.OpenCode.IOpenCodePort.AbortSession",
+        "Wanxiangshu.OpenCode.IOpenCodePort.CloseChildSession",
         "Wanxiangshu.OpenCode.IOpenCodePort.CreateChildSession",
         "Wanxiangshu.OpenCode.IOpenCodePort.CreateSession",
         "Wanxiangshu.OpenCode.IOpenCodePort.GetSessionParent",
@@ -2405,7 +2424,9 @@
         "Wanxiangshu.Persistence.EventStore.GitObjectId",
         "Wanxiangshu.Persistence.EventStore.GitObjectIdModule.create",
         "Wanxiangshu.Persistence.EventStore.GitObjectIdModule.value",
+        "Wanxiangshu.Persistence.EventStore.GitTree.canonicalOrder",
         "Wanxiangshu.Persistence.EventStore.IGitRawStore",
+        "Wanxiangshu.Persistence.EventStore.IGitRawStore.CompareAndSwapRef",
         "Wanxiangshu.Persistence.EventStore.IGitRawStore.ReadObject",
         "Wanxiangshu.Persistence.EventStore.IGitRawStore.ReadRef",
         "Wanxiangshu.Persistence.EventStore.IGitRawStore.ReadTree",

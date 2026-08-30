@@ -67,13 +67,13 @@ module PromptDispatcher =
         | Await
         | Detached
 
-    /// Internal result of the claim→physical-send path. `Superseded` is only
+    /// Internal result of the claim→physical-send path. `AdmissionRejected` is only
     /// possible for an idle-derived send carrying a final physical admission
     /// check; ordinary callers continue to consume `Result<PromptKey,string>`.
     [<RequireQualifiedAccess>]
     type internal SendAttemptOutcome =
         | Sent of PromptKey
-        | Superseded
+        | AdmissionRejected of QuiescencePermitFailure
         /// Host definitively rejected before physical acceptance. Idle gate
         /// callers may safely re-open the same quiescence permit.
         | NotSent of string

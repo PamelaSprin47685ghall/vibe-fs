@@ -59,6 +59,17 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 
+/// Host-observable exact identity for a reusable SyncDelegate child. The title
+/// is compared as a whole; escaped fields make distinct scope/role/agent tuples
+/// unambiguous even when an identity contains title delimiters.
+module internal SyncDelegatePhysicalIdentity =
+    let title (scope: ReuseScopeId) (role: SyncDelegateRole) (agentName: string) =
+        sprintf
+            "wanxiangshu:sync-delegate:v1:scope=%s:role=%s:agent=%s"
+            (Uri.EscapeDataString(ReuseScopeId.value scope))
+            (Uri.EscapeDataString(SyncDelegate.roleLabel role))
+            (Uri.EscapeDataString agentName)
+
 /// EXEC-026 / EXEC-031: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
 /// ordinary Completion → bounded WorkRecord). No return tool / dual-await.
 ///
@@ -102,13 +113,63 @@ type SyncDelegateRuntime
         PromptAuthority.toolCapabilitiesFor role ProviderRequestKind.WorkMain
         |> StaticTools.requestToolMap
 
-    let createChild (owner: SessionId) (agentName: string) (childDirectory: string option) =
+    let managedChildObservation
+        (scope: ReuseScopeId)
+        (role: SyncDelegateRole)
+        (agentName: string)
+        (children: OpenCodeChildInfo list)
+        =
+        let expectedTitle = SyncDelegatePhysicalIdentity.title scope role agentName
+
+        let matching =
+            children
+            |> List.filter (fun child -> child.Agent = Some agentName && child.Title = Some expectedTitle)
+
+        match matching with
+        | [] -> AttachedChildObservation.Missing
+        | [ child ] -> AttachedChildObservation.Matching child.SessionId
+        | conflicts ->
+            conflicts
+            |> List.map (fun child -> child.SessionId)
+            |> AttachedChildObservation.Conflicting
+
+    let observeChild
+        (owner: SessionId)
+        (scope: ReuseScopeId)
+        (role: SyncDelegateRole)
+        (agentName: string)
+        =
+        task {
+            let physicalOwner = sessions.FamilyRootOf owner
+
+            match! sessions.ListChildren physicalOwner with
+            | Error error ->
+                return
+                    Error(
+                        sprintf
+                            "sync delegate child observation failed for %s: %s"
+                            (SessionId.value physicalOwner)
+                            error
+                    )
+            | Ok children -> return Ok(managedChildObservation scope role agentName children)
+        }
+
+    let createChild
+        (owner: SessionId)
+        (scope: ReuseScopeId)
+        (role: SyncDelegateRole)
+        (agentName: string)
+        (childDirectory: string option)
+        =
         sessions.CreateChildSession(
             owner,
-            { Title = Some agentName
+            { Title = Some(SyncDelegatePhysicalIdentity.title scope role agentName)
               Agent = Some agentName
               Directory = childDirectory }
         )
+
+    let bindChild owner child agentName =
+        SessionExecutionBinding.restore owner child (Some agentName)
 
     let xTraceHead (sessionId: SessionId) : int64 =
         AgentJournal.snapshot journal
@@ -168,7 +229,9 @@ type SyncDelegateRuntime
     let deps: SyncDelegateWorkflow.Dependencies =
         { Attached = attached
           ResolveOwnerTier = resolveOwnerTier
+          ObserveChild = observeChild
           CreateChild = createChild
+          BindChild = bindChild
           OnDelegateReady = onDelegateReady
           NoteInspectorPrompt = noteInspectorPrompt
           CleanupInspectorDraft = cleanupInspectorDraft

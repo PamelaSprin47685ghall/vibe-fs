@@ -31,21 +31,21 @@ DEPENDS ON:
 
 | 命题 | 落点测试 |
 |---|---|
-| PAR-001 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs` |
-| PAR-002 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs` |
-| PAR-003 | `requirements/provider-attempt-recovery/tests/fallback-ledger.test.mjs` |
-| PAR-004 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs` |
-| PAR-005 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs` |
-| PAR-006 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs` |
-| PAR-007 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs` |
-| PAR-008 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs` |
-| PAR-009 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs` |
-| PAR-010 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs` |
-| PAR-011 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs` |
-| PAR-012 | `requirements/provider-attempt-recovery/tests/abort-residue.test.mjs` |
-| PAR-013 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs` |
-| PAR-014 | `requirements/provider-attempt-recovery/tests/fallback-ledger.test.mjs` |
-| PAR-015 | `requirements/provider-attempt-recovery/tests/fallback-aabb-confluence.test.mjs` |
-| PAR-016 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs` |
-| PAR-017 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
-| PAR-018 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
+| PAR-001 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-001] FALLBACK_001_a_new_authority_root_replaces_the_cursor_entirely` |
+| PAR-002 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-002] FALLBACK_002_an_offset_outside_zero_to_three_is_not_a_cursor_position` |
+| PAR-003 | `requirements/provider-attempt-recovery/tests/fallback-ledger.test.mjs::WHAT[PAR-003] PAR_FALLBACK_003_same_failure_observed_twice_advances_once` |
+| PAR-004 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-004] FALLBACK_004_failure_advances_the_offset_and_spends_one_unit_of_budget`；`requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-004] FALLBACK_004_success_resets_the_budget_and_normalizes_to_the_same_side_main_slot` |
+| PAR-005 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-005] FALLBACK_005_the_default_automatic_recovery_budget_is_twelve`；`requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-005] FALLBACK_005_the_verdict_is_taken_after_the_failure_so_the_twelfth_is_final` |
+| PAR-006 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-006] FALLBACK_006_the_side_sequence_table_is_unbounded_by_construction` |
+| PAR-007 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-007] FALLBACK_007_each_rejection_names_a_different_cause` |
+| PAR-008 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-008] PAR_008_an_invalid_terminal_earns_at_most_one_repair_and_never_advances` |
+| PAR-009 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-009] FALLBACK_010_the_domain_count_is_reachable_only_through_a_confirmed_failure` |
+| PAR-010 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-010] PAR_010_a_failed_squash_fails_the_slot_without_sending_the_main_request`；`requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-010] PAR_010_a_successful_squash_keeps_the_count_and_continues_to_the_main_request` |
+| PAR-011 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-011] PAR_011_fallback_advance_returns_the_fresh_opportunity_and_workflow_never_rebuilds_it_from_cursor_parity`；`requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-011] PAR_011_workmain_recovery_arms_only_after_exact_provider_retry_physical_acceptance` |
+| PAR-012 | `requirements/provider-attempt-recovery/tests/abort-residue.test.mjs::WHAT[PAR-012] PAR_012_an_interrupted_tool_call_is_not_a_confirmed_failure` |
+| PAR-013 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-013] FALLBACK_002_the_cursor_is_the_only_thing_that_moves_the_effective_agent` |
+| PAR-014 | `requirements/provider-attempt-recovery/tests/fallback-ledger.test.mjs::WHAT[PAR-014] PAR_014_a_continuation_has_a_unique_accounted_and_budgeted_occasion` |
+| PAR-015 | `requirements/provider-attempt-recovery/tests/fallback-aabb-confluence.test.mjs::WHAT[PAR-015] THEOREM_fallback_independent_sessions_commute_pure_projection` |
+| PAR-016 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-016] PAR_016_success_accounting_requires_proven_request_kind` |
+| PAR-017 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs::WHAT[PAR-017] PAR_017_blogger_retry_abandons_then_materializes_then_binds_new_prompt` |
+| PAR-018 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs::WHAT[PAR-018] recovery_continuation_waits_only_on_durable_open_producer_events` |

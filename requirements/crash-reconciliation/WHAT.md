@@ -71,3 +71,7 @@ HandleController 的 `recordCompletion` 是提交完成态的唯一入口，采�
 ## CRASH-018: `/continue` 是唯一显式 session resume；重启断点必须暴露给 LLM
 
 用户显式执行 `/continue` 是唯一的会话续传入口。系统仅重新登记物理可访问的子会话，并将进程重启、中断工具状态与可复用会话清单作为公开 briefing 放入 provider-visible 消息中，由 LLM 根据公开历史决定后续工具调用。续传材料保持 disclosure-only，不触发自动业务转换。
+
+## CRASH-019: 外部 effect 必须逐项闭合 crash reconciliation 合同
+
+每个高价值外部 effect 必须在唯一 owner 下登记类型化 `intent → process-local admission → physical receipt → durable outcome`；不适用阶段必须给出明确理由。登记项必须锚定物理 effect identity、有限且穷尽的歧义状态、查询或补偿入口、安全重试律（仅 `proven-not-applied` 或 `never`）、以及复用普通 CE 的重入入口。Host、provider、Git 与 process 边界必须同时具有确定性歧义证明和 Adapter 或 Long-Stroke 证据；证据层级由 verification owner 的独立 registry 按精确 `(path, title, WHAT)` 唯一分类，effect 行自报、改标或未登记分类均不得计入证明。Prompt dispatch 必须锚定物理发送前的 process-local `physicalAdmission`；Blogger 的外部 receipt 是 `TransportReceipt`/`PluginPromptSubmitted` 以及随后接受的 `PhysicalUserMessageId`，不是预先可派生的 `PromptKey`。恢复不得持久化 capability、continuation、`ResumeAt`、`RecoveryStage`、`RecoveryStep` 或 `NextAction` 程序计数器；未知、冲突、缺失证据一律 fail closed。登记的 owner、WHAT、source symbol 与 executable proof title 均为精确锚点，重复 WHAT ID、过期锚点或未闭合 effect 必须使 gate 失败。

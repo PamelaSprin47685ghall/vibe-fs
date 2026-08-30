@@ -151,7 +151,7 @@ module OrdinaryTurnWorkflow =
                         journal
                         joinGuardNudges
                         (fun () -> quiescence.TryConsume permit)
-                        (fun () -> quiescence.TryRelease permit |> ignore)
+                        (fun () -> quiescence.TryRelease permit)
                         turn.SessionId
                         turn.ProviderRun
                         turn.Directory

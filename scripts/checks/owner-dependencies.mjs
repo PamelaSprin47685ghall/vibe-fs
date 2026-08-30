@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -16,6 +16,10 @@ const SYMBOL_SCANNER = join(ROOT, 'scripts/checks/owner-symbol-uses.fsx')
 const FCS_SCRATCH = join(ROOT, '.fable-build/owner-dependencies-fcs')
 const FCS_RESULT = join(FCS_SCRATCH, 'symbol-uses.json')
 const FABLE_LIBRARY = join(ROOT, 'node_modules/@fable-org/fable-library-js')
+export const FCS_REUSE_PATH_ENV = 'OMP_FCS_REUSE_PATH'
+export const FCS_REUSE_RUN_ID_ENV = 'OMP_FCS_REUSE_RUN_ID'
+export const FCS_NORMALIZED_OUTPUT_ENV = 'OMP_FCS_NORMALIZED_OUTPUT_PATH'
+export const FCS_NORMALIZED_SCHEMA_VERSION = 2
 const PATH_GLOB = /[*?\[\]]/
 const PUBLICISH_PATH = /(?:Surface|Contract|Port|Api)\.fs$/
 const EXECUTION_POSITION = /(?:^|[._/])(Stage|Step|Cursor|Registry|NextAction|ResumeAt)(?:$|[A-Z._/])/i
@@ -102,18 +106,25 @@ function normalizeSymbolUse(record, productionFiles) {
 
   const consumerPath = repositoryPath(record.consumerPath, 'symbol consumer')
   const providerPaths = [...new Set(record.providerPaths.map((path) => repositoryPath(path, 'symbol provider')))].sort()
+  const declarationPaths = [...new Set((record.declarationPaths ?? record.providerPaths).map((path) => repositoryPath(path, 'symbol declaration')))].sort()
   if (!productionFiles.has(consumerPath)) throw new Error(`${consumerPath}: FCS consumer is outside the production compile set`)
   for (const path of providerPaths)
     if (!productionFiles.has(path)) throw new Error(`${path}: FCS provider is outside the production compile set`)
+  for (const path of declarationPaths)
+    if (!productionFiles.has(path)) throw new Error(`${path}: FCS declaration is outside the production compile set`)
 
   return {
     consumerPath,
     providerPaths,
+    declarationPaths,
     symbol: record.symbol,
     symbolKind: typeof record.symbolKind === 'string' ? record.symbolKind : 'Unknown',
     assembly: typeof record.assembly === 'string' ? record.assembly : '',
     line: Number.isInteger(record.line) ? record.line : 0,
     column: Number.isInteger(record.column) ? record.column : 0,
+    endLine: Number.isInteger(record.endLine) ? record.endLine : (Number.isInteger(record.line) ? record.line : 0),
+    endColumn: Number.isInteger(record.endColumn) ? record.endColumn : (Number.isInteger(record.column) ? record.column : 0),
+    inferredType: typeof record.inferredType === 'string' ? record.inferredType : '',
     isNamespace: record.isNamespace === true,
     isModule: record.isModule === true,
     isFromOpenStatement: record.isFromOpenStatement === true,
@@ -124,12 +135,309 @@ function normalizeSymbolUse(record, productionFiles) {
   }
 }
 
+function normalizeApplicationRange(record, productionFiles) {
+  if (!record || typeof record.consumerPath !== 'string') throw new Error('FCS scanner emitted an invalid application range')
+  const consumerPath = repositoryPath(record.consumerPath, 'application consumer')
+  if (!productionFiles.has(consumerPath)) throw new Error(`${consumerPath}: FCS application is outside the production compile set`)
+  return {
+    consumerPath,
+    targetStartLine: record.targetStartLine,
+    targetStartColumn: record.targetStartColumn,
+    targetEndLine: record.targetEndLine,
+    targetEndColumn: record.targetEndColumn,
+    startLine: record.startLine,
+    startColumn: record.startColumn,
+    endLine: record.endLine,
+    endColumn: record.endColumn,
+  }
+}
+
+const position = (line, column) => line * 1_000_000 + column
+
+const normalizedConsumer = (record, productionFiles, label) => {
+  if (!record || typeof record.consumerPath !== 'string') throw new Error(`FCS scanner emitted an invalid ${label}`)
+  const consumerPath = repositoryPath(record.consumerPath, `${label} consumer`)
+  if (!productionFiles.has(consumerPath)) throw new Error(`${consumerPath}: FCS ${label} is outside the production compile set`)
+  return consumerPath
+}
+
+const integer = (record, field, label) => {
+  if (!Number.isInteger(record[field])) throw new Error(`FCS scanner emitted ${label} without ${field}`)
+  return record[field]
+}
+
+const normalizeControlFlow = (parsed, productionFiles, applicationUses, applicationRanges = []) => {
+  const field = (prefix, suffix) => prefix ? `${prefix}${suffix}` : `${suffix[0].toLowerCase()}${suffix.slice(1)}`
+  const range = (record, prefix, label) => ({
+    startLine: integer(record, field(prefix, 'StartLine'), label),
+    startColumn: integer(record, field(prefix, 'StartColumn'), label),
+    endLine: integer(record, field(prefix, 'EndLine'), label),
+    endColumn: integer(record, field(prefix, 'EndColumn'), label),
+  })
+  const contains = (outer, inner) => position(outer.startLine, outer.startColumn) <= position(inner.startLine, inner.startColumn)
+    && position(inner.endLine, inner.endColumn) <= position(outer.endLine, outer.endColumn)
+
+  const matchExpressions = (parsed.matchExpressions ?? []).map((record) => {
+    const consumerPath = normalizedConsumer(record, productionFiles, 'match expression')
+    const matchRange = range(record, '', 'match expression')
+    const scrutineeRange = range(record, 'scrutinee', 'match expression')
+    const scrutineeApplication = applicationUses
+      .filter((application) => application.consumerPath === consumerPath && contains(scrutineeRange, application))
+      .sort((left, right) =>
+        (position(right.endLine, right.endColumn) - position(right.startLine, right.startColumn))
+        - (position(left.endLine, left.endColumn) - position(left.startLine, left.startColumn)))[0]
+    if (!Array.isArray(record.clauses)) throw new Error('FCS scanner emitted a match expression without clauses')
+    return {
+      consumerPath,
+      ...matchRange,
+      scrutinee: {
+        ...scrutineeRange,
+        resolvedTarget: scrutineeApplication?.resolvedTarget ?? '',
+        declarationPaths: scrutineeApplication?.declarationPaths ?? [],
+        providerPaths: scrutineeApplication?.providerPaths ?? [],
+      },
+      clauses: record.clauses.map((clause) => ({
+        patternKind: typeof clause.patternKind === 'string' ? clause.patternKind : 'Other',
+        ...range(clause, '', 'match clause'),
+      })),
+    }
+  })
+  const bindExpressions = (parsed.bindExpressions ?? []).map((record) => ({
+    consumerPath: normalizedConsumer(record, productionFiles, 'bind expression'),
+    builderKind: typeof record.builderKind === 'string' ? record.builderKind : 'Unknown',
+    binding: range(record, 'binding', 'bind expression'),
+    body: range(record, 'body', 'bind expression'),
+  }))
+  const lambdaExpressions = (parsed.lambdaExpressions ?? []).map((record) => {
+    const consumerPath = normalizedConsumer(record, productionFiles, 'lambda expression')
+    const lambdaRange = range(record, '', 'lambda expression')
+    return {
+      consumerPath,
+      ...lambdaRange,
+      body: range(record, 'body', 'lambda expression'),
+      invokedBy: applicationRanges.filter((application) =>
+        application.consumerPath === consumerPath
+        && position(application.targetStartLine, application.targetStartColumn) <= position(lambdaRange.startLine, lambdaRange.startColumn)
+        && position(lambdaRange.endLine, lambdaRange.endColumn) <= position(application.targetEndLine, application.targetEndColumn))
+        .map((application) => ({
+          startLine: application.startLine,
+          startColumn: application.startColumn,
+          endLine: application.endLine,
+          endColumn: application.endColumn,
+        })),
+    }
+  })
+  const conditionalExpressions = (parsed.conditionalExpressions ?? []).map((record) => {
+    if (!Array.isArray(record.branches)) throw new Error('FCS scanner emitted a conditional expression without branches')
+    return {
+      consumerPath: normalizedConsumer(record, productionFiles, 'conditional expression'),
+      condition: range(record, 'condition', 'conditional expression'),
+      branches: record.branches.map((branch) => ({
+        kind: typeof branch.kind === 'string' ? branch.kind : 'Branch',
+        ...range(branch, '', 'conditional branch'),
+      })),
+    }
+  })
+  const tryExpressions = (parsed.tryExpressions ?? []).map((record) => {
+    if (!Array.isArray(record.continuations)) throw new Error('FCS scanner emitted a try expression without continuations')
+    return {
+      consumerPath: normalizedConsumer(record, productionFiles, 'try expression'),
+      kind: typeof record.kind === 'string' ? record.kind : 'Unknown',
+      body: range(record, 'body', 'try expression'),
+      continuations: record.continuations.map((continuation) => ({
+        kind: typeof continuation.kind === 'string' ? continuation.kind : 'Continuation',
+        ...range(continuation, '', 'try continuation'),
+      })),
+    }
+  })
+  const loopExpressions = (parsed.loopExpressions ?? []).map((record) => ({
+    consumerPath: normalizedConsumer(record, productionFiles, 'loop expression'),
+    kind: typeof record.kind === 'string' ? record.kind : 'Unknown',
+    body: range(record, 'body', 'loop expression'),
+  }))
+  const functionDefinitions = (parsed.functionDefinitions ?? []).map((record) => ({
+    consumerPath: normalizedConsumer(record, productionFiles, 'function definition'),
+    name: typeof record.name === 'string' ? record.name : '',
+    fullSymbol: typeof record.symbol === 'string' ? record.symbol : '',
+    startLine: integer(record, 'line', 'function definition'),
+    startColumn: integer(record, 'column', 'function definition'),
+    endLine: integer(record, 'endLine', 'function definition'),
+    endColumn: integer(record, 'endColumn', 'function definition'),
+  }))
+  const localFunctionBindings = (parsed.localFunctionBindings ?? []).map((record) => {
+    const consumerPath = normalizedConsumer(record, productionFiles, 'local function binding')
+    const bindingRange = range(record, '', 'local function binding')
+    const scope = range(record, 'scope', 'local function binding')
+    const definition = functionDefinitions.find((candidate) =>
+      candidate.consumerPath === consumerPath
+      && candidate.name === record.name
+      && contains(bindingRange, candidate))
+    return {
+      consumerPath,
+      name: typeof record.name === 'string' ? record.name : '',
+      fullSymbol: definition?.fullSymbol ?? '',
+      ...bindingRange,
+      body: range(record, 'body', 'local function binding'),
+      scope,
+      invokedBy: definition ? applicationUses.filter((application) =>
+        application.consumerPath === consumerPath
+        && application.resolvedTarget === definition.fullSymbol
+        && contains(scope, application)).map((application) => ({
+        startLine: application.startLine,
+        startColumn: application.startColumn,
+        endLine: application.endLine,
+        endColumn: application.endColumn,
+      })) : [],
+    }
+  }).filter((binding) => binding.fullSymbol !== '')
+  return {
+    matchExpressions,
+    bindExpressions,
+    lambdaExpressions,
+    conditionalExpressions,
+    tryExpressions,
+    loopExpressions,
+    localFunctionBindings,
+  }
+}
+
+function resolvedApplicationUses(symbolUses, applicationRanges) {
+  const textByFile = new Map()
+  const offsetsByFile = new Map()
+  const source = (file) => {
+    if (!textByFile.has(file)) {
+      const text = readFileSync(join(ROOT, file), 'utf8')
+      textByFile.set(file, text)
+      const offsets = [0]
+      for (let index = 0; index < text.length; index += 1) if (text[index] === '\n') offsets.push(index + 1)
+      offsetsByFile.set(file, offsets)
+    }
+    return [textByFile.get(file), offsetsByFile.get(file)]
+  }
+
+  const semanticTargetOf = (application) => {
+    let semantic = application
+    const seen = new Set()
+    while (!seen.has(semantic)) {
+      seen.add(semantic)
+      const nested = applicationRanges.find((candidate) =>
+        candidate.consumerPath === semantic.consumerPath
+        && candidate.startLine === semantic.targetStartLine
+        && candidate.startColumn === semantic.targetStartColumn
+        && candidate.endLine === semantic.targetEndLine
+        && candidate.endColumn === semantic.targetEndColumn)
+      if (!nested || seen.has(nested)) break
+      semantic = nested
+    }
+    return semantic
+  }
+
+  const resolved = applicationRanges.flatMap((parsed) => {
+    const [text, offsets] = source(parsed.consumerPath)
+    const semanticTarget = semanticTargetOf(parsed)
+    const targetStart = position(semanticTarget.targetStartLine, semanticTarget.targetStartColumn)
+    const targetEnd = position(semanticTarget.targetEndLine, semanticTarget.targetEndColumn)
+    const syntacticTargetStart = position(parsed.targetStartLine, parsed.targetStartColumn)
+    const syntacticTargetEnd = position(parsed.targetEndLine, parsed.targetEndColumn)
+    const applicationStart = position(parsed.startLine, parsed.startColumn)
+    const applicationEnd = position(parsed.endLine, parsed.endColumn)
+    const candidates = symbolUses.filter((candidate) => {
+      if (candidate.consumerPath !== parsed.consumerPath || candidate.isFromType || candidate.isFromPattern || candidate.isFromOpenStatement || candidate.isNamespace || candidate.isModule) return false
+      if (!candidate.inferredType.includes('->') && candidate.symbolKind !== 'FSharpUnionCase') return false
+      return targetStart <= position(candidate.line, candidate.column)
+        && position(candidate.endLine, candidate.endColumn) <= targetEnd
+    })
+    const use = candidates.sort((left, right) =>
+      position(left.line, left.column) - position(right.line, right.column)
+      || position(left.endLine, left.endColumn) - position(right.endLine, right.endColumn))[0]
+    if (!use) return []
+
+    const targetOffset = (offsets[semanticTarget.targetStartLine - 1] ?? 0) + semanticTarget.targetStartColumn
+    const useEndOffset = (offsets[use.endLine - 1] ?? 0) + use.endColumn
+    const targetText = text.slice(targetOffset, useEndOffset)
+    const sourceAnchor = /(?:[A-Za-z_][A-Za-z0-9_']*\s*\.\s*)*[A-Za-z_][A-Za-z0-9_']*\s*$/.exec(targetText)?.[0]
+      ?.replace(/\s+/g, '') ?? targetText
+    const argumentUses = symbolUses.filter((candidate) => {
+      if (candidate.consumerPath !== parsed.consumerPath || candidate.isFromType || candidate.isFromPattern || candidate.isFromOpenStatement || candidate.isNamespace || candidate.isModule) return false
+      const candidateStart = position(candidate.line, candidate.column)
+      const candidateEnd = position(candidate.endLine, candidate.endColumn)
+      const inApplication = applicationStart <= candidateStart && candidateEnd <= applicationEnd
+      const inTarget = syntacticTargetStart <= candidateStart && candidateEnd <= syntacticTargetEnd
+      return inApplication && !inTarget
+    })
+    const orderedArgumentUses = argumentUses
+      .sort((left, right) => position(left.line, left.column) - position(right.line, right.column))
+      .filter((candidate, index, candidates) => !candidates.slice(0, index).some((prior) =>
+        prior.symbol === candidate.symbol
+        && prior.line === candidate.line
+        && prior.column === candidate.column
+        && prior.endLine === candidate.endLine
+        && prior.endColumn === candidate.endColumn))
+    const argumentIdentifiers = orderedArgumentUses.map((candidate) => candidate.symbol.split('.').at(-1)).filter(Boolean)
+    const argumentTypes = Object.fromEntries(argumentIdentifiers.map((name) => [
+      name,
+      orderedArgumentUses.find((candidate) => candidate.symbol.split('.').at(-1) === name)?.inferredType ?? '',
+    ]))
+    return [{
+      consumerPath: parsed.consumerPath,
+      sourceAnchor,
+      resolvedTarget: use.symbol,
+      declarationPaths: use.declarationPaths,
+      providerPaths: use.providerPaths,
+      startLine: parsed.startLine,
+      startColumn: parsed.startColumn,
+      endLine: parsed.endLine,
+      endColumn: parsed.endColumn,
+      isApplication: true,
+      argumentIdentifiers,
+      argumentTypes,
+      inferredType: use.inferredType,
+      targetStartLine: parsed.targetStartLine,
+      targetStartColumn: parsed.targetStartColumn,
+      targetEndLine: parsed.targetEndLine,
+      targetEndColumn: parsed.targetEndColumn,
+    }]
+  })
+
+  const containsApplicationInTarget = (outer, inner) =>
+    outer.consumerPath === inner.consumerPath
+    && outer.resolvedTarget === inner.resolvedTarget
+    && position(outer.targetStartLine, outer.targetStartColumn) <= position(inner.startLine, inner.startColumn)
+    && position(inner.endLine, inner.endColumn) <= position(outer.targetEndLine, outer.targetEndColumn)
+    && (outer.startLine !== inner.startLine || outer.startColumn !== inner.startColumn
+      || outer.endLine !== inner.endLine || outer.endColumn !== inner.endColumn)
+  const innerOfCurried = new Set()
+  const mergedArguments = new Map()
+  const merge = (application) => {
+    if (mergedArguments.has(application)) return mergedArguments.get(application)
+    const inner = resolved
+      .filter((candidate) => containsApplicationInTarget(application, candidate))
+      .sort((left, right) =>
+        (position(right.endLine, right.endColumn) - position(right.startLine, right.startColumn))
+        - (position(left.endLine, left.endColumn) - position(left.startLine, left.startColumn)))[0]
+    if (inner) innerOfCurried.add(inner)
+    const inherited = inner ? merge(inner) : { identifiers: [], types: {} }
+    const value = {
+      identifiers: [...inherited.identifiers, ...application.argumentIdentifiers],
+      types: Object.assign({}, inherited.types, application.argumentTypes),
+    }
+    mergedArguments.set(application, value)
+    return value
+  }
+  for (const application of resolved) merge(application)
+  return resolved.filter((application) => !innerOfCurried.has(application)).map((application) => {
+    const merged = merge(application)
+    return { ...application, argumentIdentifiers: merged.identifiers, argumentTypes: merged.types }
+  })
+}
+
 export function scanProjectSymbolUses({
   projectFile = FSPROJ,
   productionRoot = PRODUCTION_ROOT,
   scratchRoot = FCS_SCRATCH,
   resultPath = FCS_RESULT,
   fableLibrary = FABLE_LIBRARY,
+  applicationConsumerPaths,
 } = {}) {
   const project = resolve(projectFile)
   const production = resolve(productionRoot)
@@ -137,30 +445,99 @@ export function scanProjectSymbolUses({
   const result = resolve(resultPath)
   const library = resolve(fableLibrary)
   const expectedPaths = readCompilePaths(project, production)
-
-  if (!existsSync(SYMBOL_SCANNER)) throw new Error(`missing FCS scanner: ${repositoryPath(SYMBOL_SCANNER, 'scanner')}`)
-  if (!existsSync(library)) throw new Error(`missing Fable library: ${repositoryPath(library, 'Fable library')}`)
-  mkdirSync(scratch, { recursive: true })
-  mkdirSync(dirname(result), { recursive: true })
-  rmSync(result, { force: true })
-
-  const scan = spawnSync(
-    'dotnet',
-    ['fsi', '--exec', SYMBOL_SCANNER, project, production, scratch, fableToolDirectory(), library, result],
-    { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-  )
-  if (scan.error) throw scan.error
-  if (scan.status !== 0) {
-    const output = [scan.stdout, scan.stderr].filter(Boolean).join('\n').trim()
-    throw new Error(`FCS owner dependency scan failed with exit ${scan.status ?? 'unknown'}${output ? `\n${output}` : ''}`)
+  const applicationConsumers = applicationConsumerPaths === undefined
+    ? undefined
+    : [...new Set(applicationConsumerPaths.map((path) => resolve(path)))]
+  if (applicationConsumers?.some((path) => !expectedPaths.includes(repositoryPath(path, 'application consumer')))) {
+    throw new Error('application consumer filter contains a file outside the production compile set')
   }
-  if (!existsSync(result)) throw new Error('FCS owner dependency scan succeeded without producing its result')
 
   let parsed
-  try {
-    parsed = JSON.parse(readFileSync(result, 'utf8'))
-  } catch (error) {
-    throw new Error(`FCS owner dependency result is invalid JSON: ${error.message}`)
+  const defaultProductionScan = project === resolve(FSPROJ) && production === resolve(PRODUCTION_ROOT)
+  const reusePath = process.env[FCS_REUSE_PATH_ENV]
+  const reuseRunId = process.env[FCS_REUSE_RUN_ID_ENV]
+  if (defaultProductionScan && (reusePath !== undefined || reuseRunId !== undefined)) {
+    if (!reusePath || !reuseRunId) throw new Error('FCS evidence reuse requires both absolute path and run ID')
+    if (!isAbsolute(reusePath)) throw new Error('FCS evidence reuse path must be absolute')
+    if (!existsSync(reusePath)) throw new Error(`FCS evidence reuse file is missing: ${reusePath}`)
+    try {
+      parsed = JSON.parse(readFileSync(reusePath, 'utf8'))
+    } catch (error) {
+      throw new Error(`FCS reused evidence is invalid JSON: ${error.message}`)
+    }
+    if (parsed?.schemaVersion !== FCS_NORMALIZED_SCHEMA_VERSION)
+      throw new Error('FCS normalized evidence schema version does not match')
+    if (typeof parsed.runId !== 'string' || parsed.runId !== reuseRunId)
+      throw new Error('FCS evidence reuse run ID does not match')
+    const normalizedArrays = [
+      'symbolUses',
+      'applicationUses',
+      'matchExpressions',
+      'bindExpressions',
+      'lambdaExpressions',
+      'conditionalExpressions',
+      'tryExpressions',
+      'loopExpressions',
+      'localFunctionBindings',
+    ]
+    if (!Array.isArray(parsed.productionFiles) || normalizedArrays.some((key) => !Array.isArray(parsed[key])))
+      throw new Error('FCS normalized evidence has an invalid shape')
+    const productionFiles = parsed.productionFiles.map((path) => {
+      if (typeof path !== 'string') throw new Error('FCS normalized evidence has an invalid production path')
+      return norm(path)
+    }).sort()
+    comparePathSets([...expectedPaths].sort(), productionFiles, 'FCS production file set')
+    const applicationConsumerSet = applicationConsumers
+      ? new Set(applicationConsumers.map((path) => repositoryPath(path, 'application consumer')))
+      : null
+    const filtered = (records) => records.filter((record) => {
+      if (!record || typeof record.consumerPath !== 'string') throw new Error('FCS normalized evidence record has no consumerPath')
+      return !applicationConsumerSet || applicationConsumerSet.has(norm(record.consumerPath))
+    })
+    return {
+      projectAssembly: typeof parsed.projectAssembly === 'string' ? parsed.projectAssembly : '',
+      productionFiles,
+      symbolUses: filtered(parsed.symbolUses),
+      applicationUses: filtered(parsed.applicationUses),
+      matchExpressions: filtered(parsed.matchExpressions),
+      bindExpressions: filtered(parsed.bindExpressions),
+      lambdaExpressions: filtered(parsed.lambdaExpressions),
+      conditionalExpressions: filtered(parsed.conditionalExpressions),
+      tryExpressions: filtered(parsed.tryExpressions),
+      loopExpressions: filtered(parsed.loopExpressions),
+      localFunctionBindings: filtered(parsed.localFunctionBindings),
+    }
+  } else {
+    if (!existsSync(SYMBOL_SCANNER)) throw new Error(`missing FCS scanner: ${repositoryPath(SYMBOL_SCANNER, 'scanner')}`)
+    if (!existsSync(library)) throw new Error(`missing Fable library: ${repositoryPath(library, 'Fable library')}`)
+    mkdirSync(scratch, { recursive: true })
+    mkdirSync(dirname(result), { recursive: true })
+    rmSync(result, { force: true })
+
+    const scan = spawnSync(
+      'dotnet',
+      ['fsi', '--exec', SYMBOL_SCANNER, project, production, scratch, fableToolDirectory(), library, result],
+      {
+        cwd: ROOT,
+        encoding: 'utf8',
+        maxBuffer: 64 * 1024 * 1024,
+        env: {
+          ...process.env,
+          ...(applicationConsumers ? { OMP_FCS_APPLICATION_CONSUMERS: applicationConsumers.join('\n') } : {}),
+        },
+      },
+    )
+    if (scan.error) throw scan.error
+    if (scan.status !== 0) {
+      const output = [scan.stdout, scan.stderr].filter(Boolean).join('\n').trim()
+      throw new Error(`FCS owner dependency scan failed with exit ${scan.status ?? 'unknown'}${output ? `\n${output}` : ''}`)
+    }
+    if (!existsSync(result)) throw new Error('FCS owner dependency scan succeeded without producing its result')
+    try {
+      parsed = JSON.parse(readFileSync(result, 'utf8'))
+    } catch (error) {
+      throw new Error(`FCS owner dependency result is invalid JSON: ${error.message}`)
+    }
   }
   if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.productionFiles) || !Array.isArray(parsed.symbolUses))
     throw new Error('FCS owner dependency result has an invalid shape')
@@ -168,11 +545,49 @@ export function scanProjectSymbolUses({
   const productionFiles = parsed.productionFiles.map((path) => repositoryPath(path, 'FCS production source')).sort()
   comparePathSets([...expectedPaths].sort(), productionFiles, 'FCS production file set')
   const productionSet = new Set(productionFiles)
-  return {
+  const symbolUses = parsed.symbolUses.map((record) => normalizeSymbolUse(record, productionSet))
+  const applicationConsumerSet = applicationConsumers
+    ? new Set(applicationConsumers.map((path) => repositoryPath(path, 'application consumer')))
+    : null
+  const forRequestedConsumers = (record) => !applicationConsumerSet
+    || applicationConsumerSet.has(repositoryPath(record.consumerPath, 'application consumer'))
+  const applicationCandidates = (parsed.applicationCandidates ?? parsed.symbolUses).filter(forRequestedConsumers)
+    .map((record) => normalizeSymbolUse(record, productionSet))
+  const applicationRanges = (parsed.applicationRanges ?? []).filter(forRequestedConsumers)
+    .map((record) => normalizeApplicationRange(record, productionSet))
+  const applicationUses = resolvedApplicationUses(applicationCandidates, applicationRanges)
+  const filteredControlFlow = Object.fromEntries(Object.entries(parsed).map(([key, value]) => [
+    key,
+    ['matchExpressions', 'bindExpressions', 'lambdaExpressions', 'conditionalExpressions', 'tryExpressions', 'loopExpressions', 'functionDefinitions', 'localFunctionBindings'].includes(key)
+      && Array.isArray(value) ? value.filter(forRequestedConsumers) : value,
+  ]))
+  const normalizedEvidence = {
     projectAssembly: typeof parsed.projectAssembly === 'string' ? parsed.projectAssembly : '',
     productionFiles,
-    symbolUses: parsed.symbolUses.map((record) => normalizeSymbolUse(record, productionSet)),
+    symbolUses,
+    applicationUses,
+    ...normalizeControlFlow(filteredControlFlow, productionSet, applicationUses, applicationRanges),
   }
+  const normalizedOutput = process.env[FCS_NORMALIZED_OUTPUT_ENV]
+  if (defaultProductionScan && normalizedOutput !== undefined) {
+    if (!normalizedOutput || !isAbsolute(normalizedOutput)) throw new Error('FCS normalized evidence output path must be absolute')
+    const runId = process.env.OMP_FCS_EVIDENCE_RUN_ID
+    if (!runId || parsed.runId !== runId) throw new Error('FCS normalized evidence producer run ID does not match')
+    const artifact = {
+      schemaVersion: FCS_NORMALIZED_SCHEMA_VERSION,
+      runId,
+      ...normalizedEvidence,
+    }
+    mkdirSync(dirname(normalizedOutput), { recursive: true })
+    const temporary = `${normalizedOutput}.${process.pid}.tmp`
+    try {
+      writeFileSync(temporary, JSON.stringify(artifact))
+      renameSync(temporary, normalizedOutput)
+    } finally {
+      rmSync(temporary, { force: true })
+    }
+  }
+  return normalizedEvidence
 }
 
 function stronglyConnectedComponents(nodes, edges) {

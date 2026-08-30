@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "methods": [],
+  "contracts": [
+    {
+      "file": "positive-six-classes.fs",
+      "symbol": "CurrentEvidence",
+      "anchor": "type CurrentEvidence =",
+      "classification": "Authority",
+      "class": "Evidence",
+      "owner": "ImaginaryOwner",
+      "what": "IMAGINARY-999",
+      "scope": "exact fixture scope",
+      "freshness": "current fixture admission",
+      "multiplicity": "one fixture value",
+      "consume": "typed fixture result",
+      "durability": "fixture-local",
+      "issuers": [{ "file": "positive-six-classes.fs", "symbol": "issueCurrentEvidence", "anchor": "let issueCurrentEvidence" }]
+    }
+  ]
+}

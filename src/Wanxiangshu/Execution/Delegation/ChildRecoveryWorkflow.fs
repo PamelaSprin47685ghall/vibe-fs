@@ -39,6 +39,7 @@ module ChildRecoveryWorkflow =
     /// DSL-state-combination: physical — optional Journal/Snapshot capabilities
     /// are injected infrastructure ports; the remaining fields are one recovery
     /// invocation's identities and observations, not a stored program counter.
+    /// DSL-class: PhysicalHandle — HOST recovery invocation ports and wake handle; owner CHILD-RECOVERY, law FLOW-001, proof direct-ce-contract.
     type Ports =
         {
             Journal: AgentJournal option

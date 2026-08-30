@@ -23,17 +23,17 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| PROVIDER-PROJECTION-001 | `requirements/provider-projection/tests/projection-algebra.test.mjs` |
-| PROVIDER-PROJECTION-002 | `requirements/provider-projection/tests/projection-algebra.test.mjs` |
-| PROVIDER-PROJECTION-003 | `requirements/provider-projection/tests/projection.test.mjs` |
-| PROVIDER-PROJECTION-004 | `requirements/provider-projection/tests/projection-algebra.test.mjs` |
-| PROVIDER-PROJECTION-005 | `requirements/provider-projection/tests/projection-algebra.test.mjs` |
-| PROVIDER-PROJECTION-006 | `requirements/provider-projection/tests/projection-algebra.test.mjs` |
-| PROVIDER-PROJECTION-007 | `requirements/provider-projection/tests/projection-algebra.test.mjs` |
-| PROVIDER-PROJECTION-008 | `requirements/provider-projection/tests/synthetic-toml.test.mjs` |
-| PROVIDER-PROJECTION-009 | `requirements/provider-projection/tests/join-result-renderer-entry-comment.test.mjs` |
-| PROVIDER-PROJECTION-010 | `requirements/provider-projection/tests/pair-thought-transform.test.mjs` |
-| PROVIDER-PROJECTION-011 | `requirements/provider-projection/tests/projection-algebra.test.mjs` |
-| PROVIDER-PROJECTION-012 | `requirements/provider-projection/tests/synthetic-toml.test.mjs` |
-| PROVIDER-PROJECTION-013 | `scripts/checks/llm-facing-format-gate.mjs` + `requirements/provider-projection/tests/llm-facing.test.mjs` |
-| PROVIDER-PROJECTION-014 | `requirements/provider-projection/tests/llm-facing.test.mjs` |
+| PROVIDER-PROJECTION-001 | `requirements/provider-projection/tests/projection-algebra.test.mjs::WHAT[PROVIDER-PROJECTION-001] PROJ_004_renderer_maps_intents_to_writeback_instructions` |
+| PROVIDER-PROJECTION-002 | `requirements/provider-projection/tests/projection-algebra.test.mjs::WHAT[PROVIDER-PROJECTION-002] PROJ_002_the_snapshot_is_the_attempt_local_input_contract` |
+| PROVIDER-PROJECTION-003 | `requirements/provider-projection/tests/projection.test.mjs::WHAT[PROVIDER-PROJECTION-003] retry continuation origin stays in Host metadata, outside provider semantics` |
+| PROVIDER-PROJECTION-004 | `requirements/provider-projection/tests/projection-algebra.test.mjs::WHAT[PROVIDER-PROJECTION-004] PROJ_004_writeback_preserves_the_tail_objects_verbatim` |
+| PROVIDER-PROJECTION-005 | `requirements/provider-projection/tests/projection-algebra.test.mjs::WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_SuppressTransportOnly_smoke_drops_transport_message_ids` |
+| PROVIDER-PROJECTION-006 | `requirements/provider-projection/tests/projection-algebra.test.mjs::WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_canonical_order_is_rank_sorted_regardless_of_input_order`；`requirements/provider-projection/tests/projection-algebra.test.mjs::WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_prefix_mutual_exclusion_still_fails_closed` |
+| PROVIDER-PROJECTION-007 | `requirements/provider-projection/tests/projection-algebra.test.mjs::WHAT[PROVIDER-PROJECTION-007] PROJ_007_projection_pipeline_owns_no_lifecycle_verbs` |
+| PROVIDER-PROJECTION-008 | `requirements/provider-projection/tests/synthetic-toml.test.mjs::WHAT[PROVIDER-PROJECTION-008] ARCH_010_every_rendered_string_parses_back_to_the_value_it_was_given` |
+| PROVIDER-PROJECTION-009 | `requirements/provider-projection/tests/join-result-renderer-entry-comment.test.mjs::WHAT[PROVIDER-PROJECTION-009] MISC_join_render_batch_child_to_parent_lwr_stays_entry_local_comment` |
+| PROVIDER-PROJECTION-010 | `requirements/provider-projection/tests/pair-thought-transform.test.mjs::WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_keeps_durable_occurrence_without_synthetic_message` |
+| PROVIDER-PROJECTION-011 | `requirements/provider-projection/tests/projection-algebra.test.mjs::WHAT[PROVIDER-PROJECTION-011] PROJ_003_semantic_equality_ignores_wire_ids_but_wire_bytes_differ` |
+| PROVIDER-PROJECTION-012 | `requirements/provider-projection/tests/synthetic-toml.test.mjs::WHAT[PROVIDER-PROJECTION-012] ARCH_010_identical_input_renders_byte_identical_output`；`requirements/provider-projection/tests/synthetic-toml.test.mjs::WHAT[PROVIDER-PROJECTION-012] ARCH_010_byteCount_measures_UTF8_not_characters` |
+| PROVIDER-PROJECTION-013 | `requirements/provider-projection/tests/llm-facing.test.mjs::WHAT[PROVIDER-PROJECTION-013] LLM_FACING_single_representation_owner_is_hard_gated` |
+| PROVIDER-PROJECTION-014 | `requirements/provider-projection/tests/llm-facing.test.mjs::WHAT[PROVIDER-PROJECTION-014] LLM_FACING_composition_stays_typed_until_the_final_render` |

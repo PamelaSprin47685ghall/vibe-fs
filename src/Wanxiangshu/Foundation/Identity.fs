@@ -133,20 +133,6 @@ module Identity =
         | Before of TranscriptMessageAddress
         | After of TranscriptMessageAddress
 
-    /// Process-local side-effect admission token (HOST-004).
-    ///
-    /// Proves "this session was observed idle at the moment this permit was
-    /// minted". An idle-derived continuation (missing-final-report, interaction
-    /// repair, Manager/Companion nudges) may physically send only while a
-    /// fresh permit still holds at the send boundary.
-    ///
-    /// NEVER written to the journal (HOST-007): a restart mints nothing, so a
-    /// crashed process cannot resume sending idle-derived continuations.
-    type QuiescencePermit =
-        private
-            { SessionId: SessionId
-              AttemptSerial: int64 }
-
     /// Which system prompt a provider request carried (PROMPT-008).
     ///
     /// An id, not the text. The prompt body lives under `resources/provider/` and is
@@ -327,14 +313,6 @@ module Identity =
     module TranscriptMessageAddress =
         let create (value: string) = TranscriptMessageAddress value
         let value (TranscriptMessageAddress v) = v
-
-    module QuiescencePermit =
-        let create (sessionId: SessionId) (attemptSerial: int64) =
-            { SessionId = sessionId
-              AttemptSerial = attemptSerial }
-
-        let sessionId (permit: QuiescencePermit) = permit.SessionId
-        let attemptSerial (permit: QuiescencePermit) = permit.AttemptSerial
 
     module SystemPromptId =
         let create (value: string) = SystemPromptId value

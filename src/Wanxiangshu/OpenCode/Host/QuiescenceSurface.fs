@@ -25,9 +25,32 @@ module QuiescenceSurface =
     let observeIdle (gate: SessionQuiescenceGate) (sessionId: string) : QuiescencePermit =
         gate.ObserveIdle(SessionId.create sessionId)
 
-    let tryConsume (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : bool = gate.TryConsume permit
+    let private failureName =
+        function
+        | QuiescencePermitFailure.WrongOwner -> "WrongOwner"
+        | QuiescencePermitFailure.NoFreshIdle -> "NoFreshIdle"
+        | QuiescencePermitFailure.AlreadyConsumed -> "AlreadyConsumed"
+        | QuiescencePermitFailure.Superseded -> "Superseded"
+        | QuiescencePermitFailure.Revoked -> "Revoked"
 
-    let tryRelease (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : bool = gate.TryRelease permit
+    let private resultView =
+        function
+        | Ok() ->
+            box
+                {| accepted = true
+                   failure = (null: string) |}
+        | Error failure ->
+            box
+                {| accepted = false
+                   failure = failureName failure |}
+
+    let tryConsume (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : obj =
+        gate.TryConsume permit |> resultView
+
+    let tryRelease (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : obj =
+        gate.TryRelease permit |> resultView
+
+    let livePermitCount (gate: SessionQuiescenceGate) : int = gate.LivePermitCount
 
     let revoke (gate: SessionQuiescenceGate) (sessionId: string) : unit =
         gate.RevokeCurrentAttempt(SessionId.create sessionId)

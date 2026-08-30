@@ -57,16 +57,16 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| SPEC-INV-001 | `requirements/speculative-investigation/tests/host-canary-k0.test.mjs` |
-| SPEC-INV-002 | `requirements/speculative-investigation/tests/authority-policy.test.mjs`, `requirements/speculative-investigation/tests/strength-speculate-surface.test.mjs` |
-| SPEC-INV-003 | `requirements/speculative-investigation/tests/batch-collector.test.mjs` |
-| SPEC-INV-004 | `requirements/speculative-investigation/tests/authority-policy.test.mjs` |
-| SPEC-INV-005 | `requirements/speculative-investigation/tests/frame-projection.test.mjs` |
-| SPEC-INV-006 | `requirements/speculative-investigation/tests/commit-promotion.test.mjs` |
-| SPEC-INV-007 | `requirements/speculative-investigation/tests/turn-evidence.test.mjs` |
-| SPEC-INV-008 | `requirements/speculative-investigation/tests/lifecycle-recovery.test.mjs`, `requirements/speculative-investigation/tests/strength-replay-surface.test.mjs` |
-| SPEC-INV-009 | `requirements/speculative-investigation/tests/projection-algebra.test.mjs` |
-| SPEC-INV-010 | `requirements/speculative-investigation/tests/authority-policy.test.mjs` |
-| SPEC-INV-011 | `requirements/speculative-investigation/tests/host-policy.test.mjs` |
-| SPEC-INV-012 | `requirements/speculative-investigation/tests/invisibility.test.mjs` |
-| SPEC-INV-013 | `requirements/speculative-investigation/tests/dry-run-shadow.test.mjs` |
+| SPEC-INV-001 | `requirements/speculative-investigation/tests/host-canary-k0.test.mjs::WHAT[SPEC-INV-001] STRENGTH_002_011_policy_k0_default_when_host_canary_or_cost_is_unproven` |
+| SPEC-INV-002 | `requirements/speculative-investigation/tests/authority-policy.test.mjs::WHAT[SPEC-INV-002] STRENGTH_002_010_policy_is_fail_closed_and_only_treats_proven_deep_opportunities`；`requirements/speculative-investigation/tests/strength-speculate-surface.test.mjs::WHAT[SPEC-INV-002] StrengthSpeculate owns tryApply entry point for transform speculation` |
+| SPEC-INV-003 | `requirements/speculative-investigation/tests/batch-collector.test.mjs::WHAT[SPEC-INV-003] STRENGTH_003_005_collector_preserves_provider_request_batches_and_concurrent_order` |
+| SPEC-INV-004 | `requirements/speculative-investigation/tests/authority-policy.test.mjs::WHAT[SPEC-INV-004] STRENGTH_004_019_replica_is_never_owner_fallback_or_prefix_probe_evidence` |
+| SPEC-INV-005 | `requirements/speculative-investigation/tests/frame-projection.test.mjs::WHAT[SPEC-INV-005] STRENGTH_005_frame_bundle_accepts_only_complete_read_glob_grep_batches` |
+| SPEC-INV-006 | `requirements/speculative-investigation/tests/commit-promotion.test.mjs::WHAT[SPEC-INV-006] STRENGTH_006_prepared_commit_unknown_is_resolved_without_guessing` |
+| SPEC-INV-007 | `requirements/speculative-investigation/tests/turn-evidence.test.mjs::WHAT[SPEC-INV-007] STRENGTH_007_provider_output_evidence_is_not_host_bookkeeping` |
+| SPEC-INV-008 | `requirements/speculative-investigation/tests/lifecycle-recovery.test.mjs::WHAT[SPEC-INV-008] STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_exact_target_anchor`；`requirements/speculative-investigation/tests/strength-replay-surface.test.mjs::WHAT[SPEC-INV-008] StrengthReplay owns applyBeforeXTrace entry point for replay before xtrace` |
+| SPEC-INV-009 | `requirements/speculative-investigation/tests/projection-algebra.test.mjs::WHAT[SPEC-INV-009] STRENGTH_006_009_candidate_wrong_target_and_promoted_replica_reflection_conflict` |
+| SPEC-INV-010 | `requirements/speculative-investigation/tests/authority-policy.test.mjs::WHAT[SPEC-INV-010] STRENGTH_010_value_equations_charge_fast_bytes_delay_and_risk` |
+| SPEC-INV-011 | `requirements/speculative-investigation/tests/host-policy.test.mjs::WHAT[SPEC-INV-011] STRENGTH_011_dry_run_is_an_explicit_non_default_host_canary_mode` |
+| SPEC-INV-012 | `requirements/speculative-investigation/tests/invisibility.test.mjs::WHAT[SPEC-INV-012] STRENGTH_012_candidate_and_promoted_semantic_bytes_have_no_mechanism_provenance` |
+| SPEC-INV-013 | `requirements/speculative-investigation/tests/dry-run-shadow.test.mjs::WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_owner_path_starts_shadow_and_does_not_await_replica_terminal` |
