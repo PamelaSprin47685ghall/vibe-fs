@@ -7,6 +7,7 @@
 ## 1. 基线与范围
 
 - 计划基线：`upstream/master@1db90f5e8`。
+- 最近执行基线：`upstream/master@fcd5ab11b`（2026-08-31 fetch；检查器拆为 text/FCS lanes，并引入 Wireit 缓存）。
 - 已合并成果：PR #19，merge commit `1db90f5e8`。
 - 旧成果保留分支：`codex/pre-upstream-refactor-20260831@4bb19673e`。
 - 当前集成分支与 upstream tree 无差异。
@@ -53,12 +54,16 @@
 - 原因：后续 PR 必须先有可信 Linux verdict。不得让语义迁移与 CI portability 混在一起。
 - 批次出口：upstream CI 全绿；合并后在最新 master 运行一次 `npm run format-build-test`。
 
+执行事实（2026-08-31）：本地实现成功。最新 upstream 基线上重放后的节点为 RED `c3a39623f`、GREEN `2dbf3c179`、consumer closure `904c0be8a`、记录 `fa0003296`；定向 21/21、Fable build 734 sources / 161 surfaces、text gate 全绿。原基线完整阶梯为 3925/3925、integration/e2e/package 全绿。尚未 push、无 GitHub Linux CI、无 merge SHA，因此第 1 次尚未进入 upstream，批次外部出口未闭合。
+
 ### 第 2 次：最小 production owner 收敛
 
 - 模块：M3。
 - PR：一个独立 PR。
 - 原因：改动小、单一 owner、无前置依赖；先验证新的提交、说明和 review 节奏。
 - 批次出口：Decode、Host、Surface 不再拥有 bounds 常量或公式。
+
+执行事实（2026-08-31）：本地批次出口已闭合。RED `4b87c3c0a` 证明原行为测试全绿时三个 consumer 仍可复制 owner；GREEN `eb0e703d6` 将阈值、计数结果、typed rejection 与拒绝公式收敛到 `EnforcerCycle.validateContentBounds`；FCS closure `787a877d6` 声明 injected `byteCount` 的 exact-two trace。behavior-diagnosis 149/149、Fable build、text lane（772 WHAT / 3920 tests）与完整 owner-dep lane 全绿。未 push、无 PR/CI/merge SHA；下一位不得据此声称已进入 upstream。
 
 ### 第 3 次：production-bound proof 加固
 

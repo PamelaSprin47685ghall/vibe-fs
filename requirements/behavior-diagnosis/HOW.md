@@ -17,7 +17,7 @@
 
 1. **基数门禁与解码**：
    - 原始 assistant 步骤中 `chronicle` 调用数必须精确为 1。0 次或 2+ 次直接转入协议修复。
-   - 解码器解析 `entry`、`tip` 与可选 `evidence`，验证文本非空与内容大小边界（文本 ≤ 512 KiB，证据 ≤ 128 KiB）。
+   - 解码器解析 `entry`、`tip` 与可选 `evidence`，验证文本非空；`EnforcerCycle.validateContentBounds` 唯一拥有内容大小阈值、字节计数结果、typed rejection 与 text-first 拒绝顺序（文本 ≤ 512 KiB，证据 ≤ 128 KiB）。Decode 与 JS Surface 只注入 canonical UTF-8 `byteCount` 并消费同一纯 decision。
    - 若无活跃 Blogger cycle，产生类型化 `NoLiveCycle` 结果并清理过时会话。
 
 2. **原子提交与 Coverage 出生门**：
@@ -55,7 +55,7 @@
 | BD-008 | `requirements/behavior-diagnosis/tests/codec.test.mjs::WHAT[BD-008] ENFORCER_024_extra_numeric_properties_are_ignored` |
 | BD-009 | `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs::WHAT[BD-009] ENFORCER_061_exactly_one_valid_call_stops_physical_run` |
 | BD-010 | `requirements/behavior-diagnosis/tests/identity-fail-closed.test.mjs::WHAT[BD-010] ENFORCER_043_no_provable_provider_run_fails_closed` |
-| BD-011 | `requirements/behavior-diagnosis/tests/bounds.test.mjs::WHAT[BD-011] ENFORCER_043_canonical_text_over_512KiB_fails_closed` |
+| BD-011 | `requirements/behavior-diagnosis/tests/bounds.test.mjs::WHAT[BD-011] ENFORCER_043_canonical_text_over_512KiB_fails_closed`；`requirements/behavior-diagnosis/tests/bounds.test.mjs::WHAT[BD-011] bounds ownership gate rejects consumer and newly added decoys`；`scripts/checks/enforcer-bounds-owner.mjs` |
 | BD-012 | `requirements/behavior-diagnosis/tests/observation-projection.test.mjs::WHAT[BD-012] OBS_PROJ_002_zip_recent_tips_with_blog_frame_digests` |
 | BD-013 | `requirements/behavior-diagnosis/tests/coverage-birth-gate.test.mjs::WHAT[BD-013] ENFORCER_045_mainContext_refuses_when_next_sequence_cannot_advance` |
 | BD-014 | `requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs::WHAT[BD-014] ENFORCER_TIP_08_each_committed_cycle_records_exactly_one_tip` |

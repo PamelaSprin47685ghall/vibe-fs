@@ -219,3 +219,48 @@
 
 - 本轮授权只包含本地实现与提交；未 push、未创建 PR。
 - M0 只有在 GitHub Linux Node 20 CI 实际全绿且合并后才算进入 upstream。本地完整阶梯已闭合实现证据，不代替这个尚未发生的外部事实。
+
+## 10. M3 Enforcer bounds 单一 owner（2026-08-31）
+
+### 10.1 最新 upstream 对齐
+
+- 执行分支：`codex/remaining-merge-batch-2`；基线：`upstream/master@fcd5ab11b`。
+- upstream 新增 `4e7570abf` / `fcd5ab11b`，只修改 AGENTS、package/Wireit、`.gitignore` 与 `scripts/check.mjs` lane 编排；没有修改 Enforcer production。由于 PR #19 是 squash merge，本地旧分支与 upstream 不具线性祖先关系；本分支从 `fcd5ab11b` 新建，只按原节点重放计划文档与 M0 的 4 个独立提交，避免再次合并已被 squash 吸收的施工历史。
+- 旧 M3 证据 `40136ef0a` 仅用于定位历史意图；未 cherry-pick。当前 WHY/WHAT/HOW、production owner 与 gate 重新独立审查后实施。
+
+### 10.2 RED → GREEN → FCS closure
+
+1. `4b87c3c0a test(enforcer): expose duplicated content-bound owners`
+   - WHY/WHAT 先定义：Cycle model 唯一拥有阈值、UTF-8 字节计数结果与拒绝分支。
+   - 新增全 Enforcer production tree gate，不只检查三个已知文件。它拒绝 consumer 常量定义、raw threshold、直接 byte-count comparison、Decode/Surface 脱离 shared decision。
+   - synthetic decoy 同时覆盖 Host 常量副本、Decode 公式副本、新增目录中的 renamed raw threshold。
+   - RED 证据：原注册 Surface 行为 4/4 仍绿；gate 同时报告 Model 缺 owner、Decode/Surface 脱离 owner、Decode/Host/Surface 共 7 处副本。证明行为边界值测试不能独自阻止未来漂移。
+2. `eb0e703d6 refactor(enforcer): centralize content-bound decisions`
+   - `Cycle/Model.fs` 新增 `ContentBounds`、`ContentBoundsRejection`、两个 canonical threshold、`validateContentBounds` 与统一错误映射。
+   - `Cycle/Decode.fs` 删除常量与判定公式，真实提交路径调用 shared decision。
+   - `Surface.fs` 只暴露 owner 常量、注入 `LlmFacing.byteCount`、转换 typed result；测试不再验证另一套公式。
+   - `Host.fs` 删除未消费的重复常量。
+   - gate 初版曾把 F# `->` 误认作比较运算符；GREEN 中将模式收紧为带两侧空白的 ` > `，synthetic direct-comparison decoy 保持可失败。
+3. `787a877d6 fix(enforcer): declare byte-count trace contract`
+   - 完整 FCS lane 发现 injected `byteCount` 在同一 decision 中固定调用两次，触发 `semantic-decorator-invariant`。这不是误报：高阶 operation 的 multiplicity 需要 owner law。
+   - 在函数声明处绑定 owner=`behavior-diagnosis`、WHAT=`BD-011`、text→evidence 顺序、executable proof、同步失败语义、无 cancel/deadline、invocation bound=2。没有把计数移回 consumer，没有修改或放宽 analyzer。
+
+### 10.3 对 upstream 原文件的修改理由与证明
+
+| 修改面 | upstream 原状 | 修改理由 | 证明 |
+|---|---|---|---|
+| Enforcer Cycle model | 只拥有 `CanonicalCycle` 与 nonempty 判定；不拥有 BD-011 bounds。 | 安全阈值与拒绝公式必须只有一个可执行真源。 | typed result + exact boundary/multibyte behavior；whole-tree owner gate。 |
+| Decode | 自有两个常量及两个 `byteCount > limit` 分支。 | 真实 commit path 必须消费 model decision，不能与测试 Surface 漂移。 | architecture gate 强制 exact shared call；behavior-diagnosis 149/149。 |
+| Host | 保留两个未消费的 bounds 常量。 | 死副本仍是未来错误 owner；删除尸体。 | whole-tree gate 禁止非 owner constant/raw threshold。 |
+| Surface | 自有两个常量、两次计数与两个拒绝分支。 | Surface 只做 JS representation conversion；错误 vocabulary 与 Decode 同源。 | 注册 Surface 的 exact/boundary/UTF-8 反例；Surface Manifest 161/161。 |
+| verification entry | 无 Enforcer bounds ownership gate。 | 行为测试不能证明未来 consumer 不复制公式。 | synthetic good world + 3 类 decoy；真实旧树 RED、新树 GREEN。 |
+
+### 10.4 实际验证与剩余外部事实
+
+- `dotnet tool run fantomas src/Wanxiangshu`：696 files，2 formatted，0 error；随后目标文件 unchanged。
+- `node scripts/build.mjs`：734 F# sources、161 registered surfaces，成功。
+- `node --test requirements/behavior-diagnosis/tests/*.test.mjs`：149/149。
+- `node scripts/check.mjs`：text lane 全绿；696 production files；772 WHAT / 3920 tests closure；新 gate 扫描 28 个 Enforcer production files，只存在一个 decision owner。
+- `node scripts/check.mjs --lane=owner-dep`：27,091 FCS cross-owner uses、333 owner edges、185 contracts；authority、composition、DSL ownership、semantic decorator 全绿。
+- 最新 upstream 已把 npm scripts 切到 Wireit；本机旧 `node_modules` 尚无 Wireit，首次 `npm run format` 因 `wireit: command not found` 未启动。等价仓库命令均已直接运行，未修改 package/lockfile 绕过；PR 前应按 lockfile 刷新依赖并验证正式 npm 入口。
+- 第 2 次按计划不要求本地完整 e2e ladder；未 push、未创建 PR、无 GitHub CI、无 merge SHA。M3 仍未进入 upstream。
