@@ -67,6 +67,8 @@
 
 最新 base 的 run `33424153110` 已通过 3928/3928 unit，随后暴露 FCS production/reuse/fixture 三段共用单一 verdict 的 Linux 静默窗口缺陷。修正保持 180s 单段预算与 185s watchdog 不变，只让三个完成的真实因果阶段分别产生 verdict；本地联网正式用例 5/5，最长 production scan 109.6s。production、scanner、schema、断言与 fail-closed 路径均未修改。
 
+run `33426540260` 已验证 owner lane 修复：5/5，Linux production scan 146.8s；随后旧 workflow scanner 聚合文件在 185056ms 触发同类静默拒绝。`764c6a2cb` 将三个彼此独立的 scanner 精确拆成顺序 entry；预算、watchdog、scanner、production 与断言均不变。该 CI portability 修复从第 3 次下沉到 #20，保证最底层 PR 可独立合并。
+
 ### 第 3 次：production-bound proof 加固
 
 - 模块列表：
