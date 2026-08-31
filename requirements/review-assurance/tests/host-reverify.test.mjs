@@ -99,6 +99,62 @@ test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_durably_opens_barrier_before_firs
   }
 })
 
+test('WHAT[REVIEW-ASSURANCE-007] HOST_reverify_rejects_blank_first_physical_identity_without_a_durable_verdict', async () => {
+  let live
+  let delivery
+  let reviewerSession
+  live = await liveReviewerOwner('ses-review-owner-blank-physical', {
+    sessionBehaviour: {
+      onSendPrompt: (reviewerId) => {
+        reviewerSession = reviewerId
+        const response = reviewHost.deliverJudgement(
+          reviewerId,
+          '   ',
+          'run-blank-physical',
+          'call-blank-physical',
+          'REVISE',
+        )
+        assert.ok(response, 'the raw delivery must reach the armed Direct CE')
+
+        delivery = (async () => {
+          const result = await response
+          live.sessions.notifyTerminal(reviewerId, {
+            kind: 'Completed',
+            sessionId: reviewerId,
+            authorityRoot: 'root-blank-physical',
+            providerRun: 'run-blank-physical',
+            role: 'Reviewer',
+            terminalText: 'invalid judgement rejected',
+            turnFormalText: 'invalid judgement rejected',
+          })
+          return result
+        })()
+      },
+    },
+  })
+  const worktree = gitDir('rv-blank-physical')
+  try {
+    const result = await reviewHost.reverify(
+      hostSurface.managerPort(live.host),
+      'hostfw-blank-physical',
+      'ses_mgr_blank_physical',
+      worktree,
+      'bar_blank_physical',
+    )
+
+    assert.deepEqual(await delivery, { ok: false, effect: 'Rejected' })
+    assert.equal(result.ok, false)
+    assert.match(result.error, /physical review prompt identity/)
+
+    const projection = reviewJournal.sessionViewRaw(live.journal, reviewerSession)
+    assert.equal(projection.witness, 'NoReview')
+    assert.equal(projection.observedAttempts, 0, 'invalid physical evidence must append no verdict fact')
+  } finally {
+    await live.cleanup()
+    rmSync(worktree, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_accepts_second_PERFECT_after_typed_challenge_on_same_physical_prompt', async () => {
   const delivered = []
   const sent = []

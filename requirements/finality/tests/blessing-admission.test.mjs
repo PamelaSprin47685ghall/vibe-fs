@@ -87,6 +87,10 @@ test('WHAT[FINALITY-002] finality_admission_rejects_structurally_forged_confirma
       members: [{ ...member1, reviewer: 'ses_wrong_valid' }, member2],
     },
     {
+      name: 'cohort barrier differs from the witnessed barrier',
+      members: [{ ...member1, barrier: 'bar_wrong_valid' }, member2],
+    },
+    {
       name: 'second verdict names a different reviewer',
       members: [
         { ...member1, witness: { ...first, second: { ...first.second, reviewer: REVIEWER_2 } } },
