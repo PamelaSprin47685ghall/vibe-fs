@@ -151,6 +151,10 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 
 原提案第一章 / Phase 0 的“关键 trace 冻结”已毕业到守江山，不再保留施工长文。以下继续沿用原章节编号，未完成部分保持原意。
 
+下一个节点已裁决但未闭合 —— `Interaction/Repair` slice（`CompletedTurn.fs`、`CompletedTurnSurface.fs`、`InteractionRepair.fs`，`Port.fs` 属 dispatch-protocol 留在 backlog）。裁决结论：primary owner 从 `behavior-diagnosis` 迁到 `interaction-authority`，classification `MOVE`。依据：`INTERACTION-AUTHORITY-019` 正文直接点名 `InteractionRepair`；`scripts/lib/test-surface-scan.mjs` 已把 `Interaction/Repair/CompletedTurnSurface.js` 登记为 `owner: interaction-authority` + laws IA-004/IA-019 且无 `lawOwners` 覆写；该 slice 的全部 18 处 proof 引用都是 IA-004/IA-019 且位于 `requirements/interaction-authority/tests/`；`requirements/behavior-diagnosis/HOW.md` 从未提到这三个文件，behavior-diagnosis 的唯一利益是 BD-017 那条扫源 ratchet，即 consumer 而非 owner。因此 `semantic-owners.json` 是唯一的反对者，"一条语义只有一个 owner" 今天就已被违反，裁决必须解决而不是保留它。
+
+已量出的施工面（下一任照此执行，不必重做发现）：slice 的入边今天是 `pendingEdges` —— provider 未裁决时 `analyzeOwnerDependencies` 跳过 contract 强制；一旦它进入 DONE 节点，来自 7 个外部 consumer 文件的 11 条 symbol 边全部转 strict，每条都要精确 symbol 的 published-contract（`Composition/Turn/TurnReconcile.fs`、`Execution/Fission/OpenCode/Host.fs`、`OpenCode/Host/HostTurnObserver.fs`、`Composition/Turn/OrdinaryTurnWorkflow.fs`、`Mission/Review/Judgement/Workflow.fs`、`Context/Trace/Capture.fs`、`Context/Trace/TerminalReporter.fs`）。出边约 139 个 symbol 跨 11 个 owner，其 contract 的 consumer 需从 `behavior-diagnosis` 换成 `interaction-authority`，并在没有其它 behavior-diagnosis 文件仍消费同一 provider+symbol 时删掉 `behavior-diagnosis`，否则 `stale-contract-consumer` 报红；其中对 `interaction-authority` 的 4 个 symbol 转为同 owner、不再需要授权，对 `behavior-diagnosis` 的 9 个 symbol 反向变成跨 owner、开始需要授权。另需检查 `Enforcer/Cycle/BloggerProbe.fs` 与 `Enforcer/Repair.fs` 是否有真实 FCS 边。
+
     
     第二章：建立全仓统一的语义词典——从此不再允许 Token 万金油
     
