@@ -92,9 +92,25 @@ const PROVIDER_RECOVERY_GATE_FIXTURES = [
     ].join('\n'),
   },
   {
+    id: 'workflow-failure-ledger-owner-flow',
+    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
+    source: [
+      'let private admitAuthorizedFailure (durable: AgentJournal) (ownerSessionId: SessionId) turn authorization error =',
+      '    task {',
+      '        let! admission = FallbackLedger.recordAuthorizedFailure durable turn.SessionId authorization error',
+      '        return reconcileFailureAdmission durable ownerSessionId admission',
+      '    }',
+    ].join('\n'),
+  },
+  {
     id: 'interaction-repair-main-session-failure-owner',
     file: 'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs',
     source: 'FallbackLedger.recordConfirmedFailure journal budget turn.SessionId turn.ProviderRun reason',
+  },
+  {
+    id: 'interaction-repair-no-fallback-writer',
+    file: 'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs',
+    source: 'FallbackLedger.recordAuthorizedFailure journal turn.SessionId authorization reason',
   },
 ]
 

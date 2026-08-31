@@ -469,8 +469,17 @@ export const RULES = [
     fileHint: 'Workflow.fs',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
     pattern:
-      /\blet\s+mainSessionId\s*=\s*mainSessionOfBlogger\s+projection\s+turn\.SessionId\b[\s\S]{0,500}\blet\s+ownerSessionId\s*=\s*match\s+mainSessionId\s+with\s*\|\s*Some\s+\w+\s*->\s*Some\s+\w+\s*\|\s*None\s*->[\s\S]{0,300}\bFallbackEvidence\.tryCurrentState\s+turn\.SessionId\s+projection\b[\s\S]{0,200}\bOption\.map\s*\(fun\s+_\s*->\s*turn\.SessionId\)[\s\S]{0,500}\bmatch\s+ownerSessionId\s+with\s*\|\s*None\s*->(?:(?!FallbackLedger\.recordConfirmedFailure)[\s\S]){1,500}\|\s*Some\s+(\w+)\s*->[\s\S]{0,500}\bFallbackLedger\.recordConfirmedFailure\s+durable\s+AgentPairCursor\.DefaultAutoRecoveryBudget\s+\1\b/,
-    label: 'Fallback Workflow must append only to a resolved Blogger main or durably proven WorkMain owner',
+      /\blet\s+ownerSessionId\s*=\s*mainSessionOfBloggerProjection\s+projection\s+turn\.SessionId\s*\|>\s*Option\.orElseWith\s*\(fun\s*\(\)\s*->\s*FallbackEvidence\.tryCurrentState\s+turn\.SessionId\s+projection\s*\|>\s*Option\.map\s*\(fun\s+_\s*->\s*turn\.SessionId\)\)[\s\S]{0,700}\blet\s+ownerState\s*=\s*ownerSessionId\s*\|>\s*Option\.bind\s*\(fun\s+owner\s*->\s*FallbackEvidence\.tryCurrentState\s+owner\s+projection\s*\|>\s*Option\.map\s*\(fun\s+current\s*->\s*owner\s*,\s*current\)\)[\s\S]{0,500}\bmatch\s+ownerState\s+with\s*\|\s*None\s*->\s*Task\.FromResult\s*\(Ok\s+ConfirmedFailureOutcome\.NoActiveRun\)[\s\S]{0,300}\|\s*Some\s*\(owner\s*,\s*current\)\s*->\s*admitCurrentFailure\s+durable\s+owner\b/,
+    label: 'Fallback Workflow must resolve one Blogger-main or durable WorkMain owner and fail closed without it',
+    positive: true,
+  },
+  {
+    id: 'workflow-failure-ledger-owner-flow',
+    fileHint: 'Workflow.fs',
+    pathHint: 'Participant/Provider/Attempt/Fallback/',
+    pattern:
+      /\blet\s+private\s+admitAuthorizedFailure[\s\S]{0,400}\(ownerSessionId\s*:\s*SessionId\)[\s\S]{0,700}\bFallbackLedger\.recordAuthorizedFailure\s+durable\s+ownerSessionId\s+authorization\s+error[\s\S]{0,300}\breconcileFailureAdmission\s+durable\s+ownerSessionId\s+admission\b/,
+    label: 'Fallback Workflow must pass the same resolved owner through the sole ledger write and reconciliation',
     positive: true,
   },
   {
@@ -478,9 +487,16 @@ export const RULES = [
     fileHint: 'InteractionRepair.fs',
     pathHint: 'Interaction/Repair/',
     pattern:
-      /\bSessionAssociationProjection\.tryMainSessionOf\b[\s\S]{0,2500}\bmatch\s+mainSessionId\s+with\b[\s\S]{0,500}\|\s*Some\s+mainSessionId\s*->[\s\S]{0,500}\bFallbackLedger\.recordConfirmedFailure\s+journal\s+AgentPairCursor\.DefaultAutoRecoveryBudget\s+mainSessionId\b/,
-    label: 'InteractionRepair must resolve the exact main-session owner before recording failure',
+      /\bProviderRecoveryWorkflow\.admitPolicyAuthorizedFailure\s+journal\s+turn\s+ExecutionFailure\.ProviderTransient\s+requestKind\s+reason\b/,
+    label: 'InteractionRepair must delegate exact owner resolution and failure admission to ProviderRecoveryWorkflow',
     positive: true,
+  },
+  {
+    id: 'interaction-repair-no-fallback-writer',
+    fileHint: 'InteractionRepair.fs',
+    pathHint: 'Interaction/Repair/',
+    pattern: /\bFallbackLedger\b/,
+    label: 'InteractionRepair must not bypass ProviderRecoveryWorkflow and write the fallback ledger directly',
   },
 ]
 
