@@ -106,23 +106,14 @@ module PromptIngressCodec =
         |> Option.map (fun value -> SessionId.create (value.Trim()))
 
     let private messageIdOf (input: obj) (output: obj) =
-        let physical (value: string) =
-            Some(PhysicalUserMessageId.create value)
+        let message = if isNull output then null else output?message
 
-        if not (isNull input) && not (isNull input?messageID) then
-            physical (unbox<string> input?messageID)
-        elif not (isNull output) && not (isNull output?id) then
-            physical (unbox<string> output?id)
-        elif
-            not (isNull output)
-            && not (isNull output?message)
-            && not (isNull output?message?id)
-        then
-            physical (unbox<string> output?message?id)
-        elif not (isNull output) && not (isNull output?info) && not (isNull output?info?id) then
-            physical (unbox<string> output?info?id)
-        else
-            None
+        [ readString input "messageID"; readString message "id" ]
+        |> List.choose id
+        |> List.distinct
+        |> function
+            | [ physical ] -> Some(PhysicalUserMessageId.create physical)
+            | _ -> None
 
     /// PROMPT-011: read the anchor back from the field PromptMetadataCodec wrote.
     ///

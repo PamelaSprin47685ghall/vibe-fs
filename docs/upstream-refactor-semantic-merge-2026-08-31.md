@@ -114,3 +114,4 @@
 ## 6. 执行日志
 
 - Durable handle：新增 production-bound terminal/rebinding 反例；`LinkageProjection` 只吸收 exact Active duplicate，identity 漂移返回 `HandleIdentityConflict`，Completed/Abandoned/Retired 均保持不可逆。focused Handle、managed-session、build/check 验证结果记录在对应 Git 节点。
+- Dispatch ingress identity：proof 从 provider-projection 移回 dispatch owner；只接受 `input.messageID` / `output.message.id` 的唯一 exact nonblank 值，冲突与非契约 carrier fail closed，opaque identity 不 trim。

@@ -23,6 +23,9 @@
    - durable substrate activation 成功后才启动 claim reconciliation；它只由 durable claim 或 Host physical evidence 事件推进。
    - `PhysicalAccepted` 建立后，把 exact `(SessionId, PhysicalUserMessageId)`、`PromptKey` 与原子 `AttemptExecutionProfile`（含完整版本化 `ParticipantIdentityEvidence`）交给 `managed-chat-execution`。容量、execution binding、provider start、failure disposition 与 settlement 均由其 owner 处理，dispatch 不保存镜像状态。
 
+5. **Host physical identity 解码**：
+   `PromptIngressCodec` 只读取 Host 1.18.18 契约中的 `input.messageID` 与 `output.message.id`。空白 carrier 视为缺失；两个非空 carrier 必须保持原始字节完全一致。缺失、冲突、仅有非契约字段时均不生成 `PhysicalUserMessageId`。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
