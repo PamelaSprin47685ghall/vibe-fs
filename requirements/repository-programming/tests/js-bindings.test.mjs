@@ -128,6 +128,20 @@ test('WHAT[REPOSITORY-PROGRAMMING-010] JS009_012_bindings_write_stages_create', 
   }
 })
 
+test('WHAT[REPOSITORY-PROGRAMMING-010] JS009_bindings_write_rejects_an_existing_target_before_staging', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'existing.txt'), 'external', 'utf8')
+    const binding = createApi(dir)
+    const result = apiOf(binding).js.write('existing.txt', 'tool')
+    assert.equal(result.ok, false)
+    assert.equal(result.code, 'FILE_ALREADY_EXISTS')
+    assert.equal(stagedCount(binding), 0)
+  } finally {
+    cleanup()
+  }
+})
+
 test('WHAT[REPOSITORY-PROGRAMMING-012] JS009_012_bindings_write_leaves_disk_untouched', () => {
   const { dir, cleanup } = sandbox()
   try {

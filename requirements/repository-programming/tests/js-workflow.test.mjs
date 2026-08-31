@@ -12,6 +12,7 @@ import { parse as parseToml } from 'smol-toml'
 import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
 import {
   run,
+  runObserved,
   caseName,
   rewritten,
   created,
@@ -93,6 +94,74 @@ test('WHAT[REPOSITORY-PROGRAMMING-019] JS085_workflow_preflight_blocks_stale_rew
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Failed')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'current text')
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_workflow_rejects_a_changed_read_only_dependency', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'dependency.txt'), 'snapshot', 'utf8')
+    const program = `class Js extends JsProgram {
+  async run() {
+    const dependency = await this.file('dependency.txt');
+    this.write('output.txt', dependency.text());
+    return { ok: true };
+  }
+}`
+    let observations = 0
+    const outcome = await runObserved(
+      dir,
+      'Coder',
+      'en',
+      program,
+      2000,
+      4_102_444_800_000,
+      1 << 20,
+      null,
+      async (readPaths, effectPaths) => {
+        observations += 1
+        assert.deepEqual(readPaths, ['dependency.txt'])
+        assert.deepEqual(effectPaths, ['output.txt'])
+        writeFileSync(join(dir, 'dependency.txt'), 'external', 'utf8')
+      },
+    )
+
+    assert.equal(caseName(outcome), 'Failed')
+    assert.equal(failureCode(outcome), 'FILE_CHANGED')
+    assert.equal(readFileSync(join(dir, 'dependency.txt'), 'utf8'), 'external')
+    assert.equal(existsSync(join(dir, 'output.txt')), false)
+    assert.equal(observations, 1)
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_workflow_rejects_a_create_target_added_after_staging', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const program = `class Js extends JsProgram {
+  async run() {
+    this.write('new.txt', 'tool');
+    return { ok: true };
+  }
+}`
+    const outcome = await runObserved(
+      dir,
+      'Coder',
+      'en',
+      program,
+      2000,
+      4_102_444_800_000,
+      1 << 20,
+      null,
+      async () => writeFileSync(join(dir, 'new.txt'), 'external', 'utf8'),
+    )
+
+    assert.equal(caseName(outcome), 'Failed')
+    assert.equal(failureCode(outcome), 'FILE_CHANGED')
+    assert.equal(readFileSync(join(dir, 'new.txt'), 'utf8'), 'external')
   } finally {
     cleanup()
   }
