@@ -133,6 +133,8 @@ run `33426540260` 已验证 owner lane 修复：5/5，Linux production scan 146.
 - 原因：两项是最后的 execution adapter consumers；共同完成 support 文件删除。M7D 必须先于 M7E。
 - 批次出口：imports/exports 均为零，删除 `requirements/managed-session-lifecycle/tests/support/managed-surface.mjs`；在最新 upstream 运行完整阶梯。
 
+执行事实（2026-09-01）：M7D/M7E 本地实现与 focused 出口已闭合。SyncDelegate 五条 lifecycle proofs 现执行真实 journal-backed runtime；Host PTY 十一条 proofs 现执行真实 `HostForkRuntimePty`。最后两个 mirror exports 及整个 `managed-surface.mjs` 已删除。build 为 738 sources / 165 surfaces，managed-session 124/124，check 为 772 WHAT / 3899 tests；完整 `npm run format-build-test` 正在作为批次最终出口执行，详见 [batch 8 记录](./upstream-remaining-merge-batch-8-2026-09-01.md)。
+
 M7A → M7B → M7C → M7D → M7E 必须串行。任何迁移不得在测试中复制 decision、fold、formula 或状态机；只能调用注册 production Surface。
 
 ### 第 9 次：共享 AST binding analyzer

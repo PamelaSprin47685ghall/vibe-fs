@@ -114,6 +114,7 @@
 
 ## 6. 执行日志
 
+- M7D/M7E mirror closure：`b680f729f`→`ad5d58437` 与 `8b32a54fe`→`11485ff83`→`5c3eaa9e0` 将 SyncDelegate 与 Host PTY consumers 迁到 production owners，并删除最后的 `managed-surface.mjs`。真实 runtime proofs 分别 5/5 与 11/11；managed-session 124/124；Fable 738 sources / 165 surfaces；text gate 772 WHAT / 3899 tests 全绿。完整阶梯结果见 batch 8 专页。
 - M7B/M7C mirror closure：`43884d61f`→`a9a431728`→`7e7fe1d00` 与 `fba887a3d`→`2f0449153`→`a145572b3` 将 terminal、family、Satellite、Distiller assertions 迁到 production owners。删除 34 条常量 fork/family tests、Satellite JS 状态机、Distiller 常量与 literal semantic-cut 假 proof。Fable 737 sources / 164 surfaces、managed-session 125/125、text gate 772 WHAT / 3900 tests 全绿。`MANAGED-SESSION-006` 的 Retired 不可逆条款与 exact retired binding 重开 production 行为存在既有冲突，留待 owner 裁决，未借迁移改语义。
 
 - Durable handle：新增 production-bound rebinding 反例；`LinkageProjection` 对 child/target/byname/role/ownership 任一漂移返回 `HandleIdentityConflict`。合入最新 DELEG-024/027 后，exact binding 保留 upstream 的后续 work-unit 重开语义，同一物理 child 无需 join 即可再次 dispatch；`Abandoned` 仍不可重开。
