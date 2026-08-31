@@ -9,11 +9,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
+import { PER_TEST_TIMEOUT_MS } from '../../../e2e/support/time-budget.js'
+
 const SLICE_MS = Math.max(50, Number(process.env.UNIT_RUNNER_PROBE_SLICE_MS) || 400)
 const COUNT = Math.max(2, Number(process.env.UNIT_RUNNER_PROBE_SLICE_COUNT) || 25)
 
 for (let index = 1; index <= COUNT; index += 1) {
-  test(`slow but progressing ${index}`, async () => {
+  test(`slow but progressing ${index}`, { timeout: PER_TEST_TIMEOUT_MS }, async () => {
     await new Promise((resolve) => setTimeout(resolve, SLICE_MS))
     assert.equal(index, index)
   })

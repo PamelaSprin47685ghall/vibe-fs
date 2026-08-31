@@ -17,6 +17,7 @@
 `tests/e2e-watchdog-feed.test.mjs` 与因果原语套件负责守卫时序推进契约：
 - 确保 E2E 物理测试中看门狗计时器仅由明确的因果事件（如目标事实增长、检查点达成）驱动续期。
 - 严禁顶层测试用例直接调用底层计时器的内部 advance 接口，防止由于传输层噪声或背景任务活动导致看门狗被非法延期。
+- unit/integration/package 的 process-isolated node:test child 由外部 supervisor 管理 verdict-silence 与 suite backstop；`run-inner.mjs` 不把叶子预算下发为整份文件的 timeout，也不把共享 AbortSignal 扇出到全部文件 worker。需要 timeout-and-forget 的叶子 proof 在自己的 `test` options 中声明 timeout。
 
 ### 3. 物理契约显式声明（`physical-contract`）
 
