@@ -1,12 +1,10 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import {
-  FCS_NORMALIZED_OUTPUT_ENV,
   FCS_NORMALIZED_SCHEMA_VERSION,
   FCS_REUSE_PATH_ENV,
   FCS_REUSE_RUN_ID_ENV,
@@ -14,39 +12,26 @@ import {
 } from '../../../../scripts/checks/owner-dependencies.mjs'
 
 const repositoryScratchRoot = fileURLToPath(new URL('../../../../.fable-build/', import.meta.url))
+const normalizedEvidence = join(repositoryScratchRoot, 'owner-dependencies-fcs', 'normalized-evidence.json')
 const operations = fileURLToPath(new URL('../../../../src/Wanxiangshu/Git/Operations.fs', import.meta.url))
 
 test('WHAT[STRUCTURED-WORKFLOW-011] one tagged production scan is reused fail-closed and consumer-filtered', () => {
   mkdirSync(repositoryScratchRoot, { recursive: true })
   const scratchRoot = mkdtempSync(join(repositoryScratchRoot, 'owner-dependencies-reuse-'))
-  const rawEvidence = join(scratchRoot, 'raw-symbol-uses.json')
-  const normalizedEvidence = join(scratchRoot, 'normalized-evidence.json')
-  const runId = randomUUID()
+  assert.ok(existsSync(normalizedEvidence), 'owner-dep must produce normalized evidence before integration reuse')
+  const normalized = JSON.parse(readFileSync(normalizedEvidence, 'utf8'))
+  assert.equal(normalized.schemaVersion, FCS_NORMALIZED_SCHEMA_VERSION)
+  assert.match(normalized.runId, /\S/)
+  assert.match(normalized.inputFingerprint, /^[0-9a-f]{64}$/)
+  const runId = normalized.runId
   const previous = {
-    producer: process.env.OMP_FCS_EVIDENCE_RUN_ID,
-    output: process.env[FCS_NORMALIZED_OUTPUT_ENV],
     path: process.env[FCS_REUSE_PATH_ENV],
     reuseId: process.env[FCS_REUSE_RUN_ID_ENV],
   }
 
   try {
-    delete process.env[FCS_REUSE_PATH_ENV]
-    delete process.env[FCS_REUSE_RUN_ID_ENV]
-    process.env.OMP_FCS_EVIDENCE_RUN_ID = runId
-    process.env[FCS_NORMALIZED_OUTPUT_ENV] = normalizedEvidence
-    const produced = scanProjectSymbolUses({
-      scratchRoot: join(scratchRoot, 'producer'),
-      resultPath: rawEvidence,
-    })
-    assert.ok(produced.productionFiles.length > 0)
-    assert.equal(JSON.parse(readFileSync(rawEvidence, 'utf8')).runId, runId)
-    const normalized = JSON.parse(readFileSync(normalizedEvidence, 'utf8'))
-    assert.equal(normalized.schemaVersion, FCS_NORMALIZED_SCHEMA_VERSION)
-    assert.equal(normalized.runId, runId)
     assert.ok(!('applicationCandidates' in normalized) && !('applicationRanges' in normalized))
 
-    delete process.env.OMP_FCS_EVIDENCE_RUN_ID
-    delete process.env[FCS_NORMALIZED_OUTPUT_ENV]
     process.env[FCS_REUSE_PATH_ENV] = normalizedEvidence
     process.env[FCS_REUSE_RUN_ID_ENV] = runId
     const unusedScratch = join(scratchRoot, 'must-not-spawn')
@@ -78,6 +63,11 @@ test('WHAT[STRUCTURED-WORKFLOW-011] one tagged production scan is reused fail-cl
     process.env[FCS_REUSE_RUN_ID_ENV] = runId
     assert.throws(() => scanProjectSymbolUses(), /schema version does not match/)
     process.env[FCS_REUSE_PATH_ENV] = normalizedEvidence
+    const wrongFingerprint = join(scratchRoot, 'wrong-fingerprint.json')
+    writeFileSync(wrongFingerprint, JSON.stringify({ ...normalized, inputFingerprint: '0'.repeat(64) }))
+    process.env[FCS_REUSE_PATH_ENV] = wrongFingerprint
+    assert.throws(() => scanProjectSymbolUses(), /inputs do not match/)
+    process.env[FCS_REUSE_PATH_ENV] = normalizedEvidence
     delete process.env[FCS_REUSE_RUN_ID_ENV]
     assert.throws(() => scanProjectSymbolUses(), /requires both absolute path and run ID/)
     process.env[FCS_REUSE_RUN_ID_ENV] = runId
@@ -85,8 +75,6 @@ test('WHAT[STRUCTURED-WORKFLOW-011] one tagged production scan is reused fail-cl
     assert.throws(() => scanProjectSymbolUses(), /reuse file is missing/)
   } finally {
     const restore = (name, value) => value === undefined ? delete process.env[name] : process.env[name] = value
-    restore('OMP_FCS_EVIDENCE_RUN_ID', previous.producer)
-    restore(FCS_NORMALIZED_OUTPUT_ENV, previous.output)
     restore(FCS_REUSE_PATH_ENV, previous.path)
     restore(FCS_REUSE_RUN_ID_ENV, previous.reuseId)
     rmSync(scratchRoot, { recursive: true, force: true })
