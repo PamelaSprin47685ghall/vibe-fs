@@ -3,7 +3,7 @@ import test from 'node:test'
 import * as AttachmentSurface from '../../../dist/Execution/Session/Attachment/AttachmentSurface.js'
 import * as RecoverySurface from '../../../dist/Execution/Session/Recovery/Surface.js'
 import * as AssociationSurface from '../../../dist/Execution/Session/AssociationSurface.js'
-import * as SatelliteSurface from '../../../dist/Execution/Session/Attachment/SatelliteSurface.js'
+import * as SatelliteSurface from '../../../dist/OpenCode/Host/SatelliteSurface.js'
 import * as HandleSurface from '../../../dist/Execution/Delegation/Handle/Surface.js'
 
 test('WHAT[MANAGED-SESSION-003] session_recovery_contract_restart_reuses_matching_durable_association', async () => {

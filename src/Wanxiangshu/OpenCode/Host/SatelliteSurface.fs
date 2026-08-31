@@ -14,9 +14,10 @@ type private SatelliteSessionPort(physical: bool, conflict: bool, queryError: bo
     let created = ResizeArray<string>()
     let closed = ResizeArray<string>()
     let linkedFacts = ResizeArray<string array>()
+    // DSL-MUTABLE: resource — controlled Host child allocation sequence
     let mutable createCount = 0
 
-    let existing =
+    let existing: OpenCodeChildInfo list =
         if not physical then
             []
         else
@@ -38,8 +39,14 @@ type private SatelliteSessionPort(physical: bool, conflict: bool, queryError: bo
         Task.FromResult(Ok())
 
     interface ISessionHostPort with
-        member _.SubscribeTerminal(_, _) = { new IDisposable with member _.Dispose() = () }
-        member _.SubscribeFutureTerminal(_, _) = { new IDisposable with member _.Dispose() = () }
+        member _.SubscribeTerminal(_, _) =
+            { new IDisposable with
+                member _.Dispose() = () }
+
+        member _.SubscribeFutureTerminal(_, _) =
+            { new IDisposable with
+                member _.Dispose() = () }
+
         member _.SendPrompt(_, _, _) = Task.FromResult(Fatal "unused")
         member _.AbortSession _ = Task.FromResult(Ok())
         member _.InterruptAttempt _ = Task.FromResult(Ok())
@@ -120,5 +127,8 @@ module SatelliteSurface =
                     | Ok lease -> Some(SessionId.value lease.SessionId)
                     | Error _ -> None)
 
-            return box {| children = children; created = port.Created |}
+            return
+                box
+                    {| children = children
+                       created = port.Created |}
         }

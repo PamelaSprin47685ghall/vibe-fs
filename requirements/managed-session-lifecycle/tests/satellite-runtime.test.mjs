@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as SatelliteSurface from '../../../dist/Execution/Session/Attachment/SatelliteSurface.js'
+import * as SatelliteSurface from '../../../dist/OpenCode/Host/SatelliteSurface.js'
 
 test('WHAT[MANAGED-SESSION-003] HOST_015_companion_reuses_exact_journal_linked_physical_child', async () => {
   const observed = await SatelliteSurface.SatelliteSurface_scenario(true, true, false, false)

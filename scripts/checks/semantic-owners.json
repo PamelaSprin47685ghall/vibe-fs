@@ -857,7 +857,7 @@
       "owner": "managed-session-lifecycle"
     },
     {
-      "path": "src/Wanxiangshu/Execution/Session/Attachment/SatelliteSurface.fs",
+      "path": "src/Wanxiangshu/OpenCode/Host/SatelliteSurface.fs",
       "owner": "managed-session-lifecycle"
     },
     {

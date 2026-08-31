@@ -65,6 +65,7 @@ module HostForkPtySurface =
     let scenario (action: string) (input: string) (failure: string) : Task<obj> =
         task {
             let calls = ResizeArray<obj>()
+            // DSL-MUTABLE: resource — controlled backend read-completion port
             let mutable portRef: PtyPort option = None
 
             let handler id command =
@@ -143,7 +144,12 @@ module HostForkPtySurface =
                         else
                             None
 
-                    let prompt = if action = "write" || action = "send-closed" then input else ""
+                    let prompt =
+                        if action = "write" || action = "send-closed" then
+                            input
+                        else
+                            ""
+
                     let! outcome = runtime.SendPty(id, prompt, signal)
                     return outcomeView (calls.ToArray()) (runtime.OwnsPty id) (port.Known id) outcome
         }

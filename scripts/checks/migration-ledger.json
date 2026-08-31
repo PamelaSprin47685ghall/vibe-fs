@@ -310,7 +310,7 @@
         "src/Wanxiangshu/Execution/Session/Attachment/AttachmentSurface.fs",
         "src/Wanxiangshu/Execution/Session/Attachment/ReuseScope.fs",
       "src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs",
-      "src/Wanxiangshu/Execution/Session/Attachment/SatelliteSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/SatelliteSurface.fs",
         "src/Wanxiangshu/Execution/Session/Recovery/Coordinator.fs",
         "src/Wanxiangshu/Execution/Session/Recovery/Surface.fs",
         "src/Wanxiangshu/Execution/Session/RecoveryClosureProjection.fs",
