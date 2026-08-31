@@ -3,7 +3,8 @@ import test from 'node:test'
 import * as AttachmentSurface from '../../../dist/Execution/Session/Attachment/AttachmentSurface.js'
 import * as RecoverySurface from '../../../dist/Execution/Session/Recovery/Surface.js'
 import * as AssociationSurface from '../../../dist/Execution/Session/AssociationSurface.js'
-import { satelliteLifecycle, handleProjection, fact, fold, handleId } from './support/managed-surface.mjs'
+import * as HandleSurface from '../../../dist/Execution/Delegation/Handle/Surface.js'
+import { satelliteLifecycle } from './support/managed-surface.mjs'
 
 test('WHAT[MANAGED-SESSION-003] session_recovery_contract_restart_reuses_matching_durable_association', () => {
   const observed = satelliteLifecycle({ linked: true, physical: true })
@@ -23,21 +24,21 @@ test('WHAT[MANAGED-SESSION-003] session_recovery_contract_conflict_fails_closed_
 })
 
 test('WHAT[MANAGED-SESSION-013] session_recovery_contract_reenlist_filters_hidden_handles', () => {
-  let state = handleProjection.empty
+  let state = HandleSurface.empty()
   const parent = 'ses_parent'
   
   // Link durable public child
-  const r1 = handleProjection.link('agent:coder', 'ses_child_1', 'fast-coder', 'Coder', state, 'DurableParentHandle')
-  state = r1.value
+  const r1 = HandleSurface.apply(state, { op: 'link', handle: 'agent:coder', child: 'ses_child_1', agent: 'fast-coder', role: 'Coder', ownership: 'DurableParentHandle' })
+  state = r1.state
 
   // Link host-owned hidden child (e.g. distiller / reviewer)
-  const r2 = handleProjection.linkNamed('agent:distiller', 'ses_distiller_1', 'distiller', 'distiller-byname', 'Distiller', 'HostOwnedHidden', state)
-  state = r2.value
+  const r2 = HandleSurface.apply(state, { op: 'link', handle: 'agent:distiller', child: 'ses_distiller_1', agent: 'distiller', role: 'Distiller', ownership: 'HostOwnedHidden' })
+  state = r2.state
 
-  const listable = handleProjection.listable(state)
+  const listable = HandleSurface.views(state).listable
   assert.equal(listable.length, 1)
-  assert.equal(listable[0].handle, 'agent:coder')
-  assert.equal(listable[0].child, 'ses_child_1')
+  assert.equal(listable[0], 'agent:coder')
+  assert.equal(HandleSurface.read(state, listable[0]).child, 'ses_child_1')
 })
 
 test('WHAT[MANAGED-SESSION-013] session_recovery_contract_authorizes_family_without_physical_handle_leaks', () => {
