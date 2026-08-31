@@ -1496,6 +1496,14 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Execution/Delegation/Handle/JournalSurface.js',
+    owner: 'managed-session-lifecycle',
+    laws: ['MANAGED-SESSION-009'],
+    source: 'src/Wanxiangshu/Execution/Delegation/Handle/JournalSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'Execution/Session/Attachment/AttachmentSurface.js',
     owner: 'managed-session-lifecycle',
     laws: ['MANAGED-SESSION-001', 'MANAGED-SESSION-005', 'CRASH-019'],

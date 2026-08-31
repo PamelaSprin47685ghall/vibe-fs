@@ -61,7 +61,7 @@ const views = (projection) => ({
 
 const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-abandon-'))
-  const created = await HandleJournalSurface.openJournal(
+  const created = await HandleJournalSurface.JournalSurface_openJournal(
     dir,
     'managed-session-abandon',
     1,
@@ -71,7 +71,7 @@ const withJournal = async (fn) => {
   try {
     return await fn(created.journal)
   } finally {
-    HandleJournalSurface.dispose(created.journal)
+    HandleJournalSurface.JournalSurface_dispose(created.journal)
   }
 }
 
@@ -149,10 +149,10 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_Abandoned_is_not_joinable_and_cannot_co
 
 test('WHAT[MANAGED-SESSION-009] EXEC_009_recordAbandon_CAS_first_wins', async () => {
   await withJournal(async (j) => {
-    const linked = await HandleJournalSurface.link(j, PARENT, 'h1', CHILD, 'fast-coder', forkRuntime.role('Coder'))
+    const linked = await HandleJournalSurface.JournalSurface_link(j, PARENT, 'h1', CHILD, 'fast-coder', forkRuntime.role('Coder'))
     assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
 
-    const first = await HandleJournalSurface.recordAbandon(
+    const first = await HandleJournalSurface.JournalSurface_recordAbandon(
       j,
       PARENT,
       'h1',
@@ -161,7 +161,7 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_recordAbandon_CAS_first_wins', async ()
     )
     assert.equal(first.ok, true, first.ok ? '' : first.error)
 
-    const second = await HandleJournalSurface.recordAbandon(
+    const second = await HandleJournalSurface.JournalSurface_recordAbandon(
       j,
       PARENT,
       'h1',
@@ -171,7 +171,7 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_recordAbandon_CAS_first_wins', async ()
     // Journal accepts the line; fold absorbs AlreadyAbandoned (idempotent replay).
     assert.equal(second.ok, true, second.ok ? '' : second.error)
 
-    const projection = HandleJournalSurface.snapshot(j, PARENT, HANDLE)
+    const projection = HandleJournalSurface.JournalSurface_snapshot(j, PARENT, HANDLE)
     assert.equal(projection.record.lifecycle, 'Abandoned')
     assert.equal(projection.record.abandonReason, 'ParentCancelled')
     assert.deepEqual(projection.views.joinable, [])
