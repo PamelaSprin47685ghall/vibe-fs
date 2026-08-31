@@ -8,9 +8,10 @@
 // 不存在的路径、fail-closed 传播被改成吞错——都不会有任何测试变红。
 //
 // 本测试只 pin 三个事实：
-//   1. format-build-test 的层序（fantomas → L0 check.mjs → build → unit →
-//      integration → integration/package → warmup → L4 e2e/entry（恰一个）→
-//      L5 npm pack --dry-run）；
+//   1. format-build-test 的层序（Wireit format → L0 text/FCS gates → Wireit
+//      build → unit → integration → integration/package → warmup → L4
+//      e2e/entry（恰一个）→ L5 npm pack --dry-run），以及每个 Wireit step
+//      解析到的真实仓库命令；
 //   2. check.mjs 的 wired gate 清单：每个 wired 路径存在；
 //      scripts/checks/*.mjs == wired ∪ {spec-rules.mjs(lib)、
 //      semantic-anchors.mjs(catalog)}；
@@ -34,7 +35,7 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 // ── 1. format-build-test 层序（VERIFY-001 五层）─────────────────────────────
 
 test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the five layers in order', () => {
-  const { scripts } = JSON.parse(read('package.json'))
+  const { scripts, wireit } = JSON.parse(read('package.json'))
   const command = scripts['format-build-test']
   assert.equal(typeof command, 'string', 'package.json scripts.format-build-test must exist')
 
@@ -42,9 +43,10 @@ test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the five layer
   const normalized = steps.map((step) => step.replace(/\s+/g, ' '))
 
   assert.deepEqual(normalized, [
-    'dotnet tool run fantomas src/Wanxiangshu', // format
-    'node scripts/check.mjs', // L0 static gates
-    'node scripts/build.mjs', // build（dist 生产字节）
+    'npm run format', // format
+    'npm run check', // L0 text gates
+    'npm run owner-dep', // L0 FCS owner-dependency gates
+    'npm run build', // build（dist 生产字节）
     'node requirements/verification-system/tests/run.mjs', // L1 pure laws + L2 temporal + L3 adapter 契约面
     'node requirements/verification-system/tests/integration/run.mjs',
     'node requirements/distribution/tests/integration/package/run.mjs',
@@ -52,6 +54,20 @@ test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the five layer
     'node requirements/verification-system/tests/e2e/entry.test.mjs', // L4 唯一 Long Stroke
     'npm pack --dry-run', // L5 release（打包面）
   ])
+
+  assert.deepEqual(
+    Object.fromEntries(['format', 'check', 'owner-dep', 'build'].map((name) => [name, scripts[name]])),
+    { format: 'wireit', check: 'wireit', 'owner-dep': 'wireit', build: 'wireit' },
+  )
+  assert.deepEqual(
+    Object.fromEntries(['format', 'check', 'owner-dep', 'build'].map((name) => [name, wireit[name]?.command])),
+    {
+      format: 'dotnet tool run fantomas src/Wanxiangshu',
+      check: 'node scripts/check.mjs',
+      'owner-dep': 'node scripts/check.mjs --lane=owner-dep',
+      build: 'node scripts/build.mjs',
+    },
+  )
 })
 
 test('WHAT[VERIFICATION-SYSTEM-002] l4 has exactly one e2e entry in the ladder', () => {
