@@ -126,8 +126,7 @@ module JudgeTool =
         let isSubmitted =
             hasSession
             && (physicalUserMsg
-                |> Option.exists (fun messageId ->
-                    scope.HasVerdictSubmitted(context.SessionId, messageId)))
+                |> Option.exists (fun messageId -> scope.HasVerdictSubmitted(context.SessionId, messageId)))
 
         match
             isReviewer, hasSession, isSubmitted, verdict, context.ToolCallId, context.ProviderRunId, physicalUserMsg

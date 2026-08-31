@@ -36,7 +36,8 @@ module ProviderRunBinding =
         let sequenced =
             assistants
             |> List.choose (fun message ->
-                message.CreatedAt |> Option.map (fun createdAt -> createdAt, message.Id, message))
+                message.CreatedAt
+                |> Option.map (fun createdAt -> createdAt, message.Id, message))
 
         match assistants, sequenced with
         | [], _ -> Error Rejection.NoBindableRun

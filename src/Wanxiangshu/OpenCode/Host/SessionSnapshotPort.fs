@@ -82,7 +82,10 @@ module SessionSnapshotPort =
             if String.IsNullOrWhiteSpace text then None else Some text
 
     let private readFiniteNumber (value: obj) =
-        if not (isNull value) && emitJsExpr value "typeof $0 === 'number' && Number.isFinite($0)" then
+        if
+            not (isNull value)
+            && emitJsExpr value "typeof $0 === 'number' && Number.isFinite($0)"
+        then
             Some(unbox<float> value)
         else
             None
