@@ -30,7 +30,7 @@ DEPENDS ON:
 
 ## Task 8 final-path closure
 
-`scripts/checks/migration-ledger.json` 的 DONE 节点
+`scripts/checks/release-closure-nodes.json` 的 DONE 节点
 `context-compression-blogger-compaction-keep` 是本包 Blogger/runtime/Host-compaction
 闭包的唯一清单：其中恰有 25 个 final production paths，全部由
 `context-compression` 单一拥有。Host-boundary 与 provider-attempt-recovery 只消费
