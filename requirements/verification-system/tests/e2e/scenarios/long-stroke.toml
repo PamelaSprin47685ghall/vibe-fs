@@ -575,6 +575,9 @@ tools = ["glob", "grep", "read", "judge"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
 
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewer confirmed the tree." }
+
 
 [[turn]]
 id = "blogger"
