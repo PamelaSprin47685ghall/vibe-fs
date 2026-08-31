@@ -148,14 +148,16 @@ export const ENFORCER_POLL_SLICE_MS = 500;
 // ── unit suite (layers 1-3) ─────────────────────────────────────────────────
 
 /**
- * Hard per-test bound for `tests/unit`. A pure fold or a fake-clock trajectory has no reason to
- * take a few seconds on a busy CI runner, so this doubles as a design constraint: raising it is how a race gets papered
- * over (VERIFY-002). Local pure folds still finish well under this bound.
+ * Default for a leaf test that explicitly requests timeout-and-forget. It is not passed to
+ * node:test's process-isolated `run()` wrapper: under Node 20 that wrapper represents the whole
+ * file, so doing so turns one leaf budget into a total budget for module load plus every test in the
+ * file. Pure folds and fake-clock trajectories that opt in still finish well under this bound.
  */
 export const PER_TEST_TIMEOUT_MS = budgetFromEnv('PER_TEST_TIMEOUT_MS', 2500);
 
 /**
- * Whole-suite ceiling, now a 兜底 rather than the hang criterion.
+ * Whole-suite ceiling owned by the external node:test supervisor, as a 兜底 rather than the
+ * hang criterion.
  *
  * Before W4 this WAS the real criterion: a test that hangs while holding a handle prevents
  * node:test from emitting `end`, so nothing else terminated the run. VERIFY-004 forbids that
@@ -179,9 +181,9 @@ export const SUITE_BACKSTOP_MS = budgetFromEnv('SUITE_BACKSTOP_MS', 300000);
 export const UNIT_VERDICT_SILENCE_MS = budgetFromEnv('UNIT_VERDICT_SILENCE_MS', 5000);
 
 /**
- * Per-test bound for an integration step whose test IS a real `dotnet fsi` F# project check.
+ * Verdict-silence basis for an integration step whose test IS a real `dotnet fsi` F# project check.
  *
- * Scoped on purpose. The integration default (`PER_TEST_TIMEOUT_MS + 5000`, 20s) is the right
+ * Scoped on purpose. The integration default (15s test budget + 5s grace = 20s) is the right
  * criterion for every step that only loads modules and asserts: at 20s such a step is hung, and
  * the SIGKILL plus the outstanding-file dump name the causal scene. Raising that global to fit a
  * compiler invocation would buy the FCS steps their headroom by removing the hang criterion from

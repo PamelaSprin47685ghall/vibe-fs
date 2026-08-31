@@ -10,6 +10,7 @@ import { relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { Watchdog } from './watchdog.js'
+import { SUITE_BACKSTOP_MS } from './time-budget.js'
 import { classifyVerdict } from '../../support/verdict-feed.mjs'
 
 export const NODE_TEST_INNER = fileURLToPath(new URL('../../support/run-inner.mjs', import.meta.url))
@@ -23,7 +24,7 @@ export const NODE_TEST_INNER = fileURLToPath(new URL('../../support/run-inner.mj
  *   logPrefix?: string,
  *   inner?: string,
  * }} opts
- * @returns {Promise<never>}
+ * @returns {Promise<void>}
  */
 export async function superviseNodeTest({
   files,
@@ -84,6 +85,16 @@ export async function superviseNodeTest({
     env,
   })
 
+  let backstopFired = false
+  const backstop = setTimeout(() => {
+    backstopFired = true
+    console.error(`${logPrefix}: suite exceeded the ${SUITE_BACKSTOP_MS}ms physical backstop`)
+    try {
+      if (child?.pid) process.kill(-child.pid, 'SIGKILL')
+    } catch {}
+  }, SUITE_BACKSTOP_MS)
+  backstop.unref()
+
   child.on('message', (event) => {
     if (event?.type === 'inner:drained') {
       drained = true
@@ -112,6 +123,7 @@ export async function superviseNodeTest({
   })
 
   watchdog.stop()
+  clearTimeout(backstop)
 
   reportDurationDistribution(logPrefix, durations)
 
@@ -120,6 +132,8 @@ export async function superviseNodeTest({
   )
 
   if (failed > 0) process.exit(1)
+
+  if (backstopFired) process.exit(1)
 
   if (exit.signal !== null) {
     console.error(
