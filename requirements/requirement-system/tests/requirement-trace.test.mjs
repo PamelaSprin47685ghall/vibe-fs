@@ -25,10 +25,11 @@ const REQUIREMENTS = join(ROOT, 'requirements')
 
 test('WHAT[REQUIREMENT-SYSTEM-018] scanner skips strings, comments, and template literals', () => {
   const src = [
+    "import test from 'node:test'",
     "// test('commented WHAT[A-001] must not fire')",
     "const s = \"test('string WHAT[A-002] must not fire')\"",
-    'const t = `test(`template WHAT[A-003] must not fire`)`',
-    "test('WHAT[A-004] real call fires')",
+    'const label = `test("template WHAT[A-003] must not fire")`',
+    "test('WHAT[A-004] real call fires', () => {})",
   ].join('\n')
   const calls = scanTestSource('<virtual>', src)
   assert.equal(calls.length, 1)
@@ -37,15 +38,15 @@ test('WHAT[REQUIREMENT-SYSTEM-018] scanner skips strings, comments, and template
   assert.equal(calls[0].state, 'active')
 })
 
-test('WHAT[REQUIREMENT-SYSTEM-018] scanner recognizes test.skip / test.todo / t.test forms', () => {
+test('WHAT[REQUIREMENT-SYSTEM-018] scanner recognizes supported root and bound context forms', () => {
   const src = [
+    "import test from 'node:test'",
     "test.skip('WHAT[B-001] skipped still carries a tag', () => {})",
     "test.todo('WHAT[B-002] todo is not proof', () => {})",
-    "t.test('WHAT[B-003] nested counts', () => {})",
-    "t.test.skip('WHAT[B-004] nested skip counts', () => {})",
-    "t.test.todo('WHAT[B-005] nested todo counts', () => {})",
-    "t.test.fails('WHAT[B-006] nested fails remains executable', () => {})",
     "test.only('WHAT[B-007] only remains executable', () => {})",
+    "test('WHAT[B-003] parent', async (t) => {",
+    "  await t.test('WHAT[B-004] nested counts', () => {})",
+    '})',
   ].join('\n')
   const calls = scanTestSource('<virtual>', src)
   assert.deepEqual(
@@ -53,21 +54,18 @@ test('WHAT[REQUIREMENT-SYSTEM-018] scanner recognizes test.skip / test.todo / t.
     [
       ['WHAT[B-001] skipped still carries a tag', 'skip'],
       ['WHAT[B-002] todo is not proof', 'todo'],
-      ['WHAT[B-003] nested counts', 'active'],
-      ['WHAT[B-004] nested skip counts', 'skip'],
-      ['WHAT[B-005] nested todo counts', 'todo'],
-      ['WHAT[B-006] nested fails remains executable', 'active'],
       ['WHAT[B-007] only remains executable', 'active'],
+      ['WHAT[B-003] parent', 'active'],
+      ['WHAT[B-004] nested counts', 'active'],
     ],
   )
 })
 
 test('WHAT[REQUIREMENT-SYSTEM-018] template titles with ${} nesting are parsed', () => {
   const src = [
-    "const bad = ['x', 'y']",
-    'for (const b of bad) {',
-    '  test(`WHAT[C-001] rejects ${b}`, () => {})',
-    '}',
+    "import test from 'node:test'",
+    "const bad = 'x'",
+    'test(`WHAT[C-001] rejects ${bad}`, () => {})',
   ].join('\n')
   const calls = scanTestSource('<virtual>', src)
   assert.equal(calls.length, 1)
@@ -77,6 +75,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] template titles with ${} nesting are parsed',
 
 test('WHAT[REQUIREMENT-SYSTEM-018] scanner rejects duplicate, non-leading, and missing primary tags', () => {
   const src = [
+    "import test from 'node:test'",
     "test('WHAT[E-001] one WHAT[E-001] duplicate', () => {})",
     "test('prose WHAT[E-002] is not a declaration', () => {})",
     'test(dynamicTitle, () => {})',
@@ -96,18 +95,21 @@ test('WHAT[REQUIREMENT-SYSTEM-018] scanner rejects duplicate, non-leading, and m
 
 test('WHAT[REQUIREMENT-SYSTEM-018] scanner ignores declarations, constructors, and methods named test', () => {
   const src = [
-    "function test('WHAT[G-001] declaration is not a call site') {}",
-    "new test('WHAT[G-002] constructor is not a proof case')",
+    "import test from 'node:test'",
     'class Fixture { test(title) {} }',
+    "new Fixture().test('WHAT[G-001] method is not a proof case')",
     "test('WHAT[G-003] actual call remains visible', () => {})",
   ].join('\n')
   const calls = scanTestSource('<virtual>', src)
   assert.deepEqual(calls.map((call) => call.title), ['WHAT[G-003] actual call remains visible'])
 })
 
-test('WHAT[REQUIREMENT-SYSTEM-018] scanner sees nested test calls in template expressions', () => {
+test('WHAT[REQUIREMENT-SYSTEM-018] scanner sees a bound nested test and skips lexical decoys', () => {
   const src = [
-    'test(`WHAT[F-001] outer ${t.test(\'WHAT[F-002] inner\', () => {})}`, () => {})',
+    "import test from 'node:test'",
+    "test('WHAT[F-001] outer', async (t) => {",
+    "  await t.test('WHAT[F-002] inner', () => {})",
+    '})',
     "const notCode = /t\\.test\\('WHAT[F-003] regex'\\)/",
     "/* t.test('WHAT[F-004] block comment') */",
   ].join('\n')
@@ -115,7 +117,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] scanner sees nested test calls in template ex
   assert.deepEqual(
     calls.map((call) => [call.title, call.whatIds, call.state]),
     [
-      ['WHAT[F-001] outer ${}', ['F-001'], 'active'],
+      ['WHAT[F-001] outer', ['F-001'], 'active'],
       ['WHAT[F-002] inner', ['F-002'], 'active'],
     ],
   )
@@ -136,6 +138,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] whatHeadings extracts PREFIX-NNN with title a
 
 test('WHAT[REQUIREMENT-SYSTEM-018] scanner skips regex literals containing quotes', () => {
   const src = [
+    "import test from 'node:test'",
     "const re = /join\\(root,\\s*'checks\\/([^']+)'\\)/g",
     "test('WHAT[D-001] call after a regex literal still fires', () => {})",
     'const division = 6 / 3',
@@ -147,6 +150,35 @@ test('WHAT[REQUIREMENT-SYSTEM-018] scanner skips regex literals containing quote
     [
       'WHAT[D-001] call after a regex literal still fires',
       'WHAT[D-002] division does not confuse the scanner',
+    ],
+  )
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-018] only executable node:test bindings with callbacks create active trace declarations', () => {
+  const src = [
+    "import test from 'node:test'",
+    "test('WHAT[BINDING-001] missing callback')",
+    "test('WHAT[BINDING-002] skipped by options', { skip: true }, () => {})",
+    "test('WHAT[BINDING-003] dynamic state', { skip: runtimeFlag }, () => {})",
+    '{',
+    '  const test = () => undefined',
+    "  test('WHAT[BINDING-004] shadowed root', () => {})",
+    '}',
+    'const register = () => {',
+    "  test('WHAT[BINDING-005] indirect registration', () => {})",
+    '}',
+    "t.test('WHAT[BINDING-006] unbound context', () => {})",
+  ].join('\n')
+
+  assert.deepEqual(
+    scanTestSource('<virtual>', src).map(({ title, state, issue }) => ({ title, state, issue })),
+    [
+      { title: 'WHAT[BINDING-001] missing callback', state: 'invalid', issue: 'MissingCallback' },
+      { title: 'WHAT[BINDING-002] skipped by options', state: 'skip', issue: null },
+      { title: 'WHAT[BINDING-003] dynamic state', state: 'invalid', issue: 'DynamicTestState' },
+      { title: 'WHAT[BINDING-004] shadowed root', state: 'invalid', issue: 'ShadowedTestBinding' },
+      { title: 'WHAT[BINDING-005] indirect registration', state: 'invalid', issue: 'IndirectRegistration' },
+      { title: 'WHAT[BINDING-006] unbound context', state: 'invalid', issue: 'UnboundTestContext' },
     ],
   )
 })

@@ -350,6 +350,61 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003c_usesSurface_rejects_dead_str
   assert.equal(usesSurface(deadDefaultSource, module), false, 'imported but never referenced default binding is not active')
 })
 
+test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003f_shadow_and_nonterminal_alias_cannot_forge_surface_use', () => {
+  const module = 'Owner/Surface.js'
+  const shadowed = [
+    `import { value } from '${distImport('../../../', module)}'`,
+    '{ const value = () => 0; value() }',
+  ].join('\n')
+  const nonterminalAlias = [
+    `import { value } from '${distImport('../../../', module)}'`,
+    'const copied = value',
+    'void copied',
+  ].join('\n')
+
+  assert.equal(usesSurface(shadowed, module), false)
+  assert.equal(usesSurface(nonterminalAlias, module), false)
+})
+
+test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003f_only_the_primary_owner_law_callback_can_bind_surface_evidence', () => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-surface-callback-binding-'))
+  const ownerWhat = join(temporaryRoot, 'requirements', 'owner', 'WHAT.md')
+  const source = join(temporaryRoot, 'src', 'Wanxiangshu', 'Owner', 'Surface.fs')
+  const fsproj = join(temporaryRoot, 'src', 'Wanxiangshu', 'Wanxiangshu.fsproj')
+  const dist = join(temporaryRoot, 'dist', 'Owner', 'Surface.js')
+  const testFile = join(temporaryRoot, 'requirements', 'owner', 'tests', 'owner.test.mjs')
+  for (const path of [ownerWhat, source, dist, testFile]) mkdirSync(dirname(path), { recursive: true })
+
+  try {
+    writeFileSync(ownerWhat, '# WHAT\n\n## OWNER-001: owner law\n\n## OWNER-002: decoy law\n')
+    writeFileSync(source, 'module Owner.Surface\n')
+    writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
+    writeFileSync(dist, 'export const value = () => 1\n')
+    writeFileSync(testFile, [
+      "import test from 'node:test'",
+      `import { value } from '${distImport('../../../', 'Owner/Surface.js')}'`,
+      'const deadHelper = () => value()',
+      "test('WHAT[OWNER-001] owner law does not call production', () => { void deadHelper })",
+      "test('WHAT[OWNER-002] decoy law calls production', () => { value() })",
+    ].join('\n'))
+
+    const entry = {
+      module: 'Owner/Surface.js',
+      owner: 'owner',
+      laws: ['OWNER-001'],
+      source: 'src/Wanxiangshu/Owner/Surface.fs',
+      representation: 'json',
+      kind: 'pure',
+    }
+    assert.match(
+      validateSurfaceManifest([entry], temporaryRoot).join('\n'),
+      /no active owner-law declaration has a production-bound surface use/,
+    )
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true })
+  }
+})
+
 // ── 003d: per-consumer unauthorized import rejection ───────────────────────
 // Registration grants no blanket import authority. A test that actively uses a
 // surface must carry a matching law WHAT tag in the owner's tests directory,
