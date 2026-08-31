@@ -191,14 +191,14 @@ test('WHAT[PREFIX-STABILITY-010] H13_03_same_placement_reentry_appends_no_pair',
   const opened = await openJournal(dir)
   try {
     const session = 'h13-03'
-    const raw = [userMsg('msg_1')]
+    const raw = [userMsg('u1'), assistantText('a1'), userMsg('msg_1')]
 
     const once = await inject(opened.journal, session, raw)
-    assert.equal(once.length, 2)
+    assert.equal(once.length, 4)
     assert.equal(durablePairCount(opened.journal, session), 1)
 
     const twice = await inject(opened.journal, session, [...once])
-    assert.equal(twice.length, 2, 'same placement must replay, not append')
+    assert.equal(twice.length, 4, 'same placement must replay, not append')
     assert.equal(pairMessages(twice).length, 1)
     assert.deepEqual(twice, once)
     assert.equal(durablePairCount(opened.journal, session), 1, 'journal must hold exactly one anchored fact')
@@ -305,6 +305,8 @@ test('WHAT[PREFIX-STABILITY-010] H13_05b_xwire_drop_leading_continue_still_commi
   const opened = await openJournal(dir)
   try {
     const session = 'h13-05b'
+    const user0 = userMsg('u0', 'opening')
+    const asst0 = assistantText('a0')
     const user1 = userMsg('u1', 'X-B round 1')
     const failAsst = { info: { id: 'a1', role: 'assistant' }, parts: [] }
     const cont = userMsg('u2', '# The previous attempt did not complete.')
@@ -313,7 +315,7 @@ test('WHAT[PREFIX-STABILITY-010] H13_05b_xwire_drop_leading_continue_still_commi
       parts: [{ type: 'text', text: '# Opening\nX-B round 1\n\n# Chronicle\nframe' }],
     }
 
-    const wire1 = await inject(opened.journal, session, [user1])
+    const wire1 = await inject(opened.journal, session, [user0, asst0, user1])
     assert.equal(durablePairCount(opened.journal, session), 1)
 
     // DropLeading removes u1 (pair1's Before(u1) anchors).
@@ -327,12 +329,12 @@ test('WHAT[PREFIX-STABILITY-010] H13_05b_xwire_drop_leading_continue_still_commi
       'pair1 anchors dropped with covered prefix — must not reappear',
     )
     // Full transcript (no drop) still replays pair1; pure u1 re-entry is byte-identical.
-    const restored = await inject(opened.journal, session, [user1, failAsst, cont])
+    const restored = await inject(opened.journal, session, [user0, asst0, user1, failAsst, cont])
     assert.ok(
       restored.some((m) => m.parts?.[0]?.callID === call1),
       'full transcript must re-place pair1 at its durable anchor',
     )
-    assertWireEqual(wire1, await inject(opened.journal, session, [user1]), 'H13-05b same placement on u1 is pure replay')
+    assertWireEqual(wire1, await inject(opened.journal, session, [user0, asst0, user1]), 'H13-05b same placement on u1 is pure replay')
   } finally {
     pair.disposeJournal(opened.journal)
     rmSync(dir, { recursive: true, force: true })
@@ -344,21 +346,21 @@ test('WHAT[PREFIX-STABILITY-010] H13_05b_xwire_drop_leading_continue_still_commi
 test('WHAT[PREFIX-STABILITY-010] H13_06_prior_tip_only_affects_the_new_pair', async () => {
   const session = 'h13-06'
 
-  const wire1 = await inject(undefined, session, [userMsg('u1')], 'guideline')
+  const wire1 = await inject(undefined, session, [userMsg('u0'), assistantText('a0'), userMsg('u1')], 'guideline')
   const call1 = stableCallId(session, 1n)
-  assert.equal(wire1[0].parts[0].callID, call1)
-  assert.equal(wire1[0].parts[0].state.output, skillContent('guideline'))
+  assert.equal(wire1[2].parts[0].callID, call1)
+  assert.equal(wire1[2].parts[0].state.output, skillContent('guideline'))
 
   const wire2 = await inject(
     undefined,
     session,
-    [userMsg('u1'), assistantText('a1'), userMsg('u2')],
+    [userMsg('u0'), assistantText('a0'), userMsg('u1'), assistantText('a1'), userMsg('u2')],
     'tip2\n\nguideline',
   )
   const call2 = stableCallId(session, 2n)
-  assert.equal(wire2[0].parts[0].state.output, skillContent('guideline'), 'pair1 marker bytes must never change')
-  assert.equal(wire2[3].parts[0].state.output, skillContent('tip2\n\nguideline'))
-  assert.equal(wire2[3].parts[0].callID, call2)
+  assert.equal(wire2[2].parts[0].state.output, skillContent('guideline'), 'pair1 marker bytes must never change')
+  assert.equal(wire2[5].parts[0].state.output, skillContent('tip2\n\nguideline'))
+  assert.equal(wire2[5].parts[0].callID, call2)
   assert.notEqual(call1, call2)
 
   assertPrefixLaw(wire1, wire2, 'H13-06 prior tip isolation')

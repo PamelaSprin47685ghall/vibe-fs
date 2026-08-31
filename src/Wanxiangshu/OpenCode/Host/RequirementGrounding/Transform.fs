@@ -249,13 +249,17 @@ module RequirementGroundingTransform =
             Task.FromResult(Ok(replay providerId realMessages history))
         else
             taskResult {
-                let! callGap, resultGap = PairProgrammingThoughtTransform.decideCurrentPlacement realMessages
-                do! appendRequested journal sessionId callGap resultGap pending
+                let! placementOpt = PairProgrammingThoughtTransform.decideCurrentPlacement realMessages
 
-                let committed =
-                    RequirementGroundingRuntime.occurrences journal (SessionId.create sessionId)
+                match placementOpt with
+                | None -> return replay providerId realMessages history
+                | Some(callGap, resultGap) ->
+                    do! appendRequested journal sessionId callGap resultGap pending
 
-                return replay providerId realMessages committed
+                    let committed =
+                        RequirementGroundingRuntime.occurrences journal (SessionId.create sessionId)
+
+                    return replay providerId realMessages committed
             }
 
     let tryProject
