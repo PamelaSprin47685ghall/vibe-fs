@@ -78,6 +78,16 @@ test('WHAT[VERIFICATION-SYSTEM-002] l4 has exactly one e2e entry in the ladder',
   assert.ok(command.includes('tests/e2e/entry.test.mjs'), 'the sole e2e mention must be entry.test.mjs')
 })
 
+test('WHAT[VERIFICATION-SYSTEM-008] Wireit build fingerprint covers the repository-derived envelope', () => {
+  const { wireit } = JSON.parse(read('package.json'))
+  assert.deepEqual(
+    wireit.build?.files,
+    ['**/*', '!dist/**', '!.fable-build/**'],
+    'build must fingerprint the whole workspace because LoopDetectorEnvelope derives from every tracked source document',
+  )
+  assert.deepEqual(wireit.build?.output, ['dist/**'])
+})
+
 test('WHAT[VERIFICATION-SYSTEM-009] every ladder step target exists as a real file', () => {
   // 层序里的每个入口都必须是真实文件：指向不存在文件的命令恒为「没跑到」，
   // 层序 pin 就退化成文字装饰（VERIFY-004 静态门禁必须命中真实路径）。
