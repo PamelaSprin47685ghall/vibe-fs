@@ -8,6 +8,8 @@
 
 `tests/proof-ladder.test.mjs` 对全局构建与测试命令链（`package.json` 中的 `format-build-test` 及 `scripts/check.mjs`）进行强约束：
 - 严格锁定第 0 层静态门禁、第 1–3 层纯逻辑与时序单元测试、第 4 层单入点物理 Long Stroke 与第 5 层 Release 构建的执行顺序。
+- `format/check/owner-dep/build` 允许经 Wireit 缓存调度，但 proof 同时锁定顶层 `npm run` 顺序与每个 Wireit step 的 exact command；间接调度不得隐藏、替换或跳过 Fantomas、text gate、FCS gate 与 clean Fable build。
+- build fingerprint 覆盖整个 workspace，仅排除自身 `dist/` 与 `.fable-build/` 输出；因为 `LoopDetectorEnvelope` 从 Git 跟踪的全部源码/文档语料派生，按固定目录枚举输入会让新增目录或文档修改错误复用旧 artifact。
 - 确保 `scripts/check.mjs` 中注册的所有门禁脚本路径在磁盘上真实存在，且任何门禁失败时其非零退出码均能正确向上传播（fail-closed）。
 - `scripts/checks/proof-levels.json` 独立保存精确 `(path, title, what_id) → level` 分类；共享 resolver 对缺失或重复键返回无权威结果，registry validator 阻断形状、层序与键歧义，外部登记行只能匹配该分类而不能自我改标。
 - `scripts/build.mjs` 每次调用都持有跨进程 build lock，先删除上一轮 `dist/` artifact tree，再以显式 `Debug` configuration 执行一次真实 Fable compile；compiler 成功退出后才验证 `dist` 与 Surface Manifest。源码删除因此不会留下可被 package 收走的陈旧 JS。configuration 不依赖 Fable 的 watch/one-shot 默认值。不存在 watch-daemon、source-touch barrier、ack、artifact-exists fast path 或 wall-clock freshness 猜测，因此旧 `dist` 不能冒充当前源码的编译结果。
@@ -17,6 +19,7 @@
 `tests/e2e-watchdog-feed.test.mjs` 与因果原语套件负责守卫时序推进契约：
 - 确保 E2E 物理测试中看门狗计时器仅由明确的因果事件（如目标事实增长、检查点达成）驱动续期。
 - 严禁顶层测试用例直接调用底层计时器的内部 advance 接口，防止由于传输层噪声或背景任务活动导致看门狗被非法延期。
+- unit/integration/package 的 process-isolated node:test child 由外部 supervisor 管理 verdict-silence 与 suite backstop；`run-inner.mjs` 不把叶子预算下发为整份文件的 timeout，也不把共享 AbortSignal 扇出到全部文件 worker。需要 timeout-and-forget 的叶子 proof 在自己的 `test` options 中声明 timeout。
 
 ### 3. 物理契约显式声明（`physical-contract`）
 
@@ -49,7 +52,7 @@
 | VERIFICATION-SYSTEM-005 | `requirements/verification-system/tests/walk-fail-closed.test.mjs::WHAT[VERIFICATION-SYSTEM-005] walk throws on a missing root instead of returning an empty array` |
 | VERIFICATION-SYSTEM-006 | `requirements/verification-system/tests/e2e-watchdog-feed.test.mjs::WHAT[VERIFICATION-SYSTEM-006] top-level e2e tests never feed watchdog directly` |
 | VERIFICATION-SYSTEM-007 | `requirements/verification-system/tests/temporal-harness.test.mjs::WHAT[VERIFICATION-SYSTEM-007] deterministic queue enumerates races explicitly`；`requirements/verification-system/tests/identity-capacity-interleaving.test.mjs::WHAT[VERIFICATION-SYSTEM-007] executes every valid identity/admission/capacity causal interleaving`；`requirements/verification-system/tests/identity-capacity-interleaving.test.mjs::WHAT[VERIFICATION-SYSTEM-007] rejects every causally invalid ordering before effects`；`requirements/verification-system/tests/identity-capacity-interleaving.property.test.mjs::WHAT[VERIFICATION-SYSTEM-007] deterministic families preserve replay, restart, identity, and fence laws` |
-| VERIFICATION-SYSTEM-008 | `requirements/verification-system/tests/guide-contract.test.mjs::WHAT[VERIFICATION-SYSTEM-008] AgentProgram publishes its flow entrypoints`；`requirements/verification-system/tests/build-freshness.test.mjs::WHAT[VERIFICATION-SYSTEM-008] Fable build compiles once and never accepts watch-daemon freshness guesses` |
+| VERIFICATION-SYSTEM-008 | `requirements/verification-system/tests/guide-contract.test.mjs::WHAT[VERIFICATION-SYSTEM-008] AgentProgram publishes its flow entrypoints`；`requirements/verification-system/tests/build-freshness.test.mjs::WHAT[VERIFICATION-SYSTEM-008] Fable build compiles once and never accepts watch-daemon freshness guesses`；`requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-008] Wireit build fingerprint covers the repository-derived envelope` |
 | VERIFICATION-SYSTEM-009 | `requirements/verification-system/tests/integration-entry-coverage.test.mjs::WHAT[VERIFICATION-SYSTEM-009] integration entry coverage accepts an exact reachable set`；`requirements/verification-system/tests/repository-closure-gates.test.mjs::WHAT[VERIFICATION-SYSTEM-009] repository closure gates reject a missing semantic owner and package member` |
 | VERIFICATION-SYSTEM-010 | `requirements/verification-system/tests/deadcode-scan.test.mjs::WHAT[VERIFICATION-SYSTEM-010] deadcode_baseline_allows_only_existing_named_debt` |
 | VERIFICATION-SYSTEM-011 | `requirements/verification-system/tests/coverage-gate.test.mjs::WHAT[VERIFICATION-SYSTEM-011] parseCoverageThreshold accepts valid positive finite numbers` |

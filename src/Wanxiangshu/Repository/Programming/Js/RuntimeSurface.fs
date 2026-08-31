@@ -8,17 +8,19 @@ open System.Threading.Tasks
 [<RequireQualifiedAccess>]
 module JsRuntimeSurface =
 
-    type private JsBindingsHandle(api: obj, staging: ResizeArray<JsStagedMutation>, modelReads: ResizeArray<string>) =
+    type private JsBindingsHandle
+        (api: obj, staging: ResizeArray<JsStagedMutation>, readSnapshots: ResizeArray<JsReadSnapshot>) =
+
         member _.Api = api
         member _.Staging = staging
-        member _.ModelReads = modelReads
+        member _.ReadSnapshots = readSnapshots
 
     let createApi (root: string) : obj =
         // DSL-MUTABLE: buffer — JS mutation staging buffer handed off in handle
         let staging = ResizeArray<JsStagedMutation>()
-        let modelReads = ResizeArray<string>()
-        let api = JsToolsBindings.createApi root staging modelReads
-        box (JsBindingsHandle(api, staging, modelReads))
+        let readSnapshots = ResizeArray<JsReadSnapshot>()
+        let api = JsToolsBindings.createApi root staging readSnapshots
+        box (JsBindingsHandle(api, staging, readSnapshots))
 
     let api (handle: obj) : obj = (unbox<JsBindingsHandle> handle).Api
 
@@ -33,7 +35,10 @@ module JsRuntimeSurface =
         |> Seq.toArray
 
     let readPaths (handle: obj) : string array =
-        (unbox<JsBindingsHandle> handle).ModelReads |> Seq.distinct |> Seq.toArray
+        (unbox<JsBindingsHandle> handle).ReadSnapshots
+        |> Seq.map _.Path
+        |> Seq.distinct
+        |> Seq.toArray
 
     let private failureResult failure =
         box

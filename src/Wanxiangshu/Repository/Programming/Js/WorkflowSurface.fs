@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 
 /// Opaque workflow outcome. The semantic observation functions expose the
@@ -14,7 +16,23 @@ module JsWorkflowSurface =
     let private outcomeOf (value: obj) =
         (unbox<JsWorkflowOutcomeHandle> value).Value
 
-    let run
+    [<Emit("$0($1,$2)")>]
+    let private apply2 (callback: obj) (readPaths: obj) (effectPaths: obj) : obj = jsNative
+
+    [<Emit("Promise.resolve($0)")>]
+    let private promiseOf (value: obj) : JS.Promise<obj> = jsNative
+
+    let private observationOf callback readPaths effectPaths =
+        task {
+            let! _ =
+                unbox<Task<obj>> (
+                    promiseOf (apply2 callback (box (List.toArray readPaths)) (box (List.toArray effectPaths)))
+                )
+
+            return ()
+        }
+
+    let private runWithObservation
         (workspaceRoot: string)
         (role: string)
         (language: string)
@@ -23,6 +41,7 @@ module JsWorkflowSurface =
         (deadlineEpochMs: int64)
         (outputBoundBytes: int)
         (store: obj)
+        (fileAccessObservation: JsToolWorkflow.FileAccessObservation option)
         : Task<obj> =
         task {
             match JsGeneratorSurface.typedRole role language with
@@ -35,17 +54,63 @@ module JsWorkflowSurface =
                         Some(JsTransactionSurface.persistenceOf store)
 
                 let! outcome =
-                    JsToolWorkflow.run
-                        workspaceRoot
-                        surface.BaseClassSource
-                        program
-                        deadlineMs
-                        deadlineEpochMs
-                        outputBoundBytes
-                        persistence
+                    match fileAccessObservation with
+                    | None ->
+                        JsToolWorkflow.run
+                            workspaceRoot
+                            surface.BaseClassSource
+                            program
+                            deadlineMs
+                            deadlineEpochMs
+                            outputBoundBytes
+                            persistence
+                    | Some observe ->
+                        JsToolWorkflow.runWithFileAccessObservation
+                            workspaceRoot
+                            surface.BaseClassSource
+                            program
+                            deadlineMs
+                            deadlineEpochMs
+                            outputBoundBytes
+                            persistence
+                            observe
 
                 return box (JsWorkflowOutcomeHandle outcome)
         }
+
+    let run
+        (workspaceRoot: string)
+        (role: string)
+        (language: string)
+        (program: string)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (outputBoundBytes: int)
+        (store: obj)
+        : Task<obj> =
+        runWithObservation workspaceRoot role language program deadlineMs deadlineEpochMs outputBoundBytes store None
+
+    let runObserved
+        (workspaceRoot: string)
+        (role: string)
+        (language: string)
+        (program: string)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (outputBoundBytes: int)
+        (store: obj)
+        (fileAccessObservation: obj)
+        : Task<obj> =
+        runWithObservation
+            workspaceRoot
+            role
+            language
+            program
+            deadlineMs
+            deadlineEpochMs
+            outputBoundBytes
+            store
+            (Some(observationOf fileAccessObservation))
 
     let caseName (value: obj) : string =
         match outcomeOf value with

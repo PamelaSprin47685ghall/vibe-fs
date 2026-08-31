@@ -115,12 +115,18 @@ type Orchestrator
         |> Option.map (fun port -> port.Snapshot())
         |> Option.defaultValue Fold.empty
 
+    let acquirePublishGate () =
+        task {
+            let! gate = IntegrationGate.acquire gatePath
+            return { Release = fun () -> gate.Release() }
+        }
+
     let programDeps: OrchestratorProgramDeps =
         { Git = git
           Manager = manager
           AppendFact = appendFact
           Snapshot = snapshot
-          GatePath = gatePath }
+          AcquirePublishGate = acquirePublishGate }
 
     let startPublication (job: ManagerJob) =
         mailbox.StartJob()
