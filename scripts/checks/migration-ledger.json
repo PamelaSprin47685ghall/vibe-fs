@@ -2123,6 +2123,7 @@
       "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfig.fs",
       "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfigSurface.fs",
       "src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs",
+      "src/Wanxiangshu/OpenCode/Host/TerminalPolicySurface.fs",
       "src/Wanxiangshu/OpenCode/JoinResultRendererSurface.fs",
       "src/Wanxiangshu/OpenCode/Plugin/Plugin.fs",
       "src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs",

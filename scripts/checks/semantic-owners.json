@@ -1913,6 +1913,10 @@
       "owner": "interaction-authority"
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/TerminalPolicySurface.fs",
+      "owner": "interaction-authority"
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Host/TurnRuntimePreparation.fs",
       "owner": "managed-session-lifecycle"
     },

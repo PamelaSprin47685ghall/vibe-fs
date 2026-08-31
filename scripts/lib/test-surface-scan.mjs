@@ -1083,6 +1083,14 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'OpenCode/Host/TerminalPolicySurface.js',
+    owner: 'managed-session-lifecycle',
+    laws: ['MANAGED-SESSION-006'],
+    source: 'src/Wanxiangshu/OpenCode/Host/TerminalPolicySurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'Participant/Provider/Projection/Surface.js',
     owner: 'provider-projection',
     laws: [

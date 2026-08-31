@@ -527,6 +527,7 @@
     <Compile Include="Mission/Review/Judgement/Workflow.fs"/>
     <Compile Include="Mission/Review/OpenCode/TerminalAwait.fs"/>
     <Compile Include="OpenCode/Host/TerminalPolicy.fs"/>
+    <Compile Include="OpenCode/Host/TerminalPolicySurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fs"/>
     <Compile Include="Enforcer/Continuation.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Workflow.fs"/>
