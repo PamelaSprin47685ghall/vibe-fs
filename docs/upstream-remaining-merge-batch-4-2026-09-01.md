@@ -4,6 +4,8 @@
 
 Batch 4 closes M1, the JS transaction correctness module, against `upstream/master@fcd5ab11b`.
 
+Upstream review: [PR #22](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/22).
+
 The change does not replay the pre-refactor patch. It maps the three retained requirements to the refactored owners:
 
 - `REPOSITORY-PROGRAMMING-014` → immutable read evidence and exact commit preflight.
