@@ -673,11 +673,15 @@ module PairProgrammingThoughtTransform =
             Ok(gapCtor address, gapCtor address)
         | None -> Error errorMsg
 
-    let private decideFromBatchEnds (lastIsUser: bool) (restIsEmpty: bool) (last: obj) (resultRun: obj list) (callRun: obj list) =
+    let private decideFromBatchEnds
+        (lastIsUser: bool)
+        (restIsEmpty: bool)
+        (last: obj)
+        (resultRun: obj list)
+        (callRun: obj list)
+        =
         match List.rev resultRun, List.rev callRun with
-        | lastResult :: _, lastCall :: _ ->
-            gapsAfterToolBatch lastCall lastResult
-            |> Result.map Some
+        | lastResult :: _, lastCall :: _ -> gapsAfterToolBatch lastCall lastResult |> Result.map Some
         | _ when lastIsUser && restIsEmpty ->
             // When there is nothing before the last user message, do not inject
             // (matches cursor path) to avoid beginning the transcript with a tool call.

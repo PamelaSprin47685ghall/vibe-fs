@@ -73,11 +73,14 @@ module ChatParamsHook =
         if isNull input then
             None
         elif not (isNull input?messageID) then
-            normalizeText (string input?messageID) |> Option.map PhysicalUserMessageId.create
+            normalizeText (string input?messageID)
+            |> Option.map PhysicalUserMessageId.create
         elif not (isNull input?messageId) then
-            normalizeText (string input?messageId) |> Option.map PhysicalUserMessageId.create
+            normalizeText (string input?messageId)
+            |> Option.map PhysicalUserMessageId.create
         elif not (isNull input?message) && not (isNull input?message?id) then
-            normalizeText (string input?message?id) |> Option.map PhysicalUserMessageId.create
+            normalizeText (string input?message?id)
+            |> Option.map PhysicalUserMessageId.create
         elif not (isNull input?info) && not (isNull input?info?id) then
             normalizeText (string input?info?id) |> Option.map PhysicalUserMessageId.create
         else
@@ -124,7 +127,11 @@ module ChatParamsHook =
                     normalizeText (string input?agent)
                 elif not (isNull input) && not (isNull input?info) && not (isNull input?info?agent) then
                     normalizeText (string input?info?agent)
-                elif not (isNull input) && not (isNull input?message) && not (isNull input?message?agent) then
+                elif
+                    not (isNull input)
+                    && not (isNull input?message)
+                    && not (isNull input?message?agent)
+                then
                     normalizeText (string input?message?agent)
                 else
                     None

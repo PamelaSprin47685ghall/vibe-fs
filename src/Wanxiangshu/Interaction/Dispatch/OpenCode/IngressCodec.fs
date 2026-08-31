@@ -178,9 +178,7 @@ module PromptIngressCodec =
             |> List.tryPick id
             |> Option.filter (String.IsNullOrWhiteSpace >> not)
             |> Option.map (fun v -> v.Trim())
-            |> Option.orElseWith (fun () ->
-                sessionIdOf input output
-                |> Option.bind SessionExecutionBinding.tryAgent)
+            |> Option.orElseWith (fun () -> sessionIdOf input output |> Option.bind SessionExecutionBinding.tryAgent)
 
         { SessionId = sessionIdOf input output
           PhysicalUserMessageId = messageIdOf input output
