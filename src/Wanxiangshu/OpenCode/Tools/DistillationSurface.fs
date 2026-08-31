@@ -54,6 +54,7 @@ module DistillationSurface =
                managedAgent = managedAgentName
                internalRuntime = isInternalRuntime
                publicTarget = canBeForkedOrHorizonTarget
+               handleRole = distillerRole.ToString()
                bloggerCompanion = hasBloggerCompanion
                permissions = permissionLabels
                executionTool = executionToolName |}

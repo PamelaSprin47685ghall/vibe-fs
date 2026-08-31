@@ -853,6 +853,10 @@
       "owner": "managed-session-lifecycle"
     },
     {
+      "path": "src/Wanxiangshu/Execution/Session/Attachment/SatelliteSurface.fs",
+      "owner": "managed-session-lifecycle"
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Session/ChatExecution/Admission.fs",
       "owner": "managed-chat-execution"
     },

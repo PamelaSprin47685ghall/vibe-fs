@@ -428,6 +428,7 @@
     <Compile Include="Repository/Investigation/WarmStartSurface.fs"/>
     <Compile Include="Strength/OpenCode/Replay.fs"/>
     <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fs"/>
+    <Compile Include="Execution/Session/Attachment/SatelliteSurface.fs"/>
     <Compile Include="Interaction/Dispatch/PhysicalAcceptance.fs"/>
     <Compile Include="Interaction/Dispatch/Dispatcher.fs"/>
     <Compile Include="OpenCode/Host/ChatAdmission/Transaction.fs"/>
