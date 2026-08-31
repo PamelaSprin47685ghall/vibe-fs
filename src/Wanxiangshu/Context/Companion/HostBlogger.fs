@@ -63,7 +63,7 @@ open Wanxiangshu.Resources
 
 module internal CompanionHostBlogger =
 
-    type BloggerDeps =
+    type internal BloggerDeps =
         { Sessions: ISessionHostPort
           PrimaryId: SessionId
           Durable: ICompanionDurablePort option
