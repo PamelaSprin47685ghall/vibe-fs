@@ -249,7 +249,9 @@ module GroundingCatalog =
 
     let materialsForExactPaths workspace paths =
         let root = canonicalWorkspace workspace
-        let relativePaths = paths |> List.choose (workspaceRelative workspace root) |> Set.ofList
+
+        let relativePaths =
+            paths |> List.choose (workspaceRelative workspace root) |> Set.ofList
 
         discover root
         |> List.collect (fun package ->
