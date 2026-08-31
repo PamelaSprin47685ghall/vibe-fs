@@ -124,52 +124,58 @@ test('WHAT[DELEG-010] SYNC_RUNTIME_same_role_reuses_one_child_after_completion',
   } finally { sync.dispose(h) }
 })
 
-for (const role of ['Inspector', 'Coder']) {
-  test(`WHAT[DELEG-024] SYNC_RUNTIME_${role.toLowerCase()}_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta`, async () => {
-    const owner = `owner-handoff-${role.toLowerCase()}`
-    const h = await live(owner)
-    try {
-      await sync.captureOwnerOpening(h, owner, 'ROOT-OPENING-MARKER')
+const verifyReusableHandoff = async (role) => {
+  const owner = `owner-handoff-${role.toLowerCase()}`
+  const h = await live(owner)
+  try {
+    await sync.captureOwnerOpening(h, owner, 'ROOT-OPENING-MARKER')
 
-      const first = sync.invoke(h, owner, role, 'FIRST-CHARGE')
-      await waitForPromptCount(h, owner, role, 1)
-      assert.equal(sync.handoffFrontier(h, owner, role), null)
-      assert.match(sync.prompt(h, owner, role, 0), /ROOT-OPENING-MARKER/)
+    const first = sync.invoke(h, owner, role, 'FIRST-CHARGE')
+    await waitForPromptCount(h, owner, role, 1)
+    assert.equal(sync.handoffFrontier(h, owner, role), null)
+    assert.match(sync.prompt(h, owner, role, 0), /ROOT-OPENING-MARKER/)
 
-      assert.equal(await settle(h, owner, role, 'FIRST-ANSWER', 'run-first'), true)
-      const firstResult = await first
-      assert.equal(firstResult.ok, true)
-      assert.match(firstResult.value, /FIRST-ANSWER/)
-      const firstFrontier = sync.handoffFrontier(h, owner, role)
-      assert.notEqual(firstFrontier, null)
+    assert.equal(await settle(h, owner, role, 'FIRST-ANSWER', 'run-first'), true)
+    const firstResult = await first
+    assert.equal(firstResult.ok, true)
+    assert.match(firstResult.value, /FIRST-ANSWER/)
+    const firstFrontier = sync.handoffFrontier(h, owner, role)
+    assert.notEqual(firstFrontier, null)
 
-      await sync.captureOwnerDeltaPart(h, owner, 'PARENT-DELTA-ONLY-MARKER', 'parent-run-2')
+    await sync.captureOwnerDeltaPart(h, owner, 'PARENT-DELTA-ONLY-MARKER', 'parent-run-2')
 
-      const second = sync.invoke(h, owner, role, 'SECOND-CHARGE')
-      await waitForPromptCount(h, owner, role, 2)
-      const secondPrompt = sync.prompt(h, owner, role, 1)
-      assert.match(secondPrompt, /SECOND-CHARGE/)
-      assert.match(secondPrompt, /parent_delta_work_record\s*=/)
-      assert.match(secondPrompt, /PARENT-DELTA-ONLY-MARKER/)
-      assert.doesNotMatch(secondPrompt, /ROOT-OPENING-MARKER/)
-      assert.equal(sync.handoffFrontier(h, owner, role), firstFrontier)
+    const second = sync.invoke(h, owner, role, 'SECOND-CHARGE')
+    await waitForPromptCount(h, owner, role, 2)
+    const secondPrompt = sync.prompt(h, owner, role, 1)
+    assert.match(secondPrompt, /SECOND-CHARGE/)
+    assert.match(secondPrompt, /parent_delta_work_record\s*=/)
+    assert.match(secondPrompt, /PARENT-DELTA-ONLY-MARKER/)
+    assert.doesNotMatch(secondPrompt, /ROOT-OPENING-MARKER/)
+    assert.equal(sync.handoffFrontier(h, owner, role), firstFrontier)
 
-      assert.equal(
-        await sync.settleWithAuthorityRoot(h, owner, role, 'STALE-ANSWER', 'run-stale', 'old-authority-root'),
-        false,
-      )
-      assert.deepEqual(await remainsPending(second), { kind: 'pending' })
+    assert.equal(
+      await sync.settleWithAuthorityRoot(h, owner, role, 'STALE-ANSWER', 'run-stale', 'old-authority-root'),
+      false,
+    )
+    assert.deepEqual(await remainsPending(second), { kind: 'pending' })
 
-      assert.equal(await settle(h, owner, role, 'SECOND-ANSWER', 'run-second'), true)
-      const secondResult = await second
-      assert.equal(secondResult.ok, true)
-      assert.match(secondResult.value, /SECOND-ANSWER/)
-      assert.doesNotMatch(secondResult.value, /FIRST-ANSWER/)
-      assert.notEqual(sync.handoffFrontier(h, owner, role), firstFrontier)
-      assert.equal(sync.childCount(h), 1)
-    } finally { sync.dispose(h) }
-  })
+    assert.equal(await settle(h, owner, role, 'SECOND-ANSWER', 'run-second'), true)
+    const secondResult = await second
+    assert.equal(secondResult.ok, true)
+    assert.match(secondResult.value, /SECOND-ANSWER/)
+    assert.doesNotMatch(secondResult.value, /FIRST-ANSWER/)
+    assert.notEqual(sync.handoffFrontier(h, owner, role), firstFrontier)
+    assert.equal(sync.childCount(h), 1)
+  } finally { sync.dispose(h) }
 }
+
+test('WHAT[DELEG-024] SYNC_RUNTIME_inspector_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta', async () => {
+  await verifyReusableHandoff('Inspector')
+})
+
+test('WHAT[DELEG-024] SYNC_RUNTIME_coder_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta', async () => {
+  await verifyReusableHandoff('Coder')
+})
 
 
 test('WHAT[DELEG-008] SYNC_RUNTIME_provider_tool_call_collection_preserves_role_order', () => {
@@ -269,4 +275,3 @@ test('WHAT[DELEG-023] SYNC_RUNTIME_transient_turn_failure_stays_child_local_unti
   assert.equal(completed.result, 'WorkRecord')
   assert.equal(completed.callerFailure, false)
 })
-
