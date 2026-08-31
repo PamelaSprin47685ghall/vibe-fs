@@ -32,29 +32,20 @@ module PromptIngressCodec =
             let value = unbox<string> (source?(name))
             if String.IsNullOrWhiteSpace value then None else Some value
 
+    let private childObject (source: obj) (name: string) : obj =
+        if isNull source then null else source?(name)
+
     let private agentOf (source: obj) : string option =
-        if isNull source then
-            None
-        elif not (isNull source?agent) then
-            readString source "agent"
-        elif not (isNull source?info) && not (isNull source?info?agent) then
-            readString source?info "agent"
-        elif not (isNull source?message) then
-            if not (isNull source?message?agent) then
-                readString source?message "agent"
-            elif not (isNull source?message?info) && not (isNull source?message?info?agent) then
-                readString source?message?info "agent"
-            else
-                None
-        elif not (isNull source?properties) then
-            if not (isNull source?properties?agent) then
-                readString source?properties "agent"
-            elif not (isNull source?properties?info) && not (isNull source?properties?info?agent) then
-                readString source?properties?info "agent"
-            else
-                None
-        else
-            None
+        let message = childObject source "message"
+        let properties = childObject source "properties"
+
+        [ source
+          childObject source "info"
+          message
+          childObject message "info"
+          properties
+          childObject properties "info" ]
+        |> List.tryPick (fun candidate -> readString candidate "agent")
 
     let private metadataOf (source: obj) (key: string) : string option =
         if isNull source || isNull source?metadata then

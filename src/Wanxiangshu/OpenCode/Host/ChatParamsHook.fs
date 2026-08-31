@@ -22,6 +22,9 @@ module ChatParamsHook =
         else
             normalizeText (string value?(name))
 
+    let private childObject (value: obj) (name: string) : obj =
+        if isNull value then null else value?(name)
+
     let private extractModel (input: obj) =
         let rawModel: obj = input?model
         let message: obj = input?message
@@ -87,12 +90,10 @@ module ChatParamsHook =
             None
 
     let private isDisclosureOnlyMaterial input =
-        match trySessionId input with
-        | Some sessionId ->
-            match tryPhysicalUserMessageId input with
-            | Some physicalId -> ExplicitResumeSuppression.isPhysicalMaterial sessionId physicalId
-            | None -> ExplicitResumeSuppression.hasMarkedPhysicalMaterial sessionId
-        | None -> false
+        match trySessionId input, tryPhysicalUserMessageId input with
+        | Some sessionId, Some physicalId -> ExplicitResumeSuppression.isPhysicalMaterial sessionId physicalId
+        | Some sessionId, None -> ExplicitResumeSuppression.hasMarkedPhysicalMaterial sessionId
+        | None, _ -> false
 
     let private checkObservedProvider sessionId agent model =
         match SessionExecutionBinding.validateObservedProvider sessionId agent model with
@@ -118,26 +119,14 @@ module ChatParamsHook =
         else
             Some(SessionId.create (sessionText.Trim()), agent)
 
-    let private trySessionAndAgent (input: obj) =
-        match trySessionId input with
-        | None -> None
-        | Some sessionId ->
-            let agentOpt =
-                if not (isNull input) && not (isNull input?agent) then
-                    normalizeText (string input?agent)
-                elif not (isNull input) && not (isNull input?info) && not (isNull input?info?agent) then
-                    normalizeText (string input?info?agent)
-                elif
-                    not (isNull input)
-                    && not (isNull input?message)
-                    && not (isNull input?message?agent)
-                then
-                    normalizeText (string input?message?agent)
-                else
-                    None
+    let private tryAgent (input: obj) =
+        [ input; childObject input "info"; childObject input "message" ]
+        |> List.tryPick (fun candidate -> textField candidate "agent")
 
-            agentOpt
-            |> Option.bind (fun agent -> validateSessionAndAgent (SessionId.value sessionId) agent)
+    let private trySessionAndAgent (input: obj) =
+        match trySessionId input, tryAgent input with
+        | Some sessionId, Some agent -> validateSessionAndAgent (SessionId.value sessionId) agent
+        | _ -> None
 
     let private supportsTemperature (input: obj) =
         if

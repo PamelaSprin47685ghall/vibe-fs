@@ -872,6 +872,36 @@ module PairProgrammingThoughtTransform =
             || (rawMessages |> List.exists messageRoleIsInternal)
         | _ -> rawMessages |> List.exists messageRoleIsInternal
 
+    let private commitCurrentPairPlacement
+        providerId
+        history
+        visibleHistory
+        append
+        sessionId
+        markerText
+        concernPlacement
+        realMessages
+        =
+        taskResult {
+            let! placementOpt = decideCurrentPlacement realMessages
+
+            match placementOpt with
+            | None -> return! replay providerId realMessages visibleHistory
+            | Some(callGap, resultGap) ->
+                return!
+                    commitPairInjection
+                        providerId
+                        history
+                        visibleHistory
+                        append
+                        sessionId
+                        markerText
+                        concernPlacement
+                        realMessages
+                        callGap
+                        resultGap
+        }
+
     // ── 入口 ─────────────────────────────────────────────────────────────────
 
     /// HOST-013 commit 顺序（fail closed）：
@@ -950,23 +980,16 @@ module PairProgrammingThoughtTransform =
             if isInternalSessionOrMessage journal sessionId rawMessages then
                 return! replay providerId realMessages visibleHistory
             else
-                let! placementOpt = decideCurrentPlacement realMessages
-
-                match placementOpt with
-                | None -> return! replay providerId realMessages visibleHistory
-                | Some(callGap, resultGap) ->
-                    return!
-                        commitPairInjection
-                            providerId
-                            history
-                            visibleHistory
-                            append
-                            sessionId
-                            markerText
-                            concernPlacement
-                            realMessages
-                            callGap
-                            resultGap
+                return!
+                    commitCurrentPairPlacement
+                        providerId
+                        history
+                        visibleHistory
+                        append
+                        sessionId
+                        markerText
+                        concernPlacement
+                        realMessages
         }
 
     // ── Pair guideline injection (migrated from PluginTransforms composition root) ──
