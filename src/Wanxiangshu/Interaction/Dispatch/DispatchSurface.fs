@@ -100,6 +100,13 @@ module DispatchSurface =
 
     let fatal (reason: string) : Outcome.SendOutcome = Outcome.SendOutcome.Fatal reason
 
+    let decodePhysicalUserMessageId (input: obj) (output: obj) : obj =
+        PromptIngressCodec.decode input output
+        |> fun decoded -> decoded.PhysicalUserMessageId
+        |> Option.map PhysicalUserMessageId.value
+        |> Option.map box
+        |> Option.toObj
+
     let private appendResult result =
         match result with
         | Ok _ -> box {| ok = true; error = null |}

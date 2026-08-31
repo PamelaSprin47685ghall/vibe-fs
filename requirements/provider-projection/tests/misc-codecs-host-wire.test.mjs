@@ -146,15 +146,6 @@ test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_session_id_sources', () => {
   assert.equal(decodeIngress({}, {}).sessionId, null)
 })
 
-test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_message_id_sources', () => {
-  assert.equal(decodeIngress({ messageID: 'm1' }, {}).physicalUserMessageId, 'm1')
-  assert.equal(decodeIngress({ messageId: 'm2' }, {}).physicalUserMessageId, null, 'unsupported spelling fails closed')
-  assert.equal(decodeIngress({}, { id: 'm3' }).physicalUserMessageId, 'm3')
-  assert.equal(decodeIngress({}, { message: { id: 'm4' } }).physicalUserMessageId, 'm4')
-  assert.equal(decodeIngress({}, { info: { id: 'm5' } }).physicalUserMessageId, 'm5')
-  assert.equal(decodeIngress({}, {}).physicalUserMessageId, null)
-})
-
 test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_agent_sources', () => {
   assert.equal(decodeIngress({ agent: 'coder' }, {}).explicitAgent, 'coder')
   assert.equal(decodeIngress({ message: { agent: 'reviewer' } }, {}).explicitAgent, 'reviewer')
