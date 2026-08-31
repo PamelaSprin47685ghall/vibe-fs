@@ -50,14 +50,28 @@ export function integrationNodeTestSteps(root) {
       label: 'branch-fast-forward-adapter.test.mjs (change-integration)',
       files: [path.join(root, 'requirements/change-integration/tests/integration/branch-fast-forward-adapter.test.mjs')],
     },
-    // Structured-workflow steps below run real `dotnet fsi` F# project checks. Independent scanners
-    // own separate sequential files; the owner-evidence chain stays together but exposes each
-    // completed physical scan as a nested verdict. Aggregate runtime therefore cannot masquerade
-    // as silence, while any one hung compiler check still meets the same local FCS budget.
+    // Structured-workflow steps below run real `dotnet fsi` F# project checks. Each bounded physical
+    // phase owns a separate sequential file because Node 20 process isolation withholds nested leaf
+    // verdicts until the file wrapper exits. Aggregate runtime therefore cannot masquerade as silence,
+    // while any one hung compiler check still meets the same local FCS budget.
     {
       label: 'owner-dependencies-fcs.test.mjs (structured-workflow)',
       files: [
         path.join(root, 'requirements/structured-workflow/tests/integration/owner-dependencies-fcs.test.mjs'),
+      ],
+      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
+    },
+    {
+      label: 'owner-dependencies-reuse.test.mjs (structured-workflow)',
+      files: [
+        path.join(root, 'requirements/structured-workflow/tests/integration/owner-dependencies-reuse.test.mjs'),
+      ],
+      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
+    },
+    {
+      label: 'owner-dependencies-isolation.test.mjs (structured-workflow)',
+      files: [
+        path.join(root, 'requirements/structured-workflow/tests/integration/owner-dependencies-isolation.test.mjs'),
       ],
       perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
     },
