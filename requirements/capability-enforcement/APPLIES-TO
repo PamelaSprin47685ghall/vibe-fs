@@ -34,3 +34,5 @@
 /src/Wanxiangshu/Persistence/Journal/Writer.fs
 /src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs
 /src/Wanxiangshu/Persistence/Journal/AgentJournal.fs
+/src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
+/src/Wanxiangshu/OpenCode/Tools/ToolRegistrySurface.fs

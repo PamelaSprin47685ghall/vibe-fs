@@ -35,3 +35,8 @@
 /src/Wanxiangshu/Foundation/FatalProcess.fs
 /src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs
 /scripts/checks/retry-owner.mjs
+/src/Wanxiangshu/Execution/Failure/Model.fs
+/src/Wanxiangshu/Execution/Failure/Policy.fs
+/src/Wanxiangshu/Execution/Failure/Surface.fs
+/src/Wanxiangshu/Participant/Provider/Attempt/Failure.fs
+/src/Wanxiangshu/Participant/Provider/Attempt/FailureSurface.fs

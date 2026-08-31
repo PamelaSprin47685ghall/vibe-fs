@@ -8,3 +8,7 @@
 /resources/provider/host/pair-programming-guideline/**
 /resources/provider/tool/chronicle/**
 /scripts/checks/semantic-anchors.mjs
+/src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineProjection.fs
+/src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineSurface.fs
+/src/Wanxiangshu/Enforcer/Guidance/DeliverySurface.fs
+/src/Wanxiangshu/Enforcer/Guidance/TipSurface.fs
