@@ -12,14 +12,16 @@
 
 ### 恢复编排
 
-1. **已确认失败识别**：从完整快照与失败终态中提取确切的 `ProviderRunIdentity`。
-2. **Admission 裁决**：先写 `FallbackCursorAdvanced`；只有预算允许的 `RecoveryAdvanced` 才继续。WorkMain 在新 primed 槽获得一次 X opportunity；BloggerMain 在新 primed 槽且有 frames 时先发送 BloggerSquash。
+1. **Typed recovery licence**：Host 完整快照只提供 exact `ProviderRunIdentity` 与 terminal evidence；`execution-failure-policy` 是 failure class、retry/fallback、breaker 与 budget 后果的唯一裁决者。FallbackController 只消费绑定当前 run/request kind/decision identity 的 provider recovery licence，不解析 terminal 文本，也不为非 provider class 建立 recovery。
+2. **Admission 裁决**：只有 licence 明确授权 `AdvanceFallback` 才写 `FallbackCursorAdvanced`；只有授权 continuation 的 `RecoveryAdvanced` 才继续。WorkMain 在新 primed 槽获得一次 X opportunity；BloggerMain 在新 primed 槽且有 frames 时先发送 BloggerSquash。
 3. **WorkMain retry 物理所有权**：recovery continuation 先按正常 Prompt admission 发送；只有 `PromptIngress` 已把该 `ProviderRetryAttempt` 持久化为 `PhysicalAccepted` 后，才用 exact `PhysicalUserMessageId` 建立一次性 recovery permit。`messages.transform` 只允许消费 physical id 完全相等的 permit；同 session 的 tool continuation、旧 retry 或普通 user material 均不得误领。
 4. **ProviderRun 延迟绑定**：`messages.transform` 发生在 provider inference 之前，只冻结由 authority/cursor/physical id/request kind/prefix choice 构成的 pending attempt plan，不读取未来 assistant run。后续 tool-continuation 可见性或 reconciled turn 提供 `PhysicalUserMessageId + ProviderRunIdentity` 时，把 pending plan 一次性绑定成 `AttemptExecutionProfile`，再执行 prefix promotion / success accounting。
 5. **Blogger retry 所有权**：失败 open request 先 abandon；下一 typed request 在物理发送前 materialize，并在 send 后绑定该次 PromptKey。Main→Main、Main→Squash、Squash→Main 共用同一规则。`Fallback/Workflow.fs` 与 `Interaction/Repair/InteractionRepair.fs` 在追加失败账本前都必须先从 Blogger 身份解析 exact main session；禁止把 Blogger session 自身当作主 session 记账。
 6. **事件解锁**：WorkMain recovery 只在 linked Blogger 存在 durable open request 时通过 `AgentJournal.awaitChangeFromOrCancel` 订阅 committed journal change；`BlogObservationCommitted`、`BlogObservationsSquashed`、`BloggerRequestAbandoned` 等 fact 到达后重新求值，plugin shutdown 显式注销订阅。无 open producer 立即 retry，不读取 flight/pending，不存在 timeout/polling。
 7. **成功记账**：RequestKind 从 typed request / durable receipt / accepted continuation evidence 证明。Squash/repair success 不写 FallbackSucceeded；WorkMain/BloggerMain success 才清零失败计数。
-8. **身份隔离**：游标变更仅影响下一次派发的 `EffectiveAgent`，不改写 Persona、语言或 system prompt 字节。
+8. **身份隔离**：游标变更仅影响下一次派发的 `EffectiveAgent`。每个 attempt 复用同一 durable logical participant run 的 `ParticipantIdentity`、Persona、语言、CanonicalRole、Authority identity 与 system prompt bytes；controller 没有签发新 identity 的能力。
+9. **唯一预算投影**：`LogicalRunId` 是稳定 logical operation identity，Host 创建的 fresh `ProviderRunIdentity` 是 physical attempt identity。`FallbackProjection.ConsecutiveFailureCount < AgentPairCursor.DefaultAutoRecoveryBudget(12)` 是唯一自动恢复预算投影；初始请求计入失败序列，第 12 次失败只写 exhaustion，不发送第 13 次物理请求。因此每个 logical operation 满足 `physicalAttempts ≤ 12`，duplicate ProviderRun observation 由 ledger 幂等吸收且不增加该比值。
+10. **唯一 licence**：`ExecutionFailurePolicy.decide` 以 exact `LogicalRunId + ProviderRunIdentity + ProviderRequestKind` 生成 sealed `ProviderRecoveryAuthorization` 与稳定 `ProviderRecoveryDecisionId`。`FallbackLedger.recordAuthorizedFailure` 只接受该 licence，并复核 logical run；Host retry signal、dispatcher、repair、session recovery 无签发能力。
 
 ## 最终 production 路径
 
@@ -41,6 +43,10 @@
 ## 依赖关系
 
 DEPENDS ON:
+- `participant-identity`
+- `execution-failure-policy`
+- `execution-model-routing`
+- `interaction-authority`
 - `canonical-spine`
 - `semantic-trace-replayable-contract-cutover`
 - `prefix-stability-cutover`
@@ -72,3 +78,4 @@ DEPENDS ON:
 | PAR-018 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs::WHAT[PAR-018] recovery_continuation_waits_only_on_durable_open_producer_events` |
 
 P0 recovery re-entry proof：`requirements/structured-workflow/tests/recovery-reentry.test.mjs`；hard gate：`scripts/checks/p0-recovery-join.mjs`。该 gate 同时约束 Blogger failure 在追加 ledger 前解析 exact main session，以及 `NoActiveRun` 不得继续 recovery。
+| PAR-019 | `requirements/provider-attempt-recovery/tests/retry-owner.test.mjs::WHAT[PAR-019] one policy owner licenses every provider recovery attempt`；`requirements/verification-system/tests/retry-owner.test.mjs::WHAT[PAR-019] rejects nested physical retry owner`；`requirements/verification-system/tests/retry-owner.test.mjs::WHAT[PAR-019] rejects retry classification from diagnostic text` |

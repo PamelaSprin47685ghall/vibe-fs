@@ -1,6 +1,6 @@
 // requirements/host-boundary/tests/ordered-transform.test.mjs — WHAT[HOST-BOUNDARY-019]
 //
-// OrderedTransformProof: verifies the 16-step static semantic score of
+// OrderedTransformProof: verifies the 17-step static semantic score of
 // PluginTransforms.normalTransform alongside the StrengthReplica and
 // ExplicitResumeSuppression branch isolation paths without illegal deep-dist imports.
 
@@ -12,7 +12,7 @@ import test from 'node:test'
 const root = resolve(import.meta.dirname, '../../..')
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-test('WHAT[HOST-BOUNDARY-019] PluginTransforms declares NormalTransformCapabilities record with exact 16 named fields', () => {
+test('WHAT[HOST-BOUNDARY-019] PluginTransforms declares NormalTransformCapabilities record with exact 17 named fields', () => {
   const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 
   assert.match(text, /type\s+NormalTransformCapabilities\s*=/)
@@ -25,6 +25,7 @@ test('WHAT[HOST-BOUNDARY-019] PluginTransforms declares NormalTransformCapabilit
   assert.match(text, /ApplyManagerNarrative:\s*string option -> XTraceProjectionState option -> obj list -> obj -> Task<unit>/)
   assert.match(text, /ApplyCompanion:\s*string option -> obj -> obj -> Task<unit>/)
   assert.match(text, /ApplyXWire:\s*obj -> Task<PrefixPresentationHorizon>/)
+  assert.match(text, /FreezeProviderAttemptPlan:\s*string option -> obj -> Task<unit>/)
   assert.match(text, /ApplyEnforcerContinuation:\s*string option -> obj -> Task<unit>/)
   assert.match(text, /ApplyStrengthSpeculate:\s*obj -> Task<unit>/)
   assert.match(text, /InjectPairGuideline:\s*string option -> DateTimeOffset option -> obj -> Task<unit>/)
@@ -54,7 +55,7 @@ test('WHAT[HOST-BOUNDARY-019] tentative prefix probe horizon suppresses historic
   assert.ok(groundingAt < chronicleAt, 'Blogger-only chronicle projection remains outside the WorkMain auxiliary guard')
 })
 
-test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 16-step static score in order', () => {
+test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 17-step static score in order', () => {
   const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 
   const orderingSteps = [
@@ -67,6 +68,7 @@ test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 16-step static scor
     'ApplyManagerNarrative',
     'ApplyCompanion',
     'ApplyXWire',
+    'FreezeProviderAttemptPlan',
     'ApplyEnforcerContinuation',
     'ApplyStrengthSpeculate',
     'InjectPairGuideline',
@@ -146,10 +148,24 @@ test('WHAT[HOST-BOUNDARY-019] strength replica branch executes replica sequence 
   assert.match(body, /\|\s*StrengthReplica\s+runtime\s*->/)
   assert.match(body, /projectionSessionIdOpt\s*\|\>\s*Option\.iter\s+branches\.RegisterOwned/)
   assert.match(body, /do!\s+branches\.ReplicaXWire\s+outObj/)
+  assert.match(body, /do!\s+caps\.FreezeProviderAttemptPlan\s+projectionSessionIdOpt\s+outObj/)
   assert.match(body, /let!\s+handled\s*=\s*runtime\.HandleTransform\s+outObj/)
   assert.match(body, /failIfReplicaDecisionLost\s+handled/)
   assert.match(body, /branches\.ReplicaSanitize\s+outObj/)
   assert.match(body, /\|\s*Ordinary\s*->[\s\S]*?do!\s+normalTransform\s+caps\s+projectionSessionIdOpt\s+inObj\s+outObj/)
+  assert.ok(body.indexOf('branches.ReplicaXWire') < body.indexOf('caps.FreezeProviderAttemptPlan'))
+  assert.ok(body.indexOf('caps.FreezeProviderAttemptPlan') < body.indexOf('runtime.HandleTransform'))
+})
+
+test('WHAT[CHATEXEC-005] user-only transform cannot manufacture ProviderStarted from public Host evidence', () => {
+  const transform = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
+  const binding = read('src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs')
+
+  assert.match(transform, /freezeProviderAttemptPlanForTransform/)
+  assert.match(binding, /let\s+freezeProviderAttemptPlanForTransform/)
+  assert.doesNotMatch(transform, /persistProviderStartedForTransform|PersistProviderStarted|ManagedChatProviderLifecycle\.providerStarted/)
+  assert.doesNotMatch(binding, /let\s+persistProviderStartedForTransform/)
+  assert.match(binding, /let\s+persistProviderStartedFromObservation[\s\S]*?ExactProviderStartObservation/)
 })
 
 test('WHAT[HOST-BOUNDARY-019] explicit resume suppression short-circuits via TransformMode before ordinary provider transform', () => {
@@ -206,12 +222,14 @@ test('WHAT[HOST-BOUNDARY-019] ordered transform proof falsifiability check: swap
     'ApplyManagerNarrative',
     'ApplyCompanion',
     'ApplyXWire',
+    'FreezeProviderAttemptPlan',
     'ApplyEnforcerContinuation',
     'ApplyStrengthSpeculate',
     'InjectPairGuideline',
     'ProjectRequirementGrounding',
     'InjectBloggerChronicle',
     'SanitizeMessages',
+    'InterruptAfterSubmittedJudgement',
   ]
 
   const swappedOrder = [
@@ -224,12 +242,14 @@ test('WHAT[HOST-BOUNDARY-019] ordered transform proof falsifiability check: swap
     'ApplyStrengthReplay', // Also out of order with capture
     'ApplyCompanion',
     'ApplyXWire',
+    'FreezeProviderAttemptPlan',
     'ApplyEnforcerContinuation',
     'ApplyStrengthSpeculate',
     'InjectPairGuideline',
     'ProjectRequirementGrounding',
     'InjectBloggerChronicle',
     'SanitizeMessages',
+    'InterruptAfterSubmittedJudgement',
   ]
 
   assert.throws(

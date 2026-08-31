@@ -4,7 +4,7 @@
 // 恰一个 primary WHAT）；每个 test 只回答一个问题。
 
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -249,6 +249,24 @@ test('WHAT[REQUIREMENT-SYSTEM-018] buildTraceGraph classifies orphan / unknown /
   }
   // multi-primary is only ever produced by the scanner, never by this suite.
   assert.equal(graph.multiPrimary.length, 0)
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-018] buildTraceGraph refuses symlink entries inside the governed requirements tree', () => {
+  const root = mkdtempSync(join(tmpdir(), 'requirement-trace-symlink-'))
+  const requirements = join(root, 'requirements')
+  const packageRoot = join(requirements, 'fixture-package')
+  const outside = join(root, 'outside.md')
+  mkdirSync(packageRoot, { recursive: true })
+  try {
+    writeFileSync(outside, '# outside\n')
+    symlinkSync(outside, join(packageRoot, 'linked.md'))
+    assert.throws(
+      () => buildTraceGraph(requirements),
+      /walk: refusing to traverse symlink entry/,
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[REQUIREMENT-SYSTEM-008] duplicate definitions retain every location and never acquire authority', () => {

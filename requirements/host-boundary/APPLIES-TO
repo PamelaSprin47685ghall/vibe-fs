@@ -14,3 +14,4 @@
 /src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembraneSurface.fs
 /src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs
 /scripts/checks/architecture.mjs
+/scripts/checks/hook-policy.mjs

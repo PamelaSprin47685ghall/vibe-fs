@@ -1,0 +1,37 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/execution-failure-policy/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Execution/Failure/**
+/src/Wanxiangshu/Participant/Provider/Attempt/**
+/src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs
+/src/Wanxiangshu/OpenCode/Signals/HostSignal.fs
+/src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs
+/src/Wanxiangshu/OpenCode/Host/HostSignalSurface.fs
+/src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
+/src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs
+/src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs
+/src/Wanxiangshu/Composition/Turn/Program.fs
+/src/Wanxiangshu/Composition/Turn/Observation.fs
+/src/Wanxiangshu/Composition/Turn/ReconcilePass.fs
+/src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs
+/src/Wanxiangshu/Composition/Turn/Scheduler.fs
+/src/Wanxiangshu/Composition/Turn/ReconcileSurface.fs
+/src/Wanxiangshu/Persistence/Journal/AgentJournal.fs
+/src/Wanxiangshu/Persistence/Journal/Surface.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntimeSurface.fs
+/src/Wanxiangshu/Enforcer/Cycle/Commit.fs
+/src/Wanxiangshu/Interaction/Dispatch/PhysicalAcceptance.fs
+/src/Wanxiangshu/Interaction/Dispatch/Ingress.fs
+/src/Wanxiangshu/Interaction/Dispatch/Recovery.fs
+/src/Wanxiangshu/Interaction/Dispatch/Send.fs
+/src/Wanxiangshu/OpenCode/Host/ModelCapacity/**
+/src/Wanxiangshu/OpenCode/Host/ModelRouting.fs
+/src/Wanxiangshu/OpenCode/Host/ChatAdmission/TransactionSurface.fs
+/src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs
+/src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs
+/src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs
+/src/Wanxiangshu/Foundation/FatalProcess.fs
+/src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs
+/scripts/checks/retry-owner.mjs

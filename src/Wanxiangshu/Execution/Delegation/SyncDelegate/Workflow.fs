@@ -18,11 +18,7 @@ module internal SyncDelegateWorkflow =
         { Attached: AttachedSessionRuntime
           ResolveOwnerTier: SessionId -> AgentTier option
           ObserveChild:
-              SessionId
-                  -> ReuseScopeId
-                  -> SyncDelegateRole
-                  -> string
-                  -> Task<Result<AttachedChildObservation, string>>
+              SessionId -> ReuseScopeId -> SyncDelegateRole -> string -> Task<Result<AttachedChildObservation, string>>
           CreateChild:
               SessionId
                   -> ReuseScopeId
@@ -131,8 +127,10 @@ module internal SyncDelegateWorkflow =
         =
         store.TryPeekCallByDelegate delegateSession
         |> Option.filter (fun call ->
-            call.AcceptedAuthorityRoot
-            |> Option.exists (fun root -> TerminalStop.belongsTo root stop))
+            match call.TerminalFailureScope with
+            | Some(FreshAuthorityRoot root) -> TerminalStop.belongsTo root stop
+            | Some(ExistingAuthorityContinuation _)
+            | None -> false)
         |> Option.bind (fun _ -> store.TryPopCallByDelegate delegateSession)
         |> Option.iter (fun current -> store.FailCall(current, message))
 
@@ -194,6 +192,7 @@ module internal SyncDelegateWorkflow =
     let private dispatchBegunCall
         (deps: Dependencies)
         (store: SyncDelegateCallStore)
+        (ownerScope: ReuseScopeId)
         (role: SyncDelegateRole)
         (batchOwner: SessionId)
         (delegateSession: SessionId)
@@ -210,6 +209,8 @@ module internal SyncDelegateWorkflow =
                 SyncDelegatePrompt.withProviderPrompt combinedCharge combinedProviderPrompt
 
             let! answered = sendAndAwait deps store role batchOwner delegateSession call request
+            store.ReleaseAdmission(ownerScope, role)
+            registration.Dispose()
             completeBatch invocations answered
         }
 
@@ -233,6 +234,7 @@ module internal SyncDelegateWorkflow =
             dispatchBegunCall
                 deps
                 store
+                ownerScope
                 role
                 batchOwner
                 delegateSession

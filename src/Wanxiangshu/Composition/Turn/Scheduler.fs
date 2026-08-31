@@ -148,6 +148,11 @@ module Reconciler =
             accepting <- false
             queued.Clear()
 
+        let admittedWakeFor (sessionId: SessionId) (key: string) wake =
+            match wakes.TryGetValue key with
+            | true, previous -> ReconcileProgram.mergeWake (binding.TryPhysicalUserMessage sessionId) previous wake
+            | false, _ -> wake
+
         let dispatch (sessionId: SessionId) (wake: ReconcileProgram.ReconcileWake) =
             lock gate (fun () ->
                 if not accepting || isDurableUnavailable () then
@@ -156,8 +161,10 @@ module Reconciler =
                 else
                     let key = SessionId.value sessionId
                     let generation = currentGeneration sessionId
+                    let admittedWake = admittedWakeFor sessionId key wake
+
                     projectionWaits.Remove(key) |> ignore
-                    wakes.[key] <- wake
+                    wakes.[key] <- admittedWake
                     queued.[key] <- generation
                     startOrEnqueue key generation)
 
@@ -165,7 +172,7 @@ module Reconciler =
             match turn, wake with
             | None, _ -> false
             | Some _, ReconcileProgram.ReconcileWake.IdleWake _ -> true
-            | Some observed, ReconcileProgram.ReconcileWake.FailureWake(Some physical, _) when
+            | Some observed, ReconcileProgram.ReconcileWake.FailureWake(Some physical, _, _, _) when
                 observed.PhysicalUserMessageId = physical
                 ->
                 true
@@ -490,11 +497,18 @@ module Reconciler =
         member this.Signal(signal: HostSignal) : unit =
             match signal with
             | SessionIdle sessionId -> this.Kick(sessionId, ReconcileProgram.ReconcileWake.RetryWake)
-            | ProviderFailure(sessionId, reason) ->
-                this.Kick(
-                    sessionId,
-                    ReconcileProgram.ReconcileWake.FailureWake(binding.TryPhysicalUserMessage sessionId, reason)
-                )
+            | ProviderFailure failure ->
+                binding.TryPhysicalUserMessage failure.SessionId
+                |> Option.iter (fun physicalUserMessageId ->
+                    let wake =
+                        ReconcileProgram.ReconcileWake.FailureWake(
+                            Some physicalUserMessageId,
+                            failure.Failure,
+                            failure.Diagnostic,
+                            ReconcileProgram.FailureWakeSource.CoarseHostSignal
+                        )
+
+                    this.Kick(failure.SessionId, wake))
             | ProviderRetry retry -> this.Kick(retry.SessionId, ReconcileProgram.ReconcileWake.RetryWake)
             | SessionDeleted(sessionId, _) -> this.ClearSession(sessionId)
             // HOST-002/004: an operator abort is a typed wake, not a failure.
@@ -504,7 +518,7 @@ module Reconciler =
             // The genuine TurnAborted terminal publishes normally; Unknown /
             // Provisional StopPass instead of resurrecting an idle-derived
             // continuation.
-            | AttemptAborted sessionId -> this.Kick(sessionId, ReconcileProgram.ReconcileWake.AbortWake)
+            | AttemptAborted failure -> this.Kick(failure.SessionId, ReconcileProgram.ReconcileWake.AbortWake)
 
         member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: Role) =
             lock gate (fun () -> cleared.Remove(SessionId.value sessionId) |> ignore)

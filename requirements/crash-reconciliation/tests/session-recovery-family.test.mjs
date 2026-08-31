@@ -29,13 +29,15 @@ test('WHAT[CRASH-006] RECOVERY_FAMILY_constructor_does_not_start_fork_restore', 
   assert.doesNotMatch(code, /do!\s*this\.AwaitRecovery/)
 })
 
-test('WHAT[CRASH-017] RECOVERY_FAMILY_library_is_detached_from_ordinary_plugin_and_join_uses_current_process_permit', () => {
+test('WHAT[CRASH-017] RECOVERY_FAMILY_plugin_load_only_attaches_physical_recovery_wiring_and_join_uses_current_process_permit', () => {
   const wiring = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs'), 'utf8')
   const spike = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs'), 'utf8')
   const scope = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs'), 'utf8')
   const ports = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs'), 'utf8')
 
-  assert.doesNotMatch(spike, /PluginRecoveryWiring\.attach|AttachFamilyRecoveryPorts/)
+  assert.match(spike, /PluginRecoveryWiring\.attach boot/)
+  assert.match(wiring, /scope\.AttachDurabilityActivation\(fun \(\) ->\s*scope\.RunBackground/)
+  assert.doesNotMatch(spike, /SignalChatRecovery|FamilyRecoveryCoordinator\.runOnce|recoverFamilyDirect|AttachFamilyRecoveryPorts/)
   assert.doesNotMatch(wiring, /restoreLinkedChildren|recoverFamilyDirect|defaultRecoverPromptClaims|defaultRecoverBlogger/)
   assert.match(scope, /FamilyRecoveryPermit\.currentProcess/)
   assert.doesNotMatch(scope, /FamilyRecoveryCoordinator\.runOnce|recoverFamilyDirect/)

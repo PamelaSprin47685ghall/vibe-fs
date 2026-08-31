@@ -20,7 +20,7 @@ const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
 const pluginHooksSource = read('src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs')
 const interopSource = read('src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs')
-const generatedPluginHooks = read('dist/OpenCode/Plugin/PluginHooks.js')
+const hookPolicySource = read('src/Wanxiangshu/OpenCode/Host/HookPolicy.fs')
 
 // The complete set of hook keys the production PluginHooks.create builds.
 // Extracted from the source so a silent addition/removal is caught.
@@ -29,6 +29,7 @@ const REGISTERED_HOOK_NAMES = [
   'chat.params',
   'experimental.chat.messages.transform',
   'experimental.chat.system.transform',
+  'config',
   'experimental.session.compacting',
   'experimental.compaction.autocontinue',
   'tool.definition',
@@ -36,13 +37,14 @@ const REGISTERED_HOOK_NAMES = [
   'tool.execute.after',
   'event',
   'dispose',
+  'command.execute.before',
 ]
 
 // ── HOST-BOUNDARY-014: fatal membrane ────────────────────────────────────
 
-test('WHAT[HOST-BOUNDARY-014] HOST_009_hook_invariant_exceptions_cross_a_fatal_membrane_before_rethrow', () => {
+test('WHAT[HOST-BOUNDARY-014] LocalInvariant crosses the typed membrane after fatal policy', () => {
   let threw = null
-  const wrapped = PluginHooksSurface.fatalHook('test-fatal-sync', () => { throw new Error('invariant-broken') })
+  const wrapped = PluginHooksSurface.policyAwareHook('test-fatal-sync', () => { throw new Error('invariant-broken') })
   try {
     wrapped('args', 'ctx')
   } catch (e) {
@@ -52,9 +54,9 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_hook_invariant_exceptions_cross_a_fatal_m
   assert.equal(threw.message, 'invariant-broken')
 })
 
-test('WHAT[HOST-BOUNDARY-014] HOST_009_fatal_membrane_catches_async_rejection_and_rethrows', async () => {
+test('WHAT[HOST-BOUNDARY-014] typed membrane catches async LocalInvariant and rethrows', async () => {
   let caught = null
-  const wrapped = PluginHooksSurface.fatalHook('test-fatal-async', () => Promise.reject(new Error('async-invariant-broken')))
+  const wrapped = PluginHooksSurface.policyAwareHook('test-fatal-async', () => Promise.reject(new Error('async-invariant-broken')))
   try {
     await wrapped('args', 'ctx')
   } catch (e) {
@@ -64,7 +66,7 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_fatal_membrane_catches_async_rejection_an
   assert.equal(caught.message, 'async-invariant-broken')
 })
 
-test('WHAT[HOST-BOUNDARY-014] HOST_009_fatal_membrane_calls_diagnostic_fatal_before_rethrow', () => {
+test('WHAT[HOST-BOUNDARY-014] typed membrane calls Diagnostic.fatal before rethrow', () => {
   // The fatal membrane calls Diagnostic.fatal (which prints a JSON line to stderr)
   // before rethrowing. We capture stderr to observe the fatal record without
   // monkey-patching the module binding (which is captured at import time).
@@ -72,7 +74,7 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_fatal_membrane_calls_diagnostic_fatal_bef
   const captured = []
   process.stderr.write = (chunk) => { captured.push(String(chunk)); return true }
   try {
-    const wrapped = PluginHooksSurface.fatalHook('observed-op', () => { throw new Error('observed-error') })
+    const wrapped = PluginHooksSurface.policyAwareHook('observed-op', () => { throw new Error('observed-error') })
     try {
       wrapped('a', 'b')
     } catch (_) {
@@ -86,32 +88,31 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_fatal_membrane_calls_diagnostic_fatal_bef
   }
 })
 
-test('WHAT[HOST-BOUNDARY-014] provider input rejection rethrows without Diagnostic.fatal', async () => {
+test('WHAT[HOST-BOUNDARY-014] typed ProtocolRejection rethrows unchanged without Diagnostic.fatal', async () => {
   const originalWrite = process.stderr.write.bind(process.stderr)
   const captured = []
   process.stderr.write = (chunk) => { captured.push(String(chunk)); return true }
   try {
-    const wrapped = PluginHooksSurface.classifiedRejectionHook(
+    const rejection = PluginHooksSurface.providerInputRejection('provider-input-invalid')
+    const wrapped = PluginHooksSurface.policyAwareHook(
       'tool-before-test',
-      (error) => error?.message === 'provider-input-invalid',
-      () => Promise.reject(new Error('provider-input-invalid')),
+      () => Promise.reject(rejection),
     )
 
-    await assert.rejects(() => wrapped('args', 'ctx'), /provider-input-invalid/)
+    await assert.rejects(() => wrapped('args', 'ctx'), (error) => error === rejection)
     assert.equal(captured.some((line) => line.includes('"operation":"tool-before-test"')), false)
   } finally {
     process.stderr.write = originalWrite
   }
 })
 
-test('WHAT[HOST-BOUNDARY-014] unclassified hook rejection still enters Diagnostic.fatal', async () => {
+test('WHAT[HOST-BOUNDARY-014] unpublished rejection shape fails closed as LocalInvariant', async () => {
   const originalWrite = process.stderr.write.bind(process.stderr)
   const captured = []
   process.stderr.write = (chunk) => { captured.push(String(chunk)); return true }
   try {
-    const wrapped = PluginHooksSurface.classifiedRejectionHook(
+    const wrapped = PluginHooksSurface.policyAwareHook(
       'tool-before-invariant-test',
-      () => false,
       () => Promise.reject(new Error('invariant-broken')),
     )
 
@@ -119,6 +120,23 @@ test('WHAT[HOST-BOUNDARY-014] unclassified hook rejection still enters Diagnosti
     assert.equal(captured.some((line) => line.includes('"operation":"tool-before-invariant-test"')), true)
   } finally {
     process.stderr.write = originalWrite
+  }
+})
+
+test('WHAT[HOST-BOUNDARY-014] every HookFailurePolicy branch is selected from typed policy and settlement evidence', () => {
+  const cases = [
+    ['ProtocolRejection', 'NoOwnedExecution', 'RethrowUnchanged'],
+    ['Superseded', 'ExactSettlementComplete', 'RethrowUnchanged'],
+    ['UserCancelled', 'ExactSettlementComplete', 'RethrowUnchanged'],
+    ['CapacityQueueFull', 'ExactSettlementComplete', 'RethrowUnchanged'],
+    ['PersistenceNotCommitted', 'SettlementIncomplete', 'RethrowUnchanged'],
+    ['PersistenceUnknown', 'DurableOutcomeUnknown', 'FatalAfterSettlement'],
+    ['LocalInvariant', 'ExactSettlementComplete', 'FatalAfterSettlement'],
+    ['LocalInvariant', 'SettlementIncomplete', 'RejectFatalBeforeSettlement'],
+  ]
+
+  for (const [failure, settlement, expected] of cases) {
+    assert.equal(PluginHooksSurface.hookFailurePolicy(failure, settlement), expected, `${failure}/${settlement}`)
   }
 })
 
@@ -135,59 +153,39 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_inherited_NODE_TEST_CONTEXT_never_disable
 // ── HOST-BOUNDARY-014: registered hook set ───────────────────────────────
 
 test('WHAT[HOST-BOUNDARY-014] HOST_009_every_registered_hook_has_a_fixture_here', () => {
-  // Every hook key that PluginHooks.create assigns must appear in our fixture list.
-  // This catches silent additions (a new hook with no test) and silent removals.
-  // Some hooks are string keys in createObj; others are dynamic hooks? assignments.
-  for (const name of REGISTERED_HOOK_NAMES) {
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    // Match either "name" in createObj or hooks?name <- assignment
-    const pattern = new RegExp(`["']${escaped}["']|hooks\\?${escaped}\\s*<-`)
-    assert.match(pluginHooksSource, pattern, `PluginHooks.fs must register hook "${name}"`)
-  }
-  // The experimental.chat.messages.transform route is structurally exclusive:
-  // exactly one transform registration, not a second live copy.
-  const transformMatches = pluginHooksSource.match(/experimental\.chat\.messages\.transform/g)
-  assert.equal(transformMatches.length, 1)
+  const policyKeys = [...hookPolicySource.matchAll(/\{ HostKey = "([^"]+)"/g)].map((match) => match[1])
+  assert.deepEqual(policyKeys.slice().sort(), REGISTERED_HOOK_NAMES.slice().sort())
+  assert.equal(new Set(policyKeys).size, policyKeys.length)
 })
 
 test('WHAT[HOST-BOUNDARY-014] HOST_009_every_hook_accepts_its_arguments_positionally', async () => {
-  // The production fatalHook wraps a two-argument callable: (args, context).
+  // The production policy membrane wraps a two-argument callable: (args, context).
   // curriedHook and pairedHook both emit (args, context) arrow functions. The
   // paired adapter must also complete the second stage when Fable boxes an
   // already-paired function as curry2(fn); otherwise the Host sees a fulfilled
   // hook whose body never ran.
   assert.match(interopSource, /\(args,\s*context\)\s*=>\s*\$0\(args\)\(context\)/)
   assert.match(interopSource, /typeof result === 'function' \? result\(context\) : result/)
-  assert.doesNotMatch(
-    generatedPluginHooks,
-    /"tool\.execute\.before"[^\n]*=>\s*curry2\(toolBefore\)\(args, context\)\)/,
-    'generated tool.execute.before adapter must not return an uninvoked curry2 second stage',
-  )
-  assert.match(
-    generatedPluginHooks,
-    /"tool\.execute\.before"[^\n]*typeof result === 'function' \? result\(context\) : result/,
-    'generated tool.execute.before adapter must finish Fable curry2 boxing when present',
-  )
+  assert.match(pluginHooksSource, /registeredHook HookKey\.ToolBefore \(pairedHook \(box toolBefore\)\)/)
   // The fatal membrane itself is a two-argument callable. It wraps the return
   // in Promise.resolve, so the positional args arrive but the result is async.
-  const wrapped = PluginHooksSurface.fatalHook('positional-test', (args, context) => ({ args, context }))
+  const wrapped = PluginHooksSurface.policyAwareHook('positional-test', (args, context) => ({ args, context }))
   const result = await wrapped('arg-val', 'ctx-val')
   assert.equal(result.args, 'arg-val')
   assert.equal(result.context, 'ctx-val')
 })
 
-test('WHAT[HOST-BOUNDARY-014] tool.execute.before classifies provider input rejection before fatal handling', () => {
-  assert.match(
-    pluginHooksSource,
-    /classifiedRejectionHook\s+"plugin-hook-tool-before-failed"\s+MagicTodoHostCodec\.isProviderInputRejection/,
-  )
+test('WHAT[HOST-BOUNDARY-014] tool.execute.before uses the common typed membrane after arity adaptation', () => {
+  assert.match(pluginHooksSource, /registeredHook HookKey\.ToolBefore \(pairedHook \(box toolBefore\)\)/)
+  assert.match(interopSource, /metadata\.HostKey, policyAwareHook metadata\.DiagnosticOperation adaptedHook/)
+  assert.doesNotMatch(interopSource, /isExpected|classifiedRejectionHook|hostErrorText/)
 })
 
 test('WHAT[HOST-BOUNDARY-014] HOST_009_the_tool_registry_is_a_registry_not_a_triggered_hook', () => {
   // The tool registry is attached as hooks.tool — a property holding a Tools
   // collection, not a hook callable. It is never in the Host's Hooks type.
-  assert.match(pluginHooksSource, /hooks\?tool\s*<-\s*toolRegistration\.Tools/)
-  // tool is not among the triggered hook names (it has no fatalHook wrapper).
+  assert.match(pluginHooksSource, /"tool", registration\.Tools/)
+  // tool is not among the triggered hook names (it has no policy membrane wrapper).
   assert.equal(REGISTERED_HOOK_NAMES.includes('tool'), false)
 })
 
@@ -197,14 +195,14 @@ test('WHAT[HOST-BOUNDARY-019] STRENGTH_004_replica_transform_route_is_structural
   // The transform hook is registered exactly once under the experimental name.
   // There is no second 'chat.transform' alias — that was removed because the
   // Host Hooks type has only the experimental key.
-  assert.match(pluginHooksSource, /experimental\.chat\.messages\.transform/)
-  assert.doesNotMatch(pluginHooksSource, /["']chat\.transform["']/)
+  assert.match(hookPolicySource, /HostKey = "experimental\.chat\.messages\.transform"/)
+  assert.doesNotMatch(hookPolicySource, /HostKey = "chat\.transform"/)
 })
 
 test('WHAT[HOST-BOUNDARY-019] CHAT_MESSAGE_routes_managed_model_then_CHAT_PARAMS_only_validates', () => {
   // chat.message is registered before chat.params in the hook object.
-  const chatMessageIdx = pluginHooksSource.indexOf('"chat.message"')
-  const chatParamsIdx = pluginHooksSource.indexOf('"chat.params"')
+  const chatMessageIdx = pluginHooksSource.indexOf('registeredHook HookKey.ChatMessage')
+  const chatParamsIdx = pluginHooksSource.indexOf('registeredHook HookKey.ChatParams')
   assert.ok(chatMessageIdx >= 0, 'chat.message must be registered')
   assert.ok(chatParamsIdx >= 0, 'chat.params must be registered')
   assert.ok(chatMessageIdx < chatParamsIdx, 'chat.message is registered before chat.params')
@@ -234,7 +232,7 @@ test('WHAT[HOST-BOUNDARY-019] PROMPT_004_human_root_survives_host_synthetic_file
   assert.match(pluginHooksSource, /let ownedTransform[\s\S]*?scope\.RunOwnedWork\(fun \(\) -> transform inObj outObj\)/)
   assert.match(
     pluginHooksSource,
-    /experimental\.chat\.messages\.transform[\s\S]*?curriedHook.*ownedTransform/,
+    /registeredHook HookKey\.MessagesTransform \(curriedHook \(box ownedTransform\)\)/,
   )
   // The transform is a pure function over the message array; it does not
   // consume host-synthetic file parts as business input.

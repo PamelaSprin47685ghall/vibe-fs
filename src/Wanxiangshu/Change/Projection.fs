@@ -134,28 +134,27 @@ module OrchestratorProjection =
             match relevantPhysicalEntries with
             | Error error ->
                 WorktreeReconciliationDecision.Reject(WorktreeReconciliationFailure.WorktreeQueryFailed error)
-            | Ok [] ->
-                WorktreeReconciliationDecision.CreateAfterProvenMissing
-            | Ok relevant
-                when relevant
-                     |> List.forall (fun (observedPath, observedIdentity) ->
-                         observedPath = path && observedIdentity = Some identity) ->
+            | Ok [] -> WorktreeReconciliationDecision.CreateAfterProvenMissing
+            | Ok relevant when
+                relevant
+                |> List.forall (fun (observedPath, observedIdentity) ->
+                    observedPath = path && observedIdentity = Some identity)
+                ->
                 WorktreeReconciliationDecision.AdoptThenRecordCreated
-            | Ok _ ->
-                WorktreeReconciliationDecision.Reject
-                    WorktreeReconciliationFailure.PhysicalIdentityPathConflict
+            | Ok _ -> WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.PhysicalIdentityPathConflict
 
         match observation with
-        | WorktreeReconciliationObservation.NoDurableEffect ->
-            WorktreeReconciliationDecision.RequestThenCreate
-        | WorktreeReconciliationObservation.CreatedReceipt(recordedJobId, recordedPath)
-            when sameDurableOwner recordedJobId recordedPath ->
+        | WorktreeReconciliationObservation.NoDurableEffect -> WorktreeReconciliationDecision.RequestThenCreate
+        | WorktreeReconciliationObservation.CreatedReceipt(recordedJobId, recordedPath) when
+            sameDurableOwner recordedJobId recordedPath
+            ->
             WorktreeReconciliationDecision.AdoptCreated
         | WorktreeReconciliationObservation.CreatedReceipt _
         | WorktreeReconciliationObservation.RequestedConflict _ ->
             WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.DurableOwnershipConflict
-        | WorktreeReconciliationObservation.RequestedAmbiguity(recordedJobId, recordedPath, _)
-            when not (sameDurableOwner recordedJobId recordedPath) ->
+        | WorktreeReconciliationObservation.RequestedAmbiguity(recordedJobId, recordedPath, _) when
+            not (sameDurableOwner recordedJobId recordedPath)
+            ->
             WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.DurableOwnershipConflict
         | WorktreeReconciliationObservation.RequestedAmbiguity(_, _, physical) ->
             decidePhysicalWorktreeReconciliation physical

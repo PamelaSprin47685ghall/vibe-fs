@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Composition.Turn
 
+open Wanxiangshu.Execution.Failure
+
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
@@ -47,10 +49,15 @@ module ReconcileSurface =
                      None
                  else
                      Some(PhysicalUserMessageId.create physical)),
+                ExecutionFailure.ProviderTransient,
                 (if System.String.IsNullOrWhiteSpace reason then
                      "provider failure"
                  else
-                     reason)
+                     reason),
+                (if stringOf (property value "source") = "ExactAssistantProjection" then
+                     ReconcileProgram.FailureWakeSource.ExactAssistantProjection
+                 else
+                     ReconcileProgram.FailureWakeSource.CoarseHostSignal)
             )
         | "AbortWake" -> ReconcileProgram.ReconcileWake.AbortWake
         | other -> invalidArg "wake" (sprintf "unknown reconcile wake: %s" other)
@@ -61,7 +68,16 @@ module ReconcileSurface =
         | "NoTurn" -> ReconcileProgram.evidenceNoTurn ()
         | "Provisional" -> ReconcileProgram.evidenceProvisional (outcomeOf (property value "outcome"))
         | "Unknown" -> ReconcileProgram.evidenceUnknown ()
-        | "Terminal" -> ReconcileProgram.evidenceTerminal (outcomeOf (property value "outcome"))
+        | "Terminal" ->
+            let physical = stringOf (property value "physical")
+            let outcome = outcomeOf (property value "outcome")
+
+            if System.String.IsNullOrWhiteSpace physical then
+                ReconcileProgram.evidenceTerminal outcome
+            else
+                ReconcileProgram.turnFixture "terminal-session" physical "terminal-provider-run" outcome
+                |> ReconcileProgram.observedTurn
+                |> ReconcileProgram.ReconcileEvidence.Terminal
         | "SessionCleared" -> ReconcileProgram.evidenceSessionCleared ()
         | other -> invalidArg "evidence" (sprintf "unknown reconcile evidence: %s" other)
 
@@ -177,12 +193,35 @@ module ReconcileSurface =
             {| kind = "FailureWake"
                physical = ""
                reason = "provider failure"
+               source = "CoarseHostSignal"
+               hasQuiescence = false |}
+
+    let failureWakeFor (physical: string) : obj =
+        box
+            {| kind = "FailureWake"
+               physical = physical
+               reason = "provider failure"
+               source = "ExactAssistantProjection"
                hasQuiescence = false |}
 
     let abortWake () : obj =
         box
             {| kind = "AbortWake"
                hasQuiescence = false |}
+
+    let mergeWakeKind (currentPhysical: string) (previous: obj) (incoming: obj) =
+        ReconcileProgram.mergeWake
+            (if System.String.IsNullOrWhiteSpace currentPhysical then
+                 None
+             else
+                 Some(PhysicalUserMessageId.create currentPhysical))
+            (wakeOf previous)
+            (wakeOf incoming)
+        |> function
+            | ReconcileProgram.ReconcileWake.IdleWake _ -> "IdleWake"
+            | ReconcileProgram.ReconcileWake.RetryWake -> "RetryWake"
+            | ReconcileProgram.ReconcileWake.FailureWake _ -> "FailureWake"
+            | ReconcileProgram.ReconcileWake.AbortWake -> "AbortWake"
 
     let evidenceSnapshotError (reason: string) : obj =
         box
@@ -201,6 +240,13 @@ module ReconcileSurface =
     let evidenceTerminal (outcomeName: string) : obj =
         box
             {| kind = "Terminal"
+               physical = ""
+               outcome = outcomeName |}
+
+    let evidenceTerminalFor (physical: string) (outcomeName: string) : obj =
+        box
+            {| kind = "Terminal"
+               physical = physical
                outcome = outcomeName |}
 
     let evidenceSessionCleared () : obj = box {| kind = "SessionCleared" |}
@@ -254,6 +300,33 @@ module ReconcileSurface =
           Parts = parts
           PartIds = Array.create parts.Length None
           ToolParts = [||] }
+
+    let unboundFailureScenario () : Task<obj> =
+        task {
+            let sessionId = SessionId.create "unbound-failure-session"
+            let store = TurnBinding.Store()
+            // DSL-MUTABLE: algorithm-scratch — proves an unbound coarse failure performs zero reads.
+            let mutable snapshotReads = 0
+
+            let snapshot =
+                { new ISessionSnapshotPort with
+                    member _.GetMessages _ =
+                        snapshotReads <- snapshotReads + 1
+                        Task.FromResult(Ok []) }
+
+            let scheduler =
+                Reconciler.Scheduler(snapshot, store, (fun _ -> Task.FromResult(()) :> Task))
+
+            scheduler.Signal(
+                ProviderFailure
+                    { SessionId = sessionId
+                      Failure = ExecutionFailure.ProviderPermanent
+                      Diagnostic = "APIError" }
+            )
+
+            do! scheduler.StopAndDrain()
+            return box {| snapshotReads = snapshotReads |}
+        }
 
     let private projectionEdgeScenario (failureWake: bool) : Task<obj> =
         task {
@@ -333,7 +406,12 @@ module ReconcileSurface =
                 Reconciler.Scheduler(snapshot, store, onTurn, ?onSnapshot = Some observeSnapshot)
 
             if failureWake then
-                scheduler.Signal(ProviderFailure(sessionId, "APIError"))
+                scheduler.Signal(
+                    ProviderFailure
+                        { SessionId = sessionId
+                          Failure = ExecutionFailure.ProviderTransient
+                          Diagnostic = "APIError" }
+                )
             else
                 let quiescence = SessionQuiescenceGate()
                 quiescence.BeginProviderAttempt sessionId
@@ -430,7 +508,14 @@ module ReconcileSurface =
                 Task.FromResult(()) :> Task
 
             let scheduler = Reconciler.Scheduler(snapshot, store, onTurn)
-            scheduler.Signal(ProviderFailure(sessionId, "Bad Request: input_invalid"))
+
+            scheduler.Signal(
+                ProviderFailure
+                    { SessionId = sessionId
+                      Failure = ExecutionFailure.ProviderPermanent
+                      Diagnostic = "Bad Request: input_invalid" }
+            )
+
             do! scheduler.StopAndDrain()
 
             return formatObserved snapshotReads observed

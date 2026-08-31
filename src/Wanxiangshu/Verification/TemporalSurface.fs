@@ -14,7 +14,9 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Finality
+open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.EventStore
@@ -80,6 +82,93 @@ module TemporalSurface =
     let private optionalProviderRun (value: obj) =
         if isNullish value then None else Some(providerRunOf value)
 
+    let private participantIdentityOfJs (value: obj) : ParticipantIdentityEvidence =
+        let role =
+            if isNullish (value?Role) then
+                None
+            else
+                Roles.tryParseRole (text (value?Role))
+                |> Option.defaultWith (fun () ->
+                    failwith $"TemporalSurface: unknown participant role '{text (value?Role)}'")
+                |> Some
+
+        let tierLabel = text (value?InitialTier)
+
+        let initialTier =
+            Roles.tryParseTier tierLabel
+            |> Option.defaultWith (fun () -> failwith $"TemporalSurface: unknown participant tier '{tierLabel}'")
+
+        let originLabel = text (value?Origin)
+
+        let origin =
+            match originLabel with
+            | "ResolvedAtRoot" -> PersonaOrigin.ResolvedAtRoot
+            | "InheritedFromOwner" -> PersonaOrigin.InheritedFromOwner
+            | _ -> failwith $"TemporalSurface: unknown participant origin '{originLabel}'"
+
+        { SelectedAgent = text (value?SelectedAgent)
+          PeerAgent = text (value?PeerAgent)
+          Role = role
+          InitialTier = initialTier
+          Persona = text (value?Persona)
+          PersonaCatalogVersion = intValue (value?PersonaCatalogVersion)
+          Origin = origin }
+        |> ParticipantIdentity.fromInput
+        |> Result.defaultWith (fun error -> failwith $"TemporalSurface: invalid participant identity: {error}")
+
+    let private participantIdentityToJs (evidence: ParticipantIdentityEvidence) : obj =
+        let identity = ParticipantIdentity.toInput evidence
+
+        box
+            {| SelectedAgent = identity.SelectedAgent
+               PeerAgent = identity.PeerAgent
+               Role = identity.Role |> Option.map Roles.roleLabel |> Option.toObj
+               InitialTier = Roles.wireTierLabel identity.InitialTier
+               Persona = identity.Persona
+               PersonaCatalogVersion = identity.PersonaCatalogVersion
+               Origin =
+                match identity.Origin with
+                | PersonaOrigin.ResolvedAtRoot -> "ResolvedAtRoot"
+                | PersonaOrigin.InheritedFromOwner -> "InheritedFromOwner" |}
+
+    let private identitySeedOfJs (value: obj) : PromptAuthority.IdentitySeed =
+        let participantIdentity = participantIdentityOfJs (value?ParticipantIdentity)
+        let identityInput = ParticipantIdentity.toInput participantIdentity
+
+        let seedInput =
+            match text (value?Kind) with
+            | "RootSelection" -> PromptAuthority.IdentitySeedInput.RootSelectionInput identityInput
+            | "InheritedFromOwner" ->
+                PromptAuthority.IdentitySeedInput.InheritedFromOwnerInput
+                    { OwnerSessionId = sessionIdOf (value?OwnerSessionId)
+                      OwnerLogicalRunId = logicalRunOf (value?OwnerLogicalRunId)
+                      OwnerAuthorityRootUserMessageId = authorityRootOf (value?OwnerAuthorityRootUserMessageId)
+                      ParticipantIdentity = identityInput }
+            | kind -> failwith $"TemporalSurface: unknown identity seed kind '{kind}'"
+
+        PromptAuthority.rehydrateIdentitySeed seedInput
+        |> Result.defaultWith (fun error -> failwith $"TemporalSurface: invalid identity seed: {error}")
+
+    let private identitySeedToJs (seed: PromptAuthority.IdentitySeed) : obj =
+        let participantIdentity =
+            PromptAuthority.identitySeedParticipantIdentity seed |> participantIdentityToJs
+
+        match PromptAuthority.identitySeedOwner seed with
+        | None ->
+            box
+                {| Kind = "RootSelection"
+                   OwnerSessionId = null
+                   OwnerLogicalRunId = null
+                   OwnerAuthorityRootUserMessageId = null
+                   ParticipantIdentity = participantIdentity |}
+        | Some(ownerSessionId, ownerLogicalRunId, ownerAuthorityRootUserMessageId) ->
+            box
+                {| Kind = "InheritedFromOwner"
+                   OwnerSessionId = SessionId.value ownerSessionId
+                   OwnerLogicalRunId = LogicalRunId.value ownerLogicalRunId
+                   OwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId.value ownerAuthorityRootUserMessageId
+                   ParticipantIdentity = participantIdentity |}
+
     let private streamOfJs (value: obj) : StreamId =
         match text (value?kind) with
         | "Session" -> StreamId.Session(sessionIdOf (value?session))
@@ -113,14 +202,12 @@ module TemporalSurface =
         | "Prompt", "AuthorityRootAccepted" ->
             AgentFact.Prompt(
                 PromptFactCases.AuthorityRootAccepted
-                    {| SessionId = sessionIdOf (payload?SessionId)
-                       LogicalRunId = logicalRunOf (payload?LogicalRunId)
-                       AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
-                       AuthorityKind = text (payload?AuthorityKind)
-                       SelectedAgent = text (payload?SelectedAgent)
-                       PeerAgent = text (payload?PeerAgent)
-                       CanonicalRole = text (payload?CanonicalRole)
-                       SelectedTier = text (payload?SelectedTier) |}
+                    { SchemaVersion = 2
+                      SessionId = sessionIdOf (payload?SessionId)
+                      LogicalRunId = logicalRunOf (payload?LogicalRunId)
+                      AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
+                      AuthorityKind = text (payload?AuthorityKind)
+                      IdentitySeed = identitySeedOfJs (payload?IdentitySeed) }
             )
         | "Fallback", "FallbackCursorAdvanced" ->
             AgentFact.Fallback(
@@ -197,12 +284,34 @@ module TemporalSurface =
                dedupeKeys = state.RecentFailureKeys.Length
                exhausted = state.Exhausted |}
 
+    let private authorityProfileToJs (profile: PromptAuthority.AuthorityExecutionProfile) : obj =
+        box
+            {| session = SessionId.value profile.SessionId
+               logicalRun = LogicalRunId.value profile.LogicalRunId
+               authorityRoot = AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
+               authorityKind =
+                match profile.AuthorityKind with
+                | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
+                | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
+               identitySeed = identitySeedToJs profile.IdentitySeed
+               participantIdentity = participantIdentityToJs profile.ParticipantIdentity |}
+
     let private sessionToJs (session: SessionAgentProjection) : obj =
         box
             {| fallback =
                 match session.Fallback with
                 | None -> null
-                | Some value -> fallbackToJs value |}
+                | Some value -> fallbackToJs value
+               activeLogicalRun =
+                session.PromptAuthority
+                |> Option.bind (fun authority -> authority.ActiveLogicalRun)
+                |> Option.map authorityProfileToJs
+                |> Option.defaultValue null
+               lastAuthorityProfile =
+                session.PromptAuthority
+                |> Option.bind (fun authority -> authority.LastAuthorityProfile)
+                |> Option.map authorityProfileToJs
+                |> Option.defaultValue null |}
 
     let private projectionToJs (projection: ProjectionSet) : obj =
         let sessions =
@@ -234,15 +343,13 @@ module TemporalSurface =
                    case = "AuthorityRootAccepted"
                    payload =
                     box
-                        {| SessionId = SessionId.value payload.SessionId
+                        {| SchemaVersion = 2
+                           SessionId = SessionId.value payload.SessionId
                            LogicalRunId = LogicalRunId.value payload.LogicalRunId
                            AuthorityRootUserMessageId =
                             AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
                            AuthorityKind = payload.AuthorityKind
-                           SelectedAgent = payload.SelectedAgent
-                           PeerAgent = payload.PeerAgent
-                           CanonicalRole = payload.CanonicalRole
-                           SelectedTier = payload.SelectedTier |} |}
+                           IdentitySeed = identitySeedToJs payload.IdentitySeed |} |}
         | Fact.Agent(AgentFact.Fallback(FallbackFactCases.FallbackCursorAdvanced payload)) ->
             box
                 {| family = "Fallback"
@@ -761,6 +868,101 @@ module TemporalSurface =
         }
 
     // ── pure durable fold ───────────────────────────────────────────────────
+
+    let sessionReuseIdentityScenario (firstAccepted: obj) (secondAccepted: obj) : obj =
+        let firstFact = Fact.Agent(agentFactOfJs firstAccepted)
+        let secondFact = Fact.Agent(agentFactOfJs secondAccepted)
+        let firstPayload = firstAccepted?payload
+        let sessionId = sessionIdOf (firstPayload?SessionId)
+        let lifeId = ManagerLifeId.create "life-session-reuse-a"
+
+        let lifeOpened =
+            Fact.ManagerLifecycle(
+                ManagerLifecycleFact.LifeOpened
+                    {| SessionId = sessionId
+                       LifeId = lifeId
+                       OpeningUserMessageId =
+                        PhysicalUserMessageId.create (text (firstPayload?AuthorityRootUserMessageId))
+                       OpeningTextRef = BlobRef.create "blob:session-reuse-opening"
+                       OpeningTextDigest = BlobDigest.create "sha256:session-reuse-opening"
+                       OpeningCursorSequence = 1L |}
+            )
+
+        let lifeCompleted =
+            Fact.ManagerLifecycle(
+                ManagerLifecycleFact.LifeCompleted
+                    {| SessionId = sessionId
+                       LifeId = lifeId
+                       RequestId = FinalityRequestId.create "finality-session-reuse-a"
+                       TerminalRef = BlobRef.create "blob:session-reuse-terminal"
+                       TerminalDigest = BlobDigest.create "sha256:session-reuse-terminal" |}
+            )
+
+        let envelope sequence fact =
+            { RuntimeId = RuntimeId.create "runtime-session-reuse"
+              LocalSeq = LocalSeq.create sequence
+              ObservedAt = DateTimeOffset.Parse "2026-08-30T00:00:00Z"
+              EventId = EventId.create (sprintf "session-reuse-%d" sequence)
+              Stream = StreamId.Session sessionId
+              ProviderRun = None
+              Fact = fact }
+
+        let canonicalRoundTrip (value: Envelope) =
+            EventStoreJournalCodec.encode [] (JournalPayloadClosure.ofFact value.Fact) value
+            |> EventStoreJournalCodec.tryDecode
+            |> Result.defaultWith (fun error -> failwith $"TemporalSurface: session reuse codec failed: {error}")
+
+        let firstEnvelope = envelope 1L firstFact
+
+        let afterFirst =
+            Fold.foldEnvelope Fold.empty firstEnvelope
+            |> Result.defaultWith (fun rejection ->
+                failwith $"TemporalSurface: first root rejected: {rejection.Reason}")
+
+        let preCloseSecond = Fold.foldEnvelope afterFirst (envelope 2L secondFact)
+
+        let sequence =
+            [ firstEnvelope
+              envelope 2L lifeOpened
+              envelope 3L lifeCompleted
+              envelope 4L secondFact ]
+
+        let foldSequence facts =
+            facts
+            |> List.fold
+                (fun current value -> current |> Result.bind (fun projection -> Fold.foldEnvelope projection value))
+                (Ok Fold.empty)
+
+        let online =
+            foldSequence sequence
+            |> Result.defaultWith (fun rejection ->
+                failwith $"TemporalSurface: online sequence rejected: {rejection.Reason}")
+
+        let afterLife =
+            sequence
+            |> List.take 3
+            |> foldSequence
+            |> Result.defaultWith (fun rejection ->
+                failwith $"TemporalSurface: LifeCompleted rejected: {rejection.Reason}")
+
+        let replayed =
+            sequence
+            |> List.map canonicalRoundTrip
+            |> foldSequence
+            |> Result.defaultWith (fun rejection -> failwith $"TemporalSurface: replay rejected: {rejection.Reason}")
+
+        box
+            {| preCloseSecond =
+                match preCloseSecond with
+                | Ok _ -> box {| ok = true; error = null |}
+                | Error rejection ->
+                    box
+                        {| ok = false
+                           error = rejectionToJs rejection |}
+               afterFirst = projectionToJs afterFirst
+               afterLife = projectionToJs afterLife
+               online = projectionToJs online
+               replayed = projectionToJs replayed |}
 
     let fold (envelopes: obj array) : obj =
         let rec loop current remaining =

@@ -200,6 +200,7 @@ module FissionHostSurface =
 
             let context =
                 { Turn = turn
+                  Failure = None
                   Quiescence = None
                   Delivery = ReconciledTurnDelivery.Observation }
 

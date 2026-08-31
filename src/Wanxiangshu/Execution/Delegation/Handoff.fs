@@ -5,9 +5,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Trace
 
-type DelegationHandoffWindow =
-    { Range: XTraceRange
-      IsInitial: bool }
+type DelegationHandoffWindow = { Range: XTraceRange; IsInitial: bool }
 
 type PreparedDelegationHandoff =
     { Route: DelegationHandoffRoute

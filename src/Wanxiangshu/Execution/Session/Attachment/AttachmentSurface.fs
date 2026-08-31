@@ -14,9 +14,7 @@ module AttachmentSurface =
             match observation with
             | "missing" -> AttachedChildObservation.Missing
             | "matching" -> AttachedChildObservation.Matching existing
-            | _ ->
-                AttachedChildObservation.Conflicting
-                    [ existing; SessionId.create "host-child-conflict" ]
+            | _ -> AttachedChildObservation.Conflicting [ existing; SessionId.create "host-child-conflict" ]
 
         let decision, children =
             match AttachedChildObservation.decide evidence with
@@ -144,10 +142,7 @@ module AttachmentSurface =
                 | "matching" -> Task.FromResult(Ok(AttachedChildObservation.Matching existing))
                 | "conflicting" ->
                     Task.FromResult(
-                        Ok(
-                            AttachedChildObservation.Conflicting
-                                [ existing; SessionId.create "host-child-conflict" ]
-                        )
+                        Ok(AttachedChildObservation.Conflicting [ existing; SessionId.create "host-child-conflict" ])
                     )
                 | _ -> Task.FromResult(Error "host child query failed")
 

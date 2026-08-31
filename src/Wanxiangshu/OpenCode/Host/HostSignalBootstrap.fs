@@ -3,14 +3,15 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Execution.Delegation.Handle.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Git.Hook
@@ -29,6 +30,16 @@ open Wanxiangshu.Strength.Persistence
 
 module HostSignalBootstrap =
 
+    type internal ChatAdmissionHookFailure =
+        | IntentRejected of ChatAdmissionIntent.Rejection
+        | TransactionFailed of ChatAdmissionTransactionError
+        | TransactionStopped of ChatAdmissionTransactionOutcome
+
+    type internal ChatAdmissionHookException(failure: ChatAdmissionHookFailure, executionKey: ChatExecutionKey option) =
+        inherit Exception(sprintf "Managed chat admission failed: %A" failure)
+        member _.Failure = failure
+        member _.ExecutionKey = executionKey
+
     /// What the composition root needs back from `wire`.
     ///
     /// Exactly the members `SpikePlugin` calls. Six more used to hang here —
@@ -43,7 +54,40 @@ module HostSignalBootstrap =
           BindActiveRun: SessionId -> Role -> string option -> unit
           CurrentPhysicalUserMessage: string -> string option
           ChatMessageHook: obj
-          ObserveEvent: obj -> unit }
+          ObserveEvent: obj -> Task<unit> }
+
+    let private hostText (value: obj) =
+        if isNull value then
+            None
+        else
+            string value |> Some |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+    let private sessionIdValue (properties: obj) =
+        if isNull properties then null else properties?sessionID
+
+    let private parentIdValue (info: obj) =
+        if isNull info then null else info?parentID
+
+    let private infoValue (properties: obj) =
+        if isNull properties then null else properties?info
+
+    let private hostAuxiliaryChild (raw: obj) =
+        let event = HostEventCodec.unwrap raw
+
+        if HostEventCodec.eventTypeOf event <> "session.created" then
+            None
+        else
+            let properties = event?properties
+            let info = infoValue properties
+
+            hostText (sessionIdValue properties)
+            |> Option.bind (fun sessionId ->
+                hostText (parentIdValue info)
+                |> Option.map (fun _ -> SessionId.create sessionId))
+
+    let private observeHostAuxiliaryChild raw =
+        hostAuxiliaryChild raw
+        |> Option.iter SessionExecutionBinding.observeHostAuxiliaryChild
 
     let wire
         (sessionPort: ISessionHostPort)
@@ -53,6 +97,10 @@ module HostSignalBootstrap =
         (strengthDurability: StrengthDurabilityPort option)
         (scope: PluginRuntimeScope)
         (input: obj)
+        /// Exact process-local private-agent attachment; it cannot establish a public authority profile.
+        (tryConsumeHostInternalPrompt: SessionId -> string option -> string option -> bool)
+        /// Exact assistant terminal evidence for private agents outside public PromptAuthority.
+        (observeHostInternalTerminal: ExactProviderTerminalObservation -> unit)
         /// Workspace root for graceful Casebook finalize (SpikePlugin → CasebookLifecycle).
         (workspaceDirectory: string option)
         /// Owner-scope graceful close: finalize inspector draft once (root → inspectorSessionId).
@@ -74,6 +122,15 @@ module HostSignalBootstrap =
                     { new ISessionSnapshotPort with
                         member _.GetMessages _ =
                             Task.FromResult(Ok([]: SessionMessage list)) }
+
+            journal
+            |> Option.iter (fun durable ->
+                let recovery = SessionRecoveryHost(durable, snapshot, scope.Recovery, None)
+                scope.AttachChatRecoveryRuntime recovery
+
+                scope.AttachDurabilityActivation(fun () ->
+                    scope.RunBackground(fun () ->
+                        scope.SignalChatRecovery ChatExecutionRecoveryLifecycleEvent.DurabilityActivated)))
 
             // Host visibility catch-up still owns a Node timer backstop. Provider
             // recovery itself is causal and no longer uses a wall-clock deadline.
@@ -145,27 +202,44 @@ module HostSignalBootstrap =
                 // HOST-002/004: operator abort immediately revokes the current
                 // attempt's idle permits, then routes to the
                 // reconciler. Never ProviderFailure — it does not advance fallback.
-                | AttemptAborted sessionId ->
+                | AttemptAborted failure ->
                     // Fission retires only the replaced physical present. It is not
                     // an owner cancellation: do not revoke owner resources or cancel
                     // speculation/children here. Revoke the physical attempt's idle
                     // continuation capability so the retired conversation never continues.
                     FissionHost.routeAttemptAborted
-                        sessionId
+                        failure.SessionId
                         (fun () ->
-                            scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
+                            scope.Sessions.Quiescence.RevokeCurrentAttempt failure.SessionId
                             reconciler.Signal signal)
-                        (fun () -> handleOrdinaryAbort sessionId signal)
+                        (fun () -> handleOrdinaryAbort failure.SessionId signal)
                 | SessionDeleted(sessionId, parentSessionIdOpt) ->
+                    let deletion = HostSessionDeletion.prepare scope sessionId parentSessionIdOpt
+
                     scope.RunBackground(fun () ->
-                        HostSessionDeletion.handle
-                            scope
-                            workspaceDirectory
-                            finalizeInspector
-                            cleanupInspectorDraft
-                            reconciler.Signal
-                            sessionId
-                            parentSessionIdOpt)
+                        task {
+                            do!
+                                HostSessionDeletion.finalizePreparedInspector
+                                    scope
+                                    workspaceDirectory
+                                    finalizeInspector
+                                    deletion
+
+                            do!
+                                scope.SignalChatRecoverySession
+                                    sessionId
+                                    ChatExecutionRecoveryLifecycleEvent.SessionDeleted
+
+                            do! scope.DrainChatRecovery sessionId
+
+                            do!
+                                HostSessionDeletion.handle
+                                    scope
+                                    cleanupInspectorDraft
+                                    reconciler.Signal
+                                    sessionId
+                                    deletion
+                        })
 
             // LOOP-002/006 and HOST-027 share one raw Host subscription but own
             // disjoint stream fields. Both abort physically; only their typed armed
@@ -185,7 +259,7 @@ module HostSignalBootstrap =
                                     sessionPort
                                     sessionId
                                     prompt
-                                    PromptAuthority.DegenerationGuard
+                                    PromptAuthority.ContinuationKind.DegenerationGuard
                                     directory
                                     journal
                                     PromptDispatcher.AwaitMode.Detached
@@ -196,36 +270,150 @@ module HostSignalBootstrap =
 
             do scope.AttachLoopSensor loopSensor
 
+            let exactStarted (key: ChatExecutionKey) : ProviderStartedEvidence option =
+                journal
+                |> Option.bind (fun durable ->
+                    AgentJournal.snapshot durable
+                    |> fun projection -> projection.AgentProjections.ChatExecutions
+                    |> ChatExecutionProjection.byKey key
+                    |> Option.bind _.ProviderStarted)
+
+            let rejectProviderTerminal (observation: ExactProviderTerminalObservation) =
+                Diagnostic.emit
+                    "provider-terminal-evidence-mismatch"
+                    [ "session_id", SessionId.value observation.SessionId
+                      "physical_user_message_id", PhysicalUserMessageId.value observation.PhysicalUserMessageId ]
+
+            let applyObservedTerminal
+                (observation: ExactProviderTerminalObservation)
+                (evidence: ProviderStartedEvidence)
+                (disposition: ChatExecutionTerminalDisposition)
+                =
+                task {
+                    do!
+                        scope.SignalChatRecovery(
+                            ChatExecutionRecoveryLifecycleEvent.ExactAssistantTerminal(evidence, disposition)
+                        )
+
+                    reconciler.NotifyProjectionChanged(observation.SessionId, observation.PhysicalUserMessageId)
+
+                    FissionHost.observePhysicalExecutionEnd
+                        reconciler.TryPhysicalUserMessage
+                        journal
+                        (fun sid -> reconciler.Kick(sid, ReconcileProgram.ReconcileWake.RetryWake))
+                        observation.SessionId
+                        observation.PhysicalUserMessageId
+                }
+
+            let startedEvidenceForTerminal (observation: ExactProviderTerminalObservation) =
+                let key =
+                    { SessionId = observation.SessionId
+                      PhysicalUserMessageId = observation.PhysicalUserMessageId }
+
+                exactStarted key
+
+            let settleExactTerminal (observation: ExactProviderTerminalObservation) =
+                match observation.Outcome, observation.Disposition, startedEvidenceForTerminal observation with
+                | HostProviderTerminalOutcome.ProviderFailure failure, None, Some _ ->
+                    reconciler.Kick(
+                        observation.SessionId,
+                        ReconcileProgram.ReconcileWake.FailureWake(
+                            Some observation.PhysicalUserMessageId,
+                            failure,
+                            "exact-provider-terminal",
+                            ReconcileProgram.FailureWakeSource.ExactAssistantProjection
+                        )
+                    )
+
+                    Task.FromResult()
+                | _, Some disposition, Some evidence -> applyObservedTerminal observation evidence disposition
+                | _ ->
+                    rejectProviderTerminal observation
+                    Task.FromResult()
+
+            let settleObservedTerminal (terminal: ExactProviderTerminalObservation option) =
+                terminal
+                |> Option.map settleExactTerminal
+                |> Option.defaultValue (Task.FromResult())
+
+            let continueStartedLifecycle
+                (started: ExactProviderStartObservation)
+                (providerStepEnded: bool)
+                (terminal: ExactProviderTerminalObservation option)
+                =
+                task {
+                    if providerStepEnded then
+                        ModelRouting.endProviderStep started.SessionId started.PhysicalUserMessageId started.ProviderRun
+
+                    do! settleObservedTerminal terminal
+                }
+
+            let rejectProviderStart
+                (started: ExactProviderStartObservation)
+                (error: SessionExecutionBinding.ProviderStartObservationError<unit>)
+                =
+                Diagnostic.emit
+                    "provider-start-observation-rejected"
+                    [ "session_id", SessionId.value started.SessionId
+                      "physical_user_message_id", PhysicalUserMessageId.value started.PhysicalUserMessageId
+                      "provider_run", ProviderRunIdentity.value started.ProviderRun
+                      "reason", SessionExecutionBinding.providerStartObservationErrorCode error ]
+
+            let signalProviderStarted (started: ExactProviderStartObservation) =
+                let key =
+                    { SessionId = started.SessionId
+                      PhysicalUserMessageId = started.PhysicalUserMessageId }
+
+                exactStarted key
+                |> Option.map (
+                    ChatExecutionRecoveryLifecycleEvent.ExactAssistantStarted
+                    >> scope.SignalChatRecovery
+                )
+                |> Option.defaultValue (Task.FromResult() :> Task)
+
+            let signalNewProviderStart started providerStarted =
+                if providerStarted then
+                    signalProviderStarted started
+                else
+                    Task.FromResult() :> Task
+
+            let continueProviderStart
+                (started: ExactProviderStartObservation)
+                (providerStepEnded: bool)
+                (terminal: ExactProviderTerminalObservation option)
+                (persistence: Result<bool, SessionExecutionBinding.ProviderStartObservationError<unit>>)
+                =
+                match persistence with
+                | Error error ->
+                    rejectProviderStart started error
+                    Task.FromResult() :> Task
+                | Ok providerStarted ->
+                    task {
+                        reconciler.BindPhysicalUserMaterial(started.SessionId, started.PhysicalUserMessageId)
+                        do! signalNewProviderStart started providerStarted
+                        do! continueStartedLifecycle started providerStepEnded terminal
+                    }
+                    :> Task
+
             let signalRouter =
                 HostSignalRouter(
                     scope.Sessions.OwnedSessions,
                     onSignal,
                     onLoopEvent = loopSensor.Observe,
-                    onProviderStepEnd =
-                        (fun sessionId physicalUserMessageId providerRun ->
-                            ModelRouting.endProviderStep sessionId physicalUserMessageId providerRun),
-                    onPhysicalExecutionEnd =
-                        (fun sessionId physicalUserMessageId ->
-                            // EMR-007 owns capacity release. Reconciliation
-                            // observes the same exact terminal assistant edge as
-                            // projection visibility only; it remains outside the
-                            // HostSignal/business vocabulary.
-                            ModelRouting.releasePhysicalExecution sessionId physicalUserMessageId
-                            reconciler.NotifyProjectionChanged(sessionId, physicalUserMessageId)
+                    onExactAssistantObservation =
+                        (fun
+                            (started: ExactProviderStartObservation)
+                            (providerStepEnded: bool)
+                            (terminal: ExactProviderTerminalObservation option) ->
+                            task {
+                                let! providerStarted =
+                                    SessionExecutionBinding.persistProviderStartedFromObservation
+                                        journal
+                                        scope.TryBindAttemptPlan
+                                        started
 
-                            // INTRA-PARTICIPANT-PARALLELISM-009: OpenCode can
-                            // complete a prompt_async physical execution without
-                            // delivering the later session.status/session.idle
-                            // event to the plugin transport. A Fission lane cannot
-                            // rely on that lossy coarse wake because its ordinary
-                            // terminal is the only route into lane materialization
-                            // and eventual takeover of the old logical owner.
-                            FissionHost.observePhysicalExecutionEnd
-                                reconciler.TryPhysicalUserMessage
-                                journal
-                                (fun sid -> reconciler.Kick(sid, ReconcileProgram.ReconcileWake.RetryWake))
-                                sessionId
-                                physicalUserMessageId)
+                                do! continueProviderStart started providerStepEnded terminal providerStarted
+                            })
                 )
 
             let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.Observe None
@@ -280,6 +468,14 @@ module HostSignalBootstrap =
                         PhysicalUserMessageId.create messageId
                     )
 
+            let bindHumanContinuationMessage (sessionId: string) (messageId: string) =
+                if
+                    not (String.IsNullOrWhiteSpace sessionId)
+                    && not (String.IsNullOrWhiteSpace messageId)
+                then
+                    scope.Sessions.UserMessageBindings.[sessionId] <- PhysicalUserMessageId.create messageId
+                    bindContinuationMessage sessionId messageId
+
             let bindActiveRun (sessionId: SessionId) (role: Role) (directory: string option) =
                 let key = SessionId.value sessionId
                 registerOwned key
@@ -301,33 +497,11 @@ module HostSignalBootstrap =
                       Role = Some role
                       Directory = directory }
 
-            let reactivateBlogger mainSessionId durable root =
-                let associations = (AgentJournal.snapshot durable).AgentProjections.Associations
-
-                match SessionAssociationProjection.tryBloggerOf mainSessionId associations with
-                | None -> ()
-                | Some bloggerId -> BloggerCoordinator.reactivateAfterNewRoot scope.BloggerRuntimeHost bloggerId root
-
-            let onAuthorityRoot (mainSessionId: SessionId, root: AuthorityRootUserMessageId) =
-                match journal with
-                | None -> ()
-                | Some durable -> reactivateBlogger mainSessionId durable root
-
-            let onContinuationAccepted
-                (sessionId: SessionId, physicalUserMessageId: PhysicalUserMessageId, continuationKind)
-                =
-                match continuationKind with
-                | PromptAuthority.ProviderRetryAttempt -> scope.ArmRecovery(sessionId, physicalUserMessageId)
-                | _ -> ()
-
-            let promptIngressHook =
-                PromptIngress.createHook
-                    journal
-                    bindUserMessage
-                    bindContinuationMessage
-                    registerOwned
-                    (Some onAuthorityRoot)
-                    (Some onContinuationAccepted)
+            let admissionTransaction =
+                journal
+                |> Option.map (fun durable ->
+                    let runtime = PromptDispatcher.forJournal durable
+                    ChatAdmissionTransaction.production durable runtime.AcceptManagedChatIntent)
 
             let durabilityActivation =
                 lazy
@@ -362,65 +536,138 @@ module HostSignalBootstrap =
             let hasPhysicalParent sessionId =
                 scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
 
-            let continueRoutedChatMessage routedExecution (decoded: PromptIngressCodec.DecodedMessage) input output =
+            let continueUnmanagedChatMessage intent =
+                requireDurabilityActivation ()
+                JoinWake.observeChatMessage scope.Sessions.JoinInterrupts intent
+
+            let observePendingContinuation (evidence: ChatAdmissionIntent.PendingPromptEvidence) =
+                match evidence.Origin with
+                | PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt ->
+                    scope.ArmRecovery(evidence.Key.SessionId, evidence.Key.PhysicalUserMessageId)
+                | _ -> ()
+
+            let continueManagedChatMessage intent output =
+                match intent with
+                | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
+                    scope.Sessions.ModelRoutingSessions.Add(SessionId.value evidence.Key.SessionId)
+                    |> ignore
+
+                    bindUserMessage
+                        (SessionId.value evidence.Key.SessionId)
+                        (PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId)
+                | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
+                    let sessionId = SessionId.value evidence.Key.SessionId
+                    let physicalId = PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId
+
+                    scope.Sessions.ModelRoutingSessions.Add sessionId |> ignore
+                    bindHumanContinuationMessage sessionId physicalId
+                    registerOwned sessionId
+                | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
+                    let sessionId = SessionId.value evidence.Key.SessionId
+                    let physicalId = PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId
+
+                    scope.Sessions.ModelRoutingSessions.Add sessionId |> ignore
+                    bindContinuationMessage sessionId physicalId
+                    registerOwned sessionId
+                    observePendingContinuation evidence
+                | _ -> ()
+
+                FissionHostRequestProjection.projectPendingManaged hasPhysicalParent intent output
+                requireDurabilityActivation ()
+                JoinWake.observeChatMessage scope.Sessions.JoinInterrupts intent
+
+            let currentExecution durable intent =
+                let key =
+                    match intent with
+                    | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
+                        { SessionId = evidence.Key.SessionId
+                          PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId }
+                    | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
+                        { SessionId = evidence.Key.SessionId
+                          PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId }
+                    | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
+                        { SessionId = evidence.Key.SessionId
+                          PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId }
+                    | _ -> invalidArg "intent" "managed chat transaction requires a managed intent"
+
+                (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+                |> ChatExecutionProjection.byKey key
+
+            let executionKey intent =
+                match intent with
+                | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
+                    Some
+                        { SessionId = evidence.Key.SessionId
+                          PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId }
+                | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
+                    Some
+                        { SessionId = evidence.Key.SessionId
+                          PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId }
+                | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
+                    Some
+                        { SessionId = evidence.Key.SessionId
+                          PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId }
+                | ChatAdmissionIntent.Decision.NoManagedExecution _
+                | ChatAdmissionIntent.Decision.HostInternal _
+                | ChatAdmissionIntent.Decision.Reject _ -> None
+
+            let admitManagedChatMessage durable createTransaction intent output =
                 task {
-                    ModelRouting.projectRoutedModel output routedExecution
-                    FissionHostRequestProjection.projectRouted hasPhysicalParent routedExecution output
+                    let ports = createTransaction (ModelRouting.projectHostModel output)
 
-                    requireDurabilityActivation ()
-                    JoinWake.observeChatMessage scope.Sessions.JoinInterrupts decoded
-                    do! promptIngressHook input output
-
-                    let dispatchAccepted =
-                        journal
-                        |> Option.map (fun durable ->
-                            let runtime = PromptDispatcher.forJournal durable
-
-                            fun (claim: PromptAuthority.PromptClaim) ->
-                                runtime.DispatchAccepted(claim.SessionId, claim))
-
-                    SessionExecutionBinding.acceptRoutedExecution dispatchAccepted routedExecution
+                    match!
+                        ChatAdmissionTransaction.execute
+                            ports
+                            { Intent = intent
+                              CurrentState = currentExecution durable intent }
+                    with
+                    | Ok(ChatAdmissionTransactionOutcome.Settled _) -> continueManagedChatMessage intent output
+                    | Ok outcome -> raise (ChatAdmissionHookException(TransactionStopped outcome, executionKey intent))
+                    | Error error -> raise (ChatAdmissionHookException(TransactionFailed error, executionKey intent))
                 }
 
-            let continueOrdinaryChatMessage (decoded: PromptIngressCodec.DecodedMessage) input output =
-                task {
-                    let tryPendingClaim
-                        (j: AgentJournal option)
-                        (sid: SessionId)
-                        (key: PromptKey)
-                        : PromptAuthority.PromptClaim option =
-                        j
-                        |> Option.bind (fun durable -> (PromptDispatcher.forJournal durable).PendingClaim(sid, key))
+            let rejectedChatMessage failure =
+                let completion =
+                    TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-                    let admission =
-                        ModelRouting.chatExecutionAdmission
-                            tryPendingClaim
-                            journal
-                            decoded.IsHostCompaction
-                            decoded.SessionId
-                            decoded.PhysicalUserMessageId
-                            decoded.PromptKey
-                            decoded.ExplicitAgent
+                completion.SetException(ChatAdmissionHookException(failure, None))
+                completion.Task
 
-                    let! routedExecution =
-                        ModelRouting.routeChatExecution
-                            (fun sessionId ->
-                                scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore)
-                            SessionExecutionBinding.observeUserFacingAgent
-                            admission
-
-                    match routedExecution with
-                    | ModelRouting.RoutedChatExecution.Superseded -> ()
-                    | _ -> do! continueRoutedChatMessage routedExecution decoded input output
-                }
+            let continueClassifiedChatMessage intent output =
+                match intent, journal, admissionTransaction with
+                | ChatAdmissionIntent.Decision.NoManagedExecution _, _, _
+                | ChatAdmissionIntent.Decision.HostInternal _, _, _ ->
+                    continueUnmanagedChatMessage intent
+                    Task.FromResult()
+                | ChatAdmissionIntent.Decision.Reject rejection, _, _ -> rejectedChatMessage (IntentRejected rejection)
+                | ChatAdmissionIntent.Decision.ExternalRootIntent _, Some durable, Some createTransaction
+                | ChatAdmissionIntent.Decision.PendingPromptIntent _, Some durable, Some createTransaction ->
+                    admitManagedChatMessage durable createTransaction intent output
+                | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent _, Some durable, Some createTransaction ->
+                    JoinWake.observeChatMessage scope.Sessions.JoinInterrupts intent
+                    admitManagedChatMessage durable createTransaction intent output
+                | ChatAdmissionIntent.Decision.ExternalRootIntent _, _, _
+                | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent _, _, _
+                | ChatAdmissionIntent.Decision.PendingPromptIntent _, _, _ ->
+                    rejectedChatMessage (IntentRejected ChatAdmissionIntent.Rejection.DurableAuthorityUnavailable)
 
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
                     task {
-                        // Decode once up front so Host compaction stays entirely outside
-                        // execution-model-routing. The authority path re-decodes inside
-                        // createHook; this local value only gates routing + join wake.
+                        // Decode and resolve once; routing and physical authority consume
+                        // the same frozen claim and identity evidence.
                         let decoded = PromptIngressCodec.decode input output
+
+                        let intent =
+                            match decoded.SessionId with
+                            | Some sessionId when
+                                tryConsumeHostInternalPrompt sessionId decoded.ExplicitAgent decoded.Text
+                                ->
+                                ChatAdmissionIntent.Decision.HostInternal
+                                    { SessionId = decoded.SessionId
+                                      PhysicalUserMessageId = decoded.PhysicalUserMessageId
+                                      Origin = PromptAuthority.PromptOrigin.HostInternal }
+                            | _ -> PromptIngress.resolveDecision journal decoded
 
                         match decoded.SessionId with
                         | Some sessionId -> do! ensurePhysicalParentDiscovered sessionId
@@ -429,8 +676,8 @@ module HostSignalBootstrap =
                         // INTRA-PARTICIPANT-PARALLELISM-013: request-local origin
                         // narrowing is independent of business-root admission. In
                         // particular, CRASH-018 explicit /continue still performs a
-                        // provider turn even though it deliberately skips PromptIngress.
-                        FissionHostRequestProjection.projectExternalManaged hasPhysicalParent decoded output
+                        // provider turn even though it deliberately skips managed admission.
+                        FissionHostRequestProjection.projectExternalManaged hasPhysicalParent intent output
 
                         // CRASH-018: command.execute.before has no physical message id.
                         // Carry its dynamic restart disclosure across that one Host seam,
@@ -465,11 +712,7 @@ module HostSignalBootstrap =
                                 journal
                                 decoded
                         else
-                            // EMR-009 / PROMPT-006: route from typed authority evidence.
-                            // Keyless external roots use their explicit managed agent;
-                            // plugin prompts use PendingClaim.EffectiveAgent. Host message
-                            // agent/model fields are never authority for a continuation.
-                            do! continueOrdinaryChatMessage decoded input output
+                            do! continueClassifiedChatMessage intent output
                     }
 
             let cancelSignals (ids: SessionId seq) =
@@ -489,7 +732,13 @@ module HostSignalBootstrap =
                   ChatMessageHook = chatMessageHook
                   ObserveEvent =
                     (fun raw ->
-                        SyncDelegateHostObservation.observe scope.SyncDelegateRuntime raw
-                        MessageVisibilitySignal.observeEvent messageVisibility raw
-                        signalRouter.ObserveLocal raw) }
+                        task {
+                            HostEventCodec.tryDecodeExactProviderTerminal raw
+                            |> Option.iter observeHostInternalTerminal
+
+                            observeHostAuxiliaryChild raw
+                            do! signalRouter.ObserveLocal raw
+                            SyncDelegateHostObservation.observe scope.SyncDelegateRuntime raw
+                            MessageVisibilitySignal.observeEvent messageVisibility raw
+                        }) }
         }

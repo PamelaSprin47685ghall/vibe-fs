@@ -4,7 +4,7 @@
 //
 // 本测试扫描 requirements/ 全树，断言五个结构事实：
 //   1. INDEX（requirements/INDEX.md 表 + requirements/README.md 树入口）
-//      中当前全部 49 个包都有 requirements/<pkg>/{WHY,WHAT,HOW}.md 与 tests/；
+//      中当前全部 54 个包都有 requirements/<pkg>/{WHY,WHAT,HOW}.md 与 tests/；
 //   2. 每个 WHAT.md 的每个 `<PACKAGE>-NNN` 命题 ID（标题定义）在 HOW.md
 //      表格中有行（按包名 + ID 交叉检查）；
 //   3. 每个 HOW.md 落点引用的测试文件真实存在；
@@ -48,7 +48,7 @@ const packageNamesFromIndexTables = () => {
   return [...new Set(names)]
 }
 
-/** INDEX.md「# 依赖骨架」后的第一个 code block：当前 110 edge 邻接清单。 */
+/** INDEX.md「# 依赖骨架」后的第一个 code block：当前 144 edge 邻接清单。 */
 const dependencySkeleton = () => {
   const text = read(INDEX_FILE)
   const heading = text.indexOf('# 依赖骨架')
@@ -278,7 +278,7 @@ test('WHAT[REQUIREMENT-SYSTEM-006] tree entry and INDEX name the same package se
     'requirements/README.md tree entry and requirements-design/INDEX.md must name the same package set',
   )
 
-  assert.equal(fromIndex.length, 52, `expected 52 packages in INDEX, found ${fromIndex.length}`)
+  assert.equal(fromIndex.length, 54, `expected 54 packages in INDEX, found ${fromIndex.length}`)
 })
 
 test('WHAT[REQUIREMENT-SYSTEM-016] declared DEPENDS ON stays within the INDEX skeleton', () => {

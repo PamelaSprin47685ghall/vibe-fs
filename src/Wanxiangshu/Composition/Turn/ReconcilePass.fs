@@ -120,6 +120,7 @@ module ReconcilePass =
                 do!
                     onTurn
                         { Turn = reconciled
+                          Failure = ReconcileProgram.tryFailureWitness wake value |> Option.map fst
                           Quiescence = quiescenceOf wake
                           Delivery = delivery }
 

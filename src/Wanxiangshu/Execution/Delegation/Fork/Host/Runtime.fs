@@ -14,8 +14,8 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
@@ -183,7 +183,7 @@ type HostForkRuntime
         Dictionary<
             string,
             {| ChildId: SessionId
-               AgentName: string
+               IdentitySeed: PromptAuthority.IdentitySeed
                Prompt: string |}
          >()
 
@@ -311,7 +311,7 @@ type HostForkRuntime
         let deliverDeferredPrompt
             (pending:
                 {| ChildId: SessionId
-                   AgentName: string
+                   IdentitySeed: PromptAuthority.IdentitySeed
                    Prompt: string |})
             =
             task {
@@ -320,7 +320,7 @@ type HostForkRuntime
                         this.Sessions
                         this.Journal
                         pending.ChildId
-                        pending.AgentName
+                        pending.IdentitySeed
                         (this.DirectoryOf agentId)
                         pending.Prompt
                         (fun physical ->

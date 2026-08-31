@@ -21,8 +21,47 @@ const project = (events) => {
 
 const emptyWorld = project([])
 
+const ownerSession = 'ses-finality-owner'
+const ownerLogicalRun = 'run-finality-owner'
+const ownerAuthorityRoot = 'msg-finality-owner-root'
+
+const participantIdentity = (origin) => ({
+  selectedAgent: 'fast-manager',
+  peerAgent: 'deep-manager',
+  canonicalRole: 'manager',
+  selectedTier: 'fast',
+  persona: 'Coordinator',
+  personaCatalogVersion: 1,
+  origin,
+})
+
+const ownerAuthorityAccepted = {
+  kind: 'authority-root-accepted',
+  sessionId: ownerSession,
+  logicalRunId: ownerLogicalRun,
+  authorityRootUserMessageId: ownerAuthorityRoot,
+  authorityKind: 'HumanRoot',
+  identitySeed: {
+    kind: 'RootSelection',
+    participantIdentity: participantIdentity('ResolvedAtRoot'),
+  },
+}
+
+const inheritedOwnerIdentitySeed = {
+  kind: 'InheritedFromOwner',
+  ownerSession,
+  ownerLogicalRun,
+  ownerAuthorityRoot,
+  participantIdentity: participantIdentity('InheritedFromOwner'),
+}
+
+const ownerWorld = worldOf([ownerAuthorityAccepted])
+
 const agentOwnerEnding = (opening) =>
-  finality.endingAdmission(emptyWorld, 'agent-owner-root', 'root-1', 'fast-manager', 'deep-manager', 'fast', opening)
+  finality.endingAdmission(ownerWorld, 'agent-owner-root', 'root-1', 'fast-manager', 'deep-manager', 'fast', {
+    ...opening,
+    identitySeed: inheritedOwnerIdentitySeed,
+  })
 
 test('WHAT[FINALITY-022] unknown authority kind and tier fail closed', () => {
   const unknownKind = finality.endingAdmission(emptyWorld, 'forged-root', 'root-1', 'fast-manager', 'deep-manager', 'fast', { assignmentText: 'work' })
@@ -92,6 +131,7 @@ test('WHAT[FINALITY-022] AgentOwner migration is admitted only before any Life h
       terminalRef: 'blob-1',
       terminalDigest: 'digest-1',
     },
+    ownerAuthorityAccepted,
   ])
   assert.equal(finality.archivedLivesView(closed).length, 1)
 
@@ -102,7 +142,7 @@ test('WHAT[FINALITY-022] AgentOwner migration is admitted only before any Life h
     'fast-manager',
     'deep-manager',
     'fast',
-    opening,
+    { ...opening, identitySeed: inheritedOwnerIdentitySeed },
   )
   assert.deepEqual(
     afterCompletion,

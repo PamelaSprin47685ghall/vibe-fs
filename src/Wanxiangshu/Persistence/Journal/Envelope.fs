@@ -11,6 +11,7 @@ open Wanxiangshu.Context.Companion
 open Wanxiangshu.Enforcer.InstitutionalLearning
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
@@ -56,12 +57,14 @@ type Envelope =
 
 module Envelope =
 
-    let private extra =
+    let private baseExtra =
         { Extra.empty with
             Hash = "system-int64"
             Coders =
                 Extra.empty.Coders
                 |> Map.add "System.Int64" (Encode.boxEncoder Encode.int64, Decode.boxDecoder Decode.int64) }
+
+    let private extra = PromptFactCodec.withCoder baseExtra
 
     let private compareAcrossRuntimes (a: Envelope) (b: Envelope) : int =
         let byObservation = compare a.ObservedAt b.ObservedAt
@@ -228,6 +231,9 @@ module Envelope =
     let private delegationFactDecoder =
         Decode.Auto.generateDecoderCached<DelegationFactCases> (extra = extra)
 
+    let private chatExecutionFactDecoder =
+        Decode.Auto.generateDecoderCached<ChatExecutionFactCases> (extra = extra)
+
     let private attentionFactDecoder =
         Decode.Auto.generateDecoderCached<AttentionFactCases> (extra = extra)
 
@@ -256,6 +262,7 @@ module Envelope =
             | "Host" -> familyCase hostFactDecoder AgentFact.Host
             | "Fission" -> familyCase fissionFactDecoder AgentFact.Fission
             | "Delegation" -> familyCase delegationFactDecoder AgentFact.Delegation
+            | "ChatExecution" -> familyCase chatExecutionFactDecoder AgentFact.ChatExecution
             | "Attention" -> familyCase attentionFactDecoder AgentFact.Attention
             | "Concern" -> familyCase concernFactDecoder AgentFact.Concern
             | "InstitutionalLearning" -> familyCase institutionalLearningFactDecoder AgentFact.InstitutionalLearning
@@ -333,11 +340,13 @@ module Envelope =
         match tryDecodeMagicTodoEnvelope json with
         | Some envelope -> Ok envelope
         | None -> Decode.fromString currentEnvelopeDecoder json
+        |> Result.bind (fun envelope -> FactCodec.validateFact envelope.Fact |> Result.map (fun _ -> envelope))
 
     let private deserializeCurrentEnvelopeValue (value: JsonValue) =
         match tryDecodeMagicTodoEnvelopeValue value with
         | Some envelope -> Ok envelope
         | None -> Decode.fromValue "$" currentEnvelopeDecoder value
+        |> Result.bind (fun envelope -> FactCodec.validateFact envelope.Fact |> Result.map (fun _ -> envelope))
 
     let deserialize (json: string) : Result<Envelope, string> =
         if FactCodec.containsLegacyFallbackFields json then

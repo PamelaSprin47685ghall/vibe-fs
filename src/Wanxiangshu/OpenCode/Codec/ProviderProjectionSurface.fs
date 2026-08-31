@@ -138,6 +138,7 @@ module ProviderProjectionSurface =
                explicitAgent = optionString decoded.ExplicitAgent
                promptKey = decoded.PromptKey |> Option.map PromptKey.value |> optionString
                isHostCompaction = decoded.IsHostCompaction
+               isHostSynthetic = decoded.IsHostSynthetic
                text = optionString decoded.Text |}
 
     let opencodeModel (providerId: string) (modelId: string) (variant: obj) : obj =

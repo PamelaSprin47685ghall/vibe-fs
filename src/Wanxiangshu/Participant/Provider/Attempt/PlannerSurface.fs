@@ -57,31 +57,54 @@ module AttemptPlannerSurface =
         | "strength-replica" -> Some ProviderRequestKind.StrengthReplica
         | _ -> None
 
+    let ordinaryRequestPurpose (origin: string) (bloggerPurpose: string) =
+        let promptOrigin =
+            if origin = "InteractionRepair" then
+                PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.InteractionRepair
+            else
+                PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
+
+        let requestKind =
+            match bloggerPurpose with
+            | "main" -> ProviderRequestKind.BloggerMain
+            | "squash" -> ProviderRequestKind.BloggerSquash
+            | _ -> AttemptPlanner.ordinaryRequestKind promptOrigin
+
+        ProviderRequestKind.label requestKind
+
     let private profileOf (role: Role) (tier: AgentTier) (requestKind: ProviderRequestKind) =
-        let peerTier =
-            match tier with
-            | AgentTier.Fast -> AgentTier.Deep
-            | AgentTier.Deep -> AgentTier.Fast
+        ParticipantIdentity.resolveAtRoot (ManagedAgentCatalog.nameOf tier role)
+        |> Result.mapError (fun error -> sprintf "invalid participant identity: %A" error)
+        |> Result.bind (fun participantIdentity ->
+            PromptAuthority.createAuthorityExecutionProfile
+                (SessionId.create "surface-session")
+                (LogicalRunId.create "surface-run")
+                (AuthorityRootUserMessageId.create "surface-root")
+                PromptAuthority.RootAuthorityKind.HumanRoot
+                participantIdentity)
+        |> Result.map (fun authority ->
+            AttemptPlanner.plan
+                authority
+                AgentPairCursor.initial
+                (PhysicalUserMessageId.create "surface-user")
+                (ProviderRunIdentity.create "surface-provider-run")
+                (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot)
+                requestKind
+                RecoveryOpportunity.OrdinaryAttempt
+                (fun () -> Error NoCandidateReason.NoCoverage))
 
-        let authority: PromptAuthority.AuthorityExecutionProfile =
-            { SessionId = SessionId.create "surface-session"
-              LogicalRunId = LogicalRunId.create "surface-run"
-              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "surface-root"
-              AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
-              SelectedAgent = ManagedAgentCatalog.nameOf tier role
-              PeerAgent = ManagedAgentCatalog.nameOf peerTier role
-              CanonicalRole = role
-              SelectedTier = tier }
-
-        AttemptPlanner.plan
-            authority
-            AgentPairCursor.initial
-            (PhysicalUserMessageId.create "surface-user")
-            (ProviderRunIdentity.create "surface-provider-run")
-            (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot)
-            requestKind
-            RecoveryOpportunity.OrdinaryAttempt
-            (fun () -> Error NoCandidateReason.NoCoverage)
+    let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
+        box
+            {| selectedAgent = ParticipantIdentity.selectedAgent identity
+               peerAgent = ParticipantIdentity.peerAgent identity
+               canonicalRole = ParticipantIdentity.roleLabel identity
+               selectedTier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+               persona = ParticipantIdentity.persona identity
+               personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
+               origin =
+                match ParticipantIdentity.origin identity with
+                | PersonaOrigin.ResolvedAtRoot -> "ResolvedAtRoot"
+                | PersonaOrigin.InheritedFromOwner -> "InheritedFromOwner" |}
 
     /// Build one derived profile from JSON-shaped input.
     /// `{ role, tier, kind }` are labels; unknown labels fail closed.
@@ -92,20 +115,23 @@ module AttemptPlannerSurface =
 
         match Roles.tryParseRole roleLabel, Roles.tryParseTier tierLabel, requestKindOf kindLabel with
         | Some role, Some tier, Some requestKind ->
-            let planned = profileOf role tier requestKind
-            let profile = planned.Profile
+            match profileOf role tier requestKind with
+            | Error error -> box {| ok = false; error = error |}
+            | Ok planned ->
+                let profile = planned.Profile
 
-            box
-                {| ok = true
-                   canonicalRole = Roles.roleLabel profile.CanonicalRole
-                   systemPromptId = SystemPromptId.value profile.SystemPromptId
-                   toolCapabilities =
-                    profile.ToolCapabilitySet
-                    |> Set.toList
-                    |> List.map permissionLabel
-                    |> List.sort
-                    |> List.toArray
-                   requestKind = ProviderRequestKind.label profile.RequestKind |}
+                box
+                    {| ok = true
+                       canonicalRole = Roles.roleLabel profile.CanonicalRole
+                       participantIdentity = participantIdentityToJs profile.Authority.ParticipantIdentity
+                       systemPromptId = SystemPromptId.value profile.SystemPromptId
+                       toolCapabilities =
+                        profile.ToolCapabilitySet
+                        |> Set.toList
+                        |> List.map permissionLabel
+                        |> List.sort
+                        |> List.toArray
+                       requestKind = ProviderRequestKind.label profile.RequestKind |}
         | None, _, _ -> box {| ok = false; error = "unknown role" |}
         | _, None, _ -> box {| ok = false; error = "unknown tier" |}
         | _, _, None ->

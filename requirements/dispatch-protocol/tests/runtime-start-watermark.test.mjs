@@ -8,6 +8,22 @@ import test from 'node:test'
 
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 
+const inheritedIdentitySeed = (session) => ({
+  kind: 'InheritedFromOwner',
+  ownerSession: `${session}-owner`,
+  ownerLogicalRun: `run-${session}-owner`,
+  ownerAuthorityRoot: `root-${session}-owner`,
+  participantIdentity: {
+    selectedAgent: 'fast-coder',
+    peerAgent: 'deep-coder',
+    canonicalRole: 'coder',
+    selectedTier: 'fast',
+    persona: 'Coordinator',
+    personaCatalogVersion: 1,
+    origin: 'InheritedFromOwner',
+  },
+})
+
 const claim = (session, key, seq) => ({
   kind: 'claim',
   seq,
@@ -18,6 +34,7 @@ const claim = (session, key, seq) => ({
   logicalRun: `run-${seq}`,
   authorityRoot: `root-${seq}`,
   effectiveAgent: 'fast-coder',
+  identitySeed: inheritedIdentitySeed(session),
   payloadDigest: `pd-${seq}`,
 })
 

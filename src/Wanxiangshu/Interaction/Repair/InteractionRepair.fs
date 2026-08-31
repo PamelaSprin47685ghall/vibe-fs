@@ -56,6 +56,7 @@ open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
@@ -218,6 +219,30 @@ module InteractionRepairWorkflow =
         }
         :> Task
 
+    type private BloggerAabbFailureDecision =
+        | SendAabb
+        | ExhaustProtocol
+        | FailProtocol of string
+
+    let private decideBloggerAabbFailure
+        (guaranteedFirstAabb: bool)
+        (outcome: Result<ConfirmedFailureOutcome, string>)
+        : BloggerAabbFailureDecision =
+        match outcome with
+        | Error error -> FailProtocol error
+        | Ok ConfirmedFailureOutcome.NoActiveRun -> FailProtocol "blogger AABB has no active logical run"
+        // The nudge failure has already earned one protocol AABB attempt.
+        // A generic fallback boundary reached by this same failure may not
+        // retroactively steal that first send.
+        | Ok ConfirmedFailureOutcome.RecoveryExhausted when guaranteedFirstAabb -> SendAabb
+        | Ok ConfirmedFailureOutcome.RecoveryExhausted -> ExhaustProtocol
+        | Ok ConfirmedFailureOutcome.AlreadyRecorded ->
+            // A racing observer may have advanced this exact terminal before
+            // the request-scoped AABB claim became visible. The claim itself
+            // dedupes the physical send.
+            SendAabb
+        | Ok(ConfirmedFailureOutcome.RecoveryAdvanced _) -> SendAabb
+
     let private sendBloggerAabbAfterPermitConsumed
         (host: IBloggerRuntimeHost)
         (sessionPort: ISessionHostPort)
@@ -225,15 +250,12 @@ module InteractionRepairWorkflow =
         (journal: AgentJournal)
         (context: ReconciledTurnContext)
         (requestId: BloggerRequestId)
+        (requestKind: ProviderRequestKind)
         (guaranteedFirstAabb: bool)
         (reason: string)
         : Task =
         task {
             let turn = context.Turn
-            let snapshot = AgentJournal.snapshot journal
-
-            let mainSessionId =
-                SessionAssociationProjection.tryMainSessionOf turn.SessionId snapshot.AgentProjections.Associations
 
             let sendAabb () =
                 task {
@@ -255,39 +277,19 @@ module InteractionRepairWorkflow =
                         notifyBloggerProtocolFailure eventPort turn ("blogger AABB send failed: " + error)
                 }
 
-            match mainSessionId with
-            | None -> notifyBloggerProtocolFailure eventPort turn "blogger AABB has no durable main owner"
-            | Some mainSessionId ->
-                let fallbackStillOpen () =
-                    FallbackEvidence.mayContinue AgentPairCursor.DefaultAutoRecoveryBudget mainSessionId snapshot
+            let! confirmedFailure =
+                ProviderRecoveryWorkflow.admitPolicyAuthorizedFailure
+                    journal
+                    turn
+                    ExecutionFailure.ProviderTransient
+                    requestKind
+                    reason
 
-                match!
-                    FallbackLedger.recordConfirmedFailure
-                        journal
-                        AgentPairCursor.DefaultAutoRecoveryBudget
-                        mainSessionId
-                        turn.ProviderRun
-                        reason
-                with
-                | Error error -> notifyBloggerProtocolFailure eventPort turn error
-                | Ok ConfirmedFailureOutcome.NoActiveRun ->
-                    notifyBloggerProtocolFailure eventPort turn "blogger AABB has no active logical run"
-                | Ok ConfirmedFailureOutcome.RecoveryExhausted when guaranteedFirstAabb ->
-                    // The nudge failure has already earned one protocol AABB attempt.
-                    // A generic fallback boundary reached by this same failure may not
-                    // retroactively steal that first send.
-                    do! sendAabb ()
-                | Ok ConfirmedFailureOutcome.RecoveryExhausted ->
-                    do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
-                | Ok ConfirmedFailureOutcome.AlreadyRecorded when guaranteedFirstAabb -> do! sendAabb ()
-                | Ok ConfirmedFailureOutcome.AlreadyRecorded when fallbackStillOpen () ->
-                    // A racing observer may have advanced this exact terminal before
-                    // the request-scoped AABB claim became visible. The claim itself
-                    // dedupes the physical send.
-                    do! sendAabb ()
-                | Ok ConfirmedFailureOutcome.AlreadyRecorded ->
-                    do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
-                | Ok(ConfirmedFailureOutcome.RecoveryAdvanced _) -> do! sendAabb ()
+            match decideBloggerAabbFailure guaranteedFirstAabb confirmedFailure with
+            | SendAabb -> do! sendAabb ()
+            | ExhaustProtocol ->
+                do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
+            | FailProtocol error -> notifyBloggerProtocolFailure eventPort turn error
         }
         :> Task
 
@@ -305,6 +307,7 @@ module InteractionRepairWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal)
         (requestId: BloggerRequestId)
+        (requestKind: ProviderRequestKind)
         (guaranteedFirstAabb: bool)
         (reason: string)
         : Task =
@@ -317,6 +320,7 @@ module InteractionRepairWorkflow =
                 journal
                 context
                 requestId
+                requestKind
                 guaranteedFirstAabb
                 reason
         | Some(Error _)
@@ -330,6 +334,7 @@ module InteractionRepairWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal)
         (requestId: BloggerRequestId)
+        (requestKind: ProviderRequestKind)
         : Task =
         task {
             match context.Quiescence with
@@ -362,10 +367,25 @@ module InteractionRepairWorkflow =
                             journal
                             context
                             requestId
+                            requestKind
                             true
                             ("blogger nudge failed: " + error)
         }
         :> Task
+
+    let private isInteractionRepairContinuation (durable: AgentJournal) (turn: ReconciledTurn) =
+        continuationKindOf (Some durable) turn = Some PromptAuthority.ContinuationKind.InteractionRepair
+
+    let private bloggerProviderRequestKind (request: BloggerRequestContext) =
+        match request with
+        | BloggerRequestContext.Main _ -> ProviderRequestKind.BloggerMain
+        | BloggerRequestContext.Squash _ -> ProviderRequestKind.BloggerSquash
+
+    let private repairRequestKind (durable: AgentJournal) (turn: ReconciledTurn) (request: BloggerRequestContext) =
+        if isInteractionRepairContinuation durable turn then
+            ProviderRequestKind.InteractionRepair
+        else
+            bloggerProviderRequestKind request
 
     let private repairOwnedBloggerProtocol
         (host: IBloggerRuntimeHost)
@@ -378,6 +398,8 @@ module InteractionRepairWorkflow =
         : Task =
         let requestId = BloggerRequestContext.requestId request
 
+        let requestKind = repairRequestKind durable context.Turn request
+
         match
             BloggerRecoveryProbe.repairStateForInvalidTerminal
                 durable
@@ -386,7 +408,7 @@ module InteractionRepairWorkflow =
                 context.Turn.ProviderRun
         with
         | BloggerRecoveryProbe.InvalidTerminalRepairState.NoRecovery ->
-            sendBloggerNudge host quiescence context sessionPort eventPort durable requestId
+            sendBloggerNudge host quiescence context sessionPort eventPort durable requestId requestKind
         | BloggerRecoveryProbe.InvalidTerminalRepairState.InteractionNudgeIssued issuedRun when
             issuedRun = context.Turn.ProviderRun
             ->
@@ -400,6 +422,7 @@ module InteractionRepairWorkflow =
                 eventPort
                 durable
                 requestId
+                requestKind
                 true
                 "blogger missing chronicle after interaction nudge"
         | BloggerRecoveryProbe.InvalidTerminalRepairState.AabbRepairIssued issuedRun when
@@ -415,6 +438,7 @@ module InteractionRepairWorkflow =
                 eventPort
                 durable
                 requestId
+                requestKind
                 false
                 "blogger invalid terminal after AABB"
 

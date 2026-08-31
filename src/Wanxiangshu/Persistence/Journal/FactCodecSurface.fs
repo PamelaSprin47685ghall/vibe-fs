@@ -8,6 +8,8 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Change
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Participant.Persona
 
 /// JS-native owner surface for decode-only journal fact compatibility.
 /// Decoded facts remain inside the production codec; callers observe bytes and
@@ -50,12 +52,96 @@ module FactCodecSurface =
         | "DurableParentHandle" -> HandleOwnership.DurableParentHandle
         | other -> failwith $"FactCodecSurface: unknown ownership '{other}'"
 
+    let private tierOf (value: obj) =
+        Roles.tryParseTier (text value)
+        |> Option.defaultWith (fun () -> failwith $"FactCodecSurface: unknown tier '{text value}'")
+
+    let private originOf (value: obj) =
+        match text value with
+        | "ResolvedAtRoot" -> PersonaOrigin.ResolvedAtRoot
+        | "InheritedFromOwner" -> PersonaOrigin.InheritedFromOwner
+        | other -> failwith $"FactCodecSurface: unknown persona origin '{other}'"
+
+    let private identityInputOfJs (value: obj) =
+        { SelectedAgent = text (value?selectedAgent)
+          PeerAgent = text (value?peerAgent)
+          Role =
+            if text (value?canonicalRole) = "bookkeeper" then
+                None
+            else
+                Some(roleOf (value?canonicalRole))
+          InitialTier = tierOf (value?selectedTier)
+          Persona = text (value?persona)
+          PersonaCatalogVersion = unbox<int> (value?personaCatalogVersion)
+          Origin = originOf (value?origin) }
+
+    let private identitySeedOfJs (value: obj) =
+        let identityInput = identityInputOfJs (value?participantIdentity)
+
+        match text (value?kind) with
+        | "RootSelection" -> PromptAuthority.IdentitySeedInput.RootSelectionInput identityInput
+        | "InheritedFromOwner" ->
+            PromptAuthority.IdentitySeedInput.InheritedFromOwnerInput
+                { OwnerSessionId = SessionId.create (text (value?ownerSession))
+                  OwnerLogicalRunId = LogicalRunId.create (text (value?ownerLogicalRun))
+                  OwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (value?ownerAuthorityRoot))
+                  ParticipantIdentity = identityInput }
+        | other -> failwith $"FactCodecSurface: unknown identity seed '{other}'"
+        |> PromptAuthority.rehydrateIdentitySeed
+        |> Result.defaultWith (fun error -> failwith $"FactCodecSurface: invalid identity seed: {error}")
+
+    let private identityToJs evidence =
+        box
+            {| selectedAgent = ParticipantIdentity.selectedAgent evidence
+               peerAgent = ParticipantIdentity.peerAgent evidence
+               canonicalRole = ParticipantIdentity.roleLabel evidence
+               selectedTier = ParticipantIdentity.initialTier evidence |> Roles.wireTierLabel
+               persona = ParticipantIdentity.persona evidence
+               personaCatalogVersion = ParticipantIdentity.personaCatalogVersion evidence
+               origin =
+                match ParticipantIdentity.origin evidence with
+                | PersonaOrigin.ResolvedAtRoot -> "ResolvedAtRoot"
+                | PersonaOrigin.InheritedFromOwner -> "InheritedFromOwner" |}
+
+    let private identitySeedToJs seed =
+        let participantIdentity =
+            PromptAuthority.identitySeedParticipantIdentity seed |> identityToJs
+
+        match PromptAuthority.identitySeedOwner seed with
+        | None ->
+            box
+                {| kind = "RootSelection"
+                   ownerSession = null
+                   ownerLogicalRun = null
+                   ownerAuthorityRoot = null
+                   participantIdentity = participantIdentity |}
+        | Some(ownerSession, ownerLogicalRun, ownerAuthorityRoot) ->
+            box
+                {| kind = "InheritedFromOwner"
+                   ownerSession = SessionId.value ownerSession
+                   ownerLogicalRun = LogicalRunId.value ownerLogicalRun
+                   ownerAuthorityRoot = AuthorityRootUserMessageId.value ownerAuthorityRoot
+                   participantIdentity = participantIdentity |}
+
     let private factOfJs (value: obj) : Fact =
         let family = text (value?family)
         let case = text (value?case)
         let payload = unbox<obj> (value?payload)
 
         match family, case with
+        | "Prompt", "AuthorityRootAccepted" ->
+            Fact.Agent(
+                AgentFact.Prompt(
+                    PromptFactCases.AuthorityRootAccepted
+                        { SchemaVersion = unbox<int> (payload?SchemaVersion)
+                          SessionId = SessionId.create (text (payload?SessionId))
+                          LogicalRunId = LogicalRunId.create (text (payload?LogicalRunId))
+                          AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
+                          AuthorityKind = text (payload?AuthorityKind)
+                          IdentitySeed = identitySeedOfJs (payload?IdentitySeed) }
+                )
+            )
         | "Runtime", "RuntimeStarted" ->
             Fact.Runtime(
                 RuntimeStarted
@@ -168,8 +254,28 @@ module FactCodecSurface =
             )
         | familyName, caseName -> failwith $"FactCodecSurface: unknown fact '{familyName}.{caseName}'"
 
+    let private factToJs (fact: Fact) : obj =
+        match fact with
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityRootAccepted payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityRootAccepted"
+                   payload =
+                    {| SchemaVersion = payload.SchemaVersion
+                       SessionId = SessionId.value payload.SessionId
+                       LogicalRunId = LogicalRunId.value payload.LogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       AuthorityKind = payload.AuthorityKind
+                       IdentitySeed = identitySeedToJs payload.IdentitySeed |} |}
+        | _ ->
+            box
+                {| family = "Unknown"
+                   case = "Unknown"
+                   payload = box {| |} |}
+
     let private caseOfFact (fact: Fact) : string =
         match fact with
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityRootAccepted _)) -> "AuthorityRootAccepted"
         | Fact.Runtime(RuntimeStarted _) -> "RuntimeStarted"
         | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleAbandoned _)) -> "HandleAbandoned"
         | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleCompleted _)) -> "HandleCompleted"
@@ -198,8 +304,11 @@ module FactCodecSurface =
     let decode (line: string) : obj =
         match FactCodec.deserializeFact line with
         | Ok fact ->
+            let descriptor = factToJs fact
+
             box
                 {| ok = true
                    line = FactCodec.serializeFact fact
-                   case = caseOfFact fact |}
+                   case = caseOfFact fact
+                   payload = descriptor?payload |}
         | Error error -> box {| ok = false; error = error |}

@@ -15,7 +15,6 @@ open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
-open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
@@ -85,24 +84,45 @@ module ManagedAgent =
     let inspectorToolNames = ManagedAgentCatalog.inspectorToolNames
     let coderToolNames = ManagedAgentCatalog.coderToolNames
 
-    let private mapParseRejection rejection =
-        match rejection with
-        | PromptAuthority.AgentNameRejection.LegacyAgentName name -> Error(ManagedAgentParseError.LegacyAgentName name)
-        | PromptAuthority.AgentNameRejection.UnknownManagedAgent name ->
-            Error(ManagedAgentParseError.UnknownManagedAgent name)
-        | PromptAuthority.AgentNameRejection.Malformed name -> Error(ManagedAgentParseError.Malformed name)
+    let private mapIdentityError value error =
+        match error with
+        | ParticipantIdentityError.LegacyParticipantName name -> ManagedAgentParseError.LegacyAgentName name
+        | ParticipantIdentityError.UnknownParticipantName name -> ManagedAgentParseError.UnknownManagedAgent name
+        | ParticipantIdentityError.BlankParticipantName -> ManagedAgentParseError.Malformed value
+        | ParticipantIdentityError.MalformedParticipantName name -> ManagedAgentParseError.Malformed name
+        | ParticipantIdentityError.UnsupportedPersonaCatalogVersion _
+        | ParticipantIdentityError.RoleMismatch _
+        | ParticipantIdentityError.TierMismatch _
+        | ParticipantIdentityError.PeerMismatch _
+        | ParticipantIdentityError.BlankPersona
+        | ParticipantIdentityError.PersonaMismatch _
+        | ParticipantIdentityError.OriginMismatch _
+        | ParticipantIdentityError.OwnerRequired
+        | ParticipantIdentityError.OwnerPersonaMismatch _
+        | ParticipantIdentityError.OwnerCatalogVersionMismatch _
+        | ParticipantIdentityError.LegacyRoleMismatch _
+        | ParticipantIdentityError.LegacyTierMismatch _
+        | ParticipantIdentityError.UnsupportedLegacyAuthorityKind _
+        | ParticipantIdentityError.UnprovableLegacyAuthorityIdentity _ -> ManagedAgentParseError.Malformed value
 
-    /// AGENT-002/003: the ONE parser lives in `Domain.PromptAuthority`. This adds
-    /// only the visibility that `ManagedAgent` carries.
+    let private classifyPublicRole value =
+        function
+        | Some role -> Ok role
+        | None -> Error(ManagedAgentParseError.UnknownManagedAgent value)
+
+    let private admitPublicRole value identity =
+        ParticipantIdentity.role identity
+        |> classifyPublicRole value
+        |> Result.map (fun role ->
+            { Name = ParticipantIdentity.selectedAgent identity
+              Role = role
+              Tier = ParticipantIdentity.initialTier identity
+              Visibility = visibilityOf role })
+
     let parse (value: string) : Result<ManagedAgent, ManagedAgentParseError> =
-        match PromptAuthority.parseAgentNameTyped value with
-        | Ok parsed ->
-            Ok
-                { Name = parsed.Name
-                  Role = parsed.Role
-                  Tier = parsed.Tier
-                  Visibility = visibilityOf parsed.Role }
-        | Error rejection -> mapParseRejection rejection
+        ParticipantIdentity.resolveAtRoot value
+        |> Result.mapError (mapIdentityError value)
+        |> Result.bind (admitPublicRole value)
 
     let tryParse (value: string) : ManagedAgent option = parse value |> Result.toOption
 

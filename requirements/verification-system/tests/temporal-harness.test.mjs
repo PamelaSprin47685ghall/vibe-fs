@@ -14,6 +14,7 @@ import {
   DurableTraceEvents,
   createDurableWorld,
   createRecordedProviderPort,
+  fallbackFacts,
   runTrace,
 } from './support/temporal-harness.mjs'
 
@@ -52,20 +53,7 @@ test('WHAT[VERIFICATION-SYSTEM-007] completion source order is explicit', async 
 const SESSION_A = 'ses_a'
 const streamA = { kind: 'Session', session: SESSION_A }
 
-const rootAgentFact = () => ({
-  family: 'Prompt',
-  case: 'AuthorityRootAccepted',
-  payload: {
-    SessionId: SESSION_A,
-    LogicalRunId: 'run_L',
-    AuthorityRootUserMessageId: 'msg_u1',
-    AuthorityKind: 'HumanRoot',
-    SelectedAgent: 'fast-coder',
-    PeerAgent: 'deep-coder',
-    CanonicalRole: 'coder',
-    SelectedTier: 'fast',
-  },
-})
+const rootAgentFact = () => fallbackFacts.authorityRoot({ session: SESSION_A })
 
 const advanceAgentFact = (run, previous, next, count) => ({
   family: 'Fallback',

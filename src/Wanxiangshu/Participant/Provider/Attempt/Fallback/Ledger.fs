@@ -46,10 +46,17 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Failure
 
-/// FALLBACK-003 single writer: confirmed provider failure → durable dedupe →
-/// cursor advance/exhaust. Callers may retain the precise single-attempt outcome
-/// without collapsing duplicate or missing-run states into permission to continue.
+[<RequireQualifiedAccess>]
+type ConfirmedFailureOutcome =
+    | RecoveryAdvanced of RecoveryOpportunity
+    | RecoveryExhausted
+    | AlreadyRecorded
+    | NoActiveRun
+
+/// FALLBACK-003 single writer: policy-authorized provider failure → durable
+/// dedupe → cursor advance/exhaust.
 module FallbackLedger =
 
     let private invalidOffsetMessage decodeError =
@@ -127,17 +134,20 @@ module FallbackLedger =
             | Ok _ -> return! completeAdvance journal budget sessionId providerRun current next
         }
 
-    let recordConfirmedFailure
+    let recordAuthorizedFailure
         (journal: AgentJournal)
-        (budget: int)
         (sessionId: SessionId)
-        (providerRun: ProviderRunIdentity)
+        (authorization: ProviderRecoveryAuthorization)
         (reason: string)
         : Task<Result<ConfirmedFailureOutcome, string>> =
         task {
             match FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot journal) with
             | None -> return Ok ConfirmedFailureOutcome.NoActiveRun
+            | Some current when current.LogicalRunId <> authorization.LogicalRun ->
+                return Error "Provider recovery licence belongs to a different logical run"
             | Some current ->
+                let providerRun = authorization.ProviderRun
+
                 let identity =
                     AgentPairCursor.attemptIdentity
                         sessionId
@@ -163,7 +173,16 @@ module FallbackLedger =
                     return Error "Fallback advance violates FALLBACK-007 (offset or count is not the successor)"
                 | Error(FallbackAdvanceRejection.InvalidFallbackOffset decodeError) ->
                     return Error(invalidOffsetMessage decodeError)
-                | Ok _ -> return! appendAdvanced journal budget sessionId providerRun reason current next
+                | Ok _ ->
+                    return!
+                        appendAdvanced
+                            journal
+                            AgentPairCursor.DefaultAutoRecoveryBudget
+                            sessionId
+                            providerRun
+                            reason
+                            current
+                            next
         }
 
     let private appendSuccessFact

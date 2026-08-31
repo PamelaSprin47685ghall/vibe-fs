@@ -8,6 +8,10 @@
 /src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs
 /src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs
 /src/Wanxiangshu/Mission/Manager/JobHandoff.fs
+/src/Wanxiangshu/Enforcer/Continuation.fs
+/src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs
 /src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs
 /src/Wanxiangshu/OpenCode/Host/ModelRouting.fs
 /requirements/context-compression/tests/recovery-slot.test.mjs
+/requirements/verification-system/tests/retry-owner.test.mjs
+/scripts/checks/retry-owner.mjs

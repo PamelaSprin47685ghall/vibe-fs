@@ -32,6 +32,17 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
    - `HostEventCodec` 把 assistant completion 分成 provider-step terminal 与 physical-execution terminal 两层。
    - physical terminal 只接受明确最终 `finish`：`stop | length | content-filter`；`tool-calls | unknown | error` 与显式 assistant error 仅结束 step。OpenCode 的 upstream stream failure 可落盘为 `completed + finish="unknown"` 且无 `error`，因此禁止用“非 tool-calls”反推 physical completion。
 
+5. **Durable admission 与 fenced capacity**：
+   - `managed-chat-execution` 提供 exact `Accepted` witness 后，runtime 才建立 bounded `PendingDemand` 或调用 acquire。
+   - acquire 原子签发 opaque `CapacityFence`；execution binding 保存同一 fence identity，Host projection 只读取已建立 binding。
+   - queue 以 typed capacity/supersession/session events 推进；满载产生 `CapacityQueueFull`，不产生 provider retry/fallback。
+   - settlement 解释 `execution-failure-policy` 的 typed command，并以 exact fence 做 retain/release/transfer 的单次原子比较；不提供 count-based cleanup、timer expiry 或 session-wide release。
+
+6. **Immutable snapshot 与 fail-closed reconciliation**：
+   - capacity owner 在同一串行化边界复制 ledger、token state、exact custody、execution、waiter、lineage 与 transition counter，surface 递归冻结该值，不泄漏 dictionary、queue node 或 mutable handle。
+   - `CapacityReconciliation.decide : CapacityInvariantEvidence -> CapacityReconciliationDecision` 只比较 canonical evidence；合法状态返回 `NoOp`，ledger/map、owner/custody、state count 或 counter 不可能态返回 typed `FailClosed`。该函数不持有 runtime，因而不能 repair、清 counter/config 或推进 queue。
+   - commit、release、cancel 的唯一边界 outcome 为 `Applied | AlreadyApplied | StaleFence | Conflict`；同一 counter owner 只按后三类单调累加 duplicate/stale/conflict。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
@@ -46,3 +57,8 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
 | EMR-008 | `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs::WHAT[EMR-008] EMR_008_host_inventory_no_longer_exposes_model_binding_authority`；`requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs::WHAT[EMR-008] SPEC_INV_fast_and_deep_physical_model_equality_is_not_an_eligibility_gate` |
 | EMR-009 | `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs::WHAT[EMR-009] EMR_009_chat_message_is_the_single_managed_execution_admission_owner` |
 | EMR-010 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs::WHAT[EMR-010] EMR_010_lineage_credit_is_free_only_to_descendants_not_global_waiters`；`requirements/execution-model-routing/tests/model-routing-runtime.test.mjs::WHAT[EMR-010] EMR_010_provider_step_handoff_makes_the_same_credit_available_to_a_waiting_descendant`；`requirements/execution-model-routing/tests/model-routing-runtime.test.mjs::WHAT[EMR-010] EMR_010_ancestor_recall_waits_for_descendant_step_end_without_overbooking`；`requirements/execution-model-routing/tests/model-routing-runtime.test.mjs::WHAT[EMR-010] EMR_010_late_old_terminal_cannot_release_a_new_provider_step`；`requirements/execution-model-routing/tests/model-routing-runtime.test.mjs::WHAT[EMR-010] EMR_010_confirmed_pre_dispatch_suppression_returns_the_step_token`；`requirements/execution-model-routing/tests/model-routing-runtime.test.mjs::WHAT[EMR-010] EMR_010_recalled_child_may_take_new_ordinary_capacity_for_exact_target`；`requirements/execution-model-routing/tests/model-routing-runtime.test.mjs::WHAT[EMR-010] EMR_010_owner_priority_beats_multiple_children_and_nested_borrowers`；`requirements/execution-model-routing/tests/model-routing-runtime.test.mjs::WHAT[EMR-010] EMR_010_credit_never_crosses_provider_boundary`；`requirements/execution-model-routing/tests/model-routing-runtime.test.mjs::WHAT[EMR-010] EMR_010_multi_provider_credit_requires_one_token_attribution`；`requirements/execution-model-routing/tests/model-routing-runtime.test.mjs::WHAT[EMR-010] EMR_010_blogger_borrows_the_lender_blogger_when_main_is_borrowed`；`requirements/execution-model-routing/tests/model-routing-runtime.test.mjs::WHAT[EMR-010] EMR_010_blogger_gets_no_companion_credit_when_main_did_not_borrow`；`requirements/execution-model-routing/tests/tool-provider-step-boundary.test.mjs::WHAT[EMR-010] EMR_010_managed_tool_execution_ends_the_current_provider_step_before_tool_body` |
+| EMR-011 | `requirements/execution-model-routing/tests/capacity-lifecycle.test.mjs::WHAT[EMR-011] rejects release with the wrong physical fence` |
+| EMR-012 | `requirements/execution-model-routing/tests/execution-admission-lease.test.mjs::WHAT[EMR-012] admission lease is opaque and projects only its frozen target`；`requirements/execution-model-routing/tests/capacity-lifecycle.test.mjs::WHAT[EMR-012] capacity lifecycle admits every legal fenced transition` |
+| EMR-013 | `requirements/execution-model-routing/tests/admission-queue.test.mjs::WHAT[EMR-013] queue bound is enforced without drops` |
+| EMR-014 | `requirements/execution-model-routing/tests/capacity-reconciliation.test.mjs::WHAT[EMR-014] valid immutable snapshot is a reconciliation no-op with traceable tokens, waiters, and lineage`；`requirements/execution-model-routing/tests/capacity-soak.test.mjs::WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact reconciliation after every operation` |
+| EMR-015 | `requirements/execution-model-routing/tests/diagnostics.test.mjs::WHAT[EMR-015] diagnostic query reuses capacity snapshot queue and fence counters without duplicate formula` |

@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 
 open System.Collections.Generic
+open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
@@ -12,11 +13,11 @@ module HostSignalAdapter =
 
     let sessionIdOf =
         function
-        | SessionIdle sessionId
-        | AttemptAborted sessionId -> sessionId
+        | SessionIdle sessionId -> sessionId
+        | AttemptAborted failure -> failure.SessionId
         | SessionDeleted(sessionId, _) -> sessionId
         | ProviderRetry retry -> retry.SessionId
-        | ProviderFailure(sessionId, _) -> sessionId
+        | ProviderFailure failure -> failure.SessionId
 
     /// SSOT signals are session.status idle|retry and session.deleted.
     let tryAdapt (isOwned: SessionId -> bool) (rawInput: obj) : HostSignal option =
@@ -40,8 +41,8 @@ type HostSignalRouter
         // adapter routes raw Host events without owning sensor business state.
         // Drop-session cleanup is the composition root's job.
         ?onLoopEvent: obj -> unit,
-        ?onProviderStepEnd: SessionId -> PhysicalUserMessageId -> ProviderRunIdentity -> unit,
-        ?onPhysicalExecutionEnd: SessionId -> PhysicalUserMessageId -> unit
+        ?onExactAssistantObservation:
+            ExactProviderStartObservation -> bool -> ExactProviderTerminalObservation option -> Task<unit>
     ) =
 
     // Fail-closed: empty registry owns nothing.
@@ -53,16 +54,25 @@ type HostSignalRouter
         | Some signal -> onSignal signal
         | None -> ()
 
-    let observePhysicalExecutionEnd raw =
-        match onPhysicalExecutionEnd, HostEventCodec.tryDecodePhysicalExecutionEnd raw with
-        | Some observe, Some(sessionId, physicalUserMessageId) -> observe sessionId physicalUserMessageId
-        | _ -> ()
+    let observeExactAssistant raw : Task<unit> =
+        match onExactAssistantObservation, HostEventCodec.tryDecodeExactProviderStart raw with
+        | Some observe, Some started ->
+            let terminal =
+                HostEventCodec.tryDecodeExactProviderTerminal raw
+                |> Option.filter (fun completed ->
+                    completed.SessionId = started.SessionId
+                    && completed.PhysicalUserMessageId = started.PhysicalUserMessageId
+                    && completed.ProviderRun = started.ProviderRun)
 
-    let observeProviderStepEnd raw =
-        match onProviderStepEnd, HostEventCodec.tryDecodeProviderStepEnd raw with
-        | Some observe, Some(sessionId, physicalUserMessageId, providerRun) ->
-            observe sessionId physicalUserMessageId providerRun
-        | _ -> ()
+            let providerStepEnded =
+                HostEventCodec.tryDecodeProviderStepEnd raw
+                |> Option.exists (fun (sessionId, physicalUserMessageId, providerRun) ->
+                    sessionId = started.SessionId
+                    && physicalUserMessageId = started.PhysicalUserMessageId
+                    && providerRun = started.ProviderRun)
+
+            observe started providerStepEnded terminal
+        | _ -> Task.FromResult()
 
     member _.RegisterOwned(sessionId: SessionId) =
         ownedSessions.Add(SessionId.value sessionId) |> ignore
@@ -72,14 +82,18 @@ type HostSignalRouter
         ownedSessions.Remove key |> ignore
 
     /// LOOP-009 text detection observes textual stream deltas.
-    /// Model routing also observes exact terminal assistant identity;
-    /// none of these callbacks turns a fragment into a business HostSignal.
+    /// The SDK subscription carries coarse wakeups only. Exact assistant
+    /// lifecycle evidence is owned by the awaited public event Hook below.
     member _.Observe(raw: obj) =
-        observeProviderStepEnd raw
-        observePhysicalExecutionEnd raw
-
         match onLoopEvent with
         | Some observe when LoopEventCodec.isLoopTextDelta raw -> observe raw
         | _ -> emitAdaptedSignal raw
 
-    member this.ObserveLocal(raw: obj) = this.Observe raw
+    member _.ObserveLocal(raw: obj) =
+        task {
+            do! observeExactAssistant raw
+
+            match onLoopEvent with
+            | Some observe when LoopEventCodec.isLoopTextDelta raw -> observe raw
+            | _ -> emitAdaptedSignal raw
+        }

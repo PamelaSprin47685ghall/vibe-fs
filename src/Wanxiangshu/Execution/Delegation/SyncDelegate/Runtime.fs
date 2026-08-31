@@ -132,12 +132,7 @@ type SyncDelegateRuntime
             |> List.map (fun child -> child.SessionId)
             |> AttachedChildObservation.Conflicting
 
-    let observeChild
-        (owner: SessionId)
-        (scope: ReuseScopeId)
-        (role: SyncDelegateRole)
-        (agentName: string)
-        =
+    let observeChild (owner: SessionId) (scope: ReuseScopeId) (role: SyncDelegateRole) (agentName: string) =
         task {
             let physicalOwner = sessions.FamilyRootOf owner
 
@@ -177,6 +172,25 @@ type SyncDelegateRuntime
         |> Option.defaultValue XTraceProjection.empty
         |> XTraceProjection.headCursor
 
+    let issueCurrentOwnerIdentitySeed
+        (ownerSessionId: SessionId)
+        (childAgent: string)
+        : Task<Result<PromptAuthority.IdentitySeed, string>> =
+        let issued =
+            match
+                PromptAuthorityLedger.activeProfile ownerSessionId (AgentJournal.snapshot journal).AgentProjections
+            with
+            | None -> Error "AgentOwnerRoot identity seed requires the owner's active durable Logical Run"
+            | Some ownerProfile ->
+                PromptAuthority.issueInheritedIdentitySeed childAgent ownerProfile
+                |> Result.mapError (sprintf "Invalid inherited participant identity: %A")
+                |> Result.bind (fun seed ->
+                    PromptAuthority.validateInheritedIdentitySeed ownerProfile seed
+                    |> Result.mapError (sprintf "Invalid owner identity witness: %A")
+                    |> Result.map (fun _ -> seed))
+
+        Task.FromResult issued
+
     let sendDelegatePrompt (call: SyncDelegateCall) (request: SyncDelegatePromptRequest) =
         taskResult {
             let tools = toolMap (canonicalRole call.Role)
@@ -206,20 +220,58 @@ type SyncDelegateRuntime
                 DelegationHandoff.appendParentDelta request.ProviderPrompt prepared.ParentRecord
                 |> LlmFacing.render
 
-            let! _ =
-                dispatcher.SendAgentOwnerRootWithTools
-                    sessions
-                    call.Delegate
-                    providerPrompt
-                    call.Agent
-                    directory
-                    PromptDispatcher.AwaitMode.Await
-                    (Some(fun physical ->
-                        let root = PhysicalUserMessageId.promoteToAuthorityRoot physical
-                        call.AcceptedAuthorityRoot <- Some root
-                        AsyncSupport.trySetResult call.AcceptedRoot root |> ignore))
-                    tools
-                    None
+            let! identitySeed = issueCurrentOwnerIdentitySeed call.Owner call.Agent
+
+            let accept root scope =
+                call.AcceptedAuthorityRoot <- Some root
+                call.TerminalFailureScope <- Some scope
+                AsyncSupport.trySetResult call.AcceptedRoot root |> ignore
+
+            let activeDelegateProfile =
+                PromptAuthorityLedger.activeProfile call.Delegate (AgentJournal.snapshot journal).AgentProjections
+
+            match activeDelegateProfile with
+            | None ->
+                let! _ =
+                    dispatcher.SendAgentOwnerRootWithTools
+                        sessions
+                        call.Delegate
+                        providerPrompt
+                        identitySeed
+                        directory
+                        PromptDispatcher.AwaitMode.Await
+                        (Some(fun physical ->
+                            let root = PhysicalUserMessageId.promoteToAuthorityRoot physical
+                            accept root (FreshAuthorityRoot root)))
+                        tools
+                        None
+
+                ()
+            | Some profile when
+                profile.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+                && profile.IdentitySeed = identitySeed
+                && profile.SelectedAgent = call.Agent
+                && profile.CanonicalRole = canonicalRole call.Role
+                ->
+                let! _ =
+                    dispatcher.SendContinuationWithTools
+                        sessions
+                        call.Delegate
+                        providerPrompt
+                        PromptAuthority.ContinuationKind.ManagedDelegationAssignment
+                        profile
+                        call.Agent
+                        directory
+                        PromptDispatcher.AwaitMode.Await
+                        (Some(fun physical ->
+                            accept profile.AuthorityRootUserMessageId (ExistingAuthorityContinuation physical)))
+                        tools
+
+                ()
+            | Some _ ->
+                return!
+                    Error
+                        "sync delegate rejected: attached delegate active authority does not match its exact owner identity"
 
             let! _ = call.AcceptedRoot.Task |> TaskResultCE.ofTask
             return prepared
@@ -249,7 +301,6 @@ type SyncDelegateRuntime
                 let projections = (AgentJournal.snapshot journal).AgentProjections
 
                 PromptAuthorityLedger.activeProfile childId projections
-                |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile childId projections)
                 |> Option.map (fun profile -> profile.SelectedAgent)
                 |> Option.filter (String.IsNullOrWhiteSpace >> not)
           DescribeWait = SyncDelegateWait.describe
@@ -274,10 +325,7 @@ type SyncDelegateRuntime
         match call.Invocations |> List.tryHead |> Option.bind (fun inv -> inv.StartCursor) with
         | None -> Task.FromResult None
         | Some startCursor ->
-            projectWorkRecord
-                turnSessionId
-                (XTraceRange.create (XTraceCursor.create startCursor) endCursor)
-                providerRun
+            projectWorkRecord turnSessionId (XTraceRange.create (XTraceCursor.create startCursor) endCursor) providerRun
 
     let noteInspectorIfRole (call: SyncDelegateCall) turnSessionId record =
         if call.Role = SyncDelegateRole.Inspector then
@@ -311,7 +359,7 @@ type SyncDelegateRuntime
                 return finishCompletedCall turn.SessionId call workRecord
         }
 
-    let popIfAuthorityMatches
+    let popIfAcceptanceMatches
         (store: SyncDelegateCallStore)
         (turn: ReconciledTurn)
         (call: SyncDelegateCall)
@@ -320,7 +368,13 @@ type SyncDelegateRuntime
             let! expectedRoot = call.AcceptedRoot.Task
 
             return
-                if expectedRoot = turn.AuthorityRootUserMessageId then
+                if
+                    expectedRoot = turn.AuthorityRootUserMessageId
+                    && (match call.TerminalFailureScope with
+                        | Some(FreshAuthorityRoot root) -> root = turn.AuthorityRootUserMessageId
+                        | Some(ExistingAuthorityContinuation physical) -> physical = turn.PhysicalUserMessageId
+                        | None -> false)
+                then
                     store.TryPopCallByDelegate turn.SessionId
                 else
                     None
@@ -334,13 +388,42 @@ type SyncDelegateRuntime
                 |> List.forall (fun invocation -> invocation.StartCursor.IsSome))
 
         match candidate with
-        | Some call -> popIfAuthorityMatches store turn call
+        | Some call -> popIfAcceptanceMatches store turn call
         | None -> Task.FromResult None
+
+    let failMatchingTerminalCall (turn: ReconciledTurn) error call =
+        task {
+            let! matchingCall = popIfAcceptanceMatches store turn call
+
+            return
+                matchingCall
+                |> Option.map (fun exact ->
+                    store.FailCall(exact, sprintf "SyncDelegate run failed: %s" error)
+                    true)
+                |> Option.defaultValue false
+        }
 
     let handleCompletedRoleTurn (turn: ReconciledTurn) =
         task {
             match! tryConsumeReadyCall store turn with
             | Some call -> return! handleCompletedCall turn call
+            | None -> return false
+        }
+
+    let handleFailedContinuationTurn (turn: ReconciledTurn) error =
+        task {
+            let continuation =
+                store.TryPeekCallByDelegate turn.SessionId
+                |> Option.filter (fun call ->
+                    call.Invocations
+                    |> List.forall (fun invocation -> invocation.StartCursor.IsSome)
+                    && (match call.TerminalFailureScope with
+                        | Some(ExistingAuthorityContinuation _) -> true
+                        | Some(FreshAuthorityRoot _)
+                        | None -> false))
+
+            match continuation with
+            | Some call -> return! failMatchingTerminalCall turn error call
             | None -> return false
         }
 
@@ -390,7 +473,15 @@ type SyncDelegateRuntime
             |> Option.iter (fun previous -> cleanupInspectorDraft (sessionKey previous))
 
             true
-        | _ -> false
+        | _ ->
+            let ownerScope = ReuseScope.ofSession ownerSessionId
+
+            store.TryGetDeletedInspector ownerScope
+            |> Option.exists (fun staged -> staged = inspectorSessionId)
+
+    member this.StageDeletedInspectorBySession(inspectorSessionId: SessionId) : SessionId option =
+        attached.TryFindOwner(inspectorSessionId, SyncDelegateRole.Inspector)
+        |> Option.filter (fun ownerSessionId -> this.StageDeletedInspector(ownerSessionId, inspectorSessionId))
 
     member _.Invoke
         (ownerSessionKey: string, role: SyncDelegateRole, charge: string, ?expectedToolCalls: int)
@@ -435,11 +526,12 @@ type SyncDelegateRuntime
         task {
             match turn.Role, turn.Outcome with
             | Some(Role.Inspector | Role.Coder), ReconcileProgram.TurnCompleted -> return! handleCompletedRoleTurn turn
+            | Some(Role.Inspector | Role.Coder), ReconcileProgram.TurnFailed error ->
+                return! handleFailedContinuationTurn turn error
             | _ ->
-                // Transient failures (TurnFailed / TurnInProgress / TurnNeedsContinuation)
-                // remain child-local and allow ordinary fallback recovery to proceed.
-                // Only exhausted retries or definitive aborts (via SubscribeTerminal)
-                // report failure to the caller.
+                // Fresh-root TurnFailed, TurnInProgress and TurnNeedsContinuation
+                // remain child-local for ordinary fallback recovery. A reused
+                // continuation can fail only through its exact physical turn above.
                 return false
         }
 
@@ -502,14 +594,10 @@ type SyncDelegateRuntime
     interface IDisposable with
         member runtime.Dispose() = runtime.Dispose()
 
-/// Helpers for constructing `resolveOwnerTier` from journal / active profile —
-/// SelectedTier source for any Work role.
+/// Helpers for constructing `resolveOwnerTier` from the active logical run.
 module SyncDelegateTier =
 
-    /// Prefer ActiveLogicalRun SelectedTier; fall back to LastAuthorityProfile.
+    /// Resolve SelectedTier only while the session has an active logical run.
     let fromDispatcher (dispatcher: PromptDispatcher.Runtime) (sessionId: SessionId) : AgentTier option =
-        match dispatcher.ActiveProfile sessionId with
-        | Some profile -> Some profile.SelectedTier
-        | None ->
-            (dispatcher.ProjectionFor sessionId).LastAuthorityProfile
-            |> Option.map (fun profile -> profile.SelectedTier)
+        dispatcher.ActiveProfile sessionId
+        |> Option.map (fun profile -> profile.SelectedTier)

@@ -18,6 +18,11 @@
    - 未找到物理消息 → 保持 `StillPending`，绝不自动补发；
    - 物理读取失败 → 标记 `Unreadable` 并中止，保留现场供人工审计。
 
+4. **Durability activation 与 execution handoff**：
+   - plugin construction 只装配 dispatcher、physical evidence reader 与 handoff ports；不读取 journal，不启动 recovery。
+   - durable substrate activation 成功后才启动 claim reconciliation；它只由 durable claim 或 Host physical evidence 事件推进。
+   - `PhysicalAccepted` 建立后，把 exact `(SessionId, PhysicalUserMessageId)`、`PromptKey` 与原子 `AttemptExecutionProfile`（含完整版本化 `ParticipantIdentityEvidence`）交给 `managed-chat-execution`。容量、execution binding、provider start、failure disposition 与 settlement 均由其 owner 处理，dispatch 不保存镜像状态。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
@@ -33,3 +38,5 @@
 | DISPATCH-PROTOCOL-009 | `requirements/dispatch-protocol/tests/fire-and-forget.test.mjs::WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_claims_and_persists_without_physical_accepted`；`requirements/dispatch-protocol/tests/fire-and-forget.test.mjs::WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_sdk_physical_id_does_not_race_chat_message_acceptance`；`requirements/dispatch-protocol/tests/fire-and-forget.test.mjs::WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_returns_even_when_session_send_task_never_settles`；`requirements/dispatch-protocol/tests/fire-and-forget.test.mjs::WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_continuation_same_claim_path`；`requirements/dispatch-protocol/tests/fire-and-forget.test.mjs::WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_await_mode_constructors_exist` |
 | DISPATCH-PROTOCOL-010 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-010] DP_010_authority_root_profile_cannot_express_a_model` |
 | DISPATCH-PROTOCOL-011 | `requirements/dispatch-protocol/tests/send-format.test.mjs::WHAT[DISPATCH-PROTOCOL-011] PROMPT_006_send_payload_carries_prompt_key_metadata` |
+| DISPATCH-PROTOCOL-012 | `requirements/dispatch-protocol/tests/send-format.test.mjs::WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_identity_to_managed_execution` |
+| DISPATCH-PROTOCOL-013 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs::WHAT[DISPATCH-PROTOCOL-013] DP_013_construction_waits_for_durability_activation_before_explicit_recovery` |

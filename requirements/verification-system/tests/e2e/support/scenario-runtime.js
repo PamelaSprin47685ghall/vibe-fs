@@ -195,7 +195,10 @@ export class ScenarioRuntime {
    */
   unfiredBoundaries() {
     return (this.scenario.boundaries ?? []).filter(
-      (boundary) => boundary.kind === 'prefix-probe' && !this.firedBoundaries.has(boundary.entryId),
+      (boundary) =>
+        boundary.kind === 'prefix-probe'
+        && boundary.optional !== true
+        && !this.firedBoundaries.has(boundary.entryId),
     );
   }
 

@@ -17,7 +17,6 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
@@ -47,15 +46,45 @@ module HostForkRunLifecycle =
         | AcceptanceUncertain of string
         | Rejected of string
 
+    let private requireIdentitySeedJournal =
+        function
+        | None -> Error "No journal: an AgentOwnerRoot identity seed cannot be issued"
+        | Some durable -> Ok durable
+
+    let private requireExactActiveOwnerProfile ownerSessionId (durable: AgentJournal) =
+        match PromptAuthorityLedger.activeProfile ownerSessionId (AgentJournal.snapshot durable).AgentProjections with
+        | None -> Error "AgentOwnerRoot identity seed requires the owner's active durable Logical Run"
+        | Some ownerProfile -> Ok ownerProfile
+
+    let private issueExactActiveOwnerIdentitySeed childAgent ownerProfile =
+        PromptAuthority.issueInheritedIdentitySeed childAgent ownerProfile
+        |> Result.mapError (sprintf "Invalid inherited participant identity: %A")
+        |> Result.bind (fun seed ->
+            PromptAuthority.validateInheritedIdentitySeed ownerProfile seed
+            |> Result.mapError (sprintf "Invalid owner identity witness: %A")
+            |> Result.map (fun _ -> seed))
+
+    let issueCurrentOwnerIdentitySeed
+        (journal: AgentJournal option)
+        (ownerSessionId: SessionId)
+        (childAgent: string)
+        : Result<PromptAuthority.IdentitySeed, string> =
+        journal
+        |> requireIdentitySeedJournal
+        |> Result.bind (requireExactActiveOwnerProfile ownerSessionId)
+        |> Result.bind (issueExactActiveOwnerIdentitySeed childAgent)
+
     [<RequireQualifiedAccess>]
     type private DurableDispatchObservation =
         | Accepted of PromptAuthority.AcceptedDispatch
         | Pending of PromptAuthority.PromptClaim
+        | IdentityMismatch
         | Dispatchable
 
-    let private pendingDispatchObservation childId payloadDigest projections =
+    let private pendingDispatchObservation childId payloadDigest identitySeed projections =
         match PromptAuthorityLedger.pendingDispatchClaim childId payloadDigest projections with
-        | Some claim -> DurableDispatchObservation.Pending claim
+        | Some claim when claim.IdentitySeed = identitySeed -> DurableDispatchObservation.Pending claim
+        | Some _ -> DurableDispatchObservation.IdentityMismatch
         | None ->
             raise (
                 InvalidOperationException(
@@ -63,18 +92,27 @@ module HostForkRunLifecycle =
                 )
             )
 
-    let private durableDispatchObservation (durable: AgentJournal) (childId: SessionId) (payloadDigest: string) =
+    let private durableDispatchObservation
+        (durable: AgentJournal)
+        (childId: SessionId)
+        (payloadDigest: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
+        =
         let projections = (AgentJournal.snapshot durable).AgentProjections
 
         match PromptAuthorityLedger.dispatchStatusFor childId payloadDigest projections with
-        | PromptAuthorityLedger.DispatchStatus.Accepted evidence -> DurableDispatchObservation.Accepted evidence
-        | PromptAuthorityLedger.DispatchStatus.Pending -> pendingDispatchObservation childId payloadDigest projections
+        | PromptAuthorityLedger.DispatchStatus.Accepted evidence when evidence.IdentitySeed = identitySeed ->
+            DurableDispatchObservation.Accepted evidence
+        | PromptAuthorityLedger.DispatchStatus.Accepted _ -> DurableDispatchObservation.IdentityMismatch
+        | PromptAuthorityLedger.DispatchStatus.Pending ->
+            pendingDispatchObservation childId payloadDigest identitySeed projections
         | PromptAuthorityLedger.DispatchStatus.Dispatchable -> DurableDispatchObservation.Dispatchable
 
     let private classifyPendingSend
         (durable: AgentJournal)
         (childId: SessionId)
         (payloadDigest: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         (claim: PromptAuthority.PromptClaim)
         (onAccepted: PhysicalUserMessageId -> unit)
         (accepted: PromptAuthority.AcceptedDispatch -> AgentOwnerDispatchOutcome)
@@ -85,11 +123,14 @@ module HostForkRunLifecycle =
         // then re-read durable truth to close the accepted-between-read race.
         PromptPhysicalAcceptance.register claim.PromptKey onAccepted
 
-        match durableDispatchObservation durable childId payloadDigest with
+        match durableDispatchObservation durable childId payloadDigest identitySeed with
         | DurableDispatchObservation.Accepted evidence ->
             PromptPhysicalAcceptance.cancel claim.PromptKey
             accepted evidence
         | DurableDispatchObservation.Pending _ -> AgentOwnerDispatchOutcome.AcceptanceUncertain error
+        | DurableDispatchObservation.IdentityMismatch ->
+            PromptPhysicalAcceptance.cancel claim.PromptKey
+            AgentOwnerDispatchOutcome.Rejected "Durable child dispatch identity witness does not match this owner run"
         | DurableDispatchObservation.Dispatchable ->
             PromptPhysicalAcceptance.cancel claim.PromptKey
             AgentOwnerDispatchOutcome.Rejected error
@@ -97,6 +138,7 @@ module HostForkRunLifecycle =
     let private classifySendError
         (durable: AgentJournal)
         (childId: SessionId)
+        (identitySeed: PromptAuthority.IdentitySeed)
         (prompt: string)
         (onAccepted: PhysicalUserMessageId -> unit)
         (error: string)
@@ -110,17 +152,39 @@ module HostForkRunLifecycle =
             onAccepted evidence.PhysicalUserMessageId
             AgentOwnerDispatchOutcome.Accepted
 
-        match durableDispatchObservation durable childId payloadDigest with
+        match durableDispatchObservation durable childId payloadDigest identitySeed with
         | DurableDispatchObservation.Accepted evidence -> accepted evidence
+        | DurableDispatchObservation.IdentityMismatch ->
+            AgentOwnerDispatchOutcome.Rejected "Durable child dispatch identity witness does not match this owner run"
         | DurableDispatchObservation.Dispatchable -> AgentOwnerDispatchOutcome.Rejected error
         | DurableDispatchObservation.Pending claim ->
-            classifyPendingSend durable childId payloadDigest claim onAccepted accepted error
+            classifyPendingSend durable childId payloadDigest identitySeed claim onAccepted accepted error
+
+    let private decideAcceptedDispatchObservation =
+        function
+        | DurableDispatchObservation.Accepted _ -> AgentOwnerDispatchOutcome.Accepted
+        | DurableDispatchObservation.IdentityMismatch ->
+            AgentOwnerDispatchOutcome.Rejected "Durable child dispatch identity witness does not match this owner run"
+        | DurableDispatchObservation.Pending _ ->
+            AgentOwnerDispatchOutcome.AcceptanceUncertain
+                "Transport accepted the child dispatch before durable physical acceptance was observed"
+        | DurableDispatchObservation.Dispatchable ->
+            AgentOwnerDispatchOutcome.Rejected "Accepted child dispatch has no durable acceptance evidence"
+
+    let private observeDurableAcceptedDispatch durable childId prompt identitySeed =
+        durableDispatchObservation durable childId (HostDigest.sha256Hex prompt) identitySeed
+        |> decideAcceptedDispatchObservation
+
+    let private interpretDispatchResult durable childId identitySeed prompt onAccepted =
+        function
+        | Ok _ -> observeDurableAcceptedDispatch durable childId prompt identitySeed
+        | Error error -> classifySendError durable childId identitySeed prompt onAccepted error
 
     let private sendAgentOwnerRootWithJournal
         (sessions: ISessionHostPort)
         (durable: AgentJournal)
         (childId: SessionId)
-        (agent: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         (directory: string option)
         (prompt: string)
         (onAccepted: PhysicalUserMessageId -> unit)
@@ -133,15 +197,12 @@ module HostForkRunLifecycle =
                     sessions
                     childId
                     prompt
-                    agent
+                    identitySeed
                     directory
                     PromptDispatcher.AwaitMode.Await
                     (Some onAccepted)
 
-            return
-                match sent with
-                | Ok _ -> AgentOwnerDispatchOutcome.Accepted
-                | Error error -> classifySendError durable childId prompt onAccepted error
+            return interpretDispatchResult durable childId identitySeed prompt onAccepted sent
         }
 
     let workRecordForOutcome
@@ -167,7 +228,7 @@ module HostForkRunLifecycle =
         (sessions: ISessionHostPort)
         (journal: AgentJournal option)
         (childId: SessionId)
-        (agent: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         (directory: string option)
         (prompt: string)
         (onAccepted: PhysicalUserMessageId -> unit)
@@ -175,7 +236,8 @@ module HostForkRunLifecycle =
         match journal with
         | None ->
             Task.FromResult(AgentOwnerDispatchOutcome.Rejected "No journal: an AgentOwnerRoot prompt cannot be claimed")
-        | Some durable -> sendAgentOwnerRootWithJournal sessions durable childId agent directory prompt onAccepted
+        | Some durable ->
+            sendAgentOwnerRootWithJournal sessions durable childId identitySeed directory prompt onAccepted
 
     /// PROMPT-006: every child prompt is an AgentOwnerRoot through the Dispatcher.
     ///
@@ -188,16 +250,16 @@ module HostForkRunLifecycle =
         (_parentId: SessionId)
         (journal: AgentJournal option)
         (childId: SessionId)
-        (agent: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         (directory: string option)
         (prompt: string)
         (onAccepted: PhysicalUserMessageId -> unit)
         =
-        sendAgentOwnerRootObserved sessions journal childId agent directory prompt onAccepted
+        sendAgentOwnerRootObserved sessions journal childId identitySeed directory prompt onAccepted
 
     let childPromptSender sessions parentId journal directoryOf =
-        fun agentId childId (_role: Role) agent prompt onAccepted ->
-            sendChildPrompt sessions parentId journal childId agent (directoryOf agentId) prompt onAccepted
+        fun agentId childId (_role: Role) identitySeed prompt onAccepted ->
+            sendChildPrompt sessions parentId journal childId identitySeed (directoryOf agentId) prompt onAccepted
 
     let bindAuthorityRoot (run: PendingHostRun) (physical: PhysicalUserMessageId) =
         run.AuthorityRoot <- Some(PhysicalUserMessageId.promoteToAuthorityRoot physical)

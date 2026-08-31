@@ -7,9 +7,12 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.OpenCode
+open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 
 /// Dispatch-owned JavaScript boundary. Host ports stay opaque and durable
@@ -17,11 +20,6 @@ open Wanxiangshu.Persistence.Journal
 /// constructors, send observations, and claim counts are plain values.
 [<RequireQualifiedAccess>]
 module DispatchSurface =
-
-    let private durableTierLabel (tier: AgentTier) =
-        match tier with
-        | AgentTier.Fast -> "Fast"
-        | AgentTier.Deep -> "Deep"
 
     type private PlainSessionPort(raw: obj) =
         let typed = unbox<Wanxiangshu.OpenCode.ISessionHostPort> raw
@@ -110,109 +108,171 @@ module DispatchSurface =
                 {| ok = false
                    error = JournalAppendFailure.describe failure |}
 
+    let private text (value: obj) =
+        if isNull value then "" else string value
+
+    let private participantIdentityOf (value: obj) : Result<ParticipantIdentityEvidence, string> =
+        let role =
+            if text value?canonicalRole = "bookkeeper" then
+                Some None
+            else
+                Roles.tryParseRole (text value?canonicalRole) |> Option.map Some
+
+        let tier = Roles.tryParseTier (text value?selectedTier)
+
+        let origin =
+            match text value?origin with
+            | "ResolvedAtRoot" -> Ok PersonaOrigin.ResolvedAtRoot
+            | "InheritedFromOwner" -> Ok PersonaOrigin.InheritedFromOwner
+            | unknown -> Error(sprintf "Unknown participant identity origin: %s" unknown)
+
+        match role, tier, origin with
+        | None, _, _ -> Error(sprintf "Unknown role: %s" (text value?canonicalRole))
+        | _, None, _ -> Error(sprintf "Unknown tier: %s" (text value?selectedTier))
+        | _, _, Error error -> Error error
+        | Some role, Some tier, Ok origin ->
+            { SelectedAgent = text value?selectedAgent
+              PeerAgent = text value?peerAgent
+              Role = role
+              InitialTier = tier
+              Persona = text value?persona
+              PersonaCatalogVersion = unbox<int> value?personaCatalogVersion
+              Origin = origin }
+            |> ParticipantIdentity.fromInput
+            |> Result.mapError (fun error -> sprintf "Invalid participant identity: %A" error)
+
+    let private identitySeedOf (value: obj) : Result<PromptAuthority.IdentitySeed, string> =
+        match text value?kind with
+        | "RootSelection" ->
+            participantIdentityOf value?participantIdentity
+            |> Result.map PromptAuthority.IdentitySeed.RootSelection
+        | "InheritedFromOwner" ->
+            participantIdentityOf value?participantIdentity
+            |> Result.bind (fun identity ->
+                PromptAuthority.IdentitySeedInput.InheritedFromOwnerInput
+                    { OwnerSessionId = SessionId.create (text value?ownerSession)
+                      OwnerLogicalRunId = LogicalRunId.create (text value?ownerLogicalRun)
+                      OwnerAuthorityRootUserMessageId =
+                        AuthorityRootUserMessageId.create (text value?ownerAuthorityRoot)
+                      ParticipantIdentity = ParticipantIdentity.toInput identity }
+                |> PromptAuthority.rehydrateIdentitySeed
+                |> Result.mapError (fun error -> sprintf "Invalid identity seed: %A" error))
+        | unknown -> Error(sprintf "Unknown identity seed kind: %s" unknown)
+
     /// Seed the durable AgentOwnerRoot needed by a continuation owner. This is
     /// the same PromptFact writer used by production ingress; the returned value
     /// contains no AgentFact/union representation.
-    let appendAuthorityRoot (handle: JournalHandle) (session: string) (agent: string) : Task<obj> =
+    let appendAuthorityRoot (handle: JournalHandle) (session: string) (identitySeed: obj) : Task<obj> =
         task {
-            match PromptAuthority.parseAgentName agent with
+            match identitySeedOf identitySeed with
             | Error error -> return box {| ok = false; error = error |}
-            | Ok(_, role, tier, peer) ->
+            | Ok(PromptAuthority.IdentitySeed.RootSelection _) ->
+                return
+                    box
+                        {| ok = false
+                           error = "AgentOwnerRoot requires an inherited owner identity seed" |}
+            | Ok identitySeed ->
                 let sessionId = SessionId.create session
 
-                let fact =
-                    PromptFact.AuthorityRootAccepted
-                        {| SessionId = sessionId
-                           LogicalRunId = LogicalRunId.create (sprintf "run-%s" session)
-                           AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (sprintf "root-%s" session)
-                           AuthorityKind = "AgentOwnerRoot"
-                           SelectedAgent = agent
-                           PeerAgent = peer
-                           CanonicalRole = Roles.roleLabel role
-                           SelectedTier = durableTierLabel tier |}
+                let payload: AuthorityRootAcceptedPayload =
+                    { SchemaVersion = 2
+                      SessionId = sessionId
+                      LogicalRunId = LogicalRunId.create (sprintf "run-%s" session)
+                      AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (sprintf "root-%s" session)
+                      AuthorityKind = "AgentOwnerRoot"
+                      IdentitySeed = identitySeed }
+
+                let fact = PromptFact.AuthorityRootAccepted payload
 
                 let! result = AgentJournal.appendAgent (StreamId.Session sessionId) None fact handle.Journal
                 return appendResult result
         }
 
-    /// Real PROMPT-002 Detached send through the production dispatcher. The
-    /// transport port is adapted only at this JS boundary; claim/persist/send
-    /// semantics remain PromptDispatcher.Runtime.
+    /// Real PROMPT-002 send through the production dispatcher. The transport
+    /// port and await-mode selection are adapted only at this JS boundary;
+    /// claim/persist/send semantics remain PromptDispatcher.Runtime.
+    let private sendAgentOwnerRootWithMode
+        (awaitMode: PromptDispatcher.AwaitMode)
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (identitySeed: obj)
+        : Task<obj> =
+        task {
+            match identitySeedOf identitySeed with
+            | Error error ->
+                return
+                    box
+                        {| ok = false
+                           key = null
+                           error = error
+                           observation = null |}
+            | Ok identitySeed ->
+                let runtime = PromptDispatcher.forJournal handle.Journal
+                let adapter = PlainSessionPort(port)
+
+                let! result =
+                    runtime.SendAgentOwnerRoot
+                        (adapter :> Wanxiangshu.OpenCode.ISessionHostPort)
+                        (SessionId.create session)
+                        text
+                        identitySeed
+                        None
+                        awaitMode
+                        None
+
+                return
+                    match result with
+                    | Ok key ->
+                        box
+                            {| ok = true
+                               key = PromptKey.value key
+                               error = null
+                               observation = adapter.LastObservation |}
+                    | Error error ->
+                        box
+                            {| ok = false
+                               key = null
+                               error = error
+                               observation = adapter.LastObservation |}
+        }
+
     let sendAgentOwnerRoot
         (port: obj)
         (handle: JournalHandle)
         (session: string)
         (text: string)
-        (agent: string)
+        (identitySeed: obj)
         : Task<obj> =
-        task {
-            let runtime = PromptDispatcher.forJournal handle.Journal
-            let adapter = PlainSessionPort(port)
+        sendAgentOwnerRootWithMode PromptDispatcher.AwaitMode.Detached port handle session text identitySeed
 
-            let! result =
-                runtime.SendAgentOwnerRoot
-                    (adapter :> Wanxiangshu.OpenCode.ISessionHostPort)
-                    (SessionId.create session)
-                    text
-                    agent
-                    None
-                    PromptDispatcher.AwaitMode.Detached
-                    None
-
-            return
-                match result with
-                | Ok key ->
-                    box
-                        {| ok = true
-                           key = PromptKey.value key
-                           error = null
-                           observation = adapter.LastObservation |}
-                | Error error ->
-                    box
-                        {| ok = false
-                           key = null
-                           error = error
-                           observation = adapter.LastObservation |}
-        }
+    let sendAgentOwnerRootAwait
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (identitySeed: obj)
+        : Task<obj> =
+        sendAgentOwnerRootWithMode PromptDispatcher.AwaitMode.Await port handle session text identitySeed
 
     let private profileOf (value: obj) : Result<PromptAuthority.AuthorityExecutionProfile, string> =
-        let selectedAgent =
-            if isNull value?selectedAgent then
-                ""
-            else
-                string value?selectedAgent
-
-        match PromptAuthority.parseAgentName selectedAgent with
-        | Error error -> Error error
-        | Ok(_, role, tier, peer) ->
-            let peerAgent =
-                if isNull value?peerAgent then
-                    peer
-                else
-                    string value?peerAgent
-
-            match string value?authorityKind with
-            | "AgentOwnerRoot" ->
-                Ok
-                    { SessionId = SessionId.create (string value?session)
-                      LogicalRunId = LogicalRunId.create (string value?logicalRun)
-                      AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (string value?authorityRoot)
-                      AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-                      SelectedAgent = selectedAgent
-                      PeerAgent = peerAgent
-                      CanonicalRole = role
-                      SelectedTier = tier }
-            | "HumanRoot" ->
-                Ok
-                    { SessionId = SessionId.create (string value?session)
-                      LogicalRunId = LogicalRunId.create (string value?logicalRun)
-                      AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (string value?authorityRoot)
-                      AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
-                      SelectedAgent = selectedAgent
-                      PeerAgent = peerAgent
-                      CanonicalRole = role
-                      SelectedTier = tier }
+        let authorityKind =
+            match text value?authorityKind with
+            | "AgentOwnerRoot" -> Ok PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+            | "HumanRoot" -> Ok PromptAuthority.RootAuthorityKind.HumanRoot
             | unknown -> Error(sprintf "Unknown authority root kind: %s" unknown)
+
+        match authorityKind, identitySeedOf value?identitySeed with
+        | Ok authorityKind, Ok identitySeed ->
+            PromptAuthority.createAuthorityExecutionProfileFromSeed
+                (SessionId.create (text value?session))
+                (LogicalRunId.create (text value?logicalRun))
+                (AuthorityRootUserMessageId.create (text value?authorityRoot))
+                authorityKind
+                identitySeed
+        | Error error, _
+        | _, Error error -> Error error
 
     let private awaitModeOf (value: string) =
         if isNull value then
@@ -366,6 +426,38 @@ module DispatchSurface =
                            observation = null |}
         }
 
+    let private participantIdentityView (identity: ParticipantIdentityEvidence) : obj =
+        box
+            {| selectedAgent = ParticipantIdentity.selectedAgent identity
+               peerAgent = ParticipantIdentity.peerAgent identity
+               canonicalRole = ParticipantIdentity.roleLabel identity
+               selectedTier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+               persona = ParticipantIdentity.persona identity
+               personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
+               origin =
+                match ParticipantIdentity.origin identity with
+                | PersonaOrigin.ResolvedAtRoot -> "ResolvedAtRoot"
+                | PersonaOrigin.InheritedFromOwner -> "InheritedFromOwner" |}
+
+    let private identitySeedView (identitySeed: PromptAuthority.IdentitySeed) : obj =
+        let identity = PromptAuthority.identitySeedParticipantIdentity identitySeed
+
+        match PromptAuthority.identitySeedOwner identitySeed with
+        | None ->
+            box
+                {| kind = "RootSelection"
+                   ownerSession = null
+                   ownerLogicalRun = null
+                   ownerAuthorityRoot = null
+                   participantIdentity = participantIdentityView identity |}
+        | Some(ownerSession, ownerLogicalRun, ownerAuthorityRoot) ->
+            box
+                {| kind = "InheritedFromOwner"
+                   ownerSession = SessionId.value ownerSession
+                   ownerLogicalRun = LogicalRunId.value ownerLogicalRun
+                   ownerAuthorityRoot = AuthorityRootUserMessageId.value ownerAuthorityRoot
+                   participantIdentity = participantIdentityView identity |}
+
     let private profileView (profile: PromptAuthority.AuthorityExecutionProfile) : obj =
         box
             {| session = SessionId.value profile.SessionId
@@ -375,10 +467,25 @@ module DispatchSurface =
                 match profile.AuthorityKind with
                 | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
                 | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
-               selectedAgent = profile.SelectedAgent
-               peerAgent = profile.PeerAgent
-               canonicalRole = Roles.roleLabel profile.CanonicalRole
-               selectedTier = durableTierLabel profile.SelectedTier |}
+               identitySeed = identitySeedView profile.IdentitySeed
+               participantIdentity = participantIdentityView profile.ParticipantIdentity |}
+
+    let private humanRootAcceptanceFailureView =
+        function
+        | PromptDispatcher.HumanRootAcceptanceFailure.IdentityRejected reason ->
+            box
+                {| kind = "IdentityRejected"
+                   reason = reason |}
+        | PromptDispatcher.HumanRootAcceptanceFailure.AuthorityRegistrationRejected(PromptDispatcher.AuthorityRegistrationFailure.PersistenceRejected reason) ->
+            box
+                {| kind = "AuthorityPersistenceRejected"
+                   reason = reason |}
+        | PromptDispatcher.HumanRootAcceptanceFailure.AuthorityRegistrationRejected(PromptDispatcher.AuthorityRegistrationFailure.RegistrationRejected(PromptAuthorityRun.ActiveRunIdentityConflict(active,
+                                                                                                                                                                                                    requested))) ->
+            box
+                {| kind = "ActiveRunIdentityConflict"
+                   active = profileView active
+                   requested = profileView requested |}
 
     /// PROMPT-004/005: prove one dispatched AgentOwnerRoot at a physical message
     /// boundary. The Dispatcher writes PhysicalAccepted before registering the
@@ -410,6 +517,126 @@ module DispatchSurface =
                            error = error |}
         }
 
+    /// Registered proof boundary for external ingress: the caller supplies the
+    /// exact RootSelection seed, including the deliberate absence of a seed.
+    let acceptHumanRootSelection
+        (handle: JournalHandle)
+        (session: string)
+        (physicalMessageId: string)
+        (identitySeed: obj)
+        : Task<obj> =
+        task {
+            let seedResult =
+                if isNull identitySeed then
+                    Ok None
+                else
+                    identitySeedOf identitySeed |> Result.map Some
+
+            match seedResult with
+            | Error error ->
+                return
+                    box
+                        {| ok = false
+                           profile = null
+                           error = error |}
+            | Ok identitySeed ->
+                let! result =
+                    (PromptDispatcher.forJournal handle.Journal).AcceptHumanRoot
+                        (SessionId.create session)
+                        (PhysicalUserMessageId.create physicalMessageId)
+                        identitySeed
+
+                return
+                    match result with
+                    | Ok profile ->
+                        box
+                            {| ok = true
+                               profile = profileView profile
+                               error = null |}
+                    | Error error ->
+                        box
+                            {| ok = false
+                               profile = null
+                               error = humanRootAcceptanceFailureView error |}
+        }
+
+    let private managedAcceptanceView (result: Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>) : obj =
+        match result with
+        | Ok witness ->
+            let evidence = ManagedChatAcceptanceWitness.evidence witness
+
+            box
+                {| ok = true
+                   error = null
+                   sessionId = SessionId.value evidence.SessionId
+                   physicalUserMessageId = PhysicalUserMessageId.value evidence.PhysicalUserMessageId
+                   origin = PromptAuthority.originLabel evidence.Origin
+                   effectiveAgent = evidence.EffectiveAgent |}
+        | Error error ->
+            let kind =
+                match error with
+                | ManagedChatAcceptanceError.IntentRejected _ -> "IntentRejected"
+                | ManagedChatAcceptanceError.AuthorityRegistrationRejected _ -> "AuthorityRegistrationRejected"
+                | ManagedChatAcceptanceError.AttemptEvidenceInvalid _ -> "AttemptEvidenceInvalid"
+                | ManagedChatAcceptanceError.AttemptKeyMismatch _ -> "AttemptKeyMismatch"
+                | ManagedChatAcceptanceError.EstablishedEvidenceConflict _ -> "EstablishedEvidenceConflict"
+                | ManagedChatAcceptanceError.ProjectionMissingAfterCommit _ -> "ProjectionMissingAfterCommit"
+                | ManagedChatAcceptanceError.ProjectionConflictAfterCommit _ -> "ProjectionConflictAfterCommit"
+                | ManagedChatAcceptanceError.NotAttempted _ -> "NotAttempted"
+                | ManagedChatAcceptanceError.CommitUnknown _ -> "CommitUnknown"
+                | ManagedChatAcceptanceError.FactRejected _ -> "FactRejected"
+
+            box
+                {| ok = false
+                   error = kind
+                   sessionId = null
+                   physicalUserMessageId = null
+                   origin = null
+                   effectiveAgent = null |}
+
+    let private acceptManagedDecision
+        (handle: JournalHandle)
+        (message: ChatAdmissionIntent.DecodedMessage)
+        : Task<obj> =
+        task {
+            let decision = PromptIngress.resolveDecision (Some handle.Journal) message
+            let! accepted = (PromptDispatcher.forJournal handle.Journal).AcceptManagedChatIntent decision
+            return managedAcceptanceView accepted
+        }
+
+    let acceptManagedExternal
+        (handle: JournalHandle)
+        (session: string)
+        (physicalMessageId: string)
+        (agent: string)
+        : Task<obj> =
+        acceptManagedDecision
+            handle
+            { SessionId = Some(SessionId.create session)
+              PhysicalUserMessageId = Some(PhysicalUserMessageId.create physicalMessageId)
+              ExplicitAgent = Some agent
+              PromptKey = None
+              IsHostCompaction = false
+              IsHostSynthetic = false
+              Text = None }
+
+    let acceptManagedPromptClaim
+        (handle: JournalHandle)
+        (session: string)
+        (physicalMessageId: string)
+        (promptKey: string)
+        (agent: string)
+        : Task<obj> =
+        acceptManagedDecision
+            handle
+            { SessionId = Some(SessionId.create session)
+              PhysicalUserMessageId = Some(PhysicalUserMessageId.create physicalMessageId)
+              ExplicitAgent = Some agent
+              PromptKey = Some(PromptKey.create promptKey)
+              IsHostCompaction = false
+              IsHostSynthetic = false
+              Text = None }
+
     /// PROMPT-004: accept the external HumanRoot through the same Dispatcher
     /// writer used by chat.message. The physical id is supplied by the caller as
     /// host-boundary evidence; this surface never invents an alias.
@@ -420,24 +647,34 @@ module DispatchSurface =
         (agent: string)
         : Task<obj> =
         task {
-            let! result =
-                (PromptDispatcher.forJournal handle.Journal).AcceptHumanRoot
-                    (SessionId.create session)
-                    (PhysicalUserMessageId.create physicalMessageId)
-                    (Some agent)
-
-            return
-                match result with
-                | Ok profile ->
-                    box
-                        {| ok = true
-                           profile = profileView profile
-                           error = null |}
-                | Error error ->
+            match ParticipantIdentity.resolveAtRoot agent with
+            | Error error ->
+                return
                     box
                         {| ok = false
                            profile = null
-                           error = error |}
+                           error = sprintf "Invalid root participant identity: %A" error |}
+            | Ok identity ->
+                let identitySeed = PromptAuthority.IdentitySeed.RootSelection identity
+
+                let! result =
+                    (PromptDispatcher.forJournal handle.Journal).AcceptHumanRoot
+                        (SessionId.create session)
+                        (PhysicalUserMessageId.create physicalMessageId)
+                        (Some identitySeed)
+
+                return
+                    match result with
+                    | Ok profile ->
+                        box
+                            {| ok = true
+                               profile = profileView profile
+                               error = null |}
+                    | Error error ->
+                        box
+                            {| ok = false
+                               profile = null
+                               error = humanRootAcceptanceFailureView error |}
         }
 
     let private claimView (claim: PromptAuthority.PromptClaim) : obj =
@@ -451,6 +688,7 @@ module DispatchSurface =
                 |> Option.map AuthorityRootUserMessageId.value
                 |> Option.defaultValue null
                effectiveAgent = claim.EffectiveAgent |> Option.defaultValue null
+               identitySeed = identitySeedView claim.IdentitySeed
                payloadDigest = claim.PayloadDigest
                receipt = claim.Receipt |> Option.map TransportReceipt.value |> Option.defaultValue null
                claimedAtRuntimeStartCount = claim.ClaimedAtRuntimeStartCount |}
@@ -528,6 +766,11 @@ module DispatchSurface =
                 let logicalRun = watermarkText value?logicalRun
                 let authorityRoot = watermarkText value?authorityRoot
 
+                let identitySeed =
+                    match identitySeedOf value?identitySeed with
+                    | Ok identitySeed -> identitySeed
+                    | Error error -> invalidArg "identitySeed" error
+
                 StreamId.Session session,
                 Fact.Agent(
                     AgentFact.Prompt(
@@ -552,6 +795,7 @@ module DispatchSurface =
                                     None
                                 else
                                     Some agent
+                               IdentitySeed = identitySeed
                                PayloadDigest = watermarkText value?payloadDigest |}
                     )
                 )

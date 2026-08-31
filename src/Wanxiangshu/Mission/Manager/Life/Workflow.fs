@@ -177,7 +177,8 @@ module ManagerLifeWorkflow =
         | EndingLifeAdmission.InitialAgentOwnerMigration evidence ->
             materializeInitialAgentOwnerLife journal sessionId evidence
 
-    let private captureError = function
+    let private captureError =
+        function
         | XTraceCaptureError.Refused reason -> reason
         | XTraceCaptureError.StorageFailed reason -> reason
 

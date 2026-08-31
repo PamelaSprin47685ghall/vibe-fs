@@ -9,6 +9,8 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.EventStore
 
 /// JS-native owner surface for Journal.Envelope ↔ universal EventEnvelope codec.
@@ -28,6 +30,81 @@ module JournalCodecSurface =
         | "Child" -> Child(ChildId.create (text (value?id)))
         | "Process" -> Process(ProcessId.create (text (value?id)))
         | other -> failwith $"JournalCodecSurface: unknown stream '{other}'"
+
+    let private roleOf (value: obj) =
+        Roles.tryParseRole (text value)
+        |> Option.defaultWith (fun () -> failwith $"JournalCodecSurface: unknown role '{text value}'")
+
+    let private tierOf (value: obj) =
+        Roles.tryParseTier (text value)
+        |> Option.defaultWith (fun () -> failwith $"JournalCodecSurface: unknown tier '{text value}'")
+
+    let private originOf (value: obj) =
+        match text value with
+        | "ResolvedAtRoot" -> PersonaOrigin.ResolvedAtRoot
+        | "InheritedFromOwner" -> PersonaOrigin.InheritedFromOwner
+        | other -> failwith $"JournalCodecSurface: unknown persona origin '{other}'"
+
+    let private identityInputOfJs (value: obj) =
+        { SelectedAgent = text (value?selectedAgent)
+          PeerAgent = text (value?peerAgent)
+          Role =
+            if text (value?canonicalRole) = "bookkeeper" then
+                None
+            else
+                Some(roleOf (value?canonicalRole))
+          InitialTier = tierOf (value?selectedTier)
+          Persona = text (value?persona)
+          PersonaCatalogVersion = unbox<int> (value?personaCatalogVersion)
+          Origin = originOf (value?origin) }
+
+    let private identitySeedOfJs (value: obj) =
+        let identityInput = identityInputOfJs (value?participantIdentity)
+
+        match text (value?kind) with
+        | "RootSelection" -> PromptAuthority.IdentitySeedInput.RootSelectionInput identityInput
+        | "InheritedFromOwner" ->
+            PromptAuthority.IdentitySeedInput.InheritedFromOwnerInput
+                { OwnerSessionId = SessionId.create (text (value?ownerSession))
+                  OwnerLogicalRunId = LogicalRunId.create (text (value?ownerLogicalRun))
+                  OwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (value?ownerAuthorityRoot))
+                  ParticipantIdentity = identityInput }
+        | other -> failwith $"JournalCodecSurface: unknown identity seed '{other}'"
+        |> PromptAuthority.rehydrateIdentitySeed
+        |> Result.defaultWith (fun error -> failwith $"JournalCodecSurface: invalid identity seed: {error}")
+
+    let private identityToJs evidence =
+        box
+            {| selectedAgent = ParticipantIdentity.selectedAgent evidence
+               peerAgent = ParticipantIdentity.peerAgent evidence
+               canonicalRole = ParticipantIdentity.roleLabel evidence
+               selectedTier = ParticipantIdentity.initialTier evidence |> Roles.wireTierLabel
+               persona = ParticipantIdentity.persona evidence
+               personaCatalogVersion = ParticipantIdentity.personaCatalogVersion evidence
+               origin =
+                match ParticipantIdentity.origin evidence with
+                | PersonaOrigin.ResolvedAtRoot -> "ResolvedAtRoot"
+                | PersonaOrigin.InheritedFromOwner -> "InheritedFromOwner" |}
+
+    let private identitySeedToJs seed =
+        let participantIdentity =
+            PromptAuthority.identitySeedParticipantIdentity seed |> identityToJs
+
+        match PromptAuthority.identitySeedOwner seed with
+        | None ->
+            box
+                {| kind = "RootSelection"
+                   ownerSession = null
+                   ownerLogicalRun = null
+                   ownerAuthorityRoot = null
+                   participantIdentity = participantIdentity |}
+        | Some(ownerSession, ownerLogicalRun, ownerAuthorityRoot) ->
+            box
+                {| kind = "InheritedFromOwner"
+                   ownerSession = SessionId.value ownerSession
+                   ownerLogicalRun = LogicalRunId.value ownerLogicalRun
+                   ownerAuthorityRoot = AuthorityRootUserMessageId.value ownerAuthorityRoot
+                   participantIdentity = participantIdentity |}
 
     let private streamToJs (stream: StreamId) : obj =
         match stream with
@@ -51,6 +128,19 @@ module JournalCodecSurface =
         let payload = unbox<obj> (value?payload)
 
         match family, case with
+        | "Prompt", "AuthorityRootAccepted" ->
+            Fact.Agent(
+                AgentFact.Prompt(
+                    PromptFactCases.AuthorityRootAccepted
+                        { SchemaVersion = unbox<int> (payload?SchemaVersion)
+                          SessionId = SessionId.create (text (payload?SessionId))
+                          LogicalRunId = LogicalRunId.create (text (payload?LogicalRunId))
+                          AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.create (text (payload?AuthorityRootUserMessageId))
+                          AuthorityKind = text (payload?AuthorityKind)
+                          IdentitySeed = identitySeedOfJs (payload?IdentitySeed) }
+                )
+            )
         | "Companion", "CompanionBloggerClosed" ->
             Fact.Agent(
                 CompanionFact.CompanionBloggerClosed {| SessionId = SessionId.create (text (payload?SessionId)) |}
@@ -59,6 +149,17 @@ module JournalCodecSurface =
 
     let private factToJs (fact: Fact) : obj =
         match fact with
+        | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityRootAccepted payload)) ->
+            box
+                {| family = "Prompt"
+                   case = "AuthorityRootAccepted"
+                   payload =
+                    {| SchemaVersion = payload.SchemaVersion
+                       SessionId = SessionId.value payload.SessionId
+                       LogicalRunId = LogicalRunId.value payload.LogicalRunId
+                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                       AuthorityKind = payload.AuthorityKind
+                       IdentitySeed = identitySeedToJs payload.IdentitySeed |} |}
         | Fact.Agent(AgentFact.Companion(CompanionFactCases.CompanionBloggerClosed payload)) ->
             box
                 {| family = "Companion"

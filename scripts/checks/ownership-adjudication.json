@@ -44,20 +44,6 @@
         ]
       },
       {
-        "path": "src/Wanxiangshu/OpenCode/Host/Fact.fs",
-        "owners": [
-          "host-boundary",
-          "requirement-grounding"
-        ]
-      },
-      {
-        "path": "src/Wanxiangshu/OpenCode/Host/Facts.fs",
-        "owners": [
-          "host-boundary",
-          "requirement-grounding"
-        ]
-      },
-      {
         "path": "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs",
         "owners": [
           "context-compression"
@@ -211,13 +197,6 @@
         ]
       },
       {
-        "path": "src/Wanxiangshu/OpenCode/Host/PersonaBinding.fs",
-        "owners": [
-          "host-boundary",
-          "participant-identity"
-        ]
-      },
-      {
         "path": "src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs",
         "owners": [
           "host-boundary",
@@ -263,15 +242,6 @@
       },
       {
         "path": "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Gate.fs",
-        "owners": [
-          "context-compression",
-          "host-boundary",
-          "prefix-stability",
-          "requirement-grounding"
-        ]
-      },
-      {
-        "path": "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Model.fs",
         "owners": [
           "context-compression",
           "host-boundary",
@@ -773,6 +743,13 @@
       {
         "path": "src/Wanxiangshu/Context/Prefix/Candidate.fs",
         "owners": [
+          "prefix-stability"
+        ]
+      },
+      {
+        "path": "src/Wanxiangshu/Context/Prefix/Types.fs",
+        "owners": [
+          "context-compression",
           "prefix-stability"
         ]
       },
@@ -1444,7 +1421,7 @@
         ]
       },
       {
-        "path": "src/Wanxiangshu/Participant/Persona/SessionPersona.fs",
+        "path": "src/Wanxiangshu/Participant/Persona/Identity.fs",
         "owners": [
           "capability-enforcement",
           "cognitive-environment",
@@ -1452,16 +1429,6 @@
           "office-capability",
           "participant-identity",
           "session-ontology"
-        ]
-      },
-      {
-        "path": "src/Wanxiangshu/Participant/Persona/SessionSurface.fs",
-        "owners": [
-          "capability-enforcement",
-          "cognitive-environment",
-          "external-investigation",
-          "office-capability",
-          "participant-identity"
         ]
       },
       {

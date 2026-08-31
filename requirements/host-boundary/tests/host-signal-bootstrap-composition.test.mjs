@@ -31,13 +31,14 @@ test('WHAT[HOST-BOUNDARY-021] HostSignalBootstrap is strictly a wiring compositi
     )
   }
 
-  // Verify pure 5 responsibilities: construct, subscribe, route typed signal, drain, dispose
+  // Verify pure 5 responsibilities: construct, subscribe, route typed signal,
+  // register the Host-owned reconcile drain, and register subscription disposal.
   assert.match(bootstrapSource, /module\s+HostSignalBootstrap\b/)
   assert.match(bootstrapSource, /type\s+WiredSignals\b/)
   assert.match(bootstrapSource, /let\s+wire\b/)
   assert.match(bootstrapSource, /HostSignalSubscribe\.trySubscribe/)
-  assert.match(bootstrapSource, /scope\.TrackReconcileShutdown/)
-  assert.match(bootstrapSource, /scope\.TrackSubscription/)
+  assert.match(bootstrapSource, /do scope\.TrackReconcileShutdown\(fun \(\) -> reconciler\.StopAndDrain\(\)\)/)
+  assert.match(bootstrapSource, /do scope\.TrackSubscription subscription/)
 
   // Prohibit foreign domain policy decisions or implicit workflow PC
   assert.doesNotMatch(bootstrapSource, /\bdecideModelPolicy\b/)
@@ -53,11 +54,23 @@ test('WHAT[HOST-BOUNDARY-021] HostSignalBootstrap is strictly a wiring compositi
 test('WHAT[HOST-BOUNDARY-021] HostSignalBootstrap delegates policy to published owner contracts', () => {
   const bootstrapSource = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
 
-  // Model routing policy delegated to ModelRouting owner
+  // Host observations are persisted through the exact execution-binding owner;
+  // provider-step lifecycle remains behind ModelRouting's published contract.
+  assert.match(bootstrapSource, /SessionExecutionBinding\.persistProviderStartedFromObservation/)
   assert.match(bootstrapSource, /ModelRouting\.endProviderStep/)
-  assert.match(bootstrapSource, /ModelRouting\.releasePhysicalExecution/)
-  assert.match(bootstrapSource, /ModelRouting\.chatExecutionAdmission/)
-  assert.match(bootstrapSource, /ModelRouting\.routeChatExecution/)
+
+  // Managed chat admission is one transaction. The composition root decodes
+  // once, resolves through PromptIngress, and supplies only ModelRouting's Host
+  // projection port to the transaction owner.
+  assert.match(bootstrapSource, /PromptIngress\.resolveDecision/)
+  assert.match(bootstrapSource, /ChatAdmissionTransaction\.production/)
+  assert.match(bootstrapSource, /ChatAdmissionTransaction\.execute/)
+  assert.match(bootstrapSource, /createTransaction \(ModelRouting\.projectHostModel output\)/)
+  assert.doesNotMatch(bootstrapSource, /PromptIngress\.create(?:Decision)?Hook/)
+  assert.doesNotMatch(bootstrapSource, /ModelRouting\.routeChatExecution/)
+  assert.doesNotMatch(bootstrapSource, /SessionExecutionBinding\.acceptRoutedExecution/)
+  assert.doesNotMatch(bootstrapSource, /ModelRouting\.projectRoutedModel/)
+  assert.doesNotMatch(bootstrapSource, /ModelRouting\.releasePhysicalExecution/)
 
   // Fission policy delegated to FissionHost owner
   assert.match(bootstrapSource, /FissionHost\.routeAttemptAborted/)
@@ -65,4 +78,14 @@ test('WHAT[HOST-BOUNDARY-021] HostSignalBootstrap delegates policy to published 
 
   // Session deletion delegated to HostSessionDeletion owner
   assert.match(bootstrapSource, /HostSessionDeletion\.handle/)
+})
+
+test('WHAT[HOST-BOUNDARY-003] coarse attempt abort never aborts every current chat execution', () => {
+  const bootstrapSource = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
+  const abortBranch = bootstrapSource.match(/\| AttemptAborted failure ->([\s\S]*?)\| SessionDeleted/)
+
+  assert.ok(abortBranch, 'AttemptAborted branch must remain explicit')
+  assert.doesNotMatch(abortBranch[1], /SignalChatRecoverySession|ChatExecutionRecoveryLifecycleEvent\.SessionAborted/)
+  assert.match(abortBranch[1], /FissionHost\.routeAttemptAborted/)
+  assert.match(abortBranch[1], /reconciler\.Signal signal/)
 })

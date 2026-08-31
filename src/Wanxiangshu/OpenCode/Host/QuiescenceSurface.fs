@@ -44,11 +44,9 @@ module QuiescenceSurface =
                 {| accepted = false
                    failure = failureName failure |}
 
-    let tryConsume (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : obj =
-        gate.TryConsume permit |> resultView
+    let tryConsume (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : obj = gate.TryConsume permit |> resultView
 
-    let tryRelease (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : obj =
-        gate.TryRelease permit |> resultView
+    let tryRelease (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : obj = gate.TryRelease permit |> resultView
 
     let livePermitCount (gate: SessionQuiescenceGate) : int = gate.LivePermitCount
 

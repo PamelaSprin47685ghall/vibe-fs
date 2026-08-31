@@ -22,10 +22,45 @@ const capturingPort = () => ({
   SendPrompt: async () => dispatch.admittedWithReceipt('accepted-006'),
 })
 
-const profileFor = () => {
-  const built = authority.createAuthorityRoot(hash, 'rt-send', 'ses_006', 'HumanRoot', 'msg_u1', 'fast-coder')
+const personas = {
+  'fast-coder': 'Coder',
+  'fast-manager': 'Coordinator',
+}
+const rootSelection = (agent) => {
+  const [selectedTier, canonicalRole] = agent.split('-')
+  const peerTier = selectedTier === 'fast' ? 'deep' : 'fast'
+  return {
+    kind: 'RootSelection',
+    ownerSession: null,
+    ownerLogicalRun: null,
+    ownerAuthorityRoot: null,
+    participantIdentity: {
+      selectedAgent: agent,
+      peerAgent: `${peerTier}-${canonicalRole}`,
+      canonicalRole,
+      selectedTier,
+      persona: personas[agent] ?? 'Unknown',
+      personaCatalogVersion: 1,
+      origin: 'ResolvedAtRoot',
+    },
+  }
+}
+
+const profileFor = (runtime = 'rt-send', session = 'ses_006', physical = 'msg_u1', agent = 'fast-coder') => {
+  const built = authority.createAuthorityRoot(hash, runtime, session, 'HumanRoot', physical, rootSelection(agent))
   assert.equal(built.ok, true, built.ok ? '' : built.error)
   return built.value
+}
+
+const acceptOwner = async (handle, session = 'ses_owner') => {
+  const accepted = await dispatch.acceptHumanRootSelection(
+    handle,
+    session,
+    `msg-${session}`,
+    rootSelection('fast-manager'),
+  )
+  assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
+  return accepted.profile
 }
 
 const observation = (result) => {
@@ -66,12 +101,14 @@ test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_agent_and_no_m
     const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-send', 'rt-send', 4242, '2026-01-01T00:00:00Z')
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
+      const owner = await acceptOwner(opened.journal, 'ses_006_owner')
+      const seed = authority.issueInheritedIdentitySeed('fast-coder', owner).value
       const ownerRoot = await dispatch.sendAgentOwnerRoot(
         capturingPort(),
         opened.journal,
         'ses_006',
         'dispatch this',
-        'fast-coder',
+        seed,
       )
       const continuation = await dispatch.sendContinuation(
         capturingPort(),
@@ -119,12 +156,14 @@ test('WHAT[DISPATCH-PROTOCOL-011] PROMPT_006_send_payload_carries_prompt_key_met
     const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-send-meta', 'rt-send-meta', 4242, '2026-01-01T00:00:00Z')
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
+      const owner = await acceptOwner(opened.journal, 'ses_006m_owner')
+      const seed = authority.issueInheritedIdentitySeed('fast-coder', owner).value
       const ownerRoot = await dispatch.sendAgentOwnerRoot(
         capturingPort(),
         opened.journal,
         'ses_006m',
         'dispatch this',
-        'fast-coder',
+        seed,
       )
       const continuation = await dispatch.sendContinuation(
         capturingPort(),
@@ -132,13 +171,90 @@ test('WHAT[DISPATCH-PROTOCOL-011] PROMPT_006_send_payload_carries_prompt_key_met
         'ses_006m',
         'retry on the other side',
         'ProviderRetryAttempt',
-        authority.createAuthorityRoot(hash, 'rt-send-meta', 'ses_006m', 'HumanRoot', 'msg_u1', 'fast-coder').value,
+        profileFor('rt-send-meta', 'ses_006m', 'msg_u1', 'fast-coder'),
         'deep-coder',
         'Await',
       )
 
       assert.ok(observation(ownerRoot).metadata, 'owner-root send must carry Metadata')
       assert.ok(observation(continuation).metadata, 'continuation send must carry Metadata')
+    } finally {
+      journal.JournalSurface_dispose(opened.journal)
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_identity_to_managed_execution', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-dispatch-handoff-'))
+  try {
+    const opened = await journal.JournalSurface_bootWithWriterId(
+      base,
+      'writer-dispatch-handoff',
+      'rt-dispatch-handoff',
+      4242,
+      '2026-01-01T00:00:00Z',
+    )
+    assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+    try {
+      const owner = await acceptOwner(opened.journal, 'ses_dispatch_handoff_owner')
+      const inherited = authority.issueInheritedIdentitySeed('fast-coder', owner)
+      assert.equal(inherited.ok, true, inherited.ok ? '' : inherited.error)
+
+      const sent = await dispatch.sendAgentOwnerRoot(
+        capturingPort(),
+        opened.journal,
+        'ses_dispatch_handoff',
+        'handoff exact accepted identity',
+        inherited.value,
+      )
+      assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
+
+      const claimed = dispatch.projectionObservation(opened.journal, 'ses_dispatch_handoff').pendingClaims
+      assert.equal(claimed.length, 1)
+      assert.equal(claimed[0].promptKey, sent.key)
+      assert.deepEqual(claimed[0].identitySeed, inherited.value)
+      assert.deepEqual(claimed[0].identitySeed.participantIdentity, {
+        selectedAgent: 'fast-coder',
+        peerAgent: 'deep-coder',
+        canonicalRole: 'coder',
+        selectedTier: 'fast',
+        persona: 'Coordinator',
+        personaCatalogVersion: 1,
+        origin: 'InheritedFromOwner',
+      })
+
+      const wrongClaim = await dispatch.acceptManagedPromptClaim(
+        opened.journal,
+        'ses_dispatch_handoff',
+        'msg_dispatch_handoff',
+        `${sent.key}-wrong`,
+        'fast-coder',
+      )
+      assert.equal(wrongClaim.ok, false, 'managed acceptance must reject a non-exact PromptKey')
+      assert.equal(dispatch.pendingClaimCount(opened.journal, 'ses_dispatch_handoff'), 1)
+
+      const accepted = await dispatch.acceptManagedPromptClaim(
+        opened.journal,
+        'ses_dispatch_handoff',
+        'msg_dispatch_handoff',
+        sent.key,
+        'fast-coder',
+      )
+      assert.deepEqual(
+        accepted,
+        {
+          ok: true,
+          error: null,
+          sessionId: 'ses_dispatch_handoff',
+          physicalUserMessageId: 'msg_dispatch_handoff',
+          origin: 'AgentOwnerRoot',
+          effectiveAgent: 'fast-coder',
+        },
+        'the durable managed-execution witness must carry the exact physical identity and accepted profile',
+      )
+      assert.equal(dispatch.pendingClaimCount(opened.journal, 'ses_dispatch_handoff'), 0)
     } finally {
       journal.JournalSurface_dispose(opened.journal)
     }

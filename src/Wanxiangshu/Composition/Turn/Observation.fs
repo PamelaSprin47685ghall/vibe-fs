@@ -5,6 +5,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Execution.Failure
 
 /// DSL-state-combination: domain — this is a single reconciled provider-turn
 /// observation; optional metadata fields preserve evidence absence and never
@@ -50,6 +51,7 @@ type ReconciledTurnDelivery =
 /// idle-derived send.
 type ReconciledTurnContext =
     { Turn: ReconciledTurn
+      Failure: ExecutionFailure option
       Quiescence: QuiescencePermit option
       Delivery: ReconciledTurnDelivery }
 

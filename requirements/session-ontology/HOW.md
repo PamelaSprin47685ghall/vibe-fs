@@ -8,7 +8,7 @@
 - **ExecutionClass**：区分具备完整执行与上下文能力的 `Work` 会话，与无上下文能力的即用即弃 `InternalLeaf`。
 - **Ownership**：区分独立的主会话 `Root`，与附属于特定所有者的 `Attached(ownerSessionId, AttachmentKind)`。
 
-持久化层以向后兼容的最小结构记录 `SessionAssociation`，并由内存投影层提供只读的 `SessionOwnershipClassification` 派生视图。派生过程不修改持久化结构，支持 $O(1)$ 的双向所有权与分类查询。
+持久化层以最小 `SessionAssociation` 记录 physical-container association，并由投影层提供只读 `SessionOwnershipClassification` 派生视图。派生过程不修改 durable facts，支持 $O(1)$ 的双向所有权与分类查询；该投影不包含 Persona 或 `ParticipantIdentity`。
 
 ### 2. 关联不变量与写入守门
 
@@ -19,7 +19,11 @@
 
 ### 3. 物理扁平与逻辑层级分离
 
-Host 层的物理展示树深度恒为 2，所有子节点物理上均直挂在 family root 下。物理位置仅作为 Host 观察入口，所有真正的业务归属、级联取消依赖与恢复匹配逻辑完全以 journal 事实记录为唯一真理。
+Host 层的物理展示树深度恒为 2，所有子节点物理上均直挂在 family root 下。物理位置仅作为 Host 观察入口，业务归属、级联取消依赖与恢复匹配完全以 journal association 为唯一真理。identity consumer 必须取得原子 `AuthorityRootAccepted` 中由 `participant-identity` owner 准备的 typed evidence；physical parent 与 association query 均不返回推导 Persona 的捷径。
+
+### 4. 物理容器复用
+
+Session projection 只暴露 physical container classification 与 durable association，不存储 run-scoped identity 字段，也不生成 lifecycle terminal/closure。`interaction-authority` 只在 exact typed lifecycle source 已匹配 accepted root 后持久化 `AuthorityLogicalRunClosed`；participant identity 与 fresh root 再由新的原子 `AuthorityRootAccepted` payload 同时安装/接受。association removal、detach/attach、classification、wall clock、idle/timeout 与 Host tree 均不得替代 closure evidence。
 
 ## 验证与测试落点
 
@@ -39,3 +43,4 @@ Host 层的物理展示树深度恒为 2，所有子节点物理上均直挂在 
 | SESSION-ONTOLOGY-012 | `requirements/session-ontology/tests/sync-delegate.test.mjs::WHAT[SESSION-ONTOLOGY-012] HOST_008_root_and_attached_helpers_are_explicit` |
 | SESSION-ONTOLOGY-013 | `requirements/session-ontology/tests/terminal-policy.test.mjs::WHAT[SESSION-ONTOLOGY-013] TPOL_roleName_uses_catalog_labels_and_rejects_none` |
 | SESSION-ONTOLOGY-014 | `requirements/session-ontology/tests/satellite-kind.test.mjs::WHAT[SESSION-ONTOLOGY-014] HOST_014_satellite_kind_is_companion_only` |
+| SESSION-ONTOLOGY-015 | `requirements/session-ontology/tests/session-reuse-identity.test.mjs::WHAT[SESSION-ONTOLOGY-015] physical SessionId reuse requires durable logical-run closure` |

@@ -39,10 +39,7 @@ module LifecycleWorkRecordProjection =
             return resolved |> Seq.toList
         }
 
-    let private tryReadPartBody
-        (durable: AgentJournal)
-        (part: XTraceSemanticPartView)
-        : Task<string option> =
+    let private tryReadPartBody (durable: AgentJournal) (part: XTraceSemanticPartView) : Task<string option> =
         task {
             match! durable.Writer.BlobWriter.Read part.TextRef with
             | Ok body when HostDigest.sha256Hex body = BlobDigest.value part.TextDigest -> return Some body
@@ -58,7 +55,8 @@ module LifecycleWorkRecordProjection =
             | Ok text when
                 HostDigest.sha256Hex text = BlobDigest.value terminal.TextDigest
                 && not (String.IsNullOrWhiteSpace text)
-                -> return Some text
+                ->
+                return Some text
             | _ -> return None
         }
 
@@ -160,18 +158,10 @@ module LifecycleWorkRecordProjection =
                 xTrace)
         |> Option.defaultWith (fun () -> immediateOpeningEnd xTrace)
 
-    let private renderRange
-        (durable: AgentJournal)
-        (range: XTraceRange)
-        (xTrace: XTraceProjectionState)
-        =
+    let private renderRange (durable: AgentJournal) (range: XTraceRange) (xTrace: XTraceProjectionState) =
         XTraceMaterialization.renderRange durable range xTrace
 
-    let private renderWorkRecordRange
-        (durable: AgentJournal)
-        (range: XTraceRange)
-        (xTrace: XTraceProjectionState)
-        =
+    let private renderWorkRecordRange (durable: AgentJournal) (range: XTraceRange) (xTrace: XTraceProjectionState) =
         XTraceMaterialization.renderWorkRecordRange durable range xTrace
 
     type private RenderedRecordEvidence =
@@ -192,28 +182,18 @@ module LifecycleWorkRecordProjection =
             match XTraceProjection.latestTerminalEvidence xTrace with
             | Some terminal when XTraceCursor.isAtOrAfter terminal.Frontier gapStart ->
                 return!
-                    appendTerminalFallback
-                        durable
-                        (XTraceProjection.orderedSemanticParts xTrace)
-                        renderedGap
-                        terminal
+                    appendTerminalFallback durable (XTraceProjection.orderedSemanticParts xTrace) renderedGap terminal
             | _ -> return renderedGap
         }
 
-    let private materializeOpeningEvidence
-        durable
-        snapshot
-        session
-        includeOpening
-        coverageOverride
-        xTrace
-        opening
-        =
+    let private materializeOpeningEvidence durable snapshot session includeOpening coverageOverride xTrace opening =
         task {
             let blog = session.Blog |> Option.defaultValue BlogProjection.empty
             let! frames = BlogProjection.frames blog |> resolveFrames durable
 
-            let life = session.ManagerLife |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+            let life =
+                session.ManagerLife |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+
             let openingEnd = resolveOpeningEnd life snapshot xTrace
 
             let constitutiveStart =
@@ -255,14 +235,7 @@ module LifecycleWorkRecordProjection =
             | None -> return None
             | Some opening ->
                 return!
-                    materializeOpeningEvidence
-                        durable
-                        snapshot
-                        session
-                        includeOpening
-                        coverageOverride
-                        xTrace
-                        opening
+                    materializeOpeningEvidence durable snapshot session includeOpening coverageOverride xTrace opening
         }
 
     let lifecycleWorkRecordFromSnapshot
@@ -343,12 +316,7 @@ module LifecycleWorkRecordProjection =
             match terminalForBoundedRange terminalProviderRun range xTrace with
             | None -> return renderedGap
             | Some terminal ->
-                return!
-                    appendTerminalFallback
-                        durable
-                        (XTraceProjection.slice workRange xTrace)
-                        renderedGap
-                        terminal
+                return! appendTerminalFallback durable (XTraceProjection.slice workRange xTrace) renderedGap terminal
         }
 
     let private materializeBoundedOpeningEvidence durable session range terminalProviderRun xTrace opening =
@@ -376,8 +344,7 @@ module LifecycleWorkRecordProjection =
             match gap with
             | Error _ -> return None
             | Ok renderedGap ->
-                let! finalGap =
-                    completeBoundedGap durable xTrace workRange range terminalProviderRun renderedGap
+                let! finalGap = completeBoundedGap durable xTrace workRange range terminalProviderRun renderedGap
 
                 return Some(LifecycleWorkRecord.materialize opening frames finalGap false)
         }
@@ -394,14 +361,7 @@ module LifecycleWorkRecordProjection =
             match XTraceProjection.openingEvidence xTrace with
             | None -> return None
             | Some opening ->
-                return!
-                    materializeBoundedOpeningEvidence
-                        durable
-                        session
-                        range
-                        terminalProviderRun
-                        xTrace
-                        opening
+                return! materializeBoundedOpeningEvidence durable session range terminalProviderRun xTrace opening
         }
 
     let lifecycleWorkRecordBoundedFromSnapshot

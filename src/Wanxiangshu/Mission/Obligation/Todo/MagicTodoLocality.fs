@@ -232,10 +232,7 @@ module MagicTodoLocality =
         else
             resolvePendingAssistantMessage trace messages located
 
-    let private sameCapturedToolObservation
-        (expected: XTraceSemanticPartView)
-        (candidate: XTraceSemanticPartView)
-        =
+    let private sameCapturedToolObservation (expected: XTraceSemanticPartView) (candidate: XTraceSemanticPartView) =
         candidate.Role = expected.Role
         && candidate.Kind = expected.Kind
         && candidate.ToolName = expected.ToolName

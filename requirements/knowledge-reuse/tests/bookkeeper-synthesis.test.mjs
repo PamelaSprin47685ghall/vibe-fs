@@ -11,8 +11,14 @@ import { join } from 'node:path'
 import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
 import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
 import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
+import * as bookkeeperRefresh from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRefreshSurface.js'
 import * as lifecycle from '../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
-import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
+import {
+  CANONICAL_A,
+  CANONICAL_Q,
+  installBookkeeperRuntime,
+  scriptedBookkeeperPort,
+} from './bookkeeper-session.test.mjs'
 
 const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
 const FAIL_A = 'A-must-fail-synthesis'
@@ -40,8 +46,8 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_injected_synthesizer_error_keeps_old_cas
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     assert.equal((await casebook.archive(handle, record('s-err-1', 'Q keep', FAIL_A, [fileRead('a.txt', casebook.contentHash('hello'))]))).ok, true)
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
-    bookkeeper.setSessionPort(port)
-    const refreshed = await bookkeeper.refreshStale(handle, dir, 's-err-1')
+    await installBookkeeperRuntime(port, ['s-err-1'])
+    const refreshed = await bookkeeperRefresh.refreshStale(handle, dir, 's-err-1')
     assert.equal(refreshed.ok, false)
     assert.match(String(refreshed.error), /injected synth failure/)
     const fetched = await casebook.fetchCase(handle, 10, 's-err-1')
@@ -49,7 +55,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_injected_synthesizer_error_keeps_old_cas
     assert.equal(fetched.value.q, 'Q keep')
     assert.equal(fetched.value.observations[0].contentHash, casebook.contentHash('hello'))
   } finally {
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
     eventStore.dispose(handle)
     rmSync(dir, { recursive: true, force: true })
   }
@@ -63,14 +69,14 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_synthesizer_runs_once_per_stale_refresh'
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     assert.equal((await casebook.archive(handle, record('s-once', 'Q-count-synth-once', 'A once', [fileRead('a.txt', casebook.contentHash('hello'))]))).ok, true)
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
-    bookkeeper.setSessionPort(port)
-    const refreshed = await bookkeeper.refreshStale(handle, dir, 's-once')
+    await installBookkeeperRuntime(port, ['s-once'])
+    const refreshed = await bookkeeperRefresh.refreshStale(handle, dir, 's-once')
     assert.equal(refreshed.ok, true)
     assert.equal(refreshed.value, true)
     assert.equal(createCalls.length, 1)
     assert.equal(programCalls.length >= 1, true)
   } finally {
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
     eventStore.dispose(handle)
     rmSync(dir, { recursive: true, force: true })
   }
@@ -83,8 +89,8 @@ test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_uses_synthesizer_not_raw_noteAn
     execFileSync('git', ['init', '--quiet', dir])
     mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
     lifecycle.enable(dir)
-    bookkeeper.setSessionPort(port)
     const key = 'insp-synth-fin'
+    await installBookkeeperRuntime(port, [key])
     const rawA = 'PromptAuthority is owned by the Host.'
     lifecycle.notePrompt(key, 'What owns PromptAuthority?')
     lifecycle.collect(key, 'read', { path: 'a.txt' }, 'hello')
@@ -107,7 +113,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_uses_synthesizer_not_raw_noteAn
     assert.equal((await casebook.fetchCase(handle, 10, key)).value.a, publishedA)
     eventStore.dispose(handle)
   } finally {
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
     lifecycle.disable()
     rmSync(dir, { recursive: true, force: true })
   }
@@ -120,8 +126,8 @@ test('WHAT[KNOWLEDGE-REUSE-010] CASE010_cleanup_never_synthesizes', async () => 
     execFileSync('git', ['init', '--quiet', dir])
     mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
     lifecycle.enable(dir)
-    bookkeeper.setSessionPort(port)
     const key = 'insp-cleanup-synth'
+    await installBookkeeperRuntime(port, [key])
     lifecycle.notePrompt(key, 'Q-cleanup-never-synth')
     lifecycle.collect(key, 'read', { path: 'b.txt' }, 'body')
     lifecycle.noteAnswer(key, 'A cleanup')
@@ -133,7 +139,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] CASE010_cleanup_never_synthesizes', async () => 
     assert.equal(fetched.value, null)
     eventStore.dispose(handle)
   } finally {
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
     lifecycle.disable()
     rmSync(dir, { recursive: true, force: true })
   }

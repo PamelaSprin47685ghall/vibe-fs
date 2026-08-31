@@ -24,10 +24,15 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-/// In-flight sync delegate answer (ordinary completion → WorkRecord).
-/// DSL-state-combination: physical — AcceptedAuthorityRoot mirrors the accepted
-/// physical prompt beside its one-shot signal for callback-time causal matching.
-type internal SyncDelegateCall =
+/// Authority evidence capable of failing one in-flight managed assignment.
+type internal SyncDelegateTerminalFailureScope =
+    | FreshAuthorityRoot of AuthorityRootUserMessageId
+    | ExistingAuthorityContinuation of PhysicalUserMessageId
+
+/// Coarse terminal notifications are authoritative only for a fresh root.
+/// Reused continuations require their exact physical prompt on ReconciledTurn.
+/// DSL-state-combination: physical — live call resource couples accepted root and exact terminal scope for causal settlement.
+and internal SyncDelegateCall =
     { Owner: SessionId
       OwnerScope: ReuseScopeId
       Role: SyncDelegateRole
@@ -36,6 +41,7 @@ type internal SyncDelegateCall =
       Invocations: SyncDelegateInvocation list
       AcceptedRoot: TaskCompletionSource<AuthorityRootUserMessageId>
       mutable AcceptedAuthorityRoot: AuthorityRootUserMessageId option
+      mutable TerminalFailureScope: SyncDelegateTerminalFailureScope option
       Answer: TaskCompletionSource<Result<string, string>> }
 
 /// A single caller's pending invocation to a sync delegate.
@@ -453,6 +459,7 @@ type internal SyncDelegateCallStore() as this =
                       Invocations = invocations
                       AcceptedRoot = acceptedRoot
                       AcceptedAuthorityRoot = None
+                      TerminalFailureScope = None
                       Answer = answer }
 
                 (ownerCallsOf callsByOwnerScope ownerKey).Add call

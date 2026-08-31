@@ -81,8 +81,9 @@ module Persona =
         | "Curator" -> Some Persona.Curator
         | _ -> None
 
-/// AGENT-028: Role × initial selected tier → SessionPersona (resolve-once at create).
-/// Bookkeeper is InternalLeaf — not a public Role; use `bookkeeperPersona`.
+/// AGENT-028: Role × initial selected tier → the persona embedded in ParticipantIdentity.
+/// IdentitySeed resolves it once. Bookkeeper is InternalLeaf — not a public Role;
+/// use `bookkeeperPersona`.
 [<RequireQualifiedAccess>]
 module PersonaCatalog =
 
@@ -113,3 +114,10 @@ module PersonaCatalog =
         match tier with
         | AgentTier.Fast -> Persona.Clerk
         | AgentTier.Deep -> Persona.Curator
+
+    let personaV1 (role: Role) (tier: AgentTier) : string = persona role tier |> Persona.render
+
+    let bookkeeperPersonaV1 (tier: AgentTier) : string = bookkeeperPersona tier |> Persona.render
+
+    /// HOST-026 analogue: child / attached / InternalLeaf ParticipantIdentity inherits the owner persona.
+    let inheritFrom (ownerPersona: string) : string = ownerPersona

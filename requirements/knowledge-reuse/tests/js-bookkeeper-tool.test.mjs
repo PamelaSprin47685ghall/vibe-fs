@@ -75,7 +75,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_program_reshapes_question_and_answ
     assert.deepEqual(taken.value, currentCase(taken.value[0], taken.value[1]))
   } finally {
     bookkeeper.abort(tx)
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
   }
 })
 
@@ -101,7 +101,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_zero_mutation_is_legal', async () 
     assert.deepEqual(current(tx), ['Q', 'A'])
   } finally {
     bookkeeper.abort(tx)
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
   }
 })
 
@@ -128,7 +128,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_duplicate_set_rolls_back_the_whole
     assert.deepEqual(current(tx), ['Q', 'A'])
   } finally {
     bookkeeper.abort(tx)
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
   }
 })
 
@@ -153,7 +153,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_program_failure_rolls_back_staged_
     assert.deepEqual(current(tx), ['Q', 'A'])
   } finally {
     bookkeeper.abort(tx)
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
   }
 })
 

@@ -49,21 +49,23 @@ open Wanxiangshu.Foundation.Identity
 /// Bodies live in blobs (PERSIST-007): the journal line carries cursor, kind,
 /// role, digest and reference; the text is resolved at the read boundary, the
 /// same way `XWire.readFrames` resolves `BlogFrame.TextRef`.
-type XTraceProjectionState = private {
-        /// InitialCharge, inline: first task prompt, bounded and
-        /// human-sized; fold materialises the LWR Opening section without a
-        /// second read. BlindPlan interval end = WorkRecordStart (COMPANION-014).
-        Opening: XTraceOpeningEvidence option
-        /// Semantic parts. Stored newest-first so replay cons is O(1);
-        /// `XTraceProjection.parts` restores oldest-first cursor order.
-        /// `Kind` is one of text / reasoning / tool_call / tool_result / media.
-        Parts: XTracePartRef list
-        /// Terminal occurrences, newest first. Reusable managed sessions may
-        /// complete many work units; each occurrence keeps the ProviderRun and
-        /// the XTrace part frontier at which that completion happened so a
-        /// bounded WorkRecord can project only its own formal statement.
-        Terminals: XTraceTerminalRef list
-    }
+type XTraceProjectionState =
+    private
+        {
+            /// InitialCharge, inline: first task prompt, bounded and
+            /// human-sized; fold materialises the LWR Opening section without a
+            /// second read. BlindPlan interval end = WorkRecordStart (COMPANION-014).
+            Opening: XTraceOpeningEvidence option
+            /// Semantic parts. Stored newest-first so replay cons is O(1);
+            /// `XTraceProjection.parts` restores oldest-first cursor order.
+            /// `Kind` is one of text / reasoning / tool_call / tool_result / media.
+            Parts: XTracePartRef list
+            /// Terminal occurrences, newest first. Reusable managed sessions may
+            /// complete many work units; each occurrence keeps the ProviderRun and
+            /// the XTrace part frontier at which that completion happened so a
+            /// bounded WorkRecord can project only its own formal statement.
+            Terminals: XTraceTerminalRef list
+        }
 
 /// DSL-state-combination: domain — optional tool/provider/host identities are
 /// provenance facets of one immutable trace part, not independent execution
@@ -208,8 +210,12 @@ module XTraceProjection =
 
     let rangeFrom (startInclusive: XTraceCursor) (state: XTraceProjectionState) : XTraceRange =
         let traceHead = headCursor state
+
         let effectiveStart =
-            if XTraceCursor.isAfter startInclusive traceHead then traceHead else startInclusive
+            if XTraceCursor.isAfter startInclusive traceHead then
+                traceHead
+            else
+                startInclusive
 
         XTraceRange.create effectiveStart traceHead
 
@@ -218,8 +224,7 @@ module XTraceProjection =
         |> List.filter (fun part -> XTraceRange.contains part.Cursor range)
         |> List.map semanticPartView
 
-    let frontierAfter (part: XTraceSemanticPartView) : XTraceCursor =
-        XTraceCursor.nextCursor part.Cursor
+    let frontierAfter (part: XTraceSemanticPartView) : XTraceCursor = XTraceCursor.nextCursor part.Cursor
 
     let rangeOfPart (part: XTraceSemanticPartView) : XTraceRange =
         XTraceRange.create part.Cursor (frontierAfter part)
@@ -439,18 +444,12 @@ module XTraceProjection =
         |> List.tryFind (fun part -> part.Cursor = cursor)
         |> Option.bind tryHostMessageId
 
-    let partsForHostMessageIds
-        (messageIds: Set<string>)
-        (state: XTraceProjectionState)
-        : XTraceSemanticPartView list =
+    let partsForHostMessageIds (messageIds: Set<string>) (state: XTraceProjectionState) : XTraceSemanticPartView list =
         parts state
         |> List.filter (fun part -> tryHostMessageId part |> Option.exists messageIds.Contains)
         |> List.map semanticPartView
 
-    let tryContiguousHostRange
-        (messageIds: Set<string>)
-        (state: XTraceProjectionState)
-        : XTraceRange option =
+    let tryContiguousHostRange (messageIds: Set<string>) (state: XTraceProjectionState) : XTraceRange option =
         let matched =
             parts state
             |> List.filter (fun part -> tryHostMessageId part |> Option.exists messageIds.Contains)
@@ -523,7 +522,10 @@ module XTraceProjection =
 
             if List.isEmpty current then ordered else current
 
-        match searchable |> List.tryFind (fun part -> XTraceCursor.sequence part.Cursor > sequence) with
+        match
+            searchable
+            |> List.tryFind (fun part -> XTraceCursor.sequence part.Cursor > sequence)
+        with
         | Some part ->
             { TurnIndex = part.Turn
               PartIndex = part.PartIndex }
@@ -532,8 +534,5 @@ module XTraceProjection =
     let semanticCursorAfter (cursor: XTraceCursor) (state: XTraceProjectionState) : SemanticCursor =
         semanticCursorFor (XTraceCursor.sequence cursor) state
 
-    let semanticCursorAfterCoverage
-        (coverage: RecordCoverage)
-        (state: XTraceProjectionState)
-        : SemanticCursor =
+    let semanticCursorAfterCoverage (coverage: RecordCoverage) (state: XTraceProjectionState) : SemanticCursor =
         semanticCursorAfter (RecordCoverage.ingestedThrough coverage) state

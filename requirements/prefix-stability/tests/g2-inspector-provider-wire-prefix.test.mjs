@@ -24,14 +24,6 @@ const ANSWERS = ['answer Q1', 'answer Q2', 'answer Q3']
 const TOOLS = ['read', 'write']
 const SYSTEM = ['sys']
 
-const waitFor = async (predicate, message, ms = 2000) => {
-  const deadline = Date.now() + ms
-  while (!predicate()) {
-    if (Date.now() >= deadline) throw new Error(message)
-    await new Promise((resolve) => setImmediate(resolve))
-  }
-}
-
 const textPart = (id, text) => providerCodec.opencodeTextPart(`${id}-part`, 'text', text, false)
 
 const hostMessage = (id, role, text) => {
@@ -94,7 +86,7 @@ const mutatedWire = (wire, mutation) => mutation({
 
 test('WHAT[PREFIX-STABILITY-001] G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-g2-inspector-wire-'))
-  const harness = await delegation.create(directory)
+  const harness = await delegation.create(directory, [{ sessionId: OWNER, agent: 'fast-manager' }])
   try {
     const transcript = []
     const wires = []
@@ -105,9 +97,11 @@ test('WHAT[PREFIX-STABILITY-001] G2_inspector_Q1_Q2_Q3_provider_wire_append_only
       const question = QUESTIONS[ordinal]
       const answer = ANSWERS[ordinal]
       const pending = delegation.invoke(harness, OWNER, 'Inspector', question)
-      await waitFor(() => delegation.childCount(harness) === 1, `${question} child missing`)
+      await delegation.awaitPromptCount(harness, OWNER, 'Inspector', ordinal + 1)
+      assert.equal(delegation.acceptPrompt(harness, OWNER, 'Inspector', ordinal), true)
 
       const child = delegation.child(harness, OWNER, 'Inspector')
+      assert.notEqual(child, null, `${question} child missing`)
       childIds.push(child)
       assert.equal(delegation.childCount(harness), 1, 'Inspector child must be reused')
       assert.equal(

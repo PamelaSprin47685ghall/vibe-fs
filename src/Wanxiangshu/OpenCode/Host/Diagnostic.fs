@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
+open Wanxiangshu.OpenCode.Host
 
 /// CTX-014 / HOST-007 runtime diagnostics — two severities only:
 ///
@@ -19,6 +20,25 @@ module Diagnostic =
     let AllowedFields =
         set
             [ "session_id"
+              "logical_run_id"
+              "authority_root_user_message_id"
+              "physical_user_message_id"
+              "prompt_key"
+              "provider_run_identity"
+              "provider_run"
+              "effective_agent"
+              "role"
+              "transition_from"
+              "transition_to"
+              "failure_class"
+              "retry_decision"
+              "fallback_decision"
+              "capacity_state"
+              "capacity_fence"
+              "recovery_decision"
+              "persistence_commitment"
+              "hook"
+              "policy_class"
               // SPEC-INV-013: visible DryRun child identity; observation-only.
               "replica_session_id"
               "blogger_session_id"
@@ -53,6 +73,13 @@ module Diagnostic =
     [<Emit("JSON.stringify($0)")>]
     let private stringify (value: obj) : string = jsNative
 
+    let private shouldEmit operation =
+        ReliabilityDiagnostics.validateOperation operation && diagnosticsVisible ()
+
+    let private emitWhenVisible operation (project: unit -> obj) =
+        if shouldEmit operation then
+            project () |> stringify |> error
+
     let private validate (fields: (string * string) list) : unit =
         let illegal =
             fields
@@ -72,7 +99,7 @@ module Diagnostic =
 
     let private payload (operation: string) (fields: (string * string) list) : obj =
         fields
-        |> List.map (fun (name, value) -> [| name; value |])
+        |> List.map (fun (name, value) -> [| name; ReliabilityDiagnosticsSurface.redactText value |])
         |> List.toArray
         |> payloadObject operation
 
@@ -85,13 +112,24 @@ module Diagnostic =
     /// session parked with no explanation anywhere: every branch that could explain it emitted
     /// into silence.
     let emit (operation: string) (fields: (string * string) list) : unit =
-        validate fields
+        try
+            validate fields
+            emitWhenVisible operation (fun () -> payload operation fields)
+        with _ ->
+            ()
 
-        if diagnosticsVisible () then
-            error (stringify (payload operation fields))
+    let emitCausal (record: CausalDiagnosticRecord) : unit =
+        try
+            emitWhenVisible record.Operation (fun () -> ReliabilityDiagnosticsSurface.projectTyped record)
+        with _ ->
+            ()
 
     /// Unexpected invariant break. Print one JSON line, then kill the process.
     let fatal (operation: string) (fields: (string * string) list) : unit =
-        validate fields
-        error (stringify (payload operation fields))
+        try
+            validate fields
+            error (stringify (payload operation fields))
+        with _ ->
+            error "{\"operation\":\"diagnostic-fatal-render-failed\",\"result\":\"[REDACTED]\"}"
+
         FatalProcess.kill ()

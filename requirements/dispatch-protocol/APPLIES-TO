@@ -11,3 +11,7 @@
 /src/Wanxiangshu/Execution/Session/Recovery/Model.fs
 /src/Wanxiangshu/Context/Companion/HostBlogger.fs
 /src/Wanxiangshu/Strength/Replica/Runtime.fs
+/src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs
+/src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs
+/src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs
+/src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs

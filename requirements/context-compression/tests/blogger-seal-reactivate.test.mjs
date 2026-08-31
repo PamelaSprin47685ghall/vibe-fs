@@ -67,7 +67,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_cell_has_no_sealed_mirror_du
   // The drain permit remains opaque; the owner exposes only its semantic state.
   assert.equal(parkedTransform.isDrainOpen(scope, KEY), true)
 
-  assert.equal(bloggerRuntime.decideMaterial(false, false, ctx()), 'Start')
+  assert.equal(bloggerRuntime.decideMaterial(false, false, false, ctx()), 'Start')
   parkedTransform.claimCurrentRequest(scope, KEY, ctx())
   assert.equal(parkedTransform.hasFlight(scope, KEY), true)
 })
@@ -92,7 +92,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_parked_waiter_survives_react
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
   assert.equal(parkedTransform.isDrainOpen(scope, KEY), true)
 
-  assert.equal(bloggerRuntime.decideMaterial(true, false, ctx()), 'Offer')
+  assert.equal(bloggerRuntime.decideMaterial(false, true, false, ctx()), 'Offer')
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
 })
 
@@ -106,7 +106,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_reactivated_catchup_forceSea
   assert.equal(parkedTransform.isDrainOpen(scope, KEY), true)
   assert.equal(bloggerRuntime.blocksNewRequest(true, false, true), false)
 
-  assert.equal(bloggerRuntime.decideMaterial(false, false, ctx()), 'Start')
+  assert.equal(bloggerRuntime.decideMaterial(false, false, false, ctx()), 'Start')
   parkedTransform.claimCurrentRequest(scope, KEY, ctx())
   assert.equal(parkedTransform.hasFlight(scope, KEY), true)
   parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')

@@ -64,8 +64,7 @@ module ManagerLifeAdmission =
         (opening: XTraceOpeningEvidence option)
         : EndingLifeAdmission =
         match profile, opening with
-        | Some active, Some evidence when
-            isManagerAuthority PromptAuthority.RootAuthorityKind.AgentOwnerRoot active ->
+        | Some active, Some evidence when isManagerAuthority PromptAuthority.RootAuthorityKind.AgentOwnerRoot active ->
             EndingLifeAdmission.InitialAgentOwnerMigration(InitialAgentOwnerMigrationEvidence evidence)
         | _ -> EndingLifeAdmission.NoLife
 

@@ -1,236 +1,283 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { dirname, relative, resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { walk } from '../lib/walk.mjs'
 
-const OWNER = 'participant-identity-owner'
-const CATALOG_FILE = 'src/Wanxiangshu/Participant/Persona/Catalog.fs'
-const SESSION_FILE = 'src/Wanxiangshu/Participant/Persona/SessionPersona.fs'
-const BINDING_FILE = 'src/Wanxiangshu/OpenCode/Host/PersonaBinding.fs'
-const ROLES_FILE = 'src/Wanxiangshu/Foundation/Roles.fs'
-const LEGACY_FILE = 'src/Wanxiangshu/Participant/Persona/RoleIdentity.fs'
+const IDENTITY_OWNER = 'src/Wanxiangshu/Participant/Persona/Identity.fs'
+const AUTHORITY_FACTS = 'src/Wanxiangshu/Interaction/Authority/Facts.fs'
+const AUTHORITY_MODEL = 'src/Wanxiangshu/Interaction/Authority/Model.fs'
 const SOURCE_ROOT = 'src/Wanxiangshu'
+const RETIRED_PRODUCTION_FILES = [
+  'src/Wanxiangshu/Participant/Persona/SessionPersona.fs',
+  'src/Wanxiangshu/Participant/Persona/SessionSurface.fs',
+  'src/Wanxiangshu/Participant/Persona/RoleIdentity.fs',
+  'src/Wanxiangshu/OpenCode/Host/PersonaBinding.fs',
+]
+const SURFACE_MANIFEST = 'scripts/lib/test-surface-scan.mjs'
+const RETIRED_SESSION_SURFACE_MODULE = 'Participant/Persona/SessionSurface.js'
+const RETIRED_EMITTED_SURFACE = `dist/${RETIRED_SESSION_SURFACE_MODULE}`
 
-export const PARTICIPANT_IDENTITY_OWNER_FILES = Object.freeze([
-  CATALOG_FILE,
-  SESSION_FILE,
-  BINDING_FILE,
-  ROLES_FILE,
-])
+const normalize = (path) => path.replaceAll('\\', '/')
+const lineAt = (text, offset) => text.slice(0, offset).split('\n').length
+const withoutLineComments = (text) => text.replace(/\/\/.*$/gm, '')
 
-const PERSONAS = Object.freeze([
-  'Integrator', 'Director', 'Coordinator', 'Lead', 'Coder', 'Engineer', 'Scout',
-  'Investigator', 'Technician', 'Operator', 'Navigator', 'Researcher', 'Analyst',
-  'Inquirer', 'Examiner', 'Auditor', 'Scribe', 'Chronicler', 'Condenser',
-  'Distiller', 'Clerk', 'Curator',
-])
+const violation = (file, line, rule, message) => ({ file, line, rule, message })
 
-const normalizePath = (path) => path.replace(/\\/g, '/')
-const lineAt = (source, offset) => source.slice(0, offset).split('\n').length
-const textAt = (source, offset) => source.slice(offset).split('\n', 1)[0].trim()
+const requiredFile = (root, relativePath, failures) => {
+  const path = resolve(root, relativePath)
+  if (!existsSync(path)) {
+    failures.push(violation(relativePath, 1, 'required-surface', 'required identity surface is missing'))
+    return null
+  }
+  return readFileSync(path, 'utf8')
+}
 
-const violation = (rule, file, source, offset, text = textAt(source, offset)) => ({
-  id: OWNER,
-  rule,
-  file: normalizePath(file),
-  line: lineAt(source, offset),
-  text,
-})
+const requirePattern = (text, pattern, file, rule, message, failures) => {
+  if (!pattern.test(withoutLineComments(text))) failures.push(violation(file, 1, rule, message))
+}
 
-// Removes comments and string contents while preserving offsets and newlines.
-const codeOnly = (source) => {
-  let output = ''
-  let index = 0
-  let blockDepth = 0
-  let string = false
-  while (index < source.length) {
-    const char = source[index]
-    const next = source[index + 1]
-    if (blockDepth > 0) {
-      if (char === '(' && next === '*') { output += '  '; blockDepth += 1; index += 2 }
-      else if (char === '*' && next === ')') { output += '  '; blockDepth -= 1; index += 2 }
-      else { output += char === '\n' ? '\n' : ' '; index += 1 }
-    } else if (string) {
-      if (char === '\\' && next !== undefined) { output += '  '; index += 2 }
-      else if (char === '"') { output += ' '; string = false; index += 1 }
-      else { output += char === '\n' ? '\n' : ' '; index += 1 }
-    } else if (char === '/' && next === '/') {
-      const end = source.indexOf('\n', index)
-      if (end === -1) return output + ' '.repeat(source.length - index)
-      output += ' '.repeat(end - index); index = end
-    } else if (char === '(' && next === '*') {
-      output += '  '; blockDepth = 1; index += 2
-    } else if (char === '"') {
-      output += ' '; string = true; index += 1
-    } else {
-      output += char; index += 1
+const recordDefinition = (text, name) => {
+  const declaration = new RegExp(`^\\s*type\\s+${name}\\b`, 'm').exec(text)
+  if (!declaration) return null
+  const opening = text.indexOf('{', declaration.index)
+  if (opening < 0) return null
+  const closing = text.indexOf('}', opening)
+  if (closing < 0) return null
+  return { text: withoutLineComments(text.slice(declaration.index, closing + 1)), offset: declaration.index }
+}
+
+const scanPattern = (text, file, rule, pattern, message, failures) => {
+  for (const match of text.matchAll(pattern)) {
+    failures.push(violation(file, lineAt(text, match.index), rule, message))
+  }
+}
+
+const scanRetiredIdentitySurfaces = (root, failures) => {
+  for (const file of RETIRED_PRODUCTION_FILES) {
+    if (existsSync(resolve(root, file))) {
+      failures.push(violation(file, 1, 'retired-identity-file', 'retired identity production file must not exist'))
     }
   }
-  return output
+
+  const manifestPath = resolve(root, SURFACE_MANIFEST)
+  if (existsSync(manifestPath)) {
+    const manifest = readFileSync(manifestPath, 'utf8')
+    const registration = /module:\s*['"]Participant\/Persona\/SessionSurface\.js['"]/g
+    scanPattern(
+      manifest,
+      SURFACE_MANIFEST,
+      'retired-session-surface-registration',
+      registration,
+      `retired surface '${RETIRED_SESSION_SURFACE_MODULE}' must not be registered`,
+      failures,
+    )
+  }
+
+  if (existsSync(resolve(root, RETIRED_EMITTED_SURFACE))) {
+    failures.push(
+      violation(
+        RETIRED_EMITTED_SURFACE,
+        1,
+        'retired-session-surface-emission',
+        `retired surface '${RETIRED_SESSION_SURFACE_MODULE}' must not be emitted`,
+      ),
+    )
+  }
 }
 
-const firstOffset = (source, pattern) => {
-  const match = pattern.exec(source)
-  pattern.lastIndex = 0
-  return match?.index ?? 0
+const scanRetiredIdentityTokens = (text, file, failures) => {
+  for (const token of ['SessionPersona', 'PersonaBinding', 'SessionSurface', 'AgentRoleIdentity']) {
+    scanPattern(
+      text,
+      file,
+      'retired-identity-token',
+      new RegExp(`\\b${token}\\b`, 'g'),
+      `retired identity token '${token}' is forbidden in production source`,
+      failures,
+    )
+  }
 }
 
-/** Scan the Persona catalog's closed type and canonical rendering contract. */
-export const scanPersonaCatalogSource = (file, source) => {
-  const violations = []
-  const typeMatch = /(?:\[<RequireQualifiedAccess>\]\s*)?type\s+Persona\s*=([\s\S]*?)(?=\n(?:\[<|module\s|type\s|let\s)|$)/.exec(source)
-  const typeBody = typeMatch?.[1] ?? ''
-  const cases = [...typeBody.matchAll(/\|\s*([A-Z][A-Za-z0-9_]*)\b/g)].map((match) => match[1])
-  if (!typeMatch || !typeMatch[0].includes('RequireQualifiedAccess') ||
-      cases.length !== PERSONAS.length || PERSONAS.some((name, index) => cases[index] !== name)) {
-    violations.push(violation('catalog-closed-persona', file, source, typeMatch?.index ?? 0,
-      'Catalog must declare the exhaustive RequireQualifiedAccess Persona DU'))
-  }
+const scanIdentityCollections = (text, file, failures) => {
+  const identity = '(?:[A-Za-z_][A-Za-z0-9_]*\\.)*(?:ParticipantIdentity(?:Evidence)?|(?:Prompt)?IdentitySeed)'
+  const sessionId = '(?:[A-Za-z_][A-Za-z0-9_]*\\.)*SessionId'
+  const generic = new RegExp(
+    `\\b(?:[A-Za-z_][A-Za-z0-9_]*\\.)*(?:Dictionary|ConcurrentDictionary|IDictionary|IReadOnlyDictionary|ImmutableDictionary|Map)\\s*<\\s*${sessionId}\\s*,\\s*${identity}\\b`,
+    'g',
+  )
+  scanPattern(
+    text,
+    file,
+    'session-identity-cache',
+    generic,
+    'SessionId-keyed ParticipantIdentity/IdentitySeed collection is forbidden',
+    failures,
+  )
 
-  const renderMatch = /let\s+(?:canonical|render)\s*\(\s*persona\s*:\s*Persona\s*\)[^=]*=([\s\S]*?)(?=\n\s*let\s|$)/.exec(source)
-  const renderBody = renderMatch?.[1] ?? ''
-  const rendersAll = PERSONAS.every((name) =>
-    new RegExp(`\\|\\s*Persona\\.${name}\\s*->\\s*"${name}"`).test(renderBody))
-  if (!renderMatch || !rendersAll) {
-    violations.push(violation('catalog-canonical-rendering', file, source, renderMatch?.index ?? 0,
-      'Catalog must render every Persona to its canonical name'))
-  }
-  return violations
+  const registry = new RegExp(
+    `^.*\\b(?:identity\\w*(?:cache|registry|map|dictionary)|(?:cache|registry|map|dictionary)\\w*identity)\\b[^\\n]*(?:SessionId[^\\n]*${identity}|${identity}[^\\n]*SessionId)[^\\n]*$`,
+    'gim',
+  )
+  scanPattern(
+    text,
+    file,
+    'session-identity-registry',
+    registry,
+    'SessionId-keyed ParticipantIdentity/IdentitySeed registry is forbidden',
+    failures,
+  )
 }
 
-/** Scan typed, SessionId-scoped, immutable SessionPersona storage. */
-export const scanSessionPersonaSource = (file, source) => {
-  const violations = []
-  const code = codeOnly(source)
-  const compact = code.replace(/\s+/g, ' ')
-  if (!/Dictionary\s*<\s*SessionId\s*,\s*Persona\s*>/.test(code)) {
-    violations.push(violation('session-persona-storage', file, source,
-      firstOffset(code, /Dictionary\s*</), 'SessionPersona storage must contain Persona values'))
+const scanPrivateConstruction = (text, file, failures) => {
+  if (file === IDENTITY_OWNER) return
+
+  const patterns = [
+    /:\s*ParticipantIdentity(?:Evidence)?\s*=\s*\{/g,
+    /\{(?=[^}]{0,1000}\bSelectedAgent\s*=)(?=[^}]{0,1000}\bPeerAgent\s*=)(?=[^}]{0,1000}\bKind\s*=)(?=[^}]{0,1000}\bInitialTier\s*=)(?=[^}]{0,1000}\bPersona\s*=)(?=[^}]{0,1000}\bPersonaCatalogVersion\s*=)(?=[^}]{0,1000}\bOrigin\s*=)[^}]{0,1000}\}/g,
+    /\bPersonaName\s*(?:\(|")/g,
+    /\bPersonaCatalogVersion\s*(?:\(|\d)/g,
+    /\bParticipantKind\b/g,
+    /\bManagedRole\b/g,
+  ]
+  for (const pattern of patterns) {
+    scanPattern(
+      text,
+      file,
+      'private-identity-construction',
+      pattern,
+      'raw construction of opaque ParticipantIdentity internals is forbidden outside its owner',
+      failures,
+    )
   }
-  if (!/type\s+PersonaRejection\s*=/.test(code) ||
-      !/Result\s*<\s*Persona\s*,\s*PersonaRejection\s*>/.test(code)) {
-    violations.push(violation('session-typed-rejection', file, source,
-      firstOffset(code, /(?:type\s+PersonaRejection|let\s+bindOnce)/),
-      'bindOnce must expose Result<Persona, PersonaRejection>'))
-  }
-  const stringResult = /Result\s*<[^>]*,\s*string\s*>/g
-  for (let match = stringResult.exec(code); match !== null; match = stringResult.exec(code)) {
-    violations.push(violation('session-string-rejection', file, source, match.index, match[0].replace(/\s+/g, ' ')))
-  }
-  const bindOnceShape = /let\s+bindOnce\b/.test(code) &&
-    /true\s*,\s*existing\s+when\s+existing\s*=\s*persona\s*->\s*Ok\s+existing/.test(compact) &&
-    /true\s*,\s*existing\s*->\s*Error\b[^|]*existing[^|]*persona/.test(compact) &&
-    /false\s*,\s*_\s*->[^|]*\[sessionId\][^|]*<-\s*persona[^|]*Ok\s+persona/.test(compact)
-  if (!bindOnceShape) {
-    violations.push(violation('session-bind-once', file, source,
-      firstOffset(code, /let\s+bindOnce/), 'bindOnce must preserve the original SessionId-scoped Persona'))
-  }
-  return violations
 }
 
-/** Scan the Host adapter for swallowed typed binding conflicts. */
-export const scanPersonaBindingSource = (file, source) => {
-  const code = codeOnly(source)
-  const match = /\|\s*Error\s+_\s*->[\s\S]{0,240}?SessionPersona\.tryGet[\s\S]{0,160}?(?:Option\.default|defaultValue|defaultWith)/m.exec(code)
-  return match
-    ? [violation('binding-conflict-swallowed', file, source, match.index,
-        'PersonaBinding must propagate PersonaRejection conflicts')]
-    : []
+const scanAuthorityShape = (text, file, typeName, failures) => {
+  const definition = recordDefinition(text, typeName)
+  if (!definition) {
+    failures.push(violation(file, 1, 'authority-identity-seed', `${typeName} record definition is missing`))
+    return
+  }
+  if (!/\bIdentitySeed\s*:\s*(?:Prompt)?IdentitySeed\b|\bStoredIdentitySeed\s*:\s*(?:Prompt)?IdentitySeed\b/.test(definition.text)) {
+    failures.push(
+      violation(
+        file,
+        lineAt(text, definition.offset),
+        'authority-identity-seed',
+        `${typeName} must store IdentitySeed`,
+      ),
+    )
+  }
+  const duplicateFields = ['SelectedAgent', 'PeerAgent', 'CanonicalRole', 'SelectedTier'].filter((field) =>
+    new RegExp(`\\b(?:Stored)?${field}\\s*:`).test(definition.text),
+  )
+  if (duplicateFields.length > 0) {
+    failures.push(
+      violation(
+        file,
+        lineAt(text, definition.offset),
+        'flat-identity-duplicate',
+        `${typeName} duplicates IdentitySeed fields: ${duplicateFields.join(', ')}`,
+      ),
+    )
+  }
 }
 
-/** Scan Foundation/Roles.fs for office-capability vocabulary. */
-export const scanFoundationRolesSource = (file, source) => {
-  const code = codeOnly(source)
-  const violations = []
-  const forbidden = /\b(?:ToolPermission|permissions|isAllowed|RoleDefinition)\b/g
-  for (let match = forbidden.exec(code); match !== null; match = forbidden.exec(code)) {
-    violations.push(violation('foundation-role-capability', file, source, match.index, match[0]))
+export const scanRepo = (root = process.cwd()) => {
+  const failures = []
+  scanRetiredIdentitySurfaces(root, failures)
+  const identity = requiredFile(root, IDENTITY_OWNER, failures)
+  const facts = requiredFile(root, AUTHORITY_FACTS, failures)
+  const model = requiredFile(root, AUTHORITY_MODEL, failures)
+
+  if (identity !== null) {
+    requirePattern(
+      identity,
+      /type\s+ParticipantIdentity\s*=\s*private\s*\{/s,
+      IDENTITY_OWNER,
+      'opaque-identity-owner',
+      'ParticipantIdentity must remain an opaque private record',
+      failures,
+    )
+    requirePattern(
+      identity,
+      /type\s+ParticipantIdentityEvidence\s*=\s*private\s*\{/s,
+      IDENTITY_OWNER,
+      'opaque-identity-owner',
+      'ParticipantIdentityEvidence must remain opaque',
+      failures,
+    )
+    for (const member of ['resolveAtRoot', 'inheritFromOwner', 'rehydrate', 'selectedAgent', 'peerAgent', 'role', 'initialTier', 'persona', 'origin']) {
+      requirePattern(
+        identity,
+        new RegExp(`\\blet\\s+${member}\\b`),
+        IDENTITY_OWNER,
+        'opaque-identity-api',
+        `ParticipantIdentity owner API is missing '${member}'`,
+        failures,
+      )
+    }
   }
-  return violations
+
+  if (facts !== null) scanAuthorityShape(facts, AUTHORITY_FACTS, 'AuthorityRootAcceptedPayload', failures)
+  if (model !== null) {
+    scanAuthorityShape(model, AUTHORITY_MODEL, 'AuthorityExecutionProfile', failures)
+    requirePattern(
+      model,
+      /member\s+this\.ParticipantIdentity\s*=[\s\S]{0,250}?(?:StoredIdentitySeed|identitySeedParticipantIdentity|PromptIdentitySeed\.participantIdentity)/,
+      AUTHORITY_MODEL,
+      'authority-derived-identity',
+      'AuthorityExecutionProfile must derive ParticipantIdentity from IdentitySeed',
+      failures,
+    )
+  }
+
+  const sourcePath = resolve(root, SOURCE_ROOT)
+  if (!existsSync(sourcePath)) {
+    failures.push(violation(SOURCE_ROOT, 1, 'required-surface', 'production source root is missing'))
+    return failures
+  }
+
+  for (const absolute of walk(sourcePath, ['.fs'])) {
+    const file = normalize(relative(root, absolute))
+    const text = withoutLineComments(readFileSync(absolute, 'utf8'))
+    scanRetiredIdentityTokens(text, file, failures)
+    scanPattern(
+      text,
+      file,
+      'duplicate-identity-fact',
+      /\bParticipantIdentityEstablished\b/g,
+      'ParticipantIdentityEstablished would create a second identity fact owner',
+      failures,
+    )
+    if (file !== IDENTITY_OWNER) scanIdentityCollections(text, file, failures)
+    scanPrivateConstruction(text, file, failures)
+  }
+
+  return failures
 }
 
-/** Scan any production F# caller for legacy or text-derived identity authority. */
-export const scanProductionIdentitySource = (file, source) => {
-  const code = codeOnly(source)
-  const violations = []
-  const legacy = /\bAgentRoleIdentity\s*\./g
-  for (let match = legacy.exec(code); match !== null; match = legacy.exec(code)) {
-    violations.push(violation('legacy-role-identity-reference', file, source, match.index, 'AgentRoleIdentity.'))
+export const run = (root = process.cwd()) => {
+  let failures
+  try {
+    failures = scanRepo(root)
+  } catch (error) {
+    console.error(`participant-identity-boundary: ${error.message}`)
+    return 1
   }
 
-  const lowercase = /PersonaCatalog\.(?:persona|render|canonical)\b[\s\S]{0,180}?\.ToLowerInvariant\s*\(\s*\)/g
-  for (let match = lowercase.exec(code); match !== null; match = lowercase.exec(code)) {
-    violations.push(violation('persona-lowercase-authority', file, source, match.index,
-      textAt(source, match.index)))
+  if (failures.length > 0) {
+    console.error(`participant-identity-boundary: ${failures.length} violation(s)`)
+    for (const failure of failures) {
+      console.error(`  ${failure.file}:${failure.line} [${failure.rule}] ${failure.message}`)
+    }
+    return 1
   }
 
-  const lines = code.split('\n')
-  const rawLines = source.split('\n')
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index]
-    if (!/(?:persona|displayName|display_name)/i.test(line)) continue
-    if (!/(?:\bif\b|\bwhen\b)[^\n]*(?:=|<>|String\.Equals)|String\.Equals\s*\(/.test(line)) continue
-    violations.push({ id: OWNER, rule: 'persona-text-authority', file: normalizePath(file),
-      line: index + 1, text: rawLines[index].trim() })
-  }
-  return violations
+  console.log('participant-identity-boundary: OK — opaque logical-run evidence, atomic root authority boundary, and zero session-scoped or parallel identity owners')
+  return 0
 }
 
-/** Scan injectable production entries. */
-export const scanParticipantIdentityEntries = (entries) => {
-  const byFile = new Map(entries.map(({ file, source }) => [normalizePath(file), source]))
-  const violations = []
-  if (byFile.has(CATALOG_FILE)) violations.push(...scanPersonaCatalogSource(CATALOG_FILE, byFile.get(CATALOG_FILE)))
-  if (byFile.has(SESSION_FILE)) violations.push(...scanSessionPersonaSource(SESSION_FILE, byFile.get(SESSION_FILE)))
-  if (byFile.has(BINDING_FILE)) violations.push(...scanPersonaBindingSource(BINDING_FILE, byFile.get(BINDING_FILE)))
-  if (byFile.has(ROLES_FILE)) violations.push(...scanFoundationRolesSource(ROLES_FILE, byFile.get(ROLES_FILE)))
-  if (byFile.has(LEGACY_FILE)) {
-    violations.push({ id: OWNER, rule: 'legacy-role-identity-file', file: LEGACY_FILE, line: 1,
-      text: 'RoleIdentity.fs must be absent' })
-  }
-  for (const { file, source } of entries) {
-    const normalizedFile = normalizePath(file)
-    if (normalizedFile === CATALOG_FILE || normalizedFile === SESSION_FILE) continue
-    violations.push(...scanProductionIdentitySource(normalizedFile, source))
-  }
-  return violations.sort((left, right) => left.file.localeCompare(right.file) || left.line - right.line ||
-    left.rule.localeCompare(right.rule) || left.text.localeCompare(right.text))
-}
-
-const productionFiles = (repoRoot) => {
-  const root = resolve(repoRoot, SOURCE_ROOT)
-  const visit = (directory) => readdirSync(directory, { withFileTypes: true })
-    .sort((left, right) => left.name.localeCompare(right.name))
-    .flatMap((entry) => {
-      const absolute = resolve(directory, entry.name)
-      if (entry.isDirectory()) return visit(absolute)
-      return entry.isFile() && entry.name.endsWith('.fs') ? [absolute] : []
-    })
-  return visit(root)
-}
-
-/** Scan the fixed owners and all production identity callers. */
-export const scanParticipantIdentityRepo = (repoRoot) => {
-  for (const file of PARTICIPANT_IDENTITY_OWNER_FILES) {
-    if (!existsSync(resolve(repoRoot, file))) throw new Error(`${OWNER}: scan owner missing: ${file}`)
-  }
-  const files = productionFiles(repoRoot)
-  return scanParticipantIdentityEntries(files.map((absolute) => ({
-    file: normalizePath(relative(repoRoot, absolute)),
-    source: readFileSync(absolute, 'utf8'),
-  })))
-}
-
-export const run = (repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')) => {
-  const violations = scanParticipantIdentityRepo(repoRoot)
-  if (violations.length === 0) {
-    console.log(`${OWNER}: OK`)
-    return 0
-  }
-  console.error(`${OWNER}: VIOLATIONS`)
-  for (const item of violations) console.error(`  ${item.file}:${item.line} [${item.rule}] ${item.text}`)
-  return 1
-}
-
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = run()
+const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+if (isMain) process.exit(run())

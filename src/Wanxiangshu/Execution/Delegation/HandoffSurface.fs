@@ -17,7 +17,8 @@ module HandoffSurface =
             else
                 Some(string previousEnd |> int64 |> XTraceCursor.create)
 
-        let handoff = DelegationHandoff.window previous (currentEnd |> int64 |> XTraceCursor.create)
+        let handoff =
+            DelegationHandoff.window previous (currentEnd |> int64 |> XTraceCursor.create)
 
         box
             {| start = handoff.Range |> XTraceRange.startInclusive |> XTraceCursor.sequence |> int

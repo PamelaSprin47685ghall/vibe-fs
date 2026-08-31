@@ -37,6 +37,7 @@ open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
@@ -270,6 +271,14 @@ type ToolRuntimeScope
         |> Option.bind activeProfileFor
         |> Option.map (fun profile -> profile.CanonicalRole)
 
+    let humanRootIdentitySeedAdmission (durable: AgentJournal) sessionId agent =
+        PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot durable).AgentProjections
+        |> Option.map (fun profile -> Ok profile.IdentitySeed)
+        |> Option.defaultWith (fun () ->
+            ParticipantIdentity.resolveAtRoot agent
+            |> Result.map PromptAuthority.IdentitySeed.RootSelection)
+        |> Result.mapError (fun _ -> ())
+
     let acceptNamedHumanRoot
         (durable: AgentJournal)
         (sessionId: SessionId)
@@ -279,9 +288,19 @@ type ToolRuntimeScope
         task {
             let runtime = PromptDispatcher.forJournal durable
 
-            match! runtime.AcceptHumanRoot sessionId (PhysicalUserMessageId.create user.Id) (Some agent) with
-            | Ok profile -> return Some profile.CanonicalRole
-            | Error _ -> return None
+            let! admission =
+                taskResult {
+                    let! seed = humanRootIdentitySeedAdmission durable sessionId agent
+
+                    let! attempt =
+                        runtime.AcceptHumanRoot sessionId (PhysicalUserMessageId.create user.Id) (Some seed)
+                        |> TaskResultCE.ofTask
+
+                    let! profile = attempt |> Result.mapError (fun _ -> ())
+                    return profile.CanonicalRole
+                }
+
+            return Result.toOption admission
         }
 
     let acceptHumanRootFromUser

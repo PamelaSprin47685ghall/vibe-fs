@@ -33,9 +33,9 @@ test('WHAT[VERIFICATION-SYSTEM-003] sole e2e entry declares unsimulatable physic
 test('WHAT[VERIFICATION-SYSTEM-003] active-join user-message injection waits for physical ToolPart running', () => {
   const scenario = readFileSync(LONG_STROKE, 'utf8')
   const entry = readFileSync(ENTRY, 'utf8')
-  const joinExpectation = scenario.indexOf('{ wait = "manager.1" }')
+  const joinExpectation = scenario.indexOf('{ wait = "manager.1"')
   const runningBarrier = scenario.indexOf('{ custom = "awaitManagerJoinRunning" }')
-  const userWake = scenario.indexOf('Also make sure publish_proof.txt has exactly the content')
+  const userWake = scenario.indexOf('Interrupt the active join.')
 
   assert.ok(joinExpectation >= 0, 'Long Stroke must wait for manager.1 provider expectation')
   assert.ok(runningBarrier > joinExpectation, 'physical join-running barrier must follow manager.1')

@@ -10,6 +10,8 @@
 4. **互斥的生命周期形态**。长期复用的 Dedicated 会话（以 ReuseScope 驱动）与即用即弃的 OneShot 会话具有截然不同的生命周期，绝不能混用回收与销毁策略。
 5. **级联取消的物理因果保证**。父会话在对外宣布终止前，必须确保所有子会话（包括 Companion Blogger 等）的物理中断已完全完成，杜绝异步竞争导致的悬挂进程。
 6. **Attempt 中断与 Logical 取消的权限分离**。内部控制收束（如循环终止、求助等）仅能请求中断当前的物理尝试（physical attempt），绝不得篡夺父会话的逻辑取消权限，亦不得擅自中断用户根会话。
+7. **Session 终止不等于 execution settlement**。可复用 `SessionId` 不是当前物理执行身份。取消或删除若按 session 粗放释放，会终结错误消息或泄漏 exact capacity；lifecycle 必须等待 `managed-chat-execution` 的 exact settlement barrier，而非复制其状态机。
+8. **容器可复用不等于 logical run 已关闭**。fresh identity 只能在 `interaction-authority` 的 durable exact prior-run closure 后安装；detach、association removal 或 idle 无法证明旧 run 已不可继续。
 
 ## 核心不变量
 

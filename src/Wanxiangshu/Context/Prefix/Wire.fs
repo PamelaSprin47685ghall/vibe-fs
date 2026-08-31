@@ -138,11 +138,6 @@ module XWire =
         | Ok value -> value
         | Error reason -> raise (InvalidOperationException reason)
 
-    let private requireOkMapped (mapError: 'e -> string) (result: Result<'a, 'e>) : 'a =
-        match result with
-        | Ok value -> value
-        | Error error -> raise (InvalidOperationException(mapError error))
-
     let private ensureFrameDigest (frame: BlogFrame) (text: string) : Result<unit, string> =
         if HostDigest.sha256Hex text = BlobDigest.value frame.Digest then
             Ok()
@@ -169,7 +164,9 @@ module XWire =
     /// coordinates. A positional legacy trace is insufficient proof and fails
     /// closed instead of silently interpreting a provider-array index as history.
     let private providerRetryOrigin =
-        PromptAuthority.originLabel (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ProviderRetryAttempt)
+        PromptAuthority.originLabel (
+            PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt
+        )
 
     let private isProviderRetryAttempt (rawMessage: obj) =
         ProviderWireDecode.promptOriginOfMessage rawMessage = Some providerRetryOrigin
@@ -311,7 +308,6 @@ module XWire =
         | Some authority -> authority
 
     let private applyStrengthReplicaPlan
-        (snapshotPort: ISessionSnapshotPort)
         (durable: AgentJournal)
         (scope: PluginRuntimeScope)
         (sessionId: SessionId)
@@ -326,15 +322,6 @@ module XWire =
                 | Some physical -> physical
                 | None -> raise (InvalidOperationException "StrengthReplica request has no physical user message")
 
-            let! snapshotResult = snapshotPort.GetMessages sessionId
-            let messages = requireOk snapshotResult
-
-            let assistant =
-                requireOkMapped
-                    (fun rejection -> sprintf "StrengthReplica run binding failed: %A" rejection)
-                    (ProviderRunBinding.bindableRun (PhysicalUserMessageId.value physical) messages)
-
-            let providerRun = ProviderRunIdentity.create assistant.Id
             let projections = AgentJournal.snapshot durable
 
             let authority =
@@ -343,23 +330,25 @@ module XWire =
                     (PromptAuthorityLedger.activeProfile sessionId projections.AgentProjections)
 
             let plan =
-                AttemptPlanner.plan
+                AttemptPlanner.freezePreInference
                     authority
                     AgentPairCursor.initial
                     physical
-                    providerRun
                     (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
                     ProviderRequestKind.StrengthReplica
                     RecoveryOpportunity.OrdinaryAttempt
                     (fun () -> Error NoCandidateReason.NoCoverage)
 
-            if plan.Profile.ToolCapabilitySet <> binding.ToolCapabilitySet then
+            if
+                PromptAuthority.toolCapabilitiesFor authority.CanonicalRole ProviderRequestKind.StrengthReplica
+                <> binding.ToolCapabilitySet
+            then
                 raise (
                     InvalidOperationException
                         "StrengthReplica PromptAuthority capabilities disagree with live execution gate"
                 )
 
-            scope.RecordAttemptPlan sessionId providerRun plan
+            scope.RecordPendingAttemptPlan sessionId physical plan
         }
 
     let private readFrozenRecordPrefixBody
@@ -760,14 +749,11 @@ module XWire =
         (output: obj)
         : Task<PrefixPresentationHorizon> =
         task {
-            match scope.Strength.StrengthRuntime.TryFindByReplica sessionId, snapshot with
-            | Some binding, Some snapshotPort ->
-                do! applyStrengthReplicaPlan snapshotPort durable scope sessionId binding output
+            match scope.Strength.StrengthRuntime.TryFindByReplica sessionId with
+            | Some binding ->
+                do! applyStrengthReplicaPlan durable scope sessionId binding output
                 return PrefixPresentationHorizon.Current
-            | Some _, None ->
-                return
-                    raise (InvalidOperationException "StrengthReplica cannot plan without the public session snapshot")
-            | None, _ -> return! applyNonReplicaTransform durable scope sessionId snapshot output
+            | None -> return! applyNonReplicaTransform durable scope sessionId snapshot output
         }
 
     let applyTransform

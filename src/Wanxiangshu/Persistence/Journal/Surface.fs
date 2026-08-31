@@ -13,6 +13,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Host
+open Wanxiangshu.Execution.Failure
 
 /// Opaque capability for one journal projection and its local writer.
 type JournalHandle private (journal: AgentJournal, release: unit -> unit) =
@@ -41,6 +42,47 @@ module JournalSurface =
 
     let private str (value: obj) : string =
         if isNull value then "" else string value
+
+    let private commitmentLabel =
+        function
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted -> "NotCommitted"
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed -> "Committed"
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown -> "Unknown"
+        | ExecutionFailure.LocalInvariant
+        | ExecutionFailure.ProtocolRejection
+        | ExecutionFailure.AuthorizationDenied
+        | ExecutionFailure.UserCancelled
+        | ExecutionFailure.Superseded
+        | ExecutionFailure.CapacityQueueFull
+        | ExecutionFailure.ProviderTransient
+        | ExecutionFailure.ProviderPermanent
+        | ExecutionFailure.AcceptanceUnknown
+        | ExecutionFailure.StreamInterruptedAfterFirstToken ->
+            invalidOp "journal mapper returned a non-persistence failure"
+
+    let mapAppendFailure (value: obj) : obj =
+        if isNull value then
+            invalidArg "value" "missing journal append outcome"
+
+        let eventId = EventId.create "surface-append"
+        let diagnostic = str value?diagnostic
+
+        let physical =
+            match str value?kind with
+            | "WriterUnavailable" -> JournalAppendFailure.WriterUnavailable(eventId, JournalUnavailable.WriterClosing)
+            | "FactRejected" ->
+                JournalAppendFailure.FactRejected(
+                    eventId,
+                    { Fact = "surface"
+                      Reason = diagnostic }
+                )
+            | "WriteUnknown" -> JournalAppendFailure.WriteUnknown(eventId, JournalFailure.WriteFailed diagnostic)
+            | other -> invalidArg "kind" $"unknown journal append outcome '{other}'"
+
+        box
+            {| failure = "PersistenceFailure"
+               commitment = physical |> JournalAppendFailure.toExecutionFailure |> commitmentLabel
+               diagnostic = diagnostic |}
 
     let private sessionIdOf (value: obj) : SessionId = SessionId.create (str value)
 

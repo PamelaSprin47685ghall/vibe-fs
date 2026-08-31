@@ -5,6 +5,7 @@ open Wanxiangshu.Change
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -44,6 +45,7 @@ module Fact =
         | Attention of AttentionFactCases
         | Concern of ConcernFactCases
         | InstitutionalLearning of InstitutionalLearningFactCases
+        | ChatExecution of ChatExecutionFactCases
 
     type Fact =
         | Runtime of RuntimeFact

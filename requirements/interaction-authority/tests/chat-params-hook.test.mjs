@@ -17,6 +17,19 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_parented_session_requires_prov
   assert.equal(output.model.modelID, 'fast-haiku')
 })
 
+test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_unbound_Host_auxiliary_child_does_not_claim_managed_execution', () => {
+  binding.observeHostAuxiliaryChild('ses_chat_params_title')
+  const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
+  const observed = chatParams.apply(
+    { sessionID: 'ses_chat_params_title', agent: 'fast-coder', model: { providerID: 'anthropic', modelID: 'fast-haiku' } },
+    output,
+  )
+
+  assert.equal(observed.ok, true, observed.error)
+  assert.equal(observed.temperature, undefined)
+  assert.equal(output.model.modelID, 'fast-haiku')
+})
+
 test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_acceptance_establishes_binding_without_rewriting_host_model', () => {
   binding.bindChild('ses_chat_params_root_2', 'ses_chat_params_child_2', 'deep-coder')
   binding.acceptPromptExecution(

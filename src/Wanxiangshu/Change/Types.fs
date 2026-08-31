@@ -103,6 +103,7 @@ type ManagerStart =
 type ManagerPort =
     {
         StartManager: ManagerStart -> Task<Result<SessionId, string>>
+        SendManagerPrompt: ManagerJobId -> Task<Result<unit, string>>
         AwaitManager: ManagerJobId -> Task<Result<unit, string>>
 
         /// One review barrier: fork a reviewer, open the barrier, and wait for a

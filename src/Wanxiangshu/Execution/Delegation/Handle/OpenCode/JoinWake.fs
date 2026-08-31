@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation.Handle.OpenCode
 
 open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.OpenCode
 
 [<RequireQualifiedAccess>]
 module JoinWake =
@@ -10,7 +10,12 @@ module JoinWake =
     /// Plugin-owned continuations and Host compaction are not external-user
     /// arrivals. The registry itself remains attempt-scoped and drops the wake
     /// when no attempt is active.
-    let observeChatMessage (registry: IJoinAttemptRegistry) (decoded: PromptIngressCodec.DecodedMessage) =
-        match decoded.SessionId, decoded.PhysicalUserMessageId, decoded.PromptKey, decoded.IsHostCompaction with
-        | Some sessionId, Some _, None, false -> registry.SignalUserMessage sessionId
-        | _ -> ()
+    let observeChatMessage (registry: IJoinAttemptRegistry) (intent: ChatAdmissionIntent.Decision) =
+        match intent with
+        | ChatAdmissionIntent.Decision.ExternalRootIntent evidence -> registry.SignalUserMessage evidence.Key.SessionId
+        | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
+            registry.SignalUserMessage evidence.Key.SessionId
+        | ChatAdmissionIntent.Decision.NoManagedExecution _
+        | ChatAdmissionIntent.Decision.PendingPromptIntent _
+        | ChatAdmissionIntent.Decision.HostInternal _
+        | ChatAdmissionIntent.Decision.Reject _ -> ()

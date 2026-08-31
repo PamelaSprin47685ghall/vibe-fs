@@ -13,6 +13,7 @@ open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
@@ -95,7 +96,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let toolRuntimeGate = obj ()
     // DSL-MUTABLE: resource — session tool runtime owner handle
     let mutable toolRuntime: ISessionRuntimeOwner option = None
-    // DSL-MUTABLE: subscription — plugin host event subscription
+    // DSL-MUTABLE: resource
     let mutable subscription: IDisposable option = None
     // DSL-MUTABLE: resource — shared terminal bus key
     let mutable sharedTerminalKey: string option = None
@@ -150,6 +151,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let mutable satelliteRuntime: SatelliteRuntime option = None
     // DSL-MUTABLE: resource — sync-delegate runtime attachment slot
     let mutable syncDelegateRuntime: SyncDelegateRuntime option = None
+    // DSL-MUTABLE: resource — event-driven managed chat recovery owner
+    let mutable chatRecoveryRuntime: SessionRecoveryHost option = None
 
     let disposeRuntimeOwner (owner: ISessionRuntimeOwner option) =
         task {
@@ -223,6 +226,26 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         | None -> invalidOp "SatelliteRuntime has not been attached"
 
     member _.AttachSyncDelegateRuntime(runtime: SyncDelegateRuntime) = syncDelegateRuntime <- Some runtime
+
+    member _.AttachChatRecoveryRuntime(runtime: SessionRecoveryHost) = chatRecoveryRuntime <- Some runtime
+
+    member _.SignalChatRecovery(event: ChatExecutionRecoveryLifecycleEvent) : Task =
+        match chatRecoveryRuntime with
+        | Some runtime -> runtime.Signal event
+        | None -> Task.FromResult(()) :> Task
+
+    member _.SignalChatRecoverySession
+        (sessionId: SessionId)
+        (eventOf: ChatExecutionKey -> ChatExecutionRecoveryLifecycleEvent)
+        : Task =
+        match chatRecoveryRuntime with
+        | Some runtime -> runtime.SignalSession(sessionId, eventOf)
+        | None -> Task.FromResult(()) :> Task
+
+    member _.DrainChatRecovery(sessionId: SessionId) : Task =
+        match chatRecoveryRuntime with
+        | Some runtime -> runtime.Drain sessionId
+        | None -> Task.FromResult(()) :> Task
 
     member _.SyncDelegateRuntime = syncDelegateRuntime
 

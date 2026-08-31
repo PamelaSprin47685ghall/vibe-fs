@@ -1,0 +1,330 @@
+namespace Wanxiangshu.Participant.Persona
+
+open System
+open Wanxiangshu.Foundation
+
+[<RequireQualifiedAccess>]
+type PersonaOrigin =
+    | ResolvedAtRoot
+    | InheritedFromOwner
+
+[<RequireQualifiedAccess>]
+type ParticipantIdentityError =
+    | BlankParticipantName
+    | LegacyParticipantName of string
+    | MalformedParticipantName of string
+    | UnknownParticipantName of string
+    | UnsupportedPersonaCatalogVersion of int
+    | RoleMismatch of Expected: Role option * Actual: Role option
+    | TierMismatch of Expected: AgentTier * Actual: AgentTier
+    | PeerMismatch of Expected: string * Actual: string
+    | BlankPersona
+    | PersonaMismatch of Expected: string * Actual: string
+    | OriginMismatch of Expected: PersonaOrigin * Actual: PersonaOrigin
+    | OwnerRequired
+    | OwnerPersonaMismatch of Expected: string * Actual: string
+    | OwnerCatalogVersionMismatch of Expected: int * Actual: int
+    | LegacyRoleMismatch of Expected: string * Actual: string
+    | LegacyTierMismatch of Expected: string * Actual: string
+    | UnsupportedLegacyAuthorityKind of string
+    | UnprovableLegacyAuthorityIdentity of string
+
+type ParticipantIdentityInput =
+    { SelectedAgent: string
+      PeerAgent: string
+      Role: Role option
+      InitialTier: AgentTier
+      Persona: string
+      PersonaCatalogVersion: int
+      Origin: PersonaOrigin }
+
+type LegacyAuthorityRootIdentityV1Input =
+    { AuthorityKind: string
+      SelectedAgent: string
+      PeerAgent: string
+      CanonicalRole: string
+      SelectedTier: string }
+
+type private PersonaName = PersonaName of string
+
+type private PersonaCatalogVersion = PersonaCatalogVersion of int
+
+type private ParticipantKind =
+    | ManagedRole of Role
+    | Bookkeeper
+
+type ParticipantIdentity =
+    private
+        { SelectedAgent: PersonaName
+          PeerAgent: PersonaName
+          Kind: ParticipantKind
+          InitialTier: AgentTier
+          Persona: string
+          PersonaCatalogVersion: PersonaCatalogVersion
+          Origin: PersonaOrigin }
+
+type ParticipantIdentityEvidence =
+    private
+        { Identity: ParticipantIdentity }
+
+[<RequireQualifiedAccess>]
+module ParticipantIdentity =
+
+    let private currentVersion = PersonaCatalogVersion 1
+
+    let private versionNumber (PersonaCatalogVersion version) = version
+
+    let private nameValue (PersonaName name) = name
+
+    let private roleOfKind kind =
+        match kind with
+        | ManagedRole role -> Some role
+        | Bookkeeper -> None
+
+    let private roleLabelOfKind kind =
+        match kind with
+        | ManagedRole role -> Roles.roleLabel role
+        | Bookkeeper -> "bookkeeper"
+
+    let private peerName tier kind =
+        match kind with
+        | ManagedRole role -> ManagedAgentCatalog.peerNameOf tier role
+        | Bookkeeper -> ManagedAgentCatalog.bookkeeperNameOf (ManagedAgentCatalog.peerTier tier)
+
+    let private personaV1 tier kind =
+        match kind with
+        | ManagedRole role -> PersonaCatalog.personaV1 role tier
+        | Bookkeeper -> PersonaCatalog.bookkeeperPersonaV1 tier
+
+    let private parseRoleBackedParts
+        (name: string)
+        (parts: string list)
+        : Result<string * string, ParticipantIdentityError> =
+        match parts with
+        | [ tierLabel; roleLabel ] when String.IsNullOrEmpty tierLabel || String.IsNullOrEmpty roleLabel ->
+            Error(ParticipantIdentityError.MalformedParticipantName name)
+        | [ tierLabel; roleLabel ] -> Ok(tierLabel, roleLabel)
+        | _ -> Error(ParticipantIdentityError.MalformedParticipantName name)
+
+    let private parseRoleBackedLabels
+        (name: string)
+        (tierLabel: string, roleLabel: string)
+        : Result<PersonaName * ParticipantKind * AgentTier, ParticipantIdentityError> =
+        match Roles.tryParseTier tierLabel, Roles.tryParseRole roleLabel with
+        | Some tier, Some role when ManagedAgentCatalog.nameOf tier role = name ->
+            Ok(PersonaName name, ManagedRole role, tier)
+        | Some _, None -> Error(ParticipantIdentityError.UnknownParticipantName name)
+        | _ -> Error(ParticipantIdentityError.MalformedParticipantName name)
+
+    let private parseRoleBackedName
+        (name: string)
+        : Result<PersonaName * ParticipantKind * AgentTier, ParticipantIdentityError> =
+        name.Split('-')
+        |> Array.toList
+        |> parseRoleBackedParts name
+        |> Result.bind (parseRoleBackedLabels name)
+
+    let private parseKnownCanonicalName
+        (name: string)
+        : Result<PersonaName * ParticipantKind * AgentTier, ParticipantIdentityError> =
+        match ManagedAgentCatalog.tryParseBookkeeperTier name with
+        | Some tier -> Ok(PersonaName name, Bookkeeper, tier)
+        | None -> parseRoleBackedName name
+
+    let private parseCanonicalName (name: string) =
+        if String.IsNullOrWhiteSpace name then
+            Error ParticipantIdentityError.BlankParticipantName
+        elif ManagedAgentCatalog.isLegacyAgentName (name.ToLowerInvariant()) then
+            Error(ParticipantIdentityError.LegacyParticipantName name)
+        elif name <> name.ToLowerInvariant() then
+            Error(ParticipantIdentityError.MalformedParticipantName name)
+        else
+            parseKnownCanonicalName name
+
+    let private create
+        (selectedAgent: PersonaName)
+        (kind: ParticipantKind)
+        (tier: AgentTier)
+        (persona: string)
+        (version: PersonaCatalogVersion)
+        (origin: PersonaOrigin)
+        : ParticipantIdentityEvidence =
+        { SelectedAgent = selectedAgent
+          PeerAgent = PersonaName(peerName tier kind)
+          Kind = kind
+          InitialTier = tier
+          Persona = persona
+          PersonaCatalogVersion = version
+          Origin = origin }
+        |> fun identity -> { Identity = identity }
+
+    let private identity (evidence: ParticipantIdentityEvidence) = evidence.Identity
+
+    let selectedAgent (evidence: ParticipantIdentityEvidence) : string =
+        (identity evidence).SelectedAgent |> nameValue
+
+    let role (evidence: ParticipantIdentityEvidence) : Role option = (identity evidence).Kind |> roleOfKind
+
+    let roleLabel (evidence: ParticipantIdentityEvidence) : string =
+        (identity evidence).Kind |> roleLabelOfKind
+
+    let initialTier (evidence: ParticipantIdentityEvidence) : AgentTier = (identity evidence).InitialTier
+
+    let peerAgent (evidence: ParticipantIdentityEvidence) : string =
+        (identity evidence).PeerAgent |> nameValue
+
+    let persona (evidence: ParticipantIdentityEvidence) : string = (identity evidence).Persona
+
+    let personaCatalogVersion (evidence: ParticipantIdentityEvidence) : int =
+        (identity evidence).PersonaCatalogVersion |> versionNumber
+
+    let origin (evidence: ParticipantIdentityEvidence) : PersonaOrigin = (identity evidence).Origin
+
+    let toInput (evidence: ParticipantIdentityEvidence) : ParticipantIdentityInput =
+        { SelectedAgent = selectedAgent evidence
+          PeerAgent = peerAgent evidence
+          Role = role evidence
+          InitialTier = initialTier evidence
+          Persona = persona evidence
+          PersonaCatalogVersion = personaCatalogVersion evidence
+          Origin = origin evidence }
+
+    let resolveAtRoot (canonicalManagedName: string) : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
+        parseCanonicalName canonicalManagedName
+        |> Result.map (fun (name, kind, tier) ->
+            create name kind tier (personaV1 tier kind) currentVersion PersonaOrigin.ResolvedAtRoot)
+
+    let inheritFromOwner
+        (canonicalManagedName: string)
+        (owner: ParticipantIdentityEvidence)
+        : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
+        parseCanonicalName canonicalManagedName
+        |> Result.map (fun (name, kind, tier) ->
+            create
+                name
+                kind
+                tier
+                (persona owner)
+                (identity owner).PersonaCatalogVersion
+                PersonaOrigin.InheritedFromOwner)
+
+    let private validateRehydrationShape
+        (input: ParticipantIdentityInput)
+        ((name, kind, tier): PersonaName * ParticipantKind * AgentTier)
+        : Result<PersonaName * ParticipantKind * AgentTier, ParticipantIdentityError> =
+        let expectedRole = roleOfKind kind
+        let expectedPeer = peerName tier kind
+        let expectedVersion = versionNumber currentVersion
+
+        if input.PersonaCatalogVersion <> expectedVersion then
+            Error(ParticipantIdentityError.UnsupportedPersonaCatalogVersion input.PersonaCatalogVersion)
+        elif input.Role <> expectedRole then
+            Error(ParticipantIdentityError.RoleMismatch(expectedRole, input.Role))
+        elif input.InitialTier <> tier then
+            Error(ParticipantIdentityError.TierMismatch(tier, input.InitialTier))
+        elif input.PeerAgent <> expectedPeer then
+            Error(ParticipantIdentityError.PeerMismatch(expectedPeer, input.PeerAgent))
+        elif String.IsNullOrWhiteSpace input.Persona then
+            Error ParticipantIdentityError.BlankPersona
+        else
+            Ok(name, kind, tier)
+
+    let private rehydrateRoot
+        (input: ParticipantIdentityInput)
+        ((name, kind, tier): PersonaName * ParticipantKind * AgentTier)
+        : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
+        let expectedPersona = personaV1 tier kind
+
+        if input.Persona <> expectedPersona then
+            Error(ParticipantIdentityError.PersonaMismatch(expectedPersona, input.Persona))
+        else
+            Ok(create name kind tier input.Persona currentVersion PersonaOrigin.ResolvedAtRoot)
+
+    let private rehydrateInherited
+        (owner: ParticipantIdentityEvidence)
+        (input: ParticipantIdentityInput)
+        ((name, kind, tier): PersonaName * ParticipantKind * AgentTier)
+        : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
+        let expectedOwnerPersona = persona owner
+        let expectedOwnerVersion = personaCatalogVersion owner
+
+        if input.Persona <> expectedOwnerPersona then
+            Error(ParticipantIdentityError.OwnerPersonaMismatch(expectedOwnerPersona, input.Persona))
+        elif input.PersonaCatalogVersion <> expectedOwnerVersion then
+            Error(
+                ParticipantIdentityError.OwnerCatalogVersionMismatch(expectedOwnerVersion, input.PersonaCatalogVersion)
+            )
+        else
+            Ok(
+                create
+                    name
+                    kind
+                    tier
+                    input.Persona
+                    (identity owner).PersonaCatalogVersion
+                    PersonaOrigin.InheritedFromOwner
+            )
+
+    let private rehydrateByOrigin
+        (ownerOption: ParticipantIdentityEvidence option)
+        (input: ParticipantIdentityInput)
+        (parsed: PersonaName * ParticipantKind * AgentTier)
+        : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
+        match ownerOption, input.Origin with
+        | None, PersonaOrigin.InheritedFromOwner -> Error ParticipantIdentityError.OwnerRequired
+        | Some _, PersonaOrigin.ResolvedAtRoot ->
+            Error(
+                ParticipantIdentityError.OriginMismatch(PersonaOrigin.InheritedFromOwner, PersonaOrigin.ResolvedAtRoot)
+            )
+        | None, PersonaOrigin.ResolvedAtRoot -> rehydrateRoot input parsed
+        | Some owner, PersonaOrigin.InheritedFromOwner -> rehydrateInherited owner input parsed
+
+    let rehydrate
+        (ownerOption: ParticipantIdentityEvidence option)
+        (input: ParticipantIdentityInput)
+        : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
+        parseCanonicalName input.SelectedAgent
+        |> Result.bind (validateRehydrationShape input)
+        |> Result.bind (rehydrateByOrigin ownerOption input)
+
+    let fromInput (input: ParticipantIdentityInput) : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
+        parseCanonicalName input.SelectedAgent
+        |> Result.bind (validateRehydrationShape input)
+        |> Result.bind (fun ((name, kind, tier) as parsed) ->
+            match input.Origin with
+            | PersonaOrigin.ResolvedAtRoot -> rehydrateRoot input parsed
+            | PersonaOrigin.InheritedFromOwner ->
+                Ok(create name kind tier input.Persona currentVersion PersonaOrigin.InheritedFromOwner))
+
+    let legacyAgentOwnerRootUnprovableMessage =
+        "legacy AuthorityRootAccepted v1 AgentOwnerRoot cannot prove participant identity"
+
+    let private validateLegacyPeerRoleTier
+        (input: LegacyAuthorityRootIdentityV1Input)
+        (evidence: ParticipantIdentityEvidence)
+        : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
+        let expectedPeer = peerAgent evidence
+        let expectedRole = roleLabel evidence
+        let expectedTier = initialTier evidence |> Roles.wireTierLabel
+
+        match input.PeerAgent, input.CanonicalRole, input.SelectedTier with
+        | actualPeer, _, _ when actualPeer <> expectedPeer ->
+            Error(ParticipantIdentityError.PeerMismatch(expectedPeer, actualPeer))
+        | _, actualRole, _ when actualRole <> expectedRole ->
+            Error(ParticipantIdentityError.LegacyRoleMismatch(expectedRole, actualRole))
+        | _, _, actualTier when actualTier <> expectedTier ->
+            Error(ParticipantIdentityError.LegacyTierMismatch(expectedTier, actualTier))
+        | _ -> Ok evidence
+
+    let upgradeLegacyV1Root
+        (input: LegacyAuthorityRootIdentityV1Input)
+        : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
+        match input.AuthorityKind with
+        | "AgentOwnerRoot" ->
+            Error(ParticipantIdentityError.UnprovableLegacyAuthorityIdentity legacyAgentOwnerRootUnprovableMessage)
+        | "HumanRoot" ->
+            parseCanonicalName input.SelectedAgent
+            |> Result.map (fun (name, kind, tier) ->
+                create name kind tier (personaV1 tier kind) (PersonaCatalogVersion 1) PersonaOrigin.ResolvedAtRoot)
+            |> Result.bind (validateLegacyPeerRoleTier input)
+        | authorityKind -> Error(ParticipantIdentityError.UnsupportedLegacyAuthorityKind authorityKind)

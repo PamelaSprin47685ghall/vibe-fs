@@ -10,6 +10,7 @@ import test from 'node:test'
 import * as compression from '../../../dist/Context/Companion/CompressionSurface.js'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 import * as cursorOwner from '../../../dist/Participant/Provider/Attempt/Fallback/CursorSurface.js'
+import * as attemptPurpose from '../../../dist/Participant/Provider/Attempt/PlannerSurface.js'
 
 const planner = compression.attemptPlanner
 const cursor = cursorOwner.cursor
@@ -32,20 +33,66 @@ const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) =>
   ({ probeId: id, basedOnEpoch: 0, candidate: snapshotAt(cutoff) })
 
 test('WHAT[PAR-010] PAR_010_provider_request_kind_has_one_provider_attempt_owner', () => {
+  const requestKindSource = source('src/Wanxiangshu/Participant/Provider/Attempt/RequestKind.fs')
   const cursorSource = source('src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs')
   const oldPrefixOwner = source('src/Wanxiangshu/Context/Prefix/Candidate.fs')
 
-  assert.match(cursorSource, /type ProviderRequestKind =/)
+  assert.match(requestKindSource, /type ProviderRequestKind =/)
+  assert.doesNotMatch(cursorSource, /type ProviderRequestKind =/)
   assert.doesNotMatch(oldPrefixOwner, /type ProviderRequestKind =/)
 })
 
-test('WHAT[PAR-013] FALLBACK_002_the_cursor_is_the_only_thing_that_moves_the_effective_agent', () => {
-  const at = (offset) =>
-    planner.plan({ cursor: cursor.atOffset(offset), kind: requestKind.workMain }).effectiveAgent
+test('WHAT[CHATEXEC-011] ordinary provider purpose is selected only from typed origin or durable blogger purpose', () => {
+  assert.equal(attemptPurpose.ordinaryRequestPurpose('InteractionRepair', ''), 'interaction-repair')
+  assert.equal(attemptPurpose.ordinaryRequestPurpose('HumanRoot', 'main'), 'blogger-main')
+  assert.equal(attemptPurpose.ordinaryRequestPurpose('HumanRoot', 'squash'), 'blogger-squash')
+  assert.equal(attemptPurpose.ordinaryRequestPurpose('HumanRoot', ''), 'work-main')
+})
 
-  // A/A′ take the selected side, B/B′ the peer. The authority profile is identical in
-  // all four; only the cursor differs.
-  assert.deepEqual([0, 1, 2, 3].map(at), ['fast-coder', 'fast-coder', 'deep-coder', 'deep-coder'])
+test('WHAT[PAR-013] FALLBACK_002_the_cursor_changes_only_the_effective_agent', () => {
+  const attempts = [0, 1, 2, 3].map((offset) =>
+    planner.plan({ cursor: cursor.atOffset(offset), kind: requestKind.workMain }),
+  )
+
+  assert.deepEqual(
+    attempts.map(({ effectiveAgent }) => effectiveAgent),
+    ['fast-coder', 'fast-coder', 'deep-coder', 'deep-coder'],
+  )
+
+  const { participantIdentity: identity, systemPromptId, toolCapabilities } = attempts[0]
+  for (const attempt of attempts) {
+    assert.deepEqual(attempt.participantIdentity, identity)
+    assert.equal(attempt.systemPromptId, systemPromptId)
+    assert.deepEqual(attempt.toolCapabilities, toolCapabilities)
+  }
+  assert.deepEqual(identity, {
+    selectedAgent: 'fast-coder',
+    peerAgent: 'deep-coder',
+    canonicalRole: 'coder',
+    selectedTier: 'fast',
+    persona: 'Coder',
+    personaCatalogVersion: 1,
+    origin: 'ResolvedAtRoot',
+  })
+})
+
+test('WHAT[PAR-013] attempts derive their system prompt and tools from the participant identity Role', () => {
+  const attempt = planner.plan({ cursor: cursor.atOffset(0), kind: requestKind.workMain })
+
+  assert.equal(attempt.systemPromptId, attempt.participantIdentity.canonicalRole)
+  assert.deepEqual(attempt.toolCapabilities, [
+    'BashHoneypot',
+    'Edit',
+    'Fetch',
+    'Fission',
+    'Glob',
+    'Grep',
+    'Inspect',
+    'Move',
+    'Read',
+    'Remove',
+    'Write',
+  ])
 })
 
 // ── CTX-012: what may promote ─────────────────────────────────────────────
@@ -133,7 +180,7 @@ test('WHAT[PAR-016] PAR_016_success_accounting_requires_proven_request_kind', ()
   assert.match(workflow, /Some BlogFrameKind\.Squash -> Some ProviderRequestKind\.BloggerSquash/)
   assert.match(workflow, /Some BlogFrameKind\.Entry -> Some ProviderRequestKind\.BloggerMain/)
   assert.match(workflow, /AcceptedContinuationIds/)
-  assert.match(workflow, /Some PromptAuthority\.InteractionRepair[^\n]*ProviderRequestKind\.InteractionRepair/)
+  assert.match(workflow, /Some PromptAuthority\.ContinuationKind\.InteractionRepair[^\n]*ProviderRequestKind\.InteractionRepair/)
   assert.match(workflow, /Some Role\.Blogger -> None/)
   assert.match(workflow, /successClearingRequest[\s\S]*ProviderRequestKind\.clearsFailureCountOnSuccess/)
   assert.match(workflow, /recordSuccessIfValid[\s\S]*FallbackLedger\.recordConfirmedSuccess/)
@@ -188,11 +235,10 @@ test('WHAT[PAR-011] PAR_011_arming_is_a_control_flow_fact_not_a_position', () =>
 })
 
 test('WHAT[PAR-011] PAR_011_fallback_advance_returns_the_fresh_opportunity_and_workflow_never_rebuilds_it_from_cursor_parity', () => {
-  const failurePort = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs')
   const ledger = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs')
   const workflow = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
 
-  assert.match(failurePort, /RecoveryAdvanced of RecoveryOpportunity/)
+  assert.match(ledger, /RecoveryAdvanced of RecoveryOpportunity/)
   assert.match(ledger, /RecoverySlot\.opportunity RecoverySlot\.afterFailureAdvance next\.Offset/)
   assert.match(workflow, /RecoveryAdvanced opportunity/)
   assert.doesNotMatch(workflow, /opportunityAfterAdvance/)
@@ -201,13 +247,13 @@ test('WHAT[PAR-011] PAR_011_fallback_advance_returns_the_fresh_opportunity_and_w
 
 test('WHAT[PAR-011] PAR_011_workmain_recovery_arms_only_after_exact_provider_retry_physical_acceptance', () => {
   const fallback = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
-  const ingress = source('src/Wanxiangshu/Interaction/Dispatch/Ingress.fs')
   const bootstrap = source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const recoveryScope = source('src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs')
 
-  assert.doesNotMatch(fallback, /armRecovery turn\.SessionId/)
-  assert.match(bootstrap, /ProviderRetryAttempt[\s\S]*ArmRecovery/)
-  assert.match(ingress, /PhysicalUserMessageId[\s\S]*onContinuationAccepted/)
+  assert.match(fallback, /ProviderRetryAttempt/)
+  assert.match(bootstrap, /Ok\(ChatAdmissionTransactionOutcome\.Settled _\)[\s\S]*continueManagedChatMessage intent output/)
+  assert.match(bootstrap, /PendingPromptIntent evidence[\s\S]*observePendingContinuation evidence/)
+  assert.match(bootstrap, /ContinuationKind\.ProviderRetryAttempt[\s\S]*ArmRecovery\(evidence\.Key\.SessionId, evidence\.Key\.PhysicalUserMessageId\)/)
   assert.match(recoveryScope, /PhysicalUserMessageId/)
   assert.match(recoveryScope, /TryTakeRecoveryPermit[\s\S]*physicalUserMessageId/)
 })

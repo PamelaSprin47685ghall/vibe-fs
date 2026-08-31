@@ -98,7 +98,8 @@ type SessionQuiescenceGate() =
         | true, permit -> Some permit
         | false, _ -> None
 
-    let issuePermit sessionId serial = QuiescencePermitToken(owner, sessionId, serial) :> QuiescencePermit
+    let issuePermit sessionId serial =
+        QuiescencePermitToken(owner, sessionId, serial) :> QuiescencePermit
 
     let decideConsume evidence =
         match evidence with
@@ -222,7 +223,7 @@ type SessionQuiescenceGate() =
 
     /// Opaque diagnostics expose only process-local resource cardinality, never
     /// permit tokens, owners, session scopes, or attempt serials.
-    member internal _.LivePermitCount : int = lock gate (fun () -> currentPermits.Count)
+    member internal _.LivePermitCount: int = lock gate (fun () -> currentPermits.Count)
 
     /// `SessionDeleted` / session cleanup permanently invalidates every old
     /// permit. The serial tombstone is retained process-locally so reusing the

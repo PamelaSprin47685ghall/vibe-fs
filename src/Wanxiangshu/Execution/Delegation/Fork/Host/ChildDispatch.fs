@@ -14,8 +14,8 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
@@ -135,14 +135,14 @@ module HostForkChildDispatch =
             string
                 -> SessionId
                 -> Role
-                -> string
+                -> PromptAuthority.IdentitySeed
                 -> string
                 -> (PhysicalUserMessageId -> unit)
                 -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
         (agentId: string)
         (childId: SessionId)
         (role: Role)
-        (agent: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         (prompt: string)
         (enrichedPrompt: string option)
         (run: PendingHostRun)
@@ -153,7 +153,7 @@ module HostForkChildDispatch =
             let payload = Option.defaultValue prompt enrichedPrompt
 
             let! sent =
-                sendChildPrompt agentId childId role agent payload (HostForkRunLifecycle.bindAuthorityRoot run)
+                sendChildPrompt agentId childId role identitySeed payload (HostForkRunLifecycle.bindAuthorityRoot run)
                 |> TaskResultCE.ofTask
 
             match decideExistingSendAcceptance sent result with
@@ -182,7 +182,7 @@ module HostForkChildDispatch =
             string
                 -> SessionId
                 -> Role
-                -> string
+                -> PromptAuthority.IdentitySeed
                 -> string
                 -> (PhysicalUserMessageId -> unit)
                 -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
@@ -196,6 +196,8 @@ module HostForkChildDispatch =
         (enrichedPrompt: string option)
         : Task<Result<ForkResult, string>> =
         taskResult {
+            let! identitySeed = HostForkRunLifecycle.issueCurrentOwnerIdentitySeed journal parentId agent
+
             // Idle existing child: new AgentOwnerRoot work via ordinary send.
             //
             // A first-prompt fork (the `enrichedPrompt` Some case) carries the
@@ -255,7 +257,7 @@ module HostForkChildDispatch =
                         agentId
                         childId
                         role
-                        agent
+                        identitySeed
                         prompt
                         enrichedPrompt
                         run
@@ -284,7 +286,7 @@ module HostForkChildDispatch =
             string
                 -> SessionId
                 -> Role
-                -> string
+                -> PromptAuthority.IdentitySeed
                 -> string
                 -> (PhysicalUserMessageId -> unit)
                 -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)

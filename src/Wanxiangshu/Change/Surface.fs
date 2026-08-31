@@ -261,12 +261,7 @@ module ChangeSurface =
             | WorktreeEffectStatus.Created _ -> box "Created"
 
     /// JS-native semantic surface for the pure Requested/Created reconciliation law.
-    let worktreeReconciliationDecision
-        (job: string)
-        (identity: string)
-        (path: string)
-        (evidence: obj)
-        : obj =
+    let worktreeReconciliationDecision (job: string) (identity: string) (path: string) (evidence: obj) : obj =
         let evidenceKind = stringField evidence [ "kind" ]
         let recordedJob = jobId (field evidence [ "jobId" ])
         let recordedPath = worktreePathValue (field evidence [ "path" ])

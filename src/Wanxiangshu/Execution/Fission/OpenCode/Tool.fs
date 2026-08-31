@@ -227,24 +227,30 @@ module FissionTool =
         (payload: string)
         =
         task {
-            let dispatcher = PromptDispatcher.forJournal durable
+            let laneProfile =
+                PromptAuthorityLedger.activeProfile lane.SessionId (AgentJournal.snapshot durable).AgentProjections
 
-            match!
-                dispatcher.SendContinuation
-                    scope.Sessions
-                    lane.SessionId
-                    (deliveryPrompt owner completionId payload)
-                    PromptAuthority.ContinuationKind.FissionHandoff
-                    profile
-                    effectiveAgent
-                    (scope.DirectoryFor(SessionId.value lane.SessionId))
-                    PromptDispatcher.AwaitMode.Detached
-                    None
-            with
-            | Error _ -> return ()
-            | Ok _ ->
-                let! _ = appendDelivery durable owner None groupId completionId lane.Index
-                return ()
+            match laneProfile with
+            | None -> return ()
+            | Some activeLaneProfile ->
+                let dispatcher = PromptDispatcher.forJournal durable
+
+                match!
+                    dispatcher.SendContinuation
+                        scope.Sessions
+                        lane.SessionId
+                        (deliveryPrompt owner completionId payload)
+                        PromptAuthority.ContinuationKind.FissionHandoff
+                        activeLaneProfile
+                        activeLaneProfile.SelectedAgent
+                        (scope.DirectoryFor(SessionId.value lane.SessionId))
+                        PromptDispatcher.AwaitMode.Detached
+                        None
+                with
+                | Error _ -> return ()
+                | Ok _ ->
+                    let! _ = appendDelivery durable owner None groupId completionId lane.Index
+                    return ()
         }
 
     let private deliverLaneBody
@@ -787,6 +793,14 @@ module FissionTool =
         }
         :> Task
 
+    let private classifyAdmissionOutcome =
+        function
+        | Error FissionRejectReason.InvalidOrigin -> Error Path.InvalidOrigin
+        | Error FissionRejectReason.AlreadyFissioned -> Error Path.AlreadyActive
+        | Error FissionRejectReason.CapacityExceeded -> Error Path.Capacity
+        | Error _ -> Error Path.Unavailable
+        | Ok admission -> Ok admission
+
     let private runAdmission
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
@@ -826,25 +840,28 @@ module FissionTool =
 
             let admissionRuntime = FissionAdmission.createWithHooks deps hooks
 
-            match! FissionAdmission.admit admissionRuntime owner parsed with
-            | Error FissionRejectReason.InvalidOrigin -> return consequence language Path.InvalidOrigin
-            | Error FissionRejectReason.AlreadyFissioned -> return consequence language Path.AlreadyActive
-            | Error FissionRejectReason.CapacityExceeded -> return consequence language Path.Capacity
-            | Error _ -> return consequence language Path.Unavailable
-            | Ok admission ->
-                installPreFissionBroadcasts
-                    scope
-                    durable
-                    profile
-                    effectiveAgent
-                    groupId
-                    owner
-                    admission.Lanes
-                    preAgents
-                    prePtys
-                    ownerRuntime
+            let! admittedEffect =
+                taskResult {
+                    let! admissionAttempt = FissionAdmission.admit admissionRuntime owner parsed |> TaskResultCE.ofTask
 
-                return tomlObject [ "status", TString "fissioned"; "lane_count", TInt parsed.Count ]
+                    let! admission = classifyAdmissionOutcome admissionAttempt
+
+                    installPreFissionBroadcasts
+                        scope
+                        durable
+                        profile
+                        effectiveAgent
+                        groupId
+                        owner
+                        admission.Lanes
+                        preAgents
+                        prePtys
+                        ownerRuntime
+
+                    return tomlObject [ "status", TString "fissioned"; "lane_count", TInt parsed.Count ]
+                }
+
+            return admittedEffect |> Result.defaultWith (consequence language)
         }
 
     let private admitWhenEventPortReady
@@ -893,7 +910,10 @@ module FissionTool =
         (owner: SessionId)
         =
         task {
-            match scope.ActiveProfileFor owner, scope.RuntimeFor ctx with
+            let activeProfile =
+                PromptAuthorityLedger.activeProfile owner (AgentJournal.snapshot durable).AgentProjections
+
+            match activeProfile, scope.RuntimeFor ctx with
             | None, _
             | _, Error _ -> return consequence language Path.Unavailable
             | Some profile, Ok ownerRuntime ->

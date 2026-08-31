@@ -85,6 +85,17 @@
 
 本节只收录已经同时落到 production + executable proof + architecture gate 的事实。迁移提案中的某项达到这个标准后，删掉对应长篇施工说明，只把不可退化的不变量压进本节；未达到三件套的内容继续留在 Active Migration Proposal。
 
+以下关于 ParticipantIdentity、managed chat、capacity/failure policy 与 provider lifecycle 的条目只记录 reliability-stabilization 已落地闭环；不改变第五十七章其他节点、coverage backlog 或其他工作流的完成状态。
+
+### 当前开发者移交 — 2026-08-31
+
+- 总目标仍是 `.omo/plans/agents-debt-zero-release-closure.md` 的 debt-zero ReleaseClosure。Task 1–13 已完成；下一 production node 是 Task 14 `Strength causal lifecycle`，其后严格按真实 DAG ready frontier 推进，禁止重造线性 wave。
+- reliability-stabilization 的原始设计与实现归属 `wanxiangshu-fix`：`947e144f1 spec(reliability): redefine identity and chat execution ownership`、`e956455cf Stabilize managed chat admission and recovery`、`980dbb5c7 Document reliability stabilization guardrails`，作者记录为 `test <test@example.com>`。当前开发者只负责把该分支语义合入 master，不宣称这些成果。
+- master 侧 Task 10–13 的已提交成果分别是 `4adde35f8`、`9e6d1f2bb`、`6ce8c710c`、`219cd919b`。Task 13 的生产/证明实现由 `PersonaTypedCore`、`IdentityOfficeSplit`、`IdentityShimCutover`、`PersonaHostBinding`、`IdentityRedProof` 等协作 agent 完成；本次 merge 语义解冲突由 `MergeIdentityCore`、`MergeReliabilityFlow`、`MergePeripheralFlow`、`MergeGovernance` 完成。保留此 attribution，禁止后任把合并动作写成个人原创。
+- merge 后的最终 identity law 以本节守江山条款与 `requirements/participant-identity/WHAT.md` PID-001..011 为准：`ParticipantIdentity` 属于 exact logical run，并随 `AuthorityRootAccepted` 原子 durable 安装；Task 13 早期的 process-local `SessionPersona`/`PersonaBinding` 方案已被可靠性语义取代并删除。`OfficeCapability` 的 `ToolPermission`/权限矩阵切分仍保留，`Roles` 只拥有 Role/AgentTier。
+- 本次 merge 已完成 semantic conflict resolution；`node scripts/build.mjs` 已通过：Fable 编译 734 个 source file，JS Surface Manifest 161 项闭合。本次移交的验证边界由用户明确裁决为只编译，不运行测试、不运行 owner-check。测试红项、可靠性 requirement suites、`node scripts/check.mjs` 与最终 ReleaseClosure 全梯度由下一任负责；必须修 production/contract 根因，禁止 baseline、suppression、allowlist 或削弱断言。
+- 下一任第一动作：确认 merge commit 与工作区；运行 reliability 相关 requirement suites，优先覆盖 participant-identity、interaction-authority、managed-chat-execution、execution-failure-policy、execution-model-routing、host-boundary、managed-session-lifecycle；修绿后再启动 Task 14。任何测试失败都视为未闭合事实，不得因本次仅编译交付而宣称 ReleaseClosure。
+
 - 状态只能被事实改变，等待只能被事件结束。correctness path 禁止用 wall clock、`TimeSpan`、timer、deadline、sleep、polling 或 timeout 推断业务状态；取消是显式事件，不是时间流逝。
 - durable fact 是业务事实唯一来源。process-local registry/waiter/flight 只拥有物理资源，不得充当持久业务状态、恢复资格或成功证明。
 - 一条语义只有一个 owner、一个 vocabulary、一个推导公式。durable/domain 类型不得为了复用反向依赖 Host/OpenCode adapter；adapter 只能消费/产生领域词汇。
@@ -102,6 +113,10 @@
 - 当前 F# control-pyramid、dead private binding、JS semantic-boundary debt 均为 0；这是零基线，不是未来可重新积累的 allowance。
 - durable store 已统一到 canonical EventStore spine；feature-owned durable backend/private ref、dual-write migrator、业务层 Git bypass 由 `unified-store-gate` 拒绝。
 - provider/context recovery 已切到 failure-driven + durable-event-driven + time-independent；任何重新引入 timeout/polling/process-local recovery proof 的改动都是回归。
+- participant identity 已 clean break 到 opaque `ParticipantIdentity`：authority acceptance、execution profile、child ownership evidence 与 durable recovery 只消费这一词汇；旧 `SessionPersona` 与字符串 Role/agent 推断路径已删除。新增或复用 session 必须由 owner-issued typed identity 建立，`participant-identity-boundary` + reusable-session proofs 拒绝平行身份源。
+- managed chat admission 已收敛为单一 transaction：纯 `ChatAdmissionIntent` 决定动作，exact `SessionId + PhysicalUserMessageId` acceptance durable 后才可取得并提交 `ExecutionAdmissionLease`；provider 前失败必须先写 typed pre-provider terminal 并释放 exact fence，再按 Hook policy 传播失败。Host callback 不得另写 acceptance、绕过 lease 或从 process-local binding 推断已接纳。
+- capacity 与 provider failure 已形成封闭代数：`ExecutionAdmissionQueue` 有硬上界，lease lifecycle/fence transition 显式区分 Applied / AlreadyApplied / StaleFence / Conflict；`ExecutionFailurePolicy` 是 retry、fallback、breaker、capacity settlement 与 message disposition 的唯一决策 owner，只有其 opaque `ProviderRecoveryAuthorization` 可推进 durable fallback。`retry-owner` 与 capacity interleaving/soak proofs 拒绝第二 writer、bool/option admission collapse、跨 session credit 与 stale release。
+- managed provider lifecycle 只接受 exact public assistant evidence：`Accepted → ProviderStarted → Terminal` durable 顺序绑定同一 `ChatExecutionKey + ProviderRunIdentity + ProviderRequestKind`；重复 exact start/terminal 幂等，冲突 identity、terminal 后 start、unbound coarse failure 均 fail-closed。恢复由 durable projection + typed physical observation + closed failure decision 重入普通 CE；`HookPolicy` 静态表与 `hook-policy` gate 固定 critical/degradable failure 行为，process-local diagnostic/counter 只观测因果结果，不充当恢复资格。
 - managed provider → tool handoff 已是显式 capacity step 边界：tool body、role/capability gate 与同步 descendant provider work 之前必须先按 exact `ProviderRunIdentity + PhysicalUserMessageId` 结束当前 provider step；严禁把 `InFlight` capacity 持到 tool 返回或用 timeout 解死锁。Distiller cleanup 对同一 owned child 的物理 cancel 至多一次。
 - Strength lifecycle 已时间无关：`StrengthReplicaRuntime` 不拥有 timer/deadline/elapsed-time terminal arbitration。Treatment 显式开启后等待 Replica 的真实因果终态；DryRun 启动后立即放行 Owner，只由 K gate、Replica terminal、exact Owner `TargetProviderRun` terminal 或 owner cancel/delete 收口。语义 completion 与物理 retirement 分离：K gate/取消可先阻止后续 provider admission，但 Replica 身份必须保留到 Host terminal/session deletion，以吸收在途 transform；严禁靠 sleep/timeout 或“DryRun 必须抢在 Owner 前跑满 K”证明正确性。
 - 子→父 run-bounded LWR 从本 invocation 首个 assistant part 起算；caller 已知的 user charge 不得伪装成 Chronicle/Recent work 回传。父→子普通 bounded delta 仍保留原语义。
@@ -131,7 +146,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 
 以下内容是仍在执行中的架构迁移提案，不是已经完成的 repository law。实施时必须继续受上方正式协议与 `requirements/` 约束。
 
-毕业规则：production cutover + executable proof + hard gate 三者齐全才算完成。完成项立即从本提案缩掉，压成上方“守江山”一条；inventory / baseline / report-only / 文档宣称均不算毕业。截至 2026-08-23，migration ledger 的 22 个已建节点全部 `DONE`；未裁决 production coverage backlog 仍有 462 文件：CoverageA=99、CoverageB=33、CoverageD=86、CoverageE=121、CoverageG=123。第五十七章的 dependency-driven production cutover 路线继续保留，后续进度只以 backlog→node→cutover 闭合为准。
+毕业规则：production cutover + executable proof + hard gate 三者齐全才算完成。完成项立即从本提案缩掉，压成上方“守江山”一条；inventory / baseline / report-only / 文档宣称均不算毕业。截至 2026-08-31，migration ledger 的 36 个已建节点全部 `DONE`；未裁决 production coverage backlog 仍有 458 文件：CoverageA=101、CoverageB=27、CoverageD=101、CoverageE=116、CoverageG=113。第五十七章的 dependency-driven production cutover 路线继续保留，后续进度只以 backlog→node→cutover 闭合为准。
 
 原提案第一章 / Phase 0 的“关键 trace 冻结”已毕业到守江山，不再保留施工长文。以下继续沿用原章节编号，未完成部分保持原意。
 

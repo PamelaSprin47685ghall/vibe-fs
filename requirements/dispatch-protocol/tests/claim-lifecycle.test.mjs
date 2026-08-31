@@ -17,6 +17,44 @@ const SESSION = 'ses_a'
 const findClaim = (projection, key) => projection.pendingClaims.find((claim) => claim.promptKey === key)
 const promptOrigin = (kind) => authority.originForContinuation(kind)
 
+const personas = {
+  'fast-coder': 'Coder',
+  'fast-manager': 'Coordinator',
+}
+const rootSelection = (agent) => {
+  const [selectedTier, canonicalRole] = agent.split('-')
+  const peerTier = selectedTier === 'fast' ? 'deep' : 'fast'
+  return {
+    kind: 'RootSelection',
+    ownerSession: null,
+    ownerLogicalRun: null,
+    ownerAuthorityRoot: null,
+    participantIdentity: {
+      selectedAgent: agent,
+      peerAgent: `${peerTier}-${canonicalRole}`,
+      canonicalRole,
+      selectedTier,
+      persona: personas[agent] ?? 'Unknown',
+      personaCatalogVersion: 1,
+      origin: 'ResolvedAtRoot',
+    },
+  }
+}
+const inheritedSeed = (agent, physical) => {
+  const owner = authority.createAuthorityRoot(
+    H,
+    RUNTIME,
+    SESSION,
+    'HumanRoot',
+    physical,
+    rootSelection('fast-manager'),
+  )
+  assert.equal(owner.ok, true, owner.error)
+  const inherited = authority.issueInheritedIdentitySeed(agent, owner.value)
+  assert.equal(inherited.ok, true, inherited.error)
+  return inherited.value
+}
+
 const profileOf = () => {
   const built = authority.createAuthorityRoot(
     H,
@@ -24,7 +62,7 @@ const profileOf = () => {
     SESSION,
     'HumanRoot',
     'msg_u1',
-    'fast-coder',
+    rootSelection('fast-coder'),
   )
   assert.equal(built.ok, true, built.ok ? '' : built.error)
   return built.value
@@ -215,10 +253,8 @@ test('WHAT[DISPATCH-PROTOCOL-010] DP_010_authority_root_profile_cannot_express_a
       logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
       authorityRoot: 'msg_u1',
       authorityKind: 'HumanRoot',
-      selectedAgent: 'fast-coder',
-      peerAgent: 'deep-coder',
-      canonicalRole: 'coder',
-      selectedTier: 'fast',
+      identitySeed: profile.identitySeed,
+      participantIdentity: profile.participantIdentity,
       model: undefined,
     },
   )
@@ -227,7 +263,12 @@ test('WHAT[DISPATCH-PROTOCOL-010] DP_010_authority_root_profile_cannot_express_a
 // ── DISPATCH-PROTOCOL-002: root claim carries payload digest ──
 
 test('WHAT[DISPATCH-PROTOCOL-002] DP_002_claim_records_payload_digest_and_effective_agent', () => {
-  const claim = authority.claimAgentOwnerRoot('pk_o', SESSION, 'pd-owner', 'fast-manager')
+  const claim = authority.claimAgentOwnerRoot(
+    'pk_o',
+    SESSION,
+    'pd-owner',
+    inheritedSeed('fast-manager', 'msg-claim-owner'),
+  )
   assert.equal(claim.ok, true, claim.ok ? '' : claim.error)
   assert.deepEqual(
     {

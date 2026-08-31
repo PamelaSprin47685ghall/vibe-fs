@@ -51,6 +51,7 @@ open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
@@ -83,13 +84,17 @@ type private AttemptPlanHandle =
       ProviderRun: ProviderRunIdentity
       Plan: AttemptPlan }
 
-/// Pre-inference recovery decision awaiting the assistant run that the Host will
-/// create after messages.transform. Keyed by the exact physical user message so
-/// a later tool/reconcile observation can bind the plan without guessing.
+/// Pre-inference purpose decision awaiting the Host-created assistant run bound
+/// at transform admission. Keyed by the exact physical user message so later
+/// tool/reconcile observations replay the same plan without guessing.
 type private PendingAttemptPlanHandle =
     { SessionId: SessionId
       PhysicalUserMessageId: PhysicalUserMessageId
       Plan: PendingAttemptPlan }
+
+[<RequireQualifiedAccess>]
+type TransformAttemptPlanBindingError =
+    | PendingAttemptPlanMissing of SessionId * PhysicalUserMessageId * ProviderRunIdentity
 
 /// Family recovery coordination (PROMPT-011 + C5 + RECOVERY-FAMILY) and
 /// attempt planning state for one plugin instance: recovery ports attachment,
@@ -129,6 +134,15 @@ type PluginRecoveryScope(journal: AgentJournal option) =
     // DSL-MUTABLE: single-flight — per-provider-run attempt plan channel (frozen decision, typed handle)
     let attemptPlans = Dictionary<string, AttemptPlan>()
 
+    /// DSL-cross-callback-proof: physical resource — crash-zero typed recovery-request ownership projection.
+    let pendingChatResumes = Dictionary<ChatExecutionKey, PreProviderResumeRequest>()
+    /// DSL-cross-callback-proof: physical resource — crash-zero typed recovery-request ownership projection.
+    let authorizedChatRequeues = Dictionary<ChatExecutionKey, ProviderRequeueRequest>()
+
+    /// DSL-cross-callback-proof: physical resource — crash-zero typed recovery-request ownership projection.
+    let manualChatInterventions =
+        Dictionary<ChatExecutionKey, ManualInterventionRequest>()
+
     let physicalPlanKey (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) =
         SessionId.value sessionId
         + "\u001f"
@@ -136,6 +150,19 @@ type PluginRecoveryScope(journal: AgentJournal option) =
 
     let providerPlanKey (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
         SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun
+
+    let installOrdinaryPendingPlan
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (ordinaryPlan: PendingAttemptPlan)
+        =
+        let key = physicalPlanKey sessionId physicalUserMessageId
+
+        match pendingAttemptPlans.TryGetValue key with
+        | true, _ -> Ok()
+        | false, _ ->
+            pendingAttemptPlans.[key] <- ordinaryPlan
+            Ok()
 
     /// Ordinary business entry never performs cross-process recovery. The permit
     /// only certifies this process's join attempt and intentionally carries no old
@@ -171,12 +198,21 @@ type PluginRecoveryScope(journal: AgentJournal option) =
         | true, _ -> None
         | false, _ -> None
 
-    member _.RecordPendingAttemptPlan
+    member _.FreezePendingAttemptPlan
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId)
         (plan: PendingAttemptPlan)
         =
-        pendingAttemptPlans.[physicalPlanKey sessionId physicalUserMessageId] <- plan
+        installOrdinaryPendingPlan sessionId physicalUserMessageId plan
+
+    member this.RecordPendingAttemptPlan
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (plan: PendingAttemptPlan)
+        =
+        match this.FreezePendingAttemptPlan sessionId physicalUserMessageId plan with
+        | Ok() -> ()
+        | Error error -> invalidOp (sprintf "HOST-BOUNDARY-008: conflicting pending attempt plan: %A" error)
 
     member private _.TryTakePendingAttemptPlan
         (sessionId: SessionId)
@@ -209,8 +245,10 @@ type PluginRecoveryScope(journal: AgentJournal option) =
         (physicalUserMessageId: PhysicalUserMessageId)
         (providerRun: ProviderRunIdentity)
         : AttemptPlan option =
-        this.TryAttemptPlan sessionId providerRun
-        |> Option.orElseWith (fun () -> this.BindPendingAttemptPlan sessionId physicalUserMessageId providerRun)
+        match this.TryAttemptPlan sessionId providerRun with
+        | Some established when established.Profile.PhysicalUserMessageId = physicalUserMessageId -> Some established
+        | Some _ -> None
+        | None -> this.BindPendingAttemptPlan sessionId physicalUserMessageId providerRun
 
     member this.RecordAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) (plan: AttemptPlan) =
         attemptPlans.[providerPlanKey sessionId providerRun] <- plan
@@ -239,10 +277,41 @@ type PluginRecoveryScope(journal: AgentJournal option) =
     member this.TryAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
         this.TryPeekAttemptPlan sessionId providerRun
 
+    member _.PublishPendingChatResume(request: PreProviderResumeRequest) =
+        pendingChatResumes.[request.ExecutionKey] <- request
+
+    member _.PublishAuthorizedChatRequeue(request: ProviderRequeueRequest) =
+        let key =
+            match request with
+            | ProviderRequeueRequest.RetryFreshAttempt(started, _)
+            | ProviderRequeueRequest.AdvanceFallback(started, _) ->
+                { SessionId = started.Accepted.SessionId
+                  PhysicalUserMessageId = started.Accepted.PhysicalUserMessageId }
+
+        authorizedChatRequeues.[key] <- request
+
+    member _.PublishManualChatIntervention(request: ManualInterventionRequest) =
+        manualChatInterventions.[request.ExecutionState.Key] <- request
+
+    member _.PendingChatRecoveryOwnership() =
+        {| Resumes = pendingChatResumes.Values |> Seq.toArray
+           Requeues = authorizedChatRequeues.Values |> Seq.toArray
+           ManualInterventions = manualChatInterventions.Values |> Seq.toArray |}
+
     /// Session deletion drops arming and attempt plans for this session.
     member this.ClearSession(sessionId: string) =
         recoveryArming.Remove sessionId |> ignore
         this.ClearAttemptPlansFor sessionId
+
+        let clearExecutionRequests (requests: Dictionary<ChatExecutionKey, 'request>) =
+            requests.Keys
+            |> Seq.filter (fun key -> SessionId.value key.SessionId = sessionId)
+            |> Seq.toArray
+            |> Array.iter (fun key -> requests.Remove key |> ignore)
+
+        clearExecutionRequests pendingChatResumes
+        clearExecutionRequests authorizedChatRequeues
+        clearExecutionRequests manualChatInterventions
 
     /// Drops attempt plans whose key prefix matches (used for a session and
     /// for its linked Blogger keys during session deletion). Prefer ConsumeAttemptPlan.

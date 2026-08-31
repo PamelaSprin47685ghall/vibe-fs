@@ -18,7 +18,9 @@ module CompactionPolicySurface =
 
         match verdict with
         | CompactionGateVerdict.Satisfied ->
-            box {| kind = "Satisfied"; message = message |}
+            box
+                {| kind = "Satisfied"
+                   message = message |}
         | CompactionGateVerdict.SettingUnavailable setting ->
             box
                 {| kind = "SettingUnavailable"
@@ -77,17 +79,10 @@ module CompactionPolicySurface =
         |> verdictToJs
 
     /// HOST-006 startup verdict when one required setting could not be established.
-    let judgeFirstTurnWithUnavailable
-        (unavailablePath: string)
-        (session: string)
-        (pseudoRunsOnFirstTurn: int)
-        : obj =
+    let judgeFirstTurnWithUnavailable (unavailablePath: string) (session: string) (pseudoRunsOnFirstTurn: int) : obj =
         let unavailable =
             HostCompactionPolicy.requiredSettings
             |> List.find (settingPath >> (=) unavailablePath)
 
-        HostCompactionPolicy.judgeFirstTurn
-            (Some unavailable)
-            (SessionId.create session)
-            pseudoRunsOnFirstTurn
+        HostCompactionPolicy.judgeFirstTurn (Some unavailable) (SessionId.create session) pseudoRunsOnFirstTurn
         |> verdictToJs

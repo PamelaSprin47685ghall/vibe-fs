@@ -36,6 +36,49 @@ const contractFor = (contractOrFile) => {
     ?? { name: String(contractOrFile), file: String(contractOrFile), sites: [] }
 }
 
+const domainPolicyPatterns = [
+  /\bdecideModelPolicy\b/,
+  /\bdecideRecoverySemantics\b/,
+  /\bdecideFissionPolicy\b/,
+  /\bdecideFinality\b/,
+  /\bdecideAssistanceSuccessor\b/,
+  /\bdecideStrengthMeaning\b/,
+  /\bcalculateFinality\b/,
+  /\bclassifyRecovery\b/,
+]
+
+const pcPatterns = [
+  /\bCurrentStage\b/,
+  /\bNextStep\b/,
+  /\bResumeAt\b/,
+  /\bStepIndex\b/,
+  /\bContinueToken\b/,
+  /\bPendingSecondRetry\b/,
+  /\bFallbackPhase\b/,
+]
+
+const forbiddenInternalOpens = [
+  /^\s*open\s+Wanxiangshu\.Mission\.Review\.Judgement\b/m,
+  /^\s*open\s+Wanxiangshu\.Mission\.Obligation\.Todo(?!\.OpenCode)\b/m,
+  /^\s*open\s+Wanxiangshu\.Mission\.Finality(?!\.OpenCode)\b/m,
+  /^\s*open\s+Wanxiangshu\.Mission\.Manager\.Life\b/m,
+  /^\s*open\s+Wanxiangshu\.Strength\.Prediction\b/m,
+  /^\s*open\s+Wanxiangshu\.Strength\.Replica\b/m,
+  /^\s*open\s+Wanxiangshu\.Enforcer\.Guidance\b/m,
+  /^\s*open\s+Wanxiangshu\.Enforcer\.Cycle\b/m,
+  /^\s*open\s+Wanxiangshu\.Context\.Trace\b/m,
+]
+
+const fragmentedChatAdmissionPatterns = [
+  /PromptIngress\.create(?:Decision)?Hook/,
+  /ModelRouting\.routeChatExecution/,
+  /AcquireAndCommitRoutedExecution/,
+  /SessionExecutionBinding\.acceptRoutedExecution/,
+  /SessionExecutionBinding\.acceptExternalExecution/,
+  /SessionExecutionBinding\.acceptPromptExecution/,
+  /ModelRouting\.projectRoutedModel/,
+]
+
 const executableText = (text) => {
   let blockDepth = 0
   let inString = false
@@ -215,6 +258,24 @@ export const scanCompositionRoot = (text, contractOrFile = '<synthetic>', applic
   for (const [key, site] of registered) {
     if (!actual.has(key)) {
       violations.push({ root: contract.name, file: contract.file, kind: 'stale-anchor', message: `registered ${site.kind} anchor is stale: ${site.anchor} #${site.occurrence}` })
+    }
+  }
+
+  if (contract.file.endsWith('HostSignalBootstrap.fs') || contract.file.endsWith('ToolRegistry.fs')) {
+    const patterns = [...domainPolicyPatterns, ...pcPatterns, ...forbiddenInternalOpens]
+    if (contract.file.endsWith('HostSignalBootstrap.fs')) patterns.push(...fragmentedChatAdmissionPatterns)
+    for (const pattern of patterns) {
+      if (pattern.test(text)) {
+        violations.push({ root: contract.name, file: contract.file, kind: 'forbidden-root-policy', message: `forbidden pattern: ${pattern}` })
+      }
+    }
+  }
+
+  if (contract.file.endsWith('HostSignalBootstrap.fs')) {
+    for (const required of [/ChatAdmissionTransaction\.production/, /ChatAdmissionTransaction\.execute/]) {
+      if (!required.test(text)) {
+        violations.push({ root: contract.name, file: contract.file, kind: 'missing-chat-admission-transaction', message: `missing required pattern: ${required}` })
+      }
     }
   }
   return violations

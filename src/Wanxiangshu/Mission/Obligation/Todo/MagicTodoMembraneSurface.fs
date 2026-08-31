@@ -258,7 +258,10 @@ module MagicTodoMembraneSurface =
         task {
             let snapshots = ControlledSnapshot(rawMessages) :> ISessionSnapshotPort
             let hooks = MagicTodoHostHooks.create (Some handle.Journal) (Some snapshots)
-            let input = createObj [ "tool" ==> "todowrite"; "sessionID" ==> sessionId; "callID" ==> callId ]
+
+            let input =
+                createObj [ "tool" ==> "todowrite"; "sessionID" ==> sessionId; "callID" ==> callId ]
+
             let beforeOutput = createObj [ "args" ==> args ]
 
             do! hooks.Before input beforeOutput

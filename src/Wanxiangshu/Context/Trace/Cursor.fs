@@ -62,7 +62,8 @@ module XTraceRange =
         XTraceCursor.isAtOrAfter cursor (startInclusive range)
         && XTraceCursor.isBefore cursor (endExclusive range)
 
-    let isEmpty (range: XTraceRange) = startInclusive range = endExclusive range
+    let isEmpty (range: XTraceRange) =
+        startInclusive range = endExclusive range
 
 [<RequireQualifiedAccess>]
 module RecordCoverage =

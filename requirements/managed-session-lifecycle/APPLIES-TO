@@ -3,6 +3,9 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/Execution/Session/Attachment/**
+/src/Wanxiangshu/Interaction/Authority/Ledger.fs
+/src/Wanxiangshu/Interaction/Authority/Run.fs
+/src/Wanxiangshu/Interaction/Authority/Surface.fs
 /src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs
 /src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs
 /src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs
@@ -12,6 +15,8 @@
 /src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs
 /src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs
 /src/Wanxiangshu/OpenCode/Host/TurnRuntimePreparation.fs
+/src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs
 /src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
+/src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs
 /src/Wanxiangshu/Composition/Turn/Scheduler.fs
 /scripts/checks/session-ownership-ratchet.mjs

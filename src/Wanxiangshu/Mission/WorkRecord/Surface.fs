@@ -107,10 +107,7 @@ module WorkRecordSurface =
 
             return
                 match captured with
-                | Ok receipt ->
-                    box
-                        {| currentHeadSequence =
-                            receipt.CurrentHead |> XTraceCursor.sequence |> int |}
+                | Ok receipt -> box {| currentHeadSequence = receipt.CurrentHead |> XTraceCursor.sequence |> int |}
                 | Error error -> raise (InvalidOperationException(captureError error))
         }
 

@@ -10,7 +10,15 @@ test('WHAT[EMR-005] EMR_005_runtime_contains_no_product_lane_or_max_sessions_pol
 })
 
 test('WHAT[EMR-010] EMR_010_borrowing_complexity_is_owned_only_by_the_capacity_decorator', async () => {
-  const capacity = await source('src/Wanxiangshu/OpenCode/Host/ModelCapacity.fs')
+  const capacity = (
+    await Promise.all([
+      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Model.fs'),
+      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Ledger.fs'),
+      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs'),
+      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs'),
+      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs'),
+    ])
+  ).join('\n')
   const routing = await source('src/Wanxiangshu/OpenCode/Host/ModelRouting.fs')
   const sessions = await source('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
   const binding = await source('src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs')
@@ -18,8 +26,8 @@ test('WHAT[EMR-010] EMR_010_borrowing_complexity_is_owned_only_by_the_capacity_d
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const scheduler = await source('resources/wanxiangshu.mjs')
 
-  assert.match(capacity, /type CapacityLedger<'target>/)
-  assert.match(capacity, /type BorrowingCapacity<'target>/)
+  assert.match(capacity, /type internal CapacityLedger<'target>/)
+  assert.match(capacity, /type internal BorrowingCapacity<'target>/)
   assert.match(capacity, /ancestorDistance/)
   assert.match(capacity, /CapacityCreditState/)
   assert.match(routing, /BorrowingCapacity<ModelRoutingTarget>/)
@@ -45,21 +53,26 @@ test('WHAT[EMR-008] EMR_008_host_inventory_no_longer_exposes_model_binding_autho
 
 test('WHAT[EMR-009] EMR_009_chat_message_is_the_single_managed_execution_admission_owner', async () => {
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
+  const admission = await source('src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs')
   const routing = await source('src/Wanxiangshu/OpenCode/Host/ModelRouting.fs')
   const binding = await source('src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs')
   const sessions = await source('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
   const params = await source('src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs')
 
   assert.match(host, /decoded\.PhysicalUserMessageId/)
-  assert.match(host, /ModelRouting\.routeChatExecution/)
-  assert.match(host, /ModelRouting\.projectRoutedModel/)
+  assert.match(host, /ChatAdmissionTransaction\.production/)
+  assert.match(host, /ChatAdmissionTransaction\.execute/)
+  assert.match(host, /ModelRouting\.projectHostModel output/)
+  assert.match(admission, /Acquire =\s*fun witness ->[\s\S]*ModelRouting\.acquireExecutionAdmission/)
+  assert.match(admission, /Bind = bind/)
+  assert.match(admission, /Commit = ModelRouting\.commitExecutionAdmission/)
+  assert.match(admission, /ReleaseBeforeProvider =\s*fun lease ->[\s\S]*ModelRouting\.releaseExecutionAdmissionBeforeProvider lease lease\.Identity/)
   assert.doesNotMatch(host, /ModelRoutingAcquisition|ChatExecutionAdmission\.(NoRoute|Rejected|ExternalManaged|PluginManaged)/)
-  assert.match(routing, /let routeChatExecution/)
-  assert.match(routing, /acquireManagedExecution/)
-  assert.match(host, /SessionExecutionBinding\.acceptRoutedExecution/)
+  assert.doesNotMatch(host, /ModelRouting\.acquireExecutionAdmission|ModelRouting\.commitExecutionAdmission|ModelRouting\.releaseExecutionAdmissionBeforeProvider/)
+  assert.doesNotMatch(host, /ModelRouting\.routeChatExecution|ModelRouting\.projectRoutedModel/)
+  assert.doesNotMatch(host, /SessionExecutionBinding\.acceptRoutedExecution/)
   assert.doesNotMatch(host, /acceptPromptExecution|acceptExternalExecution/)
-  assert.match(host, /fun \(claim: PromptAuthority\.PromptClaim\) ->[\s\S]{0,100}runtime\.DispatchAccepted\(claim\.SessionId, claim\)/)
-  assert.match(binding, /let acceptRoutedExecution/)
+  assert.doesNotMatch(binding, /let acceptRoutedExecution/)
   assert.doesNotMatch(binding, /PromptDispatcher|DispatchAccepted/)
   assert.doesNotMatch(sessions, /ModelRouting\.acquireManagedExecution/, 'fork/send enqueue must never wait for model capacity')
   assert.doesNotMatch(host, /message\?model\s*<-/)
@@ -69,16 +82,17 @@ test('WHAT[EMR-009] EMR_009_chat_message_is_the_single_managed_execution_admissi
 })
 
 test('WHAT[EMR-007] EMR_007_exact_terminal_identity_releases_capacity_not_coarse_idle_or_business_completion', async () => {
-  const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
+  const recovery = await source('src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs')
   const codec = await source('src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs')
   const ordinary = await source('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
 
   assert.match(codec, /tryDecodePhysicalExecutionEnd/)
   assert.match(codec, /isMessageUpdated = not \(isNull raw\) && eventTypeOf raw = "message\.updated"/)
   assert.match(codec, /info\?parentID/)
-  assert.match(host, /onPhysicalExecutionEnd =\s*\(fun .* ->[\s\S]*ModelRouting\.releasePhysicalExecution/)
-  assert.doesNotMatch(host, /SessionIdle sessionId[\s\S]{0,260}ModelRouting\.releaseExecution sessionId/)
-  assert.doesNotMatch(host, /AttemptAborted sessionId[\s\S]{0,260}ModelRouting\.releaseExecution sessionId/)
+  assert.match(recovery, /let release \(key: ChatExecutionKey\) =[\s\S]*ModelRouting\.releasePhysicalExecution key\.SessionId key\.PhysicalUserMessageId/)
+  assert.match(recovery, /PhysicalReconciliationRequest\.ReleaseTerminalResource\(key, _, _\) -> release key/)
+  assert.doesNotMatch(recovery, /SessionIdle sessionId[\s\S]{0,260}ModelRouting\.releaseExecution sessionId/)
+  assert.doesNotMatch(recovery, /AttemptAborted sessionId[\s\S]{0,260}ModelRouting\.releaseExecution sessionId/)
   assert.doesNotMatch(ordinary, /ModelRouting\.(releaseExecution|releaseSession)/,
     'application completion/finality must not own physical capacity release')
 })
@@ -87,23 +101,22 @@ test('WHAT[EMR-007] EMR_007_chat_message_closes_the_old_idle_window_before_model
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const chatHook = host.slice(host.indexOf('let chatMessageHook ='), host.indexOf('let cancelSignals'))
   const barrier = host.slice(host.indexOf('let observePhysicalAdmission'), host.indexOf('let chatMessageHook ='))
-  const ordinaryRouting = host.slice(
-    host.indexOf('let continueOrdinaryChatMessage'),
-    host.indexOf('let chatMessageHook ='),
-  )
+  const managedAdmission = host.slice(host.indexOf('let admitManagedChatMessage'), host.indexOf('let chatMessageHook ='))
+  const classifiedAdmission = host.slice(host.indexOf('let continueClassifiedChatMessage'), host.indexOf('let chatMessageHook ='))
   const revoke = barrier.indexOf('Quiescence.ObservePhysicalUserMessage')
   const invoke = chatHook.indexOf('observePhysicalAdmission output sessionId physicalId')
-  const ordinaryCall = chatHook.indexOf('continueOrdinaryChatMessage decoded input output')
-  const classify = ordinaryRouting.indexOf('ModelRouting.chatExecutionAdmission')
-  const acquire = ordinaryRouting.indexOf('ModelRouting.routeChatExecution')
+  const continueClassified = chatHook.indexOf('continueClassifiedChatMessage intent output')
+  const classify = chatHook.indexOf('PromptIngress.resolveDecision journal decoded')
+  const acquire = managedAdmission.indexOf('ChatAdmissionTransaction.execute')
 
   assert.notEqual(revoke, -1, 'chat.message must close the preceding idle-send window')
   assert.notEqual(invoke, -1, 'chat.message must invoke the named physical admission barrier')
-  assert.notEqual(ordinaryCall, -1, 'ordinary routing must cross the named boundary after physical admission')
+  assert.match(classifiedAdmission, /PendingPromptIntent _, Some durable, Some createTransaction ->\s*admitManagedChatMessage durable createTransaction intent output/)
+  assert.notEqual(continueClassified, -1, 'chat.message must continue through the classified admission owner')
   assert.notEqual(classify, -1)
   assert.notEqual(acquire, -1)
-  assert.ok(invoke < ordinaryCall, 'physical ingress barrier must run before ordinary routing begins')
-  assert.ok(classify < acquire, 'routing classification must precede managed model acquisition')
+  assert.ok(classify < invoke, 'pure exact intent resolution must precede the physical ingress barrier')
+  assert.ok(invoke < continueClassified, 'physical ingress barrier must run before managed admission begins')
 })
 
 test('WHAT[EMR-008] SPEC_INV_fast_and_deep_physical_model_equality_is_not_an_eligibility_gate', async () => {

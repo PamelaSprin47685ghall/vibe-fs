@@ -95,10 +95,17 @@ test('WHAT[HOST-BOUNDARY-008] XWIRE_pre_inference_transform_freezes_a_pending_pl
     production.indexOf('let private planArmedWorkMainRetry'),
     production.indexOf('let private applyNonReplicaTransform'),
   )
+  const replicaPlanning = production.slice(
+    production.indexOf('let private applyStrengthReplicaPlan'),
+    production.indexOf('let private observeHostReanchor'),
+  )
 
   assert.doesNotMatch(planning, /bindProviderRunAfterProjectionCatchup/)
   assert.doesNotMatch(planning, /ProviderRunBinding\.observeBindableRun/)
   assert.match(planning, /RecordPendingAttemptPlan/)
+  assert.doesNotMatch(replicaPlanning, /GetMessages|ProviderRunBinding/)
+  assert.match(replicaPlanning, /freezePreInference/)
+  assert.match(replicaPlanning, /RecordPendingAttemptPlan/)
 })
 
 // ── HOST-BOUNDARY-020: fail-closed only after exact physical ownership ──

@@ -35,7 +35,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_same_run_after_squash_rejected_as_k
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_without_promptkey_binding_is_unexpected_end', () => {
-  assert.equal(runtime.decideMaterial(false, false, runtime.main({ toml: 'open' })), 'Start')
+  assert.equal(runtime.decideMaterial(false, false, false, runtime.main({ toml: 'open' })), 'Start')
   assert.equal(runtime.blocksNewRequest(false, false, false), false)
 })
 
@@ -69,15 +69,15 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_cancel_is_the_only_non_materia
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier', () => {
-  assert.equal(runtime.decideMaterial(true, false, runtime.main({ toml: 'future' })), 'Offer')
+  assert.equal(runtime.decideMaterial(false, true, false, runtime.main({ toml: 'future' })), 'Offer')
   assert.equal(runtime.blocksNewRequest(false, false, false), false)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_with_flight_projects_directly', () => {
   const scope = runtime.scope()
-  runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ toml: 'live' }))
+  runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ toml: 'restartable' }))
   assert.equal(runtime.hasFlight(scope, 'ses-blog'), true)
-  assert.equal(runtime.decideMaterial(false, true, runtime.currentRequest(scope, 'ses-blog')), 'Skip')
+  assert.equal(runtime.decideMaterial(true, false, true, runtime.currentRequest(scope, 'ses-blog')), 'Skip')
   runtime.dispose(scope)
 })
 
@@ -93,7 +93,7 @@ test('WHAT[CONTEXT-COMPRESSION-023] ENFORCER_park_never_expires_without_an_event
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_no_journal_projects_raw_messages', () => {
-  assert.equal(runtime.decideMaterial(false, false, runtime.main({ toml: 'raw' })), 'Start')
+  assert.equal(runtime.decideMaterial(false, false, false, runtime.main({ toml: 'raw' })), 'Start')
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_no_journal_empty_messages_is_empty_projection_fatal', () => {

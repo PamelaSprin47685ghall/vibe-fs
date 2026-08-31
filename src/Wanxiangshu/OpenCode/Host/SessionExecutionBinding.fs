@@ -4,17 +4,50 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.OpenCode.ProviderWireDecode
 open Wanxiangshu.OpenCode.ProviderWireCapture
+open Wanxiangshu.Participant.Provider.Attempt
+open Wanxiangshu.Persistence.Journal
 
 /// Process-local execution identity binding. Agent identity is frozen/observed here;
 /// physical model authority lives in ModelRouting and is leased by the exact
 /// (SessionId, PhysicalUserMessageId) provider execution.
 module SessionExecutionBinding =
+
+    [<RequireQualifiedAccess>]
+    type ProviderStartObservationError<'bindingError> =
+        | DurableJournalUnavailable
+        | PhysicalUserMessageMissing of SessionId
+        | AttemptPlanFreezeFailed of 'bindingError
+        | FrozenAttemptPlanMissing of ChatExecutionKey * ProviderRunIdentity
+        | AcceptedExecutionMissing of ChatExecutionKey
+        | AcceptedExecutionAlreadyTerminal of ChatExecutionKey
+        | BloggerRequestMissing of SessionId
+        | BloggerRequestKindUnsupported of string
+        | AuthorityEvidenceInvalid of AcceptedChatExecutionEvidence
+        | PersistenceFailed of ManagedChatProviderLifecycleError
+
+    let providerStartObservationErrorCode =
+        function
+        | ProviderStartObservationError.DurableJournalUnavailable -> "durable-journal-unavailable"
+        | ProviderStartObservationError.PhysicalUserMessageMissing _ -> "physical-user-message-missing"
+        | ProviderStartObservationError.AttemptPlanFreezeFailed _ -> "attempt-plan-freeze-failed"
+        | ProviderStartObservationError.FrozenAttemptPlanMissing _ -> "frozen-attempt-plan-missing"
+        | ProviderStartObservationError.AcceptedExecutionMissing _ -> "accepted-execution-missing"
+        | ProviderStartObservationError.AcceptedExecutionAlreadyTerminal _ -> "accepted-execution-already-terminal"
+        | ProviderStartObservationError.BloggerRequestMissing _ -> "blogger-request-missing"
+        | ProviderStartObservationError.BloggerRequestKindUnsupported _ -> "blogger-request-kind-unsupported"
+        | ProviderStartObservationError.AuthorityEvidenceInvalid _ -> "authority-evidence-invalid"
+        | ProviderStartObservationError.PersistenceFailed _ -> "persistence-failed"
 
     type private ExpectedBinding =
         { PhysicalUserMessageId: PhysicalUserMessageId
@@ -28,6 +61,8 @@ module SessionExecutionBinding =
     let private agents = Dictionary<string, string>()
     // DSL-MUTABLE: resource — internal execution roots without logical parent bindings
     let private internalRoots = HashSet<string>()
+    // DSL-MUTABLE: resource — public Host-created auxiliary child identities.
+    let private hostAuxiliaryChildren = HashSet<string>()
     // Accepted plugin prompt execution identity awaiting the provider transform
     // that answers that exact PromptKey. Process-local only; restart
     // intentionally forgets it and therefore cannot resume old sends.
@@ -53,6 +88,44 @@ module SessionExecutionBinding =
         |> Seq.filter (fun bindingKey -> bindingKey.StartsWith(sessionKey + "\u001f", StringComparison.Ordinal))
         |> Seq.toArray
         |> Array.iter (fun bindingKey -> acceptedPromptBindings.Remove bindingKey |> ignore)
+
+    let private matchingAcceptedPromptKeys sessionKey physicalUserMessageId =
+        acceptedPromptBindings
+        |> Seq.choose (fun entry ->
+            if
+                entry.Key.StartsWith(sessionKey + "\u001f", StringComparison.Ordinal)
+                && entry.Value.PhysicalUserMessageId = physicalUserMessageId
+            then
+                Some entry.Key
+            else
+                None)
+        |> Seq.toArray
+
+    let exactExecutionBindingCount (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) : int =
+        lock gate (fun () ->
+            let sessionKey = SessionId.value sessionId
+
+            let acceptedCount =
+                matchingAcceptedPromptKeys sessionKey physicalUserMessageId |> Array.length
+
+            let providerCount =
+                match providerAttemptBindings.TryGetValue sessionKey with
+                | true, binding when binding.PhysicalUserMessageId = physicalUserMessageId -> 1
+                | _ -> 0
+
+            if acceptedCount > 0 || providerCount > 0 then 1 else 0)
+
+    let releaseAcceptedExecution (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) : unit =
+        lock gate (fun () ->
+            let sessionKey = SessionId.value sessionId
+
+            matchingAcceptedPromptKeys sessionKey physicalUserMessageId
+            |> Array.iter (fun bindingKey -> acceptedPromptBindings.Remove bindingKey |> ignore)
+
+            match providerAttemptBindings.TryGetValue sessionKey with
+            | true, binding when binding.PhysicalUserMessageId = physicalUserMessageId ->
+                providerAttemptBindings.Remove sessionKey |> ignore
+            | _ -> ())
 
     let private rememberParent (childKey: string) (parentKey: string) =
         match parents.TryGetValue childKey with
@@ -97,16 +170,25 @@ module SessionExecutionBinding =
         sprintf "%s/%s[%s]" model.providerID model.modelID (model.variant |> Option.defaultValue "<missing>")
 
     let bind (parentId: SessionId) (childId: SessionId) (agent: string option) =
+        let privateHostChild =
+            agent
+            |> Option.bind nonEmpty
+            |> Option.exists ManagedAgentCatalog.isBookkeeperName
+
         lock gate (fun () ->
             let childKey = SessionId.value childId
             internalRoots.Remove childKey |> ignore
             rememberParent childKey (SessionId.value parentId)
 
-            match agent |> Option.bind nonEmpty with
-            | Some proposed -> rememberAgent childKey proposed
-            | None -> ())
+            match privateHostChild, agent |> Option.bind nonEmpty with
+            | true, _ ->
+                agents.Remove childKey |> ignore
+                hostAuxiliaryChildren.Add childKey |> ignore
+            | false, Some proposed -> rememberAgent childKey proposed
+            | false, None -> ())
 
-        ModelRouting.bindCapacityChild parentId childId
+        if not privateHostChild then
+            ModelRouting.bindCapacityChild parentId childId
 
     let restore (parentId: SessionId) (childId: SessionId) (agent: string option) = bind parentId childId agent
 
@@ -136,6 +218,17 @@ module SessionExecutionBinding =
             | true, value -> Some value
             | false, _ -> None)
 
+    /// A Host-owned auxiliary child (for example title generation) is observed from
+    /// a public session.created parent edge but has no Wanxiangshu execution agent.
+    /// Managed child binding writes its agent before provider admission.
+    let isUnboundHostAuxiliaryChild (sessionId: SessionId) =
+        lock gate (fun () ->
+            let key = SessionId.value sessionId
+            hostAuxiliaryChildren.Contains key && not (agents.ContainsKey key))
+
+    let observeHostAuxiliaryChild (sessionId: SessionId) =
+        lock gate (fun () -> hostAuxiliaryChildren.Add(SessionId.value sessionId) |> ignore)
+
     /// A real external managed user message may choose a new EffectiveAgent. Its model
     /// is deliberately ignored; chat.message routing replaces that field from ModelRouting.
     let observeUserFacingAgent (sessionId: SessionId) (agent: string) =
@@ -164,7 +257,9 @@ module SessionExecutionBinding =
         | None -> invalidOp "PROMPT-006: accepted external execution has no EffectiveAgent"
         | Some agent ->
             lock gate (fun () ->
-                providerAttemptBindings.[SessionId.value sessionId] <- exactBinding physicalUserMessageId agent model)
+                let sessionKey = SessionId.value sessionId
+                rememberAgent sessionKey agent
+                providerAttemptBindings.[sessionKey] <- exactBinding physicalUserMessageId agent model)
 
     let acceptPromptExecution
         (sessionId: SessionId)
@@ -185,37 +280,6 @@ module SessionExecutionBinding =
                 // same exact physical binding available immediately, then let the
                 // transform re-prove it from its trailing user message.
                 providerAttemptBindings.[sessionKey] <- binding)
-
-    /// PROMPT-006 process-local execution capability commit. The routing owner
-    /// publishes the typed route; this owner alone decides how an accepted route
-    /// becomes provider-attempt binding state. The composition root projects the
-    /// later-compiled dispatcher into the one predicate this earlier owner needs.
-    let private acceptRoutedPromptExecution
-        (claim: PromptAuthority.PromptClaim)
-        (physicalUserMessageId: PhysicalUserMessageId, effectiveAgent: string, model: OpencodeModel)
-        (isAccepted: PromptAuthority.PromptClaim -> bool)
-        =
-        if isAccepted claim then
-            acceptPromptExecution claim.SessionId claim.PromptKey physicalUserMessageId effectiveAgent model
-        else
-            invalidOp (
-                sprintf
-                    "PROMPT-006: PromptKey %s did not reach durable PhysicalAccepted"
-                    (PromptKey.value claim.PromptKey)
-            )
-
-    let acceptRoutedExecution
-        (dispatchAccepted: (PromptAuthority.PromptClaim -> bool) option)
-        (routed: ModelRouting.RoutedChatExecution)
-        : unit =
-        match routed, dispatchAccepted with
-        | ModelRouting.RoutedChatExecution.PluginManaged(claim, physical, agent, model), Some isAccepted ->
-            acceptRoutedPromptExecution claim (physical, agent, model) isAccepted
-        | ModelRouting.RoutedChatExecution.PluginManaged _, None -> ()
-        | ModelRouting.RoutedChatExecution.ExternalManaged(sessionId, physical, agent, model), _ ->
-            acceptExternalExecution sessionId physical agent model
-        | ModelRouting.RoutedChatExecution.NoRoute, _
-        | ModelRouting.RoutedChatExecution.Superseded, _ -> ()
 
     /// Provider-attempt boundary. The transform must bind the exact trailing
     /// PhysicalUserMessageId that chat.message admitted. PromptKey is still the
@@ -386,27 +450,201 @@ module SessionExecutionBinding =
             | None -> return ()
         }
 
+    let private providerBindingRequired (sessionId: SessionId) =
+        lock gate (fun () ->
+            let key = SessionId.value sessionId
+
+            agents.ContainsKey key
+            || (parents.ContainsKey key && not (hostAuxiliaryChildren.Contains key)))
+
+    let private bloggerRequestKind<'bindingError>
+        (projection: ProjectionSet)
+        (execution: ChatExecutionState)
+        : Result<ProviderRequestKind option, ProviderStartObservationError<'bindingError>> =
+        match
+            SessionAssociationProjection.tryMainSessionOf
+                execution.Evidence.SessionId
+                projection.AgentProjections.Associations
+        with
+        | None -> Ok None
+        | Some mainSessionId ->
+            result {
+                let openRequest =
+                    AgentProjection.tryFind mainSessionId projection.AgentProjections
+                    |> Option.bind (fun session -> session.BloggerCycles)
+                    |> Option.bind (BloggerCycleProjection.tryOpenByBlogger execution.Evidence.SessionId)
+
+                match openRequest, execution.ProviderStarted |> Option.map (fun started -> started.RequestKind) with
+                | Some request, _ ->
+                    return!
+                        OpenBloggerRequest.providerRequestKind request
+                        |> Result.map Some
+                        |> Result.mapError ProviderStartObservationError.BloggerRequestKindUnsupported
+                | None, Some(ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash as established) ->
+                    return Some established
+                | None, _ ->
+                    return! Error(ProviderStartObservationError.BloggerRequestMissing execution.Evidence.SessionId)
+            }
+
+    let private freezeOrdinaryPlan<'bindingError>
+        (durable: AgentJournal)
+        (key: ChatExecutionKey)
+        : Result<AcceptedChatExecutionEvidence * PendingAttemptPlan, ProviderStartObservationError<'bindingError>> =
+        let projection = AgentJournal.snapshot durable
+
+        result {
+            let! execution =
+                projection.AgentProjections.ChatExecutions
+                |> ChatExecutionProjection.byKey key
+                |> Result.requireSome (ProviderStartObservationError.AcceptedExecutionMissing key)
+
+            let accepted = execution.Evidence
+            let! bloggerKind = bloggerRequestKind projection execution
+
+            let requestKind =
+                bloggerKind
+                |> Option.defaultValue (AttemptPlanner.ordinaryRequestKind accepted.Origin)
+
+            let! pending =
+                AttemptPlanner.freezeOrdinary accepted requestKind
+                |> Result.mapError (fun _ -> ProviderStartObservationError.AuthorityEvidenceInvalid accepted)
+
+            return accepted, pending
+        }
+
+    let private freezeManagedProviderAttemptPlan
+        (journal: AgentJournal option)
+        (freezeAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan -> Result<unit, 'bindingError>)
+        (sessionId: SessionId)
+        (outObj: obj)
+        =
+        result {
+            let! durable =
+                journal
+                |> Result.requireSome ProviderStartObservationError.DurableJournalUnavailable
+
+            let rawMessages =
+                ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
+
+            let! physicalUserMessageId =
+                ProviderWireCapture.lastUserMessageId rawMessages
+                |> Result.requireSome (ProviderStartObservationError.PhysicalUserMessageMissing sessionId)
+
+            let key =
+                { SessionId = sessionId
+                  PhysicalUserMessageId = physicalUserMessageId }
+
+            let! _, ordinaryPlan = freezeOrdinaryPlan durable key
+
+            do!
+                freezeAttemptPlan sessionId physicalUserMessageId ordinaryPlan
+                |> Result.mapError ProviderStartObservationError.AttemptPlanFreezeFailed
+
+            return ()
+        }
+
+    let private persistPreparedProviderStarted
+        (durable: AgentJournal)
+        (acceptedEvidence: AcceptedChatExecutionEvidence)
+        (plan: AttemptPlan)
+        =
+        let profile = plan.Profile
+
+        let key =
+            { SessionId = acceptedEvidence.SessionId
+              PhysicalUserMessageId = acceptedEvidence.PhysicalUserMessageId }
+
+        task {
+            let! persisted =
+                ManagedChatProviderLifecycle.providerStarted
+                    durable
+                    key
+                    acceptedEvidence
+                    profile.ProviderRun
+                    profile.RequestKind
+                    profile.ProjectionChoice
+
+            return
+                persisted
+                |> Result.map ignore
+                |> Result.mapError ProviderStartObservationError.PersistenceFailed
+        }
+
+    let freezeProviderAttemptPlanForTransform
+        (journal: AgentJournal option)
+        (freezeAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan -> Result<unit, 'bindingError>)
+        (projectionSessionIdOpt: string option)
+        (outObj: obj)
+        : Task<Result<unit, ProviderStartObservationError<'bindingError>>> =
+        match projectionSessionIdOpt with
+        | None -> Task.FromResult(Ok())
+        | Some sessionText when not (providerBindingRequired (SessionId.create sessionText)) -> Task.FromResult(Ok())
+        | Some sessionText ->
+            freezeManagedProviderAttemptPlan journal freezeAttemptPlan (SessionId.create sessionText) outObj
+            |> Task.FromResult
+
+    let private persistObservedProviderStart
+        (durable: AgentJournal)
+        (bindAttemptPlan: SessionId -> PhysicalUserMessageId -> ProviderRunIdentity -> AttemptPlan option)
+        (observation: ExactProviderStartObservation)
+        =
+        let key =
+            { SessionId = observation.SessionId
+              PhysicalUserMessageId = observation.PhysicalUserMessageId }
+
+        let execution =
+            AgentJournal.snapshot durable
+            |> fun projection -> projection.AgentProjections.ChatExecutions
+            |> ChatExecutionProjection.byKey key
+
+        match execution |> Option.map _.Lifecycle, execution |> Option.bind _.ProviderStarted with
+        | Some(ChatExecutionLifecycle.Terminal _), _ ->
+            Task.FromResult(Error(ProviderStartObservationError.AcceptedExecutionAlreadyTerminal key))
+        | _, Some _ -> Task.FromResult(Ok false)
+        | _, None ->
+            taskResult {
+                let! acceptedEvidence =
+                    execution
+                    |> Option.map _.Evidence
+                    |> Result.requireSome (ProviderStartObservationError.AcceptedExecutionMissing key)
+
+                let! plan =
+                    bindAttemptPlan observation.SessionId observation.PhysicalUserMessageId observation.ProviderRun
+                    |> Result.requireSome (
+                        ProviderStartObservationError.FrozenAttemptPlanMissing(key, observation.ProviderRun)
+                    )
+
+                do! persistPreparedProviderStarted durable acceptedEvidence plan
+                return true
+            }
+
+    let persistProviderStartedFromObservation
+        (journal: AgentJournal option)
+        (bindAttemptPlan: SessionId -> PhysicalUserMessageId -> ProviderRunIdentity -> AttemptPlan option)
+        (observation: ExactProviderStartObservation)
+        : Task<Result<bool, ProviderStartObservationError<unit>>> =
+        match journal with
+        | None -> Task.FromResult(Error ProviderStartObservationError.DurableJournalUnavailable)
+        | Some durable -> persistObservedProviderStart durable bindAttemptPlan observation
+
     let drop (sessionId: SessionId) =
         lock gate (fun () ->
             let key = SessionId.value sessionId
             parents.Remove key |> ignore
             internalRoots.Remove key |> ignore
+            hostAuxiliaryChildren.Remove key |> ignore
             agents.Remove key |> ignore
             providerAttemptBindings.Remove key |> ignore
 
             clearAcceptedPromptBindingsForSession key)
 
-        ModelRouting.releaseExecution sessionId
+        ModelRouting.releaseExecution sessionId |> ignore
         ModelRouting.dropCapacityLineage sessionId
 
     let cancelUnacquired (sessionId: SessionId) =
-        ModelRouting.cancelUnacquiredExecution sessionId
+        ModelRouting.cancelUnacquiredExecution sessionId |> ignore
 
-    let requiresProviderBindingProof (sessionId: SessionId) =
-        lock gate (fun () ->
-            let key = SessionId.value sessionId
-
-            parents.ContainsKey key || agents.ContainsKey key)
+    let requiresProviderBindingProof (sessionId: SessionId) = providerBindingRequired sessionId
 
     let private validateRuntimeLease
         (sessionId: SessionId)

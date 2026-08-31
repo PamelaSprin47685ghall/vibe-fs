@@ -106,22 +106,26 @@ module FissionHostRequestProjection =
             tools?fission <- box false
             message?tools <- tools
 
-    let projectExternalManaged
-        (hasPhysicalParent: SessionId -> bool)
-        (decoded: PromptIngressCodec.DecodedMessage)
-        output
-        =
-        match decoded.SessionId, decoded.PromptKey, ModelRouting.managedAgentForAdmission decoded.ExplicitAgent with
-        | Some sessionId, None, Some _ -> projectVisibility (hasPhysicalParent sessionId) output
-        | _ -> ()
+    let projectExternalManaged (hasPhysicalParent: SessionId -> bool) (intent: ChatAdmissionIntent.Decision) output =
+        match intent with
+        | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
+            projectVisibility (hasPhysicalParent evidence.Key.SessionId) output
+        | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
+            projectVisibility (hasPhysicalParent evidence.Key.SessionId) output
+        | ChatAdmissionIntent.Decision.NoManagedExecution _
+        | ChatAdmissionIntent.Decision.PendingPromptIntent _
+        | ChatAdmissionIntent.Decision.HostInternal _
+        | ChatAdmissionIntent.Decision.Reject _ -> ()
 
-    let projectRouted (hasPhysicalParent: SessionId -> bool) (routed: ModelRouting.RoutedChatExecution) output =
-        match routed with
-        | ModelRouting.RoutedChatExecution.PluginManaged({ SessionId = sessionId }, _, _, _) ->
-            projectVisibility (hasPhysicalParent sessionId) output
-        | ModelRouting.RoutedChatExecution.ExternalManaged _
-        | ModelRouting.RoutedChatExecution.NoRoute
-        | ModelRouting.RoutedChatExecution.Superseded -> ()
+    let projectPendingManaged (hasPhysicalParent: SessionId -> bool) (intent: ChatAdmissionIntent.Decision) output =
+        match intent with
+        | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
+            projectVisibility (hasPhysicalParent evidence.Key.SessionId) output
+        | ChatAdmissionIntent.Decision.ExternalRootIntent _
+        | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent _
+        | ChatAdmissionIntent.Decision.NoManagedExecution _
+        | ChatAdmissionIntent.Decision.HostInternal _
+        | ChatAdmissionIntent.Decision.Reject _ -> ()
 
 /// Host-side terminal bridge for same-participant Fission lanes. A physical lane
 /// terminal is not a parent-visible agent completion. It materializes one keyed
@@ -824,7 +828,8 @@ module FissionHost =
 
             match! TerminalReporter.completeWithEvidence eventPort (Some durable) ownerTurn with
             | XTraceTerminalCompletion.Published published when
-                published.SessionId = result.SessionId && published.ProviderRun = result.ProviderRun
+                published.SessionId = result.SessionId
+                && published.ProviderRun = result.ProviderRun
                 ->
                 FissionAdmission.releaseOwner group.OwnerSessionId
                 FissionRuntime.clearOwner group.OwnerSessionId
@@ -875,8 +880,7 @@ module FissionHost =
         task {
             let! convergence = appendConvergedFromTakeover durable group takeover turn
 
-            return!
-                publishConvergedTakeover sessionPort eventPort durable group turn result role convergence
+            return! publishConvergedTakeover sessionPort eventPort durable group turn result role convergence
         }
 
     let private completeTakeover

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as trace from '../../../dist/Context/Trace/SemanticTraceSurface.js'
 
@@ -21,6 +21,24 @@ const withJournal = async (fn) => {
 }
 
 const projection = (messages) => ({ messages })
+
+test('WHAT[SEMANTIC-TRACE-002] ProviderRetryAttempt_is_transport_control_not_durable_X_semantics', () => {
+  const source = readFileSync(
+    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Trace/Capture.fs'),
+    'utf8',
+  )
+
+  assert.match(
+    source,
+    /let private capturedObservationMessage[\s\S]*?PromptAuthority\.PromptOrigin\.Continuation PromptAuthority\.ContinuationKind\.ProviderRetryAttempt[\s\S]*?\{ observation\.Message with Parts = \[\] \}/,
+    'retry transport control must be classified by the exact continuation origin',
+  )
+  assert.match(
+    source,
+    /let captured = observations \|> List\.map capturedObservationMessage/,
+    'semantic capture must strip retry transport material before durable append',
+  )
+})
 
 test('WHAT[SEMANTIC-TRACE-007] projection capture is idempotent and reports owner receipts', async () => {
   await withJournal(async (handle) => {

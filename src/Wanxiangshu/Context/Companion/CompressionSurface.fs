@@ -248,21 +248,6 @@ module CompressionSurface =
     let private attemptPlanCore (value: obj) : Result<AttemptPlan, string> =
         match roleResult value?role, tierResult value?tier, requestKindResult value?kind with
         | Ok role, Ok tier, Ok requestKind ->
-            let peerTier =
-                if tier = AgentTier.Fast then
-                    AgentTier.Deep
-                else
-                    AgentTier.Fast
-
-            let authority: PromptAuthority.AuthorityExecutionProfile =
-                { SessionId = SessionId.create "surface-session"
-                  LogicalRunId = LogicalRunId.create "surface-run"
-                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "surface-root"
-                  AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
-                  SelectedAgent = ManagedAgentCatalog.nameOf tier role
-                  PeerAgent = ManagedAgentCatalog.nameOf peerTier role
-                  CanonicalRole = role
-                  SelectedTier = tier }
 
             let selectProbe () =
                 if not (isNullish value?probe) then
@@ -270,7 +255,16 @@ module CompressionSurface =
                 else
                     Error(reasonOf value?noCandidateReason)
 
-            Ok(
+            ParticipantIdentity.resolveAtRoot (ManagedAgentCatalog.nameOf tier role)
+            |> Result.mapError (fun error -> sprintf "invalid participant identity: %A" error)
+            |> Result.bind (fun participantIdentity ->
+                PromptAuthority.createAuthorityExecutionProfile
+                    (SessionId.create "surface-session")
+                    (LogicalRunId.create "surface-run")
+                    (AuthorityRootUserMessageId.create "surface-root")
+                    PromptAuthority.RootAuthorityKind.HumanRoot
+                    participantIdentity)
+            |> Result.map (fun authority ->
                 AttemptPlanner.plan
                     authority
                     (cursorOfJs value?cursor)
@@ -282,11 +276,49 @@ module CompressionSurface =
                          RecoveryOpportunity.RecoveryAttempt
                      else
                          RecoveryOpportunity.OrdinaryAttempt)
-                    selectProbe
-            )
+                    selectProbe)
         | Error error, _, _
         | _, Error error, _
         | _, _, Error error -> Error error
+
+    let private permissionLabel (permission: ToolPermission) : string =
+        match permission with
+        | ToolPermission.Fork -> "Fork"
+        | ToolPermission.Join -> "Join"
+        | ToolPermission.Horizon -> "Horizon"
+        | ToolPermission.TodoWrite -> "TodoWrite"
+        | ToolPermission.Fission -> "Fission"
+        | ToolPermission.Read -> "Read"
+        | ToolPermission.Write -> "Write"
+        | ToolPermission.Edit -> "Edit"
+        | ToolPermission.Glob -> "Glob"
+        | ToolPermission.Grep -> "Grep"
+        | ToolPermission.Move -> "Move"
+        | ToolPermission.Remove -> "Remove"
+        | ToolPermission.Inspect -> "Inspect"
+        | ToolPermission.Behavior -> "Behavior"
+        | ToolPermission.Exec -> "Exec"
+        | ToolPermission.Pty -> "Pty"
+        | ToolPermission.Network -> "Network"
+        | ToolPermission.Judge -> "Judge"
+        | ToolPermission.Chronicle -> "Chronicle"
+        | ToolPermission.Fetch -> "Fetch"
+        | ToolPermission.Finality -> "Finality"
+        | ToolPermission.BashHoneypot -> "BashHoneypot"
+        | ToolPermission.Sphinx -> "Sphinx"
+
+    let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
+        box
+            {| selectedAgent = ParticipantIdentity.selectedAgent identity
+               peerAgent = ParticipantIdentity.peerAgent identity
+               canonicalRole = ParticipantIdentity.roleLabel identity
+               selectedTier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+               persona = ParticipantIdentity.persona identity
+               personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
+               origin =
+                match ParticipantIdentity.origin identity with
+                | PersonaOrigin.ResolvedAtRoot -> "ResolvedAtRoot"
+                | PersonaOrigin.InheritedFromOwner -> "InheritedFromOwner" |}
 
     let private attemptPlanView (plan: AttemptPlan) : obj =
         let choice, probeId =
@@ -298,7 +330,15 @@ module CompressionSurface =
             {| choice = choice
                probeId = optionObj probeId
                noProbeReason = optionObj (plan.NoProbeReason |> Option.map reasonName)
-               effectiveAgent = plan.Profile.EffectiveAgent |}
+               effectiveAgent = plan.Profile.EffectiveAgent
+               participantIdentity = participantIdentityToJs plan.Profile.Authority.ParticipantIdentity
+               systemPromptId = SystemPromptId.value plan.Profile.SystemPromptId
+               toolCapabilities =
+                plan.Profile.ToolCapabilitySet
+                |> Set.toList
+                |> List.map permissionLabel
+                |> List.sort
+                |> List.toArray |}
 
     /// Build the production AttemptPlan from plain request labels. The caller
     /// supplies either a probe or a named no-candidate result; the planner itself
@@ -323,6 +363,9 @@ module CompressionSurface =
                    probeId = viewObject?probeId
                    noProbeReason = viewObject?noProbeReason
                    effectiveAgent = viewObject?effectiveAgent
+                   participantIdentity = viewObject?participantIdentity
+                   systemPromptId = viewObject?systemPromptId
+                   toolCapabilities = viewObject?toolCapabilities
                    handle = box (AttemptPlanHandle plan) |}
 
     let private promotableProbeId (value: obj) (outcome: string) : obj =

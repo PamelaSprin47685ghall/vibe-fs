@@ -50,7 +50,7 @@ Host 因 abort 清理将工具调用标记为 interrupted 的残留记录，严�
 
 ## PAR-013: 换 Peer = 换执行者，不换身份
 
-Fallback 推进仅改变下一次执行的 `EffectiveAgent` 与物理模型目标。SessionPersona、SessionProviderLanguage、system prompt、CanonicalRole 与 Authority 身份等在生命周期内保持严格不变，且机器代数严禁泄漏进 provider horizon。
+Fallback 推进仅改变下一次执行的 `EffectiveAgent` 与物理模型目标。同一 durable logical participant run 的 immutable `ParticipantIdentity`（包括 Persona 与 provenance/version）、SessionProviderLanguage、system prompt、CanonicalRole 与 Authority identity 在所有 retry/fallback attempt 中保持严格不变；Persona 与 provenance/version 必须从该 run 的 durable identity evidence 继承。只有该 run 已 exact terminal closure 后建立的新 run 才能取得新 identity，且机器代数严禁泄漏进 provider horizon。
 
 ## PAR-014: continuation 只在失败记账后、预算允许时
 
@@ -71,3 +71,7 @@ Blogger provider attempt 失败后，旧 `BloggerRequestMaterialized` 必须先�
 ## PAR-018: recovery continuation 只由 durable 事件解锁
 
 WorkMain 失败进入 primed recovery opportunity 后，若 linked Blogger 已有 durable open request 且尚无严格更新的 prefix coverage，则 recovery continuation 必须等待该 journal stream 的下一次已提交事实并重算条件；open request 的 commit/abandon 或 coverage advance 是唯一解锁事件。禁止 timer、deadline、sleep、polling、process-local flight/pending 状态参与该等待。若没有 durable open producer，则立即进入本次物理 retry，不等待未来材料。
+
+## PAR-019: 只消费 typed provider recovery licence
+
+FallbackController 只接受 `execution-failure-policy` 针对 `ProviderTransient | ProviderPermanent` 产生的 typed `RetryFreshAttempt` / `AdvanceFallback` licence；licence 必须绑定 exact `ProviderRunIdentity`、request kind 与 policy decision identity，controller 只验证当前 attempt 匹配，不重复计算 budget、breaker 或 failure class。`LocalInvariant`、`ProtocolRejection`、`AuthorizationDenied`、`UserCancelled`、`Superseded`、`CapacityQueueFull`、`AcceptanceUnknown`、`StreamInterruptedAfterFirstToken` 与任一 `PersistenceFailure` 均不得推进 cursor、消耗 provider 失败预算或创建 retry/fallback attempt。严禁 wildcard retry、按异常/terminal 文本重分类，或将未决 acceptance 当作 provider failure。

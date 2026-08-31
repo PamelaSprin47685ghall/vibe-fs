@@ -16,6 +16,7 @@ module SpikePlugin =
                 let! boot = PluginBoot.create input
                 let! host = PluginHostWiring.create boot
                 PluginSessionWiring.attach boot host
+                PluginRecoveryWiring.attach boot
                 let transform = PluginTransforms.create boot host
                 return! PluginHooks.create boot host transform
             with ex ->

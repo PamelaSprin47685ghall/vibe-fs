@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Composition.Turn
 
+open Wanxiangshu.Execution.Failure
+
 open System
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -49,15 +51,38 @@ module ReconcileProgram =
     /// The scheduler generation (single-flight fencing) is a different physical
     /// concept and must never be reused as the attempt serial.
     [<RequireQualifiedAccess>]
+    type FailureWakeSource =
+        | CoarseHostSignal
+        | ExactAssistantProjection
+
+    [<RequireQualifiedAccess>]
     type ReconcileWake =
         | IdleWake of QuiescencePermit
         | RetryWake
-        | FailureWake of physicalUserMessageId: PhysicalUserMessageId option * reason: string
+        | FailureWake of
+            physicalUserMessageId: PhysicalUserMessageId option *
+            failure: ExecutionFailure *
+            diagnostic: string *
+            source: FailureWakeSource
         /// HOST-004: operator abort is a typed wake category, not a failure.
         /// It never carries idle/repair rights: under it, Unknown / Provisional
         /// must never Publish a stable observation that business could turn into
         /// InteractionRepair / "#".
         | AbortWake
+
+    let mergeWake
+        (currentPhysicalUserMessageId: PhysicalUserMessageId option)
+        (previous: ReconcileWake)
+        (incoming: ReconcileWake)
+        =
+        match previous, incoming, currentPhysicalUserMessageId with
+        | ReconcileWake.FailureWake(_, _, _, FailureWakeSource.ExactAssistantProjection),
+          ReconcileWake.FailureWake(_, _, _, FailureWakeSource.CoarseHostSignal),
+          _ -> previous
+        | ReconcileWake.FailureWake(Some failedPhysical, _, _, _),
+          (ReconcileWake.IdleWake _ | ReconcileWake.RetryWake),
+          currentPhysical when currentPhysical |> Option.forall ((=) failedPhysical) -> previous
+        | _ -> incoming
 
     [<RequireQualifiedAccess>]
     type ReconcileEvidence =
@@ -97,16 +122,25 @@ module ReconcileProgram =
         | TurnInProgress
         | TurnNeedsContinuation _ -> false
 
-    let tryFailureWitnessReason (wake: ReconcileWake) (turn: PublishTurn) : string option =
+    let tryFailureWitness (wake: ReconcileWake) (turn: PublishTurn) : (ExecutionFailure * string) option =
         match wake with
-        | ReconcileWake.FailureWake(Some physical, reason) when
-            physical = turn.PhysicalUserMessageId && not (isTerminalOutcome turn.Outcome)
+        | ReconcileWake.FailureWake(Some physical, failure, diagnostic, _) when
+            physical = turn.PhysicalUserMessageId
+            && (match turn.Outcome with
+                | TurnCompleted
+                | TurnAborted _ -> false
+                | TurnFailed _
+                | TurnInProgress
+                | TurnNeedsContinuation _ -> true)
             ->
-            Some reason
+            Some(failure, diagnostic)
         | ReconcileWake.IdleWake _
         | ReconcileWake.RetryWake
         | ReconcileWake.FailureWake _
         | ReconcileWake.AbortWake -> None
+
+    let tryFailureWitnessReason wake turn =
+        tryFailureWitness wake turn |> Option.map snd
 
     let private decideExhaustedRetryable (_rereadsRemaining: int) (exhausted: ReconcileDecision) =
         // HOST-BOUNDARY-005: no read is authorized by a counter. A later read
@@ -170,18 +204,27 @@ module ReconcileProgram =
         let hasFailureWitness =
             match evidence with
             | ReconcileEvidence.Provisional observed
-            | ReconcileEvidence.Unknown(Some observed) ->
+            | ReconcileEvidence.Unknown(Some observed)
+            | ReconcileEvidence.Terminal observed ->
                 observed.PublishTurn
                 |> Option.bind (tryFailureWitnessReason wake)
                 |> Option.isSome
             | ReconcileEvidence.SnapshotError _
             | ReconcileEvidence.NoTurn
             | ReconcileEvidence.Unknown None
-            | ReconcileEvidence.Terminal _
             | ReconcileEvidence.SessionCleared -> false
 
+        let failedTerminalRequiresWitness =
+            match wake, evidence with
+            | (ReconcileWake.FailureWake _ | ReconcileWake.RetryWake),
+              ReconcileEvidence.Terminal { Outcome = TurnFailed _
+                                           PublishTurn = Some _ } -> true
+            | _ -> false
+
         match hasFailureWitness, evidence with
-        | true, (ReconcileEvidence.Provisional _ | ReconcileEvidence.Unknown _) -> ReconcileDecision.Publish
+        | true, (ReconcileEvidence.Provisional _ | ReconcileEvidence.Unknown _ | ReconcileEvidence.Terminal _) ->
+            ReconcileDecision.Publish
+        | false, ReconcileEvidence.Terminal _ when failedTerminalRequiresWitness -> ReconcileDecision.StopPass
         | false, ReconcileEvidence.Terminal _ -> ReconcileDecision.Publish
         | false, (ReconcileEvidence.SnapshotError _ | ReconcileEvidence.NoTurn) ->
             decideExhaustedRetryable rereadsRemaining ReconcileDecision.StopPass

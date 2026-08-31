@@ -37,12 +37,7 @@ module OpeningSemanticSurface =
         LifecycleWorkRecord.withConstitutive (openingOf opening) constitutiveBody
         |> openingView
 
-    let materialize
-        (opening: obj)
-        (frames: string array)
-        (renderedGap: string)
-        (includeOpening: bool)
-        : string =
+    let materialize (opening: obj) (frames: string array) (renderedGap: string) (includeOpening: bool) : string =
         LifecycleWorkRecord.materialize
             (openingOf opening)
             (if isNull frames then [] else Array.toList frames)

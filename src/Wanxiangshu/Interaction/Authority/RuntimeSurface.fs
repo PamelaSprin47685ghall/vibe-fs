@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Interaction.Authority
 
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -46,26 +47,125 @@ module RuntimeSurface =
         | Some tier -> Ok tier
         | None -> Error(sprintf "unknown tier: %s" (text value))
 
-    let private profileResult (value: obj) : Result<PromptAuthority.AuthorityExecutionProfile, string> =
-        match rootKindResult value?authorityKind, roleResult value?canonicalRole, tierResult value?selectedTier with
-        | Ok authorityKind, Ok canonicalRole, Ok selectedTier ->
-            Ok
-                { SessionId = SessionId.create (text value?session)
-                  LogicalRunId = LogicalRunId.create (text value?logicalRun)
-                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text value?authorityRoot)
-                  AuthorityKind = authorityKind
-                  SelectedAgent = text value?selectedAgent
-                  PeerAgent = text value?peerAgent
-                  CanonicalRole = canonicalRole
-                  SelectedTier = selectedTier }
+    let private originResult (value: obj) : Result<PersonaOrigin, string> =
+        match text value with
+        | "ResolvedAtRoot" -> Ok PersonaOrigin.ResolvedAtRoot
+        | "InheritedFromOwner" -> Ok PersonaOrigin.InheritedFromOwner
+        | unknown -> Error(sprintf "unknown participant identity origin: %s" unknown)
+
+    let private identityRoleResult (value: obj) : Result<Role option, string> =
+        if text value = "bookkeeper" then
+            Ok None
+        else
+            roleResult value |> Result.map Some
+
+    let private participantIdentityResult (value: obj) : Result<ParticipantIdentityEvidence, string> =
+        match identityRoleResult value?canonicalRole, tierResult value?selectedTier, originResult value?origin with
+        | Ok role, Ok tier, Ok origin ->
+            { SelectedAgent = text value?selectedAgent
+              PeerAgent = text value?peerAgent
+              Role = role
+              InitialTier = tier
+              Persona = text value?persona
+              PersonaCatalogVersion = unbox<int> value?personaCatalogVersion
+              Origin = origin }
+            |> ParticipantIdentity.fromInput
+            |> Result.mapError (fun error -> sprintf "invalid participant identity: %A" error)
         | Error error, _, _
         | _, Error error, _
         | _, _, Error error -> Error error
+
+    let private identitySeedResult (value: obj) : Result<PromptAuthority.IdentitySeed, string> =
+        participantIdentityResult value?participantIdentity
+        |> Result.bind (fun identity ->
+            let input = ParticipantIdentity.toInput identity
+
+            let requiredOwnerId label ownerId =
+                let value = text ownerId
+
+                if System.String.IsNullOrWhiteSpace value then
+                    Error(sprintf "invalid identity seed: %s is blank" label)
+                else
+                    Ok value
+
+            let seedInput =
+                match text value?kind with
+                | "RootSelection" -> Ok(PromptAuthority.IdentitySeedInput.RootSelectionInput input)
+                | "InheritedFromOwner" ->
+                    match
+                        requiredOwnerId "ownerSession" value?ownerSession,
+                        requiredOwnerId "ownerLogicalRun" value?ownerLogicalRun,
+                        requiredOwnerId "ownerAuthorityRoot" value?ownerAuthorityRoot
+                    with
+                    | Ok ownerSession, Ok ownerLogicalRun, Ok ownerAuthorityRoot ->
+                        Ok(
+                            PromptAuthority.IdentitySeedInput.InheritedFromOwnerInput
+                                { OwnerSessionId = SessionId.create ownerSession
+                                  OwnerLogicalRunId = LogicalRunId.create ownerLogicalRun
+                                  OwnerAuthorityRootUserMessageId =
+                                    AuthorityRootUserMessageId.create ownerAuthorityRoot
+                                  ParticipantIdentity = input }
+                        )
+                    | Error error, _, _
+                    | _, Error error, _
+                    | _, _, Error error -> Error error
+                | unknown -> Error(sprintf "unknown identity seed kind: %s" unknown)
+
+            seedInput
+            |> Result.bind (
+                PromptAuthority.rehydrateIdentitySeed
+                >> Result.mapError (sprintf "invalid identity seed: %A")
+            ))
+
+    let private profileResult (value: obj) : Result<PromptAuthority.AuthorityExecutionProfile, string> =
+        match rootKindResult value?authorityKind, identitySeedResult value?identitySeed with
+        | Ok authorityKind, Ok identitySeed ->
+            PromptAuthority.createAuthorityExecutionProfileFromSeed
+                (SessionId.create (text value?session))
+                (LogicalRunId.create (text value?logicalRun))
+                (AuthorityRootUserMessageId.create (text value?authorityRoot))
+                authorityKind
+                identitySeed
+        | Error error, _
+        | _, Error error -> Error error
 
     let private profileOf (value: obj) : PromptAuthority.AuthorityExecutionProfile =
         match profileResult value with
         | Ok profile -> profile
         | Error error -> invalidArg "profile" error
+
+    let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
+        box
+            {| selectedAgent = ParticipantIdentity.selectedAgent identity
+               peerAgent = ParticipantIdentity.peerAgent identity
+               canonicalRole = ParticipantIdentity.roleLabel identity
+               selectedTier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+               persona = ParticipantIdentity.persona identity
+               personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
+               origin =
+                match ParticipantIdentity.origin identity with
+                | PersonaOrigin.ResolvedAtRoot -> "ResolvedAtRoot"
+                | PersonaOrigin.InheritedFromOwner -> "InheritedFromOwner" |}
+
+    let private identitySeedToJs (seed: PromptAuthority.IdentitySeed) : obj =
+        let participantIdentity =
+            PromptAuthority.identitySeedParticipantIdentity seed |> participantIdentityToJs
+
+        match PromptAuthority.identitySeedOwner seed with
+        | None ->
+            box
+                {| kind = "RootSelection"
+                   ownerSession = null
+                   ownerLogicalRun = null
+                   ownerAuthorityRoot = null
+                   participantIdentity = participantIdentity |}
+        | Some(ownerSession, ownerLogicalRun, ownerAuthorityRoot) ->
+            box
+                {| kind = "InheritedFromOwner"
+                   ownerSession = SessionId.value ownerSession
+                   ownerLogicalRun = LogicalRunId.value ownerLogicalRun
+                   ownerAuthorityRoot = AuthorityRootUserMessageId.value ownerAuthorityRoot
+                   participantIdentity = participantIdentity |}
 
     let private profileToJs (profile: PromptAuthority.AuthorityExecutionProfile) : obj =
         box
@@ -76,10 +176,8 @@ module RuntimeSurface =
                 match profile.AuthorityKind with
                 | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
                 | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
-               selectedAgent = profile.SelectedAgent
-               peerAgent = profile.PeerAgent
-               canonicalRole = Roles.roleLabel profile.CanonicalRole
-               selectedTier = Roles.wireTierLabel profile.SelectedTier |}
+               identitySeed = identitySeedToJs profile.IdentitySeed
+               participantIdentity = participantIdentityToJs profile.ParticipantIdentity |}
 
     let private optionalString (value: obj) : string option =
         if isNull value then None else Some(text value)
@@ -110,6 +208,7 @@ module RuntimeSurface =
                 |> Option.map AuthorityRootUserMessageId.value
                 |> Option.defaultValue null
                effectiveAgent = claim.EffectiveAgent |> Option.defaultValue null
+               identitySeed = identitySeedToJs claim.IdentitySeed
                payloadDigest = claim.PayloadDigest
                receipt = claim.Receipt |> Option.map TransportReceipt.value |> Option.defaultValue null
                claimedAtRuntimeStartCount = claim.ClaimedAtRuntimeStartCount |}
@@ -117,6 +216,11 @@ module RuntimeSurface =
     let private claimOf (value: obj) : PromptAuthority.PromptClaim =
         let kind = text value?origin
         let label = text value?originLabel
+
+        let identitySeed =
+            match identitySeedResult value?identitySeed with
+            | Ok seed -> seed
+            | Error error -> invalidArg "claim.identitySeed" error
 
         { PromptKey = PromptKey.create (text value?promptKey)
           SessionId = SessionId.create (text value?session)
@@ -126,6 +230,7 @@ module RuntimeSurface =
             optionalString value?authorityRoot
             |> Option.map AuthorityRootUserMessageId.create
           EffectiveAgent = optionalString value?effectiveAgent
+          IdentitySeed = identitySeed
           PayloadDigest = text value?payloadDigest
           Receipt = optionalString value?receipt |> Option.map TransportReceipt.create
           ClaimedAtRuntimeStartCount = 0 }
@@ -136,13 +241,20 @@ module RuntimeSurface =
                session = SessionId.value dispatch.SessionId
                origin = originName dispatch.Origin
                originLabel = PromptAuthority.originLabel dispatch.Origin
+               identitySeed = identitySeedToJs dispatch.IdentitySeed
                payloadDigest = dispatch.PayloadDigest
                physical = PhysicalUserMessageId.value dispatch.PhysicalUserMessageId |}
 
     let private acceptedDispatchOf (value: obj) : PromptAuthority.AcceptedDispatch =
+        let identitySeed =
+            match identitySeedResult value?identitySeed with
+            | Ok seed -> seed
+            | Error error -> invalidArg "dispatch.identitySeed" error
+
         { PromptKey = PromptKey.create (text value?promptKey)
           SessionId = SessionId.create (text value?session)
           Origin = originOf (text value?origin) (text value?originLabel)
+          IdentitySeed = identitySeed
           PayloadDigest = text value?payloadDigest
           PhysicalUserMessageId = PhysicalUserMessageId.create (text value?physical) }
 
@@ -243,7 +355,164 @@ module RuntimeSurface =
                 |> List.map (fun (scope, count) -> box {| scope = scope; count = count |})
                 |> List.toArray |}
 
+    let private identitySeedValidationErrorToJs error : obj =
+        match error with
+        | PromptAuthority.IdentitySeedValidationError.ExpectedInheritedFromOwner ->
+            box
+                {| kind = "ExpectedInheritedFromOwner"
+                   expected = "InheritedFromOwner"
+                   actual = "RootSelection" |}
+        | PromptAuthority.IdentitySeedValidationError.OwnerAuthorityNotActive sessionId ->
+            box
+                {| kind = "OwnerAuthorityNotActive"
+                   expected = SessionId.value sessionId
+                   actual = "" |}
+        | PromptAuthority.IdentitySeedValidationError.OwnerSessionIdMismatch(expected, actual) ->
+            box
+                {| kind = "OwnerSessionIdMismatch"
+                   expected = SessionId.value expected
+                   actual = SessionId.value actual |}
+        | PromptAuthority.IdentitySeedValidationError.OwnerLogicalRunIdMismatch(expected, actual) ->
+            box
+                {| kind = "OwnerLogicalRunIdMismatch"
+                   expected = LogicalRunId.value expected
+                   actual = LogicalRunId.value actual |}
+        | PromptAuthority.IdentitySeedValidationError.OwnerAuthorityRootUserMessageIdMismatch(expected, actual) ->
+            box
+                {| kind = "OwnerAuthorityRootUserMessageIdMismatch"
+                   expected = AuthorityRootUserMessageId.value expected
+                   actual = AuthorityRootUserMessageId.value actual |}
+        | PromptAuthority.IdentitySeedValidationError.InvalidInheritedParticipantIdentity error ->
+            box
+                {| kind = "InvalidInheritedParticipantIdentity"
+                   expected = "owner-bound participant identity"
+                   actual = sprintf "%A" error |}
+
     let empty: obj = projectionToJs PromptAuthority.empty
+
+    let issueInheritedIdentitySeed (childName: string) (ownerProfile: obj) : obj =
+        match profileResult ownerProfile with
+        | Error error ->
+            box
+                {| ok = false
+                   value = null
+                   error = error |}
+        | Ok owner ->
+            match PromptAuthority.issueInheritedIdentitySeed childName owner with
+            | Ok seed ->
+                box
+                    {| ok = true
+                       value = identitySeedToJs seed
+                       error = "" |}
+            | Error error ->
+                box
+                    {| ok = false
+                       value = null
+                       error = sprintf "invalid participant identity: %A" error |}
+
+    let validateInheritedIdentitySeedAgainstActiveOwner (ownerProfile: obj) (seedValue: obj) : obj =
+        match identitySeedResult seedValue with
+        | Error error ->
+            box
+                {| ok = false
+                   value = null
+                   error =
+                    box
+                        {| kind = "Malformed"
+                           expected = ""
+                           actual = error |} |}
+        | Ok seed ->
+            let ownerResult =
+                if isNull ownerProfile then
+                    Ok None
+                else
+                    profileResult ownerProfile |> Result.map Some
+
+            match ownerResult with
+            | Error error ->
+                box
+                    {| ok = false
+                       value = null
+                       error =
+                        box
+                            {| kind = "Malformed"
+                               expected = ""
+                               actual = error |} |}
+            | Ok owner ->
+                match PromptAuthority.validateInheritedIdentitySeedAgainstActiveOwner owner seed with
+                | Ok identity ->
+                    box
+                        {| ok = true
+                           value = participantIdentityToJs identity
+                           error = null |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           value = null
+                           error = identitySeedValidationErrorToJs error |}
+
+    let validateInheritedIdentitySeed (ownerProfile: obj) (seedValue: obj) : obj =
+        validateInheritedIdentitySeedAgainstActiveOwner ownerProfile seedValue
+
+    let serializeIdentitySeed (seedValue: obj) : obj =
+        match identitySeedResult seedValue with
+        | Ok seed ->
+            box
+                {| ok = true
+                   value = JS.JSON.stringify (identitySeedToJs seed)
+                   error = "" |}
+        | Error error ->
+            box
+                {| ok = false
+                   value = null
+                   error = error |}
+
+    let rehydrateIdentitySeed (serialized: string) : obj =
+        try
+            let value: obj = JS.JSON.parse serialized
+
+            match identitySeedResult value with
+            | Ok seed ->
+                box
+                    {| ok = true
+                       value = identitySeedToJs seed
+                       error = "" |}
+            | Error error ->
+                box
+                    {| ok = false
+                       value = null
+                       error = error |}
+        with error ->
+            box
+                {| ok = false
+                   value = null
+                   error = error.Message |}
+
+    let recoverActiveIdentity (projection: obj) : obj =
+        match projectionValidation projection with
+        | Error error ->
+            box
+                {| ok = false
+                   value = null
+                   error = error |}
+        | Ok() ->
+            match (projectionOf projection).ActiveLogicalRun with
+            | None ->
+                box
+                    {| ok = false
+                       value = null
+                       error = "MissingActiveAuthority" |}
+            | Some profile ->
+                box
+                    {| ok = true
+                       value =
+                        box
+                            {| participantIdentity = participantIdentityToJs profile.ParticipantIdentity
+                               identitySeed = identitySeedToJs profile.IdentitySeed |}
+                       error = "" |}
+
+    let projectClaimIdentitySeed (claim: obj) : obj =
+        claimOf claim |> fun typed -> identitySeedToJs typed.IdentitySeed
 
     let promotePhysical (physical: string) : string =
         PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create physical)
@@ -258,7 +527,7 @@ module RuntimeSurface =
         (session: string)
         (kind: string)
         (physical: string)
-        (agent: string)
+        (seedValue: obj)
         : obj =
         match rootKindResult (box kind) with
         | Error error ->
@@ -268,13 +537,15 @@ module RuntimeSurface =
                    error = error |}
         | Ok authorityKind ->
             match
-                PromptAuthorityRun.createAuthorityRoot
-                    hash
-                    (RuntimeId.create runtime)
-                    (SessionId.create session)
-                    authorityKind
-                    (PhysicalUserMessageId.create physical)
-                    agent
+                identitySeedResult seedValue
+                |> Result.bind (fun identitySeed ->
+                    PromptAuthorityRun.createAuthorityRoot
+                        hash
+                        (RuntimeId.create runtime)
+                        (SessionId.create session)
+                        authorityKind
+                        (PhysicalUserMessageId.create physical)
+                        identitySeed)
             with
             | Ok profile ->
                 box
@@ -288,25 +559,35 @@ module RuntimeSurface =
                        error = error |}
 
     let parseAgentName (agent: string) : obj =
-        match PromptAuthority.parseAgentNameTyped agent with
-        | Ok parsed ->
-            box
-                {| ok = true
-                   value =
-                    box
-                        {| name = parsed.Name
-                           role = Roles.roleLabel parsed.Role
-                           tier = Roles.wireTierLabel parsed.Tier
-                           peer = parsed.PeerName |}
-                   error = null |}
+        match ParticipantIdentity.resolveAtRoot agent with
+        | Ok identity ->
+            match ParticipantIdentity.role identity with
+            | Some role ->
+                box
+                    {| ok = true
+                       value =
+                        box
+                            {| name = ParticipantIdentity.selectedAgent identity
+                               role = Roles.roleLabel role
+                               tier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+                               peer = ParticipantIdentity.peerAgent identity |}
+                       error = null |}
+            | None ->
+                box
+                    {| ok = false
+                       value = null
+                       error =
+                        box
+                            {| kind = "UnknownManagedAgent"
+                               message = "Unknown tier or role. Use fast-* or deep-* ." |} |}
         | Error rejection ->
             let kind, message =
                 match rejection with
-                | PromptAuthority.AgentNameRejection.LegacyAgentName name ->
+                | ParticipantIdentityError.LegacyParticipantName name ->
                     "LegacyAgentName", ManagedAgentCatalog.formatLegacyNameNotSupported name
-                | PromptAuthority.AgentNameRejection.UnknownManagedAgent _ ->
+                | ParticipantIdentityError.UnknownParticipantName _ ->
                     "UnknownManagedAgent", "Unknown tier or role. Use fast-* or deep-* ."
-                | PromptAuthority.AgentNameRejection.Malformed _ -> "Malformed", "Expected fast-ROLE or deep-ROLE."
+                | _ -> "Malformed", "Expected fast-ROLE or deep-ROLE."
 
             box
                 {| ok = false
@@ -316,8 +597,16 @@ module RuntimeSurface =
     let registerAuthority (profile: obj) (projection: obj) : obj =
         match profileResult profile, projectionValidation projection with
         | Ok profile, Ok() ->
-            PromptAuthorityRun.registerAuthority profile (projectionOf projection)
-            |> projectionToJs
+            match PromptAuthorityRun.registerAuthority profile (projectionOf projection) with
+            | Ok registered -> projectionToJs registered
+            | Error(PromptAuthorityRun.ActiveRunIdentityConflict(active, requested)) ->
+                box
+                    {| ok = false
+                       error =
+                        box
+                            {| kind = "ActiveRunIdentityConflict"
+                               active = profileToJs active
+                               requested = profileToJs requested |} |}
         | Error error, _
         | _, Error error -> box {| ok = false; error = error |}
 
@@ -342,13 +631,15 @@ module RuntimeSurface =
         | Error error, _
         | _, Error error -> box {| ok = false; error = error |}
 
-    let claimAgentOwnerRoot (promptKey: string) (session: string) (payloadDigest: string) (agent: string) : obj =
+    let claimAgentOwnerRoot (promptKey: string) (session: string) (payloadDigest: string) (seedValue: obj) : obj =
         match
-            PromptAuthorityRun.claimAgentOwnerRoot
-                (PromptKey.create promptKey)
-                (SessionId.create session)
-                payloadDigest
-                agent
+            identitySeedResult seedValue
+            |> Result.bind (fun identitySeed ->
+                PromptAuthorityRun.claimAgentOwnerRoot
+                    (PromptKey.create promptKey)
+                    (SessionId.create session)
+                    payloadDigest
+                    identitySeed)
         with
         | Ok claim ->
             box

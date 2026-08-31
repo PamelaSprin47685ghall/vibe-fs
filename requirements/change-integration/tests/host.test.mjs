@@ -57,6 +57,15 @@ test('WHAT[CHGINT-009] HOST_ContinueManagerJob_has_no_detached_pending_waiter', 
   assert.doesNotMatch(source, /awaitCurrentPendingRun\s+agentId\s*\|>\s*ignore/)
 })
 
+test('WHAT[CHGINT-009] conflict resumption continues the existing Manager authority', () => {
+  const source = readFileSync(new URL('../../../src/Wanxiangshu/Change/Host/Host.fs', import.meta.url), 'utf8')
+  const resume = source.slice(source.indexOf('let resumeManager'), source.indexOf('let terminateChildren'))
+
+  assert.match(resume, /HostSessionNudge\.sendContinuation/)
+  assert.match(resume, /PromptAuthority\.ContinuationKind\.ManagedDelegationAssignment/)
+  assert.doesNotMatch(resume, /runtime\.Fork/)
+})
+
 test('WHAT[CHGINT-009] HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', () => {
   let projection = change.createJob(change.empty(), job('hostfw8', '/tmp/wt-hostfw8'))
   projection = change.recordFact(projection, 'hostfw8', change.fact('CandidateReady', {

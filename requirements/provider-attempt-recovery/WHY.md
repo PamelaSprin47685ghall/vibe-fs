@@ -8,7 +8,8 @@
 
 - **确认失败 vs 进程失忆**：attempt 失败是业务层已由快照确认的失败（与 `crash-reconciliation` 的进程失忆完全区分），必须通过单一 ledger 推进 cursor。
 - **无界侧循环 vs 有界自动预算**：A/A/B/B 侧循环本身无界，但自动恢复预算严格有界（达到预算后停止自动请求，需等待新 Authority Root 或显式动作）。
-- **换执行者 vs 不换身份**：Fallback 仅改变下一次物理执行的 EffectiveAgent，绝不改变 SessionPersona、语言、system prompt 或 Authority 身份。
+- **换执行者 vs 不换身份**：Fallback 仅改变下一次物理执行的 EffectiveAgent；同一 durable logical participant run 的 `ParticipantIdentity`、Persona、语言、system prompt、CanonicalRole 与 Authority identity 全程不变。
+- **失败分类 vs 恢复许可**：本包不解析异常或错误文案。只有 `execution-failure-policy` 已分类并授权的 `ProviderTransient | ProviderPermanent` 才能进入 retry/fallback；其他失败类别必须在各自 owner 结算。
 
 ## 违反边界的失败意义
 
@@ -20,6 +21,10 @@
 
 ## DEPENDS ON
 
+- `participant-identity`
+- `execution-failure-policy`
+- `execution-model-routing`
+- `interaction-authority`
 - `canonical-spine`
 - `semantic-trace-replayable-contract-cutover`
 - `prefix-stability-cutover`

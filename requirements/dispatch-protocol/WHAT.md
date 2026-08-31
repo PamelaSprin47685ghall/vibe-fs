@@ -34,7 +34,7 @@
 
 ## DISPATCH-PROTOCOL-009: Detached 在 durable claim 后立即交还控制
 
-在分离模式（`AwaitMode.Detached`）下，调度器在完成 durable claim 记录与宿主异步调用入栈后即刻返回 `PromptKey`，调用方不得阻塞等待模型容量调度、提供者执行或物理落地证据。若异步入栈后续发生致命拒绝，系统应触发进程级审计报错，且保留 Claim 待决记录而不自动重试。需要同步获知传输拒绝分支的场景必须显式使用 `AwaitMode.Await`。
+在分离模式（`AwaitMode.Detached`）下，调度器在完成 durable claim 记录与宿主异步调用入栈后即刻返回 `PromptKey`，调用方不得阻塞等待模型容量调度、provider 执行或物理落地证据。若异步入栈后续发生致命拒绝，系统应触发进程级审计报错，且保留 Claim 待决记录而不自动重试。需要同步获知传输拒绝分支的场景必须显式使用 `AwaitMode.Await`。物理消息落地后的 durable execution 由 `managed-chat-execution` 独占，dispatch 不创建或推进 execution facts。
 
 ## DISPATCH-PROTOCOL-010: Root 与 dispatch 不得选择、等待或覆盖 model
 
@@ -43,3 +43,11 @@
 ## DISPATCH-PROTOCOL-011: 插件 user-shaped message 一律经 PROMPT-005
 
 所有内部生成的合成用户消息必须携带合法的 `PromptKey` 与结构化来源元数据。此举保证缺乏插件元数据的消息能够被无歧义地识别为真实的外部物理用户输入。
+
+## DISPATCH-PROTOCOL-012: PhysicalAccepted 后只交接 exact identity
+
+Dispatch 在建立 `PhysicalAccepted` 后只向 `managed-chat-execution` 交接 exact `(SessionId, PhysicalUserMessageId)`、`PromptKey` 与 `interaction-authority` 发布的原子 `AttemptExecutionProfile`；该 profile 必须包含完整版本化 `ParticipantIdentityEvidence`，不得退化为可重新推导的 authority metadata。`managed-chat-execution` 独占 durable execution acceptance、provider start、terminal 与 settlement；dispatch 不复制其 transition law，不获取容量，不建立 execution binding，不解释 provider failure。
+
+## DISPATCH-PROTOCOL-013: Construction 纯 wiring，recovery 晚于 durability activation
+
+插件构造阶段只装配 dispatcher 与 handoff ports，不读 journal、不调和 pending claim、不恢复 execution、不启动 timer 或 polling。durable substrate 激活成功后，dispatch recovery 才可依据 durable claim 与 Host physical evidence 运行；execution recovery 委托 `managed-chat-execution`，且两者都不得以 wall clock 推进事实。

@@ -21,13 +21,16 @@ const checks = [
   join(root, 'checks/migration-ledger.mjs'),
   join(root, 'checks/plugin-transforms-invariant.mjs'),
   join(root, 'checks/interaction-repair-invariant.mjs'),
+  join(root, 'checks/retry-owner.mjs'),
   join(root, 'checks/composition-root-invariant.mjs'),
+  join(root, 'checks/hook-policy.mjs'),
   join(root, 'checks/semantic-decorator-invariant.mjs'),
   join(root, 'checks/deadcode.mjs'),
   join(root, 'checks/p0-recovery-join.mjs'),
   join(root, 'checks/causal-wait-boundary.mjs'),
   join(root, 'checks/cross-callback-pc.mjs'),
   join(root, 'checks/session-ownership-ratchet.mjs'),
+  join(root, 'checks/participant-identity-boundary.mjs'),
   join(root, 'checks/js-surface-gate.mjs'),
   // js-surface-manifest moved to build.mjs post-compile validation: it requires
   // emitted dist/ surfaces and cannot pass pre-build with partial/missing dist.

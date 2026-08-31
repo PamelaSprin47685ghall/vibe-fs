@@ -35,6 +35,7 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
@@ -74,7 +75,13 @@ module CasebookBookkeeper =
             let freeze = CasebookReplay.replayAll root case.Observations
 
             let! q', a' =
-                BookkeeperRuntime.runTransaction BookkeeperRequest.CaseRefresh sessionId case.Q case.A freeze None
+                BookkeeperRuntime.runTransaction
+                    BookkeeperRequest.CaseRefresh
+                    (SessionId.create sessionId)
+                    case.Q
+                    case.A
+                    freeze
+                    None
 
             let verify = CasebookReplay.replayAll root case.Observations
 

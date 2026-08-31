@@ -9,6 +9,7 @@ open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
@@ -30,49 +31,20 @@ open Wanxiangshu.Strength.Prediction
 
 open System
 open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
 module PromptAuthority =
 
-    type RootAuthorityKind =
-        | HumanRoot
-        | AgentOwnerRoot
+    type RootAuthorityKind = PromptRootAuthorityKind
+    type ContinuationKind = PromptContinuationKind
+    type PromptOrigin = Wanxiangshu.Interaction.Authority.PromptOrigin
 
-    /// PROMPT-003. Every one of these extends an existing Logical Run and may
-    /// not change the execution profile.
-    ///
-    /// There is deliberately no compaction continuation: HOST-006 closes Host
-    /// compaction globally, so a compaction-driven continuation has no origin
-    /// that could produce it.
-    type ContinuationKind =
-        | InteractionRepair
-        | JoinGuard
-        | ManagerGuard
-        | ReviewerGuard
-        | BusyAgentNudge
-        | ProviderRetryAttempt
-        /// DG-011: same-run continuation owned by degeneration-guard after its own interrupt.
-        | DegenerationGuard
-        /// Same-run Fission delivery: predecessor work or a pre-Fission shared
-        /// external completion enters a lane only at a safe provider boundary.
-        | FissionHandoff
-        /// GLORY-029: pure encouragement for an idle Manager; carries no work
-        /// record and no specific issue.
-        | ManagerIdleEncouragement
-        /// GLORY-053: a suicide was rejected; the reviewer's canonical work
-        /// record is the feedback body.
-        | FinalityRejected
-        /// GLORY-044: a later durable sibling REVISE, delivered as steer
-        /// continuation (not the suicide tool result).
-        | FinalitySteer
-
-    type PromptOrigin =
-        | AuthorityRoot of RootAuthorityKind
-        | Continuation of ContinuationKind
-        | HostInternal
-        | UnknownOrigin
+    type OwnerIdentityWitness = Wanxiangshu.Interaction.Authority.OwnerIdentityWitness
+    type IdentitySeed = PromptIdentitySeed
+    type OwnerIdentityWitnessInput = Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput
+    type IdentitySeedInput = PromptIdentitySeedInput
+    type IdentitySeedValidationError = PromptIdentitySeedValidationError
 
     /// What an Authority Root fixes for the whole Logical Run (PROMPT-002).
     ///
@@ -83,14 +55,130 @@ module PromptAuthority =
     /// PROMPT-002 also forbids a model id: there is deliberately no field for
     /// one, so "Authority Root overrides the model" is not expressible.
     type AuthorityExecutionProfile =
-        { SessionId: SessionId
-          LogicalRunId: LogicalRunId
-          AuthorityRootUserMessageId: AuthorityRootUserMessageId
-          AuthorityKind: RootAuthorityKind
-          SelectedAgent: string
-          PeerAgent: string
-          CanonicalRole: Role
-          SelectedTier: AgentTier }
+        private
+            { StoredSessionId: SessionId
+              StoredLogicalRunId: LogicalRunId
+              StoredAuthorityRootUserMessageId: AuthorityRootUserMessageId
+              StoredAuthorityKind: RootAuthorityKind
+              StoredIdentitySeed: IdentitySeed }
+
+        member this.SessionId = this.StoredSessionId
+        member this.LogicalRunId = this.StoredLogicalRunId
+        member this.AuthorityRootUserMessageId = this.StoredAuthorityRootUserMessageId
+        member this.AuthorityKind = this.StoredAuthorityKind
+        member this.IdentitySeed = this.StoredIdentitySeed
+
+        member this.ParticipantIdentity =
+            match this.StoredIdentitySeed with
+            | RootSelection identity -> identity
+            | InheritedFromOwner witness -> witness.ParticipantIdentity
+
+        member this.SelectedAgent = ParticipantIdentity.selectedAgent this.ParticipantIdentity
+        member this.PeerAgent = ParticipantIdentity.peerAgent this.ParticipantIdentity
+
+        member this.CanonicalRole =
+            match ParticipantIdentity.role this.ParticipantIdentity with
+            | Some role -> role
+            | None -> invalidOp "public authority participant identity cannot be Bookkeeper"
+
+        member this.SelectedTier = ParticipantIdentity.initialTier this.ParticipantIdentity
+        member this.Persona = ParticipantIdentity.persona this.ParticipantIdentity
+
+        member this.PersonaCatalogVersion =
+            ParticipantIdentity.personaCatalogVersion this.ParticipantIdentity
+
+        member this.PersonaOrigin = ParticipantIdentity.origin this.ParticipantIdentity
+
+    let identitySeedParticipantIdentity = PromptIdentitySeed.participantIdentity
+
+    let identitySeedOwner = PromptIdentitySeed.owner
+
+    let issueInheritedIdentitySeed
+        (canonicalChildName: string)
+        (owner: AuthorityExecutionProfile)
+        : Result<IdentitySeed, ParticipantIdentityError> =
+        ParticipantIdentity.inheritFromOwner canonicalChildName owner.ParticipantIdentity
+        |> Result.map (fun identity ->
+            PromptIdentitySeed.inherited owner.SessionId owner.LogicalRunId owner.AuthorityRootUserMessageId identity)
+
+    let validateInheritedIdentitySeedAgainstActiveOwner
+        (ownerOption: AuthorityExecutionProfile option)
+        (seed: IdentitySeed)
+        : Result<ParticipantIdentityEvidence, IdentitySeedValidationError> =
+        match ownerOption, seed with
+        | _, RootSelection _ -> Error ExpectedInheritedFromOwner
+        | None, InheritedFromOwner witness -> Error(OwnerAuthorityNotActive witness.OwnerSessionId)
+        | Some owner, InheritedFromOwner witness when witness.OwnerSessionId <> owner.SessionId ->
+            Error(OwnerSessionIdMismatch(owner.SessionId, witness.OwnerSessionId))
+        | Some owner, InheritedFromOwner witness when witness.OwnerLogicalRunId <> owner.LogicalRunId ->
+            Error(OwnerLogicalRunIdMismatch(owner.LogicalRunId, witness.OwnerLogicalRunId))
+        | Some owner, InheritedFromOwner witness when
+            witness.OwnerAuthorityRootUserMessageId <> owner.AuthorityRootUserMessageId
+            ->
+            Error(
+                OwnerAuthorityRootUserMessageIdMismatch(
+                    owner.AuthorityRootUserMessageId,
+                    witness.OwnerAuthorityRootUserMessageId
+                )
+            )
+        | Some owner, InheritedFromOwner witness ->
+            ParticipantIdentity.rehydrate
+                (Some owner.ParticipantIdentity)
+                (ParticipantIdentity.toInput witness.ParticipantIdentity)
+            |> Result.mapError InvalidInheritedParticipantIdentity
+            |> Result.map (fun _ -> witness.ParticipantIdentity)
+
+    let validateInheritedIdentitySeed owner seed =
+        validateInheritedIdentitySeedAgainstActiveOwner (Some owner) seed
+
+    let internal identitySeedInput = PromptIdentitySeed.toInput
+
+    let internal rehydrateIdentitySeed = PromptIdentitySeed.rehydrate
+
+    let createAuthorityExecutionProfileFromSeed
+        (sessionId: SessionId)
+        (logicalRunId: LogicalRunId)
+        (authorityRootUserMessageId: AuthorityRootUserMessageId)
+        (authorityKind: RootAuthorityKind)
+        (identitySeed: IdentitySeed)
+        : Result<AuthorityExecutionProfile, string> =
+        let participantIdentity = identitySeedParticipantIdentity identitySeed
+
+        match authorityKind, identitySeed, ParticipantIdentity.role participantIdentity with
+        | _, _, None -> Error "public authority participant identity cannot be Bookkeeper"
+        | RootAuthorityKind.HumanRoot, RootSelection _, Some _ when
+            ParticipantIdentity.origin participantIdentity = PersonaOrigin.ResolvedAtRoot
+            ->
+            Ok
+                { StoredSessionId = sessionId
+                  StoredLogicalRunId = logicalRunId
+                  StoredAuthorityRootUserMessageId = authorityRootUserMessageId
+                  StoredAuthorityKind = authorityKind
+                  StoredIdentitySeed = identitySeed }
+        | RootAuthorityKind.AgentOwnerRoot, InheritedFromOwner _, Some _ ->
+            Ok
+                { StoredSessionId = sessionId
+                  StoredLogicalRunId = logicalRunId
+                  StoredAuthorityRootUserMessageId = authorityRootUserMessageId
+                  StoredAuthorityKind = authorityKind
+                  StoredIdentitySeed = identitySeed }
+        | RootAuthorityKind.HumanRoot, _, Some _ -> Error "HumanRoot requires a root-selection identity seed"
+        | RootAuthorityKind.AgentOwnerRoot, _, Some _ ->
+            Error "AgentOwnerRoot requires an inherited owner identity seed"
+
+    let createAuthorityExecutionProfile
+        (sessionId: SessionId)
+        (logicalRunId: LogicalRunId)
+        (authorityRootUserMessageId: AuthorityRootUserMessageId)
+        (authorityKind: RootAuthorityKind)
+        (participantIdentity: ParticipantIdentityEvidence)
+        : Result<AuthorityExecutionProfile, string> =
+        createAuthorityExecutionProfileFromSeed
+            sessionId
+            logicalRunId
+            authorityRootUserMessageId
+            authorityKind
+            (RootSelection participantIdentity)
 
     /// One provider request (PROMPT-008).
     ///
@@ -165,6 +253,7 @@ module PromptAuthority =
             LogicalRunId: LogicalRunId option
             AuthorityRootUserMessageId: AuthorityRootUserMessageId option
             EffectiveAgent: string option
+            IdentitySeed: IdentitySeed
             /// PROMPT-005 requires the payload digest at claim time so recovery can
             /// tell two dispatches of the same shape apart.
             PayloadDigest: string
@@ -191,6 +280,7 @@ module PromptAuthority =
         { PromptKey: PromptKey
           SessionId: SessionId
           Origin: PromptOrigin
+          IdentitySeed: IdentitySeed
           PayloadDigest: string
           PhysicalUserMessageId: PhysicalUserMessageId }
 
@@ -248,6 +338,8 @@ module PromptAuthority =
         | Continuation ManagerGuard -> "ManagerGuard"
         | Continuation ReviewerGuard -> "ReviewerGuard"
         | Continuation BusyAgentNudge -> "BusyAgentNudge"
+        | Continuation HumanMessage -> "HumanMessage"
+        | Continuation ManagedDelegationAssignment -> "ManagedDelegationAssignment"
         | Continuation ProviderRetryAttempt -> "ProviderRetryAttempt"
         | Continuation DegenerationGuard -> "DegenerationGuard"
         | Continuation ManagerIdleEncouragement -> "ManagerIdleEncouragement"
@@ -264,6 +356,8 @@ module PromptAuthority =
         | "ManagerGuard" -> Some ManagerGuard
         | "ReviewerGuard" -> Some ReviewerGuard
         | "BusyAgentNudge" -> Some BusyAgentNudge
+        | "HumanMessage" -> Some HumanMessage
+        | "ManagedDelegationAssignment" -> Some ManagedDelegationAssignment
         | "ProviderRetryAttempt" -> Some ProviderRetryAttempt
         | "DegenerationGuard" -> Some DegenerationGuard
         | "ManagerIdleEncouragement" -> Some ManagerIdleEncouragement
@@ -360,8 +454,9 @@ module PromptAuthority =
         )
 
     let agentPair (profile: AuthorityExecutionProfile) : AgentPairCursor.AuthorityAgentPair =
-        { AgentPairCursor.AuthorityAgentPair.SelectedAgent = profile.SelectedAgent
-          AgentPairCursor.AuthorityAgentPair.PeerAgent = profile.PeerAgent }
+        { AgentPairCursor.AuthorityAgentPair.SelectedAgent =
+            ParticipantIdentity.selectedAgent profile.ParticipantIdentity
+          AgentPairCursor.AuthorityAgentPair.PeerAgent = ParticipantIdentity.peerAgent profile.ParticipantIdentity }
 
     // ── PromptKey derivation (PROMPT-011) ───────────────────────────────────
     //
@@ -636,8 +731,9 @@ module PromptAuthority =
     /// or a tool set that disagrees with the role.
     ///
     /// FALLBACK-014 / AGENT-029: `EffectiveAgent` may move to PeerAgent on B-side;
-    /// `SystemPromptId`, SessionPersona and SessionProviderLanguage stay on
-    /// CanonicalRole + session bind-once — never on EffectiveAgent tier/name.
+    /// `SystemPromptId` and ParticipantIdentity stay fixed by the Authority Root
+    /// IdentitySeed, while SessionProviderLanguage stays session bind-once. None
+    /// follows EffectiveAgent tier/name.
     ///
     /// That is the whole clause. The previous code assembled these fields from a
     /// mutable session cache, the last user message, a Role map and the fallback

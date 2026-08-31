@@ -189,7 +189,10 @@ module XTraceCapture =
         task {
             let existing = xTraceOf durable sessionId
 
-            if not (XTraceProjection.openingCaptured existing) && not (String.IsNullOrWhiteSpace assignmentText) then
+            if
+                not (XTraceProjection.openingCaptured existing)
+                && not (String.IsNullOrWhiteSpace assignmentText)
+            then
                 do!
                     CompanionFact.OpeningPromptCaptured
                         {| SessionId = sessionId
@@ -439,7 +442,9 @@ module XTraceCapture =
             let generation = captureGeneration durable sessionId
 
             let recorded =
-                XTraceProjection.parts existing |> List.map (fun part -> part.Provenance) |> Set.ofList
+                XTraceProjection.parts existing
+                |> List.map (fun part -> part.Provenance)
+                |> Set.ofList
             // DSL-MUTABLE: algorithm-scratch — next durable cursor while appending one capture batch
             let mutable cursor = XTraceProjection.headSequence existing
 
@@ -665,7 +670,9 @@ module XTraceCapture =
             let provenance = sprintf "g:%d/last_words" generation
 
             let recorded =
-                XTraceProjection.parts existing |> List.map (fun part -> part.Provenance) |> Set.ofList
+                XTraceProjection.parts existing
+                |> List.map (fun part -> part.Provenance)
+                |> Set.ofList
 
             if Set.contains provenance recorded then
                 return ()
@@ -869,7 +876,9 @@ module XTraceCapture =
         { PreviousHead = XTraceProjection.headCursor before
           CurrentHead = XTraceProjection.headCursor after
           CapturedPartCount = XTraceProjection.partCount after - XTraceProjection.partCount before
-          OpeningCaptured = not (XTraceProjection.openingCaptured before) && XTraceProjection.openingCaptured after
+          OpeningCaptured =
+            not (XTraceProjection.openingCaptured before)
+            && XTraceProjection.openingCaptured after
           TerminalCaptured = XTraceProjection.terminalCount after > XTraceProjection.terminalCount before
           Identity = identity }
 
@@ -964,7 +973,7 @@ module XTraceCapture =
 
     let private capturedObservationMessage (observation: XTraceMessageObservation) =
         match observation.Origin with
-        | Some(PromptAuthority.PromptOrigin.Continuation PromptAuthority.ProviderRetryAttempt) ->
+        | Some(PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt) ->
             { observation.Message with Parts = [] }
         | _ -> observation.Message
 
@@ -1011,11 +1020,13 @@ module XTraceCapture =
     let private captureObservedDurable journal durable sessionId observations =
         let before = xTraceOf durable sessionId
         let captured = observations |> List.map capturedObservationMessage
-        let observedIds = observations |> List.map (fun observation -> observation.HostMessageId)
+
+        let observedIds =
+            observations |> List.map (fun observation -> observation.HostMessageId)
+
         let eligibility = stableCaptureEligibility journal sessionId observedIds
 
-        protectObservedCapture (fun () ->
-            captureObservedByEligibility journal sessionId before eligibility captured)
+        protectObservedCapture (fun () -> captureObservedByEligibility journal sessionId before eligibility captured)
 
     /// Typed Host observation membrane. Retry-attempt continuation rows retain
     /// their physical position and identity but contribute no durable semantic
@@ -1066,10 +1077,12 @@ module XTraceCapture =
     let private captureSessionMessagesDurable journal durable sessionId messages =
         task {
             let before = xTraceOf durable sessionId
+
             let eligibility =
                 messages
                 |> List.map (fun message -> Some message.Id)
                 |> stableCaptureEligibility journal sessionId
+
             let identity = captureIdentityForEligibility eligibility
             let! result = captureSessionMessages journal sessionId messages
 
@@ -1089,6 +1102,5 @@ module XTraceCapture =
             | None -> return Ok(withoutJournalReceipt ())
             | Some durable ->
                 return!
-                    protectObservedCapture (fun () ->
-                        captureSessionMessagesDurable journal durable sessionId messages)
+                    protectObservedCapture (fun () -> captureSessionMessagesDurable journal durable sessionId messages)
         }

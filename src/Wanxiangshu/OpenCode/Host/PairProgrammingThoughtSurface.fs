@@ -274,6 +274,7 @@ module PairProgrammingThoughtSurface =
     let gapConstructorFailureTrace (messageId: string) : obj =
         // DSL-MUTABLE: algorithm-scratch — invocations before the thrown callback failure.
         let mutable calls = 0
+
         let message =
             box
                 {| info = {| id = messageId; role = "assistant" |}
@@ -290,7 +291,9 @@ module PairProgrammingThoughtSurface =
 
             box {| calls = calls; error = "" |}
         with error ->
-            box {| calls = calls; error = error.Message |}
+            box
+                {| calls = calls
+                   error = error.Message |}
 
     let stableCallId (sessionId: obj) (ordinal: int64) =
         PairProgrammingThoughtTransform.stableCallId (if isNull sessionId then None else Some(string sessionId)) ordinal

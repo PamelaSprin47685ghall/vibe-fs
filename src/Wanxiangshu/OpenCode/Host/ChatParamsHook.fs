@@ -78,7 +78,12 @@ module ChatParamsHook =
         match SessionExecutionBinding.validateObservedProvider sessionId agent model with
         | Ok true -> ()
         | Ok false ->
-            invalidOp (sprintf "PROMPT-006: managed provider run '%s' was not recognized as a bound session" agent)
+            invalidOp (
+                sprintf
+                    "PROMPT-006: managed provider run '%s' was not recognized as bound session '%s'"
+                    agent
+                    (SessionId.value sessionId)
+            )
         | Error error -> invalidOp error
 
     let private validateModel (sessionId: SessionId) (agent: string) (input: obj) =
@@ -152,6 +157,7 @@ module ChatParamsHook =
 
     let private applyManagedPolicy input output =
         match trySessionAndAgent input with
+        | Some(sessionId, _) when SessionExecutionBinding.isUnboundHostAuxiliaryChild sessionId -> ()
         | Some(sessionId, agent) ->
             validateModel sessionId agent input
             applyManagedTemperature input output

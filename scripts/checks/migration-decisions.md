@@ -86,7 +86,7 @@
    - `scripts/checks/tool-referential-integrity.mjs` (L0 工具引用完整性门禁)
    - `requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs` (L1 权限同构测试)
    - `requirements/capability-enforcement/tests/tool-referential-integrity.test.mjs` (L1 引用完整性测试)
-4. **`OpenCode/Host/ModelCapacity.fs`**:
+4. **`OpenCode/Host/ModelCapacity/**`**:
    - `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs` (L1 路由与容量权威边界测试)
    - `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs` (L2 模型路由运行时租约与容量测试)
 5. **`Persistence/EventStore/CanonicalIntegrator.fs`**:

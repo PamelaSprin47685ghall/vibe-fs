@@ -179,6 +179,12 @@ test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_host_compaction_detection', () 
   assert.equal(decodeIngress({}, null).isHostCompaction, false)
 })
 
+test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_host_synthetic_detection', () => {
+  assert.equal(decodeIngress({}, { parts: [{ synthetic: true }] }).isHostSynthetic, true)
+  assert.equal(decodeIngress({}, { parts: [{ synthetic: false }] }).isHostSynthetic, false)
+  assert.equal(decodeIngress({}, {}).isHostSynthetic, false)
+})
+
 test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_text_joins_text_parts_and_filters_blanks', () => {
   const msg = decodeIngress({}, { parts: [{ type: 'text', text: 'one' }, { type: 'text', text: '   ' }, { type: 'tool-call', tool: 'x' }, { type: 'text', text: 'two' }] })
   assert.equal(msg.text, 'one\ntwo')

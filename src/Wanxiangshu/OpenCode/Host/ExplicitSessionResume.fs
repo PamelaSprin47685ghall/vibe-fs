@@ -8,7 +8,6 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation.Identity
 
@@ -18,11 +17,6 @@ open Wanxiangshu.Foundation.Identity
 /// tool call, appends recovery facts, or sends a prompt on the user's behalf.
 [<RequireQualifiedAccess>]
 module ExplicitSessionResume =
-
-    let private requirePersona result =
-        match result with
-        | Ok _ -> ()
-        | Error rejection -> invalidOp (PersonaRejection.render rejection)
 
     let private tryResumeProfile (journal: AgentJournal option) sessionId =
         journal
@@ -39,7 +33,9 @@ module ExplicitSessionResume =
         explicitAgent
         =
         let resumeAgent =
-            ModelRouting.managedAgentForAdmission explicitAgent
+            explicitAgent
+            |> Option.bind ManagedAgent.tryParse
+            |> Option.map (fun agent -> agent.Name)
             |> Option.orElseWith (fun () -> profileOpt |> Option.map (fun profile -> profile.SelectedAgent))
 
         resumeAgent
@@ -47,10 +43,6 @@ module ExplicitSessionResume =
             observeManagedSession sessionId
             SessionExecutionBinding.observeUserFacingAgent sessionId agent
             ProviderLanguageBinding.ensureRoot sessionId |> ignore)
-
-        match profileOpt with
-        | Some profile -> PersonaBinding.ensureFromAuthority profile |> requirePersona
-        | None -> PersonaBinding.ensureRoot sessionId |> requirePersona
 
     /// CRASH-018 process-local reenlistment of the explicit-resume provider turn.
     /// The runtime scope supplies only its managed-session observation; durable

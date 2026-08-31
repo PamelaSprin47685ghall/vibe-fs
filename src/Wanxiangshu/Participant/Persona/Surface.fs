@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Participant.Persona
 
+open System
 open Wanxiangshu.Foundation
 
 /// JS-native identity and persona contract owned by Participant/Persona.
@@ -86,3 +87,111 @@ module PersonaSurface =
 
     let formatLegacyNameInConfig (name: string) : string =
         ManagedAgentCatalog.formatLegacyNameInConfig name
+
+    let private originLabel origin =
+        match origin with
+        | PersonaOrigin.ResolvedAtRoot -> "ResolvedAtRoot"
+        | PersonaOrigin.InheritedFromOwner -> "InheritedFromOwner"
+
+    let private errorLabel error =
+        match error with
+        | ParticipantIdentityError.BlankParticipantName -> "BlankParticipantName"
+        | ParticipantIdentityError.LegacyParticipantName _ -> "LegacyParticipantName"
+        | ParticipantIdentityError.MalformedParticipantName _ -> "MalformedParticipantName"
+        | ParticipantIdentityError.UnknownParticipantName _ -> "UnknownParticipantName"
+        | ParticipantIdentityError.UnsupportedPersonaCatalogVersion _ -> "UnsupportedPersonaCatalogVersion"
+        | ParticipantIdentityError.RoleMismatch _ -> "RoleMismatch"
+        | ParticipantIdentityError.TierMismatch _ -> "TierMismatch"
+        | ParticipantIdentityError.PeerMismatch _ -> "PeerMismatch"
+        | ParticipantIdentityError.BlankPersona -> "BlankPersona"
+        | ParticipantIdentityError.PersonaMismatch _ -> "PersonaMismatch"
+        | ParticipantIdentityError.OriginMismatch _ -> "OriginMismatch"
+        | ParticipantIdentityError.OwnerRequired -> "OwnerRequired"
+        | ParticipantIdentityError.OwnerPersonaMismatch _ -> "OwnerPersonaMismatch"
+        | ParticipantIdentityError.OwnerCatalogVersionMismatch _ -> "OwnerCatalogVersionMismatch"
+        | ParticipantIdentityError.LegacyRoleMismatch _ -> "LegacyRoleMismatch"
+        | ParticipantIdentityError.LegacyTierMismatch _ -> "LegacyTierMismatch"
+        | ParticipantIdentityError.UnsupportedLegacyAuthorityKind _ -> "UnsupportedLegacyAuthorityKind"
+        | ParticipantIdentityError.UnprovableLegacyAuthorityIdentity _ -> "UnprovableLegacyAuthorityIdentity"
+
+    let private identityToJs evidence : obj =
+        box
+            {| name = ParticipantIdentity.selectedAgent evidence
+               role = ParticipantIdentity.roleLabel evidence
+               initialTier = ParticipantIdentity.initialTier evidence |> Roles.wireTierLabel
+               peer = ParticipantIdentity.peerAgent evidence
+               persona = ParticipantIdentity.persona evidence
+               catalogVersion = ParticipantIdentity.personaCatalogVersion evidence
+               origin = ParticipantIdentity.origin evidence |> originLabel |}
+
+    let private identityResult result : obj =
+        match result with
+        | Ok evidence ->
+            box
+                {| ok = true
+                   identity = identityToJs evidence
+                   error = null |}
+        | Error error ->
+            box
+                {| ok = false
+                   identity = null
+                   error = errorLabel error |}
+
+    let private boundaryFailure error : obj =
+        box
+            {| ok = false
+               identity = null
+               error = error |}
+
+    let resolveParticipantIdentityAtRoot (canonicalManagedName: string) : obj =
+        ParticipantIdentity.resolveAtRoot canonicalManagedName |> identityResult
+
+    let inheritParticipantIdentityFromOwner (canonicalManagedName: string) (ownerCanonicalManagedName: string) : obj =
+        ParticipantIdentity.resolveAtRoot ownerCanonicalManagedName
+        |> Result.bind (ParticipantIdentity.inheritFromOwner canonicalManagedName)
+        |> identityResult
+
+    let rehydrateParticipantIdentity
+        (ownerCanonicalManagedName: string)
+        (canonicalManagedName: string)
+        (roleLabel: string)
+        (initialTierLabel: string)
+        (peerCanonicalManagedName: string)
+        (personaName: string)
+        (catalogVersion: int)
+        (origin: string)
+        : obj =
+        let parsedRole =
+            if roleLabel = "bookkeeper" then
+                Some None
+            else
+                roleOf roleLabel |> Option.map Some
+
+        let parsedTier = tierOf initialTierLabel
+
+        let parsedOrigin =
+            match origin with
+            | "ResolvedAtRoot" -> Some PersonaOrigin.ResolvedAtRoot
+            | "InheritedFromOwner" -> Some PersonaOrigin.InheritedFromOwner
+            | _ -> None
+
+        match parsedRole, parsedTier, parsedOrigin with
+        | None, _, _ -> boundaryFailure "InvalidRoleLabel"
+        | _, None, _ -> boundaryFailure "InvalidTierLabel"
+        | _, _, None -> boundaryFailure "InvalidOriginLabel"
+        | Some role, Some tier, Some personaOrigin ->
+            let input =
+                { SelectedAgent = canonicalManagedName
+                  PeerAgent = peerCanonicalManagedName
+                  Role = role
+                  InitialTier = tier
+                  Persona = personaName
+                  PersonaCatalogVersion = catalogVersion
+                  Origin = personaOrigin }
+
+            if String.IsNullOrWhiteSpace ownerCanonicalManagedName then
+                ParticipantIdentity.rehydrate None input |> identityResult
+            else
+                ParticipantIdentity.resolveAtRoot ownerCanonicalManagedName
+                |> Result.bind (fun owner -> ParticipantIdentity.rehydrate (Some owner) input)
+                |> identityResult

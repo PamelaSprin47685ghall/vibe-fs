@@ -25,14 +25,28 @@ module SemanticTraceSurface =
     let private isNullish (value: obj) : bool = jsNative
 
     let private field (value: obj) (name: string) : obj =
-        if isNullish value then null else emitJsExpr (value, name) "$0[$1]"
+        if isNullish value then
+            null
+        else
+            emitJsExpr (value, name) "$0[$1]"
 
-    let private text (value: obj) = if isNullish value then "" else string value
-    let private optionalText value = if isNullish value then None else Some(text value)
-    let private arrayOf value = if isNullish value then [||] else unbox<obj array> value
-    let private cursorOf value = XTraceCursor.create (int64 (text (field value "sequence")))
-    let private cursorView cursor : obj = box {| sequence = XTraceCursor.sequence cursor |> int |}
-    let private rangeOf value = XTraceRange.create (cursorOf (field value "start")) (cursorOf (field value "endExclusive"))
+    let private text (value: obj) =
+        if isNullish value then "" else string value
+
+    let private optionalText value =
+        if isNullish value then None else Some(text value)
+
+    let private arrayOf value =
+        if isNullish value then [||] else unbox<obj array> value
+
+    let private cursorOf value =
+        XTraceCursor.create (int64 (text (field value "sequence")))
+
+    let private cursorView cursor : obj =
+        box {| sequence = XTraceCursor.sequence cursor |> int |}
+
+    let private rangeOf value =
+        XTraceRange.create (cursorOf (field value "start")) (cursorOf (field value "endExclusive"))
 
     let private rangeView range : obj =
         box
@@ -43,10 +57,20 @@ module SemanticTraceSurface =
         match part with
         | SemanticText value -> box {| kind = "text"; text = value |}
         | SemanticReasoning value -> box {| kind = "reasoning"; text = value |}
-        | SemanticToolCall(name, args) -> box {| kind = "tool-call"; name = name; args = args |}
-        | SemanticToolResult value -> box {| kind = "tool-result"; result = value |}
+        | SemanticToolCall(name, args) ->
+            box
+                {| kind = "tool-call"
+                   name = name
+                   args = args |}
+        | SemanticToolResult value ->
+            box
+                {| kind = "tool-result"
+                   result = value |}
         | SemanticMedia(mediaType, digest) ->
-            box {| kind = "media"; mediaType = mediaType |> Option.map box |> Option.toObj; digest = digest |}
+            box
+                {| kind = "media"
+                   mediaType = mediaType |> Option.map box |> Option.toObj
+                   digest = digest |}
 
     let private semanticPartOf value =
         match text (field value "kind") with
@@ -65,9 +89,14 @@ module SemanticTraceSurface =
         | "reasoning" -> Wanxiangshu.OpenCode.MessagePart.Reasoning(text (field value "text"))
         | "tool-call"
         | "tool_call" ->
-            Wanxiangshu.OpenCode.MessagePart.ToolCall(text (field value "callId"), text (field value "name"), text (field value "args"))
+            Wanxiangshu.OpenCode.MessagePart.ToolCall(
+                text (field value "callId"),
+                text (field value "name"),
+                text (field value "args")
+            )
         | "tool-result"
-        | "tool_result" -> Wanxiangshu.OpenCode.MessagePart.ToolResult(text (field value "callId"), text (field value "result"))
+        | "tool_result" ->
+            Wanxiangshu.OpenCode.MessagePart.ToolResult(text (field value "callId"), text (field value "result"))
         | "activity" -> Wanxiangshu.OpenCode.MessagePart.Activity(text (field value "activity"))
         | other -> failwith $"SemanticTraceSurface: unknown capture part '{other}'"
 
@@ -79,14 +108,21 @@ module SemanticTraceSurface =
                   Parts = arrayOf (field message "parts") |> Array.map semanticPartOf |> Array.toList })
             |> Array.toList
 
-        { ProviderId = None; ModelId = None; Variant = None; Tools = []; System = []; Messages = messages }
+        { ProviderId = None
+          ModelId = None
+          Variant = None
+          Tools = []
+          System = []
+          Messages = messages }
 
     let private projectionView (projection: ProviderSemanticProjection) : obj =
         box
             {| messages =
                 projection.Messages
                 |> List.map (fun message ->
-                    box {| role = message.Role; parts = message.Parts |> List.map semanticPartView |> List.toArray |})
+                    box
+                        {| role = message.Role
+                           parts = message.Parts |> List.map semanticPartView |> List.toArray |})
                 |> List.toArray |}
 
     let private partView (part: XTraceSemanticPartView) : obj =
@@ -99,7 +135,10 @@ module SemanticTraceSurface =
                partIndex = part.PartIndex
                kind = part.Kind
                toolName = part.ToolName |> Option.map box |> Option.toObj
-               providerRun = part.ProviderRun |> Option.map (ProviderRunIdentity.value >> box) |> Option.toObj
+               providerRun =
+                part.ProviderRun
+                |> Option.map (ProviderRunIdentity.value >> box)
+                |> Option.toObj
                toolCallId = part.ToolCallId |> Option.map (ToolCallId.value >> box) |> Option.toObj
                hostToolPartId = part.HostToolPartId |> Option.map (HostToolPartId.value >> box) |> Option.toObj
                textRef = BlobRef.value part.TextRef
@@ -133,8 +172,14 @@ module SemanticTraceSurface =
 
     let private updateResult result : obj =
         match result with
-        | Ok state -> box {| ok = true; projection = SemanticTraceProjection.Create state |}
-        | Error error -> box {| ok = false; error = rejection error |}
+        | Ok state ->
+            box
+                {| ok = true
+                   projection = SemanticTraceProjection.Create state |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = rejection error |}
 
     let private captureError error =
         match error with
@@ -149,7 +194,10 @@ module SemanticTraceSurface =
 
     let private receiptView result : obj =
         match result with
-        | Error error -> box {| ok = false; error = captureError error |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = captureError error |}
         | Ok receipt ->
             box
                 {| ok = true
@@ -161,26 +209,54 @@ module SemanticTraceSurface =
                    identity = identityView receipt.Identity |}
 
     let textPart value : obj = box {| kind = "text"; text = value |}
-    let reasoningPart value : obj = box {| kind = "reasoning"; text = value |}
-    let toolCallPart callId name args : obj = box {| kind = "tool-call"; callId = callId; name = name; args = args |}
-    let toolResultPart callId result : obj = box {| kind = "tool-result"; callId = callId; result = result |}
-    let activityPart kind : obj = box {| kind = "activity"; activity = kind |}
+
+    let reasoningPart value : obj =
+        box {| kind = "reasoning"; text = value |}
+
+    let toolCallPart callId name args : obj =
+        box
+            {| kind = "tool-call"
+               callId = callId
+               name = name
+               args = args |}
+
+    let toolResultPart callId result : obj =
+        box
+            {| kind = "tool-result"
+               callId = callId
+               result = result |}
+
+    let activityPart kind : obj =
+        box {| kind = "activity"; activity = kind |}
 
     let mapPart value : obj option =
-        value |> messagePartOf |> XTraceCapture.semanticPart |> Option.map semanticPartView
+        value
+        |> messagePartOf
+        |> XTraceCapture.semanticPart
+        |> Option.map semanticPartView
 
     let semanticText value : obj = semanticPartView (SemanticText value)
-    let semanticReasoning value : obj = semanticPartView (SemanticReasoning value)
-    let semanticToolCall name args : obj = semanticPartView (SemanticToolCall(name, args))
-    let semanticToolResult value : obj = semanticPartView (SemanticToolResult value)
-    let semanticMedia mediaType digest : obj = semanticPartView (SemanticMedia(optionalText mediaType, digest))
 
-    let emptyProjection () = SemanticTraceProjection.Create XTraceProjection.empty
+    let semanticReasoning value : obj =
+        semanticPartView (SemanticReasoning value)
+
+    let semanticToolCall name args : obj =
+        semanticPartView (SemanticToolCall(name, args))
+
+    let semanticToolResult value : obj =
+        semanticPartView (SemanticToolResult value)
+
+    let semanticMedia mediaType digest : obj =
+        semanticPartView (SemanticMedia(optionalText mediaType, digest))
+
+    let emptyProjection () =
+        SemanticTraceProjection.Create XTraceProjection.empty
 
     let private stateOf (projection: SemanticTraceProjection) : XTraceProjectionState = projection.State
 
     let appendOpening (projection: SemanticTraceProjection) assignmentText (requirements: string array) : obj =
-        XTraceProjection.applyOpening assignmentText (requirements |> Array.toList) (stateOf projection) |> updateResult
+        XTraceProjection.applyOpening assignmentText (requirements |> Array.toList) (stateOf projection)
+        |> updateResult
 
     let appendPart (projection: SemanticTraceProjection) value : obj =
         XTraceProjection.applyPart
@@ -191,7 +267,8 @@ module SemanticTraceSurface =
             (int (text (field value "partIndex")))
             (text (field value "kind"))
             (optionalText (field value "toolName"))
-            (optionalText (field value "providerRun") |> Option.map ProviderRunIdentity.create)
+            (optionalText (field value "providerRun")
+             |> Option.map ProviderRunIdentity.create)
             (optionalText (field value "toolCallId") |> Option.map ToolCallId.create)
             (optionalText (field value "hostToolPartId") |> Option.map HostToolPartId.create)
             (BlobRef.create (text (field value "textRef")))
@@ -210,35 +287,66 @@ module SemanticTraceSurface =
     let openingEvidence (projection: SemanticTraceProjection) : obj option =
         XTraceProjection.openingEvidence (stateOf projection) |> Option.map openingView
 
-    let hasOpening projection = XTraceProjection.hasOpening (stateOf projection)
-    let hasSemanticParts projection = XTraceProjection.hasSemanticParts (Some(stateOf projection))
-    let orderedSemanticParts projection = XTraceProjection.orderedSemanticParts (stateOf projection) |> List.map partView |> List.toArray
-    let currentGenerationSemanticParts projection = XTraceProjection.currentGenerationSemanticParts (stateOf projection) |> List.map partView |> List.toArray
-    let partKinds projection = XTraceProjection.partKinds (stateOf projection) |> List.toArray
-    let latestPartCursor projection = XTraceProjection.latestPartCursor (stateOf projection) |> Option.map cursorView
-    let headCursor projection = XTraceProjection.headCursor (stateOf projection) |> cursorView
-    let frontierAfter value = field value "cursor" |> cursorOf |> XTraceCursor.nextCursor |> cursorView
-    let rangeFrom start projection = XTraceProjection.rangeFrom (cursorOf start) (stateOf projection) |> rangeView
+    let hasOpening projection =
+        XTraceProjection.hasOpening (stateOf projection)
+
+    let hasSemanticParts projection =
+        XTraceProjection.hasSemanticParts (Some(stateOf projection))
+
+    let orderedSemanticParts projection =
+        XTraceProjection.orderedSemanticParts (stateOf projection)
+        |> List.map partView
+        |> List.toArray
+
+    let currentGenerationSemanticParts projection =
+        XTraceProjection.currentGenerationSemanticParts (stateOf projection)
+        |> List.map partView
+        |> List.toArray
+
+    let partKinds projection =
+        XTraceProjection.partKinds (stateOf projection) |> List.toArray
+
+    let latestPartCursor projection =
+        XTraceProjection.latestPartCursor (stateOf projection) |> Option.map cursorView
+
+    let headCursor projection =
+        XTraceProjection.headCursor (stateOf projection) |> cursorView
+
+    let frontierAfter value =
+        field value "cursor" |> cursorOf |> XTraceCursor.nextCursor |> cursorView
+
+    let rangeFrom start projection =
+        XTraceProjection.rangeFrom (cursorOf start) (stateOf projection) |> rangeView
 
     let rangeOfPart value =
         let cursor = cursorOf (field value "cursor")
         XTraceRange.create cursor (XTraceCursor.nextCursor cursor) |> rangeView
 
-    let slice range projection = XTraceProjection.slice (rangeOf range) (stateOf projection) |> List.map partView |> List.toArray
+    let slice range projection =
+        XTraceProjection.slice (rangeOf range) (stateOf projection)
+        |> List.map partView
+        |> List.toArray
 
     let latestTerminalEvidence projection =
-        XTraceProjection.latestTerminalEvidence (stateOf projection) |> Option.map terminalView
+        XTraceProjection.latestTerminalEvidence (stateOf projection)
+        |> Option.map terminalView
 
     let terminalEvidenceForProviderRun providerRun projection =
         XTraceProjection.terminalEvidenceForProviderRun (ProviderRunIdentity.create providerRun) (stateOf projection)
         |> Option.map terminalView
 
     let providerRunParts providerRun projection =
-        XTraceProjection.providerRunParts (ProviderRunIdentity.create providerRun) (stateOf projection) |> List.map partView |> List.toArray
+        XTraceProjection.providerRunParts (ProviderRunIdentity.create providerRun) (stateOf projection)
+        |> List.map partView
+        |> List.toArray
 
     let toolResultParts providerRun toolCallId projection =
-        XTraceProjection.toolResultParts (ProviderRunIdentity.create providerRun) (ToolCallId.create toolCallId) (stateOf projection)
-        |> List.map partView |> List.toArray
+        XTraceProjection.toolResultParts
+            (ProviderRunIdentity.create providerRun)
+            (ToolCallId.create toolCallId)
+            (stateOf projection)
+        |> List.map partView
+        |> List.toArray
 
     let toolPartsForHostIdentity providerRun toolCallId hostToolPartId projection =
         XTraceProjection.toolPartsForHostIdentity
@@ -246,31 +354,67 @@ module SemanticTraceSurface =
             (ToolCallId.create toolCallId)
             (HostToolPartId.create hostToolPartId)
             (stateOf projection)
-        |> List.map partView |> List.toArray
+        |> List.map partView
+        |> List.toArray
 
-    let tryHostMessageIdAt cursor projection = XTraceProjection.tryHostMessageIdAt (cursorOf cursor) (stateOf projection)
-    let partsForHostMessageIds ids projection = XTraceProjection.partsForHostMessageIds (Set.ofArray ids) (stateOf projection) |> List.map partView |> List.toArray
-    let tryContiguousHostRange ids projection = XTraceProjection.tryContiguousHostRange (Set.ofArray ids) (stateOf projection) |> Option.map rangeView
-    let tryTurnOfHostMessageId id projection = XTraceProjection.tryTurnOfHostMessageId id (stateOf projection)
-    let tryOpeningHostMessageId projection = XTraceProjection.tryOpeningHostMessageId (stateOf projection)
-    let hostMessageIdsBeforeTurn cutoff projection = XTraceProjection.hostMessageIdsBeforeTurn cutoff (stateOf projection) |> List.toArray
+    let tryHostMessageIdAt cursor projection =
+        XTraceProjection.tryHostMessageIdAt (cursorOf cursor) (stateOf projection)
+
+    let partsForHostMessageIds ids projection =
+        XTraceProjection.partsForHostMessageIds (Set.ofArray ids) (stateOf projection)
+        |> List.map partView
+        |> List.toArray
+
+    let tryContiguousHostRange ids projection =
+        XTraceProjection.tryContiguousHostRange (Set.ofArray ids) (stateOf projection)
+        |> Option.map rangeView
+
+    let tryTurnOfHostMessageId id projection =
+        XTraceProjection.tryTurnOfHostMessageId id (stateOf projection)
+
+    let tryOpeningHostMessageId projection =
+        XTraceProjection.tryOpeningHostMessageId (stateOf projection)
+
+    let hostMessageIdsBeforeTurn cutoff projection =
+        XTraceProjection.hostMessageIdsBeforeTurn cutoff (stateOf projection)
+        |> List.toArray
 
     let semanticCursorAfter cursor projection : obj =
-        let value = XTraceProjection.semanticCursorAfter (cursorOf cursor) (stateOf projection)
-        box {| turn = value.TurnIndex; partIndex = value.PartIndex |}
+        let value =
+            XTraceProjection.semanticCursorAfter (cursorOf cursor) (stateOf projection)
 
-    let originCursor : obj = XTraceCursor.originCursor |> cursorView
-    let cursor sequence : obj = XTraceCursor.create (int64 sequence) |> cursorView
-    let next value = XTraceCursor.nextCursor (cursorOf value) |> cursorView
-    let isAfter value previous = XTraceCursor.isAfter (cursorOf value) (cursorOf previous)
-    let isAtOrAfter value previous = XTraceCursor.isAtOrAfter (cursorOf value) (cursorOf previous)
-    let isBefore value nextValue = XTraceCursor.isBefore (cursorOf value) (cursorOf nextValue)
-    let createRange start endExclusive = XTraceRange.create (cursorOf start) (cursorOf endExclusive) |> rangeView
-    let rangeContains value range = XTraceRange.contains (cursorOf value) (rangeOf range)
+        box
+            {| turn = value.TurnIndex
+               partIndex = value.PartIndex |}
+
+    let originCursor: obj = XTraceCursor.originCursor |> cursorView
+
+    let cursor sequence : obj =
+        XTraceCursor.create (int64 sequence) |> cursorView
+
+    let next value =
+        XTraceCursor.nextCursor (cursorOf value) |> cursorView
+
+    let isAfter value previous =
+        XTraceCursor.isAfter (cursorOf value) (cursorOf previous)
+
+    let isAtOrAfter value previous =
+        XTraceCursor.isAtOrAfter (cursorOf value) (cursorOf previous)
+
+    let isBefore value nextValue =
+        XTraceCursor.isBefore (cursorOf value) (cursorOf nextValue)
+
+    let createRange start endExclusive =
+        XTraceRange.create (cursorOf start) (cursorOf endExclusive) |> rangeView
+
+    let rangeContains value range =
+        XTraceRange.contains (cursorOf value) (rangeOf range)
+
     let rangeIsEmpty range = XTraceRange.isEmpty (rangeOf range)
 
     let private itemOf value : XTraceItem =
         let cursorValue = field value "cursor"
+
         let cursor =
             if isNullish cursorValue then
                 XTraceCursor.create (int64 (text (field value "sequence")))
@@ -300,12 +444,23 @@ module SemanticTraceSurface =
         |> List.toArray
 
     let forOpening values =
-        arrayOf values |> Array.toList |> List.map itemOf |> XTrace.forOpening |> List.map itemView |> List.toArray
+        arrayOf values
+        |> Array.toList
+        |> List.map itemOf
+        |> XTrace.forOpening
+        |> List.map itemView
+        |> List.toArray
 
     let forWorkRecord values =
-        arrayOf values |> Array.toList |> List.map itemOf |> XTrace.forWorkRecord |> List.map itemView |> List.toArray
+        arrayOf values
+        |> Array.toList
+        |> List.map itemOf
+        |> XTrace.forWorkRecord
+        |> List.map itemView
+        |> List.toArray
 
-    let render values = arrayOf values |> Array.toList |> List.map itemOf |> XTrace.render
+    let render values =
+        arrayOf values |> Array.toList |> List.map itemOf |> XTrace.render
 
     let flatten messages : obj array =
         let typed =
@@ -316,14 +471,22 @@ module SemanticTraceSurface =
             |> Array.toList
 
         XTrace.flatten typed
-        |> List.map (fun entry -> box {| role = entry.Role; part = semanticPartView entry.Part |})
+        |> List.map (fun entry ->
+            box
+                {| role = entry.Role
+                   part = semanticPartView entry.Part |})
         |> List.toArray
 
     let snapshot (handle: JournalHandle) (sessionId: string) = traceOf handle sessionId
 
     let captureProjection (handle: JournalHandle) (sessionId: string) (projection: obj) : Task<obj> =
         task {
-            let! result = XTraceCapture.captureProjectionWithReceipt (Some handle.Journal) (SessionId.create sessionId) (projectionOf projection)
+            let! result =
+                XTraceCapture.captureProjectionWithReceipt
+                    (Some handle.Journal)
+                    (SessionId.create sessionId)
+                    (projectionOf projection)
+
             return receiptView result
         }
 
@@ -334,7 +497,13 @@ module SemanticTraceSurface =
         (requirements: string array)
         : Task<obj> =
         task {
-            let! result = XTraceCapture.captureOpeningWithReceipt (Some handle.Journal) (SessionId.create sessionId) assignment (Array.toList requirements)
+            let! result =
+                XTraceCapture.captureOpeningWithReceipt
+                    (Some handle.Journal)
+                    (SessionId.create sessionId)
+                    assignment
+                    (Array.toList requirements)
+
             return receiptView result
         }
 
@@ -345,7 +514,13 @@ module SemanticTraceSurface =
         (providerRun: string)
         : Task<obj> =
         task {
-            let! result = XTraceCapture.captureTerminalTextWithReceipt (Some handle.Journal) (SessionId.create sessionId) value (ProviderRunIdentity.create providerRun)
+            let! result =
+                XTraceCapture.captureTerminalTextWithReceipt
+                    (Some handle.Journal)
+                    (SessionId.create sessionId)
+                    value
+                    (ProviderRunIdentity.create providerRun)
+
             return receiptView result
         }
 
@@ -357,16 +532,36 @@ module SemanticTraceSurface =
         (providerRun: string)
         : Task<obj> =
         task {
-            let! result = XTraceCapture.captureLastWordsWithReceipt (Some handle.Journal) (SessionId.create sessionId) (BlobRef.create textRef) (BlobDigest.create textDigest) (ProviderRunIdentity.create providerRun)
+            let! result =
+                XTraceCapture.captureLastWordsWithReceipt
+                    (Some handle.Journal)
+                    (SessionId.create sessionId)
+                    (BlobRef.create textRef)
+                    (BlobDigest.create textDigest)
+                    (ProviderRunIdentity.create providerRun)
+
             return receiptView result
         }
 
     let captureMessageView (handle: JournalHandle) (sessionId: string) (messages: obj) : Task<obj> =
         task {
             let raw = arrayOf messages
-            let captured = Wanxiangshu.OpenCode.ProviderWireCapture.decodeCapturedMessageView (Array.toList raw)
-            let ids = raw |> Array.map (fun message -> text (field (field message "info") "id")) |> Array.toList
-            let! result = XTraceCapture.captureMessageViewWithReceipt (Some handle.Journal) (SessionId.create sessionId) (Some ids) captured
+
+            let captured =
+                Wanxiangshu.OpenCode.ProviderWireCapture.decodeCapturedMessageView (Array.toList raw)
+
+            let ids =
+                raw
+                |> Array.map (fun message -> text (field (field message "info") "id"))
+                |> Array.toList
+
+            let! result =
+                XTraceCapture.captureMessageViewWithReceipt
+                    (Some handle.Journal)
+                    (SessionId.create sessionId)
+                    (Some ids)
+                    captured
+
             return receiptView result
         }
 
@@ -386,7 +581,7 @@ module SemanticTraceSurface =
                         | Some "ProviderRetryAttempt" ->
                             Some(
                                 PromptAuthority.PromptOrigin.Continuation
-                                    PromptAuthority.ProviderRetryAttempt
+                                    PromptAuthority.ContinuationKind.ProviderRetryAttempt
                             )
                         | _ -> None
 
@@ -402,7 +597,10 @@ module SemanticTraceSurface =
 
             return
                 match result with
-                | Error error -> box {| ok = false; error = captureError error |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           error = captureError error |}
                 | Ok(captured: XTraceMessageCapture) ->
                     box
                         {| ok = true
@@ -413,6 +611,7 @@ module SemanticTraceSurface =
     let currentProjection (handle: JournalHandle) (sessionId: string) : Task<obj> =
         task {
             let trace = traceOf handle sessionId
+
             match! XTraceMaterialization.currentProjection handle.Journal (stateOf trace) with
             | Ok projection -> return projectionView projection
             | Error error -> return raise (InvalidOperationException error)
@@ -421,6 +620,7 @@ module SemanticTraceSurface =
     let currentProjectionBetween (handle: JournalHandle) (sessionId: string) (range: obj) : Task<obj> =
         task {
             let trace = traceOf handle sessionId
+
             match! XTraceMaterialization.currentProjectionBetween handle.Journal (rangeOf range) (stateOf trace) with
             | Ok projection -> return projectionView projection
             | Error error -> return raise (InvalidOperationException error)
@@ -429,6 +629,7 @@ module SemanticTraceSurface =
     let renderRange (handle: JournalHandle) (sessionId: string) (range: obj) : Task<string> =
         task {
             let trace = traceOf handle sessionId
+
             match! XTraceMaterialization.renderRange handle.Journal (rangeOf range) (stateOf trace) with
             | Ok rendered -> return rendered
             | Error error -> return raise (InvalidOperationException error)

@@ -28,7 +28,6 @@ open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
@@ -86,18 +85,12 @@ open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Strength
 
 module PluginSessionWiring =
-
-    let private requirePersona result =
-        match result with
-        | Ok _ -> ()
-        | Error rejection -> invalidOp (PersonaRejection.render rejection)
 
     /// SyncDelegate + StrengthReplica runtimes, attached only when a durable
     /// journal exists (the sync path is what makes both runtimes meaningful).
@@ -125,13 +118,12 @@ module PluginSessionWiring =
             snapshot.AgentProjections.Sessions
             |> Map.iter (fun sessionId sessionProj ->
                 sessionProj.PromptAuthority
-                |> Option.bind (fun a -> a.ActiveLogicalRun |> Option.orElse a.LastAuthorityProfile)
+                |> Option.bind (fun authority -> authority.ActiveLogicalRun)
                 |> Option.iter (fun profile ->
                     let agent = profile.SelectedAgent
                     SessionExecutionBinding.observeUserFacingAgent sessionId agent
                     scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore
-                    ProviderLanguageBinding.ensureRoot sessionId |> ignore
-                    PersonaBinding.ensureFromAuthority profile |> requirePersona))
+                    ProviderLanguageBinding.ensureRoot sessionId |> ignore))
 
         match journal with
         | Some durable ->
@@ -201,7 +193,7 @@ module PluginSessionWiring =
                         Some(fun sessionId agent ->
                             ModelRouting.tryReserveManaged sessionId agent
                             |> Option.map ModelRouting.toOpenCodeModel),
-                    ?releaseModel = Some(fun sessionId -> ModelRouting.releaseExecution sessionId)
+                    ?releaseModel = Some(fun sessionId -> ModelRouting.releaseExecution sessionId |> ignore)
                 )
 
             scope.Strength.AttachStrengthReplicaRuntime strengthReplicaRuntime

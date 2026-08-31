@@ -424,9 +424,10 @@ export function reachableTurnIds(turns, entries, { flow, prompt, setup } = {}) {
   //   `TurnCompletionProgram.fs:92`        continuation, SAME lane, new user message
   //
   // That last one is why this is a per-TURN flag rather than a per-lane one.
-  const scenarioPrompts = [prompt?.text, ...(flow ?? []).map((flowStep) => flowStep.prompt?.text)].filter(
-    (text) => typeof text === 'string',
-  );
+  const scenarioPrompts = [
+    prompt?.text,
+    ...(flow ?? []).flatMap((flowStep) => [flowStep.prompt?.text, flowStep.prompt?.resumeAfterIdleText]),
+  ].filter((text) => typeof text === 'string');
   const preFlowTurnIds = new Set(
     Array.isArray(setup?.preFlowTurns) ? setup.preFlowTurns.filter((id) => typeof id === 'string') : [],
   );
@@ -913,5 +914,6 @@ const compileBoundary = (entries, boundary) => {
     entryId: entry.id,
     lane: entry.lane,
     kind: boundary.reason ?? boundary.kind,
+    optional: boundary.optional === true,
   };
 };

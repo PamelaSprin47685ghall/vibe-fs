@@ -3,6 +3,8 @@ namespace Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Participant.Provider.Attempt
 
 /// C5: unified Entry|Squash receipt keyed by ProviderRun (item 12).
 /// Kind reuses BlogFrameKind — the frame-vs-cycle distinction is the same
@@ -26,6 +28,15 @@ type OpenBloggerRequest =
       FrameEpochId: FrameEpochId
       SelectedFrameDigests: BlobDigest list
       PromptKey: PromptKey option }
+
+[<RequireQualifiedAccess>]
+module OpenBloggerRequest =
+
+    let providerRequestKind (request: OpenBloggerRequest) =
+        match request.RequestKind with
+        | "main" -> Ok ProviderRequestKind.BloggerMain
+        | "squash" -> Ok ProviderRequestKind.BloggerSquash
+        | unsupported -> Error unsupported
 
 type BloggerCycleProjectionState =
     {

@@ -33,19 +33,10 @@ type private AttachedRuntimePlan =
     | Attach of AttachedChildDecision
 
 type private ObserveAttachedChild =
-    SessionId
-        -> ReuseScopeId
-        -> SyncDelegateRole
-        -> string
-        -> Task<Result<AttachedChildObservation, string>>
+    SessionId -> ReuseScopeId -> SyncDelegateRole -> string -> Task<Result<AttachedChildObservation, string>>
 
 type private CreateAttachedChild =
-    SessionId
-        -> ReuseScopeId
-        -> SyncDelegateRole
-        -> string
-        -> string option
-        -> Task<Result<SessionId, string>>
+    SessionId -> ReuseScopeId -> SyncDelegateRole -> string -> string option -> Task<Result<SessionId, string>>
 
 [<RequireQualifiedAccess>]
 type private AttachedFlightClaim =
@@ -60,10 +51,13 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
     /// DSL-cross-callback-proof: physical resource — reusable dedicated child identity binding
     // DSL-MUTABLE: resource — attached session binding registry by scope+role
     let bindings = Dictionary<string, SessionId * string>()
+
     /// DSL-cross-callback-proof: physical single-flight — the entire Host
     /// observe/create/adopt/bind transaction is shared by exact scope+role.
     // DSL-MUTABLE: resource — in-flight attached reconciliation by scope+role
-    let flights = Dictionary<string, TaskCompletionSource<Result<SessionId * string, string>>>()
+    let flights =
+        Dictionary<string, TaskCompletionSource<Result<SessionId * string, string>>>()
+
     let register = defaultArg registerParent (fun _ _ -> ())
     let usable = defaultArg isUsable (fun _ -> true)
 
@@ -178,6 +172,22 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
     member _.TryFindByScope(scope: ReuseScopeId, role: SyncDelegateRole) : SessionId option =
         lock gate (fun () -> tryGetLocked scope role |> Option.map fst)
 
+    member _.TryFindOwner(delegateSessionId: SessionId, role: SyncDelegateRole) : SessionId option =
+        let suffix = "\u001f" + roleLabel role
+
+        lock gate (fun () ->
+            bindings
+            |> Seq.tryPick (fun binding ->
+                let delegateId, _ = binding.Value
+
+                if
+                    delegateId = delegateSessionId
+                    && binding.Key.EndsWith(suffix, StringComparison.Ordinal)
+                then
+                    Some(SessionId.create (binding.Key.Substring(0, binding.Key.Length - suffix.Length)))
+                else
+                    None))
+
     member _.Remove(ownerSessionId: SessionId, role: SyncDelegateRole) : bool =
         let scope = ReuseScope.ofSession ownerSessionId
         lock gate (fun () -> bindings.Remove(bindingKey scope role))
@@ -217,16 +227,6 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
         | AttachedFlightClaim.Follow flight -> flight
         | AttachedFlightClaim.Own flight ->
             runOwnedFlight key flight (fun () ->
-                reconcile
-                    key
-                    scope
-                    role
-                    ownerSessionId
-                    agentName
-                    directory
-                    observeChild
-                    createChild
-                    bindChild
-                    onReady)
+                reconcile key scope role ownerSessionId agentName directory observeChild createChild bindChild onReady)
 
     member _.Clear() = lock gate (fun () -> bindings.Clear())

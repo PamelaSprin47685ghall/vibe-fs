@@ -33,7 +33,7 @@
 # ── §21 adversity checklist (one representative path each) ───────────────────
 #
 #   [x] provider transient failure          — [[fault]] provider-error + assertProviderTransientFailure
-#   [x] fallback                            — continue + assertFallbackContinuation
+#   [x] fallback                            — manager.1→continue.0 + assertFallbackContinuation
 #   [x] join blocked then causally awakened — flow.prompt wake + assertJoinWakePath
 #   [x] reviewer REVISE                     — first unified barrier-reviewer verdict + assertReviewerRevise
 #   [x] interrupted/aborted child or session— holdChildC1UntilLabor + assertInterruptedJoin
@@ -73,7 +73,7 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 #                      Both pins are machine-checked runaway ceilings, not wall-clock budgets; a
 #                      future legitimate topology change must re-measure the complete stroke first.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-owner", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-batch-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g2-inspector-batch", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 700, maxSseEvents = 3450, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-replica-continue", "strength-canary-owner", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g2-inspector-batch", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 700, maxSseEvents = 3450, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -82,22 +82,24 @@ must = [
   "g2-inspector-q1.0",
   "g2-inspector-q2.0",
   "g2-inspector-q3.0",
-  "g2-inspector-batch-owner.0",
+  "g2-inspector-owner.3",
   "g2-inspector-batch.0",
   "g6-bookkeeper-finalize.0",
   "orch.0",
   "manager.0",
   "manager.1",
-  "mgr-labor.0",
+  "continue.0",
+  "continue.1",
+  "manager-resume.0",
+  "manager-resume.8",
   "coder.0",
   "coder.1",
   "coder.2",
-  "continue.0",
-  "manager-idle.0",
-  "manager-idle.1",
+  "manager-resume.1",
   "conflict-resume.0",
   "coder-resolve.0",
   "barrier-reviewer.0",
+  "barrier-reviewer-reentry.0",
   # orch.2 = join harvest text after Published (orch-unhappy Stroke 6). EXEC-016
   "orch.2",
 ]
@@ -114,7 +116,7 @@ flow = [
   { assertDeliveries = { id = "g2-inspector-q1.0", eq = 2 } },
   { assertDeliveries = { id = "g2-inspector-q2.0", eq = 1 } },
   { assertDeliveries = { id = "g2-inspector-q3.0", eq = 1 } },
-  { assertDeliveries = { id = "g2-inspector-batch-owner.0", eq = 1 } },
+  { assertDeliveries = { id = "g2-inspector-owner.3", eq = 1 } },
   { assertDeliveries = { id = "g2-inspector-batch.0", eq = 1 } },
   { assertDeliveries = { id = "g6-bookkeeper-finalize.0", eq = 1 } },
   { assertFacts = { name = "StrengthCandidatePrepared", eq = 0 } },
@@ -128,6 +130,7 @@ flow = [
   # orch.2 provider acceptance freezes the SSE baseline, then Stroke 6 waits for
   # the root session idle strictly after that baseline.
   { armIdle = { id = "orch.2" } },
+  { armIdle = { id = "coder.3" } },
 
   # Stale-head AFTER manager worktree exists (orch-unhappy / restart-conflict canary note).
   # gitConflictProof ONLY — zero restart fields (§12 one OpenCode lifetime).
@@ -144,41 +147,37 @@ flow = [
   # here fails toolsGate. A/E/G/H assert uses wire evidence.
   # All Manager prompts MUST use session="child" (bindChild); default session is Orchestrator.
   { wait = "manager.0" },
-  { wait = "manager.1" },
+  # The held child request proves the forked run is active before the idle join
+  # attempt. Without this causal barrier, join may correctly report NothingToJoin
+  # while the fork tool is still starting the child provider request.
+  { wait = "coder.0", timeoutMs = 60000 },
+  { wait = "manager.1", timeoutMs = 60000 },
+  { wait = "continue.0", timeoutMs = 60000 },
+  { waitFact = { name = "FallbackCursorAdvanced", eq = 1 }, timeoutMs = 60000 },
   # EXEC-017 stimulus must target an ACTIVE join attempt. Provider expectation only
   # proves the model returned a join call; wait for the real Host ToolPart running
   # event before injecting the external user message, or the wake is correctly dropped.
   { custom = "awaitManagerJoinRunning" },
-  { prompt = { agent = "fast-manager", text = "Also make sure publish_proof.txt has exactly the content 'Published by long-stroke canary' before the end." }, session = "child" },
-
-  # Labor: premature suicide against held child → interrupted join wake → harvest
-  { wait = "mgr-labor.0" },
-  { wait = "coder.0" },
-  { waitFact = { name = "HandleCompleted", gte = 1 } },
-  { wait = "mgr-labor.1" },
-  { wait = "mgr-labor.2" },
-
-  # Normal Manager idle continuation owns the next same-lane action. Delivery #1
-  # receives the sole provider-error fault; the Host fallback continuation then
-  # completes, and delivery #2 of the same step performs the first legal suicide.
-  # No external Manager prompt races the Host continuation.
-  { wait = "manager-idle.0" },
-  { awaitTerminal = true, requireAssistantTerminal = true, requireIdleAfterActivity = true, session = "child" },
-  { wait = "continue" },
-  { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
-  { wait = "manager-idle.0" },
+  { prompt = { agent = "fast-manager", text = "Interrupt the active join.", resumeAfterIdleText = "Continue after the interrupted join." }, session = "child", timeoutMs = 60000 },
+  { wait = "coder.3", timeoutMs = 60000 },
+  { awaitIdle = { after = "coder.3" }, timeoutMs = 60000 },
+  { waitFact = { name = "HandleCompleted", gte = 1 }, timeoutMs = 60000 },
+  { wait = "manager-resume.0", timeoutMs = 60000 },
+  { wait = "manager-resume.1", timeoutMs = 60000 },
+  { wait = "manager-resume.2", timeoutMs = 60000 },
+  { wait = "manager-resume.3", timeoutMs = 60000 },
   { waitFact = { name = "FinalityRejected", gte = 1, renewOn = ["ReviewVerdictRecorded", "ReviewAttemptClosed", "BlogObservationCommitted"] }, timeoutMs = 60000 },
 
-  # Same physical ManagerIdle turn repairs, then seeks dual-PERFECT blessing.
+  # The same physical Manager continuation repairs, then seeks dual-PERFECT blessing.
   # Reviewer protocol identity is deliberately not duplicated in the flow; the
   # durable finality facts are the business barrier.
-  { wait = "manager-idle.1" },
-  { wait = "coder-fix.0" },
-  { wait = "manager-idle.2" },
-  { wait = "manager-idle.3" },
+  { wait = "manager-resume.4" },
+  { wait = "coder-fix.0", timeoutMs = 60000 },
+  { wait = "manager-resume.5" },
+  { wait = "manager-resume.6" },
   { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ReviewAttemptClosed", "ConfirmedReviewWitness", "FinalityReviewerEnlisted", "BlogObservationCommitted"] }, timeoutMs = 180000 },
-  { wait = "manager-idle.4", timeoutMs = 30000 },
-  { wait = "manager-idle.5", timeoutMs = 30000 },
+  { wait = "manager-resume.7", timeoutMs = 30000 },
+  { wait = "manager-resume.8", timeoutMs = 30000 },
   { waitFact = { name = "LifeCompleted", gte = 1 } },
   { waitFact = { name = "CandidateReady", eq = 1 }, timeoutMs = 60000 },
 
@@ -234,10 +233,23 @@ forbiddenTools = ["edit"]
   [[turn.step]]
   respond = { type = "tool-calls", calls = [{ tool = "read", args = { filePath = "README.md" } }, { tool = "read", args = { filePath = "AGENTS.md" } }] }
 
+[[turn]]
+id = "strength-canary-replica-continue"
+internal = true
+user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path."
+tools = ["glob", "grep", "read"]
+forbiddenTools = ["edit"]
+
   [[turn.step]]
   runtimeStep = 1
   optional = true
-  respond = { type = "tool-call", tool = "read", args = { filePath = ".wanxiang/casebook/.keep" } }
+  respond = { type = "text", text = "Strength replica inspection completed." }
+
+[[epoch]]
+turn = "strength-canary-replica-continue"
+step = 1
+reason = "prefix-probe"
+optional = true
 
 [[turn]]
 id = "strength-canary-owner"
@@ -246,15 +258,6 @@ user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica 
 
   [[turn.step]]
   respond = { type = "text", text = "Strength dry-run canary owner completed." }
-
-[[turn]]
-id = "g2-inspector-title"
-lane = "g2-inspector-owner"
-kind = "title"
-user = "G2_INSPECTOR_PREFIX_CANARY: reuse one inspector for Q1, Q2, then Q3."
-
-  [[turn.step]]
-  respond = { type = "title", text = "G2 Inspector Prefix Canary" }
 
 [[turn]]
 id = "g2-inspector-owner"
@@ -272,19 +275,10 @@ tools = ["inspect"]
   respond = { type = "tool-call", tool = "inspect", args = { charge = "G2Q3: when does CaseFinalize run?" } }
 
   [[turn.step]]
-  respond = { type = "text", text = "G2 inspector prefix canary owner completed." }
-
-[[turn]]
-id = "g2-inspector-batch-owner"
-lane = "g2-inspector-owner"
-user = "G2_INSPECTOR_BATCH_CANARY: issue three Inspector charges in one provider response."
-tools = ["inspect"]
-
-  [[turn.step]]
   respond = { type = "tool-calls", streamCalls = true, yieldBetweenChunks = true, calls = [{ tool = "inspect", args = { charge = "G2B1: establish the first repository fact." } }, { tool = "inspect", args = { charge = "G2B2: establish the second repository fact." } }, { tool = "inspect", args = { charge = "G2B3: establish the third repository fact." } }] }
 
   [[turn.step]]
-  respond = { type = "text", text = "G2 inspector batch canary owner completed." }
+  respond = { type = "text", text = "G2 inspector prefix and batch canary owner completed." }
 
 [[turn]]
 id = "g2-inspector-child-title"
@@ -429,48 +423,46 @@ tools = ["fork", "join", "horizon", "suicide"]
   respond = { type = "tool-call", tool = "fork", args = { calling = "coder", name = "Proof Writer", charge = "Write publish_proof.txt." } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "join" }
+  respond = { type = "tool-call", tool = "join", args = {} }
 
 [[turn]]
-id = "mgr-labor"
-lane = "fast-manager"
-user = "Also make sure publish_proof.txt has exactly the content 'Published by long-stroke canary' before the end."
-tools = ["fork", "join", "horizon", "suicide"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "suicide", args = { last_words = "premature" } }
+id = "continue"
+internal = true
+user = "# The previous physical attempt did not complete.\n#\n# Continue the same work from the evidence already before you.\n#\n# The failed attempt itself is not evidence about the task.\n"
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join", args = {} }
 
   [[turn.step]]
-  respond = { type = "text", text = "Join harvested after user_message wake; continue." }
+  respond = { type = "text", text = "The active join yielded to the newer user message." }
 
 [[turn]]
-id = "continue"
-internal = true
-user = "# The previous physical attempt did not complete."
+id = "manager-interrupt"
+lane = "fast-manager"
+user = "Interrupt the active join."
+tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
+optional = true
 
   [[turn.step]]
-  respond = { type = "text", text = "long-stroke fallback continuation completed." }
+  respond = { type = "text", text = "The active join was interrupted and the child result was harvested." }
 
-[[epoch]]
-turn = "continue"
-step = 0
-reason = "prefix-probe"
+  [[turn.step]]
+  respond = { type = "text", text = "Interruption handled; continue the durable Manager job." }
 
-# GLORY-029 normal Manager idle continuation. The sole provider-error fault
-# consumes this physical occasion. The confirmed failure then creates one fresh
-# recovery opportunity whose ProviderRetryAttempt is the `continue.0` turn above;
-# that is the only prefix-probe boundary for this failure. Requiring another
-# prefix-probe on `manager-idle.0` would grant one failure two compression probes.
-# After the successful continuation, later Manager-idle occasions own the rest
-# of the Manager tool loop, so no same-lane external prompt races it.
 [[turn]]
-id = "manager-idle"
-internal = true
-user = ["# You have done useful work, and useful action may still remain.", "# Time spent is not time exhausted.", "# A long road is still a road.", "# Look again at what the mission still owes.", "# If useful action remains, continue.", "# When nothing useful remains, seek your end."]
+id = "manager-resume"
+lane = "fast-manager"
+user = "Continue after the interrupted join."
 tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "materialize the Manager life" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "todowrite", args = { planComplete = true, workingOn = "long-stroke", obligations = [{ name = "long-stroke", horizon = "near", work = "Run the long stroke through publish_proof.txt." }] } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "suicide", args = { last_words = "first ending" } }
@@ -494,10 +486,10 @@ tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
 id = "coder"
 lane = "fast-coder"
 user = "# Write publish_proof.txt."
-tools = ["write", "read"]
+tools = ["js-coder", "read"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by long-stroke canary\n" } }
+  respond = { type = "tool-call", tool = "js-coder", args = { program = "class Js extends JsProgram { async run() { await this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return { written: true }; } }" } }
 
   # G6 cold fetch rides the first later Coder child instead of spawning a
   # dedicated proof-only root/Companion/title session. It is still a new Host
@@ -517,10 +509,10 @@ tools = ["write", "read"]
 id = "coder-fix"
 lane = "fast-coder"
 user = "# Ensure publish_proof.txt contains exactly: Published by long-stroke canary"
-tools = ["write"]
+tools = ["js-coder"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by long-stroke canary\n" } }
+  respond = { type = "tool-call", tool = "js-coder", args = { program = "class Js extends JsProgram { async run() { await this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return { written: true }; } }" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Coder repaired proof file." }
@@ -570,6 +562,18 @@ tools = ["glob", "grep", "read", "judge"]
 
   [[turn.step]]
   respond = { type = "text", text = "Reviewer confirmed the tree." }
+
+[[turn]]
+id = "barrier-reviewer-reentry"
+internal = true
+user = "Review the current worktree against all authoritative user requirements."
+tools = ["glob", "grep", "read", "judge"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
 
 
 [[turn]]
@@ -1037,9 +1041,14 @@ attempts = [1]
 
 # Sole physical fault: one settled non-retryable provider-error (no AABB here).
 [[fault]]
-turn = "manager-idle"
-step = 0
+turn = "manager"
+step = 1
 delivery = "provider-error"
 status = 400
 retryable = false
 attempts = [1]
+
+[[epoch]]
+turn = "continue"
+step = 0
+reason = "prefix-probe"

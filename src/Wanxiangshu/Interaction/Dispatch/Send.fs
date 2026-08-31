@@ -283,7 +283,7 @@ module PromptDispatcherSend =
             (port: ISessionHostPort)
             (sessionId: SessionId)
             (text: string)
-            (agent: string)
+            (identitySeed: PromptAuthority.IdentitySeed)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
@@ -292,6 +292,11 @@ module PromptDispatcherSend =
             (model: OpencodeModel option)
             : Task<Result<PromptKey, string>> =
             taskResult {
+                let! participantIdentity =
+                    this.ValidateAgentOwnerIdentitySeed identitySeed
+                    |> Result.mapError PromptDispatcher.describeIdentitySeedRejection
+
+                let agent = ParticipantIdentity.selectedAgent participantIdentity
                 let payloadDigest = HostDigest.sha256Hex text
 
                 let origin =
@@ -300,7 +305,7 @@ module PromptDispatcherSend =
                 let key =
                     deriveKey (this.ProjectionFor sessionId) sessionId None None origin (Some agent) payloadDigest
 
-                let! claim = PromptAuthorityRun.claimAgentOwnerRoot key sessionId payloadDigest agent
+                let! claim = PromptAuthorityRun.claimAgentOwnerRoot key sessionId payloadDigest identitySeed
 
                 let claimed =
                     PromptFact.PluginPromptClaimed
@@ -310,6 +315,7 @@ module PromptDispatcherSend =
                            LogicalRunId = None
                            AuthorityRootUserMessageId = None
                            EffectiveAgent = claim.EffectiveAgent
+                           IdentitySeed = claim.IdentitySeed
                            PayloadDigest = payloadDigest |}
 
                 let! _ = this.Persist sessionId None claimed
@@ -333,7 +339,7 @@ module PromptDispatcherSend =
                 let sendTask = port.SendPrompt(sessionId, text, options)
 
                 let acceptFn physicalId =
-                    this.AcceptPhysicalAgentOwnerRoot key sessionId physicalId agent
+                    this.AcceptPhysicalAgentOwnerRoot key sessionId physicalId claim.IdentitySeed
                     |> TaskValue.map (Result.map ignore)
 
                 match awaitMode with
@@ -351,18 +357,18 @@ module PromptDispatcherSend =
             (port: ISessionHostPort)
             (sessionId: SessionId)
             (text: string)
-            (agent: string)
+            (identitySeed: PromptAuthority.IdentitySeed)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             : Task<Result<PromptKey, string>> =
-            this.SendAgentOwnerRootCore port sessionId text agent directory awaitMode onAccepted None None None
+            this.SendAgentOwnerRootCore port sessionId text identitySeed directory awaitMode onAccepted None None None
 
         member this.SendAgentOwnerRootDetachedObserved
             (port: ISessionHostPort)
             (sessionId: SessionId)
             (text: string)
-            (agent: string)
+            (identitySeed: PromptAuthority.IdentitySeed)
             (directory: string option)
             (onFailure: string -> Task)
             : Task<Result<PromptKey, string>> =
@@ -370,7 +376,7 @@ module PromptDispatcherSend =
                 port
                 sessionId
                 text
-                agent
+                identitySeed
                 directory
                 PromptDispatcher.AwaitMode.Detached
                 None
@@ -382,14 +388,24 @@ module PromptDispatcherSend =
             (port: ISessionHostPort)
             (sessionId: SessionId)
             (text: string)
-            (agent: string)
+            (identitySeed: PromptAuthority.IdentitySeed)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             (tools: Map<string, bool>)
             (model: OpencodeModel option)
             : Task<Result<PromptKey, string>> =
-            this.SendAgentOwnerRootCore port sessionId text agent directory awaitMode onAccepted None (Some tools) model
+            this.SendAgentOwnerRootCore
+                port
+                sessionId
+                text
+                identitySeed
+                directory
+                awaitMode
+                onAccepted
+                None
+                (Some tools)
+                model
 
         /// PROMPT-003: a continuation of an existing Logical Run.
         ///
@@ -518,6 +534,7 @@ module PromptDispatcherSend =
                            LogicalRunId = claim.LogicalRunId
                            AuthorityRootUserMessageId = claim.AuthorityRootUserMessageId
                            EffectiveAgent = claim.EffectiveAgent
+                           IdentitySeed = claim.IdentitySeed
                            PayloadDigest = payloadDigest |}
 
                 match! this.Persist sessionId None claimed with

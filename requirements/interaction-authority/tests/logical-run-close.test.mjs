@@ -7,8 +7,45 @@ import test from 'node:test'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 
 const hash = (value) => `H(${value})`
+const personas = {
+  'fast-manager': 'Coordinator',
+}
+const rootSelection = (agent) => {
+  const [selectedTier, canonicalRole] = agent.split('-')
+  const peerTier = selectedTier === 'fast' ? 'deep' : 'fast'
+  return {
+    kind: 'RootSelection',
+    ownerSession: null,
+    ownerLogicalRun: null,
+    ownerAuthorityRoot: null,
+    participantIdentity: {
+      selectedAgent: agent,
+      peerAgent: `${peerTier}-${canonicalRole}`,
+      canonicalRole,
+      selectedTier,
+      persona: personas[agent] ?? 'Coordinator',
+      personaCatalogVersion: 1,
+      origin: 'ResolvedAtRoot',
+    },
+  }
+}
+const inheritedSeed = (agent, physical) => {
+  const owner = authority.createAuthorityRoot(
+    hash,
+    'rt-owner',
+    'ses-owner',
+    'HumanRoot',
+    `owner-${physical}`,
+    rootSelection('fast-manager'),
+  )
+  assert.equal(owner.ok, true, owner.error)
+  const inherited = authority.issueInheritedIdentitySeed(agent, owner.value)
+  assert.equal(inherited.ok, true, inherited.error)
+  return inherited.value
+}
 const profile = (run, root, kind = 'HumanRoot') => {
-  const result = authority.createAuthorityRoot(hash, 'rt-close', 'ses-close', kind, root, 'fast-manager')
+  const seed = kind === 'AgentOwnerRoot' ? inheritedSeed('fast-manager', root) : rootSelection('fast-manager')
+  const result = authority.createAuthorityRoot(hash, 'rt-close', 'ses-close', kind, root, seed)
   assert.equal(result.ok, true, result.error)
   return { ...result.value, logicalRun: run, authorityRoot: root }
 }

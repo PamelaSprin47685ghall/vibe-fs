@@ -39,14 +39,35 @@ const assertPrepared = (result, agent) => {
   assert.equal(result.value.modelProvided, false, 'dispatch remains model-free')
 }
 
+const acquireLease = async (sessionId, physicalUserMessageId, agent) => {
+  const outcome = await routing.acquireSharedExecutionAdmission(
+    sessionId,
+    physicalUserMessageId,
+    agent,
+  )
+  assert.equal(outcome.kind, 'Acquired')
+  const target = routing.sharedExecutionAdmissionTarget(outcome.lease)
+  return {
+    lease: outcome.lease,
+    exact: {
+      sessionId,
+      physicalUserMessageId,
+      effectiveAgent: agent,
+      target,
+    },
+  }
+}
+
 const admitPhysicalExecution = async (sessionId, agent) => {
   const physicalId = `msg-binding-${sessionId}`
-  const outcome = await routing.acquire(sessionId, physicalId, agent)
-  assert.equal(outcome.kind, 'Acquired')
-  const target = outcome.target
+  const admission = await acquireLease(sessionId, physicalId, agent)
+  const target = admission.exact.target
   assert.equal(target.model, agent.startsWith('deep-') ? 'test/deep' : 'test/fast')
   assert.equal(target.reasoning, agent.startsWith('deep-') ? 'high' : 'none')
-  routing.release(sessionId)
+  assert.deepEqual(
+    routing.releaseSharedExecutionAdmissionBeforeProvider(admission.lease, admission.exact),
+    { kind: 'Applied' },
+  )
   return target
 }
 
@@ -110,10 +131,10 @@ test('WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease', asyn
 
   const physicalId = 'msg-variant-exact'
   const expected = modelFor('deep-distiller')
-  const outcome = await routing.acquire(child, physicalId, 'deep-distiller')
-  assert.equal(outcome.kind, 'Acquired')
-  const target = outcome.target
+  const admission = await acquireLease(child, physicalId, 'deep-distiller')
+  const target = admission.exact.target
   assert.deepEqual(target, { model: 'test/deep', reasoning: 'high' })
+  assert.deepEqual(routing.commitSharedExecutionAdmission(admission.lease, admission.exact), { kind: 'Applied' })
 
   binding.acceptPromptExecution(child, 'prompt-variant-exact', physicalId, 'deep-distiller', expected)
   assert.equal(binding.beginProviderAttempt(child, physicalId, 'prompt-variant-exact').ok, true)

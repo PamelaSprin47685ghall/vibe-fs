@@ -232,7 +232,7 @@ module private StrengthReplicaRuntimeLogic =
         (promptModel: OpencodeModel option)
         (directory: string option)
         (replica: SessionId)
-        (fastAgent: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         (state: StrengthReplicaDecisionState)
         : Task<unit> =
         task {
@@ -242,7 +242,7 @@ module private StrengthReplicaRuntimeLogic =
                         sessions
                         replica
                         (LlmFacing.renderInstruction "Continue.")
-                        fastAgent
+                        identitySeed
                         directory
                         PromptDispatcher.AwaitMode.Detached
                         None
@@ -615,6 +615,15 @@ type StrengthReplicaRuntime
             let! managed = StrengthReplicaRuntimeLogic.parseEligibleFastAgent fastAgent
             do! StrengthReplicaRuntimeLogic.requireOwnerIdle liveRegistry owner
 
+            let! ownerProfile =
+                match (dispatcher.ProjectionFor owner).ActiveLogicalRun with
+                | Some profile -> Ok profile
+                | None -> Error "StrengthReplica owner has no active authority profile"
+
+            let! identitySeed =
+                PromptAuthority.issueInheritedIdentitySeed fastAgent ownerProfile
+                |> Result.mapError (sprintf "StrengthReplica identity seed is invalid: %A")
+
             let! replica =
                 sessions.CreateChildSession(
                     owner,
@@ -676,7 +685,7 @@ type StrengthReplicaRuntime
                     promptModel
                     directory
                     replica
-                    fastAgent
+                    identitySeed
                     state
                 |> TaskResultCE.ofTask
 

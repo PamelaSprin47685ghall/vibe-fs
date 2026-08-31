@@ -38,9 +38,20 @@ after(async () => {
 
 const model = { providerID: 'openai', modelID: 'gpt-5' }
 const modelFromLease = async (sessionId, physicalUserMessageId, agent) => {
-  const outcome = await routing.acquire(sessionId, physicalUserMessageId, agent)
+  const outcome = await routing.acquireSharedExecutionAdmission(
+    sessionId,
+    physicalUserMessageId,
+    agent,
+  )
   assert.equal(outcome.kind, 'Acquired')
-  const target = outcome.target
+  const target = routing.sharedExecutionAdmissionTarget(outcome.lease)
+  const settlement = routing.commitSharedExecutionAdmission(outcome.lease, {
+    sessionId,
+    physicalUserMessageId,
+    effectiveAgent: agent,
+    target,
+  })
+  assert.ok(['Applied', 'AlreadyApplied'].includes(settlement.kind))
   const [providerID, ...modelParts] = target.model.split('/')
   return { providerID, modelID: modelParts.join('/'), variant: target.reasoning }
 }
@@ -62,6 +73,19 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_accept_prompt_execution_binds_physical_pr
   assert.equal(began.ok, true)
   const allowed = binding.validateObservedProvider('ses_binding_2', 'deep-coder', leasedModel)
   assert.equal(allowed.ok, true)
+  assert.equal(allowed.value, true)
+})
+
+test('WHAT[HOST-BOUNDARY-006] HOST-006_external_acceptance_immediately_binds_effective_agent', async () => {
+  const session = 'ses_binding_external_acceptance'
+  binding.drop(session)
+  const leasedModel = await modelFromLease(session, 'physical-external', 'fast-coder')
+
+  binding.acceptExternalExecution(session, 'physical-external', 'fast-coder', leasedModel)
+
+  assert.equal(binding.tryAgent(session), 'fast-coder')
+  const allowed = binding.validateObservedProvider(session, 'fast-coder', leasedModel)
+  assert.equal(allowed.ok, true, allowed.error)
   assert.equal(allowed.value, true)
 })
 
@@ -107,6 +131,16 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_child_enqueue_uses_binding_agent_and_mode
   assert.equal(prepared.ok, true)
   assert.equal(prepared.value.agent, 'deep-coder')
   assert.equal(prepared.value.modelProvided, false)
+})
+
+test('WHAT[HOST-BOUNDARY-006] HOST-006_private_bookkeeper_child_stays_outside_managed_execution_binding', () => {
+  const child = 'ses_binding_bookkeeper_child'
+  binding.drop(child)
+
+  const created = binding.bindChild('ses_binding_bookkeeper_parent', child, 'fast-bookkeeper')
+  assert.equal(created.ok, true, created.error)
+  assert.equal(binding.tryAgent(child), '')
+  assert.equal(binding.isUnboundHostAuxiliaryChild(child), true)
 })
 
 test('WHAT[HOST-BOUNDARY-006] HOST-006_terminal_listener_refcounts_do_not_share_disposal', () => {

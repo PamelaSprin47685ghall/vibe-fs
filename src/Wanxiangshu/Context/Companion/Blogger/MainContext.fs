@@ -34,15 +34,16 @@ module BloggerMainContext =
         (xTrace: XTraceProjectionState)
         (projection: ProviderProjection.ProviderSemanticProjection)
         =
-        let ingested =
-            blog.Coverage.IngestedThroughSequence
-            |> XTraceCursor.create
+        let ingested = blog.Coverage.IngestedThroughSequence |> XTraceCursor.create
 
         let effectiveIngested =
             openingFloor journal mainSessionId
             |> Option.map XTraceCursor.create
             |> Option.map (fun floor ->
-                if XTraceCursor.isAfter floor ingested then floor else ingested)
+                if XTraceCursor.isAfter floor ingested then
+                    floor
+                else
+                    ingested)
             |> Option.defaultValue ingested
             |> RecordCoverage.create
 

@@ -14,7 +14,7 @@
 
 ## SPEC-INV-004: Replica Authority 结构约束
 
-Replica 构造为 `InternalLeaf × Attached(owner, StrengthReplica)`，使用 `fast-<owner-role>`；继承 Owner 的 SessionPersona 与 SessionProviderLanguage，仅切换执行绑定至 fast EffectiveAgent，其物理执行目标由调度器解析。Replica 拥有短生命周期，完成即释放，不跨决策复用；无 Companion、无嵌套投机、无深度 Fallback 或权限交互。其可见工具 Schema 与底层执行门禁严格同源且仅允许 `read/glob/grep`，任何其他工具调用直接 fail closed。
+Replica 构造为 `InternalLeaf × Attached(owner, StrengthReplica)`，使用 `fast-<owner-role>`；通过 owner-derived `ParticipantIdentity` evidence 继承 Owner logical run 的 Persona 与 provenance/version，并继承 Owner 的 SessionProviderLanguage，仅切换执行绑定至 fast EffectiveAgent，其物理执行目标由调度器解析。Replica 拥有短生命周期，完成即释放，不跨决策复用；无 Companion、无嵌套投机、无深度 Fallback 或权限交互。其可见工具 Schema 与底层执行门禁严格同源且仅允许 `read/glob/grep`，任何其他工具调用直接 fail closed。
 
 ## SPEC-INV-005: Candidate Frame 确定性规范化
 

@@ -226,11 +226,13 @@ module ManagerNarrativeTransform =
         match
             traceState
             |> Option.bind (fun state ->
-                XTraceProjection.openingEvidence state |> Option.map (fun opening -> state, opening))
+                XTraceProjection.openingEvidence state
+                |> Option.map (fun opening -> state, opening))
         with
         | Some(state, opening) when
             List.isEmpty completedLives
-            && XTraceProjection.orderedSemanticParts state |> List.exists (fun part -> part.Turn <> 0)
+            && XTraceProjection.orderedSemanticParts state
+               |> List.exists (fun part -> part.Turn <> 0)
             ->
             Some opening
         | _ -> None
@@ -285,14 +287,7 @@ module ManagerNarrativeTransform =
                         |> Option.defaultValue XTraceCursor.originCursor
                     )
 
-                let! result =
-                    ManagerLifeWorkflow.ensureOpening
-                        durable
-                        sid
-                        lifeId
-                        messageIdValue
-                        rawText
-                        cursor
+                let! result = ManagerLifeWorkflow.ensureOpening durable sid lifeId messageIdValue rawText cursor
 
                 requireWorkflowUnit result
                 return Some(rewriteMessage rawMessages messageIndex narrative)

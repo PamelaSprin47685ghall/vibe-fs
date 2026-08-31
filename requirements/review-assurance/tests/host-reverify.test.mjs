@@ -14,14 +14,53 @@ import {
   liveOrchestrator,
 } from '../../verification-system/tests/support/orchestrator-host-harness.mjs'
 import * as hostSurface from '../../../dist/Change/Host/Surface.js'
+import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as reviewHost from '../../../dist/Mission/Review/OpenCode/ReviewHostSurface.js'
 import * as reviewJournal from '../../../dist/Persistence/Journal/ReviewJournalSurface.js'
+
+const ownerSelection = {
+  kind: 'RootSelection',
+  ownerSession: null,
+  ownerLogicalRun: null,
+  ownerAuthorityRoot: null,
+  participantIdentity: {
+    selectedAgent: 'fast-manager',
+    peerAgent: 'deep-manager',
+    canonicalRole: 'manager',
+    selectedTier: 'fast',
+    persona: 'Coordinator',
+    personaCatalogVersion: 1,
+    origin: 'ResolvedAtRoot',
+  },
+}
+
+const liveReviewerOwner = async (ownerSession, options) => {
+  const live = await liveOrchestrator({ ...options, orchestratorId: ownerSession })
+  const seedOwner = await dispatch.acceptHumanRootSelection(
+    live.journal,
+    `${ownerSession}-seed-owner`,
+    `msg-${ownerSession}-seed-owner`,
+    ownerSelection,
+  )
+  assert.equal(seedOwner.ok, true, seedOwner.ok ? '' : seedOwner.error)
+
+  const inherited = authority.issueInheritedIdentitySeed('fast-manager', seedOwner.profile)
+  assert.equal(inherited.ok, true, inherited.ok ? '' : inherited.error)
+  const appended = await dispatch.appendAuthorityRoot(live.journal, ownerSession, inherited.value)
+  assert.equal(appended.ok, true, appended.ok ? '' : JSON.stringify(appended.error))
+
+  const activeOwner = dispatch.projectionObservation(live.journal, ownerSession).activeLogicalRun
+  assert.ok(activeOwner, 'reviewer owner must have an active durable authority before fork')
+  assert.deepEqual(activeOwner.identitySeed, inherited.value, 'reviewer fork must inherit from the exact active owner')
+  return live
+}
 
 test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_durably_opens_barrier_before_first_reviewer_prompt', async () => {
   let live
   let barrierVisibleAtSend = false
   let reviewPrompt = ''
-  live = await liveOrchestrator({
+  live = await liveReviewerOwner('ses-review-owner-order', {
     sessionBehaviour: {
       onSendPrompt: (reviewerId, prompt, _options, meta) => {
         reviewPrompt = prompt
@@ -66,7 +105,7 @@ test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_accepts_second_PERFECT_after_type
   let reviewerDriver
   let live
 
-  live = await liveOrchestrator({
+  live = await liveReviewerOwner('ses-review-owner-perfect', {
     sessionBehaviour: {
       onSendPrompt: (reviewerId, prompt, _options, meta) => {
         const physical = meta.physical
@@ -159,7 +198,7 @@ test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_normal_terminal_before_first_judg
   let live
   let reviewerDriver
   let sends = 0
-  live = await liveOrchestrator({
+  live = await liveReviewerOwner('ses-review-owner-before-first', {
     sessionBehaviour: {
       onSendPrompt: (reviewerId, prompt, _options, meta) => {
         sends += 1
@@ -234,7 +273,7 @@ test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_normal_terminal_before_second_jud
   let sends = 0
   let firstPhysical
   let secondPhysical
-  live = await liveOrchestrator({
+  live = await liveReviewerOwner('ses-review-owner-before-second', {
     sessionBehaviour: {
       onSendPrompt: (reviewerId, prompt, _options, meta) => {
         sends += 1
@@ -317,7 +356,7 @@ test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_normal_terminal_before_second_jud
 
 test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_rejects_completed_terminal_with_unknown_role', async () => {
   let live
-  live = await liveOrchestrator({
+  live = await liveReviewerOwner('ses-review-owner-invalid-role', {
     sessionBehaviour: {
       onSendPrompt: (reviewerId) => {
         queueMicrotask(() =>

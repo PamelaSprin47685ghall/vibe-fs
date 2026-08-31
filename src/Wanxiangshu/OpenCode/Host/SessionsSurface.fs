@@ -46,19 +46,23 @@ module SessionsSurface =
     type private ControlledOpenCodePort(childId: SessionId, rejectAbort: bool) =
         let aborts = ResizeArray<string>()
         let abortTimes = ResizeArray<int>()
-        let rejection = TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        let rejection =
+            TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
+
         let virtualTime = ref 0
 
         member _.Aborts = aborts.ToArray()
         member _.AbortTimes = abortTimes.ToArray()
         member _.VirtualTime = virtualTime.Value
         member _.AdvanceTo(timestamp: int) = virtualTime.Value <- timestamp
+
         member _.RejectAbort() =
-            AsyncSupport.trySetResult rejection (Error "controlled Host rejected AbortSession") |> ignore
+            AsyncSupport.trySetResult rejection (Error "controlled Host rejected AbortSession")
+            |> ignore
 
         interface IOpenCodePort with
-            member _.SendPrompt _ _ _ =
-                Task.FromResult(Fatal "unused")
+            member _.SendPrompt _ _ _ = Task.FromResult(Fatal "unused")
 
             member _.AbortSession sessionId =
                 aborts.Add(SessionId.value sessionId)
@@ -95,10 +99,7 @@ module SessionsSurface =
             let transport = ControlledOpenCodePort(childId, false)
 
             let sessions =
-                InjectedSessionPort(
-                    Some(transport :> IOpenCodePort),
-                    ControlledEventPort() :> IEventObservationPort
-                )
+                InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
                 :> ISessionHostPort
 
             let options: OpenCodeChildOptions =
@@ -153,10 +154,7 @@ module SessionsSurface =
             let transport = ControlledOpenCodePort(childId, true)
 
             let sessions =
-                InjectedSessionPort(
-                    Some(transport :> IOpenCodePort),
-                    ControlledEventPort() :> IEventObservationPort
-                )
+                InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
                 :> ISessionHostPort
 
             let options: OpenCodeChildOptions =

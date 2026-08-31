@@ -102,4 +102,5 @@ module LifecycleWorkRecord =
 
     /// Attach the trace owner's canonical rendering of BlindPlan constitutive evidence.
     let withConstitutive (opening: XTraceOpeningEvidence) (constitutiveBody: string) : XTraceOpeningEvidence =
-        { opening with ConstitutiveBody = constitutiveBody }
+        { opening with
+            ConstitutiveBody = constitutiveBody }

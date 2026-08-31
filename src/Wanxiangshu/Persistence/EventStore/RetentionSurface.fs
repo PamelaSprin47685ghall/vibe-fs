@@ -84,8 +84,7 @@ module RetentionSurface =
             let treeBytes entries =
                 entries
                 |> GitTree.canonicalOrder
-                |> List.map (fun entry ->
-                    String.concat "\t" [ entry.Mode; entry.Name; entry.Oid |> GitObjectId.value ])
+                |> List.map (fun entry -> String.concat "\t" [ entry.Mode; entry.Name; entry.Oid |> GitObjectId.value ])
                 |> String.concat "\n"
                 |> Encoding.UTF8.GetBytes
 
@@ -110,6 +109,7 @@ module RetentionSurface =
                     member _.ReadObject oid =
                         let value = GitObjectId.value oid
                         protocol.Add(sprintf "ReadObject %s" value)
+
                         match blobs.TryGetValue value with
                         | true, bytes -> Task.FromResult(Some bytes)
                         | _ -> Task.FromResult None
@@ -117,6 +117,7 @@ module RetentionSurface =
                     member _.ReadTree oid =
                         let value = GitObjectId.value oid
                         protocol.Add(sprintf "ReadTree %s" value)
+
                         match trees.TryGetValue value with
                         | true, entries -> Task.FromResult(Some entries)
                         | _ -> Task.FromResult None
@@ -128,43 +129,63 @@ module RetentionSurface =
                     member _.CompareAndSwapRef(refName, expectedOld, newOid) =
                         let expected =
                             expectedOld |> Option.map GitObjectId.value |> Option.defaultValue "-"
-                        protocol.Add(
-                            sprintf "CompareAndSwapRef %s %s %s" refName expected (GitObjectId.value newOid)
-                        )
+
+                        protocol.Add(sprintf "CompareAndSwapRef %s %s %s" refName expected (GitObjectId.value newOid))
                         Task.FromResult false }
 
             let remoteWriterName = remoteWriterId + ".ndjson"
             let remoteBlob = remoteWriterText |> Encoding.UTF8.GetBytes |> putBlob
+
             let writerTree =
                 putTree
                     [ { Mode = "100644"
                         Name = remoteWriterName
                         Oid = remoteBlob } ]
+
             let payloadTree = putTree []
+
             let encodedName =
-                emitJsExpr remoteWriterName "Buffer.from($0, 'utf8').toString('base64url')" |> unbox<string>
+                emitJsExpr remoteWriterName "Buffer.from($0, 'utf8').toString('base64url')"
+                |> unbox<string>
+
             let manifest =
                 sprintf "v2\n%s\t%s\t%g\n" encodedName (GitObjectId.value remoteBlob) remoteActivityMs
                 |> Encoding.UTF8.GetBytes
                 |> putBlob
+
             let validRoot =
                 putTree
-                    [ { Mode = "40000"; Name = "writers"; Oid = writerTree }
-                      { Mode = "40000"; Name = "payloads"; Oid = payloadTree }
-                      { Mode = "100644"; Name = "writer-manifest"; Oid = manifest } ]
-            let invalidRoot = putTree [ { Mode = "40000"; Name = "writers"; Oid = writerTree } ]
+                    [ { Mode = "40000"
+                        Name = "writers"
+                        Oid = writerTree }
+                      { Mode = "40000"
+                        Name = "payloads"
+                        Oid = payloadTree }
+                      { Mode = "100644"
+                        Name = "writer-manifest"
+                        Oid = manifest } ]
+
+            let invalidRoot =
+                putTree
+                    [ { Mode = "40000"
+                        Name = "writers"
+                        Oid = writerTree } ]
+
             protocol.Clear()
 
             let run root =
                 task {
                     protocol.Clear()
+
                     let! outcome =
                         WriterStreamSync.syncWriterStreamsAt
                             raw
                             commonDir
                             (Some { RootOid = RootOid.create root })
                             nowMs
+
                     let calls = protocol.ToArray()
+
                     return
                         match outcome with
                         | Ok snapshot ->
@@ -173,10 +194,7 @@ module RetentionSurface =
                                   "root" ==> (snapshot.RootOid |> RootOid.value |> GitObjectId.value)
                                   "protocol" ==> calls ]
                         | Error error ->
-                            createObj
-                                [ "ok" ==> false
-                                  "error" ==> sprintf "%A" error
-                                  "protocol" ==> calls ]
+                            createObj [ "ok" ==> false; "error" ==> sprintf "%A" error; "protocol" ==> calls ]
                 }
 
             let! first = run validRoot

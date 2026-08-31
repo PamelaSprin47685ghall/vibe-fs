@@ -3,13 +3,18 @@ namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Session.OpenCode
@@ -27,6 +32,11 @@ module ForkToolSurface =
         let promptWaiters =
             Dictionary<string, ResizeArray<int * TaskCompletionSource<unit>>>()
 
+        let emittedWaiters = ResizeArray<int * TaskCompletionSource<unit>>()
+
+        let pendingAcceptances =
+            Dictionary<string, ResizeArray<TaskCompletionSource<SendOutcome>>>()
+
         let physicalRoots = Dictionary<string, ResizeArray<string>>()
         // DSL-MUTABLE: algorithm-scratch — exactly one next Host send outcome in the harness
         let mutable nextSendOutcome: SendOutcome option = None
@@ -41,6 +51,14 @@ module ForkToolSurface =
             | false, _ ->
                 let values = ResizeArray<string>()
                 source[key] <- values
+                values
+
+        let acceptancesOf key =
+            match pendingAcceptances.TryGetValue key with
+            | true, values -> values
+            | false, _ ->
+                let values = ResizeArray<TaskCompletionSource<SendOutcome>>()
+                pendingAcceptances[key] <- values
                 values
 
         let waitersOf key =
@@ -74,6 +92,24 @@ module ForkToolSurface =
 
                 ready
                 |> List.iter (fun (_, waiter) -> AsyncSupport.trySetResult waiter () |> ignore)
+
+        let releaseEmittedWaiters () =
+            let admitted =
+                match children |> Seq.tryLast with
+                | Some child -> promptCountForKey (SessionId.value child.SessionId)
+                | None -> 0
+
+            let ready =
+                emittedWaiters
+                |> Seq.filter (fun (target, _) -> admitted >= target)
+                |> Seq.toList
+
+            for registration in ready do
+                emittedWaiters.Remove registration |> ignore
+
+                registration
+                |> snd
+                |> fun waiter -> AsyncSupport.trySetResult waiter () |> ignore
 
         let subscribe sessionId listener =
             let key = SessionId.value sessionId
@@ -111,6 +147,40 @@ module ForkToolSurface =
                 waitersOf key |> fun values -> values.Add(count, waiter)
                 waiter.Task :> Task
 
+        member _.WaitForEmittedPromptCount(count: int) : Task =
+            let admitted =
+                match children |> Seq.tryLast with
+                | Some child -> promptCountForKey (SessionId.value child.SessionId)
+                | None -> 0
+
+            if admitted >= count then
+                Task.FromResult(()) :> Task
+            else
+                let waiter =
+                    TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+                emittedWaiters.Add(count, waiter)
+                waiter.Task :> Task
+
+        member _.AcceptPrompt(sessionId: SessionId, index: int) =
+            let key = SessionId.value sessionId
+
+            match pendingAcceptances.TryGetValue key with
+            | true, values when index >= 0 && index < values.Count ->
+                physicalSequence.Value <- physicalSequence.Value + 1
+                let physical = sprintf "fork-physical-%d" physicalSequence.Value
+
+                if
+                    AsyncSupport.trySetResult
+                        values[index]
+                        (SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create physical))
+                then
+                    historyOf physicalRoots key |> fun roots -> roots.Add physical
+                    true
+                else
+                    false
+            | _ -> false
+
         member _.Prompt(sessionId: SessionId, index: int) =
             match prompts.TryGetValue(SessionId.value sessionId) with
             | true, values when index >= 0 && index < values.Count -> Some values[index]
@@ -139,16 +209,18 @@ module ForkToolSurface =
                 let key = SessionId.value sessionId
                 historyOf prompts key |> fun values -> values.Add text
                 releasePromptWaiters key
+                releaseEmittedWaiters ()
 
                 match nextSendOutcome with
                 | Some outcome ->
                     nextSendOutcome <- None
                     Task.FromResult outcome
                 | None ->
-                    physicalSequence.Value <- physicalSequence.Value + 1
-                    let physical = sprintf "fork-physical-%d" physicalSequence.Value
-                    historyOf physicalRoots key |> fun values -> values.Add physical
-                    Task.FromResult(SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create physical))
+                    let acceptance =
+                        TaskCompletionSource<SendOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+                    acceptancesOf key |> fun values -> values.Add acceptance
+                    acceptance.Task
 
             member _.AbortSession _ =
                 abortCount <- abortCount + 1
@@ -194,11 +266,17 @@ module ForkToolSurface =
                 |> Option.defaultValue sessionId
 
     type private ForkHarness
-        (journal: AgentJournal, scope: ToolRuntimeScope, sessions: ForkSessionPort, ownerPrefix: string) =
+        (
+            journal: AgentJournal,
+            scope: ToolRuntimeScope,
+            sessions: ForkSessionPort,
+            ownerAgents: Dictionary<string, string>
+        ) =
         member _.Journal = journal
         member _.Scope = scope
         member _.Sessions = sessions
-        member _.OwnerSession(owner: string) = SessionId.create (ownerPrefix + owner)
+        member _.OwnerSession(owner: string) = SessionId.create owner
+        member _.OwnerAgent(owner: string) = ownerAgents[owner]
 
         member _.Dispose() =
             (scope :> IDisposable).Dispose()
@@ -224,9 +302,101 @@ module ForkToolSurface =
             | Error rejection -> return failwithf "%s: %s" rejection.Fact rejection.Reason
         }
 
-    let createRuntime (directory: string) : Task<obj> =
+    [<Emit("$0 == null")>]
+    let private isNullish (value: obj) : bool = jsNative
+
+    let private requiredOwnerString (fieldName: string) (value: obj) : Result<string, string> =
+        let isString: bool = emitJsExpr value "typeof $0 === 'string'"
+
+        if not isString || String.IsNullOrWhiteSpace(unbox<string> value) then
+            Error(sprintf "invalid fork owner descriptor: %s must be a non-empty string" fieldName)
+        else
+            Ok(unbox<string> value)
+
+    let private ownerAdmission (descriptor: obj) =
+        let isPlainObject: bool =
+            not (isNullish descriptor)
+            && emitJsExpr
+                descriptor
+                "typeof $0 === 'object' && !Array.isArray($0) && (Object.getPrototypeOf($0) === Object.prototype || Object.getPrototypeOf($0) === null)"
+
+        if not isPlainObject then
+            Error "invalid fork owner descriptor: descriptor must be a plain object"
+        else
+            match requiredOwnerString "sessionId" descriptor?sessionId with
+            | Error error -> Error error
+            | Ok sessionId ->
+                match requiredOwnerString "agent" descriptor?agent with
+                | Error error -> Error error
+                | Ok agent ->
+                    ParticipantIdentity.resolveAtRoot agent
+                    |> Result.mapError (sprintf "invalid fork owner descriptor agent: %A")
+                    |> Result.map (fun identity ->
+                        SessionId.create sessionId,
+                        PhysicalUserMessageId.create (sprintf "fork-owner-root:%s" sessionId),
+                        PromptAuthority.IdentitySeed.RootSelection identity,
+                        agent)
+
+    let private ownerAdmissions (owners: obj) =
+        let isArray: bool = emitJsExpr owners "Array.isArray($0)"
+
+        if not isArray || (unbox<obj array> owners).Length = 0 then
+            Error "invalid fork owner descriptors: expected a non-empty array"
+        else
+            let rec collect seen admissions remaining =
+                match remaining with
+                | [] -> Ok(List.rev admissions)
+                | descriptor :: tail ->
+                    match ownerAdmission descriptor with
+                    | Error error -> Error error
+                    | Ok((sessionId, _, _, _) as admission) ->
+                        let session = SessionId.value sessionId
+
+                        if Set.contains session seen then
+                            Error(sprintf "invalid fork owner descriptors: duplicate sessionId '%s'" session)
+                        else
+                            collect (Set.add session seen) (admission :: admissions) tail
+
+            unbox<obj array> owners |> Array.toList |> collect Set.empty []
+
+    let rec private acceptOwnerRoots (dispatcher: PromptDispatcher.Runtime) admissions : Task<Result<unit, string>> =
         task {
+            match admissions with
+            | [] -> return Ok()
+            | (sessionId, physicalMessageId, identitySeed, _) :: tail ->
+                match! dispatcher.AcceptHumanRoot sessionId physicalMessageId (Some identitySeed) with
+                | Ok _ -> return! acceptOwnerRoots dispatcher tail
+                | Error error ->
+                    return
+                        Error(
+                            sprintf
+                                "fork owner '%s' root admission rejected: %s"
+                                (SessionId.value sessionId)
+                                (PromptDispatcher.describeHumanRootAcceptanceFailure error)
+                        )
+        }
+
+    let createRuntime (directory: string) (owners: obj) : Task<obj> =
+        task {
+            let admissions =
+                match ownerAdmissions owners with
+                | Ok admissions -> admissions
+                | Error error -> raise (ArgumentException error)
+
             let! journal = createJournal directory
+            let dispatcher = PromptDispatcher.Runtime(journal)
+
+            match! acceptOwnerRoots dispatcher admissions with
+            | Error error ->
+                (journal :> IDisposable).Dispose()
+                raise (InvalidOperationException error)
+            | Ok() -> ()
+
+            let ownerAgents = Dictionary<string, string>()
+
+            for (sessionId, _, _, agent) in admissions do
+                ownerAgents.Add(SessionId.value sessionId, agent)
+
             let sessionPort = ForkSessionPort()
             let sessions = sessionPort :> ISessionHostPort
 
@@ -247,13 +417,12 @@ module ForkToolSurface =
                     None
                 )
 
-            let ownerPrefix = sprintf "fork-surface-%s-" (ToolHostCodec.digest directory)
-            return box (ForkHarness(journal, scope, sessionPort, ownerPrefix))
+            return box (ForkHarness(journal, scope, sessionPort, ownerAgents))
         }
 
     let private managerContext (harness: ForkHarness) owner =
         { SessionId = SessionId.value (harness.OwnerSession owner)
-          Agent = Some "fast-manager"
+          Agent = Some(harness.OwnerAgent owner)
           ToolCallId = None
           ProviderRunId = None
           PromptText = None
@@ -290,11 +459,7 @@ module ForkToolSurface =
             let harness = unbox<ForkHarness> value
 
             match!
-                XTraceCapture.captureOpeningWithReceipt
-                    (Some harness.Journal)
-                    (harness.OwnerSession owner)
-                    text
-                    []
+                XTraceCapture.captureOpeningWithReceipt (Some harness.Journal) (harness.OwnerSession owner) text []
             with
             | Ok _ -> ()
             | Error error -> return raise (InvalidOperationException(sprintf "%A" error))
@@ -319,10 +484,7 @@ module ForkToolSurface =
     let private captureTraceText journal sessionId messageId text : Task =
         task {
             match!
-                XTraceCapture.captureSessionMessagesWithReceipt
-                    (Some journal)
-                    sessionId
-                    [ traceMessage messageId text ]
+                XTraceCapture.captureSessionMessagesWithReceipt (Some journal) sessionId [ traceMessage messageId text ]
             with
             | Ok _ -> ()
             | Error error -> return raise (InvalidOperationException(sprintf "%A" error))
@@ -353,10 +515,14 @@ module ForkToolSurface =
 
     let awaitPromptCount (value: obj) (count: int) : Task =
         let harness = unbox<ForkHarness> value
+        harness.Sessions.WaitForEmittedPromptCount count
+
+    let acceptPrompt (value: obj) (index: int) : bool =
+        let harness = unbox<ForkHarness> value
 
         match harness.Sessions.LatestChild with
-        | Some childId -> harness.Sessions.WaitForPromptCount(childId, count)
-        | None -> task { return raise (InvalidOperationException "fork surface has no child to await") } :> Task
+        | Some childId -> harness.Sessions.AcceptPrompt(childId, index)
+        | None -> false
 
     let prompt (value: obj) (index: int) : obj =
         let harness = unbox<ForkHarness> value
@@ -369,6 +535,10 @@ module ForkToolSurface =
     let nextPromptAcceptanceUnknown (value: obj) (reason: string) =
         let harness = unbox<ForkHarness> value
         harness.Sessions.SetNextSendOutcome(SendOutcome.AcceptanceUnknown reason)
+
+    let nextPromptAdmittedWithReceipt (value: obj) (receipt: string) =
+        let harness = unbox<ForkHarness> value
+        harness.Sessions.SetNextSendOutcome(SendOutcome.AdmittedWithReceipt(TransportReceipt.create receipt))
 
     let cancelOwnerChildren (value: obj) (owner: string) : Task =
         let harness = unbox<ForkHarness> value

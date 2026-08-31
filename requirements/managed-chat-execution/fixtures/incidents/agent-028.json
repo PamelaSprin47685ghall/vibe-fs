@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "incidentId": "agent-028",
+  "redaction": {
+    "payloads": "removed",
+    "credentials": "removed",
+    "stacks": "removed",
+    "paths": "removed"
+  },
+  "historicalModel": {
+    "bindingIdentity": "SessionId",
+    "first": {
+      "sessionId": "session-agent-028",
+      "physicalUserMessageId": "message-agent-028-a",
+      "bindingKey": "session-agent-028"
+    },
+    "second": {
+      "sessionId": "session-agent-028",
+      "physicalUserMessageId": "message-agent-028-b",
+      "bindingKey": "session-agent-028"
+    },
+    "observedOutcome": "IdentityConflict"
+  },
+  "currentModel": {
+    "bindingIdentity": "SessionId+PhysicalUserMessageId",
+    "facts": [
+      "[\"Agent\",[\"ChatExecution\",[\"Accepted\",{\"Evidence\":{\"SessionId\":[\"SessionId\",\"session-agent-028\"],\"LogicalRunId\":[\"LogicalRunId\",\"run-agent-028\"],\"AuthorityRootUserMessageId\":[\"AuthorityRootUserMessageId\",\"root-agent-028\"],\"AuthorityKind\":\"HumanRoot\",\"IdentitySeed\":[\"RootSelection\",{\"InitialTier\":\"Fast\",\"Origin\":\"ResolvedAtRoot\",\"PeerAgent\":\"deep-coder\",\"Persona\":\"Coder\",\"PersonaCatalogVersion\":1,\"Role\":\"coder\",\"SelectedAgent\":\"fast-coder\"}],\"PhysicalUserMessageId\":[\"PhysicalUserMessageId\",\"message-agent-028-a\"],\"Origin\":[\"AuthorityRoot\",\"HumanRoot\"],\"EffectiveAgent\":\"fast-coder\"},\"Key\":{\"SessionId\":[\"SessionId\",\"session-agent-028\"],\"PhysicalUserMessageId\":[\"PhysicalUserMessageId\",\"message-agent-028-a\"]},\"SchemaVersion\":1}]]]",
+      "[\"Agent\",[\"ChatExecution\",[\"Accepted\",{\"Evidence\":{\"SessionId\":[\"SessionId\",\"session-agent-028\"],\"LogicalRunId\":[\"LogicalRunId\",\"run-agent-028\"],\"AuthorityRootUserMessageId\":[\"AuthorityRootUserMessageId\",\"root-agent-028\"],\"AuthorityKind\":\"HumanRoot\",\"IdentitySeed\":[\"RootSelection\",{\"InitialTier\":\"Fast\",\"Origin\":\"ResolvedAtRoot\",\"PeerAgent\":\"deep-coder\",\"Persona\":\"Coder\",\"PersonaCatalogVersion\":1,\"Role\":\"coder\",\"SelectedAgent\":\"fast-coder\"}],\"PhysicalUserMessageId\":[\"PhysicalUserMessageId\",\"message-agent-028-b\"],\"Origin\":[\"AuthorityRoot\",\"HumanRoot\"],\"EffectiveAgent\":\"fast-coder\"},\"Key\":{\"SessionId\":[\"SessionId\",\"session-agent-028\"],\"PhysicalUserMessageId\":[\"PhysicalUserMessageId\",\"message-agent-028-b\"]},\"SchemaVersion\":1}]]]"
+    ],
+    "recoveryScenario": "CrashAfterAcceptance",
+    "expectedDecision": "ResumePreProvider"
+  }
+}

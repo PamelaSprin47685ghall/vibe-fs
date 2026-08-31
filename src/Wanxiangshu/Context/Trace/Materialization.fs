@@ -78,10 +78,7 @@ module XTraceMaterialization =
         (parts: XTracePartRef list)
         : Task<Result<ProviderProjection.ProviderSemanticProjection, string>> =
         taskResult {
-            let turns =
-                parts
-                |> List.groupBy (fun part -> part.Turn)
-                |> List.sortBy fst
+            let turns = parts |> List.groupBy (fun part -> part.Turn) |> List.sortBy fst
 
             let! messages = turns |> TaskResultList.traverseM (readTurn journal)
             return { empty with Messages = messages }

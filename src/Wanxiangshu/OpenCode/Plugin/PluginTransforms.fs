@@ -16,6 +16,7 @@ open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
@@ -111,6 +112,7 @@ module PluginTransforms =
           ApplyManagerNarrative: string option -> XTraceProjectionState option -> obj list -> obj -> Task<unit>
           ApplyCompanion: string option -> obj -> obj -> Task<unit>
           ApplyXWire: obj -> Task<PrefixPresentationHorizon>
+          FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
           ApplyStrengthSpeculate: obj -> Task<unit>
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
@@ -151,8 +153,9 @@ module PluginTransforms =
 
     let private decodePromptOrigin (label: string) : PromptAuthority.PromptOrigin =
         match label with
-        | "HumanRoot" -> PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.HumanRoot
-        | "AgentOwnerRoot" -> PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.AgentOwnerRoot
+        | "HumanRoot" -> PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
+        | "AgentOwnerRoot" ->
+            PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot
         | "HostInternal" -> PromptAuthority.PromptOrigin.HostInternal
         | "UnknownOrigin" -> PromptAuthority.PromptOrigin.UnknownOrigin
         | continuation ->
@@ -185,11 +188,20 @@ module PluginTransforms =
         let wired = host.Wired
         let strengthFailFuse = boot.StrengthFailClosed
 
-        let terminateSession: SessionTermination =
-            fun sessionId reason ->
-                match wired.CurrentPhysicalUserMessage(SessionId.value sessionId) with
-                | None -> Task.FromResult(Error "MANAGED-SESSION-017: current authority root unavailable")
-                | Some physical ->
+        let drainTermination sessionId =
+            function
+            | Error error -> Task.FromResult(Error error)
+            | Ok() ->
+                task {
+                    do! scope.DrainChatRecovery sessionId
+                    return Ok()
+                }
+
+        let terminatePhysical sessionId reason physical =
+            task {
+                do! scope.SignalChatRecoverySession sessionId ChatExecutionRecoveryLifecycleEvent.SessionCancelled
+
+                let! termination =
                     ManagedSessionTermination.terminate
                         (fun ownerId -> scope.CancelSessionChildren(SessionId.value ownerId))
                         sessionPort
@@ -199,6 +211,36 @@ module PluginTransforms =
                          |> PhysicalUserMessageId.create
                          |> PhysicalUserMessageId.promoteToAuthorityRoot)
                         reason
+
+                return! drainTermination sessionId termination
+            }
+
+        let terminateSession: SessionTermination =
+            fun sessionId reason ->
+                wired.CurrentPhysicalUserMessage(SessionId.value sessionId)
+                |> Option.map (terminatePhysical sessionId reason)
+                |> Option.defaultWith (fun () ->
+                    Task.FromResult(Error "MANAGED-SESSION-017: current authority root unavailable"))
+
+        let freezeProviderAttemptPlan projectionSessionIdOpt outObj =
+            task {
+                match!
+                    SessionExecutionBinding.freezeProviderAttemptPlanForTransform
+                        journal
+                        scope.Recovery.FreezePendingAttemptPlan
+                        projectionSessionIdOpt
+                        outObj
+                with
+                | Ok _ -> return ()
+                | Error error ->
+                    return
+                        invalidOp (
+                            sprintf
+                                "HOST-BOUNDARY-008: provider attempt plan freeze failed (%s): %A"
+                                (SessionExecutionBinding.providerStartObservationErrorCode error)
+                                error
+                        )
+            }
 
         { BeginPhysicalProviderAttempt =
             SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
@@ -269,11 +311,7 @@ module PluginTransforms =
                     match projectionSessionIdOpt with
                     | Some _ ->
                         match!
-                            ManagerNarrativeTransform.tryTransform
-                                journal
-                                projectionSessionIdOpt
-                                traceState
-                                rawMessages
+                            ManagerNarrativeTransform.tryTransform journal projectionSessionIdOpt traceState rawMessages
                         with
                         | Some rewritten -> HostMessageProjection.replaceMessagesInPlace outObj rewritten
                         | None -> ()
@@ -296,6 +334,7 @@ module PluginTransforms =
                     ExplicitResumeSuppression.isCurrentMaterial outObj
                     || ExplicitResumeSuppression.isExplicitResumeBinding projectionSessionIdOpt outObj)
           ApplyXWire = XWire.applyTransform snapshotOpt journal scope
+          FreezeProviderAttemptPlan = freezeProviderAttemptPlan
           ApplyEnforcerContinuation =
             fun projectionSessionIdOpt outObj ->
                 task {
@@ -384,20 +423,13 @@ module PluginTransforms =
             let! traceCapture = caps.CaptureXTraceMessages projectionSessionIdOpt outObj
 
             // 5. StrengthReplay.commitTracedAfterCapture
-            do!
-                caps.CommitStrengthTrace projectionSessionIdOpt
-                    traceCapture.Current
-                    strengthReplayPlans
+            do! caps.CommitStrengthTrace projectionSessionIdOpt traceCapture.Current strengthReplayPlans
 
             // 6. CompanionHost.RefreshXTrace
             caps.RefreshCompanionXTrace projectionSessionIdOpt traceCapture.Current
 
             // 7. ManagerNarrativeTransform.tryTransform
-            do!
-                caps.ApplyManagerNarrative projectionSessionIdOpt
-                    traceCapture.Current
-                    traceCapture.RawMessages
-                    outObj
+            do! caps.ApplyManagerNarrative projectionSessionIdOpt traceCapture.Current traceCapture.RawMessages outObj
 
             // 8. applyCompanionForOrdinaryMaterial
             do! caps.ApplyCompanion projectionSessionIdOpt inObj outObj
@@ -407,26 +439,32 @@ module PluginTransforms =
             // historical auxiliaries must not replay the old horizon into it.
             let! prefixHorizon = caps.ApplyXWire outObj
 
-            // 10. EnforcerContinuation.applyContinuation
+            // 10. SessionExecutionBinding.freezeProviderAttemptPlanForTransform
+            // The transform sees the accepted user message only. Freeze the
+            // exact request plan; a later public assistant observation owns
+            // ProviderRunIdentity binding and ProviderStarted persistence.
+            do! caps.FreezeProviderAttemptPlan projectionSessionIdOpt outObj
+
+            // 11. EnforcerContinuation.applyContinuation
             do! caps.ApplyEnforcerContinuation projectionSessionIdOpt outObj
 
             if prefixHorizon = PrefixPresentationHorizon.Current then
-                // 11. StrengthSpeculate.tryApply
+                // 12. StrengthSpeculate.tryApply
                 do! caps.ApplyStrengthSpeculate outObj
 
-                // 12. PairProgrammingThoughtTransform.maybeInjectGuideline
+                // 13. PairProgrammingThoughtTransform.maybeInjectGuideline
                 do! caps.InjectPairGuideline projectionSessionIdOpt sessionStartedAt outObj
 
-                // 13. RequirementGroundingTransform.projectOrTerminate
+                // 14. RequirementGroundingTransform.projectOrTerminate
                 do! caps.ProjectRequirementGrounding projectionSessionIdOpt outObj
 
-            // 14. BloggerChronicleText.maybeInject
+            // 15. BloggerChronicleText.maybeInject
             caps.InjectBloggerChronicle projectionSessionIdOpt outObj
 
-            // 15. HostMessageProjection.sanitizeMessages
+            // 16. HostMessageProjection.sanitizeMessages
             caps.SanitizeMessages outObj
 
-            // 16. JudgeTool.interruptAfterSubmittedJudgement
+            // 17. JudgeTool.interruptAfterSubmittedJudgement
             do! caps.InterruptAfterSubmittedJudgement projectionSessionIdOpt
             ()
         }
@@ -464,6 +502,7 @@ module PluginTransforms =
                     // writer plus its mirror/K gate. XTrace, Manager narrative,
                     // Companion, Enforcer, Pair and Review are owner-only.
                     do! branches.ReplicaXWire outObj
+                    do! caps.FreezeProviderAttemptPlan projectionSessionIdOpt outObj
                     let! handled = runtime.HandleTransform outObj
                     do failIfReplicaDecisionLost handled
                     branches.ReplicaSanitize outObj

@@ -10,6 +10,7 @@ open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
@@ -128,6 +129,8 @@ type AgentProjectionSet =
         HandleByChildSession: Map<SessionId, HandleRecord>
         /// Same-participant multi-present groups and physical lane aliases.
         Fission: FissionProjectionState
+        /// Exact durable managed-chat executions, keyed by physical user message.
+        ChatExecutions: ChatExecutionProjectionState
         /// Canonical per-Life Magic Todo checkpoint projection.
         MagicTodo: MagicTodoProjection.MagicTodoProjectionState
 
@@ -172,6 +175,7 @@ module AgentProjection =
           Orchestrator = OrchestratorProjection.empty
           HandleByChildSession = Map.empty
           Fission = FissionProjection.empty
+          ChatExecutions = ChatExecutionProjection.empty
           MagicTodo = MagicTodoProjection.empty
           DelegationCompletedHandoffs = Map.empty
           Attention = AttentionProjection.empty

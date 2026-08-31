@@ -17,5 +17,5 @@ module PromptFact =
     let inline PluginPromptAbandoned payload =
         AgentFact.Prompt(PromptFactCases.PluginPromptAbandoned payload)
 
-    let inline AuthorityRootAccepted payload =
+    let AuthorityRootAccepted (payload: AuthorityRootAcceptedPayload) =
         AgentFact.Prompt(PromptFactCases.AuthorityRootAccepted payload)

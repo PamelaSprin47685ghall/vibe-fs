@@ -48,22 +48,28 @@ module PromptAuthorityRun =
         (sessionId: SessionId)
         (rootKind: PromptAuthority.RootAuthorityKind)
         (physicalMessageId: PhysicalUserMessageId)
-        (selectedAgentName: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         : Result<PromptAuthority.AuthorityExecutionProfile, string> =
-        match PromptAuthority.parseAgentName selectedAgentName with
-        | Error error -> Error error
-        | Ok(name, role, tier, peer) ->
-            let authorityRoot = PhysicalUserMessageId.promoteToAuthorityRoot physicalMessageId
+        let authorityRoot = PhysicalUserMessageId.promoteToAuthorityRoot physicalMessageId
 
-            Ok
-                { SessionId = sessionId
-                  LogicalRunId = PromptAuthority.stableLogicalRunId sha256 runtimeId sessionId authorityRoot
-                  AuthorityRootUserMessageId = authorityRoot
-                  AuthorityKind = rootKind
-                  SelectedAgent = name
-                  PeerAgent = peer
-                  CanonicalRole = role
-                  SelectedTier = tier }
+        PromptAuthority.createAuthorityExecutionProfileFromSeed
+            sessionId
+            (PromptAuthority.stableLogicalRunId sha256 runtimeId sessionId authorityRoot)
+            authorityRoot
+            rootKind
+            identitySeed
+
+    let private requireInheritedOwnerIdentity identitySeed =
+        match identitySeed with
+        | PromptAuthority.IdentitySeed.RootSelection _ ->
+            Error "AgentOwnerRoot requires an inherited owner identity seed"
+        | PromptAuthority.IdentitySeed.InheritedFromOwner _ ->
+            Ok(PromptAuthority.identitySeedParticipantIdentity identitySeed)
+
+    let private admitPublicRole participantIdentity =
+        match ParticipantIdentity.role participantIdentity with
+        | None -> Error "public authority participant identity cannot be Bookkeeper"
+        | Some _ -> Ok participantIdentity
 
     /// Claim a prompt that will become a new Authority Root (PROMPT-004
     /// AgentOwnerRoot).
@@ -74,21 +80,21 @@ module PromptAuthorityRun =
         (key: PromptKey)
         (sessionId: SessionId)
         (payloadDigest: string)
-        (selectedAgentName: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         : Result<PromptAuthority.PromptClaim, string> =
-        match PromptAuthority.parseAgentName selectedAgentName with
-        | Error error -> Error error
-        | Ok(name, _role, _tier, _peer) ->
-            Ok
-                { PromptKey = key
-                  SessionId = sessionId
-                  Origin = PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-                  LogicalRunId = None
-                  AuthorityRootUserMessageId = None
-                  EffectiveAgent = Some name
-                  PayloadDigest = payloadDigest
-                  Receipt = None
-                  ClaimedAtRuntimeStartCount = 0 }
+        requireInheritedOwnerIdentity identitySeed
+        |> Result.bind admitPublicRole
+        |> Result.map (fun participantIdentity ->
+            { PromptKey = key
+              SessionId = sessionId
+              Origin = PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+              LogicalRunId = None
+              AuthorityRootUserMessageId = None
+              EffectiveAgent = Some(ParticipantIdentity.selectedAgent participantIdentity)
+              IdentitySeed = identitySeed
+              PayloadDigest = payloadDigest
+              Receipt = None
+              ClaimedAtRuntimeStartCount = 0 })
 
     /// Claim a continuation (PROMPT-003). It inherits the run and the root, and
     /// carries the EffectiveAgent the current fallback cursor selected.
@@ -106,6 +112,7 @@ module PromptAuthorityRun =
           LogicalRunId = Some profile.LogicalRunId
           AuthorityRootUserMessageId = Some profile.AuthorityRootUserMessageId
           EffectiveAgent = Some effectiveAgent
+          IdentitySeed = profile.IdentitySeed
           PayloadDigest = payloadDigest
           Receipt = None
           ClaimedAtRuntimeStartCount = 0 }
@@ -126,23 +133,58 @@ module PromptAuthorityRun =
             { projection with
                 PendingClaims = Map.add key { claim with Receipt = Some receipt } projection.PendingClaims }
 
-    /// A new Authority Root resets everything scoped to a Logical Run
-    /// (PROMPT-002): continuation set, repair budget, and — via the caller's
-    /// fallback projection — the cursor (FALLBACK-001).
+    /// An exact duplicate root is idempotent. A fresh root is admitted only
+    /// after the prior logical run has released the active binding.
+    type AuthorityRegistrationRejection =
+        | ActiveRunIdentityConflict of
+            active: PromptAuthority.AuthorityExecutionProfile *
+            requested: PromptAuthority.AuthorityExecutionProfile
+
+    let describeRegistrationRejection =
+        function
+        | ActiveRunIdentityConflict(active, requested) ->
+            sprintf
+                "active logical run must close before replacement: active=%s requested=%s"
+                (LogicalRunId.value active.LogicalRunId)
+                (LogicalRunId.value requested.LogicalRunId)
+
+    let private isExactDurableRootReplay
+        (active: PromptAuthority.AuthorityExecutionProfile)
+        (requested: PromptAuthority.AuthorityExecutionProfile)
+        =
+        active.SessionId = requested.SessionId
+        && active.AuthorityRootUserMessageId = requested.AuthorityRootUserMessageId
+        && active.AuthorityKind = requested.AuthorityKind
+        && active.IdentitySeed = requested.IdentitySeed
+
+    let resolveAuthorityProfile
+        (requested: PromptAuthority.AuthorityExecutionProfile)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        : Result<PromptAuthority.AuthorityExecutionProfile, AuthorityRegistrationRejection> =
+        match projection.ActiveLogicalRun with
+        | Some active when active = requested || isExactDurableRootReplay active requested -> Ok active
+        | Some active -> Error(ActiveRunIdentityConflict(active, requested))
+        | None -> Ok requested
+
     let registerAuthority
         (profile: PromptAuthority.AuthorityExecutionProfile)
         (projection: PromptAuthority.PromptAuthorityProjection)
-        =
-        { projection with
-            LastAuthorityProfile = Some profile
-            ActiveLogicalRun = Some profile
-            PendingClaims = Map.empty
-            AcceptedContinuationIds = Map.empty
-            // PROMPT-011: ClaimSequence counts within one Logical Run, so a new
-            // root restarts the count. This is also what bounds the map
-            // (PERSIST-008) — it grows with distinct payloads in one run, not
-            // with session lifetime.
-            ClaimSequences = Map.empty }
+        : Result<PromptAuthority.PromptAuthorityProjection, AuthorityRegistrationRejection> =
+        resolveAuthorityProfile profile projection
+        |> Result.map (fun canonical ->
+            match projection.ActiveLogicalRun with
+            | Some _ -> projection
+            | None ->
+                { projection with
+                    LastAuthorityProfile = Some canonical
+                    ActiveLogicalRun = Some canonical
+                    PendingClaims = Map.empty
+                    AcceptedContinuationIds = Map.empty
+                    // PROMPT-011: ClaimSequence counts within one Logical Run, so a new
+                    // root restarts the count. This is also what bounds the map
+                    // (PERSIST-008) — it grows with distinct payloads in one run, not
+                    // with session lifetime.
+                    ClaimSequences = Map.empty })
 
     /// Close exactly the active Logical Run named by durable terminal evidence.
     /// Run-scoped continuation resources are discarded; LastAuthorityProfile is
@@ -227,6 +269,7 @@ module PromptAuthorityRun =
                 { PromptKey = claim.PromptKey
                   SessionId = claim.SessionId
                   Origin = claim.Origin
+                  IdentitySeed = claim.IdentitySeed
                   PayloadDigest = claim.PayloadDigest
                   PhysicalUserMessageId = physicalMessageId }
 
@@ -271,7 +314,7 @@ module PromptAuthorityRun =
         match pending, promptKey, projection.ActiveLogicalRun, hostCompaction with
         | Some claim, _, _, _ -> claim.Origin
         | None, _, _, true -> PromptAuthority.PromptOrigin.HostInternal
-        | None, Some _, Some { AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot }, _ ->
+        | None, Some _, Some profile, _ when profile.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->
             PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot
         | _ -> PromptAuthority.PromptOrigin.UnknownOrigin
 

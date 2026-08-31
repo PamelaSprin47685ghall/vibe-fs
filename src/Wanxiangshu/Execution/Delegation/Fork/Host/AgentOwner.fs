@@ -13,8 +13,8 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
@@ -42,7 +42,7 @@ module HostForkAgentOwner =
         (sessions: ISessionHostPort)
         (journal: AgentJournal option)
         (childId: SessionId)
-        (agent: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         (directory: string option)
         (prompt: string)
         (onAccepted: (PhysicalUserMessageId -> unit) option)
@@ -57,19 +57,19 @@ module HostForkAgentOwner =
                     sessions
                     childId
                     prompt
-                    agent
+                    identitySeed
                     directory
                     PromptDispatcher.AwaitMode.Await
                     (Some accepted)
             | None, Some callback ->
-                dispatcher.SendAgentOwnerRootDetachedObserved sessions childId prompt agent directory callback
+                dispatcher.SendAgentOwnerRootDetachedObserved sessions childId prompt identitySeed directory callback
             | None, None ->
                 // PROMPT-007 Detached: child owner root does not wait for PhysicalAccepted.
                 dispatcher.SendAgentOwnerRoot
                     sessions
                     childId
                     prompt
-                    agent
+                    identitySeed
                     directory
                     PromptDispatcher.AwaitMode.Detached
                     None
@@ -78,8 +78,15 @@ module HostForkAgentOwner =
         | None -> Task.FromResult(Error "No journal: an AgentOwnerRoot prompt cannot be claimed")
         | Some durable -> sendClaimed durable
 
-    let sendFirstPrompt sessions journal childId agent directory prompt =
-        sendFirstPromptCore sessions journal childId agent directory prompt None None
+    let sendFirstPrompt sessions journal childId identitySeed directory prompt =
+        sendFirstPromptCore sessions journal childId identitySeed directory prompt None None
 
-    let sendFirstPromptObserved sessions journal childId agent directory prompt onAccepted onDetachedFailure =
-        HostForkRunLifecycle.sendAgentOwnerRootObserved sessions journal childId agent directory prompt onAccepted
+    let sendFirstPromptObserved sessions journal childId identitySeed directory prompt onAccepted onDetachedFailure =
+        HostForkRunLifecycle.sendAgentOwnerRootObserved
+            sessions
+            journal
+            childId
+            identitySeed
+            directory
+            prompt
+            onAccepted

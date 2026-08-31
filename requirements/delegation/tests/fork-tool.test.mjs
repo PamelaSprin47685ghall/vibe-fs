@@ -28,6 +28,7 @@ const toolModule = {
 }
 
 const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime, count)
+const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'fast-manager' }]
 
 test('WHAT[DELEG-019] FORK_TOOL_payload_has_assignment_and_requirements', () => {
   const wire = fork.render('en', {
@@ -76,13 +77,13 @@ test('WHAT[DELEG-006] FORK_continuation_reuses_bound_managed_agent_and_does_not_
 
 test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_leaves_completion_to_join', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-reuse-'))
-  const runtime = await forkTool.createRuntime(directory)
   const owner = 'manager-reuse'
+  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
     await forkTool.captureOwnerOpening(runtime, owner, 'ROOT-OPENING-MARKER')
 
-    const first = await forkTool.executeManagerFork(
+    const first = forkTool.executeManagerFork(
       runtime,
       toolModule,
       owner,
@@ -91,12 +92,13 @@ test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_lea
       'FIRST-FORK-CHARGE',
     )
     await waitForPromptCount(runtime, 1)
+    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
     assert.equal(forkTool.childCount(runtime), 1)
     const child = forkTool.child(runtime)
     assert.notEqual(child, null)
     assert.match(forkTool.prompt(runtime, 0), /FIRST-FORK-CHARGE/)
     assert.match(forkTool.prompt(runtime, 0), /ROOT-OPENING-MARKER/)
-    assert.match(first, /Ada/)
+    assert.match(await first, /Ada/)
 
     assert.equal(await forkTool.settle(runtime, owner, 'FIRST-FORK-ANSWER', 'fork-run-1'), true)
 
@@ -112,6 +114,7 @@ test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_lea
     )
 
     await waitForPromptCount(runtime, 2)
+    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
     assert.equal(forkTool.child(runtime), child, 'same Byname must reuse the same physical child')
     assert.equal(forkTool.childCount(runtime), 1)
 
@@ -145,8 +148,8 @@ test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_lea
 
 test('WHAT[DELEG-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_placed', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-unknown-'))
-  const runtime = await forkTool.createRuntime(directory)
   const owner = 'manager-unknown'
+  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
     forkTool.nextPromptAcceptanceUnknown(runtime, 'connection closed after request write')
@@ -160,14 +163,42 @@ test('WHAT[DELEG-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_p
       'UNCERTAIN-FORK-CHARGE',
     )
 
-    assert.doesNotMatch(result, /could not be placed/i)
-    assert.match(result, /may already have been accepted/i)
+    assert.doesNotMatch(result, /could not be placed|无法托付/i)
+    assert.match(result, /may already have been accepted|可能已经接收/i)
     assert.equal(forkTool.childCount(runtime), 1)
     assert.equal(forkTool.promptCount(runtime), 1, 'physical Host send was attempted exactly once')
+    assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')
+  } finally {
+    forkTool.disposeRuntime(runtime)
+  }
+})
 
-    const roster = await forkTool.executeHorizon(runtime, owner)
-    assert.match(roster, /Ada/)
-    assert.match(roster, /still away/i)
+test('WHAT[DELEG-026] FORK_TOOL_transport_receipt_without_physical_acceptance_keeps_run_active', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-receipt-pending-'))
+  const owner = 'manager-receipt-pending'
+  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+  try {
+    forkTool.nextPromptAdmittedWithReceipt(runtime, 'accepted-without-message-id')
+
+    const result = await forkTool.executeManagerFork(
+      runtime,
+      toolModule,
+      owner,
+      'coder',
+      'Ada',
+      'RECEIPT-PENDING-FORK-CHARGE',
+    )
+
+    assert.doesNotMatch(result, /could not complete the charge|could not be placed|无法托付/i)
+    assert.match(result, /may already have been accepted|可能已经接收/i)
+    assert.equal(forkTool.childCount(runtime), 1)
+    assert.equal(forkTool.promptCount(runtime), 1)
+    assert.equal(
+      forkTool.durableLifecycleByname(runtime, owner, 'Ada'),
+      'Active',
+      'transport admission without PhysicalAccepted must preserve the pending run for exact ingress evidence',
+    )
   } finally {
     forkTool.disposeRuntime(runtime)
   }
@@ -175,20 +206,21 @@ test('WHAT[DELEG-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_p
 
 test('WHAT[PARTICIPANT-HORIZON-011] FORK_TOOL_abandoned_child_does_not_vanish_from_horizon_before_join', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-abandoned-horizon-'))
-  const runtime = await forkTool.createRuntime(directory)
   const owner = 'manager-abandoned-horizon'
+  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
-    const placed = await forkTool.executeManagerFork(runtime, toolModule, owner, 'coder', 'Ada', 'VISIBLE-CHARGE')
-    assert.match(placed, /Ada/)
+    const placed = forkTool.executeManagerFork(runtime, toolModule, owner, 'coder', 'Ada', 'VISIBLE-CHARGE')
     await waitForPromptCount(runtime, 1)
+    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
+    assert.match(await placed, /Ada/)
 
     await forkTool.cancelOwnerChildren(runtime, owner)
 
     const roster = await forkTool.executeHorizon(runtime, owner)
     assert.match(roster, /Ada/, 'durable abandoned child must not become indistinguishable from never-created')
-    assert.match(roster, /did not return/i)
-    assert.doesNotMatch(roster, /no one is currently away/i)
+    assert.match(roster, /did not return|未从此项任务归来/i)
+    assert.doesNotMatch(roster, /no one is currently away|当前没有.*在外/i)
     assert.equal(forkTool.abortCount(runtime), 1, 'authorized logical cancel still physically tears down the child')
   } finally {
     forkTool.disposeRuntime(runtime)
@@ -197,13 +229,14 @@ test('WHAT[PARTICIPANT-HORIZON-011] FORK_TOOL_abandoned_child_does_not_vanish_fr
 
 test('WHAT[MANAGED-SESSION-018] FORK_TOOL_process_detach_preserves_durable_active_child_for_restart', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-process-detach-'))
-  const runtime = await forkTool.createRuntime(directory)
   const owner = 'manager-process-detach'
+  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
-    const placed = await forkTool.executeManagerFork(runtime, toolModule, owner, 'coder', 'Ada', 'SURVIVE-PLUGIN-RELOAD')
-    assert.match(placed, /Ada/)
+    const placed = forkTool.executeManagerFork(runtime, toolModule, owner, 'coder', 'Ada', 'SURVIVE-PLUGIN-RELOAD')
     await waitForPromptCount(runtime, 1)
+    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
+    assert.match(await placed, /Ada/)
     assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')
 
     await forkTool.detachToolRuntime(runtime)

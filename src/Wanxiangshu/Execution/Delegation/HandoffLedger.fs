@@ -12,6 +12,7 @@ module DelegationHandoffLedger =
 
     let private previousEnd (journal: AgentJournal) parent route =
         let projection = (AgentJournal.snapshot journal).AgentProjections
+
         Map.tryFind (DelegationHandoff.key parent route) projection.DelegationCompletedHandoffs
         |> Option.map XTraceCursor.create
 

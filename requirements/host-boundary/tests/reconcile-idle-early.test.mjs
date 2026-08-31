@@ -4,6 +4,33 @@ import * as ReconcileSurface from '../../../dist/Composition/Turn/ReconcileSurfa
 
 const idleWake = ReconcileSurface.idleWake('s1', 1n)
 
+test('WHAT[HOST-BOUNDARY-005] exact failure wake survives same-physical idle admission', () => {
+  const failure = ReconcileSurface.failureWakeFor('msg-current')
+
+  assert.equal(ReconcileSurface.mergeWakeKind('msg-current', failure, idleWake), 'FailureWake')
+  assert.equal(
+    ReconcileSurface.mergeWakeKind('', failure, ReconcileSurface.failureWake()),
+    'FailureWake',
+    'a coarse failure without identity cannot erase an exact failed physical',
+  )
+  assert.equal(
+    ReconcileSurface.mergeWakeKind('', failure, idleWake),
+    'FailureWake',
+    'missing process-local binding is not evidence that the exact failed physical was superseded',
+  )
+  assert.equal(
+    ReconcileSurface.mergeWakeKind('msg-next', failure, idleWake),
+    'IdleWake',
+    'a new physical user message must release the old failure wake',
+  )
+  assert.equal(ReconcileSurface.mergeWakeKind('msg-current', failure, ReconcileSurface.abortWake()), 'AbortWake')
+})
+
+test('WHAT[HOST-BOUNDARY-005] coarse failure without physical binding cannot publish a terminal turn', async () => {
+  const result = await ReconcileSurface.unboundFailureScenario()
+  assert.equal(result.snapshotReads, 0)
+})
+
 test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_projection_edge_drives_exactly_one_additional_idle_read', async () => {
   const result = await ReconcileSurface.idleProjectionEdgeScenario()
 
@@ -86,4 +113,25 @@ test('WHAT[HOST-BOUNDARY-005] mutation_canary_terminal_evidence_still_publishes'
     ReconcileSurface.evidenceTerminal('TurnFailed'),
   )
   assert.equal(ReconcileSurface.decisionName(decision), 'Publish')
+})
+
+test('WHAT[HOST-BOUNDARY-005] terminal provider failure publishes only with matching typed physical witness', () => {
+  const terminal = ReconcileSurface.evidenceTerminalFor('failed-physical', 'TurnFailed')
+
+  assert.equal(
+    ReconcileSurface.decisionName(
+      ReconcileSurface.decideStep(ReconcileSurface.failureWakeFor('failed-physical'), 1, terminal),
+    ),
+    'Publish',
+  )
+  assert.equal(
+    ReconcileSurface.decisionName(
+      ReconcileSurface.decideStep(ReconcileSurface.failureWakeFor('other-physical'), 1, terminal),
+    ),
+    'StopPass',
+  )
+  assert.equal(
+    ReconcileSurface.decisionName(ReconcileSurface.decideStep(ReconcileSurface.retryWake(), 1, terminal)),
+    'StopPass',
+  )
 })
