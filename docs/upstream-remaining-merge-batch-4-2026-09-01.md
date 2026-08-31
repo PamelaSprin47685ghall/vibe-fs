@@ -49,6 +49,21 @@ The rollback proof first asserts that the production commit succeeded and all th
 
 No baseline, suppression, allowlist, threshold, timeout, or assertion was weakened.
 
+### Linux production-evidence follow-up
+
+The first cumulative Linux run exposed one defect introduced by this PR, not inherited from upstream: `JsMutationFs.writeCreate` received `resolvePath` as an operation and could invoke it again while classifying a failed exclusive create. The production FCS gate rejected that unowned repeated trace.
+
+`847850587` removes the repeated operation instead of declaring an artificial retry contract. `commitPlan` and `rollbackPlan` now resolve every logical path exactly once into private typed mutations. Preflight, immediate revalidation, write, failure classification, and CAS rollback reuse that exact resolved path. External error paths remain logical paths; no host path leaks through the public failure algebra.
+
+Follow-up proof:
+
+- `node scripts/build.mjs` — PASS; 734 F# sources, 161 registered surfaces.
+- Transaction/filesystem/adapter proofs — PASS; 13/13.
+- `owner-dependencies-reuse.test.mjs` — PASS; the real production FCS scan and fail-closed evidence reuse completed in 107.5s.
+- `npm run format` — PASS; 696 F# files, one formatted.
+
+This repair adds no semantic-decorator declaration, suppression, allowance, timeout, or duplicated path formula.
+
 ## Remaining work
 
 This PR closes only batch 4 / M1. Batches 5–9 remain separate modules and PRs. `upstream/master` was fetched again immediately before PR creation and remained `fcd5ab11b`; no additional semantic merge was required.

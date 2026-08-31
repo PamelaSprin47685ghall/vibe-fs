@@ -40,7 +40,7 @@ Synthetic TOML 渲染器 (# ok / # failed + [data] / [fs])
 ### 3. 事务生命周期与持久化
 
 - **Staging**：所有 `rewrite` 与 `write` 只在内存维护 `StagedMutation` 列表，不修改实际文件。
-- **Preflight**：在落盘前核验目标文件指纹是否与初次读取一致；若外部发生变更，立即报告 `FILE_CHANGED` 并中止。
+- **Preflight**：提交/回滚计划先将每个逻辑路径解析一次为私有 typed mutation；预检、逐项重验、物理写入、失败分类与 CAS 回滚复用同一 resolved path。在落盘前核验目标文件指纹是否与初次读取一致；若外部发生变更，立即报告 `FILE_CHANGED` 并中止。
 - **EventStore 闭环**：多文件提交前先持久化 `JsTransactionPrepared` 事件；落盘成功后追加 `JsTransactionCommitted`。进程若在两事件之间中断，未完成事务仅作审计记录，重启后不自动回滚或补齐。
 
 ### 4. 工具描述的行为引导

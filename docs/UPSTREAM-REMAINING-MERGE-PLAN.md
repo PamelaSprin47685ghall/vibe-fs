@@ -88,6 +88,8 @@ run `33426540260` 已验证 owner lane 修复：5/5，Linux production scan 146.
 - 原因：涉及 snapshot、commit race 与 rollback，错误会破坏第三方数据；不与其他行为改动混合。
 - 批次出口：read-only conflict、create race、CAS-safe rollback 三类 counterworld 全部绑定 production transaction。
 
+执行事实（2026-09-01）：本地 M1 行为闭合后，累计 Linux production-evidence run 发现本 PR 新增的 `writeCreate` 会在失败分类中再次调用注入的 `resolvePath`。`847850587` 未用 trace contract 掩盖，而是将 commit/rollback 逻辑路径一次解析成 private typed mutation，使 preflight、逐项重验、write、failure classification、CAS rollback 共用 exact resolved path。Fable build、13/13 transaction proofs、真实 owner production scan+reuse（107.5s）与 format 全绿；修复需传播到第 5 次累计头后重新取得 #22/#23 verdict。
+
 ### 第 5 次：Change publish correctness
 
 - 模块：M2。
