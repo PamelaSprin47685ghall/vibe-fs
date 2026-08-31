@@ -3,22 +3,22 @@ import test from 'node:test'
 import * as AttachmentSurface from '../../../dist/Execution/Session/Attachment/AttachmentSurface.js'
 import * as RecoverySurface from '../../../dist/Execution/Session/Recovery/Surface.js'
 import * as AssociationSurface from '../../../dist/Execution/Session/AssociationSurface.js'
+import * as SatelliteSurface from '../../../dist/Execution/Session/Attachment/SatelliteSurface.js'
 import * as HandleSurface from '../../../dist/Execution/Delegation/Handle/Surface.js'
-import { satelliteLifecycle } from './support/managed-surface.mjs'
 
-test('WHAT[MANAGED-SESSION-003] session_recovery_contract_restart_reuses_matching_durable_association', () => {
-  const observed = satelliteLifecycle({ linked: true, physical: true })
+test('WHAT[MANAGED-SESSION-003] session_recovery_contract_restart_reuses_matching_durable_association', async () => {
+  const observed = await SatelliteSurface.SatelliteSurface_scenario(true, true, false, false)
   assert.equal(observed.ok, true)
   assert.equal(observed.origin, 'Reused')
   assert.deepEqual(observed.linked, [['work', 'blogger-1', 'fast-blogger']])
 })
 
-test('WHAT[MANAGED-SESSION-003] session_recovery_contract_conflict_fails_closed_without_guessing', () => {
-  const conflict = satelliteLifecycle({ conflict: true })
+test('WHAT[MANAGED-SESSION-003] session_recovery_contract_conflict_fails_closed_without_guessing', async () => {
+  const conflict = await SatelliteSurface.SatelliteSurface_scenario(true, true, true, false)
   assert.equal(conflict.ok, false)
   assert.match(conflict.error, /Conflicting companion satellite recovery/)
 
-  const queryError = satelliteLifecycle({ queryError: true })
+  const queryError = await SatelliteSurface.SatelliteSurface_scenario(false, false, false, true)
   assert.equal(queryError.ok, false)
   assert.match(queryError.error, /Cannot recover companion satellite/)
 })
