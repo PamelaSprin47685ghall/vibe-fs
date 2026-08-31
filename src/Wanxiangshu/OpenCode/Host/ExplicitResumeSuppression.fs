@@ -137,6 +137,9 @@ module ExplicitResumeSuppression =
             | true, current -> current = PhysicalUserMessageId.value physicalId
             | false, _ -> false)
 
+    let hasMarkedPhysicalMaterial (sessionId: SessionId) : bool =
+        lock gate (fun () -> markedPhysicalBySession.ContainsKey(SessionId.value sessionId))
+
     /// CRASH-018 chat.message classification. Materialization and exact-physical
     /// replay knowledge are one owner decision; Host wiring must not reconstruct
     /// the precedence between them.

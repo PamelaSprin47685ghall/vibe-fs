@@ -281,3 +281,95 @@ test('WHAT[CRASH-018] CRASH_018_abandoned_command_handoff_cannot_mark_a_later_or
     )
   })
 })
+
+test('WHAT[CRASH-018] CRASH_018_resumed_session_user_message_without_explicit_agent_admits_and_transforms', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'ses_resumed_user_continue'
+    const userMessageID = 'msg-user-continue-1'
+
+    await acceptAuthorityRoot(runtime, sessionID, 'fast-manager')
+
+    const userOutput = {
+      message: { id: userMessageID, sessionID, role: 'user' },
+      parts: [{ type: 'text', text: '继续' }],
+    }
+
+    // Host sends chat.message with only sessionID (no explicit agent in user message)
+    await hooks['chat.message'](
+      { sessionID, messageID: userMessageID },
+      userOutput,
+    )
+
+    // User message should have managed model routed onto output.message.model
+    assert.ok(userOutput.message.model, 'user message must receive routed model')
+    assert.ok(userOutput.message.model.providerID, 'routed model must have providerID')
+    assert.ok(userOutput.message.model.modelID, 'routed model must have modelID')
+
+    const transformOutput = {
+      messages: [
+        {
+          info: { id: userMessageID, sessionID, role: 'user' },
+          parts: [{ type: 'text', text: '继续' }],
+        },
+      ],
+    }
+
+    await hooks['experimental.chat.messages.transform'](
+      { sessionID },
+      transformOutput,
+    )
+
+    assert.ok(transformOutput.messages.length > 0, 'transform must succeed without error')
+  })
+})
+
+test('WHAT[CRASH-018] CRASH_018_chat_params_with_toplevel_messageID_recognizes_disclosure_only', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'ses_continue_toplevel_messageid'
+    const continueID = 'msg-continue-toplevel-id'
+
+    await acceptAuthorityRoot(runtime, sessionID, 'fast-manager')
+
+    const commandOutput = { parts: [] }
+    await hooks['command.execute.before'](
+      { command: 'continue', sessionID, arguments: '' },
+      commandOutput,
+    )
+
+    const config = {}
+    resume.registerCommand(config)
+    const physicalOutput = {
+      message: { id: continueID, sessionID, role: 'user' },
+      parts: [{ type: 'text', text: config.command.continue.template }],
+    }
+
+    await hooks['chat.message'](
+      { sessionID, messageID: continueID },
+      physicalOutput,
+    )
+
+    const paramsOutput = { options: {} }
+    // Host sends input with top-level messageID and no nested message.id
+    await hooks['chat.params'](
+      {
+        sessionID,
+        messageID: continueID,
+        agent: 'fast-manager',
+        model: {
+          id: 'host-default-model',
+          providerID: 'fixture',
+          capabilities: { temperature: true },
+          options: {},
+        },
+        provider: {},
+      },
+      paramsOutput,
+    )
+
+    assert.equal(
+      paramsOutput.temperature,
+      undefined,
+      'disclosure-only /continue with top-level messageID must bypass managed execution temperature policy without throwing',
+    )
+  })
+})

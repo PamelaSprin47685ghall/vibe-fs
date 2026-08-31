@@ -56,23 +56,40 @@ module ChatParamsHook =
         ManagedAgent.requiredNames |> List.contains agent
 
     let private trySessionId (input: obj) =
-        if isNull input || isNull input?sessionID then
+        if isNull input then
             None
+        elif not (isNull input?sessionID) then
+            normalizeText (string input?sessionID) |> Option.map SessionId.create
+        elif not (isNull input?sessionId) then
+            normalizeText (string input?sessionId) |> Option.map SessionId.create
+        elif not (isNull input?message) && not (isNull input?message?sessionID) then
+            normalizeText (string input?message?sessionID) |> Option.map SessionId.create
+        elif not (isNull input?info) && not (isNull input?info?sessionID) then
+            normalizeText (string input?info?sessionID) |> Option.map SessionId.create
         else
-            string input?sessionID |> normalizeText |> Option.map SessionId.create
+            None
 
     let private tryPhysicalUserMessageId (input: obj) =
-        if isNull input || isNull input?message || isNull input?message?id then
+        if isNull input then
             None
+        elif not (isNull input?messageID) then
+            normalizeText (string input?messageID) |> Option.map PhysicalUserMessageId.create
+        elif not (isNull input?messageId) then
+            normalizeText (string input?messageId) |> Option.map PhysicalUserMessageId.create
+        elif not (isNull input?message) && not (isNull input?message?id) then
+            normalizeText (string input?message?id) |> Option.map PhysicalUserMessageId.create
+        elif not (isNull input?info) && not (isNull input?info?id) then
+            normalizeText (string input?info?id) |> Option.map PhysicalUserMessageId.create
         else
-            string input?message?id
-            |> normalizeText
-            |> Option.map PhysicalUserMessageId.create
+            None
 
     let private isDisclosureOnlyMaterial input =
-        match trySessionId input, tryPhysicalUserMessageId input with
-        | Some sessionId, Some physicalId -> ExplicitResumeSuppression.isPhysicalMaterial sessionId physicalId
-        | _ -> false
+        match trySessionId input with
+        | Some sessionId ->
+            match tryPhysicalUserMessageId input with
+            | Some physicalId -> ExplicitResumeSuppression.isPhysicalMaterial sessionId physicalId
+            | None -> ExplicitResumeSuppression.hasMarkedPhysicalMaterial sessionId
+        | None -> false
 
     let private checkObservedProvider sessionId agent model =
         match SessionExecutionBinding.validateObservedProvider sessionId agent model with
@@ -99,12 +116,21 @@ module ChatParamsHook =
             Some(SessionId.create (sessionText.Trim()), agent)
 
     let private trySessionAndAgent (input: obj) =
-        if isNull input || isNull input?sessionID || isNull input?agent then
-            None
-        else
-            let sessionText = string input?sessionID
-            let agent = (string input?agent).Trim()
-            validateSessionAndAgent sessionText agent
+        match trySessionId input with
+        | None -> None
+        | Some sessionId ->
+            let agentOpt =
+                if not (isNull input) && not (isNull input?agent) then
+                    normalizeText (string input?agent)
+                elif not (isNull input) && not (isNull input?info) && not (isNull input?info?agent) then
+                    normalizeText (string input?info?agent)
+                elif not (isNull input) && not (isNull input?message) && not (isNull input?message?agent) then
+                    normalizeText (string input?message?agent)
+                else
+                    None
+
+            agentOpt
+            |> Option.bind (fun agent -> validateSessionAndAgent (SessionId.value sessionId) agent)
 
     let private supportsTemperature (input: obj) =
         if

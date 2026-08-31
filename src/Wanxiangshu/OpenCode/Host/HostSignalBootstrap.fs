@@ -654,6 +654,8 @@ module HostSignalBootstrap =
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
                     task {
+                        requireDurabilityActivation ()
+
                         // Decode and resolve once; routing and physical authority consume
                         // the same frozen claim and identity evidence.
                         let decoded = PromptIngressCodec.decode input output
