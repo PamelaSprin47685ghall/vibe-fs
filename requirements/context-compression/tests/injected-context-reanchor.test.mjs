@@ -41,7 +41,11 @@ test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_reanchor_retires_old_pair_wire_but_k
   assert.equal(opened.ok, true)
   try {
     const session = 'ctx-019-pair'
-    const raw = [{ info: { id: 'u1', role: 'user', providerID: 'anthropic' }, parts: [{ type: 'text', text: 'hello' }] }]
+    const raw = [
+      { info: { id: 'u0', role: 'user', providerID: 'anthropic' }, parts: [{ type: 'text', text: 'hello' }] },
+      { info: { id: 'a0', role: 'assistant', providerID: 'anthropic' }, parts: [{ type: 'text', text: 'welcome' }] },
+      { info: { id: 'u1', role: 'user', providerID: 'anthropic' }, parts: [{ type: 'text', text: 'task' }] },
+    ]
     const first = await pair.tryInjectWithJournal(opened.journal, session, pair.text, raw)
     assert.equal(first.ok, true)
     const firstIds = pairCallIds(first.value)

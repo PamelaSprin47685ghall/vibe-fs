@@ -69,6 +69,65 @@ type StoreFileGate internal (releaseFn: obj) =
 [<RequireQualifiedAccess>]
 module ProcessEventLog =
 
+    [<Import("default", "node:fs")>]
+    let private nodeFs: obj = jsNative
+
+    [<Import("default", "node:path")>]
+    let private nodePath: obj = jsNative
+
+    [<Emit("""
+    (function(nodeFs, nodePath) {
+        function isProcessAlive(pid) {
+            if (typeof pid !== 'number' || pid <= 0 || isNaN(pid)) return false;
+            try {
+                process.kill(pid, 0);
+                return true;
+            } catch (e) {
+                return e.code === 'EPERM';
+            }
+        }
+
+        return Object.assign({}, nodeFs, {
+            mkdir: function(dirPath, cb) {
+                nodeFs.mkdir(dirPath, function(err) {
+                    if (!err) {
+                        try {
+                            nodeFs.writeFileSync(nodePath.join(dirPath, 'owner.json'), JSON.stringify({ pid: process.pid, time: Date.now() }));
+                        } catch (_) {}
+                    }
+                    cb(err);
+                });
+            },
+            rmdir: function(dirPath, cb) {
+                nodeFs.rm(dirPath, { recursive: true, force: true }, cb);
+            },
+            rmdirSync: function(dirPath) {
+                nodeFs.rmSync(dirPath, { recursive: true, force: true });
+            },
+            stat: function(dirPath, cb) {
+                nodeFs.stat(dirPath, function(err, stat) {
+                    if (err) return cb(err);
+                    try {
+                        var ownerFile = nodePath.join(dirPath, 'owner.json');
+                        if (nodeFs.existsSync(ownerFile)) {
+                            var content = nodeFs.readFileSync(ownerFile, 'utf8');
+                            var data = JSON.parse(content);
+                            if (data && data.pid && !isProcessAlive(data.pid)) {
+                                stat.mtime = new Date(0);
+                                stat.mtimeMs = 0;
+                            }
+                        }
+                    } catch (_) {}
+                    cb(null, stat);
+                });
+            }
+        });
+    })($0, $1)
+    """)>]
+    let private buildProcessAwareFs (nodeFs: obj) (nodePath: obj) : obj = jsNative
+
+    let internal processAwareFs: obj = buildProcessAwareFs nodeFs nodePath
+
     [<Import("default", "proper-lockfile")>]
     let private lockfile: obj = jsNative
 
@@ -196,13 +255,16 @@ module ProcessEventLog =
                     lockfile
                     target
                     (createObj
-                        [ "realpath" ==> false
+                        [ "fs" ==> processAwareFs
+                          "realpath" ==> false
+                          "stale" ==> 5000
+                          "update" ==> 1500
                           "retries"
                           ==> createObj
                                   [ "forever" ==> true
-                                    "minTimeout" ==> 20
-                                    "maxTimeout" ==> 200
-                                    "factor" ==> 1 ] ])
+                                    "minTimeout" ==> 30
+                                    "maxTimeout" ==> 150
+                                    "factor" ==> 1.1 ] ])
 
             return new StoreFileGate(release)
         }

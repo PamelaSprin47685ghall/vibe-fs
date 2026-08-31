@@ -10,6 +10,7 @@ const inject = async (session, raw, markerText = pair.text) => {
 }
 
 const userMsg = (id, body = 'hello') => ({ info: { id, role: 'user' }, parts: [{ type: 'text', text: body }] })
+const assistantText = (id, body = 'ack') => ({ info: { id, role: 'assistant' }, parts: [{ type: 'text', text: body }] })
 const pairMessages = (messages) => messages.filter((message) => pair.isPairProgrammingThought(message))
 const assertPairShape = (msg, callId, markerText) => {
   assert.equal(msg.info.role, 'assistant')
@@ -38,9 +39,9 @@ test('WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_keeps_durable_occurrence_without
     const cursor = await inject(session, raw)
     assert.equal(pairMessages(cursor).length, 0)
     assert.deepEqual(cursor, raw)
-    const ordinary = await inject(session, [userMsg('u1', 'steer')])
+    const ordinary = await inject(session, [userMsg('u0'), assistantText('a0'), userMsg('u1', 'steer')])
     assert.equal(pairMessages(ordinary).length, 1)
-    assertPairShape(ordinary[0], pair.stableCallId(session, 1n), pair.text)
+    assertPairShape(ordinary[2], pair.stableCallId(session, 1n), pair.text)
   } finally {
     if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
     else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous

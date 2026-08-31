@@ -113,7 +113,11 @@ test('WHAT[GD-006] ENFORCER_TIP_NUDGE_003_missing_owner_returns_none', async () 
 })
 
 const guideline = '# Pair programming auto-injected'
-const anchor = [{ info: { id: 'user-1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }]
+const anchor = [
+  { info: { id: 'u0', role: 'user' }, parts: [{ type: 'text', text: 'initial' }] },
+  { info: { id: 'a0', role: 'assistant' }, parts: [{ type: 'text', text: 'reply' }] },
+  { info: { id: 'user-1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] },
+]
 const markerOutput = (messages) => {
   // pair sits before trailing user: completed synthetic skill, user
   const result = messages.find((m) => m?.parts?.[0]?.tool === 'skill' && m?.parts?.[0]?.state?.status === 'completed')
@@ -132,6 +136,8 @@ test('WHAT[GD-009] CTX_002_GUIDELINE_002_marker_with_nudge_is_one_instruction_pl
   const nudge = 'A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.'
   const marker = `# ${nudge}\n${pair.text}`
   const result = await tryInject(undefined, marker, [
+    { info: { id: 'u0', role: 'user' }, parts: [{ type: 'text', text: 'initial' }] },
+    { info: { id: 'a0', role: 'assistant' }, parts: [{ type: 'text', text: 'reply' }] },
     { info: { id: 'user-2', role: 'user' }, parts: [{ type: 'text', text: 'task' }] },
   ])
   assert.equal(result.ok, true, result.error)

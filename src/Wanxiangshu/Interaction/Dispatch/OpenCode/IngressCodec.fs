@@ -25,13 +25,34 @@ module PromptIngressCodec =
 
     type DecodedMessage = ChatAdmissionIntent.DecodedMessage
 
+    let private readString (source: obj) (name: string) : string option =
+        if isNull source || isNull (source?(name)) then
+            None
+        else
+            let value = unbox<string> (source?(name))
+            if String.IsNullOrWhiteSpace value then None else Some value
+
     let private agentOf (source: obj) : string option =
         if isNull source then
             None
         elif not (isNull source?agent) then
-            Some(unbox<string> source?agent)
-        elif not (isNull source?message) && not (isNull source?message?agent) then
-            Some(unbox<string> source?message?agent)
+            readString source "agent"
+        elif not (isNull source?info) && not (isNull source?info?agent) then
+            readString source?info "agent"
+        elif not (isNull source?message) then
+            if not (isNull source?message?agent) then
+                readString source?message "agent"
+            elif not (isNull source?message?info) && not (isNull source?message?info?agent) then
+                readString source?message?info "agent"
+            else
+                None
+        elif not (isNull source?properties) then
+            if not (isNull source?properties?agent) then
+                readString source?properties "agent"
+            elif not (isNull source?properties?info) && not (isNull source?properties?info?agent) then
+                readString source?properties?info "agent"
+            else
+                None
         else
             None
 
@@ -47,13 +68,6 @@ module PromptIngressCodec =
             [||]
         else
             unbox<obj array> source?parts
-
-    let private readString (source: obj) (name: string) : string option =
-        if isNull source || isNull (source?(name)) then
-            None
-        else
-            let value = unbox<string> (source?(name))
-            if String.IsNullOrWhiteSpace value then None else Some value
 
     let private tryBoolean (value: obj) =
         try
@@ -151,9 +165,26 @@ module PromptIngressCodec =
             | texts -> Some(String.concat "\n" texts)
 
     let decode (input: obj) (output: obj) : DecodedMessage =
+        let message = if isNull output then null else output?message
+        let info = if isNull output then null else output?info
+        let properties = if isNull output then null else output?properties
+
+        let explicitAgent =
+            [ agentOf input
+              agentOf output
+              agentOf message
+              agentOf info
+              agentOf properties ]
+            |> List.tryPick id
+            |> Option.filter (String.IsNullOrWhiteSpace >> not)
+            |> Option.map (fun v -> v.Trim())
+            |> Option.orElseWith (fun () ->
+                sessionIdOf input output
+                |> Option.bind SessionExecutionBinding.tryAgent)
+
         { SessionId = sessionIdOf input output
           PhysicalUserMessageId = messageIdOf input output
-          ExplicitAgent = [ input; output ] |> List.tryPick agentOf
+          ExplicitAgent = explicitAgent
           PromptKey = promptKeyOf input output
           IsHostCompaction = isHostCompaction output
           IsHostSynthetic = isHostSynthetic output

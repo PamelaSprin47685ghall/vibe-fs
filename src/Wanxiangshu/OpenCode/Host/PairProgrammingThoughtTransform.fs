@@ -673,22 +673,31 @@ module PairProgrammingThoughtTransform =
             Ok(gapCtor address, gapCtor address)
         | None -> Error errorMsg
 
-    let private decideFromBatchEnds (lastIsUser: bool) (last: obj) (resultRun: obj list) (callRun: obj list) =
+    let private decideFromBatchEnds (lastIsUser: bool) (restIsEmpty: bool) (last: obj) (resultRun: obj list) (callRun: obj list) =
         match List.rev resultRun, List.rev callRun with
-        | lastResult :: _, lastCall :: _ -> gapsAfterToolBatch lastCall lastResult
+        | lastResult :: _, lastCall :: _ ->
+            gapsAfterToolBatch lastCall lastResult
+            |> Result.map Some
+        | _ when lastIsUser && restIsEmpty ->
+            // When there is nothing before the last user message, do not inject
+            // (matches cursor path) to avoid beginning the transcript with a tool call.
+            Ok None
         | _ when lastIsUser ->
             gapsAroundAddress TranscriptGap.Before last "trailing user without transcript address (HOST-013)"
-        | _ -> gapsAroundAddress TranscriptGap.After last "last message without transcript address (HOST-013)"
+            |> Result.map Some
+        | _ ->
+            gapsAroundAddress TranscriptGap.After last "last message without transcript address (HOST-013)"
+            |> Result.map Some
 
-    let decideCurrentPlacement (realMessages: obj list) : Result<TranscriptGap * TranscriptGap, string> =
+    let decideCurrentPlacement (realMessages: obj list) : Result<(TranscriptGap * TranscriptGap) option, string> =
         match List.rev realMessages with
-        | [] -> Ok(TranscriptGap.Start, TranscriptGap.Start)
+        | [] -> Ok None
         | last :: rest ->
             let lastIsUser = messageRole last = "user"
             let scanFrom = if lastIsUser then rest else (last :: rest)
             let resultRun, afterResults = takeToolResults [] scanFrom
             let callRun, _ = takeToolCalls [] afterResults
-            decideFromBatchEnds lastIsUser last resultRun callRun
+            decideFromBatchEnds lastIsUser (List.isEmpty rest) last resultRun callRun
 
     // ── durable / memory history ─────────────────────────────────────────────
 
@@ -808,6 +817,57 @@ module PairProgrammingThoughtTransform =
                 return rendered
         }
 
+    let private sessionRole (journal: AgentJournal option) (sessionId: SessionId) : Role option =
+        journal
+        |> Option.bind (fun durable ->
+            let projections = (AgentJournal.snapshot durable).AgentProjections
+
+            PromptAuthorityLedger.activeProfile sessionId projections
+            |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections)
+            |> Option.map (fun profile -> profile.CanonicalRole)
+            |> Option.orElseWith (fun () ->
+                projections.HandleByChildSession
+                |> Map.tryFind sessionId
+                |> Option.map (fun handle -> handle.CanonicalRole)))
+
+    let private isInternalRole (roleOpt: Role option) =
+        roleOpt |> Option.exists Roles.isInternal
+
+    let private messageRoleIsInternal (msg: obj) : bool =
+        if isNull msg then
+            false
+        else
+            let agent =
+                messageInfo msg
+                |> Option.bind (fun info -> tryUnboxString info?agent)
+                |> Option.orElseWith (fun () -> tryUnboxString msg?agent)
+
+            let role =
+                agent
+                |> Option.bind HostSessionContext.roleOf
+                |> Option.orElseWith (fun () ->
+                    messageInfo msg
+                    |> Option.bind (fun info -> tryUnboxString info?role)
+                    |> Option.orElseWith (fun () -> tryUnboxString msg?role)
+                    |> Option.bind Roles.tryParseRole)
+
+            isInternalRole role
+
+    let private isInternalSessionOrMessage
+        (journal: AgentJournal option)
+        (sessionId: string option)
+        (rawMessages: obj list)
+        =
+        match journal, sessionId with
+        | Some durable, Some sid when not (String.IsNullOrWhiteSpace sid) ->
+            let session = SessionId.create sid
+            let snapshot = AgentJournal.snapshot durable
+
+            SessionAssociationProjection.isCompanion session snapshot.AgentProjections.Associations
+            || isInternalRole (sessionRole journal session)
+            || (rawMessages |> List.exists messageRoleIsInternal)
+        | _ -> rawMessages |> List.exists messageRoleIsInternal
+
     // ── 入口 ─────────────────────────────────────────────────────────────────
 
     /// HOST-013 commit 顺序（fail closed）：
@@ -883,20 +943,26 @@ module PairProgrammingThoughtTransform =
                         (String.Join(", ", orphaned |> List.truncate 3)))
                     (List.isEmpty orphaned)
 
-            let! callGap, resultGap = decideCurrentPlacement realMessages
+            if isInternalSessionOrMessage journal sessionId rawMessages then
+                return! replay providerId realMessages visibleHistory
+            else
+                let! placementOpt = decideCurrentPlacement realMessages
 
-            return!
-                commitPairInjection
-                    providerId
-                    history
-                    visibleHistory
-                    append
-                    sessionId
-                    markerText
-                    concernPlacement
-                    realMessages
-                    callGap
-                    resultGap
+                match placementOpt with
+                | None -> return! replay providerId realMessages visibleHistory
+                | Some(callGap, resultGap) ->
+                    return!
+                        commitPairInjection
+                            providerId
+                            history
+                            visibleHistory
+                            append
+                            sessionId
+                            markerText
+                            concernPlacement
+                            realMessages
+                            callGap
+                            resultGap
         }
 
     // ── Pair guideline injection (migrated from PluginTransforms composition root) ──
@@ -905,10 +971,12 @@ module PairProgrammingThoughtTransform =
 
     let private skipPairGuideline (journal: AgentJournal option) (projectionSessionIdOpt: string option) : bool =
         match journal, projectionSessionIdOpt with
-        | Some durable, Some sessionId ->
-            SessionAssociationProjection.isCompanion
-                (SessionId.create sessionId)
-                (AgentJournal.snapshot durable).AgentProjections.Associations
+        | Some durable, Some sessionId when not (String.IsNullOrWhiteSpace sessionId) ->
+            let sid = SessionId.create sessionId
+            let snapshot = AgentJournal.snapshot durable
+
+            SessionAssociationProjection.isCompanion sid snapshot.AgentProjections.Associations
+            || isInternalRole (sessionRole journal sid)
         | _ -> false
 
     let private toolEstimateText

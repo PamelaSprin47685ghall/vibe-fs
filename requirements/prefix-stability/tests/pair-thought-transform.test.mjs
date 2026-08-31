@@ -83,22 +83,17 @@ test('WHAT[PREFIX-STABILITY-014] PPT_source_is_the_frozen_side_channel_identity'
   assert.equal(isPairProgrammingThought({ parts: [] }), false, 'no info.source means not a marker')
 })
 
-test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_appends_pair_on_empty_history_at_start_gap', async () => {
+test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_empty_history_does_not_inject_pair', async () => {
   const out = await inject('ses_empty', [])
-  assert.ok(out, 'empty history must still append one pair')
-  assert.equal(out.length, 1)
-  const callId = stableCallId('ses_empty', 1n)
-  assertPairShape(out[0], callId, text)
+  assert.equal(out.length, 0, 'empty history must not inject pair')
 })
 
-test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_places_pair_before_trailing_user', async () => {
+test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_single_user_message_does_not_inject_pair_to_prevent_tool_start', async () => {
   const raw = [userMsg('msg_1')]
   const out = await inject('ses_1', raw)
   assert.ok(out)
-  assert.equal(out.length, 2)
-  const callId = stableCallId('ses_1', 1n)
-  assertPairShape(out[0], callId, text)
-  assert.deepEqual(out[1], raw[0], 'trailing user stays last')
+  assert.equal(out.length, 1)
+  assert.deepEqual(out[0], raw[0], 'single user message stays intact without preceding tool call')
 })
 
 test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_places_pair_before_trailing_user_with_prior_assistant', async () => {
@@ -141,20 +136,20 @@ test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_merges_into_tool_batches_before_u
 })
 
 test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_second_pass_of_same_placement_replays_existing_pair', async () => {
-  const once = await inject('ses_append', [userMsg('msg_1')])
+  const initial = [userMsg('u1'), assistantText('a1'), userMsg('u2')]
+  const once = await inject('ses_append', initial)
   assert.ok(once)
-  assert.equal(once.length, 2)
+  assert.equal(once.length, 4)
 
   // Same real transcript again (production raw carries the previous wire's
   // synthetic messages): same placement → replay only, no new pair.
   const twice = await inject('ses_append', once)
   assert.ok(twice)
-  assert.equal(twice.length, 2, 'same placement must not append a second pair')
+  assert.equal(twice.length, 4, 'same placement must not append a second pair')
   assert.equal(pairMessages(twice).length, 1)
 
   const firstCall = stableCallId('ses_append', 1n)
-  assertPairShape(twice[0], firstCall, text)
-  assert.equal(twice[1].info.role, 'user')
+  assertPairShape(twice[2], firstCall, text)
   assert.deepEqual(twice, once, 'replay must be byte-identical')
 })
 
@@ -165,19 +160,20 @@ test('WHAT[PREFIX-STABILITY-015] PPT_tryInject_call_id_is_stable_per_session_and
 })
 
 test('WHAT[PREFIX-STABILITY-015] PPT_tryInject_without_session_id_still_appends_stable_pair', async () => {
-  const out = await inject(undefined, [])
+  const raw = [userMsg('u1'), assistantText('a1'), userMsg('u2')]
+  const out = await inject(undefined, raw)
   assert.ok(out)
-  assert.equal(out.length, 1)
+  assert.equal(out.length, 4)
   const callId = stableCallId(undefined, 1n)
-  assertPairShape(out[0], callId, text)
+  assertPairShape(out[2], callId, text)
 })
 
 test('WHAT[PREFIX-STABILITY-014] PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker', async () => {
-  const raw = [userMsg('msg_1', text)]
+  const raw = [userMsg('u1'), assistantText('a1'), userMsg('msg_1', text)]
   const out = await inject('ses_quote', raw)
-  assert.equal(isPairProgrammingThought(out[1]), false, 'matching text alone must not classify as marker')
-  assert.equal(out.length, 2)
-  assert.equal(out[1].info.role, 'user')
+  assert.equal(isPairProgrammingThought(out[3]), false, 'matching text alone must not classify as marker')
+  assert.equal(out.length, 4)
+  assert.equal(out[3].info.role, 'user')
 })
 
 test('WHAT[PREFIX-STABILITY-010] PPT_skip_auto_injected_env_blocks_new_pair_but_replays_history', async () => {
@@ -187,14 +183,14 @@ test('WHAT[PREFIX-STABILITY-010] PPT_skip_auto_injected_env_blocks_new_pair_but_
     assert.equal(skipAutoInjectedRequested(undefined), false)
 
     const session = 'ses_skip_env'
-    const seeded = await inject(session, [userMsg('msg_u1')])
+    const seeded = await inject(session, [userMsg('u1'), assistantText('a1'), userMsg('msg_u1')])
     assert.equal(pairMessages(seeded).length, 1)
 
     process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = '1'
     assert.equal(skipAutoInjectedRequested(undefined), true)
 
     const raw = [
-      userMsg('msg_u1'),
+      ...seeded,
       toolCall('msg_c1', 'bash', 'call_1'),
       toolResult('msg_r1', 'bash', 'call_1'),
       userMsg('msg_u2'),
@@ -202,10 +198,8 @@ test('WHAT[PREFIX-STABILITY-010] PPT_skip_auto_injected_env_blocks_new_pair_but_
     const out = await inject(session, raw)
     // Historical pair for placement Before(msg_u1) still replays; no new pair for Before(msg_u2).
     assert.equal(pairMessages(out).length, 1)
-    assert.equal(out.length, 5)
-    assert.equal(isPairProgrammingThought(out[0]), true)
-    assert.equal(out[1].info.id, 'msg_u1')
-    assert.equal(out[4].info.id, 'msg_u2')
+    assert.equal(out.length, 7)
+    assert.equal(isPairProgrammingThought(out[2]), true)
   } finally {
     if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
     else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
@@ -227,7 +221,8 @@ test('WHAT[PREFIX-STABILITY-010] PPT_skip_auto_injected_env_keeps_empty_transcri
 
 test('WHAT[PREFIX-STABILITY-010] C_PH_ordinary_cursor_ordinary_suppresses_then_restores_same_occurrence', async () => {
   const session = 'ses_cursor_transition'
-  const ordinary = await inject(session, [userMsg('u1')])
+  const initial = [userMsg('u1'), assistantText('a1'), userMsg('u2')]
+  const ordinary = await inject(session, initial)
   const ordinaryCallId = stableCallId(session, 1n)
   assert.equal(pairMessages(ordinary).length, 1)
 
@@ -239,7 +234,27 @@ test('WHAT[PREFIX-STABILITY-010] C_PH_ordinary_cursor_ordinary_suppresses_then_r
   assert.equal(pairMessages(cursor).length, 0)
   assert.deepEqual(cursor, cursorReal)
 
-  const back = await inject(session, [userMsg('u1')])
+  const back = await inject(session, initial)
   assert.equal(pairMessages(back).length, 1)
-  assertPairShape(back[0], ordinaryCallId, text)
+  assertPairShape(back[2], ordinaryCallId, text)
+})
+
+test('WHAT[PREFIX-STABILITY-010] PPT_distiller_and_blogger_never_inject_pair_hint', async () => {
+  const bloggerMsg = [
+    userMsg('u1'),
+    assistantText('a1'),
+    { info: { id: 'u2', role: 'user', agent: 'fast-blogger' }, parts: [{ type: 'text', text: 'blog task' }] },
+  ]
+  const bloggerOut = await inject('ses_blogger', bloggerMsg)
+  assert.equal(pairMessages(bloggerOut).length, 0)
+  assert.deepEqual(bloggerOut, bloggerMsg)
+
+  const distillerMsg = [
+    userMsg('u3'),
+    assistantText('a2'),
+    { info: { id: 'u4', role: 'user', agent: 'fast-distiller' }, parts: [{ type: 'text', text: 'distill task' }] },
+  ]
+  const distillerOut = await inject('ses_distiller', distillerMsg)
+  assert.equal(pairMessages(distillerOut).length, 0)
+  assert.deepEqual(distillerOut, distillerMsg)
 })
