@@ -348,6 +348,118 @@
       "sites": [
         {
           "kind": "declaration",
+          "anchor": "let private hostText (value: obj) =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "if",
+          "anchor": "if isNull value then",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let private sessionIdValue (properties: obj) =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "if",
+          "anchor": "if isNull properties then null else properties?sessionID",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let private parentIdValue (info: obj) =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "if",
+          "anchor": "if isNull info then null else info?parentID",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let private infoValue (properties: obj) =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "if",
+          "anchor": "if isNull properties then null else properties?info",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let private hostAuxiliaryChild (raw: obj) =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let event = HostEventCodec.unwrap raw",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "if",
+          "anchor": "if HostEventCodec.eventTypeOf event <> \"session.created\" then",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let properties = event?properties",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let info = infoValue properties",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "lambda",
+          "anchor": "|> Option.bind (fun sessionId ->",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "lambda",
+          "anchor": "|> Option.map (fun _ -> SessionId.create sessionId))",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let private observeHostAuxiliaryChild raw =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
           "anchor": "let wire",
           "occurrence": 1,
           "classification": "wiring",
@@ -391,6 +503,34 @@
         {
           "kind": "match",
           "anchor": "match snapshotOpt with",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "lambda",
+          "anchor": "|> Option.iter (fun durable ->",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let recovery = SessionRecoveryHost(durable, snapshot, scope.Recovery, None)",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "lambda",
+          "anchor": "scope.AttachDurabilityActivation(fun () ->",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "lambda",
+          "anchor": "scope.RunBackground(fun () ->",
           "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
@@ -516,7 +656,14 @@
         },
         {
           "kind": "lambda",
-          "anchor": "(fun () -> handleOrdinaryAbort sessionId signal)",
+          "anchor": "(fun () -> handleOrdinaryAbort failure.SessionId signal)",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let deletion = HostSessionDeletion.prepare scope sessionId parentSessionIdOpt",
           "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
@@ -524,7 +671,7 @@
         {
           "kind": "lambda",
           "anchor": "scope.RunBackground(fun () ->",
-          "occurrence": 1,
+          "occurrence": 2,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
@@ -565,21 +712,35 @@
         },
         {
           "kind": "declaration",
-          "anchor": "let signalRouter =",
+          "anchor": "let exactStarted (key: ChatExecutionKey) : ProviderStartedEvidence option =",
           "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
           "kind": "lambda",
-          "anchor": "(fun sessionId physicalUserMessageId providerRun ->",
+          "anchor": "|> Option.bind (fun durable ->",
           "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
           "kind": "lambda",
-          "anchor": "(fun sessionId physicalUserMessageId ->",
+          "anchor": "|> fun projection -> projection.AgentProjections.ChatExecutions",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let rejectProviderTerminal (observation: ExactProviderTerminalObservation) =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let applyObservedTerminal",
           "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
@@ -587,6 +748,125 @@
         {
           "kind": "lambda",
           "anchor": "(fun sid -> reconciler.Kick(sid, ReconcileProgram.ReconcileWake.RetryWake))",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let startedEvidenceForTerminal (observation: ExactProviderTerminalObservation) =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let key =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let settleExactTerminal (observation: ExactProviderTerminalObservation) =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "match",
+          "anchor": "match observation.Outcome, observation.Disposition, startedEvidenceForTerminal observation with",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let settleObservedTerminal (terminal: ExactProviderTerminalObservation option) =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let continueStartedLifecycle",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "if",
+          "anchor": "if providerStepEnded then",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let rejectProviderStart",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let signalProviderStarted (started: ExactProviderStartObservation) =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let key =",
+          "occurrence": 2,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let signalNewProviderStart started providerStarted =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "if",
+          "anchor": "if providerStarted then",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let continueProviderStart",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "match",
+          "anchor": "match persistence with",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let signalRouter =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "lambda",
+          "anchor": "(fun",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let! providerStarted =",
           "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
@@ -677,7 +957,7 @@
         },
         {
           "kind": "lambda",
-          "anchor": "|> Option.bind (fun profile ->",
+          "anchor": "|> Option.map (fun profile -> profile.CanonicalRole)",
           "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
@@ -693,6 +973,20 @@
           "kind": "if",
           "anchor": "if",
           "occurrence": 2,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let bindHumanContinuationMessage (sessionId: string) (messageId: string) =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "if",
+          "anchor": "if",
+          "occurrence": 3,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
@@ -726,56 +1020,21 @@
         },
         {
           "kind": "declaration",
-          "anchor": "let reactivateBlogger mainSessionId durable root =",
+          "anchor": "let admissionTransaction =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "lambda",
+          "anchor": "|> Option.map (fun durable ->",
           "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
           "kind": "declaration",
-          "anchor": "let associations = (AgentJournal.snapshot durable).AgentProjections.Associations",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "match",
-          "anchor": "match SessionAssociationProjection.tryBloggerOf mainSessionId associations with",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "declaration",
-          "anchor": "let onAuthorityRoot (mainSessionId: SessionId, root: AuthorityRootUserMessageId) =",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "match",
-          "anchor": "match journal with",
-          "occurrence": 2,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "declaration",
-          "anchor": "let onContinuationAccepted",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "match",
-          "anchor": "match continuationKind with",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "declaration",
-          "anchor": "let promptIngressHook =",
+          "anchor": "let runtime = PromptDispatcher.forJournal durable",
           "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
@@ -839,7 +1098,7 @@
         {
           "kind": "if",
           "anchor": "if",
-          "occurrence": 3,
+          "occurrence": 4,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
@@ -859,84 +1118,147 @@
         },
         {
           "kind": "declaration",
-          "anchor": "let continueRoutedChatMessage routedExecution (decoded: PromptIngressCodec.DecodedMessage) input output =",
+          "anchor": "let continueUnmanagedChatMessage intent =",
           "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
           "kind": "declaration",
-          "anchor": "let dispatchAccepted =",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "lambda",
-          "anchor": "|> Option.map (fun durable ->",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "declaration",
-          "anchor": "let runtime = PromptDispatcher.forJournal durable",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "lambda",
-          "anchor": "fun (claim: PromptAuthority.PromptClaim) ->",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "declaration",
-          "anchor": "let continueOrdinaryChatMessage (decoded: PromptIngressCodec.DecodedMessage) input output =",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "declaration",
-          "anchor": "let tryPendingClaim",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "lambda",
-          "anchor": "|> Option.bind (fun durable -> (PromptDispatcher.forJournal durable).PendingClaim(sid, key))",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "declaration",
-          "anchor": "let admission =",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "declaration",
-          "anchor": "let! routedExecution =",
-          "occurrence": 1,
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "lambda",
-          "anchor": "(fun sessionId ->",
+          "anchor": "let observePendingContinuation (evidence: ChatAdmissionIntent.PendingPromptEvidence) =",
           "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
           "kind": "match",
-          "anchor": "match routedExecution with",
+          "anchor": "match evidence.Origin with",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let continueManagedChatMessage intent output =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "match",
+          "anchor": "match intent with",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let sessionId = SessionId.value evidence.Key.SessionId",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let physicalId = PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let sessionId = SessionId.value evidence.Key.SessionId",
+          "occurrence": 2,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let physicalId = PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId",
+          "occurrence": 2,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let currentExecution durable intent =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let key =",
+          "occurrence": 3,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "match",
+          "anchor": "match intent with",
+          "occurrence": 2,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let executionKey intent =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "match",
+          "anchor": "match intent with",
+          "occurrence": 3,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let admitManagedChatMessage durable createTransaction intent output =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let ports = createTransaction (ModelRouting.projectHostModel output)",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "match",
+          "anchor": "match!",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let rejectedChatMessage failure =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let completion =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "declaration",
+          "anchor": "let continueClassifiedChatMessage intent output =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "match",
+          "anchor": "match intent, journal, admissionTransaction with",
           "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
@@ -963,9 +1285,23 @@
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
+          "kind": "declaration",
+          "anchor": "let intent =",
+          "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
           "kind": "match",
           "anchor": "match decoded.SessionId with",
           "occurrence": 1,
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "match",
+          "anchor": "match decoded.SessionId with",
+          "occurrence": 2,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
@@ -993,7 +1329,7 @@
         {
           "kind": "lambda",
           "anchor": "(fun sessionId ->",
-          "occurrence": 2,
+          "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
@@ -1014,7 +1350,7 @@
         {
           "kind": "lambda",
           "anchor": "(fun sessionId ->",
-          "occurrence": 3,
+          "occurrence": 2,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
@@ -1027,11 +1363,302 @@
         },
         {
           "kind": "application",
+          "anchor": "sprintf",
+          "occurrence": 1,
+          "line": 39,
+          "column": 26,
+          "endLine": 39,
+          "endColumn": 77,
+          "resolvedTarget": "Microsoft.FSharp.Core.ExtraTopLevelOperators.sprintf",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "isNull",
+          "occurrence": 1,
+          "line": 60,
+          "column": 11,
+          "endLine": 60,
+          "endColumn": 23,
+          "resolvedTarget": "Microsoft.FSharp.Core.Operators.isNull",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "string",
+          "occurrence": 1,
+          "line": 63,
+          "column": 12,
+          "endLine": 63,
+          "endColumn": 24,
+          "resolvedTarget": "Microsoft.FSharp.Core.Operators.string",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Option.filter",
+          "occurrence": 1,
+          "line": 63,
+          "column": 36,
+          "endLine": 63,
+          "endColumn": 84,
+          "resolvedTarget": "Microsoft.FSharp.Core.Option.filter",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": ">>",
+          "occurrence": 1,
+          "line": 63,
+          "column": 51,
+          "endLine": 63,
+          "endColumn": 83,
+          "resolvedTarget": "Microsoft.FSharp.Core.Operators.(>>)",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "isNull",
+          "occurrence": 2,
+          "line": 66,
+          "column": 11,
+          "endLine": 66,
+          "endColumn": 28,
+          "resolvedTarget": "Microsoft.FSharp.Core.Operators.isNull",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "isNull",
+          "occurrence": 3,
+          "line": 69,
+          "column": 11,
+          "endLine": 69,
+          "endColumn": 22,
+          "resolvedTarget": "Microsoft.FSharp.Core.Operators.isNull",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "isNull",
+          "occurrence": 4,
+          "line": 72,
+          "column": 11,
+          "endLine": 72,
+          "endColumn": 28,
+          "resolvedTarget": "Microsoft.FSharp.Core.Operators.isNull",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "HostEventCodec.unwrap",
+          "occurrence": 1,
+          "line": 75,
+          "column": 20,
+          "endLine": 75,
+          "endColumn": 45,
+          "resolvedTarget": "Wanxiangshu.OpenCode.HostEventCodec.unwrap",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "HostEventCodec.eventTypeOf",
+          "occurrence": 1,
+          "line": 77,
+          "column": 11,
+          "endLine": 77,
+          "endColumn": 43,
+          "resolvedTarget": "Wanxiangshu.OpenCode.HostEventCodec.eventTypeOf",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "<>",
+          "occurrence": 1,
+          "line": 77,
+          "column": 11,
+          "endLine": 77,
+          "endColumn": 64,
+          "resolvedTarget": "Microsoft.FSharp.Core.Operators.(<>)",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "infoValue",
+          "occurrence": 1,
+          "line": 81,
+          "column": 23,
+          "endLine": 81,
+          "endColumn": 43,
+          "resolvedTarget": "Wanxiangshu.OpenCode.HostSignalBootstrap.infoValue",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "hostText",
+          "occurrence": 1,
+          "line": 83,
+          "column": 12,
+          "endLine": 83,
+          "endColumn": 48,
+          "resolvedTarget": "Wanxiangshu.OpenCode.HostSignalBootstrap.hostText",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "sessionIdValue",
+          "occurrence": 1,
+          "line": 83,
+          "column": 22,
+          "endLine": 83,
+          "endColumn": 47,
+          "resolvedTarget": "Wanxiangshu.OpenCode.HostSignalBootstrap.sessionIdValue",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Option.bind",
+          "occurrence": 1,
+          "line": 84,
+          "column": 15,
+          "endLine": 86,
+          "endColumn": 68,
+          "resolvedTarget": "Microsoft.FSharp.Core.Option.bind",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "hostText",
+          "occurrence": 2,
+          "line": 85,
+          "column": 16,
+          "endLine": 85,
+          "endColumn": 45,
+          "resolvedTarget": "Wanxiangshu.OpenCode.HostSignalBootstrap.hostText",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "parentIdValue",
+          "occurrence": 1,
+          "line": 85,
+          "column": 26,
+          "endLine": 85,
+          "endColumn": 44,
+          "resolvedTarget": "Wanxiangshu.OpenCode.HostSignalBootstrap.parentIdValue",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Option.map",
+          "occurrence": 1,
+          "line": 86,
+          "column": 19,
+          "endLine": 86,
+          "endColumn": 67,
+          "resolvedTarget": "Microsoft.FSharp.Core.Option.map",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "SessionId.create",
+          "occurrence": 1,
+          "line": 86,
+          "column": 40,
+          "endLine": 86,
+          "endColumn": 66,
+          "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.create",
+          "declarationPaths": [
+            "src/Wanxiangshu/Foundation/Identity.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "hostAuxiliaryChild",
+          "occurrence": 1,
+          "line": 89,
+          "column": 8,
+          "endLine": 89,
+          "endColumn": 30,
+          "resolvedTarget": "Wanxiangshu.OpenCode.HostSignalBootstrap.hostAuxiliaryChild",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Option.iter",
+          "occurrence": 1,
+          "line": 90,
+          "column": 11,
+          "endLine": 90,
+          "endColumn": 72,
+          "resolvedTarget": "Microsoft.FSharp.Core.Option.iter",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
           "anchor": "defaultArg",
           "occurrence": 1,
-          "line": 67,
+          "line": 114,
           "column": 16,
-          "endLine": 67,
+          "endLine": 114,
           "endColumn": 82,
           "resolvedTarget": "Microsoft.FSharp.Core.Operators.defaultArg",
           "declarationPaths": [],
@@ -1042,9 +1669,9 @@
           "kind": "application",
           "anchor": "Task.FromResult",
           "occurrence": 1,
-          "line": 67,
+          "line": 114,
           "column": 60,
-          "endLine": 67,
+          "endLine": 114,
           "endColumn": 81,
           "resolvedTarget": "System.Threading.Tasks.Task.FromResult",
           "declarationPaths": [],
@@ -1055,9 +1682,9 @@
           "kind": "application",
           "anchor": "defaultArg",
           "occurrence": 2,
-          "line": 69,
+          "line": 116,
           "column": 40,
-          "endLine": 69,
+          "endLine": 116,
           "endColumn": 81,
           "resolvedTarget": "Microsoft.FSharp.Core.Operators.defaultArg",
           "declarationPaths": [],
@@ -1068,9 +1695,9 @@
           "kind": "application",
           "anchor": "Task.FromResult",
           "occurrence": 2,
-          "line": 77,
+          "line": 124,
           "column": 28,
-          "endLine": 77,
+          "endLine": 124,
           "endColumn": 72,
           "resolvedTarget": "System.Threading.Tasks.Task.FromResult",
           "declarationPaths": [],
@@ -1079,11 +1706,99 @@
         },
         {
           "kind": "application",
+          "anchor": "Option.iter",
+          "occurrence": 2,
+          "line": 127,
+          "column": 15,
+          "endLine": 133,
+          "endColumn": 107,
+          "resolvedTarget": "Microsoft.FSharp.Core.Option.iter",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "SessionRecoveryHost",
+          "occurrence": 1,
+          "line": 128,
+          "column": 31,
+          "endLine": 128,
+          "endColumn": 91,
+          "resolvedTarget": "Wanxiangshu.OpenCode.SessionRecoveryHost",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "scope.AttachChatRecoveryRuntime",
+          "occurrence": 1,
+          "line": 129,
+          "column": 16,
+          "endLine": 129,
+          "endColumn": 56,
+          "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachChatRecoveryRuntime",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "scope.AttachDurabilityActivation",
+          "occurrence": 1,
+          "line": 131,
+          "column": 16,
+          "endLine": 133,
+          "endColumn": 106,
+          "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachDurabilityActivation",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "scope.RunBackground",
+          "occurrence": 1,
+          "line": 132,
+          "column": 20,
+          "endLine": 133,
+          "endColumn": 105,
+          "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.RunBackground",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "scope.SignalChatRecovery",
+          "occurrence": 1,
+          "line": 133,
+          "column": 24,
+          "endLine": 133,
+          "endColumn": 104,
+          "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.SignalChatRecovery",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
           "anchor": "PtyTiming.nodeTimerPort",
           "occurrence": 1,
-          "line": 81,
+          "line": 137,
           "column": 36,
-          "endLine": 81,
+          "endLine": 137,
           "endColumn": 62,
           "resolvedTarget": "Wanxiangshu.Process.PtyTiming.nodeTimerPort",
           "declarationPaths": [
@@ -1096,9 +1811,9 @@
           "kind": "application",
           "anchor": "MessageVisibilityHub",
           "occurrence": 1,
-          "line": 85,
+          "line": 141,
           "column": 36,
-          "endLine": 85,
+          "endLine": 141,
           "endColumn": 75,
           "resolvedTarget": "Wanxiangshu.OpenCode.MessageVisibilityHub",
           "declarationPaths": [
@@ -1111,9 +1826,9 @@
           "kind": "application",
           "anchor": "scope.AttachMessageVisibility",
           "occurrence": 1,
-          "line": 86,
+          "line": 142,
           "column": 12,
-          "endLine": 86,
+          "endLine": 142,
           "endColumn": 59,
           "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachMessageVisibility",
           "declarationPaths": [
@@ -1126,9 +1841,9 @@
           "kind": "application",
           "anchor": "HostReviewGuard.continuationPort",
           "occurrence": 1,
-          "line": 88,
+          "line": 144,
           "column": 43,
-          "endLine": 88,
+          "endLine": 144,
           "endColumn": 95,
           "resolvedTarget": "Wanxiangshu.Mission.Review.OpenCode.HostReviewGuard.continuationPort",
           "declarationPaths": [
@@ -1141,9 +1856,9 @@
           "kind": "application",
           "anchor": "AgentJournal.snapshot",
           "occurrence": 1,
-          "line": 93,
+          "line": 149,
           "column": 34,
-          "endLine": 93,
+          "endLine": 149,
           "endColumn": 57,
           "resolvedTarget": "Wanxiangshu.Persistence.Journal.AgentJournalModule.snapshot",
           "declarationPaths": [
@@ -1156,9 +1871,9 @@
           "kind": "application",
           "anchor": "TurnBinding.Store",
           "occurrence": 1,
-          "line": 95,
+          "line": 151,
           "column": 26,
-          "endLine": 95,
+          "endLine": 151,
           "endColumn": 45,
           "resolvedTarget": "Wanxiangshu.Composition.Turn.TurnBinding.Store",
           "declarationPaths": [
@@ -1171,9 +1886,9 @@
           "kind": "application",
           "anchor": "HostTurnObserver.observe",
           "occurrence": 1,
-          "line": 98,
+          "line": 154,
           "column": 16,
-          "endLine": 98,
+          "endLine": 154,
           "endColumn": 120,
           "resolvedTarget": "Wanxiangshu.OpenCode.HostTurnObserver.observe",
           "declarationPaths": [
@@ -1186,9 +1901,9 @@
           "kind": "application",
           "anchor": "HostCompactionObserver.observe",
           "occurrence": 1,
-          "line": 100,
+          "line": 156,
           "column": 29,
-          "endLine": 100,
+          "endLine": 156,
           "endColumn": 73,
           "resolvedTarget": "Wanxiangshu.OpenCode.HostCompactionObserver.observe",
           "declarationPaths": [
@@ -1201,9 +1916,9 @@
           "kind": "application",
           "anchor": "Reconciler.Scheduler",
           "occurrence": 1,
-          "line": 103,
+          "line": 159,
           "column": 16,
-          "endLine": 110,
+          "endLine": 166,
           "endColumn": 17,
           "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler",
           "declarationPaths": [
@@ -1216,9 +1931,9 @@
           "kind": "application",
           "anchor": "Option.exists",
           "occurrence": 1,
-          "line": 109,
+          "line": 165,
           "column": 68,
-          "endLine": 109,
+          "endLine": 165,
           "endColumn": 105,
           "resolvedTarget": "Microsoft.FSharp.Core.Option.exists",
           "declarationPaths": [],
@@ -1229,9 +1944,9 @@
           "kind": "application",
           "anchor": "scope.TrackReconcileShutdown",
           "occurrence": 1,
-          "line": 112,
+          "line": 168,
           "column": 15,
-          "endLine": 112,
+          "endLine": 168,
           "endColumn": 80,
           "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.TrackReconcileShutdown",
           "declarationPaths": [
@@ -1244,9 +1959,9 @@
           "kind": "application",
           "anchor": "reconciler.StopAndDrain",
           "occurrence": 1,
-          "line": 112,
+          "line": 168,
           "column": 54,
-          "endLine": 112,
+          "endLine": 168,
           "endColumn": 79,
           "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.StopAndDrain",
           "declarationPaths": [
@@ -1259,9 +1974,9 @@
           "kind": "application",
           "anchor": "scope.Sessions.Quiescence.RevokeCurrentAttempt",
           "occurrence": 1,
-          "line": 115,
+          "line": 171,
           "column": 16,
-          "endLine": 115,
+          "endLine": 171,
           "endColumn": 72,
           "resolvedTarget": "Wanxiangshu.OpenCode.SessionQuiescenceGate.RevokeCurrentAttempt",
           "declarationPaths": [
@@ -1273,10 +1988,10 @@
         {
           "kind": "application",
           "anchor": "Option.iter",
-          "occurrence": 1,
-          "line": 118,
+          "occurrence": 3,
+          "line": 174,
           "column": 19,
-          "endLine": 118,
+          "endLine": 174,
           "endColumn": 87,
           "resolvedTarget": "Microsoft.FSharp.Core.Option.iter",
           "declarationPaths": [],
@@ -1287,9 +2002,9 @@
           "kind": "application",
           "anchor": "runtime.CancelOwner",
           "occurrence": 1,
-          "line": 118,
+          "line": 174,
           "column": 47,
-          "endLine": 118,
+          "endLine": 174,
           "endColumn": 76,
           "resolvedTarget": "Wanxiangshu.Strength.Replica.StrengthReplicaRuntime.CancelOwner",
           "declarationPaths": [
@@ -1302,9 +2017,9 @@
           "kind": "application",
           "anchor": "ignore",
           "occurrence": 1,
-          "line": 118,
+          "line": 174,
           "column": 47,
-          "endLine": 118,
+          "endLine": 174,
           "endColumn": 86,
           "resolvedTarget": "Microsoft.FSharp.Core.Operators.ignore",
           "declarationPaths": [],
@@ -1315,9 +2030,9 @@
           "kind": "application",
           "anchor": "reconciler.Signal",
           "occurrence": 1,
-          "line": 120,
+          "line": 176,
           "column": 16,
-          "endLine": 120,
+          "endLine": 176,
           "endColumn": 40,
           "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.Signal",
           "declarationPaths": [
@@ -1330,9 +2045,9 @@
           "kind": "application",
           "anchor": "scope.LoopSensor.ResetDetector",
           "occurrence": 1,
-          "line": 137,
+          "line": 193,
           "column": 20,
-          "endLine": 137,
+          "endLine": 193,
           "endColumn": 60,
           "resolvedTarget": "Wanxiangshu.OpenCode.LoopSensor.ResetDetector",
           "declarationPaths": [
@@ -1345,9 +2060,9 @@
           "kind": "application",
           "anchor": "scope.Sessions.Quiescence.ObserveIdle",
           "occurrence": 1,
-          "line": 142,
+          "line": 198,
           "column": 33,
-          "endLine": 142,
+          "endLine": 198,
           "endColumn": 80,
           "resolvedTarget": "Wanxiangshu.OpenCode.SessionQuiescenceGate.ObserveIdle",
           "declarationPaths": [
@@ -1360,9 +2075,9 @@
           "kind": "application",
           "anchor": "reconciler.SignalIdle",
           "occurrence": 1,
-          "line": 143,
+          "line": 199,
           "column": 20,
-          "endLine": 143,
+          "endLine": 199,
           "endColumn": 60,
           "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.SignalIdle",
           "declarationPaths": [
@@ -1375,9 +2090,9 @@
           "kind": "application",
           "anchor": "reconciler.Signal",
           "occurrence": 2,
-          "line": 145,
+          "line": 201,
           "column": 39,
-          "endLine": 145,
+          "endLine": 201,
           "endColumn": 63,
           "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.Signal",
           "declarationPaths": [
@@ -1390,10 +2105,10 @@
           "kind": "application",
           "anchor": "FissionHost.routeAttemptAborted",
           "occurrence": 1,
-          "line": 154,
+          "line": 210,
           "column": 20,
-          "endLine": 159,
-          "endColumn": 72,
+          "endLine": 215,
+          "endColumn": 80,
           "resolvedTarget": "Wanxiangshu.Execution.Fission.OpenCode.FissionHost.routeAttemptAborted",
           "declarationPaths": [
             "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs"
@@ -1405,10 +2120,10 @@
           "kind": "application",
           "anchor": "scope.Sessions.Quiescence.RevokeCurrentAttempt",
           "occurrence": 2,
-          "line": 157,
+          "line": 213,
           "column": 28,
-          "endLine": 157,
-          "endColumn": 84,
+          "endLine": 213,
+          "endColumn": 92,
           "resolvedTarget": "Wanxiangshu.OpenCode.SessionQuiescenceGate.RevokeCurrentAttempt",
           "declarationPaths": [
             "src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs"
@@ -1420,9 +2135,9 @@
           "kind": "application",
           "anchor": "reconciler.Signal",
           "occurrence": 3,
-          "line": 158,
+          "line": 214,
           "column": 28,
-          "endLine": 158,
+          "endLine": 214,
           "endColumn": 52,
           "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.Signal",
           "declarationPaths": [
@@ -1435,10 +2150,10 @@
           "kind": "application",
           "anchor": "handleOrdinaryAbort",
           "occurrence": 1,
-          "line": 159,
+          "line": 215,
           "column": 35,
-          "endLine": 159,
-          "endColumn": 71,
+          "endLine": 215,
+          "endColumn": 79,
           "resolvedTarget": "handleOrdinaryAbort",
           "declarationPaths": [
             "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
@@ -1448,13 +2163,73 @@
         },
         {
           "kind": "application",
-          "anchor": "scope.RunBackground",
+          "anchor": "HostSessionDeletion.prepare",
           "occurrence": 1,
-          "line": 161,
+          "line": 217,
+          "column": 35,
+          "endLine": 217,
+          "endColumn": 97,
+          "resolvedTarget": "Wanxiangshu.OpenCode.HostSessionDeletion.prepare",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSessionDeletion.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "scope.RunBackground",
+          "occurrence": 2,
+          "line": 219,
           "column": 20,
-          "endLine": 169,
-          "endColumn": 47,
+          "endLine": 242,
+          "endColumn": 26,
           "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.RunBackground",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "HostSessionDeletion.finalizePreparedInspector",
+          "occurrence": 1,
+          "line": 222,
+          "column": 32,
+          "endLine": 226,
+          "endColumn": 44,
+          "resolvedTarget": "Wanxiangshu.OpenCode.HostSessionDeletion.finalizePreparedInspector",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSessionDeletion.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "scope.SignalChatRecoverySession",
+          "occurrence": 1,
+          "line": 229,
+          "column": 32,
+          "endLine": 231,
+          "endColumn": 86,
+          "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.SignalChatRecoverySession",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "scope.DrainChatRecovery",
+          "occurrence": 1,
+          "line": 233,
+          "column": 32,
+          "endLine": 233,
+          "endColumn": 65,
+          "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.DrainChatRecovery",
           "declarationPaths": [
             "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs"
           ],
@@ -1465,10 +2240,10 @@
           "kind": "application",
           "anchor": "HostSessionDeletion.handle",
           "occurrence": 1,
-          "line": 162,
-          "column": 24,
-          "endLine": 169,
-          "endColumn": 46,
+          "line": 236,
+          "column": 32,
+          "endLine": 241,
+          "endColumn": 44,
           "resolvedTarget": "Wanxiangshu.OpenCode.HostSessionDeletion.handle",
           "declarationPaths": [
             "src/Wanxiangshu/OpenCode/Host/HostSessionDeletion.fs"
@@ -1480,9 +2255,9 @@
           "kind": "application",
           "anchor": "LoopSensor.create",
           "occurrence": 1,
-          "line": 175,
+          "line": 248,
           "column": 16,
-          "endLine": 196,
+          "endLine": 269,
           "endColumn": 26,
           "resolvedTarget": "Wanxiangshu.OpenCode.LoopSensorModule.create",
           "declarationPaths": [
@@ -1495,9 +2270,9 @@
           "kind": "application",
           "anchor": "sessionPort.InterruptAttempt",
           "occurrence": 1,
-          "line": 178,
+          "line": 251,
           "column": 38,
-          "endLine": 178,
+          "endLine": 251,
           "endColumn": 76,
           "resolvedTarget": "Wanxiangshu.OpenCode.ISessionHostPort.InterruptAttempt",
           "declarationPaths": [
@@ -1510,9 +2285,9 @@
           "kind": "application",
           "anchor": "ProviderProse.documentFor",
           "occurrence": 1,
-          "line": 182,
+          "line": 255,
           "column": 32,
-          "endLine": 182,
+          "endLine": 255,
           "endColumn": 112,
           "resolvedTarget": "Wanxiangshu.Participant.Provider.ProviderProse.documentFor",
           "declarationPaths": [
@@ -1525,9 +2300,9 @@
           "kind": "application",
           "anchor": "LoopSensor.continuationPath",
           "occurrence": 1,
-          "line": 182,
+          "line": 255,
           "column": 69,
-          "endLine": 182,
+          "endLine": 255,
           "endColumn": 101,
           "resolvedTarget": "Wanxiangshu.OpenCode.LoopSensorModule.continuationPath",
           "declarationPaths": [
@@ -1540,9 +2315,9 @@
           "kind": "application",
           "anchor": "HostSessionNudge.sendContinuationResult",
           "occurrence": 1,
-          "line": 185,
+          "line": 258,
           "column": 32,
-          "endLine": 193,
+          "endLine": 266,
           "endColumn": 40,
           "resolvedTarget": "Wanxiangshu.Interaction.Dispatch.OpenCode.HostSessionNudge.sendContinuationResult",
           "declarationPaths": [
@@ -1555,9 +2330,9 @@
           "kind": "application",
           "anchor": "Result.map",
           "occurrence": 1,
-          "line": 195,
+          "line": 268,
           "column": 46,
-          "endLine": 195,
+          "endLine": 268,
           "endColumn": 63,
           "resolvedTarget": "Microsoft.FSharp.Core.Result.map",
           "declarationPaths": [],
@@ -1568,9 +2343,9 @@
           "kind": "application",
           "anchor": "scope.AttachLoopSensor",
           "occurrence": 1,
-          "line": 198,
+          "line": 271,
           "column": 15,
-          "endLine": 198,
+          "endLine": 271,
           "endColumn": 48,
           "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachLoopSensor",
           "declarationPaths": [
@@ -1581,45 +2356,116 @@
         },
         {
           "kind": "application",
-          "anchor": "HostSignalRouter",
+          "anchor": "Option.bind",
+          "occurrence": 2,
+          "line": 275,
+          "column": 19,
+          "endLine": 279,
+          "endColumn": 53,
+          "resolvedTarget": "Microsoft.FSharp.Core.Option.bind",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "AgentJournal.snapshot",
+          "occurrence": 2,
+          "line": 276,
+          "column": 20,
+          "endLine": 276,
+          "endColumn": 49,
+          "resolvedTarget": "Wanxiangshu.Persistence.Journal.AgentJournalModule.snapshot",
+          "declarationPaths": [
+            "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "ChatExecutionProjection.byKey",
           "occurrence": 1,
-          "line": 201,
+          "line": 278,
+          "column": 23,
+          "endLine": 278,
+          "endColumn": 56,
+          "resolvedTarget": "Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionProjection.byKey",
+          "declarationPaths": [
+            "src/Wanxiangshu/Execution/Session/ChatExecution/Projection.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Option.bind",
+          "occurrence": 3,
+          "line": 279,
+          "column": 23,
+          "endLine": 279,
+          "endColumn": 52,
+          "resolvedTarget": "Microsoft.FSharp.Core.Option.bind",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Diagnostic.emit",
+          "occurrence": 1,
+          "line": 282,
           "column": 16,
-          "endLine": 230,
-          "endColumn": 17,
-          "resolvedTarget": "Wanxiangshu.OpenCode.HostSignalRouter",
+          "endLine": 285,
+          "endColumn": 113,
+          "resolvedTarget": "Wanxiangshu.OpenCode.Diagnostic.emit",
           "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs"
+            "src/Wanxiangshu/OpenCode/Host/Diagnostic.fs"
           ],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
           "kind": "application",
-          "anchor": "ModelRouting.endProviderStep",
+          "anchor": "SessionId.value",
           "occurrence": 1,
-          "line": 207,
-          "column": 28,
-          "endLine": 207,
-          "endColumn": 100,
-          "resolvedTarget": "Wanxiangshu.OpenCode.ModelRouting.endProviderStep",
+          "line": 284,
+          "column": 36,
+          "endLine": 284,
+          "endColumn": 73,
+          "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.value",
           "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs"
+            "src/Wanxiangshu/Foundation/Identity.fs"
           ],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
           "kind": "application",
-          "anchor": "ModelRouting.releasePhysicalExecution",
+          "anchor": "PhysicalUserMessageId.value",
           "occurrence": 1,
-          "line": 214,
-          "column": 28,
-          "endLine": 214,
-          "endColumn": 97,
-          "resolvedTarget": "Wanxiangshu.OpenCode.ModelRouting.releasePhysicalExecution",
+          "line": 285,
+          "column": 50,
+          "endLine": 285,
+          "endColumn": 111,
+          "resolvedTarget": "Wanxiangshu.Foundation.Identity.PhysicalUserMessageIdModule.value",
           "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs"
+            "src/Wanxiangshu/Foundation/Identity.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "scope.SignalChatRecovery",
+          "occurrence": 2,
+          "line": 294,
+          "column": 24,
+          "endLine": 296,
+          "endColumn": 25,
+          "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.SignalChatRecovery",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs"
           ],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
@@ -1628,10 +2474,10 @@
           "kind": "application",
           "anchor": "reconciler.NotifyProjectionChanged",
           "occurrence": 1,
-          "line": 215,
-          "column": 28,
-          "endLine": 215,
-          "endColumn": 96,
+          "line": 298,
+          "column": 20,
+          "endLine": 298,
+          "endColumn": 112,
           "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.NotifyProjectionChanged",
           "declarationPaths": [
             "src/Wanxiangshu/Composition/Turn/Scheduler.fs"
@@ -1643,10 +2489,10 @@
           "kind": "application",
           "anchor": "FissionHost.observePhysicalExecutionEnd",
           "occurrence": 1,
-          "line": 224,
-          "column": 28,
-          "endLine": 229,
-          "endColumn": 53,
+          "line": 300,
+          "column": 20,
+          "endLine": 305,
+          "endColumn": 57,
           "resolvedTarget": "Wanxiangshu.Execution.Fission.OpenCode.FissionHost.observePhysicalExecutionEnd",
           "declarationPaths": [
             "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs"
@@ -1658,10 +2504,10 @@
           "kind": "application",
           "anchor": "reconciler.Kick",
           "occurrence": 1,
-          "line": 227,
-          "column": 44,
-          "endLine": 227,
-          "endColumn": 106,
+          "line": 303,
+          "column": 36,
+          "endLine": 303,
+          "endColumn": 98,
           "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.Kick",
           "declarationPaths": [
             "src/Wanxiangshu/Composition/Turn/Scheduler.fs"
@@ -1671,11 +2517,469 @@
         },
         {
           "kind": "application",
+          "anchor": "exactStarted",
+          "occurrence": 1,
+          "line": 313,
+          "column": 16,
+          "endLine": 313,
+          "endColumn": 32,
+          "resolvedTarget": "exactStarted",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "startedEvidenceForTerminal",
+          "occurrence": 1,
+          "line": 316,
+          "column": 68,
+          "endLine": 316,
+          "endColumn": 106,
+          "resolvedTarget": "startedEvidenceForTerminal",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "reconciler.Kick",
+          "occurrence": 2,
+          "line": 318,
+          "column": 20,
+          "endLine": 326,
+          "endColumn": 21,
+          "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.Kick",
+          "declarationPaths": [
+            "src/Wanxiangshu/Composition/Turn/Scheduler.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Task.FromResult",
+          "occurrence": 3,
+          "line": 328,
+          "column": 20,
+          "endLine": 328,
+          "endColumn": 37,
+          "resolvedTarget": "System.Threading.Tasks.Task.FromResult",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "applyObservedTerminal",
+          "occurrence": 1,
+          "line": 329,
+          "column": 56,
+          "endLine": 329,
+          "endColumn": 110,
+          "resolvedTarget": "applyObservedTerminal",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "rejectProviderTerminal",
+          "occurrence": 1,
+          "line": 331,
+          "column": 20,
+          "endLine": 331,
+          "endColumn": 54,
+          "resolvedTarget": "rejectProviderTerminal",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Task.FromResult",
+          "occurrence": 4,
+          "line": 332,
+          "column": 20,
+          "endLine": 332,
+          "endColumn": 37,
+          "resolvedTarget": "System.Threading.Tasks.Task.FromResult",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Option.map",
+          "occurrence": 2,
+          "line": 336,
+          "column": 19,
+          "endLine": 336,
+          "endColumn": 49,
+          "resolvedTarget": "Microsoft.FSharp.Core.Option.map",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Option.defaultValue",
+          "occurrence": 1,
+          "line": 337,
+          "column": 19,
+          "endLine": 337,
+          "endColumn": 58,
+          "resolvedTarget": "Microsoft.FSharp.Core.Option.defaultValue",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Task.FromResult",
+          "occurrence": 5,
+          "line": 337,
+          "column": 40,
+          "endLine": 337,
+          "endColumn": 57,
+          "resolvedTarget": "System.Threading.Tasks.Task.FromResult",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "ModelRouting.endProviderStep",
+          "occurrence": 1,
+          "line": 346,
+          "column": 24,
+          "endLine": 346,
+          "endColumn": 120,
+          "resolvedTarget": "Wanxiangshu.OpenCode.ModelRouting.endProviderStep",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "settleObservedTerminal",
+          "occurrence": 1,
+          "line": 348,
+          "column": 24,
+          "endLine": 348,
+          "endColumn": 55,
+          "resolvedTarget": "settleObservedTerminal",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Diagnostic.emit",
+          "occurrence": 2,
+          "line": 355,
+          "column": 16,
+          "endLine": 360,
+          "endColumn": 97,
+          "resolvedTarget": "Wanxiangshu.OpenCode.Diagnostic.emit",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/Diagnostic.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "SessionId.value",
+          "occurrence": 2,
+          "line": 357,
+          "column": 36,
+          "endLine": 357,
+          "endColumn": 69,
+          "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.value",
+          "declarationPaths": [
+            "src/Wanxiangshu/Foundation/Identity.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "PhysicalUserMessageId.value",
+          "occurrence": 2,
+          "line": 358,
+          "column": 50,
+          "endLine": 358,
+          "endColumn": 107,
+          "resolvedTarget": "Wanxiangshu.Foundation.Identity.PhysicalUserMessageIdModule.value",
+          "declarationPaths": [
+            "src/Wanxiangshu/Foundation/Identity.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "ProviderRunIdentity.value",
+          "occurrence": 1,
+          "line": 359,
+          "column": 38,
+          "endLine": 359,
+          "endColumn": 83,
+          "resolvedTarget": "Wanxiangshu.Foundation.Identity.ProviderRunIdentityModule.value",
+          "declarationPaths": [
+            "src/Wanxiangshu/Foundation/Identity.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "SessionExecutionBinding.providerStartObservationErrorCode",
+          "occurrence": 1,
+          "line": 360,
+          "column": 32,
+          "endLine": 360,
+          "endColumn": 95,
+          "resolvedTarget": "Wanxiangshu.OpenCode.SessionExecutionBinding.providerStartObservationErrorCode",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "exactStarted",
+          "occurrence": 2,
+          "line": 367,
+          "column": 16,
+          "endLine": 367,
+          "endColumn": 32,
+          "resolvedTarget": "exactStarted",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Option.map",
+          "occurrence": 3,
+          "line": 368,
+          "column": 19,
+          "endLine": 371,
+          "endColumn": 17,
+          "resolvedTarget": "Microsoft.FSharp.Core.Option.map",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": ">>",
+          "occurrence": 2,
+          "line": 369,
+          "column": 20,
+          "endLine": 370,
+          "endColumn": 47,
+          "resolvedTarget": "Microsoft.FSharp.Core.Operators.(>>)",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Option.defaultValue",
+          "occurrence": 2,
+          "line": 372,
+          "column": 19,
+          "endLine": 372,
+          "endColumn": 66,
+          "resolvedTarget": "Microsoft.FSharp.Core.Option.defaultValue",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Task.FromResult",
+          "occurrence": 6,
+          "line": 372,
+          "column": 40,
+          "endLine": 372,
+          "endColumn": 57,
+          "resolvedTarget": "System.Threading.Tasks.Task.FromResult",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "signalProviderStarted",
+          "occurrence": 1,
+          "line": 376,
+          "column": 20,
+          "endLine": 376,
+          "endColumn": 49,
+          "resolvedTarget": "signalProviderStarted",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Task.FromResult",
+          "occurrence": 7,
+          "line": 378,
+          "column": 20,
+          "endLine": 378,
+          "endColumn": 37,
+          "resolvedTarget": "System.Threading.Tasks.Task.FromResult",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "rejectProviderStart",
+          "occurrence": 1,
+          "line": 388,
+          "column": 20,
+          "endLine": 388,
+          "endColumn": 53,
+          "resolvedTarget": "rejectProviderStart",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "Task.FromResult",
+          "occurrence": 8,
+          "line": 389,
+          "column": 20,
+          "endLine": 389,
+          "endColumn": 37,
+          "resolvedTarget": "System.Threading.Tasks.Task.FromResult",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "reconciler.BindPhysicalUserMaterial",
+          "occurrence": 1,
+          "line": 392,
+          "column": 24,
+          "endLine": 392,
+          "endColumn": 109,
+          "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.BindPhysicalUserMaterial",
+          "declarationPaths": [
+            "src/Wanxiangshu/Composition/Turn/Scheduler.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "signalNewProviderStart",
+          "occurrence": 1,
+          "line": 393,
+          "column": 28,
+          "endLine": 393,
+          "endColumn": 74,
+          "resolvedTarget": "signalNewProviderStart",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "continueStartedLifecycle",
+          "occurrence": 1,
+          "line": 394,
+          "column": 28,
+          "endLine": 394,
+          "endColumn": 87,
+          "resolvedTarget": "continueStartedLifecycle",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "HostSignalRouter",
+          "occurrence": 1,
+          "line": 399,
+          "column": 16,
+          "endLine": 417,
+          "endColumn": 17,
+          "resolvedTarget": "Wanxiangshu.OpenCode.HostSignalRouter",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "SessionExecutionBinding.persistProviderStartedFromObservation",
+          "occurrence": 1,
+          "line": 410,
+          "column": 36,
+          "endLine": 413,
+          "endColumn": 47,
+          "resolvedTarget": "Wanxiangshu.OpenCode.SessionExecutionBinding.persistProviderStartedFromObservation",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "continueProviderStart",
+          "occurrence": 1,
+          "line": 415,
+          "column": 36,
+          "endLine": 415,
+          "endColumn": 108,
+          "resolvedTarget": "continueProviderStart",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
           "anchor": "HostSignalSubscribe.trySubscribe",
           "occurrence": 1,
-          "line": 232,
+          "line": 419,
           "column": 38,
-          "endLine": 232,
+          "endLine": 419,
           "endColumn": 102,
           "resolvedTarget": "Wanxiangshu.OpenCode.HostSignalSubscribe.trySubscribe",
           "declarationPaths": [
@@ -1688,9 +2992,9 @@
           "kind": "application",
           "anchor": "Diagnostic.fatal",
           "occurrence": 1,
-          "line": 237,
+          "line": 424,
           "column": 20,
-          "endLine": 237,
+          "endLine": 424,
           "endColumn": 80,
           "resolvedTarget": "Wanxiangshu.OpenCode.Diagnostic.fatal",
           "declarationPaths": [
@@ -1703,9 +3007,9 @@
           "kind": "application",
           "anchor": "raise",
           "occurrence": 1,
-          "line": 238,
+          "line": 425,
           "column": 20,
-          "endLine": 238,
+          "endLine": 425,
           "endColumn": 57,
           "resolvedTarget": "Microsoft.FSharp.Core.Operators.raise",
           "declarationPaths": [],
@@ -1716,9 +3020,9 @@
           "kind": "application",
           "anchor": "InvalidOperationException",
           "occurrence": 1,
-          "line": 238,
+          "line": 425,
           "column": 27,
-          "endLine": 238,
+          "endLine": 425,
           "endColumn": 56,
           "resolvedTarget": "System.InvalidOperationException",
           "declarationPaths": [],
@@ -1728,10 +3032,10 @@
         {
           "kind": "application",
           "anchor": "Option.map",
-          "occurrence": 1,
-          "line": 244,
+          "occurrence": 4,
+          "line": 431,
           "column": 23,
-          "endLine": 246,
+          "endLine": 433,
           "endColumn": 63,
           "resolvedTarget": "Microsoft.FSharp.Core.Option.map",
           "declarationPaths": [],
@@ -1742,9 +3046,9 @@
           "kind": "application",
           "anchor": "scope.TrackSubscription",
           "occurrence": 1,
-          "line": 248,
+          "line": 435,
           "column": 15,
-          "endLine": 248,
+          "endLine": 435,
           "endColumn": 51,
           "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.TrackSubscription",
           "declarationPaths": [
@@ -1757,9 +3061,9 @@
           "kind": "application",
           "anchor": "not",
           "occurrence": 1,
-          "line": 251,
+          "line": 438,
           "column": 19,
-          "endLine": 251,
+          "endLine": 438,
           "endColumn": 60,
           "resolvedTarget": "Microsoft.FSharp.Core.Operators.``not``",
           "declarationPaths": [],
@@ -1770,9 +3074,9 @@
           "kind": "application",
           "anchor": "String.IsNullOrWhiteSpace",
           "occurrence": 1,
-          "line": 251,
+          "line": 438,
           "column": 24,
-          "endLine": 251,
+          "endLine": 438,
           "endColumn": 59,
           "resolvedTarget": "System.String.IsNullOrWhiteSpace",
           "declarationPaths": [],
@@ -1783,9 +3087,9 @@
           "kind": "application",
           "anchor": "scope.Sessions.OwnedSessions.Add",
           "occurrence": 1,
-          "line": 252,
+          "line": 439,
           "column": 20,
-          "endLine": 252,
+          "endLine": 439,
           "endColumn": 62,
           "resolvedTarget": "System.Collections.Generic.HashSet.Add",
           "declarationPaths": [],
@@ -1796,9 +3100,9 @@
           "kind": "application",
           "anchor": "ignore",
           "occurrence": 2,
-          "line": 252,
+          "line": 439,
           "column": 20,
-          "endLine": 252,
+          "endLine": 439,
           "endColumn": 72,
           "resolvedTarget": "Microsoft.FSharp.Core.Operators.ignore",
           "declarationPaths": [],
@@ -1808,10 +3112,10 @@
         {
           "kind": "application",
           "anchor": "SessionId.create",
-          "occurrence": 1,
-          "line": 253,
+          "occurrence": 2,
+          "line": 440,
           "column": 30,
-          "endLine": 253,
+          "endLine": 440,
           "endColumn": 56,
           "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.create",
           "declarationPaths": [
@@ -1824,9 +3128,9 @@
           "kind": "application",
           "anchor": "signalRouter.RegisterOwned",
           "occurrence": 1,
-          "line": 254,
+          "line": 441,
           "column": 20,
-          "endLine": 254,
+          "endLine": 441,
           "endColumn": 50,
           "resolvedTarget": "Wanxiangshu.OpenCode.HostSignalRouter.RegisterOwned",
           "declarationPaths": [
@@ -1839,9 +3143,9 @@
           "kind": "application",
           "anchor": "ProviderLanguageBinding.ensureRoot",
           "occurrence": 1,
-          "line": 256,
+          "line": 443,
           "column": 20,
-          "endLine": 256,
+          "endLine": 443,
           "endColumn": 58,
           "resolvedTarget": "Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot",
           "declarationPaths": [
@@ -1854,9 +3158,9 @@
           "kind": "application",
           "anchor": "ignore",
           "occurrence": 3,
-          "line": 256,
+          "line": 443,
           "column": 20,
-          "endLine": 256,
+          "endLine": 443,
           "endColumn": 68,
           "resolvedTarget": "Microsoft.FSharp.Core.Operators.ignore",
           "declarationPaths": [],
@@ -1867,9 +3171,9 @@
           "kind": "application",
           "anchor": "not",
           "occurrence": 2,
-          "line": 260,
+          "line": 447,
           "column": 20,
-          "endLine": 260,
+          "endLine": 447,
           "endColumn": 61,
           "resolvedTarget": "Microsoft.FSharp.Core.Operators.``not``",
           "declarationPaths": [],
@@ -1880,9 +3184,9 @@
           "kind": "application",
           "anchor": "&&",
           "occurrence": 1,
-          "line": 260,
+          "line": 447,
           "column": 20,
-          "endLine": 261,
+          "endLine": 448,
           "endColumn": 64,
           "resolvedTarget": "Microsoft.FSharp.Core.LanguagePrimitives.IntrinsicOperators.(&&)",
           "declarationPaths": [],
@@ -1893,9 +3197,9 @@
           "kind": "application",
           "anchor": "String.IsNullOrWhiteSpace",
           "occurrence": 2,
-          "line": 260,
+          "line": 447,
           "column": 25,
-          "endLine": 260,
+          "endLine": 447,
           "endColumn": 60,
           "resolvedTarget": "System.String.IsNullOrWhiteSpace",
           "declarationPaths": [],
@@ -1906,9 +3210,9 @@
           "kind": "application",
           "anchor": "not",
           "occurrence": 3,
-          "line": 261,
+          "line": 448,
           "column": 23,
-          "endLine": 261,
+          "endLine": 448,
           "endColumn": 64,
           "resolvedTarget": "Microsoft.FSharp.Core.Operators.``not``",
           "declarationPaths": [],
@@ -1919,9 +3223,9 @@
           "kind": "application",
           "anchor": "String.IsNullOrWhiteSpace",
           "occurrence": 3,
-          "line": 261,
+          "line": 448,
           "column": 28,
-          "endLine": 261,
+          "endLine": 448,
           "endColumn": 63,
           "resolvedTarget": "System.String.IsNullOrWhiteSpace",
           "declarationPaths": [],
@@ -1931,10 +3235,10 @@
         {
           "kind": "application",
           "anchor": "SessionId.create",
-          "occurrence": 2,
-          "line": 263,
+          "occurrence": 3,
+          "line": 450,
           "column": 30,
-          "endLine": 263,
+          "endLine": 450,
           "endColumn": 56,
           "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.create",
           "declarationPaths": [
@@ -1947,9 +3251,9 @@
           "kind": "application",
           "anchor": "PhysicalUserMessageId.create",
           "occurrence": 1,
-          "line": 264,
+          "line": 451,
           "column": 35,
-          "endLine": 264,
+          "endLine": 451,
           "endColumn": 73,
           "resolvedTarget": "Wanxiangshu.Foundation.Identity.PhysicalUserMessageIdModule.create",
           "declarationPaths": [
@@ -1962,9 +3266,9 @@
           "kind": "application",
           "anchor": "HostSessionNudge.tryActiveProfile",
           "occurrence": 1,
-          "line": 268,
+          "line": 455,
           "column": 24,
-          "endLine": 268,
+          "endLine": 455,
           "endColumn": 69,
           "resolvedTarget": "Wanxiangshu.Interaction.Dispatch.OpenCode.HostSessionNudge.tryActiveProfile",
           "declarationPaths": [
@@ -1975,44 +3279,14 @@
         },
         {
           "kind": "application",
-          "anchor": "Option.bind",
-          "occurrence": 1,
-          "line": 269,
+          "anchor": "Option.map",
+          "occurrence": 5,
+          "line": 456,
           "column": 27,
-          "endLine": 272,
-          "endColumn": 62,
-          "resolvedTarget": "Microsoft.FSharp.Core.Option.bind",
+          "endLine": 456,
+          "endColumn": 76,
+          "resolvedTarget": "Microsoft.FSharp.Core.Option.map",
           "declarationPaths": [],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "PromptAuthority.roleLabel",
-          "occurrence": 1,
-          "line": 270,
-          "column": 28,
-          "endLine": 271,
-          "endColumn": 56,
-          "resolvedTarget": "Wanxiangshu.Interaction.Authority.PromptAuthority.roleLabel",
-          "declarationPaths": [
-            "src/Wanxiangshu/Interaction/Authority/Model.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "AgentRoleIdentity.roleOfString",
-          "occurrence": 1,
-          "line": 270,
-          "column": 28,
-          "endLine": 272,
-          "endColumn": 61,
-          "resolvedTarget": "Wanxiangshu.Participant.Persona.AgentRoleIdentity.roleOfString",
-          "declarationPaths": [
-            "src/Wanxiangshu/Participant/Persona/RoleIdentity.fs"
-          ],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
@@ -2020,9 +3294,9 @@
           "kind": "application",
           "anchor": "reconciler.BindUserMessage",
           "occurrence": 1,
-          "line": 274,
+          "line": 458,
           "column": 20,
-          "endLine": 274,
+          "endLine": 458,
           "endColumn": 85,
           "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.BindUserMessage",
           "declarationPaths": [
@@ -2035,9 +3309,9 @@
           "kind": "application",
           "anchor": "registerOwned",
           "occurrence": 1,
-          "line": 275,
+          "line": 459,
           "column": 20,
-          "endLine": 275,
+          "endLine": 459,
           "endColumn": 43,
           "resolvedTarget": "registerOwned",
           "declarationPaths": [
@@ -2050,9 +3324,9 @@
           "kind": "application",
           "anchor": "not",
           "occurrence": 4,
-          "line": 279,
+          "line": 463,
           "column": 20,
-          "endLine": 279,
+          "endLine": 463,
           "endColumn": 61,
           "resolvedTarget": "Microsoft.FSharp.Core.Operators.``not``",
           "declarationPaths": [],
@@ -2063,9 +3337,9 @@
           "kind": "application",
           "anchor": "&&",
           "occurrence": 2,
-          "line": 279,
+          "line": 463,
           "column": 20,
-          "endLine": 280,
+          "endLine": 464,
           "endColumn": 64,
           "resolvedTarget": "Microsoft.FSharp.Core.LanguagePrimitives.IntrinsicOperators.(&&)",
           "declarationPaths": [],
@@ -2076,9 +3350,9 @@
           "kind": "application",
           "anchor": "String.IsNullOrWhiteSpace",
           "occurrence": 4,
-          "line": 279,
+          "line": 463,
           "column": 25,
-          "endLine": 279,
+          "endLine": 463,
           "endColumn": 60,
           "resolvedTarget": "System.String.IsNullOrWhiteSpace",
           "declarationPaths": [],
@@ -2089,9 +3363,9 @@
           "kind": "application",
           "anchor": "not",
           "occurrence": 5,
-          "line": 280,
+          "line": 464,
           "column": 23,
-          "endLine": 280,
+          "endLine": 464,
           "endColumn": 64,
           "resolvedTarget": "Microsoft.FSharp.Core.Operators.``not``",
           "declarationPaths": [],
@@ -2102,9 +3376,9 @@
           "kind": "application",
           "anchor": "String.IsNullOrWhiteSpace",
           "occurrence": 5,
-          "line": 280,
+          "line": 464,
           "column": 28,
-          "endLine": 280,
+          "endLine": 464,
           "endColumn": 63,
           "resolvedTarget": "System.String.IsNullOrWhiteSpace",
           "declarationPaths": [],
@@ -2115,9 +3389,9 @@
           "kind": "application",
           "anchor": "reconciler.BindContinuationUserMessage",
           "occurrence": 1,
-          "line": 282,
+          "line": 466,
           "column": 20,
-          "endLine": 285,
+          "endLine": 469,
           "endColumn": 21,
           "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.BindContinuationUserMessage",
           "declarationPaths": [
@@ -2129,10 +3403,10 @@
         {
           "kind": "application",
           "anchor": "SessionId.create",
-          "occurrence": 3,
-          "line": 283,
+          "occurrence": 4,
+          "line": 467,
           "column": 24,
-          "endLine": 283,
+          "endLine": 467,
           "endColumn": 50,
           "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.create",
           "declarationPaths": [
@@ -2145,9 +3419,9 @@
           "kind": "application",
           "anchor": "PhysicalUserMessageId.create",
           "occurrence": 2,
-          "line": 284,
+          "line": 468,
           "column": 24,
-          "endLine": 284,
+          "endLine": 468,
           "endColumn": 62,
           "resolvedTarget": "Wanxiangshu.Foundation.Identity.PhysicalUserMessageIdModule.create",
           "declarationPaths": [
@@ -2158,11 +3432,106 @@
         },
         {
           "kind": "application",
-          "anchor": "SessionId.value",
+          "anchor": "not",
+          "occurrence": 6,
+          "line": 473,
+          "column": 20,
+          "endLine": 473,
+          "endColumn": 61,
+          "resolvedTarget": "Microsoft.FSharp.Core.Operators.``not``",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "&&",
+          "occurrence": 3,
+          "line": 473,
+          "column": 20,
+          "endLine": 474,
+          "endColumn": 64,
+          "resolvedTarget": "Microsoft.FSharp.Core.LanguagePrimitives.IntrinsicOperators.(&&)",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "String.IsNullOrWhiteSpace",
+          "occurrence": 6,
+          "line": 473,
+          "column": 25,
+          "endLine": 473,
+          "endColumn": 60,
+          "resolvedTarget": "System.String.IsNullOrWhiteSpace",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "not",
+          "occurrence": 7,
+          "line": 474,
+          "column": 23,
+          "endLine": 474,
+          "endColumn": 64,
+          "resolvedTarget": "Microsoft.FSharp.Core.Operators.``not``",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "String.IsNullOrWhiteSpace",
+          "occurrence": 7,
+          "line": 474,
+          "column": 28,
+          "endLine": 474,
+          "endColumn": 63,
+          "resolvedTarget": "System.String.IsNullOrWhiteSpace",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "PhysicalUserMessageId.create",
+          "occurrence": 3,
+          "line": 476,
+          "column": 70,
+          "endLine": 476,
+          "endColumn": 108,
+          "resolvedTarget": "Wanxiangshu.Foundation.Identity.PhysicalUserMessageIdModule.create",
+          "declarationPaths": [
+            "src/Wanxiangshu/Foundation/Identity.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "bindContinuationMessage",
           "occurrence": 1,
-          "line": 288,
+          "line": 477,
+          "column": 20,
+          "endLine": 477,
+          "endColumn": 63,
+          "resolvedTarget": "bindContinuationMessage",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "SessionId.value",
+          "occurrence": 3,
+          "line": 480,
           "column": 26,
-          "endLine": 288,
+          "endLine": 480,
           "endColumn": 51,
           "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.value",
           "declarationPaths": [
@@ -2175,9 +3544,9 @@
           "kind": "application",
           "anchor": "registerOwned",
           "occurrence": 2,
-          "line": 289,
+          "line": 481,
           "column": 16,
-          "endLine": 289,
+          "endLine": 481,
           "endColumn": 33,
           "resolvedTarget": "registerOwned",
           "declarationPaths": [
@@ -2190,9 +3559,9 @@
           "kind": "application",
           "anchor": "scope.Sessions.UserMessageBindings.TryGetValue",
           "occurrence": 1,
-          "line": 295,
+          "line": 487,
           "column": 26,
-          "endLine": 295,
+          "endLine": 487,
           "endColumn": 76,
           "resolvedTarget": "System.Collections.Generic.Dictionary.TryGetValue",
           "declarationPaths": [],
@@ -2203,9 +3572,9 @@
           "kind": "application",
           "anchor": "reconciler.BindActiveRun",
           "occurrence": 1,
-          "line": 299,
+          "line": 491,
           "column": 16,
-          "endLine": 306,
+          "endLine": 498,
           "endColumn": 45,
           "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.BindActiveRun",
           "declarationPaths": [
@@ -2217,10 +3586,10 @@
         {
           "kind": "application",
           "anchor": "Option.map",
-          "occurrence": 2,
-          "line": 302,
+          "occurrence": 6,
+          "line": 494,
           "column": 63,
-          "endLine": 302,
+          "endLine": 494,
           "endColumn": 118,
           "resolvedTarget": "Microsoft.FSharp.Core.Option.map",
           "declarationPaths": [],
@@ -2229,90 +3598,43 @@
         },
         {
           "kind": "application",
-          "anchor": "AgentJournal.snapshot",
-          "occurrence": 2,
-          "line": 309,
-          "column": 36,
-          "endLine": 309,
-          "endColumn": 65,
-          "resolvedTarget": "Wanxiangshu.Persistence.Journal.AgentJournalModule.snapshot",
-          "declarationPaths": [
-            "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs"
-          ],
+          "anchor": "Option.map",
+          "occurrence": 7,
+          "line": 502,
+          "column": 19,
+          "endLine": 504,
+          "endColumn": 96,
+          "resolvedTarget": "Microsoft.FSharp.Core.Option.map",
+          "declarationPaths": [],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
           "kind": "application",
-          "anchor": "SessionAssociationProjection.tryBloggerOf",
+          "anchor": "PromptDispatcher.forJournal",
           "occurrence": 1,
-          "line": 311,
-          "column": 22,
-          "endLine": 311,
-          "endColumn": 90,
-          "resolvedTarget": "Wanxiangshu.Execution.Session.SessionAssociationProjection.tryBloggerOf",
-          "declarationPaths": [
-            "src/Wanxiangshu/Execution/Session/Association.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "BloggerCoordinator.reactivateAfterNewRoot",
-          "occurrence": 1,
-          "line": 313,
-          "column": 36,
-          "endLine": 313,
-          "endColumn": 117,
-          "resolvedTarget": "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.reactivateAfterNewRoot",
-          "declarationPaths": [
-            "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "reactivateBlogger",
-          "occurrence": 1,
-          "line": 318,
+          "line": 503,
           "column": 34,
-          "endLine": 318,
-          "endColumn": 78,
-          "resolvedTarget": "reactivateBlogger",
+          "endLine": 503,
+          "endColumn": 69,
+          "resolvedTarget": "Wanxiangshu.Interaction.Dispatch.PromptDispatcher.forJournal",
           "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+            "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs"
           ],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
           "kind": "application",
-          "anchor": "scope.ArmRecovery",
+          "anchor": "ChatAdmissionTransaction.production",
           "occurrence": 1,
-          "line": 324,
-          "column": 58,
-          "endLine": 324,
-          "endColumn": 109,
-          "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.ArmRecovery",
+          "line": 504,
+          "column": 20,
+          "endLine": 504,
+          "endColumn": 95,
+          "resolvedTarget": "Wanxiangshu.OpenCode.ChatAdmissionTransaction.production",
           "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "PromptIngress.createHook",
-          "occurrence": 1,
-          "line": 328,
-          "column": 16,
-          "endLine": 334,
-          "endColumn": 49,
-          "resolvedTarget": "Wanxiangshu.Interaction.Dispatch.PromptIngress.createHook",
-          "declarationPaths": [
-            "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs"
+            "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs"
           ],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
@@ -2321,9 +3643,9 @@
           "kind": "application",
           "anchor": "HookDispatcher.ensure",
           "occurrence": 1,
-          "line": 340,
+          "line": 510,
           "column": 41,
-          "endLine": 340,
+          "endLine": 510,
           "endColumn": 72,
           "resolvedTarget": "Wanxiangshu.Git.Hook.HookDispatcher.ensure",
           "declarationPaths": [
@@ -2336,9 +3658,9 @@
           "kind": "application",
           "anchor": "scope.ActivateDurability",
           "occurrence": 1,
-          "line": 344,
+          "line": 514,
           "column": 26,
-          "endLine": 344,
+          "endLine": 514,
           "endColumn": 52,
           "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.ActivateDurability",
           "declarationPaths": [
@@ -2351,9 +3673,9 @@
           "kind": "application",
           "anchor": "Diagnostic.fatal",
           "occurrence": 2,
-          "line": 345,
+          "line": 515,
           "column": 33,
-          "endLine": 345,
+          "endLine": 515,
           "endColumn": 100,
           "resolvedTarget": "Wanxiangshu.OpenCode.Diagnostic.fatal",
           "declarationPaths": [
@@ -2366,9 +3688,9 @@
           "kind": "application",
           "anchor": "scope.Sessions.Quiescence.ObservePhysicalUserMessage",
           "occurrence": 1,
-          "line": 348,
+          "line": 518,
           "column": 16,
-          "endLine": 348,
+          "endLine": 518,
           "endColumn": 91,
           "resolvedTarget": "Wanxiangshu.OpenCode.SessionQuiescenceGate.ObservePhysicalUserMessage",
           "declarationPaths": [
@@ -2381,9 +3703,9 @@
           "kind": "application",
           "anchor": "ExplicitResumeSuppression.requiresPhysicalBinding",
           "occurrence": 1,
-          "line": 350,
+          "line": 520,
           "column": 19,
-          "endLine": 350,
+          "endLine": 520,
           "endColumn": 96,
           "resolvedTarget": "Wanxiangshu.OpenCode.ExplicitResumeSuppression.requiresPhysicalBinding",
           "declarationPaths": [
@@ -2395,10 +3717,10 @@
         {
           "kind": "application",
           "anchor": "reconciler.BindPhysicalUserMaterial",
-          "occurrence": 1,
-          "line": 351,
+          "occurrence": 2,
+          "line": 521,
           "column": 20,
-          "endLine": 351,
+          "endLine": 521,
           "endColumn": 78,
           "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.BindPhysicalUserMaterial",
           "declarationPaths": [
@@ -2410,10 +3732,10 @@
         {
           "kind": "application",
           "anchor": "SessionId.value",
-          "occurrence": 2,
-          "line": 355,
+          "occurrence": 4,
+          "line": 525,
           "column": 30,
-          "endLine": 355,
+          "endLine": 525,
           "endColumn": 55,
           "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.value",
           "declarationPaths": [
@@ -2425,10 +3747,10 @@
         {
           "kind": "application",
           "anchor": "not",
-          "occurrence": 6,
-          "line": 358,
+          "occurrence": 8,
+          "line": 528,
           "column": 24,
-          "endLine": 358,
+          "endLine": 528,
           "endColumn": 75,
           "resolvedTarget": "Microsoft.FSharp.Core.Operators.``not``",
           "declarationPaths": [],
@@ -2438,10 +3760,10 @@
         {
           "kind": "application",
           "anchor": "&&",
-          "occurrence": 3,
-          "line": 358,
+          "occurrence": 4,
+          "line": 528,
           "column": 24,
-          "endLine": 359,
+          "endLine": 529,
           "endColumn": 79,
           "resolvedTarget": "Microsoft.FSharp.Core.LanguagePrimitives.IntrinsicOperators.(&&)",
           "declarationPaths": [],
@@ -2452,9 +3774,9 @@
           "kind": "application",
           "anchor": "scope.Sessions.SessionParents.ContainsKey",
           "occurrence": 1,
-          "line": 358,
+          "line": 528,
           "column": 29,
-          "endLine": 358,
+          "endLine": 528,
           "endColumn": 74,
           "resolvedTarget": "System.Collections.Generic.Dictionary.ContainsKey",
           "declarationPaths": [],
@@ -2465,9 +3787,9 @@
           "kind": "application",
           "anchor": "SessionExecutionBinding.tryParent",
           "occurrence": 1,
-          "line": 359,
+          "line": 529,
           "column": 28,
-          "endLine": 359,
+          "endLine": 529,
           "endColumn": 71,
           "resolvedTarget": "Wanxiangshu.OpenCode.SessionExecutionBinding.tryParent",
           "declarationPaths": [
@@ -2480,9 +3802,9 @@
           "kind": "application",
           "anchor": "sessionPort.TryGetParentSession",
           "occurrence": 1,
-          "line": 361,
+          "line": 531,
           "column": 31,
-          "endLine": 361,
+          "endLine": 531,
           "endColumn": 72,
           "resolvedTarget": "Wanxiangshu.OpenCode.ISessionHostPort.TryGetParentSession",
           "declarationPaths": [
@@ -2494,10 +3816,10 @@
         {
           "kind": "application",
           "anchor": "SessionId.value",
-          "occurrence": 3,
-          "line": 362,
+          "occurrence": 5,
+          "line": 532,
           "column": 86,
-          "endLine": 362,
+          "endLine": 532,
           "endColumn": 110,
           "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.value",
           "declarationPaths": [
@@ -2510,9 +3832,9 @@
           "kind": "application",
           "anchor": "scope.Sessions.SessionParents.ContainsKey",
           "occurrence": 2,
-          "line": 367,
+          "line": 537,
           "column": 16,
-          "endLine": 367,
+          "endLine": 537,
           "endColumn": 84,
           "resolvedTarget": "System.Collections.Generic.Dictionary.ContainsKey",
           "declarationPaths": [],
@@ -2522,10 +3844,10 @@
         {
           "kind": "application",
           "anchor": "SessionId.value",
-          "occurrence": 4,
-          "line": 367,
+          "occurrence": 6,
+          "line": 537,
           "column": 58,
-          "endLine": 367,
+          "endLine": 537,
           "endColumn": 83,
           "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.value",
           "declarationPaths": [
@@ -2536,42 +3858,12 @@
         },
         {
           "kind": "application",
-          "anchor": "ModelRouting.projectRoutedModel",
-          "occurrence": 1,
-          "line": 371,
-          "column": 20,
-          "endLine": 371,
-          "endColumn": 74,
-          "resolvedTarget": "Wanxiangshu.OpenCode.ModelRouting.projectRoutedModel",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "FissionHostRequestProjection.projectRouted",
-          "occurrence": 1,
-          "line": 372,
-          "column": 20,
-          "endLine": 372,
-          "endColumn": 103,
-          "resolvedTarget": "Wanxiangshu.Execution.Fission.OpenCode.FissionHostRequestProjection.projectRouted",
-          "declarationPaths": [
-            "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
           "anchor": "requireDurabilityActivation",
           "occurrence": 1,
-          "line": 374,
-          "column": 20,
-          "endLine": 374,
-          "endColumn": 50,
+          "line": 540,
+          "column": 16,
+          "endLine": 540,
+          "endColumn": 46,
           "resolvedTarget": "requireDurabilityActivation",
           "declarationPaths": [
             "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
@@ -2583,10 +3875,10 @@
           "kind": "application",
           "anchor": "JoinWake.observeChatMessage",
           "occurrence": 1,
-          "line": 375,
-          "column": 20,
-          "endLine": 375,
-          "endColumn": 85,
+          "line": 541,
+          "column": 16,
+          "endLine": 541,
+          "endColumn": 80,
           "resolvedTarget": "Wanxiangshu.Execution.Delegation.Handle.OpenCode.JoinWake.observeChatMessage",
           "declarationPaths": [
             "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/JoinWake.fs"
@@ -2596,146 +3888,15 @@
         },
         {
           "kind": "application",
-          "anchor": "promptIngressHook",
+          "anchor": "scope.ArmRecovery",
           "occurrence": 1,
-          "line": 376,
-          "column": 24,
-          "endLine": 376,
-          "endColumn": 54,
-          "resolvedTarget": "promptIngressHook",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "Option.map",
-          "occurrence": 3,
-          "line": 380,
-          "column": 27,
-          "endLine": 384,
-          "endColumn": 81,
-          "resolvedTarget": "Microsoft.FSharp.Core.Option.map",
-          "declarationPaths": [],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "PromptDispatcher.forJournal",
-          "occurrence": 1,
-          "line": 381,
-          "column": 42,
-          "endLine": 381,
-          "endColumn": 77,
-          "resolvedTarget": "Wanxiangshu.Interaction.Dispatch.PromptDispatcher.forJournal",
-          "declarationPaths": [
-            "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "runtime.DispatchAccepted",
-          "occurrence": 1,
-          "line": 384,
-          "column": 32,
-          "endLine": 384,
-          "endColumn": 80,
-          "resolvedTarget": "Wanxiangshu.Interaction.Dispatch.PromptDispatcher.Runtime.DispatchAccepted",
-          "declarationPaths": [
-            "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "SessionExecutionBinding.acceptRoutedExecution",
-          "occurrence": 1,
-          "line": 386,
+          "line": 546,
           "column": 20,
-          "endLine": 386,
-          "endColumn": 98,
-          "resolvedTarget": "Wanxiangshu.OpenCode.SessionExecutionBinding.acceptRoutedExecution",
+          "endLine": 546,
+          "endColumn": 97,
+          "resolvedTarget": "Wanxiangshu.OpenCode.PluginRuntimeScope.ArmRecovery",
           "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "Option.bind",
-          "occurrence": 2,
-          "line": 397,
-          "column": 27,
-          "endLine": 397,
-          "endColumn": 116,
-          "resolvedTarget": "Microsoft.FSharp.Core.Option.bind",
-          "declarationPaths": [],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "PendingClaim",
-          "occurrence": 1,
-          "line": 397,
-          "column": 55,
-          "endLine": 397,
-          "endColumn": 115,
-          "resolvedTarget": "Wanxiangshu.Interaction.Dispatch.PromptDispatcher.Runtime.PendingClaim",
-          "declarationPaths": [
-            "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "PromptDispatcher.forJournal",
-          "occurrence": 2,
-          "line": 397,
-          "column": 56,
-          "endLine": 397,
-          "endColumn": 91,
-          "resolvedTarget": "Wanxiangshu.Interaction.Dispatch.PromptDispatcher.forJournal",
-          "declarationPaths": [
-            "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "ModelRouting.chatExecutionAdmission",
-          "occurrence": 1,
-          "line": 400,
-          "column": 24,
-          "endLine": 407,
-          "endColumn": 49,
-          "resolvedTarget": "Wanxiangshu.OpenCode.ModelRouting.chatExecutionAdmission",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "ModelRouting.routeChatExecution",
-          "occurrence": 1,
-          "line": 410,
-          "column": 24,
-          "endLine": 414,
-          "endColumn": 37,
-          "resolvedTarget": "Wanxiangshu.OpenCode.ModelRouting.routeChatExecution",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs"
+            "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs"
           ],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
@@ -2744,10 +3905,10 @@
           "kind": "application",
           "anchor": "scope.Sessions.ModelRoutingSessions.Add",
           "occurrence": 1,
-          "line": 412,
-          "column": 32,
-          "endLine": 412,
-          "endColumn": 98,
+          "line": 552,
+          "column": 20,
+          "endLine": 552,
+          "endColumn": 99,
           "resolvedTarget": "System.Collections.Generic.HashSet.Add",
           "declarationPaths": [],
           "classification": "wiring",
@@ -2757,10 +3918,10 @@
           "kind": "application",
           "anchor": "ignore",
           "occurrence": 4,
-          "line": 412,
-          "column": 32,
-          "endLine": 412,
-          "endColumn": 108,
+          "line": 552,
+          "column": 20,
+          "endLine": 553,
+          "endColumn": 29,
           "resolvedTarget": "Microsoft.FSharp.Core.Operators.ignore",
           "declarationPaths": [],
           "classification": "wiring",
@@ -2768,12 +3929,42 @@
         },
         {
           "kind": "application",
+          "anchor": "bindUserMessage",
+          "occurrence": 1,
+          "line": 555,
+          "column": 20,
+          "endLine": 557,
+          "endColumn": 88,
+          "resolvedTarget": "bindUserMessage",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "PhysicalUserMessageId.value",
+          "occurrence": 3,
+          "line": 557,
+          "column": 25,
+          "endLine": 557,
+          "endColumn": 87,
+          "resolvedTarget": "Wanxiangshu.Foundation.Identity.PhysicalUserMessageIdModule.value",
+          "declarationPaths": [
+            "src/Wanxiangshu/Foundation/Identity.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
           "anchor": "SessionId.value",
-          "occurrence": 5,
-          "line": 412,
-          "column": 72,
-          "endLine": 412,
-          "endColumn": 97,
+          "occurrence": 7,
+          "line": 559,
+          "column": 36,
+          "endLine": 559,
+          "endColumn": 74,
           "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.value",
           "declarationPaths": [
             "src/Wanxiangshu/Foundation/Identity.fs"
@@ -2783,204 +3974,13 @@
         },
         {
           "kind": "application",
-          "anchor": "continueRoutedChatMessage",
-          "occurrence": 1,
-          "line": 418,
-          "column": 31,
-          "endLine": 418,
-          "endColumn": 93,
-          "resolvedTarget": "continueRoutedChatMessage",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "PromptIngressCodec.decode",
-          "occurrence": 1,
-          "line": 427,
-          "column": 38,
-          "endLine": 427,
-          "endColumn": 76,
-          "resolvedTarget": "Wanxiangshu.Interaction.Dispatch.OpenCode.PromptIngressCodec.decode",
-          "declarationPaths": [
-            "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressCodec.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "ensurePhysicalParentDiscovered",
-          "occurrence": 1,
-          "line": 430,
-          "column": 48,
-          "endLine": 430,
-          "endColumn": 88,
-          "resolvedTarget": "ensurePhysicalParentDiscovered",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "FissionHostRequestProjection.projectExternalManaged",
-          "occurrence": 1,
-          "line": 437,
-          "column": 24,
-          "endLine": 437,
-          "endColumn": 108,
-          "resolvedTarget": "Wanxiangshu.Execution.Fission.OpenCode.FissionHostRequestProjection.projectExternalManaged",
-          "declarationPaths": [
-            "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "ExplicitResumeSuppression.classifyChatMessage",
-          "occurrence": 1,
-          "line": 444,
-          "column": 45,
-          "endLine": 444,
-          "endColumn": 105,
-          "resolvedTarget": "Wanxiangshu.OpenCode.ExplicitResumeSuppression.classifyChatMessage",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/ExplicitResumeSuppression.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "observePhysicalAdmission",
-          "occurrence": 1,
-          "line": 457,
-          "column": 28,
-          "endLine": 457,
-          "endColumn": 80,
-          "resolvedTarget": "observePhysicalAdmission",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "ExplicitSessionResume.observeChatMessage",
-          "occurrence": 1,
-          "line": 466,
-          "column": 28,
-          "endLine": 470,
-          "endColumn": 39,
-          "resolvedTarget": "Wanxiangshu.OpenCode.ExplicitSessionResume.observeChatMessage",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/ExplicitSessionResume.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "ignore",
-          "occurrence": 5,
-          "line": 468,
-          "column": 36,
-          "endLine": 468,
-          "endColumn": 112,
-          "resolvedTarget": "Microsoft.FSharp.Core.Operators.ignore",
-          "declarationPaths": [],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "continueOrdinaryChatMessage",
-          "occurrence": 1,
-          "line": 476,
-          "column": 32,
-          "endLine": 476,
-          "endColumn": 80,
-          "resolvedTarget": "continueOrdinaryChatMessage",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "Seq.iter",
-          "occurrence": 1,
-          "line": 481,
-          "column": 19,
-          "endLine": 483,
-          "endColumn": 52,
-          "resolvedTarget": "Microsoft.FSharp.Collections.Seq.iter",
-          "declarationPaths": [],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "scope.LoopSensor.DropSession",
-          "occurrence": 1,
-          "line": 482,
-          "column": 20,
-          "endLine": 482,
-          "endColumn": 51,
-          "resolvedTarget": "Wanxiangshu.OpenCode.LoopSensor.DropSession",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/LoopSensor.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "signalRouter.UnregisterOwned",
-          "occurrence": 1,
-          "line": 483,
-          "column": 20,
-          "endLine": 483,
-          "endColumn": 51,
-          "resolvedTarget": "Wanxiangshu.OpenCode.HostSignalRouter.UnregisterOwned",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "reconciler.TryPhysicalUserMessage",
-          "occurrence": 1,
-          "line": 491,
-          "column": 24,
-          "endLine": 491,
-          "endColumn": 85,
-          "resolvedTarget": "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.TryPhysicalUserMessage",
-          "declarationPaths": [
-            "src/Wanxiangshu/Composition/Turn/Scheduler.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "SessionId.create",
+          "anchor": "PhysicalUserMessageId.value",
           "occurrence": 4,
-          "line": 491,
-          "column": 58,
-          "endLine": 491,
-          "endColumn": 84,
-          "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.create",
+          "line": 560,
+          "column": 37,
+          "endLine": 560,
+          "endColumn": 99,
+          "resolvedTarget": "Wanxiangshu.Foundation.Identity.PhysicalUserMessageIdModule.value",
           "declarationPaths": [
             "src/Wanxiangshu/Foundation/Identity.fs"
           ],
@@ -2989,59 +3989,171 @@
         },
         {
           "kind": "application",
-          "anchor": "Option.map",
-          "occurrence": 4,
-          "line": 492,
-          "column": 27,
-          "endLine": 492,
-          "endColumn": 65,
-          "resolvedTarget": "Microsoft.FSharp.Core.Option.map",
+          "anchor": "ignore",
+          "occurrence": 5,
+          "line": 562,
+          "column": 20,
+          "endLine": 562,
+          "endColumn": 79,
+          "resolvedTarget": "Microsoft.FSharp.Core.Operators.ignore",
           "declarationPaths": [],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
           "kind": "application",
-          "anchor": "SyncDelegateHostObservation.observe",
-          "occurrence": 1,
-          "line": 496,
-          "column": 24,
-          "endLine": 496,
-          "endColumn": 89,
-          "resolvedTarget": "Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode.SyncDelegateHostObservation.observe",
+          "anchor": "SessionId.value",
+          "occurrence": 8,
+          "line": 566,
+          "column": 36,
+          "endLine": 566,
+          "endColumn": 74,
+          "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.value",
           "declarationPaths": [
-            "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Observation.fs"
+            "src/Wanxiangshu/Foundation/Identity.fs"
           ],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
           "kind": "application",
-          "anchor": "MessageVisibilitySignal.observeEvent",
+          "anchor": "PhysicalUserMessageId.value",
+          "occurrence": 5,
+          "line": 567,
+          "column": 37,
+          "endLine": 567,
+          "endColumn": 99,
+          "resolvedTarget": "Wanxiangshu.Foundation.Identity.PhysicalUserMessageIdModule.value",
+          "declarationPaths": [
+            "src/Wanxiangshu/Foundation/Identity.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "ignore",
+          "occurrence": 6,
+          "line": 569,
+          "column": 20,
+          "endLine": 569,
+          "endColumn": 79,
+          "resolvedTarget": "Microsoft.FSharp.Core.Operators.ignore",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "FissionHostRequestProjection.projectPendingManaged",
           "occurrence": 1,
-          "line": 497,
-          "column": 24,
-          "endLine": 497,
+          "line": 575,
+          "column": 16,
+          "endLine": 575,
+          "endColumn": 98,
+          "resolvedTarget": "Wanxiangshu.Execution.Fission.OpenCode.FissionHostRequestProjection.projectPendingManaged",
+          "declarationPaths": [
+            "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "requireDurabilityActivation",
+          "occurrence": 2,
+          "line": 576,
+          "column": 16,
+          "endLine": 576,
+          "endColumn": 46,
+          "resolvedTarget": "requireDurabilityActivation",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "JoinWake.observeChatMessage",
+          "occurrence": 2,
+          "line": 577,
+          "column": 16,
+          "endLine": 577,
+          "endColumn": 80,
+          "resolvedTarget": "Wanxiangshu.Execution.Delegation.Handle.OpenCode.JoinWake.observeChatMessage",
+          "declarationPaths": [
+            "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/JoinWake.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "invalidArg",
+          "occurrence": 1,
+          "line": 591,
+          "column": 27,
+          "endLine": 591,
+          "endColumn": 99,
+          "resolvedTarget": "Microsoft.FSharp.Core.Operators.invalidArg",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "AgentJournal.snapshot",
+          "occurrence": 3,
+          "line": 593,
+          "column": 16,
+          "endLine": 594,
+          "endColumn": 18,
+          "resolvedTarget": "Wanxiangshu.Persistence.Journal.AgentJournalModule.snapshot",
+          "declarationPaths": [
+            "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "ChatExecutionProjection.byKey",
+          "occurrence": 2,
+          "line": 594,
+          "column": 19,
+          "endLine": 594,
+          "endColumn": 52,
+          "resolvedTarget": "Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionProjection.byKey",
+          "declarationPaths": [
+            "src/Wanxiangshu/Execution/Session/ChatExecution/Projection.fs"
+          ],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "TaskCompletionSource",
+          "occurrence": 1,
+          "line": 631,
+          "column": 20,
+          "endLine": 631,
+          "endColumn": 98,
+          "resolvedTarget": "System.Threading.Tasks.TaskCompletionSource",
+          "declarationPaths": [],
+          "classification": "wiring",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
+          "anchor": "completion.SetException",
+          "occurrence": 1,
+          "line": 633,
+          "column": 16,
+          "endLine": 633,
           "endColumn": 82,
-          "resolvedTarget": "Wanxiangshu.OpenCode.MessageVisibilitySignal.observeEvent",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/MessageVisibility.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "signalRouter.ObserveLocal",
-          "occurrence": 1,
-          "line": 498,
-          "column": 24,
-          "endLine": 498,
-          "endColumn": 53,
-          "resolvedTarget": "Wanxiangshu.OpenCode.HostSignalRouter.ObserveLocal",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs"
-          ],
+          "resolvedTarget": "System.Threading.Tasks.TaskCompletionSource.SetException",
+          "declarationPaths": [],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         }
