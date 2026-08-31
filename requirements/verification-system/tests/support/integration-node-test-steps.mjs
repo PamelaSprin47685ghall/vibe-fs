@@ -50,10 +50,10 @@ export function integrationNodeTestSteps(root) {
       label: 'branch-fast-forward-adapter.test.mjs (change-integration)',
       files: [path.join(root, 'requirements/change-integration/tests/integration/branch-fast-forward-adapter.test.mjs')],
     },
-    // Both structured-workflow steps below run real `dotnet fsi` F# project checks: an F# project
-    // check over the production tree cannot report a verdict inside the integration default, so the
-    // budget is declared here rather than raised for every step. Measured lanes: 6s + 116s here,
-    // 34s + 107s + 5s next door.
+    // Structured-workflow steps below run real `dotnet fsi` F# project checks. Each physical check
+    // is its own file and sequential step so completion renews the verdict watchdog. Combining
+    // several checks in one file hides every leaf verdict behind the file wrapper and turns normal
+    // aggregate runtime into false silence. The wider budget remains local to these checks.
     {
       label: 'owner-dependencies-fcs.test.mjs (structured-workflow)',
       files: [
@@ -62,9 +62,23 @@ export function integrationNodeTestSteps(root) {
       perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
     },
     {
-      label: 'workflow-constitution-scanners.test.mjs (structured-workflow)',
+      label: 'composition-root-scanner.test.mjs (structured-workflow)',
       files: [
-        path.join(root, 'requirements/structured-workflow/tests/integration/workflow-constitution-scanners.test.mjs'),
+        path.join(root, 'requirements/structured-workflow/tests/integration/composition-root-scanner.test.mjs'),
+      ],
+      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
+    },
+    {
+      label: 'plugin-decorator-scanners.test.mjs (structured-workflow)',
+      files: [
+        path.join(root, 'requirements/structured-workflow/tests/integration/plugin-decorator-scanners.test.mjs'),
+      ],
+      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
+    },
+    {
+      label: 'semantic-decorator-fcs.test.mjs (structured-workflow)',
+      files: [
+        path.join(root, 'requirements/structured-workflow/tests/integration/semantic-decorator-fcs.test.mjs'),
       ],
       perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
     },
