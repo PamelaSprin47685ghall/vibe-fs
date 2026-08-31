@@ -2222,6 +2222,7 @@
       "src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs",
       "src/Wanxiangshu/Execution/Delegation/Handle/Controller.fs",
       "src/Wanxiangshu/Execution/Delegation/Handle/FoldSurface.fs",
+      "src/Wanxiangshu/Execution/Delegation/Handle/JournalSurface.fs",
       "src/Wanxiangshu/Execution/Delegation/Handle/JoinInterruptRegistry.fs",
       "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/JoinWake.fs",
       "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs",
