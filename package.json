@@ -42,6 +42,7 @@
   "devDependencies": {
     "@opencode-ai/plugin": "1.18.18",
     "opencode-ai": "1.18.18",
-    "smol-toml": "1.8.0"
+    "smol-toml": "1.8.0",
+    "wireit": "^0.14.13"
   }
 }
