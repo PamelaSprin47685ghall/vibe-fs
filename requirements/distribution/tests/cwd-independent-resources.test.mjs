@@ -15,7 +15,7 @@
 
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -92,9 +92,9 @@ test('WHAT[DISTRIBUTION-005] DISTRIBUTION_lookup_is_single_fixed_relative_path_n
 
   // DISTRIBUTION-005：资源单份发布——resources/ 只存在于包根，不得复制进 dist/ 形成双副本。
   assert.equal(
-    existsSync(path.join(root, 'dist', 'resources')),
+    readdirSync(path.join(root, 'dist')).includes('resources'),
     false,
-    'resources must not be duplicated into dist/ (single-copy publish)',
+    'an exact lowercase resources entry must not be duplicated into dist/ (single-copy publish)',
   )
 })
 
