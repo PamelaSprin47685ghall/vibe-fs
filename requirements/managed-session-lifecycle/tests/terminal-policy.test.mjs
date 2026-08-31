@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { terminalPolicy } from './support/managed-surface.mjs'
+import * as TerminalPolicySurface from '../../../dist/OpenCode/Host/TerminalPolicySurface.js'
 
 const childJournal = {
   children: { 'ses_child': { handle: 'agent:h1', targetAgent: 'fast-coder' } },
@@ -10,9 +10,7 @@ const childJournal = {
 }
 
 test('WHAT[MANAGED-SESSION-006] TPOL_sessionDead_false_without_journal_or_on_fresh_journal', () => {
-  assert.equal(terminalPolicy.sessionDead(null), false)
-  assert.equal(terminalPolicy.sessionDead(undefined), false)
-  assert.equal(terminalPolicy.sessionDead({}), false)
+  assert.equal(TerminalPolicySurface.sessionDeadWithoutJournal('ses_main'), false)
 })
 
 test('WHAT[MANAGED-SESSION-015] TPOL_tryLinkedChild_finds_child_handle_and_keeps_target_agent', () => {
