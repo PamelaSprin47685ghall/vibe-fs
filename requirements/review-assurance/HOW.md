@@ -5,6 +5,7 @@
 - **Witness 数据模型**：`ReviewWitness` 仅包含 `NoReview`、`RevisionWitness` 与 `Confirmed` 三种终态。不存在“已第一次 PERFECT、等待第二次”的持久化状态。`Confirmed` 结构自包含两次判断标识、代码树哈希与物理交互消息标识，有效性通过纯函数派生计算。
 - **Cohort 资格**：`ReviewWitness.isQualifiedConfirmationFor` 同时校验 cohort reviewer、barrier、outer/nested tree、两次 nested reviewer 与 distinct ProviderRun/ToolCall；Finality projection 复用该谓词，不从外围字段补全或覆盖 witness。
 - **物理因果绑定**：工具层通过 `ToolRuntimeScope` 提取当前执行绑定的 `PhysicalUserMessageId`，并在向工作流投递强类型 judgement 时传递 `Accept`、`Challenge` 与 `Reject` 完成能力。第二判断等待器在触发首次 `Challenge` 之前预先就位，因果关系由调用顺序天然保证。
+- **Physical evidence 合法性**：`PhysicalUserMessageId.isNonBlank` 是 JudgeTool、Direct CE、witness construction 与 replay qualification 的唯一空白判定；非法 evidence 在追加 verdict fact 前拒绝。
 
 ## 2. 终审双重确认与状态流转
 

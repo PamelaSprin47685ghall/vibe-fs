@@ -129,6 +129,8 @@ module ReviewWitness =
             && confirmed.Second.ReviewerSessionId = reviewerSessionId
             && confirmed.First.GitTreeHash = gitTreeHash
             && confirmed.Second.GitTreeHash = gitTreeHash
+            && PhysicalUserMessageId.isNonBlank confirmed.FirstPhysicalUserMessageId
+            && PhysicalUserMessageId.isNonBlank confirmed.SecondPhysicalUserMessageId
             && isDistinctAttempt confirmed.BarrierId confirmed.First confirmed.Second
         | NoReview
         | RevisionWitness _ -> false
@@ -141,7 +143,11 @@ module ReviewWitness =
         (first: VerdictWitness)
         (second: VerdictWitness)
         : ReviewWitness option =
-        if not (isDistinctAttempt barrierId first second) then
+        if
+            not (PhysicalUserMessageId.isNonBlank firstPhysicalUserMessageId)
+            || not (PhysicalUserMessageId.isNonBlank secondPhysicalUserMessageId)
+            || not (isDistinctAttempt barrierId first second)
+        then
             None
         else
             Some(

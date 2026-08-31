@@ -434,6 +434,10 @@ module ReviewJournalSurface =
 
             box
                 {| witness = witness
+                   observedAttempts =
+                    session.ReviewGuard
+                    |> Option.map (fun guard -> List.length guard.ObservedAttempts)
+                    |> Option.defaultValue 0
                    barrier =
                     session.ReviewGuard
                     |> Option.bind (fun guard -> guard.CurrentBarrierId)

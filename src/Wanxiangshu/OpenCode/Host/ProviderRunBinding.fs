@@ -52,19 +52,23 @@ module ProviderRunBinding =
         |> latestAssistant
         |> Result.bind (confirmLatestRun single)
 
+    let private decideCandidates messages candidates =
+        match candidates with
+        | [] -> Error Rejection.NoBindableRun
+        | [ single ] -> decideSingleRun single messages
+        | many -> Error(Rejection.AmbiguousRun(List.length many))
+
     let bindableRun (physicalUserMessage: string) (messages: SessionMessage list) =
-        let candidates =
+        if System.String.IsNullOrWhiteSpace physicalUserMessage then
+            Error Rejection.NoBindableRun
+        else
             messages
             |> List.filter (fun message ->
                 message.Role = "assistant"
                 && not message.Completed
                 && not message.IsCompaction
                 && message.ParentId = Some physicalUserMessage)
-
-        match candidates with
-        | [] -> Error Rejection.NoBindableRun
-        | [ single ] -> decideSingleRun single messages
-        | many -> Error(Rejection.AmbiguousRun(List.length many))
+            |> decideCandidates messages
 
     /// Split a physical snapshot visibility gap from a genuine identity
     /// rejection without weakening `bindableRun` itself. The Host can publish
