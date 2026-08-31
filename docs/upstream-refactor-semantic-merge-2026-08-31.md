@@ -262,5 +262,6 @@
 - `node --test requirements/behavior-diagnosis/tests/*.test.mjs`：149/149。
 - `node scripts/check.mjs`：text lane 全绿；696 production files；772 WHAT / 3920 tests closure；新 gate 扫描 28 个 Enforcer production files，只存在一个 decision owner。
 - `node scripts/check.mjs --lane=owner-dep`：27,091 FCS cross-owner uses、333 owner edges、185 contracts；authority、composition、DSL ownership、semantic decorator 全绿。
-- 最新 upstream 已把 npm scripts 切到 Wireit；本机旧 `node_modules` 尚无 Wireit，首次 `npm run format` 因 `wireit: command not found` 未启动。等价仓库命令均已直接运行，未修改 package/lockfile 绕过；PR 前应按 lockfile 刷新依赖并验证正式 npm 入口。
+- 最新 upstream 已把 npm scripts 切到 Wireit；本机旧 `node_modules` 最初没有 Wireit，首次 `npm run format` 因 `wireit: command not found` 未启动。PR preflight 使用 `npm ci` 按原 lockfile 重建 153 个依赖，audit 为 0 vulnerability；package/lockfile 无修改。
+- 正式 `npm run format-build-test` 首次运行在 unit tier 报 3924/3926：`proof-ladder.test.mjs` 与 distribution release proof 仍要求 upstream 改造前的 direct Fantomas/check/build 字符串，而 `fcd5ab11b` 已改为 `npm run ...` → Wireit。`45b20b63e` 没有放宽为“出现任一 build 别名即可”；它分别锁定顶层 format→text→FCS→build→unit→integration→package→e2e→pack 顺序，以及四个 Wireit step 的 exact underlying commands。focused verification/distribution 17/17。
 - 第 2 次按计划不要求本地完整 e2e ladder；未 push、未创建 PR、无 GitHub CI、无 merge SHA。M3 仍未进入 upstream。
