@@ -55,13 +55,6 @@ module ReviewAssuranceSurface =
             if isNull candidate then None else Some candidate)
         |> Option.defaultValue null
 
-    let private boolField (value: obj) (name: string) =
-        let candidate = field value name
-        if isNull candidate then false else unbox<bool> candidate
-
-    let private optionText (value: obj) =
-        if isNull value then None else Some(text value)
-
     let private physicalOf value =
         PhysicalUserMessageId.create (text value)
 
@@ -427,27 +420,7 @@ module ReviewAssuranceSurface =
     /// Provider run binding result. The raw Host message is adapted once here;
     /// SessionMessage never crosses the owner boundary.
     let bindableRun (physicalUser: string) (messages: obj array) : obj =
-        let messageOf value : SessionMessage =
-            let agent = firstField value [| "agent"; "Agent" |] |> optionText
-            let mode = firstField value [| "mode"; "Mode" |] |> text
-            let summary = boolField value "summary"
-            let isCompaction = summary || mode = "compaction" || agent = Some "compaction"
-
-            { Id = text (firstField value [| "id"; "Id" |])
-              Role = text (firstField value [| "role"; "Role" |])
-              Agent = agent
-              Finish = None
-              ErrorName = None
-              Model = None
-              ParentId = firstField value [| "parentID"; "ParentId"; "parentId" |] |> optionText
-              Completed = boolField value "completed"
-              IsCompaction = isCompaction
-              PromptKey = None
-              Parts = [||]
-              PartIds = [||]
-              ToolParts = [||] }
-
-        let typedMessages = messages |> Array.toList |> List.map messageOf
+        let typedMessages = SessionSnapshotPort.projectMessages messages
 
         match ProviderRunBinding.bindableRun physicalUser typedMessages with
         | Ok message ->
@@ -466,3 +439,7 @@ module ReviewAssuranceSurface =
                    error = "AmbiguousRun"
                    count = count |}
         | Error ProviderRunBinding.Rejection.NotLatestRun -> box {| ok = false; error = "NotLatestRun" |}
+        | Error ProviderRunBinding.Rejection.InsufficientSequence ->
+            box
+                {| ok = false
+                   error = "InsufficientSequence" |}

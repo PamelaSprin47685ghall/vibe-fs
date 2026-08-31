@@ -7,11 +7,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as review from '../../../dist/Mission/Review/Assurance/Surface.js'
 
-const msg = ({ id, role, parentID, completed, agent, summary, mode }) => ({
+const msg = ({ id, role, parentID, created = 1, completed, agent, summary, mode }) => ({
   id,
   role,
   parentID,
-  completed: Boolean(completed),
+  time: { created, ...(completed ? { completed: true } : {}) },
   agent,
   summary,
   mode,

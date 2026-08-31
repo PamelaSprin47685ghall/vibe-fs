@@ -102,6 +102,7 @@ module FissionHostSurface =
           ErrorName = None
           Model = None
           ParentId = parentId
+          CreatedAt = None
           Completed = completed
           IsCompaction = false
           PromptKey = None

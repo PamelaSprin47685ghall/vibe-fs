@@ -9,6 +9,7 @@ module ProviderRunBinding =
         | NoBindableRun
         | AmbiguousRun of count: int
         | NotLatestRun
+        | InsufficientSequence
 
     [<RequireQualifiedAccess>]
     type Observation =
@@ -31,12 +32,25 @@ module ProviderRunBinding =
         else
             Error Rejection.NotLatestRun
 
-    let private decideSingleRun single (messages: SessionMessage list) =
-        let assistants = messages |> List.filter (fun message -> message.Role = "assistant")
+    let private latestAssistant (assistants: SessionMessage list) =
+        let sequenced =
+            assistants
+            |> List.choose (fun message ->
+                message.CreatedAt |> Option.map (fun createdAt -> createdAt, message.Id, message))
 
-        match assistants with
-        | [] -> Error Rejection.NoBindableRun
-        | _ -> confirmLatestRun single (assistants |> List.maxBy (fun message -> message.Id))
+        match assistants, sequenced with
+        | [], _ -> Error Rejection.NoBindableRun
+        | _, values when List.length values <> List.length assistants -> Error Rejection.InsufficientSequence
+        | _, values ->
+            values
+            |> List.maxBy (fun (createdAt, id, _) -> createdAt, id)
+            |> fun (_, _, message) -> Ok message
+
+    let private decideSingleRun single (messages: SessionMessage list) =
+        messages
+        |> List.filter (fun message -> message.Role = "assistant")
+        |> latestAssistant
+        |> Result.bind (confirmLatestRun single)
 
     let bindableRun (physicalUserMessage: string) (messages: SessionMessage list) =
         let candidates =

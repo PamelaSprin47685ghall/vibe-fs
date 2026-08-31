@@ -32,6 +32,7 @@ module HostBoundarySurface =
         | ProviderRunBinding.Rejection.NoBindableRun -> "NoBindableRun", 0
         | ProviderRunBinding.Rejection.AmbiguousRun count -> "AmbiguousRun", count
         | ProviderRunBinding.Rejection.NotLatestRun -> "NotLatestRun", 0
+        | ProviderRunBinding.Rejection.InsufficientSequence -> "InsufficientSequence", 0
 
     let bindableRun (physicalUserMessageId: string) (rawMessages: obj array) : obj =
         match

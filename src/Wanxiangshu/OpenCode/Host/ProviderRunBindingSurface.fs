@@ -6,7 +6,7 @@ namespace Wanxiangshu.OpenCode
 ///
 /// `ProviderRunBinding.bindableRun` returns `Result<SessionMessage, Rejection>`
 /// where `Rejection` is a typed F# union (`NoBindableRun | AmbiguousRun of int
-/// | NotLatestRun`). This surface translates that into JSON-shaped objects so
+/// | NotLatestRun | InsufficientSequence`). This surface translates that into JSON-shaped objects so
 /// semantic tests observe the real binding law without touching Fable
 /// representation (`.tag` / `.fields` / DU ordinals).
 ///
@@ -33,6 +33,11 @@ module ProviderRunBindingSurface =
             box
                 {| ok = false
                    error = "NotLatestRun"
+                   reads = reads |}
+        | ProviderRunBinding.Rejection.InsufficientSequence ->
+            box
+                {| ok = false
+                   error = "InsufficientSequence"
                    reads = reads |}
 
     /// HOST-BOUNDARY-008 causal read: bind the unsealed assistant child of one
@@ -67,6 +72,10 @@ module ProviderRunBindingSurface =
                        error = "AmbiguousRun"
                        count = count |}
             | ProviderRunBinding.Rejection.NotLatestRun -> box {| ok = false; error = "NotLatestRun" |}
+            | ProviderRunBinding.Rejection.InsufficientSequence ->
+                box
+                    {| ok = false
+                       error = "InsufficientSequence" |}
 
     /// Exercise the same typed observation policy used by the physical wire:
     /// `NoBindableRun` may advance to another public snapshot, while genuine
