@@ -1,21 +1,21 @@
-// Split from tests/unit/context/projection-algebra.test.mjs (cutover Wave 2a); owner: context-compression.
-//
-// PROJ-008 step 3b: algebra InsertBlogFrames ≡ CompanionProjectionBuilder —
-// the InsertBlogFrames intent renders exactly like the production Companion
-// builder (workingRecord historic frames, squash instruction, digest parity).
+// Context owns Companion materialization; provider projection only plans and
+// renders generic rows.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as algebra from '../../../dist/Participant/Provider/Projection/Surface.js'
 import * as companionProj from '../../../dist/Context/Companion/ProjectionSurface.js'
 
-const projectionSnapshot = algebra
+const emptyProjection = {
+  providerId: null,
+  modelId: null,
+  variant: null,
+  tools: [],
+  system: [],
+  messages: [],
+}
 
-const stage3Snapshot = (blogFrames = []) =>
-  algebra.projectionSnapshot(
-    { providerId: null, modelId: null, variant: null, tools: [], system: [], messages: [] },
-    { blogFrames, transportMessages: [], hostReanchor: null },
-  )
+const snapshot = () => algebra.projectionSnapshot(emptyProjection)
 
 const planNames = (intents) => {
   const result = algebra.plan(intents)
@@ -23,78 +23,88 @@ const planNames = (intents) => {
   return result.intents
 }
 
-test('WHAT[CONTEXT-COMPRESSION-012] PROJ_008_step3b_InsertBlogFrames_digest_equiv_to_CompanionProjectionBuilder', () => {
+const assertOwnerRowsMatchBuilder = (intent, builderPlan) => {
+  assert.deepEqual(
+    intent.rows.map((row) => [row.message.role, row.message.parts[0]?.text]),
+    builderPlan.messages.map((message) => [message.role, message.text]),
+  )
+  assert.deepEqual(
+    intent.rows.map((row) => row.hostMessageId),
+    builderPlan.messages.map((message) => message.id),
+  )
+  assert.deepEqual(
+    intent.rows.map((row) => row.hostIsPhysical),
+    builderPlan.physicalFlags,
+  )
+}
+
+test('WHAT[CONTEXT-COMPRESSION-012] PROJ_008_Companion_owner_normal_rows_render_through_generic_projection', () => {
   const spy = (input) => `«${input}»`
-  const dataToml = '[[new_work_to_record]]\nuser = "work"'
   const frames = [
-    projectionSnapshot.blogFrame({ kind: 'Entry', digest: 'sha-f0', body: 'frame body 0' }),
-    projectionSnapshot.blogFrame({ kind: 'Entry', digest: 'sha-f1', body: 'frame body 1' }),
+    { digest: 'sha-f0', body: 'frame body 0' },
+    { digest: 'sha-f1', body: 'frame body 1' },
   ]
   const previousTips = [{ field: 'progress', cycleId: 'cycle-1' }]
-  const delta = { messageId: 'msg_delta', toml: dataToml }
+  const delta = { messageId: 'msg_delta', toml: '[[new_work_to_record]]\nuser = "work"' }
+  const input = { blogger: 'ses_y', epoch: 0, kind: 'normal', frames, delta, previousTips }
 
-  const intent = algebra.insertBlogFrames({
-    requestKind: 'normal',
-    squashFrameCount: 0,
-    bloggerSessionId: 'ses_y',
-    frameEpoch: 0,
-    physicalDelta: delta,
-    previousTips,
-    normalInstructionLines: companionProj.normalInstructionLines,
-    squashInstructionLines: companionProj.squashInstructionLines,
-  })
-  const snapshot = stage3Snapshot(frames)
-  assert.deepEqual(planNames([intent]), ['InsertBlogFrames'])
+  const intent = companionProj.projectionIntent(spy, input)
+  const builderPlan = companionProj.build(spy, input)
 
-  const algebraView = algebra.renderMessages(snapshot, [], [intent])
-  const builderPlan = companionProj.build(spy, {
-    blogger: 'ses_y',
-    epoch: 0,
-    kind: 'normal',
-    frames: frames.map((f) => ({ digest: f.digest, body: f.body })),
-    delta,
-    previousTips,
-  })
+  assert.equal(intent.kind, 'ReplaceMessageBase')
+  assert.deepEqual(planNames([intent]), ['ReplaceMessageBase'])
+  assertOwnerRowsMatchBuilder(intent, builderPlan)
 
+  const rendered = algebra.renderMessages(snapshot(), [], [intent])
+  const renderedWithHost = algebra.renderMessagesWithHostIds(snapshot(), [], [intent])
   assert.deepEqual(
-    algebraView.map((m) => m.role),
-    builderPlan.roles,
+    rendered.map((message) => [message.role, message.parts[0]?.text]),
+    builderPlan.messages.map((message) => [message.role, message.text]),
   )
   assert.deepEqual(
-    algebraView.map((m) => m.parts[0]?.text),
-    builderPlan.texts,
+    renderedWithHost.hostMessageIds,
+    builderPlan.messages.map((message) => message.id),
   )
+  assert.deepEqual(renderedWithHost.hostIsPhysical, builderPlan.physicalFlags)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-012] PROJ_008_step3b_InsertBlogFrames_squash_digest_equiv_to_Builder', () => {
+test('WHAT[CONTEXT-COMPRESSION-014] PROJ_008_Companion_owner_squash_rows_render_through_generic_projection', () => {
   const spy = (input) => `«${input}»`
   const frames = [
-    projectionSnapshot.blogFrame({ kind: 'Entry', digest: 'sha-f0', body: 'frame body 0' }),
-    projectionSnapshot.blogFrame({ kind: 'Entry', digest: 'sha-f1', body: 'frame body 1' }),
-    projectionSnapshot.blogFrame({ kind: 'Squash', digest: 'sha-f2', body: 'frame body 2' }),
+    { digest: 'sha-f0', body: 'frame body 0' },
+    { digest: 'sha-f1', body: 'frame body 1' },
+    { digest: 'sha-f2', body: 'frame body 2' },
   ]
-  const intent = algebra.insertBlogFrames({
-    requestKind: 'squash',
-    squashFrameCount: 2,
-    bloggerSessionId: 'ses_y',
-    frameEpoch: 1,
-    physicalDelta: null,
-    previousTips: [],
-    normalInstructionLines: companionProj.normalInstructionLines,
-    squashInstructionLines: companionProj.squashInstructionLines,
-  })
-  const snapshot = stage3Snapshot(frames)
-  const algebraView = algebra.renderMessages(snapshot, [], [intent])
-  const builderPlan = companionProj.build(spy, {
-    blogger: 'ses_y',
-    epoch: 1,
-    kind: companionProj.squash(2),
-    frames: frames.map((f) => ({ digest: f.digest, body: f.body })),
-  })
+  const input = { blogger: 'ses_y', epoch: 1, kind: companionProj.squash(2), frames }
 
+  const intent = companionProj.projectionIntent(spy, input)
+  const builderPlan = companionProj.build(spy, input)
+
+  assert.equal(intent.kind, 'ReplaceMessageBase')
+  assertOwnerRowsMatchBuilder(intent, builderPlan)
+
+  const rendered = algebra.renderMessages(snapshot(), [], [intent])
   assert.deepEqual(
-    algebraView.map((m) => [m.role, m.parts[0]?.text]),
-    builderPlan.messages.map((m) => [m.role, m.text]),
+    rendered.map((message) => [message.role, message.parts[0]?.text]),
+    builderPlan.messages.map((message) => [message.role, message.text]),
   )
-  assert.equal(algebraView.at(-1)?.parts[0]?.text, companionProj.squashInstruction)
+  assert.equal(rendered.at(-1)?.parts[0]?.text, companionProj.squashInstruction)
+})
+
+test('WHAT[CONTEXT-COMPRESSION-012] PROJ_008_frame_only_owner_inserts_before_message_index_one_and_empty_is_no_op', () => {
+  const spy = (input) => `«${input}»`
+  const input = {
+    blogger: 'ses_y',
+    epoch: 2,
+    kind: 'normal',
+    frames: [{ digest: 'sha-f0', body: 'frame body 0' }],
+  }
+
+  const intent = companionProj.projectionIntent(spy, input)
+  const builderPlan = companionProj.build(spy, input)
+
+  assert.equal(intent.kind, 'InsertMessageRows')
+  assert.deepEqual(intent.anchor, { kind: 'BeforeMessageIndex', index: 1 })
+  assertOwnerRowsMatchBuilder(intent, builderPlan)
+  assert.equal(companionProj.projectionIntent(spy, { ...input, frames: [] }), null)
 })

@@ -219,6 +219,23 @@ module XWire =
         | PrefixPresentationHorizon.Current -> Set.empty
         | PrefixPresentationHorizon.TentativeCold -> staleProviderRetryMessageIds rawMessages
 
+    let replacePrefixByHostIds
+        (rawMessages: obj list)
+        (coveredHostMessageIds: string list)
+        (openingHostMessageId: string option)
+        (syntheticMessageId: string)
+        (memory: string)
+        =
+        ProjectionMessageEdit.replacePrefixByHostIds
+            rawMessages
+            coveredHostMessageIds
+            openingHostMessageId
+            syntheticMessageId
+            memory
+
+    let suppressHostMessagesByIds (rawMessages: obj list) (hostMessageIds: Set<string>) =
+        ProjectionMessageEdit.suppressHostMessagesByIds rawMessages hostMessageIds
+
     /// COMPANION-009 / CTX-011: FrozenRecordPrefix = Opening + coverable Y frame
     /// prefix. RawGap never participates — it has no Y coverage proof.
     let private materializeFrozenRecordPrefix
@@ -252,6 +269,7 @@ module XWire =
         (journal: AgentJournal)
         (sessionId: SessionId)
         (snapshot: ProjectionSnapshot)
+        (committed: PrefixSnapshot option)
         (state: SessionAgentProjection)
         (requestCutoff: int)
         : Task<Result<PrefixProbe, NoCandidateReason>> =
@@ -273,7 +291,7 @@ module XWire =
                         HostDigest.sha256Hex
                         sessionId
                         prefix.EpochId
-                        snapshot.CommittedPrefix
+                        committed
                         blog.Coverage.CoverableTurnCutoffExclusive
                         blog.Coverage.CoveredPrefixDigest
                         requestCutoff
@@ -344,19 +362,6 @@ module XWire =
             scope.RecordAttemptPlan sessionId providerRun plan
         }
 
-    /// PROJ-008 Step6: reanchor 后 CommittedPrefix=None 且声明 ReanchorAfterCompaction（wire no-op）。
-    /// 若 epoch 仍有 snapshot，则走既有 Activate/Keep 路径。HostReanchor 由 Coordinator 填充。
-    let private observeHostReanchor (prefix: ActivePrefixEpoch) : HostReanchorFact option =
-        match prefix.Snapshot, Set.isEmpty prefix.ReanchoredRuns with
-        | None, false ->
-            // 最近一次 reanchor 观察：集合有元素但无 snapshot。
-            // 生产路径不重放 observed run id 到 wire；仅作事实侧。
-            Some
-                { PreviousEpochId = string (max 0L (PrefixEpochId.value prefix.EpochId - 1L))
-                  NextEpochId = string (PrefixEpochId.value prefix.EpochId)
-                  ObservedCompactionRunId = "" }
-        | _ -> None
-
     let private readFrozenRecordPrefixBody
         (durable: AgentJournal)
         (choice: XProjectionChoice)
@@ -369,16 +374,6 @@ module XWire =
                 let! body = durable.Writer.BlobWriter.Read blobRef
                 return requireOk body
             }
-
-    // reanchor 后：prefix intent 已是 KeepPhysicalPrefix（Snapshot=None）；
-    // 再声明 ReanchorAfterCompaction 表达 HOST-006 投影语义（wire no-op）。
-    // Activate + Reanchor 同批 → ConflictingPrefixLifecycle（fail-closed）。
-    // hostReanchor 仅在 Snapshot=None 时填充 → prefixIntent 必为 Keep。
-    // Activate + Reanchor 冲突由 plan fail-closed 覆盖（unit 已证明）。
-    let private intentsForHostReanchor (hostReanchor: HostReanchorFact option) (prefixIntent: ProjectionIntent) =
-        match hostReanchor with
-        | Some _ -> [ prefixIntent; ProjectionIntent.ReanchorAfterCompaction ]
-        | None -> [ prefixIntent ]
 
     let private requireStableReplacement
         (activation: PrefixActivation)
@@ -405,31 +400,26 @@ module XWire =
         |> List.filter (fun messageId -> Some messageId <> openingHostMessageId),
         openingHostMessageId
 
-    let private applyPlannedPrefix
-        (state: SessionAgentProjection)
-        (rawMessages: obj list)
-        (ordered: ProjectionIntent list)
-        =
-        let rendered = ProjectionRenderer.renderPrefix ordered
-
-        match rendered with
-        | RenderedPrefix.PhysicalPrefix -> rawMessages
-        | RenderedPrefix.SyntheticPrefix activation ->
+    let private applyPrefix (state: SessionAgentProjection) (rawMessages: obj list) (intent: PrefixProjectionIntent) =
+        match XPrefixProjection.render intent with
+        | PrefixRendered.Physical -> rawMessages
+        | PrefixRendered.Synthetic activation ->
             let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
 
             let replaceableHostMessageIds, openingHostMessageId =
                 requireStableReplacement activation xTrace
 
-            ProjectionMessageEdit.applyRenderedPrefixByHostIds
+            ProjectionMessageEdit.replacePrefixByHostIds
                 rawMessages
                 replaceableHostMessageIds
                 openingHostMessageId
-                rendered
+                activation.SyntheticMessageId
+                activation.Memory
 
     let private renderPrefixMessages
         (state: SessionAgentProjection)
         (rawMessages: obj list)
-        (intents: ProjectionIntent list)
+        (intent: PrefixProjectionIntent)
         (horizon: PrefixPresentationHorizon)
         =
         // A retry row that was visible in a tentative-cold provider request is
@@ -439,17 +429,8 @@ module XWire =
         // part of a later real cold presentation; Current must be byte-preserving.
         let staleTransport = retryTransportRetirement horizon rawMessages
 
-        let intents =
-            if Set.isEmpty staleTransport then
-                intents
-            else
-                ProjectionIntent.SuppressTransportOnly :: intents
-
-        match ProjectionPlanner.plan intents with
-        | Error conflict -> raise (InvalidOperationException(sprintf "X-wire projection conflict: %A" conflict))
-        | Ok ordered ->
-            applyPlannedPrefix state rawMessages ordered
-            |> fun prefixed -> ProjectionMessageEdit.suppressHostMessagesByIds prefixed staleTransport
+        applyPrefix state rawMessages intent
+        |> fun prefixed -> ProjectionMessageEdit.suppressHostMessagesByIds prefixed staleTransport
 
     let private commitPromotablePrefixRebase
         (durable: AgentJournal)
@@ -472,7 +453,8 @@ module XWire =
                     true
                     (Some AttemptOutcome.Completed)
                     (Option.isSome promotableProbe)
-                    (promotableProbe |> Option.exists (fun probe -> epoch.EpochId = probe.BasedOnEpochId))
+                    (promotableProbe
+                     |> Option.exists (fun probe -> epoch.EpochId = probe.BasedOnEpochId))
 
             match promotableProbe, decision.Promoted with
             | Some probe, true ->
@@ -612,11 +594,8 @@ module XWire =
                 // transport membrane. Otherwise every ordinary A/B slot between
                 // failed probes would accumulate all prior ProviderRetryAttempt
                 // rows and undo the recovery slot's cleanup.
-                let intents =
-                    intentsForHostReanchor (observeHostReanchor prefix) ProjectionIntent.KeepPhysicalPrefix
-
                 let transformed =
-                    renderPrefixMessages state rawMessages intents PrefixPresentationHorizon.Current
+                    renderPrefixMessages state rawMessages PrefixProjectionIntent.Keep PrefixPresentationHorizon.Current
 
                 Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
             | Some committed ->
@@ -626,13 +605,11 @@ module XWire =
                 let memoryPreamble =
                     ProviderProse.render (ProviderProse.languageOf sessionId) CompanionPrompt.MemoryPreamble Map.empty
 
-                let prefixIntent =
+                let intent =
                     XPrefixProjection.forChoice choice (Some committed) memoryPreamble frozenRecordPrefixBody
 
-                let intents = intentsForHostReanchor (observeHostReanchor prefix) prefixIntent
-
                 let transformed =
-                    renderPrefixMessages state rawMessages intents PrefixPresentationHorizon.Current
+                    renderPrefixMessages state rawMessages intent PrefixPresentationHorizon.Current
 
                 Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
         }
@@ -681,20 +658,14 @@ module XWire =
                 // PROJ-002: the attempt-local projection snapshot is built once
                 // and feeds both the probe proof (cutoffDigest) and the prefix
                 // decision (requiredBlob / forChoice).
-                let hostReanchor = observeHostReanchor prefix
-
-                let snapshot =
-                    { CurrentProjection = current
-                      CommittedPrefix = prefix.Snapshot
-                      BlogFrames = []
-                      TransportMessages = Set.empty
-                      HostReanchor = hostReanchor }
+                let snapshot = { CurrentProjection = current }
 
                 let opportunity = RecoverySlot.opportunity arming fallback.Cursor.Offset
 
                 let! candidateResult =
                     match opportunity with
-                    | RecoveryOpportunity.RecoveryAttempt -> candidate durable sessionId snapshot state cutoff
+                    | RecoveryOpportunity.RecoveryAttempt ->
+                        candidate durable sessionId snapshot prefix.Snapshot state cutoff
                     | RecoveryOpportunity.OrdinaryAttempt -> Task.FromResult(Error NoCandidateReason.NoCoverage)
 
                 let selectProbeForPlan () = selectProbe opportunity candidateResult
@@ -720,7 +691,7 @@ module XWire =
                 // COMMITTED blob for a probe attempt would inject the old prefix under
                 // the candidate's id).
                 let! frozenRecordPrefixBody =
-                    readFrozenRecordPrefixBody durable pendingPlan.ProjectionChoice snapshot.CommittedPrefix
+                    readFrozenRecordPrefixBody durable pendingPlan.ProjectionChoice prefix.Snapshot
 
                 let memoryPreamble =
                     ProviderProse.render (ProviderProse.languageOf sessionId) CompanionPrompt.MemoryPreamble Map.empty
@@ -728,12 +699,12 @@ module XWire =
                 let prefixIntent =
                     XPrefixProjection.forChoice
                         pendingPlan.ProjectionChoice
-                        snapshot.CommittedPrefix
+                        prefix.Snapshot
                         memoryPreamble
                         frozenRecordPrefixBody
 
-                let intents = intentsForHostReanchor hostReanchor prefixIntent
-                let transformed = renderPrefixMessages state rawMessages intents presentationHorizon
+                let transformed =
+                    renderPrefixMessages state rawMessages prefixIntent presentationHorizon
 
                 Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
 

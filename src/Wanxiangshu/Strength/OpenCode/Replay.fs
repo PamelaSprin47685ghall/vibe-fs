@@ -103,19 +103,14 @@ module StrengthReplay =
             else
                 let wire = ProviderWireCapture.decodeMessageView rawMessages
 
-                let snapshot =
-                    { CurrentProjection = ProviderProjection.toSemantic wire
-                      CommittedPrefix = None
-                      BlogFrames = []
-                      TransportMessages = Set.empty
-                      HostReanchor = None }
+                let! intents =
+                    StrengthLifecycle.replayIntents HostDigest.sha256Hex plans
+                    |> Result.mapError (fun error -> sprintf "Strength replay intent refused: %A" error)
+
+                let snapshot = { CurrentProjection = ProviderProjection.toSemantic wire }
 
                 let rendered =
-                    ProjectionRenderer.renderMessagesWithHostIds
-                        HostDigest.sha256Hex
-                        snapshot
-                        wire.Messages
-                        (StrengthLifecycle.replayIntents plans)
+                    ProjectionRenderer.renderMessagesWithHostIds snapshot wire.Messages intents
 
                 let! replayed =
                     ProjectionMessageEdit.tryApplyRenderedInsertionsPreservingBase
@@ -247,7 +242,7 @@ module StrengthReplay =
         |> Option.map (fun range ->
             ({ StartInclusive = range |> XTraceRange.startInclusive |> XTraceCursor.sequence
                EndExclusive = range |> XTraceRange.endExclusive |> XTraceCursor.sequence }
-             : StrengthTraceRange))
+            : StrengthTraceRange))
 
     let private recoverPlanTraceRange
         (durable: AgentJournal)

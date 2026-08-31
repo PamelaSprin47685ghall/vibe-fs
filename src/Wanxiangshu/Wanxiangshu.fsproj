@@ -98,6 +98,7 @@
     <Compile Include="Composition/Turn/Program.fs"/>
     <Compile Include="Host/CompactionPolicy.fs"/>
     <Compile Include="Participant/Provider/Projection/Model.fs"/>
+    <Compile Include="Participant/Provider/Projection/Intent.fs"/>
     <Compile Include="Context/Trace/Model.fs"/>
     <Compile Include="Mission/Obligation/Todo/ObligationCodec.fs"/>
     <Compile Include="Mission/Obligation/Todo/PrefixEpoch.fs"/>
@@ -133,7 +134,6 @@
     <Compile Include="Context/Companion/Identity.fs"/>
     <Compile Include="Context/Companion/Builder.fs"/>
     <Compile Include="Enforcer/Rulebook.fs"/>
-    <Compile Include="Participant/Provider/Projection/Intent.fs"/>
     <Compile Include="Participant/Provider/Projection/Planner.fs"/>
     <Compile Include="Participant/Provider/Projection/Renderer.fs"/>
     <Compile Include="Context/Companion/Blogger/Delta.fs"/>

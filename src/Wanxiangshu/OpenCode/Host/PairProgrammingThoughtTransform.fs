@@ -82,12 +82,12 @@ open Wanxiangshu.Resources
 /// 不再新增。同 epoch 内前次 provider wire 必须是后次 wire 的字节前缀（ARCH-004）。
 module PairProgrammingThoughtTransform =
 
+    [<Literal>]
+    let private PairProgrammingGuidelinePath = "host/pair-programming-guideline"
+
     /// HOST-013 English canonical used by tests; production loads via session language.
     let text =
-        ProviderProse.instructionLines
-            ProviderLanguage.English
-            ProjectionConstants.PairProgrammingGuidelinePath
-            Map.empty
+        ProviderProse.instructionLines ProviderLanguage.English PairProgrammingGuidelinePath Map.empty
         |> LlmFacing.renderInstructions
 
     // ── JS Evidence parsers（flat；无嵌套 decision）──────────────────────────
@@ -1010,8 +1010,7 @@ module PairProgrammingThoughtTransform =
         task {
             let messages = unbox<obj array> outObj?messages |> Array.toList
 
-            let guideline =
-                ProviderProse.render language ProjectionConstants.PairProgrammingGuidelinePath Map.empty
+            let guideline = ProviderProse.render language PairProgrammingGuidelinePath Map.empty
 
             let elapsed =
                 sessionStartedAt

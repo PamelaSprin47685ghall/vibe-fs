@@ -3,6 +3,8 @@ namespace Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Participant.Provider.Projection
 
 /// Which physical request the Companion is about to make.
 [<RequireQualifiedAccess>]
@@ -115,6 +117,68 @@ module CompanionProjectionBuilder =
                   IsPhysical = false }
 
             { Messages = pairedHistory @ [ instruction ] }
+
+    let private projectionKey (bloggerSessionId: SessionId) (frameEpoch: FrameEpochId) (kind: CompanionRequestKind) =
+        let request =
+            match kind with
+            | CompanionRequestKind.Normal -> "normal"
+            | CompanionRequestKind.Squash count -> "squash-" + string count
+
+        $"companion:{SessionId.value bloggerSessionId}:{FrameEpochId.value frameEpoch}:{request}"
+
+    let private ownerProjectionIntent fullRebuild key rows =
+        if fullRebuild then
+            ProjectionIntent.replaceMessageBase key rows
+        else
+            ProjectionIntent.insertMessageRows key (ProjectionMessageAnchor.BeforeMessageIndex 1) rows
+
+    let private projectionRow (message: CompanionProjectedMessage) : ProjectionMessageRow =
+        { Message =
+            { Role = message.Role
+              Parts = [ ProviderProjection.WireText message.Text ] }
+          HostMessageId = Some message.MessageId
+          HostIsPhysical = message.IsPhysical }
+
+    /// Materialize Companion-owned message shape and identity before crossing
+    /// into the provider's generic projection algebra.
+    let projectionIntent
+        (sha256: string -> string)
+        (bloggerSessionId: SessionId)
+        (frameEpoch: FrameEpochId)
+        (kind: CompanionRequestKind)
+        (frameBodies: (BlobDigest * string) list)
+        (physicalDelta: (string * BloggerDeltaItem list) option)
+        (previousTips: (string * string) list)
+        (normalInstructionLines: string list)
+        (squashInstructionLines: string list)
+        : ProjectionIntent option =
+        let isSquash =
+            match kind with
+            | CompanionRequestKind.Squash _ -> true
+            | CompanionRequestKind.Normal -> false
+
+        let fullRebuild =
+            Option.isSome physicalDelta || not (List.isEmpty previousTips) || isSquash
+
+        if List.isEmpty frameBodies && not fullRebuild then
+            None
+        else
+            let rows =
+                build
+                    sha256
+                    bloggerSessionId
+                    frameEpoch
+                    kind
+                    frameBodies
+                    physicalDelta
+                    previousTips
+                    normalInstructionLines
+                    squashInstructionLines
+                |> fun plan -> plan.Messages
+                |> List.map projectionRow
+
+            let key = projectionKey bloggerSessionId frameEpoch kind
+            ownerProjectionIntent fullRebuild key rows |> Some
 
     /// First-turn shape: one physical user message whose body is an ARCH-010 comment header.
     /// Language-agnostic — do not match English prose (PROMPT-019).

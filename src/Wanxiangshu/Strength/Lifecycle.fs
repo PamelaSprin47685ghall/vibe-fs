@@ -6,6 +6,7 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength.Persistence
 
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -160,13 +161,16 @@ module StrengthLifecycle =
         | Some range, Some covered -> covered < range.EndExclusive - 1L
         | _ -> true
 
-    let replayIntents (plans: StrengthReplayPlan list) : ProjectionIntent list =
+    let replayIntents
+        (sha256: string -> string)
+        (plans: StrengthReplayPlan list)
+        : Result<ProjectionIntent list, StrengthProjectionIntentError> =
         plans
-        |> List.map (fun plan ->
-            ProjectionIntent.strengthPromoted
+        |> List.traverseResultM (fun plan ->
+            StrengthProjectionIntent.promoted
+                sha256
                 plan.Prepared.OwnerSessionId
                 plan.Prepared.DecisionId
-                plan.Prepared.TargetProviderRun
                 plan.BeforeMessageIndex
                 false
                 plan.Bundle)

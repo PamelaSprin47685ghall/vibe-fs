@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as wire from '../../../dist/OpenCode/Codec/ProviderProjectionSurface.js'
-import * as Projection from '../../../dist/Participant/Provider/Projection/Surface.js'
 
 const kind = (value) => value?.kind
 
@@ -71,133 +70,17 @@ test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_message_view_and_transform_o
   assert.deepEqual(wire.messagesFromTransformOutput({ messages: [{ role: 'user' }] }), [{ role: 'user' }])
 })
 
-test('WHAT[PROVIDER-PROJECTION-004] MISC_projection_prepend_companion_memory', () => {
-  const raw = [{ info: { id: 'm1' }, role: 'user' }, { info: { id: 'm2' }, role: 'user' }]
-  const prefixed = wire.prependCompanionMemory(raw, 'syn-1', 'remember this', 1)
-  assert.equal(prefixed.length, 2)
-  assert.equal(prefixed[0].info.id, 'syn-1')
-  assert.equal(prefixed[0].parts[0].text, 'remember this')
-  assert.equal(prefixed[1].info.id, 'm2')
-  assert.throws(() => wire.prependCompanionMemory(raw, 's', 'm', 5), /cutoff exceeds/)
-})
 
-test('WHAT[PROVIDER-PROJECTION-004] MISC_projection_y_prefix_preserves_raw_todowrite_rounds', () => {
-  const message = (id, role, parts) => ({ info: { id, role }, parts })
-  const raw = [
-    message('u0', 'user', [{ type: 'text', text: 'ordinary old context' }]),
-    message('a0', 'assistant', [
-      { type: 'text', text: 'updating obligations' },
-      { type: 'tool-call', tool: 'todowrite', callID: 'todo-call-1', args: { planComplete: false } },
-    ]),
-    message('t0', 'tool', [{ type: 'tool-result', callID: 'todo-call-1', result: { ok: true } }]),
-    message('a1', 'assistant', [{ type: 'text', text: 'ordinary replaced tail' }]),
-    message('u1', 'user', [{ type: 'text', text: 'live request' }]),
-  ]
 
-  const projected = wire.prependCompanionMemory(raw, 'y-prefix', 'compressed ordinary history', 4)
-  assert.deepEqual(projected.map(item => item.info.id), ['y-prefix', 'a0', 't0', 'u1'])
-  assert.equal(projected[1], raw[1], 'todowrite call message remains the exact raw Host object')
-  assert.equal(projected[2], raw[2], 'matching result message remains the exact raw Host object')
-})
 
-test('WHAT[PROVIDER-PROJECTION-004] Y_prefix_removes_covered_history_by_stable_Host_identity_not_request_local_index', () => {
-  const message = (id, role, text) => ({
-    info: { id, role },
-    parts: [{ type: 'text', text }],
-  })
-  const raw = [
-    message('covered-u', 'user', 'old user'),
-    message('request-local', 'assistant', 'request-local presentation only'),
-    message('covered-a', 'assistant', 'old answer'),
-    message('live-u', 'user', 'live request'),
-  ]
 
-  const projected = wire.prependCompanionMemoryByHostIds(
-    raw,
-    'y-prefix',
-    'compressed canonical X',
-    ['covered-u', 'covered-a'],
-    '',
-  )
 
-  assert.deepEqual(
-    projected.map(item => item.info.id),
-    ['y-prefix', 'request-local', 'live-u'],
-    'an unrelated presentation row must not move the replacement boundary',
-  )
-  assert.equal(projected[1], raw[1])
-  assert.equal(projected[2], raw[3])
-})
 
-test('WHAT[PROVIDER-PROJECTION-004] Y_prefix_stable_identity_deletion_preserves_surviving_raw_message_order', () => {
-  const message = (id, role, parts) => ({ info: { id, role }, parts })
-  const raw = [
-    message('todo-call-msg', 'assistant', [
-      { type: 'tool-call', tool: 'todowrite', callID: 'todo-call-1', args: { planComplete: false } },
-    ]),
-    message('request-local', 'assistant', [{ type: 'text', text: 'request-local presentation only' }]),
-    message('todo-result-msg', 'tool', [
-      { type: 'tool-result', callID: 'todo-call-1', result: { ok: true } },
-    ]),
-    message('covered-ordinary', 'assistant', [{ type: 'text', text: 'replace me' }]),
-    message('live-u', 'user', [{ type: 'text', text: 'live request' }]),
-  ]
 
-  const projected = wire.prependCompanionMemoryByHostIds(
-    raw,
-    'y-prefix',
-    'compressed canonical X',
-    ['todo-call-msg', 'todo-result-msg', 'covered-ordinary'],
-    '',
-  )
 
-  assert.deepEqual(
-    projected.map(item => item.info.id),
-    ['y-prefix', 'todo-call-msg', 'request-local', 'todo-result-msg', 'live-u'],
-    'stable deletion may remove covered rows, but it must not reorder any raw row that survives',
-  )
-  assert.equal(projected[1], raw[0])
-  assert.equal(projected[2], raw[1])
-  assert.equal(projected[3], raw[2])
-  assert.equal(projected[4], raw[4])
-})
 
-test('WHAT[PROVIDER-PROJECTION-004] same_session_Y_prefix_is_inserted_after_the_preserved_raw_Opening', () => {
-  const message = (id, role, text) => ({
-    info: { id, role },
-    parts: [{ type: 'text', text }],
-  })
-  const raw = [
-    message('opening-u', 'user', 'raw opening'),
-    message('covered-a', 'assistant', 'covered work'),
-    message('live-u', 'user', 'live request'),
-  ]
 
-  const projected = wire.prependCompanionMemoryByHostIds(
-    raw,
-    'y-prefix',
-    'compressed post-opening history',
-    ['covered-a'],
-    'opening-u',
-  )
 
-  assert.deepEqual(
-    projected.map(item => item.info.id),
-    ['opening-u', 'y-prefix', 'live-u'],
-    'FrozenRecordPrefix(includeOpening=false) must follow, never precede, the raw Opening it summarizes after',
-  )
-  assert.equal(projected[0], raw[0])
-  assert.equal(projected[2], raw[2])
-})
-
-test('WHAT[PROVIDER-PROJECTION-004] MISC_projection_apply_rendered_prefix_both_shapes', () => {
-  const raw = [{ info: { id: 'm1' } }]
-  const synthetic = { name: 'SyntheticPrefix', activation: { syntheticMessageId: 'syn-9', memory: 'memory text', dropLeading: 0 } }
-  const out = Projection.applyRenderedPrefix(raw, synthetic)
-  assert.equal(out[0].info.id, 'syn-9')
-  assert.equal(out[1].info.id, 'm1')
-  assert.deepEqual(Projection.applyRenderedPrefix(raw, { name: 'PhysicalPrefix', activation: null }), raw)
-})
 
 test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_host_message_id', () => {
   assert.equal(wire.hostMessageId({ info: { id: 'via-info' }, id: 'top' }), 'via-info')
@@ -222,27 +105,7 @@ test('WHAT[PROVIDER-PROJECTION-003] retry continuation origin stays in Host meta
   assert.equal(wire.decodeMessageView([retry]).messages[0].parts[0].text, 'continue')
 })
 
-test('WHAT[PROVIDER-PROJECTION-004] transport membrane suppresses exact stale Host ids without role heuristics', () => {
-  const message = (id, role, text, origin = null) => ({
-    info: { id, role },
-    parts: [{
-      type: 'text',
-      text,
-      ...(origin ? { metadata: { wanxiangshu_origin: origin } } : {}),
-    }],
-  })
-  const raw = [
-    message('root', 'user', 'root'),
-    message('retry-old', 'user', 'retry old', 'ProviderRetryAttempt'),
-    message('business-assistant', 'assistant', 'must survive'),
-    message('retry-current', 'user', 'retry current', 'ProviderRetryAttempt'),
-  ]
 
-  const projected = wire.suppressHostMessagesByIds(raw, ['retry-old'])
-  assert.deepEqual(projected.map(item => item.info.id), ['root', 'business-assistant', 'retry-current'])
-  assert.equal(projected[1], raw[2], 'unaddressed assistant semantics must never be deleted by transport suppression')
-  assert.equal(projected[2], raw[3], 'the current physical retry continuation remains provider-visible')
-})
 
 test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_session_id_from_messages', () => {
   assert.equal(wire.projectionSessionIdFromMessages(null), null)

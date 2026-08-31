@@ -15,9 +15,8 @@ open Wanxiangshu.Participant.Provider.Attempt
 /// The production `XWire.applyTransform` is async and coupled to `AgentJournal`,
 /// `PluginRuntimeScope`, and `ISessionSnapshotPort` — it orchestrates blob reads,
 /// session-snapshot awaits, and in-place message replacement. The *decisions* it
-/// makes are pure: `RecoverySlot.mayRecover`, `PrefixProbeSelection.select`,
-/// `XPrefixProjection.forChoice`, `ProjectionPlanner.plan`,
-/// `ProjectionRenderer.renderPrefix`. This surface exposes that decision pipeline
+/// makes are pure: `RecoverySlot.mayRecover`, `PrefixProbeSelection.select`, and
+/// `XPrefixProjection.forChoice` / `XPrefixProjection.render`. This surface exposes that decision pipeline
 /// as a single JS-callable function with JS-native input/output, so the
 /// fail-closed and no-op laws can be proven without a live runtime.
 ///
@@ -174,12 +173,7 @@ module XWireSurface =
     let coveredPrefixDigest (projection: obj) (cutoff: int) : string =
         let typed = semanticProjectionOfJs projection
 
-        let snapshot =
-            { CurrentProjection = typed
-              CommittedPrefix = None
-              BlogFrames = []
-              TransportMessages = Set.empty
-              HostReanchor = None }
+        let snapshot = { CurrentProjection = typed }
 
         ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot cutoff
 
@@ -196,6 +190,36 @@ module XWireSurface =
 
         XWire.retryTransportRetirement typedHorizon (Array.toList rawMessages)
         |> Set.toArray
+
+    let replacePrefixByHostIds
+        (rawMessages: obj array)
+        (coveredHostMessageIds: string array)
+        (openingHostMessageId: obj)
+        (syntheticMessageId: string)
+        (memory: string)
+        : obj array =
+        XWire.replacePrefixByHostIds
+            (if isNull rawMessages then [] else Array.toList rawMessages)
+            (if isNull coveredHostMessageIds then
+                 []
+             else
+                 Array.toList coveredHostMessageIds)
+            (if isNullish openingHostMessageId then
+                 None
+             else
+                 Some(text openingHostMessageId))
+            syntheticMessageId
+            memory
+        |> List.toArray
+
+    let suppressHostMessagesByIds (rawMessages: obj array) (hostMessageIds: string array) : obj array =
+        XWire.suppressHostMessagesByIds
+            (if isNull rawMessages then [] else Array.toList rawMessages)
+            (if isNull hostMessageIds then
+                 Set.empty
+             else
+                 Set.ofArray hostMessageIds)
+        |> List.toArray
 
     /// HOST-BOUNDARY-020/021: the X-wire transform decision.
     ///
@@ -332,27 +356,23 @@ module XWireSurface =
 
                         let currentProjection = semanticProjectionOfJs input?currentProjection
 
-                        let projectionSnapshot =
-                            { CurrentProjection = currentProjection
-                              CommittedPrefix = committedSnapshot
-                              BlogFrames = []
-                              TransportMessages = Set.empty
-                              HostReanchor = None }
+                        let projectionSnapshot = { CurrentProjection = currentProjection }
 
-                        let recomputeDigest = ProjectionRenderer.cutoffDigest HostDigest.sha256Hex projectionSnapshot
+                        let recomputeDigest =
+                            ProjectionRenderer.cutoffDigest HostDigest.sha256Hex projectionSnapshot
 
                         let candidateResult =
                             PrefixProbeSelection.select
-                                    sha256Hex
-                                    (SessionId.create sessionId)
-                                    committedEpoch
-                                    committedSnapshot
-                                    coverableCutoff
-                                    coveredDigest
-                                    requestStartCutoff
-                                    frozenRef
-                                    frozenDigest
-                                    recomputeDigest
+                                sha256Hex
+                                (SessionId.create sessionId)
+                                committedEpoch
+                                committedSnapshot
+                                coverableCutoff
+                                coveredDigest
+                                requestStartCutoff
+                                frozenRef
+                                frozenDigest
+                                recomputeDigest
 
                         let probeResult = XWire.selectProbe opportunity candidateResult
 
@@ -368,87 +388,72 @@ module XWireSurface =
                         let prefixIntent =
                             XPrefixProjection.forChoice choice committedSnapshot memoryPreamble frozenBody
 
-                        // ── Render decision (PROJ-004/006) ──
-                        let intents = [ prefixIntent ]
+                        // ── Prefix-owner render decision ──
+                        let rendered = XPrefixProjection.render prefixIntent
 
-                        match ProjectionPlanner.plan intents with
-                        | Error conflict ->
-                            box
-                                {| ok = false
-                                   noop = false
-                                   changed = false
-                                   consumed = false
-                                   promoted = false
-                                   probe = null
-                                   noProbeReason = null
-                                   error = $"X-wire projection conflict: %A{conflict}"
-                                   output = null |}
-                        | Ok ordered ->
-                            let rendered = ProjectionRenderer.renderPrefix ordered
+                        let changed =
+                            match rendered with
+                            | PrefixRendered.Synthetic _ -> true
+                            | PrefixRendered.Physical -> false
 
-                            let changed =
+                        // The typed permit was consumed before this attempt was built.
+                        // No probe result can leak arming into a later physical request.
+                        let consumed = true
+
+                        // ── Reconcile: promotableProbe (CTX-012) ──
+                        // AttemptPlanner.promotableProbe reads only
+                        // `plan.Profile.ProjectionChoice` and the outcome.
+                        // We have the choice and probe result directly,
+                        // so the promote decision is: Completed + has probe.
+                        let reconcileDecision =
+                            XWire.reconciliationDecision
+                                true
+                                (attemptOutcomeOfJs input?outcome)
+                                (Result.isOk probeResult)
+                                true
+
+                        let promoted = reconcileDecision.Promoted
+
+                        let probeJs =
+                            match probeResult with
+                            | Ok probe -> probeToJs probe
+                            | Error _ -> null
+
+                        let noProbeJs =
+                            noProbeReason |> Option.map noCandidateReasonLabel |> Option.defaultValue null
+
+                        // ── Output: the transformed projection ──
+                        let output =
+                            if changed then
                                 match rendered with
-                                | RenderedPrefix.SyntheticPrefix _ -> true
-                                | RenderedPrefix.PhysicalPrefix -> false
+                                | PrefixRendered.Synthetic activation ->
+                                    let head: SemanticMessage =
+                                        { Role = "user"
+                                          Parts = [ SemanticText activation.Memory ] }
 
-                            // The typed permit was consumed before this attempt was built.
-                            // No probe result can leak arming into a later physical request.
-                            let consumed = true
+                                    let tail = currentProjection.Messages |> List.skip activation.CutoffExclusive
 
-                            // ── Reconcile: promotableProbe (CTX-012) ──
-                            // AttemptPlanner.promotableProbe reads only
-                            // `plan.Profile.ProjectionChoice` and the outcome.
-                            // We have the choice and probe result directly,
-                            // so the promote decision is: Completed + has probe.
-                            let reconcileDecision =
-                                XWire.reconciliationDecision
-                                    true
-                                    (attemptOutcomeOfJs input?outcome)
-                                    (Result.isOk probeResult)
-                                    true
+                                    let transformed =
+                                        { currentProjection with
+                                            Messages = head :: tail }
 
-                            let promoted = reconcileDecision.Promoted
+                                    box
+                                        {| messages =
+                                            transformed.Messages |> List.map semanticMessageToJs |> List.toArray |}
+                                | _ -> input?currentProjection
+                            else
+                                input?currentProjection
 
-                            let probeJs =
-                                match probeResult with
-                                | Ok probe -> probeToJs probe
-                                | Error _ -> null
-
-                            let noProbeJs =
-                                noProbeReason |> Option.map noCandidateReasonLabel |> Option.defaultValue null
-
-                            // ── Output: the transformed projection ──
-                            let output =
-                                if changed then
-                                    match rendered with
-                                    | RenderedPrefix.SyntheticPrefix activation ->
-                                        let head: SemanticMessage =
-                                            { Role = "user"
-                                              Parts = [ SemanticText activation.Memory ] }
-
-                                        let tail = currentProjection.Messages |> List.skip activation.CutoffExclusive
-
-                                        let transformed =
-                                            { currentProjection with
-                                                Messages = head :: tail }
-
-                                        box
-                                            {| messages =
-                                                transformed.Messages |> List.map semanticMessageToJs |> List.toArray |}
-                                    | _ -> input?currentProjection
-                                else
-                                    input?currentProjection
-
-                            box
-                                {| ok = true
-                                   noop = false
-                                   changed = changed
-                                   consumed = consumed
-                                   promoted = promoted
-                                   probe = probeJs
-                                   noProbeReason = noProbeJs
-                                   error = null
-                                   output = output |}
+                        box
+                            {| ok = true
+                               noop = false
+                               changed = changed
+                               consumed = consumed
+                               promoted = promoted
+                               probe = probeJs
+                               noProbeReason = noProbeJs
+                               error = null
+                               output = output |}
 
     /// HOST-BOUNDARY-021: reconcile decision — does a completed attempt promote
     /// a prefix rebase, and does a failed/aborted attempt clear the plan?
@@ -490,11 +495,7 @@ module XWireSurface =
             | _ -> false
 
         let decision =
-            XWire.reconciliationDecision
-                hasPlan
-                (attemptOutcomeOfJs input?outcome)
-                hasProbe
-                epochMatches
+            XWire.reconciliationDecision hasPlan (attemptOutcomeOfJs input?outcome) hasProbe epochMatches
 
         box
             {| promoted = decision.Promoted

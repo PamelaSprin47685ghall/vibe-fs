@@ -622,8 +622,7 @@
       "contract": "Context.CompanionContract",
       "kind": "published-contract",
       "consumers": [
-        "behavior-diagnosis",
-        "provider-projection"
+        "behavior-diagnosis"
       ],
       "symbols": [
         "Wanxiangshu.Context.Companion.Blogger.BloggerDeltaItemWireModule.tryListOfJs"
@@ -909,28 +908,13 @@
       "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
     },
     {
-      "path": "src/Wanxiangshu/Context/Companion/Blogger/Toml.fs",
-      "owner": "context-compression",
-      "node": "context-compression-blogger-compaction-keep",
-      "contract": "Context.CompanionContract",
-      "kind": "published-contract",
-      "consumers": [
-        "provider-projection"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Companion.Blogger.BloggerDeltaItem"
-      ],
-      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
-    },
-    {
       "path": "src/Wanxiangshu/Context/Companion/Builder.fs",
       "owner": "context-compression",
       "node": "context-trace-companion-contract",
       "contract": "Context.CompanionContract",
       "kind": "published-contract",
       "consumers": [
-        "behavior-diagnosis",
-        "provider-projection"
+        "behavior-diagnosis"
       ],
       "symbols": [
         "Wanxiangshu.Context.Companion.CompanionProjectedMessage.IsPhysical",
@@ -939,6 +923,7 @@
         "Wanxiangshu.Context.Companion.CompanionProjectedMessage.Text",
         "Wanxiangshu.Context.Companion.CompanionProjectionBuilder.build",
         "Wanxiangshu.Context.Companion.CompanionProjectionBuilder.isFirstTurnShape",
+        "Wanxiangshu.Context.Companion.CompanionProjectionBuilder.projectionIntent",
         "Wanxiangshu.Context.Companion.CompanionProjectionPlan.Messages",
         "Wanxiangshu.Context.Companion.CompanionRequestKind",
         "Wanxiangshu.Context.Companion.CompanionRequestKind.Normal",
@@ -1168,8 +1153,7 @@
         "durable-events",
         "interaction-authority",
         "obligation-ledger",
-        "provider-attempt-recovery",
-        "provider-projection"
+        "provider-attempt-recovery"
       ],
       "symbols": [
         "Wanxiangshu.Context.Prefix.PrefixProbe",
@@ -1243,25 +1227,6 @@
         "Wanxiangshu.Context.Prefix.NoCandidateReason.WouldRetreat"
       ],
       "justification": "PrefixStability.Contract publishes only the typed probe refusal vocabulary observed by attempt planning; the selector remains inside prefix-stability and the cutoff proof is bound to the cutover node."
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Prefix/Projection.fs",
-      "owner": "prefix-stability",
-      "node": "prefix-stability-cutover",
-      "contract": "PrefixStability.Contract",
-      "kind": "published-contract",
-      "law": "WHAT[PREFIX-STABILITY-003]",
-      "proof": "requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs",
-      "consumers": [
-        "provider-projection"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Prefix.XPrefixProjection.RawPrefixMessageFacts",
-        "Wanxiangshu.Context.Prefix.XPrefixProjection.RawPrefixMessageFacts.ContainsTodoWrite",
-        "Wanxiangshu.Context.Prefix.XPrefixProjection.RawPrefixMessageFacts.ToolCallIds",
-        "Wanxiangshu.Context.Prefix.XPrefixProjection.retainTodoWriteRounds"
-      ],
-      "justification": "PrefixStability.Contract publishes the observed prefix projection decisions and todo-round retention predicate to provider projection; the attempt-plan proof is bound to the cutover node."
     },
     {
       "path": "src/Wanxiangshu/Context/Prefix/Wire.fs",
@@ -4247,6 +4212,314 @@
         "Wanxiangshu.Strength.StrengthPrediction.P2"
       ],
       "justification": "ModelCapacity.BorrowingCapacity publishes exactly these symbols to the listed owners; every unlisted sibling remains private to execution-model-routing."
+    },
+    {
+      "path": "src/Wanxiangshu/Foundation/LlmFacing.fs",
+      "owner": "provider-projection",
+      "node": "provider-projection-cutover",
+      "contract": "Foundation.LlmFacing",
+      "kind": "published-contract",
+      "consumers": [
+        "action-affordance",
+        "attention-regulation",
+        "behavior-diagnosis",
+        "change-integration",
+        "cognitive-environment",
+        "concern-routing",
+        "context-compression",
+        "delegation",
+        "distribution",
+        "finality",
+        "guidance-delivery",
+        "host-boundary",
+        "institutional-learning",
+        "intra-participant-parallelism",
+        "knowledge-reuse",
+        "obligation-ledger",
+        "output-distillation",
+        "provider-language",
+        "repository-investigation",
+        "repository-programming",
+        "requirement-grounding",
+        "review-judgement",
+        "speculative-investigation",
+        "time-capability"
+      ],
+      "symbols": [
+        "Wanxiangshu.Foundation.LlmFacing.Data.Value",
+        "Wanxiangshu.Foundation.LlmFacing.Data.Value.Array",
+        "Wanxiangshu.Foundation.LlmFacing.Data.Value.Bool",
+        "Wanxiangshu.Foundation.LlmFacing.Data.Value.Float",
+        "Wanxiangshu.Foundation.LlmFacing.Data.Value.Integer",
+        "Wanxiangshu.Foundation.LlmFacing.Data.Value.Null",
+        "Wanxiangshu.Foundation.LlmFacing.Data.Value.Object",
+        "Wanxiangshu.Foundation.LlmFacing.Data.Value.String",
+        "Wanxiangshu.Foundation.LlmFacing.Data.boolField",
+        "Wanxiangshu.Foundation.LlmFacing.Data.boolMember",
+        "Wanxiangshu.Foundation.LlmFacing.Data.fileEffects",
+        "Wanxiangshu.Foundation.LlmFacing.Data.floatMember",
+        "Wanxiangshu.Foundation.LlmFacing.Data.int64Field",
+        "Wanxiangshu.Foundation.LlmFacing.Data.int64Member",
+        "Wanxiangshu.Foundation.LlmFacing.Data.intField",
+        "Wanxiangshu.Foundation.LlmFacing.Data.intMember",
+        "Wanxiangshu.Foundation.LlmFacing.Data.stringField",
+        "Wanxiangshu.Foundation.LlmFacing.Data.stringMember",
+        "Wanxiangshu.Foundation.LlmFacing.Data.structuredValue",
+        "Wanxiangshu.Foundation.LlmFacing.Data.table",
+        "Wanxiangshu.Foundation.LlmFacing.Data.tableArray",
+        "Wanxiangshu.Foundation.LlmFacing.DataBlock",
+        "Wanxiangshu.Foundation.LlmFacing.Document",
+        "Wanxiangshu.Foundation.LlmFacing.byteCount",
+        "Wanxiangshu.Foundation.LlmFacing.combine",
+        "Wanxiangshu.Foundation.LlmFacing.empty",
+        "Wanxiangshu.Foundation.LlmFacing.instruction",
+        "Wanxiangshu.Foundation.LlmFacing.instructions",
+        "Wanxiangshu.Foundation.LlmFacing.normalizeNewlines",
+        "Wanxiangshu.Foundation.LlmFacing.render",
+        "Wanxiangshu.Foundation.LlmFacing.renderInstruction",
+        "Wanxiangshu.Foundation.LlmFacing.renderInstructions",
+        "Wanxiangshu.Foundation.LlmFacing.stringValueByteCount",
+        "Wanxiangshu.Foundation.LlmFacing.stringValuePrefixByteCount",
+        "Wanxiangshu.Foundation.LlmFacing.withData",
+        "Wanxiangshu.Foundation.LlmFacing.withInstructions"
+      ],
+      "justification": "The provider-projection cutover publishes exactly these active compiler-observed generic symbols to the listed production owners; unlisted symbols remain owner-private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs",
+      "owner": "provider-projection",
+      "node": "provider-projection-cutover",
+      "contract": "ProviderProjection.HostWriteback",
+      "kind": "published-contract",
+      "consumers": [
+        "prefix-stability",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ProjectionMessageEdit.replacePrefixByHostIds",
+        "Wanxiangshu.OpenCode.ProjectionMessageEdit.suppressHostMessagesByIds",
+        "Wanxiangshu.OpenCode.ProjectionMessageEdit.tryApplyRenderedInsertionsPreservingBase"
+      ],
+      "justification": "The provider-projection cutover publishes exactly these active compiler-observed generic symbols to the listed production owners; unlisted symbols remain owner-private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Codec/ProviderWireCapture.fs",
+      "owner": "provider-projection",
+      "node": "provider-projection-cutover",
+      "contract": "ProviderProjection.HostCapture",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "cognitive-environment",
+        "finality",
+        "host-boundary",
+        "prefix-stability",
+        "semantic-trace",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ProviderWireCapture.CapturedWireMessage",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.CapturedWireMessage.Parts",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.CapturedWireMessage.ProviderRun",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.CapturedWireMessage.Role",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.CapturedWirePart.HostPartId",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.CapturedWirePart.HostToolPartId",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.CapturedWirePart.WirePart",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.decodeCapturedMessage",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.decodeCapturedMessageView",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.decodeMessage",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.decodeMessageView",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.lastUserMessageId",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.lastUserPromptKey",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.tryPhysicalParentOfProviderRun",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.trySemanticTurnOfHostMessageId",
+        "Wanxiangshu.OpenCode.ProviderWireCapture.visibleProviderRuns"
+      ],
+      "justification": "The provider-projection cutover publishes exactly these active compiler-observed generic symbols to the listed production owners; unlisted symbols remain owner-private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Codec/ProviderWireDecode.fs",
+      "owner": "provider-projection",
+      "node": "provider-projection-cutover",
+      "contract": "ProviderProjection.HostDecode",
+      "kind": "published-contract",
+      "consumers": [
+        "cognitive-environment",
+        "finality",
+        "guidance-delivery",
+        "host-boundary",
+        "prefix-stability",
+        "requirement-grounding",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ProviderWireDecode.decodePart",
+        "Wanxiangshu.OpenCode.ProviderWireDecode.firstString",
+        "Wanxiangshu.OpenCode.ProviderWireDecode.hostMessageId",
+        "Wanxiangshu.OpenCode.ProviderWireDecode.infoObject",
+        "Wanxiangshu.OpenCode.ProviderWireDecode.messagesFromTransformOutput",
+        "Wanxiangshu.OpenCode.ProviderWireDecode.projectionSessionIdFromMessages",
+        "Wanxiangshu.OpenCode.ProviderWireDecode.promptOriginOfMessage",
+        "Wanxiangshu.OpenCode.ProviderWireDecode.rawArray",
+        "Wanxiangshu.OpenCode.ProviderWireDecode.rawPartsOf",
+        "Wanxiangshu.OpenCode.ProviderWireDecode.readField"
+      ],
+      "justification": "The provider-projection cutover publishes exactly these active compiler-observed generic symbols to the listed production owners; unlisted symbols remain owner-private."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Projection/Intent.fs",
+      "owner": "provider-projection",
+      "node": "provider-projection-cutover",
+      "contract": "ProviderProjection.Intent",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "context-compression",
+        "prefix-stability",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionIntent",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionIntent.InsertMessageRows",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionIntent.ReplaceMessageBase",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionIntentModule.insertMessageRows",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionIntentModule.replaceMessageBase",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionMessageAnchor",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionMessageAnchor.Append",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionMessageAnchor.BeforeMessageIndex",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionMessageBase.Key",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionMessageBase.Rows",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionMessageInsertion.Anchor",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionMessageInsertion.Key",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionMessageInsertion.Rows",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionMessageRow",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionMessageRow.HostIsPhysical",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionMessageRow.HostMessageId",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionMessageRow.Message",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionSnapshot",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionSnapshot.CurrentProjection"
+      ],
+      "justification": "The provider-projection cutover publishes exactly these active compiler-observed generic symbols to the listed production owners; unlisted symbols remain owner-private."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Projection/Model.fs",
+      "owner": "provider-projection",
+      "node": "provider-projection-cutover",
+      "contract": "ProviderProjection.Model",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "context-compression",
+        "finality",
+        "prefix-stability",
+        "semantic-trace",
+        "speculative-investigation",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderSemanticProjection",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderSemanticProjection.Messages",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderSemanticProjection.ModelId",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderSemanticProjection.ProviderId",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderSemanticProjection.System",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderSemanticProjection.Tools",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderSemanticProjection.Variant",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderWireProjection",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderWireProjection.Messages",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderWireProjection.ModelId",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderWireProjection.ProviderId",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderWireProjection.System",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderWireProjection.Tools",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderWireProjection.Variant",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.SemanticMessage",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.SemanticMessage.Parts",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.SemanticMessage.Role",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.SemanticPart",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.SemanticPart.SemanticMedia",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.SemanticPart.SemanticReasoning",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.SemanticPart.SemanticText",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.SemanticPart.SemanticToolCall",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.SemanticPart.SemanticToolResult",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.WireMessage",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.WireMessage.Parts",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.WireMessage.Role",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.WirePart",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.WirePart.WireMedia",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.WirePart.WireReasoning",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.WirePart.WireText",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.WirePart.WireToolCall",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.WirePart.WireToolResult",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.renderSemantic",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.renderWire",
+        "Wanxiangshu.Participant.Provider.Projection.ProviderProjection.toSemantic"
+      ],
+      "justification": "The provider-projection cutover publishes exactly these active compiler-observed generic symbols to the listed production owners; unlisted symbols remain owner-private."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Projection/Planner.fs",
+      "owner": "provider-projection",
+      "node": "provider-projection-cutover",
+      "contract": "ProviderProjection.Planner",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionPlanner.plan"
+      ],
+      "justification": "The provider-projection cutover publishes exactly these active compiler-observed generic symbols to the listed production owners; unlisted symbols remain owner-private."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs",
+      "owner": "provider-projection",
+      "node": "provider-projection-cutover",
+      "contract": "ProviderProjection.Renderer",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "prefix-stability",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionRenderer.cutoffDigest",
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionRenderer.renderMessagesWithHostIds",
+        "Wanxiangshu.Participant.Provider.Projection.RenderedMessages",
+        "Wanxiangshu.Participant.Provider.Projection.RenderedMessages.HostIsPhysical",
+        "Wanxiangshu.Participant.Provider.Projection.RenderedMessages.HostMessageIds",
+        "Wanxiangshu.Participant.Provider.Projection.RenderedMessages.Messages"
+      ],
+      "justification": "The provider-projection cutover publishes exactly these active compiler-observed generic symbols to the listed production owners; unlisted symbols remain owner-private."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Projection/Surface.fs",
+      "owner": "provider-projection",
+      "node": "provider-projection-cutover",
+      "contract": "ProviderProjection.Surface",
+      "kind": "published-contract",
+      "consumers": [
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Projection.ProjectionSurface.intentToSurfaceValue"
+      ],
+      "justification": "The provider-projection cutover publishes exactly these active compiler-observed generic symbols to the listed production owners; unlisted symbols remain owner-private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs",
+      "owner": "provider-projection",
+      "node": "provider-projection-cutover",
+      "contract": "ProjectionMessageEdit.HostWireEncoding",
+      "kind": "physical-port",
+      "consumers": [
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ProjectionMessageEdit.HostWireEncoding.completedToolPart",
+        "Wanxiangshu.OpenCode.ProjectionMessageEdit.HostWireEncoding.rawMessage",
+        "Wanxiangshu.OpenCode.ProjectionMessageEdit.HostWireEncoding.tryEncodeNonToolParts"
+      ],
+      "justification": "The speculative-investigation native tool adapter consumes only these three active physical Host encoding primitives; Strength validation, pairing, and policy do not cross this port."
     }
   ],
   "physical_adapters": [

@@ -11,6 +11,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)))
 const checks = [
   join(root, 'checks/spec.mjs'),
   join(root, 'checks/architecture.mjs'),
+  join(root, 'checks/provider-projection-boundary.mjs'),
   join(root, 'checks/semantic-owners.mjs'),
   join(root, 'checks/owner-dependencies.mjs'),
   join(root, 'checks/dsl-ownership.mjs'),

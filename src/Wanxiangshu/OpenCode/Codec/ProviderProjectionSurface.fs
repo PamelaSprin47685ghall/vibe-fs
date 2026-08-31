@@ -324,44 +324,6 @@ module ProviderProjectionSurface =
         let value: OpencodeToolExecuteOutput = { args = args }
         box {| args = value.args |}
 
-    let prependCompanionMemory (raw: obj array) (syntheticId: string) (memory: string) (dropLeading: int) : obj array =
-        ProjectionMessageEdit.prependCompanionMemory
-            (if isNull raw then [] else Array.toList raw)
-            syntheticId
-            memory
-            dropLeading
-        |> List.toArray
-
-    let prependCompanionMemoryByHostIds
-        (raw: obj array)
-        (syntheticId: string)
-        (memory: string)
-        (coveredHostMessageIds: string array)
-        (insertAfterHostMessageId: string)
-        : obj array =
-        ProjectionMessageEdit.prependCompanionMemoryByHostIds
-            (if isNull raw then [] else Array.toList raw)
-            syntheticId
-            memory
-            (if isNull coveredHostMessageIds then
-                 []
-             else
-                 Array.toList coveredHostMessageIds)
-            (if System.String.IsNullOrWhiteSpace insertAfterHostMessageId then
-                 None
-             else
-                 Some insertAfterHostMessageId)
-        |> List.toArray
-
-    let suppressHostMessagesByIds (raw: obj array) (hostMessageIds: string array) : obj array =
-        ProjectionMessageEdit.suppressHostMessagesByIds
-            (if isNull raw then [] else Array.toList raw)
-            (if isNull hostMessageIds then
-                 Set.empty
-             else
-                 Set.ofArray hostMessageIds)
-        |> List.toArray
-
     let promptOriginOfMessage (raw: obj) : obj =
         ProviderWireDecode.promptOriginOfMessage raw
         |> Option.map box
@@ -429,9 +391,6 @@ module ProviderProjectionSurface =
         ProjectionMessageEdit.tryApplyRenderedMessages sessionId sha256 (renderedMessagesOf rendered)
         |> appliedResult
 
-    let tryApplyStrengthRenderedMessages (sessionId: string) (sha256: string -> string) (rendered: obj) : obj =
-        ProjectionMessageEdit.tryApplyStrengthRenderedMessages sessionId sha256 (renderedMessagesOf rendered)
-        |> appliedResult
 
     let tryApplyRenderedInsertionsPreservingBase
         (sessionId: string)

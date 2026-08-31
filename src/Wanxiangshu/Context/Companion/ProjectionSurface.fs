@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Resources
 
 /// Context-compression projection owner. Prompt wrappers, synthetic identities
@@ -121,19 +122,20 @@ module CompanionProjectionSurface =
         | "squash" -> CompanionRequestKind.Squash count
         | _ -> CompanionRequestKind.Normal
 
-    /// Build one normal or squash request from durable frame bodies and the
-    /// physical delta. Squash intentionally ignores `delta` in production.
-    let build (sha256: obj) (value: obj) : obj =
+    type private ProjectionInput =
+        { BloggerSessionId: SessionId
+          FrameEpoch: FrameEpochId
+          Kind: CompanionRequestKind
+          FrameBodies: (BlobDigest * string) list
+          PhysicalDelta: (string * BloggerDeltaItem list) option
+          PreviousTips: (string * string) list }
+
+    let private projectionInput (value: obj) =
         let frameValues =
             if isNullish value?frames then
                 [||]
             else
                 unbox<obj array> value?frames
-
-        let frameBodies =
-            frameValues
-            |> Array.toList
-            |> List.map (fun frame -> BlobDigest.create (text frame?digest), text frame?body)
 
         let physicalDelta =
             if isNullish value?delta then
@@ -147,20 +149,33 @@ module CompanionProjectionSurface =
             else
                 unbox<obj array> value?previousTips
 
-        let previousTips =
+        { BloggerSessionId = SessionId.create (text value?blogger)
+          FrameEpoch = FrameEpochId.create (int64 (text value?epoch))
+          Kind = planKind value
+          FrameBodies =
+            frameValues
+            |> Array.toList
+            |> List.map (fun frame -> BlobDigest.create (text frame?digest), text frame?body)
+          PhysicalDelta = physicalDelta
+          PreviousTips =
             tipValues
             |> Array.toList
-            |> List.map (fun tip -> text tip?field, text tip?cycleId)
+            |> List.map (fun tip -> text tip?field, text tip?cycleId) }
+
+    /// Build one normal or squash request from durable frame bodies and the
+    /// physical delta. Squash intentionally ignores `delta` in production.
+    let build (sha256: obj) (value: obj) : obj =
+        let input = projectionInput value
 
         let plan =
             CompanionProjectionBuilder.build
                 (shaOf sha256)
-                (SessionId.create (text value?blogger))
-                (FrameEpochId.create (int64 (text value?epoch)))
-                (planKind value)
-                frameBodies
-                physicalDelta
-                previousTips
+                input.BloggerSessionId
+                input.FrameEpoch
+                input.Kind
+                input.FrameBodies
+                input.PhysicalDelta
+                input.PreviousTips
                 normalLines
                 squashLines
 
@@ -172,3 +187,59 @@ module CompanionProjectionSurface =
                roles = plan.Messages |> List.map (fun message -> message.Role) |> List.toArray
                physicalFlags = plan.Messages |> List.map (fun message -> message.IsPhysical) |> List.toArray
                isFirstTurnShape = CompanionProjectionBuilder.isFirstTurnShape plan |}
+
+    /// Plain-data proof boundary for Context tests: materialize owner rows,
+    /// without exposing the F# projection intent union to JavaScript.
+    let private projectionRowValue (row: ProjectionMessageRow) : obj =
+        let parts =
+            row.Message.Parts
+            |> List.map (function
+                | ProviderProjection.WireText value -> box {| kind = "text"; text = value |}
+                | _ -> invalidOp "Companion projection rows must contain only text parts")
+            |> List.toArray
+
+        box
+            {| message =
+                box
+                    {| role = row.Message.Role
+                       parts = parts |}
+               hostMessageId = row.HostMessageId |> Option.map box |> Option.defaultValue null
+               hostIsPhysical = row.HostIsPhysical |}
+
+    let private projectionIntentValue (intent: ProjectionIntent) : obj =
+        match intent with
+        | ProjectionIntent.ReplaceMessageBase replacement ->
+            box
+                {| kind = "ReplaceMessageBase"
+                   key = replacement.Key
+                   rows = replacement.Rows |> List.map projectionRowValue |> List.toArray |}
+        | ProjectionIntent.InsertMessageRows insertion ->
+            let anchor =
+                match insertion.Anchor with
+                | ProjectionMessageAnchor.Append -> box {| kind = "Append" |}
+                | ProjectionMessageAnchor.BeforeMessageIndex index ->
+                    box
+                        {| kind = "BeforeMessageIndex"
+                           index = index |}
+
+            box
+                {| kind = "InsertMessageRows"
+                   key = insertion.Key
+                   anchor = anchor
+                   rows = insertion.Rows |> List.map projectionRowValue |> List.toArray |}
+
+    let projectionIntent (sha256: obj) (value: obj) : obj =
+        let input = projectionInput value
+
+        CompanionProjectionBuilder.projectionIntent
+            (shaOf sha256)
+            input.BloggerSessionId
+            input.FrameEpoch
+            input.Kind
+            input.FrameBodies
+            input.PhysicalDelta
+            input.PreviousTips
+            normalLines
+            squashLines
+        |> Option.map projectionIntentValue
+        |> Option.defaultValue null

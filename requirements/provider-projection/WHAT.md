@@ -6,7 +6,7 @@ Provider 消息投影必须通过类型化组合子与直接执行的计算管�
 
 ## PROVIDER-PROJECTION-002: 投影输入为不可变的 ProjectionSnapshot
 
-投影管线的核心输入是只读、不可变的 `ProjectionSnapshot`。快照仅包含当前已接线意图实际需要的事实子集，不直接查询外部存储或推测会话状态。
+投影管线的核心输入是只读、不可变的 `ProjectionSnapshot`。快照只包含当前 canonical semantic projection；不得携带 feature cache、lifecycle state，不直接查询外部存储或推测会话状态。
 
 ## PROVIDER-PROJECTION-003: 输出管线严格分层且 Semantic 与 Wire 类型隔离
 
@@ -19,19 +19,19 @@ Provider 消息投影必须通过类型化组合子与直接执行的计算管�
 2. **Pure Projection Planner**：负责收集意图、规范排序与冲突仲裁；
 3. **Canonical Renderer**：负责纯函数式渲染最终字节与确定性表示。
 
-当 semantic intent 携带的是历史 cutoff 而 Host 当前 message view 还包含 request-local presentation row 时，Renderer 只渲染 typed prefix activation；Host write-back adapter 必须通过 owner 提供的 stable Host identity 集合执行删除，严禁把 semantic cutoff 重新解释为当前数组下标。
+Feature owner 必须先把己方决策完整物化为 provider rows；Renderer 只解释 generic row intent。Host write-back adapter 只把渲染结果写入原生对象，不得重新解释 feature policy。
 
 ## PROVIDER-PROJECTION-005: 功能模块仅声明 ProjectionIntent
 
-功能模块与渲染器之间的交互仅限于预定义的封闭意图集合（如保持物理前缀、激活前缀纪元、插入博客帧、插入修复指令、抑制 transport-only rows 等）。严禁功能模块直接拦截或修改原始消息流。`SuppressTransportOnly` 的删除语义必须由 stable Host message identity 精确决定；严禁把 transport id 的数量解释成“删除前 N 条 assistant”，也严禁用 role heuristic 猜测目标消息。
+功能 owner 必须先把己方策略结果完整物化为 provider rows，然后只能提交 `ReplaceMessageBase` 或 `InsertMessageRows` 两种 generic `ProjectionIntent`。Provider projection 不得定义 prefix/context/repair/Strength 等 feature-specific intent；功能模块不得直接拦截或修改原始 Host 消息流。
 
 ## PROVIDER-PROJECTION-006: 规范排序与显式合并冲突，禁止注册顺序依赖
 
-不同意图作用于同一锚点时，必须遵循预定义的确定性合并律；若存在互斥冲突，必须显式返回 `ProjectionConflict` 并终止（fail-closed）。投影结果与冲突判定严禁依赖意图的注册顺序。
+不同 message-base replacement 同批出现，或同一 insertion key 对应不同 anchor/rows/Host metadata 时，必须显式返回 `ProjectionConflict` 并终止（fail-closed）。同值重复必须幂等；合法 insertion 必须按 anchor+key 产生与注册顺序无关的 canonical 顺序。
 
 ## PROVIDER-PROJECTION-007: 投影 DSL 不承担生命周期驱动
 
-投影管线仅负责从不可变快照生成确定性呈现，严禁在投影层启动/等待 Agent、执行工具、写入存储、推进生命周期状态或处理在线心跳。
+投影管线仅负责从不可变快照和 generic rows 生成确定性呈现。严禁在投影层物化 prefix/context/repair/Strength policy，启动/等待 Agent、执行工具、写入存储、推进生命周期状态或处理在线心跳。
 
 ## PROVIDER-PROJECTION-008: SyntheticToml 是唯一的 TOML 渲染器且故意不设解析器
 

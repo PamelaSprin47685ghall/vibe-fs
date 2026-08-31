@@ -186,6 +186,31 @@ module StrengthSurface =
     let private messagesOf (value: obj) =
         arrayOf value |> Array.toList |> List.map wireMessageOf
 
+    let private projectionMessageRowOf (value: obj) : ProjectionMessageRow =
+        { Message = wireMessageOf value?message
+          HostMessageId = optionalText value?hostMessageId
+          HostIsPhysical = unbox<bool> value?hostIsPhysical }
+
+    let private projectionMessageRowsOf (value: obj) =
+        arrayOf value |> Array.toList |> List.map projectionMessageRowOf
+
+    let private renderedMessagesOf (value: obj) : RenderedMessages =
+        { Messages = messagesOf value?messages
+          HostMessageIds =
+            arrayOf value?hostMessageIds
+            |> Array.toList
+            |> List.map (fun id -> if isNullish id then None else Some(textOf id))
+          HostIsPhysical = arrayOf value?hostIsPhysical |> Array.toList |> List.map unbox<bool> }
+
+    /// Apply Strength's native completed-tool Host adaptation to rendered rows.
+    let tryApplyRenderedMessages (sessionId: string) (sha256: string -> string) (rendered: obj) : obj =
+        match StrengthReplicaTransform.tryApplyRenderedMessages sessionId sha256 (renderedMessagesOf rendered) with
+        | Ok values ->
+            box
+                {| ok = true
+                   value = values |> List.toArray |}
+        | Error error -> box {| ok = false; error = error |}
+
     let private exchangesOf (value: obj) : StrengthToolExchange list =
         arrayOf value
         |> Array.toList
@@ -235,6 +260,60 @@ module StrengthSurface =
         match result with
         | Ok value -> box {| ok = true; value = valueOf value |}
         | Error error -> box {| ok = false; error = errorOf error |}
+
+    let private projectionIntentErrorName error =
+        match error with
+        | StrengthProjectionIntentError.CandidateWrongTarget _ -> "StrengthCandidateWrongTarget"
+        | StrengthProjectionIntentError.PromotedReplicaReflection _ -> "StrengthPromotedReplicaReflection"
+        | StrengthProjectionIntentError.FrameDigestMismatch _ -> "StrengthFrameDigestMismatch"
+        | StrengthProjectionIntentError.InvalidAnchor _ -> "InvalidStrengthAnchor"
+
+    let private projectionIntentResultToJs result =
+        match result with
+        | Ok intent ->
+            box
+                {| ok = true
+                   value = ProjectionSurface.intentToSurfaceValue intent
+                   error = null |}
+        | Error error ->
+            box
+                {| ok = false
+                   value = null
+                   error = projectionIntentErrorName error |}
+
+    let projectionMirror (value: obj) : obj =
+        StrengthProjectionIntent.projectionMirror
+            (StrengthDecisionId.create (textOf value?decisionId))
+            (projectionMessageRowsOf value?rows)
+        |> projectionIntentResultToJs
+
+    let candidate (sha256: string -> string) (value: obj) : obj =
+        StrengthProjectionIntent.candidate
+            sha256
+            (SessionId.create (textOf value?ownerSessionId))
+            (StrengthDecisionId.create (textOf value?decisionId))
+            (ProviderRunIdentity.create (textOf value?targetProviderRun))
+            (ProviderRunIdentity.create (textOf value?currentProviderRun))
+            (bundleOf value?bundle)
+        |> projectionIntentResultToJs
+
+    let promoted (sha256: string -> string) (value: obj) : obj =
+        StrengthProjectionIntent.promoted
+            sha256
+            (SessionId.create (textOf value?ownerSessionId))
+            (StrengthDecisionId.create (textOf value?decisionId))
+            (int (textOf value?beforeIndex))
+            (unbox<bool> value?isReplicaRequest)
+            (bundleOf value?bundle)
+        |> projectionIntentResultToJs
+
+    let replicaLocal (sha256: string -> string) (value: obj) : obj =
+        StrengthProjectionIntent.replicaLocal
+            sha256
+            (SessionId.create (textOf value?ownerSessionId))
+            (StrengthDecisionId.create (textOf value?decisionId))
+            (bundleOf value?bundle)
+        |> projectionIntentResultToJs
 
     /// Build one deterministic frame bundle from plain request batches.
     let frameTryBuild (sha256: string -> string) (maxBytes: int) (batches: obj array) : obj =
@@ -1114,19 +1193,23 @@ module StrengthSurface =
 
         StrengthLifecycle.needsRawReplay covered (planOf plan)
 
-    let lifecycleReplayIntents (plans: obj array) : obj array =
-        plans
-        |> Array.map (fun value ->
-            let plan = planOf value
-
+    let lifecycleReplayIntents (sha256: string -> string) (plans: obj array) : obj =
+        match
+            plans
+            |> Array.toList
+            |> List.map planOf
+            |> StrengthLifecycle.replayIntents sha256
+        with
+        | Ok intents ->
             box
-                {| kind = "strength-promoted"
-                   ownerSessionId = SessionId.value plan.Prepared.OwnerSessionId
-                   decisionId = StrengthDecisionId.value plan.Prepared.DecisionId
-                   targetProviderRun = ProviderRunIdentity.value plan.Prepared.TargetProviderRun
-                   beforeIndex = plan.BeforeMessageIndex
-                   isReplicaRequest = false
-                   bundle = bundleToJs plan.Bundle |})
+                {| ok = true
+                   value = intents |> List.map ProjectionSurface.intentToSurfaceValue |> List.toArray
+                   error = null |}
+        | Error error ->
+            box
+                {| ok = false
+                   value = null
+                   error = projectionIntentErrorName error |}
 
     let predictorCreate () : obj =
         PredictorHandle StrengthPredictor.empty :> obj

@@ -74,6 +74,10 @@ test('WHAT[CONTEXT-COMPRESSION-020] todowrite call and matching result are retai
 
 test('WHAT[CONTEXT-COMPRESSION-017] same_session_Y_prefix_never_repackages_or_deletes_the_raw_Opening', () => {
   const wire = readFileSync(new URL('../../../src/Wanxiangshu/Context/Prefix/Wire.fs', import.meta.url), 'utf8')
+  const adapter = readFileSync(
+    new URL('../../../src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs', import.meta.url),
+    'utf8',
+  )
 
   const frozen = wire.slice(
     wire.indexOf('let private materializeFrozenRecordPrefix'),
@@ -88,5 +92,14 @@ test('WHAT[CONTEXT-COMPRESSION-017] same_session_Y_prefix_never_repackages_or_de
   )
   assert.match(replacement, /XTraceProjection\.tryOpeningHostMessageId/)
   assert.match(replacement, /List\.filter/)
-  assert.match(replacement, /applyRenderedPrefixByHostIds/)
+  assert.match(replacement, /replacePrefixByHostIds/)
+  assert.doesNotMatch(replacement, /List\.(?:take|skip)\s+activation\.CutoffExclusive/)
+
+  const stableReplacement = adapter.slice(
+    adapter.indexOf('let replacePrefixByHostIds'),
+    adapter.indexOf('let suppressHostMessagesByIds'),
+  )
+  assert.match(stableReplacement, /ProviderWireDecode\.hostMessageId/)
+  assert.match(stableReplacement, /Set\.contains messageId coveredIds/)
+  assert.doesNotMatch(stableReplacement, /List\.(?:take|skip)/)
 })

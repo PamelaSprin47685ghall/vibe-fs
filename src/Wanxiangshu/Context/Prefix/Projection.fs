@@ -21,7 +21,6 @@ open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
@@ -29,7 +28,23 @@ open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-/// COMPANION-009 / CTX-010: which prefix X sends, as a `ProjectionIntent` (PROJ-005).
+/// The materialized companion memory that replaces one stable physical prefix.
+type PrefixActivation =
+    { SyntheticMessageId: string
+      Memory: string
+      CutoffExclusive: int }
+
+[<RequireQualifiedAccess>]
+type PrefixProjectionIntent =
+    | Keep
+    | Activate of PrefixActivation
+
+[<RequireQualifiedAccess>]
+type PrefixRendered =
+    | Physical
+    | Synthetic of PrefixActivation
+
+/// COMPANION-009 / CTX-010: which prefix X sends.
 ///
 /// Pure and index-based. The Host message objects live at the adapter boundary; what
 /// is decided here is the intent: whether the companion memory replaces the physical
@@ -37,6 +52,11 @@ open Wanxiangshu.Foundation.Identity
 /// the intent, the renderer applies it).
 [<RequireQualifiedAccess>]
 module XPrefixProjection =
+
+    let render (intent: PrefixProjectionIntent) : PrefixRendered =
+        match intent with
+        | PrefixProjectionIntent.Keep -> PrefixRendered.Physical
+        | PrefixProjectionIntent.Activate activation -> PrefixRendered.Synthetic activation
 
     type RawPrefixMessageFacts =
         { ContainsTodoWrite: bool
@@ -80,11 +100,11 @@ module XPrefixProjection =
         (snapshot: PrefixSnapshot option)
         (memoryPreamble: string)
         (frozenRecordPrefixBody: string)
-        : ProjectionIntent =
+        : PrefixProjectionIntent =
         match snapshot with
-        | None -> ProjectionIntent.KeepPhysicalPrefix
+        | None -> PrefixProjectionIntent.Keep
         | Some value ->
-            ProjectionIntent.ActivatePrefixEpoch
+            PrefixProjectionIntent.Activate
                 { SyntheticMessageId = value.SyntheticMessageId
                   Memory = CompanionPrompt.companionMemoryBlock memoryPreamble frozenRecordPrefixBody
                   CutoffExclusive = value.CutoffExclusive }
@@ -100,7 +120,7 @@ module XPrefixProjection =
         (committed: PrefixSnapshot option)
         (memoryPreamble: string)
         (frozenRecordPrefixBody: string)
-        : ProjectionIntent =
+        : PrefixProjectionIntent =
         match choice with
         | XProjectionChoice.UseCommittedEpoch -> forSnapshot committed memoryPreamble frozenRecordPrefixBody
         | XProjectionChoice.UsePrefixProbe probe ->

@@ -82,11 +82,6 @@ module EnforcerFrameRecovery =
         | DigestMismatch of digest: string
         | EpochMismatch
 
-    let private projectionBlogFrameKind kind =
-        match kind with
-        | BlogFrameKind.Entry -> ProjectionBlogFrameKind.Entry
-        | BlogFrameKind.Squash -> ProjectionBlogFrameKind.Squash
-
     let private ensureFrameDigest (frame: BlogFrame) (text: string) =
         let digest = BlobDigest.value frame.Digest
 
@@ -105,10 +100,7 @@ module EnforcerFrameRecovery =
 
             do! ensureFrameDigest frame text
 
-            return
-                { Kind = projectionBlogFrameKind frame.Kind
-                  Digest = digest
-                  Body = text }
+            return frame.Digest, text
         }
 
     let private loadBlogFrames (journal: AgentJournal) (blog: BlogProjectionState) =
@@ -132,11 +124,10 @@ module EnforcerFrameRecovery =
 
     /// C6: unique fail-closed loader for effective BlogFrames.
     /// Silent List.choose drop of bad frames is forbidden.
-    /// Kind is preserved so ProjectionSnapshot.BlogFrames can carry ProjectionBlogFrameKind.
     let loadEffectiveFrames
         (journal: AgentJournal)
         (mainSessionId: SessionId)
-        : Task<Result<ResolvedBlogFrame list * FrameEpochId, FrameLoadError>> =
+        : Task<Result<(BlobDigest * string) list * FrameEpochId, FrameLoadError>> =
         task {
             let projections = AgentJournal.snapshot journal
 
@@ -157,8 +148,8 @@ module EnforcerFrameRecovery =
             let messageId =
                 CompanionIdentity.newWorkMessageId HostDigest.sha256Hex bloggerSessionId main.DeltaDigest
 
-            "normal", 0, Some(messageId, main.Items)
-        | BloggerRequestContext.Squash squash -> "squash", squash.CoveredFrameCount, None
+            CompanionRequestKind.Normal, Some(messageId, main.Items)
+        | BloggerRequestContext.Squash squash -> CompanionRequestKind.Squash squash.CoveredFrameCount, None
 
     let private previousTipsOf (projections: ProjectionSet) (owner: SessionId) =
         match projections.AgentProjections.Sessions |> Map.tryFind owner with
@@ -208,8 +199,7 @@ module EnforcerFrameRecovery =
         fold [] items
 
     let private renderValidatedHostMessages (snapshot: ProjectionSnapshot) ordered =
-        let rendered =
-            ProjectionRenderer.renderMessagesWithHostIds HostDigest.sha256Hex snapshot [] ordered
+        let rendered = ProjectionRenderer.renderMessagesWithHostIds snapshot [] ordered
 
         let n = List.length rendered.Messages
 
@@ -244,19 +234,9 @@ module EnforcerFrameRecovery =
             | Error(FrameLoadError.DigestMismatch _)
             | Error FrameLoadError.EpochMismatch -> return None
             | Ok(resolvedFrames, frameEpoch) ->
-                let requestKind, squashCount, delta = requestKindEvidence bloggerSessionId ctx
+                let requestKind, delta = requestKindEvidence bloggerSessionId ctx
                 let previousTips = previousTipsOf projections owner
                 let lang = ProviderProse.languageOf owner
-
-                let blogFramesIntent: BlogFramesIntent =
-                    { RequestKind = requestKind
-                      SquashFrameCount = squashCount
-                      BloggerSessionId = SessionId.value bloggerSessionId
-                      FrameEpoch = FrameEpochId.value frameEpoch
-                      PhysicalDelta = delta
-                      PreviousTips = previousTips
-                      NormalInstructionLines = ProviderProse.instructionLines lang CompanionPrompt.Normal Map.empty
-                      SquashInstructionLines = ProviderProse.instructionLines lang CompanionPrompt.Squash Map.empty }
 
                 let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
                     { ProviderId = None
@@ -266,18 +246,27 @@ module EnforcerFrameRecovery =
                       System = []
                       Messages = [] }
 
-                let snapshot: ProjectionSnapshot =
-                    { CurrentProjection = emptyCurrent
-                      CommittedPrefix = None
-                      BlogFrames = resolvedFrames
-                      TransportMessages = Set.empty
-                      HostReanchor = None }
+                let snapshot: ProjectionSnapshot = { CurrentProjection = emptyCurrent }
 
-                return renderPlannedHostMessages snapshot [ ProjectionIntent.InsertBlogFrames blogFramesIntent ]
+                let intent =
+                    CompanionProjectionBuilder.projectionIntent
+                        HostDigest.sha256Hex
+                        bloggerSessionId
+                        frameEpoch
+                        requestKind
+                        resolvedFrames
+                        delta
+                        previousTips
+                        (ProviderProse.instructionLines lang CompanionPrompt.Normal Map.empty)
+                        (ProviderProse.instructionLines lang CompanionPrompt.Squash Map.empty)
+
+                return
+                    intent
+                    |> Option.bind (fun value -> renderPlannedHostMessages snapshot [ value ])
         }
 
     /// ENFORCER-051 / PROJ-008 step 3b: rebuild via Projection Algebra.
-    /// Snapshot → InsertBlogFrames → Planner → Builder-shaped Host messages.
+    /// Companion-owned rows → Planner → generic renderer → Host messages.
     /// Missing association / frame load → None so the caller keeps rawMessages.
     /// Never return an empty list: that blanks the Host transcript (mock lastUser=null).
     let tryRebuildFromContext

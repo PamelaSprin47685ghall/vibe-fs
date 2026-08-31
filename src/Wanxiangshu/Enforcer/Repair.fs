@@ -1,75 +1,23 @@
 namespace Wanxiangshu.Enforcer
 
-open Wanxiangshu.OpenCode
-
 open System
-open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-open Wanxiangshu.Strength.Projection
-open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Host
 open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.Fork.Host
-open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
+open Wanxiangshu.Host
+open Wanxiangshu.Persistence.Journal
 
 /// Protocol repair: incomplete/aborted blog tool detection, repair key and
-/// repair instruction projection. Owns only the repair path.
+/// repair instruction materialization. Owns only the repair path.
 module EnforcerRepair =
 
     /// Item 15: stable minimal repair instruction (no dynamic context resend).
-    /// Domain 单源 — `ProjectionConstants.RepairInstruction`（PROJ-008 Step4）。
-    let RepairInstruction = ProjectionConstants.RepairInstruction
+    let RepairInstruction =
+        LlmFacing.renderInstructions
+            [ "Protocol repair"
+              "Call the chronicle tool exactly once with a non-empty entry. Do not answer in prose." ]
 
     let tryOpenByBlogger
         (journal: AgentJournal)
@@ -180,10 +128,8 @@ module EnforcerRepair =
                    | Some "error" -> true
                    | _ -> false)
 
-    /// ENFORCER-060/061: InteractionRepair via Projection algebra (PROJ-008 Step4).
+    /// ENFORCER-060/061: append the stable InteractionRepair instruction.
     ///
-    /// 消息正文 / 顺序来自 `InsertRepair` → plan → renderMessagesWithIntents。
-    /// Host `createObj` 只写回 id / source / requestKey / repairTerminalRun 侧信道；
     /// terminal identity makes AABB re-entry idempotent instead of degrading to a
     /// LogicalRun-wide consumed bit. id 规则保持
     /// `enforcer-repair-` + sha256(requestKey + "|" + RepairInstruction).Substring(0, 24)。
@@ -192,60 +138,22 @@ module EnforcerRepair =
         (requestKey: string)
         (repairTerminalRun: ProviderRunIdentity)
         : obj list =
-        let baseWire = rawMessages |> List.choose ProviderWireCapture.decodeMessage
+        let msgId =
+            "enforcer-repair-"
+            + (HostDigest.sha256Hex (requestKey + "|" + RepairInstruction)).Substring(0, 24)
 
-        let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
-            { ProviderId = None
-              ModelId = None
-              Variant = None
-              Tools = []
-              System = []
-              Messages = [] }
+        let repairMsg =
+            createObj
+                [ "info",
+                  box (
+                      createObj
+                          [ "id", box msgId
+                            "role", box "user"
+                            "synthetic", box true
+                            "source", box "interaction-repair"
+                            "requestKey", box requestKey
+                            "repairTerminalRun", box (ProviderRunIdentity.value repairTerminalRun) ]
+                  )
+                  "parts", box [| createObj [ "type", box "text"; "text", box RepairInstruction ] |] ]
 
-        let snapshot: ProjectionSnapshot =
-            { CurrentProjection = emptyCurrent
-              CommittedPrefix = None
-              BlogFrames = []
-              TransportMessages = Set.empty
-              HostReanchor = None }
-
-        let intents = [ ProjectionIntent.InsertRepair { RequestKey = requestKey } ]
-
-        match ProjectionPlanner.plan intents with
-        | Error _ ->
-            // fail-closed: 不注入手写 list；返回未改 raw（调用方仍 project 原视图）
-            rawMessages
-        | Ok ordered ->
-            let wire = ProjectionRenderer.renderMessagesWithIntents snapshot baseWire ordered
-
-            let msgId =
-                "enforcer-repair-"
-                + (HostDigest.sha256Hex (requestKey + "|" + ProjectionConstants.RepairInstruction))
-                    .Substring(0, 24)
-
-            // InsertRepair 只追加：前缀保留原始 raw（含 id）；尾部正文来自 algebra。
-            let repairText =
-                wire
-                |> List.tryLast
-                |> Option.bind (fun msg ->
-                    msg.Parts
-                    |> List.tryPick (function
-                        | ProviderProjection.WireText t -> Some t
-                        | _ -> None))
-                |> Option.defaultValue ProjectionConstants.RepairInstruction
-
-            let repairMsg =
-                createObj
-                    [ "info",
-                      box (
-                          createObj
-                              [ "id", box msgId
-                                "role", box "user"
-                                "synthetic", box true
-                                "source", box "interaction-repair"
-                                "requestKey", box requestKey
-                                "repairTerminalRun", box (ProviderRunIdentity.value repairTerminalRun) ]
-                      )
-                      "parts", box [| createObj [ "type", box "text"; "text", box repairText ] |] ]
-
-            rawMessages @ [ repairMsg ]
+        rawMessages @ [ repairMsg ]

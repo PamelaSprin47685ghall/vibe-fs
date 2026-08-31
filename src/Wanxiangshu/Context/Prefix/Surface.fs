@@ -6,7 +6,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
 
 /// Prefix-stability owner surface. Prefix epoch state, rebase and reanchor
 /// facts cross as JSON; the production epoch and identity representations stay
@@ -232,26 +231,20 @@ module PrefixSurface =
     let isReanchored (run: string) (state: obj) : bool =
         PrefixEpochProjection.isReanchored (ProviderRunIdentity.create (text run)) (stateOfJs state)
 
-    let private intentToJs (intent: ProjectionIntent) : obj =
-        match intent with
-        | ProjectionIntent.KeepPhysicalPrefix ->
+    let private renderedToJs (rendered: PrefixRendered) : obj =
+        match rendered with
+        | PrefixRendered.Physical ->
             box
                 {| replacesPrefix = false
                    dropLeading = 0
                    memoryId = null
                    memoryText = null |}
-        | ProjectionIntent.ActivatePrefixEpoch value ->
+        | PrefixRendered.Synthetic value ->
             box
                 {| replacesPrefix = true
                    dropLeading = value.CutoffExclusive
                    memoryId = value.SyntheticMessageId
                    memoryText = value.Memory |}
-        | _ ->
-            box
-                {| replacesPrefix = false
-                   dropLeading = 0
-                   memoryId = null
-                   memoryText = null |}
 
     let forSnapshot (snapshot: obj) (memoryPreamble: string) (memoryBody: string) : obj =
         let value =
@@ -260,7 +253,9 @@ module PrefixSurface =
             else
                 Some(snapshotOfJs snapshot)
 
-        XPrefixProjection.forSnapshot value memoryPreamble memoryBody |> intentToJs
+        XPrefixProjection.forSnapshot value memoryPreamble memoryBody
+        |> XPrefixProjection.render
+        |> renderedToJs
 
     let private choiceOfJs (choice: obj) : XProjectionChoice =
         if text choice?kind = "probe" then
@@ -287,7 +282,8 @@ module PrefixSurface =
                 Some(snapshotOfJs committed)
 
         XPrefixProjection.forChoice (choiceOfJs choice) value memoryPreamble memoryBody
-        |> intentToJs
+        |> XPrefixProjection.render
+        |> renderedToJs
 
     let requiredBlob (choice: obj) (committed: obj) : obj =
         let value =

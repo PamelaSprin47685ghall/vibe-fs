@@ -9,7 +9,7 @@ const H = (text) => `H(${text})`
 const frame = Strength.frameTryBuild(H, 65536, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"src/a.fs"}', canonicalResult: 'let a = 1' }, { toolName: 'grep', canonicalArguments: '{"pattern":"a"}', canonicalResult: 'src/a.fs:1:let a = 1' }] }]).value
 const text = (value) => ({ kind: 'text', text: value })
 const message = (role, parts) => ({ role, parts })
-const snapshot = (messages) => Projection.projectionSnapshot(Projection.semanticProjection(messages), { committedPrefix: null, blogFrames: [], transportMessages: [], hostReanchor: null })
+const snapshot = (messages) => Projection.projectionSnapshot(Projection.semanticProjection(messages))
 const append = async (durability, event) => {
   const result = await Strength.durabilityAppend(durability, event)
   assert.equal(result.ok, true, result.error)
@@ -28,8 +28,8 @@ test('WHAT[SPEC-INV-008] STRENGTH_INTEGRATION_Prepared_candidate_consumption_Pro
     assert.equal((await Strength.lifecycleReplayPlans('owner', [{ id: 'run-1' }], frame, projection)).value.length, 0)
 
     const current = [message('user', [text('inspect the file')])]
-    const candidateIntent = Projection.strengthCandidate({ ownerSessionId: 'owner', decisionId: 'decision-1', targetProviderRun: 'run-1', currentProviderRun: 'run-1', bundle: frame })
-    const candidateWire = Projection.renderMessagesWithHostIds(H, snapshot(current), current, [candidateIntent])
+    const candidateIntent = Strength.candidate(H, { ownerSessionId: 'owner', decisionId: 'decision-1', targetProviderRun: 'run-1', currentProviderRun: 'run-1', bundle: frame }).value
+    const candidateWire = Projection.renderMessagesWithHostIds(snapshot(current), current, [candidateIntent])
     assert.deepEqual(candidateWire.messages.map((item) => item.role), ['user', 'assistant', 'tool'])
 
     const consumed = {
@@ -53,7 +53,9 @@ test('WHAT[SPEC-INV-008] STRENGTH_INTEGRATION_Prepared_candidate_consumption_Pro
     const [plan] = replayPlans.value
     assert.equal(plan.beforeMessageIndex, 1)
 
-    const replayed = Projection.renderMessagesWithHostIds(H, snapshot(baseWire), baseWire, Strength.lifecycleReplayIntents(replayPlans.value))
+    const replayIntents = Strength.lifecycleReplayIntents(H, replayPlans.value)
+    assert.equal(replayIntents.ok, true)
+    const replayed = Projection.renderMessagesWithHostIds(snapshot(baseWire), baseWire, replayIntents.value)
     const written = Adapter.tryApplyRenderedInsertionsPreservingBase('owner', H, rawBase, replayed)
     assert.equal(written.ok, true)
     assert.equal(written.value[0], rawBase[0])

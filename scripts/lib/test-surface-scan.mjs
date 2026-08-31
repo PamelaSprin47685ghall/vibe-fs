@@ -1107,7 +1107,7 @@ export const SURFACE_MANIFEST = [
     lawOwners: { 'HOST-BOUNDARY-020': 'host-boundary' },
     source: 'src/Wanxiangshu/OpenCode/Codec/ProviderProjectionSurface.fs',
     representation: 'json',
-    kind: 'pure',
+    kind: 'resource',
   },
   {
     module: 'OpenCode/Codec/ToolHostSurface.js',

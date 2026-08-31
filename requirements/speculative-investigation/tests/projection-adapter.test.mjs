@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as Adapter from '../../../dist/OpenCode/Codec/ProviderProjectionSurface.js'
 import * as Projection from '../../../dist/Participant/Provider/Projection/Surface.js'
+import * as Strength from '../../../dist/Strength/Surface.js'
 
 const H = (text) => `H(${text})`
 const text = (value) => ({ kind: 'text', text: value })
@@ -28,7 +29,7 @@ test('WHAT[SPEC-INV-009] STRENGTH_009_host_adapter_encodes_strength_tool_pairs_a
     hostMessageIds: [null, 'synthetic-call-message', 'synthetic-result-message'],
     hostIsPhysical: [false, false, false],
   }
-  const applied = Adapter.tryApplyStrengthRenderedMessages('replica-session', H, input)
+  const applied = Strength.tryApplyRenderedMessages('replica-session', H, input)
   assert.equal(applied.ok, true)
   assert.equal(applied.value.length, 2)
   assert.equal(applied.value[1].info.role, 'assistant')

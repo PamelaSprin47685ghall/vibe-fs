@@ -48,6 +48,143 @@ type StrengthProjection =
     { ByDecision: Map<string, StrengthCandidateView>
       ByTargetRun: Map<string, StrengthDecisionId> }
 
+/// Typed refusal taxonomy for Strength-owned projection decisions.
+[<RequireQualifiedAccess>]
+type StrengthProjectionIntentError =
+    | CandidateWrongTarget of decisionId: StrengthDecisionId
+    | PromotedReplicaReflection of decisionId: StrengthDecisionId
+    | FrameDigestMismatch of decisionId: StrengthDecisionId
+    | InvalidAnchor of decisionId: StrengthDecisionId
+
+/// Strength policy and frame expansion. The provider projection receives only
+/// generic message-base and message-row intents produced here.
+[<RequireQualifiedAccess>]
+module StrengthProjectionIntent =
+
+    let private key (decisionId: StrengthDecisionId) = StrengthDecisionId.value decisionId
+
+    let projectionMirror
+        (decisionId: StrengthDecisionId)
+        (localizedRows: ProjectionMessageRow list)
+        : Result<ProjectionIntent, StrengthProjectionIntentError> =
+        Ok(ProjectionIntent.replaceMessageBase (key decisionId) localizedRows)
+
+    let private digestMatches (sha256: string -> string) (bundle: StrengthFrameBundle) =
+        sha256 (StrengthFrame.canonicalText bundle.Batches) = bundle.Digest
+
+    let private frameRows
+        (sha256: string -> string)
+        (ownerSessionId: SessionId)
+        (decisionId: StrengthDecisionId)
+        (bundle: StrengthFrameBundle)
+        : ProjectionMessageRow list =
+        bundle.Batches
+        |> List.collect (fun batch ->
+            let exchanges =
+                batch.Exchanges
+                |> List.mapi (fun index exchange ->
+                    let callId =
+                        StrengthFrame.wireToolCallId
+                            sha256
+                            ownerSessionId
+                            decisionId
+                            batch.RequestOrdinal
+                            (index + 1)
+                            bundle.Digest
+                        |> ToolCallId.create
+
+                    callId, exchange)
+
+            let calls =
+                exchanges
+                |> List.map (fun (callId, exchange) ->
+                    ProviderProjection.WireToolCall(callId, exchange.ToolName, exchange.CanonicalArguments))
+
+            let results =
+                exchanges
+                |> List.map (fun (callId, exchange) ->
+                    ProviderProjection.WireToolResult(callId, exchange.CanonicalResult))
+
+            [ { Message = { Role = "assistant"; Parts = calls }
+                HostMessageId =
+                  Some(
+                      StrengthFrame.hostMessageId
+                          sha256
+                          ownerSessionId
+                          decisionId
+                          batch.RequestOrdinal
+                          "call"
+                          bundle.Digest
+                  )
+                HostIsPhysical = false }
+              { Message = { Role = "tool"; Parts = results }
+                HostMessageId =
+                  Some(
+                      StrengthFrame.hostMessageId
+                          sha256
+                          ownerSessionId
+                          decisionId
+                          batch.RequestOrdinal
+                          "result"
+                          bundle.Digest
+                  )
+                HostIsPhysical = false } ])
+
+    let private insertion
+        (sha256: string -> string)
+        (ownerSessionId: SessionId)
+        (decisionId: StrengthDecisionId)
+        (anchor: ProjectionMessageAnchor)
+        (bundle: StrengthFrameBundle)
+        : Result<ProjectionIntent, StrengthProjectionIntentError> =
+        if not (digestMatches sha256 bundle) then
+            Error(StrengthProjectionIntentError.FrameDigestMismatch decisionId)
+        else
+            frameRows sha256 ownerSessionId decisionId bundle
+            |> ProjectionIntent.insertMessageRows (key decisionId) anchor
+            |> Ok
+
+    let candidate
+        (sha256: string -> string)
+        (ownerSessionId: SessionId)
+        (decisionId: StrengthDecisionId)
+        (targetProviderRun: ProviderRunIdentity)
+        (currentProviderRun: ProviderRunIdentity)
+        (bundle: StrengthFrameBundle)
+        : Result<ProjectionIntent, StrengthProjectionIntentError> =
+        if targetProviderRun <> currentProviderRun then
+            Error(StrengthProjectionIntentError.CandidateWrongTarget decisionId)
+        else
+            insertion sha256 ownerSessionId decisionId ProjectionMessageAnchor.Append bundle
+
+    let promoted
+        (sha256: string -> string)
+        (ownerSessionId: SessionId)
+        (decisionId: StrengthDecisionId)
+        (beforeMessageIndex: int)
+        (isReplicaRequest: bool)
+        (bundle: StrengthFrameBundle)
+        : Result<ProjectionIntent, StrengthProjectionIntentError> =
+        if isReplicaRequest then
+            Error(StrengthProjectionIntentError.PromotedReplicaReflection decisionId)
+        elif beforeMessageIndex < 0 then
+            Error(StrengthProjectionIntentError.InvalidAnchor decisionId)
+        else
+            insertion
+                sha256
+                ownerSessionId
+                decisionId
+                (ProjectionMessageAnchor.BeforeMessageIndex beforeMessageIndex)
+                bundle
+
+    let replicaLocal
+        (sha256: string -> string)
+        (ownerSessionId: SessionId)
+        (decisionId: StrengthDecisionId)
+        (bundle: StrengthFrameBundle)
+        : Result<ProjectionIntent, StrengthProjectionIntentError> =
+        insertion sha256 ownerSessionId decisionId ProjectionMessageAnchor.Append bundle
+
 /// DSL-class: Decision — Strength candidate fold refusals (Prepared/Promoted/Trace/Abandon).
 [<RequireQualifiedAccess>]
 type StrengthProjectionError =

@@ -84,12 +84,34 @@ test('WHAT[PREFIX-STABILITY-009] prefix_proof_and_writeback_use_canonical_XTrace
   assert.match(wireSource, /XTraceMaterialization\.currentProjection/)
   assert.match(wireSource, /XTraceProjection\.tryTurnOfHostMessageId/)
   assert.match(wireSource, /XTraceProjection\.hostMessageIdsBeforeTurn/)
-  assert.match(wireSource, /applyRenderedPrefixByHostIds/)
+  assert.match(wireSource, /replacePrefixByHostIds/)
   assert.doesNotMatch(
     wireSource,
     /ProviderWireCapture\.decodeMessageView\(rawMessages\)[\s\S]{0,500}ProjectionRenderer\.cutoffDigest/,
     'step-5 proof must not hash the mutable request presentation',
   )
+})
+
+test('WHAT[PREFIX-STABILITY-009] prefix lifecycle and rendering stay with the prefix owner', () => {
+  const ownerSource = readFileSync(
+    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Prefix/Projection.fs'),
+    'utf8',
+  )
+  const providerIntentSource = readFileSync(
+    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Participant/Provider/Projection/Intent.fs'),
+    'utf8',
+  )
+  const providerRendererSource = readFileSync(
+    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs'),
+    'utf8',
+  )
+
+  assert.match(ownerSource, /type PrefixActivation/)
+  assert.match(ownerSource, /type PrefixProjectionIntent/)
+  assert.match(ownerSource, /type PrefixRendered/)
+  assert.match(ownerSource, /let render \(intent: PrefixProjectionIntent\)/)
+  assert.doesNotMatch(providerIntentSource, /PrefixActivation|KeepPhysicalPrefix|ActivatePrefixEpoch|ReanchorAfterCompaction/)
+  assert.doesNotMatch(providerRendererSource, /PrefixActivation|RenderedPrefix|renderPrefix/)
 })
 
 test('WHAT[PREFIX-STABILITY-009] retry_transport_rows_retire_only_at_a_real_cold_horizon', () => {
@@ -106,15 +128,17 @@ test('WHAT[PREFIX-STABILITY-009] retry_transport_rows_retire_only_at_a_real_cold
     /PrefixPresentationHorizon\.Current\s*->\s*Set\.empty[\s\S]*?PrefixPresentationHorizon\.TentativeCold\s*->\s*staleProviderRetryMessageIds rawMessages/,
     'same-horizon retry rows must remain byte-stable; only a real cold presentation may retire them',
   )
-  assert.match(wireSource, /ProjectionIntent\.SuppressTransportOnly :: intents/)
   assert.match(
     wireSource,
-    /renderPrefixMessages state rawMessages intents PrefixPresentationHorizon\.Current/,
+    /renderPrefixMessages state rawMessages PrefixProjectionIntent\.Keep PrefixPresentationHorizon\.Current/,
     'ordinary presentation must preserve the current physical prefix',
   )
-  assert.match(wireSource, /renderPrefixMessages state rawMessages intents presentationHorizon/)
+  assert.match(wireSource, /renderPrefixMessages state rawMessages prefixIntent presentationHorizon/)
   assert.match(wireSource, /presentationHorizonForProbe/)
+  assert.match(wireSource, /XPrefixProjection\.render intent/)
   assert.match(wireSource, /ProjectionMessageEdit\.suppressHostMessagesByIds prefixed staleTransport/)
+  assert.doesNotMatch(wireSource, /ProjectionIntent\.(?:SuppressTransportOnly|ReanchorAfterCompaction)/)
+  assert.doesNotMatch(wireSource, /Projection(?:Planner\.plan|Renderer\.renderPrefix)/)
 })
 
 test('WHAT[PREFIX-STABILITY-009] compiled retry retirement preserves Current and only removes stale retry rows at TentativeCold', () => {
