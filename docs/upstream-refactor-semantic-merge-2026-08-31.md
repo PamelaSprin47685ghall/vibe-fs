@@ -275,3 +275,11 @@
 - 修正 oracle 后，正式入口由 build freshness 再次 fail closed：`fcd5ab11b` 的 `wireit.build.files` 只含 `scripts/build.mjs`、F# source 与 `package.json`，但 build 同时从 Git 跟踪的全部源码/文档生成 `LoopDetectorEnvelope.js`；本节文档修改没有使 Wireit cache 失效，旧 dist 被错误复用。`51fff4bd8` 将整个 workspace 纳入 build fingerprint，仅排除 `dist/` 与 `.fable-build/` 自身输出；新增 VERIFICATION-SYSTEM-008 proof 锁定该闭包。focused proof 11/11，`npm run build` 真实重编译 734 sources 并验证 161 surfaces。
 - 最终 PR preflight 从 `2026ee242` 运行单次正式 `npm run format-build-test`：Fantomas 696 unchanged；text/FCS gates 全绿；Fable 734 sources / 161 surfaces；unit 3927/3927；两次真实 FCS integration、harness 273/273、package、唯一 Long Stroke 与 `npm pack --dry-run`（2015 files，2.2 MB）全部通过。
 - M0 与 M3 已合并为同一 [upstream PR #20](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/20)。GitHub CI 与 merge SHA 尚未产生；M3 仍未进入 upstream。
+
+## 11. M8/M9 共享 AST binding analyzer（2026-09-01）
+
+- 累计基线仍为 `upstream/master@fcd5ab11b`；M0–M7E 全部保留，没有回退到旧分支。
+- requirement trace 从自制 lexical tokenizer 切到共享 Acorn AST，只接受真实 `node:test` binding 的直接 registration；15 处动态/间接声明迁成静态测试，原 graph、HOW anchor、proof level、symlink/inactive 与 portfolio 规则保留。
+- Surface Manifest 从 import/use regex 切到 exact lexical provenance + primary WHAT callback use；shadow、dead/nonterminal alias、静态不可达、helper/nested callback、wrong-law decoy 均不能取得 proof authority。
+- 新门禁暴露 14 个既有 helper-hidden proofs；全部迁为命题 callback 直接调用 production Surface。另纠正 `ReconcileSurface` 与 `ReviewTodoSurface` 两个错误 manifest owner/law 登记；production F# 与公开 API 未改。
+- RED/GREEN 节点为 `37ece7962`、`f69f4d480`、`ff0cda20f`、`024684299`。聚焦验证为 requirement trace 19/19、surface charter 19/19、受影响行为 121/121、772 WHAT / 3901 tests、165 surfaces；build 与 `scripts/check.mjs` 全绿。无缓存完整阶梯亦全绿：Fantomas 700 unchanged、27,218 FCS uses / 333 edges / 185 contracts、273/273 integration harness、Long Stroke 57 步 / 5.8s、pack 2019 files。完整事实见 `docs/upstream-remaining-merge-batch-9-2026-09-01.md`。
