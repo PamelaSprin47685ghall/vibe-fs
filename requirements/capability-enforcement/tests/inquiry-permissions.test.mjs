@@ -3,7 +3,7 @@
 // Inquiry capability matrix (AGENT-025 / AGENT-030): ENF-010 role-predicate gate +
 // ENF-007 MCP wildcard schema mechanism.
 //
-// Inquiry = SyncDelegate inspect + Sphinx MCP + Fission: Roles.permissions carries Inspect,
+// Inquiry = SyncDelegate inspect + Sphinx MCP + Fission: OfficeCapability.permissions carries Inspect,
 // Sphinx and Fission; must not carry Read/Glob/Grep. Host schema, PromptAuthority.toolCapabilitiesFor,
 // and ToolRegistry.rolePredicate all derive from that set (or deny when the
 // capability is absent).
@@ -15,7 +15,7 @@ import test from 'node:test'
 
 import { capabilityToolNames, rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import { configure as configureManagedAgents, installDefaultResources } from '../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js'
-import { permissions as rolePermissions, isAllowed as surfaceIsAllowed } from '../../../dist/Foundation/RolesSurface.js'
+import { permissions as rolePermissions, isAllowed as surfaceIsAllowed } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 
 installDefaultResources()
 
@@ -52,7 +52,7 @@ test('WHAT[ENF-001] Inquiry_toolCapabilitiesFor_WorkMain_matches_Roles_permissio
 test('WHAT[ENF-010] Inquiry_rolePredicate_inspector_allow_and_host_native_read_gap', () => {
   // Gap note: read/glob/grep are Host-native builtins — they are NOT ToolRegistry
   // specs, so rolePredicate has no isAllowed cases for them and falls through to
-  // default deny. The real Inquiry gate for those tools is Roles.permissions /
+  // default deny. The real Inquiry gate for those tools is OfficeCapability.permissions /
   // Host permission schema (asserted above), not a ToolRegistry rolePredicate.
   for (const tool of READ_TOOLS) {
     assert.equal(rolePredicate(tool, 'inquiry'), false, `default deny for Host-native ${tool}`)

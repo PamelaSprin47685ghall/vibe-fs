@@ -3,6 +3,7 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/Participant/Persona/**
+/src/Wanxiangshu/Foundation/OfficeCapability.fs
 /src/Wanxiangshu/Foundation/Roles.fs
 /src/Wanxiangshu/Foundation/RolesSurface.fs
 /resources/provider/role/manager/**

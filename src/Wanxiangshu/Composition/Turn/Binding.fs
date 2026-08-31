@@ -4,7 +4,6 @@ open System.Collections.Generic
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
 
@@ -16,9 +15,6 @@ open Wanxiangshu.OpenCode
 /// `ContinuationMessageIds` stays a set of raw wire addresses: it is matched
 /// against transcript addresses during reconcile, where role is not yet known.
 module TurnBinding =
-
-    let private canonicalRoleOf (role: Role) : Role option =
-        Wanxiangshu.Participant.Persona.AgentRoleIdentity.roleOfString (PromptAuthority.roleLabel role)
 
     /// Build an ActiveRunBinding from the journal PromptAuthority projection.
     ///
@@ -53,7 +49,7 @@ module TurnBinding =
                   AuthorityRootUserMessageId = Some run.AuthorityRootUserMessageId
                   PhysicalUserMessageId = tryBoundPhysical userBindings sessionId
                   ContinuationMessageIds = continuationIds
-                  Role = canonicalRoleOf run.CanonicalRole
+                  Role = Some run.CanonicalRole
                   Directory = None }
 
     /// Mutable store for in-memory bindings. Durable recovery uses the journal.

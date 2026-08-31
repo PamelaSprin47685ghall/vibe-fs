@@ -947,12 +947,16 @@
       "owner": "intra-participant-parallelism"
     },
     {
+      "path": "src/Wanxiangshu/Foundation/OfficeCapability.fs",
+      "owner": "office-capability"
+    },
+    {
       "path": "src/Wanxiangshu/Foundation/Roles.fs",
       "owner": "participant-identity"
     },
     {
       "path": "src/Wanxiangshu/Foundation/RolesSurface.fs",
-      "owner": "office-capability"
+      "owner": "participant-identity"
     },
     {
       "path": "src/Wanxiangshu/Foundation/SyntheticToml.fs",
@@ -1957,10 +1961,6 @@
     {
       "path": "src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs",
       "owner": "office-capability"
-    },
-    {
-      "path": "src/Wanxiangshu/Participant/Persona/RoleIdentity.fs",
-      "owner": "participant-identity"
     },
     {
       "path": "src/Wanxiangshu/Participant/Persona/SessionPersona.fs",

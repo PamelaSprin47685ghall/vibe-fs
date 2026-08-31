@@ -6,9 +6,8 @@ open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Outcome
-open Wanxiangshu.Foundation
+open Wanxiangshu.Participant.Persona
 
 type SessionPromptOptions = OpenCodePromptOptions
 
@@ -238,15 +237,22 @@ type InjectedSessionPort
         | Error error -> Task.FromResult(Fatal error)
         | Ok sendOptions -> sendAvailablePort sessionId text sendOptions
 
+    let bindSiblingLaneIdentity (ownerSessionId: SessionId) (laneId: SessionId) (agent: string option) =
+        try
+            SessionExecutionBinding.bindInternalRoot laneId agent
+            ModelRouting.bindCapacityChild ownerSessionId laneId
+
+            PersonaBinding.ensureInherited ownerSessionId laneId
+            |> Result.map (fun _ -> ProviderLanguageBinding.ensureInherited ownerSessionId laneId |> ignore)
+            |> Result.mapError PersonaRejection.render
+        with ex ->
+            Error ex.Message
+
     let bindSiblingLane (port: IOpenCodePort) (ownerSessionId: SessionId) (laneId: SessionId) (agent: string option) =
         taskResult {
-            try
-                SessionExecutionBinding.bindInternalRoot laneId agent
-                ModelRouting.bindCapacityChild ownerSessionId laneId
-                PersonaBinding.ensureInherited ownerSessionId laneId |> ignore
-                ProviderLanguageBinding.ensureInherited ownerSessionId laneId |> ignore
-                return laneId
-            with ex ->
+            match bindSiblingLaneIdentity ownerSessionId laneId agent with
+            | Ok() -> return laneId
+            | Error error ->
                 do!
                     task {
                         let! _ = port.AbortSession laneId
@@ -254,7 +260,7 @@ type InjectedSessionPort
                     }
                     |> TaskResultCE.ofTask
 
-                return! Error ex.Message
+                return! Error error
         }
 
     let createSiblingSession
@@ -287,7 +293,11 @@ type InjectedSessionPort
             let! childId = port.CreateChildSession hostParentId options
             registerChild rootId childId
             SessionExecutionBinding.bind parentId childId options.Agent
-            PersonaBinding.ensureInherited parentId childId |> ignore
+
+            let! _persona =
+                PersonaBinding.ensureInherited parentId childId
+                |> Result.mapError PersonaRejection.render
+
             // HOST-026: inherit owner/commissioner language (parentId), not family root.
             ProviderLanguageBinding.ensureInherited parentId childId |> ignore
             return childId

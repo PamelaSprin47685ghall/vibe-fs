@@ -13,7 +13,7 @@ import {
   isGeneratedToolName,
   memberBinding,
 } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
-import { permissions as rolePermissions } from '../../../dist/Foundation/RolesSurface.js'
+import { permissions as rolePermissions } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 
 const caps = (...permissions) => permissions
 const surface = (role, permissionNames) => generate(role, caps(...permsOf(permissionNames)), 'en')

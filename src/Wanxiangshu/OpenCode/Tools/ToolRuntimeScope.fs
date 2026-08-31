@@ -37,7 +37,6 @@ open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
@@ -235,12 +234,7 @@ type ToolRuntimeScope
     let adoptExistingIntoRuntime (parentSessionId: SessionId) (record: HandleRecord) agentId =
         getOrCreateRuntime (SessionId.value parentSessionId)
         |> Result.map (fun runtime ->
-            runtime.AdoptExisting(
-                agentId,
-                record.ChildSessionId,
-                AgentRoleIdentity.ofRole record.CanonicalRole,
-                record.TargetAgent
-            ))
+            runtime.AdoptExisting(agentId, record.ChildSessionId, record.CanonicalRole, record.TargetAgent))
 
     let sessionIdOf (ctx: HostToolContext) =
         if String.IsNullOrWhiteSpace ctx.SessionId then

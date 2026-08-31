@@ -253,8 +253,7 @@ module ForkTool =
         ToolHostCodec.tomlObjectWithInstructions [ text ] []
 
     let private personaBinding (role: Role) (tier: AgentTier) =
-        PersonaCatalog.persona role tier
-        |> fun value -> value.ToLowerInvariant(), ManagedAgent.make tier role
+        PersonaCatalog.persona role tier, ManagedAgent.make tier role
 
     let private managerCallingBindings =
         [ for role in ManagedAgentCatalog.managerForkableRoles do
@@ -265,16 +264,18 @@ module ForkTool =
         [ personaBinding Role.Manager AgentTier.Fast
           personaBinding Role.Manager AgentTier.Deep ]
 
-    let private callingNames bindings = bindings |> List.map fst
+    let private callingNames bindings =
+        bindings |> List.map (fst >> ManagedAgentCatalog.personaCallingName)
 
     let private tryCalling bindings (raw: string) =
         if String.IsNullOrWhiteSpace raw then
             None
         else
-            let wanted = raw.Trim().ToLowerInvariant()
-
-            bindings
-            |> List.tryPick (fun (name, managed) -> if name = wanted then Some managed else None)
+            raw.Trim()
+            |> ManagedAgentCatalog.tryParsePersonaCallingName
+            |> Option.bind (fun wanted ->
+                bindings
+                |> List.tryPick (fun (identity, managed) -> if identity = wanted then Some managed else None))
 
     let private hasCalling (request: Request) =
         not (String.IsNullOrWhiteSpace request.Calling)
@@ -507,7 +508,7 @@ module ForkTool =
         handles
         (managed: ManagedAgent)
         =
-        let role = AgentRoleIdentity.ofManaged managed.Role
+        let role = managed.Role
 
         if hasKeywords request && not (warmStartAllowed role) then
             Task.FromResult(consequence (prose language Path.Fork.WarmStartUnavailable))

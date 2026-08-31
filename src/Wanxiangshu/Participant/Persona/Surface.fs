@@ -16,19 +16,13 @@ module PersonaSurface =
         if isNull label then None else Roles.tryParseTier label
 
     let allRoleLabels: string array =
-        ManagedAgentCatalog.allRoles
-        |> List.map ManagedAgentCatalog.roleLabel
-        |> List.toArray
+        ManagedAgentCatalog.allRoles |> List.map Roles.roleLabel |> List.toArray
 
     let allPublicRoleLabels: string array =
-        ManagedAgentCatalog.allPublicRoles
-        |> List.map ManagedAgentCatalog.roleLabel
-        |> List.toArray
+        ManagedAgentCatalog.allPublicRoles |> List.map Roles.roleLabel |> List.toArray
 
     let allInternalRoleLabels: string array =
-        ManagedAgentCatalog.allInternalRoles
-        |> List.map ManagedAgentCatalog.roleLabel
-        |> List.toArray
+        ManagedAgentCatalog.allInternalRoles |> List.map Roles.roleLabel |> List.toArray
 
     let requiredNames: string array = ManagedAgentCatalog.requiredNames |> List.toArray
 
@@ -75,18 +69,16 @@ module PersonaSurface =
         && ManagedAgentCatalog.isLegacyAgentName (name.ToLowerInvariant())
 
     let roleName (roleLabel: string) : string =
-        roleOf roleLabel
-        |> Option.map ManagedAgentCatalog.roleLabel
-        |> Option.defaultValue ""
+        roleOf roleLabel |> Option.map Roles.roleLabel |> Option.defaultValue ""
 
     let persona (roleLabel: string) (tierLabel: string) : string =
         match tierOf tierLabel, roleOf roleLabel with
-        | Some tier, Some role -> PersonaCatalog.persona role tier
+        | Some tier, Some role -> PersonaCatalog.persona role tier |> Persona.render
         | _ -> ""
 
     let bookkeeperPersona (tierLabel: string) : string =
         match tierOf tierLabel with
-        | Some tier -> PersonaCatalog.bookkeeperPersona tier
+        | Some tier -> PersonaCatalog.bookkeeperPersona tier |> Persona.render
         | None -> ""
 
     let formatLegacyNameNotSupported (name: string) : string =

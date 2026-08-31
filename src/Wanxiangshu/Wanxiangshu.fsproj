@@ -19,6 +19,7 @@
     <Compile Include="OpenCode/Host/SessionQuiescenceGate.fs"/>
     <Compile Include="Context/Trace/Cursor.fs"/>
     <Compile Include="Foundation/Roles.fs"/>
+    <Compile Include="Foundation/OfficeCapability.fs"/>
     <Compile Include="Foundation/RolesSurface.fs"/>
     <Compile Include="Foundation/McpLaunch.fs"/>
     <Compile Include="Foundation/TaskResult.fs"/>
@@ -265,7 +266,6 @@
     <Compile Include="Participant/Provider/SessionLanguage.fs"/>
     <Compile Include="Execution/Delegation/Fork/Model.fs"/>
     <Compile Include="Execution/Session/AgentCompletion.fs"/>
-    <Compile Include="Participant/Persona/RoleIdentity.fs"/>
     <Compile Include="Execution/Delegation/Handle/Controller.fs"/>
     <Compile Include="Execution/Delegation/Fork/ChildRun.fs"/>
     <Compile Include="Execution/Delegation/Fork/LifecycleSurface.fs"/>

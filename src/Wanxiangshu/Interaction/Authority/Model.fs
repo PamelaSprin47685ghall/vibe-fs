@@ -272,12 +272,6 @@ module PromptAuthority =
         | "FissionHandoff" -> Some FissionHandoff
         | _ -> None
 
-    /// Labels and tier/role tables live in `ManagedAgentCatalog` (AGENT-001…004).
-    let roleLabel = ManagedAgentCatalog.roleLabel
-    let tryParseRole = ManagedAgentCatalog.tryParseRole
-    let tierLabel = ManagedAgentCatalog.tierLabel
-    let tryParseTier = ManagedAgentCatalog.tryParseTier
-
     /// Why a managed agent name was refused.
     ///
     /// Typed rather than a message, because the three cases mean different things to
@@ -300,7 +294,7 @@ module PromptAuthority =
 
     /// Parse the tier/role segments with fail-closed handling for unknown values.
     let private parseTierAndRole (trimmed: string) (parts: string array) : Result<ParsedAgentName, AgentNameRejection> =
-        match ManagedAgentCatalog.tryParseTier parts.[0], ManagedAgentCatalog.tryParseRole parts.[1] with
+        match Roles.tryParseTier parts.[0], Roles.tryParseRole parts.[1] with
         | None, _
         | _, None -> Error(AgentNameRejection.UnknownManagedAgent trimmed)
         | Some tier, Some role ->
@@ -595,7 +589,8 @@ module PromptAuthority =
     /// identity is a function of CanonicalRole alone. Tier deliberately does not
     /// participate — if it did, `permissions(fast-coder) = permissions(deep-coder)`
     /// (AGENT-010) would stop being structurally guaranteed.
-    let systemPromptIdFor (role: Role) : SystemPromptId = SystemPromptId.create (roleLabel role)
+    let systemPromptIdFor (role: Role) : SystemPromptId =
+        SystemPromptId.create (Roles.roleLabel role)
 
     /// STRENGTH-004 / PROMPT-008: the request-specific authority is exact, not
     /// inferred by intersecting the ordinary role surface. Inquiry is eligible
@@ -630,7 +625,7 @@ module PromptAuthority =
         | ProviderRequestKind.WorkMain
         | ProviderRequestKind.BloggerMain
         | ProviderRequestKind.BloggerSquash
-        | ProviderRequestKind.InteractionRepair -> Roles.permissions role
+        | ProviderRequestKind.InteractionRepair -> OfficeCapability.permissions role
 
     /// The ONLY way to build an AttemptExecutionProfile (PROMPT-008).
     ///

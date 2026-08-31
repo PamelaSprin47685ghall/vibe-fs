@@ -87,9 +87,11 @@ module StaticTools =
                   ToolPermission.Glob
                   ToolPermission.Grep ]
 
-        Set.intersect (Roles.permissions role) fsPermissions |> Set.isEmpty |> not
+        Set.intersect (OfficeCapability.permissions role) fsPermissions
+        |> Set.isEmpty
+        |> not
 
-    /// Single source: Kernel.Roles.permissions → OpenCode agent permission object.
+    /// Single source: OfficeCapability.permissions → OpenCode agent permission object.
     /// Emits explicit allow/deny for the full known tool name set so host schema
     /// filters and contract tests see concrete denies (not only "*").
     let knownToolNames =
@@ -202,7 +204,7 @@ module StaticTools =
         | _ -> defaultPermission allowed name
 
     let permissionObj (role: Role) : obj =
-        let allowed = Roles.permissions role |> namesForPermissions
+        let allowed = OfficeCapability.permissions role |> namesForPermissions
 
         // Host defaults set external_directory:* = ask (agent.ts). Rulesets merge by
         // flat concat + findLast, so this trailing allow cancels the Host ask and

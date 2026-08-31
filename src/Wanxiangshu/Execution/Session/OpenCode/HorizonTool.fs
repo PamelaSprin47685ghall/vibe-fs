@@ -227,7 +227,8 @@ module HorizonTool =
             | Some journal -> return! executeWithJournal language scope context journal
         }
 
-    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Horizon
+    let admission: ToolAdmission =
+        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Horizon
 
     let spec scope =
         { Name = "horizon"

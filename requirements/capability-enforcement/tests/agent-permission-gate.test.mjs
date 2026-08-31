@@ -14,7 +14,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { permissions } from '../../../dist/Foundation/RolesSurface.js'
+import { permissions } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import {
   configure as configureManagedAgents,
   installDefaultResources,
@@ -284,9 +284,9 @@ test('WHAT[ENF-011] AGENT_002_owned_writes_never_touch_the_model_binding', () =>
   }
 })
 
-test('WHAT[ENF-002] roles.permissions_agree_with_the_host_schema_matrix', () => {
+test('WHAT[ENF-002] office_capability_permissions_agree_with_the_host_schema_matrix', () => {
   // Same matrix, expressed at the domain layer: the Host permission object is
-  // built from Roles.permissions, so the two must agree per role.
+  // built from OfficeCapability.permissions, so the two must agree per role.
   const permissionOf = (toolName) =>
     ({
       fork: 'Fork',

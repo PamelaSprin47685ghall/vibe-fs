@@ -32,7 +32,6 @@ open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
@@ -69,7 +68,6 @@ open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
@@ -274,6 +272,7 @@ module ReviewerWorkflow =
         journal
         |> Option.bind (fun durable ->
             let snapshot = AgentJournal.snapshot durable
+
             AgentProjection.tryFind turn.SessionId snapshot.AgentProjections
             |> Option.bind (fun session ->
                 session.ReviewGuard
@@ -329,8 +328,7 @@ module ReviewerWorkflow =
         let reason =
             match error with
             | XTraceCaptureError.Refused detail -> sprintf "review terminal capture refused: %s" detail
-            | XTraceCaptureError.StorageFailed detail ->
-                sprintf "review terminal capture storage failed: %s" detail
+            | XTraceCaptureError.StorageFailed detail -> sprintf "review terminal capture storage failed: %s" detail
 
         eventPort.NotifyTerminal
             turn.SessionId
@@ -350,17 +348,13 @@ module ReviewerWorkflow =
                 { SessionId = turn.SessionId
                   AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
                   ProviderRun = turn.ProviderRun
-                  Role = AgentRoleIdentity.toRole role
+                  Role = role
                   Directory = turn.Directory
                   TerminalText = terminalText
                   TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
 
             match!
-                XTraceCapture.captureTerminalTextWithReceipt
-                    journal
-                    turn.SessionId
-                    terminalText
-                    turn.ProviderRun
+                XTraceCapture.captureTerminalTextWithReceipt journal turn.SessionId terminalText turn.ProviderRun
             with
             | Ok _ ->
                 do! appendAttemptClosed journal turn
@@ -403,8 +397,7 @@ module ReviewerWorkflow =
         let sessionWide = CompletedTurnClassifier.partsSessionText turn.Parts
 
         match decideReviewerCompletion sessionWide turn.Role with
-        | ReviewerCompletionDecision.ToolOnlyFallback role ->
-            reportToolOnlyReviewerRun eventPort journal turn role
+        | ReviewerCompletionDecision.ToolOnlyFallback role -> reportToolOnlyReviewerRun eventPort journal turn role
         | ReviewerCompletionDecision.TurnEvidence -> reportReviewerTurnEvidence eventPort journal turn
 
     /// Physical terminal observer. Active Finality reviewers are owned by the

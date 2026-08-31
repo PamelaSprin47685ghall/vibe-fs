@@ -363,7 +363,7 @@ module FinalitySurface =
 
         match foldOneEvent world.Projection world.SessionId event with
         | Error message -> box {| ok = false; error = message |}
-        | Ok (projection, sessionId) ->
+        | Ok(projection, sessionId) ->
             box
                 {| ok = true
                    world =
@@ -773,7 +773,8 @@ module FinalitySurface =
 
     /// FINALITY-001: the Finality capability is granted only to Manager. The
     /// role and permission labels are plain strings at this boundary.
-    let isAllowed (role: string) (permission: string) : bool = RolesSurface.isAllowed role permission
+    let isAllowed (role: string) (permission: string) : bool =
+        Wanxiangshu.Participant.Persona.OfficeCapabilitySurface.isAllowed role permission
 
     /// FINALITY-027: durable parent-visible handles are the Manager's only
     /// background obligation. Hidden Reviewer handles stay invisible through

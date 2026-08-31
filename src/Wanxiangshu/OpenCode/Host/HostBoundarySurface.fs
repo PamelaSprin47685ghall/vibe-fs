@@ -1,8 +1,8 @@
 namespace Wanxiangshu.OpenCode
 
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Participant.Persona
 
 /// JS-native observation boundary for Host transcript/session membrane laws.
 /// Raw Host objects enter here; typed snapshot identities and F# unions never
@@ -17,7 +17,7 @@ module HostBoundarySurface =
 
     let roleOf (agent: string) : string =
         HostSessionContext.roleOf agent
-        |> Option.map AgentRoleIdentity.roleName
+        |> Option.map Roles.roleLabel
         |> Option.defaultValue null
 
     let sessionContext (raw: obj) : obj =

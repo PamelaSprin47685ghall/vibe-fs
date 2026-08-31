@@ -68,8 +68,8 @@ module AttemptPlannerSurface =
               LogicalRunId = LogicalRunId.create "surface-run"
               AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "surface-root"
               AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
-              SelectedAgent = Roles.managedAgentName tier role
-              PeerAgent = Roles.managedAgentName peerTier role
+              SelectedAgent = ManagedAgentCatalog.nameOf tier role
+              PeerAgent = ManagedAgentCatalog.nameOf peerTier role
               CanonicalRole = role
               SelectedTier = tier }
 

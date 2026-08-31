@@ -18,6 +18,11 @@ open Wanxiangshu.Persistence.Journal
 [<RequireQualifiedAccess>]
 module DispatchSurface =
 
+    let private durableTierLabel (tier: AgentTier) =
+        match tier with
+        | AgentTier.Fast -> "Fast"
+        | AgentTier.Deep -> "Deep"
+
     type private PlainSessionPort(raw: obj) =
         let typed = unbox<Wanxiangshu.OpenCode.ISessionHostPort> raw
         let sendPrompt = raw?``SendPrompt``
@@ -73,7 +78,11 @@ module DispatchSurface =
 
     /// JS-safe controlled Host child listing for adapter proofs. The F# Result
     /// and OpenCodeChildInfo representations stay on this registered surface.
-    let acceptedChild (session: string) (title: string) (agent: string) : Result<Wanxiangshu.OpenCode.OpenCodeChildInfo list, string> =
+    let acceptedChild
+        (session: string)
+        (title: string)
+        (agent: string)
+        : Result<Wanxiangshu.OpenCode.OpenCodeChildInfo list, string> =
         Ok
             [ { SessionId = SessionId.create session
                 ParentSessionId = None
@@ -119,8 +128,8 @@ module DispatchSurface =
                            AuthorityKind = "AgentOwnerRoot"
                            SelectedAgent = agent
                            PeerAgent = peer
-                           CanonicalRole = PromptAuthority.roleLabel role
-                           SelectedTier = PromptAuthority.tierLabel tier |}
+                           CanonicalRole = Roles.roleLabel role
+                           SelectedTier = durableTierLabel tier |}
 
                 let! result = AgentJournal.appendAgent (StreamId.Session sessionId) None fact handle.Journal
                 return appendResult result
@@ -368,8 +377,8 @@ module DispatchSurface =
                 | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
                selectedAgent = profile.SelectedAgent
                peerAgent = profile.PeerAgent
-               canonicalRole = PromptAuthority.roleLabel profile.CanonicalRole
-               selectedTier = PromptAuthority.tierLabel profile.SelectedTier |}
+               canonicalRole = Roles.roleLabel profile.CanonicalRole
+               selectedTier = durableTierLabel profile.SelectedTier |}
 
     /// PROMPT-004/005: prove one dispatched AgentOwnerRoot at a physical message
     /// boundary. The Dispatcher writes PhysicalAccepted before registering the

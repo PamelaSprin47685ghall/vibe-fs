@@ -14,7 +14,6 @@ open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
@@ -211,7 +210,7 @@ module HandleCompletionCodec =
         (decoded: DurableAgentCompletionV2)
         (completedAt: DateTimeOffset)
         : RunCompletion =
-        let role = AgentRoleIdentity.ofRole record.CanonicalRole
+        let role = record.CanonicalRole
 
         match decoded with
         | CompletedV2 payload ->

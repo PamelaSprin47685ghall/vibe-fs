@@ -1,32 +1,5 @@
 namespace Wanxiangshu.Participant.Persona
 
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-
 open Wanxiangshu.Foundation
 
 /// Sole identity directory for managed agents (AGENT-001…004).
@@ -35,41 +8,70 @@ open Wanxiangshu.Foundation
 [<RequireQualifiedAccess>]
 module ManagedAgentCatalog =
 
-    let roleLabel (role: Role) : string = Roles.roleLabel role
-
-    let tryParseRole (value: string) : Role option = Roles.tryParseRole value
-
-    /// Journal / durable capitalised form (Fast / Deep).
-    let tierLabel (tier: AgentTier) : string =
-        match tier with
-        | AgentTier.Fast -> "Fast"
-        | AgentTier.Deep -> "Deep"
-
-    /// Wire spelling used in Host agent names (fast / deep).
-    let wireTierLabel (tier: AgentTier) : string = Roles.wireTierLabel tier
-
-    let tryParseTier (value: string) : AgentTier option = Roles.tryParseTier value
-
     let peerTier (tier: AgentTier) : AgentTier =
         match tier with
         | AgentTier.Fast -> AgentTier.Deep
         | AgentTier.Deep -> AgentTier.Fast
 
-    let nameOf (tier: AgentTier) (role: Role) : string = Roles.managedAgentName tier role
+    let nameOf (tier: AgentTier) (role: Role) : string =
+        sprintf "%s-%s" (Roles.wireTierLabel tier) (Roles.roleLabel role)
 
     let peerNameOf (tier: AgentTier) (role: Role) : string = nameOf (peerTier tier) role
 
-    let allRoles: Role list =
-        [ Role.Orchestrator
-          Role.Manager
-          Role.Coder
-          Role.Inspector
-          Role.DevOps
-          Role.Browser
-          Role.Inquiry
-          Role.Reviewer
-          Role.Blogger
-          Role.Distiller ]
+    /// Lowercase Host schema label for the `calling` selector.
+    let personaCallingName (persona: Persona) : string =
+        match persona with
+        | Persona.Integrator -> "integrator"
+        | Persona.Director -> "director"
+        | Persona.Coordinator -> "coordinator"
+        | Persona.Lead -> "lead"
+        | Persona.Coder -> "coder"
+        | Persona.Engineer -> "engineer"
+        | Persona.Scout -> "scout"
+        | Persona.Investigator -> "investigator"
+        | Persona.Technician -> "technician"
+        | Persona.Operator -> "operator"
+        | Persona.Navigator -> "navigator"
+        | Persona.Researcher -> "researcher"
+        | Persona.Analyst -> "analyst"
+        | Persona.Inquirer -> "inquirer"
+        | Persona.Examiner -> "examiner"
+        | Persona.Auditor -> "auditor"
+        | Persona.Scribe -> "scribe"
+        | Persona.Chronicler -> "chronicler"
+        | Persona.Condenser -> "condenser"
+        | Persona.Distiller -> "distiller"
+        | Persona.Clerk -> "clerk"
+        | Persona.Curator -> "curator"
+
+    /// Parse one exact lowercase Host `calling` label into typed identity.
+    let tryParsePersonaCallingName (value: string) : Persona option =
+        match value with
+        | "integrator" -> Some Persona.Integrator
+        | "director" -> Some Persona.Director
+        | "coordinator" -> Some Persona.Coordinator
+        | "lead" -> Some Persona.Lead
+        | "coder" -> Some Persona.Coder
+        | "engineer" -> Some Persona.Engineer
+        | "scout" -> Some Persona.Scout
+        | "investigator" -> Some Persona.Investigator
+        | "technician" -> Some Persona.Technician
+        | "operator" -> Some Persona.Operator
+        | "navigator" -> Some Persona.Navigator
+        | "researcher" -> Some Persona.Researcher
+        | "analyst" -> Some Persona.Analyst
+        | "inquirer" -> Some Persona.Inquirer
+        | "examiner" -> Some Persona.Examiner
+        | "auditor" -> Some Persona.Auditor
+        | "scribe" -> Some Persona.Scribe
+        | "chronicler" -> Some Persona.Chronicler
+        | "condenser" -> Some Persona.Condenser
+        | "distiller" -> Some Persona.Distiller
+        | "clerk" -> Some Persona.Clerk
+        | "curator" -> Some Persona.Curator
+        | _ -> None
+
+    let allRoles: Role list = Roles.all
 
     let allPublicRoles: Role list = allRoles |> List.filter (Roles.isInternal >> not)
 
@@ -99,7 +101,7 @@ module ManagedAgentCatalog =
         | _ -> None
 
     let bookkeeperNameOf (tier: AgentTier) : string =
-        sprintf "%s-bookkeeper" (wireTierLabel tier)
+        sprintf "%s-bookkeeper" (Roles.wireTierLabel tier)
 
     let bookkeeperPeerName (name: string) : string option =
         match tryParseBookkeeperTier name with

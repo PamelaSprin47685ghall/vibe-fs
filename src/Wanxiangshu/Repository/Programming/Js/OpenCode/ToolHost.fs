@@ -181,7 +181,7 @@ module JsToolSpec =
 
         fun _ r ->
             (string r).ToLowerInvariant() = roleName.ToLowerInvariant()
-            && not (Set.isEmpty (Set.intersect (Roles.permissions r) fsPermissions))
+            && not (Set.isEmpty (Set.intersect (OfficeCapability.permissions r) fsPermissions))
 
     [<Emit("$0===undefined||$0===null")>]
     let private isUndefined (value: obj) : bool = jsNative

@@ -61,7 +61,6 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Participant.Persona.AgentRoleIdentity
 
 /// Wave 3 (Proposal ch. 12): HostForkRuntime keeps the state/resource spine;
 /// the join/await workflow lives here as free functions over the runtime's

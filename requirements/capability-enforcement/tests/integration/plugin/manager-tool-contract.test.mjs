@@ -9,7 +9,7 @@ import {
   markerSource,
   markerToolName,
 } from '../../../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js'
-import { permissions } from '../../../../../dist/Foundation/RolesSurface.js'
+import { permissions } from '../../../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import {
   acceptAuthorityRoot,
   withExecutablePlugin,

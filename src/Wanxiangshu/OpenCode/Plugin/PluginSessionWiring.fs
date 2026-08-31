@@ -94,6 +94,11 @@ open Wanxiangshu.Strength
 
 module PluginSessionWiring =
 
+    let private requirePersona result =
+        match result with
+        | Ok _ -> ()
+        | Error rejection -> invalidOp (PersonaRejection.render rejection)
+
     /// SyncDelegate + StrengthReplica runtimes, attached only when a durable
     /// journal exists (the sync path is what makes both runtimes meaningful).
     let attach (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : unit =
@@ -126,7 +131,7 @@ module PluginSessionWiring =
                     SessionExecutionBinding.observeUserFacingAgent sessionId agent
                     scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore
                     ProviderLanguageBinding.ensureRoot sessionId |> ignore
-                    PersonaBinding.ensureFromAuthority profile |> ignore))
+                    PersonaBinding.ensureFromAuthority profile |> requirePersona))
 
         match journal with
         | Some durable ->

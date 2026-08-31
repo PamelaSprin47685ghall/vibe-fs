@@ -1652,22 +1652,7 @@
       ],
       "justification": "The listed owners consume this exact process-local causal-wait port; it carries no durable business state."
     },
-    {
-      "path": "src/Wanxiangshu/Foundation/RolesSurface.fs",
-      "owner": "office-capability",
-      "node": "office-capability-keep",
-      "contract": "RolesSurface.Contract",
-      "kind": "published-contract",
-      "consumers": [
-        "finality",
-        "output-distillation"
-      ],
-      "symbols": [
-        "Wanxiangshu.Foundation.RolesSurface.isAllowed",
-        "Wanxiangshu.Foundation.RolesSurface.permissions"
-      ],
-      "justification": "RolesSurface.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to office-capability."
-    },
+
     {
       "path": "src/Wanxiangshu/Git/Gateway.fs",
       "owner": "change-integration",
@@ -4520,6 +4505,226 @@
         "Wanxiangshu.OpenCode.ProjectionMessageEdit.HostWireEncoding.tryEncodeNonToolParts"
       ],
       "justification": "The speculative-investigation native tool adapter consumes only these three active physical Host encoding primitives; Strength validation, pairing, and policy do not cross this port."
+    },
+    {
+      "path": "src/Wanxiangshu/Foundation/Roles.fs",
+      "owner": "participant-identity",
+      "node": "participant-identity-cutover",
+      "contract": "ParticipantIdentity.RoleVocabulary",
+      "kind": "published-contract",
+      "consumers": [
+        "action-affordance",
+        "attention-regulation",
+        "behavior-diagnosis",
+        "capability-enforcement",
+        "change-integration",
+        "cognitive-environment",
+        "concern-routing",
+        "context-compression",
+        "delegation",
+        "dispatch-protocol",
+        "distribution",
+        "durable-events",
+        "execution-model-routing",
+        "finality",
+        "host-boundary",
+        "institutional-learning",
+        "interaction-authority",
+        "intra-participant-parallelism",
+        "knowledge-reuse",
+        "managed-session-lifecycle",
+        "office-capability",
+        "output-distillation",
+        "process-execution",
+        "provider-attempt-recovery",
+        "repository-investigation",
+        "repository-programming",
+        "review-assurance",
+        "review-judgement",
+        "semantic-trace",
+        "speculative-investigation",
+        "time-capability"
+      ],
+      "symbols": [
+        "Wanxiangshu.Foundation.AgentTier",
+        "Wanxiangshu.Foundation.AgentTier.Deep",
+        "Wanxiangshu.Foundation.AgentTier.Fast",
+        "Wanxiangshu.Foundation.Role",
+        "Wanxiangshu.Foundation.Role.Blogger",
+        "Wanxiangshu.Foundation.Role.Browser",
+        "Wanxiangshu.Foundation.Role.Coder",
+        "Wanxiangshu.Foundation.Role.DevOps",
+        "Wanxiangshu.Foundation.Role.Distiller",
+        "Wanxiangshu.Foundation.Role.Inquiry",
+        "Wanxiangshu.Foundation.Role.Inspector",
+        "Wanxiangshu.Foundation.Role.Manager",
+        "Wanxiangshu.Foundation.Role.Orchestrator",
+        "Wanxiangshu.Foundation.Role.Reviewer",
+        "Wanxiangshu.Foundation.Roles.all",
+        "Wanxiangshu.Foundation.Roles.isInternal",
+        "Wanxiangshu.Foundation.Roles.roleLabel",
+        "Wanxiangshu.Foundation.Roles.tryParseRole",
+        "Wanxiangshu.Foundation.Roles.tryParseTier",
+        "Wanxiangshu.Foundation.Roles.wireTierLabel"
+      ],
+      "justification": "Role and AgentTier are the participant-identity published vocabulary. These are the exact compiler-observed foreign consumers and symbols; capability consequences remain outside this contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Foundation/OfficeCapability.fs",
+      "owner": "office-capability",
+      "node": "office-capability-cutover",
+      "contract": "OfficeCapability.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "action-affordance",
+        "capability-enforcement",
+        "delegation",
+        "execution-model-routing",
+        "finality",
+        "interaction-authority",
+        "intra-participant-parallelism",
+        "participant-horizon",
+        "process-execution",
+        "repository-investigation",
+        "repository-programming",
+        "review-judgement",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Foundation.OfficeCapability.isAllowed",
+        "Wanxiangshu.Foundation.OfficeCapability.permissions",
+        "Wanxiangshu.Foundation.ToolPermission",
+        "Wanxiangshu.Foundation.ToolPermission.BashHoneypot",
+        "Wanxiangshu.Foundation.ToolPermission.Behavior",
+        "Wanxiangshu.Foundation.ToolPermission.Chronicle",
+        "Wanxiangshu.Foundation.ToolPermission.Edit",
+        "Wanxiangshu.Foundation.ToolPermission.Exec",
+        "Wanxiangshu.Foundation.ToolPermission.Fetch",
+        "Wanxiangshu.Foundation.ToolPermission.Finality",
+        "Wanxiangshu.Foundation.ToolPermission.Fission",
+        "Wanxiangshu.Foundation.ToolPermission.Fork",
+        "Wanxiangshu.Foundation.ToolPermission.Glob",
+        "Wanxiangshu.Foundation.ToolPermission.Grep",
+        "Wanxiangshu.Foundation.ToolPermission.Horizon",
+        "Wanxiangshu.Foundation.ToolPermission.Inspect",
+        "Wanxiangshu.Foundation.ToolPermission.Join",
+        "Wanxiangshu.Foundation.ToolPermission.Judge",
+        "Wanxiangshu.Foundation.ToolPermission.Move",
+        "Wanxiangshu.Foundation.ToolPermission.Network",
+        "Wanxiangshu.Foundation.ToolPermission.Pty",
+        "Wanxiangshu.Foundation.ToolPermission.Read",
+        "Wanxiangshu.Foundation.ToolPermission.Remove",
+        "Wanxiangshu.Foundation.ToolPermission.Sphinx",
+        "Wanxiangshu.Foundation.ToolPermission.TodoWrite",
+        "Wanxiangshu.Foundation.ToolPermission.Write"
+      ],
+      "justification": "OfficeCapability publishes the exact typed consequence vocabulary and exhaustive permission decision used by these compiler-observed consumers; participant identity contains no copy."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Persona/Catalog.fs",
+      "owner": "participant-identity",
+      "node": "participant-identity-cutover",
+      "contract": "ParticipantIdentity.Persona",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Persona.PersonaCatalog.persona"
+      ],
+      "justification": "Delegation consumes only the canonical Role × AgentTier to Persona decision; Persona rendering and parsing remain identity-owner boundary mechanics."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs",
+      "owner": "participant-identity",
+      "node": "participant-identity-cutover",
+      "contract": "ParticipantIdentity.ManagedCatalog",
+      "kind": "published-contract",
+      "consumers": [
+        "action-affordance",
+        "capability-enforcement",
+        "cognitive-environment",
+        "context-compression",
+        "delegation",
+        "execution-model-routing",
+        "interaction-authority",
+        "office-capability",
+        "output-distillation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.allInternalRoles",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.allPublicRoles",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.allRoles",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.bookkeeperPeerName",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.coderToolNames",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.formatLegacyNameInConfig",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.formatLegacyNameNotSupported",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.inspectorToolNames",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.isBookkeeperName",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.isLegacyAgentName",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.legacyAgentNames",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.managerForkableNames",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.managerForkableRoles",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.nameOf",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.orchestratorForkableNames",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.peerNameOf",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.peerTier",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.personaCallingName",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.requiredNames",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.tryParsePersonaCallingName"
+      ],
+      "justification": "ManagedCatalog publishes the exact machine-name, peer, role-set and Host calling-name boundary consumed across owners; every role/tier decision delegates to the canonical identity vocabulary."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Persona/SessionPersona.fs",
+      "owner": "participant-identity",
+      "node": "participant-identity-cutover",
+      "contract": "ParticipantIdentity.SessionPersona",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol",
+        "host-boundary",
+        "session-ontology"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Persona.PersonaRejectionModule.render",
+        "Wanxiangshu.Participant.Persona.SessionPersona.drop"
+      ],
+      "justification": "Foreign owners may render a typed rejection at a Host boundary or drop identity with session lifecycle; issuance, bind-once and inheritance remain participant-identity-owned."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/PersonaBinding.fs",
+      "owner": "participant-identity",
+      "node": "participant-identity-cutover",
+      "contract": "ParticipantIdentity.PersonaBinding",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol",
+        "host-boundary",
+        "session-ontology"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.PersonaBinding.ensureFromAuthority",
+        "Wanxiangshu.OpenCode.PersonaBinding.ensureInherited",
+        "Wanxiangshu.OpenCode.PersonaBinding.ensureRoot"
+      ],
+      "justification": "Host workflows consume only the three typed identity binding operations; conflicts remain PersonaRejection and cannot be swallowed or converted to fallback identity."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs",
+      "owner": "office-capability",
+      "node": "office-capability-cutover",
+      "contract": "OfficeCapabilitySurface.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality",
+        "output-distillation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Persona.OfficeCapabilitySurface.isAllowed",
+        "Wanxiangshu.Participant.Persona.OfficeCapabilitySurface.permissions"
+      ],
+      "justification": "The two production consumers receive only JS-compatible label projections from the office-capability owner; no F# DU representation or duplicate permission matrix crosses the surface."
     }
   ],
   "physical_adapters": [

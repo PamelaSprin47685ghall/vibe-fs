@@ -13,7 +13,6 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.Journal
 
@@ -96,7 +95,7 @@ module CompanionTransform =
             Some(tryMessageSessionId message, tryMessageRole message)
 
     let allowsBloggerCompanionForAgentName (agentName: string) =
-        match AgentRoleIdentity.roleOfString agentName with
+        match ManagedAgent.tryParse agentName |> Option.map (fun managed -> managed.Role) with
         | Some Role.Distiller -> false
         | _ -> true
 

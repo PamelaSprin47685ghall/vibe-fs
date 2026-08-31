@@ -38,7 +38,6 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Participant.Persona.AgentRoleIdentity
 
 /// Bridges real child sessions to the existing completion mailbox.
 /// Fork / Reuse / Pty operations live in extension files (semantic split).

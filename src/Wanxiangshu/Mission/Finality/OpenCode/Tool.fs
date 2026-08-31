@@ -454,7 +454,8 @@ module FinalityTool =
             | None, _, _ -> return refuse context Path.TryAgainLater
         }
 
-    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Finality
+    let admission: ToolAdmission =
+        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Finality
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "suicide"

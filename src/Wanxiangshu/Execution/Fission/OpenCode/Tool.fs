@@ -976,7 +976,8 @@ module FissionTool =
                 return! executeForCaller scope args ctx language (SessionId.create ctx.SessionId)
         }
 
-    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Fission
+    let admission: ToolAdmission =
+        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fission
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "fission"

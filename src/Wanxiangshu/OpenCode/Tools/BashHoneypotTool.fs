@@ -32,7 +32,7 @@ module BashHoneypotTool =
         }
 
     let admission: ToolAdmission =
-        fun _ r -> Roles.isAllowed r ToolPermission.BashHoneypot
+        fun _ r -> OfficeCapability.isAllowed r ToolPermission.BashHoneypot
 
     let spec: ToolSpec =
         { Name = "bash-honeypot"

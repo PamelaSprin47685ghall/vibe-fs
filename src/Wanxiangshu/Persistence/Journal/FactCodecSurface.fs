@@ -8,7 +8,6 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Change
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Participant.Persona
 
 /// JS-native owner surface for decode-only journal fact compatibility.
 /// Decoded facts remain inside the production codec; callers observe bytes and
@@ -42,7 +41,7 @@ module FactCodecSurface =
         | other -> failwith $"FactCodecSurface: unknown abandon reason '{other}'"
 
     let private roleOf (value: obj) =
-        AgentRoleIdentity.roleOfString (text value)
+        Roles.tryParseRole (text value)
         |> Option.defaultWith (fun () -> failwith $"FactCodecSurface: unknown role '{text value}'")
 
     let private ownershipOf (value: obj) =

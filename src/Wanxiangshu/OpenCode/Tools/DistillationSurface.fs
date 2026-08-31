@@ -9,6 +9,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 
@@ -26,7 +27,8 @@ module DistillationSurface =
     let roleLabel: string = Roles.roleLabel distillerRole
 
     /// The fixed fast-tier managed identity used for bounded-tail distillation.
-    let managedAgentName: string = Roles.managedAgentName AgentTier.Fast distillerRole
+    let managedAgentName: string =
+        ManagedAgentCatalog.nameOf AgentTier.Fast distillerRole
 
     /// Distiller is an internal Host-owned runtime.
     let isInternalRuntime: bool = Roles.isInternal distillerRole
@@ -39,7 +41,8 @@ module DistillationSurface =
         CompanionTransform.allowsBloggerCompanionForAgentName managedAgentName
 
     /// Distiller has no execution, mutation, or judgement permissions.
-    let permissionLabels: string array = RolesSurface.permissions roleLabel
+    let permissionLabels: string array =
+        Wanxiangshu.Participant.Persona.OfficeCapabilitySurface.permissions roleLabel
 
     /// Distillation is invoked by the provider-visible run surface.
     let executionToolName: string = ExecutorTool.RunToolName

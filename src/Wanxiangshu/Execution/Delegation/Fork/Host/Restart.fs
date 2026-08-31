@@ -14,7 +14,6 @@ open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
@@ -410,7 +409,7 @@ module HostForkRestart =
         =
         task {
             let agentId = AgentHandleId.value agentHandle
-            let role = AgentRoleIdentity.ofRole record.CanonicalRole
+            let role = record.CanonicalRole
 
             bindChildIntoRuntime runtime children childCreatedDir directoryOf agentId record role
 
@@ -447,7 +446,7 @@ module HostForkRestart =
         (record: HandleRecord)
         =
         let agentId = AgentHandleId.value agentHandle
-        let role = AgentRoleIdentity.ofRole record.CanonicalRole
+        let role = record.CanonicalRole
 
         children.[agentId] <- record.ChildSessionId
         childCreatedDir agentId record.ChildSessionId (directoryOf agentId)

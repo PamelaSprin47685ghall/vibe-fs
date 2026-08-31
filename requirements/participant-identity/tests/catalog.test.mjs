@@ -45,6 +45,19 @@ const EXPECTED_LEGACY = [
   'deep',
 ]
 
+const EXPECTED_PERSONAS = {
+  orchestrator: { fast: 'Integrator', deep: 'Director' },
+  manager: { fast: 'Coordinator', deep: 'Lead' },
+  coder: { fast: 'Coder', deep: 'Engineer' },
+  inspector: { fast: 'Scout', deep: 'Investigator' },
+  devops: { fast: 'Technician', deep: 'Operator' },
+  browser: { fast: 'Navigator', deep: 'Researcher' },
+  inquiry: { fast: 'Analyst', deep: 'Inquirer' },
+  reviewer: { fast: 'Examiner', deep: 'Auditor' },
+  blogger: { fast: 'Scribe', deep: 'Chronicler' },
+  distiller: { fast: 'Condenser', deep: 'Distiller' },
+}
+
 const roleNames = () => identity.requiredNames.filter((name) => !name.endsWith('-bookkeeper'))
 
 test('WHAT[PID-001] catalog_has_exactly_ten_canonical_roles_and_two_tiers', () => {
@@ -97,6 +110,21 @@ test('WHAT[PID-009] bookkeeper_pair_has_machine_identity_and_peer_but_no_public_
   }
 })
 
+test('WHAT[PID-002] persona_catalog_is_the_exact_closed_twenty_two_label_matrix', () => {
+  const labels = []
+  for (const [role, tiers] of Object.entries(EXPECTED_PERSONAS)) {
+    for (const tier of ['fast', 'deep']) {
+      const expected = tiers[tier]
+      assert.equal(personaLabel(role, tier), expected)
+      labels.push(expected)
+    }
+  }
+  labels.push(identity.bookkeeperPersona('fast'), identity.bookkeeperPersona('deep'))
+  assert.deepEqual(labels.slice(-2), ['Clerk', 'Curator'])
+  assert.equal(labels.length, 22)
+  assert.equal(new Set(labels).size, 22)
+})
+
 test('WHAT[PID-007] peer_is_same_role_opposite_tier_and_symmetric', () => {
   const names = new Set(identity.requiredNames)
   for (const name of names) {
@@ -140,3 +168,5 @@ test('WHAT[PID-002] rejection_prose_is_version_agnostic', () => {
     "Legacy agent name 'coder' is present in opencode.json. Managed agents require explicit fast-/deep- names.",
   )
 })
+
+const personaLabel = (role, tier) => identity.persona(role, tier)

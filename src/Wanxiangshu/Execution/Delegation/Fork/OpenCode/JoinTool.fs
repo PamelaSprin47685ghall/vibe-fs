@@ -359,7 +359,8 @@ module JoinTool =
                 return! executeAfterSession scope context language (SessionId.create context.SessionId)
         }
 
-    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Join
+    let admission: ToolAdmission =
+        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Join
 
     let spec scope =
         { Name = "join"

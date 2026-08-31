@@ -12,7 +12,6 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
@@ -90,7 +89,7 @@ module HandleController =
                        Handle = agentHandle agentId
                        TargetAgent = targetAgent
                        Byname = byname
-                       CanonicalRole = AgentRoleIdentity.toRole role
+                       CanonicalRole = role
                        Ownership = ownership |})
 
     /// Internal compatibility: when no distinct provider presentation identity

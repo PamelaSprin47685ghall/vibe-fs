@@ -20,7 +20,12 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-import { managerForkableOffices } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
+import {
+  isAllowed,
+  managerForkableOffices,
+  permissions,
+} from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
+import { assertJsData } from '../../verification-system/tests/support/js-contract.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const PROVIDER = join(ROOT, 'resources/provider')
@@ -77,6 +82,40 @@ const FIVE_OFFICES = [
 
 test('WHAT[OFF-002] OFF_002_managed_catalog_forkable_offices_are_exactly_the_five_canonical_offices', () => {
   assert.deepEqual(managerForkableOffices(), ['Coder', 'Inspector', 'DevOps', 'Browser', 'Inquiry'])
+})
+
+test('WHAT[ENF-002] office_permission_surface_matches_the_canonical_roles_matrix', () => {
+  const matrix = [
+    ['manager', ['Finality', 'Fission', 'Fork', 'Horizon', 'Join', 'TodoWrite']],
+    ['orchestrator', ['Fork', 'Horizon', 'Join']],
+    ['coder', ['BashHoneypot', 'Edit', 'Fetch', 'Fission', 'Glob', 'Grep', 'Inspect', 'Move', 'Read', 'Remove', 'Write']],
+    ['inspector', ['Exec', 'Fetch', 'Fission', 'Glob', 'Grep', 'Read']],
+    ['browser', ['Fission', 'Glob', 'Grep', 'Network', 'Read']],
+    ['inquiry', ['Fission', 'Inspect', 'Sphinx']],
+    ['reviewer', ['Glob', 'Grep', 'Judge', 'Read']],
+    ['devops', ['Behavior', 'Exec', 'Glob', 'Grep', 'Horizon', 'Inspect', 'Join', 'Pty', 'Read']],
+    ['distiller', []],
+    ['blogger', ['Chronicle']],
+  ]
+
+  for (const [role, expected] of matrix) {
+    assertJsData(permissions(role), `permissions(${role})`)
+    assert.deepEqual(permissions(role), expected, `permissions(${role}) must equal the canonical matrix`)
+  }
+
+  assert.deepEqual(permissions('not-a-role'), [], 'unknown role fails closed to empty set')
+})
+
+test('WHAT[ENF-002] office_permission_surface_denies_outside_the_matrix', () => {
+  assert.equal(isAllowed('inquiry', 'Inspect'), true)
+  assert.equal(isAllowed('inquiry', 'Sphinx'), true)
+  assert.equal(isAllowed('inquiry', 'Fission'), true)
+  assert.equal(isAllowed('inquiry', 'Read'), false, 'Inquiry lacks Read')
+  assert.equal(isAllowed('blogger', 'Chronicle'), true, 'Blogger has exactly Chronicle')
+  assert.equal(isAllowed('blogger', 'Fork'), false, 'Blogger lacks Fork')
+  assert.equal(isAllowed('manager', 'Finality'), true, 'Manager has Finality')
+  assert.equal(isAllowed('unknown-role', 'Fork'), false, 'unknown role → deny')
+  assert.equal(isAllowed('manager', 'UnknownPermission'), false, 'unknown permission → deny')
 })
 
 test('WHAT[OFF-005] OFF_005_each_office_consequence_hits_manager_law_and_fork_description_in_both_locales', () => {

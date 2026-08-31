@@ -26,7 +26,11 @@ test('WHAT[PID-003] persona_binds_once_and_never_rewrites', () => {
 
   const rewrite = session.bindOnce(owner, 'Engineer')
   assert.equal(rewrite.ok, false)
-  assert.match(rewrite.error, /already bound/)
+  assert.equal(
+    rewrite.error,
+    "Session 'ses_gate_d' persona conflict: existing 'Coordinator', attempted 'Engineer'.",
+  )
+  assert.equal(session.tryGet(owner), 'Coordinator')
 })
 
 test('WHAT[PID-004] persona_frozen_across_gate_d_events', () => {
@@ -44,5 +48,27 @@ test('WHAT[PID-004] persona_frozen_across_gate_d_events', () => {
 
   const rewrite = session.bindOnce(owner, 'Engineer')
   assert.equal(rewrite.ok, false)
-  assert.match(rewrite.error, /already bound/)
+  assert.equal(
+    rewrite.error,
+    "Session 'ses_gate_d_t1_review_reanchor' persona conflict: existing 'Coordinator', attempted 'Engineer'.",
+  )
+  assert.equal(session.tryGet(owner), 'Coordinator')
+})
+
+test('WHAT[PID-008] independent_session_occurrences_bind_different_personas', () => {
+  session.clear()
+  assert.equal(session.bindOnce('ses_occurrence_fast', 'Coder').ok, true)
+  assert.equal(session.bindOnce('ses_occurrence_deep', 'Engineer').ok, true)
+  assert.equal(session.tryGet('ses_occurrence_fast'), 'Coder')
+  assert.equal(session.tryGet('ses_occurrence_deep'), 'Engineer')
+})
+
+test('WHAT[PID-003] dropped_session_occurrence_releases_its_persona_binding', () => {
+  session.clear()
+  const occurrence = 'ses_completed_occurrence'
+  assert.equal(session.bindOnce(occurrence, 'Coder').ok, true)
+  session.drop(occurrence)
+  assert.equal(session.tryGet(occurrence), '')
+  assert.equal(session.bindOnce(occurrence, 'Engineer').ok, true)
+  assert.equal(session.tryGet(occurrence), 'Engineer')
 })

@@ -87,7 +87,7 @@ module JsGeneratorSurface =
     let private canonicalLabels (role: string) =
         match Roles.tryParseRole role with
         | None -> [||]
-        | Some parsed -> Roles.permissions parsed |> Set.toArray |> Array.map permissionLabel
+        | Some parsed -> OfficeCapability.permissions parsed |> Set.toArray |> Array.map permissionLabel
 
     let internal typedFor (role: string) (labels: string array) (language: string) : JsSurface option =
         if not (roleExists role) then

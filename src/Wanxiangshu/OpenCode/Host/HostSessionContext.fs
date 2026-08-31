@@ -17,20 +17,23 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
 module HostSessionContext =
 
+    let private parseRole (agent: string) : Role option =
+        match ManagedAgent.tryParse agent with
+        | Some managed -> Some managed.Role
+        | None -> Roles.tryParseRole (agent.Trim())
+
     /// Resolve Role from Host Agent identity (fast-ROLE / deep-ROLE) or Canonical Role.
     /// build/plan aliases remain rejected.
-    let roleOf (agent: string) =
-        if isNull agent || String.IsNullOrWhiteSpace agent then
-            None
-        else
-            AgentRoleIdentity.roleOfString agent
+    let roleOf (agent: string) : Role option =
+        Option.ofObj agent
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+        |> Option.bind parseRole
 
     let read raw =
         let event = if isNull raw || isNull raw?event then raw else raw?event

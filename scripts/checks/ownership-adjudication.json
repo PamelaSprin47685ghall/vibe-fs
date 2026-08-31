@@ -1444,17 +1444,6 @@
         ]
       },
       {
-        "path": "src/Wanxiangshu/Participant/Persona/RoleIdentity.fs",
-        "owners": [
-          "capability-enforcement",
-          "cognitive-environment",
-          "external-investigation",
-          "office-capability",
-          "participant-identity",
-          "session-ontology"
-        ]
-      },
-      {
         "path": "src/Wanxiangshu/Participant/Persona/SessionPersona.fs",
         "owners": [
           "capability-enforcement",
@@ -1589,19 +1578,21 @@
         ]
       },
       {
+        "path": "src/Wanxiangshu/Foundation/OfficeCapability.fs",
+        "owners": [
+          "office-capability"
+        ]
+      },
+      {
         "path": "src/Wanxiangshu/Foundation/Roles.fs",
         "owners": [
-          "capability-enforcement",
-          "intra-participant-parallelism",
-          "office-capability",
           "participant-identity"
         ]
       },
       {
         "path": "src/Wanxiangshu/Foundation/RolesSurface.fs",
         "owners": [
-          "capability-enforcement",
-          "office-capability"
+          "participant-identity"
         ]
       }
     ],

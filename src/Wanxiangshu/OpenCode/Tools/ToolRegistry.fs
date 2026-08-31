@@ -85,8 +85,7 @@ module ToolRegistry =
     let private lang (ctx: HostToolContext) =
         let sessionText = ctx.SessionId
 
-        ProviderLanguageBinding.forSessionText
-            sessionText
+        ProviderLanguageBinding.forSessionText sessionText
 
     let private staticAdmissions (bloggerHost: IBloggerRuntimeHost option) : (string * ToolAdmission) list =
         [ "fork", ForkTool.managerAdmission
@@ -190,8 +189,8 @@ module ToolRegistry =
             )
 
         let generatedJsSpecs () =
-            [ for role in RoleDefinitions.all |> List.map (fun d -> d.Role) do
-                  match JsToolGenerator.generate (string role) (Roles.permissions role) jsProse with
+            [ for role in Roles.all do
+                  match JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse with
                   | Some surface ->
                       yield
                           JsToolSpec.create

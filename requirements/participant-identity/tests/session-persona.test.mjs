@@ -37,8 +37,25 @@ test('WHAT[PID-003] SessionPersona_binds_once_same_value_idempotent_different_va
   assert.equal(again.ok, true)
 
   const conflict = session.bindOnce(owner, 'Coder')
+  assertJsData(conflict)
   assert.equal(conflict.ok, false)
-  assert.match(conflict.error, /already bound/)
+  assert.equal(
+    conflict.error,
+    "Session 'ses_owner_persona' persona conflict: existing 'Engineer', attempted 'Coder'.",
+  )
+  assert.equal(session.tryGet(owner), 'Engineer')
+})
+
+test('WHAT[PID-003] invalid_persona_labels_fail_closed_without_binding', () => {
+  session.clear()
+  const invalid = session.bindOnce('ses_invalid_persona', 'engineer')
+  assertJsData(invalid)
+  assert.deepEqual(invalid, {
+    ok: false,
+    value: '',
+    error: "Invalid persona 'engineer'.",
+  })
+  assert.equal(session.tryGet('ses_invalid_persona'), '')
 })
 
 test('WHAT[PID-010] child_session_persona_inherits_owner_persona', () => {
@@ -47,20 +64,21 @@ test('WHAT[PID-010] child_session_persona_inherits_owner_persona', () => {
   const replica = 'ses_replica_persona'
 
   assert.equal(session.bindOnce(owner, 'Engineer').ok, true)
-  const inherited = session.inheritFromOwner('Engineer', replica)
+  const inherited = session.inheritFromOwner(owner, replica)
   assert.equal(inherited.ok, true)
   assert.equal(inherited.value, 'Engineer')
   assert.equal(session.tryGet(replica), 'Engineer')
 })
 
-test('WHAT[PID-010] child_session_persona_inherits_even_when_owner_was_not_yet_queried', () => {
+test('WHAT[PID-010] child_session_persona_requires_a_bound_owner', () => {
   session.clear()
+  const owner = 'ses_unseeded_owner'
   const child = 'ses_unseeded_child'
 
-  const inherited = session.inheritFromOwner('Coordinator', child)
-  assert.equal(inherited.ok, true)
-  assert.equal(inherited.value, 'Coordinator')
-  assert.equal(session.tryGet(child), 'Coordinator')
+  const inherited = session.inheritFromOwner(owner, child)
+  assert.equal(inherited.ok, false)
+  assert.equal(inherited.error, "Owner session 'ses_unseeded_owner' has no bound persona.")
+  assert.equal(session.tryGet(child), '')
 })
 
 test('WHAT[PID-005] system_prompt_id_follows_canonical_role_not_effective_agent_tier', () => {

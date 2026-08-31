@@ -60,8 +60,8 @@ type ManagedAgentParseError =
 
 module ManagedAgent =
 
-    let roleName = ManagedAgentCatalog.roleLabel
-    let tierName = ManagedAgentCatalog.wireTierLabel
+    let roleName = Roles.roleLabel
+    let tierName = Roles.wireTierLabel
     let nameOf = ManagedAgentCatalog.nameOf
 
     let visibilityOf (role: Role) : AgentVisibility =

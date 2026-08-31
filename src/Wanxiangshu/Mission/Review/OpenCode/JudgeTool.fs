@@ -243,7 +243,8 @@ module JudgeTool =
             | ExecutionDecision.Proceed judgement -> return! dispatchJudgement scope context judgement
         }
 
-    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Judge
+    let admission: ToolAdmission =
+        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Judge
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "judge"

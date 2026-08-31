@@ -314,7 +314,8 @@ module PtyTool =
           PtySignal.User1Name
           PtySignal.User2Name ]
 
-    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Pty
+    let admission: ToolAdmission =
+        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Pty
 
     let openSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "open-terminal"

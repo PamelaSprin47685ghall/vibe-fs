@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
@@ -74,7 +75,7 @@ module SessionExecutionBinding =
         | _ -> None
 
     let private peerFromTokens (tierText, roleText) : string option =
-        match ManagedAgentCatalog.tryParseTier tierText, ManagedAgentCatalog.tryParseRole roleText with
+        match Roles.tryParseTier tierText, Roles.tryParseRole roleText with
         | Some tier, Some role -> Some(ManagedAgentCatalog.peerNameOf tier role)
         | _ -> None
 

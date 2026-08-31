@@ -20,7 +20,6 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Review.OpenCode
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
@@ -266,10 +265,7 @@ module HostSignalBootstrap =
 
                     let agentRole =
                         HostSessionNudge.tryActiveProfile journal sid
-                        |> Option.bind (fun profile ->
-                            profile.CanonicalRole
-                            |> PromptAuthority.roleLabel
-                            |> AgentRoleIdentity.roleOfString)
+                        |> Option.map (fun profile -> profile.CanonicalRole)
 
                     reconciler.BindUserMessage(sid, physical, ?agentRole = agentRole)
                     registerOwned sessionId

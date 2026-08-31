@@ -1,7 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open Fable.Core
-open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Foundation
 
 /// JS-native Host session context boundary.
 module HostSessionContextSurface =
@@ -9,7 +9,7 @@ module HostSessionContextSurface =
     let private jsUndefined: obj = jsNative
 
     let roleOf (agent: string) : string option =
-        HostSessionContext.roleOf agent |> Option.map AgentRoleIdentity.roleName
+        HostSessionContext.roleOf agent |> Option.map Roles.roleLabel
 
     let read (raw: obj) : obj =
         let sessionId, agent = HostSessionContext.read raw

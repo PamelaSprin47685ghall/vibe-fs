@@ -19,6 +19,11 @@ open Wanxiangshu.Foundation.Identity
 [<RequireQualifiedAccess>]
 module ExplicitSessionResume =
 
+    let private requirePersona result =
+        match result with
+        | Ok _ -> ()
+        | Error rejection -> invalidOp (PersonaRejection.render rejection)
+
     let private tryResumeProfile (journal: AgentJournal option) sessionId =
         journal
         |> Option.bind (fun durable ->
@@ -44,8 +49,8 @@ module ExplicitSessionResume =
             ProviderLanguageBinding.ensureRoot sessionId |> ignore)
 
         match profileOpt with
-        | Some profile -> PersonaBinding.ensureFromAuthority profile |> ignore
-        | None -> PersonaBinding.ensureRoot sessionId |> ignore
+        | Some profile -> PersonaBinding.ensureFromAuthority profile |> requirePersona
+        | None -> PersonaBinding.ensureRoot sessionId |> requirePersona
 
     /// CRASH-018 process-local reenlistment of the explicit-resume provider turn.
     /// The runtime scope supplies only its managed-session observation; durable

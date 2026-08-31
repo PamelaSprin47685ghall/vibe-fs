@@ -7,7 +7,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
@@ -34,18 +33,14 @@ module TerminalReporter =
                 { SessionId = turn.SessionId
                   AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
                   ProviderRun = turn.ProviderRun
-                  Role = AgentRoleIdentity.toRole role
+                  Role = role
                   Directory = turn.Directory
                   TerminalText = sessionWideText
                   TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
 
             if runResult.IsValid then
                 match!
-                    XTraceCapture.captureTerminalTextWithReceipt
-                        journal
-                        turn.SessionId
-                        sessionWideText
-                        turn.ProviderRun
+                    XTraceCapture.captureTerminalTextWithReceipt journal turn.SessionId sessionWideText turn.ProviderRun
                 with
                 | Ok _ ->
                     eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)

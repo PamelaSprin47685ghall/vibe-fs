@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { permissions } from '../../../dist/Foundation/RolesSurface.js'
+import { permissions } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import { ROLE_ANCHOR_DIRS, ROLE_SEMANTIC_ANCHORS } from '../../../scripts/checks/semantic-anchors.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')

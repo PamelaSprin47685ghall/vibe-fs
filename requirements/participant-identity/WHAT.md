@@ -2,18 +2,20 @@
 
 ## PID-001: Role 是 office 身份；Tier 只改 ExecutionBinding
 
-`Role` 是系统预定义的固定 office 身份枚举（如 Manager、Orchestrator、Coder、Inspector、DevOps、Browser、Inquiry、Reviewer、Distiller、Blogger）。`AgentTier` 仅包含 Fast 与 Deep 两档。Tier 只决定物理 ExecutionBinding 的机器档位（EffectiveAgent），不产生新 Role，不改变 Role Law，亦不改变工具权限集合。
+`Role` 是系统预定义的固定 office 身份枚举（如 Manager、Orchestrator、Coder、Inspector、DevOps、Browser、Inquiry、Reviewer、Distiller、Blogger）。`AgentTier` 仅包含 Fast 与 Deep 两档。Tier 只决定物理 ExecutionBinding 的机器档位（EffectiveAgent），不产生新 Role，不改变 Role Law，亦不改变工具权限集合。`ToolPermission` 与权限矩阵归 `office-capability`；身份 owner 不得复制 capability law。
 
 ## PID-002: Role ≠ Persona ≠ ExecutionBinding 三轴分离
 
 Role、Persona 与 ExecutionBinding 保持绝对独立正交：
 - Role：职责 office，在 session 生命周期内严格不变。
-- Persona：自我模型，在 session 创建时单次绑定且不可变。
+- Persona：封闭的 22 case 类型；自我模型在 session 创建时单次绑定且不可变。只有 owner 的穷尽 `render/tryParse` 可穿越字符串边界；显示文案不得参与 authority 判断。
 - ExecutionBinding：由 EffectiveAgent/tier 及其物理执行租约组成，可在 Fallback 或 Strength 机制下发生切换。
+
+全仓只有这一组 `Role`/`AgentTier`/`Persona` identity vocabulary。旧 `RoleIdentity` 字符串桥与任何 forwarding alias 均不存在。
 
 ## PID-003: Persona 一次冻结，创建时 resolve-once，之后不可变
 
-`SessionPersona` 在 session 创建时根据 `Role × initial tier` 完成单次绑定（resolve-once）。同值重绑幂等成功，异值重绑直接拒绝并报错。在后续的 Fallback、Strength、Peer 切换或 mid-life 状态中，严禁改写或重绑 Persona。
+`SessionPersona` 以 branded `SessionId` 为键、以 `Persona` 为值，在 session 创建时根据 `Role × initial tier` 完成单次绑定（resolve-once）。同值重绑幂等成功；异值重绑返回携带 `SessionId × existing × attempted` 的 typed `PersonaRejection`，原值不变。Host adapter 必须显式传播或在物理边界 fail closed，不得吞掉冲突后继续。在后续的 Fallback、Strength、Peer 切换或 mid-life 状态中，严禁改写或重绑 Persona。
 
 ## PID-004: 换执行者 ≠ 换人；Fallback/Strength/Peer 只改 ExecutionBinding
 

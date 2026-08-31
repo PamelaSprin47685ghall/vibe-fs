@@ -194,7 +194,8 @@ module InspectorTool =
                 return renderResult context result
         }
 
-    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Inspect
+    let admission: ToolAdmission =
+        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Inspect
 
     let spec
         (factory: HostToolFactory)

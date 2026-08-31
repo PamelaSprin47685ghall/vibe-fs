@@ -59,7 +59,6 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Participant.Persona.AgentRoleIdentity
 
 /// Existing-child send must use the session's bound managed agent.
 /// Never invent `fast-ROLE` from CanonicalRole; never let the caller overwrite Deep with Fast.

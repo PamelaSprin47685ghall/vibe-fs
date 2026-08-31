@@ -57,6 +57,16 @@ module PromptDispatcher =
 
     let internal originLabel = PromptAuthority.originLabel
 
+    let private authorityKindLabel =
+        function
+        | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
+        | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
+
+    let private selectedTierLabel =
+        function
+        | AgentTier.Fast -> "Fast"
+        | AgentTier.Deep -> "Deep"
+
     /// PROMPT-007: whether the caller waits for PhysicalAccepted.
     ///
     /// Detached = fire-and-forget: claim, authority, persist, idempotence and error
@@ -125,21 +135,19 @@ module PromptDispatcher =
         /// it from this fact's `AuthorityKind`, so a HumanRoot cannot be recorded
         /// without its requirement appearing with it.
         member this.RegisterAuthority(profile: PromptAuthority.AuthorityExecutionProfile) : Task<Result<unit, string>> =
-            PersonaBinding.ensureFromAuthority profile |> ignore
-
-            PromptFact.AuthorityRootAccepted
-                {| SessionId = profile.SessionId
-                   LogicalRunId = profile.LogicalRunId
-                   AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
-                   AuthorityKind =
-                    match profile.AuthorityKind with
-                    | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
-                    | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
-                   SelectedAgent = profile.SelectedAgent
-                   PeerAgent = profile.PeerAgent
-                   CanonicalRole = PromptAuthority.roleLabel profile.CanonicalRole
-                   SelectedTier = PromptAuthority.tierLabel profile.SelectedTier |}
-            |> this.Persist profile.SessionId None
+            match PersonaBinding.ensureFromAuthority profile with
+            | Error rejection -> Task.FromResult(Error(PersonaRejection.render rejection))
+            | Ok _ ->
+                PromptFact.AuthorityRootAccepted
+                    {| SessionId = profile.SessionId
+                       LogicalRunId = profile.LogicalRunId
+                       AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
+                       AuthorityKind = authorityKindLabel profile.AuthorityKind
+                       SelectedAgent = profile.SelectedAgent
+                       PeerAgent = profile.PeerAgent
+                       CanonicalRole = Roles.roleLabel profile.CanonicalRole
+                       SelectedTier = selectedTierLabel profile.SelectedTier |}
+                |> this.Persist profile.SessionId None
 
         /// PROMPT-002: a human root must name a managed agent. There is no
         /// default, because inferring one is how a human prompt silently acquires

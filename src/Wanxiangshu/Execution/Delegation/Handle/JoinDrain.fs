@@ -13,7 +13,6 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
-open Wanxiangshu.Participant.Persona
 
 /// EXEC-009 + EXEC-018 + clean-break: pure durable join drain.
 ///
@@ -56,7 +55,7 @@ module JoinDrain =
                 Ok
                     { RunId = "abandoned-" + agentId
                       AgentName = record.TargetAgent
-                      Role = AgentRoleIdentity.ofRole record.CanonicalRole
+                      Role = record.CanonicalRole
                       Outcome = AgentCompletion.abandoned agentId reasonText
                       CompletedAt = completedAt }
             )
