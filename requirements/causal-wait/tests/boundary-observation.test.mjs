@@ -9,9 +9,21 @@ import test from 'node:test'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assertOpaque } from '../../verification-system/tests/support/js-contract.mjs'
+
+const causal = await import('../../../dist/Execution/Session/Wait/Surface.js')
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const SRC = join(ROOT, 'src/Wanxiangshu')
+
+const descriptor = causal.createWait({
+  waitKind: 'boundary-observation',
+  owner: causal.owner('workflow', { id: 'decision-decoy' }),
+  subject: { journalFact: 'lexical-decoy' },
+  producer: causal.externalProducer('provider', { id: 'producer-1' }),
+  escapes: [causal.escape('processLifetime')],
+  source: 'boundary-observation.test',
+})
 
 // CausalWait / WaitKind / IWaitSnapshotReader / CausalAwait 是 process-local 诊断词汇；
 // 出现在 Journal 与 Fact codec 表面 = 观测进入世界事实路径（违反 CAUSAL-003）。
@@ -26,6 +38,20 @@ const listFs = (dir) => {
   }
   return out
 }
+
+test('WHAT[CAUSAL-003] business observer cannot read the diagnostic snapshot', () => {
+  const registry = causal.createRegistry()
+  const observer = causal.observerCapability(registry)
+  const reader = causal.snapshotReaderCapability(registry)
+  assertOpaque(observer, 'wait observer capability')
+  assertOpaque(reader, 'wait snapshot reader capability')
+
+  const lease = causal.observerEnter(observer, descriptor)
+  assert.equal(causal.readerSnapshot(reader).active.length, 1)
+  assert.throws(() => causal.readerSnapshot(observer), /snapshot reader capability required/)
+
+  causal.dispose(lease)
+})
 
 test('WHAT[CAUSAL-003] Journal codec surfaces stay free of the causal-wait vocabulary', () => {
   const journalDir = join(SRC, 'Persistence', 'Journal')
