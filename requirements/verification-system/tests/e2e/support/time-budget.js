@@ -191,12 +191,12 @@ export const UNIT_VERDICT_SILENCE_MS = budgetFromEnv('UNIT_VERDICT_SILENCE_MS', 
  * 掩盖竞态」 (VERIFICATION-SYSTEM-006). So the bound is declared per step, and only the two steps
  * that invoke FCS carry it.
  *
- * The value is measured, not padded to taste. Worst observed lane is
- * `owner-dependencies-fcs.test.mjs`'s produce-then-reuse test at 116s (one full production-tree
- * project check plus a fixture project check in the same test); the production-tree scanner lanes
- * measure 34s and 107s. 180s is ~1.55× the worst lane, which is the headroom a cold or loaded
- * runner needs and no more — it stays well under `SUITE_BACKSTOP_MS`, so the suite ceiling remains
- * the 兜底 and the verdict-silence window derived from this stays the primary criterion.
+ * The value is measured, not padded to taste. Production-tree scanner lanes measure 34s and 110s.
+ * Tagged evidence production, reuse validation, and the explicit-project isolation scan expose
+ * separate verdicts: a completed compiler check is causal progress, while stdout remains background.
+ * 180s is ~1.64× the worst lane, which is the headroom a cold or loaded runner needs and no more —
+ * it stays well under `SUITE_BACKSTOP_MS`, so the suite ceiling remains the 兜底 and the
+ * verdict-silence window derived from this stays the primary criterion.
  *
  * There is no evidence-reuse shortcut available to these lanes. `FCS_REUSE_PATH_ENV` applies only
  * to a default production scan, and the expensive lanes are either fixture-project scans (not

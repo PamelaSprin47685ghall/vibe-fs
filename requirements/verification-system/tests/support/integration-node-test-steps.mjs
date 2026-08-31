@@ -52,7 +52,7 @@ export function integrationNodeTestSteps(root) {
     },
     // Both structured-workflow steps below run real `dotnet fsi` F# project checks: an F# project
     // check over the production tree cannot report a verdict inside the integration default, so the
-    // budget is declared here rather than raised for every step. Measured lanes: 6s + 116s here,
+    // budget is declared here rather than raised for every step. Measured lanes: 11s + 110s here,
     // 34s + 107s + 5s next door.
     {
       label: 'owner-dependencies-fcs.test.mjs (structured-workflow)',
