@@ -245,7 +245,7 @@ module OrchestratorProgram =
     /// it, so release must not depend on the happy path being taken.
     let private publishUnderGate (deps: OrchestratorProgramDeps) (job: ManagerJob) (expectedHead: CommitHash) =
         task {
-            let! gate = IntegrationGate.acquire deps.GatePath
+            let! gate = deps.AcquirePublishGate()
 
             let! outcome =
                 task {
