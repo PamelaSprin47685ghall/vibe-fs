@@ -8,9 +8,9 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import * as HandleJournalSurface from '../../../dist/Execution/Delegation/Handle/JournalSurface.js'
 import {
   agentFactCaseOf,
-  agentJournal,
   caseNameOf,
   clockAt,
   envelope,
@@ -18,7 +18,6 @@ import {
   fold,
   forkRuntime,
   handleAbandonReason,
-  handleController,
   handleId,
   handleOwnership,
   handleProjection,
@@ -62,12 +61,17 @@ const views = (projection) => ({
 
 const withJournal = async (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-abandon-'))
-  const created = await agentJournal.create({ directory: dir })
+  const created = await HandleJournalSurface.openJournal(
+    dir,
+    'managed-session-abandon',
+    1,
+    '2026-03-01T12:00:00Z',
+  )
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   try {
     return await fn(created.journal)
   } finally {
-    created.dispose()
+    HandleJournalSurface.dispose(created.journal)
   }
 }
 
@@ -145,10 +149,10 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_Abandoned_is_not_joinable_and_cannot_co
 
 test('WHAT[MANAGED-SESSION-009] EXEC_009_recordAbandon_CAS_first_wins', async () => {
   await withJournal(async (j) => {
-    const linked = await handleController.link(j, PARENT, 'h1', CHILD, 'fast-coder', forkRuntime.role('Coder'))
+    const linked = await HandleJournalSurface.link(j, PARENT, 'h1', CHILD, 'fast-coder', forkRuntime.role('Coder'))
     assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
 
-    const first = await handleController.recordAbandon(
+    const first = await HandleJournalSurface.recordAbandon(
       j,
       PARENT,
       'h1',
@@ -157,7 +161,7 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_recordAbandon_CAS_first_wins', async ()
     )
     assert.equal(first.ok, true, first.ok ? '' : first.error)
 
-    const second = await handleController.recordAbandon(
+    const second = await HandleJournalSurface.recordAbandon(
       j,
       PARENT,
       'h1',
@@ -167,10 +171,10 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_recordAbandon_CAS_first_wins', async ()
     // Journal accepts the line; fold absorbs AlreadyAbandoned (idempotent replay).
     assert.equal(second.ok, true, second.ok ? '' : second.error)
 
-    const projection = agentJournal.handleProjection(j, PARENT)
-    assert.equal(stateOf(projection).lifecycle, 'Abandoned')
-    assert.equal(stateOf(projection).abandonReason, 'ParentCancelled')
-    assert.deepEqual(views(projection).joinable, [])
+    const projection = HandleJournalSurface.snapshot(j, PARENT, HANDLE)
+    assert.equal(projection.record.lifecycle, 'Abandoned')
+    assert.equal(projection.record.abandonReason, 'ParentCancelled')
+    assert.deepEqual(projection.views.joinable, [])
   })
 })
 
