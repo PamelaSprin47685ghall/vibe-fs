@@ -14,7 +14,9 @@ const ok = (...actions) => {
 }
 
 test('WHAT[EFFECT-ACCOUNTING-008] C5_materialize_opens_request_queryable_by_blogger', () => {
-  assert.deepEqual(ok(materialize({ requestId: 'req-open' }),), {
+  const result = cycle.scenario([materialize({ requestId: 'req-open' })])
+  assert.equal(result.ok, true, result.error ?? '')
+  assert.deepEqual(result.state, {
     openRequests: 1,
     openBloggers: 1,
     receipts: 0,

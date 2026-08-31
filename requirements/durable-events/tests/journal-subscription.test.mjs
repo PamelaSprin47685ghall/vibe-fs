@@ -23,17 +23,27 @@ const lifeOpened = (session) => ({
   },
 })
 
-const withJournal = async (writerId, fn) => {
+const openJournal = async (writerId) => {
   const repo = mkdtempSync(join(tmpdir(), `wxs-jrev-${writerId}-`))
   execFileSync('git', ['init', '--quiet', repo])
   const commonDir = join(repo, '.git')
   const opened = await journal.JournalSurface_bootWithWriterId(commonDir, writerId, `rt-${writerId}`, 4242, '2026-04-01T00:00:00Z')
   assert.equal(opened.ok, true, JSON.stringify(opened.error))
+  return {
+    handle: opened.journal,
+    close: () => {
+      journal.JournalSurface_dispose(opened.journal)
+      rmSync(repo, { recursive: true, force: true })
+    },
+  }
+}
+
+const withJournal = async (writerId, fn) => {
+  const opened = await openJournal(writerId)
   try {
-    await fn(opened.journal)
+    await fn(opened.handle)
   } finally {
-    journal.JournalSurface_dispose(opened.journal)
-    rmSync(repo, { recursive: true, force: true })
+    opened.close()
   }
 }
 
@@ -41,17 +51,17 @@ const appendLife = (handle, session) =>
   journal.JournalSurface_appendManagerLifecycle(handle, { kind: 'Session', session }, lifeOpened(session))
 const revisionOf = (handle) => Number(revisions.revision(handle))
 
-test('WHAT[DURABLE-EVENTS-013] EXEC_journal_revision_advances_only_on_successful_fold', async () => {
-  await withJournal('revision-advance', async (handle) => {
-    const before = revisionOf(handle)
-    assert.equal(before, 0, 'pure load writes no RuntimeStarted and starts at revision 0')
+test('WHAT[DURABLE-EVENTS-013] EXEC_journal_revision_advances_only_on_successful_fold', async (context) => {
+  const opened = await openJournal('revision-advance')
+  context.after(opened.close)
+  const before = Number(revisions.revision(opened.handle))
+  assert.equal(before, 0, 'pure load writes no RuntimeStarted and starts at revision 0')
 
-    const linked = await appendLife(handle, 'ses_p')
-    assert.equal(linked.ok, true, JSON.stringify(linked.error))
+  const linked = await appendLife(opened.handle, 'ses_p')
+  assert.equal(linked.ok, true, JSON.stringify(linked.error))
 
-    const after = revisionOf(handle)
-    assert.equal(after, 2, 'first business append lazily writes RuntimeStarted#1 then publishes business#2')
-  })
+  const after = Number(revisions.revision(opened.handle))
+  assert.equal(after, 2, 'first business append lazily writes RuntimeStarted#1 then publishes business#2')
 })
 
 test('WHAT[DURABLE-EVENTS-013] EXEC_AwaitChangeFrom_after_append_returns_promptly', async () => {

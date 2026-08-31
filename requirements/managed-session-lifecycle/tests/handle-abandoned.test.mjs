@@ -39,22 +39,6 @@ const completeOn = (projection, { handle = HANDLE, kind = 'Terminal' } = {}) => 
 const stateOf = (projection, handle = HANDLE) => HandleSurface.read(projection, handle)
 const views = (projection) => HandleSurface.views(projection)
 
-const withJournal = async (fn) => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-abandon-'))
-  const created = await HandleJournalSurface.JournalSurface_openJournal(
-    dir,
-    'managed-session-abandon',
-    1,
-    '2026-03-01T12:00:00Z',
-  )
-  assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
-  try {
-    return await fn(created.journal)
-  } finally {
-    HandleJournalSurface.JournalSurface_dispose(created.journal)
-  }
-}
-
 test('WHAT[MANAGED-SESSION-009] EXEC_009_HandleAbandoned_serializes_round_trip', () => {
   const value = fact('HandleAbandoned', {
     ParentSessionId: PARENT,
@@ -123,8 +107,17 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_Abandoned_is_not_joinable_and_cannot_co
   assert.equal(stateOf(reopened.state).lifecycle, 'Active')
 })
 
-test('WHAT[MANAGED-SESSION-009] EXEC_009_recordAbandon_CAS_first_wins', async () => {
-  await withJournal(async (j) => {
+test('WHAT[MANAGED-SESSION-009] EXEC_009_recordAbandon_CAS_first_wins', async (context) => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-abandon-direct-'))
+  const created = await HandleJournalSurface.JournalSurface_openJournal(
+    dir,
+    'managed-session-abandon-direct',
+    1,
+    '2026-03-01T12:00:00Z',
+  )
+  assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
+  context.after(() => HandleJournalSurface.JournalSurface_dispose(created.journal))
+  const j = created.journal
     const linked = await HandleJournalSurface.JournalSurface_link(j, PARENT, 'h1', CHILD, 'fast-coder', 'Coder')
     assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
 
@@ -151,7 +144,6 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_recordAbandon_CAS_first_wins', async ()
     assert.equal(projection.record.lifecycle, 'Abandoned')
     assert.equal(projection.record.abandonReason, 'ParentCancelled')
     assert.deepEqual(projection.views.joinable, [])
-  })
 })
 
 test('WHAT[MANAGED-SESSION-009] EXEC_009_fold_replays_HandleAbandoned_idempotent', () => {

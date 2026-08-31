@@ -624,7 +624,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Composition/Turn/ReconcileSurface.js',
     owner: 'structured-workflow',
-    laws: ['STRUCTURED-WORKFLOW-007'],
+    laws: ['STRUCTURED-WORKFLOW-004'],
     source: 'src/Wanxiangshu/Composition/Turn/ReconcileSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1693,8 +1693,9 @@ export const SURFACE_MANIFEST = [
   },
   {
     module: 'Mission/Review/ReviewTodoSurface.js',
-    owner: 'review-assurance',
-    laws: ['REVIEW-ASSURANCE-008', 'REVIEW-ASSURANCE-009', 'REVIEW-ASSURANCE-010', 'REVIEW-ASSURANCE-012'],
+    owner: 'review-judgement',
+    laws: ['EFFECT-ACCOUNTING-011'],
+    lawOwners: { 'EFFECT-ACCOUNTING-011': 'effect-accounting' },
     source: 'src/Wanxiangshu/Mission/Review/ReviewTodoSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',

@@ -166,7 +166,11 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or
         writeFileSync(source, 'module Owner.Surface\n')
     writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
     writeFileSync(dist, 'export const value = 1\n')
-    writeFileSync(testFile, ['import * as surface ', 'from ', `'${distImport('../../../', 'Owner/Surface.js')}'\nvoid surface\n`].join(''))
+    writeFileSync(testFile, [
+      "import test from 'node:test'",
+      `import * as surface from '${distImport('../../../', 'Owner/Surface.js')}'`,
+      "test('WHAT[OWNER-001] owner behavior', () => { assert.equal(surface.value, 1) })",
+    ].join('\n'))
     const entry = {
       module: 'Owner/Surface.js',
       owner: 'owner',
@@ -177,7 +181,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or
     }
 
     assert.equal(usesSurface(readFileSync(testFile, 'utf8'), entry.module), true)
-    assert.match(validateSurfaceManifest([entry], temporaryRoot).join('\n'), /no active contract test WHAT law authorizes/)
+    assert.deepEqual(validateSurfaceManifest([entry], temporaryRoot), [])
 
     rmSync(dist)
     assert.match(validateSurfaceManifest([entry], temporaryRoot).join('\n'), /missing emitted surface/)
@@ -434,9 +438,9 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003d_manifest_rejects_unauthorize
     writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
     writeFileSync(dist, 'export const value = 1\n')
     // Authorized: owner dir + matching WHAT tag
-    writeFileSync(ownerTest, `import { value } from '${distImport('../../../', 'Owner/Surface.js')}'\ntest('WHAT[OWNER-001] authorized', () => { value() })\n`)
+    writeFileSync(ownerTest, `import test from 'node:test'\nimport { value } from '${distImport('../../../', 'Owner/Surface.js')}'\ntest('WHAT[OWNER-001] authorized', () => { value() })\n`)
     // Unauthorized: rogue dir, non-matching WHAT tag, no declared consumer edge
-    writeFileSync(rogueTest, `import { value } from '${distImport('../../../', 'Owner/Surface.js')}'\ntest('WHAT[ROGUE-001] unauthorized', () => { value() })\n`)
+    writeFileSync(rogueTest, `import test from 'node:test'\nimport { value } from '${distImport('../../../', 'Owner/Surface.js')}'\ntest('WHAT[ROGUE-001] unauthorized', () => { value() })\n`)
 
     const entry = {
       module: 'Owner/Surface.js',

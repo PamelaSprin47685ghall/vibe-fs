@@ -27,7 +27,6 @@ const sandbox = ({ enabled = true } = {}) => {
   return { dir, handle, cleanup: () => { eventStore.dispose(handle); rmSync(dir, { recursive: true, force: true }) } }
 }
 const factory = { tool: { schema: { string: () => ({}) } } }
-const buildTool = (dir, handle) => fetchSurface.contract(factory, dir, handle)
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
 const execute = (tool, shelfmark) => tool.execute({ shelfmark }, { sessionID: 'ses', agent: 'fast-inspector' })
 const assertFresh = (text) => assert.match(text, /No change was found in the evidence this answer depended on\.|这份答案所依赖的证据没有变化。/i)
@@ -42,7 +41,7 @@ test('WHAT[KNOWLEDGE-REUSE-004] CASE004_fetch_uses_shelfmark_and_replays_before_
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     const caseRec = record('s1', 'When does CaseFinalize run?', 'A1', [fileRead('a.txt', casebook.contentHash('hello'))])
     assert.equal((await casebook.archive(handle, caseRec)).ok, true)
-    const tool = buildTool(dir, handle)
+    const tool = fetchSurface.contract(factory, dir, handle)
     assert.equal(tool.name, 'fetch')
     const shelfmark = index.shelfmarkFor('s1', caseRec.q)
 
@@ -78,7 +77,7 @@ test('WHAT[KNOWLEDGE-REUSE-002] CASE004_fetch_returns_exact_canonical_a', async 
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     const caseRec = record('s1', 'When does CaseFinalize run?', 'A1', [fileRead('a.txt', casebook.contentHash('hello'))])
     assert.equal((await casebook.archive(handle, caseRec)).ok, true)
-    const tool = buildTool(dir, handle)
+    const tool = fetchSurface.contract(factory, dir, handle)
     const shelfmark = index.shelfmarkFor('s1', caseRec.q)
 
     const fresh = await execute(tool, shelfmark)
@@ -91,7 +90,7 @@ test('WHAT[KNOWLEDGE-REUSE-002] CASE004_fetch_returns_exact_canonical_a', async 
 test('WHAT[KNOWLEDGE-REUSE-009] CASE009_fetch_execution_rejects_a_workspace_without_the_marker', async () => {
   const { dir, handle, cleanup } = sandbox({ enabled: false })
   try {
-    const tool = buildTool(dir, handle)
+    const tool = fetchSurface.contract(factory, dir, handle)
     const result = await execute(tool, 'Anything · 00000000')
 
     assertUnavailable(result)
@@ -106,7 +105,7 @@ test('WHAT[KNOWLEDGE-REUSE-004] CASE009_fetch_never_writes_the_subject', async (
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     await casebook.archive(handle, record('s1', 'Q', 'A', [fileRead('a.txt', casebook.contentHash('hello'))]))
-    const tool = buildTool(dir, handle)
+    const tool = fetchSurface.contract(factory, dir, handle)
     await execute(tool, index.shelfmarkFor('s1', 'Q'))
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'hello')
   } finally {
@@ -119,7 +118,7 @@ test('WHAT[KNOWLEDGE-REUSE-011] CASE011_fetch_single_flight_serializes_same_shel
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     await casebook.archive(handle, record('s1', 'Q', 'A', [fileRead('a.txt', casebook.contentHash('hello'))]))
-    const tool = buildTool(dir, handle)
+    const tool = fetchSurface.contract(factory, dir, handle)
     const shelfmark = index.shelfmarkFor('s1', 'Q')
     const [a, b] = await Promise.all([execute(tool, shelfmark), execute(tool, shelfmark)])
     assertFresh(a)
