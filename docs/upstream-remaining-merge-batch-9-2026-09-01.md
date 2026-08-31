@@ -62,5 +62,6 @@ production F# 仅有 Satellite 测试 Surface 的 fail-closed fake port 修正�
 
 ## 剩余边界
 
+- 最终累计 PR：[upstream #27](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/27)。它完整包含 #20–#26；owner 只需合并 #27，随后关闭旧累计 PR。
 - GitHub CI 与 upstream merge 是外部事实，不能由本地绿色替代。
 - M10 fast-check pilot 仍是可选独立批次；没有负责人对依赖、property、CI budget、seed/path 形式的裁决时，不混入本 PR。
