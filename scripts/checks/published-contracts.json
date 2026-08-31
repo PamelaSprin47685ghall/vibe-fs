@@ -3595,6 +3595,20 @@
       "justification": "DurableConvergence.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-convergence."
     },
     {
+      "path": "src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs",
+      "owner": "durable-convergence",
+      "node": "durable-convergence-store-contracts",
+      "contract": "DurableConvergence.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.ProcessEventLogModule.processAwareFs"
+      ],
+      "justification": "Change integration consumes only the process-aware proper-lockfile adapter so a dead publishing process cannot leave the repository branch gate stale; no event stream reader or durable state capability crosses this contract."
+    },
+    {
       "path": "src/Wanxiangshu/Persistence/EventStore/ProcessGitRawStore.fs",
       "owner": "durable-events",
       "node": "canonical-spine",
