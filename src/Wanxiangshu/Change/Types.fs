@@ -138,12 +138,14 @@ module OrchestratorJournalPort =
                 }
           Snapshot = fun () -> AgentJournal.snapshot journal }
 
+type PublishGateLease = { Release: unit -> Task<unit> }
+
 type OrchestratorProgramDeps =
     { Git: GitPort
       Manager: ManagerPort
       AppendFact: StreamId -> AgentFact -> Task<Result<unit, string>>
       Snapshot: unit -> ProjectionSet
-      GatePath: string }
+      AcquirePublishGate: unit -> Task<PublishGateLease> }
 
 module OrchestratorConstants =
     /// `FfMerge` reports this when the target advanced between the head read and

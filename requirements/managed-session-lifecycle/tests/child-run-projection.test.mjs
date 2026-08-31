@@ -6,7 +6,7 @@ const childRunSnapshot = ({ action = 'fresh', runtimeCancelled = false, message 
   ForkLifecycleSurface.snapshot(action, runtimeCancelled, message)
 
 test('WHAT[MANAGED-SESSION-012] VERIFY_009_child_run_starts_active', () => {
-  const run = childRunSnapshot()
+  const run = ForkLifecycleSurface.snapshot('fresh', false, 'done')
   assert.equal(run.active, true)
   assert.equal(run.completed, false)
   assert.equal(run.cancelled, false)

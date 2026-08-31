@@ -121,12 +121,12 @@ test('WHAT[CAUSAL-006] history_capacity_bounds_ring_buffer', () => {
 })
 
 test('WHAT[CAUSAL-001] RED_8_application_observer_enter_only_snapshot_via_reader', () => {
-  assert.equal(causal.observerHasSnapshot(), false)
-  assert.equal(causal.readerHasSnapshot(), true)
-
-  const lease = causal.hubEnter(waitFor('hub', 'ext'))
-  const viaSnapshotFn = causal.hubSnapshot()
-  assert.ok(viaSnapshotFn.active.length >= 1)
+  const registry = causal.createRegistry()
+  const observer = causal.observerCapability(registry)
+  const reader = causal.snapshotReaderCapability(registry)
+  const lease = causal.observerEnter(observer, waitFor('hub', 'ext'))
+  assert.equal(causal.readerSnapshot(reader).active.length, 1)
+  assert.throws(() => causal.readerSnapshot(observer), /snapshot reader capability required/)
   causal.markExit(lease, 'WaitResolved')
   causal.dispose(lease)
 })

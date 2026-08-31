@@ -938,6 +938,28 @@ module SyncDelegateSurface =
             | Some sessionId -> box (SessionId.value sessionId)
             | None -> null
 
+    let stageDeletedInspector (value: obj) (owner: string) : bool =
+        let harness = unbox<Harness> value
+        let ownerSession = harness.OwnerSession owner
+
+        match harness.Runtime.TryFind(ownerSession, SyncDelegateRole.Inspector) with
+        | Some child -> harness.Runtime.StageDeletedInspector(ownerSession, child)
+        | None -> false
+
+    let scopeCloseChild (value: obj) (owner: string) (role: string) : obj =
+        let harness = unbox<Harness> value
+
+        match roleOf role with
+        | Error _ -> null
+        | Ok role ->
+            harness.Runtime.TryFindForScopeClose(harness.OwnerSession owner, role)
+            |> Option.map (SessionId.value >> box)
+            |> Option.defaultValue null
+
+    let cancelSession (value: obj) (session: string) : unit =
+        let harness = unbox<Harness> value
+        harness.Runtime.CancelSession(harness.OwnerSession session)
+
     let vocabulary (roleName: string) (tierName: string) (scope: string) : obj =
         match roleOf roleName with
         | Error error -> box {| ok = false; error = error |}

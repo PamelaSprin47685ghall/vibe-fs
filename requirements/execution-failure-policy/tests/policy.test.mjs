@@ -124,7 +124,7 @@ test('WHAT[EXECFAIL-001] observes every closed failure and persistence commitmen
   assert.equal(failures.length, 13)
 
   for (const failure of failures) {
-    const decision = decide({ failure })
+    const decision = policy.decide({ ...baseInput, failure })
     assert.equal(typeof decision, 'object')
     assert.equal(Object.keys(decision).length, 6)
   }

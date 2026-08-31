@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 /**
- * g4r-ce-vocabulary.mjs — G4R-CE Semantic CE Vocabulary static ratchets
- * (changes/active/rabbit.md §24).
+ * g4r-ce-vocabulary.mjs — obsolete-controller and ambient-time architecture gate.
  *
- * Fail-closed detectors for obsolete controller absence (§24.1) and raw-time
- * (§24.2). Pure scan* helpers accept injectable trees; direct invocation always
- * exits non-zero on a violation. There is no warning phase.
+ * The CLI is permanently fail-closed. Pure analyzers accept controlled inputs;
+ * the production collector traverses the whole tree before exact-file physical
+ * adapter exemptions are applied.
  *
  * Usage: node scripts/checks/g4r-ce-vocabulary.mjs
  */
@@ -32,22 +31,10 @@ export const OBSOLETE_CONTROLLER_PATHS = Object.freeze([
 ])
 
 /**
- * Layers where raw wall-clock / timer primitives are forbidden (§24.2).
- * Infrastructure / Process physical adapters are outside this scan.
+ * Scan the complete production tree. Physical adapters are removed only by the
+ * exact-file allowlist below; a new sibling never inherits an exemption.
  */
-export const RAW_TIME_SCAN_LAYERS = Object.freeze([
-  'Execution',
-  'Mission',
-  'Interaction',
-  'Context',
-  'Participant',
-  'Repository',
-  'Strength',
-  'Foundation',
-  'Change',
-  'Enforcer',
-  'Composition',
-])
+export const RAW_TIME_SCAN_ROOTS = Object.freeze(['.'])
 
 /**
  * Forbidden raw-time tokens in Domain / Application / Session.
@@ -63,25 +50,35 @@ export const RAW_TIME_TOKENS = Object.freeze([
 ])
 
 /**
- * Allowlist hook for physical adapters that temporarily live under scanned
- * layers (posix paths relative to src/Wanxiangshu/, or repo-relative).
- * Exact file match OR prefix (trailing `/`).
- *
- * Exact Session files below are physical runtime/codec/mailbox implementations,
- * not Application business workflows. They own Host timestamps or timer waits;
- * ChildRecovery/HandleController business decisions receive time as data instead.
- * Process/ + Infrastructure/ are already outside RAW_TIME_SCAN_LAYERS.
+ * Exact physical adapter files allowed to own ambient time. Directory prefixes
+ * are forbidden: every new adapter must be reviewed and added explicitly.
  */
 export const RAW_TIME_ALLOWLIST = Object.freeze([
-  // Physical OpenCode / Host / Surface / Stdio adapter subdirectories
-  'Execution/Delegation/Fork/OpenCode/',
-  'Execution/Delegation/SyncDelegate/Surface.fs',
-  'Mission/Finality/OpenCode/',
-  'Repository/Investigation/Semble/Stdio.fs',
-  'Repository/Knowledge/Casebook/BookkeeperRuntime.fs',
-  'Repository/Programming/Js/OpenCode/',
-  'Change/Host/',
+  'Change/Host/Host.fs',
   'Enforcer/Guidance/TipSurface.fs',
+  'Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs',
+  'Execution/Delegation/Fork/OpenCode/JoinTool.fs',
+  'Execution/Delegation/Fork/OpenCode/ToolSurface.fs',
+  'Execution/Delegation/SyncDelegate/Surface.fs',
+  'OpenCode/Host/PairProgrammingThoughtSurface.fs',
+  'OpenCode/Host/PluginHost.fs',
+  'OpenCode/Host/RequirementGroundingRepositorySurface.fs',
+  'OpenCode/Host/RequirementGroundingSurface.fs',
+  'OpenCode/Tools/Distillation.fs',
+  'OpenCode/Tools/DistillationSurface.fs',
+  'Persistence/EventStore/ProcessEventLog.fs',
+  'Persistence/EventStore/WriterStreamSync.fs',
+  'Persistence/Journal/EventStoreJournalWriter.fs',
+  'Process/JsSandbox.fs',
+  'Process/NodeProcessWait.fs',
+  'Process/ProcessRunner.fs',
+  'Process/Pty.fs',
+  'Process/PtySupervisor.fs',
+  'Process/PtyTiming.fs',
+  'Repository/Investigation/Semble/Stdio.fs',
+  'Repository/Programming/Js/OpenCode/BookkeeperTool.fs',
+  'Repository/Programming/Js/OpenCode/ToolHost.fs',
+  'Sphinx/McpServer.fs',
 ])
 
 const norm = (p) => p.replace(/\\/g, '/')
@@ -102,8 +99,6 @@ export const isRawTimeAllowlisted = (file, allowlist = RAW_TIME_ALLOWLIST) => {
     const a = norm(entry)
     for (const c of candidates) {
       if (c === a) return true
-      if (a.endsWith('/') && c.startsWith(a)) return true
-      if (!a.endsWith('/') && c.startsWith(`${a}/`)) return true
     }
   }
   return false
@@ -169,18 +164,28 @@ export const scanRawTimeEntries = (entries, opts = {}) => {
 }
 
 /**
- * Collect Domain/Application/Session source entries under a production root.
+ * Collect every source entry under the declared production scan roots.
  * @param {string} productionRoot absolute path to src/Wanxiangshu
- * @param {readonly string[]} [layers]
+ * @param {readonly string[]} [roots]
  */
 export const collectRawTimeScanEntries = (
   productionRoot,
-  layers = RAW_TIME_SCAN_LAYERS,
+  roots = RAW_TIME_SCAN_ROOTS,
 ) => {
+  if (!existsSync(productionRoot)) {
+    throw new Error(`raw-time scan root does not exist: ${productionRoot}`)
+  }
+
   const entries = []
-  for (const layer of layers) {
-    const dir = join(productionRoot, layer)
-    if (!existsSync(dir)) continue
+  for (const root of roots) {
+    const dir = resolve(productionRoot, root)
+    const relativeRoot = norm(relative(productionRoot, dir))
+    if (relativeRoot.startsWith('../') || relativeRoot === '..') {
+      throw new Error(`raw-time scan root escapes production tree: ${root}`)
+    }
+    if (!existsSync(dir)) {
+      throw new Error(`raw-time scan root does not exist: ${dir}`)
+    }
     for (const abs of walk(dir, ['.fs', '.mjs', '.js', '.ts'])) {
       entries.push({
         file: norm(relative(productionRoot, abs) || abs),

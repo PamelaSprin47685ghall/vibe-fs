@@ -19,13 +19,22 @@ const mustOk = (result) => {
   return result
 }
 
-const withRepo = async (name, fn) => {
+const openRepo = (name) => {
   const workspace = mkdtempSync(join(tmpdir(), `wxs-host-es-${name}-`))
+  execFileSync('git', ['init', '--quiet', workspace])
+  return {
+    workspace,
+    commonDir: join(workspace, '.git'),
+    close: () => rmSync(workspace, { recursive: true, force: true }),
+  }
+}
+
+const withRepo = async (name, fn) => {
+  const opened = openRepo(name)
   try {
-    execFileSync('git', ['init', '--quiet', workspace])
-    await fn(workspace, join(workspace, '.git'))
+    await fn(opened.workspace, opened.commonDir)
   } finally {
-    rmSync(workspace, { recursive: true, force: true })
+    opened.close()
   }
 }
 
@@ -58,20 +67,20 @@ test('WHAT[DURABLE-EVENTS-010] SharedAgentJournal_boots_local_EventStore_and_lea
   })
 })
 
-test('WHAT[DURABLE-EVENTS-009] SharedAgentJournal_cache_hit_returns_same_instance_without_rereading_retired_path', async () => {
-  await withRepo('cache', async (workspace, commonDir) => {
-    const retiredDir = join(commonDir, 'wanxiangshu-next', 'runtimes')
-    mkdirSync(retiredDir, { recursive: true })
-    const stale = join(retiredDir, 'old.ndjson')
-    writeFileSync(stale, POISON)
-    const before = fingerprint(stale)
+test('WHAT[DURABLE-EVENTS-009] SharedAgentJournal_cache_hit_returns_same_instance_without_rereading_retired_path', async (context) => {
+  const opened = openRepo('cache')
+  context.after(opened.close)
+  const retiredDir = join(opened.commonDir, 'wanxiangshu-next', 'runtimes')
+  mkdirSync(retiredDir, { recursive: true })
+  const stale = join(retiredDir, 'old.ndjson')
+  writeFileSync(stale, POISON)
+  const before = fingerprint(stale)
 
-    const first = mustOk(await workspaceHost.WorkspaceEventStoreSurface_acquire(retiredDir, commonDir, process.pid, '2026-04-01T00:00:00Z'))
-    const second = mustOk(await workspaceHost.WorkspaceEventStoreSurface_acquire(retiredDir, commonDir, process.pid, '2026-04-01T00:00:01Z'))
-    assert.equal(workspaceHost.WorkspaceEventStoreSurface_same(first.journal, second.journal), true)
-    assert.deepEqual(fingerprint(stale), before)
+  const first = mustOk(await workspaceHost.WorkspaceEventStoreSurface_acquire(retiredDir, opened.commonDir, process.pid, '2026-04-01T00:00:00Z'))
+  const second = mustOk(await workspaceHost.WorkspaceEventStoreSurface_acquire(retiredDir, opened.commonDir, process.pid, '2026-04-01T00:00:01Z'))
+  assert.equal(workspaceHost.WorkspaceEventStoreSurface_same(first.journal, second.journal), true)
+  assert.deepEqual(fingerprint(stale), before)
 
-    workspaceHost.WorkspaceEventStoreSurface_release(first.journal)
-    workspaceHost.WorkspaceEventStoreSurface_release(second.journal)
-  })
+  workspaceHost.WorkspaceEventStoreSurface_release(first.journal)
+  workspaceHost.WorkspaceEventStoreSurface_release(second.journal)
 })

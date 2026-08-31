@@ -14,7 +14,7 @@
 
 ## JS-SEMANTIC-SURFACE-003: 值得独立测试的 law 必须有独立 semantic owner + JS surface
 
-任何值得独立验证的语义定理或业务规则，必须归属于明确的 package owner，且该 owner 必须为其提供 JS 原生的 Surface 承载。Surface 必须在所属领域边界处负责完成 JavaScript 原生数据表示与内部领域模型之间的双向适配与转换，严禁建立跨越所有业务领域的集中式上帝外观（god facade）。
+任何值得独立验证的语义定理或业务规则，必须归属于明确的 package owner，且该 owner 必须为其提供 JS 原生的 Surface 承载。Surface proof authority 只来自 active primary WHAT callback 内对该 Surface import binding 的直接、可达、terminal use；shadow、dead helper、其他 law callback、非 terminal alias 与 assignment target 均不得制造因果证据。Surface 必须在所属领域边界处负责完成 JavaScript 原生数据表示与内部领域模型之间的双向适配与转换，严禁建立跨越所有业务领域的集中式上帝外观（god facade）。
 
 ## JS-SEMANTIC-SURFACE-004: 不拥有独立 law 的 helper 不直接测试
 

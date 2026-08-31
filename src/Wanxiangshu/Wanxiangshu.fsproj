@@ -428,6 +428,7 @@
     <Compile Include="Repository/Investigation/WarmStartSurface.fs"/>
     <Compile Include="Strength/OpenCode/Replay.fs"/>
     <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fs"/>
+    <Compile Include="OpenCode/Host/SatelliteSurface.fs"/>
     <Compile Include="Interaction/Dispatch/PhysicalAcceptance.fs"/>
     <Compile Include="Interaction/Dispatch/Dispatcher.fs"/>
     <Compile Include="OpenCode/Host/ChatAdmission/Transaction.fs"/>
@@ -470,6 +471,7 @@
     <Compile Include="Execution/Delegation/Fork/Host/JoinSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/Agent.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/Pty.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Host/HostForkPtySurface.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/State.fs"/>
     <Compile Include="Interaction/Repair/Port.fs"/>
 
@@ -527,6 +529,7 @@
     <Compile Include="Mission/Review/Judgement/Workflow.fs"/>
     <Compile Include="Mission/Review/OpenCode/TerminalAwait.fs"/>
     <Compile Include="OpenCode/Host/TerminalPolicy.fs"/>
+    <Compile Include="OpenCode/Host/TerminalPolicySurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fs"/>
     <Compile Include="Enforcer/Continuation.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Workflow.fs"/>
@@ -664,6 +667,7 @@
     <Compile Include="Persistence/Journal/RevisionSurface.fs"/>
     <Compile Include="Persistence/Journal/CodecSurface.fs"/>
     <Compile Include="Persistence/Journal/FactCodecSurface.fs"/>
+    <Compile Include="Execution/Delegation/Handle/JournalSurface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Bookkeeper.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperRefreshSurface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperSurface.fs"/>

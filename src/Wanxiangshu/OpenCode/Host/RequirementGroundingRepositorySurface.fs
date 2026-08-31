@@ -66,7 +66,7 @@ module RequirementGroundingRepositorySurface =
                 |> List.toArray
                created = created |}
 
-    let runFirstAttempt workspace sessionId program : Task<obj> =
+    let private runAttempt failObservation workspace sessionId program : Task<obj> =
         task {
             match! boot workspace sessionId with
             | Error error -> return raise (InvalidOperationException error)
@@ -75,12 +75,18 @@ module RequirementGroundingRepositorySurface =
                 | None -> return raise (InvalidOperationException "Coder js surface unavailable")
                 | Some surface ->
                     let observe readPaths effectPaths =
-                        RequirementGroundingGate.programObservation
-                            (Some runtime.Handle.Journal)
-                            runtime.Workspace
-                            runtime.SessionId
-                            readPaths
-                            effectPaths
+                        task {
+                            do!
+                                RequirementGroundingGate.programObservation
+                                    (Some runtime.Handle.Journal)
+                                    runtime.Workspace
+                                    runtime.SessionId
+                                    readPaths
+                                    effectPaths
+
+                            if failObservation then
+                                return raise (InvalidOperationException "observation failed after recording effects")
+                        }
 
                     let! outcome =
                         JsToolWorkflow.runWithFileAccessObservation
@@ -95,3 +101,9 @@ module RequirementGroundingRepositorySurface =
 
                     return summary runtime outcome
         }
+
+    let runFirstAttempt workspace sessionId program : Task<obj> =
+        runAttempt false workspace sessionId program
+
+    let runWithObservationFailure workspace sessionId program : Task<obj> =
+        runAttempt true workspace sessionId program

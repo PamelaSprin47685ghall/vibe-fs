@@ -1,56 +1,36 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { terminalPolicy } from './support/managed-surface.mjs'
+import * as HandleSurface from '../../../dist/Execution/Delegation/Handle/Surface.js'
+import * as TerminalPolicySurface from '../../../dist/OpenCode/Host/TerminalPolicySurface.js'
 
-const childJournal = {
-  children: { 'ses_child': { handle: 'agent:h1', targetAgent: 'fast-coder' } },
-  listable: ['ses_main'],
-  sealed: true,
-  activeJobs: true,
-}
-
-test('WHAT[MANAGED-SESSION-006] TPOL_sessionDead_false_without_journal_or_on_fresh_journal', () => {
-  assert.equal(terminalPolicy.sessionDead(null), false)
-  assert.equal(terminalPolicy.sessionDead(undefined), false)
-  assert.equal(terminalPolicy.sessionDead({}), false)
+test('WHAT[MANAGED-SESSION-006] TPOL_sessionDead_false_without_journal', () => {
+  assert.equal(TerminalPolicySurface.sessionDeadWithoutJournal('ses_main'), false)
 })
 
-test('WHAT[MANAGED-SESSION-015] TPOL_tryLinkedChild_finds_child_handle_and_keeps_target_agent', () => {
-  const record = terminalPolicy.tryLinkedChild(childJournal, 'ses_child')
-  assert.equal(record.handle, 'agent:h1')
-  assert.equal(record.targetAgent, 'fast-coder')
+test('WHAT[MANAGED-SESSION-006] TPOL_outstanding_without_durable_work_is_role_closed', () => {
+  assert.equal(TerminalPolicySurface.outstandingWithoutJournal('Manager', false, 'ses_main'), false)
+  assert.equal(TerminalPolicySurface.outstandingWithoutJournal('DevOps', true, 'ses_devops'), true)
+  assert.equal(TerminalPolicySurface.outstandingWithoutJournal('Orchestrator', false, 'ses_orchestrator'), false)
+  assert.equal(TerminalPolicySurface.outstandingWithoutJournal('Coder', true, 'ses_coder'), false)
+  assert.equal(TerminalPolicySurface.outstandingWithoutJournal('unknown', true, 'ses_unknown'), false)
 })
 
-test('WHAT[MANAGED-SESSION-015] TPOL_tryLinkedChild_without_journal_returns_none', () => {
-  assert.equal(terminalPolicy.tryLinkedChild(null, 'ses_child'), undefined)
-  assert.equal(terminalPolicy.isLinkedChild(undefined, 'ses_child'), false)
-})
-
-test('WHAT[MANAGED-SESSION-006] TPOL_mainSealedForBlogger_false_without_journal_or_unlinked_main', () => {
-  assert.equal(terminalPolicy.mainSealedForBlogger(null), false)
-  assert.equal(terminalPolicy.mainSealedForBlogger({}), false)
-})
-
-test('WHAT[MANAGED-SESSION-006] TPOL_mainSealedForBlogger_retired_handle_seals_main', () => {
-  assert.equal(terminalPolicy.mainSealedForBlogger(childJournal), true)
-})
-
-test('WHAT[MANAGED-SESSION-006] TPOL_outstandingBackground_manager_has_listable_handles', () => {
-  assert.equal(terminalPolicy.outstandingBackground(childJournal, () => false, 'Manager', 'ses_main'), true)
-  assert.equal(terminalPolicy.outstandingBackground(childJournal, () => false, 'Manager', 'ses_other'), false)
-})
-
-test('WHAT[MANAGED-SESSION-006] TPOL_outstandingBackground_devops_checks_durable_then_live_pty', () => {
-  assert.equal(terminalPolicy.outstandingBackground(childJournal, () => false, 'DevOps', 'ses_main'), true)
-  assert.equal(terminalPolicy.outstandingBackground({}, () => true, 'DevOps', 'ses_pty'), true)
-})
-
-test('WHAT[MANAGED-SESSION-006] TPOL_outstandingBackground_orchestrator_active_jobs', () => {
-  assert.equal(terminalPolicy.outstandingBackground(childJournal, () => false, 'Orchestrator', 'ses_main'), true)
-  assert.equal(terminalPolicy.outstandingBackground({}, () => false, 'Orchestrator', 'ses_main'), false)
-})
-
-test('WHAT[MANAGED-SESSION-006] TPOL_outstandingBackground_other_roles_never_outstanding', () => {
-  assert.equal(terminalPolicy.outstandingBackground(childJournal, () => true, 'Coder', 'ses_main'), false)
-  assert.equal(terminalPolicy.outstandingBackground(childJournal, () => true, undefined, 'ses_main'), false)
+test('WHAT[MANAGED-SESSION-015] TPOL_linked_child_keeps_exact_handle_and_target', () => {
+  const linked = HandleSurface.apply(HandleSurface.empty(), {
+    op: 'link', handle: 'agent:h1', child: 'ses_child', agent: 'fast-coder', role: 'Coder',
+  })
+  assert.equal(linked.ok, true)
+  assert.deepEqual(HandleSurface.tryFindByChildSession(linked.state, 'ses_child'), {
+    handle: 'agent:h1',
+    child: 'ses_child',
+    targetAgent: 'fast-coder',
+    role: 'Coder',
+    lifecycle: 'Active',
+    creationOrder: 0,
+    completion: undefined,
+    completionRef: undefined,
+    completionDigest: undefined,
+    abandonReason: undefined,
+  })
+  assert.equal(HandleSurface.tryFindByChildSession(linked.state, 'ses_missing'), null)
 })

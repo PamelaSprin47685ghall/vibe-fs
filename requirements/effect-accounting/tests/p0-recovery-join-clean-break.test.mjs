@@ -130,13 +130,13 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_GATE_exports_clean_break_rule
   }
 })
 
-for (const sample of NEGATIVES) {
-  test(`WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_GATE_negative_${sample.id}_goes_red`, () => {
+test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_GATE_each_negative_fixture_goes_red', () => {
+  for (const sample of NEGATIVES) {
     const hits = scanText(sample.source, sample.file)
     const ofId = hits.filter((h) => h.id === sample.id)
     assert.ok(ofId.length >= 1, `expected rule ${sample.id} to fire; got ${hits.map((h) => h.id).join(',')}`)
-  })
-}
+  }
+})
 
 test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
   const files = [

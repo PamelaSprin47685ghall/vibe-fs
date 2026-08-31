@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
@@ -19,7 +20,7 @@ const FABLE_LIBRARY = join(ROOT, 'node_modules/@fable-org/fable-library-js')
 export const FCS_REUSE_PATH_ENV = 'OMP_FCS_REUSE_PATH'
 export const FCS_REUSE_RUN_ID_ENV = 'OMP_FCS_REUSE_RUN_ID'
 export const FCS_NORMALIZED_OUTPUT_ENV = 'OMP_FCS_NORMALIZED_OUTPUT_PATH'
-export const FCS_NORMALIZED_SCHEMA_VERSION = 2
+export const FCS_NORMALIZED_SCHEMA_VERSION = 3
 const PATH_GLOB = /[*?\[\]]/
 const PUBLICISH_PATH = /(?:Surface|Contract|Port|Api)\.fs$/
 const EXECUTION_POSITION = /(?:^|[._/])(Stage|Step|Cursor|Registry|NextAction|ResumeAt)(?:$|[A-Z._/])/i
@@ -46,6 +47,25 @@ function readCompilePaths(projectFile, productionRoot) {
   if (paths.length === 0) throw new Error(`${repositoryPath(project, 'project file')}: no production Compile entries found`)
   if (new Set(paths).size !== paths.length) throw new Error(`${repositoryPath(project, 'project file')}: duplicate Compile entry`)
   return paths
+}
+
+function evidenceInputFingerprint(project, productionFiles) {
+  const inputs = [
+    fileURLToPath(import.meta.url),
+    SYMBOL_SCANNER,
+    project,
+    join(ROOT, 'package-lock.json'),
+    ...productionFiles.map((path) => join(ROOT, path)),
+  ].map((path) => [repositoryPath(path, 'FCS evidence input'), path])
+    .sort(([left], [right]) => left.localeCompare(right))
+  const hash = createHash('sha256')
+  for (const [path, absolutePath] of inputs) {
+    hash.update(path)
+    hash.update('\0')
+    hash.update(readFileSync(absolutePath))
+    hash.update('\0')
+  }
+  return hash.digest('hex')
 }
 
 function findFiles(directory, name, found = []) {
@@ -538,6 +558,7 @@ export function scanProjectSymbolUses({
 
   let parsed
   const defaultProductionScan = project === resolve(FSPROJ) && production === resolve(PRODUCTION_ROOT)
+  const inputFingerprint = defaultProductionScan ? evidenceInputFingerprint(project, expectedPaths) : null
   const reusePath = process.env[FCS_REUSE_PATH_ENV]
   const reuseRunId = process.env[FCS_REUSE_RUN_ID_ENV]
   if (defaultProductionScan && (reusePath !== undefined || reuseRunId !== undefined)) {
@@ -553,6 +574,8 @@ export function scanProjectSymbolUses({
       throw new Error('FCS normalized evidence schema version does not match')
     if (typeof parsed.runId !== 'string' || parsed.runId !== reuseRunId)
       throw new Error('FCS evidence reuse run ID does not match')
+    if (parsed.inputFingerprint !== inputFingerprint)
+      throw new Error('FCS normalized evidence inputs do not match the current production tree')
     const normalizedArrays = [
       'symbolUses',
       'applicationUses',
@@ -660,6 +683,7 @@ export function scanProjectSymbolUses({
     const artifact = {
       schemaVersion: FCS_NORMALIZED_SCHEMA_VERSION,
       runId,
+      inputFingerprint,
       ...normalizedEvidence,
     }
     mkdirSync(dirname(normalizedOutput), { recursive: true })

@@ -23,7 +23,7 @@
     "access": "restricted"
   },
   "scripts": {
-    "format-build-test": "dotnet tool run fantomas src/Wanxiangshu && node scripts/check.mjs && node scripts/build.mjs && node requirements/verification-system/tests/run.mjs && node requirements/verification-system/tests/integration/run.mjs && node requirements/distribution/tests/integration/package/run.mjs && node scripts/warmup-opencode.mjs && node requirements/verification-system/tests/e2e/entry.test.mjs && npm pack --dry-run",
+    "format-build-test": "npm run format && npm run check && npm run owner-dep && npm run build && node requirements/verification-system/tests/run.mjs && node requirements/verification-system/tests/integration/run.mjs && node requirements/distribution/tests/integration/package/run.mjs && node scripts/warmup-opencode.mjs && node requirements/verification-system/tests/e2e/entry.test.mjs && npm pack --dry-run",
     "format": "wireit",
     "check": "wireit",
     "owner-dep": "wireit",
@@ -65,9 +65,9 @@
     "build": {
       "command": "node scripts/build.mjs",
       "files": [
-        "scripts/build.mjs",
-        "src/Wanxiangshu/**",
-        "package.json"
+        "**/*",
+        "!dist/**",
+        "!.fable-build/**"
       ],
       "output": [
         "dist/**"
@@ -90,6 +90,7 @@
   },
   "devDependencies": {
     "@opencode-ai/plugin": "1.18.18",
+    "acorn": "^8.18.0",
     "opencode-ai": "1.18.18",
     "smol-toml": "1.8.0",
     "wireit": "^0.14.13"

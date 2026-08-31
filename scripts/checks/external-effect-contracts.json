@@ -70,7 +70,7 @@
       "owner": "change-integration",
       "what_ids": ["CHGINT-002", "CHGINT-007"],
       "intent": {"kind": "durable-intent", "path": "src/Wanxiangshu/Change/Facts.fs", "symbols": ["PublishClaimed"]},
-      "admission": {"kind": "process-local-admission", "path": "src/Wanxiangshu/Change/Program.fs", "symbols": ["publishUnderGate", "IntegrationGate.acquire"]},
+      "admission": {"kind": "process-local-admission", "path": "src/Wanxiangshu/Change/Program.fs", "symbols": ["publishUnderGate", "AcquirePublishGate"]},
       "physical_receipt": {"kind": "typed-result", "path": "src/Wanxiangshu/Git/Operations.fs", "symbols": ["ffMerge"]},
       "durable_outcome": {"kind": "durable-outcome", "path": "src/Wanxiangshu/Change/Facts.fs", "symbols": ["Published"]},
       "effect_identity": "TargetRef expected head and rebased candidate commit",
