@@ -110,7 +110,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] scanner sees a bound nested test and skips le
     "test('WHAT[F-001] outer', async (t) => {",
     "  await t.test('WHAT[F-002] inner', () => {})",
     '})',
-    "const notCode = /t\\.test\\('WHAT[F-003] regex'\\)/",
+    "const notCode = /t\\.test\\('WHAT\\[F-003\\] regex'\\)/",
     "/* t.test('WHAT[F-004] block comment') */",
   ].join('\n')
   const calls = scanTestSource('<virtual>', src)
@@ -195,7 +195,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects 
   mkdirSync(tests, { recursive: true })
   try {
     writeFileSync(whatFile, '# WHAT\n\n## FIXTURE-PACKAGE-001：contract\n')
-    writeFileSync(testFile, "test('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})\n")
+    writeFileSync(testFile, "import test from 'node:test'\ntest('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})\n")
 
     writeFileSync(proofFile, '| 命题 | 落点 |\n|---|---|\n| FIXTURE-PACKAGE-001 | `tests/case.test.mjs` |\n')
     const bare = buildTraceGraph(requirements)
@@ -214,10 +214,11 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects 
         state: closed.proofEdges[0].state,
         whatId: closed.proofEdges[0].whatId,
       },
-      { line: 1, title: 'WHAT[FIXTURE-PACKAGE-001] exact anchor', state: 'active', whatId: 'FIXTURE-PACKAGE-001' },
+      { line: 2, title: 'WHAT[FIXTURE-PACKAGE-001] exact anchor', state: 'active', whatId: 'FIXTURE-PACKAGE-001' },
     )
 
     writeFileSync(testFile, [
+      "import test from 'node:test'",
       "test('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})",
       "test('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})",
     ].join('\n') + '\n')
@@ -226,7 +227,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects 
     assert.equal(ambiguous.danglingProof[0].reason, 'anchor resolves to multiple tests')
     assert.deepEqual(ambiguous.proofMissing.map(({ id }) => id), ['FIXTURE-PACKAGE-001'])
 
-    writeFileSync(testFile, "test('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})\n")
+    writeFileSync(testFile, "import test from 'node:test'\ntest('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})\n")
     writeFileSync(proofFile, '| 命题 | 落点 |\n|---|---|\n| FIXTURE-PACKAGE-001 | `tests/case.test.mjs::WHAT[FIXTURE-PACKAGE-001] removed anchor` |\n')
     const dangling = buildTraceGraph(requirements)
     assert.equal(dangling.danglingProof.length, 1)
@@ -311,7 +312,7 @@ test('WHAT[REQUIREMENT-SYSTEM-008] duplicate definitions retain every location a
   try {
     writeFileSync(join(packageA, 'WHAT.md'), '# WHAT\n## SHARED-001: first owner\n## LOCAL-001: first duplicate\n## LOCAL-001: second duplicate\n## UNIQUE-001: unique authority\n')
     writeFileSync(join(packageA, 'HOW.md'), '# HOW\n')
-    writeFileSync(join(packageA, 'tests/case.test.mjs'), "test('WHAT[SHARED-001] ambiguous authority', () => {})\n")
+    writeFileSync(join(packageA, 'tests/case.test.mjs'), "import test from 'node:test'\ntest('WHAT[SHARED-001] ambiguous authority', () => {})\n")
     writeFileSync(join(packageB, 'WHAT.md'), '# WHAT\n## SHARED-001: second owner\n')
     writeFileSync(join(packageB, 'HOW.md'), '# HOW\n')
 
@@ -343,6 +344,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph preserves proof portfolios and rejects 
     writeFileSync(
       join(tests, 'case.test.mjs'),
       [
+        "import test from 'node:test'",
         "test('WHAT[PORTFOLIO-001] first proof', () => {})",
         "test('WHAT[PORTFOLIO-001] second proof', () => {})",
         "test('orphan proof', () => {})",
@@ -361,11 +363,11 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph preserves proof portfolios and rejects 
 
     const graph = buildTraceGraph(requirements)
     assert.deepEqual(graph.proofEdges.map(({ whatId, line }) => [whatId, line]), [
-      ['PORTFOLIO-001', 1],
       ['PORTFOLIO-001', 2],
+      ['PORTFOLIO-001', 3],
     ])
-    assert.deepEqual(graph.orphans.map(({ line }) => line), [3])
-    assert.deepEqual(graph.multiPrimary.map(({ test: ownedTest }) => ownedTest.line), [4])
+    assert.deepEqual(graph.orphans.map(({ line }) => line), [4])
+    assert.deepEqual(graph.multiPrimary.map(({ test: ownedTest }) => ownedTest.line), [5])
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -379,7 +381,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph resolves ownership before a five-column
   mkdirSync(tests, { recursive: true })
   try {
     writeFileSync(join(packageRoot, 'WHAT.md'), '# WHAT\n## WIDE-PROOF-001: semantic law\n')
-    writeFileSync(join(tests, 'case.test.mjs'), "test('WHAT[WIDE-PROOF-001] exact semantic proof', () => {})\n")
+    writeFileSync(join(tests, 'case.test.mjs'), "import test from 'node:test'\ntest('WHAT[WIDE-PROOF-001] exact semantic proof', () => {})\n")
     writeFileSync(join(packageRoot, 'HOW.md'), [
       '| vocabulary | owner | law | relation | proof |',
       '|---|---|---|---|---|',
@@ -418,7 +420,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph rejects prose-only proof rows with no e
   mkdirSync(tests, { recursive: true })
   try {
     writeFileSync(whatFile, '# WHAT\n\n## FIXTURE-PACKAGE-001：contract\n\n## FIXTURE-PACKAGE-002：untested\n')
-    writeFileSync(testFile, "test('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})\n")
+    writeFileSync(testFile, "import test from 'node:test'\ntest('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})\n")
     // Row 1 has a test path → valid proof. Row 2 has only a law ID + prose,
     // no .test.mjs path → must be flagged as prose-only.
     writeFileSync(proofFile, [

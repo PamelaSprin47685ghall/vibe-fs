@@ -50,8 +50,8 @@ const terminal = (disposition, attempt = evidence(), appendOutcome = 'Committed'
 })
 const run = (...actions) => chatExecution.providerLifecycleScenario(actions)
 
-for (const disposition of ['Completed', 'Cancelled', 'Rejected', 'Failed']) {
-  test(`WHAT[CHATEXEC-006] Accepted -> ProviderStarted -> ${disposition} is durable`, async () => {
+test('WHAT[CHATEXEC-006] each terminal disposition is durable after provider start', async () => {
+  for (const disposition of ['Completed', 'Cancelled', 'Rejected', 'Failed']) {
     const result = await run(accept(), start(), terminal(disposition))
 
     assert.equal(result.ok, true, JSON.stringify(result.error))
@@ -62,8 +62,8 @@ for (const disposition of ['Completed', 'Cancelled', 'Rejected', 'Failed']) {
       disposition,
     })
     assert.deepEqual(result.appendCounts, { accepted: 1, providerStarted: 1, terminal: 1 })
-  })
-}
+  }
+})
 
 test('WHAT[CHATEXEC-002] writes ProviderStarted before provider work', async () => {
   const result = await run(accept(), start(), { kind: 'ProviderWork' })
@@ -136,18 +136,20 @@ test('WHAT[CHATEXEC-011] exact physical provider run and evidence are frozen', a
   }
 })
 
-for (const outcome of ['NotAttempted', 'CommitUnknown']) {
-  test(`WHAT[CHATEXEC-002] ProviderStarted ${outcome} does not advance projection`, async () => {
+test('WHAT[CHATEXEC-002] each uncertain ProviderStarted append leaves projection accepted', async () => {
+  for (const outcome of ['NotAttempted', 'CommitUnknown']) {
     const result = await run(accept(), start(evidence(), outcome))
     assert.equal(result.ok, false)
     assert.equal(result.error.kind, outcome)
     assert.equal(result.projection.phase, 'Accepted')
-  })
+  }
+})
 
-  test(`WHAT[CHATEXEC-006] Terminal ${outcome} does not advance projection`, async () => {
+test('WHAT[CHATEXEC-006] each uncertain Terminal append leaves projection provider-started', async () => {
+  for (const outcome of ['NotAttempted', 'CommitUnknown']) {
     const result = await run(accept(), start(), terminal('Completed', evidence(), outcome))
     assert.equal(result.ok, false)
     assert.equal(result.error.kind, outcome)
     assert.equal(result.projection.phase, 'ProviderStarted')
-  })
-}
+  }
+})

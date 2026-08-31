@@ -3,16 +3,16 @@ import test from 'node:test'
 import * as Strength from '../../../dist/Strength/Surface.js'
 
 const exactReadonly = ['Glob', 'Grep', 'Read']
-for (const role of ['Coder', 'Inspector', 'DevOps', 'Inquiry']) {
-  test(`WHAT[SPEC-INV-004] STRENGTH_004_${role}_replica_has_exact_readonly_capabilities`, () => {
+test('WHAT[SPEC-INV-004] STRENGTH_004_each_supported_replica_has_exact_readonly_capabilities', () => {
+  for (const role of ['Coder', 'Inspector', 'DevOps', 'Inquiry']) {
     assert.deepEqual(Strength.capabilities(role), exactReadonly)
-  })
-}
-for (const role of ['Manager', 'Orchestrator', 'Browser', 'Reviewer', 'Distiller', 'Blogger']) {
-  test(`WHAT[SPEC-INV-004] STRENGTH_004_${role}_replica_is_fail_closed`, () => {
+  }
+})
+test('WHAT[SPEC-INV-004] STRENGTH_004_each_unsupported_replica_is_fail_closed', () => {
+  for (const role of ['Manager', 'Orchestrator', 'Browser', 'Reviewer', 'Distiller', 'Blogger']) {
     assert.deepEqual(Strength.capabilities(role), [])
-  })
-}
+  }
+})
 
 test('WHAT[SPEC-INV-004] STRENGTH_004_019_replica_is_never_owner_fallback_or_prefix_probe_evidence', () => {
   assert.equal(Strength.clearsFailureCountOnSuccess('strength-replica'), false)

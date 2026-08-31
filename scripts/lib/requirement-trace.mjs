@@ -5,15 +5,13 @@
 //   TestNode { file, line, title, state: active|skip|todo, whatIds }
 //   ProofEdge { proofFile, proofLine, whatId, file, line, title, state, anchor }
 //
-// The scanner is a lexical parser, not a source-text regex. It tokenizes
-// identifiers and call punctuation while skipping comments, quoted strings,
-// regular-expression literals, and template bodies. Template expressions are
-// tokenized recursively, so a nested t.test() remains visible without making
-// text that merely resembles code visible.
+// Test declarations are parsed through the shared JavaScript syntax core.
+// Only statically bound node:test registrations can own proof edges.
 
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+import { isFunction, parseModule, patternNames, walkSyntax } from './js-syntax.mjs'
 import { walk } from './walk.mjs'
 
 export const WHAT_TAG_RE = /WHAT\[([A-Z][A-Z0-9-]*-\d{3})\]/g
@@ -64,286 +62,6 @@ export function resolveProofLevel(document, proof) {
 
 const TEST_MODIFIER = new Set(['fails', 'only', 'skip', 'todo'])
 const STATE_MODIFIER = new Set(['skip', 'todo'])
-const IDENT_START_RE = /[A-Za-z_$]/
-const IDENT_PART_RE = /[A-Za-z0-9_$]/
-const REGEX_PRECEDING_KEYWORDS = new Set([
-  'await',
-  'case',
-  'delete',
-  'else',
-  'in',
-  'instanceof',
-  'of',
-  'return',
-  'throw',
-  'typeof',
-  'void',
-  'yield',
-])
-
-const isIdentStart = (ch) => ch !== undefined && IDENT_START_RE.test(ch)
-const isIdentPart = (ch) => ch !== undefined && IDENT_PART_RE.test(ch)
-const isSpace = (ch) => ch === ' ' || ch === '\t' || ch === '\r' || ch === '\n'
-
-const lineStartsOf = (text) => {
-  const starts = [0]
-  for (let i = 0; i < text.length; i++) if (text[i] === '\n') starts.push(i + 1)
-  return starts
-}
-
-const lineOf = (starts, index) => {
-  let low = 0
-  let high = starts.length
-  while (low + 1 < high) {
-    const middle = (low + high) >> 1
-    if (starts[middle] <= index) low = middle
-    else high = middle
-  }
-  return low + 1
-}
-
-const skipQuoted = (text, start, quote) => {
-  let i = start + 1
-  while (i < text.length) {
-    if (text[i] === '\\') {
-      i += 2
-      continue
-    }
-    if (text[i] === quote) return i + 1
-    i++
-  }
-  return text.length
-}
-
-const skipLineComment = (text, start) => {
-  const end = text.indexOf('\n', start + 2)
-  return end < 0 ? text.length : end
-}
-
-const skipBlockComment = (text, start) => {
-  const end = text.indexOf('*/', start + 2)
-  return end < 0 ? text.length : end + 2
-}
-
-/**
- * Heuristic: is the slash at index i a regular-expression literal? The
- * previous token is unavailable while finding a template expression, so use
- * the preceding significant character plus the small set of expression
- * keywords that can precede a regex. Division cannot contain a test call in a
- * valid expression, while a regex can contain arbitrary quote-like text.
- */
-const isRegexSlash = (text, i) => {
-  if (text[i + 1] === '/' || text[i + 1] === '*') return false
-  let j = i - 1
-  while (j >= 0 && isSpace(text[j])) j--
-  if (j < 0) return true
-  const previous = text[j]
-  if (/[A-Za-z0-9_$)\]}]/.test(previous)) {
-    let end = j + 1
-    let begin = j
-    while (begin >= 0 && isIdentPart(text[begin])) begin--
-    if (REGEX_PRECEDING_KEYWORDS.has(text.slice(begin + 1, end))) return true
-    return false
-  }
-  return true
-}
-
-const skipRegex = (text, start) => {
-  let i = start + 1
-  let inClass = false
-  while (i < text.length) {
-    const ch = text[i]
-    if (ch === '\\') i += 2
-    else if (ch === '\n' || ch === '\r') return start + 1
-    else if (ch === '[') {
-      inClass = true
-      i++
-    } else if (ch === ']') {
-      inClass = false
-      i++
-    } else if (ch === '/' && !inClass) {
-      i++
-      while (isIdentPart(text[i])) i++
-      return i
-    } else i++
-  }
-  return start + 1
-}
-
-/** Find the closing `}` for a `${ ... }` expression. */
-const findExpressionEnd = (text, start) => {
-  let i = start
-  let braces = 0
-  while (i < text.length) {
-    const ch = text[i]
-    if (ch === '/' && text[i + 1] === '/') i = skipLineComment(text, i)
-    else if (ch === '/' && text[i + 1] === '*') i = skipBlockComment(text, i)
-    else if (ch === '"' || ch === "'") i = skipQuoted(text, i, ch)
-    else if (ch === '`') i = parseTemplate(text, i).end
-    else if (ch === '/' && isRegexSlash(text, i)) {
-      const next = skipRegex(text, i)
-      i = next === i + 1 ? i + 1 : next
-    } else if (ch === '{') {
-      braces++
-      i++
-    } else if (ch === '}') {
-      if (braces === 0) return i
-      braces--
-      i++
-    } else i++
-  }
-  return text.length
-}
-
-/** Parse a template literal, returning static title text and expression spans. */
-const parseTemplate = (text, start) => {
-  let i = start + 1
-  let value = ''
-  const expressions = []
-  while (i < text.length) {
-    const ch = text[i]
-    if (ch === '\\') {
-      value += text.slice(i, Math.min(i + 2, text.length))
-      i += 2
-    } else if (ch === '`') {
-      return { end: i + 1, value, dynamic: expressions.length > 0, expressions }
-    } else if (ch === '$' && text[i + 1] === '{') {
-      const expressionStart = i + 2
-      const expressionEnd = findExpressionEnd(text, expressionStart)
-      expressions.push({ start: expressionStart, end: expressionEnd })
-      value += '${}'
-      i = expressionEnd < text.length ? expressionEnd + 1 : text.length
-    } else {
-      value += ch
-      i++
-    }
-  }
-  return { end: text.length, value, dynamic: expressions.length > 0, expressions }
-}
-
-const decodeQuoted = (text, start, end) => {
-  let value = ''
-  for (let i = start + 1; i < end - 1; i++) {
-    if (text[i] === '\\' && i + 1 < end - 1) {
-      value += text[i + 1]
-      i++
-    } else value += text[i]
-  }
-  return value
-}
-
-const tokenize = (text, file) => {
-  const starts = lineStartsOf(text)
-  const tokens = []
-
-  const tokenizeRange = (start, end) => {
-    let i = start
-    while (i < end) {
-      const ch = text[i]
-      if (isSpace(ch)) {
-        i++
-        continue
-      }
-      if (ch === '/' && text[i + 1] === '/') {
-        i = Math.min(skipLineComment(text, i), end)
-        continue
-      }
-      if (ch === '/' && text[i + 1] === '*') {
-        i = Math.min(skipBlockComment(text, i), end)
-        continue
-      }
-      if (ch === '"' || ch === "'") {
-        const tokenEnd = Math.min(skipQuoted(text, i, ch), end)
-        tokens.push({ kind: 'string', value: decodeQuoted(text, i, tokenEnd), start: i, end: tokenEnd, line: lineOf(starts, i), file })
-        i = tokenEnd
-        continue
-      }
-      if (ch === '`') {
-        const template = parseTemplate(text, i)
-        const tokenEnd = Math.min(template.end, end)
-        tokens.push({ kind: 'template', value: template.value, dynamic: template.dynamic, start: i, end: tokenEnd, line: lineOf(starts, i), file })
-        for (const expression of template.expressions) {
-          const expressionEnd = Math.min(expression.end, end)
-          if (expression.start < expressionEnd) tokenizeRange(expression.start, expressionEnd)
-        }
-        i = tokenEnd
-        continue
-      }
-      if (ch === '/' && isRegexSlash(text, i)) {
-        const tokenEnd = Math.min(skipRegex(text, i), end)
-        if (tokenEnd > i + 1) {
-          i = tokenEnd
-          continue
-        }
-      }
-      if (isIdentStart(ch)) {
-        let tokenEnd = i + 1
-        while (tokenEnd < end && isIdentPart(text[tokenEnd])) tokenEnd++
-        tokens.push({ kind: 'identifier', value: text.slice(i, tokenEnd), start: i, end: tokenEnd, line: lineOf(starts, i), file })
-        i = tokenEnd
-        continue
-      }
-      tokens.push({ kind: 'punct', value: ch, start: i, end: i + 1, line: lineOf(starts, i), file })
-      i++
-    }
-  }
-
-  tokenizeRange(0, text.length)
-  return tokens.sort((a, b) => a.start - b.start || a.end - b.end)
-}
-
-const isPropertyToken = (tokens, index) => {
-  const previous = tokens[index - 1]
-  return previous?.value === '.' || previous?.value === '?' || previous?.value === '#'
-}
-
-// Names that look like test calls in declarations/constructors are not proof cases.
-const isDeclarationOrConstructorTarget = (tokens, index) => {
-  const previous = tokens[index - 1]?.value
-  if (previous === 'function' || previous === 'new' || previous === 'class') return true
-  return previous === '*' && tokens[index - 2]?.value === 'function'
-}
-
-const closesWithMethodBody = (tokens, open) => {
-  let depth = 0
-  for (let index = open; index < tokens.length; index++) {
-    const value = tokens[index].value
-    if (value === '(') depth++
-    else if (value === ')') {
-      depth--
-      if (depth === 0) return tokens[index + 1]?.value === '{'
-    }
-  }
-  return false
-}
-
-const callShapeAt = (tokens, index) => {
-  const token = tokens[index]
-  if (!token || token.kind !== 'identifier' || isPropertyToken(tokens, index) || isDeclarationOrConstructorTarget(tokens, index)) return null
-
-  const next = tokens[index + 1]
-  if (token.value === 'test') {
-    if (next?.value === '(') return { open: index + 1, modifier: null }
-    if (next?.value === '.' && tokens[index + 2]?.kind === 'identifier' && TEST_MODIFIER.has(tokens[index + 2].value) && tokens[index + 3]?.value === '(') {
-      return { open: index + 3, modifier: tokens[index + 2].value }
-    }
-    return null
-  }
-
-  if (token.value !== 't' || next?.value !== '.' || tokens[index + 2]?.value !== 'test') return null
-  const afterTest = tokens[index + 3]
-  if (afterTest?.value === '(') return { open: index + 3, modifier: null }
-  if (afterTest?.value === '.' && tokens[index + 4]?.kind === 'identifier' && TEST_MODIFIER.has(tokens[index + 4].value) && tokens[index + 5]?.value === '(') {
-    return { open: index + 5, modifier: tokens[index + 4].value }
-  }
-  return null
-}
-
-const readTitleToken = (tokens, open) => {
-  const first = tokens[open + 1]
-  if (first?.kind === 'string' || first?.kind === 'template') return first
-  return null
-}
 
 const titleParts = (title) => {
   if (title === null) return { whatIds: [], anchor: null }
@@ -354,34 +72,187 @@ const titleParts = (title) => {
   return { whatIds, anchor: leading.slice(first.length).trim() }
 }
 
-/**
- * Scan one JS test source for actual `test()` / `test.skip()` /
- * `test.todo()` / `t.test()` call sites. Accepts a source string (for unit
- * tests) or a file path.
- */
-export function scanTestSource(file, source) {
+const titleOf = (node) => {
+  if (node?.type === 'Literal' && typeof node.value === 'string') return { title: node.value, dynamic: false }
+  if (node?.type !== 'TemplateLiteral') return { title: null, dynamic: false }
+  return {
+    title: node.quasis
+      .map((quasi, index) => `${quasi.value.cooked ?? quasi.value.raw}${index < node.expressions.length ? '${}' : ''}`)
+      .join(''),
+    dynamic: node.expressions.length > 0,
+  }
+}
+
+const nodeTestBound = (program) => program.body.some((statement) =>
+  statement.type === 'ImportDeclaration'
+  && statement.source.value === 'node:test'
+  && statement.specifiers.some((specifier) =>
+    specifier.local.name === 'test'
+    && (specifier.type === 'ImportDefaultSpecifier' || specifier.imported?.name === 'test')))
+
+const testCallShape = (call) => {
+  const callee = call.callee
+  if (callee.type === 'Identifier' && callee.name === 'test') {
+    return { kind: 'root', modifier: null, contextName: null, unsupported: false }
+  }
+  if (callee.type !== 'MemberExpression' || callee.computed || callee.property.type !== 'Identifier') return null
+  if (callee.object.type === 'Identifier' && callee.object.name === 'test') {
+    const modifier = callee.property.name
+    if (!TEST_MODIFIER.has(modifier)) return null
+    return { kind: 'root', modifier, contextName: null, unsupported: modifier === 'fails' }
+  }
+  if (callee.object.type === 'Identifier' && callee.object.name === 't' && callee.property.name === 'test') {
+    return { kind: 'context', modifier: null, contextName: 't', unsupported: false }
+  }
+  const context = callee.object
+  if (
+    context.type === 'MemberExpression'
+    && !context.computed
+    && context.object.type === 'Identifier'
+    && context.object.name === 't'
+    && context.property.type === 'Identifier'
+    && context.property.name === 'test'
+  ) {
+    return { kind: 'context', modifier: callee.property.name, contextName: 't', unsupported: true }
+  }
+  return null
+}
+
+const directRegistration = (call, container, ancestors) => {
+  if (call === container) return true
+  let current = call
+  for (let index = ancestors.length - 1; index >= 0; index--) {
+    const parent = ancestors[index]
+    if (parent === container) return parent.body?.includes(current) === true
+    if (parent.type === 'AwaitExpression' && parent.argument === current) current = parent
+    else if (parent.type === 'ExpressionStatement' && parent.expression === current) current = parent
+    else return false
+  }
+  return false
+}
+
+const declarationNames = (statement) => {
+  if (statement?.type === 'VariableDeclaration') return statement.declarations.flatMap(({ id }) => patternNames(id))
+  if (statement?.type === 'FunctionDeclaration' || statement?.type === 'ClassDeclaration') return statement.id ? [statement.id.name] : []
+  return []
+}
+
+const shadows = (name, ancestors) => ancestors.some((ancestor) => {
+  if (isFunction(ancestor) && ancestor.params.flatMap(patternNames).includes(name)) return true
+  if (ancestor.type === 'CatchClause' && patternNames(ancestor.param).includes(name)) return true
+  if (ancestor.type === 'ForStatement' && declarationNames(ancestor.init).includes(name)) return true
+  if ((ancestor.type === 'ForInStatement' || ancestor.type === 'ForOfStatement') && declarationNames(ancestor.left).includes(name)) return true
+  if (ancestor.type !== 'BlockStatement') return false
+  return ancestor.body.some((statement) => declarationNames(statement).includes(name))
+})
+
+const callbackOf = (call) => {
+  const callback = call.arguments.at(-1)
+  return callback?.type === 'ArrowFunctionExpression' || callback?.type === 'FunctionExpression' ? callback : null
+}
+
+const callbackBody = (callback) => callback === null
+  ? { bodyStart: null, bodyEnd: null, contextName: null }
+  : {
+      bodyStart: callback.body.start,
+      bodyEnd: callback.body.end,
+      contextName: callback.params[0]?.type === 'Identifier' ? callback.params[0].name : null,
+    }
+
+const staticState = (node) => {
+  if (node?.type !== 'ObjectExpression') return { state: 'invalid', issue: 'DynamicTestState' }
+  const states = []
+  for (const property of node.properties) {
+    if (property.type !== 'Property' || property.computed || property.kind !== 'init') {
+      return { state: 'invalid', issue: 'DynamicTestState' }
+    }
+    const name = property.key.type === 'Identifier' ? property.key.name : property.key.value
+    if (name !== 'skip' && name !== 'todo') continue
+    if (property.value.type !== 'Literal') return { state: 'invalid', issue: 'DynamicTestState' }
+    if (property.value.value !== false) states.push(name)
+  }
+  if (new Set(states).size > 1) return { state: 'invalid', issue: 'DynamicTestState' }
+  return { state: states[0] ?? 'active', issue: null }
+}
+
+export function scanTestSource(file, source, syntax) {
   const text = source === undefined ? readFileSync(file, 'utf8') : source
-  const tokens = tokenize(text, file)
-  const calls = []
-  for (let index = 0; index < tokens.length; index++) {
-    const shape = callShapeAt(tokens, index)
-    if (!shape) continue
-    const titleToken = readTitleToken(tokens, shape.open)
-    if (!titleToken && closesWithMethodBody(tokens, shape.open)) continue
-    const call = tokens[index]
-    const title = titleToken?.value ?? null
+  const program = syntax ?? parseModule(text, file)
+  const hasBinding = nodeTestBound(program)
+  const candidates = []
+  walkSyntax(program, (node, _parent, _key, ancestors) => {
+    if (node.type !== 'CallExpression') return
+    const shape = testCallShape(node)
+    if (shape) candidates.push({ node, shape, ancestors })
+  })
+  candidates.sort((left, right) => left.node.start - right.node.start)
+
+  const contexts = []
+  const declarations = []
+  for (const { node, shape, ancestors } of candidates) {
+    const { title, dynamic } = titleOf(node.arguments[0])
     const { whatIds, anchor } = titleParts(title)
-    calls.push({
+    const callback = callbackOf(node)
+    const body = callbackBody(callback)
+    let state = 'active'
+    let issue = null
+    let owner = null
+
+    if (shape.unsupported) {
+      state = 'invalid'
+      issue = 'UnsupportedModifier'
+    } else if (shape.kind === 'root' && !hasBinding) {
+      state = 'invalid'
+      issue = 'UnboundTestBinding'
+    } else if (shape.kind === 'root' && shadows('test', ancestors)) {
+      state = 'invalid'
+      issue = 'ShadowedTestBinding'
+    } else if (shape.kind === 'root' && !directRegistration(node, program, ancestors)) {
+      state = 'invalid'
+      issue = 'IndirectRegistration'
+    } else if (shape.kind === 'context') {
+      owner = contexts
+        .filter((context) => context.contextName === shape.contextName && context.bodyStart <= node.start && node.end <= context.bodyEnd)
+        .sort((left, right) => right.bodyStart - left.bodyStart)[0]
+      if (!owner) {
+        state = 'invalid'
+        issue = 'UnboundTestContext'
+      } else if (!directRegistration(node, owner.callback.body, ancestors)) {
+        state = 'invalid'
+        issue = 'IndirectRegistration'
+      } else state = owner.state
+    }
+
+    if (!issue && callback === null) {
+      state = 'invalid'
+      issue = 'MissingCallback'
+    }
+    if (!issue && node.arguments.length >= 3) {
+      const options = staticState(node.arguments[1])
+      state = options.state
+      issue = options.issue
+    }
+    if (!issue && shape.modifier && STATE_MODIFIER.has(shape.modifier)) state = shape.modifier
+    if (!issue && owner && owner.state !== 'active') state = owner.state
+
+    const declaration = {
       file,
-      line: call.line,
+      line: node.loc.start.line,
+      start: node.start,
+      end: node.end,
+      bodyStart: body.bodyStart,
+      bodyEnd: body.bodyEnd,
       title,
       anchor,
-      dynamic: titleToken?.kind === 'template' ? titleToken.dynamic : false,
-      state: STATE_MODIFIER.has(shape.modifier) ? shape.modifier : 'active',
+      dynamic,
+      state,
+      issue,
       whatIds,
-    })
+    }
+    declarations.push(declaration)
+    if (!issue && callback !== null && body.contextName !== null) contexts.push({ ...body, callback, state })
   }
-  return calls
+  return declarations
 }
 
 /** Collect every semantic test module under requirements/<pkg>/tests/**. */
@@ -629,7 +500,7 @@ export function buildTraceGraph(requirementsRoot) {
     whatDefinitions,
     duplicateWhats,
     tests,
-    edges: tests.flatMap((test) => test.whatIds.map((what) => ({ test, what: whats.get(what) ?? null }))),
+    edges: tests.filter((test) => test.state !== 'invalid').flatMap((test) => test.whatIds.map((what) => ({ test, what: whats.get(what) ?? null }))),
     proofEdges: proof.proofEdges,
     orphans,
     unknownWhat: [...unknownWhat],
