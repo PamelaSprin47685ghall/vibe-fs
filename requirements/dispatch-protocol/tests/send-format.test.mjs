@@ -290,10 +290,11 @@ test('WHAT[DISPATCH-PROTOCOL-002] HOST_004_stale_idle_repair_is_abandoned_at_the
         'InteractionRepair',
         accepted.profile,
         'fast-blogger',
-        false,
+        'Superseded',
       )
 
       assert.equal(outcome.outcome, 'Superseded', 'stale final admission must become Superseded, not a send failure')
+      assert.equal(outcome.error, 'Superseded', 'the exact typed quiescence failure must survive physical admission')
       assert.equal(sends, 0, 'superseded idle repair must never invoke the physical Host SendPrompt')
       assert.equal(outcome.observation, null, 'no physical send means no Host observation is captured')
 

@@ -21,6 +21,70 @@ const next = (fact, run) => ({
   fact,
 })
 
+const companionFact = (caseName, payload, run = null) =>
+  next(
+    {
+      family: 'Companion',
+      case: caseName,
+      payload,
+    },
+    run,
+  )
+
+const linkedFact = (bloggerSessionId = BLOGGER) =>
+  companionFact('CompanionBloggerLinked', {
+    SessionId: SESSION,
+    BloggerSessionId: bloggerSessionId,
+    BloggerAgent: 'blogger',
+  })
+
+const openingFact = () =>
+  companionFact(
+    'OpeningPromptCaptured',
+    {
+      SessionId: SESSION,
+      AssignmentText: 'ship the durable fold',
+      AuthoritativeRequirements: ['preserve replay'],
+      ProviderRun: 'msg_opening',
+    },
+    'msg_opening',
+  )
+
+const partFact = () =>
+  companionFact(
+    'XTracePartAppended',
+    {
+      SessionId: SESSION,
+      CursorSequence: 1n,
+      Role: 'assistant',
+      Provenance: 'g:0/provider',
+      Turn: 0,
+      PartIndex: 0,
+      Kind: 'text',
+      ToolName: null,
+      ProviderRun: 'msg_part',
+      ToolCallId: null,
+      HostToolPartId: null,
+      TextRef: 'blob-part',
+      TextDigest: 'sha-part',
+    },
+    'msg_part',
+  )
+
+const terminalFact = () =>
+  companionFact(
+    'TerminalOutputCaptured',
+    {
+      SessionId: SESSION,
+      TextRef: 'blob-terminal',
+      TextDigest: 'sha-terminal',
+      ProviderRun: 'msg_terminal',
+    },
+    'msg_terminal',
+  )
+
+const closedFact = () => companionFact('CompanionBloggerClosed', { SessionId: SESSION })
+
 const entryFact = ({ epoch = 0, from, to, cutoffFrom, cutoffTo, digest = `d-${cutoffTo}`, n = 1, run = `msg_e${n}` }) =>
   next(
     {
@@ -116,6 +180,53 @@ const coverageOf = (session) => ({
   ingestedThroughSequence: Number(session.Blog.Coverage.IngestedThroughSequence),
   cutoff: session.Blog.Coverage.CoverableTurnCutoffExclusive,
   digest: session.Blog.Coverage.CoveredPrefixDigest,
+})
+
+// ── Companion facts use the production single-event fold online and on replay ──
+
+test('WHAT[DURABLE-EVENTS-015] PERSIST_010_companion_online_and_codec_replay_are_identical', () => {
+  const envelopes = [linkedFact(), openingFact(), partFact(), terminalFact(), closedFact()]
+
+  assert.deepEqual(contextFold.replay(envelopes), contextFold.fold(envelopes))
+})
+
+test('WHAT[DURABLE-EVENTS-015] PERSIST_010_companion_facts_fold_into_the_owned_projection', () => {
+  const session = foldOk([linkedFact(), openingFact(), partFact(), terminalFact()])
+
+  assert.equal(session.Companion.BloggerSessionId, BLOGGER)
+  assert.deepEqual(session.XTrace.Opening, {
+    AssignmentText: 'ship the durable fold',
+    AuthoritativeRequirements: ['preserve replay'],
+  })
+  assert.equal(session.XTrace.Parts.length, 1)
+  assert.equal(Number(session.XTrace.Parts[0].CursorSequence), 1)
+  assert.deepEqual(
+    { ...session.XTrace.Parts[0], CursorSequence: undefined },
+    {
+      CursorSequence: undefined,
+      Provenance: 'g:0/provider',
+      Role: 'assistant',
+      Kind: 'text',
+      TextRef: 'blob-part',
+      TextDigest: 'sha-part',
+    },
+  )
+  assert.equal(Number(session.XTrace.LatestTerminal.FrontierSequence), 2)
+  assert.deepEqual({ ...session.XTrace.LatestTerminal, FrontierSequence: undefined }, {
+    TextRef: 'blob-terminal',
+    TextDigest: 'sha-terminal',
+    ProviderRun: 'msg_terminal',
+    FrontierSequence: undefined,
+  })
+})
+
+test('WHAT[DURABLE-EVENTS-015] HOST_008_duplicate_companion_link_to_a_different_child_fails_closed', () => {
+  const envelopes = [linkedFact(), linkedFact('ses_other_blogger')]
+  const result = contextFold.fold(envelopes)
+
+  assert.equal(result.ok, false)
+  assert.equal(result.error.Fact, 'CompanionBloggerLinked')
+  assert.deepEqual(contextFold.replay(envelopes), result)
 })
 
 // ── the happy path ──────────────────────────────────────────────────────────

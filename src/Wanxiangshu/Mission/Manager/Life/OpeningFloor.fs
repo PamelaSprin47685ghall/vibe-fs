@@ -47,7 +47,7 @@ open Wanxiangshu.Mission.Obligation.Todo
 module ManagerOpeningFloor =
 
     let private partAnchors (xTrace: XTraceProjectionState) : MagicTodo.TracePartAnchor list =
-        XTraceProjection.parts xTrace
+        XTraceProjection.orderedSemanticParts xTrace
         |> List.map (fun part ->
             { Cursor = part.Cursor
               Kind = part.Kind
@@ -108,4 +108,4 @@ module ManagerOpeningFloor =
             |> Option.defaultValue XTraceProjection.empty
 
         effectiveOpeningFloor life projections.MagicTodo xTrace
-        |> Option.map (fun cursor -> cursor.Sequence)
+        |> Option.map XTraceCursor.sequence

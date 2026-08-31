@@ -2,6 +2,7 @@ namespace Wanxiangshu.Execution.Session.ChatExecution
 
 open System
 open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona

@@ -3,26 +3,11 @@
  * g4r-ce-vocabulary.mjs — G4R-CE Semantic CE Vocabulary static ratchets
  * (changes/active/rabbit.md §24).
  *
- * S0 RED scaffolding (landing order §27):
- *   - Detectors for obsolete controller absence (§24.1) and raw-time (§24.2).
- *   - Unit tests prove scanners fail closed on synthetic trees.
- *   - Production still retains obsolete controllers / Session raw time —
- *     therefore `npm run check` must NOT hard-fail on the live tree yet.
+ * Fail-closed detectors for obsolete controller absence (§24.1) and raw-time
+ * (§24.2). Pure scan* helpers accept injectable trees; direct invocation always
+ * exits non-zero on a violation. There is no warning phase.
  *
- * Phases:
- *   --phase=s0-soft   (default) scan production; print hits; exit 0 (warn-mode)
- *   --phase=hard      fail-closed on any hit (S14 / Exit; do not use in check.mjs yet)
- *
- * Pure scan* helpers accept injectable trees so tests never depend on deleting
- * production controllers.
- *
- * G4R-CE-S0: not wired into scripts/check.mjs hard fail. Wire as s0-soft or
- * leave commented until S14. See scripts/check.mjs note.
- *
- * Usage:
- *   node scripts/checks/g4r-ce-vocabulary.mjs
- *   node scripts/checks/g4r-ce-vocabulary.mjs --phase=s0-soft
- *   node scripts/checks/g4r-ce-vocabulary.mjs --phase=hard
+ * Usage: node scripts/checks/g4r-ce-vocabulary.mjs
  */
 
 import { existsSync, readFileSync } from 'node:fs'
@@ -34,9 +19,8 @@ export const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 export const PRODUCTION_ROOT_REL = 'src/Wanxiangshu'
 
 /**
- * §24.1 + S6 HostReviewProgram — paths that MUST be absent at G4R-CE Exit.
- * Relative to src/Wanxiangshu/. Presence today is expected; S0 only scaffolds
- * the detector. Do NOT delete these in S0.
+ * §24.1 + S6 HostReviewProgram — paths that MUST remain absent.
+ * Relative to src/Wanxiangshu/.
  */
 export const OBSOLETE_CONTROLLER_PATHS = Object.freeze([
   'Application/Reconciliation/TurnCompletionProgram.fs',
@@ -99,8 +83,6 @@ export const RAW_TIME_ALLOWLIST = Object.freeze([
   'Change/Host/',
   'Enforcer/Guidance/TipSurface.fs',
 ])
-
-export const PHASES = Object.freeze(['s0-soft', 'hard'])
 
 const norm = (p) => p.replace(/\\/g, '/')
 
@@ -229,57 +211,22 @@ export const scanG4RCeVocabulary = (repoRoot = ROOT, opts = {}) => {
   }
 }
 
-/**
- * @param {string[]} argv
- * @returns {'s0-soft' | 'hard'}
- */
-export const parsePhase = (argv = process.argv.slice(2)) => {
-  for (const arg of argv) {
-    if (arg.startsWith('--phase=')) {
-      const phase = arg.slice('--phase='.length)
-      if (phase === 's0-soft' || phase === 'hard') return phase
-      throw new Error(
-        `g4r-ce-vocabulary: unknown --phase=${phase} (expected s0-soft|hard)`,
-      )
-    }
-  }
-  return 's0-soft'
-}
-
 const runCli = () => {
-  let phase
-  try {
-    phase = parsePhase()
-  } catch (err) {
-    console.error(String(err?.message ?? err))
+  if (process.argv.slice(2).some((arg) => arg.startsWith('--phase='))) {
+    console.error('g4r-ce-vocabulary: --phase is obsolete; direct invocation is always hard')
     process.exit(2)
   }
 
   const { obsolete, rawTime, violations } = scanG4RCeVocabulary(ROOT)
-
-  const header =
-    `g4r-ce-vocabulary [${phase}]: obsolete=${obsolete.length} raw-time=${rawTime.length} ` +
-    `(G4R-CE §24 S0 RED scaffolding)`
+  const header = `g4r-ce-vocabulary: obsolete=${obsolete.length} raw-time=${rawTime.length}`
 
   if (violations.length === 0) {
     console.log(`${header} — clean`)
     process.exit(0)
   }
 
-  const stream = phase === 'hard' ? console.error : console.warn
-  stream(`${header} — ${violations.length} hit(s)\n`)
-  for (const v of violations) {
-    stream(`  [${v.kind}] ${v.message}`)
-  }
-
-  if (phase === 's0-soft') {
-    stream(
-      `\nG4R-CE-S0: warn-only. Production may still retain obsolete controllers / raw time. ` +
-        `Unit tests prove detectors on synthetic trees. Harden at S14 (--phase=hard).`,
-    )
-    process.exit(0)
-  }
-
+  console.error(`${header} — ${violations.length} hit(s)\n`)
+  for (const v of violations) console.error(`  [${v.kind}] ${v.message}`)
   process.exit(1)
 }
 

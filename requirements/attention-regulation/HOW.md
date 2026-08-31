@@ -19,9 +19,9 @@
 
 | 命题 | 最低充分 proof |
 |---|---|
-| ATTENTION-REGULATION-001 | `requirements/attention-regulation/tests/attention-regulation.test.mjs` |
-| ATTENTION-REGULATION-002 | `requirements/attention-regulation/tests/attention-regulation.test.mjs` |
-| ATTENTION-REGULATION-003 | `requirements/attention-regulation/tests/attention-regulation.test.mjs` |
-| ATTENTION-REGULATION-004 | `requirements/attention-regulation/tests/attention-regulation.test.mjs` |
-| ATTENTION-REGULATION-005 | `requirements/attention-regulation/tests/attention-regulation.test.mjs` |
-| ATTENTION-REGULATION-006 | `requirements/attention-regulation/tests/attention-regulation.test.mjs` |
+| ATTENTION-REGULATION-001 | `requirements/attention-regulation/tests/attention-regulation.test.mjs::WHAT[ATTENTION-REGULATION-001] enough is a pure cognitive stop with no durable authority state` |
+| ATTENTION-REGULATION-002 | `requirements/attention-regulation/tests/attention-regulation.test.mjs::WHAT[ATTENTION-REGULATION-002] abandon releases only cognitive attention and never mutates obligations or authority` |
+| ATTENTION-REGULATION-003 | `requirements/attention-regulation/tests/attention-regulation.test.mjs::WHAT[ATTENTION-REGULATION-003] defer creates pending work without creating execution or obligation state` |
+| ATTENTION-REGULATION-004 | `requirements/attention-regulation/tests/attention-regulation.test.mjs::WHAT[ATTENTION-REGULATION-004] deferred work is occurrence-idempotent and participant-life isolated` |
+| ATTENTION-REGULATION-005 | `requirements/attention-regulation/tests/attention-regulation.test.mjs::WHAT[ATTENTION-REGULATION-005] resurfacing consumes deferred visibility once without activating work` |
+| ATTENTION-REGULATION-006 | `requirements/attention-regulation/tests/attention-regulation.test.mjs::WHAT[ATTENTION-REGULATION-006] attention state stays a minimal deferred-work projection, not a workflow engine` |

@@ -30,10 +30,10 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Persistence.Journal
 open FsToolkit.ErrorHandling
-open Wanxiangshu.Mission.Obligation.Todo
 
 /// Existing-child dispatch + parent teardown helpers.
 module HostForkChildDispatch =
@@ -173,8 +173,8 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
-        (xTraceHead: SessionId -> int64)
+        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
+        (xTraceHead: SessionId -> XTraceCursor)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
         (handoffPort: ReusableHandoffPort option)
@@ -277,8 +277,8 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
-        (xTraceHead: SessionId -> int64)
+        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
+        (xTraceHead: SessionId -> XTraceCursor)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
         (handoffPort: ReusableHandoffPort option)

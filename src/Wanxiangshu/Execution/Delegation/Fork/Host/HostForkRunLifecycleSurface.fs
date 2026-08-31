@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -29,7 +30,7 @@ type HostForkRunLifecycleHandle
               AgentId = agentId
               ChildId = SessionId.create childId
               Role = Role.Coder
-              StartCursor = 0L
+              StartCursor = XTraceCursor.create 0L
               Handoff = None
               AuthorityRoot = None
               Source = HostPendingRun.completionSource ()

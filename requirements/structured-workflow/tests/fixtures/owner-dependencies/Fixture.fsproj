@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="FSharp.Core" Version="10.1.203"/>
+    <PackageReference Include="Fable.Core" Version="5.0.0"/>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Provider.fs"/>
+    <Compile Include="Consumer.fs"/>
+  </ItemGroup>
+</Project>

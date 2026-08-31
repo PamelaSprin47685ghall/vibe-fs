@@ -41,7 +41,9 @@
 
 ### 3. 候选物化、持久化与晋升 (Frame Canonicalization & Promotion)
 
-- **规范化编码**：提取纯粹的工具调用与结果，剔除模型中间推理文本；Owner 侧工具调用 ID 采用确定性哈希派生。
+- **Strength-owned 校验与帧展开**：`StrengthProjectionIntent` 校验 decision/target、frame digest、只读工具集合与完整 call/result 配对，再把通过校验的 `ProjectionMessageRow` 交给 `ProjectionIntent.replaceMessageBase` 或 `ProjectionIntent.insertMessageRows`。provider-projection 只负责通用 rows 的规划与渲染，不暴露 Strength 专用构造器。
+- **Native tool adapter**：`Strength.Replica.Transform` 消费 `ProjectionMessageEdit.HostWireEncoding.tryEncodeNonToolParts`、`completedToolPart` 与 `rawMessage`，把已验证的 call/result 对编码为 OpenCode completed-tool part；工具配对、角色折叠与 Strength policy 仍归 Strength。
+- **在线/重放等价**：`Strength.OpenCode.Speculate` 与 `Replay` 都消费 `ProjectionRenderer.renderMessagesWithHostIds`，并通过 `ProjectionMessageEdit.tryApplyRenderedInsertionsPreservingBase` 写回；既有 Host object 保持不变。Replica transform 对 renderer rows 使用上述 native adapter，写回后仍由 generic capture 解码为相同 wire semantics。
 - **两阶段提交**：
   - 候选帧就绪后，先写入 `StrengthCandidatePrepared` 并将大对象存入 payload_refs；
   - 仅当主模型在目标运行中产生可用输出后，触发 `StrengthCandidatePromoted`；
@@ -57,16 +59,16 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| SPEC-INV-001 | `requirements/speculative-investigation/tests/host-canary-k0.test.mjs` |
-| SPEC-INV-002 | `requirements/speculative-investigation/tests/authority-policy.test.mjs`, `requirements/speculative-investigation/tests/strength-speculate-surface.test.mjs` |
-| SPEC-INV-003 | `requirements/speculative-investigation/tests/batch-collector.test.mjs` |
-| SPEC-INV-004 | `requirements/speculative-investigation/tests/authority-policy.test.mjs` |
-| SPEC-INV-005 | `requirements/speculative-investigation/tests/frame-projection.test.mjs` |
-| SPEC-INV-006 | `requirements/speculative-investigation/tests/commit-promotion.test.mjs` |
-| SPEC-INV-007 | `requirements/speculative-investigation/tests/turn-evidence.test.mjs` |
-| SPEC-INV-008 | `requirements/speculative-investigation/tests/lifecycle-recovery.test.mjs`, `requirements/speculative-investigation/tests/strength-replay-surface.test.mjs` |
-| SPEC-INV-009 | `requirements/speculative-investigation/tests/projection-algebra.test.mjs` |
-| SPEC-INV-010 | `requirements/speculative-investigation/tests/authority-policy.test.mjs` |
-| SPEC-INV-011 | `requirements/speculative-investigation/tests/host-policy.test.mjs` |
-| SPEC-INV-012 | `requirements/speculative-investigation/tests/invisibility.test.mjs` |
-| SPEC-INV-013 | `requirements/speculative-investigation/tests/dry-run-shadow.test.mjs` |
+| SPEC-INV-001 | `requirements/speculative-investigation/tests/host-canary-k0.test.mjs::WHAT[SPEC-INV-001] STRENGTH_002_011_policy_k0_default_when_host_canary_or_cost_is_unproven` |
+| SPEC-INV-002 | `requirements/speculative-investigation/tests/authority-policy.test.mjs::WHAT[SPEC-INV-002] STRENGTH_002_010_policy_is_fail_closed_and_only_treats_proven_deep_opportunities`；`requirements/speculative-investigation/tests/strength-speculate-surface.test.mjs::WHAT[SPEC-INV-002] StrengthSpeculate owns tryApply entry point for transform speculation` |
+| SPEC-INV-003 | `requirements/speculative-investigation/tests/batch-collector.test.mjs::WHAT[SPEC-INV-003] STRENGTH_003_005_collector_preserves_provider_request_batches_and_concurrent_order` |
+| SPEC-INV-004 | `requirements/speculative-investigation/tests/authority-policy.test.mjs::WHAT[SPEC-INV-004] STRENGTH_004_019_replica_is_never_owner_fallback_or_prefix_probe_evidence` |
+| SPEC-INV-005 | `requirements/speculative-investigation/tests/frame-projection.test.mjs::WHAT[SPEC-INV-005] STRENGTH_005_frame_bundle_accepts_only_complete_read_glob_grep_batches` |
+| SPEC-INV-006 | `requirements/speculative-investigation/tests/commit-promotion.test.mjs::WHAT[SPEC-INV-006] STRENGTH_006_prepared_commit_unknown_is_resolved_without_guessing` |
+| SPEC-INV-007 | `requirements/speculative-investigation/tests/turn-evidence.test.mjs::WHAT[SPEC-INV-007] STRENGTH_007_provider_output_evidence_is_not_host_bookkeeping` |
+| SPEC-INV-008 | `requirements/speculative-investigation/tests/lifecycle-recovery.test.mjs::WHAT[SPEC-INV-008] STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_exact_target_anchor`；`requirements/speculative-investigation/tests/strength-replay-surface.test.mjs::WHAT[SPEC-INV-008] StrengthReplay owns applyBeforeXTrace entry point for replay before xtrace` |
+| SPEC-INV-009 | `requirements/speculative-investigation/tests/projection-algebra.test.mjs::WHAT[SPEC-INV-009] STRENGTH_006_009_candidate_wrong_target_and_promoted_replica_reflection_conflict`；`requirements/speculative-investigation/tests/projection-adapter.test.mjs::WHAT[SPEC-INV-009] STRENGTH_009_rendered_message_adapter_roundtrips_wire_semantics_with_host_only_ids`；`requirements/speculative-investigation/tests/projection-adapter.test.mjs::WHAT[SPEC-INV-009] STRENGTH_009_host_adapter_encodes_strength_tool_pairs_as_native_completed_OpenCode_parts`；`requirements/speculative-investigation/tests/replica-transform.test.mjs::WHAT[SPEC-INV-009] STRENGTH_003_004_replica_initial_transform_replaces_bootstrap_with_frozen_owner_mirror` |
+| SPEC-INV-010 | `requirements/speculative-investigation/tests/authority-policy.test.mjs::WHAT[SPEC-INV-010] STRENGTH_010_value_equations_charge_fast_bytes_delay_and_risk` |
+| SPEC-INV-011 | `requirements/speculative-investigation/tests/host-policy.test.mjs::WHAT[SPEC-INV-011] STRENGTH_011_dry_run_is_an_explicit_non_default_host_canary_mode` |
+| SPEC-INV-012 | `requirements/speculative-investigation/tests/invisibility.test.mjs::WHAT[SPEC-INV-012] STRENGTH_012_candidate_and_promoted_semantic_bytes_have_no_mechanism_provenance` |
+| SPEC-INV-013 | `requirements/speculative-investigation/tests/dry-run-shadow.test.mjs::WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_owner_path_starts_shadow_and_does_not_await_replica_terminal` |

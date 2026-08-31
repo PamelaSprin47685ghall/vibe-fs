@@ -154,6 +154,31 @@ test('WHAT[MANAGED-SESSION-015] EXEC_009_a_linked_handle_records_the_child_sessi
   })
 })
 
+test('WHAT[MANAGED-SESSION-007] LOOP_optional_string_traversal_calls_extract_zero_for_None_once_for_Some_and_propagates_failure', () => {
+  const calls = []
+  const extract = (value) => {
+    calls.push(value)
+    return `projected:${value}`
+  }
+
+  assert.equal(HandleSurface.optionalStringTraversal(false, 'absent', extract), undefined)
+  assert.deepEqual(calls, [], 'None must not invoke extract')
+
+  assert.equal(HandleSurface.optionalStringTraversal(true, 'present', extract), 'projected:present')
+  assert.deepEqual(calls, ['present'], 'Some must invoke extract exactly once with its value')
+
+  const failure = new Error('extract failed')
+  assert.throws(
+    () =>
+      HandleSurface.optionalStringTraversal(true, 'failing', (value) => {
+        calls.push(value)
+        throw failure
+      }),
+    (error) => error === failure,
+  )
+  assert.deepEqual(calls, ['present', 'failing'], 'extract failure propagates after exactly one invocation')
+})
+
 // ── EXEC-004: the completion cell is single-assignment ───────────────────────
 
 test('WHAT[MANAGED-SESSION-007] EXEC_004_the_first_completion_wins_and_later_ones_are_refused', () => {

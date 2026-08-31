@@ -10,6 +10,13 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 
+[<RequireQualifiedAccess>]
+type XTraceTerminalCompletion =
+    | Published of AgentRunResult
+    | CaptureFailed of XTraceCaptureError
+    | RejectedMissingRole
+    | RejectedEmptyOutput
+
 /// Physical terminal materialisation: ReconciledTurn → AgentRunResult →
 /// XTrace capture → NotifyTerminal. No Fallback / Manager / Reviewer /
 /// cohort lifecycle / JoinGuard / IdleRepair / LoopSensor.
@@ -21,7 +28,7 @@ module TerminalReporter =
         (turn: ReconciledTurn)
         (sessionWideText: string)
         (role: Role)
-        : Task<bool * bool> =
+        : Task<XTraceTerminalCompletion> =
         task {
             let runResult: AgentRunResult =
                 { SessionId = turn.SessionId
@@ -33,12 +40,15 @@ module TerminalReporter =
                   TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
 
             if runResult.IsValid then
-                do! XTraceCapture.captureTerminal journal turn
+                match!
+                    XTraceCapture.captureTerminalTextWithReceipt journal turn.SessionId sessionWideText turn.ProviderRun
+                with
+                | Ok _ ->
+                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
+                    |> ignore
 
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
-                |> ignore
-
-                return false, true
+                    return XTraceTerminalCompletion.Published runResult
+                | Error error -> return XTraceTerminalCompletion.CaptureFailed error
             else
                 eventPort.NotifyTerminal
                     turn.SessionId
@@ -47,19 +57,18 @@ module TerminalReporter =
                     ))
                 |> ignore
 
-                return false, false
+                return XTraceTerminalCompletion.RejectedEmptyOutput
         }
 
     /// Build the `AgentRunResult`, validate via `runResult.IsValid`, capture the
     /// XTrace terminal segment, and report Completed / Failed.
-    let complete
+    let completeUsingTextEvidence
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
-        : Task<bool * bool> =
+        (sessionWideText: string)
+        : Task<XTraceTerminalCompletion> =
         task {
-            let sessionWideText = CompletedTurnClassifier.partsSessionText turn.Parts
-
             match turn.Role with
             | None ->
                 eventPort.NotifyTerminal
@@ -69,6 +78,32 @@ module TerminalReporter =
                     ))
                 |> ignore
 
-                return false, false
+                return XTraceTerminalCompletion.RejectedMissingRole
             | Some role -> return! reportResolvedRole eventPort journal turn sessionWideText role
+        }
+
+    let completeWithEvidence
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (turn: ReconciledTurn)
+        : Task<XTraceTerminalCompletion> =
+        let sessionWideText = CompletedTurnClassifier.partsSessionText turn.Parts
+        completeUsingTextEvidence eventPort journal turn sessionWideText
+
+    /// Legacy workflow result shape while foreign callers migrate. All terminal
+    /// decisions and effects are owned by the typed operation above.
+    let complete
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (turn: ReconciledTurn)
+        : Task<bool * bool> =
+        task {
+            let! completion = completeWithEvidence eventPort journal turn
+
+            return
+                match completion with
+                | XTraceTerminalCompletion.Published _ -> false, true
+                | XTraceTerminalCompletion.CaptureFailed _
+                | XTraceTerminalCompletion.RejectedMissingRole
+                | XTraceTerminalCompletion.RejectedEmptyOutput -> false, false
         }

@@ -14,7 +14,7 @@
 4. **Long Stroke**：恰好一个真实完整的端到端（E2E）物理验收环境。
 5. **Release**：一次确定性的全量构建、打包与交付物验证。
 
-证据层序由 `package.json` 中的构建流程与 `scripts/check.mjs` 注册清单固定，层序颠倒或错置直接判为违约。
+证据层序由 `package.json` 中的构建流程与 `scripts/check.mjs` 注册清单固定，层序颠倒或错置直接判为违约。每项可被外部登记表引用的证明，其层级只能由 verification-system 所有的 `scripts/checks/proof-levels.json` 以精确 `(path, title, what_id)` 键独立分类；消费方自报层级、缺失键或重复键均不得取得证明权威。
 
 ## VERIFICATION-SYSTEM-002: One World——恰一个 Long Stroke
 

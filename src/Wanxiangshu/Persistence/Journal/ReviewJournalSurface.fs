@@ -358,14 +358,13 @@ module ReviewJournalSurface =
                     | ReviewWitness.Confirmed _ -> "Confirmed"
 
             let xTraceHead =
-                session.XTrace |> Option.map XTraceProjection.head |> Option.defaultValue 0L
+                session.XTrace
+                |> Option.map (XTraceProjection.headCursor >> XTraceCursor.sequence)
+                |> Option.defaultValue 0L
 
             let xTracePartKinds =
                 session.XTrace
-                |> Option.map (fun xTrace ->
-                    XTraceProjection.parts xTrace
-                    |> List.map (fun part -> part.Kind)
-                    |> List.toArray)
+                |> Option.map (XTraceProjection.partKinds >> List.toArray)
                 |> Option.defaultValue [||]
 
             let closedAttempts =
@@ -376,7 +375,7 @@ module ReviewJournalSurface =
                         box
                             {| providerRun = ProviderRunIdentity.value closed.Attempt.ProviderRun
                                toolCallId = ToolCallId.value closed.Attempt.ToolCallId
-                               frontier = closed.FrozenFrontier.Sequence |})
+                               frontier = XTraceCursor.sequence closed.FrozenFrontier |})
                     |> List.toArray)
                 |> Option.defaultValue [||]
 
@@ -446,7 +445,7 @@ module ReviewJournalSurface =
 
         AgentProjection.tryFind (SessionId.create sessionId) projection.AgentProjections
         |> Option.bind (fun session -> session.XTrace)
-        |> Option.map XTraceProjection.head
+        |> Option.map (XTraceProjection.headCursor >> XTraceCursor.sequence)
         |> Option.defaultValue 0L
 
     let xTracePartKinds (handle: JournalHandle) (sessionId: string) : string array =
@@ -454,8 +453,5 @@ module ReviewJournalSurface =
 
         AgentProjection.tryFind (SessionId.create sessionId) projection.AgentProjections
         |> Option.bind (fun session -> session.XTrace)
-        |> Option.map (fun xTrace ->
-            XTraceProjection.parts xTrace
-            |> List.map (fun part -> part.Kind)
-            |> List.toArray)
+        |> Option.map (XTraceProjection.partKinds >> List.toArray)
         |> Option.defaultValue [||]

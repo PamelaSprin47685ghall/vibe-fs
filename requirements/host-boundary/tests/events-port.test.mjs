@@ -36,6 +36,19 @@ test('WHAT[HOST-BOUNDARY-016] EVT_failed_and_aborted_outcomes_are_not_deduped', 
   assert.deepEqual(received, ['Failed', 'Failed', 'Aborted', 'Aborted'])
 })
 
+test('WHAT[HOST-BOUNDARY-016] EVT_terminal_notification_fans_out_once_to_each_live_physical_listener', () => {
+  const port = EventsSurface.create()
+  const first = []
+  const second = []
+  EventsSurface.subscribeFuture(port, (sessionId, outcome) => first.push([sessionId, outcome.kind]))
+  EventsSurface.subscribeFuture(port, (sessionId, outcome) => second.push([sessionId, outcome.kind]))
+
+  notify(port, 'ses_fanout', failed('diagnostic'))
+
+  assert.deepEqual(first, [['ses_fanout', 'Failed']])
+  assert.deepEqual(second, [['ses_fanout', 'Failed']])
+})
+
 test('WHAT[HOST-BOUNDARY-016] EVT_late_subscriber_replays_the_last_sticky_outcome_per_session', () => {
   const port = EventsSurface.create()
   notify(port, 'ses_replay_a', completed('run-a'))

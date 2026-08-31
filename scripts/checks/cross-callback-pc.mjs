@@ -33,9 +33,8 @@
  * checks state == Idle(permit.AttemptSerial). The permit is an unforgeable
  * typed capability, not a presence probe. Restart clears the gate (HOST-007).
  *
- * Baseline: known debt entries (file::name) are allowed but reported; new debt
- * not in baseline and without proof annotation is RED. BASELINE_MAX_SIZE is a
- * ratchet — it only decreases as debt items are fixed, never increases.
+ * Every detected cell without a proof annotation is RED. There is no debt
+ * baseline or ceiling: ownership evidence is required at the declaration.
  */
 
 import { readFileSync } from 'node:fs'
@@ -45,17 +44,6 @@ import { walk } from '../lib/walk.mjs'
 
 export const PRODUCTION_ROOT = 'src/Wanxiangshu'
 const norm = (p) => p.replace(/\\/g, '/')
-
-/**
- * Known debt baseline: each entry is `file::variableName`.
- * These are the existing cross-callback PC patterns identified in the
- * 2026-08-18 obligation account. They are allowed (reported but not RED)
- * until fixed; any NEW pattern not listed here is RED.
- */
-export const KNOWN_DEBT_BASELINE = new Set([
-  // LoopSensor — armed
-  'src/Wanxiangshu/OpenCode/Host/LoopSensor.fs::armed',
-])
 
 /**
  * Physical capability exemption categories.
@@ -74,14 +62,6 @@ export const EXEMPTION_CATEGORIES = new Set([
   'cancellation-token',
   'resource',
 ])
-
-/**
- * Baseline ratchet ceiling: KNOWN_DEBT_BASELINE.size must never exceed this.
- * When a debt item is fixed, remove it from KNOWN_DEBT_BASELINE and decrease
- * BASELINE_MAX_SIZE by 1. Increasing BASELINE_MAX_SIZE is a ratchet violation
- * (VERIFICATION-SYSTEM-010: acceptance criteria only tighten).
- */
-export const BASELINE_MAX_SIZE = 1
 
 /**
  * Pattern 1: TryTake continuation consumption.
@@ -201,9 +181,8 @@ export const scanText = (text, file = '<synthetic>') => {
   // Check each registry for pattern matches
   for (const reg of registries) {
     const fileNorm = norm(String(file))
-    const debtKey = `${fileNorm}::${reg.name}`
 
-    // If proof annotation exists, this is whitelisted
+    // If proof annotation exists, this physical cell is positively classified.
     if (reg.hasProof) continue
 
     // A member pattern only implicates the registry it actually reads/consumes.
@@ -224,16 +203,12 @@ export const scanText = (text, file = '<synthetic>') => {
 
     if (!pattern) continue
 
-    // Check if this is known debt (baseline)
-    const isKnownDebt = KNOWN_DEBT_BASELINE.has(debtKey)
-
     violations.push({
       file: fileNorm,
       line: reg.line + 1,
       name: reg.name,
       pattern,
       text: lines[reg.line].trim(),
-      knownDebt: isKnownDebt,
     })
   }
 
@@ -249,15 +224,11 @@ export const scanFiles = (entries) => {
   return violations
 }
 
-/**
- * Evaluate violations against baseline.
- * Known debt is reported but not RED; new debt is RED.
- */
-export const evaluateViolations = (violations) => {
-  const regressions = violations.filter((v) => !v.knownDebt)
-  const knownDebt = violations.filter((v) => v.knownDebt)
-  return { regressions, knownDebt, ok: regressions.length === 0 }
-}
+/** Every unproved detection is a regression. */
+export const evaluateViolations = (violations) => ({
+  regressions: [...violations],
+  ok: violations.length === 0,
+})
 
 const runCli = () => {
   const productionFiles = walk(PRODUCTION_ROOT, ['.fs']).map(norm)
@@ -266,18 +237,10 @@ const runCli = () => {
     text: readFileSync(file, 'utf8'),
   }))
   const violations = scanFiles(entries)
-  const { regressions, knownDebt, ok } = evaluateViolations(violations)
-
-  if (knownDebt.length > 0) {
-    console.error(`cross-callback-pc: ${knownDebt.length} known debt entry(s) (baseline — fix to remove)`)
-    for (const v of knownDebt) {
-      console.error(`  [KNOWN] ${v.file}:${v.line}  ${v.name} (${v.pattern})`)
-    }
-    console.error('')
-  }
+  const { regressions } = evaluateViolations(violations)
 
   if (regressions.length > 0) {
-    console.error(`cross-callback-pc: ${regressions.length} NEW violation(s) — cross-callback program counter without proof`)
+    console.error(`cross-callback-pc: ${regressions.length} violation(s) — cross-callback program counter without proof`)
     for (const v of regressions) {
       console.error(`  [RED] ${v.file}:${v.line}  ${v.name} (${v.pattern})`)
       console.error(`    ${v.text}`)
@@ -286,11 +249,7 @@ const runCli = () => {
     process.exit(1)
   }
 
-  if (knownDebt.length > 0) {
-    console.log(`cross-callback-pc: OK with ${knownDebt.length} known debt (baseline ratchet)`)
-  } else {
-    console.log(`cross-callback-pc: OK — ${productionFiles.length} files, zero cross-callback PC`)
-  }
+  console.log(`cross-callback-pc: OK — ${productionFiles.length} files, zero cross-callback PC`)
   process.exit(0)
 }
 

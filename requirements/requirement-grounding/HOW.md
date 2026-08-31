@@ -49,15 +49,15 @@ Missing-Material Filter (同 horizon 已看见的材料逐文件跳过)
 
 | 命题 | 落点测试 |
 |---|---|
-| REQUIREMENT-GROUNDING-001 | `requirements/requirement-grounding/tests/scope-resolution.test.mjs` |
-| REQUIREMENT-GROUNDING-002 | `requirements/requirement-grounding/tests/scope-resolution.test.mjs` |
-| REQUIREMENT-GROUNDING-003 | `requirements/requirement-grounding/tests/scope-resolution.test.mjs` |
-| REQUIREMENT-GROUNDING-004 | `requirements/requirement-grounding/tests/scope-resolution.test.mjs` |
-| REQUIREMENT-GROUNDING-005 | `requirements/requirement-grounding/tests/grounding-delivery.test.mjs` |
-| REQUIREMENT-GROUNDING-006 | `requirements/requirement-grounding/tests/grounding-delivery.test.mjs` |
-| REQUIREMENT-GROUNDING-007 | `requirements/requirement-grounding/tests/opencode-gate.test.mjs`, `requirements/requirement-grounding/tests/requirement-grounding-project-surface.test.mjs` |
-| REQUIREMENT-GROUNDING-008 | `requirements/requirement-grounding/tests/opencode-gate.test.mjs` |
-| REQUIREMENT-GROUNDING-009 | `requirements/requirement-grounding/tests/repository-programming-gate.test.mjs` |
-| REQUIREMENT-GROUNDING-010 | `requirements/requirement-grounding/tests/repository-programming-gate.test.mjs` |
-| REQUIREMENT-GROUNDING-011 | `requirements/requirement-grounding/tests/grounding-delivery.test.mjs` |
-| REQUIREMENT-GROUNDING-012 | `requirements/requirement-grounding/tests/grounding-delivery.test.mjs` |
+| REQUIREMENT-GROUNDING-001 | `requirements/requirement-grounding/tests/scope-resolution.test.mjs::WHAT[REQUIREMENT-GROUNDING-001] discovers requirement packages from the current workspace without a Wanxiangshu package list` |
+| REQUIREMENT-GROUNDING-002 | `requirements/requirement-grounding/tests/scope-resolution.test.mjs::WHAT[REQUIREMENT-GROUNDING-002] treats a package own requirements subtree as implicit coverage that APPLIES-TO cannot cancel` |
+| REQUIREMENT-GROUNDING-003 | `requirements/requirement-grounding/tests/scope-resolution.test.mjs::WHAT[REQUIREMENT-GROUNDING-003] evaluates APPLIES-TO as ordered positive wildmatch includes with bang exclusions` |
+| REQUIREMENT-GROUNDING-004 | `requirements/requirement-grounding/tests/scope-resolution.test.mjs::WHAT[REQUIREMENT-GROUNDING-004] returns every overlapping package in deterministic package-name order` |
+| REQUIREMENT-GROUNDING-005 | `requirements/requirement-grounding/tests/grounding-delivery.test.mjs::WHAT[REQUIREMENT-GROUNDING-005] APPLIES-TO external grounding injects only direct Markdown and excludes tests plus the manifest` |
+| REQUIREMENT-GROUNDING-006 | `requirements/requirement-grounding/tests/grounding-delivery.test.mjs::WHAT[REQUIREMENT-GROUNDING-006] direct Markdown read counts as visible grounding material and only unread siblings are injected`；`requirements/requirement-grounding/tests/grounding-delivery.test.mjs::WHAT[REQUIREMENT-GROUNDING-006] deduplicates material content versions and re-grounds only the changed Markdown sibling`；`requirements/requirement-grounding/tests/grounding-delivery.test.mjs::WHAT[REQUIREMENT-GROUNDING-006] reanchor_resets_horizon_coverage_so_the_same_digest_must_ground_again` |
+| REQUIREMENT-GROUNDING-007 | `requirements/requirement-grounding/tests/opencode-gate.test.mjs::WHAT[REQUIREMENT-GROUNDING-007] ordinary providers replay anchored read call-result pairs while Cursor appends NUL-BOM result-only bytes after the pseudo-skill with stable source-path attributes`；`requirements/requirement-grounding/tests/opencode-gate.test.mjs::WHAT[REQUIREMENT-GROUNDING-007] grep match files do not trigger APPLIES-TO before an explicit read`；`requirements/requirement-grounding/tests/requirement-grounding-project-surface.test.mjs::WHAT[REQUIREMENT-GROUNDING-007] RequirementGroundingTransform owns projectOrTerminate entry point` |
+| REQUIREMENT-GROUNDING-008 | `requirements/requirement-grounding/tests/opencode-gate.test.mjs::WHAT[REQUIREMENT-GROUNDING-008] mutation grounding is weak observation and never becomes tool admission` |
+| REQUIREMENT-GROUNDING-009 | `requirements/requirement-grounding/tests/repository-programming-gate.test.mjs::WHAT[REQUIREMENT-GROUNDING-009] js-* mutations commit normally while grounding observes the full effect set without admission` |
+| REQUIREMENT-GROUNDING-010 | `requirements/requirement-grounding/tests/repository-programming-gate.test.mjs::WHAT[REQUIREMENT-GROUNDING-010] js-* read is a real read: covered code triggers grounding and already-read Markdown is deduplicated` |
+| REQUIREMENT-GROUNDING-011 | `requirements/requirement-grounding/tests/grounding-delivery.test.mjs::WHAT[REQUIREMENT-GROUNDING-011] ordinary read observations add knowledge without creating authority or expanding capability` |
+| REQUIREMENT-GROUNDING-012 | `requirements/requirement-grounding/tests/grounding-delivery.test.mjs::WHAT[REQUIREMENT-GROUNDING-012] freezes ordinary read-pair bytes and Cursor path-attributed result bytes for restart replay while changed digests append without rewriting the provider prefix` |

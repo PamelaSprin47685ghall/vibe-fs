@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Foundation
 
 open System.Threading.Tasks
+open Fable.Core
 
 /// Fable-only async/result vocabulary owned by this repository.
 /// FsToolkit.ErrorHandling excludes its Task helpers from the Fable build.
@@ -37,3 +38,22 @@ module TaskResultList =
             }
 
         collect [] items
+
+/// JS-native executable view of TaskResultList traversal. Callback results use
+/// bool only at this boundary; false is translated to Error inside traverseM.
+module TaskResultListSurface =
+    [<Emit("$0($1)")>]
+    let private invokeMapper (mapper: obj) (item: string) : Task<bool> = jsNative
+
+    let traverseM (mapper: obj) (items: string array) : Task<string array> =
+        task {
+            let map item =
+                task {
+                    let! accepted = invokeMapper mapper item
+                    return if accepted then Ok item else Error item
+                }
+
+            match! TaskResultList.traverseM map (items |> Array.toList) with
+            | Ok values -> return Array.append [| "Ok" |] (values |> List.toArray)
+            | Error error -> return [| "Error"; error |]
+        }

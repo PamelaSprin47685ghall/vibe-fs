@@ -40,6 +40,12 @@ export function integrationNodeTestSteps(root) {
       files: [path.join(root, 'requirements/change-integration/tests/integration/worktree-create.test.mjs')],
     },
     {
+      label: 'owner-dependencies-fcs.test.mjs (structured-workflow)',
+      files: [
+        path.join(root, 'requirements/structured-workflow/tests/integration/owner-dependencies-fcs.test.mjs'),
+      ],
+    },
+    {
       label: 'plugin/file-mutation-tools.test.mjs (repository-programming)',
       files: [path.join(root, 'requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs')],
     },

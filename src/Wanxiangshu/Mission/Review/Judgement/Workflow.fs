@@ -165,18 +165,15 @@ module ReviewerWorkflow =
         | NoAttempt
         | AlreadyClosed
         | ToolResultMissing
-        | ToolResultReady of attempt: ReviewAttemptIdentity * frontier: int64
+        | ToolResultReady of attempt: ReviewAttemptIdentity * frontier: XTraceCursor
 
     let private matchingToolResultFrontier
         (attempt: ReviewAttemptIdentity)
         (xTrace: XTraceProjectionState)
-        : int64 option =
-        XTraceProjection.parts xTrace
-        |> List.tryFind (fun part ->
-            part.Kind = "tool_result"
-            && part.ProviderRun = Some attempt.ProviderRun
-            && part.ToolCallId = Some attempt.ToolCallId)
-        |> Option.map (fun part -> part.Cursor.Sequence + 1L)
+        : XTraceCursor option =
+        XTraceProjection.toolResultParts attempt.ProviderRun attempt.ToolCallId xTrace
+        |> List.tryHead
+        |> Option.map XTraceProjection.frontierAfter
 
     let private tryAppendAgent
         (stream: StreamId)
@@ -200,7 +197,7 @@ module ReviewerWorkflow =
     let private appendSubmittedAttemptClosed
         (journal: AgentJournal)
         (attempt: ReviewAttemptIdentity)
-        (frontier: int64)
+        (frontier: XTraceCursor)
         : Task<Result<unit, string>> =
         task {
             let closed =
@@ -210,7 +207,7 @@ module ReviewerWorkflow =
                        GitTreeHash = attempt.GitTreeHash
                        ProviderRun = attempt.ProviderRun
                        ToolCallId = attempt.ToolCallId
-                       FrozenFrontierSequence = frontier |}
+                       FrozenFrontierSequence = XTraceCursor.sequence frontier |}
 
             match!
                 tryAppendAgent (StreamId.Session attempt.ReviewerSessionId) (Some attempt.ProviderRun) closed journal
@@ -270,30 +267,35 @@ module ReviewerWorkflow =
                 return true
             }
 
-    /// The latest verdict attempt this turn carried plus the
-    /// XTrace head at closure time. `None` when the turn produced no verdict.
+    /// The latest verdict attempt this turn carried plus the captured terminal
+    /// frontier (or current trace frontier when completion was rejected).
+    /// `None` when the turn produced no verdict.
     let private closedAttemptEvidence (journal: AgentJournal option) (turn: ReconciledTurn) =
         journal
         |> Option.bind (fun durable ->
             let snapshot = AgentJournal.snapshot durable
 
-            let frontier =
-                AgentProjection.tryFind turn.SessionId snapshot.AgentProjections
-                |> Option.bind (fun session -> session.XTrace)
-                |> Option.map XTraceProjection.head
-                |> Option.defaultValue 0L
-
             AgentProjection.tryFind turn.SessionId snapshot.AgentProjections
-            |> Option.bind (fun session -> session.ReviewGuard)
-            |> Option.bind ReviewProjection.latestObservedAttempt
-            |> Option.map (fun attempt -> attempt, frontier))
+            |> Option.bind (fun session ->
+                session.ReviewGuard
+                |> Option.bind ReviewProjection.latestObservedAttempt
+                |> Option.map (fun attempt ->
+                    let frontier =
+                        session.XTrace
+                        |> Option.map (fun xTrace ->
+                            XTraceProjection.terminalEvidenceForProviderRun turn.ProviderRun xTrace
+                            |> Option.map (fun terminal -> terminal.Frontier)
+                            |> Option.defaultWith (fun () -> XTraceProjection.headCursor xTrace))
+                        |> Option.defaultValue XTraceCursor.originCursor
+
+                    attempt, frontier)))
 
     /// One closure append, one flat result match.
     let private writeAttemptClosed
         (journal: AgentJournal)
         (turn: ReconciledTurn)
         (attempt: ReviewAttemptIdentity)
-        (frontier: int64)
+        (frontier: XTraceCursor)
         : Task =
         task {
             let closed =
@@ -303,7 +305,7 @@ module ReviewerWorkflow =
                        GitTreeHash = attempt.GitTreeHash
                        ProviderRun = attempt.ProviderRun
                        ToolCallId = attempt.ToolCallId
-                       FrozenFrontierSequence = frontier |}
+                       FrozenFrontierSequence = XTraceCursor.sequence frontier |}
 
             let! appended =
                 AgentJournal.appendAgent (StreamId.Session turn.SessionId) (Some attempt.ProviderRun) closed journal
@@ -320,28 +322,71 @@ module ReviewerWorkflow =
         | None -> AsyncSupport.completedTask ()
         | Some(attempt, frontier) -> writeAttemptClosed (Option.get journal) turn attempt frontier
 
-    let private reportResolvedReviewerRun
+    let private reportCaptureFailure
+        (eventPort: IEventObservationPort)
+        (turn: ReconciledTurn)
+        (error: XTraceCaptureError)
+        =
+        let reason =
+            match error with
+            | XTraceCaptureError.Refused detail -> sprintf "review terminal capture refused: %s" detail
+            | XTraceCaptureError.StorageFailed detail -> sprintf "review terminal capture storage failed: %s" detail
+
+        eventPort.NotifyTerminal
+            turn.SessionId
+            (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
+        |> ignore
+
+    let private reportToolOnlyReviewerRun
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
-        (runResult: AgentRunResult)
+        (role: Role)
         =
         task {
-            if runResult.IsValid then
-                do! XTraceCapture.captureTerminal journal turn
+            let terminalText = "Review judgement submitted."
+
+            let runResult: AgentRunResult =
+                { SessionId = turn.SessionId
+                  AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
+                  ProviderRun = turn.ProviderRun
+                  Role = AgentRoleIdentity.toRole role
+                  Directory = turn.Directory
+                  TerminalText = terminalText
+                  TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
+
+            match!
+                XTraceCapture.captureTerminalTextWithReceipt journal turn.SessionId terminalText turn.ProviderRun
+            with
+            | Ok _ ->
                 do! appendAttemptClosed journal turn
 
                 eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
                 |> ignore
-            else
-                do! appendAttemptClosed journal turn
+            | Error error -> reportCaptureFailure eventPort turn error
+        }
 
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (TerminalOutcome.Failed(
-                        TerminalStop.forAuthority turn.AuthorityRootUserMessageId "completed with empty terminal output"
-                    ))
-                |> ignore
+    [<RequireQualifiedAccess>]
+    type private ReviewerCompletionDecision =
+        | ToolOnlyFallback of Role
+        | TurnEvidence
+
+    let private decideReviewerCompletion (sessionWide: string) (role: Role option) =
+        match String.IsNullOrWhiteSpace sessionWide, role with
+        | true, Some resolved -> ReviewerCompletionDecision.ToolOnlyFallback resolved
+        | _ -> ReviewerCompletionDecision.TurnEvidence
+
+    let private reportReviewerTurnEvidence
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (turn: ReconciledTurn)
+        : Task =
+        task {
+            match! TerminalReporter.completeWithEvidence eventPort journal turn with
+            | XTraceTerminalCompletion.Published _ -> do! appendAttemptClosed journal turn
+            | XTraceTerminalCompletion.CaptureFailed error -> reportCaptureFailure eventPort turn error
+            | XTraceTerminalCompletion.RejectedEmptyOutput -> do! appendAttemptClosed journal turn
+            | XTraceTerminalCompletion.RejectedMissingRole -> ()
         }
 
     /// Build the `AgentRunResult`, validate via `runResult.IsValid`, capture the
@@ -350,39 +395,12 @@ module ReviewerWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
-        (allowToolOnlyFallback: bool)
         : Task =
-        task {
-            let sessionWide = CompletedTurnClassifier.partsSessionText turn.Parts
+        let sessionWide = CompletedTurnClassifier.partsSessionText turn.Parts
 
-            let sessionWideText =
-                if not (String.IsNullOrWhiteSpace sessionWide) then
-                    sessionWide
-                elif allowToolOnlyFallback then
-                    "Review judgement submitted."
-                else
-                    sessionWide
-
-            match turn.Role with
-            | None ->
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (TerminalOutcome.Failed(
-                        TerminalStop.forAuthority turn.AuthorityRootUserMessageId "completed with no resolved role"
-                    ))
-                |> ignore
-            | Some role ->
-                let runResult: AgentRunResult =
-                    { SessionId = turn.SessionId
-                      AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
-                      ProviderRun = turn.ProviderRun
-                      Role = AgentRoleIdentity.toRole role
-                      Directory = turn.Directory
-                      TerminalText = sessionWideText
-                      TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
-
-                return! reportResolvedReviewerRun eventPort journal turn runResult
-        }
+        match decideReviewerCompletion sessionWide turn.Role with
+        | ReviewerCompletionDecision.ToolOnlyFallback role -> reportToolOnlyReviewerRun eventPort journal turn role
+        | ReviewerCompletionDecision.TurnEvidence -> reportReviewerTurnEvidence eventPort journal turn
 
     /// Physical terminal observer. Active Finality reviewers are owned by the
     /// direct ReviewBarrierWorkflow CE, so this function reports their turn.
@@ -393,4 +411,4 @@ module ReviewerWorkflow =
         (turn: ReconciledTurn)
         (_reviewerKey: string)
         : Task =
-        completeReviewer eventPort journal turn true
+        completeReviewer eventPort journal turn

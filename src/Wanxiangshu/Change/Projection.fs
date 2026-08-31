@@ -46,6 +46,32 @@ type WorktreeEffectStatus =
         {| ManagerJobId: ManagerJobId
            WorktreePath: WorktreePath |}
 
+/// Complete evidence presented to the pure worktree reconciliation boundary.
+/// Physical evidence is representable only for the ambiguous Requested state.
+[<RequireQualifiedAccess>]
+type WorktreeReconciliationObservation =
+    | NoDurableEffect
+    | RequestedConflict of recordedJobId: ManagerJobId * recordedPath: WorktreePath
+    | RequestedAmbiguity of
+        recordedJobId: ManagerJobId *
+        recordedPath: WorktreePath *
+        physical: Result<(WorktreePath * WorktreeIdentity option) list, string>
+    | CreatedReceipt of recordedJobId: ManagerJobId * recordedPath: WorktreePath
+
+[<RequireQualifiedAccess>]
+type WorktreeReconciliationFailure =
+    | DurableOwnershipConflict
+    | WorktreeQueryFailed of string
+    | PhysicalIdentityPathConflict
+
+[<RequireQualifiedAccess>]
+type WorktreeReconciliationDecision =
+    | RequestThenCreate
+    | CreateAfterProvenMissing
+    | AdoptThenRecordCreated
+    | AdoptCreated
+    | Reject of WorktreeReconciliationFailure
+
 type OrchestratorProjection =
     { Jobs: Map<ManagerJobId, ManagerJobProjection>
       WorktreeEffects: Map<WorktreeIdentity, WorktreeEffectStatus> }
@@ -85,6 +111,53 @@ module OrchestratorProjection =
 
     let tryWorktreeEffect (identity: WorktreeIdentity) (projection: OrchestratorProjection) =
         Map.tryFind identity projection.WorktreeEffects
+
+    /// PERSIST-009: decide from durable intent plus, only when Requested is
+    /// ambiguous, one complete physical worktree observation.
+    let decideWorktreeReconciliation
+        (jobId: ManagerJobId)
+        (identity: WorktreeIdentity)
+        (path: WorktreePath)
+        (observation: WorktreeReconciliationObservation)
+        : WorktreeReconciliationDecision =
+        let sameDurableOwner recordedJobId recordedPath =
+            recordedJobId = jobId && recordedPath = path
+
+        let decidePhysicalWorktreeReconciliation physical =
+            let relevantPhysicalEntries =
+                physical
+                |> Result.map (
+                    List.filter (fun (observedPath, observedIdentity) ->
+                        observedPath = path || observedIdentity = Some identity)
+                )
+
+            match relevantPhysicalEntries with
+            | Error error ->
+                WorktreeReconciliationDecision.Reject(WorktreeReconciliationFailure.WorktreeQueryFailed error)
+            | Ok [] -> WorktreeReconciliationDecision.CreateAfterProvenMissing
+            | Ok relevant when
+                relevant
+                |> List.forall (fun (observedPath, observedIdentity) ->
+                    observedPath = path && observedIdentity = Some identity)
+                ->
+                WorktreeReconciliationDecision.AdoptThenRecordCreated
+            | Ok _ -> WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.PhysicalIdentityPathConflict
+
+        match observation with
+        | WorktreeReconciliationObservation.NoDurableEffect -> WorktreeReconciliationDecision.RequestThenCreate
+        | WorktreeReconciliationObservation.CreatedReceipt(recordedJobId, recordedPath) when
+            sameDurableOwner recordedJobId recordedPath
+            ->
+            WorktreeReconciliationDecision.AdoptCreated
+        | WorktreeReconciliationObservation.CreatedReceipt _
+        | WorktreeReconciliationObservation.RequestedConflict _ ->
+            WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.DurableOwnershipConflict
+        | WorktreeReconciliationObservation.RequestedAmbiguity(recordedJobId, recordedPath, _) when
+            not (sameDurableOwner recordedJobId recordedPath)
+            ->
+            WorktreeReconciliationDecision.Reject WorktreeReconciliationFailure.DurableOwnershipConflict
+        | WorktreeReconciliationObservation.RequestedAmbiguity(_, _, physical) ->
+            decidePhysicalWorktreeReconciliation physical
 
     let requestWorktree
         (identity: WorktreeIdentity)

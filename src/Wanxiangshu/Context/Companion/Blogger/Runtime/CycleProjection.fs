@@ -4,6 +4,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Participant.Provider.Attempt
 
 /// C5: unified Entry|Squash receipt keyed by ProviderRun (item 12).
 /// Kind reuses BlogFrameKind — the frame-vs-cycle distinction is the same

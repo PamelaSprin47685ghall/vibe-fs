@@ -1,19 +1,6 @@
 namespace Wanxiangshu.Participant.Provider.Projection
 
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Host
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-
 open System
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// The two provider projections (VERIFY-007).

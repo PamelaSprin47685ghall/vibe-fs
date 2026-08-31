@@ -43,6 +43,11 @@ test('WHAT[CONTEXT-COMPRESSION-021] CTX_021_failed_squash_always_leaves_the_slot
   assert.equal(slot.nextBloggerRequest('blogger-squash', 'RecoveryAttempt', true), 'blogger-main')
 })
 
+test('WHAT[CONTEXT-COMPRESSION-021] CTX_021_blogger_dispatch_distinguishes_missing_projection_from_no_active_run', () => {
+  assert.equal(slot.nextBloggerRequest('missing', 'RecoveryAttempt', true), 'MissingProjection')
+  assert.equal(slot.nextBloggerRequest('work-main', 'RecoveryAttempt', true), 'NoActiveBloggerRun')
+})
+
 test('WHAT[CONTEXT-COMPRESSION-021] CTX_021_future_X_material_waiter_is_deleted_from_production', () => {
   const forbidden = /StartRecoveryOpportunity|OfferRecoveryMaterial|recoveryWaiter|ReArmRecovery/
   const hits = production
@@ -103,7 +108,7 @@ test('WHAT[PAR-017] PAR_017_blogger_retry_abandons_then_materializes_then_binds_
   )
   assert.match(
     workflow,
-    /sendStagedBloggerContinuation[\s\S]*taskResult[\s\S]*stageContinuationContext[\s\S]*sendContinuation[\s\S]*bindContinuationContext/,
+    /sendStagedBloggerContinuation[\s\S]*taskResult[\s\S]*materializeContinuationContext[\s\S]*sendContinuation[\s\S]*bindContinuationContext/,
   )
 })
 
@@ -117,7 +122,7 @@ test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_all_materialization_owners_share_adm
   assert.match(coordinator, /let private withMaterialization[\s\S]*AcquireMaterialization/)
   assert.match(
     coordinator,
-    /stageContinuationContext[\s\S]*withMaterialization[\s\S]*foreignFlightReason[\s\S]*materializeRequest/,
+    /materializeContinuationContext[\s\S]*withMaterialization[\s\S]*foreignFlightReason[\s\S]*materializeRequest/,
   )
   assert.match(
     coordinator,

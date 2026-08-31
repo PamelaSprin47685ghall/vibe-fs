@@ -59,11 +59,8 @@ open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Resources
 open Wanxiangshu.Strength.OpenCode
 open Wanxiangshu.Strength.Persistence
-open Wanxiangshu.Resources
-open Wanxiangshu.Resources
 open Wanxiangshu.Change
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Persistence.Journal
@@ -213,10 +210,7 @@ module ForkTool =
             let RoadCannotTakeCharge = "tool/commission/road-cannot-take-charge"
 
     let private lang (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private prose language path =
         ProviderProse.render language path Map.empty
@@ -225,7 +219,7 @@ module ForkTool =
         ProviderProse.render language path (Map [ "name", byname ])
 
     let private forkInstructions (sessionId: SessionId) : ForkChildInstructions =
-        let lang = ProviderProse.languageOf sessionId
+        let lang = SessionProviderLanguage.languageOf sessionId
 
         { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
           CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty

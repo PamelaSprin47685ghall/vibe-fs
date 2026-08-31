@@ -415,7 +415,7 @@ module HostSessionNudge =
         /// an error and never a physical send. If supersession wins after durable
         /// claim persistence, the dispatcher closes that audit trail with
         /// `PluginPromptAbandoned(SupersededBeforePhysicalSend)`.
-        | Superseded
+        | AdmissionRejected of QuiescencePermitFailure
         /// A concurrent observer already admitted this exact durable occasion.
         /// This is idempotency evidence, never transport/protocol failure.
         | AlreadyAdmitted
@@ -429,16 +429,24 @@ module HostSessionNudge =
     let private idleOutcomeOfDispatch =
         function
         | PromptDispatcher.SendAttemptOutcome.Sent key -> IdleContinuationOutcome.Sent key
-        | PromptDispatcher.SendAttemptOutcome.Superseded -> IdleContinuationOutcome.Superseded
+        | PromptDispatcher.SendAttemptOutcome.AdmissionRejected failure ->
+            IdleContinuationOutcome.AdmissionRejected failure
         | PromptDispatcher.SendAttemptOutcome.NotSent error -> IdleContinuationOutcome.NotSent error
         | PromptDispatcher.SendAttemptOutcome.Failed error -> IdleContinuationOutcome.Failed error
 
-    let private gateIdleOutcome (releaseAdmission: unit -> unit) (outcome: PromptDispatcher.SendAttemptOutcome) =
-        match outcome with
-        | PromptDispatcher.SendAttemptOutcome.NotSent _ -> releaseAdmission ()
-        | _ -> ()
+    let private gateIdleOutcome
+        (releaseAdmission: unit -> Result<unit, QuiescencePermitFailure>)
+        (outcome: PromptDispatcher.SendAttemptOutcome)
+        =
+        let releaseResult =
+            match outcome with
+            | PromptDispatcher.SendAttemptOutcome.NotSent _ -> Some(releaseAdmission ())
+            | _ -> None
 
-        idleOutcomeOfDispatch outcome
+        match outcome, releaseResult with
+        | PromptDispatcher.SendAttemptOutcome.NotSent _, Some(Error failure) ->
+            IdleContinuationOutcome.AdmissionRejected failure
+        | _ -> idleOutcomeOfDispatch outcome
 
     /// HOST-004 + GLORY-029: idle-derived Manager encouragement with exact-terminal
     /// idempotency and no cross-terminal count limit.
@@ -475,7 +483,7 @@ module HostSessionNudge =
                 (liveDirectory directory)
                 PromptDispatcher.AwaitMode.Await
                 (fun () -> quiescence.TryConsume permit)
-            |> TaskValue.map (gateIdleOutcome (fun () -> quiescence.TryRelease permit |> ignore))
+            |> TaskValue.map (gateIdleOutcome (fun () -> quiescence.TryRelease permit))
 
     let trySendIdleManagerEncouragement
         (quiescence: SessionQuiescenceGate)
@@ -513,8 +521,8 @@ module HostSessionNudge =
         }
 
     let private sendGateContinuationWithAdmissionProfile
-        (physicalAdmission: unit -> bool)
-        (releaseAdmission: unit -> unit)
+        (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
+        (releaseAdmission: unit -> Result<unit, QuiescencePermitFailure>)
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
         (prompt: string)
@@ -549,8 +557,8 @@ module HostSessionNudge =
             |> TaskValue.map (gateIdleOutcome releaseAdmission)
 
     let trySendGateContinuationWithAdmission
-        (physicalAdmission: unit -> bool)
-        (releaseAdmission: unit -> unit)
+        (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
+        (releaseAdmission: unit -> Result<unit, QuiescencePermitFailure>)
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
         (prompt: string)
@@ -602,7 +610,7 @@ module HostSessionNudge =
         : Task<IdleContinuationOutcome> =
         trySendGateContinuationWithAdmission
             (fun () -> quiescence.TryConsume permit)
-            (fun () -> quiescence.TryRelease permit |> ignore)
+            (fun () -> quiescence.TryRelease permit)
             sessionPort
             sessionId
             prompt
@@ -676,7 +684,7 @@ module HostSessionNudge =
                 (liveDirectory directory)
                 PromptDispatcher.AwaitMode.Await
                 (fun () -> quiescence.TryConsume permit)
-            |> TaskValue.map idleOutcomeOfDispatch
+            |> TaskValue.map (gateIdleOutcome (fun () -> quiescence.TryRelease permit))
 
     let trySendIdleInteractionRepair
         (quiescence: SessionQuiescenceGate)

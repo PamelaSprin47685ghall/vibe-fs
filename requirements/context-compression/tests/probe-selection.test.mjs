@@ -15,8 +15,18 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as selection from '../../../dist/Context/Companion/CompressionSurface.js'
-const prefix = selection
+import * as compression from '../../../dist/Context/Companion/CompressionSurface.js'
+import * as prefix from '../../../dist/Context/Prefix/Surface.js'
+const selection = prefix
+
+test('WHAT[PREFIX-STABILITY-002] PREFIX_STABILITY_prefix_behavior_is_exported_only_by_PrefixSurface', () => {
+  for (const removed of ['select', 'snapshot', 'empty', 'prefixEmpty', 'prefixSnapshot', 'prefixProbe', 'applyRebase', 'retainTodoWriteRounds', 'requestKind', 'requestKindLabels', 'requestKindLabel', 'requestKindMayCarryProbe']) {
+    assert.equal(typeof compression[removed], 'undefined', `${removed} must not remain on CompressionSurface`)
+  }
+  assert.equal(prefix.requestKind.mayCarryProbe(prefix.requestKind.workMain), true)
+  assert.equal(prefix.requestKind.mayCarryProbe(prefix.requestKind.bloggerMain), false)
+  assert.equal(prefix.requestKindLabel(prefix.requestKind.workMain), 'work-main')
+})
 
 /** A digest oracle that agrees with the Companion at every cutoff. */
 const agreeing = (digest) => () => digest

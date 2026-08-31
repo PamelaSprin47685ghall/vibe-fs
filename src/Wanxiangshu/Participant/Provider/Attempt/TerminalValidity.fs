@@ -1,11 +1,5 @@
 namespace Wanxiangshu.Participant.Provider.Attempt
 
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-
 open System
 open System.Text.RegularExpressions
 

@@ -1,0 +1,676 @@
+{
+  "version": 1,
+  "methods": [
+    {
+      "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
+      "symbol": "ReviewWitness.confirm",
+      "classification": "Admission",
+      "result": "Option",
+      "resultSymbol": "ReviewWitness",
+      "owner": "review-judgement",
+      "what": "FINALITY-002, ENF-015",
+      "whatOwners": { "FINALITY-002": "finality", "ENF-015": "capability-enforcement" }
+    },
+    {
+      "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
+      "symbol": "FinalityAdmission.grantBlessing",
+      "classification": "Admission",
+      "result": "Capability",
+      "resultSymbol": "BlessingPermit",
+      "owner": "finality",
+      "what": "FINALITY-002, ENF-015",
+      "whatOwners": { "FINALITY-002": "finality", "ENF-015": "capability-enforcement" }
+    },
+    {
+      "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
+      "symbol": "BlessingWorkflow.checkAdmission",
+      "classification": "Admission",
+      "result": "Capability",
+      "resultSymbol": "BlessingPermit",
+      "owner": "finality",
+      "what": "FINALITY-002, ENF-015",
+      "whatOwners": { "FINALITY-002": "finality", "ENF-015": "capability-enforcement" }
+    },
+    {
+      "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
+      "symbol": "BlessingWorkflow.prepareBlessing",
+      "classification": "Admission",
+      "result": "Capability",
+      "resultSymbol": "BlessingPermit",
+      "owner": "finality",
+      "what": "FINALITY-002, ENF-015",
+      "whatOwners": { "FINALITY-002": "finality", "ENF-015": "capability-enforcement" }
+    },
+    {
+      "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
+      "symbol": "AgentJournal.appendAgent",
+      "classification": "Effect",
+      "owner": "durable-events",
+      "what": "ENF-015",
+      "whatOwners": { "ENF-015": "capability-enforcement" }
+    },
+    {
+      "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
+      "symbol": "AgentJournal.AppendAgent",
+      "classification": "Effect",
+      "owner": "durable-events",
+      "what": "ENF-015",
+      "whatOwners": { "ENF-015": "capability-enforcement" }
+    },
+    {
+      "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
+      "symbol": "AgentJournal.WriteBlob",
+      "classification": "Effect",
+      "owner": "durable-events",
+      "what": "ENF-015",
+      "whatOwners": { "ENF-015": "capability-enforcement" }
+    },
+    {
+      "file": "src/Wanxiangshu/Mission/Finality/Record.fs",
+      "symbol": "FinalityJournal.appendLifecycle",
+      "classification": "Effect",
+      "owner": "finality",
+      "what": "ENF-015",
+      "whatOwners": { "ENF-015": "capability-enforcement" }
+    },
+    {
+      "file": "src/Wanxiangshu/Mission/Finality/Ports.fs",
+      "symbol": "FinalityReviewerPortModule.abortAll",
+      "classification": "Effect",
+      "owner": "finality",
+      "what": "ENF-015",
+      "whatOwners": { "ENF-015": "capability-enforcement" }
+    },
+    {
+      "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
+      "symbol": "AgentJournal.AppendAgent",
+      "classification": "DurableSink",
+      "owner": "durable-events",
+      "what": "ENF-019",
+      "whatOwners": { "ENF-019": "capability-enforcement" }
+    },
+    {
+      "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
+      "symbol": "AgentJournal.appendAgent",
+      "classification": "DurableSink",
+      "owner": "durable-events",
+      "what": "ENF-019",
+      "whatOwners": { "ENF-019": "capability-enforcement" }
+    },
+    {
+      "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
+      "symbol": "AgentJournal.WriteBlob",
+      "classification": "DurableSink",
+      "owner": "durable-events",
+      "what": "ENF-019",
+      "whatOwners": { "ENF-019": "capability-enforcement" }
+    },
+    {
+      "file": "src/Wanxiangshu/Mission/Finality/Record.fs",
+      "symbol": "FinalityJournal.appendLifecycle",
+      "classification": "DurableSink",
+      "owner": "finality",
+      "what": "ENF-019",
+      "whatOwners": { "ENF-019": "capability-enforcement" }
+    }
+  ],
+  "contracts": [
+    {
+      "file": "src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs",
+      "symbol": "QuiescencePermit",
+      "anchor": "type QuiescencePermit = interface end",
+      "classification": "Authority",
+      "class": "Capability",
+      "owner": "host-boundary",
+      "what": "ENF-018, ENF-019",
+      "scope": "opaque process-local token whose SessionId and attempt serial live only in the gate",
+      "freshness": "only the latest ObserveIdle admission is eligible",
+      "multiplicity": "one-shot consume or safe release",
+      "consume": "Result<unit, QuiescencePermitFailure>",
+      "durability": "process-local; never Fact/Event/codec/JSON",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs",
+          "symbol": "ObserveIdle",
+          "anchor": "member _.ObserveIdle(sessionId: SessionId) : QuiescencePermit =",
+          "owner": "host-boundary"
+        }
+      ],
+      "whatOwners": {
+        "ENF-018": "capability-enforcement",
+        "ENF-019": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Foundation/Identity.fs",
+      "symbol": "TransportReceipt",
+      "anchor": "type TransportReceipt = private TransportReceipt of string",
+      "classification": "Authority",
+      "class": "Receipt",
+      "owner": "dispatch-protocol",
+      "what": "ENF-013, ENF-014",
+      "scope": "one Host transport admission identifier",
+      "freshness": "bound to the accepting transport response",
+      "multiplicity": "replayable evidence, not a reusable capability",
+      "consume": "validated by typed transport admission",
+      "durability": "receipt may be recorded; it grants no future send",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Foundation/Identity.fs",
+          "symbol": "create",
+          "anchor": "let create (value: string) = TransportReceipt value",
+          "owner": "dispatch-protocol"
+        }
+      ],
+      "whatOwners": {
+        "ENF-013": "capability-enforcement",
+        "ENF-014": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
+      "symbol": "DrainPermit",
+      "anchor": "type DrainPermit = private DrainPermit of AuthorityRootUserMessageId",
+      "classification": "Authority",
+      "class": "Capability",
+      "owner": "context-compression",
+      "what": "ENF-014, ENF-017",
+      "scope": "one AuthorityRoot drain window",
+      "freshness": "minted only when that root opens the current window",
+      "multiplicity": "one open physical drain slot",
+      "consume": "pattern-matched only through DrainWindow.Open",
+      "durability": "process-local physical admission",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
+          "symbol": "openDrain",
+          "anchor": "let openDrain (root: AuthorityRootUserMessageId)",
+          "owner": "context-compression"
+        }
+      ],
+      "whatOwners": {
+        "ENF-014": "capability-enforcement",
+        "ENF-017": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
+      "symbol": "RecoveryReceipt",
+      "anchor": "type RecoveryReceipt =",
+      "classification": "Authority",
+      "class": "Receipt",
+      "owner": "dispatch-protocol",
+      "what": "ENF-013, ENF-015",
+      "scope": "SessionId + journal sequence + snapshot digest + resolved closure",
+      "freshness": "describes the exact recovered snapshot",
+      "multiplicity": "replayable evidence",
+      "consume": "consumers compare typed scope fields",
+      "durability": "receipt describes recovery; it does not authorize effects",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
+          "symbol": "create",
+          "anchor": "let create",
+          "owner": "dispatch-protocol"
+        }
+      ],
+      "whatOwners": {
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs",
+      "symbol": "RecoveryArmingPermit",
+      "anchor": "type private RecoveryArmingPermit =",
+      "classification": "Authority",
+      "class": "Capability",
+      "owner": "host-boundary",
+      "what": "ENF-014, ENF-017, ENF-019",
+      "scope": "SessionId + exact PhysicalUserMessageId + SlotArming",
+      "freshness": "armed only after durable PromptIngress acceptance",
+      "multiplicity": "one-shot TryTake by the owning recovery CE",
+      "consume": "absence or mismatched physical material has no effect",
+      "durability": "process-local and crash-zero; never a recovery PC",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs",
+          "symbol": "ArmRecovery",
+          "anchor": "member _.ArmRecovery(sessionId: SessionId, physicalUserMessageId: PhysicalUserMessageId) =",
+          "owner": "host-boundary"
+        }
+      ],
+      "whatOwners": {
+        "ENF-014": "capability-enforcement",
+        "ENF-017": "capability-enforcement",
+        "ENF-019": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
+      "symbol": "FamilyRecoveryPermit",
+      "anchor": "type FamilyRecoveryPermit =",
+      "classification": "Authority",
+      "class": "Capability",
+      "owner": "dispatch-protocol",
+      "what": "ENF-014, ENF-016",
+      "scope": "root session + journal sequence + recovered closure members",
+      "freshness": "admitted against the current family closure",
+      "multiplicity": "fresh permit per ordinary join admission",
+      "consume": "typed family validation precedes join",
+      "durability": "current-process admission only; durable recovery facts are separate",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
+          "symbol": "currentProcess",
+          "anchor": "let currentProcess (root: SessionId)",
+          "owner": "dispatch-protocol"
+        },
+        {
+          "file": "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
+          "symbol": "authorizeFamilyResume",
+          "anchor": "let authorizeFamilyResume",
+          "owner": "dispatch-protocol"
+        }
+      ],
+      "whatOwners": {
+        "ENF-014": "capability-enforcement",
+        "ENF-016": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
+      "symbol": "VerdictWitness",
+      "anchor": "type VerdictWitness =",
+      "classification": "Authority",
+      "class": "Witness",
+      "owner": "review-judgement",
+      "what": "FINALITY-002, FINALITY-010, ENF-015",
+      "scope": "provider run + tool call + current Git tree + reviewer",
+      "freshness": "valid only for the compared current tree and barrier",
+      "multiplicity": "two distinct attempts form confirmation",
+      "consume": "pure admission derives ReviewWitness",
+      "durability": "evidence may fold from facts; witness itself grants no effect",
+      "admissions": [
+        {
+          "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
+          "symbol": "ReviewWitness.confirm"
+        }
+      ],
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Mission/Review/Judgement/Verdict.fs",
+          "symbol": "verdictWitness",
+          "anchor": "let private verdictWitness (tree: GitTreeHash) (judgement: ReviewJudgement) : VerdictWitness =",
+          "owner": "review-judgement"
+        },
+        {
+          "file": "src/Wanxiangshu/Mission/Manager/FinalitySurface.fs",
+          "symbol": "witnessOf",
+          "anchor": "let private witnessOf (value: obj) : VerdictWitness =",
+          "owner": "finality"
+        },
+        {
+          "file": "src/Wanxiangshu/Mission/Review/Assurance/Surface.fs",
+          "symbol": "witnessOf",
+          "anchor": "let private witnessOf (value: obj) : VerdictWitness =",
+          "owner": "review-assurance"
+        },
+        {
+          "file": "src/Wanxiangshu/Mission/Review/ReviewFactFold.fs",
+          "symbol": "fold",
+          "anchor": "let fold (projection: AgentProjectionSet) (fact: ReviewFactCases) : Result<AgentProjectionSet, FoldRejection> =",
+          "owner": "review-judgement"
+        }
+      ],
+      "whatOwners": {
+        "FINALITY-002": "finality",
+        "FINALITY-010": "finality",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
+      "symbol": "ReviewWitness",
+      "anchor": "type ReviewWitness =",
+      "classification": "Authority",
+      "class": "Witness",
+      "owner": "review-judgement",
+      "what": "FINALITY-002, FINALITY-010, ENF-015",
+      "scope": "review barrier + two attempts + physical messages + Git tree",
+      "freshness": "rechecked against the current Git tree",
+      "multiplicity": "confirmation requires two distinct PERFECT attempts",
+      "consume": "pure current-tree admission only",
+      "durability": "projection evidence, never direct effect authority",
+      "admissions": [
+        {
+          "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
+          "symbol": "ReviewWitness.confirm"
+        }
+      ],
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
+          "symbol": "confirm",
+          "anchor": ": ReviewWitness option =",
+          "owner": "review-judgement"
+        }
+      ],
+      "whatOwners": {
+        "FINALITY-002": "finality",
+        "FINALITY-010": "finality",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
+      "symbol": "ConfirmedReviewWitness",
+      "anchor": "type ConfirmedReviewWitness =",
+      "classification": "Authority",
+      "class": "Witness",
+      "owner": "review-judgement",
+      "what": "FINALITY-002, FINALITY-010, ENF-015",
+      "scope": "LifeId + FinalityRequestId + Git tree + cohort witnesses",
+      "freshness": "candidate tree must equal the witness tree",
+      "multiplicity": "one cohort confirmation from at least two legitimate members",
+      "consume": "ReviewCandidate.verifyCandidate returns typed failure",
+      "durability": "derived from durable facts; never a separate event",
+      "admissions": [
+        {
+          "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
+          "symbol": "FinalityAdmission.grantBlessing"
+        },
+        {
+          "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
+          "symbol": "BlessingWorkflow.checkAdmission"
+        },
+        {
+          "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
+          "symbol": "BlessingWorkflow.prepareBlessing"
+        }
+      ],
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
+          "symbol": "create",
+          "anchor": "let create",
+          "owner": "review-judgement"
+        }
+      ],
+      "whatOwners": {
+        "FINALITY-002": "finality",
+        "FINALITY-010": "finality",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Mission/Finality/Types.fs",
+      "symbol": "BlessingPermit",
+      "anchor": "type BlessingPermit =",
+      "classification": "Authority",
+      "class": "Capability",
+      "owner": "finality",
+      "what": "FINALITY-002, FINALITY-010, ENF-015",
+      "scope": "LifeId + FinalityRequestId + current Git tree",
+      "freshness": "issued only after current tree equals confirmed witness tree",
+      "multiplicity": "one-shot authority to record one blessing",
+      "consume": "typed BlessingAdmissionFailure on stale/incomplete admission",
+      "durability": "permit is process-local; FinalityBlessed is the durable outcome",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
+          "symbol": "grantBlessing",
+          "anchor": ": Result<BlessingPermit, BlessingAdmissionFailure> =",
+          "owner": "finality"
+        }
+      ],
+      "whatOwners": {
+        "FINALITY-002": "finality",
+        "FINALITY-010": "finality",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleProjection.fs",
+      "symbol": "BloggerCycleReceipt",
+      "anchor": "type BloggerCycleReceipt =",
+      "classification": "Authority",
+      "class": "Receipt",
+      "owner": "context-compression",
+      "what": "ENF-013, ENF-015",
+      "scope": "provider run + frame kind + Blogger request",
+      "freshness": "bound to the folded provider run and request",
+      "multiplicity": "duplicate or mixed receipt is rejected",
+      "consume": "recordReceipt validates projection identity",
+      "durability": "receipt is projection evidence, not effect authority",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
+          "symbol": "applyEnforcementAndReceipt",
+          "anchor": "{ ProviderRun = payload.ProviderRun\n                          Kind = BlogFrameKind.Entry",
+          "owner": "context-compression"
+        },
+        {
+          "file": "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
+          "symbol": "applyReceiptAndTips",
+          "anchor": "{ ProviderRun = payload.ProviderRun\n                      Kind = BlogFrameKind.Squash",
+          "owner": "context-compression"
+        },
+        {
+          "file": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleSurface.fs",
+          "symbol": "receipt",
+          "anchor": "let private receipt kind requestId run : BloggerCycleReceipt =",
+          "owner": "context-compression"
+        }
+      ],
+      "whatOwners": {
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs",
+      "symbol": "TerminalEvidence",
+      "anchor": "type TerminalEvidence =",
+      "classification": "Authority",
+      "class": "Evidence",
+      "owner": "delegation",
+      "what": "ENF-013, ENF-014",
+      "scope": "child handle + session + proven terminal payload",
+      "freshness": "derived from the current durable child snapshot",
+      "multiplicity": "one classified child resolution",
+      "consume": "pure recovery resolution only",
+      "durability": "evidence is reconstructed; no direct effect authority",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs",
+          "symbol": "completed",
+          "anchor": "let completed (agentId: string)",
+          "owner": "delegation"
+        },
+        {
+          "file": "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs",
+          "symbol": "failed",
+          "anchor": "let failed (agentId: string)",
+          "owner": "delegation"
+        }
+      ],
+      "whatOwners": {
+        "ENF-013": "capability-enforcement",
+        "ENF-014": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs",
+      "symbol": "ActiveChildReceipt",
+      "anchor": "type ActiveChildReceipt =",
+      "classification": "Authority",
+      "class": "Receipt",
+      "owner": "delegation",
+      "what": "ENF-013, ENF-015",
+      "scope": "one active child handle + child session",
+      "freshness": "issued after current recovery observes the child active",
+      "multiplicity": "one receipt per resolved child recovery",
+      "consume": "RecoveredActive distinguishes completion from incomplete recovery",
+      "durability": "receipt does not authorize join by itself",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs",
+          "symbol": "resolveAndCommit",
+          "anchor": "ChildRecoveryResult.RecoveredActive",
+          "owner": "delegation"
+        }
+      ],
+      "whatOwners": {
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs",
+      "symbol": "AppendReceipt",
+      "anchor": "type AppendReceipt = { Cuts: SemanticCut list }",
+      "classification": "Authority",
+      "class": "Receipt",
+      "owner": "durable-events",
+      "what": "ENF-013, ENF-015",
+      "scope": "one canonical append and its finite semantic cuts",
+      "freshness": "returned by the completed append attempt",
+      "multiplicity": "replayable outcome evidence",
+      "consume": "cutFor queries exact EventId ambiguity",
+      "durability": "receipt reports the append; it grants no append capability",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Persistence/EventStore/Store.fs",
+          "symbol": "commitPrepared",
+          "anchor": "{ Cuts = prepared.Cuts }",
+          "owner": "durable-convergence"
+        }
+      ],
+      "whatOwners": {
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
+      "symbol": "MagicTodoAppendReceipt",
+      "anchor": "type MagicTodoAppendReceipt =",
+      "classification": "Authority",
+      "class": "Receipt",
+      "owner": "durable-events",
+      "what": "ENF-013, ENF-015",
+      "scope": "Todo EventId + resulting projection",
+      "freshness": "returned only after the exact Todo append",
+      "multiplicity": "one receipt per admitted append",
+      "consume": "typed JournalAppendFailure otherwise",
+      "durability": "receipt records outcome, not future write authority",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
+          "symbol": "AppendMagicTodo",
+          "anchor": "member this.AppendMagicTodo",
+          "owner": "durable-events"
+        }
+      ],
+      "whatOwners": {
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Persistence/Journal/Writer.fs",
+      "symbol": "BlobWriteReceipt",
+      "anchor": "type BlobWriteReceipt =",
+      "classification": "Authority",
+      "class": "Receipt",
+      "owner": "durable-events",
+      "what": "ENF-013, ENF-015",
+      "scope": "one BlobRef + content digest",
+      "freshness": "returned by the completed content write",
+      "multiplicity": "replayable content-addressed receipt",
+      "consume": "digest and ref identify the exact written blob",
+      "durability": "receipt describes storage outcome, not future write authority",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs",
+          "symbol": "writePayload",
+          "anchor": "let writePayload (content: string) =",
+          "owner": "durable-events"
+        }
+      ],
+      "whatOwners": {
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Context/Trace/Capture.fs",
+      "symbol": "XTraceCaptureReceipt",
+      "anchor": "type XTraceCaptureReceipt =",
+      "classification": "Authority",
+      "class": "Receipt",
+      "owner": "semantic-trace",
+      "what": "ENF-013, ENF-015",
+      "scope": "one exact semantic-trace capture attempt and its durable projection delta",
+      "freshness": "derived after the capture from before/after canonical projection heads",
+      "multiplicity": "replayable evidence; never reusable capture authority",
+      "consume": "callers may inspect or discard the typed evidence only after matching Ok",
+      "durability": "derived from durable trace state; grants no future append capability",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Context/Trace/Capture.fs",
+          "symbol": "captureReceipt",
+          "anchor": "let private captureReceipt",
+          "owner": "semantic-trace"
+        },
+        {
+          "file": "src/Wanxiangshu/Context/Trace/Capture.fs",
+          "symbol": "withoutJournalReceipt",
+          "anchor": "let private withoutJournalReceipt () =",
+          "owner": "semantic-trace"
+        }
+      ],
+      "whatOwners": {
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Interaction/Dispatch/JoinGuardSurface.fs",
+      "symbol": "ReservationCapability",
+      "anchor": "type private ReservationCapability() =",
+      "classification": "Vocabulary",
+      "owner": "dispatch-protocol",
+      "what": "ENF-014",
+      "issuers": [],
+      "whatOwners": {
+        "ENF-014": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs",
+      "symbol": "RequirePermit",
+      "anchor": "type RequirePermit = unit -> Task<Result<FamilyRecoveryPermit, string>>",
+      "classification": "Vocabulary",
+      "owner": "output-distillation",
+      "what": "ENF-014",
+      "issuers": [],
+      "whatOwners": {
+        "ENF-014": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Repository/Programming/Js/Capability.fs",
+      "symbol": "JsCapability",
+      "anchor": "type JsCapability =",
+      "classification": "Vocabulary",
+      "owner": "repository-programming",
+      "what": "ENF-008",
+      "issuers": [],
+      "whatOwners": {
+        "ENF-008": "capability-enforcement"
+      }
+    }
+  ]
+}

@@ -112,6 +112,22 @@ test('WHAT[VERIFICATION-SYSTEM-009] every wired gate path exists', () => {
   }
 })
 
+test('WHAT[VERIFICATION-SYSTEM-005] FCS evidence producer precedes every semantic consumer gate', () => {
+  const checkSource = read('scripts/check.mjs')
+  const wired = wiredGates(checkSource)
+  const semanticOwners = wired.indexOf('semantic-owners.mjs')
+  const ownerDependencies = wired.indexOf('owner-dependencies.mjs')
+  assert.ok(semanticOwners >= 0 && ownerDependencies === semanticOwners + 1)
+  for (const consumer of [
+    'dsl-ownership.mjs',
+    'authority-boundary.mjs',
+    'composition-root-invariant.mjs',
+    'semantic-decorator-invariant.mjs',
+  ]) assert.ok(ownerDependencies < wired.indexOf(consumer), `${consumer} must run after the one FCS evidence producer`)
+  assert.match(checkSource, /delete env\.OMP_FCS_REUSE_PATH[\s\S]*script\.endsWith\('owner-dependencies\.mjs'\)/)
+  assert.match(checkSource, /if \(ownerEvidenceReady\)[\s\S]*env\.OMP_FCS_REUSE_PATH = fcsEvidencePath/)
+})
+
 test('WHAT[VERIFICATION-SYSTEM-010] wired gate count has a non-shrinking floor', () => {
   const checkSource = read('scripts/check.mjs')
   const wired = wiredGates(checkSource)

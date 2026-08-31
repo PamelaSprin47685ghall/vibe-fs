@@ -67,7 +67,6 @@ open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Resources
 open Wanxiangshu.Process
 open Wanxiangshu.Context.Trace
 
@@ -76,7 +75,7 @@ open Wanxiangshu.Context.Trace
 module OneShotAgentTool =
 
     let private forkInstructions (sessionId: SessionId) : ForkChildInstructions =
-        let lang = ProviderProse.languageOf sessionId
+        let lang = SessionProviderLanguage.languageOf sessionId
 
         { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
           CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
@@ -237,17 +236,26 @@ module OneShotAgentTool =
         (completion: TaskCompletionSource<Result<string * string option, string>>)
         =
         task {
-            do! XTraceCapture.captureTerminalText scope.Journal childId terminal.TerminalText (providerRunOf terminal)
-
-            let! workRecord = childWorkRecord scope childId
-
-            match workRecord with
-            | Some wr -> succeed terminal.TurnFormalText (Some wr)
-            | None ->
+            match!
+                XTraceCapture.captureTerminalTextWithReceipt
+                    scope.Journal
+                    childId
+                    terminal.TerminalText
+                    (providerRunOf terminal)
+            with
+            | Error error ->
                 latch.Finish(fun () ->
-                    completion.SetResult(
-                        Error "EXEC-028: Completed without LifecycleWorkRecord (WorkRecord missing or empty)"
-                    ))
+                    completion.SetResult(Error(sprintf "EXEC-028: terminal trace capture failed: %A" error)))
+            | Ok _ ->
+                let! workRecord = childWorkRecord scope childId
+
+                match workRecord with
+                | Some wr -> succeed terminal.TurnFormalText (Some wr)
+                | None ->
+                    latch.Finish(fun () ->
+                        completion.SetResult(
+                            Error "EXEC-028: Completed without LifecycleWorkRecord (WorkRecord missing or empty)"
+                        ))
         }
 
     let private settleCompletedTerminal
@@ -418,9 +426,9 @@ module OneShotAgentTool =
             // ORIGINAL oneshot assignment (not the rendered relay
             // envelope), matching HostForkAgent. PromptIngress skips
             // Opening for AgentOwnerRoot; capture before send.
-            do!
-                XTraceCapture.captureOpening scope.Journal childId request.Prompt []
-                |> TaskResultCE.ofTask
+            let! _ =
+                XTraceCapture.captureOpeningWithReceipt scope.Journal childId request.Prompt []
+                |> TaskResult.mapError (fun error -> sprintf "one-shot opening trace capture failed: %A" error)
 
             // Ok carries (formal text, optional WorkRecord); Error is the
             // Result.Error channel (timeout sibling) — not SetException.

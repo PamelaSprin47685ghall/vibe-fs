@@ -11,6 +11,7 @@ open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoAdmission
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoPrefixEpoch
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Resources
 
 /// JS-native semantic entry points for Magic Todo's pure owner modules.
@@ -92,7 +93,7 @@ module MagicTodoSemanticSurface =
                 {| ok = false
                    error = rejectCode error |}
 
-    let private cursor (sequence: int) : XTraceCursor = { Sequence = int64 sequence }
+    let private cursor (sequence: int) : XTraceCursor = XTraceCursor.create (int64 sequence)
 
     let private traceAnchorOf (value: obj) : TracePartAnchor =
         { Cursor = cursor (unbox<int> (value?sequence))
@@ -228,7 +229,8 @@ module MagicTodoSemanticSurface =
 
     let workRecordStart (openingSequence: int) : int =
         MagicTodo.workRecordStart (cursor openingSequence)
-        |> fun value -> int value.Sequence
+        |> XTraceCursor.sequence
+        |> int
 
     let blindPlanOpeningBoundary
         (openingSequence: int)
@@ -241,7 +243,8 @@ module MagicTodoSemanticSurface =
             (cursor t1CallSequence)
             (ToolCallId.create t1ToolCallId)
             (traceAnchorsOf parts)
-        |> fun value -> int value.Sequence
+        |> XTraceCursor.sequence
+        |> int
 
     let effectiveOpeningFloor
         (hasOpenLife: bool)
@@ -268,12 +271,15 @@ module MagicTodoSemanticSurface =
             callId
             (int64 xTraceHeadSequence)
             (traceAnchorsOf parts)
-        |> Option.map (fun value -> box (int value.Sequence))
+        |> Option.map (XTraceCursor.sequence >> int >> box)
         |> Option.toObj
 
     let bloggerEffectiveStart (ingestedThrough: int) (workRecordStartSequence: int) : int =
-        MagicTodo.bloggerEffectiveStart { IngestedThrough = cursor ingestedThrough } (cursor workRecordStartSequence)
-        |> fun value -> int value.Sequence
+        MagicTodo.bloggerEffectiveStart
+            (RecordCoverage.create (cursor ingestedThrough))
+            (cursor workRecordStartSequence)
+        |> XTraceCursor.sequence
+        |> int
 
     let requirePlanCommitmentBeforeFirstSuicide (planCommitted: bool) : obj =
         MagicTodo.requirePlanCommitmentBeforeFirstSuicide planCommitted

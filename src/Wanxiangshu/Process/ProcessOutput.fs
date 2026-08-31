@@ -8,6 +8,7 @@ open System.Text
 module ProcessOutput =
 
     /// DSL-state-combination: physical — stdout/stderr byte-buffer spool state
+    /// DSL-class: PhysicalHandle — process-owned byte buffers and spool resource; owner ProcessOutput, law PTY output limit, proof process-output.
     type OutputCollector =
         { mutable Stdout: List<byte[]>
           mutable Stderr: List<byte[]>

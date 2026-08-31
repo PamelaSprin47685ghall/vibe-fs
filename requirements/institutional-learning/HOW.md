@@ -32,11 +32,11 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| INSTITUTIONAL-LEARNING-001 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
-| INSTITUTIONAL-LEARNING-002 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
-| INSTITUTIONAL-LEARNING-003 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
-| INSTITUTIONAL-LEARNING-004 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
-| INSTITUTIONAL-LEARNING-005 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
-| INSTITUTIONAL-LEARNING-006 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
-| INSTITUTIONAL-LEARNING-007 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
-| INSTITUTIONAL-LEARNING-008 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
+| INSTITUTIONAL-LEARNING-001 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-001] celebrate and regret accept one raw natural-language experience without a rule template` |
+| INSTITUTIONAL-LEARNING-002 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-002] one enhancer evaluation yields exactly one ABSORB BIRTH or DISCARD disposition with no score state` |
+| INSTITUTIONAL-LEARNING-003 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-003] enhancer is bounded to the supplied experience and live rulebook snapshot` |
+| INSTITUTIONAL-LEARNING-004 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-004] unsafe raw experience cannot bypass behavior-rule admission by directly birthing a rule` |
+| INSTITUTIONAL-LEARNING-005 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-005] no reusable trigger or nonduplicate mechanism degrades to DISCARD rather than attention-tax debt` |
+| INSTITUTIONAL-LEARNING-006 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-006] positive and negative experiences use the same non-punitive bounded enhancer` |
+| INSTITUTIONAL-LEARNING-007 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-007] celebrate alone resurfaces deferred work and the same durable fact updates attention coverage` |
+| INSTITUTIONAL-LEARNING-008 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-008] occurrence replay keeps the first frozen result and does not create a second disposition` |

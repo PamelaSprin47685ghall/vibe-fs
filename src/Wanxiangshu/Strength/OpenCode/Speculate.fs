@@ -138,19 +138,14 @@ module StrengthSpeculate =
             let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
             let wire = ProviderWireCapture.decodeMessageView rawMessages
 
-            let snapshot =
-                { CurrentProjection = ProviderProjection.toSemantic wire
-                  CommittedPrefix = None
-                  BlogFrames = []
-                  TransportMessages = Set.empty
-                  HostReanchor = None }
+            let! intent =
+                StrengthProjectionIntent.candidate HostDigest.sha256Hex owner decision target target bundle
+                |> Result.mapError (fun error -> sprintf "Strength Candidate intent refused: %A" error)
+
+            let snapshot = { CurrentProjection = ProviderProjection.toSemantic wire }
 
             let rendered =
-                ProjectionRenderer.renderMessagesWithHostIds
-                    HostDigest.sha256Hex
-                    snapshot
-                    wire.Messages
-                    [ ProjectionIntent.strengthCandidate owner decision target target bundle ]
+                ProjectionRenderer.renderMessagesWithHostIds snapshot wire.Messages [ intent ]
 
             let! projected =
                 ProjectionMessageEdit.tryApplyRenderedInsertionsPreservingBase
@@ -554,8 +549,12 @@ module StrengthSpeculate =
         let costsAvailable = settings.Costs.IsSome
 
         let stableCaptureEligible =
-            XTraceCapture.supportsStableInsertion (Some durable) owner
-            && (rawMessages |> List.forall (ProviderWireDecode.hostMessageId >> Option.isSome))
+            rawMessages
+            |> List.map ProviderWireDecode.hostMessageId
+            |> XTraceCapture.stableCaptureEligibility (Some durable) owner
+            |> function
+                | XTraceStableCaptureEligibility.Eligible _ -> true
+                | _ -> false
 
         { IsRootWork = rootWork owner projections.AgentProjections.Associations
           RequestKind = requestKind

@@ -1,13 +1,13 @@
 namespace Wanxiangshu.Context.Companion
 
 open System
-open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Persistence.Journal
 
 /// Context-owned fold oracle for durable recovery laws.
@@ -42,6 +42,18 @@ module ContextFoldSurface =
     let private optionalProviderRun (value: obj) =
         if isNull value then None else Some(providerRun value)
 
+    let private optionalToolCall (value: obj) =
+        if isNull value then
+            None
+        else
+            Some(ToolCallId.create (text value))
+
+    let private optionalHostToolPart (value: obj) =
+        if isNull value then
+            None
+        else
+            Some(HostToolPartId.create (text value))
+
     let private int64Value (value: obj) = unbox<int64> value
     let private intValue (value: obj) = unbox<int> value
 
@@ -57,25 +69,53 @@ module ContextFoldSurface =
         else
             unbox<string array> value |> Array.toList |> List.map ToolCallId.create
 
-    let private companionFact (caseName: string) (payload: obj) : AgentFact option =
+    let private companionFact (caseName: string) (payload: obj) : AgentFact =
         match caseName with
+        | "CompanionBloggerLinked" ->
+            AgentFact.Companion(
+                CompanionFactCases.CompanionBloggerLinked
+                    {| SessionId = sessionId (payload?SessionId)
+                       BloggerSessionId = sessionId (payload?BloggerSessionId)
+                       BloggerAgent = text (payload?BloggerAgent) |}
+            )
         | "CompanionBloggerClosed" ->
-            Some(
-                AgentFact.Companion(
-                    CompanionFactCases.CompanionBloggerClosed {| SessionId = sessionId (payload?SessionId) |}
-                )
+            AgentFact.Companion(
+                CompanionFactCases.CompanionBloggerClosed {| SessionId = sessionId (payload?SessionId) |}
             )
         | "OpeningPromptCaptured" ->
-            Some(
-                AgentFact.Companion(
-                    CompanionFactCases.OpeningPromptCaptured
-                        {| SessionId = sessionId (payload?SessionId)
-                           AssignmentText = text (payload?AssignmentText)
-                           AuthoritativeRequirements = stringList (payload?AuthoritativeRequirements)
-                           ProviderRun = optionalProviderRun (payload?ProviderRun) |}
-                )
+            AgentFact.Companion(
+                CompanionFactCases.OpeningPromptCaptured
+                    {| SessionId = sessionId (payload?SessionId)
+                       AssignmentText = text (payload?AssignmentText)
+                       AuthoritativeRequirements = stringList (payload?AuthoritativeRequirements)
+                       ProviderRun = optionalProviderRun (payload?ProviderRun) |}
             )
-        | _ -> None
+        | "XTracePartAppended" ->
+            AgentFact.Companion(
+                CompanionFactCases.XTracePartAppended
+                    {| SessionId = sessionId (payload?SessionId)
+                       CursorSequence = int64Value (payload?CursorSequence)
+                       Role = text (payload?Role)
+                       Turn = intValue (payload?Turn)
+                       PartIndex = intValue (payload?PartIndex)
+                       Kind = text (payload?Kind)
+                       ToolName = optionalText (payload?ToolName)
+                       TextRef = blobRef (payload?TextRef)
+                       TextDigest = blobDigest (payload?TextDigest)
+                       Provenance = text (payload?Provenance)
+                       ProviderRun = optionalProviderRun (payload?ProviderRun)
+                       ToolCallId = optionalToolCall (payload?ToolCallId)
+                       HostToolPartId = optionalHostToolPart (payload?HostToolPartId) |}
+            )
+        | "TerminalOutputCaptured" ->
+            AgentFact.Companion(
+                CompanionFactCases.TerminalOutputCaptured
+                    {| SessionId = sessionId (payload?SessionId)
+                       TextRef = blobRef (payload?TextRef)
+                       TextDigest = blobDigest (payload?TextDigest)
+                       ProviderRun = providerRun (payload?ProviderRun) |}
+            )
+        | other -> failwith $"ContextFoldSurface: unknown Companion fact '{other}'"
 
     let private contextFact (caseName: string) (payload: obj) : AgentFact =
         match caseName with
@@ -144,10 +184,7 @@ module ContextFoldSurface =
         let payload = unbox<obj> (value?payload)
 
         match family with
-        | "Companion" ->
-            match companionFact caseName payload with
-            | Some fact -> Fact.Agent fact
-            | None -> failwith $"ContextFoldSurface: unknown Companion fact '{caseName}'"
+        | "Companion" -> Fact.Agent(companionFact caseName payload)
         | "Context" -> Fact.Agent(contextFact caseName payload)
         | _ -> failwith $"ContextFoldSurface: unknown fact family '{family}'"
 
@@ -195,10 +232,59 @@ module ContextFoldSurface =
                            CoverableTurnCutoffExclusive = state.Coverage.CoverableTurnCutoffExclusive
                            CoveredPrefixDigest = state.Coverage.CoveredPrefixDigest |} |}
 
+    let private companionToJs (companion: CompanionProjection option) =
+        match companion with
+        | None -> null
+        | Some state ->
+            box
+                {| BloggerSessionId =
+                    match state.BloggerSessionId with
+                    | None -> null
+                    | Some blogger -> box (SessionId.value blogger) |}
+
+    let private xTraceToJs (xTrace: XTraceProjectionState option) =
+        match xTrace with
+        | None -> null
+        | Some state ->
+            let opening =
+                match XTraceProjection.openingEvidence state with
+                | None -> null
+                | Some value ->
+                    box
+                        {| AssignmentText = value.AssignmentText
+                           AuthoritativeRequirements = value.AuthoritativeRequirements |> List.toArray |}
+
+            let parts =
+                XTraceProjection.orderedSemanticParts state
+                |> List.map (fun part ->
+                    box
+                        {| CursorSequence = XTraceCursor.sequence part.Cursor
+                           Provenance = part.Provenance
+                           Role = part.Role
+                           Kind = part.Kind
+                           TextRef = BlobRef.value part.TextRef
+                           TextDigest = BlobDigest.value part.TextDigest |})
+                |> List.toArray
+
+            let latestTerminal =
+                match XTraceProjection.latestTerminalEvidence state with
+                | None -> null
+                | Some terminal ->
+                    box
+                        {| TextRef = BlobRef.value terminal.TextRef
+                           TextDigest = BlobDigest.value terminal.TextDigest
+                           ProviderRun = ProviderRunIdentity.value terminal.ProviderRun
+                           FrontierSequence = XTraceCursor.sequence terminal.Frontier |}
+
+            box
+                {| Opening = opening
+                   Parts = parts
+                   LatestTerminal = latestTerminal |}
+
     let private sessionToJs (session: SessionAgentProjection) : obj =
         box
-            {| Companion = null
-               XTrace = null
+            {| Companion = companionToJs session.Companion
+               XTrace = xTraceToJs session.XTrace
                Blog = blogToJs session.Blog
                PrefixEpoch =
                 match session.PrefixEpoch with
@@ -234,19 +320,25 @@ module ContextFoldSurface =
             {| Fact = rejection.Fact
                Reason = rejection.Reason |}
 
-    let fold (envelopes: obj array) : obj =
-        let rec loop current remaining =
-            match remaining with
-            | [] -> box {| ok = true; value = okState current |}
-            | value :: tail ->
-                match Wanxiangshu.Composition.Durable.Fold.foldEnvelope current (envelopeOfJs value) with
-                | Ok updated -> loop updated tail
-                | Error rejection ->
-                    box
-                        {| ok = false
-                           error = rejectionToJs rejection |}
+    let private foldEnvelopes (envelopes: Envelope array) : obj =
+        envelopes
+        |> Array.fold
+            (fun result envelope ->
+                result
+                |> Result.bind (fun current -> Wanxiangshu.Composition.Durable.Fold.foldEnvelope current envelope))
+            (Ok Wanxiangshu.Composition.Durable.Fold.empty)
+        |> function
+            | Ok projection ->
+                box
+                    {| ok = true
+                       value = okState projection |}
+            | Error rejection ->
+                box
+                    {| ok = false
+                       error = rejectionToJs rejection |}
 
-        loop Wanxiangshu.Composition.Durable.Fold.empty (envelopes |> Array.toList)
+    let fold (envelopes: obj array) : obj =
+        envelopes |> Array.map envelopeOfJs |> foldEnvelopes
 
     /// Same fold, but each envelope crosses the canonical line codec first.
     let replay (envelopes: obj array) : obj =
@@ -259,15 +351,4 @@ module ContextFoldSurface =
                 | Ok roundTripped -> roundTripped
                 | Error error -> failwith $"ContextFoldSurface: envelope round trip failed: {error}")
 
-        let rec loop current remaining =
-            match remaining with
-            | [] -> box {| ok = true; value = okState current |}
-            | envelope :: tail ->
-                match Wanxiangshu.Composition.Durable.Fold.foldEnvelope current envelope with
-                | Ok updated -> loop updated tail
-                | Error rejection ->
-                    box
-                        {| ok = false
-                           error = rejectionToJs rejection |}
-
-        loop Wanxiangshu.Composition.Durable.Fold.empty (decoded |> Array.toList)
+        foldEnvelopes decoded

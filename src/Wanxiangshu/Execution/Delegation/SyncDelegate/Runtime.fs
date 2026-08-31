@@ -32,7 +32,6 @@ open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Mission.WorkRecord
@@ -59,6 +58,17 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 
+/// Host-observable exact identity for a reusable SyncDelegate child. The title
+/// is compared as a whole; escaped fields make distinct scope/role/agent tuples
+/// unambiguous even when an identity contains title delimiters.
+module internal SyncDelegatePhysicalIdentity =
+    let title (scope: ReuseScopeId) (role: SyncDelegateRole) (agentName: string) =
+        sprintf
+            "wanxiangshu:sync-delegate:v1:scope=%s:role=%s:agent=%s"
+            (Uri.EscapeDataString(ReuseScopeId.value scope))
+            (Uri.EscapeDataString(SyncDelegate.roleLabel role))
+            (Uri.EscapeDataString agentName)
+
 /// EXEC-026 / EXEC-031: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
 /// ordinary Completion → bounded WorkRecord). No return tool / dual-await.
 ///
@@ -73,7 +83,7 @@ type SyncDelegateRuntime
         resolveOwnerTier: SessionId -> AgentTier option,
         onDelegateReady: SessionId -> string -> unit,
         quiescence: SessionQuiescenceGate,
-        workRecordFor: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>,
+        workRecordFor: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>,
         handoff: ReusableHandoffPort,
         ?workspaceDirectory: string,
         /// Casebook draft hooks (wired from SpikePlugin → CasebookLifecycle; compile-order seam).
@@ -102,20 +112,65 @@ type SyncDelegateRuntime
         PromptAuthority.toolCapabilitiesFor role ProviderRequestKind.WorkMain
         |> StaticTools.requestToolMap
 
-    let createChild (owner: SessionId) (agentName: string) (childDirectory: string option) =
+    let managedChildObservation
+        (scope: ReuseScopeId)
+        (role: SyncDelegateRole)
+        (agentName: string)
+        (children: OpenCodeChildInfo list)
+        =
+        let expectedTitle = SyncDelegatePhysicalIdentity.title scope role agentName
+
+        let matching =
+            children
+            |> List.filter (fun child -> child.Agent = Some agentName && child.Title = Some expectedTitle)
+
+        match matching with
+        | [] -> AttachedChildObservation.Missing
+        | [ child ] -> AttachedChildObservation.Matching child.SessionId
+        | conflicts ->
+            conflicts
+            |> List.map (fun child -> child.SessionId)
+            |> AttachedChildObservation.Conflicting
+
+    let observeChild (owner: SessionId) (scope: ReuseScopeId) (role: SyncDelegateRole) (agentName: string) =
+        task {
+            let physicalOwner = sessions.FamilyRootOf owner
+
+            match! sessions.ListChildren physicalOwner with
+            | Error error ->
+                return
+                    Error(
+                        sprintf
+                            "sync delegate child observation failed for %s: %s"
+                            (SessionId.value physicalOwner)
+                            error
+                    )
+            | Ok children -> return Ok(managedChildObservation scope role agentName children)
+        }
+
+    let createChild
+        (owner: SessionId)
+        (scope: ReuseScopeId)
+        (role: SyncDelegateRole)
+        (agentName: string)
+        (childDirectory: string option)
+        =
         sessions.CreateChildSession(
             owner,
-            { Title = Some agentName
+            { Title = Some(SyncDelegatePhysicalIdentity.title scope role agentName)
               Agent = Some agentName
               Directory = childDirectory }
         )
 
-    let xTraceHead (sessionId: SessionId) : int64 =
+    let bindChild owner child agentName =
+        SessionExecutionBinding.restore owner child (Some agentName)
+
+    let xTraceFrontier (sessionId: SessionId) : XTraceCursor =
         AgentJournal.snapshot journal
         |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
         |> Option.bind (fun session -> session.XTrace)
-        |> Option.map XTraceProjection.head
-        |> Option.defaultValue 0L
+        |> Option.defaultValue XTraceProjection.empty
+        |> XTraceProjection.headCursor
 
     let issueCurrentOwnerIdentitySeed
         (ownerSessionId: SessionId)
@@ -147,16 +202,16 @@ type SyncDelegateRuntime
             // Opening for AgentOwnerRoot, so the LWR projector would otherwise
             // return None and the bounded record would be undefined. Idempotent:
             // a reused child keeps its first invocation's Opening (PERSIST-010).
-            do!
-                XTraceCapture.captureOpening (Some journal) call.Delegate request.Charge []
-                |> TaskResultCE.ofTask
+            let! _ =
+                XTraceCapture.captureOpeningWithReceipt (Some journal) call.Delegate request.Charge []
+                |> TaskResult.mapError (fun error -> sprintf "sync delegate opening trace capture failed: %A" error)
 
             // EXEC-031: snapshot the child's XTrace head (one-past last part,
             // 0 when empty) at send. This is the inclusive start of the
             // per-invocation range; the exclusive end is the same head
             // captured at completion. All coalesced invocations in this
             // call share the same head and thus the same bounded record.
-            let startCursor = xTraceHead call.Delegate
+            let startCursor = xTraceFrontier call.Delegate |> XTraceCursor.sequence
 
             for inv in call.Invocations do
                 inv.StartCursor <- Some startCursor
@@ -225,7 +280,9 @@ type SyncDelegateRuntime
     let deps: SyncDelegateWorkflow.Dependencies =
         { Attached = attached
           ResolveOwnerTier = resolveOwnerTier
+          ObserveChild = observeChild
           CreateChild = createChild
+          BindChild = bindChild
           OnDelegateReady = onDelegateReady
           NoteInspectorPrompt = noteInspectorPrompt
           CleanupInspectorDraft = cleanupInspectorDraft
@@ -262,17 +319,13 @@ type SyncDelegateRuntime
     let resolveWorkRecord
         (turnSessionId: SessionId)
         (call: SyncDelegateCall)
-        (endCursor: int64)
+        (endCursor: XTraceCursor)
         (providerRun: ProviderRunIdentity)
         =
         match call.Invocations |> List.tryHead |> Option.bind (fun inv -> inv.StartCursor) with
         | None -> Task.FromResult None
         | Some startCursor ->
-            projectWorkRecord
-                turnSessionId
-                { StartInclusive = { Sequence = startCursor }
-                  EndExclusive = { Sequence = endCursor } }
-                providerRun
+            projectWorkRecord turnSessionId (XTraceRange.create (XTraceCursor.create startCursor) endCursor) providerRun
 
     let noteInspectorIfRole (call: SyncDelegateCall) turnSessionId record =
         if call.Role = SyncDelegateRole.Inspector then
@@ -297,13 +350,13 @@ type SyncDelegateRuntime
             // Completion marker for ManagerLife/Reviewer. HandleTurn
             // does not use Terminal to build the inspect payload;
             // the bounded WorkRecord is the invocation's parts range.
-            do! XTraceCapture.captureTerminal (Some journal) turn
-
-            // Exclusive range end = XTrace.head (one-past last part).
-            let endCursor = xTraceHead turn.SessionId
-
-            let! workRecord = resolveWorkRecord turn.SessionId call endCursor turn.ProviderRun
-            return finishCompletedCall turn.SessionId call workRecord
+            match! XTraceCapture.captureTerminalWithReceipt (Some journal) turn with
+            | Error error ->
+                store.FailCall(call, sprintf "sync delegate terminal trace capture failed: %A" error)
+                return true
+            | Ok receipt ->
+                let! workRecord = resolveWorkRecord turn.SessionId call receipt.CurrentHead turn.ProviderRun
+                return finishCompletedCall turn.SessionId call workRecord
         }
 
     let popIfAcceptanceMatches

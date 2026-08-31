@@ -46,15 +46,13 @@
       {
         "path": "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs",
         "owners": [
-          "context-compression",
-          "host-boundary"
+          "context-compression"
         ]
       },
       {
         "path": "src/Wanxiangshu/OpenCode/Host/HostCompactionObserver.fs",
         "owners": [
-          "context-compression",
-          "host-boundary"
+          "context-compression"
         ]
       },
       {
@@ -745,7 +743,6 @@
       {
         "path": "src/Wanxiangshu/Context/Prefix/Candidate.fs",
         "owners": [
-          "context-compression",
           "prefix-stability"
         ]
       },
@@ -759,42 +756,37 @@
       {
         "path": "src/Wanxiangshu/Context/Prefix/Epoch.fs",
         "owners": [
-          "context-compression",
           "prefix-stability"
         ]
       },
       {
         "path": "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
         "owners": [
-          "context-compression",
           "prefix-stability"
         ]
       },
       {
         "path": "src/Wanxiangshu/Context/Prefix/Projection.fs",
         "owners": [
-          "context-compression",
           "prefix-stability"
         ]
       },
       {
         "path": "src/Wanxiangshu/Context/Prefix/Surface.fs",
         "owners": [
-          "context-compression",
           "prefix-stability"
         ]
       },
       {
         "path": "src/Wanxiangshu/Context/Prefix/Wire.fs",
         "owners": [
-          "context-compression",
           "prefix-stability"
         ]
       },
       {
         "path": "src/Wanxiangshu/Context/Prefix/XWireSurface.fs",
         "owners": [
-          "context-compression",
+          "host-boundary",
           "prefix-stability"
         ]
       },
@@ -839,11 +831,9 @@
         ]
       },
       {
-        "path": "src/Wanxiangshu/Context/Trace/XTraceSurface.fs",
+        "path": "src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fs",
         "owners": [
-          "semantic-trace",
-          "speculative-investigation",
-          "work-record"
+          "semantic-trace"
         ]
       }
     ],
@@ -1379,8 +1369,26 @@
     ],
     "Participant": [
       {
+        "path": "src/Wanxiangshu/Participant/Provider/Prose.fs",
+        "owners": [
+          "cognitive-environment",
+          "distribution",
+          "provider-language"
+        ]
+      },
+      {
+        "path": "src/Wanxiangshu/Participant/Provider/ProviderResources.fs",
+        "owners": [
+          "cognitive-environment",
+          "distribution",
+          "provider-language"
+        ]
+      },
+      {
         "path": "src/Wanxiangshu/Participant/Provider/Attempt/TerminalValidity.fs",
-        "owners": []
+        "owners": [
+          "context-compression"
+        ]
       },
       {
         "path": "src/Wanxiangshu/Participant/Persona/Catalog.fs",
@@ -1847,22 +1855,6 @@
         "owners": [
           "cognitive-environment",
           "distribution"
-        ]
-      },
-      {
-        "path": "src/Wanxiangshu/Resources/ProviderProse.fs",
-        "owners": [
-          "cognitive-environment",
-          "distribution",
-          "provider-language"
-        ]
-      },
-      {
-        "path": "src/Wanxiangshu/Resources/ProviderResources.fs",
-        "owners": [
-          "cognitive-environment",
-          "distribution",
-          "provider-language"
         ]
       },
       {

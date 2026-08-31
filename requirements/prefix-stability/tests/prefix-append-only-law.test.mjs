@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as prefix from '../../../dist/Context/Companion/CompressionSurface.js'
+import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 import * as providerProjection from '../../../dist/Participant/Provider/Projection/Surface.js'
 
 const wire = (
@@ -106,6 +106,6 @@ test('WHAT[PREFIX-STABILITY-011] PREFIX_STABILITY_epoch_switches_are_fact_driven
     prefix.empty,
   )
   assert.equal(committed.ok, true, committed.ok ? '' : committed.error)
-  assert.equal(committed.value.epoch, 1)
+  assert.equal(prefix.epochOf(committed.value), 1n)
   assert.ok(committed.value.snapshot)
 })

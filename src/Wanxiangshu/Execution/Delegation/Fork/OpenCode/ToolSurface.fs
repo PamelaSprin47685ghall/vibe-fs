@@ -455,8 +455,16 @@ module ForkToolSurface =
         }
 
     let captureOwnerOpening (value: obj) (owner: string) (text: string) : Task =
-        let harness = unbox<ForkHarness> value
-        XTraceCapture.captureOpening (Some harness.Journal) (harness.OwnerSession owner) text [] :> Task
+        task {
+            let harness = unbox<ForkHarness> value
+
+            match!
+                XTraceCapture.captureOpeningWithReceipt (Some harness.Journal) (harness.OwnerSession owner) text []
+            with
+            | Ok _ -> ()
+            | Error error -> return raise (InvalidOperationException(sprintf "%A" error))
+        }
+        :> Task
 
     let private traceMessage (messageId: string) (text: string) : SessionMessage =
         { Id = messageId
@@ -475,9 +483,11 @@ module ForkToolSurface =
 
     let private captureTraceText journal sessionId messageId text : Task =
         task {
-            match! XTraceCapture.captureSessionMessages (Some journal) sessionId [ traceMessage messageId text ] with
-            | Ok() -> ()
-            | Error error -> return raise (InvalidOperationException error)
+            match!
+                XTraceCapture.captureSessionMessagesWithReceipt (Some journal) sessionId [ traceMessage messageId text ]
+            with
+            | Ok _ -> ()
+            | Error error -> return raise (InvalidOperationException(sprintf "%A" error))
         }
         :> Task
 

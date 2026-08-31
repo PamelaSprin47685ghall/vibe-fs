@@ -31,15 +31,15 @@ DEPENDS ON:
 
 | 命题 | 落点测试 |
 |---|---|
-| DG-001 | `requirements/degeneration-guard/tests/loop-detector.test.mjs` |
-| DG-002 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
-| DG-003 | `requirements/degeneration-guard/tests/loop-detector.test.mjs` |
-| DG-004 | `requirements/degeneration-guard/tests/loop-detector.test.mjs` |
-| DG-005 | `requirements/degeneration-guard/tests/loop-detector-memory.test.mjs` |
-| DG-006 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
-| DG-007 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
-| DG-008 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
-| DG-009 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
-| DG-010 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
-| DG-011 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs`, `requirements/interaction-authority/tests/continuation-origin.test.mjs` |
-| DG-012 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
+| DG-001 | `requirements/degeneration-guard/tests/loop-detector.test.mjs::WHAT[DG-001] LOOP_003_single_token_repetition_becomes_too_repetitive`；`requirements/degeneration-guard/tests/loop-detector.test.mjs::WHAT[DG-001] LOOP_003_repository_like_programmatic_text_stays_normal` |
+| DG-002 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs::WHAT[DG-002] LOOP_002_sensor_observes_text_and_reasoning_only` |
+| DG-003 | `requirements/degeneration-guard/tests/loop-detector.test.mjs::WHAT[DG-003] LOOP_003_fresh_detector_uses_repository_normal_prior`；`requirements/degeneration-guard/tests/loop-detector.test.mjs::WHAT[DG-003] LOOP_003_push_text_is_o200k_token_based` |
+| DG-004 | `requirements/degeneration-guard/tests/loop-detector.test.mjs::WHAT[DG-004] LOOP_004_runtime_envelope_is_freshly_derived_from_the_current_repository_without_numeric_snapshots`；`requirements/degeneration-guard/tests/loop-detector.test.mjs::WHAT[DG-004] LOOP_004_repository_corpus_contains_normal_source_documents_only` |
+| DG-005 | `requirements/degeneration-guard/tests/loop-detector-memory.test.mjs::WHAT[DG-005] LOOP_005_detector_memory_is_bounded_by_tokenizer_vocabulary_not_stream_length` |
+| DG-006 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs::WHAT[DG-006] LOOP_006_attempt_reset_preserves_armed_cause_until_reconcile` |
+| DG-007 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs::WHAT[DG-007] LOOP_006_low_side_interrupts_once_but_does_not_continue_before_reconcile`；`requirements/degeneration-guard/tests/loop-sensor.test.mjs::WHAT[DG-007] LOOP_006_abort_failure_rolls_back_guard_ownership` |
+| DG-008 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs::WHAT[DG-008] LOOP_001_armed_anomaly_is_process_local` |
+| DG-009 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs::WHAT[DG-009] LOOP_008_guard_has_no_fallback_or_nudge_recovery_path` |
+| DG-010 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs::WHAT[DG-010] LOOP_007_unowned_session_never_interrupts` |
+| DG-011 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs::WHAT[DG-011] LOOP_006_anomaly_resources_preserve_distinct_recovery_meanings` |
+| DG-012 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs::WHAT[DG-012] LOOP_012_degeneration_guard_is_the_single_closed_recovery_owner` |

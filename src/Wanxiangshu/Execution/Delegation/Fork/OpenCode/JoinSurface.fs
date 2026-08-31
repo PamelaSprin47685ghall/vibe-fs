@@ -19,10 +19,7 @@ module JoinSurface =
     let private text (value: obj) =
         if isNull value then "" else string value
 
-    let private language (value: string) =
-        match value.ToLowerInvariant() with
-        | "chinese" -> ProviderLanguage.SimplifiedChinese
-        | _ -> ProviderLanguage.English
+    let private language (value: string) = ProviderLanguage.parse value
 
     let private role (value: obj) : Role option =
         match text value with

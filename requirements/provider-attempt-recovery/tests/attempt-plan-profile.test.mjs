@@ -8,13 +8,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as compression from '../../../dist/Context/Companion/CompressionSurface.js'
+import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 import * as cursorOwner from '../../../dist/Participant/Provider/Attempt/Fallback/CursorSurface.js'
 import * as attemptPurpose from '../../../dist/Participant/Provider/Attempt/PlannerSurface.js'
 
 const planner = compression.attemptPlanner
 const cursor = cursorOwner.cursor
-const prefix = compression
-const prefixProbe = compression.prefixProbe
 const requestKind = compression.requestKind
 const slot = compression
 
@@ -31,7 +30,17 @@ const snapshotAt = (cutoff, { seal = `seal-${cutoff}` } = {}) =>
   })
 
 const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) =>
-  prefixProbe({ probeId: id, basedOnEpoch: 0, candidate: snapshotAt(cutoff) })
+  ({ probeId: id, basedOnEpoch: 0, candidate: snapshotAt(cutoff) })
+
+test('WHAT[PAR-010] PAR_010_provider_request_kind_has_one_provider_attempt_owner', () => {
+  const requestKindSource = source('src/Wanxiangshu/Participant/Provider/Attempt/RequestKind.fs')
+  const cursorSource = source('src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs')
+  const oldPrefixOwner = source('src/Wanxiangshu/Context/Prefix/Candidate.fs')
+
+  assert.match(requestKindSource, /type ProviderRequestKind =/)
+  assert.doesNotMatch(cursorSource, /type ProviderRequestKind =/)
+  assert.doesNotMatch(oldPrefixOwner, /type ProviderRequestKind =/)
+})
 
 test('WHAT[CHATEXEC-011] ordinary provider purpose is selected only from typed origin or durable blogger purpose', () => {
   assert.equal(attemptPurpose.ordinaryRequestPurpose('InteractionRepair', ''), 'interaction-repair')

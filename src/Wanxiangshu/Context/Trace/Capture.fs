@@ -68,6 +68,43 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
+[<RequireQualifiedAccess>]
+type XTraceCaptureIdentity =
+    | NoDurableTrace
+    | PositionalIdentity
+    | StableHostIdentity
+
+[<RequireQualifiedAccess>]
+type XTraceCaptureError =
+    | Refused of string
+    | StorageFailed of string
+
+type XTraceCaptureReceipt =
+    { PreviousHead: XTraceCursor
+      CurrentHead: XTraceCursor
+      CapturedPartCount: int
+      OpeningCaptured: bool
+      TerminalCaptured: bool
+      Identity: XTraceCaptureIdentity }
+
+[<RequireQualifiedAccess>]
+type XTraceStableCaptureEligibility =
+    | Eligible of messageIds: string list
+    | NoDurableTrace
+    | LegacyPositionalTrace
+    | MissingHostMessageIdentity
+    | BlankHostMessageIdentity
+    | DuplicateHostMessageIdentity
+
+type XTraceMessageObservation =
+    { Message: ProviderWireCapture.CapturedWireMessage
+      HostMessageId: string option
+      Origin: PromptAuthority.PromptOrigin option }
+
+type XTraceMessageCapture =
+    { Receipt: XTraceCaptureReceipt
+      Current: XTraceProjectionState option }
+
 /// COMPANION-003 / HOST-005 / COMPANION-012: the single semantic capture path.
 ///
 /// Every prompt/assistant/reasoning/tool part enters the XTrace through exactly
@@ -152,7 +189,10 @@ module XTraceCapture =
         task {
             let existing = xTraceOf durable sessionId
 
-            if existing.Opening.IsNone && not (String.IsNullOrWhiteSpace assignmentText) then
+            if
+                not (XTraceProjection.openingCaptured existing)
+                && not (String.IsNullOrWhiteSpace assignmentText)
+            then
                 do!
                     CompanionFact.OpeningPromptCaptured
                         {| SessionId = sessionId
@@ -236,6 +276,30 @@ module XTraceCapture =
             match journal with
             | None -> return ()
             | Some durable -> do! captureTerminalTextWhenFresh durable sessionId text providerRun
+        }
+
+    let private captureTerminalBlobWhenFresh
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (textRef: BlobRef)
+        (textDigest: BlobDigest)
+        (providerRun: ProviderRunIdentity)
+        : Task<unit> =
+        task {
+            let existing =
+                xTraceOf durable sessionId
+                |> XTraceProjection.terminalForProviderRun providerRun
+
+            match existing with
+            | Some terminal when terminal.TextRef = textRef && terminal.TextDigest = textDigest -> return ()
+            | _ ->
+                do!
+                    CompanionFact.TerminalOutputCaptured
+                        {| SessionId = sessionId
+                           TextRef = textRef
+                           TextDigest = textDigest
+                           ProviderRun = providerRun |}
+                    |> appendFact durable sessionId (Some providerRun)
         }
 
     /// COMPANION-003 / EXEC-009: capture the terminal output verbatim as the
@@ -378,7 +442,9 @@ module XTraceCapture =
             let generation = captureGeneration durable sessionId
 
             let recorded =
-                existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+                XTraceProjection.parts existing
+                |> List.map (fun part -> part.Provenance)
+                |> Set.ofList
             // DSL-MUTABLE: algorithm-scratch — next durable cursor while appending one capture batch
             let mutable cursor = XTraceProjection.headSequence existing
 
@@ -415,8 +481,52 @@ module XTraceCapture =
         | Some durable ->
             let existing = xTraceOf durable sessionId
 
-            existing.Parts
+            XTraceProjection.parts existing
             |> List.forall (fun part -> part.Provenance.Contains("/msg:", StringComparison.Ordinal))
+
+    let private classifyStableHostIds (hostMessageIds: string option list) =
+        let ids = hostMessageIds |> List.choose id
+        let missing = hostMessageIds |> List.exists Option.isNone
+        let blank = ids |> List.exists String.IsNullOrWhiteSpace
+        let duplicate = (ids |> Set.ofList |> Set.count) <> List.length ids
+
+        match missing, blank, duplicate with
+        | true, _, _ -> XTraceStableCaptureEligibility.MissingHostMessageIdentity
+        | false, true, _ -> XTraceStableCaptureEligibility.BlankHostMessageIdentity
+        | false, false, true -> XTraceStableCaptureEligibility.DuplicateHostMessageIdentity
+        | false, false, false -> XTraceStableCaptureEligibility.Eligible ids
+
+    let stableCaptureEligibility
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (hostMessageIds: string option list)
+        : XTraceStableCaptureEligibility =
+        match journal, supportsStableInsertion journal sessionId with
+        | None, _ -> XTraceStableCaptureEligibility.NoDurableTrace
+        | Some _, false -> XTraceStableCaptureEligibility.LegacyPositionalTrace
+        | Some _, true -> classifyStableHostIds hostMessageIds
+
+    let private stableCaptureRejection =
+        function
+        | XTraceStableCaptureEligibility.Eligible _ -> None
+        | XTraceStableCaptureEligibility.NoDurableTrace -> Some "stable XTrace requires a durable journal"
+        | XTraceStableCaptureEligibility.LegacyPositionalTrace ->
+            Some "legacy positional XTrace cannot accept stable historical insertion"
+        | XTraceStableCaptureEligibility.MissingHostMessageIdentity ->
+            Some "stable XTrace requires a Host id for every semantic message"
+        | XTraceStableCaptureEligibility.BlankHostMessageIdentity ->
+            Some "stable XTrace requires a non-empty Host id for every semantic message"
+        | XTraceStableCaptureEligibility.DuplicateHostMessageIdentity ->
+            Some "stable XTrace requires unique Host message ids"
+
+    let private requireStableEligibility =
+        function
+        | XTraceStableCaptureEligibility.Eligible _ -> Ok()
+        | eligibility ->
+            eligibility
+            |> stableCaptureRejection
+            |> Option.defaultValue "stable XTrace eligibility was refused"
+            |> Error
 
     /// Evidence → Decision: stable insertion prerequisites (capability + id contract).
     let private validateStableCapturePrerequisites
@@ -425,16 +535,11 @@ module XTraceCapture =
         (messageIds: string list)
         (messages: TraceSourceMessage list)
         : Result<unit, string> =
-        if not (supportsStableInsertion journal sessionId) then
-            Error "legacy positional XTrace cannot accept stable historical insertion"
-        elif List.length messageIds <> List.length messages then
+        if List.length messageIds <> List.length messages then
             Error "stable XTrace message identity cardinality does not match semantic projection"
-        elif messageIds |> List.exists String.IsNullOrWhiteSpace then
-            Error "stable XTrace requires a non-empty Host id for every semantic message"
-        elif (messageIds |> Set.ofList |> Set.count) <> List.length messageIds then
-            Error "stable XTrace requires unique Host message ids"
         else
-            Ok()
+            stableCaptureEligibility journal sessionId (messageIds |> List.map Some)
+            |> requireStableEligibility
 
     let private legacySemanticMatch (work: PartCaptureWork) (part: XTracePartRef) =
         let kind, toolName, body = partShape work.Source.Part
@@ -548,7 +653,7 @@ module XTraceCapture =
 
     /// Evidence → Decision: last-words turn/part from existing XTrace tip.
     let private lastWordsPlacement (existing: XTraceProjectionState) : int * int =
-        match List.tryLast existing.Parts with
+        match XTraceProjection.parts existing |> List.tryLast with
         | Some last -> last.Turn + 1, 0
         | None -> 0, 0
 
@@ -565,7 +670,9 @@ module XTraceCapture =
             let provenance = sprintf "g:%d/last_words" generation
 
             let recorded =
-                existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+                XTraceProjection.parts existing
+                |> List.map (fun part -> part.Provenance)
+                |> Set.ofList
 
             if Set.contains provenance recorded then
                 return ()
@@ -734,6 +841,18 @@ module XTraceCapture =
 
     /// Synchronise XTrace with the Host snapshot (after-hook / ensureReview).
     /// Idempotent with messages.transform via the same stable or positional provenance.
+    let private captureStableSessionMessages journal sessionId ids captured =
+        task {
+            let! result = captureMessageViewStable journal sessionId ids captured
+            return result |> Result.map ignore
+        }
+
+    let private capturePositionalSessionMessages journal sessionId captured =
+        task {
+            let! _ = captureMessageView journal sessionId captured
+            return Ok()
+        }
+
     let captureSessionMessages
         (journal: AgentJournal option)
         (sessionId: SessionId)
@@ -741,18 +860,247 @@ module XTraceCapture =
         : Task<Result<unit, string>> =
         task {
             let captured = messages |> List.map toCapturedWire
-            let ids = messages |> List.map (fun message -> message.Id)
+            let observedIds = messages |> List.map (fun message -> Some message.Id)
 
-            if
-                supportsStableInsertion journal sessionId
-                && ids |> List.forall (fun id -> not (String.IsNullOrWhiteSpace id))
-                && (Set.ofList ids |> Set.count) = List.length ids
-                && List.length ids = List.length captured
-            then
-                match! captureMessageViewStable journal sessionId ids captured with
-                | Ok _ -> return Ok()
-                | Error error -> return Error error
-            else
-                let! _ = captureMessageView journal sessionId captured
-                return Ok()
+            match stableCaptureEligibility journal sessionId observedIds with
+            | XTraceStableCaptureEligibility.Eligible ids when List.length ids = List.length captured ->
+                return! captureStableSessionMessages journal sessionId ids captured
+            | _ -> return! capturePositionalSessionMessages journal sessionId captured
+        }
+
+    let private captureReceipt
+        (identity: XTraceCaptureIdentity)
+        (before: XTraceProjectionState)
+        (after: XTraceProjectionState)
+        : XTraceCaptureReceipt =
+        { PreviousHead = XTraceProjection.headCursor before
+          CurrentHead = XTraceProjection.headCursor after
+          CapturedPartCount = XTraceProjection.partCount after - XTraceProjection.partCount before
+          OpeningCaptured =
+            not (XTraceProjection.openingCaptured before)
+            && XTraceProjection.openingCaptured after
+          TerminalCaptured = XTraceProjection.terminalCount after > XTraceProjection.terminalCount before
+          Identity = identity }
+
+    let private withoutJournalReceipt () =
+        { PreviousHead = XTraceCursor.originCursor
+          CurrentHead = XTraceCursor.originCursor
+          CapturedPartCount = 0
+          OpeningCaptured = false
+          TerminalCaptured = false
+          Identity = XTraceCaptureIdentity.NoDurableTrace }
+
+    let private captureDurableUnitWithReceipt durable sessionId identity capture =
+        task {
+            let before = xTraceOf durable sessionId
+
+            try
+                do! capture ()
+                let after = xTraceOf durable sessionId
+                return Ok(captureReceipt identity before after)
+            with ex ->
+                return Error(XTraceCaptureError.StorageFailed ex.Message)
+        }
+
+    let private captureUnitWithReceipt
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (identity: XTraceCaptureIdentity)
+        (capture: unit -> Task<unit>)
+        : Task<Result<XTraceCaptureReceipt, XTraceCaptureError>> =
+        task {
+            match journal with
+            | None -> return Ok(withoutJournalReceipt ())
+            | Some durable -> return! captureDurableUnitWithReceipt durable sessionId identity capture
+        }
+
+    /// Typed Opening capture. The receipt states whether the append changed the
+    /// durable trace, so callers never infer capture from projection fields.
+    let captureOpeningWithReceipt
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (assignmentText: string)
+        (authoritativeRequirements: string list)
+        =
+        captureUnitWithReceipt journal sessionId XTraceCaptureIdentity.PositionalIdentity (fun () ->
+            captureOpening journal sessionId assignmentText authoritativeRequirements)
+
+    let captureTerminalTextWithReceipt
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (text: string)
+        (providerRun: ProviderRunIdentity)
+        =
+        captureUnitWithReceipt journal sessionId XTraceCaptureIdentity.PositionalIdentity (fun () ->
+            captureTerminalText journal sessionId text providerRun)
+
+    let captureTerminalBlobWithReceipt
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (textRef: BlobRef)
+        (textDigest: BlobDigest)
+        (providerRun: ProviderRunIdentity)
+        =
+        captureUnitWithReceipt journal sessionId XTraceCaptureIdentity.PositionalIdentity (fun () ->
+            match journal with
+            | None -> Task.FromResult(())
+            | Some durable -> captureTerminalBlobWhenFresh durable sessionId textRef textDigest providerRun)
+
+    let captureTerminalWithReceipt (journal: AgentJournal option) (turn: ReconciledTurn) =
+        captureUnitWithReceipt journal turn.SessionId XTraceCaptureIdentity.PositionalIdentity (fun () ->
+            captureTerminal journal turn)
+
+    let captureLastWordsWithReceipt
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (textRef: BlobRef)
+        (textDigest: BlobDigest)
+        (providerRun: ProviderRunIdentity)
+        =
+        captureUnitWithReceipt journal sessionId XTraceCaptureIdentity.PositionalIdentity (fun () ->
+            captureLastWords journal sessionId textRef textDigest providerRun)
+
+    let captureProjectionWithReceipt
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (projection: ProviderSemanticProjection)
+        : Task<Result<XTraceCaptureReceipt, XTraceCaptureError>> =
+        captureUnitWithReceipt journal sessionId XTraceCaptureIdentity.PositionalIdentity (fun () ->
+            task {
+                let! _ = captureProjection journal sessionId projection
+                return ()
+            })
+
+    let private capturedObservationMessage (observation: XTraceMessageObservation) =
+        match observation.Origin with
+        | Some(PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt) ->
+            { observation.Message with Parts = [] }
+        | _ -> observation.Message
+
+    let private observedCaptureResult identity before current =
+        let after = current |> Option.defaultValue before
+
+        { Receipt = captureReceipt identity before after
+          Current = current }
+
+    let private captureStableObserved journal sessionId before stableIds captured =
+        task {
+            let! result = captureMessageViewStable journal sessionId stableIds captured
+
+            return
+                result
+                |> Result.mapError XTraceCaptureError.Refused
+                |> Result.map (observedCaptureResult XTraceCaptureIdentity.StableHostIdentity before)
+        }
+
+    let private capturePositionalObserved journal sessionId before captured =
+        task {
+            let! current = captureMessageView journal sessionId captured
+
+            return
+                current
+                |> observedCaptureResult XTraceCaptureIdentity.PositionalIdentity before
+                |> Ok
+        }
+
+    let private captureObservedByEligibility journal sessionId before eligibility captured =
+        match eligibility with
+        | XTraceStableCaptureEligibility.Eligible stableIds ->
+            captureStableObserved journal sessionId before stableIds captured
+        | _ -> capturePositionalObserved journal sessionId before captured
+
+    let private protectObservedCapture capture =
+        task {
+            try
+                return! capture ()
+            with ex ->
+                return Error(XTraceCaptureError.StorageFailed ex.Message)
+        }
+
+    let private captureObservedDurable journal durable sessionId observations =
+        let before = xTraceOf durable sessionId
+        let captured = observations |> List.map capturedObservationMessage
+
+        let observedIds =
+            observations |> List.map (fun observation -> observation.HostMessageId)
+
+        let eligibility = stableCaptureEligibility journal sessionId observedIds
+
+        protectObservedCapture (fun () -> captureObservedByEligibility journal sessionId before eligibility captured)
+
+    /// Typed Host observation membrane. Retry-attempt continuation rows retain
+    /// their physical position and identity but contribute no durable semantic
+    /// parts. Stable eligibility and append mode are decided only here.
+    let captureObservedMessagesWithReceipt
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (observations: XTraceMessageObservation list)
+        : Task<Result<XTraceMessageCapture, XTraceCaptureError>> =
+        task {
+            match journal with
+            | None ->
+                return
+                    Ok
+                        { Receipt = withoutJournalReceipt ()
+                          Current = None }
+            | Some durable -> return! captureObservedDurable journal durable sessionId observations
+        }
+
+    /// Existing decoded-view entry derives from the typed observation membrane;
+    /// it contains no filtering or stable-identity policy of its own.
+    let captureMessageViewWithReceipt
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (messageIds: string list option)
+        (messages: ProviderWireCapture.CapturedWireMessage list)
+        : Task<Result<XTraceCaptureReceipt, XTraceCaptureError>> =
+        task {
+            let observations =
+                messages
+                |> List.mapi (fun index message ->
+                    { Message = message
+                      HostMessageId = messageIds |> Option.bind (List.tryItem index)
+                      Origin = None })
+
+            let! captured = captureObservedMessagesWithReceipt journal sessionId observations
+            return captured |> Result.map (fun result -> result.Receipt)
+        }
+
+    /// Trace-owned capture decision for a complete Host snapshot. Composition
+    /// roots control ordering; this operation alone chooses stable vs positional
+    /// identity and performs the durable append.
+    let private captureIdentityForEligibility =
+        function
+        | XTraceStableCaptureEligibility.Eligible _ -> XTraceCaptureIdentity.StableHostIdentity
+        | _ -> XTraceCaptureIdentity.PositionalIdentity
+
+    let private captureSessionMessagesDurable journal durable sessionId messages =
+        task {
+            let before = xTraceOf durable sessionId
+
+            let eligibility =
+                messages
+                |> List.map (fun message -> Some message.Id)
+                |> stableCaptureEligibility journal sessionId
+
+            let identity = captureIdentityForEligibility eligibility
+            let! result = captureSessionMessages journal sessionId messages
+
+            return
+                result
+                |> Result.mapError XTraceCaptureError.Refused
+                |> Result.map (fun () -> captureReceipt identity before (xTraceOf durable sessionId))
+        }
+
+    let captureSessionMessagesWithReceipt
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (messages: SessionMessage list)
+        : Task<Result<XTraceCaptureReceipt, XTraceCaptureError>> =
+        task {
+            match journal with
+            | None -> return Ok(withoutJournalReceipt ())
+            | Some durable ->
+                return!
+                    protectObservedCapture (fun () -> captureSessionMessagesDurable journal durable sessionId messages)
         }

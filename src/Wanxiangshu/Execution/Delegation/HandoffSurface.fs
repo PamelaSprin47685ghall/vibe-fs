@@ -1,30 +1,35 @@
 namespace Wanxiangshu.Execution.Delegation
 
+open Wanxiangshu.Context.Trace
+
 [<RequireQualifiedAccess>]
 module HandoffSurface =
 
-    let private rangeView (range: Wanxiangshu.Mission.Obligation.Todo.MagicTodoLwr.BoundedRange) =
+    let private rangeView (range: XTraceRange) =
         box
-            {| start = int range.StartInclusive.Sequence
-               ``end`` = int range.EndExclusive.Sequence |}
+            {| start = range |> XTraceRange.startInclusive |> XTraceCursor.sequence |> int
+               ``end`` = range |> XTraceRange.endExclusive |> XTraceCursor.sequence |> int |}
 
     let handoffWindow (previousEnd: obj) (currentEnd: int) : obj =
         let previous =
             if isNull previousEnd then
                 None
             else
-                Some(int64 (string previousEnd))
+                Some(string previousEnd |> int64 |> XTraceCursor.create)
 
-        let handoff = DelegationHandoff.window previous (int64 currentEnd)
+        let handoff =
+            DelegationHandoff.window previous (currentEnd |> int64 |> XTraceCursor.create)
 
         box
-            {| start = int handoff.Range.StartInclusive.Sequence
-               ``end`` = int handoff.Range.EndExclusive.Sequence
+            {| start = handoff.Range |> XTraceRange.startInclusive |> XTraceCursor.sequence |> int
+               ``end`` = handoff.Range |> XTraceRange.endExclusive |> XTraceCursor.sequence |> int
                isInitial = handoff.IsInitial |}
 
     let render (charge: string) (parentRecord: string) : string =
         DelegationHandoff.renderPrompt charge (Option.ofObj parentRecord)
 
     let childRange (startInclusive: int) (endExclusive: int) : obj =
-        DelegationHandoff.childRange (int64 startInclusive) (int64 endExclusive)
+        DelegationHandoff.childRange
+            (startInclusive |> int64 |> XTraceCursor.create)
+            (endExclusive |> int64 |> XTraceCursor.create)
         |> rangeView

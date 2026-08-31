@@ -65,7 +65,7 @@ module ManagerJobHandoff =
         task {
             match tryJob journal turn.SessionId with
             | Some job when isTransferred journal turn.SessionId turn.Outcome job ->
-                let! _ = TerminalReporter.complete eventPort journal turn
+                let! _ = TerminalReporter.completeWithEvidence eventPort journal turn
                 return HandoffOutcome.Transferred
             | _ -> return HandoffOutcome.ManagerOwnsTurn
         }
@@ -79,14 +79,17 @@ module ManagerJobHandoff =
             | None -> ()
         }
 
-    let private recordFallbackSuccessIfValid
+    let private recordFallbackSuccessAfterCompletion
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
-        (terminalValid: bool)
+        (completion: XTraceTerminalCompletion)
         : Task<unit> =
         task {
-            if terminalValid then
-                do! recordFallbackSuccess journal turn
+            match completion with
+            | XTraceTerminalCompletion.Published _ -> do! recordFallbackSuccess journal turn
+            | XTraceTerminalCompletion.CaptureFailed _
+            | XTraceTerminalCompletion.RejectedMissingRole
+            | XTraceTerminalCompletion.RejectedEmptyOutput -> ()
         }
 
     let private completeCompleted
@@ -97,8 +100,8 @@ module ManagerJobHandoff =
         task {
             match tryJob journal turn.SessionId with
             | Some job when isTransferred journal turn.SessionId turn.Outcome job ->
-                let! _, terminalValid = TerminalReporter.complete eventPort journal turn
-                do! recordFallbackSuccessIfValid journal turn terminalValid
+                let! completion = TerminalReporter.completeWithEvidence eventPort journal turn
+                do! recordFallbackSuccessAfterCompletion journal turn completion
                 return HandoffOutcome.Transferred
             | _ -> return HandoffOutcome.ManagerOwnsTurn
         }

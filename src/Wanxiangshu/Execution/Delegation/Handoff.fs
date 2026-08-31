@@ -4,11 +4,8 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Mission.Obligation.Todo
 
-type DelegationHandoffWindow =
-    { Range: MagicTodoLwr.BoundedRange
-      IsInitial: bool }
+type DelegationHandoffWindow = { Range: XTraceRange; IsInitial: bool }
 
 type PreparedDelegationHandoff =
     { Route: DelegationHandoffRoute
@@ -26,23 +23,20 @@ module DelegationHandoff =
     let key (parent: SessionId) (route: DelegationHandoffRoute) =
         SessionId.value parent + "\x1f" + DelegationHandoffRoute.value route
 
-    let window (previousEnd: int64 option) (currentEnd: int64) : DelegationHandoffWindow =
-        let start = previousEnd |> Option.defaultValue 0L
+    let window (previousEnd: XTraceCursor option) (currentEnd: XTraceCursor) : DelegationHandoffWindow =
+        let start = previousEnd |> Option.defaultValue (XTraceCursor.create 0L)
 
-        if currentEnd < start then
+        if XTraceCursor.isAfter start currentEnd then
             invalidArg "currentEnd" "delegation handoff cursor cannot retreat"
 
-        { Range =
-            { StartInclusive = { Sequence = start }
-              EndExclusive = { Sequence = currentEnd } }
+        { Range = XTraceRange.create start currentEnd
           IsInitial = previousEnd.IsNone }
 
-    let childRange (startInclusive: int64) (endExclusive: int64) : MagicTodoLwr.BoundedRange =
-        if endExclusive < startInclusive then
+    let childRange (startInclusive: XTraceCursor) (endExclusive: XTraceCursor) : XTraceRange =
+        if XTraceCursor.isAfter startInclusive endExclusive then
             invalidArg "endExclusive" "delegation child range cannot retreat"
 
-        { StartInclusive = { Sequence = startInclusive }
-          EndExclusive = { Sequence = endExclusive } }
+        XTraceRange.create startInclusive endExclusive
 
     let promptDocument (charge: string) (parentRecord: string option) =
         let body =

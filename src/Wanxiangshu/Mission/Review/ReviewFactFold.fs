@@ -56,12 +56,12 @@ module ReviewFactFold =
     let private exactClosedToolResult (closed: ClosedAttempt) (session: SessionAgentProjection) =
         session.XTrace
         |> Option.bind (fun xTrace ->
-            XTraceProjection.parts xTrace
+            XTraceProjection.toolResultParts closed.Attempt.ProviderRun closed.Attempt.ToolCallId xTrace
             |> List.tryFind (fun part ->
-                part.Kind = "tool_result"
-                && part.ProviderRun = Some closed.Attempt.ProviderRun
-                && part.ToolCallId = Some closed.Attempt.ToolCallId
-                && part.Cursor.Sequence + 1L = closed.FrozenFrontier.Sequence))
+                let frontier = XTraceProjection.frontierAfter part
+
+                XTraceCursor.isAtOrAfter frontier closed.FrozenFrontier
+                && XTraceCursor.isAtOrAfter closed.FrozenFrontier frontier))
 
     let private applyAttemptClosure (closed: ClosedAttempt) (session: SessionAgentProjection) =
         let closedGuard =
@@ -118,7 +118,7 @@ module ReviewFactFold =
                       ReviewerSessionId = payload.ReviewerSessionId
                       ProviderRun = payload.ProviderRun
                       ToolCallId = payload.ToolCallId }
-                  FrozenFrontier = { Sequence = payload.FrozenFrontierSequence } }
+                  FrozenFrontier = XTraceCursor.create payload.FrozenFrontierSequence }
 
             AgentProjection.tryUpdate payload.ReviewerSessionId (applyAttemptClosure closed >> Ok) projection
             |> function

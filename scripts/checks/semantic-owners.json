@@ -1,5 +1,5 @@
 {
-  "total": 701,
+  "total": 696,
   "owners": [
     "action-affordance",
     "attention-regulation",
@@ -289,10 +289,6 @@
       "owner": "context-compression"
     },
     {
-      "path": "src/Wanxiangshu/Context/Companion/Errors.fs",
-      "owner": "context-compression"
-    },
-    {
       "path": "src/Wanxiangshu/Context/Companion/Fact.fs",
       "owner": "context-compression"
     },
@@ -325,10 +321,6 @@
       "owner": "context-compression"
     },
     {
-      "path": "src/Wanxiangshu/Context/Companion/Program.fs",
-      "owner": "context-compression"
-    },
-    {
       "path": "src/Wanxiangshu/Context/Companion/Projection.fs",
       "owner": "context-compression"
     },
@@ -354,10 +346,6 @@
     },
     {
       "path": "src/Wanxiangshu/Context/Prefix/Candidate.fs",
-      "owner": "prefix-stability"
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Prefix/Types.fs",
       "owner": "prefix-stability"
     },
     {
@@ -409,11 +397,7 @@
       "owner": "semantic-trace"
     },
     {
-      "path": "src/Wanxiangshu/Context/Trace/XTracePipeline.fs",
-      "owner": "semantic-trace"
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Trace/XTraceSurface.fs",
+      "path": "src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fs",
       "owner": "semantic-trace"
     },
     {
@@ -1365,10 +1349,6 @@
       "owner": "obligation-ledger"
     },
     {
-      "path": "src/Wanxiangshu/Mission/Obligation/Todo/Lwr.fs",
-      "owner": "obligation-ledger"
-    },
-    {
       "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs",
       "owner": "obligation-ledger"
     },
@@ -2117,6 +2097,10 @@
       "owner": "provider-attempt-recovery"
     },
     {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/RequestKind.fs",
+      "owner": "provider-attempt-recovery"
+    },
+    {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Failure.fs",
       "owner": "execution-failure-policy"
     },
@@ -2128,6 +2112,7 @@
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
       "owner": "provider-attempt-recovery"
     },
+
     {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs",
       "owner": "provider-attempt-recovery"
@@ -2145,19 +2130,11 @@
       "owner": "provider-attempt-recovery"
     },
     {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/HandleSurface.fs",
-      "owner": "provider-attempt-recovery"
-    },
-    {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
       "owner": "provider-attempt-recovery"
     },
     {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
-      "owner": "provider-attempt-recovery"
-    },
-    {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Surface.fs",
       "owner": "provider-attempt-recovery"
     },
     {
@@ -2645,6 +2622,10 @@
       "owner": "distribution"
     },
     {
+      "path": "src/Wanxiangshu/Resources/ProviderResourceBytes.fs",
+      "owner": "distribution"
+    },
+    {
       "path": "src/Wanxiangshu/Resources/PromptResources.fs",
       "owner": "cognitive-environment"
     },
@@ -2653,11 +2634,11 @@
       "owner": "cognitive-environment"
     },
     {
-      "path": "src/Wanxiangshu/Resources/ProviderProse.fs",
+      "path": "src/Wanxiangshu/Participant/Provider/Prose.fs",
       "owner": "provider-language"
     },
     {
-      "path": "src/Wanxiangshu/Resources/ProviderResources.fs",
+      "path": "src/Wanxiangshu/Participant/Provider/ProviderResources.fs",
       "owner": "provider-language"
     },
     {

@@ -35,30 +35,30 @@ DEPENDS ON: durable-events, effect-accounting, semantic-trace
 
 | 命题 | 落点测试 |
 |---|---|
-| OBLIGATION-LEDGER-001 | `requirements/obligation-ledger/tests/magic-todo.test.mjs` |
-| OBLIGATION-LEDGER-002 | `requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs` |
-| OBLIGATION-LEDGER-003 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs` |
-| OBLIGATION-LEDGER-004 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs` |
-| OBLIGATION-LEDGER-005 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs` |
-| OBLIGATION-LEDGER-006 | `requirements/obligation-ledger/tests/magic-todo.test.mjs` |
-| OBLIGATION-LEDGER-007 | `requirements/obligation-ledger/tests/magic-todo.test.mjs` |
-| OBLIGATION-LEDGER-008 | `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs` |
-| OBLIGATION-LEDGER-009 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs` |
-| OBLIGATION-LEDGER-010 | `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs` |
-| OBLIGATION-LEDGER-011 | `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs` |
-| OBLIGATION-LEDGER-012 | `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs` |
-| OBLIGATION-LEDGER-013 | `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs` |
-| OBLIGATION-LEDGER-014 | `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs` |
-| OBLIGATION-LEDGER-015 | `requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs` |
-| OBLIGATION-LEDGER-016 | `requirements/obligation-ledger/tests/opening-floor.test.mjs` |
-| OBLIGATION-LEDGER-017 | `requirements/obligation-ledger/tests/opening-floor.test.mjs` |
-| OBLIGATION-LEDGER-018 | `requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs` |
-| OBLIGATION-LEDGER-019 | `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs` |
-| OBLIGATION-LEDGER-020 | `requirements/obligation-ledger/tests/magic-todo-after.test.mjs` |
-| OBLIGATION-LEDGER-021 | `requirements/obligation-ledger/tests/prefix-epoch-cutoff.test.mjs` |
-| OBLIGATION-LEDGER-022 | `requirements/obligation-ledger/tests/magic-todo.test.mjs` |
-| OBLIGATION-LEDGER-023 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs` |
-| OBLIGATION-LEDGER-024 | `requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs` |
-| OBLIGATION-LEDGER-025 | `requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs` |
-| OBLIGATION-LEDGER-026 | `requirements/obligation-ledger/tests/magic-todo-after.test.mjs` |
-| OBLIGATION-LEDGER-027 | `requirements/obligation-ledger/tests/magic-todo.test.mjs` |
+| OBLIGATION-LEDGER-001 | `requirements/obligation-ledger/tests/magic-todo.test.mjs::WHAT[OBLIGATION-LEDGER-001] canonical obligation wire carries no provider-visible cold state` |
+| OBLIGATION-LEDGER-002 | `requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs::WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and obligations`；`requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs::WHAT[OBLIGATION-LEDGER-002] malformed provider wire is a typed provider rejection` |
+| OBLIGATION-LEDGER-003 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs::WHAT[OBLIGATION-LEDGER-003] clean break removes the legacy todo ontology from the production graph` |
+| OBLIGATION-LEDGER-004 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs::WHAT[OBLIGATION-LEDGER-004] Manager Role Law distinguishes planning relation from entrusted mission without owning tool timing`；`requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs::WHAT[OBLIGATION-LEDGER-004] committed mode rejects planning-only debt by consequence, not keywords` |
+| OBLIGATION-LEDGER-005 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs::WHAT[OBLIGATION-LEDGER-005] empty placeholders remain invalid while concrete planning work is legal before commitment` |
+| OBLIGATION-LEDGER-006 | `requirements/obligation-ledger/tests/magic-todo.test.mjs::WHAT[OBLIGATION-LEDGER-006] rejects blank and duplicate obligation names as call syntax` |
+| OBLIGATION-LEDGER-007 | `requirements/obligation-ledger/tests/magic-todo.test.mjs::WHAT[OBLIGATION-LEDGER-007] rejects different todowrite calls in one assistant message as syntax/protocol error` |
+| OBLIGATION-LEDGER-008 | `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs::WHAT[OBLIGATION-LEDGER-008] rejects Accepted when it names another Prepared envelope`；`requirements/obligation-ledger/tests/magic-todo-projection.test.mjs::WHAT[OBLIGATION-LEDGER-008] rejects a replay whose frozen prepared identity differs` |
+| OBLIGATION-LEDGER-009 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs::WHAT[OBLIGATION-LEDGER-009] failure triage keeps red for syntax and kills OpenCode on infrastructure faults` |
+| OBLIGATION-LEDGER-010 | `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs::WHAT[OBLIGATION-LEDGER-010] Accepted supersedes Current immediately` |
+| OBLIGATION-LEDGER-011 | `requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs::WHAT[OBLIGATION-LEDGER-011] next checkpoint updates Current without rollback`；`requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs::WHAT[OBLIGATION-LEDGER-011] production checkpoint path has no reviewer settlement owner` |
+| OBLIGATION-LEDGER-012 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs::WHAT[OBLIGATION-LEDGER-012] TodoWriteAccepted is the sole SSOT for checkpoints`；`requirements/obligation-ledger/tests/magic-todo.test.mjs::WHAT[OBLIGATION-LEDGER-012] replays an identical obligation checkpoint even while its review is outstanding (no new review from replay)` |
+| OBLIGATION-LEDGER-013 | `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs::WHAT[OBLIGATION-LEDGER-013] successive checkpoints can be prepared and accepted without review blockage` |
+| OBLIGATION-LEDGER-014 | `requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs::WHAT[OBLIGATION-LEDGER-014] successive checkpoints can be prepared and accepted seamlessly` |
+| OBLIGATION-LEDGER-015 | `requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs::WHAT[OBLIGATION-LEDGER-015] workingOn projects to in_progress and every other obligation to pending`；`requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs::WHAT[OBLIGATION-LEDGER-015] projects obligations into a non-enumerable V1 compatibility view` |
+| OBLIGATION-LEDGER-016 | `requirements/obligation-ledger/tests/opening-floor.test.mjs::WHAT[OBLIGATION-LEDGER-016] T1 constitutive boundary is independent from the compression floor`；`requirements/obligation-ledger/tests/opening-floor.test.mjs::WHAT[OBLIGATION-LEDGER-016] T1 constitutive body renders in Opening, not Recent`；`requirements/obligation-ledger/tests/opening-floor.test.mjs::WHAT[OBLIGATION-LEDGER-016] XTrace.forOpening keeps T1 tools; forWorkRecord drops them` |
+| OBLIGATION-LEDGER-017 | `requirements/obligation-ledger/tests/opening-floor.test.mjs::WHAT[OBLIGATION-LEDGER-017] Pre-T1 BlindPlan does not enlarge the structural Opening floor`；`requirements/obligation-ledger/tests/opening-floor.test.mjs::WHAT[OBLIGATION-LEDGER-017] Pre-T1: no CurrentLife → no floor`；`requirements/obligation-ledger/tests/opening-floor.test.mjs::WHAT[OBLIGATION-LEDGER-017] static: BloggerCoordinator + CompanionTransform zero ProtectedPrefixEnd refs` |
+| OBLIGATION-LEDGER-018 | `requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs::WHAT[OBLIGATION-LEDGER-018] business sequencing is a direct F# CE, not a second runtime`；`requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs::WHAT[OBLIGATION-LEDGER-018] hot-path queries use incremental projection facts, never AcceptedOrder replay`；`requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs::WHAT[OBLIGATION-LEDGER-018] recovery contract is fact reentry, not a resumable workflow position`；`requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs::WHAT[OBLIGATION-LEDGER-018] Manager authority root on blessed life completion is derived from durable LifeOpening facts, not transient PromptAuthority profiles`；`requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs::WHAT[OBLIGATION-LEDGER-018] ObligationLedgerWorkflow is isolated from foreign domain dependencies` |
+| OBLIGATION-LEDGER-019 | `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs::WHAT[OBLIGATION-LEDGER-019] rejects a legacy seed after the first Magic provider request` |
+| OBLIGATION-LEDGER-020 | `requirements/obligation-ledger/tests/magic-todo-after.test.mjs::WHAT[OBLIGATION-LEDGER-020] quality assurance is consolidated to Finality Review without dedicated process reviewers` |
+| OBLIGATION-LEDGER-021 | `requirements/obligation-ledger/tests/prefix-epoch-cutoff.test.mjs::WHAT[OBLIGATION-LEDGER-021] committed cutoff is supplied by one previous locator, never by scanning Accepted history`；`requirements/obligation-ledger/tests/prefix-epoch-cutoff.test.mjs::WHAT[OBLIGATION-LEDGER-021] TodoCheckpoint evidence binds trigger plus O(1) previous committed locator` |
+| OBLIGATION-LEDGER-022 | `requirements/obligation-ledger/tests/magic-todo.test.mjs::WHAT[OBLIGATION-LEDGER-022] blocks Finality until plan commitment, not merely until any checkpoint` |
+| OBLIGATION-LEDGER-023 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs::WHAT[OBLIGATION-LEDGER-023] manager guideline freezes ledger discipline as Manager-only content` |
+| OBLIGATION-LEDGER-024 | `requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs::WHAT[OBLIGATION-LEDGER-024] advertises planComplete in description, parameters, and jsonSchema` |
+| OBLIGATION-LEDGER-025 | `requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs::WHAT[OBLIGATION-LEDGER-025] accept rejects unknown physical success evidence`；`requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs::WHAT[OBLIGATION-LEDGER-025] openLife and compatibility injection do not wait for snapshot IO`；`requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs::WHAT[OBLIGATION-LEDGER-025] prepare rejects a pending ToolPart whose provider input is still empty`；`requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs::WHAT[OBLIGATION-LEDGER-025] before materializes the exact provider input including planComplete and workingOn`；`requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs::WHAT[OBLIGATION-LEDGER-025] materialization fails closed when the provider input differs`；`requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs::WHAT[OBLIGATION-LEDGER-025] materialized snapshot input must still match tool.execute.before args` |
+| OBLIGATION-LEDGER-026 | `requirements/obligation-ledger/tests/magic-todo-after.test.mjs::WHAT[OBLIGATION-LEDGER-026] after hook accepts checkpoint durably and enriches T1 revelation` |
+| OBLIGATION-LEDGER-027 | `requirements/obligation-ledger/tests/magic-todo.test.mjs::WHAT[OBLIGATION-LEDGER-027] horizon is planning resolution, not provider-visible lifecycle state` |

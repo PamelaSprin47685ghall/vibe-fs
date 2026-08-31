@@ -42,32 +42,32 @@ Join 机制从所有者的完成信箱中按稳定排序逐项 CAS 消费可用�
 
 | 命题 | 落点测试 |
 |---|---|
-| DELEG-001 | `requirements/delegation/tests/delegation-structure-contract.test.mjs` |
-| DELEG-002 | `requirements/delegation/tests/delegation-structure-contract.test.mjs` |
-| DELEG-003 | `requirements/delegation/tests/fork-tool.test.mjs` |
-| DELEG-004 | `requirements/delegation/tests/delegation-structure-contract.test.mjs` |
-| DELEG-005 | `requirements/delegation/tests/join-v2-wire.test.mjs` |
-| DELEG-006 | `requirements/delegation/tests/fork-tool.test.mjs` |
-| DELEG-007 | `requirements/delegation/tests/delegation-structure-contract.test.mjs` |
-| DELEG-008 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
-| DELEG-009 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
-| DELEG-010 | `requirements/delegation/tests/sync-delegate.test.mjs` |
-| DELEG-011 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
-| DELEG-012 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
-| DELEG-013 | `requirements/delegation/tests/join-v2-mailbox.test.mjs` + `requirements/delegation/tests/join-completion.test.mjs` |
-| DELEG-014 | `requirements/delegation/tests/join-v2-mailbox.test.mjs` |
-| DELEG-015 | `requirements/delegation/tests/join-v2-mailbox.test.mjs` + `requirements/delegation/tests/join-completion.test.mjs` |
-| DELEG-016 | `requirements/delegation/tests/join-v2-wire.test.mjs` |
-| DELEG-017 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
-| DELEG-019 | `requirements/delegation/tests/fork-child-payload.test.mjs` |
-| DELEG-020 | `requirements/delegation/tests/delegation-structure-contract.test.mjs` |
-| DELEG-021 | `requirements/delegation/tests/fork-attachment.test.mjs` |
-| DELEG-022 | `requirements/delegation/tests/delegated-tool-estimate-surface.test.mjs` |
-| DELEG-023 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
-| DELEG-024 | `requirements/delegation/tests/reusable-work-unit.test.mjs` + `requirements/delegation/tests/fork-tool.test.mjs` + `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
-| DELEG-025 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` + `requirements/delegation/tests/reusable-work-unit.test.mjs` + `requirements/host-boundary/tests/events-port.test.mjs` |
-| DELEG-026 | `requirements/delegation/tests/reusable-work-unit.test.mjs` + `requirements/delegation/tests/delegation-structure-contract.test.mjs` |
-| DELEG-027 | `requirements/delegation/tests/reusable-work-unit.test.mjs` + `requirements/delegation/tests/fork-tool.test.mjs` |
+| DELEG-001 | `requirements/delegation/tests/delegation-structure-contract.test.mjs::WHAT[DELEG-001] manager_role_law_entrusts_by_consequence_not_persona` |
+| DELEG-002 | `requirements/delegation/tests/delegation-structure-contract.test.mjs::WHAT[DELEG-002] calling_names_differ_in_persona_depth_not_authority` |
+| DELEG-003 | `requirements/delegation/tests/fork-tool.test.mjs::WHAT[DELEG-003] FORK_road_with_calling_is_independent_and_omitted_calling_continues_byname` |
+| DELEG-004 | `requirements/delegation/tests/delegation-structure-contract.test.mjs::WHAT[DELEG-004] commission_and_fork_are_distinct_contracts_not_witness` |
+| DELEG-005 | `requirements/delegation/tests/join-v2-wire.test.mjs::WHAT[DELEG-005] JOIN_V2_rendered_wire_is_parseable_without_legacy_fields` |
+| DELEG-006 | `requirements/delegation/tests/fork-tool.test.mjs::WHAT[DELEG-006] FORK_continuation_reuses_bound_managed_agent_and_does_not_rebind_tier` |
+| DELEG-007 | `requirements/delegation/tests/delegation-structure-contract.test.mjs::WHAT[DELEG-007] sync_delegate_edges_are_the_allowed_dag_only` |
+| DELEG-008 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-008] SYNC_RUNTIME_provider_tool_call_collection_preserves_role_order` |
+| DELEG-009 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-009] SYNC_RUNTIME_same_reuse_scope_serializes_distinct_provider_runs_but_distinct_scopes_are_independent` |
+| DELEG-010 | `requirements/delegation/tests/sync-delegate.test.mjs::WHAT[DELEG-010] EXEC_026_agentNameFor_covers_fast_deep_times_inspector_coder` |
+| DELEG-011 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-011] SYNC_RUNTIME_ordinary_completion_settles_batch_without_return_channel` |
+| DELEG-012 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-012] SYNC_RUNTIME_first_provider_call_receives_canonical_record_and_sibling_receives_reference` |
+| DELEG-013 | `requirements/delegation/tests/join-completion.test.mjs::WHAT[DELEG-013] JOIN_COMPLETION_completed_is_rendered_as_entry_local_work_record` |
+| DELEG-014 | `requirements/delegation/tests/join-completion.test.mjs::WHAT[DELEG-014] JOIN_COMPLETION_batch_preserves_order_and_bounded_work_records` |
+| DELEG-015 | `requirements/delegation/tests/join-completion.test.mjs::WHAT[DELEG-015] JOIN_COMPLETION_interrupted_is_not_fork_error` |
+| DELEG-016 | `requirements/delegation/tests/join-v2-wire.test.mjs::WHAT[DELEG-016] JOIN_V2_empty_batch_is_plain_empty_wire` |
+| DELEG-017 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-017] SYNC_RUNTIME_work_record_is_evidence_and_does_not_transfer_authority` |
+| DELEG-019 | `requirements/delegation/tests/fork-child-payload.test.mjs::WHAT[DELEG-019] FORK_CHILD_PAYLOAD_full_shape_puts_all_instructions_before_reference_data` |
+| DELEG-020 | `requirements/delegation/tests/delegation-structure-contract.test.mjs::WHAT[DELEG-020] delegation_semantics_do_not_depend_on_current_tool_names` |
+| DELEG-021 | `requirements/delegation/tests/fork-attachment.test.mjs::WHAT[DELEG-021] DELEG_021_attachment_is_background_between_commissioner_and_requirements`；`requirements/delegation/tests/fork-attachment.test.mjs::WHAT[DELEG-021] DELEG_021_attachment_text_cannot_replace_the_assignment` |
+| DELEG-022 | `requirements/delegation/tests/delegated-tool-estimate-surface.test.mjs::WHAT[DELEG-022] DELEG_022_replace_sets_exact_remaining_and_clears_prior_counted_calls`；`requirements/delegation/tests/delegated-tool-estimate-surface.test.mjs::WHAT[DELEG-022] DELEG_022_each_distinct_real_tool_call_decrements_once_and_saturates_at_zero`；`requirements/delegation/tests/delegated-tool-estimate-surface.test.mjs::WHAT[DELEG-022] DELEG_022_projection_is_incremental_not_a_transcript_or_xtrace_scan` |
+| DELEG-023 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-023] SYNC_RUNTIME_transient_turn_failure_stays_child_local_until_exhausted` |
+| DELEG-024 | `requirements/delegation/tests/fork-tool.test.mjs::WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_leaves_completion_to_join`；`requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-024] SYNC_RUNTIME_inspector_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta`；`requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-024] SYNC_RUNTIME_coder_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta` |
+| DELEG-025 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-025] SYNC_RUNTIME_late_failure_from_previous_authority_root_cannot_fail_reused_call`；`requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-025] reusable fork terminal failure is guarded by the accepted authority root`；`requirements/host-boundary/tests/events-port.test.mjs::WHAT[DELEG-025] EVT_run_scoped_failure_preserves_authority_root_across_host_event_port` |
+| DELEG-026 | `requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-026] reusable delegation has no durable program-counter/state-machine vocabulary`；`requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-026] fork admission bookkeeping that can fail happens before dispatch` |
+| DELEG-027 | `requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-027] active fork assignment never becomes BusyAgentNudge` |
 
 ## GAP
 

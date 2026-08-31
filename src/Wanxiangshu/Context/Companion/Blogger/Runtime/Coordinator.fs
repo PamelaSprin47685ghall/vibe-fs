@@ -279,7 +279,7 @@ module BloggerCoordinator =
             return! claimMaterializedContinuation scope journal ctx
         }
 
-    let stageContinuationContext
+    let materializeContinuationContext
         (scope: IBloggerRuntimeHost)
         (journal: AgentJournal)
         (ctx: BloggerRequestContext)

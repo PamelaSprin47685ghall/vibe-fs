@@ -3,8 +3,8 @@
 // Structured-workflow positive surface: business programs are direct CE
 // workflows (DSL-001 / FLOW-001 / ARCH-001), their exports are the story
 // entrypoints — never a stored Stage/Phase/NextAction program counter
-// (DSL-002 / ARCH-008). Execution/Agent/Errors + Context/Companion/Errors +
-// Foundation/Outcome are pure domain fact types consumed by those CE programs,
+// (DSL-002 / ARCH-008). Execution/Agent/Errors + Foundation/Outcome are pure
+// domain fact types consumed by those CE programs,
 // not control-state tags.
 //
 // The registered Foundation/OutcomeSurface is the owner contract for outcome
@@ -13,7 +13,7 @@
 // modules load and export callable functions.
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -63,16 +63,30 @@ test('WHAT[STRUCTURED-WORKFLOW-003] SW_002_workflow_modules_export_no_program_co
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-003] SW_003_domain_flow_and_outcome_types_are_domain_facts', () => {
-  // Context/error vocabularies live with their owning domains after the
-  // rotation-2 split; neither module is a Flow AST or program position.
-  // Source-tree proof: the error types are defined as F# record/union types.
+  // Agent errors remain domain facts. Companion has no generic context/error
+  // workflow vocabulary: direct durable and transform owners carry its operations.
   const agentErrors = readSrc('src/Wanxiangshu/Execution/Agent/Errors.fs')
   assert.match(agentErrors, /\btype AgentContext\b/, 'Execution/Agent/Errors must define AgentContext')
   assert.match(agentErrors, /\btype AgentError\b/, 'Execution/Agent/Errors must define AgentError')
 
-  const companionErrors = readSrc('src/Wanxiangshu/Context/Companion/Errors.fs')
-  assert.match(companionErrors, /\btype CompanionContext\b/, 'Context/Companion/Errors must define CompanionContext')
-  assert.match(companionErrors, /\btype CompanionError\b/, 'Context/Companion/Errors must define CompanionError')
+  assert.equal(
+    existsSync(join(ROOT, 'src/Wanxiangshu/Context/Companion/Errors.fs')),
+    false,
+    'Context/Companion/Errors.fs must stay deleted with its generic flow facade',
+  )
+
+  const companionOwnerFiles = [
+    'src/Wanxiangshu/Context/Companion/Model.fs',
+    'src/Wanxiangshu/Context/Companion/Runtime.fs',
+    'src/Wanxiangshu/Context/Companion/Host.fs',
+    'src/Wanxiangshu/Context/Companion/HostBlogger.fs',
+    'src/Wanxiangshu/Context/Companion/JournalPort.fs',
+    'src/Wanxiangshu/Context/Companion/Transform.fs',
+  ]
+  const companionOwners = companionOwnerFiles.map(readSrc).join('\n')
+  assert.doesNotMatch(companionOwners, /\b(?:CompanionProgram|CompanionContext|CompanionError)\b/)
+  assert.match(companionOwners, /\bICompanionDurablePort\b/)
+  assert.match(companionOwners, /\bapplyCompanionForOrdinaryMaterial\b/)
 
   // AgentRunResult is the completion payload of a successful agent run
   // (EXEC-006): typed physical facts plus terminal output, validated by

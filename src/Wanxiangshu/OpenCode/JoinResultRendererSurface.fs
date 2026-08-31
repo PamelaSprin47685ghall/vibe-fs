@@ -11,10 +11,7 @@ open Wanxiangshu.Participant.Provider
 module JoinResultRendererSurface =
 
     let renderAgentCompletion (language: string) (agentName: string) (workRecord: string) : string =
-        let providerLanguage =
-            match language.ToLowerInvariant() with
-            | "chinese" -> ProviderLanguage.SimplifiedChinese
-            | _ -> ProviderLanguage.English
+        let providerLanguage = ProviderLanguage.parse language
 
         let payload: AgentCompletionPayload =
             { AgentId = agentName

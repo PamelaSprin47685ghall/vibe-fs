@@ -29,6 +29,9 @@ module OrchestratorHostSurface =
     [<Emit("$0[$1](...$2)")>]
     let private invokeRawTask (value: obj) (name: string) (args: obj array) : Task<obj> = jsNative
 
+    [<Emit("$0($1)")>]
+    let private invokeRawRunner (runner: obj) (command: obj) : Task<obj> = jsNative
+
     [<Emit("$0[$1](...$2)")>]
     let private invokeRawDisposable (value: obj) (name: string) (args: obj array) : IDisposable = jsNative
 
@@ -52,6 +55,19 @@ module OrchestratorHostSurface =
 
     let private stringOf (value: obj) =
         if isNullish value then "" else string value
+
+    let private commandObject (command: Wanxiangshu.Process.Command) : obj =
+        box
+            {| fileName = command.FileName
+               args = command.Arguments |> List.toArray
+               workingDirectory = command.WorkingDirectory |> Option.toObj |}
+
+    let private commandRunner (runner: obj) (command: Wanxiangshu.Process.Command) =
+        task {
+            let! raw = invokeRawRunner runner (commandObject command)
+            let values = unbox<obj array> raw
+            return int (stringOf values.[0]), stringOf values.[1], stringOf values.[2]
+        }
 
     let private boolOf (value: obj) =
         if isNullish value then false else unbox<bool> value
@@ -359,3 +375,15 @@ module OrchestratorHostSurface =
 
     let hasChild (handle: obj) (agentId: string) : bool =
         hasChildInRuntime (handle :?> HostHandle).Host agentId
+
+    /// Exercise the production candidate-finalization sequence through a plain
+    /// JavaScript command port without exposing Command or Result internals.
+    let finalizeWorktree (runner: obj) (managerId: string) (worktree: string) : Task<obj> =
+        task {
+            let! result = OrchestratorGit.finalizeWorktree (commandRunner runner) managerId worktree
+
+            return
+                match result with
+                | Ok _ -> box {| ok = true; error = null |}
+                | Error error -> box {| ok = false; error = error |}
+        }

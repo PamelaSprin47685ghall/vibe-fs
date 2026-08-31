@@ -1,5 +1,5 @@
-// FINALITY-009/010/016 cohort laws. Every trace is plain lifecycle history
-// folded by the registered FinalitySurface; the answer is JS-native roster,
+// FINALITY-009/010/016 cohort laws. Every plain lifecycle event enters the
+// registered FinalitySurface one-event fold; the answer is JS-native roster,
 // standing, and resolution data. Crash/re-entry is durable history replay.
 
 import assert from 'node:assert/strict'
@@ -110,9 +110,22 @@ const confirmWitness = (reviewer, barrier) => [
 ]
 
 const project = (events) => {
-  const result = surface.project(events)
-  assert.equal(result.ok, true, JSON.stringify(result.error))
-  return result.world
+  let world = surface.emptyWorld()
+  for (const event of events) {
+    const result = surface.applyEvent(world, event)
+    assert.equal(result.ok, true, JSON.stringify(result.error))
+    world = result.world
+  }
+  return world
+}
+
+const apply = (world, events) => {
+  for (const event of events) {
+    const result = surface.applyEvent(world, event)
+    assert.equal(result.ok, true, JSON.stringify(result.error))
+    world = result.world
+  }
+  return world
 }
 
 const rosterView = (world) =>
@@ -159,9 +172,7 @@ test('WHAT[FINALITY-010] graduated reviewer excluded from roster', () => {
     finalityRejected(REQ1, HIST_A, BAR1),
     finalityRequested(REQ2, 'run-2', 'call-2'),
   ])
-  const confirmedResult = surface.applyEvents(base, confirmWitness(HIST_A, BAR1))
-  assert.equal(confirmedResult.ok, true, JSON.stringify(confirmedResult.error))
-  const confirmed = confirmedResult.world
+  const confirmed = apply(base, confirmWitness(HIST_A, BAR1))
 
   const standing = surface.lifeView(confirmed).enlistedReviewers.find((entry) => entry.sessionId === HIST_A)
   assert.ok(standing)
@@ -182,7 +193,7 @@ test('WHAT[FINALITY-009] crash reentry reuses already created new slot exactly o
     { agentId: 'finality-new-req-1', session: NEW, ordinal: 0, isNew: false },
   ])
 
-  const replay = surface.applyEvents(world, [enlist(REQ1, NEW, 0, BAR1, true)])
+  const replay = surface.applyEvent(world, enlist(REQ1, NEW, 0, BAR1, true))
   assert.equal(replay.ok, true, JSON.stringify(replay.error))
   assert.equal(surface.lifeView(replay.world).activeFinality.members.length, 1)
 })
@@ -232,7 +243,7 @@ test('WHAT[FINALITY-016] blessed exactly once: second completion rejected', () =
   assert.equal(surface.lifeView(world).activeFinality.resolution.kind, 'blessed')
   assert.equal(surface.lifeView(world).lastBlessing.requestId, REQ1)
 
-  const again = surface.applyEvents(world, [finalityBlessed(REQ1)])
+  const again = surface.applyEvent(world, finalityBlessed(REQ1))
   assert.equal(again.ok, false, 'second FinalityBlessed must be rejected by production fold')
   assert.equal(surface.lifeView(world).activeFinality.resolution.kind, 'blessed')
 })
@@ -261,7 +272,7 @@ test('WHAT[FINALITY-008] history replay preserves durable finality facts', () =>
     ],
   )
 
-  const duplicate = surface.applyEvents(after, [finalityBlessed(REQ2)])
+  const duplicate = surface.applyEvent(after, finalityBlessed(REQ2))
   assert.equal(duplicate.ok, false, 'replayed history cannot accept a second blessing')
 })
 
@@ -281,12 +292,12 @@ test('WHAT[FINALITY-009] replay preserves an open finality roster source', () =>
   assert.deepEqual(rosterView(after), expected)
   assert.deepEqual(surface.cohortRosterFromSnapshot(after, LIFE, REQ2), expected)
 
-  const enlisted = surface.applyEvents(after, [enlist(REQ2, NEW, 1, BAR2, true)])
+  const enlisted = surface.applyEvent(after, enlist(REQ2, NEW, 1, BAR2, true))
   assert.equal(enlisted.ok, true, JSON.stringify(enlisted.error))
   assert.deepEqual(surface.lifeView(enlisted.world).activeFinality.members, [
     { sessionId: NEW, ordinal: 1, barrierId: BAR2, isNew: true },
   ])
-  const replay = surface.applyEvents(enlisted.world, [enlist(REQ2, NEW, 1, BAR2, true)])
+  const replay = surface.applyEvent(enlisted.world, enlist(REQ2, NEW, 1, BAR2, true))
   assert.equal(replay.ok, true, JSON.stringify(replay.error))
   assert.deepEqual(surface.lifeView(replay.world).activeFinality.members, [
     { sessionId: NEW, ordinal: 1, barrierId: BAR2, isNew: true },

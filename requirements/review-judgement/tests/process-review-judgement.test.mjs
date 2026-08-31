@@ -92,6 +92,26 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_first_terminal_receipt_is_physically
     'only the named first-Chronicle decision may wait an already-open Blogger producer',
   )
   assert.match(
+    reviewerWorkflow,
+    /XTraceProjection\.toolResultParts[\s\S]*?XTraceProjection\.frontierAfter/,
+    'review closure must derive its frontier from the trace-owned provider/tool identity query',
+  )
+  assert.match(
+    reviewerWorkflow,
+    /XTraceCapture\.captureTerminalTextWithReceipt[\s\S]*?\| Ok _ ->[\s\S]*?\| Error error -> reportCaptureFailure/,
+    'the review-owned tool-only fallback must consume the typed terminal capture receipt',
+  )
+  assert.match(
+    reviewerWorkflow,
+    /TerminalReporter\.completeWithEvidence[\s\S]*?XTraceTerminalCompletion\.Published[\s\S]*?XTraceTerminalCompletion\.CaptureFailed[\s\S]*?XTraceTerminalCompletion\.RejectedEmptyOutput[\s\S]*?XTraceTerminalCompletion\.RejectedMissingRole/,
+    'ordinary reviewer completion must exhaust the terminal reporter evidence outcomes',
+  )
+  assert.doesNotMatch(
+    reviewerWorkflow,
+    /XTraceProjection\.(?:parts|currentGenerationParts|head|headSequence|semanticCursorFor|tryHostMessageId)\b|\.Cursor\.Sequence\b|\{\s*Sequence\s*=/,
+    'review judgement must not inspect raw trace storage or cursor representation',
+  )
+  assert.match(
     reviewPorts,
     /type ReviewerTerminalOccasion\s*=\s*\{ ReviewerSessionId: SessionId\s*BarrierId: ReviewBarrierId \}/,
     'reviewer terminal authority must carry the reusable session and exact barrier as one typed occasion',

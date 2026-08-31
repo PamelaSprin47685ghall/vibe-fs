@@ -59,7 +59,8 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] Host convergence performs ring tak
   assert.doesNotMatch(host, /acceptedDispatchForPromptKey|takeoverPhysicalMessage|TakeoverTurnDisposition/)
   assert.match(host, /turn\.SessionId\s*=\s*takeover\.LaneSessionId/)
   assert.match(host, /CompletedTurnClassifier\.partsSessionText turn\.Parts/)
-  assert.match(host, /NotifyTerminal group\.OwnerSessionId \(TerminalOutcome\.Completed result\)/)
+  assert.match(host, /SessionId\s*=\s*group\.OwnerSessionId[\s\S]{0,300}?TerminalReporter\.completeWithEvidence/)
+  assert.match(host, /published\.SessionId\s*=\s*result\.SessionId\s*&&\s*published\.ProviderRun\s*=\s*result\.ProviderRun/)
   assert.doesNotMatch(host, /TerminalText\s*=\s*aggregate/)
 
   assert.match(host, /FissionRing\.finalLane group\.LaneCount/)

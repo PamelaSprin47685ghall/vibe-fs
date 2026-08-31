@@ -4,7 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Context.Companion
-open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation.Identity
@@ -67,7 +67,13 @@ module WorkRecordSurface =
                 {| ok = false
                    error = JournalAppendFailure.describe failure |}
 
-    let private sequenceOf (cursor: obj) : int64 = int64 (text (cursor?Sequence))
+    let private cursorOf (cursor: obj) : XTraceCursor =
+        XTraceCursor.create (int64 (text (cursor?Sequence)))
+
+    let private captureError error =
+        match error with
+        | XTraceCaptureError.Refused reason -> reason
+        | XTraceCaptureError.StorageFailed reason -> reason
 
     /// COMPANION-003: capture an OpeningPrompt through the canonical XTrace owner.
     let captureOpening
@@ -78,25 +84,31 @@ module WorkRecordSurface =
         : Task<unit> =
         let required = arrayOf requirements |> Array.map text |> Array.toList
 
-        Wanxiangshu.Context.Trace.XTraceCapture.captureOpening
-            (Some handle.Journal)
-            (SessionId.create sessionId)
-            assignment
-            required
+        task {
+            match!
+                XTraceCapture.captureOpeningWithReceipt
+                    (Some handle.Journal)
+                    (SessionId.create sessionId)
+                    assignment
+                    required
+            with
+            | Ok _ -> return ()
+            | Error error -> return raise (InvalidOperationException(captureError error))
+        }
 
     /// COMPANION-012: capture a plain semantic projection and return its inclusive last cursor.
     let captureProjection (handle: JournalHandle) (sessionId: string) (projection: obj) : Task<obj> =
         task {
             let! captured =
-                Wanxiangshu.Context.Trace.XTraceCapture.captureProjection
+                XTraceCapture.captureProjectionWithReceipt
                     (Some handle.Journal)
                     (SessionId.create sessionId)
                     (semanticProjectionOf projection)
 
             return
                 match captured with
-                | None -> null
-                | Some state -> box {| lastSequence = int (Wanxiangshu.Context.Trace.XTraceProjection.head state) - 1 |}
+                | Ok receipt -> box {| currentHeadSequence = receipt.CurrentHead |> XTraceCursor.sequence |> int |}
+                | Error error -> raise (InvalidOperationException(captureError error))
         }
 
     /// WORK-RECORD-011 fixture seam: capture the private completion evidence
@@ -108,11 +120,17 @@ module WorkRecordSurface =
         (value: string)
         (providerRun: string)
         : Task<unit> =
-        Wanxiangshu.Context.Trace.XTraceCapture.captureTerminalText
-            (Some handle.Journal)
-            (SessionId.create sessionId)
-            value
-            (ProviderRunIdentity.create providerRun)
+        task {
+            match!
+                XTraceCapture.captureTerminalTextWithReceipt
+                    (Some handle.Journal)
+                    (SessionId.create sessionId)
+                    value
+                    (ProviderRunIdentity.create providerRun)
+            with
+            | Ok _ -> return ()
+            | Error error -> return raise (InvalidOperationException(captureError error))
+        }
 
     /// COMPANION-015: append one Blogger observation commit from plain proof fields.
     let appendBlogObservation
@@ -167,9 +185,8 @@ module WorkRecordSurface =
 
     /// COMPANION-015 / EXEC-031: render one request-range bounded WorkRecord without exposing typed cursors.
     let lifecycleWorkRecordBounded (handle: JournalHandle) (sessionId: string) (range: obj) : Task<obj> =
-        let bounded: MagicTodoLwr.BoundedRange =
-            { StartInclusive = { Sequence = sequenceOf range?StartInclusive }
-              EndExclusive = { Sequence = sequenceOf range?EndExclusive } }
+        let bounded =
+            XTraceRange.create (cursorOf range?StartInclusive) (cursorOf range?EndExclusive)
 
         task {
             let! rendered =

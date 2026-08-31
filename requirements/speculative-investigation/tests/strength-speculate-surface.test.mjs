@@ -16,6 +16,10 @@ test('WHAT[SPEC-INV-002] StrengthSpeculate owns tryApply entry point for transfo
 
   assert.match(speculate, /let\s+tryApply/)
   assert.match(speculate, /applyBoundOwner/)
+  assert.match(speculate, /XTraceCapture\.stableCaptureEligibility/)
+  assert.doesNotMatch(speculate, /XTraceCapture\.supportsStableInsertion/)
+  assert.doesNotMatch(speculate, /XTraceCapture\.capture\w+/,
+    'speculative presentation must never capture unconfirmed material into canonical XTrace')
   assert.match(pt, /StrengthSpeculate\.tryApply/)
 })
 

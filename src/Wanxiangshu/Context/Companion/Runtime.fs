@@ -9,7 +9,6 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System
-open System.Threading.Tasks
 open Fable.Core
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -52,14 +51,13 @@ open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 
-/// Companion state wrapper with a single mutable in-flight Task gate.
+/// Companion state wrapper for the physical caches used at Host boundaries.
 type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort, ?sessionId: SessionId) =
     let lockObj = obj ()
 
     let restoredMemory = initialMemory
 
-    // DSL-MUTABLE: resource — in-memory blog projection mirror (durable-backed)
-    let mutable blogProjection: BlogProjectionState =
+    let blogProjection: BlogProjectionState =
         restoredMemory
         |> Option.map (fun m -> m.Blog)
         |> Option.defaultValue BlogProjection.empty
@@ -70,8 +68,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         |> Option.map (fun m -> m.XTrace)
         |> Option.defaultValue XTraceProjection.empty
 
-    // DSL-MUTABLE: resource — last effective blog frames cache
-    let mutable latestB: BlogText option =
+    let latestB: BlogText option =
         restoredMemory |> Option.bind (fun m -> m.EffectiveFrames)
 
     /// COMPANION-002: the companion Blogger Session Y for this X.
@@ -83,12 +80,6 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     // DSL-MUTABLE: resource — cached companion Blogger session id
     let mutable bloggerSessionId: SessionId option =
         restoredMemory |> Option.bind (fun m -> m.BloggerSessionId)
-
-    // Physical send Task is not the Blogger busy authority (ENFORCER-047).
-    // Busy = host flight ownership (HasFlight) only.
-    // Keep a fire-and-forget handle only for WaitInFlightAsync diagnostics.
-    // DSL-MUTABLE: single-flight — fire-and-forget send task handle
-    let mutable lastSendTask: Task<unit> option = None
 
     member _.Memory: CompanionMemory =
         lock lockObj (fun () ->
@@ -112,16 +103,3 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     /// at first and re-reads the projection head every round.
     member _.RefreshXTrace(state: XTraceProjectionState) : unit =
         lock lockObj (fun () -> xTraceProjection <- state)
-
-    member this.Snapshot: CompanionMemory = this.Memory
-    member this.GetMemory() : CompanionMemory = this.Memory
-
-    /// Diagnostic only — not the busy definition (busy = host HasFlight).
-    member _.LastSendTask: Task<unit> option = lock lockObj (fun () -> lastSendTask)
-
-    member this.WaitInFlightAsync() : Task =
-        let tOpt = lock lockObj (fun () -> lastSendTask)
-
-        match tOpt with
-        | Some t -> t :> Task
-        | None -> Task.FromResult(()) :> Task

@@ -16,12 +16,14 @@
     <Compile Include="AssemblyInfo.fs"/>
     <Compile Include="Host/Digest.fs"/>
     <Compile Include="Foundation/Identity.fs"/>
+    <Compile Include="OpenCode/Host/SessionQuiescenceGate.fs"/>
     <Compile Include="Context/Trace/Cursor.fs"/>
     <Compile Include="Foundation/Roles.fs"/>
     <Compile Include="Participant/Persona/Catalog.fs"/>
     <Compile Include="Participant/Persona/ManagedCatalog.fs"/>
     <Compile Include="Participant/Persona/Identity.fs"/>
-    <Compile Include="Context/Prefix/Types.fs"/>
+    <Compile Include="Context/Prefix/Candidate.fs"/>
+    <Compile Include="Participant/Provider/Attempt/RequestKind.fs"/>
     <Compile Include="Foundation/RolesSurface.fs"/>
     <Compile Include="Foundation/McpLaunch.fs"/>
     <Compile Include="Foundation/TaskResult.fs"/>
@@ -94,7 +96,6 @@
     <Compile Include="Participant/Provider/Language.fs"/>
     <Compile Include="Participant/Provider/Attempt/Cursor.fs"/>
     <Compile Include="Participant/Provider/Attempt/TerminalValidity.fs"/>
-    <Compile Include="Context/Prefix/Candidate.fs"/>
     <Compile Include="Enforcer/Catalog.fs"/>
     <Compile Include="Enforcer/InstitutionalLearning/Enhancer.fs"/>
     <Compile Include="Enforcer/Codec.fs"/>
@@ -107,13 +108,13 @@
     <Compile Include="Composition/Turn/Program.fs"/>
     <Compile Include="Host/CompactionPolicy.fs"/>
     <Compile Include="Participant/Provider/Projection/Model.fs"/>
+    <Compile Include="Participant/Provider/Projection/Intent.fs"/>
     <Compile Include="Context/Trace/Model.fs"/>
     <Compile Include="Mission/Obligation/Todo/ObligationCodec.fs"/>
     <Compile Include="Mission/Obligation/Todo/PrefixEpoch.fs"/>
     <Compile Include="Mission/Obligation/Todo/Surface.fs"/>
     <Compile Include="Mission/Obligation/Todo/Admission.fs"/>
     <Compile Include="Mission/WorkRecord/Model.fs"/>
-    <Compile Include="Mission/Obligation/Todo/Lwr.fs"/>
     <Compile Include="Mission/Obligation/Todo/FinalityCohort.fs"/>
     <Compile Include="Foundation/SyntheticToml.fs"/>
     <Compile Include="Foundation/LlmFacing.fs"/>
@@ -143,7 +144,6 @@
     <Compile Include="Context/Companion/Identity.fs"/>
     <Compile Include="Context/Companion/Builder.fs"/>
     <Compile Include="Enforcer/Rulebook.fs"/>
-    <Compile Include="Participant/Provider/Projection/Intent.fs"/>
     <Compile Include="Participant/Provider/Projection/Planner.fs"/>
     <Compile Include="Participant/Provider/Projection/Renderer.fs"/>
     <Compile Include="Context/Companion/Blogger/Delta.fs"/>
@@ -329,9 +329,10 @@
     <Compile Include="Process/PtyApi.fs"/>
     <Compile Include="Change/Types.fs"/>
     <Compile Include="Resources/PackageResources.fs"/>
+    <Compile Include="Resources/ProviderResourceBytes.fs"/>
     <Compile Include="Resources/ModelRoutingResource.fs"/>
-    <Compile Include="Resources/ProviderResources.fs"/>
-    <Compile Include="Resources/ProviderProse.fs"/>
+    <Compile Include="Participant/Provider/ProviderResources.fs"/>
+    <Compile Include="Participant/Provider/Prose.fs"/>
     <Compile Include="Context/Companion/ProjectionSurface.fs"/>
     <Compile Include="Context/Prefix/Surface.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoSemanticSurface.fs"/>
@@ -355,10 +356,8 @@
     <Compile Include="Git/Hook/Sync.fs"/>
     <Compile Include="Git/Hook/Dispatcher.fs"/>
     <Compile Include="Git/Hook/Surface.fs"/>
-    <Compile Include="Context/Companion/Errors.fs"/>
     <Compile Include="Context/Companion/Model.fs"/>
     <Compile Include="Context/Companion/Runtime.fs"/>
-    <Compile Include="Context/Companion/Program.fs"/>
     <Compile Include="OpenCode/Tools/ToolContext.fs"/>
     <Compile Include="OpenCode/Tools/StaticTools.fs"/>
     <Compile Include="OpenCode/Tools/FileTools.fs"/>
@@ -389,6 +388,7 @@
     <Compile Include="OpenCode/Host/ReliabilityDiagnostics.fs"/>
     <Compile Include="OpenCode/Host/ReliabilityDiagnosticsSurface.fs"/>
     <Compile Include="OpenCode/Host/Diagnostic.fs"/>
+    <Compile Include="OpenCode/Host/HookPolicySurface.fs"/>
     <Compile Include="Context/Companion/CompressionSurface.fs"/>
     <Compile Include="OpenCode/Host/Events.fs"/>
     <Compile Include="OpenCode/Host/SharedTerminalBus.fs"/>
@@ -450,7 +450,6 @@
     <Compile Include="Mission/Obligation/Todo/MagicTodoMembrane.fs"/>
     <Compile Include="Interaction/Dispatch/Ingress.fs"/>
     <Compile Include="Interaction/Authority/Child.fs"/>
-    <Compile Include="OpenCode/Host/SessionQuiescenceGate.fs"/>
     <Compile Include="OpenCode/Host/QuiescenceSurface.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Wait.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Store.fs"/>
@@ -473,6 +472,7 @@
     <Compile Include="Execution/Delegation/Fork/Host/Pty.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/State.fs"/>
     <Compile Include="Interaction/Repair/Port.fs"/>
+
     <Compile Include="Context/Companion/Blogger/Runtime/ParkedTransform.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Host.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Abandon.fs"/>
@@ -523,13 +523,12 @@
     <Compile Include="Mission/Review/Barrier/Reverify.fs"/>
     <Compile Include="Mission/Review/Judgement/Evidence.fs"/>
     <Compile Include="Mission/Review/Judgement/Continuation.fs"/>
+    <Compile Include="Context/Trace/TerminalReporter.fs"/>
     <Compile Include="Mission/Review/Judgement/Workflow.fs"/>
     <Compile Include="Mission/Review/OpenCode/TerminalAwait.fs"/>
     <Compile Include="OpenCode/Host/TerminalPolicy.fs"/>
-    <Compile Include="Context/Trace/TerminalReporter.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fs"/>
     <Compile Include="Enforcer/Continuation.fs"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/Surface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Workflow.fs"/>
     <Compile Include="Interaction/Repair/InteractionRepair.fs"/>
     <Compile Include="Composition/Turn/OrdinaryTurnWorkflow.fs"/>
@@ -658,7 +657,6 @@
     <Compile Include="Execution/Session/ChatExecution/StatusSurface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGroundingRepositorySurface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGroundingSurface.fs"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/HandleSurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/CursorSurface.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtSurface.fs"/>
     <Compile Include="Persistence/Journal/ObligationJournalSurface.fs"/>
@@ -684,8 +682,7 @@
     <Compile Include="OpenCode/Host/ChatParamsHook.fs"/>
     <Compile Include="OpenCode/Host/ChatParamsSurface.fs"/>
     <Compile Include="OpenCode/Host/PluginHostInterop.fs"/>
-    <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
-    <Compile Include="OpenCode/Host/HookPolicySurface.fs"/>
+
     <Compile Include="OpenCode/Host/ProviderSystemTransform.fs"/>
     <Compile Include="Participant/Provider/LanguageSurface.fs"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fs"/>
@@ -693,7 +690,6 @@
     <Compile Include="OpenCode/Plugin/PluginSessionWiring.fs"/>
     <Compile Include="OpenCode/Plugin/PluginRecoveryWiring.fs"/>
     <Compile Include="OpenCode/Host/BloggerChronicleText.fs"/>
-    <Compile Include="Context/Trace/XTracePipeline.fs"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fs"/>
     <Compile Include="OpenCode/Plugin/PluginHooks.fs"/>
     <Compile Include="OpenCode/Plugin/SpikePlugin.fs"/>
@@ -704,11 +700,12 @@
     <Compile Include="Persistence/Journal/ReviewJournalSurface.fs"/>
     <Compile Include="Enforcer/Guidance/TipSurface.fs"/>
     <Compile Include="Mission/WorkRecord/Surface.fs"/>
-    <Compile Include="Context/Trace/XTraceSurface.fs"/>
+    <Compile Include="Context/Trace/SemanticTraceSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs"/>
     <Compile Include="Change/Host/Surface.fs"/>
     <Compile Include="Foundation/OutcomeSurface.fs"/>
     <Compile Include="Interaction/Dispatch/DispatchSurface.fs"/>
+    <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
     <Compile Include="Interaction/Dispatch/JoinGuardSurface.fs"/>
     <Compile Include="Interaction/Dispatch/RecoverySurface.fs"/>
     <Compile Include="Verification/EventStoreWriterSurface.fs"/>

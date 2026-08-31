@@ -76,8 +76,7 @@ module JsGeneratorSurface =
         | JsCapability.Glob -> "Glob"
         | JsCapability.Grep -> "Grep"
 
-    let private languageOf (value: string) =
-        ProviderLanguage.tryParse value |> Option.defaultValue ProviderLanguage.English
+    let private languageOf (value: string) = ProviderLanguage.parse value
 
     let private roleExists (role: string) =
         Roles.tryParseRole role |> Option.isSome

@@ -6,10 +6,11 @@
 /src/Wanxiangshu/Participant/Provider/Language.fs
 /src/Wanxiangshu/Participant/Provider/LanguageSurface.fs
 /src/Wanxiangshu/Participant/Provider/SessionLanguage.fs
+/src/Wanxiangshu/Participant/Provider/ProviderResources.fs
+/src/Wanxiangshu/Participant/Provider/Prose.fs
 /src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs
-/src/Wanxiangshu/Resources/ProviderResources.fs
-/src/Wanxiangshu/Resources/ProviderProse.fs
-/src/Wanxiangshu/Resources/RuntimeResources.fs
+/src/Wanxiangshu/Resources/PackageResources.fs
+/src/Wanxiangshu/Resources/ProviderResourceBytes.fs
 /scripts/checks/language-parity-gate.mjs
 /scripts/checks/provider-prose-ownership.mjs
 /scripts/checks/semantic-anchors.mjs

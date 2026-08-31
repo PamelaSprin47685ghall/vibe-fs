@@ -123,8 +123,8 @@ module PromptDispatcherSend =
         | PromptDispatcher.SendAttemptOutcome.Sent key -> Ok key
         | PromptDispatcher.SendAttemptOutcome.NotSent error -> Error error
         | PromptDispatcher.SendAttemptOutcome.Failed error -> Error error
-        | PromptDispatcher.SendAttemptOutcome.Superseded ->
-            Error "idle-derived send was superseded before physical dispatch"
+        | PromptDispatcher.SendAttemptOutcome.AdmissionRejected failure ->
+            Error(sprintf "idle-derived send admission rejected before physical dispatch: %A" failure)
 
     let private continuationAttemptOutcome (key: PromptKey) (outcome: SendOutcome) (result: Result<PromptKey, string>) =
         match outcome, result with
@@ -151,8 +151,8 @@ module PromptDispatcherSend =
                 return raise ex
         }
 
-    let private physicalSendAdmitted (admission: (unit -> bool) option) =
-        admission |> Option.map (fun admit -> admit ()) |> Option.defaultValue true
+    let private physicalSendAdmission (admission: (unit -> Result<unit, QuiescencePermitFailure>) option) =
+        admission |> Option.map (fun admit -> admit ()) |> Option.defaultValue (Ok())
 
     type PromptDispatcher.Runtime with
 
@@ -428,7 +428,7 @@ module PromptDispatcherSend =
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             (tools: Map<string, bool> option)
-            (physicalAdmission: (unit -> bool) option)
+            (physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) option)
             (key: PromptKey)
             : Task<PromptDispatcher.SendAttemptOutcome> =
             task {
@@ -485,14 +485,14 @@ module PromptDispatcherSend =
                         return! sendAfterAdmission ()
                     }
 
-                if not (physicalSendAdmitted physicalAdmission) then
+                match physicalSendAdmission physicalAdmission with
+                | Error failure ->
                     return!
                         this.Abandon key sessionId PromptAbandonReason.SupersededBeforePhysicalSend
                         |> TaskValue.map (function
-                            | Ok() -> PromptDispatcher.SendAttemptOutcome.Superseded
+                            | Ok() -> PromptDispatcher.SendAttemptOutcome.AdmissionRejected failure
                             | Error error -> PromptDispatcher.SendAttemptOutcome.Failed error)
-                else
-                    return! sendAdmitted ()
+                | Ok() -> return! sendAdmitted ()
             }
 
         member private this.SendContinuationWithDigestAttempt
@@ -507,7 +507,7 @@ module PromptDispatcherSend =
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             (tools: Map<string, bool> option)
-            (physicalAdmission: (unit -> bool) option)
+            (physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) option)
             : Task<PromptDispatcher.SendAttemptOutcome> =
             task {
                 let origin = PromptAuthority.PromptOrigin.Continuation continuation
@@ -741,7 +741,7 @@ module PromptDispatcherSend =
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
-            (physicalAdmission: unit -> bool)
+            (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
             : Task<PromptDispatcher.SendAttemptOutcome> =
             this.SendContinuationWithDigestAttempt
                 port
@@ -770,7 +770,7 @@ module PromptDispatcherSend =
             (effectiveAgent: string)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (physicalAdmission: unit -> bool)
+            (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
             : Task<PromptDispatcher.SendAttemptOutcome> =
             this.SendContinuationWithDigestAttempt
                 port
@@ -797,7 +797,7 @@ module PromptDispatcherSend =
             (effectiveAgent: string)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (physicalAdmission: unit -> bool)
+            (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
             : Task<PromptDispatcher.SendAttemptOutcome> =
             this.SendContinuationWithDigestAttempt
                 port
@@ -824,7 +824,7 @@ module PromptDispatcherSend =
             (effectiveAgent: string)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
-            (physicalAdmission: unit -> bool)
+            (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
             : Task<PromptDispatcher.SendAttemptOutcome> =
             this.SendContinuationWithDigestAttempt
                 port

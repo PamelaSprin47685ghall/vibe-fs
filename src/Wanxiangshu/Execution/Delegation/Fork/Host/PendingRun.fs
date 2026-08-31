@@ -22,6 +22,7 @@ open Wanxiangshu.Strength
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
@@ -31,7 +32,7 @@ type PendingHostRun =
       AgentId: string
       ChildId: SessionId
       Role: Role
-      StartCursor: int64
+      StartCursor: XTraceCursor
       Handoff: PreparedDelegationHandoff option
       mutable AuthorityRoot: AuthorityRootUserMessageId option
       Source: TaskCompletionSource<AgentCompletionOutcome>

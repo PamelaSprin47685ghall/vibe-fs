@@ -149,9 +149,7 @@ module EnforcerTipGuidance =
         (field: string)
         : Task<TipGuidance option> =
         task {
-            let lang =
-                SessionProviderLanguage.tryGet mainSessionId
-                |> Option.defaultValue ProviderLanguage.English
+            let lang = SessionProviderLanguage.languageOf mainSessionId
 
             match EnforcerCatalog.tryFindByField field (RuntimeResources.enforcerRulesFor lang) with
             | None -> return None

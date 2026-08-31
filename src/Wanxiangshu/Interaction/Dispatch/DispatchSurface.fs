@@ -74,6 +74,19 @@ module DispatchSurface =
     let internal sessionPort (port: obj) : Wanxiangshu.OpenCode.ISessionHostPort =
         PlainSessionPort(port) :> Wanxiangshu.OpenCode.ISessionHostPort
 
+    /// JS-safe controlled Host child listing for adapter proofs. The F# Result
+    /// and OpenCodeChildInfo representations stay on this registered surface.
+    let acceptedChild
+        (session: string)
+        (title: string)
+        (agent: string)
+        : Result<Wanxiangshu.OpenCode.OpenCodeChildInfo list, string> =
+        Ok
+            [ { SessionId = SessionId.create session
+                ParentSessionId = None
+                Agent = Some agent
+                Title = Some title } ]
+
     let admittedWithReceipt (value: string) : Outcome.SendOutcome =
         Outcome.SendOutcome.AdmittedWithReceipt(TransportReceipt.create value)
 
@@ -340,7 +353,7 @@ module DispatchSurface =
         (continuation: string)
         (profile: obj)
         (effectiveAgent: string)
-        (physicalAdmission: bool)
+        (physicalAdmission: obj)
         : Task<obj> =
         task {
             match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
@@ -359,7 +372,17 @@ module DispatchSurface =
                         None
                         PromptDispatcher.AwaitMode.Await
                         None
-                        (fun () -> physicalAdmission)
+                        (fun () ->
+                            match physicalAdmission with
+                            | :? bool as admitted when admitted -> Ok()
+                            | :? string as failure ->
+                                match failure with
+                                | "WrongOwner" -> Error QuiescencePermitFailure.WrongOwner
+                                | "NoFreshIdle" -> Error QuiescencePermitFailure.NoFreshIdle
+                                | "AlreadyConsumed" -> Error QuiescencePermitFailure.AlreadyConsumed
+                                | "Revoked" -> Error QuiescencePermitFailure.Revoked
+                                | _ -> Error QuiescencePermitFailure.Superseded
+                            | _ -> Error QuiescencePermitFailure.Superseded)
 
                 return
                     match outcome with
@@ -369,11 +392,11 @@ module DispatchSurface =
                                key = PromptKey.value key
                                error = null
                                observation = adapter.LastObservation |}
-                    | PromptDispatcher.SendAttemptOutcome.Superseded ->
+                    | PromptDispatcher.SendAttemptOutcome.AdmissionRejected failure ->
                         box
                             {| outcome = "Superseded"
                                key = null
-                               error = null
+                               error = string failure
                                observation = adapter.LastObservation |}
                     | PromptDispatcher.SendAttemptOutcome.NotSent error ->
                         box

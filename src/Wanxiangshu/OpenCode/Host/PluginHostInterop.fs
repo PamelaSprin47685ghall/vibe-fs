@@ -10,6 +10,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode

@@ -11,21 +11,13 @@ import test from 'node:test'
 
 import * as providerCodec from '../../../dist/OpenCode/Codec/ProviderProjectionSurface.js'
 import * as providerProjection from '../../../dist/Participant/Provider/Projection/Surface.js'
+import * as XWireSurface from '../../../dist/Context/Prefix/XWireSurface.js'
 
 const semanticView = (raw) => providerProjection.semanticProjection(providerCodec.decodeMessageView(raw).messages)
-const sha256 = (input) => `«${input}»`
-
 const stage2Snapshot = (raw, committed = null) => ({
   currentProjection: semanticView(raw),
   committedPrefix: committed,
 })
-
-const cutoffDigest = (sha, snapshot, cutoff) => sha(
-  providerProjection.renderSemantic({
-    ...snapshot.currentProjection,
-    messages: snapshot.currentProjection.messages.slice(0, cutoff),
-  }),
-)
 
 test('WHAT[PREFIX-STABILITY-009] CTX_011_step5_cutoff_digest_truncates_exactly_at_the_cutoff', () => {
   const snapshot = stage2Snapshot([
@@ -34,21 +26,33 @@ test('WHAT[PREFIX-STABILITY-009] CTX_011_step5_cutoff_digest_truncates_exactly_a
     { info: { id: 'm3', role: 'user' }, parts: [{ type: 'text', text: 'third' }] },
   ])
 
-  const full = providerProjection.renderSemantic(snapshot.currentProjection)
   const truncated = {
     ...snapshot.currentProjection,
     messages: snapshot.currentProjection.messages.slice(0, 2),
   }
-  assert.equal(cutoffDigest(sha256, snapshot, 2), sha256(providerProjection.renderSemantic(truncated)))
-  assert.notEqual(cutoffDigest(sha256, snapshot, 2), sha256(full), 'a real cutoff changes the digest')
+  assert.equal(
+    XWireSurface.coveredPrefixDigest(snapshot.currentProjection, 2),
+    XWireSurface.coveredPrefixDigest(truncated, 2),
+  )
+  assert.notEqual(
+    XWireSurface.coveredPrefixDigest(snapshot.currentProjection, 2),
+    XWireSurface.coveredPrefixDigest(snapshot.currentProjection, 99),
+    'a real cutoff changes the digest',
+  )
 
   // cutoff 0 proves the EMPTY prefix — the load-bearing CTX-011 step-5 shape.
   const empty = { ...snapshot.currentProjection, messages: [] }
-  assert.equal(cutoffDigest(sha256, snapshot, 0), sha256(providerProjection.renderSemantic(empty)))
+  assert.equal(
+    XWireSurface.coveredPrefixDigest(snapshot.currentProjection, 0),
+    XWireSurface.coveredPrefixDigest(empty, 0),
+  )
 
   // An out-of-range cutoff keeps every message; the selector clamps before this
   // proof is requested, but the proof itself remains total.
-  assert.equal(cutoffDigest(sha256, snapshot, 99), sha256(full))
+  assert.equal(
+    XWireSurface.coveredPrefixDigest(snapshot.currentProjection, 99),
+    XWireSurface.coveredPrefixDigest(snapshot.currentProjection, snapshot.currentProjection.messages.length),
+  )
 })
 
 test('WHAT[PREFIX-STABILITY-009] CTX_011_step5_the_proof_reads_the_SNAPSHOT_not_a_stale_closure', () => {
@@ -65,8 +69,8 @@ test('WHAT[PREFIX-STABILITY-009] CTX_011_step5_the_proof_reads_the_SNAPSHOT_not_
   // Same cutoff over a 1-message and a 2-message projection: the grown one keeps
   // its second message, so the proof cannot be the same.
   assert.notEqual(
-    cutoffDigest(sha256, before, 2),
-    cutoffDigest(sha256, after, 2),
+    XWireSurface.coveredPrefixDigest(before.currentProjection, 2),
+    XWireSurface.coveredPrefixDigest(after.currentProjection, 2),
     'the same cutoff over a grown projection must not produce the same proof',
   )
 })
@@ -80,12 +84,34 @@ test('WHAT[PREFIX-STABILITY-009] prefix_proof_and_writeback_use_canonical_XTrace
   assert.match(wireSource, /XTraceMaterialization\.currentProjection/)
   assert.match(wireSource, /XTraceProjection\.tryTurnOfHostMessageId/)
   assert.match(wireSource, /XTraceProjection\.hostMessageIdsBeforeTurn/)
-  assert.match(wireSource, /applyRenderedPrefixByHostIds/)
+  assert.match(wireSource, /replacePrefixByHostIds/)
   assert.doesNotMatch(
     wireSource,
     /ProviderWireCapture\.decodeMessageView\(rawMessages\)[\s\S]{0,500}ProjectionRenderer\.cutoffDigest/,
     'step-5 proof must not hash the mutable request presentation',
   )
+})
+
+test('WHAT[PREFIX-STABILITY-009] prefix lifecycle and rendering stay with the prefix owner', () => {
+  const ownerSource = readFileSync(
+    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Prefix/Projection.fs'),
+    'utf8',
+  )
+  const providerIntentSource = readFileSync(
+    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Participant/Provider/Projection/Intent.fs'),
+    'utf8',
+  )
+  const providerRendererSource = readFileSync(
+    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs'),
+    'utf8',
+  )
+
+  assert.match(ownerSource, /type PrefixActivation/)
+  assert.match(ownerSource, /type PrefixProjectionIntent/)
+  assert.match(ownerSource, /type PrefixRendered/)
+  assert.match(ownerSource, /let render \(intent: PrefixProjectionIntent\)/)
+  assert.doesNotMatch(providerIntentSource, /PrefixActivation|KeepPhysicalPrefix|ActivatePrefixEpoch|ReanchorAfterCompaction/)
+  assert.doesNotMatch(providerRendererSource, /PrefixActivation|RenderedPrefix|renderPrefix/)
 })
 
 test('WHAT[PREFIX-STABILITY-009] retry_transport_rows_retire_only_at_a_real_cold_horizon', () => {
@@ -96,18 +122,40 @@ test('WHAT[PREFIX-STABILITY-009] retry_transport_rows_retire_only_at_a_real_cold
 
   assert.match(wireSource, /let private staleProviderRetryMessageIds/)
   assert.match(wireSource, /Some messageId <> currentPhysical/)
-  assert.match(wireSource, /let private retryTransportRetirement/)
+  assert.match(wireSource, /let retryTransportRetirement/)
   assert.match(
     wireSource,
     /PrefixPresentationHorizon\.Current\s*->\s*Set\.empty[\s\S]*?PrefixPresentationHorizon\.TentativeCold\s*->\s*staleProviderRetryMessageIds rawMessages/,
     'same-horizon retry rows must remain byte-stable; only a real cold presentation may retire them',
   )
-  assert.match(wireSource, /ProjectionIntent\.SuppressTransportOnly :: intents/)
   assert.match(
     wireSource,
-    /renderPrefixMessages state rawMessages intents PrefixPresentationHorizon\.Current/,
+    /renderPrefixMessages state rawMessages PrefixProjectionIntent\.Keep PrefixPresentationHorizon\.Current/,
     'ordinary presentation must preserve the current physical prefix',
   )
-  assert.match(wireSource, /renderPrefixMessages state rawMessages intents presentationHorizon/)
+  assert.match(wireSource, /renderPrefixMessages state rawMessages prefixIntent presentationHorizon/)
+  assert.match(wireSource, /presentationHorizonForProbe/)
+  assert.match(wireSource, /XPrefixProjection\.render intent/)
   assert.match(wireSource, /ProjectionMessageEdit\.suppressHostMessagesByIds prefixed staleTransport/)
+  assert.doesNotMatch(wireSource, /ProjectionIntent\.(?:SuppressTransportOnly|ReanchorAfterCompaction)/)
+  assert.doesNotMatch(wireSource, /Projection(?:Planner\.plan|Renderer\.renderPrefix)/)
+})
+
+test('WHAT[PREFIX-STABILITY-009] compiled retry retirement preserves Current and only removes stale retry rows at TentativeCold', () => {
+  const retry = (id) => ({
+    info: { id, role: 'user', metadata: { wanxiangshu_origin: 'ProviderRetryAttempt' } },
+    parts: [{ type: 'text', text: id }],
+  })
+  const ordinary = {
+    info: { id: 'ordinary-1', role: 'user' },
+    parts: [{ type: 'text', text: 'ordinary' }],
+  }
+  const messages = [retry('retry-stale'), ordinary, retry('retry-current')]
+
+  assert.deepEqual(XWireSurface.retiredRetryMessageIds('Current', messages), [])
+  assert.deepEqual(
+    XWireSurface.retiredRetryMessageIds('TentativeCold', messages),
+    ['retry-stale'],
+    'the current physical retry remains on the new cold horizon',
+  )
 })

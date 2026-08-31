@@ -781,14 +781,17 @@ module FissionHost =
         match ownerAuthority projections group.OwnerSessionId with
         | None -> Error "Fission takeover completed without owner authority"
         | Some authority ->
-            { SessionId = group.OwnerSessionId
-              AuthorityRootUserMessageId = authority.AuthorityRootUserMessageId
-              ProviderRun = turn.ProviderRun
-              Role = authority.CanonicalRole
-              Directory = turn.Directory
-              TerminalText = CompletedTurnClassifier.partsSessionText turn.Parts
-              TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
-            |> validateOwnerRunResult
+            let result =
+                { SessionId = group.OwnerSessionId
+                  AuthorityRootUserMessageId = authority.AuthorityRootUserMessageId
+                  ProviderRun = turn.ProviderRun
+                  Role = authority.CanonicalRole
+                  Directory = turn.Directory
+                  TerminalText = CompletedTurnClassifier.partsSessionText turn.Parts
+                  TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
+
+            validateOwnerRunResult result
+            |> Result.map (fun valid -> valid, authority.CanonicalRole)
 
     let private appendConvergedFromTakeover
         (durable: AgentJournal)
@@ -814,16 +817,54 @@ module FissionHost =
         (group: FissionGroupProjection)
         (turn: ReconciledTurn)
         (result: AgentRunResult)
+        (role: Role)
         =
         task {
-            do! XTraceCapture.captureTerminal (Some durable) turn
+            let ownerTurn =
+                { turn with
+                    SessionId = group.OwnerSessionId
+                    AuthorityRootUserMessageId = result.AuthorityRootUserMessageId
+                    Role = Some role }
 
-            eventPort.NotifyTerminal group.OwnerSessionId (TerminalOutcome.Completed result)
-            |> ignore
+            match! TerminalReporter.completeWithEvidence eventPort (Some durable) ownerTurn with
+            | XTraceTerminalCompletion.Published published when
+                published.SessionId = result.SessionId
+                && published.ProviderRun = result.ProviderRun
+                ->
+                FissionAdmission.releaseOwner group.OwnerSessionId
+                FissionRuntime.clearOwner group.OwnerSessionId
+                return Ok true
+            | XTraceTerminalCompletion.Published _ ->
+                return Error "Fission takeover terminal reporter changed the physical owner or provider run"
+            | XTraceTerminalCompletion.CaptureFailed error ->
+                return Error(sprintf "Fission takeover terminal trace capture failed: %A" error)
+            | XTraceTerminalCompletion.RejectedMissingRole ->
+                return Error "Fission takeover terminal reporter rejected the owner role"
+            | XTraceTerminalCompletion.RejectedEmptyOutput ->
+                return Error "Fission takeover completed with empty terminal output"
+        }
 
-            FissionAdmission.releaseOwner group.OwnerSessionId
-            FissionRuntime.clearOwner group.OwnerSessionId
-            return true
+    let private publishConvergedTakeover
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        (turn: ReconciledTurn)
+        (result: AgentRunResult)
+        (role: Role)
+        (convergence: Result<unit, string>)
+        =
+        task {
+            let! outcome =
+                match convergence with
+                | Error error -> Task.FromResult(Error error)
+                | Ok() -> publishOwnerTakeover eventPort durable group turn result role
+
+            match outcome with
+            | Ok published -> return published
+            | Error error ->
+                do! failGroup sessionPort eventPort durable group error
+                return true
         }
 
     let private persistAndPublishTakeover
@@ -834,13 +875,12 @@ module FissionHost =
         (takeover: FissionTakeoverProjection)
         (turn: ReconciledTurn)
         (result: AgentRunResult)
+        (role: Role)
         =
         task {
-            match! appendConvergedFromTakeover durable group takeover turn with
-            | Error error ->
-                do! failGroup sessionPort eventPort durable group error
-                return true
-            | Ok() -> return! publishOwnerTakeover eventPort durable group turn result
+            let! convergence = appendConvergedFromTakeover durable group takeover turn
+
+            return! publishConvergedTakeover sessionPort eventPort durable group turn result role convergence
         }
 
     let private completeTakeover
@@ -856,7 +896,8 @@ module FissionHost =
             | Error error ->
                 do! failGroup sessionPort eventPort durable group error
                 return true
-            | Ok result -> return! persistAndPublishTakeover sessionPort eventPort durable group takeover turn result
+            | Ok(result, role) ->
+                return! persistAndPublishTakeover sessionPort eventPort durable group takeover turn result role
         }
 
     let private appendLaneMaterialized
@@ -968,7 +1009,7 @@ module FissionHost =
                         journal
                         joinGuardNudges
                         (fun () -> quiescence.TryConsume idlePermit)
-                        (fun () -> quiescence.TryRelease idlePermit |> ignore)
+                        (fun () -> quiescence.TryRelease idlePermit)
                         turn.SessionId
                         turn.ProviderRun
                         turn.Directory

@@ -2,9 +2,10 @@ namespace Wanxiangshu.Context.Prefix
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion
-open Wanxiangshu.Participant.Provider.Projection
+open Wanxiangshu.Participant.Provider.Attempt
 
 /// Prefix-stability owner surface. Prefix epoch state, rebase and reanchor
 /// facts cross as JSON; the production epoch and identity representations stay
@@ -20,6 +21,12 @@ module PrefixSurface =
 
     let private int64Value (value: obj) : int64 = int64 (text value)
     let private intValue (value: obj) : int = int (text value)
+
+    let private shaOf (value: obj) : string -> string =
+        if isNullish value then
+            fun input -> "«" + input + "»"
+        else
+            unbox<string -> string> value
 
     let private snapshotOfJs (value: obj) : PrefixSnapshot =
         { FrozenRecordPrefixRef = BlobRef.create (text value?ref)
@@ -91,6 +98,109 @@ module PrefixSurface =
 
     let snapshot (value: obj) : obj = snapshotOfJs value |> snapshotToJs
 
+    let private requestKindOf (value: obj) : ProviderRequestKind option =
+        match text value |> fun item -> item.ToLowerInvariant() with
+        | "workmain"
+        | "work-main" -> Some ProviderRequestKind.WorkMain
+        | "bloggermain"
+        | "blogger-main" -> Some ProviderRequestKind.BloggerMain
+        | "bloggersquash"
+        | "blogger-squash" -> Some ProviderRequestKind.BloggerSquash
+        | "interactionrepair"
+        | "interaction-repair" -> Some ProviderRequestKind.InteractionRepair
+        | "strengthreplica"
+        | "strength-replica" -> Some ProviderRequestKind.StrengthReplica
+        | _ -> None
+
+    let requestKindLabels: string array =
+        [| ProviderRequestKind.WorkMain
+           ProviderRequestKind.BloggerMain
+           ProviderRequestKind.BloggerSquash
+           ProviderRequestKind.InteractionRepair
+           ProviderRequestKind.StrengthReplica |]
+        |> Array.map ProviderRequestKind.label
+
+    let requestKindMayCarryProbe (kind: string) : bool =
+        requestKindOf kind
+        |> Option.map ProviderRequestKind.mayCarryProbe
+        |> Option.defaultValue false
+
+    let requestKindLabel (kind: string) : string =
+        requestKindOf kind
+        |> Option.map ProviderRequestKind.label
+        |> Option.defaultValue ""
+
+    let requestKind =
+        box
+            {| workMain = "work-main"
+               bloggerMain = "blogger-main"
+               bloggerSquash = "blogger-squash"
+               interactionRepair = "interaction-repair"
+               strengthReplica = "strength-replica"
+               all = requestKindLabels
+               mayCarryProbe = (fun kind -> requestKindMayCarryProbe kind)
+               label = (fun kind -> requestKindLabel kind) |}
+
+    let private noCandidateName (reason: NoCandidateReason) : string =
+        match reason with
+        | NoCandidateReason.NoCoverage -> "NoCoverage"
+        | NoCandidateReason.CoverageNotAheadOfRequest -> "CoverageNotAheadOfRequest"
+        | NoCandidateReason.WouldRetreat _ -> "WouldRetreat"
+        | NoCandidateReason.NotNewerThanCommitted -> "NotNewerThanCommitted"
+        | NoCandidateReason.CutoffProofFailed _ -> "CutoffProofFailed"
+
+    let private selectionToJs (result: Result<PrefixProbe, NoCandidateReason>) : obj =
+        match result with
+        | Ok probe ->
+            let candidate = probe.Candidate
+
+            box
+                {| ok = true
+                   probeId = probe.ProbeId
+                   basedOnEpoch = PrefixEpochId.value probe.BasedOnEpochId
+                   candidate = snapshotToJs candidate
+                   cutoff = candidate.CutoffExclusive
+                   sealRoot = candidate.SealRoot
+                   syntheticId = candidate.SyntheticMessageId |}
+        | Error reason ->
+            box
+                {| ok = false
+                   error = noCandidateName reason
+                   message = PrefixProbeSelection.describeNoCandidate reason |}
+
+    /// CTX-011 owner bridge: decode one selection request and encode the typed
+    /// candidate or refusal returned by the pure selector.
+    let select (value: obj) : obj =
+        let committed =
+            if isNullish value?committedSnapshot then
+                None
+            else
+                Some(snapshotOfJs value?committedSnapshot)
+
+        let recompute =
+            if isNullish value?recomputeDigest then
+                fun (_: int) -> ""
+            else
+                unbox<int -> string> value?recomputeDigest
+
+        PrefixProbeSelection.select
+            (shaOf value?sha256)
+            (SessionId.create (text value?session))
+            (PrefixEpochId.create (int64Value value?committedEpoch))
+            committed
+            (intValue value?coverableCutoff)
+            (text value?coveredDigest)
+            (intValue value?requestStartCutoff)
+            (BlobRef.create (
+                if isNullish value?frozenRef then
+                    "blob-frozen-" + string (intValue value?coverableCutoff)
+                else
+                    text value?frozenRef
+            ))
+            (BlobDigest.create (text value?frozenDigest))
+            recompute
+        |> selectionToJs
+
     let applyRebase (request: obj) (state: obj) : obj =
         PrefixEpochProjection.applyRebase
             (PrefixEpochId.create (int64Value request?previousEpoch))
@@ -121,36 +231,31 @@ module PrefixSurface =
     let isReanchored (run: string) (state: obj) : bool =
         PrefixEpochProjection.isReanchored (ProviderRunIdentity.create (text run)) (stateOfJs state)
 
-    let private intentToJs (intent: ProjectionIntent) : obj =
-        match intent with
-        | ProjectionIntent.KeepPhysicalPrefix ->
+    let private renderedToJs (rendered: PrefixRendered) : obj =
+        match rendered with
+        | PrefixRendered.Physical ->
             box
                 {| replacesPrefix = false
                    dropLeading = 0
                    memoryId = null
                    memoryText = null |}
-        | ProjectionIntent.ActivatePrefixEpoch value ->
+        | PrefixRendered.Synthetic value ->
             box
                 {| replacesPrefix = true
                    dropLeading = value.CutoffExclusive
                    memoryId = value.SyntheticMessageId
                    memoryText = value.Memory |}
-        | _ ->
-            box
-                {| replacesPrefix = false
-                   dropLeading = 0
-                   memoryId = null
-                   memoryText = null |}
 
-    let forSnapshot (snapshot: obj) (memoryBody: string) : obj =
+    let forSnapshot (snapshot: obj) (memoryPreamble: string) (memoryBody: string) : obj =
         let value =
             if isNullish snapshot then
                 None
             else
                 Some(snapshotOfJs snapshot)
 
-        XPrefixProjection.forSnapshot value CompanionProjectionSurface.memoryPreamble memoryBody
-        |> intentToJs
+        XPrefixProjection.forSnapshot value memoryPreamble memoryBody
+        |> XPrefixProjection.render
+        |> renderedToJs
 
     let private choiceOfJs (choice: obj) : XProjectionChoice =
         if text choice?kind = "probe" then
@@ -169,15 +274,16 @@ module PrefixSurface =
         else
             XProjectionChoice.UseCommittedEpoch
 
-    let forChoice (choice: obj) (committed: obj) (memoryBody: string) : obj =
+    let forChoice (choice: obj) (committed: obj) (memoryPreamble: string) (memoryBody: string) : obj =
         let value =
             if isNullish committed then
                 None
             else
                 Some(snapshotOfJs committed)
 
-        XPrefixProjection.forChoice (choiceOfJs choice) value CompanionProjectionSurface.memoryPreamble memoryBody
-        |> intentToJs
+        XPrefixProjection.forChoice (choiceOfJs choice) value memoryPreamble memoryBody
+        |> XPrefixProjection.render
+        |> renderedToJs
 
     let requiredBlob (choice: obj) (committed: obj) : obj =
         let value =
@@ -189,3 +295,28 @@ module PrefixSurface =
         XPrefixProjection.requiredBlob (choiceOfJs choice) value
         |> Option.map BlobRef.value
         |> optionObj
+
+    let retainTodoWriteRounds (messages: obj array) : bool array =
+        messages
+        |> Array.toList
+        |> List.map (fun message ->
+            let containsTodoWrite =
+                not (isNullish message?containsTodoWrite)
+                && unbox<bool> message?containsTodoWrite
+
+            let callIds =
+                if isNullish message?callIds then
+                    Set.empty
+                else
+                    message?callIds
+                    |> unbox<string array>
+                    |> Array.map ToolCallId.create
+                    |> Set.ofArray
+
+            let facts: XPrefixProjection.RawPrefixMessageFacts =
+                { ContainsTodoWrite = containsTodoWrite
+                  ToolCallIds = callIds }
+
+            facts)
+        |> XPrefixProjection.retainTodoWriteRounds
+        |> List.toArray

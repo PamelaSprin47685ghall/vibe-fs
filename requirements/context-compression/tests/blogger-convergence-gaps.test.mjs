@@ -185,6 +185,12 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_single_main_material_coordinator_entry', 
     ['src/Wanxiangshu/Context/Companion/Transform.fs'],
     'ordinary Blogger material must enter the physical coordinator exactly once through Transform',
   )
+  const proofSurface = prodText('src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs')
+  assert.equal(
+    proofSurface.match(/CompanionTransform\.coordinateBloggerContext\b/g)?.length,
+    2,
+    'the unresolved adapter proof must enter Blogger coordination twice through the Transform owner operation',
+  )
   assert.deepEqual(
     filesContaining(/BloggerCoordinator\.onMainMaterial\b/).map(rel),
     [],

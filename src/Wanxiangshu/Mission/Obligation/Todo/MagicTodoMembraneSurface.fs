@@ -21,6 +21,11 @@ type MagicTodoPreparedHandle private (bridge: MagicTodoMembrane.PreparedBridge) 
 [<RequireQualifiedAccess>]
 module MagicTodoMembraneSurface =
 
+    type private ControlledSnapshot(rawMessages: obj array) =
+        interface ISessionSnapshotPort with
+            member _.GetMessages(_sessionId) =
+                Task.FromResult(Ok(SessionSnapshotPort.projectMessages rawMessages))
+
     let private text (value: obj) =
         if isNull value then "" else string value
 
@@ -30,7 +35,7 @@ module MagicTodoMembraneSurface =
         | 2 -> SnapshotToolPartState.Failed ""
         | _ -> SnapshotToolPartState.Pending
 
-    let private cursor (sequence: int) : XTraceCursor = { Sequence = int64 sequence }
+    let private cursor (sequence: int) : XTraceCursor = XTraceCursor.create (int64 sequence)
 
     let private localizedOf
         (callId: string)
@@ -48,9 +53,7 @@ module MagicTodoMembraneSurface =
           TodowriteCallIdsInMessage = [ ToolCallId.create callId ]
           ToolPartOrdinal = 1
           ReviewFrontier = frontier
-          Range =
-            { Start = frontier
-              EndExclusive = cursor 8 } }
+          Range = XTraceRange.create frontier (cursor 8) }
 
     let private obligationsOf (values: obj array) : ObligationList =
         if isNull values then
@@ -239,3 +242,34 @@ module MagicTodoMembraneSurface =
 
     let snapshot (handle: JournalHandle) (lifeId: string) : obj =
         ObligationJournalSurface.snapshotMagicTodo handle lifeId
+
+    /// Real Host Before -> controlled builtin executor -> After workflow. Only
+    /// successful return from the supplied physical executor reaches After;
+    /// no PhysicalSuccessEvidence value crosses this boundary.
+    let executeHostSuccess
+        (handle: JournalHandle)
+        (rawMessages: obj array)
+        (sessionId: string)
+        (lifeId: string)
+        (callId: string)
+        (args: obj)
+        (executor: obj)
+        : Task<obj> =
+        task {
+            let snapshots = ControlledSnapshot(rawMessages) :> ISessionSnapshotPort
+            let hooks = MagicTodoHostHooks.create (Some handle.Journal) (Some snapshots)
+
+            let input =
+                createObj [ "tool" ==> "todowrite"; "sessionID" ==> sessionId; "callID" ==> callId ]
+
+            let beforeOutput = createObj [ "args" ==> args ]
+
+            do! hooks.Before input beforeOutput
+            let hostOutput: obj = emitJsExpr (executor, beforeOutput?args) "$0($1)"
+            do! hooks.After input hostOutput
+
+            return
+                box
+                    {| output = hostOutput
+                       life = ObligationJournalSurface.snapshotMagicTodo handle lifeId |}
+        }

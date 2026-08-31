@@ -24,17 +24,17 @@ Office Consequence Model (语义唯一事实源)
 
 | 命题 | 落点测试 |
 |---|---|
-| OFF-001 | `requirements/office-capability/tests/office-capability-integrity.test.mjs` |
-| OFF-002 | `requirements/office-capability/tests/office-capability-integrity.test.mjs` |
-| OFF-003 | `requirements/office-capability/tests/office-capability-integrity.test.mjs` |
-| OFF-004 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs` |
-| OFF-005 | `requirements/office-capability/tests/office-capability-integrity.test.mjs` |
-| OFF-006 | `requirements/office-capability/tests/office-capability-integrity.test.mjs` |
-| OFF-007 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs` |
-| OFF-008 | `requirements/office-capability/tests/office-capability-integrity.test.mjs` |
-| OFF-009 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs` |
-| OFF-010 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs` |
-| OFF-011 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs` |
-| OFF-012 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs` |
-| OFF-013 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs` |
-| OFF-014 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs` |
+| OFF-001 | `requirements/office-capability/tests/office-capability-integrity.test.mjs::WHAT[OFF-001] OFF_001_office_capability_is_consequence_not_tool_whitelist` |
+| OFF-002 | `requirements/office-capability/tests/office-capability-integrity.test.mjs::WHAT[OFF-002] OFF_002_managed_catalog_forkable_offices_are_exactly_the_five_canonical_offices`；`requirements/office-capability/tests/office-capability-integrity.test.mjs::WHAT[OFF-002] OFF_002_each_office_role_law_carries_its_entitled_consequence` |
+| OFF-003 | `requirements/office-capability/tests/office-capability-integrity.test.mjs::WHAT[OFF-003] OFF_003_two_calling_names_differ_in_persona_and_depth_not_authority` |
+| OFF-004 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs::WHAT[OFF-004] capability_is_consequence_model_not_tool_whitelist_transcription` |
+| OFF-005 | `requirements/office-capability/tests/office-capability-integrity.test.mjs::WHAT[OFF-005] OFF_005_each_office_consequence_hits_manager_law_and_fork_description_in_both_locales` |
+| OFF-006 | `requirements/office-capability/tests/office-capability-integrity.test.mjs::WHAT[OFF-006] OFF_006_offices_are_not_interchangeable_general_purpose_agents` |
+| OFF-007 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs::WHAT[OFF-007] manager_has_no_personal_repository_witness` |
+| OFF-008 | `requirements/office-capability/tests/eval/provider-office-boundary/office-boundary-eval.test.mjs::WHAT[OFF-008] office_boundary_eval_coder_inspect_ownership_case_is_red_and_green`；`requirements/office-capability/tests/eval/provider-office-boundary/office-boundary-eval.test.mjs::WHAT[OFF-008] office_boundary_eval_coder_inspect_oracle_is_charge_text_not_a_filter_module`；`requirements/office-capability/tests/eval/provider-office-boundary/office-boundary-eval.test.mjs::WHAT[OFF-008] office_boundary_eval_oracles_are_not_wired_into_production_tools` |
+| OFF-009 | `requirements/office-capability/tests/eval/provider-office-boundary/office-boundary-eval.test.mjs::WHAT[OFF-009] office_boundary_eval_inspector_refuses_repair_case_is_red_and_green` |
+| OFF-010 | `requirements/office-capability/tests/eval/provider-office-boundary/office-boundary-eval.test.mjs::WHAT[OFF-010] office_boundary_eval_devops_does_not_choose_case_is_red_and_green` |
+| OFF-011 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs::WHAT[OFF-011] reviewer_consequence_is_readonly_judgement_not_repair` |
+| OFF-012 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs::WHAT[OFF-012] orchestrator_commissions_manager_roads_not_phases` |
+| OFF-013 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs::WHAT[OFF-013] browser_consequence_is_external_facts_with_provenance_not_local_repo` |
+| OFF-014 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs::WHAT[OFF-014] inquiry_consequence_is_semantic_understanding_not_evidence_minting` |

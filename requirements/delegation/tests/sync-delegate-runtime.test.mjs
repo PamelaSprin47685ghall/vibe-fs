@@ -27,14 +27,15 @@ const remainsPending = async (promise) =>
 
 for (const role of ['Inspector', 'Coder']) {
   test(`WHAT[DELEG-021] SYNC_RUNTIME_${role.toLowerCase()}_invoke_admits_one_managed_child_and_settles_answer`, async () => {
-    const h = await live('owner-sync')
+    const owner = `owner-sync-${role.toLowerCase()}`
+    const h = await live(owner)
     try {
-      const pending = sync.invoke(h, 'owner-sync', role, `${role} question`)
-      await waitForPromptCount(h, 'owner-sync', role, 1)
-      const child = sync.child(h, 'owner-sync', role)
+      const pending = sync.invoke(h, owner, role, `${role} question`)
+      await waitForPromptCount(h, owner, role, 1)
+      const child = sync.child(h, owner, role)
       assert.ok(child)
       assert.equal(sync.childCount(h), 1)
-      assert.equal(await settle(h, 'owner-sync', role, `${role} answer`), true)
+      assert.equal(await settle(h, owner, role, `${role} answer`), true)
       const result = await pending
       assert.equal(result.ok, true)
       assert.match(result.value, /Recent work/)

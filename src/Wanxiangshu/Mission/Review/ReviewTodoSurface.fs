@@ -31,13 +31,15 @@ module ReviewTodoSurface =
     let private boolField value name = unbox<bool> (field value name)
 
     let private cursorOf value =
-        { Sequence =
-            let nested = field value "Sequence"
+        let nested = field value "Sequence"
 
+        let sequence =
             if isNull nested then
                 int64 (unbox<int> value)
             else
-                int64 (unbox<int> nested) }
+                int64 (unbox<int> nested)
+
+        XTraceCursor.create sequence
 
     let private blobRefOf value = BlobRef.create (text value)
     let private blobDigestOf value = BlobDigest.create (text value)

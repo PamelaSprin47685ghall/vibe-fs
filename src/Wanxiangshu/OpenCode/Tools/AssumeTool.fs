@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Resources
 open ToolHostCodec
 
@@ -26,10 +27,7 @@ module AssumeTool =
         let Committed = "tool/assume/committed"
 
     let private languageOf (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private execute (args: HostToolArguments) (ctx: HostToolContext) =
         task {

@@ -1,17 +1,5 @@
 namespace Wanxiangshu.Host
 
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// HOST-006: one Host compaction setting the plugin must force off.

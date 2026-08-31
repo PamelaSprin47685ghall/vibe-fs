@@ -9,9 +9,9 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 
-/// JS-native boundary for reconciliation's classifiers, evidence, wakes and
-/// publish seals. Maps remain opaque; turns, decisions and observations cross
-/// as plain objects or stable strings.
+/// JS boundary for reconciliation's classifiers, evidence, wakes and publish
+/// seals. Maps and idle permits remain opaque handles; decisions and
+/// observations cross as plain objects or stable strings.
 module ReconcileSurface =
 
     type private PublishMapsHandle(maps: ReconcileProgram.PublishMaps) =
@@ -25,9 +25,6 @@ module ReconcileSurface =
     let private stringOf (value: obj) =
         if isNullish value then "" else string value
 
-    let private int64Of (value: obj) =
-        if isNullish value then 0L else int64 (string value)
-
     let private boolOf (value: obj) =
         if isNullish value then false else unbox<bool> value
 
@@ -39,11 +36,9 @@ module ReconcileSurface =
     let private wakeOf (value: obj) : ReconcileProgram.ReconcileWake =
         match stringOf (property value "kind") with
         | "IdleWake" ->
-            ReconcileProgram.ReconcileWake.IdleWake(
-                QuiescencePermit.create
-                    (SessionId.create (stringOf (property value "session")))
-                    (int64Of (property value "attemptSerial"))
-            )
+            property value "permit"
+            |> unbox<QuiescencePermit>
+            |> ReconcileProgram.ReconcileWake.IdleWake
         | "RetryWake" -> ReconcileProgram.ReconcileWake.RetryWake
         | "FailureWake" ->
             let physical = stringOf (property value "physical")
@@ -177,12 +172,16 @@ module ReconcileSurface =
 
     // ── wake and evidence observations ───────────────────────────────────────
 
-    let idleWake (session: string) (attemptSerial: int64) : obj =
+    let idleWake (session: string) : obj =
+        let sessionId = SessionId.create session
+        let gate = SessionQuiescenceGate()
+        gate.BeginProviderAttempt sessionId
+        let permit = gate.ObserveIdle sessionId
+
         box
             {| kind = "IdleWake"
                hasQuiescence = true
-               session = session
-               attemptSerial = attemptSerial |}
+               permit = permit |}
 
     let retryWake () : obj =
         box
@@ -414,7 +413,9 @@ module ReconcileSurface =
                           Diagnostic = "APIError" }
                 )
             else
-                scheduler.SignalIdle(sessionId, QuiescencePermit.create sessionId 1L)
+                let quiescence = SessionQuiescenceGate()
+                quiescence.BeginProviderAttempt sessionId
+                scheduler.SignalIdle(sessionId, quiescence.ObserveIdle sessionId)
 
             do! firstSnapshotObserved.Task
             currentVisible <- true

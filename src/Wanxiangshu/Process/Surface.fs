@@ -536,6 +536,10 @@ module ProcessSurface =
         value.Exit.SetResult code
         NodeProcessHost.notifyExited value
 
+    let childOnExit (child: obj) (callback: obj) : unit =
+        childOf child
+        |> fun value -> value.OnExited.Add(fun () -> call0 callback |> ignore)
+
     let childView (child: obj) : obj =
         let value = childOf child
 

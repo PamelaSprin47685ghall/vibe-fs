@@ -53,8 +53,6 @@ open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Resources
-open Wanxiangshu.Resources
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.Authority
@@ -84,7 +82,7 @@ module HostForkBinding =
 module HostForkAgent =
 
     let private forkInstructions (sessionId: SessionId) : ForkChildInstructions =
-        let lang = ProviderProse.languageOf sessionId
+        let lang = SessionProviderLanguage.languageOf sessionId
 
         { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
           CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
@@ -292,7 +290,7 @@ module HostForkAgent =
         (run: PendingHostRun)
         (result: ForkResult)
         : Task<Result<ForkResult, string>> =
-        task {
+        taskResult {
             runtime.MarkReady(run)
 
             // COMPANION-003 / EXEC-006: the child's OpeningMaterial is the ORIGINAL
@@ -301,9 +299,15 @@ module HostForkAgent =
             // parent LWR recursively). Captured before the first prompt is sent;
             // idempotent.
             if isFirstPrompt then
-                do! XTraceCapture.captureOpening runtime.Journal childId prompt requirements
+                let! _ =
+                    XTraceCapture.captureOpeningWithReceipt runtime.Journal childId prompt requirements
+                    |> TaskResult.mapError (fun error -> sprintf "fork opening trace capture failed: %A" error)
 
-            do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
+                ()
+
+            do!
+                maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
+                |> TaskResultCE.ofTask
 
             if deferSend && isFirstPrompt then
                 runtime.DeferredFirstPrompts.[agentId] <-
@@ -311,7 +315,7 @@ module HostForkAgent =
                        IdentitySeed = identitySeed
                        Prompt = enrichedPrompt |}
 
-                return Ok result
+                return result
             else
                 return! sendFirstPromptOutcome runtime run agentId childId identitySeed enrichedPrompt result
         }

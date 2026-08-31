@@ -1,33 +1,41 @@
 # semantic-trace — HOW
 
-## 架构机制
+## Owner boundary
 
-### XTrace 核心模型与单调游标
+`src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fs` is the registered JS proof surface. It accepts plain JS descriptors and opaque journal/projection capabilities, converts them to typed semantic-trace inputs, calls production owner operations, and returns copied plain evidence. It does not expose projection storage, F# union/record representation, a generic history fold, WorkRecord rendering policy, Todo locality policy, or Prefix reanchor mutation.
 
-1. **游标与半开区间**：`XTraceCursor` 维护全局单调递增的序列号。提供 `sliceBetween [start, endExclusive)` 与 `sliceFrom [start, head)` 支持对历史前沿的精确半开切片。
-2. **同源多投影**：
-   - `forOpening`：保留初始任务及宪章性承诺，作为 OpeningMaterial 永久封存；
-   - `forWorkRecord`：过滤原始工具调用及结果，保留正文与推理，用于物化 LifecycleWorkRecord；
-   - `flatten`：将消息与部件平铺为带角色的标准语义流，供下游增量记忆（Blogger）消费。
-   - `XTraceMaterialization.currentProjection`：从当前 reanchor generation 的 durable part/blob 重建 canonical X semantic projection。Blogger coverage、crash/retry main rebuild 与 XWire cutoff digest 只使用此入口，不读取本次 `messages.transform` 已被其它功能改写后的 presentation。
+The published owner vocabulary is:
 
-### 捕获管线与重锚持久化
+| Operation family | Laws | Published evidence |
+|---|---|---|
+| `XTraceProjection.openingEvidence/hasOpening`, `latestTerminalEvidence/terminalEvidenceForProviderRun` | SEMANTIC-TRACE-001/010 | copied opening and terminal evidence |
+| `XTraceCapture.semanticPart`, `captureObservedMessagesWithReceipt` | SEMANTIC-TRACE-002/007/008 | copied semantic parts and typed capture receipts |
+| `XTraceCursor.*`, `XTraceRange.*` | SEMANTIC-TRACE-003/006 | opaque monotonic cursors and half-open ranges |
+| `orderedSemanticParts/currentGenerationSemanticParts/providerRunParts` | SEMANTIC-TRACE-003/004/009 | ordered, run-bound, generation-aware evidence |
+| `toolResultParts/toolPartsForHostIdentity`, Host-message and range queries | SEMANTIC-TRACE-002/004/006 | exact provider, Host, and range evidence |
+| `XTrace.render`, `XTraceMaterialization.renderRange` | SEMANTIC-TRACE-005/006/007 | canonical semantic rendering |
+| `XTrace.flatten`, `currentProjection/currentProjectionBetween` | SEMANTIC-TRACE-007 | one semantic projection formula |
+| Typed capture receipts and exact `SemanticTrace.Contract` symbols | SEMANTIC-TRACE-008 | owner-issued receipts and declared contracts |
 
-- **幂等捕获与 Provenance 分段**：`XTraceCapture` 以物理 `host-part-id` 结合消息与运行标识构造溯源标识 `g:N/msg:<id>/host-part:<id>`，防止数组下标偏移造成重复录入。
-- **Retry transport membrane**：`XTracePipeline` 从 Host metadata 读取 `ProviderRetryAttempt` origin。该物理 row 继续参与 decodable-message / stable-id 坐标枚举，但捕获时写入空 semantic parts；因此后续真实 Host message 的 canonical turn 不会因过滤而重编号，同时 retry 控制文本不会进入 durable X。
-- **Compaction 隔离**：宿主触发 `ContextReanchored` 时仅重置物理前缀纪元，XTrace 的已持久化部件、Opening 记录与 `RecordCoverage` 保持完全存活，保证因果历史不发生丢失。
+`Cursor.fs` is registered as the exact `semantic-evidence` contract kind: its durable cursor operations cross the execution-position guard only under `WHAT[SEMANTIC-TRACE-003]`; symbol roots and representation fields are not authorized.
 
-## 验证与测试落点
+## Capture and provenance
 
-| 命题 | 落点测试 |
+The capture owner maps every semantic message part once. Activity parts are transport bookkeeping and are omitted. `captureObservedMessagesWithReceipt` owns the retry membrane: a typed `ProviderRetryAttempt` observation retains physical Host identity for stable eligibility but contributes no semantic parts. Receipts explicitly report identity mode, previous/current head, and captured counts.
+
+Provenance carries stable provider, Host-message, and Host-part identity. Queries return copied `XTraceSemanticPartView` evidence. A new Host generation changes `currentGenerationSemanticParts` without deleting lifecycle-wide `orderedSemanticParts`, Opening evidence, terminal evidence, or the globally monotonic cursor.
+
+## Law registration
+
+| Law | Proof paths |
 |---|---|
-| SEMANTIC-TRACE-001 | `requirements/semantic-trace/tests/x-trace-fold.test.mjs` |
-| SEMANTIC-TRACE-002 | `requirements/semantic-trace/tests/x-trace-capture.test.mjs`, `requirements/semantic-trace/tests/x-trace-capture-hardening.test.mjs` |
-| SEMANTIC-TRACE-003 | `requirements/semantic-trace/tests/x-trace.test.mjs` |
-| SEMANTIC-TRACE-004 | `requirements/semantic-trace/tests/x-trace-provider-run-provenance.test.mjs` |
-| SEMANTIC-TRACE-005 | `requirements/semantic-trace/tests/x-trace.test.mjs` |
-| SEMANTIC-TRACE-006 | `requirements/semantic-trace/tests/x-trace.test.mjs` |
-| SEMANTIC-TRACE-007 | `requirements/semantic-trace/tests/x-trace.test.mjs`, `x-trace-capture-hardening.test.mjs` |
-| SEMANTIC-TRACE-008 | `requirements/semantic-trace/tests/x-trace-capture-boundary.test.mjs` |
-| SEMANTIC-TRACE-009 | `requirements/semantic-trace/tests/x-trace-compaction-survival.test.mjs` |
-| SEMANTIC-TRACE-010 | `requirements/semantic-trace/tests/x-trace-capture-hardening.test.mjs` |
+| SEMANTIC-TRACE-001 | `requirements/semantic-trace/tests/x-trace-fold.test.mjs::WHAT[SEMANTIC-TRACE-001] opening evidence is copied verbatim and idempotent`；`requirements/semantic-trace/tests/x-trace-fold.test.mjs::WHAT[SEMANTIC-TRACE-001] semantic parts append in strict cursor order`；`requirements/semantic-trace/tests/x-trace-fold.test.mjs::WHAT[SEMANTIC-TRACE-001] terminal evidence is idempotent per provider run` |
+| SEMANTIC-TRACE-002 | `requirements/semantic-trace/tests/x-trace-capture.test.mjs::WHAT[SEMANTIC-TRACE-002] capture mapper copies text and reasoning semantics`；`requirements/semantic-trace/tests/x-trace-capture-hardening.test.mjs::WHAT[SEMANTIC-TRACE-002] typed retry observation retains stable identity but appends no semantics`；`requirements/semantic-trace/tests/x-trace-locality.test.mjs::WHAT[SEMANTIC-TRACE-002] provider-run query returns copied semantic evidence` |
+| SEMANTIC-TRACE-003 | `requirements/semantic-trace/tests/x-trace.test.mjs::WHAT[SEMANTIC-TRACE-003] cursor vocabulary is monotonic and opaque`；`requirements/semantic-trace/tests/x-trace-fold.test.mjs::WHAT[SEMANTIC-TRACE-003] duplicate and retreating cursors are rejected` |
+| SEMANTIC-TRACE-004 | `requirements/semantic-trace/tests/x-trace-provider-run-provenance.test.mjs::WHAT[SEMANTIC-TRACE-004] provider runs segment the ordered semantic projection`；`requirements/semantic-trace/tests/x-trace-locality.test.mjs::WHAT[SEMANTIC-TRACE-004] stable Host message identity resolves at a durable cursor` |
+| SEMANTIC-TRACE-005 | `requirements/semantic-trace/tests/x-trace.test.mjs::WHAT[SEMANTIC-TRACE-005] canonical render is deterministic and omits provenance`；`requirements/semantic-trace/tests/x-trace-capture-boundary.test.mjs::WHAT[SEMANTIC-TRACE-005] raw projection storage is rejected while copied semantic query is admitted` |
+| SEMANTIC-TRACE-006 | `requirements/semantic-trace/tests/x-trace.test.mjs::WHAT[SEMANTIC-TRACE-006] range vocabulary is half-open`；`requirements/semantic-trace/tests/x-trace-locality.test.mjs::WHAT[SEMANTIC-TRACE-006] Host message set resolves only to its exact contiguous range`；`requirements/semantic-trace/tests/x-trace-locality.test.mjs::WHAT[SEMANTIC-TRACE-006] range and frontier queries preserve half-open boundaries` |
+| SEMANTIC-TRACE-007 | `requirements/semantic-trace/tests/x-trace.test.mjs::WHAT[SEMANTIC-TRACE-007] flatten is the single semantic source`；`requirements/semantic-trace/tests/x-trace-capture-hardening.test.mjs::WHAT[SEMANTIC-TRACE-007] projection capture is idempotent and reports owner receipts`；`requirements/semantic-trace/tests/x-trace-capture-hardening.test.mjs::WHAT[SEMANTIC-TRACE-007] materialization reads canonical durable semantics` |
+| SEMANTIC-TRACE-008 | `requirements/semantic-trace/tests/x-trace-capture-boundary.test.mjs::WHAT[SEMANTIC-TRACE-008] semantic surface admits only the three append transitions`；`requirements/semantic-trace/tests/x-trace-capture-boundary.test.mjs::WHAT[SEMANTIC-TRACE-008] published trace contract contains exact implementation vocabulary` |
+| SEMANTIC-TRACE-009 | `requirements/semantic-trace/tests/x-trace-compaction-survival.test.mjs::WHAT[SEMANTIC-TRACE-009] a new Host generation does not erase opening or semantic parts`；`requirements/semantic-trace/tests/x-trace-compaction-survival.test.mjs::WHAT[SEMANTIC-TRACE-009] cursor sequence remains global across Host generations` |
+| SEMANTIC-TRACE-010 | `requirements/semantic-trace/tests/x-trace-fold.test.mjs::WHAT[SEMANTIC-TRACE-010] conflicting opening is rejected`；`requirements/semantic-trace/tests/x-trace-capture-hardening.test.mjs::WHAT[SEMANTIC-TRACE-010] opening capture reports idempotent evidence` |

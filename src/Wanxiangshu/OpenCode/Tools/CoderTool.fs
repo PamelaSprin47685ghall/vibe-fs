@@ -168,10 +168,7 @@ module CoderTool =
           Incomplete = Path.Repair.Incomplete }
 
     let private lang (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private consequence ctx path subs =
         tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] []

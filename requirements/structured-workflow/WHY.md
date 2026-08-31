@@ -19,9 +19,12 @@
 ## 核心张力与架构哲学
 
 - **直执而不是解释（Direct CE over Interpreter）**：领域 DSL 由 CE（Computation Expression）与具名语义操作直接构成并直接执行，严禁构造内部 AST 后再通过通用解释器进行重放或轮询驱动。
-- **状态标签仅表达真实事物**：DU（联合类型）与字段仅用于表达封闭的领域词汇、已发生的持久事实或单次函数的返回结果，严禁充当程序计数器。
-- **组合具有结构闭包（Compositional Closure）**：父 workflow 组合子 workflow 时，只能观察子流程的类型化输入、领域结果与能力证明，严禁读取或驱动子流程的内部执行位置。
-- **以可观察效果证明流程**：流程的正确性完全由领域事实、端口交互与最终状态证明，不由内部解释器运行到了哪一步来定义。
+- **状态标签仅表达真实事物**：DU（联合类型）与字段仅用于表达封闭领域词汇、DurableFact、Evidence/Decision、ExternalSignal、Witness、Capability、Receipt 或 PhysicalHandle，严禁充当程序计数器。同名协议碰撞必须正向分类，路径不提供豁免。
+- **组合具有结构闭包（Compositional Closure）**：父 workflow 组合子 workflow 时，只能观察子流程的类型化输入、领域结果与能力证明，严禁读取、存储或驱动子流程的内部执行位置；此约束跨 module/callback 仍成立。
+- **高阶 trace 必须可解释**：once-through scope 可透明组合；retry/fallback/recovery/deadline 等重复或恢复路径调用必须由 owner law、明确 trace relation 与可执行证明约束其 failure/cancel/deadline 行为，不能藏进 generic middleware。
+- **root 宽而浅**：composition root 可看见大量 construction/topology/order/lifetime wiring，但不得因此拥有 foreign policy；深语义必须回到 owner，不能以 LOC/import-count 代替语义审查。
+- **以可观察效果证明流程**：流程的正确性完全由领域事实、端口交互、调用 trace 与最终状态证明，不由内部解释器运行到了哪一步来定义。
+- **依赖必须穿过 owner 海关**：编译引用只说明实现依赖，requirement 引用只说明命题前提；两张图不可混同。跨 owner 的生产依赖必须落到 owner 明确承诺的 published contract、physical port/adapter 或 composition-root wiring。语言层面的 `public`、目录位置和 `Surface.fs` 文件名都不构成授权。
 
 ## 核心不变量与违约状态（RED）
 
@@ -31,4 +34,6 @@
 3. 崩溃恢复尝试恢复协程内部指针或暂停点，而非通过 Journal fold 产生事实后重入普通业务入口。
 4. 控制流决策形成第二层及更深的嵌套控制金字塔（lexical pyramid），手写短路样板而未使用标准的 Result/Option 组合子。
 5. 模块接缝处暴露内部阶段或运行槽位，导致父模块需要探测子模块状态以驱动下一步业务动作。
-6. 使用无界并发或无界重试作为业务流程的默认行为。
+6. 使用无界并发或无界重试作为业务流程的默认行为，或把 repeated/recovery-path invocation 藏进无 owner/WHAT/relation/proof/policy 的 decorator。
+7. foreign owner 直接读取 private implementation、Stage/Step/cursor/registry presence，或 composition root 匹配 foreign policy DU。
+8. composition root 实现深层 semantic helper、动态 pipeline 或 generic middleware/decorator interface。

@@ -25,6 +25,7 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
 /// DSL-state-combination: physical — spawn fn + load task are runtime resource slots
+/// DSL-class: PhysicalHandle — process-owned spawn loader and live PTY session registry; owner PtySupervisor, law PTY lifecycle, proof pty-supervisor.
 type PtySupervisor =
     { Gate: obj
       mutable SpawnFn: obj option

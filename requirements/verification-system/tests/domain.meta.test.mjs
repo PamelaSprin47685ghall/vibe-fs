@@ -14,7 +14,10 @@ import * as deadline from '../../../dist/Process/DeadlineSurface.js'
 import * as journalCodec from '../../../dist/Persistence/Journal/CodecSurface.js'
 import * as factCodec from '../../../dist/Persistence/Journal/FactCodecSurface.js'
 import * as contextFold from '../../../dist/Context/Companion/FoldSurface.js'
-import * as fallback from '../../../dist/Participant/Provider/Attempt/Fallback/Surface.js'
+import {
+  cursor as fallbackCursor,
+  fallbackProjection,
+} from '../../../dist/Participant/Provider/Attempt/Fallback/CursorSurface.js'
 
 const SESSION = 'ses_meta'
 
@@ -208,19 +211,34 @@ test('WHAT[VERIFICATION-SYSTEM-008] Context_fold_rejects_unknown_fact_cases_loud
 // ── Fallback owner: cursor projection is a named semantic result ────────────
 
 test('WHAT[VERIFICATION-SYSTEM-008] Fallback_owner_exposes_cursor_and_dedupe_state', () => {
-  assert.deepEqual(fallback.ownerFailure(), {
+  const initial = fallbackProjection.forAuthority('run_L', 'msg_u1')
+  const ownerIdentity = fallbackCursor.attemptIdentity(SESSION, 'run_L', 'msg_u1', 'run_owner')
+  const bloggerIdentity = fallbackCursor.attemptIdentity(SESSION, 'run_L', 'msg_u1', 'run_blog_interrupt')
+  const ownerAdvance = fallbackProjection.applyAdvance(ownerIdentity, 0, 1, 1, initial)
+  assert.equal(ownerAdvance.ok, true, ownerAdvance.ok ? '' : ownerAdvance.error)
+  assert.deepEqual(fallbackProjection.read(ownerAdvance.value), {
+    logicalRun: 'run_L',
+    authorityRoot: 'msg_u1',
     offset: 1,
     failures: 1,
     dedupeKeys: 1,
     exhausted: false,
   })
-  assert.deepEqual(fallback.counterfactualBloggerFailure(), {
+
+  const bloggerAdvance = fallbackProjection.applyAdvance(bloggerIdentity, 1, 2, 2, ownerAdvance.value)
+  assert.equal(bloggerAdvance.ok, true, bloggerAdvance.ok ? '' : bloggerAdvance.error)
+  assert.deepEqual(fallbackProjection.read(bloggerAdvance.value), {
+    logicalRun: 'run_L',
+    authorityRoot: 'msg_u1',
     offset: 2,
     failures: 2,
     dedupeKeys: 2,
     exhausted: false,
   })
-  assert.deepEqual(fallback.recordSuccess(), {
+
+  assert.deepEqual(fallbackProjection.read(fallbackProjection.recordSuccess(ownerAdvance.value)), {
+    logicalRun: 'run_L',
+    authorityRoot: 'msg_u1',
     offset: 0,
     failures: 0,
     dedupeKeys: 0,
@@ -238,7 +256,8 @@ test('WHAT[VERIFICATION-SYSTEM-008] registered_owner_surfaces_publish_their_cont
     'Journal.Codec.serialize': journalCodec.serialize,
     'Journal.FactCodec.decode': factCodec.decode,
     'Context.Fold.fold': contextFold.fold,
-    'Fallback.ownerFailure': fallback.ownerFailure,
+    'Fallback.cursor.read': fallbackCursor.read,
+    'Fallback.projection.applyAdvance': fallbackProjection.applyAdvance,
   })) {
     assert.equal(typeof value, 'function', `${name} must be callable`)
   }

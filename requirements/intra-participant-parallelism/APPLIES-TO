@@ -3,6 +3,7 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/Execution/Fission/**
+/src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs
 /src/Wanxiangshu/Foundation/Roles.fs
 /src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
 /src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs

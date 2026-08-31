@@ -1,70 +1,24 @@
 namespace Wanxiangshu.Mission.WorkRecord
 
-open Wanxiangshu.Change
-open Wanxiangshu.Mission.Obligation
-open Wanxiangshu.Mission.Review.Barrier
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength.Persistence
-
 open System
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-open Wanxiangshu.Strength.Projection
-open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
-open Wanxiangshu.Host
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Trace
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Foundation.Identity
 
 /// COMPANION-003 / EXEC-006 / EXEC-008: session LifecycleWorkRecord as opaque text.
 ///
-/// `includeOpening`:
-/// - parent → child background: true（子需要父任务上下文）
-/// - child → parent: false（布置者已知任务，Opening 不回传）
-///
-/// Opening 必须仍已 captured（否则 LWR 未定义 → None）；标志只控制渲染。
-/// Same materialiser for frames/gap; no B-else-A branch.
-///
-/// `coverageOverride`:
-/// - None → use blog.Coverage (incremental / compressed-frames gap).
-/// - Some → force that coverage for gapStart (blessing wants full canonical:
-///   IngestedThrough = origin so gap starts at openingEnd).
+/// Opening must have been captured even when `includeOpening` is false. Trace
+/// selection and rendering remain owned by XTrace; this projection only combines
+/// those rendered facts with verified Chronicle frames.
 module LifecycleWorkRecordProjection =
 
     let private tryResolveFrameText (durable: AgentJournal) (frame: BlogFrame) : Task<string option> =
@@ -74,20 +28,18 @@ module LifecycleWorkRecordProjection =
             | _ -> return None
         }
 
-    /// Resolve Y-compressed Chronicle frames from blobs, oldest first.
     let private resolveFrames (durable: AgentJournal) (frames: BlogFrame list) : Task<string list> =
         task {
-            // DSL-MUTABLE: algorithm-scratch — resolved frame accumulator
             let resolved = ResizeArray<string>()
 
             for frame in frames do
-                let! textOpt = tryResolveFrameText durable frame
-                textOpt |> Option.iter resolved.Add
+                let! text = tryResolveFrameText durable frame
+                Option.iter resolved.Add text
 
             return resolved |> Seq.toList
         }
 
-    let private tryReadPartBody (durable: AgentJournal) (part: XTracePartRef) : Task<string option> =
+    let private tryReadPartBody (durable: AgentJournal) (part: XTraceSemanticPartView) : Task<string option> =
         task {
             match! durable.Writer.BlobWriter.Read part.TextRef with
             | Ok body when HostDigest.sha256Hex body = BlobDigest.value part.TextDigest -> return Some body
@@ -96,221 +48,178 @@ module LifecycleWorkRecordProjection =
 
     let private readVerifiedTerminalText
         (durable: AgentJournal)
-        (terminalRef: BlobRef)
-        (terminalDigest: BlobDigest)
+        (terminal: XTraceTerminalEvidence)
         : Task<string option> =
         task {
-            match! durable.Writer.BlobWriter.Read terminalRef with
-            | Error _ -> return None
-            | Ok terminalText when HostDigest.sha256Hex terminalText <> BlobDigest.value terminalDigest -> return None
-            | Ok terminalText when String.IsNullOrWhiteSpace terminalText -> return None
-            | Ok terminalText -> return Some terminalText
+            match! durable.Writer.BlobWriter.Read terminal.TextRef with
+            | Ok text when
+                HostDigest.sha256Hex text = BlobDigest.value terminal.TextDigest
+                && not (String.IsNullOrWhiteSpace text)
+                ->
+                return Some text
+            | _ -> return None
         }
 
-    let private isNaturalAssistant (part: XTracePartRef) =
+    let private isNaturalAssistant (part: XTraceSemanticPartView) =
         part.Role = "assistant" && (part.Kind = "text" || part.Kind = "reasoning")
 
-    let private concatLatestAssistantBodies
+    let private readOptionalPartBody
         (durable: AgentJournal)
-        (ordered: XTracePartRef list)
-        (latest: XTracePartRef)
-        : Task<string> =
+        (part: XTraceSemanticPartView)
+        : Task<Result<string option, string>> =
         task {
-            let relevant =
-                ordered
-                |> List.filter (fun part ->
-                    part.Role = "assistant"
-                    && part.Turn = latest.Turn
-                    && part.Generation = latest.Generation
-                    && (part.Kind = "text" || part.Kind = "reasoning"))
+            let! body = tryReadPartBody durable part
+            return Ok body
+        }
 
-            // DSL-MUTABLE: algorithm-scratch — part body accumulator
-            let bodies = ResizeArray<string>()
-
-            for part in relevant do
-                let! bodyOpt = tryReadPartBody durable part
-                bodyOpt |> Option.iter bodies.Add
-
-            return bodies |> Seq.toList |> String.concat "\n\n"
+    let private readPartBodies durable parts =
+        task {
+            let! bodies = parts |> TaskResultList.traverseM (readOptionalPartBody durable)
+            return bodies |> Result.defaultValue [] |> List.choose id
         }
 
     let private terminalAlreadyCaptured
         (durable: AgentJournal)
-        (ordered: XTracePartRef list)
+        (ordered: XTraceSemanticPartView list)
         (terminalText: string)
         : Task<bool> =
         task {
             match ordered |> List.filter isNaturalAssistant |> List.tryLast with
             | None -> return false
             | Some latest ->
-                let! concat = concatLatestAssistantBodies durable ordered latest
-                return concat = terminalText
+                let relevant =
+                    ordered
+                    |> List.filter (fun part ->
+                        part.Role = "assistant"
+                        && part.Turn = latest.Turn
+                        && part.Generation = latest.Generation
+                        && (part.Kind = "text" || part.Kind = "reasoning"))
+
+                let! bodies = readPartBodies durable relevant
+                return String.concat "\n\n" bodies = terminalText
         }
 
-    let private withTerminalText
-        (durable: AgentJournal)
-        (ordered: XTracePartRef list)
-        (frontier: XTraceCursor)
-        (trace: XTraceItem list)
-        (terminalText: string)
-        : Task<XTraceItem list> =
+    /// Evidence → Decision: terminal bytes already present in the natural trace.
+    let private appendTerminalWhenMissing rendered terminalText alreadyCaptured =
+        let fallback = "assistant: " + terminalText
+
+        match alreadyCaptured, String.IsNullOrEmpty rendered with
+        | true, _ -> rendered
+        | false, true -> fallback
+        | false, false -> rendered + "\n" + fallback
+
+    let private appendTerminalText durable ordered rendered terminalText =
         task {
             let! alreadyCaptured = terminalAlreadyCaptured durable ordered terminalText
-
-            if alreadyCaptured then
-                return trace
-            else
-                return
-                    trace
-                    @ [ { Cursor = frontier
-                          Provenance = "terminal-projection-fallback"
-                          Role = "assistant"
-                          Part = SemanticText terminalText } ]
+            return appendTerminalWhenMissing rendered terminalText alreadyCaptured
         }
 
     let private appendTerminalFallback
         (durable: AgentJournal)
-        (ordered: XTracePartRef list)
-        (trace: XTraceItem list)
-        (terminal: XTraceTerminalRef)
-        : Task<XTraceItem list> =
+        (ordered: XTraceSemanticPartView list)
+        (rendered: string)
+        (terminal: XTraceTerminalEvidence)
+        : Task<string> =
         task {
-            let! terminalOpt = readVerifiedTerminalText durable terminal.TextRef terminal.TextDigest
+            let! terminalText = readVerifiedTerminalText durable terminal
 
-            match terminalOpt with
-            | None -> return trace
-            | Some terminalText -> return! withTerminalText durable ordered terminal.Frontier trace terminalText
+            match terminalText with
+            | None -> return rendered
+            | Some text -> return! appendTerminalText durable ordered rendered text
         }
 
-    /// Full-lifecycle LWR fallback for Host-owned completion paths that consume a
-    /// terminal before messages.transform has captured that final assistant turn.
-    /// TerminalOutputCaptured is already durable; project it into Recent work only
-    /// when the latest assistant turn's natural-language parts do not already
-    /// reconstruct the exact same terminal bytes. No new XTrace fact/cursor is
-    /// written, so normal captured turns remain unchanged and event counts do not grow.
-    let private withTerminalFallback
-        (durable: AgentJournal)
-        (xTrace: XTraceProjectionState)
-        (trace: XTraceItem list)
-        : Task<XTraceItem list> =
-        task {
-            match XTraceProjection.latestTerminal xTrace with
-            | None -> return trace
-            | Some terminal -> return! appendTerminalFallback durable (XTraceProjection.parts xTrace) trace terminal
-        }
-
-    /// COMPANION-015: (Previous, Next] overlaps [Start, End); Next is inclusive-through.
-    let private framesOverlappingRange (range: MagicTodoLwr.BoundedRange) (frames: BlogFrame list) =
-        frames
-        |> List.filter (fun frame ->
-            frame.CoveredFromSequence + 1L < range.EndExclusive.Sequence
-            && frame.CoveredThroughSequence >= range.StartInclusive.Sequence)
-
-    let private partsWithinRange (range: MagicTodoLwr.BoundedRange) (xTrace: XTraceProjectionState) =
-        XTraceProjection.parts xTrace
-        |> List.filter (fun part ->
-            part.Cursor.Sequence >= range.StartInclusive.Sequence
-            && part.Cursor.Sequence < range.EndExclusive.Sequence)
-
-    let private boundedWorkRange
-        (providerRun: ProviderRunIdentity option)
-        (range: MagicTodoLwr.BoundedRange)
-        (xTrace: XTraceProjectionState)
-        =
-        match providerRun with
-        | None -> range
-        | Some _ ->
-            let workStart =
-                partsWithinRange range xTrace
-                |> List.tryFind (fun part -> part.Role = "assistant")
-                |> Option.map (fun part -> part.Cursor)
-                |> Option.defaultValue range.EndExclusive
-
-            { range with
-                StartInclusive = workStart }
-
-    let private terminalForBoundedRange
-        (providerRun: ProviderRunIdentity option)
-        (range: MagicTodoLwr.BoundedRange)
-        (xTrace: XTraceProjectionState)
-        =
-        providerRun
-        |> Option.bind (fun run -> XTraceProjection.terminalForProviderRun run xTrace)
-        |> Option.filter (fun terminal -> terminal.Frontier = range.EndExclusive)
-
-    let private semanticPart (kind: string) (body: string) (toolName: string option) =
-        match kind with
-        | "text" -> Some(SemanticText body)
-        | "reasoning" -> Some(SemanticReasoning body)
-        | "tool_call" -> toolName |> Option.map (fun name -> SemanticToolCall(name, body))
-        | "tool_result" -> Some(SemanticToolResult body)
-        // COMPANION-003: omission markers are semantic parts of
-        // the XTrace; dropping them would make LWR gap/parent
-        // background lose media presence the model already saw.
-        | "media_omitted" ->
-            let mediaType = if String.IsNullOrWhiteSpace body then None else Some body
-            Some(SemanticMedia(mediaType, ""))
-        | _ -> None
-
-    let private tryResolveTraceItem (durable: AgentJournal) (part: XTracePartRef) : Task<XTraceItem option> =
-        task {
-            match! durable.Writer.BlobWriter.Read part.TextRef with
-            | Error _ -> return None
-            | Ok body ->
-                return
-                    semanticPart part.Kind body part.ToolName
-                    |> Option.map (fun partValue ->
-                        { Cursor = part.Cursor
-                          Provenance = part.Provenance
-                          Role = part.Role
-                          Part = partValue })
-        }
-
-    /// Resolve XTrace part bodies into semantic items (single mapper; a part
-    /// that fails its digest check is dropped, matching the canonical path).
-    let private resolveTrace (durable: AgentJournal) (xTrace: XTraceProjectionState) : Task<XTraceItem list> =
-        task {
-            // DSL-MUTABLE: algorithm-scratch — resolved trace item accumulator
-            let resolved = ResizeArray<XTraceItem>()
-
-            for part in XTraceProjection.parts xTrace do
-                let! itemOpt = tryResolveTraceItem durable part
-                itemOpt |> Option.iter resolved.Add
-
-            return resolved |> Seq.toList
-        }
+    let private laterCursor left right =
+        if XTraceCursor.isAfter left right then left else right
 
     let private coverageOrDefault (coverageOverride: RecordCoverage option) (blog: BlogProjectionState) =
-        match coverageOverride with
-        | Some forced -> forced
-        | None -> { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
+        coverageOverride
+        |> Option.defaultWith (fun () ->
+            blog.Coverage.IngestedThroughSequence
+            |> XTraceCursor.create
+            |> RecordCoverage.create)
 
-    let private immediateOpeningEnd (trace: XTraceItem list) =
-        match trace with
-        | first :: _ -> { Sequence = first.Cursor.Sequence + 1L }
-        | [] -> XTraceCursor.originCursor
+    let private immediateOpeningEnd (xTrace: XTraceProjectionState) =
+        xTrace
+        |> XTraceProjection.orderedSemanticParts
+        |> List.tryHead
+        |> Option.map XTraceProjection.frontierAfter
+        |> Option.defaultValue XTraceCursor.originCursor
 
     let private resolveOpeningEnd
         (life: LifeProjection option)
         (snapshot: ProjectionSet)
         (xTrace: XTraceProjectionState)
-        (trace: XTraceItem list)
         =
-        match
-            life
-            |> Option.bind (fun current ->
-                ManagerOpeningFloor.workRecordStart
-                    current
-                    (MagicTodoProjection.tryLife current.LifeId snapshot.AgentProjections.MagicTodo)
-                    xTrace)
-        with
-        | Some boundary -> boundary
-        | None -> immediateOpeningEnd trace
+        life
+        |> Option.bind (fun current ->
+            ManagerOpeningFloor.workRecordStart
+                current
+                (MagicTodoProjection.tryLife current.LifeId snapshot.AgentProjections.MagicTodo)
+                xTrace)
+        |> Option.defaultWith (fun () -> immediateOpeningEnd xTrace)
 
-    let private constitutiveItemsFor (openingEnd: XTraceCursor) (trace: XTraceItem list) =
-        match trace with
-        | first :: _ -> XTrace.sliceBetween { Sequence = first.Cursor.Sequence + 1L } openingEnd trace
-        | [] -> []
+    let private renderRange (durable: AgentJournal) (range: XTraceRange) (xTrace: XTraceProjectionState) =
+        XTraceMaterialization.renderRange durable range xTrace
+
+    let private renderWorkRecordRange (durable: AgentJournal) (range: XTraceRange) (xTrace: XTraceProjectionState) =
+        XTraceMaterialization.renderWorkRecordRange durable range xTrace
+
+    type private RenderedRecordEvidence =
+        { ConstitutiveBody: string
+          Gap: string }
+
+    /// Evidence → Decision: both owner render operations proved their blobs.
+    let private renderedRecordEvidence constitutive gap =
+        match constitutive, gap with
+        | Ok constitutiveBody, Ok renderedGap ->
+            Some
+                { ConstitutiveBody = constitutiveBody
+                  Gap = renderedGap }
+        | _ -> None
+
+    let private completeFullGap durable xTrace gapStart renderedGap =
+        task {
+            match XTraceProjection.latestTerminalEvidence xTrace with
+            | Some terminal when XTraceCursor.isAtOrAfter terminal.Frontier gapStart ->
+                return!
+                    appendTerminalFallback durable (XTraceProjection.orderedSemanticParts xTrace) renderedGap terminal
+            | _ -> return renderedGap
+        }
+
+    let private materializeOpeningEvidence durable snapshot session includeOpening coverageOverride xTrace opening =
+        task {
+            let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+            let! frames = BlogProjection.frames blog |> resolveFrames durable
+
+            let life =
+                session.ManagerLife |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+
+            let openingEnd = resolveOpeningEnd life snapshot xTrace
+
+            let constitutiveStart =
+                xTrace
+                |> XTraceProjection.orderedSemanticParts
+                |> List.tryHead
+                |> Option.map XTraceProjection.frontierAfter
+                |> Option.defaultValue openingEnd
+
+            let constitutiveRange = XTraceRange.create constitutiveStart openingEnd
+            let coverage = coverageOrDefault coverageOverride blog
+            let gapStart = laterCursor (RecordCoverage.ingestedThrough coverage) openingEnd
+            let gapRange = XTraceProjection.rangeFrom gapStart xTrace
+
+            let! constitutive = renderRange durable constitutiveRange xTrace
+            let! gap = renderWorkRecordRange durable gapRange xTrace
+
+            match renderedRecordEvidence constitutive gap with
+            | None -> return None
+            | Some evidence ->
+                let openingMaterial =
+                    LifecycleWorkRecord.withConstitutive opening evidence.ConstitutiveBody
+
+                let! finalGap = completeFullGap durable xTrace gapStart evidence.Gap
+                return Some(LifecycleWorkRecord.materialize openingMaterial frames finalGap includeOpening)
+        }
 
     let private materializeOpenedSession
         (durable: AgentJournal)
@@ -321,33 +230,12 @@ module LifecycleWorkRecordProjection =
         : Task<string option> =
         task {
             let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
-            let blog = session.Blog |> Option.defaultValue BlogProjection.empty
 
-            let! frames = resolveFrames durable (BlogProjection.frames blog)
-            let! rawTrace = resolveTrace durable xTrace
-            let! trace = withTerminalFallback durable xTrace rawTrace
-
-            match xTrace.Opening with
+            match XTraceProjection.openingEvidence xTrace with
             | None -> return None
             | Some opening ->
-                let coverage = coverageOrDefault coverageOverride blog
-
-                let life =
-                    session.ManagerLife |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-
-                // TODO-001 / COMPANION-014: OpeningBoundary = WorkRecordStart when
-                // Post-T1; else Immediate exclusive end after first XTrace part.
-                let openingEnd = resolveOpeningEnd life snapshot xTrace trace
-
-                // Constitutive Opening interval after InitialCharge through Boundary
-                // (BlindPlan T1 call/result ∈ OpeningMaterial; not Recent).
-                let constitutiveItems = constitutiveItemsFor openingEnd trace
-                let openingMaterial = LifecycleWorkRecord.withConstitutive opening constitutiveItems
-
-                return
-                    Some(
-                        LifecycleWorkRecord.materialize openingMaterial frames trace coverage openingEnd includeOpening
-                    )
+                return!
+                    materializeOpeningEvidence durable snapshot session includeOpening coverageOverride xTrace opening
         }
 
     let lifecycleWorkRecordFromSnapshot
@@ -373,76 +261,114 @@ module LifecycleWorkRecordProjection =
         | Some durable ->
             lifecycleWorkRecordFromSnapshot durable (AgentJournal.snapshot durable) sessionId includeOpening None
 
-    let private clampCoverageToRange (coverage: RecordCoverage) (range: MagicTodoLwr.BoundedRange) =
-        if coverage.IngestedThrough.Sequence < range.StartInclusive.Sequence then
-            { IngestedThrough = range.StartInclusive }
-        elif coverage.IngestedThrough.Sequence > range.EndExclusive.Sequence then
-            { IngestedThrough = range.EndExclusive }
+    /// COMPANION-015: (Previous, Next] overlaps [Start, End); Next is inclusive-through.
+    let private framesOverlappingRange (range: XTraceRange) (frames: BlogFrame list) =
+        let startSequence = range |> XTraceRange.startInclusive |> XTraceCursor.sequence
+        let endSequence = range |> XTraceRange.endExclusive |> XTraceCursor.sequence
+
+        frames
+        |> List.filter (fun frame ->
+            frame.CoveredFromSequence + 1L < endSequence
+            && frame.CoveredThroughSequence >= startSequence)
+
+    let private boundedWorkRange
+        (providerRun: ProviderRunIdentity option)
+        (range: XTraceRange)
+        (xTrace: XTraceProjectionState)
+        =
+        match providerRun with
+        | None -> range
+        | Some _ ->
+            let workStart =
+                XTraceProjection.slice range xTrace
+                |> List.tryFind (fun part -> part.Role = "assistant")
+                |> Option.map (fun part -> part.Cursor)
+                |> Option.defaultValue (XTraceRange.endExclusive range)
+
+            XTraceRange.create workStart (XTraceRange.endExclusive range)
+
+    let private sameCursor left right =
+        XTraceCursor.sequence left = XTraceCursor.sequence right
+
+    let private terminalForBoundedRange
+        (providerRun: ProviderRunIdentity option)
+        (range: XTraceRange)
+        (xTrace: XTraceProjectionState)
+        =
+        providerRun
+        |> Option.bind (fun run -> XTraceProjection.terminalEvidenceForProviderRun run xTrace)
+        |> Option.filter (fun terminal -> sameCursor terminal.Frontier (XTraceRange.endExclusive range))
+
+    let private clampCoverageToRange (coverage: RecordCoverage) (range: XTraceRange) =
+        let cursor = RecordCoverage.ingestedThrough coverage
+        let start = XTraceRange.startInclusive range
+        let finish = XTraceRange.endExclusive range
+
+        if XTraceCursor.isBefore cursor start then
+            RecordCoverage.create start
+        elif XTraceCursor.isAfter cursor finish then
+            RecordCoverage.create finish
         else
             coverage
 
-    let private materializeBoundedOpenedSession
-        (durable: AgentJournal)
-        (session: SessionAgentProjection)
-        (range: MagicTodoLwr.BoundedRange)
-        (terminalProviderRun: ProviderRunIdentity option)
-        : Task<string option> =
+    let private completeBoundedGap durable xTrace workRange range terminalProviderRun renderedGap =
         task {
-            let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
+            match terminalForBoundedRange terminalProviderRun range xTrace with
+            | None -> return renderedGap
+            | Some terminal ->
+                return! appendTerminalFallback durable (XTraceProjection.slice workRange xTrace) renderedGap terminal
+        }
+
+    let private materializeBoundedOpeningEvidence durable session range terminalProviderRun xTrace opening =
+        task {
             let blog = session.Blog |> Option.defaultValue BlogProjection.empty
             let workRange = boundedWorkRange terminalProviderRun range xTrace
 
-            // COMPANION-015 ④/⑩: Chronicle = Y frames overlapping this work range.
             let! frames =
                 BlogProjection.frames blog
                 |> framesOverlappingRange workRange
                 |> resolveFrames durable
 
-            // Recent-work TRACE sliced to the receiver-visible work range so
-            // the caller's own charge and prior invocations never appear.
-            let! resolvedTrace = resolveTrace durable xTrace
+            let coverage =
+                blog.Coverage.IngestedThroughSequence
+                |> XTraceCursor.create
+                |> RecordCoverage.create
+                |> fun value -> clampCoverageToRange value workRange
 
-            let boundedTrace =
-                XTrace.sliceBetween workRange.StartInclusive workRange.EndExclusive resolvedTrace
+            let gapStart =
+                laterCursor (RecordCoverage.ingestedThrough coverage) (XTraceRange.startInclusive workRange)
 
-            let! trace =
-                match terminalForBoundedRange terminalProviderRun range xTrace with
-                | None -> Task.FromResult boundedTrace
-                | Some terminal ->
-                    appendTerminalFallback durable (partsWithinRange workRange xTrace) boundedTrace terminal
+            let gapRange = XTraceRange.create gapStart (XTraceRange.endExclusive workRange)
+            let! gap = renderWorkRecordRange durable gapRange xTrace
 
-            match xTrace.Opening with
-            | None -> return None
-            | Some opening ->
-                let coverage =
-                    { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
+            match gap with
+            | Error _ -> return None
+            | Ok renderedGap ->
+                let! finalGap = completeBoundedGap durable xTrace workRange range terminalProviderRun renderedGap
 
-                // Gap start inside the bounded window: max(coverage, range start),
-                // so an older coverage never pulls a prior invocation into view.
-                let coverageClamped = clampCoverageToRange coverage workRange
-
-                return
-                    Some(
-                        LifecycleWorkRecord.materialize
-                            opening
-                            frames
-                            trace
-                            coverageClamped
-                            workRange.StartInclusive
-                            (* includeOpening = *) false
-                    )
+                return Some(LifecycleWorkRecord.materialize opening frames finalGap false)
         }
 
-    /// EXEC-031: per-invocation bounded LWR for reusable SyncDelegate children
-    /// (includeOpening=false). Chronicle frames (interval overlap) + Recent-work
-    /// TRACE are sliced to the invocation's XTrace range, including the last part.
-    /// Reuses LifecycleWorkRecord.materialize — no second renderer.
-    /// A full-lifecycle projection here would leak prior invocations on a reused child.
+    let private materializeBoundedOpenedSession
+        (durable: AgentJournal)
+        (session: SessionAgentProjection)
+        (range: XTraceRange)
+        (terminalProviderRun: ProviderRunIdentity option)
+        : Task<string option> =
+        task {
+            let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
+
+            match XTraceProjection.openingEvidence xTrace with
+            | None -> return None
+            | Some opening ->
+                return! materializeBoundedOpeningEvidence durable session range terminalProviderRun xTrace opening
+        }
+
     let lifecycleWorkRecordBoundedFromSnapshot
         (durable: AgentJournal)
         (snapshot: ProjectionSet)
         (sessionId: SessionId)
-        (range: MagicTodoLwr.BoundedRange)
+        (range: XTraceRange)
         : Task<string option> =
         task {
             match AgentProjection.tryFind sessionId snapshot.AgentProjections with
@@ -454,7 +380,7 @@ module LifecycleWorkRecordProjection =
         (durable: AgentJournal)
         (snapshot: ProjectionSet)
         (sessionId: SessionId)
-        (range: MagicTodoLwr.BoundedRange)
+        (range: XTraceRange)
         (providerRun: ProviderRunIdentity)
         : Task<string option> =
         task {
@@ -466,7 +392,7 @@ module LifecycleWorkRecordProjection =
     let lifecycleWorkRecordBounded
         (journal: AgentJournal option)
         (sessionId: SessionId)
-        (range: MagicTodoLwr.BoundedRange)
+        (range: XTraceRange)
         : Task<string option> =
         match journal with
         | None -> Task.FromResult None
@@ -475,7 +401,7 @@ module LifecycleWorkRecordProjection =
     let lifecycleWorkRecordBoundedForRun
         (journal: AgentJournal option)
         (sessionId: SessionId)
-        (range: MagicTodoLwr.BoundedRange)
+        (range: XTraceRange)
         (providerRun: ProviderRunIdentity)
         : Task<string option> =
         match journal with

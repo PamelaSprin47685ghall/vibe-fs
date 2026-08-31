@@ -17,7 +17,6 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
@@ -172,7 +171,8 @@ module SyncDelegateSurface =
             (scope :> IDisposable).Dispose()
             (journal :> IDisposable).Dispose()
 
-    and private SessionPort(children: ResizeArray<SessionId>, readiness: PromptReadiness) =
+    and private SessionPort
+        (children: ResizeArray<SessionId>, readiness: PromptReadiness, observationMode: string option) =
         // DSL-MUTABLE: algorithm-scratch — synthetic physical message id counter for the harness
         let physicalSequence = ref 0
         let listeners = Dictionary<string, ResizeArray<TerminalCompletionListener>>()
@@ -183,6 +183,13 @@ module SyncDelegateSurface =
 
         let promptOrigins = Dictionary<string, ResizeArray<string>>()
         let acceptedPhysical = Dictionary<string, ResizeArray<PhysicalUserMessageId>>()
+        let listedFamilies = ResizeArray<string>()
+        let createRequests = ResizeArray<string * string option * string option>()
+
+        let prompted =
+            TaskCompletionSource<SessionId>(TaskCreationOptions.RunContinuationsAsynchronously)
+        // DSL-MUTABLE: algorithm-scratch — exact title expected within one proof scenario
+        let mutable expectedTitle: string option = None
 
         let acceptancesOf key =
             match pendingAcceptances.TryGetValue key with
@@ -223,6 +230,11 @@ module SyncDelegateSurface =
 
             { new IDisposable with
                 member _.Dispose() = registrations.Remove listener |> ignore }
+
+        member _.ListedFamilies = listedFamilies.ToArray()
+        member _.CreateRequests = createRequests.ToArray()
+        member _.WaitForPrompt() = prompted.Task
+        member _.SetExpectedTitle(title: string) = expectedTitle <- Some title
 
         member _.Notify(sessionId: SessionId, outcome: TerminalOutcome) =
             match listeners.TryGetValue(SessionId.value sessionId) with
@@ -275,6 +287,7 @@ module SyncDelegateSurface =
 
             member _.SendPrompt(sessionId, prompt, options) =
                 readiness.Mark(sessionId, prompt)
+                AsyncSupport.trySetResult prompted sessionId |> ignore
                 let origin: string = options.Metadata.Value?wanxiangshu_origin
                 originsOf (SessionId.value sessionId) |> fun values -> values.Add origin
 
@@ -294,9 +307,14 @@ module SyncDelegateSurface =
 
             member _.TryGetParentSession _ = Task.FromResult(Ok None)
 
-            member _.CreateChildSession(parent, _) =
+            member _.CreateChildSession(parent, options) =
+                createRequests.Add(SessionId.value parent, options.Title, options.Agent)
+
                 let child =
-                    SessionId.create (sprintf "%s-child-%d" (SessionId.value parent) (children.Count + 1))
+                    match observationMode with
+                    | Some "other-scope" -> SessionId.create "host-child-created-exact-scope"
+                    | Some _ -> SessionId.create "host-child-created"
+                    | None -> SessionId.create (sprintf "%s-child-%d" (SessionId.value parent) (children.Count + 1))
 
                 children.Add child
 
@@ -315,24 +333,57 @@ module SyncDelegateSurface =
                 Task.FromResult(Ok child)
 
             member _.ListChildren parent =
-                children
-                |> Seq.filter (fun child ->
-                    (SessionId.value child)
-                        .StartsWith((SessionId.value parent) + "-child-", StringComparison.Ordinal))
-                |> Seq.collect (fun child ->
-                    [ { SessionId = child
-                        ParentSessionId = Some parent
-                        Title = Some "managed delegate"
-                        Agent = Some "fast-inspector" }
-                      { SessionId = child
-                        ParentSessionId = Some parent
-                        Title = Some "managed delegate"
-                        Agent = Some "fast-coder" } ])
-                |> Seq.toList
-                |> Ok
-                |> Task.FromResult
+                listedFamilies.Add(SessionId.value parent)
 
-            member _.FamilyRootOf sessionId = sessionId
+                match observationMode with
+                | Some "query-error" -> Task.FromResult(Error "controlled ListChildren rejection")
+                | Some mode ->
+                    let descriptor id title agent =
+                        { SessionId = SessionId.create id
+                          ParentSessionId = Some parent
+                          Title = Some title
+                          Agent = Some agent }
+
+                    let exactTitle = Option.defaultValue "missing exact title" expectedTitle
+
+                    let children =
+                        match mode with
+                        | "matching" ->
+                            [ descriptor "host-child-wrong-agent" exactTitle "fast-coder"
+                              descriptor "host-child-existing" exactTitle "fast-inspector" ]
+                        | "conflicting" ->
+                            [ descriptor "host-child-existing-a" exactTitle "fast-inspector"
+                              descriptor "host-child-existing-b" exactTitle "fast-inspector" ]
+                        | "other-scope" ->
+                            [ descriptor
+                                  "host-child-other-scope"
+                                  "wanxiangshu:sync-delegate:v1:scope=another-owner:role=inspector:agent=fast-inspector"
+                                  "fast-inspector" ]
+                        | _ -> [ descriptor "host-child-wrong-agent" exactTitle "fast-coder" ]
+
+                    Task.FromResult(Ok children)
+                | None ->
+                    children
+                    |> Seq.filter (fun child ->
+                        (SessionId.value child)
+                            .StartsWith((SessionId.value parent) + "-child-", StringComparison.Ordinal))
+                    |> Seq.collect (fun child ->
+                        [ { SessionId = child
+                            ParentSessionId = Some parent
+                            Title = Some "managed delegate"
+                            Agent = Some "fast-inspector" }
+                          { SessionId = child
+                            ParentSessionId = Some parent
+                            Title = Some "managed delegate"
+                            Agent = Some "fast-coder" } ])
+                    |> Seq.toList
+                    |> Ok
+                    |> Task.FromResult
+
+            member _.FamilyRootOf sessionId =
+                match observationMode with
+                | Some _ -> SessionId.create "host-family-root"
+                | None -> sessionId
 
     let private waitForReadyCall
         (runtime: SyncDelegateRuntime)
@@ -411,6 +462,14 @@ module SyncDelegateSurface =
         else
             Ok(unbox<string> value)
 
+    let private ownerAdmissionFor (sessionId: string) (agent: string) =
+        ParticipantIdentity.resolveAtRoot agent
+        |> Result.mapError (sprintf "invalid sync delegate owner descriptor agent: %A")
+        |> Result.map (fun identity ->
+            SessionId.create sessionId,
+            PhysicalUserMessageId.create (sprintf "sync-delegate-owner-root:%s" sessionId),
+            PromptAuthority.IdentitySeed.RootSelection identity)
+
     let private ownerAdmission (descriptor: obj) =
         let isPlainObject: bool =
             not (isNullish descriptor)
@@ -426,13 +485,7 @@ module SyncDelegateSurface =
             | Ok sessionId ->
                 match requiredOwnerString "agent" descriptor?agent with
                 | Error error -> Error error
-                | Ok agent ->
-                    ParticipantIdentity.resolveAtRoot agent
-                    |> Result.mapError (sprintf "invalid sync delegate owner descriptor agent: %A")
-                    |> Result.map (fun identity ->
-                        SessionId.create sessionId,
-                        PhysicalUserMessageId.create (sprintf "sync-delegate-owner-root:%s" sessionId),
-                        PromptAuthority.IdentitySeed.RootSelection identity)
+                | Ok agent -> ownerAdmissionFor sessionId agent
 
     let private ownerAdmissions (owners: obj) =
         let isArray: bool = emitJsExpr owners "Array.isArray($0)"
@@ -480,15 +533,8 @@ module SyncDelegateSurface =
             (journal :> IDisposable).Dispose()
             raise (InvalidOperationException error)
 
-    /// Create a real SyncDelegateRuntime with an opaque journal and Host port.
-    /// Every owner must first be admitted as an explicit durable HumanRoot.
-    let create (directory: string) (owners: obj) : Task<obj> =
+    let private createWithAdmissions (directory: string) (observationMode: string option) admissions : Task<obj> =
         task {
-            let admissions =
-                match ownerAdmissions owners with
-                | Ok admissions -> admissions
-                | Error error -> raise (ArgumentException error)
-
             let! journal = createJournal directory
             let dispatcher = PromptDispatcher.Runtime(journal)
 
@@ -498,16 +544,12 @@ module SyncDelegateSurface =
             // DSL-MUTABLE: resource — session id backing registry for SessionPort
             let children = ResizeArray<SessionId>()
             let readiness = PromptReadiness()
-            let sessionPort = SessionPort(children, readiness)
+            let sessionPort = SessionPort(children, readiness, observationMode)
             let sessions = sessionPort :> ISessionHostPort
             let attached = new AttachedSessionRuntime()
             let gate = new SessionQuiescenceGate()
 
-            let workRecordFor
-                (sessionId: SessionId)
-                (range: MagicTodoLwr.BoundedRange)
-                (providerRun: ProviderRunIdentity)
-                =
+            let workRecordFor (sessionId: SessionId) (range: XTraceRange) (providerRun: ProviderRunIdentity) =
                 LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
                     (Some journal)
                     sessionId
@@ -546,6 +588,131 @@ module SyncDelegateSurface =
                 )
 
             return box (Harness(journal, runtime, scope, sessionPort, readiness, children))
+        }
+
+    /// Create a real SyncDelegateRuntime with an opaque journal and Host port.
+    /// Every owner must first be admitted as an explicit durable HumanRoot.
+    let create (directory: string) (owners: obj) : Task<obj> =
+        match ownerAdmissions owners with
+        | Ok admissions -> createWithAdmissions directory None admissions
+        | Error error -> raise (ArgumentException error)
+
+    let private createForObservation (directory: string) (observationMode: string option) : Task<obj> =
+        match ownerAdmissionFor "managed-child-reconciliation" "fast-manager" with
+        | Ok admission -> createWithAdmissions directory observationMode [ admission ]
+        | Error error -> raise (InvalidOperationException error)
+
+    /// MANAGED-SESSION-001: drive SyncDelegateRuntime's production child
+    /// observation into AttachedSessionRuntime against controlled Host callbacks.
+    let managedChildReconciliationScenario (directory: string) (mode: string) : Task<obj> =
+        task {
+            let! value = createForObservation directory (Some mode)
+            let harness = unbox<Harness> value
+            let owner = harness.OwnerSession "managed-child-reconciliation"
+            let ownerScope = ReuseScope.ofSession owner
+
+            harness.Sessions.SetExpectedTitle(
+                SyncDelegatePhysicalIdentity.title ownerScope SyncDelegateRole.Inspector "fast-inspector"
+            )
+
+            let invocation =
+                harness.Runtime.Invoke(SessionId.value owner, SyncDelegateRole.Inspector, "probe")
+
+            let! child, error =
+                if mode = "matching" || mode = "missing" || mode = "other-scope" then
+                    task {
+                        let! prompted = harness.Sessions.WaitForPrompt()
+                        return SessionId.value prompted, ""
+                    }
+                else
+                    task {
+                        match! invocation with
+                        | Ok _ -> return "", "expected reconciliation to fail closed"
+                        | Error rejection -> return "", rejection
+                    }
+
+            let request = harness.Sessions.CreateRequests |> Array.tryHead
+
+            let createParent, createTitle, createAgent =
+                match request with
+                | Some(parent, title, agent) -> parent, Option.defaultValue "" title, Option.defaultValue "" agent
+                | None -> "", "", ""
+
+            let result =
+                box
+                    {| listedFamilies = harness.Sessions.ListedFamilies
+                       ownerScope = ReuseScopeId.value ownerScope
+                       createCount = harness.Sessions.CreateRequests.Length
+                       createParent = createParent
+                       createTitle = createTitle
+                       createAgent = createAgent
+                       child = child
+                       error = error |}
+
+            harness.Dispose()
+            return result
+        }
+
+    /// MANAGED-SESSION-001: two simultaneous callers for one exact key share
+    /// the complete physical reconciliation transaction and its result.
+    let concurrentAttachedGetOrCreateScenario () : Task<obj> =
+        task {
+            let attached = new AttachedSessionRuntime()
+
+            let entered =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let release =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            // DSL-MUTABLE: algorithm-scratch — one-scenario physical observation counter
+            let mutable observeCount = 0
+            // DSL-MUTABLE: algorithm-scratch — one-scenario physical creation counter
+            let mutable createCount = 0
+            let owner = SessionId.create "concurrent-owner"
+
+            let observe _ _ _ _ =
+                task {
+                    observeCount <- observeCount + 1
+                    AsyncSupport.trySetResult entered () |> ignore
+                    do! release.Task
+                    return Ok AttachedChildObservation.Missing
+                }
+
+            let create _ _ _ _ _ =
+                createCount <- createCount + 1
+                Task.FromResult(Ok(SessionId.create "concurrent-child"))
+
+            let get () =
+                attached.GetOrCreate(
+                    owner,
+                    SyncDelegateRole.Inspector,
+                    "fast-inspector",
+                    None,
+                    observe,
+                    create,
+                    (fun _ _ _ -> ()),
+                    (fun _ _ -> ())
+                )
+
+            let first = get ()
+            do! entered.Task
+            let second = get ()
+            AsyncSupport.trySetResult release () |> ignore
+            let! firstResult = first
+            let! secondResult = second
+            let results = [| firstResult; secondResult |]
+
+            let children =
+                results
+                |> Array.map (function
+                    | Ok(child, _) -> SessionId.value child
+                    | Error error -> failwith error)
+
+            return
+                box
+                    {| observeCount = observeCount
+                       createCount = createCount
+                       children = children |}
         }
 
     /// Execute the real InspectorTool specification against the opaque scope and
@@ -865,8 +1032,16 @@ module SyncDelegateSurface =
             |> Option.defaultValue null
 
     let captureOwnerOpening (value: obj) (owner: string) (text: string) : Task =
-        let harness = unbox<Harness> value
-        XTraceCapture.captureOpening (Some harness.Journal) (harness.OwnerSession owner) text [] :> Task
+        task {
+            let harness = unbox<Harness> value
+
+            match!
+                XTraceCapture.captureOpeningWithReceipt (Some harness.Journal) (harness.OwnerSession owner) text []
+            with
+            | Ok _ -> ()
+            | Error error -> return raise (InvalidOperationException(sprintf "%A" error))
+        }
+        :> Task
 
     let captureOwnerDeltaPart (value: obj) (owner: string) (text: string) (providerRun: string) : Task =
         task {
@@ -875,13 +1050,16 @@ module SyncDelegateSurface =
             match! harness.Journal.WriteBlob text with
             | Error error -> return raise (InvalidOperationException error)
             | Ok blob ->
-                do!
-                    XTraceCapture.captureLastWords
+                match!
+                    XTraceCapture.captureLastWordsWithReceipt
                         (Some harness.Journal)
                         (harness.OwnerSession owner)
                         blob.BlobRef
                         blob.BlobDigest
                         (ProviderRunIdentity.create providerRun)
+                with
+                | Ok _ -> ()
+                | Error error -> return raise (InvalidOperationException(sprintf "%A" error))
         }
         :> Task
 

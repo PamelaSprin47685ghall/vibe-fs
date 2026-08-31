@@ -24,19 +24,19 @@ PromptResources.systemForRole (语言 lang, 角色 role)
 
 | 命题 | 落点测试 |
 |---|---|
-| COGNITIVE-ENVIRONMENT-001 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
-| COGNITIVE-ENVIRONMENT-002 | `requirements/cognitive-environment/tests/semantic-anchor-parity.test.mjs` |
-| COGNITIVE-ENVIRONMENT-003 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
-| COGNITIVE-ENVIRONMENT-004 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
-| COGNITIVE-ENVIRONMENT-005 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
-| COGNITIVE-ENVIRONMENT-006 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
-| COGNITIVE-ENVIRONMENT-007 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
-| COGNITIVE-ENVIRONMENT-008 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
-| COGNITIVE-ENVIRONMENT-009 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
-| COGNITIVE-ENVIRONMENT-010 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
-| COGNITIVE-ENVIRONMENT-011 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
-| COGNITIVE-ENVIRONMENT-012 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
-| COGNITIVE-ENVIRONMENT-013 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs`, `requirements/cognitive-environment/tests/session-execution-attempt-surface.test.mjs` |
-| COGNITIVE-ENVIRONMENT-014 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
-| COGNITIVE-ENVIRONMENT-015 | `requirements/cognitive-environment/tests/blogger-chronicle-text.test.mjs` |
-| COGNITIVE-ENVIRONMENT-016 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
+| COGNITIVE-ENVIRONMENT-001 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-001] CE_prompt_015_one_system_prompt_per_role` |
+| COGNITIVE-ENVIRONMENT-002 | `requirements/cognitive-environment/tests/semantic-anchor-parity.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-002] gate_c_semantic_anchor_parity_detects_missing_zh_id` |
+| COGNITIVE-ENVIRONMENT-003 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-003] CE_prompt_015_canonical_composition_common_law_role_law_office_library` |
+| COGNITIVE-ENVIRONMENT-004 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-004] CE_prompt_015_system_prompt_does_not_enumerate_runtime_tool_surface` |
+| COGNITIVE-ENVIRONMENT-005 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-005] CE_prompt_015_no_tier_split_duplicates` |
+| COGNITIVE-ENVIRONMENT-006 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-006] CE_prompt_016_library_ingress_books_do_not_enlarge_authority` |
+| COGNITIVE-ENVIRONMENT-007 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-007] CE_prompt_016_library_ingress_teaches_craft_within_existing_authority` |
+| COGNITIVE-ENVIRONMENT-008 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-008] CE_prompt_016_office_library_closing_books_older_than_assignment` |
+| COGNITIVE-ENVIRONMENT-009 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-009] CE_prompt_016_office_library_closing_work_not_forced_to_resemble_book` |
+| COGNITIVE-ENVIRONMENT-010 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-010] CE_010_lifecycle_texts_orient_without_educating_or_replacing_system_prompt` |
+| COGNITIVE-ENVIRONMENT-011 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-011] CE_011_transient_texts_do_not_rewrite_role_self_model` |
+| COGNITIVE-ENVIRONMENT-012 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-012] CE_012_reviewer_prompt_carries_role_law_and_ledger_without_process_mechanics` |
+| COGNITIVE-ENVIRONMENT-013 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_teaches_continuous_ready_frontier_without_batch_barriers` |
+| COGNITIVE-ENVIRONMENT-014 | `requirements/guidance-delivery/tests/pair-calibration.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-014] CE_014_tool_estimate_is_explicitly_advisory_in_both_provider_languages` |
+| COGNITIVE-ENVIRONMENT-015 | `requirements/cognitive-environment/tests/blogger-chronicle-text.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_TEXT_is_companion_only_ephemeral_assistant_text_injection` |
+| COGNITIVE-ENVIRONMENT-016 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-016] CE_016_pair_hint_retains_brief_trigger_without_repeating_full_psychological_contract` |

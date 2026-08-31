@@ -9,13 +9,13 @@ const base = [
   { role: 'user', parts: [{ kind: 'text', text: 'inspect the file' }] },
   { role: 'assistant', parts: [{ kind: 'text', text: 'primary output' }] },
 ]
-const snapshot = () => Projection.projectionSnapshot(Projection.semanticProjection(base), { committedPrefix: null, blogFrames: [], transportMessages: [], hostReanchor: null })
+const snapshot = () => Projection.projectionSnapshot(Projection.semanticProjection(base))
 
 test('WHAT[SPEC-INV-012] STRENGTH_012_candidate_and_promoted_semantic_bytes_have_no_mechanism_provenance', () => {
-  const candidate = Projection.strengthCandidate({ ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-1', currentProviderRun: 'target-1', bundle })
-  const promoted = Projection.strengthPromoted({ ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-1', beforeIndex: 1, isReplicaRequest: false, bundle })
+  const candidate = Strength.candidate(H, { ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-1', currentProviderRun: 'target-1', bundle }).value
+  const promoted = Strength.promoted(H, { ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-1', beforeIndex: 1, isReplicaRequest: false, bundle }).value
   for (const intent of [candidate, promoted]) {
-    const rendered = Projection.renderMessagesWithHostIds(H, snapshot(), base, [intent])
+    const rendered = Projection.renderMessagesWithHostIds(snapshot(), base, [intent])
     const visible = `${Projection.renderWire(rendered.messages)}\n${Projection.renderSemantic(Projection.semanticProjection(rendered.messages))}`
     assert.doesNotMatch(visible, /prefetch|weak model|confidence|prediction|source=sidecar/i)
     assert.doesNotMatch(visible, /\breplica\b/i)

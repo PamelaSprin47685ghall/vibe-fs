@@ -209,7 +209,12 @@ module ReviewProjection =
         =
         match current.CurrentBarrierId with
         | Some barrierId when barrierId = closed.Attempt.ReviewBarrierId ->
-            recordFrontierIfOpen barrierId terminalRef terminalDigest closed.FrozenFrontier.Sequence current
+            recordFrontierIfOpen
+                barrierId
+                terminalRef
+                terminalDigest
+                (XTraceCursor.sequence closed.FrozenFrontier)
+                current
         | _ -> current
 
     /// REVIEW-002: any REVISE clears an unfinished PERFECT confirmation.

@@ -35,10 +35,10 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| TIME-001 | `requirements/time-capability/tests/timer-port.test.mjs` |
-| TIME-002 | `requirements/time-capability/tests/deadline-typed.test.mjs` |
-| TIME-003 | `requirements/time-capability/tests/timer-port.test.mjs` |
-| TIME-004 | `requirements/time-capability/tests/ambient-time-forbidden.test.mjs` |
-| TIME-005 | `requirements/time-capability/tests/deadline-typed.test.mjs` |
-| TIME-006 | `requirements/time-capability/tests/until-signal-or-deadline.test.mjs` |
-| TIME-007 | `requirements/time-capability/tests/pair-session-elapsed.test.mjs`, `requirements/time-capability/tests/session-started-at-bind-surface.test.mjs` |
+| TIME-001 | `requirements/time-capability/tests/clock-port-virtual.test.mjs::WHAT[TIME-001] TIME_001_virtual_clocks_are_independent_not_ambient` |
+| TIME-002 | `requirements/time-capability/tests/deadline-typed.test.mjs::WHAT[TIME-002] TIME_002_deadline_of_budget_and_remaining_are_pure_clock_functions` |
+| TIME-003 | `requirements/time-capability/tests/timer-port.test.mjs::WHAT[TIME-003] VERIFY_004_virtual_timer_fires_exactly_when_advanced_past_deadline` |
+| TIME-004 | `requirements/time-capability/tests/ambient-time-forbidden.test.mjs::WHAT[TIME-004] domain_application_session_contain_no_raw_time_tokens` |
+| TIME-005 | `requirements/time-capability/tests/deadline-typed.test.mjs::WHAT[TIME-005] TIME_005_verdict_follows_injected_clock_not_value` |
+| TIME-006 | `requirements/time-capability/tests/until-signal-or-deadline.test.mjs::WHAT[TIME-006] THEOREM_untilSignalOrDeadline_deadline_without_material_is_WaitTimedOut` |
+| TIME-007 | `requirements/time-capability/tests/pair-session-elapsed.test.mjs::WHAT[TIME-007] TIME_007_session_started_at_is_bind_once_to_first_prompt_sample`；`requirements/time-capability/tests/session-started-at-bind-surface.test.mjs::WHAT[TIME-007] SessionStartedAtLedger owns bindSessionStartedAt entry point for transform boundary` |

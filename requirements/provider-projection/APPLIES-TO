@@ -2,7 +2,19 @@
 # requirements/provider-projection/** is covered implicitly and must not be listed here.
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
-/src/Wanxiangshu/**
+/src/Wanxiangshu/Participant/Provider/Projection/Model.fs
+/src/Wanxiangshu/Participant/Provider/Projection/Intent.fs
+/src/Wanxiangshu/Participant/Provider/Projection/Planner.fs
+/src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs
+/src/Wanxiangshu/Participant/Provider/Projection/Surface.fs
+/src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs
+/src/Wanxiangshu/OpenCode/Codec/ProviderProjectionSurface.fs
+/src/Wanxiangshu/OpenCode/Codec/ProviderWireCapture.fs
+/src/Wanxiangshu/OpenCode/Codec/ProviderWireDecode.fs
+/src/Wanxiangshu/Foundation/LlmFacing.fs
+/src/Wanxiangshu/Foundation/SyntheticToml.fs
+/src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs
+/scripts/checks/provider-projection-boundary.mjs
 /scripts/checks/provider-leak-gate.mjs
 /scripts/checks/llm-facing-format-gate.mjs
 /requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs

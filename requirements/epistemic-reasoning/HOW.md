@@ -59,17 +59,17 @@ MCP 层返回 structuredContent 携带 nextTool 提示
 
 | 命题 | 落点测试 |
 |---|---|
-| EPI-001 | `requirements/epistemic-reasoning/tests/kernel.test.mjs` |
-| EPI-002 | `requirements/epistemic-reasoning/tests/kernel.test.mjs` |
-| EPI-003 | `requirements/epistemic-reasoning/tests/semantics.test.mjs` |
-| EPI-004 | `requirements/epistemic-reasoning/tests/kernel.test.mjs` |
-| EPI-005 | `requirements/epistemic-reasoning/tests/kernel.test.mjs` |
-| EPI-006 | `requirements/epistemic-reasoning/tests/bayes.test.mjs` |
-| EPI-007 | `requirements/epistemic-reasoning/tests/kernel.test.mjs` |
-| EPI-008 | `requirements/epistemic-reasoning/tests/semantics.test.mjs` |
-| EPI-009 | `requirements/epistemic-reasoning/tests/bayes.test.mjs` |
-| EPI-010 | `requirements/epistemic-reasoning/tests/search.test.mjs` |
-| EPI-011 | `requirements/epistemic-reasoning/tests/represent.test.mjs` |
-| EPI-012 | `requirements/epistemic-reasoning/tests/kernel.test.mjs` |
-| EPI-013 | `requirements/epistemic-reasoning/tests/mcp-handle.test.mjs` |
-| EPI-014 | `requirements/epistemic-reasoning/tests/mcp-stdio.test.mjs` |
+| EPI-001 | `requirements/epistemic-reasoning/tests/kernel.test.mjs::WHAT[EPI-001] start_yields_semantic_assessment_request` |
+| EPI-002 | `requirements/epistemic-reasoning/tests/kernel.test.mjs::WHAT[EPI-002] fsharp_kernel_has_no_agent_host_domain_dependency_and_sdk_stays_at_mcp_edge` |
+| EPI-003 | `requirements/epistemic-reasoning/tests/semantics.test.mjs::WHAT[EPI-003] ungrounded_model_finding_is_retained_as_claim_but_never_promoted_to_evidence` |
+| EPI-004 | `requirements/epistemic-reasoning/tests/kernel.test.mjs::WHAT[EPI-004] resume_rejects_observation_that_does_not_match_pending_kernel_request` |
+| EPI-005 | `requirements/epistemic-reasoning/tests/kernel.test.mjs::WHAT[EPI-005] semantic_assessment_and_candidates_are_control_observations_not_world_evidence`；`requirements/epistemic-reasoning/tests/kernel.test.mjs::WHAT[EPI-005] candidate_question_must_be_investigated_before_it_can_affect_answer` |
+| EPI-006 | `requirements/epistemic-reasoning/tests/bayes.test.mjs::WHAT[EPI-006] same_semantic_evidence_from_independent_dependency_groups_is_preserved_twice`；`requirements/epistemic-reasoning/tests/bayes.test.mjs::WHAT[EPI-006] same_dependency_group_is_not_counted_as_independent_evidence_twice` |
+| EPI-007 | `requirements/epistemic-reasoning/tests/kernel.test.mjs::WHAT[EPI-007] contract_keeps_distribution_after_semantic_assessment` |
+| EPI-008 | `requirements/epistemic-reasoning/tests/semantics.test.mjs::WHAT[EPI-008] gateway_gain_can_make_low_immediate_gain_question_worth_asking` |
+| EPI-009 | `requirements/epistemic-reasoning/tests/bayes.test.mjs::WHAT[EPI-009] bayesian_posterior_requires_explicit_numeric_qualification`；`requirements/epistemic-reasoning/tests/bayes.test.mjs::WHAT[EPI-009] qualified_independent_evidence_updates_posterior`；`requirements/epistemic-reasoning/tests/bayes.test.mjs::WHAT[EPI-009] unqualified_item_cannot_mask_qualified_evidence_from_same_dependency_group` |
+| EPI-010 | `requirements/epistemic-reasoning/tests/search.test.mjs::WHAT[EPI-010] graph_astar_degenerates_to_standard_g_plus_h_shortest_path`；`requirements/epistemic-reasoning/tests/search.test.mjs::WHAT[EPI-010] graph_astar_reopens_closed_node_when_better_g_is_discovered`；`requirements/epistemic-reasoning/tests/search.test.mjs::WHAT[EPI-010] graph_astar_rejects_negative_cost_graph` |
+| EPI-011 | `requirements/epistemic-reasoning/tests/represent.test.mjs::WHAT[EPI-011] wire_equivalence_hint_cannot_force_kernel_merge`；`requirements/epistemic-reasoning/tests/represent.test.mjs::WHAT[EPI-011] same_kernel_identity_merges_candidate_provenance_instead_of_erasing_it`；`requirements/epistemic-reasoning/tests/represent.test.mjs::WHAT[EPI-011] same_question_from_independent_dependency_groups_is_not_false_deduplicated`；`requirements/epistemic-reasoning/tests/represent.test.mjs::WHAT[EPI-011] kernel_owned_equivalence_class_removes_only_truly_dominated_representation`；`requirements/epistemic-reasoning/tests/represent.test.mjs::WHAT[EPI-011] pareto_incomparable_equivalent_representations_both_survive` |
+| EPI-012 | `requirements/epistemic-reasoning/tests/kernel.test.mjs::WHAT[EPI-012] closure_is_idempotent_at_fixed_point` |
+| EPI-013 | `requirements/epistemic-reasoning/tests/mcp-handle.test.mjs::WHAT[EPI-013] mcp_server_surface_exposes_phase_tools_and_legacy_resume` |
+| EPI-014 | `requirements/epistemic-reasoning/tests/mcp-stdio.test.mjs::WHAT[EPI-014] initialize_returns_server_identity_and_instructions` |

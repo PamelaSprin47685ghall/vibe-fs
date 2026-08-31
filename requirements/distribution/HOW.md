@@ -43,11 +43,11 @@ Release Proof (npm pack --dry-run 验证 tarball 清单)
 
 | 命题 | 落点测试 |
 |---|---|
-| DISTRIBUTION-001 | `requirements/distribution/tests/pack-closure.test.mjs` |
-| DISTRIBUTION-002 | `requirements/distribution/tests/cwd-independent-resources.test.mjs` |
-| DISTRIBUTION-003 | `requirements/distribution/tests/pack-closure.test.mjs` |
-| DISTRIBUTION-004 | `requirements/distribution/tests/pack-closure.test.mjs` |
-| DISTRIBUTION-005 | `requirements/distribution/tests/cwd-independent-resources.test.mjs` |
-| DISTRIBUTION-006 | `requirements/distribution/tests/cwd-independent-resources.test.mjs` |
-| DISTRIBUTION-007 | `requirements/distribution/tests/pack-closure.test.mjs` |
-| DISTRIBUTION-008 | `requirements/distribution/tests/pack-closure.test.mjs` |
+| DISTRIBUTION-001 | `requirements/distribution/tests/pack-closure.test.mjs::WHAT[DISTRIBUTION-001] DISTRIBUTION_artifact_carries_compiled_code_and_runtime_resources_together` |
+| DISTRIBUTION-002 | `requirements/distribution/tests/cwd-independent-resources.test.mjs::WHAT[DISTRIBUTION-002] DISTRIBUTION_resource_reads_resolve_under_package_root_regardless_of_cwd`；`requirements/distribution/tests/cwd-independent-resources.test.mjs::WHAT[DISTRIBUTION-002] DISTRIBUTION_fresh_process_with_foreign_cwd_imports_entry_and_reads_resources` |
+| DISTRIBUTION-003 | `requirements/distribution/tests/pack-closure.test.mjs::WHAT[DISTRIBUTION-003] DISTRIBUTION_manifest_entry_matches_exports_and_shipped_path` |
+| DISTRIBUTION-004 | `requirements/distribution/tests/pack-closure.test.mjs::WHAT[DISTRIBUTION-004] DISTRIBUTION_files_whitelist_is_explicit_and_excludes_dev_test_legacy` |
+| DISTRIBUTION-005 | `requirements/distribution/tests/cwd-independent-resources.test.mjs::WHAT[DISTRIBUTION-005] DISTRIBUTION_lookup_is_single_fixed_relative_path_not_candidate_search` |
+| DISTRIBUTION-006 | `requirements/distribution/tests/cwd-independent-resources.test.mjs::WHAT[DISTRIBUTION-006] DISTRIBUTION_resource_missing_fails_fast_no_fallback` |
+| DISTRIBUTION-007 | `requirements/distribution/tests/pack-closure.test.mjs::WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_packing_and_artifact_checks` |
+| DISTRIBUTION-008 | `requirements/distribution/tests/pack-closure.test.mjs::WHAT[DISTRIBUTION-008] DISTRIBUTION_enforcer_rulebook_closure_is_complete`；`requirements/distribution/tests/pack-closure.test.mjs::WHAT[DISTRIBUTION-008] DISTRIBUTION_provider_resource_closure_is_language_complete` |

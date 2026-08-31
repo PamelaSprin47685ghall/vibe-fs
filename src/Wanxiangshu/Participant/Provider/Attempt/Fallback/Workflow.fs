@@ -188,10 +188,11 @@ module ProviderRecoveryWorkflow =
         | None -> Task.FromResult(()) :> Task
         | Some bloggerSessionId -> awaitLinkedProducer host durable mainSessionId bloggerSessionId
 
+    let private mainSessionOfBloggerProjection (projection: ProjectionSet) (bloggerSessionId: SessionId) =
+        SessionAssociationProjection.tryMainSessionOf bloggerSessionId projection.AgentProjections.Associations
+
     let private mainSessionOfBlogger (durable: AgentJournal) (bloggerSessionId: SessionId) =
-        SessionAssociationProjection.tryMainSessionOf
-            bloggerSessionId
-            (AgentJournal.snapshot durable).AgentProjections.Associations
+        mainSessionOfBloggerProjection (AgentJournal.snapshot durable) bloggerSessionId
 
     let private requestKindFor (durable: AgentJournal) (scope: IBloggerRuntimeHost) (sessionId: SessionId) =
         match mainSessionOfBlogger durable sessionId, scope.TryPeekCurrentRequest(SessionId.value sessionId) with
@@ -267,7 +268,7 @@ module ProviderRecoveryWorkflow =
             let! outcome =
                 taskResult {
                     do!
-                        BloggerCoordinator.stageContinuationContext scope durable ctx
+                        BloggerCoordinator.materializeContinuationContext scope durable ctx
                         |> TaskResult.mapError BloggerContinuationFailure.Materialize
 
                     let! promptKey =
@@ -509,8 +510,10 @@ module ProviderRecoveryWorkflow =
         | Ok ConfirmedFailureOutcome.RecoveryExhausted ->
             notifyFailure eventPort turn error
             Task.FromResult(()) :> Task
-        | Ok ConfirmedFailureOutcome.AlreadyRecorded
-        | Ok ConfirmedFailureOutcome.NoActiveRun -> Task.FromResult(()) :> Task
+        | Ok ConfirmedFailureOutcome.AlreadyRecorded -> Task.FromResult(()) :> Task
+        | Ok ConfirmedFailureOutcome.NoActiveRun ->
+            notifyFailure eventPort turn "Confirmed provider failure has no active fallback run"
+            Task.FromResult(()) :> Task
         | Ok(ConfirmedFailureOutcome.RecoveryAdvanced opportunity) ->
             continueAdvancedFailure sessionPort eventPort durable scope turn continuationPrompt error opportunity
 
@@ -569,17 +572,19 @@ module ProviderRecoveryWorkflow =
 
     let private admitAuthorizedFailure
         (durable: AgentJournal)
+        (ownerSessionId: SessionId)
         (turn: ReconciledTurn)
         (authorization: ProviderRecoveryAuthorization)
         (error: string)
         =
         task {
-            let! admission = FallbackLedger.recordAuthorizedFailure durable turn.SessionId authorization error
-            return reconcileFailureAdmission durable turn.SessionId admission
+            let! admission = FallbackLedger.recordAuthorizedFailure durable ownerSessionId authorization error
+            return reconcileFailureAdmission durable ownerSessionId admission
         }
 
     let private admitCurrentFailure
         (durable: AgentJournal)
+        (ownerSessionId: SessionId)
         (turn: ReconciledTurn)
         (failure: ExecutionFailure)
         (requestKind: ProviderRequestKind)
@@ -588,7 +593,8 @@ module ProviderRecoveryWorkflow =
         =
         match policyFallbackDecision turn failure current requestKind with
         | PolicyFallbackDecision.Exhausted -> Task.FromResult(Ok ConfirmedFailureOutcome.RecoveryExhausted)
-        | PolicyFallbackDecision.Authorized authorization -> admitAuthorizedFailure durable turn authorization error
+        | PolicyFallbackDecision.Authorized authorization ->
+            admitAuthorizedFailure durable ownerSessionId turn authorization error
 
     let admitPolicyAuthorizedFailure
         (durable: AgentJournal)
@@ -597,9 +603,20 @@ module ProviderRecoveryWorkflow =
         (requestKind: ProviderRequestKind)
         (error: string)
         : Task<Result<ConfirmedFailureOutcome, string>> =
-        match FallbackEvidence.tryCurrentState turn.SessionId (AgentJournal.snapshot durable) with
+        let projection = AgentJournal.snapshot durable
+
+        let ownerSessionId =
+            mainSessionOfBloggerProjection projection turn.SessionId
+            |> Option.orElseWith (fun () ->
+                FallbackEvidence.tryCurrentState turn.SessionId projection
+                |> Option.map (fun _ -> turn.SessionId))
+
+        match ownerSessionId with
         | None -> Task.FromResult(Ok ConfirmedFailureOutcome.NoActiveRun)
-        | Some current -> admitCurrentFailure durable turn failure requestKind error current
+        | Some owner ->
+            match FallbackEvidence.tryCurrentState owner projection with
+            | None -> Task.FromResult(Ok ConfirmedFailureOutcome.NoActiveRun)
+            | Some current -> admitCurrentFailure durable owner turn failure requestKind error current
 
     let private executeFallbackDecision
         (sessionPort: ISessionHostPort)

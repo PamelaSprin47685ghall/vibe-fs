@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 const change = await import('../../../dist/Change/Surface.js')
+const hostSurface = await import('../../../dist/Change/Host/Surface.js')
 
 const fakeRunner = (answers) => {
   const calls = []
@@ -132,6 +133,17 @@ test('WHAT[CHGINT-003] GIT_rebase_surfaces_stderr_on_failure', async () => {
   assert.equal(result.error, 'CONFLICT (content)')
 })
 
+test('WHAT[CHGINT-003] GIT_candidate_commit_deletes_stale_rebase_head_before_commit_and_surfaces_failure', async () => {
+  const fake = fakeRunner([['commit -m candidate: manager-1', [1, '', 'commit rejected']]])
+  const result = await hostSurface.finalizeWorktree(fake.runner, 'manager-1', WORKTREE)
+  assert.equal(result.ok, false)
+  assert.equal(result.error, 'git commit failed: commit rejected')
+  assert.deepEqual(fake.calls.slice(-2).map((call) => call.args.join(' ')), [
+    'update-ref -d REBASE_HEAD',
+    'commit -m candidate: manager-1',
+  ])
+})
+
 test('WHAT[CHGINT-005] GIT_conflicted_files_parses_lines', async () => {
   const result = await change.gitConflictedFiles(git(fakeRunner([['diff --name-only --diff-filter=U', [0, 'a.fs\nb.fs\n', '']]]).runner), WORKTREE)
   assert.deepEqual(ok(result), ['a.fs', 'b.fs'])
@@ -148,7 +160,12 @@ test('WHAT[CHGINT-003] GIT_has_rebase_head_true_only_when_git_path_dir_exists', 
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rebase-head-'))
-  assert.equal(await change.gitHasRebaseHead(git(fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}\n`, '']]]).runner), WORKTREE), true)
+  const fake = fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}\n`, '']]])
+  assert.equal(await change.gitHasRebaseHead(git(fake.runner), WORKTREE), true)
+  assert.deepEqual(fake.calls.map((call) => call.args.join(' ')), [
+    'rev-parse --git-path rebase-merge',
+    'rev-parse --git-path rebase-apply',
+  ])
   assert.equal(await change.gitHasRebaseHead(git(fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}-gone\n`, '']]]).runner), WORKTREE), false)
   assert.equal(await change.gitHasRebaseHead(git(fakeRunner([]).runner), WORKTREE), false)
   rmSync(dir, { recursive: true, force: true })

@@ -82,12 +82,12 @@ open Wanxiangshu.Resources
 /// 不再新增。同 epoch 内前次 provider wire 必须是后次 wire 的字节前缀（ARCH-004）。
 module PairProgrammingThoughtTransform =
 
+    [<Literal>]
+    let private PairProgrammingGuidelinePath = "host/pair-programming-guideline"
+
     /// HOST-013 English canonical used by tests; production loads via session language.
     let text =
-        ProviderProse.instructionLines
-            ProviderLanguage.English
-            ProjectionConstants.PairProgrammingGuidelinePath
-            Map.empty
+        ProviderProse.instructionLines ProviderLanguage.English PairProgrammingGuidelinePath Map.empty
         |> LlmFacing.renderInstructions
 
     // ── JS Evidence parsers（flat；无嵌套 decision）──────────────────────────
@@ -654,7 +654,15 @@ module PairProgrammingThoughtTransform =
             )
         | _ -> Error "tool batch message without transcript address (HOST-013)"
 
-    let private gapsAroundAddress
+    // semantic-decorator-owner: guidance-delivery
+    // semantic-decorator-WHAT: GD-011
+    // semantic-decorator-trace-relation: R_gap_pair(address) = (gapCtor address, gapCtor address), left then right, with a pure extensional constructor
+    // semantic-decorator-proof: requirements/guidance-delivery/tests/pair-gap-constructor.test.mjs::WHAT[GD-011] PPT_gap_constructor_receives_the_same_address_exactly_twice_in_pair_order
+    // semantic-decorator-failure-policy: a constructor exception propagates immediately and prevents the second invocation
+    // semantic-decorator-cancel-policy: pure synchronous gap construction introduces no cancellation boundary
+    // semantic-decorator-deadline-policy: pure synchronous gap construction introduces no deadline
+    // semantic-decorator-retry-bound: 2
+    let internal gapsAroundAddress
         (gapCtor: TranscriptMessageAddress -> TranscriptGap)
         (message: obj)
         (errorMsg: string)
@@ -1002,8 +1010,7 @@ module PairProgrammingThoughtTransform =
         task {
             let messages = unbox<obj array> outObj?messages |> Array.toList
 
-            let guideline =
-                ProviderProse.render language ProjectionConstants.PairProgrammingGuidelinePath Map.empty
+            let guideline = ProviderProse.render language PairProgrammingGuidelinePath Map.empty
 
             let elapsed =
                 sessionStartedAt

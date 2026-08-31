@@ -33,9 +33,9 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Mission.Obligation.Todo
 
 /// Per-run terminal lifecycle for HostForkRuntime: install, complete, fail.
 module HostForkRunLifecycle =
@@ -206,8 +206,8 @@ module HostForkRunLifecycle =
         }
 
     let workRecordForOutcome
-        (childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
-        (xTraceHead: SessionId -> int64)
+        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
+        (xTraceHead: SessionId -> XTraceCursor)
         (run: PendingHostRun)
         (outcome: TerminalOutcome)
         =
@@ -497,8 +497,8 @@ module HostForkRunLifecycle =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
-        (xTraceHead: SessionId -> int64)
+        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
+        (xTraceHead: SessionId -> XTraceCursor)
         (trackOwnedWork: (unit -> Task) -> unit)
         (handoffPort: ReusableHandoffPort option)
         (handoff: PreparedDelegationHandoff option)

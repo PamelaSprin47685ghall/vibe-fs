@@ -10,15 +10,21 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 import {
+  LEGACY_PROVIDER_PROSE_REL,
+  LEGACY_PROVIDER_RESOURCES_REL,
   LOCALE_FILES,
   PROVIDER_ROOT,
+  PROVIDER_RESOURCES_REL,
   extractCodeSpans,
   extractPlaceholders,
   extractProtocolIdentifiers,
   listSemanticResourceDirs,
+  scanForbiddenLegacyProviderPaths,
   scanIdentifierParity,
+  scanLegacyProviderResourcesPolicy,
   scanParity,
   scanPlaceholderParity,
+  scanProviderLanguageBinding,
   scanProviderResourcesHook,
   scanRepo,
   scanSemanticAnchorCatalog,
@@ -31,6 +37,13 @@ module ProviderResources =
         for lang in [ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ] do
             if not (exists lang semanticPath) then failwith "missing"
     let resourceFileName lang = "en.md"
+`
+
+const THIN_HOST_BINDING = `
+module ProviderLanguageBinding =
+    let readGlobalPreference () =
+        Environment.GetEnvironmentVariable "WANXIANGSHU_PROVIDER_LANGUAGE"
+        |> ProviderLanguage.fromPreferenceObservation
 `
 
 const makeProviderFixture = () => {
@@ -65,9 +78,104 @@ test('WHAT[PROVIDER-LANGUAGE-006] parity detects missing en leaf in the real tre
   assert.equal(violations.length, 0)
 })
 
-test('WHAT[PROVIDER-LANGUAGE-006] ProviderResources hook must require the language pair', () => {
+test('WHAT[PROVIDER-LANGUAGE-006] Participant/Provider owner hook requires the language pair', () => {
+  assert.equal(
+    PROVIDER_RESOURCES_REL,
+    'src/Wanxiangshu/Participant/Provider/ProviderResources.fs',
+  )
   assert.equal(scanProviderResourcesHook(GOOD_HOOK).length, 0)
-  assert.ok(scanProviderResourcesHook('module ProviderResources = let x = 1').some((v) => v.code === 'missing-require-language-pair'))
+  const red = scanProviderResourcesHook('module ProviderResources = let x = 1')
+  assert.ok(red.some((v) => v.code === 'missing-require-language-pair'))
+  assert.ok(red.every((v) => v.path === PROVIDER_RESOURCES_REL))
+})
+
+test('WHAT[PROVIDER-LANGUAGE-006] Host binding only observes raw preference and delegates', () => {
+  assert.deepEqual(scanProviderLanguageBinding(THIN_HOST_BINDING), [])
+})
+
+test('WHAT[PROVIDER-LANGUAGE-006] Host English fallback and parser are owner-policy violations', () => {
+  const fallback = scanProviderLanguageBinding(
+    `${THIN_HOST_BINDING}\nlet fallback = ProviderLanguage.English`,
+  )
+  assert.deepEqual(fallback, [
+    {
+      code: 'provider-language-policy',
+      path: 'src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs',
+      detail: 'ProviderLanguage.English fallback belongs to Participant/Provider owner, not Host',
+    },
+  ])
+
+  const parser = scanProviderLanguageBinding(
+    `${THIN_HOST_BINDING}\nlet parse raw = ProviderLanguage.tryParse raw`,
+  )
+  assert.deepEqual(parser, [
+    {
+      code: 'provider-language-policy',
+      path: 'src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs',
+      detail: 'ProviderLanguage.tryParse belongs to Participant/Provider owner, not Host',
+    },
+  ])
+})
+
+test('WHAT[PROVIDER-LANGUAGE-006] Host preference branches and aliases are owner-policy violations', () => {
+  const red = scanProviderLanguageBinding(`
+module ProviderLanguageBinding =
+    let readGlobalPreference () =
+        match Environment.GetEnvironmentVariable "WANXIANGSHU_PROVIDER_LANGUAGE" with
+        | null -> ProviderLanguage.fromPreferenceObservation null
+        | raw when String.IsNullOrWhiteSpace raw -> ProviderLanguage.fromPreferenceObservation raw
+        | "en" -> ProviderLanguage.fromPreferenceObservation "en"
+        | raw -> ProviderLanguage.fromPreferenceObservation raw
+`)
+  assert.ok(
+    red.some(
+      (v) =>
+        v.code === 'provider-language-policy' &&
+        v.detail ===
+          'provider-language whitespace/default policy belongs to Participant/Provider owner, not Host',
+    ),
+  )
+  assert.ok(
+    red.some(
+      (v) =>
+        v.code === 'provider-language-policy' &&
+        v.detail === 'provider-language aliases belong to Participant/Provider owner, not Host',
+    ),
+  )
+})
+
+test('WHAT[PROVIDER-LANGUAGE-006] language policy is rejected at legacy Resources path', () => {
+  assert.deepEqual(
+    scanLegacyProviderResourcesPolicy(`
+module ProviderResources =
+    let requireLanguagePair path = ProviderLanguage.resourceFileName path
+`),
+    [
+      {
+        code: 'provider-language-policy',
+        path: LEGACY_PROVIDER_RESOURCES_REL,
+        detail: 'provider-language policy belongs to Participant/Provider/ProviderResources.fs',
+      },
+    ],
+  )
+})
+
+test('WHAT[PROVIDER-LANGUAGE-006] legacy ProviderResources and ProviderProse paths are forbidden', () => {
+  assert.deepEqual(
+    scanForbiddenLegacyProviderPaths([LEGACY_PROVIDER_PROSE_REL, LEGACY_PROVIDER_RESOURCES_REL]),
+    [
+      {
+        code: 'forbidden-legacy-path',
+        path: LEGACY_PROVIDER_RESOURCES_REL,
+        detail: 'legacy ProviderResources path must be absent',
+      },
+      {
+        code: 'forbidden-legacy-path',
+        path: LEGACY_PROVIDER_PROSE_REL,
+        detail: 'legacy ProviderProse path must be absent',
+      },
+    ],
+  )
 })
 
 test('WHAT[PROVIDER-LANGUAGE-010] repo lists role semantic dirs for the catalog', () => {

@@ -243,7 +243,7 @@ module MagicTodo =
             parts
             |> List.tryFind (fun part ->
                 part.Kind = "tool_result"
-                && part.Cursor.Sequence > t1CallCursor.Sequence
+                && XTraceCursor.isAfter part.Cursor t1CallCursor
                 && part.ToolCallId = Some t1ToolCallId)
             |> Option.map (fun part -> XTraceCursor.nextCursor part.Cursor)
 
@@ -254,7 +254,7 @@ module MagicTodo =
 
         let minimum = workRecordStart openingCursor
 
-        if candidate.Sequence > minimum.Sequence then
+        if XTraceCursor.isAfter candidate minimum then
             candidate
         else
             minimum
@@ -277,8 +277,10 @@ module MagicTodo =
             Some(workRecordStart openingCursor)
 
     let bloggerEffectiveStart (recordCoverage: RecordCoverage) (workRecordStartCursor: XTraceCursor) : XTraceCursor =
-        if recordCoverage.IngestedThrough.Sequence > workRecordStartCursor.Sequence then
-            recordCoverage.IngestedThrough
+        let ingestedThrough = RecordCoverage.ingestedThrough recordCoverage
+
+        if XTraceCursor.isAfter ingestedThrough workRecordStartCursor then
+            ingestedThrough
         else
             workRecordStartCursor
 

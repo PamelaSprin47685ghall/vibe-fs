@@ -17,10 +17,12 @@ type SatelliteOrigin =
     | Reused
     | Replacement
 
+/// DSL-class: PhysicalHandle — HOST-014 session lease identity and observed allocation origin; owner SatelliteRuntime, law HOST-014, proof satellite-runtime.
 type SatelliteLease =
     { SessionId: SessionId
       Origin: SatelliteOrigin }
 
+/// DSL-class: PhysicalHandle — HOST-014 injected session lifecycle ports and physical launch coordinates; owner SatelliteRuntime, law HOST-014, proof satellite-runtime.
 type SatelliteSpec =
     { Kind: SatelliteKind
       Agent: string

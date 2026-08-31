@@ -1,6 +1,7 @@
 // requirement-trace.mjs — pure data graph for the test ↔ WHAT closure.
 //
 //   WhatNode { id, package, file, line, heading }
+//   WhatConflict { id, kind: duplicate|multi-owner, definitions: WhatNode[] }
 //   TestNode { file, line, title, state: active|skip|todo, whatIds }
 //   ProofEdge { proofFile, proofLine, whatId, file, line, title, state, anchor }
 //
@@ -11,11 +12,55 @@
 // text that merely resembles code visible.
 
 import { readFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 
 import { walk } from './walk.mjs'
 
 export const WHAT_TAG_RE = /WHAT\[([A-Z][A-Z0-9-]*-\d{3})\]/g
+export const PROOF_LEVELS = Object.freeze(['static', 'pure', 'temporal', 'adapter', 'long-stroke'])
+
+const PROOF_LEVEL_SET = new Set(PROOF_LEVELS)
+const normalizeWorkspacePath = (value) => String(value).replace(/\\/g, '/').replace(/^\.\//, '')
+
+export const proofLevelKey = ({ path, title, what_id: whatId }) =>
+  `${normalizeWorkspacePath(path)}\u0000${title}\u0000${whatId}`
+
+/** Validate the verification-owned proof classification registry without consulting external rows. */
+export function validateProofLevelRegistry(document) {
+  const findings = []
+  const add = (code, key, message) => findings.push({ code, key, message })
+  if (document === null || typeof document !== 'object' || Array.isArray(document) || document.schema_version !== 1 || !Array.isArray(document.levels) || !Array.isArray(document.proofs)) {
+    add('PROOF_LEVEL_REGISTRY_SHAPE', null, 'expected { schema_version: 1, levels: [...], proofs: [...] }')
+    return findings
+  }
+  if (document.levels.length !== PROOF_LEVELS.length || document.levels.some((level, index) => level !== PROOF_LEVELS[index])) {
+    add('PROOF_LEVEL_LADDER', null, `levels must be exactly ${PROOF_LEVELS.join(', ')}`)
+  }
+  const seen = new Set()
+  for (const proof of document.proofs) {
+    if (proof === null || typeof proof !== 'object' || Array.isArray(proof)) {
+      add('PROOF_LEVEL_SHAPE', null, 'proof entry must be an object')
+      continue
+    }
+    const keys = Object.keys(proof).sort()
+    if (keys.join(',') !== 'level,path,title,what_id' || typeof proof.path !== 'string' || proof.path.length === 0 || proof.path.startsWith('/') || normalizeWorkspacePath(proof.path).split('/').includes('..') || typeof proof.title !== 'string' || proof.title.length === 0 || typeof proof.what_id !== 'string' || !/^[A-Z][A-Z0-9-]*-\d{3}$/.test(proof.what_id) || !PROOF_LEVEL_SET.has(proof.level)) {
+      add('PROOF_LEVEL_SHAPE', null, 'proof requires only workspace-relative path, exact title, what_id, and canonical level')
+      continue
+    }
+    const key = proofLevelKey(proof)
+    if (seen.has(key)) add('PROOF_LEVEL_DUPLICATE', key, 'proof classification key is ambiguous')
+    seen.add(key)
+  }
+  return findings
+}
+
+/** Resolve one exact proof classification. Invalid, absent, and ambiguous registries fail closed. */
+export function resolveProofLevel(document, proof) {
+  if (validateProofLevelRegistry(document).length > 0 || proof === null || typeof proof !== 'object') return null
+  const key = proofLevelKey(proof)
+  const matches = document.proofs.filter((candidate) => proofLevelKey(candidate) === key)
+  return matches.length === 1 ? matches[0].level : null
+}
 
 const TEST_MODIFIER = new Set(['fails', 'only', 'skip', 'todo'])
 const STATE_MODIFIER = new Set(['skip', 'todo'])
@@ -380,34 +425,41 @@ const pathReferences = (text, proofFile, requirementsRoot) => {
   return refs
 }
 
-const anchorMatches = (test, anchor) => {
-  if (!anchor) return false
+/**
+ * Resolve an explicit HOW.md proof title against scanned tests. Resolution is
+ * exact after accepting the documented optional `test:` prefix and the
+ * scanner's primary-WHAT-stripped title alias. Callers decide whether zero or
+ * multiple matches are admissible; this helper never guesses from a filename.
+ */
+export const resolveExactProofTitle = (tests, anchor) => {
+  if (!anchor) return []
   const normalized = anchor.replace(/^test:\s*/, '').trim()
-  return normalized === test.title || normalized === test.anchor || normalized === test.title?.replace(/^WHAT\[[^\]]+\]\s*/, '')
+  return tests.filter(
+    (test) => normalized === test.title || normalized === test.anchor || normalized === test.title?.replace(/^WHAT\[[^\]]+\]\s*/, ''),
+  )
 }
 
 const proofEdgesForRow = ({ proofFile, proofLine, rowText, whatIds, testsByFile, requirementsRoot }) => {
   const edges = []
   for (const reference of pathReferences(rowText, proofFile, requirementsRoot)) {
     const candidates = testsByFile.get(reference.path) ?? []
-    const explicit = reference.explicit
     if (candidates.length === 0) {
-      if (explicit) edges.push({ proofFile, proofLine, whatId: whatIds[0] ?? null, file: reference.path, line: null, title: null, state: 'dangling', anchor: reference.anchor, reason: 'test file does not exist' })
+      edges.push({ proofFile, proofLine, whatId: whatIds[0] ?? null, file: reference.path, line: null, title: null, state: 'dangling', anchor: reference.anchor, reason: 'test file does not exist' })
+      continue
+    }
+    if (!reference.explicit) {
+      edges.push({ proofFile, proofLine, whatId: whatIds[0] ?? null, file: reference.path, line: null, title: null, state: 'dangling', anchor: null, reason: 'bare test path has no exact title anchor' })
       continue
     }
 
-    let matched = reference.anchor ? candidates.filter((test) => anchorMatches(test, reference.anchor)) : []
-    if (!reference.anchor) {
-      // Existing PROOF prose often places an exact title beside a backticked
-      // path. A title match is an exact edge; a bare file path remains a
-      // structural reference owned by the meta-verifier and is not guessed.
-      matched = candidates.filter((test) => {
-        const aliases = [test.title, test.anchor].filter(Boolean)
-        return aliases.some((alias) => alias.length > 0 && rowText.includes(alias))
-      })
-    }
+    const matched = resolveExactProofTitle(candidates, reference.anchor)
     if (matched.length === 0) {
-      if (explicit) edges.push({ proofFile, proofLine, whatId: whatIds[0] ?? null, file: reference.path, line: null, title: null, state: 'dangling', anchor: reference.anchor, reason: 'test anchor does not exist' })
+      edges.push({ proofFile, proofLine, whatId: whatIds[0] ?? null, file: reference.path, line: null, title: null, state: 'dangling', anchor: reference.anchor, reason: 'test anchor does not exist' })
+      continue
+    }
+    if (matched.length !== 1) {
+      const test = matched[0]
+      edges.push({ proofFile, proofLine, whatId: whatIds[0] ?? null, file: test.file, line: test.line, title: test.title, state: 'dangling', anchor: reference.anchor, reason: 'anchor resolves to multiple tests' })
       continue
     }
 
@@ -416,41 +468,18 @@ const proofEdgesForRow = ({ proofFile, proofLine, rowText, whatIds, testsByFile,
       return Boolean(whatId && test.whatIds.length === 1 && test.whatIds[0] === whatId && test.state === 'active')
     })
     if (valid.length === 0) {
-      // A non-explicit cross-package REUSE note may name a test owned by a
-      // different proposition. It is not an executable edge for this row, but
-      // it is also not a stale anchor. Explicit `::anchor` syntax is strict.
-      if (explicit) {
-        const test = matched[0]
-        edges.push({
-          proofFile,
-          proofLine,
-          whatId: whatIds[0] ?? null,
-          file: test.file,
-          line: test.line,
-          title: test.title,
-          state: test.state,
-          anchor: test.anchor,
-          reason: test.state !== 'active' ? 'skip/todo is not executable proof' : 'test WHAT does not match PROOF proposition',
-        })
-      }
-      continue
-    }
-
-    if (valid.length !== 1) {
-      if (explicit) {
-        const test = valid[0] ?? matched[0]
-        edges.push({
-          proofFile,
-          proofLine,
-          whatId: whatIds[0] ?? null,
-          file: test.file,
-          line: test.line,
-          title: test.title,
-          state: 'dangling',
-          anchor: reference.anchor ?? test.anchor,
-          reason: valid.length === 0 ? 'anchor does not match an active WHAT-owned test' : 'anchor resolves to multiple active tests',
-        })
-      }
+      const test = matched[0]
+      edges.push({
+        proofFile,
+        proofLine,
+        whatId: whatIds[0] ?? null,
+        file: test.file,
+        line: test.line,
+        title: test.title,
+        state: test.state,
+        anchor: test.anchor,
+        reason: test.state !== 'active' ? 'skip/todo is not executable proof' : 'test WHAT does not match PROOF proposition',
+      })
       continue
     }
 
@@ -462,7 +491,7 @@ const proofEdgesForRow = ({ proofFile, proofLine, rowText, whatIds, testsByFile,
   return edges
 }
 
-const readProofRows = (requirementsRoot, tests) => {
+const readProofRows = (requirementsRoot, tests, uniqueWhats) => {
   const proofFiles = walk(requirementsRoot, ['.md']).filter((file) => file.endsWith('/HOW.md'))
   const testsByFile = new Map()
   for (const test of tests) {
@@ -470,14 +499,18 @@ const readProofRows = (requirementsRoot, tests) => {
     testsByFile.get(test.file).push(test)
   }
 
+  const idsByPackage = new Map()
+  for (const what of uniqueWhats.values()) {
+    if (!idsByPackage.has(what.package)) idsByPackage.set(what.package, [])
+    idsByPackage.get(what.package).push(what.id)
+  }
+
   const proofIds = new Set()
   const proofEdges = []
   const proseOnlyProof = []
   for (const file of proofFiles) {
     const packageName = file.split('/').slice(-2)[0]
-    const whatFile = join(file, '..', 'WHAT.md')
-    const whatText = readFileSync(whatFile, 'utf8')
-    const packageIds = whatHeadings(whatText).map(({ id }) => id)
+    const packageIds = idsByPackage.get(packageName) ?? []
     const byTail = new Map(packageIds.map((id) => [id.slice(-3), id]))
     const lines = readFileSync(file, 'utf8').split('\n')
     let inProofSection = false
@@ -501,47 +534,70 @@ const readProofRows = (requirementsRoot, tests) => {
       // Skip header separator rows (|---|---|) and column header rows.
       if (/^\|[-:\s|]+\|?$/.test(line)) continue
       const cells = line.split('|')
-      const rawCell1 = cells[1] ?? ''
-      const rawCell2 = cells[2] ?? ''
-      const cell1 = rawCell1.replace(/`/g, '')
-      const cell2 = rawCell2.replace(/`/g, '')
+      const rawRowText = cells.slice(1, -1).join(' | ')
+      const proofCellIndexes = cells
+        .map((cell, cellIndex) => pathReferences(cell, file, requirementsRoot).length > 0 ? cellIndex : -1)
+        .filter((cellIndex) => cellIndex >= 0)
+      // A wide semantic table may place WHAT ownership before a later proof
+      // column. Read every non-proof cell that precedes at least one proof,
+      // but never acquire ownership from WHAT text inside the proof title.
+      const ownershipCells = proofCellIndexes.length === 0
+        ? cells.slice(1, -1)
+        : cells.filter((_, cellIndex) => cellIndex > 0 && !proofCellIndexes.includes(cellIndex) && proofCellIndexes.some((proofIndex) => cellIndex < proofIndex))
       const ids = []
-      for (const token of proofIdTokens(cell1)) {
-        if (/^\d{3}$/.test(token) && byTail.has(token)) ids.push(byTail.get(token))
-        else if (!/^\d{3}$/.test(token) && packageIds.includes(token)) ids.push(token)
-      }
-      for (const token of proofIdTokens(cell2)) {
-        if (/^\d{3}$/.test(token) && byTail.has(token)) ids.push(byTail.get(token))
-        else if (!/^\d{3}$/.test(token) && packageIds.includes(token)) ids.push(token)
-      }
-      for (const match of cell1.matchAll(/(?:^|[\s,、/–—])([0-9]{3})(?=$|[\s,、/–—])/g)) {
-        if (byTail.has(match[1])) ids.push(byTail.get(match[1]))
+      for (const rawCell of ownershipCells) {
+        const cell = rawCell.replace(/`/g, '')
+        for (const token of proofIdTokens(cell)) {
+          if (/^\d{3}$/.test(token) && byTail.has(token)) ids.push(byTail.get(token))
+          else if (!/^\d{3}$/.test(token) && packageIds.includes(token)) ids.push(token)
+        }
+        for (const match of cell.matchAll(/(?:^|[\s,、/–—])([0-9]{3})(?=$|[\s,、/–—])/g)) {
+          if (byTail.has(match[1])) ids.push(byTail.get(match[1]))
+        }
       }
       const uniqueIds = [...new Set(ids)]
-      const rowText = cells.slice(1, -1).join(' | ').replace(/`/g, '')
-      const rawRowText = cells.slice(1, -1).join(' | ')
       const refs = pathReferences(rawRowText, file, requirementsRoot)
 
-      if (refs.length > 0) {
-        for (const id of uniqueIds) proofIds.add(`${packageName}:${id}`)
-      } else if (uniqueIds.length > 0 && inProofSection) {
+      if (refs.length === 0 && uniqueIds.length > 0 && inProofSection) {
         proseOnlyProof.push({ proofFile: file, proofLine: index + 1, whatIds: uniqueIds, rowText: rawRowText.trim() })
       }
-      proofEdges.push(...proofEdgesForRow({ proofFile: file, proofLine: index + 1, rowText: rawRowText, whatIds: uniqueIds, testsByFile, requirementsRoot }))
+      const rowEdges = proofEdgesForRow({ proofFile: file, proofLine: index + 1, rowText: rawRowText, whatIds: uniqueIds, testsByFile, requirementsRoot })
+      for (const edge of rowEdges) {
+        if (edge.state === 'active' && !edge.reason && edge.whatId) proofIds.add(`${packageName}:${edge.whatId}`)
+      }
+      proofEdges.push(...rowEdges)
     }
   }
   return { proofIds, proofEdges, proseOnlyProof }
 }
 
 export function buildTraceGraph(requirementsRoot) {
-  const whats = new Map()
+  const whatDefinitions = new Map()
   const whatFiles = walk(requirementsRoot, ['.md']).filter((file) => file.endsWith('/WHAT.md'))
   for (const file of whatFiles) {
     const packageName = file.split('/').slice(-2)[0]
     const text = readFileSync(file, 'utf8')
     for (const { id, line } of whatHeadings(text)) {
       const heading = whatHeadingLine(text, line)
-      whats.set(id, { id, package: packageName, file, line, heading, deleted: isDeletedProposition(heading) })
+      const definition = { id, package: packageName, file, line, heading, deleted: isDeletedProposition(heading) }
+      if (!whatDefinitions.has(id)) whatDefinitions.set(id, [])
+      whatDefinitions.get(id).push(definition)
+    }
+  }
+
+  // Ambiguous definitions have no authority. Keep every location for an exact
+  // diagnostic, but expose only genuinely unique IDs through the ownership
+  // map consumed by tests and proof edges.
+  const whats = new Map()
+  const duplicateWhats = []
+  for (const [id, definitions] of whatDefinitions) {
+    if (definitions.length === 1) whats.set(id, definitions[0])
+    else {
+      duplicateWhats.push({
+        id,
+        definitions,
+        kind: new Set(definitions.map((definition) => definition.package)).size > 1 ? 'multi-owner' : 'duplicate',
+      })
     }
   }
 
@@ -557,14 +613,11 @@ export function buildTraceGraph(requirementsRoot) {
       continue
     }
     if (test.whatIds.length !== 1) multiPrimary.push({ test, whats: test.whatIds })
-    for (const id of new Set(test.whatIds)) if (!whats.has(id)) unknownWhat.add(id)
+    for (const id of new Set(test.whatIds)) if (!whatDefinitions.has(id)) unknownWhat.add(id)
   }
 
-  const unproved = [...whats.values()].filter(
-    (what) => !what.deleted && tests.some((test) => test.state === 'active' && test.whatIds.length === 1 && test.whatIds[0] === what.id),
-  )
   const missingProof = [...whats.values()].filter((what) => !what.deleted)
-  const proof = readProofRows(requirementsRoot, tests)
+  const proof = readProofRows(requirementsRoot, tests, whats)
   const unprovedWhats = [...whats.values()].filter(
     (what) => !what.deleted && !tests.some((test) => test.state === 'active' && test.whatIds.length === 1 && test.whatIds[0] === what.id),
   )
@@ -573,6 +626,8 @@ export function buildTraceGraph(requirementsRoot) {
 
   return {
     whats,
+    whatDefinitions,
+    duplicateWhats,
     tests,
     edges: tests.flatMap((test) => test.whatIds.map((what) => ({ test, what: whats.get(what) ?? null }))),
     proofEdges: proof.proofEdges,

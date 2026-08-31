@@ -1,8 +1,4 @@
-/**
- * G4R-CE §24 S0 RED scaffolding: obsolete-controller absence + raw-time scanners
- * must detect synthetic violations. Production tree is allowed to still be dirty
- * (controllers not deleted in S0; check.mjs not hard-wired).
- */
+/** G4R-CE §24 fail-closed obsolete-controller and raw-time scanners. */
 import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -14,7 +10,6 @@ import {
   RAW_TIME_SCAN_LAYERS,
   RAW_TIME_TOKENS,
   isRawTimeAllowlisted,
-  parsePhase,
   scanG4RCeVocabulary,
   scanObsoleteControllerAbsence,
   scanRawTimeEntries,
@@ -158,13 +153,6 @@ test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_synthetic_tree_scan_proves_gate_ca
   } finally {
     rmSync(tmp, { recursive: true, force: true })
   }
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_parse_phase_defaults_to_soft', () => {
-  assert.equal(parsePhase([]), 's0-soft')
-  assert.equal(parsePhase(['--phase=s0-soft']), 's0-soft')
-  assert.equal(parsePhase(['--phase=hard']), 'hard')
-  assert.throws(() => parsePhase(['--phase=nope']), /unknown --phase/)
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S14_production_has_no_obsolete_controllers', () => {

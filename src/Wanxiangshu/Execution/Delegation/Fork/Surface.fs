@@ -6,7 +6,6 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Resources
 
 /// JS-native semantic surface for fork child payload (P3 pilot).
 module ForkChildPayloadSurface =
@@ -14,8 +13,7 @@ module ForkChildPayloadSurface =
     [<Emit("$0===undefined||$0===null")>]
     let private isUndefined (value: obj) : bool = jsNative
 
-    let private languageOf (lang: string) : ProviderLanguage =
-        ProviderLanguage.tryParse lang |> Option.defaultValue ProviderLanguage.English
+    let private languageOf (lang: string) : ProviderLanguage = ProviderLanguage.parse lang
 
     let private proseOf (lang: string) : ForkChildInstructions =
         let l = languageOf lang

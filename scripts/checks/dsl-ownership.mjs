@@ -9,11 +9,14 @@
 // CI calls with --threshold to freeze the current backlog while preventing new violations.
 
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
+import { scanProjectSymbolUses } from './owner-dependencies.mjs'
 
 export const PRODUCTION_ROOT = 'src/Wanxiangshu'
+const FCS_SCRATCH = join('.fable-build', 'dsl-ownership-fcs')
+const FCS_RESULT = join(FCS_SCRATCH, 'symbol-uses.json')
 const norm = (p) => p.replace(/\\/g, '/')
 
 /**
@@ -137,9 +140,8 @@ export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Context/Companion/CompressionSurface.fs',
   'src/Wanxiangshu/Context/Prefix/Wire.fs',
   'src/Wanxiangshu/Context/Trace/Capture.fs',
+  'src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fs',
   'src/Wanxiangshu/Context/Trace/TerminalReporter.fs',
-  'src/Wanxiangshu/Context/Trace/XTracePipeline.fs',
-  'src/Wanxiangshu/Context/Trace/XTraceSurface.fs',
   'src/Wanxiangshu/Enforcer/Continuation.fs',
   'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs',
   'src/Wanxiangshu/Enforcer/Cycle/Decode.fs',
@@ -774,8 +776,259 @@ export const scanRegistryJointBranches = (text, file = '<synthetic>') => {
   return violations
 }
 
+export const EXECUTION_POSITION_NAMES = Object.freeze([
+  'NextAction',
+  'NextStep',
+  'ResumeAt',
+  'StepIndex',
+  'ContinueToken',
+])
+
+const EXECUTION_POSITION_DECLARATION =
+  /\b(?:type|and)\s+(?:private\s+|internal\s+|public\s+)?(?:NextAction|NextStep|ResumeAt\w*|StepIndex|ContinueToken)\b|\|\s*(?:NextAction|NextStep|ResumeAt\w*|StepIndex|ContinueToken)\b|\b(?:NextAction|NextStep|ResumeAt\w*|StepIndex|ContinueToken)\s*:\s*[^=]|\bmember\s+(?:val\s+)?(?:NextAction|NextStep|ResumeAt\w*|StepIndex|ContinueToken)\b|\blet\s+(?:mutable\s+|private\s+|internal\s+)?(?:nextAction|nextStep|resumeAt\w*|stepIndex|continueToken)\b/i
+
+const regexEscape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const declarationClassification = (lines, index) => {
+  let declaration = index
+  for (let i = index; i >= 0; i--) {
+    if (/^\s*(?:type|and)\s+/.test(lines[i])) {
+      declaration = i
+      break
+    }
+    if (i < index && /^\s*(?:let|module|namespace)\s+/.test(lines[i])) break
+  }
+
+  const docs = []
+  for (let i = declaration - 1; i >= 0; i--) {
+    const trimmed = lines[i].trim()
+    if (/^\[<.*>\]$/.test(trimmed)) continue
+    if (trimmed === '' || !trimmed.startsWith('///')) break
+    docs.unshift(trimmed)
+  }
+  const match = /DSL-class:\s*([A-Za-z][\w-]*)/.exec(docs.join('\n'))
+  return match?.[1]
+}
+
+/** Stored/cross-module execution-position declarations are PCs unless the
+ * enclosing declaration positively identifies a physical/external protocol
+ * value. In addition to the legacy spelling tripwire, this reads record
+ * structure and direct data flow: an exported record slot used as a
+ * match/conditional discriminant or collection instruction index is a stored
+ * branch position regardless of what either the record or field is called.
+ * A path or familiar type name never grants an exemption. */
+export const scanExecutionPositions = (text, file = '<synthetic>', compilerEvidence = undefined) => {
+  const lines = text.split('\n')
+  const violations = []
+  const emitted = new Set()
+  const emit = (line, source) => {
+    if (emitted.has(line)) return
+    emitted.add(line)
+    violations.push({ gate: 'program-counter', file, line, text: source.trim() })
+  }
+
+  // Parse public/default-public F# records. The body may be inline or span
+  // lines (including the standard `type X =` then `{ ... }` form), and fields
+  // may be separated by newlines or semicolons. Private fields are not exported
+  // and are left to the mutable/durable storage gates.
+  const records = []
+  const recordDeclaration =
+    /^\s*(?:type|and)\s+(?:(private|internal|public)\s+)?(\w+)(?:<[^=>]*>)?\s*=\s*(.*)$/
+  let record = null
+  let pendingRecord = null
+  const beginRecord = (candidate, body) => {
+    record = { ...candidate, body: body.slice(body.indexOf('{') + 1) }
+    if (record.body.includes('}')) {
+      record.body = record.body.slice(0, record.body.indexOf('}'))
+      records.push(record)
+      record = null
+    }
+  }
+  for (let i = 0; i < lines.length; i++) {
+    const code = lines[i].replace(/\/\/.*$/, '')
+    const declaration = recordDeclaration.exec(code)
+    if (declaration) {
+      record = null
+      pendingRecord = null
+      const candidate = {
+        line: i + 1,
+        source: lines[i],
+        name: declaration[2],
+        exported: declaration[1] !== 'private' && declaration[1] !== 'internal',
+        classification: declarationClassification(lines, i),
+      }
+      if (declaration[3].includes('{')) {
+        beginRecord(candidate, declaration[3])
+      } else if (declaration[3].trim() === '') pendingRecord = candidate
+      continue
+    }
+    if (pendingRecord) {
+      if (code.trim() === '') continue
+      if (code.includes('{')) beginRecord(pendingRecord, code)
+      pendingRecord = null
+      continue
+    }
+    if (!record) continue
+    if (code.includes('}')) {
+      record.body += `\n${code.slice(0, code.indexOf('}'))}`
+      records.push(record)
+      record = null
+    } else {
+      record.body += `\n${code}`
+    }
+  }
+
+  const executableLines = lines.map((line) => line.replace(/\/\/.*$/, ''))
+  const executable = executableLines.join('\n')
+  const sameConsumer = (use) => norm(use.consumerPath ?? '') === norm(file)
+  const resolvedUses = (compilerEvidence?.symbolUses ?? []).filter(sameConsumer)
+  const resolvedApplications = (compilerEvidence?.applicationUses ?? []).filter(sameConsumer)
+  const executionCall =
+    /\b(?:validate|send|dispatch|append|publish|write|emit|remove|add|start|stop|abort|create|delete)[A-Z]\w*\s*\(|(?<![.\w])(?:validate|send|dispatch|append|publish|write|emit|remove|add|start|stop|abort|create|delete)\s*\(/
+  // Syntax-resolved function values are executable even when this module only
+  // returns them through its public seam and the eventual invocation lives in
+  // another file. This deliberately keys on the binding shape, not on a list
+  // of operation-like names.
+  const functionBindings = new Set()
+  const callableMembers = new Set()
+  for (const line of executableLines) {
+    const binding =
+      /^\s*let\s+(?:(?:private|internal|public|inline|mutable|rec)\s+)*(?:``([^`]+)``|(\w+))\s+(.+?)\s*=/.exec(
+        line,
+      )
+    if (binding && !/^:\s*/.test(binding[3])) functionBindings.add(binding[1] ?? binding[2])
+    const abstractMember = /^\s*abstract\s+([A-Za-z_]\w*)\s*:/.exec(line)
+    if (abstractMember) callableMembers.add(abstractMember[1])
+    const concreteMember = /^\s*member\s+[^.]*\.([A-Za-z_]\w*)\s*(?:\([^)]*\)|[A-Za-z_])/.exec(line)
+    if (concreteMember) callableMembers.add(concreteMember[1])
+  }
+  const branchSelectsExecution = (region) => {
+    const branchLines = region.split('\n')
+    for (let i = 0; i < branchLines.length; i++) {
+      const arrow = branchLines[i].indexOf('->')
+      if (arrow < 0) continue
+      const result = branchLines[i].slice(arrow + 2).trim().replace(/^(?:return|return!)\s+/, '')
+      if (/^(?:fun\b|function\b)/.test(result)) return true
+
+      const returned = /^(?:\(?\s*)?([A-Za-z_]\w*)(?:\s*\)?)$/.exec(result)
+      if (returned && functionBindings.has(returned[1])) {
+        let continuation = i + 1
+        while (continuation < branchLines.length && branchLines[continuation].trim() === '') continuation++
+        const next = branchLines[continuation]
+        const armIndent = branchLines[i].search(/\S|$/)
+        if (next === undefined || next.trimStart().startsWith('|') || next.search(/\S|$/) <= armIndent) {
+          return true
+        }
+      }
+
+      // An application expression is direct execution evidence regardless of
+      // receiver casing or spelling. It includes curried member applications
+      // (`port.Send value`) that the old verb-shaped call regex missed.
+      const memberApplication = /\b[a-z_]\w*\.([A-Za-z_]\w*)\s*(?:\(|\s+(?=["'\dA-Za-z_({\[]))/.exec(
+        result,
+      )
+      if (memberApplication && callableMembers.has(memberApplication[1])) return true
+    }
+    return false
+  }
+  const branchRegion = (offset) => {
+    const start = executable.slice(0, offset).split('\n').length - 1
+    const baseIndent = executableLines[start].search(/\S|$/)
+    let end = start + 1
+    while (end < executableLines.length) {
+      const line = executableLines[end]
+      const trimmed = line.trim()
+      if (trimmed !== '') {
+        const indent = line.search(/\S|$/)
+        if (indent < baseIndent || (indent === baseIndent && !/^(?:\||else\b|elif\b)/.test(trimmed))) break
+      }
+      end++
+    }
+    return { start, end, text: executableLines.slice(start, end).join('\n') }
+  }
+  const compilerBranchSelectsExecution = ({ start, end }) => {
+    const inBranch = (use) => {
+      const line = use.line ?? use.startLine
+      return line >= start + 1 && line <= end
+    }
+    const applications = resolvedApplications.filter(inBranch)
+
+    // A resolved application is execution evidence when its callable returns
+    // unit or an effect carrier. Pure helpers returning immutable domain data
+    // intentionally remain green. Every arm must select such an application:
+    // a conditional validation inside one arm is not a returned operation seam.
+    const armLines = executableLines
+      .slice(start, end)
+      .map((line, index) => (line.includes('->') ? start + index + 1 : 0))
+      .filter(Boolean)
+    const effectApplicationLines = new Set(
+      applications
+        .filter((application) => {
+        const resultType = String(application.inferredType ?? '').split('->').at(-1)?.trim() ?? ''
+        return /^(?:Microsoft\.FSharp\.Core\.)?unit\b|(?:^|\.)Task(?:<|$)|(?:^|\.)Async</.test(
+          resultType,
+        )
+        })
+        .map((application) => application.startLine),
+    )
+    if (armLines.length > 0 && armLines.every((line) => effectApplicationLines.has(line))) return true
+
+    // A resolved function symbol appearing after an arm arrow without a
+    // corresponding application is a function selected for another caller.
+    return resolvedUses.some((use) => {
+      if (!inBranch(use) || !String(use.inferredType ?? '').includes('->')) return false
+      const sourceLine = executableLines[use.line - 1] ?? ''
+      const arrow = sourceLine.indexOf('->')
+      if (arrow < 0 || use.column <= arrow) return false
+      return !applications.some(
+        (application) =>
+          application.startLine === use.line && application.resolvedTarget === use.symbol,
+      )
+    })
+  }
+  for (const rec of records) {
+    if (!rec.exported) continue
+    if (rec.classification === 'ExternalSignal' || rec.classification === 'PhysicalHandle') continue
+    const receivers = new Set([rec.name[0].toLowerCase() + rec.name.slice(1)])
+    const typedReceiver = new RegExp(`\\b([a-z_]\\w*)\\s*:\\s*${regexEscape(rec.name)}\\b`, 'g')
+    for (const binding of executable.matchAll(typedReceiver)) receivers.add(binding[1])
+    const receiver = `(?:${[...receivers].map(regexEscape).join('|')})`
+    for (const match of rec.body.matchAll(/\b(\w+)\s*:\s*([^;}\n]+)/g)) {
+      const field = regexEscape(match[1])
+      const access = `\\b${receiver}\\.${field}\\b`
+      const branch = new RegExp(
+        `\\bmatch\\s+${access}\\s+with|\\b(?:if|elif)\\s+(?:not\\s+)?${access}\\s+then|` +
+          `\\bwhile\\s+(?:not\\s+)?${access}\\s+do`,
+        'gm',
+      )
+      const index = new RegExp(
+        `\\b(?:Array|List|Seq)\\.item\\s+${access}|\\b[A-Za-z_]\\w*\\.\\[\\s*${access}\\s*\\]`,
+        'm',
+      )
+      const drivesBranch = [...executable.matchAll(branch)].some((use) => {
+        const region = branchRegion(use.index)
+        return (
+          executionCall.test(region.text) ||
+          branchSelectsExecution(region.text) ||
+          compilerBranchSelectsExecution(region)
+        )
+      })
+      if (drivesBranch || index.test(executable)) emit(rec.line, rec.source)
+    }
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const code = lines[i].replace(/\/\/.*$/, '')
+    if (!EXECUTION_POSITION_DECLARATION.test(code)) continue
+    const classification = declarationClassification(lines, i)
+    if (classification === 'ExternalSignal' || classification === 'PhysicalHandle') continue
+    emit(i + 1, lines[i])
+  }
+  return violations
+}
+
 /** Scan one source text. Returns [{gate, file, line, text}, ...]. */
-export const scanText = (text, file = '<synthetic>') => {
+export const scanText = (text, file = '<synthetic>', compilerEvidence = undefined) => {
   const violations = []
   const lines = text.split('\n')
 
@@ -784,6 +1037,7 @@ export const scanText = (text, file = '<synthetic>') => {
   violations.push(...scanStateProducts(text, file))
   violations.push(...scanMutableRecordFields(text, file))
   violations.push(...scanRegistryJointBranches(text, file))
+  violations.push(...scanExecutionPositions(text, file, compilerEvidence))
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
@@ -827,7 +1081,8 @@ export const scanText = (text, file = '<synthetic>') => {
  *
  * A DU with >= 10 cases must carry a `/// DSL-class:` doc annotation naming
  * its vocabulary category (Vocabulary / DurableFact / Evidence / Decision /
- * ExternalSignal). ControlState is a separate forbidden class (see scanText).
+ * ExternalSignal / Witness / Capability / Receipt / PhysicalHandle).
+ * ControlState is a separate forbidden class (see scanText).
  *
  * Hard gate: since PR 9 D, an unclassified large DU fails the build in
  * runCli (it is folded into the violation list, no longer report-only).
@@ -835,7 +1090,17 @@ export const scanText = (text, file = '<synthetic>') => {
 export const LARGE_DU_THRESHOLD = 10
 // ControlState is intentionally absent: it is a forbidden program-counter
 // class (see scanText), not a legitimate large-DU vocabulary category.
-export const DSL_CLASSES = ['Vocabulary', 'DurableFact', 'Evidence', 'Decision', 'ExternalSignal']
+export const DSL_CLASSES = [
+  'Vocabulary',
+  'DurableFact',
+  'Evidence',
+  'Decision',
+  'ExternalSignal',
+  'Witness',
+  'Capability',
+  'Receipt',
+  'PhysicalHandle',
+]
 
 /** Returns [{ file, line, name, cases }] for large DUs lacking a DSL-class annotation. */
 export const scanLargeDus = (text, file) => {
@@ -885,12 +1150,12 @@ export const scanLargeDus = (text, file) => {
 }
 
 /** Scan {file, text} entries. */
-export const scanFiles = (entries) => {
+export const scanFiles = (entries, compilerEvidence = undefined) => {
   const violations = []
   for (const entry of entries) {
     const file = entry.file
     const text = entry.text
-    for (const v of scanText(text, file)) violations.push(v)
+    for (const v of scanText(text, file, compilerEvidence)) violations.push(v)
 
     // PR 9 item 4 / B: multi-bool loop detection applies to every Program
     // file, Process/ included (a PTY/process layer is not immune to a
@@ -1003,7 +1268,11 @@ const runCli = () => {
     file,
     text: readFileSync(file, 'utf8'),
   }))
-  const violations = scanFiles(entries)
+  const compilerEvidence = scanProjectSymbolUses({
+    scratchRoot: FCS_SCRATCH,
+    resultPath: FCS_RESULT,
+  })
+  const violations = scanFiles(entries, compilerEvidence)
   const byGate = groupByGate(violations)
   const write = threshold >= 0 ? console.log : console.error
 
@@ -1038,7 +1307,7 @@ const runCli = () => {
     write(`${gate} (${items.length})`)
     for (const v of items) {
       if (gate === 'large-DU') {
-        write(`  ${v.file}:${v.line}  ${v.name} (${v.cases} cases) — add /// DSL-class: <Vocabulary|DurableFact|Evidence|Decision|ExternalSignal>`)
+        write(`  ${v.file}:${v.line}  ${v.name} (${v.cases} cases) — add /// DSL-class: <Vocabulary|DurableFact|Evidence|Decision|ExternalSignal|Witness|Capability|Receipt|PhysicalHandle>`)
       } else {
         write(`  ${v.file}:${v.line}  ${v.text}`)
       }

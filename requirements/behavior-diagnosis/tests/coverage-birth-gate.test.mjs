@@ -1,7 +1,22 @@
 // ENFORCER-045 / PERSIST-010 — coverage birth gate.
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as blog from '../../../dist/Enforcer/BlogSurface.js'
+
+const source = (path) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8')
+
+test('WHAT[BD-013] ENFORCER_045_coverage_mapping_uses_owned_trace_cursors', () => {
+  const host = source('src/Wanxiangshu/Enforcer/Host.fs')
+  const recovery = source('src/Wanxiangshu/Enforcer/Cycle/Recovery.fs')
+
+  assert.match(recovery, /XTraceProjection\.currentGenerationSemanticParts[\s\S]*?Option\.map \(fun part -> part\.Cursor\)/)
+  assert.match(host, /RecordCoverage\.create[\s\S]*?XTraceCursor\.isAfter[\s\S]*?XTraceCursor\.sequence/)
+  assert.doesNotMatch(
+    `${host}\n${recovery}`,
+    /XTraceProjection\.(?:parts|currentGenerationParts|head|headSequence|semanticCursorFor|tryHostMessageId)\b|\.Cursor\.Sequence\b|\{\s*Sequence\s*=/,
+  )
+})
 
 test('WHAT[BD-013] ENFORCER_045_mainContext_refuses_when_next_sequence_cannot_advance', () => {
   const refused = blog.coverageBirth({

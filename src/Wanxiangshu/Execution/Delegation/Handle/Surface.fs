@@ -233,15 +233,21 @@ module HandleSurface =
     [<Emit("undefined")>]
     let private jsUndefined: obj = jsNative
 
+    let private optStr (value: 'T option) (extract: 'T -> string) : obj =
+        match value with
+        | Some item -> box (extract item)
+        | None -> jsUndefined
+
+    /// JS-native proof surface for the optional string adapter used by record
+    /// snapshots. `hasValue` carries the option case without exposing Fable's
+    /// option representation to JS.
+    let optionalStringTraversal (hasValue: bool) (value: obj) (extract: obj -> string) : obj =
+        optStr (if hasValue then Some value else None) extract
+
     /// Full record snapshot — the shape every `read(tryFind(...))` call expects.
     /// Missing optional fields are `undefined` (not `null`) to match JS
     /// `deepStrictEqual` semantics in the test suite.
     let private recordView (record: HandleRecord) : obj =
-        let optStr (value: 'T option) (extract: 'T -> string) =
-            match value with
-            | Some s -> box (extract s)
-            | None -> jsUndefined
-
         let completion, completionRef, completionDigest, abandonReason =
             match record.Lifecycle with
             | HandleLifecycle.CompletedAwaitingJoin c ->

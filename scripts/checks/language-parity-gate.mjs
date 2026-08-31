@@ -23,7 +23,11 @@ import {
 export const PROVIDER_ROOT = 'resources/provider'
 export const ENFORCER_ROOT = 'resources/enforcer'
 export const LOCALE_FILES = Object.freeze(['en.md', 'zh-CN.md'])
-export const PROVIDER_RESOURCES_REL = 'src/Wanxiangshu/Resources/ProviderResources.fs'
+export const PROVIDER_RESOURCES_REL = 'src/Wanxiangshu/Participant/Provider/ProviderResources.fs'
+export const PROVIDER_LANGUAGE_BINDING_REL =
+  'src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs'
+export const LEGACY_PROVIDER_RESOURCES_REL = 'src/Wanxiangshu/Resources/ProviderResources.fs'
+export const LEGACY_PROVIDER_PROSE_REL = 'src/Wanxiangshu/Resources/ProviderProse.fs'
 export const STATIC_TOOLS_REL = 'src/Wanxiangshu/OpenCode/Tools/StaticTools.fs'
 
 const norm = (p) => p.replace(/\\/g, '/')
@@ -452,6 +456,82 @@ export const scanProviderResourcesHook = (text) => {
 }
 
 /**
+ * Host may observe the raw environment value, but provider language defaulting
+ * and parsing belong to the Participant/Provider owner.
+ * @param {string} text ProviderLanguageBinding.fs source
+ * @returns {Violation[]}
+ */
+export const scanProviderLanguageBinding = (text) => {
+  /** @type {Violation[]} */
+  const violations = []
+  const reject = (detail) =>
+    violations.push({
+      code: 'provider-language-policy',
+      path: PROVIDER_LANGUAGE_BINDING_REL,
+      detail,
+    })
+
+  if (!text.includes('Environment.GetEnvironmentVariable')) {
+    reject('Host binding must observe the raw provider-language environment value')
+  }
+  if (!/ProviderLanguage\s*\.\s*fromPreferenceObservation/.test(text)) {
+    reject(
+      'Host binding must delegate provider-language defaulting and parsing to ProviderLanguage.fromPreferenceObservation',
+    )
+  }
+  if (/ProviderLanguage\s*\.\s*English/.test(text)) {
+    reject('ProviderLanguage.English fallback belongs to Participant/Provider owner, not Host')
+  }
+  if (/ProviderLanguage\s*\.\s*tryParse/.test(text)) {
+    reject('ProviderLanguage.tryParse belongs to Participant/Provider owner, not Host')
+  }
+  if (/String\s*\.\s*IsNullOrWhiteSpace|\.IsNullOrWhiteSpace\s*\(/.test(text)) {
+    reject('provider-language whitespace/default policy belongs to Participant/Provider owner, not Host')
+  }
+  if (/\|\s*None\s*->\s*ProviderLanguage\b|Option\s*\.\s*default(?:Value|With)/.test(text)) {
+    reject('provider-language default branches belong to Participant/Provider owner, not Host')
+  }
+  if (/["'](?:en|en-US|zh|zh-CN|zh_CN|English|SimplifiedChinese)["']/i.test(text)) {
+    reject('provider-language aliases belong to Participant/Provider owner, not Host')
+  }
+  return violations
+}
+
+/**
+ * Domain language policy must not remain under the legacy Resources boundary.
+ * @param {string} text legacy ProviderResources.fs source
+ * @returns {Violation[]}
+ */
+export const scanLegacyProviderResourcesPolicy = (text) => {
+  if (!/\bProviderLanguage\b|\brequireLanguagePair\b|\bresourceFileName\b/.test(text)) return []
+  return [
+    {
+      code: 'provider-language-policy',
+      path: LEGACY_PROVIDER_RESOURCES_REL,
+      detail: 'provider-language policy belongs to Participant/Provider/ProviderResources.fs',
+    },
+  ]
+}
+
+/**
+ * @param {Iterable<string>} paths repository-relative paths
+ * @returns {Violation[]}
+ */
+export const scanForbiddenLegacyProviderPaths = (paths) => {
+  const present = new Set([...paths].map(norm))
+  return [LEGACY_PROVIDER_RESOURCES_REL, LEGACY_PROVIDER_PROSE_REL]
+    .filter((path) => present.has(path))
+    .map((path) => ({
+      code: 'forbidden-legacy-path',
+      path,
+      detail:
+        path === LEGACY_PROVIDER_RESOURCES_REL
+          ? 'legacy ProviderResources path must be absent'
+          : 'legacy ProviderProse path must be absent',
+    }))
+}
+
+/**
  * @param {string} [repoRoot]
  * @param {{ tipIdentities?: Iterable<string>, toolNames?: Iterable<string> }} [catalogOverrides]
  * @returns {{ ok: boolean, violations: Violation[], semanticDirs: string[] }}
@@ -501,6 +581,26 @@ export const scanRepo = (repoRoot = process.cwd(), catalogOverrides) => {
     violations.push({ code: 'missing-file', path: PROVIDER_RESOURCES_REL, detail: 'ProviderResources.fs missing' })
   } else {
     violations.push(...scanProviderResourcesHook(readFileSync(hookAbs, 'utf8')))
+  }
+
+  const bindingAbs = resolve(repoRoot, PROVIDER_LANGUAGE_BINDING_REL)
+  if (!existsSync(bindingAbs)) {
+    violations.push({
+      code: 'missing-file',
+      path: PROVIDER_LANGUAGE_BINDING_REL,
+      detail: 'ProviderLanguageBinding.fs missing',
+    })
+  } else {
+    violations.push(...scanProviderLanguageBinding(readFileSync(bindingAbs, 'utf8')))
+  }
+
+  const legacyPaths = [LEGACY_PROVIDER_RESOURCES_REL, LEGACY_PROVIDER_PROSE_REL].filter((path) =>
+    existsSync(resolve(repoRoot, path)),
+  )
+  violations.push(...scanForbiddenLegacyProviderPaths(legacyPaths))
+  const legacyResourcesAbs = resolve(repoRoot, LEGACY_PROVIDER_RESOURCES_REL)
+  if (existsSync(legacyResourcesAbs)) {
+    violations.push(...scanLegacyProviderResourcesPolicy(readFileSync(legacyResourcesAbs, 'utf8')))
   }
 
   return { ok: violations.length === 0, violations, semanticDirs }

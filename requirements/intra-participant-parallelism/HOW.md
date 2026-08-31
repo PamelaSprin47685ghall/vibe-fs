@@ -20,18 +20,19 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| INTRA-PARTICIPANT-PARALLELISM-001 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-002 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-003 | `requirements/intra-participant-parallelism/tests/fission-runtime.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-004 | `requirements/intra-participant-parallelism/tests/fission-runtime.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-005 | `requirements/intra-participant-parallelism/tests/fission-runtime.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-006 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-007 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-008 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-009 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-010 | `requirements/intra-participant-parallelism/tests/fission-source-ratchet.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-011 | `requirements/intra-participant-parallelism/tests/fission-runtime.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-012 | `requirements/intra-participant-parallelism/tests/fission-source-ratchet.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-013 | `requirements/intra-participant-parallelism/tests/fission-tool-origin.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-014 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs`, `requirements/intra-participant-parallelism/tests/fission-source-ratchet.test.mjs` |
-| INTRA-PARTICIPANT-PARALLELISM-015 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs`, `requirements/intra-participant-parallelism/tests/fission-source-ratchet.test.mjs` |
+| INTRA-PARTICIPANT-PARALLELISM-001 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-001] lanes carry no provider-visible identity or handle and keep the same logical participant` |
+| INTRA-PARTICIPANT-PARALLELISM-002 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-002] canonical lane array preserves each prompt including embedded newlines` |
+| INTRA-PARTICIPANT-PARALLELISM-003 | `requirements/intra-participant-parallelism/tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-003] admission creates fresh sibling sessions with old parent and starts from LWR + exact lane input` |
+| INTRA-PARTICIPANT-PARALLELISM-004 | `requirements/intra-participant-parallelism/tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-004] partial create or start failure rolls back every created lane and never interrupts old caller` |
+| INTRA-PARTICIPANT-PARALLELISM-005 | `requirements/intra-participant-parallelism/tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-005] old caller silent-interrupts only after every lane started`；`requirements/intra-participant-parallelism/tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-005] failed silent interrupt rolls back lanes and old caller stays out of active set` |
+| INTRA-PARTICIPANT-PARALLELISM-006 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-006] pre-fission completion broadcasts to every lane exactly once with idempotent delivery` |
+| INTRA-PARTICIPANT-PARALLELISM-007 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-007] post-fission completion has exactly one affinity target: the initiating lane` |
+| INTRA-PARTICIPANT-PARALLELISM-008 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-008] keyed work bundle is idempotent and rejects conflicting records for one lane` |
+| INTRA-PARTICIPANT-PARALLELISM-009 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-009] convergence requires all lane records and all completion deliveries`；`requirements/intra-participant-parallelism/tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-009] ring successor wraps and forwards past already-closed lanes to the next live present` |
+| INTRA-PARTICIPANT-PARALLELISM-010 | `requirements/intra-participant-parallelism/tests/fission-source-ratchet.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-010] V1 Fission has no OpenCode session-fork path and owns durable replay anchors` |
+| INTRA-PARTICIPANT-PARALLELISM-011 | `requirements/intra-participant-parallelism/tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-011] second admission while active is rejected as AlreadyFissioned until release` |
+| INTRA-PARTICIPANT-PARALLELISM-012 | `requirements/intra-participant-parallelism/tests/fission-source-ratchet.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility comes from ToolPermission.Fission for current office vocabulary` |
+| INTRA-PARTICIPANT-PARALLELISM-013 | `requirements/intra-participant-parallelism/tests/fission-tool-origin.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-013] real root chat message carries a request-local fission deny`；`requirements/intra-participant-parallelism/tests/fission-tool-origin.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-013] forced root fission rejects origin before parsing prompts` |
+| INTRA-PARTICIPANT-PARALLELISM-014 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-014] control-plane successors run before lane settlement and final takeover`；`requirements/intra-participant-parallelism/tests/fission-source-ratchet.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-014] Degeneration guard remains control-plane owner before Fission settlement` |
+| INTRA-PARTICIPANT-PARALLELISM-015 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-015] ring fold order and final takeover lane are canonical, never arrival ordered` |
+| INTRA-PARTICIPANT-PARALLELISM-016 | `requirements/intra-participant-parallelism/tests/task-result-list-traversal.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-016] TASK_RESULT_LIST_traverseM_calls_mapper_once_per_input_in_order_stops_at_first_Error_and_skips_empty` |

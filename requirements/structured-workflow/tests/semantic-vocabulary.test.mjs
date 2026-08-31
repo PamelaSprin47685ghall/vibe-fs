@@ -17,6 +17,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { buildTraceGraph } from '../../../scripts/lib/requirement-trace.mjs'
 
 const ROOT = new URL('../../../', import.meta.url).pathname
 const readSrc = (rel) => readFileSync(join(ROOT, rel), 'utf8')
@@ -79,43 +80,51 @@ test('WHAT[STRUCTURED-WORKFLOW-008] SW_015_no_anonymous_middleware_framework_in_
   assert.deepEqual(bad, [], bad.join('; '))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-007] every obligation-table vocabulary is a real production definition', () => {
-  // DSL-014 / STRUCTURED-WORKFLOW-007: compressed Semantic Vocabulary must be
-  // backed by its own temporal/behavioral proof. The proof obligation table
-  // (HOW §3.4) is that registration: each row names a compressed vocabulary
-  // and what it must prove. The machine floor is that the table is not a
-  // fiction — every registered vocabulary must have a real definition in the
-  // production tree (the compression actually happens at a named call site),
-  // and the table must cover exactly the vocabularies it registers. A row
-  // naming a nonexistent definition would be compression without proof.
+test('WHAT[STRUCTURED-WORKFLOW-007] every vocabulary binds owner_law_relation_and_executable_proof', () => {
   const OBLIGATIONS = [
-    ['ManagerBackground.ensureSettled', 'Mission/Manager/Background.fs'],
-    ['ManagerIdle.encourageLabor', 'Mission/Manager/Idle.fs'],
-    ['ReviewerContinuation.ensurePerfectConfirmed', 'Mission/Review/Judgement/Continuation.fs'],
-    ['ReviewBarrierWorkflow.reverify', 'Mission/Review/Barrier/Reverify.fs'],
-    ['FallbackLedger.recordAuthorizedFailure', 'Participant/Provider/Attempt/Fallback/Ledger.fs'],
-    ['ProviderRecoveryWorkflow.continueAfterConfirmedFailure', 'Participant/Provider/Attempt/Fallback/Workflow.fs'],
-    ['FinalityCohort.reviewUntilFirstRevisionOrAllConfirmed', 'Mission/Finality/Cohort.fs'],
-    ['SessionRecoveryWorkflow.recoverFamilyDirect', 'Execution/Session/Recovery/Workflow.fs'],
-    ['Orchestrator.publishEventually', 'Change/Program.fs'],
+    ['ManagerBackground.ensureSettled', 'Mission/Manager/Background.fs', 'Mission.Manager'],
+    ['ManagerIdle.encourageLabor', 'Mission/Manager/Idle.fs', 'Mission.Manager'],
+    ['ReviewerContinuation.ensurePerfectConfirmed', 'Mission/Review/Judgement/Continuation.fs', 'Mission.Review'],
+    ['ReviewBarrierWorkflow.reverify', 'Mission/Review/Barrier/Reverify.fs', 'Mission.Review'],
+    ['FallbackLedger.recordConfirmedFailure', 'Participant/Provider/Attempt/Fallback/Ledger.fs', 'Participant.Provider'],
+    ['ProviderRecoveryWorkflow.continueAfterConfirmedFailure', 'Participant/Provider/Attempt/Fallback/Workflow.fs', 'Participant.Provider'],
+    ['FinalityCohort.reviewUntilFirstRevisionOrAllConfirmed', 'Mission/Finality/Cohort.fs', 'Mission.Finality'],
+    ['SessionRecoveryWorkflow.recoverFamilyDirect', 'Execution/Session/Recovery/Workflow.fs', 'Execution.Session'],
+    ['Orchestrator.publishEventually', 'Change/Program.fs', 'Change'],
   ]
 
-  // Table completeness: HOW §3.3 registers exactly these nine.
-  const how = readFileSync(join(ROOT, 'requirements/structured-workflow/HOW.md'), 'utf8')
-  const tableSection = how.slice(how.indexOf('### 3.3'), how.indexOf('### 3.3.1'))
-  for (const [vocab] of OBLIGATIONS) {
-    assert.match(tableSection, new RegExp(`\\| \`${vocab.replace('.', '\\.')}\``), `HOW §3.4 must register ${vocab}`)
-  }
+  const howPath = join(ROOT, 'requirements/structured-workflow/HOW.md')
+  const how = readFileSync(howPath, 'utf8')
+  const lines = how.split('\n')
+  const tableStart = lines.findIndex((line) => line.startsWith('### 3.3 '))
+  const tableEnd = lines.findIndex((line) => line.startsWith('### 3.3.1'))
+  const rows = lines
+    .slice(tableStart + 1, tableEnd)
+    .map((text, offset) => ({ text, line: tableStart + offset + 2 }))
+    .filter(({ text }) => text.startsWith('| `'))
+  assert.equal(rows.length, OBLIGATIONS.length, 'the obligation table must contain exactly the registered vocabulary')
 
-  // Every registered vocabulary is a real definition in production, at the
-  // owner path the table names — the compression is observable, not fictional.
-  for (const [vocab, file] of OBLIGATIONS) {
+  const graph = buildTraceGraph(join(ROOT, 'requirements'))
+  for (const [vocab, file, owner] of OBLIGATIONS) {
+    const row = rows.find(({ text }) => text.includes(`\`${vocab}\``))
+    assert.ok(row, `HOW §3.3 must register ${vocab}`)
+    const columns = row.text.split('|').map((column) => column.trim()).filter(Boolean)
+    assert.equal(columns.length, 5, `${vocab} must bind vocabulary, owner/path, WHAT, relation, proof`)
+    assert.ok(columns[1].includes(owner) && columns[1].includes(file), `${vocab} must name exact owner and source`)
+
+    const whatId = columns[2].replaceAll('`', '')
+    assert.ok(['STRUCTURED-WORKFLOW-007', 'STRUCTURED-WORKFLOW-008'].includes(whatId), `${vocab} must bind its primary workflow law`)
+    assert.equal(graph.whats.get(whatId)?.package, 'structured-workflow', `${vocab} law must belong to the semantic-vocabulary owner`)
+    assert.ok(columns[3].length > 12, `${vocab} must declare a non-empty trace relation`)
+
+    const proofEdges = graph.proofEdges.filter(
+      (edge) => edge.proofFile === howPath && edge.proofLine === row.line && edge.whatId === whatId && edge.state === 'active',
+    )
+    assert.equal(proofEdges.length, 1, `${vocab} must resolve one exact active proof-title edge for ${whatId}`)
+    assert.ok(proofEdges[0].title && proofEdges[0].file.endsWith('.test.mjs'), `${vocab} proof edge must resolve to an executable test`)
+
     const short = vocab.split('.').pop()
     const production = readSrc(`src/Wanxiangshu/${file}`)
-    assert.match(
-      production,
-      new RegExp(`\\blet(?: rec)?(?: private)? ${short}\\b`),
-      `${vocab} must exist in production (${file})`,
-    )
+    assert.match(production, new RegExp(`\\blet(?: rec)?(?: private)? ${short}\\b`), `${vocab} must exist in ${file}`)
   }
 })

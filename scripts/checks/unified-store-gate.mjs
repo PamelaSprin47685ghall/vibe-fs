@@ -14,6 +14,11 @@
  *   5. no-migrator — one-shot legacy importer / LegacyProjection≡NewProjection tooling
  *   6. dual-write — same production module writing EventStore AND Journal NDJSON
  *
+ * Scanners (canonical history ownership):
+ *   7. feature-history-loop — path-sensitive reader/merge/fold census
+ *   8. private-durable-substrate — feature-local NDJSON/SQLite/private stores
+ *   9. canonical-shared-program — one-envelope IntegrationRule and shared boot/live integrateOne
+ *
  * Dual-write note (Phase 5 DONE for NDJSON substrate): production Boot / NDJSON
  * JournalWriter / dir BlobWriter are deleted. Strategy A keeps AgentJournal as an
  * EventStore-backed surface — AgentJournal-only modules are NOT dual-write.
@@ -82,9 +87,64 @@ export const SCANNER_IDS = Object.freeze([
   'student-qa-revival',
   'no-migrator',
   'dual-write',
+  'feature-history-loop',
+  'private-durable-substrate',
+  'canonical-shared-program',
 ])
 
 const norm = (p) => p.replace(/\\/g, '/')
+
+const CANONICAL_INTEGRATOR_PATH =
+  'src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs'
+const INTEGRATION_KERNEL_PATH =
+  'src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs'
+
+/**
+ * Exact physical stream readers/convergence programs. They may observe or order
+ * envelopes, but do not own any feature Current. Keep this census exact: a new
+ * reader is an architecture decision, not a prefix exception.
+ */
+export const PHYSICAL_HISTORY_OBSERVER_PATHS = Object.freeze([
+  'src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs',
+  'src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs',
+  'src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs',
+  'src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs',
+  'src/Wanxiangshu/Persistence/EventStore/MergeSurface.fs',
+  'src/Wanxiangshu/Verification/TemporalSurface.fs',
+])
+
+const pathIs = (file, expected) => {
+  const n = norm(file)
+  return n === expected || n.endsWith(`/${expected}`)
+}
+
+const isCanonicalIntegratorPath = (file) => pathIs(file, CANONICAL_INTEGRATOR_PATH)
+const isPhysicalHistoryObserverPath = (file) =>
+  PHYSICAL_HISTORY_OBSERVER_PATHS.some((expected) => pathIs(file, expected))
+
+/** Exact canonical implementations that own the public single-event/head reader surface. */
+export const CANONICAL_EVENT_READER_OWNER_PATHS = Object.freeze([
+  'src/Wanxiangshu/Persistence/EventStore/Store.fs',
+  'src/Wanxiangshu/Persistence/EventStore/Surface.fs',
+  'src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs',
+  'src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs',
+  'src/Wanxiangshu/Verification/EventStoreWriterSurface.fs',
+])
+const isCanonicalEventReaderOwnerPath = (file) =>
+  isCanonicalIntegratorPath(file) ||
+  isPhysicalHistoryObserverPath(file) ||
+  CANONICAL_EVENT_READER_OWNER_PATHS.some((expected) => pathIs(file, expected))
+const DURABLE_SUBSTRATE_OWNER_PATHS = Object.freeze([
+  'src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs',
+  'src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs',
+  'src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs',
+  'src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs',
+  'src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs',
+  'src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs',
+  'src/Wanxiangshu/Verification/EventStoreWriterSurface.fs',
+])
+const isDurableSubstrateOwnerPath = (file) =>
+  DURABLE_SUBSTRATE_OWNER_PATHS.some((expected) => pathIs(file, expected))
 
 const stripLineComment = (line) => line.replace(/\/\/.*/, '')
 
@@ -121,7 +181,7 @@ export const isDualWriteAllowed = (file) => {
 }
 
 /**
- * @typedef {{ id: string, file: string, line: number, label: string, text: string }} Violation
+ * @typedef {{ id: string, file: string, line: number, token?: string, label: string, text: string }} Violation
  */
 
 const FEATURE_REF_RE = /refs\/wanxiang\//
@@ -202,6 +262,40 @@ const EVENT_STORE_WRITE_RE =
   /\b(?:IEventStore|AppendCandidate)\b|\bEventStore\.(?:append|create|createWithConverge|createWithRetries|commit)\b/
 const JOURNAL_NDJSON_WRITE_RE =
   /\b(?:JournalWriter|AgentJournal|SharedAgentJournal)\b|\.ndjson\b|wanxiangshu-next/
+
+/** History access/order is owner-sensitive; feature history APIs are always forbidden. */
+const HISTORY_OBSERVER_RES = [
+  { re: /\bProcessEventLog\.readStreams(?:At)?\b/ },
+  { re: /\bEventKWayMerge\.(?:merge|mergeRetained)\b/ },
+]
+
+const FEATURE_HISTORY_LOOP_RES = [
+  { re: /\b(?:replay|load|read|scan|fold|merge)(?:Events?|History)\b/i },
+  { re: /\b(?:replay|load|read|scan|fold|merge)[_-](?:events?|history)\b/i },
+  { re: /\bmanualMerge\b/ },
+]
+
+/** Canonical EventStore history surfaces are readers even when no helper is named "history". */
+const EVENT_STORE_READER_RES = [
+  { re: /\.\s*(TryEvent)\b/ },
+  { re: /\.\s*(TryHeads)\b/ },
+  { re: /\.\s*(AllHeads)\b/ },
+  { re: /\b(?:EventStore\.)?Surface\s*\.\s*(read|heads)\b/ },
+]
+
+const PRIVATE_DURABLE_SUBSTRATE_RES = [
+  { re: /\.(?:ndjson|jsonl)\b/i },
+  { re: /\b(?:SQLite|Sqlite|sqlite3)\b/ },
+  { re: /\.(?:sqlite|sqlite3|db)\b/i },
+  {
+    re: /\b(?:PrivateStore|PrivateDurableStore|PrivateEventStore|FeatureStore|FeatureEventStore|LocalFeatureStore|CustomStore|JsonlStore|JsonLineStore)\b/,
+  },
+  {
+    re: /\b(?:System\.IO\.)?File\.(?:AppendAllText|AppendAllLines|WriteAllText|WriteAllLines|WriteAllBytes|OpenWrite|Create)\b/,
+  },
+  { re: /\b(?:FileStream|StreamWriter)\s*\(/ },
+  { re: /\b(?:DbConnection|IDbConnection|SqlConnection|NpgsqlConnection|MySqlConnection)\b/ },
+]
 
 /**
  * feature-ref: any refs/wanxiang/ outside Persist/Git; non-canonical store refs always RED.
@@ -497,6 +591,251 @@ export const scanDualWrite = (text, file = '<synthetic>') => {
 }
 
 /**
+ * Feature code must not open/order durable history or build a second history
+ * fold. Exact physical convergence/readers may observe streams; only the
+ * CanonicalIntegrator may interpret them into business Current.
+ * @param {string} text
+ * @param {string} [file]
+ * @returns {Violation[]}
+ */
+export const scanFeatureHistoryLoop = (text, file = '<synthetic>') => {
+  if (isCanonicalIntegratorPath(file)) return []
+
+  const observer = isPhysicalHistoryObserverPath(file)
+  const readerOwner = isCanonicalEventReaderOwnerPath(file)
+  const lines = text.split('\n')
+  const codeLines = lines.map(stripLineComment)
+  const hits = []
+
+  const push = (lineIdx, token, label) => {
+    hits.push({
+      id: 'feature-history-loop',
+      file,
+      line: lineIdx + 1,
+      token,
+      label,
+      text: lines[lineIdx].trim(),
+    })
+  }
+
+  for (let i = 0; i < codeLines.length; i++) {
+    const code = codeLines[i]
+    for (const { re } of FEATURE_HISTORY_LOOP_RES) {
+      const match = code.match(re)
+      if (match) {
+        const token = match[0]
+        push(
+          i,
+          token,
+          `feature history loop token '${token}' is forbidden; only CanonicalIntegrator derives business Current`,
+        )
+      }
+    }
+
+    if (!observer) {
+      for (const { re } of HISTORY_OBSERVER_RES) {
+        const match = code.match(re)
+        if (match) {
+          const token = match[0]
+          push(
+            i,
+            token,
+            `history reader/order token '${token}' is forbidden at this path; only exact physical observers or CanonicalIntegrator may use it`,
+          )
+        }
+      }
+    }
+
+    if (!readerOwner) {
+      for (const { re } of EVENT_STORE_READER_RES) {
+        const match = code.match(re)
+        if (match) {
+          const token = match[1] || match[0]
+          push(
+            i,
+            token,
+            `EventStore reader token '${token}' is forbidden at this path; only exact canonical reader owners and physical verification may use it`,
+          )
+        }
+      }
+    }
+  }
+
+  // Catch a hand-rolled stream merge without pretending every ordinary List.fold
+  // is history interpretation. Both signals are required in the same file.
+  const joined = codeLines.join('\n')
+  const flattensWriterStreams =
+    /\b(?:List|Seq|Array)\.collect\s+snd\b|\b(?:List|Seq|Array)\.(?:concat|collect)\b/.test(joined)
+  if (!observer && /\b(?:streams|history)\b/i.test(joined) && flattensWriterStreams) {
+    const lineIdx = codeLines.findIndex((line) => /\b(?:List|Seq|Array)\.sortBy\b/.test(line))
+    if (lineIdx >= 0) {
+      push(
+        lineIdx,
+        'manual merge',
+        "feature history loop token 'manual merge' is forbidden; only CanonicalIntegrator derives business Current",
+      )
+    }
+  }
+
+  return hits
+}
+
+/**
+ * Feature-local NDJSON/SQLite/private stores are a second durable substrate.
+ * Only the exact canonical physical-store programs may own their representation.
+ * @param {string} text
+ * @param {string} [file]
+ * @returns {Violation[]}
+ */
+export const scanPrivateDurableSubstrate = (text, file = '<synthetic>') => {
+  if (isDurableSubstrateOwnerPath(file)) return []
+
+  const lines = text.split('\n')
+  const hits = []
+  for (let i = 0; i < lines.length; i++) {
+    const code = stripLineComment(lines[i])
+    for (const { re } of PRIVATE_DURABLE_SUBSTRATE_RES) {
+      const match = code.match(re)
+      if (!match) continue
+      const token = match[0]
+      hits.push({
+        id: 'private-durable-substrate',
+        file,
+        line: i + 1,
+        token,
+        label: `feature-local durable substrate token '${token}' is forbidden; use the canonical EventStore`,
+        text: lines[i].trim(),
+      })
+      break
+    }
+  }
+  return hits
+}
+
+/**
+ * Positive shared-program shape: IntegrationRule is a one-envelope oracle and
+ * both boot replay and live preparation invoke the same integrateOne program.
+ * @param {{ file: string, text: string }[]} entries
+ * @returns {Violation[]}
+ */
+export const scanCanonicalSharedProgram = (entries) => {
+  const hits = []
+  const findEntry = (expected) => entries.find((entry) => pathIs(entry.file, expected))
+  const kernel = findEntry(INTEGRATION_KERNEL_PATH)
+  const canonical = findEntry(CANONICAL_INTEGRATOR_PATH)
+
+  const missing = (file, line, token, label, text = '') =>
+    hits.push({ id: 'canonical-shared-program', file, line, token, label, text })
+
+  if (!kernel) {
+    missing(INTEGRATION_KERNEL_PATH, 1, 'IntegrationRule', 'canonical IntegrationRule definition is missing')
+  } else {
+    const lines = kernel.text.split('\n')
+    const start = lines.findIndex((line) => /^\s*type\s+IntegrationRule\s*=/.test(stripLineComment(line)))
+    const end = start < 0 ? -1 : lines.findIndex((line, i) => i > start && /^\s*type\s+/.test(stripLineComment(line)))
+    const block = start < 0 ? '' : lines.slice(start, end < 0 ? lines.length : end).map(stripLineComment).join('\n')
+    const hasOneEnvelopeOracle =
+      /\bIntegrate\s*:\s*obj\s*->\s*EventEnvelope\s*->\s*Result</.test(block) &&
+      !/\bEventEnvelope\s+(?:list|array|seq)\b|\b(?:History|Streams|Events)Reader\b/.test(block)
+    if (!hasOneEnvelopeOracle) {
+      missing(
+        kernel.file,
+        start < 0 ? 1 : start + 1,
+        'IntegrationRule.Integrate(EventEnvelope)',
+        'IntegrationRule must consume exactly one EventEnvelope',
+        start < 0 ? '' : lines[start].trim(),
+      )
+    }
+  }
+
+  if (!canonical) {
+    missing(CANONICAL_INTEGRATOR_PATH, 1, 'integrateOne', 'canonical shared integration program is missing')
+    return hits
+  }
+
+  const lines = canonical.text.split('\n')
+  const codeLines = lines.map(stripLineComment)
+  const definition = codeLines.findIndex((line) => /^\s*let\s+private\s+integrateOne\b/.test(line))
+  if (definition < 0) {
+    missing(canonical.file, 1, 'integrateOne', 'canonical single-envelope integration program is missing')
+  }
+
+  const indentation = (line) => (line.match(/^\s*/) || [''])[0].length
+  const regionFrom = (startRe, boundaryRe) => {
+    const start = codeLines.findIndex((line) => startRe.test(line))
+    if (start < 0) return { start, body: [] }
+    const indent = indentation(codeLines[start])
+    let end = codeLines.length
+    for (let i = start + 1; i < codeLines.length; i++) {
+      const line = codeLines[i]
+      if (line.trim() && indentation(line) <= indent && boundaryRe.test(line)) {
+        end = i
+        break
+      }
+    }
+    return { start, body: codeLines.slice(start, end) }
+  }
+
+  const hasDirectCall = (body, callee) => {
+    const call = new RegExp(`\\b${callee}\\b(?=\\s+(?:[A-Za-z0-9_("']))`)
+    return body.some((line) => {
+      if (/^\s*let\s+_\s*=/.test(line)) return false
+      if (new RegExp(`^\\s*let(?:\\s+private)?\\s+${callee}\\b`).test(line)) return false
+      return call.test(line)
+    })
+  }
+
+  const assertDirectCall = (region, callee, token, label) => {
+    if (!hasDirectCall(region.body, callee)) {
+      missing(
+        canonical.file,
+        region.start < 0 ? 1 : region.start + 1,
+        token,
+        label,
+        region.start < 0 ? '' : lines[region.start].trim(),
+      )
+    }
+  }
+
+  const replay = regionFrom(/^\s*let\s+private\s+replay\b/, /^\s*let\b|^\s*\{\s*new\b/)
+  const prepareLive = regionFrom(/^\s*let\s+prepareLive\b/, /^\s*let\b|^\s*\{\s*new\b/)
+  const reloadLocal = regionFrom(
+    /^\s*member\s+[^.]+\.ReloadLocal\b/,
+    /^\s*member\b|^\s*\}\s*$/,
+  )
+  const prepareLiveMember = regionFrom(
+    /^\s*member\s+[^.]+\.PrepareLive\b/,
+    /^\s*member\b|^\s*\}\s*$/,
+  )
+
+  assertDirectCall(
+    reloadLocal,
+    'replay',
+    'ReloadLocal->replay',
+    'ReloadLocal must directly call the canonical replay program',
+  )
+  assertDirectCall(
+    replay,
+    'integrateOne',
+    'replay->integrateOne',
+    'replay must directly call the canonical integrateOne program',
+  )
+  assertDirectCall(
+    prepareLive,
+    'integrateOne',
+    'PrepareLive->integrateOne',
+    'PrepareLive path must directly call the canonical integrateOne program',
+  )
+  assertDirectCall(
+    prepareLiveMember,
+    'prepareLive',
+    'PrepareLive->integrateOne',
+    'PrepareLive must directly enter the helper that calls integrateOne',
+  )
+  return hits
+}
+
+/**
  * Run Phase 1–3 + clean-break scanners on one file body.
  * @param {string} text
  * @param {string} [file]
@@ -509,6 +848,8 @@ export const scanText = (text, file = '<synthetic>') => [
   ...scanStudentQaRevival(text, file),
   ...scanNoMigrator(text, file),
   ...scanDualWrite(text, file),
+  ...scanFeatureHistoryLoop(text, file),
+  ...scanPrivateDurableSubstrate(text, file),
 ]
 
 /** @param {{ file: string, text: string }[]} entries */
@@ -569,6 +910,7 @@ const runCli = () => {
 
   const violations = [
     ...scanFiles(production),
+    ...scanCanonicalSharedProgram(production),
     ...collectNoMigratorExtraEntries().flatMap((entry) => scanNoMigrator(entry.text, entry.file)),
   ]
 
@@ -581,7 +923,8 @@ const runCli = () => {
 
   console.error(`unified-store-gate: ${violations.length} violation(s)\n`)
   for (const v of violations) {
-    console.error(`  [${v.id}] ${v.file}:${v.line}  ${v.label}`)
+    const token = v.token === undefined ? '' : ` token='${v.token}'`
+    console.error(`  [${v.id}] ${v.file}:${v.line}${token}  ${v.label}`)
     console.error(`    ${v.text.slice(0, 160)}`)
   }
   process.exit(1)

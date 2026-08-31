@@ -9,13 +9,17 @@ import test from 'node:test'
 
 const finality = await import('../../../dist/Mission/Manager/FinalitySurface.js')
 
-const worldOf = (events) => {
-  const out = finality.project(events)
-  assert.equal(out.ok, true, JSON.stringify(out.error))
-  return out.world
+const project = (events) => {
+  let world = finality.emptyWorld()
+  for (const event of events) {
+    const result = finality.applyEvent(world, event)
+    assert.equal(result.ok, true, JSON.stringify(result.error))
+    world = result.world
+  }
+  return world
 }
 
-const emptyWorld = worldOf([])
+const emptyWorld = project([])
 
 const ownerSession = 'ses-finality-owner'
 const ownerLogicalRun = 'run-finality-owner'
@@ -78,7 +82,7 @@ test('WHAT[FINALITY-022] AgentOwner migration is admitted only before any Life h
 
   // A Life that was completed and archived: CurrentLife=None after completion
   // is terminal closure, never permission to rematerialize XTrace.
-  const closed = finality.project([
+  const closed = project([
     {
       kind: 'life-opened',
       sessionId: 'ses-admission',
@@ -129,11 +133,10 @@ test('WHAT[FINALITY-022] AgentOwner migration is admitted only before any Life h
     },
     ownerAuthorityAccepted,
   ])
-  assert.equal(closed.ok, true, JSON.stringify(closed.error))
-  assert.equal(finality.archivedLivesView(closed.world).length, 1)
+  assert.equal(finality.archivedLivesView(closed).length, 1)
 
   const afterCompletion = finality.endingAdmission(
-    closed.world,
+    closed,
     'agent-owner-root',
     'root-1',
     'fast-manager',

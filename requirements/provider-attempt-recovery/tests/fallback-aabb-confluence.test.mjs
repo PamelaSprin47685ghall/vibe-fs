@@ -5,6 +5,7 @@
 // and projection state private while this suite proves race algebra.
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import * as temporal from '../../../dist/Verification/TemporalSurface.js'
@@ -65,6 +66,11 @@ const envelope = (seq, session, fact, run) => ({
 const fallbackOf = (projection, sessionId) => projection?.sessions?.[sessionId]?.fallback
 
 const fold = (envelopes) => temporal.fold(envelopes)
+
+const ledgerSource = readFileSync(
+  new URL('../../../src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs', import.meta.url),
+  'utf8',
+)
 
 // ── Theorem 1: independent sessions commute (A;B == B;A) ───────────────────
 
@@ -142,6 +148,14 @@ test('WHAT[PAR-003] THEOREM_fallback_exactly_once_same_provider_run_advances_onc
   const absorbed = temporal.fallbackApplyAdvance(identityFor(SESSION_A, RUN_L, ROOT_A, run), 1, 2, 2, validAfterStale.value)
   assert.deepEqual(absorbed, { ok: false, error: 'AlreadyObserved' })
   assert.deepEqual(temporal.fallbackRead(validAfterStale.value), temporal.fallbackRead(first.value))
+})
+
+test('WHAT[PAR-003] duplicate and exhausted re-entry are explicit AlreadyRecorded outcomes', () => {
+  assert.match(
+    ledgerSource,
+    /FallbackAdvanceRejection\.AlreadyObserved\s*\|\s*Error FallbackAdvanceRejection\.AlreadyExhausted\s*->\s*return Ok ConfirmedFailureOutcome\.AlreadyRecorded/,
+  )
+  assert.doesNotMatch(ledgerSource, /AlreadyObserved[\s\S]{0,160}ContinueRecovery/)
 })
 
 test('WHAT[PAR-003] THEOREM_fold_duplicate_absorbed_not_double_counted', () => {

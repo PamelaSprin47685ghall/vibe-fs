@@ -35,14 +35,14 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| PROC-001 | `requirements/process-execution/tests/pty-types.test.mjs` |
-| PROC-002 | `requirements/process-execution/tests/pty-port.test.mjs` |
-| PROC-003 | `requirements/process-execution/tests/pty-port.test.mjs` |
-| PROC-004 | `requirements/process-execution/tests/process-runner.test.mjs` |
-| PROC-005 | `requirements/process-execution/tests/executor-tool.test.mjs` |
-| PROC-006 | `requirements/process-execution/tests/process-wait.test.mjs` |
-| PROC-007 | `requirements/process-execution/tests/pty-port.test.mjs` |
-| PROC-008 | `requirements/process-execution/tests/join-v2-mailbox-drain.test.mjs` |
-| PROC-009 | `requirements/process-execution/tests/process-output.test.mjs` |
-| PROC-010 | `requirements/process-execution/tests/join-v2-wire-pty.test.mjs` |
-| PROC-011 | `requirements/process-execution/tests/executor-tool.test.mjs` |
+| PROC-001 | `requirements/process-execution/tests/pty-types.test.mjs::WHAT[PROC-001] PTY_TYPES_tryParse_accepts_every_supported_signal_name` |
+| PROC-002 | `requirements/process-execution/tests/pty-port.test.mjs::WHAT[PROC-002] PORT_send_term_kill_int_marks_abort_for_the_next_completion` |
+| PROC-003 | `requirements/process-execution/tests/pty-port.test.mjs::WHAT[PROC-003] PORT_complete_default_publishes_pty_exited_closed` |
+| PROC-004 | `requirements/process-execution/tests/process-runner.test.mjs::WHAT[PROC-004] EXEC_011_slow_process_is_killed_and_reports_timeout` |
+| PROC-005 | `requirements/process-execution/tests/executor-tool.test.mjs::WHAT[PROC-005] RUN_non_positive_deadline_is_rejected`；`requirements/process-execution/tests/executor-tool.test.mjs::WHAT[PROC-005] RUN_invalid_output_budget_is_rejected` |
+| PROC-006 | `requirements/process-execution/tests/process-wait.test.mjs::WHAT[PROC-006] EXEC_011_D_mid_wait_cancellation_kills_once_and_rejects_without_hanging_on_exit` |
+| PROC-007 | `requirements/process-execution/tests/pty-port.test.mjs::WHAT[PROC-007] PORT_list_reports_active_handles` |
+| PROC-008 | `requirements/process-execution/tests/join-v2-mailbox-drain.test.mjs::WHAT[PROC-008] EXEC_018_drain_available_returns_two_completions_in_publish_order` |
+| PROC-009 | `requirements/process-execution/tests/process-output.test.mjs::WHAT[PROC-009] EXEC_011_collector_spools_when_byte_count_crosses_threshold`；`requirements/process-execution/tests/process-output.test.mjs::WHAT[PROC-009] EXEC_011_collector_spooled_buffers_are_cleared` |
+| PROC-010 | `requirements/process-execution/tests/join-v2-wire-pty.test.mjs::WHAT[PROC-010] EXEC_004_pty_completion_is_natural_language_plus_exit_code` |
+| PROC-011 | `requirements/process-execution/tests/executor-tool.test.mjs::WHAT[PROC-011] RUN_surface_names_the_provider_execution_verb`；`requirements/process-execution/tests/executor-tool.test.mjs::WHAT[PROC-011] RUN_deadline_overrun_returns_the_fixed_timeout_consequence` |

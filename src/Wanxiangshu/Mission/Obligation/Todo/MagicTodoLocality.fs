@@ -50,10 +50,6 @@ open Wanxiangshu.Foundation.Identity
 /// provider run is admissible evidence.
 module MagicTodoLocality =
 
-    type XTraceRange =
-        { Start: XTraceCursor
-          EndExclusive: XTraceCursor }
-
     type LocalizedToolCall =
         { ProviderRun: ProviderRunIdentity
           HostToolPartId: HostToolPartId
@@ -112,14 +108,19 @@ module MagicTodoLocality =
         let expectedPrefixCount = capturablePartsBeforeTool message.Parts toolCallId
 
         let capturedPrefixCount =
-            XTraceProjection.parts trace
-            |> List.filter (fun part -> part.ProviderRun = Some providerRun)
+            XTraceProjection.providerRunParts providerRun trace
             |> List.length
             |> min expectedPrefixCount
 
         let missingPrefixCount = expectedPrefixCount - capturedPrefixCount
 
-        { Sequence = XTraceProjection.headSequence trace + 1L + int64 missingPrefixCount }
+        let nextAssigned =
+            XTraceProjection.latestPartCursor trace
+            |> Option.map XTraceCursor.nextCursor
+            |> Option.defaultWith (fun () -> XTraceCursor.nextCursor XTraceCursor.originCursor)
+
+        [ 1..missingPrefixCount ]
+        |> List.fold (fun frontier _ -> XTraceCursor.nextCursor frontier) nextAssigned
 
     let private isUnmaterializedPendingStub (part: SessionToolPart) =
         part.State = SnapshotToolPartState.Pending
@@ -146,14 +147,13 @@ module MagicTodoLocality =
         trace
         messages
         (located: SessionSnapshotPort.ToolCallLocation)
-        (part: XTracePartRef)
+        (part: XTraceSemanticPartView)
         =
         let toolPartOrdinal =
-            XTraceProjection.parts trace
+            XTraceProjection.providerRunParts located.ProviderRun trace
             |> List.filter (fun candidate ->
-                candidate.ProviderRun = Some located.ProviderRun
-                && candidate.Kind = "tool_call"
-                && candidate.Cursor.Sequence <= part.Cursor.Sequence)
+                candidate.Kind = "tool_call"
+                && XTraceCursor.isAtOrAfter part.Cursor candidate.Cursor)
             |> List.distinctBy (fun candidate ->
                 candidate.HostToolPartId
                 |> Option.map HostToolPartId.value
@@ -176,9 +176,7 @@ module MagicTodoLocality =
                   TodowriteCallIdsInMessage = todowriteCallIds
                   ToolPartOrdinal = toolPartOrdinal
                   ReviewFrontier = part.Cursor
-                  Range =
-                    { Start = part.Cursor
-                      EndExclusive = { Sequence = part.Cursor.Sequence + 1L } } }
+                  Range = XTraceProjection.rangeOfPart part }
         | _ -> Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
 
     let private resolvePendingInMessage
@@ -210,9 +208,7 @@ module MagicTodoLocality =
                   TodowriteCallIdsInMessage = todowriteCallIds
                   ToolPartOrdinal = index + 1
                   ReviewFrontier = frontier
-                  Range =
-                    { Start = frontier
-                      EndExclusive = { Sequence = frontier.Sequence + 1L } } }
+                  Range = XTraceRange.create frontier (XTraceCursor.nextCursor frontier) }
         | _ -> Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
 
     let private resolvePendingAssistantMessage trace messages (located: SessionSnapshotPort.ToolCallLocation) =
@@ -236,13 +232,13 @@ module MagicTodoLocality =
         else
             resolvePendingAssistantMessage trace messages located
 
-    let private sameCapturedToolObservation (expected: XTracePartRef) (candidate: XTracePartRef) =
+    let private sameCapturedToolObservation (expected: XTraceSemanticPartView) (candidate: XTraceSemanticPartView) =
         candidate.Role = expected.Role
         && candidate.Kind = expected.Kind
         && candidate.ToolName = expected.ToolName
         && candidate.TextDigest = expected.TextDigest
 
-    let private collapseIdenticalPhysicalReplays (matches: XTracePartRef list) =
+    let private collapseIdenticalPhysicalReplays (matches: XTraceSemanticPartView list) =
         match matches with
         | first :: rest when rest |> List.forall (sameCapturedToolObservation first) -> Some first
         | _ -> None
@@ -251,7 +247,7 @@ module MagicTodoLocality =
         trace
         messages
         (located: SessionSnapshotPort.ToolCallLocation)
-        (duplicates: XTracePartRef list)
+        (duplicates: XTraceSemanticPartView list)
         =
         match collapseIdenticalPhysicalReplays duplicates with
         | Some first -> resolveCapturedToolCall trace messages located first
@@ -260,11 +256,11 @@ module MagicTodoLocality =
 
     let private resolveLocated trace messages (located: SessionSnapshotPort.ToolCallLocation) =
         let matches =
-            XTraceProjection.parts trace
-            |> List.filter (fun part ->
-                part.ProviderRun = Some located.ProviderRun
-                && part.ToolCallId = Some located.ToolCallId
-                && part.HostToolPartId = Some located.HostToolPartId)
+            XTraceProjection.toolPartsForHostIdentity
+                located.ProviderRun
+                located.ToolCallId
+                located.HostToolPartId
+                trace
 
         match matches with
         | [ part ] -> resolveCapturedToolCall trace messages located part

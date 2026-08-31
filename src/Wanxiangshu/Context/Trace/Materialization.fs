@@ -73,19 +73,85 @@ module XTraceMaterialization =
                   ProviderProjection.SemanticMessage.Parts = semanticParts }
         }
 
+    let private projectionFromParts
+        (journal: AgentJournal)
+        (parts: XTracePartRef list)
+        : Task<Result<ProviderProjection.ProviderSemanticProjection, string>> =
+        taskResult {
+            let turns = parts |> List.groupBy (fun part -> part.Turn) |> List.sortBy fst
+
+            let! messages = turns |> TaskResultList.traverseM (readTurn journal)
+            return { empty with Messages = messages }
+        }
+
     /// Rebuild the current reanchor generation from durable XTrace only.
     /// Blob failure is a proof failure, not permission to silently omit history.
     let currentProjection
         (journal: AgentJournal)
         (xTrace: XTraceProjectionState)
         : Task<Result<ProviderProjection.ProviderSemanticProjection, string>> =
+        XTraceProjection.currentGenerationParts (XTraceProjection.parts xTrace)
+        |> projectionFromParts journal
+
+    /// Canonical current-generation semantic projection restricted to a
+    /// trace-owned half-open interval.
+    let currentProjectionBetween
+        (journal: AgentJournal)
+        (range: XTraceRange)
+        (xTrace: XTraceProjectionState)
+        : Task<Result<ProviderProjection.ProviderSemanticProjection, string>> =
+        XTraceProjection.currentGenerationParts (XTraceProjection.parts xTrace)
+        |> List.filter (fun part -> XTraceRange.contains part.Cursor range)
+        |> projectionFromParts journal
+
+    let private readItem (journal: AgentJournal) (part: XTracePartRef) : Task<Result<XTraceItem, string>> =
         taskResult {
-            let turns =
-                XTraceProjection.currentGenerationParts (XTraceProjection.parts xTrace)
-                |> List.groupBy (fun part -> part.Turn)
-                |> List.sortBy fst
+            let! semantic = readSemanticPart journal part
 
-            let! messages = turns |> TaskResultList.traverseM (readTurn journal)
+            return
+                { Cursor = part.Cursor
+                  Provenance = part.Provenance
+                  Role = part.Role
+                  Part = semantic }
+        }
 
-            return { empty with Messages = messages }
+    /// Resolve one range to the owner model used by deterministic rendering.
+    /// Missing/corrupt blobs fail closed rather than silently shortening proof.
+    let materializeRange
+        (journal: AgentJournal)
+        (range: XTraceRange)
+        (xTrace: XTraceProjectionState)
+        : Task<Result<XTraceItem list, string>> =
+        XTraceProjection.parts xTrace
+        |> List.filter (fun part -> XTraceRange.contains part.Cursor range)
+        |> TaskResultList.traverseM (readItem journal)
+
+    let materializeWorkRecordRange
+        (journal: AgentJournal)
+        (range: XTraceRange)
+        (xTrace: XTraceProjectionState)
+        : Task<Result<XTraceItem list, string>> =
+        task {
+            let! resolved = materializeRange journal range xTrace
+            return resolved |> Result.map XTrace.forWorkRecord
+        }
+
+    let renderRange
+        (journal: AgentJournal)
+        (range: XTraceRange)
+        (xTrace: XTraceProjectionState)
+        : Task<Result<string, string>> =
+        task {
+            let! resolved = materializeRange journal range xTrace
+            return resolved |> Result.map XTrace.render
+        }
+
+    let renderWorkRecordRange
+        (journal: AgentJournal)
+        (range: XTraceRange)
+        (xTrace: XTraceProjectionState)
+        : Task<Result<string, string>> =
+        task {
+            let! resolved = materializeWorkRecordRange journal range xTrace
+            return resolved |> Result.map XTrace.render
         }

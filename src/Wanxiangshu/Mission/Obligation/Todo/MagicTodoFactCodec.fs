@@ -15,10 +15,10 @@ open Wanxiangshu.Persistence.EventStore
 module MagicTodoFactCodec =
 
     let private cursorEncoder (c: XTraceCursor) =
-        Encode.object [ "Sequence", Encode.int64 c.Sequence ]
+        Encode.object [ "Sequence", Encode.int64 (XTraceCursor.sequence c) ]
 
     let private cursorDecoder: Decoder<XTraceCursor> =
-        Decode.object (fun get -> { Sequence = get.Required.Field "Sequence" Decode.int64 })
+        Decode.object (fun get -> XTraceCursor.create (get.Required.Field "Sequence" Decode.int64))
 
     let private todoWriteIdEncoder (id: TodoWriteId) = Encode.string (TodoWriteId.value id)
 

@@ -4,15 +4,14 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Rendered projection → Host raw write-back adapters (Wave 3 split of the old
-/// `Projection` module). This module turns `RenderedMessages` / `RenderedPrefix`
-/// into Host object lists; decoding back the other way lives in
+/// `Projection` module). This module turns rendered messages and stable Host-id
+/// edits into Host object lists; decoding back the other way lives in
 /// `ProviderWireDecode` / `ProviderWireCapture`.
 module ProjectionMessageEdit =
 
@@ -23,47 +22,42 @@ module ProjectionMessageEdit =
         ProviderWireDecode.firstString part [ "tool"; "name" ]
         |> Option.exists (fun tool -> String.Equals(tool, "todowrite", StringComparison.OrdinalIgnoreCase))
 
-    let private retentionFacts (message: obj) : XPrefixProjection.RawPrefixMessageFacts =
+    let private retentionFacts (message: obj) =
         let parts = ProviderWireDecode.rawPartsOf message
 
-        { ContainsTodoWrite = parts |> List.exists isTodoWritePart
-          ToolCallIds = parts |> List.choose rawPartCallId |> List.map ToolCallId.create |> Set.ofList }
+        parts |> List.exists isTodoWritePart, parts |> List.choose rawPartCallId |> Set.ofList
 
     let private retainedTodoRounds (covered: obj list) =
-        List.zip covered (covered |> List.map retentionFacts |> XPrefixProjection.retainTodoWriteRounds)
+        let facts = covered |> List.map retentionFacts
+
+        let todoCallIds =
+            facts |> List.filter fst |> List.collect (snd >> Set.toList) |> Set.ofList
+
+        let retained =
+            facts
+            |> List.map (fun (containsTodoWrite, callIds) ->
+                containsTodoWrite || not (Set.intersect callIds todoCallIds |> Set.isEmpty))
+
+        List.zip covered retained
         |> List.choose (fun (message, retain) -> if retain then Some message else None)
 
-    let private companionHead (syntheticId: string) (memory: string) =
+    let private syntheticHead (syntheticId: string) (memory: string) =
         createObj
             [ "info", box (createObj [ "id", box syntheticId; "role", box "user" ])
               "parts", box [| createObj [ "type", box "text"; "text", box memory ] |] ]
 
-    let prependCompanionMemory
-        (rawMessages: obj list)
-        (syntheticId: string)
-        (memory: string)
-        (dropLeading: int)
-        : obj list =
-        if dropLeading > List.length rawMessages then
-            invalidArg "dropLeading" "X-wire prefix cutoff exceeds the current provider snapshot"
-
-        let dropped = List.take dropLeading rawMessages
-
-        companionHead syntheticId memory
-        :: (retainedTodoRounds dropped @ List.skip dropLeading rawMessages)
-
-    /// Prefix replacement for stable XTrace-backed sessions.
+    /// Replace stable Host rows with one synthetic message.
     ///
     /// `coveredHostMessageIds` names the physical historical messages proved by
     /// canonical XTrace. Request-local provider rows are not in that set, so a
     /// narrative/replay/grounding insertion can neither shift the cutoff nor be
     /// accidentally deleted merely because it occupies an earlier array index.
-    let prependCompanionMemoryByHostIds
+    let replacePrefixByHostIds
         (rawMessages: obj list)
-        (syntheticId: string)
-        (memory: string)
         (coveredHostMessageIds: string list)
         (insertAfterHostMessageId: string option)
+        (syntheticMessageId: string)
+        (memory: string)
         : obj list =
         let coveredIds = coveredHostMessageIds |> Set.ofList
 
@@ -84,7 +78,7 @@ module ProjectionMessageEdit =
             | _ -> true
 
         let surviving = rawMessages |> List.filter survivesReplacement
-        let head = companionHead syntheticId memory
+        let head = syntheticHead syntheticMessageId memory
 
         let insertionIndex =
             insertAfterHostMessageId
@@ -137,8 +131,7 @@ module ProjectionMessageEdit =
             )
         | WireMedia _ ->
             // VERIFY-007: semantic/media digests are one-way. Reconstructing media
-            // bytes from a digest would invent provider-visible content, so a
-            // Strength mirror containing media is ineligible rather than lossy.
+            // bytes from a digest would invent provider-visible content.
             Error "wire media cannot be reconstructed from semantic digest"
 
     let private encodeParts (parts: WirePart list) : Result<obj list, string> =
@@ -175,7 +168,7 @@ module ProjectionMessageEdit =
                       "parts", box (List.toArray parts) ]
         }
 
-    /// STRENGTH-009 / PROJ-004: write a fully rendered DSL message view back to
+    /// PROJ-004: write a fully rendered DSL message view back to
     /// Host objects. This is intentionally an adapter, not business assembly.
     /// Missing Host ids are derived from wire bytes + ordinal and are Host-only;
     /// the generated identity never enters ProviderSemanticProjection.
@@ -189,248 +182,53 @@ module ProjectionMessageEdit =
         |> List.traverseResultM (fun (index, message, hostId) ->
             encodeRenderedMessage sessionId sha256 index message hostId)
 
-    let private strengthHostMessageId
-        (sha256: string -> string)
-        (index: int)
-        (message: WireMessage)
-        (hostId: string option)
-        =
-        hostId
-        |> Option.defaultWith (fun () -> derivedHostMessageId sha256 index message)
+    /// Small physical Host encoding port for owner modules that need a native
+    /// representation different from the generic one-row-per-wire-message adapter.
+    module HostWireEncoding =
 
-    let private strengthCompletedPart
-        (callId: ToolCallId)
-        (name: string)
-        (argsCanonical: string)
-        (resultCanonical: string)
-        : obj =
-        createObj
-            [ "type", box "tool"
-              "tool", box name
-              "callID", box (ToolCallId.value callId)
-              "state",
-              box (
-                  createObj
-                      [ "status", box "completed"
-                        "input", canonicalValue argsCanonical
-                        "output", canonicalValue resultCanonical
-                        "time", box (createObj [ "start", box 0; "end", box 0 ]) ]
-              ) ]
+        let tryEncodeNonToolParts (parts: WirePart list) : Result<obj list, string> =
+            parts
+            |> List.traverseResultM (fun part ->
+                match part with
+                | WireToolCall _
+                | WireToolResult _ -> Error "Host wire encoding received a tool part"
+                | _ -> encodeWirePart part)
 
-    let private encodeRegularPart (part: WirePart) : Result<obj, string> =
-        match part with
-        | WireToolCall _
-        | WireToolResult _ -> Error "Strength Host adapter received an unpaired tool part"
-        | _ -> encodeWirePart part
+        let completedToolPart
+            (callId: ToolCallId)
+            (name: string)
+            (argsCanonical: string)
+            (resultCanonical: string)
+            : obj =
+            createObj
+                [ "type", box "tool"
+                  "tool", box name
+                  "callID", box (ToolCallId.value callId)
+                  "state",
+                  box (
+                      createObj
+                          [ "status", box "completed"
+                            "input", canonicalValue argsCanonical
+                            "output", canonicalValue resultCanonical
+                            "time", box (createObj [ "start", box 0; "end", box 0 ]) ]
+                  ) ]
 
-    let private encodeRegularParts (parts: WirePart list) : Result<obj list, string> =
-        parts |> List.traverseResultM encodeRegularPart
+        let rawMessage
+            (sessionId: string)
+            (sha256: string -> string)
+            (index: int)
+            (message: WireMessage)
+            (hostId: string option)
+            (role: string)
+            (parts: obj list)
+            : obj =
+            let id =
+                hostId
+                |> Option.defaultWith (fun () -> derivedHostMessageId sha256 index message)
 
-    let private collectToolCalls (parts: WirePart list) =
-        parts
-        |> List.choose (function
-            | WireToolCall(callId, name, args) -> Some(callId, name, args)
-            | _ -> None)
-
-    let private collectToolResults (parts: WirePart list) =
-        parts
-        |> List.choose (function
-            | WireToolResult(callId, result) -> Some(callId, result)
-            | _ -> None)
-
-    let private nonCallParts (parts: WirePart list) =
-        parts
-        |> List.filter (function
-            | WireToolCall _ -> false
-            | _ -> true)
-
-    let private requireDistinctIds (ids: string list) (error: string) : Result<unit, string> =
-        if Set.count (Set.ofList ids) <> List.length ids then
-            Error error
-        else
-            Ok()
-
-    let private requireAssistantRole (role: string) : Result<unit, string> =
-        if String.Equals(role, "assistant", StringComparison.OrdinalIgnoreCase) then
-            Ok()
-        else
-            Error "Strength tool calls must originate from an assistant message"
-
-    let private requireToolRole (role: string) : Result<unit, string> =
-        if String.Equals(role, "tool", StringComparison.OrdinalIgnoreCase) then
-            Ok()
-        else
-            Error "Strength tool results must originate from a logical tool message"
-
-    type private StrengthCallBatch =
-        Map<string, ToolCallId * string * string> * obj list * int * WireMessage * string option
-
-    let private startCallBatch
-        (pendingBatch: StrengthCallBatch option)
-        (message: WireMessage)
-        (index: int)
-        (hostId: string option)
-        (calls: (ToolCallId * string * string) list)
-        : Result<StrengthCallBatch option, string> =
-        if Option.isSome pendingBatch then
-            Error "Strength Host adapter saw a new tool batch before the previous batch completed"
-        else
-            result {
-                do! requireAssistantRole message.Role
-                let! regularParts = encodeRegularParts (nonCallParts message.Parts)
-
-                do!
-                    requireDistinctIds
-                        (calls |> List.map (fun (id, _, _) -> ToolCallId.value id))
-                        "Strength Host adapter refuses duplicate tool call ids in one batch"
-
-                let pendingCalls =
-                    calls
-                    |> List.map (fun (callId, name, args) -> ToolCallId.value callId, (callId, name, args))
-                    |> Map.ofList
-
-                return Some(pendingCalls, regularParts, index, message, hostId)
-            }
-
-    let private completeOneResult
-        (pendingCalls: Map<string, ToolCallId * string * string>)
-        (callId: ToolCallId, resultCanonical: string)
-        : Result<obj, string> =
-        match Map.tryFind (ToolCallId.value callId) pendingCalls with
-        | None -> Error "Strength Host adapter found an orphan tool result"
-        | Some(_, name, args) -> Ok(strengthCompletedPart callId name args resultCanonical)
-
-    let private strengthRawMessage (sessionId: string) (sha256: string -> string) index message hostId role parts =
-        let id = strengthHostMessageId sha256 index message hostId
-
-        createObj
-            [ "info", box (createObj [ "id", box id; "sessionID", box sessionId; "role", box role ])
-              "parts", box (List.toArray parts) ]
-
-    let private requireResultPartsOnly
-        (message: WireMessage)
-        (results: (ToolCallId * string) list)
-        : Result<unit, string> =
-        if List.length results <> List.length message.Parts then
-            Error "Strength tool result message contains non-result parts"
-        else
-            Ok()
-
-    let private requireBatchCardinality
-        (pendingCalls: Map<string, ToolCallId * string * string>)
-        (results: (ToolCallId * string) list)
-        : Result<unit, string> =
-        if Map.count pendingCalls <> List.length results then
-            Error "Strength Host adapter requires every tool call/result in the request batch"
-        else
-            Ok()
-
-    let private requirePendingBatch (pendingBatch: StrengthCallBatch option) : Result<StrengthCallBatch, string> =
-        match pendingBatch with
-        | None -> Error "Strength Host adapter found tool results without a preceding call batch"
-        | Some batch -> Ok batch
-
-    let private finishResultBatch
-        (sessionId: string)
-        (sha256: string -> string)
-        (pendingBatch: StrengthCallBatch option)
-        (message: WireMessage)
-        (results: (ToolCallId * string) list)
-        : Result<obj, string> =
-        result {
-            let! pendingCalls, regularParts, callIndex, callMessage, callHostId = requirePendingBatch pendingBatch
-
-            do! requireToolRole message.Role
-            do! requireResultPartsOnly message results
-            do! requireBatchCardinality pendingCalls results
-
-            do!
-                requireDistinctIds
-                    (results |> List.map (fun (id, _) -> ToolCallId.value id))
-                    "Strength Host adapter refuses duplicate tool result ids in one batch"
-
-            let! completed = results |> List.traverseResultM (completeOneResult pendingCalls)
-
-            return
-                strengthRawMessage
-                    sessionId
-                    sha256
-                    callIndex
-                    callMessage
-                    callHostId
-                    "assistant"
-                    (regularParts @ completed)
-        }
-
-    let private emitRegularMessage
-        (sessionId: string)
-        (sha256: string -> string)
-        (pendingBatch: StrengthCallBatch option)
-        (index: int)
-        (message: WireMessage)
-        (hostId: string option)
-        : Result<obj, string> =
-        if Option.isSome pendingBatch then
-            Error "Strength Host adapter requires tool results immediately after the tool-call message"
-        else
-            result {
-                let! parts = encodeRegularParts message.Parts
-                return strengthRawMessage sessionId sha256 index message hostId message.Role parts
-            }
-
-    let private continueStrengthMessage
-        (sessionId: string)
-        (sha256: string -> string)
-        (loop:
-            (int * (WireMessage * string option * bool)) list
-                -> StrengthCallBatch option
-                -> obj list
-                -> Result<obj list, string>)
-        (tail: (int * (WireMessage * string option * bool)) list)
-        (pendingBatch: StrengthCallBatch option)
-        (acc: obj list)
-        (index: int)
-        (message: WireMessage)
-        (hostId: string option)
-        : Result<obj list, string> =
-        let calls = collectToolCalls message.Parts
-        let results = collectToolResults message.Parts
-
-        match List.isEmpty calls, List.isEmpty results with
-        | false, false -> Error "Strength Host adapter refuses a message mixing tool calls and results"
-        | false, true ->
-            startCallBatch pendingBatch message index hostId calls
-            |> Result.bind (fun nextBatch -> loop tail nextBatch acc)
-        | true, false ->
-            finishResultBatch sessionId sha256 pendingBatch message results
-            |> Result.bind (fun raw -> loop tail None (raw :: acc))
-        | true, true ->
-            emitRegularMessage sessionId sha256 pendingBatch index message hostId
-            |> Result.bind (fun raw -> loop tail None (raw :: acc))
-
-    /// STRENGTH-003/009: encode a Strength Replica provider view into the Host's
-    /// native OpenCode tool-part shape. `MessageV2.toModelMessagesEffect` renders
-    /// one completed `type=tool` part as the provider's tool-call + tool-result
-    /// exchange; pending/running parts are rendered as interrupted errors. The
-    /// logical assistant-call + tool-result pair must therefore collapse to one
-    /// completed Host assistant message, never two physical Host rows.
-    let tryApplyStrengthRenderedMessages
-        (sessionId: string)
-        (sha256: string -> string)
-        (rendered: Wanxiangshu.Participant.Provider.Projection.RenderedMessages)
-        : Result<obj list, string> =
-        let triples =
-            List.zip3 rendered.Messages rendered.HostMessageIds rendered.HostIsPhysical
-            |> List.mapi (fun index triple -> index, triple)
-
-        let rec encodeMessages remaining pending acc =
-            match remaining, pending with
-            | [], None -> Ok(List.rev acc)
-            | [], Some _ -> Error "Strength Host adapter ended with an incomplete tool batch"
-            | (index, (message, hostId, _)) :: tail, pendingBatch ->
-                continueStrengthMessage sessionId sha256 encodeMessages tail pendingBatch acc index message hostId
-
-        encodeMessages triples None []
+            createObj
+                [ "info", box (createObj [ "id", box id; "sessionID", box sessionId; "role", box role ])
+                  "parts", box (List.toArray parts) ]
 
     let private decodeSingle raw =
         match (ProviderWireCapture.decodeMessageView [ raw ]).Messages with
@@ -493,11 +291,11 @@ module ProjectionMessageEdit =
 
         merge renderedRows decodedRaw []
 
-    /// STRENGTH-006/009: insertion-only write-back for owner Work history.
+    /// Insertion-only write-back for owner Work history.
     /// Existing Host objects are reused byte/object-for-object; only renderer rows
     /// that do not match the next raw semantic message may be synthesized, and
-    /// such rows must carry an explicit algebra-owned Host id. This prevents a
-    /// Strength insertion from silently re-identifying physical owner history.
+    /// such rows must carry an explicit algebra-owned Host id. This prevents an
+    /// insertion from silently re-identifying physical owner history.
     let tryApplyRenderedInsertionsPreservingBase
         (sessionId: string)
         (sha256: string -> string)
@@ -512,40 +310,3 @@ module ProjectionMessageEdit =
 
             return! mergeInsertions sessionId sha256 renderedRows decodedRaw
         }
-
-    /// PROJ-004: apply a rendered prefix to the Host message view — the one write-back
-    /// adapter for the projection DSL's prefix stage. Business modules declare intents
-    /// (PROJ-005) and never assemble messages themselves; this function turns the
-    /// renderer's instruction into the Host object list, preserving the untouched tail
-    /// verbatim so byte equality with what the provider saw is never re-derived.
-    let applyRenderedPrefix
-        (rawMessages: obj list)
-        (rendered: Wanxiangshu.Participant.Provider.Projection.RenderedPrefix)
-        : obj list =
-        match rendered with
-        | Wanxiangshu.Participant.Provider.Projection.RenderedPrefix.PhysicalPrefix -> rawMessages
-        | Wanxiangshu.Participant.Provider.Projection.RenderedPrefix.SyntheticPrefix activation ->
-            prependCompanionMemory
-                rawMessages
-                activation.SyntheticMessageId
-                activation.Memory
-                activation.CutoffExclusive
-
-    /// Stable-identity counterpart of `applyRenderedPrefix`. The renderer keeps
-    /// carrying the canonical semantic cutoff for identity/seal purposes; the
-    /// Host adapter resolves deletion through XTrace-owned physical identities.
-    let applyRenderedPrefixByHostIds
-        (rawMessages: obj list)
-        (coveredHostMessageIds: string list)
-        (insertAfterHostMessageId: string option)
-        (rendered: Wanxiangshu.Participant.Provider.Projection.RenderedPrefix)
-        : obj list =
-        match rendered with
-        | Wanxiangshu.Participant.Provider.Projection.RenderedPrefix.PhysicalPrefix -> rawMessages
-        | Wanxiangshu.Participant.Provider.Projection.RenderedPrefix.SyntheticPrefix activation ->
-            prependCompanionMemoryByHostIds
-                rawMessages
-                activation.SyntheticMessageId
-                activation.Memory
-                coveredHostMessageIds
-                insertAfterHostMessageId

@@ -18,16 +18,16 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| DISTILL-001 | `requirements/output-distillation/tests/distiller-fragment-humility.test.mjs` |
-| DISTILL-002 | `requirements/output-distillation/tests/distiller-fragment-humility.test.mjs` |
-| DISTILL-003 | `requirements/output-distillation/tests/distiller-fragment-humility.test.mjs` |
-| DISTILL-004 | `requirements/output-distillation/tests/executor-summarize.test.mjs` |
-| DISTILL-005 | `requirements/output-distillation/tests/distiller-fragment-humility.test.mjs` |
-| DISTILL-006 | `requirements/output-distillation/tests/executor-summarize.test.mjs`；`requirements/output-distillation/tests/reconcile-supervisor-distill.test.mjs` |
-| DISTILL-007 | `requirements/output-distillation/tests/executor-summarize.test.mjs` |
-| DISTILL-008 | `requirements/output-distillation/tests/executor-summarize.test.mjs` |
-| DISTILL-009 | `requirements/output-distillation/tests/distiller-role-contract.test.mjs` |
-| DISTILL-010 | `requirements/output-distillation/tests/distiller-role-contract.test.mjs` |
-| DISTILL-011 | `requirements/output-distillation/tests/large-gate.test.mjs` |
-| DISTILL-012 | `requirements/output-distillation/tests/tool-host-codec-full.test.mjs` |
-| DISTILL-013 | `requirements/output-distillation/tests/executor-summarize.test.mjs` |
+| DISTILL-001 | `requirements/output-distillation/tests/distiller-fragment-humility.test.mjs::WHAT[DISTILL-001] truncation_produces_nonempty_bounded_observation` |
+| DISTILL-002 | `requirements/output-distillation/tests/distiller-fragment-humility.test.mjs::WHAT[DISTILL-002] bounded_tail_keeps_recent_judgment_changing_marker` |
+| DISTILL-003 | `requirements/output-distillation/tests/distiller-fragment-humility.test.mjs::WHAT[DISTILL-003] truncated_tail_is_explicitly_not_the_whole_run` |
+| DISTILL-004 | `requirements/output-distillation/tests/executor-summarize.test.mjs::WHAT[DISTILL-004] EXEC_distill_spool_never_fans_out_or_reduces_when_spool_grows` |
+| DISTILL-005 | `requirements/output-distillation/tests/distiller-fragment-humility.test.mjs::WHAT[DISTILL-005] unseen_reader_gets_locator_plus_visible_truncation_boundary` |
+| DISTILL-006 | `requirements/output-distillation/tests/executor-summarize.test.mjs::WHAT[DISTILL-006] EXEC_distill_spool_failure_returns_bounded_raw_tail_and_cancels_once`；`requirements/output-distillation/tests/reconcile-supervisor-distill.test.mjs::WHAT[DISTILL-006] EXEC_distillation_cancel_single_owned_distiller_once_on_failure` |
+| DISTILL-007 | `requirements/output-distillation/tests/executor-summarize.test.mjs::WHAT[DISTILL-007] EXEC_distill_spool_keeps_only_latest_200kib_payload` |
+| DISTILL-008 | `requirements/output-distillation/tests/executor-summarize.test.mjs::WHAT[DISTILL-008] EXEC_distill_spool_waiting_rechecks_same_exact_agent_after_readiness` |
+| DISTILL-009 | `requirements/output-distillation/tests/distiller-role-contract.test.mjs::WHAT[DISTILL-009] distiller_is_private_leaf_runtime_without_public_target_or_blogger_companion` |
+| DISTILL-010 | `requirements/output-distillation/tests/distiller-role-contract.test.mjs::WHAT[DISTILL-010] distiller_carries_no_execution_or_judgement_permissions_and_run_is_the_only_execution_surface` |
+| DISTILL-011 | `requirements/output-distillation/tests/large-gate.test.mjs::WHAT[DISTILL-011] VERIFY_009_large_gate_first_acquire_succeeds_immediately`；`requirements/output-distillation/tests/large-gate.test.mjs::WHAT[DISTILL-011] VERIFY_009_large_gate_second_acquire_waits_until_release`；`requirements/output-distillation/tests/large-gate.test.mjs::WHAT[DISTILL-011] VERIFY_009_large_gate_release_without_holder_is_noop`；`requirements/output-distillation/tests/large-gate.test.mjs::WHAT[DISTILL-011] VERIFY_009_large_gate_waiters_are_served_fifo`；`requirements/output-distillation/tests/large-gate.test.mjs::WHAT[DISTILL-011] VERIFY_009_large_gate_cancelled_waiter_is_skipped`；`requirements/output-distillation/tests/large-gate.test.mjs::WHAT[DISTILL-011] VERIFY_009_large_gate_precancelled_token_is_rejected_immediately`；`requirements/output-distillation/tests/large-gate.test.mjs::WHAT[DISTILL-011] VERIFY_009_large_gate_cancellation_observed_by_gate`；`requirements/output-distillation/tests/large-gate.test.mjs::WHAT[DISTILL-011] VERIFY_009_large_gate_acquire_after_release_reenters_cleanly` |
+| DISTILL-012 | `requirements/output-distillation/tests/tool-host-codec-full.test.mjs::WHAT[DISTILL-012] CODEC_register_applies_tool_with_uncurried_execute_and_bounds_result` |
+| DISTILL-013 | `requirements/output-distillation/tests/executor-summarize.test.mjs::WHAT[DISTILL-013] DISTILLATION_prompt_has_no_chunk_or_reduce_instrumentation` |

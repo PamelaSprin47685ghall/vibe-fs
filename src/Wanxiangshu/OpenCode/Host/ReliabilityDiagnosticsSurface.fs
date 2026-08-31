@@ -5,6 +5,7 @@ open System.Text.RegularExpressions
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

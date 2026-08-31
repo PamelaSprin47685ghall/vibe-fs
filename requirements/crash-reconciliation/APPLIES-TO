@@ -11,4 +11,6 @@
 /src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs
 /scripts/checks/p0-recovery-join.mjs
+/scripts/checks/external-effect-reconciliation.mjs
+/scripts/checks/external-effect-contracts.json
 /requirements/change-integration/tests/runtime.test.mjs

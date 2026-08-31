@@ -25,8 +25,9 @@
 
 `scripts/checks/requirement-trace.mjs` 与 `tests/requirement-trace.test.mjs` 实现规范与测试的双向映射：
 - 扫描全量测试用例调用点（`test()` / `t.test()`），提取 `WHAT[<PACKAGE-NNN>]` 标签并验证其唯一性与合法性。
+- 为每个命题 ID 保留全部定义位置；仅为恰有一个定义的 ID 建立权威映射，同包重复与跨包多 owner 均以全部位置 fail-closed。
 - 识别并阻断未关联命题的孤儿测试、多 primary 标签的歧义测试以及无有效测试覆盖的休眠命题。
-- 解析 `HOW.md` 中声明的精确锚点，确保规范至测试代码的双向可追溯。
+- 由共享的精确标题解析器解析 `HOW.md` 的 `(path, title)` 锚点；裸路径、零匹配或多匹配均产生缺失/悬空证明诊断且不取得 HOW 权威，同一命题可以保留多个独立证明边。
 
 ### 4. 变更生命周期约束（`change-lifecycle`）
 
@@ -38,21 +39,21 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| REQUIREMENT-SYSTEM-001 | `requirements/requirement-system/tests/meta-verifier.test.mjs` |
-| REQUIREMENT-SYSTEM-002 | `requirements/requirement-system/tests/meta-verifier.test.mjs` |
-| REQUIREMENT-SYSTEM-003 | `requirements/requirement-system/tests/meta-verifier.test.mjs` |
-| REQUIREMENT-SYSTEM-004 | `requirements/requirement-system/tests/meta-verifier.test.mjs` |
-| REQUIREMENT-SYSTEM-005 | `requirements/requirement-system/tests/spec-rules.test.mjs` |
-| REQUIREMENT-SYSTEM-006 | `requirements/requirement-system/tests/meta-verifier.test.mjs` |
-| REQUIREMENT-SYSTEM-007 | `requirements/requirement-system/tests/meta-verifier.test.mjs` |
-| REQUIREMENT-SYSTEM-008 | `requirements/requirement-system/tests/spec-rules.test.mjs` |
-| REQUIREMENT-SYSTEM-009 | `requirements/requirement-system/tests/spec-rules.test.mjs` |
-| REQUIREMENT-SYSTEM-010 | `requirements/requirement-system/tests/spec-rules.test.mjs` |
-| REQUIREMENT-SYSTEM-011 | `requirements/requirement-system/tests/spec-rules.test.mjs` |
-| REQUIREMENT-SYSTEM-012 | `requirements/requirement-system/tests/spec-rules.test.mjs` |
-| REQUIREMENT-SYSTEM-013 | `requirements/requirement-system/tests/change-lifecycle.test.mjs` |
-| REQUIREMENT-SYSTEM-014 | `requirements/requirement-system/tests/change-lifecycle.test.mjs` |
-| REQUIREMENT-SYSTEM-015 | `requirements/requirement-system/tests/change-lifecycle.test.mjs` |
-| REQUIREMENT-SYSTEM-016 | `requirements/requirement-system/tests/meta-verifier.test.mjs` |
-| REQUIREMENT-SYSTEM-017 | `requirements/requirement-system/tests/meta-verifier.test.mjs` |
-| REQUIREMENT-SYSTEM-018 | `requirements/requirement-system/tests/requirement-trace.test.mjs` |
+| REQUIREMENT-SYSTEM-001 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-001] every product truth has exactly one owner package` |
+| REQUIREMENT-SYSTEM-002 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-002] package identity is the name, not the physical layout` |
+| REQUIREMENT-SYSTEM-003 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-003] every INDEX package carries all three documents` |
+| REQUIREMENT-SYSTEM-004 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-004] every WHAT proposition has a proof row and a live landing file` |
+| REQUIREMENT-SYSTEM-005 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-005] formalClauseDefinitionHeadings surfaces clause definitions from routing files` |
+| REQUIREMENT-SYSTEM-006 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-006] tree entry and INDEX name the same package set` |
+| REQUIREMENT-SYSTEM-007 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-007] spec gate requires exact README coverage of formal files` |
+| REQUIREMENT-SYSTEM-008 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-008] spec gate rejects unknown and suffixed clause-looking references`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-008] duplicate definitions retain every location and never acquire authority` |
+| REQUIREMENT-SYSTEM-009 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-009] formalClauseDefinitionHeadings still recognizes a product clause defined in a Change file` |
+| REQUIREMENT-SYSTEM-010 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-010] spec gate detects retired workflow paths` |
+| REQUIREMENT-SYSTEM-011 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-011] spec gate rejects proposed and specific completed dependencies but allows active scope` |
+| REQUIREMENT-SYSTEM-012 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-012] formalClauseDefinitionHeadings separates CHG-001 from product clauses` |
+| REQUIREMENT-SYSTEM-013 | `requirements/requirement-system/tests/change-lifecycle.test.mjs::WHAT[REQUIREMENT-SYSTEM-013] Completed is not current product behavior` |
+| REQUIREMENT-SYSTEM-014 | `requirements/requirement-system/tests/change-lifecycle.test.mjs::WHAT[REQUIREMENT-SYSTEM-014] WHAT states the four-step blocker protocol` |
+| REQUIREMENT-SYSTEM-015 | `requirements/requirement-system/tests/change-lifecycle.test.mjs::WHAT[REQUIREMENT-SYSTEM-015] AGENTS.md keeps the small-fix exemption` |
+| REQUIREMENT-SYSTEM-016 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-016] declared DEPENDS ON stays within the INDEX skeleton` |
+| REQUIREMENT-SYSTEM-017 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-017] meta-verifier executes as the machine proof` |
+| REQUIREMENT-SYSTEM-018 | `requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] exact proof-title resolution is reusable and never guesses`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] graph preserves proof portfolios and rejects orphan or multi-primary tests`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects stale anchors` |

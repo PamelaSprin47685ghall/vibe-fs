@@ -6,16 +6,21 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
+  CANONICAL_EVENT_READER_OWNER_PATHS,
   DUAL_WRITE_ALLOWLIST,
   GIT_BYPASS_ALLOWLIST,
   NON_STORE_SCHEMA_VERSION_SITES,
+  PHYSICAL_HISTORY_OBSERVER_PATHS,
   SCANNER_IDS,
   collectProductionEntries,
+  scanCanonicalSharedProgram,
   scanDualWrite,
+  scanFeatureHistoryLoop,
   scanFeatureRef,
   scanFiles,
   scanGitBypass,
   scanNoMigrator,
+  scanPrivateDurableSubstrate,
   scanSchemaVersionInStoreContext,
   scanStudentQaRevival,
   scanText,
@@ -24,7 +29,7 @@ import {
 const readFixture = (name) =>
   readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
 
-test('WHAT[DURABLE-EVENTS-016] scanner ids cover Phase 1–3 and P4U2 clean-break rules', () => {
+test('WHAT[DURABLE-EVENTS-016] scanner ids cover unified-store clean-break and history ownership rules', () => {
   assert.deepEqual([...SCANNER_IDS], [
     'feature-ref',
     'schema-version-in-store-context',
@@ -32,6 +37,9 @@ test('WHAT[DURABLE-EVENTS-016] scanner ids cover Phase 1–3 and P4U2 clean-brea
     'student-qa-revival',
     'no-migrator',
     'dual-write',
+    'feature-history-loop',
+    'private-durable-substrate',
+    'canonical-shared-program',
   ])
 })
 
@@ -191,6 +199,259 @@ test('WHAT[DURABLE-EVENTS-009] dual-write allowlist is empty (no parked bridges)
   assert.deepEqual([...DUAL_WRITE_ALLOWLIST], [])
 })
 
+test('WHAT[DURABLE-EVENTS-019] feature history loops report exact path line and token', () => {
+  const fixtures = [
+    ['ProcessEventLog.readStreams commonDir', 'ProcessEventLog.readStreams'],
+    ['let loadEvents raw = raw', 'loadEvents'],
+    ['let scanHistory stream = stream', 'scanHistory'],
+    ['let readHistory stream = stream', 'readHistory'],
+    ['let foldHistory state events = List.fold apply state events', 'foldHistory'],
+    ['let replayEvents events = List.fold alternate empty events', 'replayEvents'],
+    ['let event = (store: IEventStore).TryEvent eventId', 'TryEvent'],
+    ['let heads = (store: IEventStore).TryHeads streamId', 'TryHeads'],
+    ['let heads = (store: IEventStore).AllHeads()', 'AllHeads'],
+    ['let event = EventStore.Surface.read(handle, eventId)', 'read'],
+    ['let heads = Surface.heads(handle, streamId)', 'heads'],
+  ]
+
+  for (const [source, token] of fixtures) {
+    const file = 'src/Wanxiangshu/Repository/Feature/History.fs'
+    const hits = scanFeatureHistoryLoop(`module Feature\n${source}`, file)
+    const hit = hits.find((candidate) => candidate.token === token)
+    assert.deepEqual(
+      hit && { file: hit.file, line: hit.line, token: hit.token },
+      { file, line: 2, token },
+    )
+  }
+
+  const manualMerge = [
+    'module FeatureHistory',
+    'let merge streams =',
+    '    streams',
+    '    |> List.collect snd',
+    '    |> List.sortBy (fun envelope -> envelope.EventId)',
+    '    |> List.fold apply empty',
+  ].join('\n')
+  const manualHit = scanFeatureHistoryLoop(
+    manualMerge,
+    'src/Wanxiangshu/Repository/Feature/ManualMerge.fs',
+  ).find((hit) => hit.token === 'manual merge')
+  assert.deepEqual(
+    manualHit && { line: manualHit.line, token: manualHit.token },
+    { line: 5, token: 'manual merge' },
+  )
+})
+
+test('WHAT[DURABLE-EVENTS-019] feature-local NDJSON SQLite and private stores are forbidden', () => {
+  const file = 'src/Wanxiangshu/Repository/Feature/PrivateStore.fs'
+  const source = [
+    'module FeatureStorage',
+    'let journal = "feature-history.ndjson"',
+    'let connection = SQLite.open "feature.sqlite"',
+    'let store = PrivateEventStore(connection)',
+  ].join('\n')
+  const hits = scanPrivateDurableSubstrate(source, file)
+  assert.deepEqual(
+    hits.map(({ file, line, token }) => ({ file, line, token })),
+    [
+      { file, line: 2, token: '.ndjson' },
+      { file, line: 3, token: 'SQLite' },
+      { file, line: 4, token: 'PrivateEventStore' },
+    ],
+  )
+})
+
+test('WHAT[DURABLE-EVENTS-019] durable file database and custom-store writer capabilities are owner-bound', () => {
+  const file = 'src/Wanxiangshu/Repository/Feature/CustomHistory.fs'
+  const fixtures = [
+    ['System.IO.File.AppendAllText("feature-history.log", payload)', 'System.IO.File.AppendAllText'],
+    ['File.WriteAllText("feature-history.log", payload)', 'File.WriteAllText'],
+    ['use writer = StreamWriter(path)', 'StreamWriter('],
+    ['let connection: DbConnection = openDatabase ()', 'DbConnection'],
+    ['let store = CustomStore(path)', 'CustomStore'],
+  ]
+
+  for (const [source, token] of fixtures) {
+    const hits = scanPrivateDurableSubstrate(source, file)
+    assert.ok(hits.some((hit) => hit.token === token), `${token} must be RED outside owners`)
+  }
+
+  const owner = 'src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs'
+  assert.equal(
+    scanPrivateDurableSubstrate(fixtures.map(([source]) => source).join('\n'), owner).length,
+    0,
+    'the exact physical owner may use durable writer capabilities',
+  )
+})
+
+test('WHAT[DURABLE-EVENTS-019] canonical integrator and exact physical or proof readers are allowed', () => {
+  const reader = [
+    'let streams = ProcessEventLog.readStreams commonDir',
+    'let event = (store: IEventStore).TryEvent eventId',
+    'let streamHeads = (store: IEventStore).TryHeads streamId',
+    'let allHeads = (store: IEventStore).AllHeads()',
+    'let exposed = EventStore.Surface.read(handle, eventId)',
+    'let exposedHeads = EventStore.Surface.heads(handle, streamId)',
+  ].join('\n')
+  assert.equal(
+    scanFeatureHistoryLoop(
+      reader,
+      'src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs',
+    ).length,
+    0,
+  )
+
+  assert.deepEqual([...PHYSICAL_HISTORY_OBSERVER_PATHS], [
+    'src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs',
+    'src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs',
+    'src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs',
+    'src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs',
+    'src/Wanxiangshu/Persistence/EventStore/MergeSurface.fs',
+    'src/Wanxiangshu/Verification/TemporalSurface.fs',
+  ])
+  for (const file of PHYSICAL_HISTORY_OBSERVER_PATHS) {
+    assert.equal(scanFeatureHistoryLoop(reader, file).length, 0, file)
+  }
+
+  assert.deepEqual([...CANONICAL_EVENT_READER_OWNER_PATHS], [
+    'src/Wanxiangshu/Persistence/EventStore/Store.fs',
+    'src/Wanxiangshu/Persistence/EventStore/Surface.fs',
+    'src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs',
+    'src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs',
+    'src/Wanxiangshu/Verification/EventStoreWriterSurface.fs',
+  ])
+  const eventStoreReaders = reader.split('\n').slice(1).join('\n')
+  for (const file of CANONICAL_EVENT_READER_OWNER_PATHS) {
+    assert.equal(scanFeatureHistoryLoop(eventStoreReaders, file).length, 0, file)
+  }
+
+  const substrate = 'let physicalLine = "writer.ndjson"'
+  const substrateOwners = [
+    'src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs',
+    'src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs',
+    'src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs',
+    'src/Wanxiangshu/Verification/EventStoreWriterSurface.fs',
+  ]
+  for (const file of substrateOwners) {
+    assert.equal(scanPrivateDurableSubstrate(substrate, file).length, 0, file)
+  }
+  assert.ok(
+    scanPrivateDurableSubstrate(
+      substrate,
+      'src/Wanxiangshu/Repository/Knowledge/Casebook/Surface.fs',
+    ).length > 0,
+    'the same substrate token remains forbidden outside exact physical/proof owners',
+  )
+
+  const physicalMerge = [
+    'let merge streams =',
+    '    streams',
+    '    |> List.collect snd',
+    '    |> List.sortBy eventKey',
+  ].join('\n')
+  assert.equal(
+    scanFeatureHistoryLoop(
+      physicalMerge,
+      'src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs',
+    ).length,
+    0,
+  )
+  assert.ok(
+    scanFeatureHistoryLoop(
+      physicalMerge,
+      'src/Wanxiangshu/Repository/Feature/EventKWayMerge.fs',
+    ).some((hit) => hit.token === 'manual merge'),
+    'the exact physical merge path does not grant similarly named feature files ownership',
+  )
+
+  assert.ok(
+    scanFeatureHistoryLoop(
+      reader,
+      'src/Wanxiangshu/Verification/AnotherProbe.fs',
+    ).length > 0,
+    'verification observation is granted to exact probes, not the whole directory',
+  )
+})
+
+test('WHAT[DURABLE-EVENTS-013] canonical shape requires one-envelope rule and shared boot live program', () => {
+  const kernelFile = 'src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs'
+  const canonicalFile = 'src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs'
+  const kernel = [
+    'type IntegrationRule =',
+    '    { Name: string',
+    '      Integrate: obj -> EventEnvelope -> Result<obj, string> }',
+    'type PreparedIntegration = { Commit: unit -> unit }',
+  ].join('\n')
+  const goodCanonical = [
+    'let private integrateOne state envelope = Ok state',
+    'let private replay streams =',
+    '    integrateOne empty (List.head streams)',
+    'let private fullReplayGate = obj ()',
+    'let prepareLive state events =',
+    '    integrateOne state (List.head events)',
+    '{ new ICanonicalIntegrator with',
+    '    member _.ReloadLocal(commonDir) = replay streams',
+    '    member _.PrepareLive(events) = prepareLive state events',
+    '    member _.TryCurrent(key) = None }',
+  ].join('\n')
+
+  assert.deepEqual(
+    scanCanonicalSharedProgram([
+      { file: kernelFile, text: kernel },
+      { file: canonicalFile, text: goodCanonical },
+    ]),
+    [],
+  )
+
+  const collectionRule = kernel.replace(
+    'Integrate: obj -> EventEnvelope -> Result<obj, string>',
+    'Integrate: obj -> EventEnvelope list -> Result<obj, string>',
+  )
+  const collectionHits = scanCanonicalSharedProgram([
+    { file: kernelFile, text: collectionRule },
+    { file: canonicalFile, text: goodCanonical },
+  ])
+  assert.deepEqual(
+    collectionHits.map(({ file, line, token }) => ({ file, line, token })),
+    [{ file: kernelFile, line: 1, token: 'IntegrationRule.Integrate(EventEnvelope)' }],
+  )
+
+  const missingSharedCalls = goodCanonical
+    .replace('integrateOne empty (List.head streams)', 'Ok empty')
+    .replace('integrateOne state (List.head events)', 'Ok state')
+  const hits = scanCanonicalSharedProgram([
+    { file: kernelFile, text: kernel },
+    { file: canonicalFile, text: missingSharedCalls },
+  ])
+  assert.deepEqual(
+    hits.map(({ file, line, token }) => ({ file, line, token })),
+    [
+      { file: canonicalFile, line: 2, token: 'replay->integrateOne' },
+      { file: canonicalFile, line: 5, token: 'PrepareLive->integrateOne' },
+    ],
+  )
+
+  const bypassCanonical = goodCanonical
+    .replace('integrateOne empty (List.head streams)', 'alternateReplay empty streams\n    let _ = integrateOne')
+    .replace('integrateOne state (List.head events)', 'alternateLive state events\n    let _ = integrateOne')
+    .replace('member _.ReloadLocal(commonDir) = replay streams', 'member _.ReloadLocal(commonDir) = alternateReplay empty streams')
+    .replace('member _.PrepareLive(events) = prepareLive state events', 'member _.PrepareLive(events) = alternateLive state events')
+  const bypassHits = scanCanonicalSharedProgram([
+    { file: kernelFile, text: kernel },
+    { file: canonicalFile, text: bypassCanonical },
+  ])
+  assert.deepEqual(
+    bypassHits.map(({ token }) => token),
+    [
+      'ReloadLocal->replay',
+      'replay->integrateOne',
+      'PrepareLive->integrateOne',
+      'PrepareLive->integrateOne',
+    ],
+    'alternate reducers and unused integrateOne references must not satisfy any call-graph edge',
+  )
+})
+
 test('WHAT[DURABLE-EVENTS-009] e2e journal observers that only read wanxiangshu-next are not no-migrator', () => {
   const observer = [
     "const dir = path.join(common, 'wanxiangshu-next', 'runtimes')",
@@ -201,6 +462,28 @@ test('WHAT[DURABLE-EVENTS-009] e2e journal observers that only read wanxiangshu-
     scanNoMigrator(observer, 'tests/e2e/cases/reviewer-verdict.test.mjs').length,
     0,
     'live Journal observation is not a legacy migrator',
+  )
+})
+
+test('WHAT[DURABLE-EVENTS-019] production tree has no feature history loop or private substrate', () => {
+  const entries = collectProductionEntries()
+  const violations = scanFiles(entries).filter(
+    (v) => v.id === 'feature-history-loop' || v.id === 'private-durable-substrate',
+  )
+  assert.deepEqual(
+    violations,
+    [],
+    violations.map((v) => `[${v.id}] ${v.file}:${v.line} ${v.token} ${v.label}`).join('\n'),
+  )
+})
+
+test('WHAT[DURABLE-EVENTS-013] production CanonicalIntegrator has the shared one-envelope program shape', () => {
+  const entries = collectProductionEntries()
+  const violations = scanCanonicalSharedProgram(entries)
+  assert.deepEqual(
+    violations,
+    [],
+    violations.map((v) => `[${v.id}] ${v.file}:${v.line} ${v.token} ${v.label}`).join('\n'),
   )
 })
 

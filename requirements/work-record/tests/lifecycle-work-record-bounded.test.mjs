@@ -24,7 +24,7 @@ const withJournal = async (fn) => {
   }
 }
 
-const lastSequence = (trace) => trace.lastSequence
+const lastSequence = (trace) => trace.currentHeadSequence - 1
 
 const commitY = async (handle, { from, to, body, n }) => {
   const written = await journal.JournalSurface_writePayload(handle, body)
@@ -135,7 +135,7 @@ test('WHAT[WORK-RECORD-007] child_to_parent_run_bounded_LWR_omits_caller_charge'
         { role: 'assistant', parts: [{ kind: 'text', text: 'did child work' }] },
       ],
     })
-    assert.equal(captured.lastSequence, 2)
+    assert.equal(captured.currentHeadSequence, 3)
 
     const bounded = await workRecord.lifecycleWorkRecordBounded(journal, SEM, {
       StartInclusive: { Sequence: 0 },
@@ -174,7 +174,7 @@ test('WHAT[WORK-RECORD-011] bounded terminal-only completion still yields Recent
         { role: 'assistant', parts: [{ kind: 'text', text: 'work before final statement' }] },
       ],
     })
-    assert.equal(captured.lastSequence, 2)
+    assert.equal(captured.currentHeadSequence, 3)
     await commitY(handle, { from: 0, to: 2, body: 'CURRENT_CHRONICLE', n: 10 })
     await workRecord.captureTerminalText(handle, SEM, 'FINAL_STATEMENT_FROM_TERMINAL', 'run-terminal-race')
 
@@ -199,7 +199,7 @@ test('WHAT[WORK-RECORD-004] same terminal text in a reused child is a fresh occu
         { role: 'assistant', parts: [{ kind: 'text', text: 'first work' }] },
       ],
     })
-    assert.equal(first.lastSequence, 2)
+    assert.equal(first.currentHeadSequence, 3)
     await commitY(handle, { from: 0, to: 2, body: 'FIRST_CHRONICLE', n: 11 })
     await workRecord.captureTerminalText(handle, SEM, 'SAME_FINAL_TEXT', 'run-reuse-1')
 
@@ -211,7 +211,7 @@ test('WHAT[WORK-RECORD-004] same terminal text in a reused child is a fresh occu
         { role: 'assistant', parts: [{ kind: 'text', text: 'second work' }] },
       ],
     })
-    assert.equal(second.lastSequence, 4)
+    assert.equal(second.currentHeadSequence, 5)
     await commitY(handle, { from: 2, to: 4, body: 'SECOND_CHRONICLE', n: 12 })
     await workRecord.captureTerminalText(handle, SEM, 'SAME_FINAL_TEXT', 'run-reuse-2')
 

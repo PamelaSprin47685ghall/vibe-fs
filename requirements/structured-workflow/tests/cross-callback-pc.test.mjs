@@ -2,9 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
-  KNOWN_DEBT_BASELINE,
   EXEMPTION_CATEGORIES,
-  BASELINE_MAX_SIZE,
   evaluateViolations,
   scanText,
   scanFiles,
@@ -51,16 +49,14 @@ test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_trytake_without_proof_is_R
     '        | _ -> None',
   ].join('\n')
   const hits = scanText(source, 'src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs')
-  // recoveryArming was removed from the known debt baseline after being proven
-  // as a physical single-flight channel (DSL-cross-callback-proof: physical).
-  // A synthetic source WITHOUT the proof annotation must now be RED.
+  // A synthetic source without the required physical proof is RED.
   const { regressions, ok } = evaluateViolations(hits)
   assert.ok(hits.some((v) => v.name === 'recoveryArming'))
   assert.equal(ok, false, 'recoveryArming without proof annotation must be RED after baseline removal')
   assert.ok(regressions.some((v) => v.name === 'recoveryArming'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_new_trytake_not_in_baseline_is_RED', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_new_trytake_without_proof_is_RED', () => {
   const source = [
     'module Sample',
     '// DSL-MUTABLE: single-flight — new continuation',
@@ -73,7 +69,7 @@ test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_new_trytake_not_in_baselin
   ].join('\n')
   const hits = scanText(source, 'src/Wanxiangshu/New/Module.fs')
   const { regressions, ok } = evaluateViolations(hits)
-  assert.equal(ok, false, 'new TryTake pattern not in baseline must be RED')
+  assert.equal(ok, false, 'new TryTake pattern without proof must be RED')
   assert.ok(regressions.some((v) => v.name === 'newContinuation'))
 })
 
@@ -105,12 +101,12 @@ test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_armed_probe_without_proof_
     '    member _.TryArm(sessionId: string) = armed.Add(sessionId)',
   ].join('\n')
   const hits = scanText(source, 'src/Wanxiangshu/OpenCode/Host/LoopSensor.fs')
-  // armed in LoopSensor is in the known debt baseline
-  assert.ok(hits.some((v) => v.name === 'armed' && v.pattern === 'armed-presence-probe'))
-  assert.ok(hits.every((v) => v.knownDebt === true), 'LoopSensor.armed must be recognized as known debt')
+  const { regressions, ok } = evaluateViolations(hits)
+  assert.equal(ok, false, 'an exact production-looking path grants no exemption')
+  assert.ok(regressions.some((v) => v.name === 'armed' && v.pattern === 'armed-presence-probe'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_new_armed_not_in_baseline_is_RED', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_new_armed_without_proof_is_RED', () => {
   const source = [
     'module Sample',
     '// DSL-MUTABLE: single-flight — new armed mark',
@@ -120,7 +116,7 @@ test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_new_armed_not_in_baseline_
   ].join('\n')
   const hits = scanText(source, 'src/Wanxiangshu/New/Sensor.fs')
   const { regressions, ok } = evaluateViolations(hits)
-  assert.equal(ok, false, 'new armed probe not in baseline must be RED')
+  assert.equal(ok, false, 'new armed probe without proof must be RED')
   assert.ok(regressions.some((v) => v.name === 'newArmed'))
 })
 
@@ -153,14 +149,6 @@ test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_plain_resource_without_pat
   assert.deepEqual(hits, [], 'plain resource without TryTake/IsArmed/DU-await must stay green')
 })
 
-// ── Baseline completeness ───────────────────────────────────────────────────
-
-test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_baseline_covers_known_debt', () => {
-  assert.ok(KNOWN_DEBT_BASELINE.has('src/Wanxiangshu/OpenCode/Host/LoopSensor.fs::armed'))
-  assert.equal(KNOWN_DEBT_BASELINE.size, 1, 'baseline must contain exactly 1 known debt entry')
-  assert.ok(KNOWN_DEBT_BASELINE.size <= BASELINE_MAX_SIZE, 'baseline size must not exceed BASELINE_MAX_SIZE (ratchet)')
-})
-
 // ── scanFiles aggregates ────────────────────────────────────────────────────
 
 test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_scanFiles_aggregates_entries', () => {
@@ -188,12 +176,12 @@ test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_clear_presence_without_pro
     '    member _.ClearArmed(sessionId: string) = armed.Remove(sessionId)',
   ].join('\n')
   const hits = scanText(source, 'src/Wanxiangshu/OpenCode/Host/LoopSensor.fs')
-  // armed in LoopSensor is in the known debt baseline; ClearArmed triggers clear-presence-probe
-  assert.ok(hits.some((v) => v.name === 'armed'))
-  assert.ok(hits.every((v) => v.knownDebt === true), 'LoopSensor.armed must be recognized as known debt')
+  const { regressions, ok } = evaluateViolations(hits)
+  assert.equal(ok, false)
+  assert.ok(regressions.some((v) => v.name === 'armed'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_new_clear_presence_not_in_baseline_is_RED', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_new_clear_presence_without_proof_is_RED', () => {
   const source = [
     'module Sample',
     '// DSL-MUTABLE: single-flight — new clear mark',
@@ -203,7 +191,7 @@ test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_new_clear_presence_not_in_
   ].join('\n')
   const hits = scanText(source, 'src/Wanxiangshu/New/Sensor.fs')
   const { regressions, ok } = evaluateViolations(hits)
-  assert.equal(ok, false, 'new clear-presence probe not in baseline must be RED')
+  assert.equal(ok, false, 'new clear-presence probe without proof must be RED')
   assert.ok(regressions.some((v) => v.name === 'newArmed' && v.pattern === 'clear-presence-probe'))
 })
 
@@ -217,7 +205,7 @@ test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_drop_attempt_presence_with
   ].join('\n')
   const hits = scanText(source, 'src/Wanxiangshu/New/AttemptTracker.fs')
   const { regressions, ok } = evaluateViolations(hits)
-  assert.equal(ok, false, 'DropAttempt presence-clearing not in baseline must be RED')
+  assert.equal(ok, false, 'DropAttempt presence-clearing without proof must be RED')
   assert.ok(regressions.some((v) => v.name === 'attempts' && v.pattern === 'clear-presence-probe'))
 })
 
@@ -233,15 +221,6 @@ test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_exemption_categories_conta
   assert.equal(EXEMPTION_CATEGORIES.size, 9, 'EXEMPTION_CATEGORIES must contain exactly 9 categories')
 })
 
-// ── BASELINE_MAX_SIZE ratchet ───────────────────────────────────────────────
-
-test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_baseline_max_size_is_a_ratchet_ceiling', () => {
-  assert.equal(typeof BASELINE_MAX_SIZE, 'number')
-  assert.ok(BASELINE_MAX_SIZE >= 0, 'BASELINE_MAX_SIZE must be a non-negative integer')
-  assert.ok(KNOWN_DEBT_BASELINE.size <= BASELINE_MAX_SIZE,
-    `KNOWN_DEBT_BASELINE.size (${KNOWN_DEBT_BASELINE.size}) must not exceed BASELINE_MAX_SIZE (${BASELINE_MAX_SIZE})`)
-})
-
 // ── SessionQuiescenceGate as legal reference (green) ────────────────────────
 
 test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_session_quiescence_gate_stays_green', () => {
@@ -253,8 +232,8 @@ test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_session_quiescence_gate_st
     'module Sample',
     'type SessionQuiescenceGate() =',
     '    let mutable activities = Map.empty<string, int>',
-    '    member _.TryConsume(permit: QuiescencePermit) : bool =',
-    '        lock gate (fun () -> true)',
+    '    member _.TryConsume(permit: QuiescencePermit) : Result<unit, QuiescencePermitFailure> =',
+    '        lock gate (fun () -> Ok())',
   ].join('\n')
   const hits = scanText(source, 'src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs')
   assert.deepEqual(hits, [], 'SessionQuiescenceGate must stay green — typed permit, not registry presence')

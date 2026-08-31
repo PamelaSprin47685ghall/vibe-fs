@@ -1,8 +1,8 @@
 // FINALITY-028: published/released ManagerJob never revives; an active owned
 // job may receive an Orchestrator append on the same session/worktree.
 //
-// ManagerJob history is folded by the production FinalitySurface owner. Tests
-// pass plain event objects and assert the JS-native projection only.
+// Each ManagerJob event enters the production FinalitySurface owner once. Tests
+// pass plain event objects and assert the JS-native projection view only.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -46,10 +46,14 @@ const laterFacts = [
   fact('JobAbandoned'),
 ]
 
-const projectionOf = (events) => {
-  const result = finality.jobProjection(events)
-  assert.equal(result.ok, true, JSON.stringify(result.error))
-  return result
+const project = (events) => {
+  let projection = finality.emptyJobProjection()
+  for (const event of events) {
+    const result = finality.applyJobProjectionEvent(projection, event)
+    assert.equal(result.ok, true, JSON.stringify(result.error))
+    projection = result.projection
+  }
+  return finality.jobProjectionView(projection)
 }
 
 const onlyJob = (projection) => {
@@ -59,7 +63,7 @@ const onlyJob = (projection) => {
 
 test('WHAT[FINALITY-028] a terminal ManagerJob is not active and does not resume', () => {
   for (const name of terminalNames) {
-    const projection = projectionOf([created(), terminal[name]()])
+    const projection = project([created(), terminal[name]()])
     const job = onlyJob(projection)
     assert.deepEqual(job.facts, [name])
     assert.equal(projection.activeJobs.length, 0, `${name}: not active`)
@@ -68,10 +72,10 @@ test('WHAT[FINALITY-028] a terminal ManagerJob is not active and does not resume
 
 test('WHAT[FINALITY-028] later facts cannot reopen a terminal ManagerJob', () => {
   for (const name of terminalNames) {
-    const sealed = projectionOf([created(), terminal[name]()])
+    const sealed = project([created(), terminal[name]()])
     const sealedFacts = onlyJob(sealed).facts
     for (const later of laterFacts) {
-      const after = projectionOf([created(), terminal[name](), later])
+      const after = project([created(), terminal[name](), later])
       assert.deepEqual(onlyJob(after).facts, sealedFacts)
       assert.equal(after.activeJobs.length, 0)
     }
@@ -79,7 +83,7 @@ test('WHAT[FINALITY-028] later facts cannot reopen a terminal ManagerJob', () =>
 })
 
 test('WHAT[FINALITY-028] replaying ManagerJobCreated cannot re-enlist a terminal job', () => {
-  const replayed = projectionOf([
+  const replayed = project([
     created(),
     terminal.Published(),
     created({
@@ -100,7 +104,7 @@ test('WHAT[FINALITY-028] replaying ManagerJobCreated cannot re-enlist a terminal
 })
 
 test('WHAT[FINALITY-028] an active owned job continues on the same session and worktree', () => {
-  const projection = projectionOf([created()])
+  const projection = project([created()])
   const job = onlyJob(projection)
   assert.equal(projection.activeJobs.length, 1)
   assert.deepEqual(job.facts, [])

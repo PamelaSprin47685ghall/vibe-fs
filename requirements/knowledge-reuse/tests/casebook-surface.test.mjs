@@ -26,6 +26,12 @@ const caseRec = (sessionId, q, a, observations) => ({
   observations,
   lastAccessOrder: 0,
 })
+const project = (events) =>
+  events.reduce((world, event) => {
+    const result = casebook.applyEvent(world, event)
+    assert.equal(result.ok, true, JSON.stringify(result.error))
+    return result.world
+  }, casebook.emptyWorld())
 
 const openStore = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-casebook-surface-'))
@@ -58,12 +64,11 @@ test('WHAT[KNOWLEDGE-REUSE-004] CASE004_classifyReplay_fresh_only_on_exact_norma
 })
 
 test('WHAT[KNOWLEDGE-REUSE-002] CASE002_fold_captured_and_refreshed_keeps_qa_verbatim', () => {
-  const folded = casebook.foldEvents([
+  const folded = project([
     { kind: 'case-captured', case: caseRec('s1', 'Q1', 'A1', [read('a.txt', 'h1')]) },
     { kind: 'case-captured', case: caseRec('s2', 'Q2', 'A2', [read('b.txt', 'h2')]) },
     { kind: 'case-refreshed', sessionId: 's1', q: 'Q1b', a: 'A1b', observations: [read('a.txt', 'h1'), read('c.txt', 'h3')] },
   ])
-  assert.equal(folded.ok, true, JSON.stringify(folded.error))
   assert.equal(folded.cases.length, 2)
   const s1 = folded.cases.find((c) => c.sessionId === 's1')
   assert.equal(s1.a, 'A1b')
@@ -71,14 +76,14 @@ test('WHAT[KNOWLEDGE-REUSE-002] CASE002_fold_captured_and_refreshed_keeps_qa_ver
 })
 
 test('WHAT[KNOWLEDGE-REUSE-008] CASE008_fold_accessed_and_evicted_derives_access_order', () => {
-  const folded = casebook.foldEvents([
+  const folded = project([
     { kind: 'case-captured', case: caseRec('s1', 'Q1', 'A1', [read('a.txt', 'h1')]) },
     { kind: 'case-captured', case: caseRec('s2', 'Q2', 'A2', [read('b.txt', 'h2')]) },
     { kind: 'case-accessed', sessionId: 's2' },
   ])
   assert.equal(folded.cases.length, 2)
   // Evicted removes the Case (captured+evicted in one fold)
-  const combined = casebook.foldEvents([
+  const combined = project([
     { kind: 'case-captured', case: caseRec('s2', 'Q2', 'A2', []) },
     { kind: 'case-evicted', sessionId: 's2' },
   ])
@@ -86,7 +91,7 @@ test('WHAT[KNOWLEDGE-REUSE-008] CASE008_fold_accessed_and_evicted_derives_access
 })
 
 test('WHAT[KNOWLEDGE-REUSE-008] CASE008_lru_evict_keeps_most_recently_accessed', () => {
-  const folded = casebook.foldEvents([
+  const folded = project([
     { kind: 'case-captured', case: caseRec('s1', 'Q1', 'A1', []) },
     { kind: 'case-captured', case: caseRec('s2', 'Q2', 'A2', []) },
     { kind: 'case-captured', case: caseRec('s3', 'Q3', 'A3', []) },

@@ -16,7 +16,9 @@ test('WHAT[SPEC-INV-008] StrengthReplay owns applyBeforeXTrace entry point for r
 
   assert.match(replay, /let\s+applyBeforeXTrace/)
   assert.match(replay, /plansOrFailClosed/)
-  assert.match(replay, /XTraceProjection\.tryHostMessageId/)
-  assert.doesNotMatch(replay, /stableHostIdOfProvenance|IndexOf\("\\\/part:/)
+  assert.match(replay, /XTraceProjection\.tryContiguousHostRange/)
+  assert.match(replay, /XTraceProjection\.orderedSemanticParts/)
+  assert.doesNotMatch(replay, /XTraceProjection\.(?:tryHostMessageId|parts|currentGenerationParts)|XTracePartRef/)
+  assert.doesNotMatch(replay, /stableHostIdOfProvenance|IndexOf\("\\\/part:|isContiguousFromFirst/)
   assert.match(pt, /StrengthReplay\.applyBeforeXTrace/)
 })

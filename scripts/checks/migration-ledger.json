@@ -8,6 +8,38 @@
     },
     "concurrency_policy": "同文件冲突=edit mutex 不造永久边；READY 节点 touched_paths 正交即可并行",
     "acyclic_invariant": "新节点/边入账即查环，Kahn 拓扑排序校验",
+    "completion_credit": "只有 production cutover + executable proof + hard gate 三件套同时成立，节点才可 DONE；inventory/report/baseline/manifest/gate-only 不得计为迁移进度",
+    "constitutional_scope": [
+      {
+        "chapters": "2-8",
+        "obligation": "Evidence/Decision/Witness/Capability、proof-carrying authority、Decorator trace relation、CE 与 semantic vocabulary 准入"
+      },
+      {
+        "chapters": "10-55",
+        "obligation": "owner dependency/exclusivity、shallow composition roots、single canonical history integration、crash reconciliation 与 proof portfolio"
+      },
+      {
+        "chapters": "57-92",
+        "obligation": "READY-frontier semantic cutovers、owner-local hard cut/tree rotation/requirement-proof sync，以及 Chapter 92 Definition of Done"
+      },
+      {
+        "chapters": "93",
+        "obligation": "Chapter 57 是唯一施工调度来源；禁止第二套线性 wave 计划"
+      }
+    ],
+    "sole_release_sink": {
+      "id": "ReleaseClosure",
+      "depends_on": [
+        "all production coverage nodes DONE",
+        "all owner dependency closures DONE",
+        "all required tree rotations DONE",
+        "all requirement/proof sync DONE",
+        "migration baseline and temporary allowlist zero",
+        "old namespace/path/deleted symbol references zero",
+        "migration TODO/FIXME/compatibility shim zero",
+        "Chapter 92 Definition of Done"
+      ]
+    },
     "legal_edge_kinds": [
       "contract",
       "ownership",
@@ -105,7 +137,9 @@
       "depends_on": [],
       "production_callers_to_migrate": [],
       "proofs": [
-        "requirements/execution-model-routing/tests/model-routing.test.mjs"
+        "requirements/execution-model-routing/tests/model-routing-runtime.test.mjs",
+        "requirements/execution-model-routing/tests/model-capacity-exclusivity.test.mjs",
+        "requirements/execution-model-routing/tests/open-code-port-routing.test.mjs"
       ],
       "architecture_gates": [
         "cross-callback-pc.mjs",
@@ -177,7 +211,7 @@
       "depends_on": [],
       "production_callers_to_migrate": [],
       "proofs": [
-        "requirements/host-boundary/tests/plugin-transforms.test.mjs"
+        "requirements/host-boundary/tests/ordered-transform.test.mjs"
       ],
       "architecture_gates": [
         "plugin-transforms-invariant.mjs",
@@ -599,7 +633,6 @@
       "files": [
         "src/Wanxiangshu/Context/Companion/Builder.fs",
         "src/Wanxiangshu/Context/Companion/Model.fs",
-        "src/Wanxiangshu/Context/Companion/Program.fs",
         "src/Wanxiangshu/Context/Companion/Transform.fs"
       ],
       "classification": "MOVE",
@@ -633,6 +666,314 @@
       ],
       "state": "DONE",
       "result": "CUTOVER"
+    },
+    {
+      "id": "context-compression-companion-core-cutover",
+      "primary_owner": "context-compression",
+      "intent": "Companion core clean cutover: durable facts and single-event fold, projection and identity algebra, compression decisions, typed host and journal adapters, and narrow JS proof surfaces; obsolete direct-program and generic-error flows are deleted.",
+      "files": [
+        "src/Wanxiangshu/Context/Companion/CompanionFactFold.fs",
+        "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Fact.fs",
+        "src/Wanxiangshu/Context/Companion/Facts.fs",
+        "src/Wanxiangshu/Context/Companion/FoldSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Host.fs",
+        "src/Wanxiangshu/Context/Companion/HostBlogger.fs",
+        "src/Wanxiangshu/Context/Companion/Identity.fs",
+        "src/Wanxiangshu/Context/Companion/JournalPort.fs",
+        "src/Wanxiangshu/Context/Companion/Projection.fs",
+        "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Prompt.fs",
+        "src/Wanxiangshu/Context/Companion/Runtime.fs",
+        "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs"
+      ],
+      "classification": "SPLIT",
+      "publishes": [
+        "Context.CompanionContract"
+      ],
+      "consumes": [
+        "DurableEvents.Contract",
+        "SemanticTrace.Contract",
+        "PrefixStability.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        },
+        {
+          "id": "context-trace-companion-contract",
+          "kind": "contract"
+        },
+        {
+          "id": "semantic-trace-replayable-contract-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "prefix-stability-cutover",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Composition/Durable/Fact.fs",
+        "src/Wanxiangshu/Composition/Durable/Fold.fs",
+        "src/Wanxiangshu/Composition/Durable/ProjectionUpdate.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs",
+        "src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/PluginSessionScope.fs"
+      ],
+      "proofs": [
+        "requirements/context-compression/tests/attempt-plan-probe-eligibility.test.mjs",
+        "requirements/context-compression/tests/companion-projection.test.mjs",
+        "requirements/context-compression/tests/companion-recovery-slot.test.mjs",
+        "requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs",
+        "requirements/context-compression/tests/ctx-opening-floor.test.mjs",
+        "requirements/context-compression/tests/ctx014.test.mjs",
+        "requirements/context-compression/tests/host-compaction-policy.test.mjs",
+        "requirements/context-compression/tests/injected-context-reanchor.test.mjs",
+        "requirements/context-compression/tests/probe-selection.test.mjs",
+        "requirements/context-compression/tests/projection-algebra-blogframes.test.mjs",
+        "requirements/context-compression/tests/recovery-slot.test.mjs",
+        "requirements/context-compression/tests/terminal-validity.test.mjs",
+        "requirements/durable-events/tests/fold-context-recovery.test.mjs"
+      ],
+      "architecture_gates": [
+        "migration-ledger.mjs",
+        "owner-dependencies.mjs",
+        "semantic-owners.mjs",
+        "js-surface-manifest.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Context/Companion/CompanionFactFold.fs",
+        "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Fact.fs",
+        "src/Wanxiangshu/Context/Companion/Facts.fs",
+        "src/Wanxiangshu/Context/Companion/FoldSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Host.fs",
+        "src/Wanxiangshu/Context/Companion/HostBlogger.fs",
+        "src/Wanxiangshu/Context/Companion/Identity.fs",
+        "src/Wanxiangshu/Context/Companion/JournalPort.fs",
+        "src/Wanxiangshu/Context/Companion/Projection.fs",
+        "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Prompt.fs",
+        "src/Wanxiangshu/Context/Companion/Runtime.fs",
+        "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER"
+    },
+    {
+      "id": "semantic-trace-replayable-contract-cutover",
+      "primary_owner": "semantic-trace",
+      "intent": "Replayable SemanticTrace.Contract cutover: seven surviving owner files publish opaque semantic evidence and owner queries to 15 caller owners; deleted XTracePipeline.fs and XTraceSurface.fs are not live contract paths.",
+      "files": [
+        "src/Wanxiangshu/Context/Trace/Cursor.fs",
+        "src/Wanxiangshu/Context/Trace/Model.fs",
+        "src/Wanxiangshu/Context/Trace/Projection.fs",
+        "src/Wanxiangshu/Context/Trace/Capture.fs",
+        "src/Wanxiangshu/Context/Trace/Materialization.fs",
+        "src/Wanxiangshu/Context/Trace/TerminalReporter.fs",
+        "src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fs"
+      ],
+      "classification": "SPLIT",
+      "publishes": [
+        "SemanticTrace.Contract"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Composition/Durable/Projection.fs",
+        "src/Wanxiangshu/Composition/Durable/ProjectionUpdate.fs",
+        "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs",
+        "src/Wanxiangshu/Context/Companion/CompanionFactFold.fs",
+        "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Host.fs",
+        "src/Wanxiangshu/Context/Companion/JournalPort.fs",
+        "src/Wanxiangshu/Context/Companion/Model.fs",
+        "src/Wanxiangshu/Context/Companion/Runtime.fs",
+        "src/Wanxiangshu/Context/Companion/Transform.fs",
+        "src/Wanxiangshu/Context/Prefix/Wire.fs",
+        "src/Wanxiangshu/Enforcer/Cycle/Recovery.fs",
+        "src/Wanxiangshu/Enforcer/Host.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/PendingRun.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handoff.fs",
+        "src/Wanxiangshu/Execution/Delegation/HandoffLedger.fs",
+        "src/Wanxiangshu/Execution/Delegation/HandoffSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs",
+        "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs",
+        "src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs",
+        "src/Wanxiangshu/Mission/Finality/Record.fs",
+        "src/Wanxiangshu/Mission/Manager/FinalitySurface.fs",
+        "src/Wanxiangshu/Mission/Manager/JobHandoff.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/Admission.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/Projection.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/Workflow.fs",
+        "src/Wanxiangshu/Mission/Manager/OpenCode/NarrativeTransform.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Admission.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocalitySurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembraneSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoSemanticSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Model.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs",
+        "src/Wanxiangshu/Mission/Review/Barrier/Projection.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs",
+        "src/Wanxiangshu/Mission/Review/ReviewFactFold.fs",
+        "src/Wanxiangshu/Mission/Review/ReviewTodoSurface.fs",
+        "src/Wanxiangshu/Mission/WorkRecord/Materialize.fs",
+        "src/Wanxiangshu/Mission/WorkRecord/Model.fs",
+        "src/Wanxiangshu/Mission/WorkRecord/OpeningSemanticSurface.fs",
+        "src/Wanxiangshu/Mission/WorkRecord/Surface.fs",
+        "src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtSurface.fs",
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs",
+        "src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.fs",
+        "src/Wanxiangshu/Persistence/Journal/ReviewJournalSurface.fs",
+        "src/Wanxiangshu/Strength/OpenCode/Replay.fs",
+        "src/Wanxiangshu/Strength/OpenCode/Speculate.fs"
+      ],
+      "proofs": [
+        "requirements/semantic-trace/tests/x-trace.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-capture.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-capture-boundary.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-capture-hardening.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-compaction-survival.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-fold.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-locality.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-provider-run-provenance.test.mjs"
+      ],
+      "architecture_gates": [
+        "owner-dependencies.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Context/Trace/Cursor.fs",
+        "src/Wanxiangshu/Context/Trace/Model.fs",
+        "src/Wanxiangshu/Context/Trace/Projection.fs",
+        "src/Wanxiangshu/Context/Trace/Capture.fs",
+        "src/Wanxiangshu/Context/Trace/Materialization.fs",
+        "src/Wanxiangshu/Context/Trace/TerminalReporter.fs",
+        "src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER",
+      "closure_evidence": "Production cutover retains exactly Cursor.fs, Model.fs, Projection.fs, Capture.fs, Materialization.fs, TerminalReporter.fs, and SemanticTraceSurface.fs; obsolete src/Wanxiangshu/Context/Trace/XTracePipeline.fs and src/Wanxiangshu/Context/Trace/XTraceSurface.fs are deleted. Semantic-trace executable proofs are green and owner-dependencies.mjs is the hard publication gate."
+    },
+    {
+      "id": "prefix-stability-cutover",
+      "primary_owner": "prefix-stability",
+      "intent": "Canonical prefix owner cutover: candidate identity, epoch facts, probe selection, projection, JS proof surfaces, and X-wire orchestration",
+      "files": [
+        "src/Wanxiangshu/Context/Prefix/Candidate.fs",
+        "src/Wanxiangshu/Context/Prefix/Epoch.fs",
+        "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
+        "src/Wanxiangshu/Context/Prefix/Projection.fs",
+        "src/Wanxiangshu/Context/Prefix/Surface.fs",
+        "src/Wanxiangshu/Context/Prefix/Wire.fs",
+        "src/Wanxiangshu/Context/Prefix/XWireSurface.fs"
+      ],
+      "classification": "SPLIT",
+      "publishes": [
+        "PrefixStability.Contract",
+        "PrefixStability.SurfaceContract"
+      ],
+      "consumes": [
+        "SemanticTrace.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        },
+        {
+          "id": "semantic-trace-replayable-contract-cutover",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Composition/Durable/Fold.fs",
+        "src/Wanxiangshu/Composition/Durable/ProjectionUpdate.fs",
+        "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
+        "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs",
+        "src/Wanxiangshu/Interaction/Authority/Model.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoSemanticSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/PrefixEpoch.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs",
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ToolRegistrySurface.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/PlannerSurface.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Intent.fs",
+        "src/Wanxiangshu/Strength/OpenCode/Speculate.fs",
+        "src/Wanxiangshu/Strength/Policy.fs",
+        "src/Wanxiangshu/Strength/Replica/Runtime.fs",
+        "src/Wanxiangshu/Strength/Runtime.fs",
+        "src/Wanxiangshu/Strength/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs",
+        "requirements/prefix-stability/tests/g2-inspector-provider-wire-prefix.test.mjs",
+        "requirements/prefix-stability/tests/pair-thought-anchored.test.mjs",
+        "requirements/prefix-stability/tests/pair-thought-transform.test.mjs",
+        "requirements/prefix-stability/tests/prefix-append-only-law.test.mjs",
+        "requirements/prefix-stability/tests/prefix-epoch-todo-checkpoint.test.mjs",
+        "requirements/prefix-stability/tests/prefix-epoch.test.mjs",
+        "requirements/prefix-stability/tests/projection-algebra-step5-digest.test.mjs",
+        "requirements/prefix-stability/tests/system-prompt-stability.test.mjs",
+        "requirements/prefix-stability/tests/xwire-transform-surface.test.mjs"
+      ],
+      "architecture_gates": [
+        "migration-ledger.mjs",
+        "owner-dependencies.mjs",
+        "requirement-trace.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Context/Prefix/Candidate.fs",
+        "src/Wanxiangshu/Context/Prefix/Epoch.fs",
+        "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
+        "src/Wanxiangshu/Context/Prefix/Projection.fs",
+        "src/Wanxiangshu/Context/Prefix/Surface.fs",
+        "src/Wanxiangshu/Context/Prefix/Wire.fs",
+        "src/Wanxiangshu/Context/Prefix/XWireSurface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER",
+      "closure_evidence": "PrefixStability.Contract retains exactly the seven canonical Context/Prefix owner files; the bound proof portfolio covers all PREFIX-STABILITY-001 through PREFIX-STABILITY-015 vocabulary, and owner-dependencies.mjs is the hard exact-symbol publication gate."
     },
     {
       "id": "strength-prediction-replica-cutover",
@@ -897,7 +1238,6 @@
       "files": [
         "src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/FinalityCohort.fs",
-        "src/Wanxiangshu/Mission/Obligation/Todo/Lwr.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocalitySurface.fs",
@@ -1180,6 +1520,426 @@
       ],
       "state": "DONE",
       "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "concern-routing-proven-keep",
+      "primary_owner": "concern-routing",
+      "intent": "Concern routing proven-keep: 4 Interaction/Concern files single owner concern-routing, no cross-owner private import, surface contract hardened",
+      "files": [
+        "src/Wanxiangshu/Interaction/Concern/Facts.fs",
+        "src/Wanxiangshu/Interaction/Concern/Fold.fs",
+        "src/Wanxiangshu/Interaction/Concern/Projection.fs",
+        "src/Wanxiangshu/Interaction/Concern/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ConcernRouting.Contract"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/concern-routing/tests/concern-routing.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "evidence": "2026-08-30: concern-routing.test.mjs 7/7; semantic-owners.mjs and architecture.mjs GREEN; migration-ledger coverage mutation RED then restored GREEN",
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageB"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "attention-regulation-proven-keep",
+      "primary_owner": "attention-regulation",
+      "intent": "Attention regulation proven-keep: 4 Interaction/Attention files single owner attention-regulation, no cross-owner private import, surface contract hardened",
+      "files": [
+        "src/Wanxiangshu/Interaction/Attention/Facts.fs",
+        "src/Wanxiangshu/Interaction/Attention/Fold.fs",
+        "src/Wanxiangshu/Interaction/Attention/Projection.fs",
+        "src/Wanxiangshu/Interaction/Attention/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "AttentionRegulation.Contract"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/attention-regulation/tests/attention-regulation.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "evidence": "2026-08-30: attention-regulation.test.mjs 6/6; semantic-owners.mjs and architecture.mjs GREEN; migration-ledger coverage mutation RED then restored GREEN",
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageB"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "context-compression-blogger-compaction-keep",
+      "primary_owner": "context-compression",
+      "intent": "Proven-keep closure for the event-driven Blogger domain/runtime, canonical Host compaction policy and adapters, and provider terminal-validity seam.",
+      "files": [
+        "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Delta.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/DeltaSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/FrameSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/ItemWire.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/OpenCode/PluginScope.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Projection.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Request.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Abandon.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleProjection.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Host.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Toml.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
+        "src/Wanxiangshu/Host/CompactionPolicy.fs",
+        "src/Wanxiangshu/Host/Contract/CompactionPolicySurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostCompactionObserver.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/TerminalValidity.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Context.CompanionContract",
+        "Host.CompactionPolicy",
+        "Provider.TerminalValidity"
+      ],
+      "consumes": [
+        "DurableEvents.Contract",
+        "Context.TraceContract",
+        "SemanticTrace.Contract",
+        "PrefixStability.Contract",
+        "ModelRouting.Contract",
+        "Session.Quiescence"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        },
+        {
+          "id": "context-trace-companion-contract",
+          "kind": "contract"
+        },
+        {
+          "id": "context-compression-companion-core-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "semantic-trace-replayable-contract-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "prefix-stability-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "model-routing-capacity",
+          "kind": "contract"
+        },
+        {
+          "id": "execution-quiescence",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/context-compression/tests/attempt-plan-probe-eligibility.test.mjs",
+        "requirements/context-compression/tests/blog-entry-committed.test.mjs",
+        "requirements/context-compression/tests/blog-projection.test.mjs",
+        "requirements/context-compression/tests/blogger-convergence-gaps.test.mjs",
+        "requirements/context-compression/tests/blogger-delta.test.mjs",
+        "requirements/context-compression/tests/blogger-runtime.test.mjs",
+        "requirements/context-compression/tests/blogger-seal-reactivate.test.mjs",
+        "requirements/context-compression/tests/companion-ordinary-material-surface.test.mjs",
+        "requirements/context-compression/tests/companion-projection.test.mjs",
+        "requirements/context-compression/tests/companion-recovery-slot.test.mjs",
+        "requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs",
+        "requirements/context-compression/tests/ctx-opening-floor.test.mjs",
+        "requirements/context-compression/tests/ctx014.test.mjs",
+        "requirements/context-compression/tests/enforcer-cycle-commit-convergence.test.mjs",
+        "requirements/context-compression/tests/enforcer-cycle-convergence.test.mjs",
+        "requirements/context-compression/tests/enforcer-frame-loader.test.mjs",
+        "requirements/context-compression/tests/enforcer-open-reload.test.mjs",
+        "requirements/context-compression/tests/host-compaction-policy.test.mjs",
+        "requirements/context-compression/tests/injected-context-reanchor.test.mjs",
+        "requirements/context-compression/tests/parked-transform.test.mjs",
+        "requirements/context-compression/tests/probe-selection.test.mjs",
+        "requirements/context-compression/tests/projection-algebra-blogframes.test.mjs",
+        "requirements/context-compression/tests/recovery-slot.test.mjs",
+        "requirements/context-compression/tests/terminal-validity.test.mjs",
+        "requirements/crash-reconciliation/tests/blogger-crash-recovery.test.mjs",
+        "requirements/effect-accounting/tests/external-adapter-boundary.test.mjs",
+        "requirements/host-boundary/tests/host-capability-observation.test.mjs"
+      ],
+      "architecture_gates": [
+        "migration-ledger.mjs",
+        "owner-dependencies.mjs",
+        "semantic-owners.mjs",
+        "js-surface-manifest.mjs",
+        "cross-callback-pc.mjs",
+        "fsharp-control-pyramid.mjs"
+      ],
+      "closure_evidence": "All 25 final paths are singularly owned by context-compression; Blogger crash, replay, park, compaction, and terminal laws are bound to executable proofs. No path was deleted or renamed, so there are no deleted aliases or legacy final-path references.",
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageE",
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "provider-attempt-recovery-cutover",
+      "primary_owner": "provider-attempt-recovery",
+      "intent": "Provider attempt recovery clean cutover: typed request-kind and failure outcomes, a single durable ledger/cursor, exact Blogger main-session ownership, and one canonical recovery proof surface.",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs"
+      ],
+      "classification": "MOVE",
+      "publishes": [
+        "Provider.AttemptRecovery"
+      ],
+      "consumes": [
+        "DurableEvents.Contract",
+        "SemanticTrace.Contract",
+        "PrefixStability.Contract",
+        "Context.CompanionContract",
+        "Interaction.AuthorityWorkflow",
+        "Session.RecoveryReconciliation"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        },
+        {
+          "id": "semantic-trace-replayable-contract-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "prefix-stability-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "context-compression-blogger-compaction-keep",
+          "kind": "contract"
+        },
+        {
+          "id": "interaction-assistance-workflow-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "session-lifecycle-recovery-contract",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/provider-attempt-recovery/tests/abort-residue.test.mjs",
+        "requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs",
+        "requirements/provider-attempt-recovery/tests/cursor.test.mjs",
+        "requirements/provider-attempt-recovery/tests/fallback-aabb-confluence.test.mjs",
+        "requirements/provider-attempt-recovery/tests/fallback-ledger.test.mjs",
+        "requirements/context-compression/tests/companion-recovery-slot.test.mjs",
+        "requirements/structured-workflow/tests/recovery-reentry.test.mjs"
+      ],
+      "architecture_gates": [
+        "p0-recovery-join.mjs",
+        "requirement-trace.mjs",
+        "migration-ledger.mjs",
+        "owner-dependencies.mjs",
+        "semantic-owners.mjs",
+        "js-surface-manifest.mjs"
+      ],
+      "closure_evidence": "All 12 surviving paths are owned by provider-attempt-recovery; both obsolete proof surfaces are deleted, CursorSurface.fs is the sole recovery JS proof surface, and all provider-attempt-recovery laws are bound to exact executable proofs and the p0 recovery re-entry gate.",
+      "touched_paths": [
+        "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs"
+      ],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER"
+    },
+    {
+      "id": "provider-language-cutover",
+      "primary_owner": "provider-language",
+      "intent": "Provider language clean cutover: owner-local language policy, session bind/inherit/lookup, resource addressing and prose rendering, with Resources/ProviderResourceBytes.fs as the byte-only physical adapter and ProviderLanguageBinding as the raw-observation Host boundary.",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/Language.fs",
+        "src/Wanxiangshu/Participant/Provider/LanguageSurface.fs",
+        "src/Wanxiangshu/Participant/Provider/SessionLanguage.fs",
+        "src/Wanxiangshu/Participant/Provider/ProviderResources.fs",
+        "src/Wanxiangshu/Participant/Provider/Prose.fs",
+        "src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs",
+        "src/Wanxiangshu/Resources/ProviderResourceBytes.fs"
+      ],
+      "classification": "MOVE",
+      "publishes": [
+        "Provider.Language",
+        "Distribution.ProviderResourceBytes"
+      ],
+      "consumes": [
+        "Distribution.ProviderResourceBytes"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/provider-language/tests/provider-language.test.mjs",
+        "requirements/provider-language/tests/provider-prose-and-preference.test.mjs",
+        "requirements/provider-language/tests/provider-prose-ownership.test.mjs",
+        "requirements/provider-language/tests/language-parity-gate.test.mjs"
+      ],
+      "architecture_gates": [
+        "language-parity-gate.mjs",
+        "provider-prose-ownership.mjs",
+        "provider-leak-gate.mjs",
+        "migration-ledger.mjs",
+        "owner-dependencies.mjs",
+        "semantic-owners.mjs",
+        "js-surface-manifest.mjs"
+      ],
+      "closure_evidence": "All seven final paths reached their owner boundary: policy, resource addressing, pair laws, and prose are owner-local; Resources/ProviderResourceBytes.fs is the byte-only adapter that delegates physical reads to PackageResources; ProviderLanguageBinding remains provider-language-owned under host-boundary governance; all 11 laws retain executable proof links; and the two legacy Resources paths are absent except from the explicit negative legacy gate.",
+      "touched_paths": [
+        "src/Wanxiangshu/Participant/Provider/Language.fs",
+        "src/Wanxiangshu/Participant/Provider/LanguageSurface.fs",
+        "src/Wanxiangshu/Participant/Provider/SessionLanguage.fs",
+        "src/Wanxiangshu/Participant/Provider/ProviderResources.fs",
+        "src/Wanxiangshu/Participant/Provider/Prose.fs",
+        "src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs",
+        "src/Wanxiangshu/Resources/ProviderResourceBytes.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER"
+    },
+    {
+      "id": "provider-projection-cutover",
+      "primary_owner": "provider-projection",
+      "intent": "Provider projection clean split: generic model, intent algebra, planner and renderer; raw Host decode/capture/writeback adapters; shared LlmFacing and SyntheticToml representation primitives; Strength policy and native tool pairing remain owned by speculative-investigation and consume the generic contracts.",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/Projection/Model.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Intent.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Planner.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Surface.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProviderProjectionSurface.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProviderWireCapture.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProviderWireDecode.fs",
+        "src/Wanxiangshu/Foundation/LlmFacing.fs",
+        "src/Wanxiangshu/Foundation/SyntheticToml.fs",
+        "src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs"
+      ],
+      "classification": "SPLIT",
+      "publishes": [
+        "Foundation.LlmFacing",
+        "ProjectionMessageEdit.HostWireEncoding",
+        "ProviderProjection.HostCapture",
+        "ProviderProjection.HostDecode",
+        "ProviderProjection.HostWriteback",
+        "ProviderProjection.Model",
+        "ProviderProjection.Intent",
+        "ProviderProjection.Planner",
+        "ProviderProjection.Renderer",
+        "ProviderProjection.Surface"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Context/Companion/Builder.fs",
+        "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs",
+        "src/Wanxiangshu/Context/Prefix/Wire.fs",
+        "src/Wanxiangshu/Context/Prefix/XWireSurface.fs",
+        "src/Wanxiangshu/Enforcer/Cycle/Recovery.fs",
+        "src/Wanxiangshu/Strength/Lifecycle.fs",
+        "src/Wanxiangshu/Strength/OpenCode/Replay.fs",
+        "src/Wanxiangshu/Strength/OpenCode/Speculate.fs",
+        "src/Wanxiangshu/Strength/Projection/Model.fs",
+        "src/Wanxiangshu/Strength/Replica/Transform.fs",
+        "src/Wanxiangshu/Strength/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/provider-projection/tests/message-intent-algebra.test.mjs",
+        "requirements/provider-projection/tests/projection-algebra.test.mjs",
+        "requirements/provider-projection/tests/projection.test.mjs",
+        "requirements/provider-projection/tests/provider-projection-boundary.test.mjs"
+      ],
+      "architecture_gates": [
+        "provider-projection-boundary.mjs",
+        "llm-facing-format-gate.mjs",
+        "migration-ledger.mjs",
+        "owner-dependencies.mjs",
+        "semantic-owners.mjs",
+        "js-surface-manifest.mjs"
+      ],
+      "closure_evidence": "All 12 OwnerScope paths are provider-projection-owned and split into a two-intent generic projection algebra, physical Host decode/capture/writeback adapters, and shared representation primitives. ProjectionSnapshot now carries only CurrentProjection; ReplaceMessageBase and InsertMessageRows are the complete intent algebra. Context, Prefix, Enforcer, and Strength callers migrated to generic rows. Strength validation, frame expansion, and native tool pairing remain speculative-investigation-owned; ProjectionMessageEdit.HostWireEncoding is its sole narrow physical port, and online/replay writeback shares the same rendered row semantics.",
+      "touched_paths": [
+        "src/Wanxiangshu/Participant/Provider/Projection/Model.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Intent.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Planner.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Surface.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProviderProjectionSurface.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProviderWireCapture.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProviderWireDecode.fs",
+        "src/Wanxiangshu/Foundation/LlmFacing.fs",
+        "src/Wanxiangshu/Foundation/SyntheticToml.fs",
+        "src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageE",
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER"
     }
   ],
   "debt_face": {
@@ -1201,10 +1961,6 @@
       "src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs",
       "src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs",
       "src/Wanxiangshu/OpenCode/Codec/OpencodeTypes.fs",
-      "src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs",
-      "src/Wanxiangshu/OpenCode/Codec/ProviderProjectionSurface.fs",
-      "src/Wanxiangshu/OpenCode/Codec/ProviderWireCapture.fs",
-      "src/Wanxiangshu/OpenCode/Codec/ProviderWireDecode.fs",
       "src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs",
       "src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs",
       "src/Wanxiangshu/OpenCode/Host/BloggerChronicleText.fs",
@@ -1222,8 +1978,6 @@
       "src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs",
       "src/Wanxiangshu/OpenCode/Host/GitTree.fs",
       "src/Wanxiangshu/OpenCode/Host/HostBoundarySurface.fs",
-      "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs",
-      "src/Wanxiangshu/OpenCode/Host/HostCompactionObserver.fs",
       "src/Wanxiangshu/OpenCode/Host/HostMessageProjection.fs",
       "src/Wanxiangshu/OpenCode/Host/HostSessionContext.fs",
       "src/Wanxiangshu/OpenCode/Host/HostSessionContextSurface.fs",
@@ -1254,7 +2008,6 @@
       "src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs",
       "src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs",
       "src/Wanxiangshu/OpenCode/Host/PluginSessionScope.fs",
-      "src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs",
       "src/Wanxiangshu/OpenCode/Host/ProviderSystemTransform.fs",
       "src/Wanxiangshu/OpenCode/Host/QuiescenceSurface.fs",
       "src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnostics.fs",
@@ -1305,10 +2058,6 @@
       "src/Wanxiangshu/OpenCode/Tools/ToolRegistrySurface.fs"
     ],
     "CoverageB": [
-      "src/Wanxiangshu/Interaction/Attention/Facts.fs",
-      "src/Wanxiangshu/Interaction/Attention/Fold.fs",
-      "src/Wanxiangshu/Interaction/Attention/Projection.fs",
-      "src/Wanxiangshu/Interaction/Attention/Surface.fs",
       "src/Wanxiangshu/Interaction/Authority/Child.fs",
       "src/Wanxiangshu/Interaction/Authority/Fact.fs",
       "src/Wanxiangshu/Interaction/Authority/Facts.fs",
@@ -1320,10 +2069,6 @@
       "src/Wanxiangshu/Interaction/Authority/Run.fs",
       "src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs",
       "src/Wanxiangshu/Interaction/Authority/Surface.fs",
-      "src/Wanxiangshu/Interaction/Concern/Facts.fs",
-      "src/Wanxiangshu/Interaction/Concern/Fold.fs",
-      "src/Wanxiangshu/Interaction/Concern/Projection.fs",
-      "src/Wanxiangshu/Interaction/Concern/Surface.fs",
       "src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs",
       "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
       "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs",
@@ -1467,7 +2212,6 @@
       "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
       "src/Wanxiangshu/Context/Companion/CompanionFactFold.fs",
       "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
-      "src/Wanxiangshu/Context/Companion/Errors.fs",
       "src/Wanxiangshu/Context/Companion/Fact.fs",
       "src/Wanxiangshu/Context/Companion/Facts.fs",
       "src/Wanxiangshu/Context/Companion/FoldSurface.fs",
@@ -1481,7 +2225,6 @@
       "src/Wanxiangshu/Context/Companion/Runtime.fs",
       "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs",
       "src/Wanxiangshu/Context/Prefix/Candidate.fs",
-      "src/Wanxiangshu/Context/Prefix/Types.fs",
       "src/Wanxiangshu/Context/Prefix/Epoch.fs",
       "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
       "src/Wanxiangshu/Context/Prefix/Projection.fs",
@@ -1495,7 +2238,6 @@
       "src/Wanxiangshu/Context/Trace/Projection.fs",
       "src/Wanxiangshu/Context/Trace/TerminalReporter.fs",
       "src/Wanxiangshu/Context/Trace/XTracePipeline.fs",
-      "src/Wanxiangshu/Context/Trace/XTraceSurface.fs",
       "src/Wanxiangshu/Enforcer/BlogSurface.fs",
       "src/Wanxiangshu/Enforcer/Catalog.fs",
       "src/Wanxiangshu/Enforcer/ChronicleExecution.fs",
@@ -1526,6 +2268,7 @@
       "src/Wanxiangshu/Participant/Persona/RoleIdentity.fs",
       "src/Wanxiangshu/Participant/Persona/Surface.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/RequestKind.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/Failure.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/FailureSurface.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
@@ -1533,10 +2276,8 @@
       "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/HandleSurface.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Surface.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs",
@@ -1573,19 +2314,14 @@
       "src/Wanxiangshu/Foundation/FatalProcess.fs",
       "src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs",
       "src/Wanxiangshu/Foundation/Identity.fs",
-      "src/Wanxiangshu/Foundation/LlmFacing.fs",
       "src/Wanxiangshu/Foundation/McpLaunch.fs",
       "src/Wanxiangshu/Foundation/Outcome.fs",
       "src/Wanxiangshu/Foundation/OutcomeSurface.fs",
       "src/Wanxiangshu/Foundation/Parallel.fs",
       "src/Wanxiangshu/Foundation/ParallelSurface.fs",
       "src/Wanxiangshu/Foundation/Roles.fs",
-      "src/Wanxiangshu/Foundation/SyntheticToml.fs",
-      "src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs",
       "src/Wanxiangshu/Foundation/TaskResult.fs",
       "src/Wanxiangshu/Foundation/Temporal.fs",
-      "src/Wanxiangshu/Host/CompactionPolicy.fs",
-      "src/Wanxiangshu/Host/Contract/CompactionPolicySurface.fs",
       "src/Wanxiangshu/Host/Contract/ToolResultBound.fs",
       "src/Wanxiangshu/Host/Digest.fs",
       "src/Wanxiangshu/Host/Fact.fs",
@@ -1665,8 +2401,6 @@
       "src/Wanxiangshu/Resources/PackageResources.fs",
       "src/Wanxiangshu/Resources/PromptResources.fs",
       "src/Wanxiangshu/Resources/PromptSurface.fs",
-      "src/Wanxiangshu/Resources/ProviderProse.fs",
-      "src/Wanxiangshu/Resources/ProviderResources.fs",
       "src/Wanxiangshu/Resources/RuntimeResources.fs",
       "src/Wanxiangshu/Sphinx/Absorb.fs",
       "src/Wanxiangshu/Sphinx/Bayes.fs",
