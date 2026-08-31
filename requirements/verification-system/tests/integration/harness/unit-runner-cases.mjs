@@ -35,6 +35,8 @@ import { harnessProgress } from './progress.mjs';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 const RUNNER = 'requirements/verification-system/tests/run.mjs';
+const INNER_RUNNER = 'requirements/verification-system/tests/support/run-inner.mjs';
+const SUPERVISOR = 'requirements/verification-system/tests/e2e/support/supervise-node-test.mjs';
 const FIXTURE_DIR = 'requirements/verification-system/tests/support/fixtures';
 
 /**
@@ -73,9 +75,9 @@ const runFixture = (fixture, budgetEnv = {}) =>
   });
 
 // Probe budgets are FIXED, not production/2.
-// Production PER_TEST_TIMEOUT_MS is the real unit-suite design bound (raised for
-// busy CI concurrency). Fixtures pin the measured 1000/1500 lattice via
-// UNIT_RUNNER_PROBE_* so production headroom does not collapse fixture headroom.
+// Fixtures pin their own leaf-test timeout and verdict-silence lattice via
+// UNIT_RUNNER_PROBE_*; the process-isolated file wrapper must not inherit the
+// leaf timeout because it contains the whole serial fixture.
 
 const scaledBudget = (silenceMs) => ({
   PER_TEST_TIMEOUT_MS: String(UNIT_RUNNER_PROBE_PER_TEST_MS),
@@ -217,7 +219,7 @@ export const unitRunnerCases = [
       // GHA timer stretch cancelled 0.5–0.75× per-test slices (1 passed,1 failed).
       // Use a wide local per-test bound + short fixed slices; total > silence.
       // Suite-wide concurrency remains true (NODE_TEST_CONCURRENCY unset elsewhere).
-      const probePerTestMs = Math.max(UNIT_RUNNER_PROBE_PER_TEST_MS, 10_000);
+      const probePerTestMs = UNIT_RUNNER_PROBE_PER_TEST_MS;
       const probeSliceMs = 400;
       const probeSliceCount = Math.max(
         5,
@@ -286,6 +288,21 @@ export const unitRunnerCases = [
       assertTrue(
         source.includes('UNIT_VERDICT_SILENCE_MS'),
         'the runner must be bounded by the verdict-silence window, not by a literal or the backstop',
+      );
+
+      const inner = readFileSync(`${REPO_ROOT}${INNER_RUNNER}`, 'utf8');
+      const supervisor = readFileSync(`${REPO_ROOT}${SUPERVISOR}`, 'utf8');
+      assertTrue(
+        !inner.includes('timeout: PER_TEST_TIMEOUT_MS'),
+        'a leaf-test timeout must not be applied to the process-isolated file wrapper',
+      );
+      assertTrue(
+        !inner.includes('AbortSignal.timeout(SUITE_BACKSTOP_MS)'),
+        'the inner runner must not fan one backstop AbortSignal out to every file worker',
+      );
+      assertTrue(
+        supervisor.includes('SUITE_BACKSTOP_MS'),
+        'the external supervisor must own the suite backstop',
       );
     },
   },

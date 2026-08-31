@@ -919,6 +919,9 @@ module ProcessSurface =
     let portRegisterExitTask (port: obj) (id: obj) (taskValue: obj) : unit =
         (ptyPortOf port).RegisterExitTask(ptyIdOf id, unbox<Task> taskValue)
 
+    let ptyRaceExit (exitTask: obj) (milliseconds: int) : Task<bool> =
+        PtyTiming.raceExit (unbox<Task> exitTask) milliseconds
+
     let portComplete (port: obj) (id: obj) (outcome: obj) : unit =
         match optionalResult outcome with
         | None -> (ptyPortOf port).Complete(ptyIdOf id)
