@@ -1,90 +1,226 @@
 #!/usr/bin/env node
 /**
- * Causal wait boundary gate (causal-ce-observability Phase 8).
+ * Causal-wait architecture gate.
  *
- * Proves only what static analysis can reliably prove — not "every wait is observed".
+ * CAUSAL-003/004:
+ *   - Fact and Journal carriers contain no executable causal-wait vocabulary.
+ *   - Snapshot readers, registry implementation, diagnostic bridges and their
+ *     file locator stay inside Execution/Session/Wait.
  *
- * 1. Domain must not reference CausalWaitRegistry / CausalWaitHub implementation
- * 2. Application must not access IWaitSnapshotReader
- * 3. CausalWait must not enter Fact / Journal codec surfaces
- * 4. diagnostics snapshot must not enter PromptDispatcher / decision paths
- * 5. Critical migrated sites must not reintroduce bare TCS.Task awaits
- * 6. CausalWaitRegistry mutable fields must carry DSL-MUTABLE annotations
+ * Migration guards retained here:
+ *   - critical migrated sites do not reintroduce bare TCS.Task awaits;
+ *   - CausalWaitRegistry mutable fields carry DSL-MUTABLE annotations.
  */
 
-import { existsSync, readFileSync } from 'node:fs'
-import { resolve, dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { walk } from '../lib/walk.mjs'
+import { maskFSharpTrivia } from '../lib/fsharp-source.mjs'
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const src = join(root, 'src/Wanxiangshu')
-const norm = (p) => p.replace(/\\/g, '/')
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const WAIT_OWNER = 'Execution/Session/Wait/'
+const DIAGNOSTIC_LOCATOR = 'causal-waits.json'
+const normalize = (path) => path.replace(/\\/g, '/')
 
-const problems = []
+const DURABLE_VOCABULARY = [
+  ['IWaitSnapshotReader', /\bIWaitSnapshotReader\b/],
+  ['IWaitObserver', /\bIWaitObserver\b/],
+  ['CausalWaitRegistry', /\bCausalWaitRegistry\b/],
+  ['CausalWaitHub', /\bCausalWaitHub\b/],
+  ['CausalWaitBridge', /\bCausalWaitBridge\b/],
+  ['CausalWaitSurface', /\bCausalWaitSurface\b/],
+  ['CausalAwait', /\bCausalAwait\b/],
+  ['DiagnosticWaitSnapshot', /\bDiagnosticWaitSnapshot\b/],
+  ['DiagnosticWaitExit', /\bDiagnosticWaitExit\b/],
+  ['DiagnosticWait', /\bDiagnosticWait\b/],
+  ['WaitKind', /\bWaitKind\b/],
+  ['CausalWait', /\bCausalWait\b/],
+]
 
-const read = (abs) => readFileSync(abs, 'utf8')
+const SNAPSHOT_READ_CAPABILITIES = [
+  ['IWaitSnapshotReader', /\bIWaitSnapshotReader\b/],
+  ['DiagnosticWaitSnapshot', /\bDiagnosticWaitSnapshot\b/],
+  ['CausalWaitRegistry', /\bCausalWaitRegistry\b/],
+  ['CausalWaitBridge', /\bCausalWaitBridge\b/],
+  ['CausalWaitSurface', /\bCausalWaitSurface\b/],
+  ['CausalWaitHub.reader', /\bCausalWaitHub\.reader\b/],
+  ['CausalWaitHub.snapshot', /\bCausalWaitHub\.snapshot\b/],
+  ['CausalWaitHub.read', /\bCausalWaitHub\.read\b/],
+  ['CausalWaitHub.frontiers', /\bCausalWaitHub\.frontiers\b/],
+  ['CausalWaitHub.writeToWorkspace', /\bCausalWaitHub\.writeToWorkspace\b/],
+]
 
-const filesUnder = (relDir) => {
-  const dir = join(src, relDir)
-  if (!existsSync(dir)) return []
-  return [...walk(dir)].filter((f) => f.endsWith('.fs')).map((f) => ({ abs: f, rel: norm(f.slice(src.length + 1)) }))
+const firstToken = (rules, text) => rules.find(([, pattern]) => pattern.test(text))?.[0]
+
+const isDurableCarrier = (relativePath) => {
+  const parts = relativePath.split('/')
+  const name = parts.at(-1)
+  return parts.includes('Journal') || name === 'Fact.fs' || name === 'Facts.fs'
 }
 
-const allFs = () =>
-  [...walk(src)].filter((f) => f.endsWith('.fs')).map((f) => ({ abs: f, rel: norm(f.slice(src.length + 1)) }))
+const durableViolation = (relativePath, token) =>
+  `${relativePath}: causal-wait vocabulary "${token}" must not enter Fact/Journal`
 
-// 1. Pure domain layers must not reference CausalWaitRegistry implementation / snapshot readers
-const domainLayers = ['Foundation', 'Participant', 'Interaction', 'Mission', 'Strength', 'Context', 'Repository']
-for (const layer of domainLayers) {
-  for (const { abs, rel } of filesUnder(layer)) {
-    if (rel.includes('/OpenCode/') || rel.includes('/Host/') || rel.endsWith('Surface.fs') || rel.includes('BookkeeperRuntime.fs')) continue
-    const text = read(abs)
-    if (/CausalWaitRegistry|CausalWaitHub\.(?:snapshot|read)/.test(text)) {
-      problems.push(`Domain/${rel}: must not reference CausalWaitRegistry/snapshot`)
+const readViolation = (relativePath, token) =>
+  `${relativePath}: diagnostics read capability "${token}" is confined to Execution/Session/Wait`
+
+export function analyzeObservationBoundary(files) {
+  if (!Array.isArray(files)) throw new TypeError('causal-wait-boundary: files must be an array')
+
+  const violations = []
+  for (const file of files) {
+    if (typeof file?.rel !== 'string' || typeof file?.text !== 'string') {
+      throw new TypeError('causal-wait-boundary: every file requires string rel and text fields')
+    }
+
+    const relativePath = normalize(file.rel)
+    const executable = maskFSharpTrivia(file.text)
+
+    if (isDurableCarrier(relativePath)) {
+      const token = firstToken(DURABLE_VOCABULARY, executable)
+      if (token !== undefined) {
+        violations.push(durableViolation(relativePath, token))
+        continue
+      }
+    }
+
+    if (relativePath.startsWith(WAIT_OWNER)) continue
+
+    const capability = firstToken(SNAPSHOT_READ_CAPABILITIES, executable)
+    if (capability !== undefined) {
+      violations.push(readViolation(relativePath, capability))
+      continue
+    }
+
+    const hubWithoutWriterUses = executable.replace(
+      /\bCausalWaitHub\.(?:observer|setWorkspace)\b/g,
+      '',
+    )
+    if (/\bCausalWaitHub\b/.test(hubWithoutWriterUses)) {
+      violations.push(readViolation(relativePath, 'CausalWaitHub'))
+      continue
+    }
+
+    if (file.text.includes(DIAGNOSTIC_LOCATOR)) {
+      violations.push(readViolation(relativePath, DIAGNOSTIC_LOCATOR))
     }
   }
+
+  return violations
 }
 
-// 2. Application ↛ IWaitSnapshotReader
-const appLayers = ['Execution', 'Mission', 'Change', 'Composition']
-for (const layer of appLayers) {
-  for (const { abs, rel } of filesUnder(layer)) {
-    if (rel.includes('/Wait/')) continue
-    const text = read(abs)
-    if (/IWaitSnapshotReader/.test(text)) {
-      problems.push(`Application/${rel}: must not access IWaitSnapshotReader`)
-    }
+export function collectCausalWaitBoundaryFiles(root = ROOT) {
+  const sourceRoot = join(root, 'src/Wanxiangshu')
+  if (!existsSync(sourceRoot) || !statSync(sourceRoot).isDirectory()) {
+    throw new Error('causal-wait-boundary: required scan root missing: src/Wanxiangshu')
   }
+
+  return [...walk(sourceRoot)]
+    .filter((path) => path.endsWith('.fs'))
+    .map((path) => ({
+      rel: normalize(path.slice(sourceRoot.length + 1)),
+      text: readFileSync(path, 'utf8'),
+    }))
 }
 
-// 3. CausalWait not in Fact / Journal codec
-for (const { abs, rel } of allFs()) {
-  const parts = rel.split('/')
-  const underJournal = parts.includes('Journal')
-  const isFact = parts.at(-1)?.endsWith('Fact.fs') || parts.at(-1)?.endsWith('Facts.fs')
-  if (!underJournal && !isFact) continue
-  const body = read(abs)
-  if (/CausalWaitRegistry|IWaitSnapshotReader/.test(body)) {
-    problems.push(`${rel}: CausalWait must not enter Fact/Journal codec surfaces`)
+const SELF_TEST_LEGAL = [
+  {
+    rel: 'Execution/Session/Wait/Registry.fs',
+    text: 'let reader: IWaitSnapshotReader = registry :> IWaitSnapshotReader\n',
+  },
+  {
+    rel: 'Persistence/Journal/Codec.fs',
+    text: 'let decoy = "CausalWait WaitKind IWaitSnapshotReader"\n',
+  },
+  {
+    rel: 'Change/Fact.fs',
+    text: 'let decoy = @"DiagnosticWait CausalAwait"\n',
+  },
+  {
+    rel: 'Interaction/Dispatch/FutureDecision.fs',
+    text: [
+      '// IWaitSnapshotReader CausalWaitHub.snapshot',
+      'let ordinary = "CausalWaitBridge CausalWaitSurface"',
+      'let triple = """DiagnosticWaitSnapshot"""',
+      '',
+    ].join('\n'),
+  },
+  {
+    rel: 'Change/Job.fs',
+    text: 'let observer = CausalWaitHub.observer\n',
+  },
+  {
+    rel: 'OpenCode/Plugin/PluginHostWiring.fs',
+    text: 'CausalWaitHub.setWorkspace workspace\n',
+  },
+]
+
+const mutateSelfTest = (relativePath, addition) => {
+  let applied = false
+  const files = SELF_TEST_LEGAL.map((file) => {
+    if (file.rel !== relativePath) return file
+    const text = file.text + addition
+    applied = applied || text !== file.text
+    return { ...file, text }
+  })
+  return { applied, files }
+}
+
+const same = (left, right) => JSON.stringify(left) === JSON.stringify(right)
+
+export function runObservationBoundarySelfTest() {
+  const cases = []
+  cases.push({
+    name: 'known-good: owner code and lexical decoys pass',
+    ok: analyzeObservationBoundary(SELF_TEST_LEGAL).length === 0,
+  })
+
+  const expectSingle = (name, relativePath, addition, expected) => {
+    const mutation = mutateSelfTest(relativePath, addition)
+    const actual = analyzeObservationBoundary(mutation.files)
+    cases.push({
+      name,
+      ok: mutation.applied && same(actual, [expected]),
+      detail: mutation.applied ? actual.join(' | ') : 'target mutation was not applied',
+    })
   }
+
+  expectSingle(
+    'known-bad: Journal vocabulary',
+    'Persistence/Journal/Codec.fs',
+    'let reader: IWaitSnapshotReader = source\n',
+    durableViolation('Persistence/Journal/Codec.fs', 'IWaitSnapshotReader'),
+  )
+  expectSingle(
+    'known-bad: Fact vocabulary',
+    'Change/Fact.fs',
+    'let wait: DiagnosticWait = source\n',
+    durableViolation('Change/Fact.fs', 'DiagnosticWait'),
+  )
+  expectSingle(
+    'known-bad: unlisted decision reader',
+    'Interaction/Dispatch/FutureDecision.fs',
+    'let reader: IWaitSnapshotReader = source\n',
+    readViolation('Interaction/Dispatch/FutureDecision.fs', 'IWaitSnapshotReader'),
+  )
+  expectSingle(
+    'known-bad: opened reader hub alias',
+    'Interaction/Dispatch/FutureDecision.fs',
+    'open Wanxiangshu.Execution.Session.Wait.CausalWaitHub\nlet leaked = snapshot ()\n',
+    readViolation('Interaction/Dispatch/FutureDecision.fs', 'CausalWaitHub'),
+  )
+  expectSingle(
+    'known-bad: diagnostic locator outside owner',
+    'Interaction/Dispatch/FutureDecision.fs',
+    'let path = ".wanxiangshu/diagnostics/causal-waits.json"\n',
+    readViolation('Interaction/Dispatch/FutureDecision.fs', DIAGNOSTIC_LOCATOR),
+  )
+
+  return cases
 }
 
-// 4. diagnostics snapshot not in PromptDispatcher / decision
-for (const name of ['Interaction/Dispatch/Dispatcher.fs', 'Composition/Turn/TurnReconcile.fs', 'Mission/Manager/Workflow.fs']) {
-  const abs = join(src, name)
-  try {
-    const text = read(abs)
-    if (/IWaitSnapshotReader|CausalWaitHub\.(?:snapshot|read)|causal-waits\.json/.test(text)) {
-      problems.push(`${name}: diagnostics snapshot must not enter decision/prompt paths`)
-    }
-  } catch {
-    /* optional path */
-  }
-}
-
-// 5. Critical migrated sites — no bare `return! xxx.Task` / `do! xxx.Task` outside CausalAwait lines
-const critical = [
+const criticalWaitSites = [
   'Execution/Delegation/SyncDelegate/Workflow.fs',
   'Mission/Finality/Cohort.fs',
   'Mission/Finality/OpenCode/Tool.fs',
@@ -94,53 +230,91 @@ const critical = [
   'Change/Job.fs',
 ]
 
-for (const rel of critical) {
-  const abs = join(src, rel)
-  if (!existsSync(abs)) {
-    problems.push(`${rel}: critical causal-wait site missing on disk`)
-    continue
-  }
-  const text = read(abs)
-  const lines = text.split('\n')
-  for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i]
-    if (!/\b(return!|do!)\s+\w[\w.]*\.Task\b/.test(line)) continue
-    // CancelToken.Task arms inside Promise.race / CausalAwait escapes are not
-    // a reintroduced business wait — the outer race is what CausalAwait wraps.
-    if (/\bcancel\.Task\b/.test(line)) continue
-    // Allow when CausalAwait.await appears in a nearby window (argument form).
-    const window = lines.slice(Math.max(0, i - 40), i + 1).join('\n')
-    if (/CausalAwait\.await/.test(window)) continue
-    // Local fan-in helpers (concurrentAll*) settle a private TCS; callers own
-    // the observed wait descriptors on each branch task.
-    const ahead = lines.slice(Math.max(0, i - 80), i).join('\n')
-    if (/let private concurrent/.test(ahead) && /return! tcs\.Task/.test(line)) continue
-    problems.push(`${rel}:${i + 1}: bare TCS.Task await outside CausalAwait (${line.trim()})`)
-  }
-}
+const analyzeCriticalWaits = (files) => {
+  const violations = []
+  const byPath = new Map(files.map((file) => [file.rel, file.text]))
 
-// 6. CausalWaitRegistry mutable must be DSL-MUTABLE annotated
-{
-  const abs = join(src, 'Execution/Session/Wait/Registry.fs')
-  if (!existsSync(abs)) {
-    problems.push('Execution/Session/Wait/Registry.fs: missing on disk')
-  } else {
-    const text = read(abs)
+  for (const relativePath of criticalWaitSites) {
+    const text = byPath.get(relativePath)
+    if (text === undefined) {
+      violations.push(`${relativePath}: critical causal-wait site missing on disk`)
+      continue
+    }
+
     const lines = text.split('\n')
-    for (let i = 0; i < lines.length; i += 1) {
-      if (!/\blet mutable\b/.test(lines[i])) continue
-      const prev = lines.slice(Math.max(0, i - 2), i).join('\n')
-      if (!/\/\/\s*DSL-MUTABLE:/.test(prev)) {
-        problems.push(`Execution/Session/Wait/Registry.fs:${i + 1}: mutable lacks DSL-MUTABLE annotation`)
-      }
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index]
+      if (!/\b(return!|do!)\s+\w[\w.]*\.Task\b/.test(line)) continue
+      if (/\bcancel\.Task\b/.test(line)) continue
+
+      const nearby = lines.slice(Math.max(0, index - 40), index + 1).join('\n')
+      if (/CausalAwait\.await/.test(nearby)) continue
+
+      const preceding = lines.slice(Math.max(0, index - 80), index).join('\n')
+      if (/let private concurrent/.test(preceding) && /return! tcs\.Task/.test(line)) continue
+
+      violations.push(
+        `${relativePath}:${index + 1}: bare TCS.Task await outside CausalAwait (${line.trim()})`,
+      )
     }
   }
+
+  return violations
 }
 
-if (problems.length > 0) {
-  console.error('causal-wait-boundary FAILED:')
-  for (const p of problems) console.error(`  - ${p}`)
-  process.exit(1)
+const analyzeRegistryMutableAnnotations = (files) => {
+  const relativePath = 'Execution/Session/Wait/Registry.fs'
+  const file = files.find((candidate) => candidate.rel === relativePath)
+  if (file === undefined) return [`${relativePath}: missing on disk`]
+
+  const violations = []
+  const lines = file.text.split('\n')
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/\blet mutable\b/.test(lines[index])) continue
+    const preceding = lines.slice(Math.max(0, index - 2), index).join('\n')
+    if (!/\/\/\s*DSL-MUTABLE:/.test(preceding)) {
+      violations.push(`${relativePath}:${index + 1}: mutable lacks DSL-MUTABLE annotation`)
+    }
+  }
+  return violations
 }
 
-console.log('causal-wait-boundary OK')
+const isMainModule = (() => {
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
+  } catch {
+    return false
+  }
+})()
+
+if (isMainModule) {
+  const selfTests = runObservationBoundarySelfTest()
+  const failedSelfTests = selfTests.filter((fixture) => !fixture.ok)
+  for (const fixture of selfTests) {
+    const marker = fixture.ok ? '✓' : '✗'
+    console.log(`  ${marker} ${fixture.name}${fixture.detail && !fixture.ok ? ` — ${fixture.detail}` : ''}`)
+  }
+
+  let files
+  try {
+    files = collectCausalWaitBoundaryFiles()
+  } catch (error) {
+    console.error(`causal-wait-boundary FAILED: ${error.message}`)
+    process.exit(1)
+  }
+
+  const problems = [
+    ...failedSelfTests.map((fixture) => `self-test failed: ${fixture.name}`),
+    ...analyzeObservationBoundary(files),
+    ...analyzeCriticalWaits(files),
+    ...analyzeRegistryMutableAnnotations(files),
+  ]
+
+  if (problems.length > 0) {
+    console.error('causal-wait-boundary FAILED:')
+    for (const problem of problems) console.error(`  - ${problem}`)
+    process.exit(1)
+  }
+
+  console.log(`causal-wait-boundary OK — ${files.length} production files, ${selfTests.length} fixtures`)
+}
