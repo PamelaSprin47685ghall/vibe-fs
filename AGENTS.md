@@ -87,15 +87,15 @@
 
 以下关于 ParticipantIdentity、managed chat、capacity/failure policy 与 provider lifecycle 的条目只记录 reliability-stabilization 已落地闭环；不改变第五十七章其他节点、coverage backlog 或其他工作流的完成状态。
 
-### 当前开发者移交 — 2026-08-31
+### 当前开发者移交 — 2026-09-01
 
-- 总目标仍是 debt-zero ReleaseClosure。原计划文件 `.omo/plans/agents-debt-zero-release-closure.md` 不在工作区，其 Task 1–14 的成果已全部反映在本文件"守江山"（含 Strength 时间无关 lifecycle）与 `scripts/checks/migration-ledger.json`：36 个节点全部 `DONE`。因此不存在"下一个 Task 编号"，只剩 386 文件的 production coverage backlog；后续 production 进度只以 backlog→node→cutover 闭合为准，按真实依赖 ready frontier 选节点，禁止重造线性 wave。
+- 总目标仍是 debt-zero ReleaseClosure。原计划文件 `.omo/plans/agents-debt-zero-release-closure.md` 不在工作区，其 Task 1–14 与后续 frontier 扩展的成果已全部反映在本文件"守江山"与 `scripts/checks/migration-ledger.json`：71 个节点全部 `DONE`，coverage backlog 为 0。ReleaseClosure 已达成；后续新增工作必须经正式 owner 裁决后建立新 node，禁止重造线性 wave。
 - reliability-stabilization 的原始设计与实现归属 `wanxiangshu-fix`：`947e144f1 spec(reliability): redefine identity and chat execution ownership`、`e956455cf Stabilize managed chat admission and recovery`、`980dbb5c7 Document reliability stabilization guardrails`，作者记录为 `test <test@example.com>`。当前开发者只负责把该分支语义合入 master，不宣称这些成果。
 - master 侧 Task 10–13 的已提交成果分别是 `4adde35f8`、`9e6d1f2bb`、`6ce8c710c`、`219cd919b`。Task 13 的生产/证明实现由 `PersonaTypedCore`、`IdentityOfficeSplit`、`IdentityShimCutover`、`PersonaHostBinding`、`IdentityRedProof` 等协作 agent 完成；本次 merge 语义解冲突由 `MergeIdentityCore`、`MergeReliabilityFlow`、`MergePeripheralFlow`、`MergeGovernance` 完成。保留此 attribution，禁止后任把合并动作写成个人原创。
 - merge 后的最终 identity law 以本节守江山条款与 `requirements/participant-identity/WHAT.md` PID-001..011 为准：`ParticipantIdentity` 属于 exact logical run，并随 `AuthorityRootAccepted` 原子 durable 安装；Task 13 早期的 process-local `SessionPersona`/`PersonaBinding` 方案已被可靠性语义取代并删除。`OfficeCapability` 的 `ToolPermission`/权限矩阵切分仍保留，`Roles` 只拥有 Role/AgentTier。
 - 该 merge 的验证闭合已完成，成果在 `60532ec23`、`696e67cad`、`d89fb0511`、`89ff8f809` 及本次提交。当时"只编译不跑测试"留下的账已全部结清：`npm run format-build-test` 整条阶梯绿 —— fantomas 696 文件 unchanged 2s、build 38s、unit 3909/3909 15s、Long Stroke e2e 11s（57 步 5.2s flow）、`scripts/check.mjs` 36 门禁 258s（owner-dependencies 810→0、requirement-trace 102→0、composition-root 777→0、fsharp-control-pyramid 6→0、authority-boundary 8→0）、integration 14/14 step 304s、package 与 `npm pack --dry-run` 各 1s。全部按 production/contract 根因修复，未新增 baseline、suppression、allowlist，未削弱断言。
 - 三条必须继承的工程事实：① owner check 的成本不在 F# 扫描（106s）而曾在 JS 后处理的 O(n²) evidence 全表扫描，已改为按 consumer 分组 + 二分包含窗口；② 迭代 FCS 门禁时先产出一次归一化 evidence，再用 `OMP_FCS_REUSE_PATH` + `OMP_FCS_REUSE_RUN_ID` 复用，owner gate 从 109s 降到 0s，`scripts/check.mjs` 内部已这样串联；③ 真实 F# 工程检查不能放进 unit tier（5s verdict 静默预算），实扫 lane 属于 `requirements/<package>/tests/integration/`，且该 step 需自报 `perTestTimeoutMs`。整条阶梯约 10.5 分钟，其中 562s 是两次不可压缩的真实 F# 工程检查。
-- 下一任第一动作：`git status` 确认工作区干净，跑一遍 `npm run format-build-test` 建立自己的基线，再从 386 文件 coverage backlog 里按依赖 ready frontier 选下一个 node 做 backlog→node→cutover。任何红项都视为未闭合事实，不得因前一任的绿宣称 ReleaseClosure。
+- 下一任第一动作：`git status` 确认工作区干净，`npm run format-build-test` 绿且 `migration-ledger` 全 `DONE`、coverage backlog 0 时方可宣称 ReleaseClosure。无未裁决 node 时不应再选下一节点；后续新增工作必须经正式 owner 裁决后建立新 node。
 
 - 状态只能被事实改变，等待只能被事件结束。correctness path 禁止用 wall clock、`TimeSpan`、timer、deadline、sleep、polling 或 timeout 推断业务状态；取消是显式事件，不是时间流逝。
 - durable fact 是业务事实唯一来源。process-local registry/waiter/flight 只拥有物理资源，不得充当持久业务状态、恢复资格或成功证明。
@@ -122,6 +122,7 @@
 - Strength lifecycle 已时间无关：`StrengthReplicaRuntime` 不拥有 timer/deadline/elapsed-time terminal arbitration。Treatment 显式开启后等待 Replica 的真实因果终态；DryRun 启动后立即放行 Owner，只由 K gate、Replica terminal、exact Owner `TargetProviderRun` terminal 或 owner cancel/delete 收口。语义 completion 与物理 retirement 分离：K gate/取消可先阻止后续 provider admission，但 Replica 身份必须保留到 Host terminal/session deletion，以吸收在途 transform；严禁靠 sleep/timeout 或“DryRun 必须抢在 Owner 前跑满 K”证明正确性。
 - 子→父 run-bounded LWR 从本 invocation 首个 assistant part 起算；caller 已知的 user charge 不得伪装成 Chronicle/Recent work 回传。父→子普通 bounded delta 仍保留原语义。
 - Fable build 已收敛为跨进程 lock 下先清空上一轮 `dist/`，再执行一次真实 `Debug` compiler invocation；compiler 成功退出后才验 artifact/Surface Manifest，configuration 不得依赖 Fable 的 watch/one-shot 默认值。源码删除不得留下可被 package 收走的陈旧 JS；watch daemon、`FableBarrier.fs`、ack、source-touch barrier、artifact-exists fast path 均已删除；现存 `dist`、日志静默、mtime 与 wall-clock 不能证明构建成功。
+- `Interaction/Repair` 切片（`CompletedTurn.fs`、`CompletedTurnSurface.fs`、`InteractionRepair.fs`）primary owner 已切至 `interaction-authority`，`Port.fs` 归 `dispatch-protocol`；跨 owner 消费通过 `published-contracts.json` 的 `Interaction.Repair.Classification` / `Interaction.Repair.Workflow` / `Interaction.Repair.SendOutcome` 授权；`semantic-owners.json` 与 `interaction-repair-invariant` gate 已闭合。
 
 ## 交付门禁
 
@@ -147,15 +148,10 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 
 以下内容是仍在执行中的架构迁移提案，不是已经完成的 repository law。实施时必须继续受上方正式协议与 `requirements/` 约束。
 
-毕业规则：production cutover + executable proof + hard gate 三者齐全才算完成。完成项立即从本提案缩掉，压成上方“守江山”一条；inventory / baseline / report-only / 文档宣称均不算毕业。截至 2026-08-31，migration ledger 的 36 个已建节点全部 `DONE`；未裁决 production coverage backlog 仍有 386 文件：CoverageA=101、CoverageB=27、CoverageD=101、CoverageE=44、CoverageG=113。第五十七章的 dependency-driven production cutover 路线继续保留，后续进度只以 backlog→node→cutover 闭合为准。
+毕业规则：production cutover + executable proof + hard gate 三者齐全才算完成。完成项立即从本提案缩掉，压成上方“守江山”一条；inventory / baseline / report-only / 文档宣称均不算毕业。截至 2026-09-01，migration ledger 的 71 个已建节点全部 `DONE`；未裁决 production coverage backlog 为 0。上一裁决节点 `Interaction/Repair` slice 已闭合并压入“守江山”，其跨 owner 调用通过 `published-contracts.json` 中的 `Interaction.Repair.Classification` / `Interaction.Repair.Workflow` / `Interaction.Repair.SendOutcome` 授权。当前无未裁决 production node，ReleaseClosure 已达成。
 
 原提案第一章 / Phase 0 的“关键 trace 冻结”已毕业到守江山，不再保留施工长文。以下继续沿用原章节编号，未完成部分保持原意。
 
-下一个节点已裁决但未闭合 —— `Interaction/Repair` slice（`CompletedTurn.fs`、`CompletedTurnSurface.fs`、`InteractionRepair.fs`，`Port.fs` 属 dispatch-protocol 留在 backlog）。裁决结论：primary owner 从 `behavior-diagnosis` 迁到 `interaction-authority`，classification `MOVE`。依据：`INTERACTION-AUTHORITY-019` 正文直接点名 `InteractionRepair`；`scripts/lib/test-surface-scan.mjs` 已把 `Interaction/Repair/CompletedTurnSurface.js` 登记为 `owner: interaction-authority` + laws IA-004/IA-019 且无 `lawOwners` 覆写；该 slice 的全部 18 处 proof 引用都是 IA-004/IA-019 且位于 `requirements/interaction-authority/tests/`；`requirements/behavior-diagnosis/HOW.md` 从未提到这三个文件，behavior-diagnosis 的唯一利益是 BD-017 那条扫源 ratchet，即 consumer 而非 owner。因此 `semantic-owners.json` 是唯一的反对者，"一条语义只有一个 owner" 今天就已被违反，裁决必须解决而不是保留它。
-
-已量出的施工面（下一任照此执行，不必重做发现）：slice 的入边今天是 `pendingEdges` —— provider 未裁决时 `analyzeOwnerDependencies` 跳过 contract 强制；一旦它进入 DONE 节点，来自 7 个外部 consumer 文件的 11 条 symbol 边全部转 strict，每条都要精确 symbol 的 published-contract（`Composition/Turn/TurnReconcile.fs`、`Execution/Fission/OpenCode/Host.fs`、`OpenCode/Host/HostTurnObserver.fs`、`Composition/Turn/OrdinaryTurnWorkflow.fs`、`Mission/Review/Judgement/Workflow.fs`、`Context/Trace/Capture.fs`、`Context/Trace/TerminalReporter.fs`）。出边约 139 个 symbol 跨 11 个 owner，其 contract 的 consumer 需从 `behavior-diagnosis` 换成 `interaction-authority`，并在没有其它 behavior-diagnosis 文件仍消费同一 provider+symbol 时删掉 `behavior-diagnosis`，否则 `stale-contract-consumer` 报红；其中对 `interaction-authority` 的 4 个 symbol 转为同 owner、不再需要授权，对 `behavior-diagnosis` 的 9 个 symbol 反向变成跨 owner、开始需要授权。另需检查 `Enforcer/Cycle/BloggerProbe.fs` 与 `Enforcer/Repair.fs` 是否有真实 FCS 边。
-
-    
     第二章：建立全仓统一的语义词典——从此不再允许 Token 万金油
     
     这是整个重构的语言基础。
