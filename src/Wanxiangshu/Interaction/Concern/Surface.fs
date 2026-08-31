@@ -79,6 +79,16 @@ module ConcernSurface =
                Message = message |}
         |> fun fact -> apply fact current
 
+    let applySubscribedClaim owner occurrence id concern state =
+        let current = stateOf state
+
+        ConcernFactCases.MailboxSubscribed
+            {| Id = id
+               Concern = concern
+               Generation = occurrence
+               OwnerSessionId = SessionId.create owner |}
+        |> fun fact -> apply fact current
+
     let retire owner id generation state =
         let current = stateOf state
 
