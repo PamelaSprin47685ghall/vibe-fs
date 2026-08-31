@@ -42,53 +42,98 @@
 - 旧 ProofGraph、RequirementSync、completion gate 删除链。
 - 旧 fast-check/property 试点整批回放。M10 只允许保留能消灭新错误世界的性质。
 
-## 4. PR 波次与依赖
+## 4. 执行批次、顺序与 PR 边界
 
-### Wave 0
+一个批次对应一次完整工作 prompt。批次减少重复调查与全量验证；模块仍保留独立 RED/GREEN/closure commit。只有共享同一 proof boundary 或同一待删除 support 文件的模块才进入同一 PR。
 
-1. M0。
-2. 合并后重新 fetch upstream。
-3. 在合并后的最新 master 运行一次 `npm run format-build-test`。
+### 第 1 次：CI 可信基线
 
-### Wave A：production correctness
+- 模块：M0。
+- PR：一个独立 PR。
+- 原因：后续 PR 必须先有可信 Linux verdict。不得让语义迁移与 CI portability 混在一起。
+- 批次出口：upstream CI 全绿；合并后在最新 master 运行一次 `npm run format-build-test`。
 
-1. M3：小范围单一 owner，先验证 PR 节奏。
-2. M1：JS transaction。
-3. M2：Change publish。
-4. 三项全部合并后，在最新 upstream 统一运行一次完整阶梯。
+### 第 2 次：最小 production owner 收敛
 
-M1、M2、M3 没有语义依赖。每个分支从创建时的最新 upstream 开始；不建立长期 stacked PR。
+- 模块：M3。
+- PR：一个独立 PR。
+- 原因：改动小、单一 owner、无前置依赖；先验证新的提交、说明和 review 节奏。
+- 批次出口：Decode、Host、Surface 不再拥有 bounds 常量或公式。
 
-### Wave B：proof/gate hardening
+### 第 3 次：production-bound proof 加固
 
-1. M4。
-2. M5。
-3. M6。
-4. 三项全部合并后统一完整验证。
+- 模块列表：
+  1. M5 ambient-time。
+  2. M4 causal-wait。
+  3. M6 Host boundary。
+- PR：默认一个 PR，内部按 M5 → M4 → M6 保留三组独立提交。任一模块若需要产品语义修改或显著扩大 diff，立即拆成独立 PR。
+- 原因：三项都不改变业务规则；共同目标是把弱分类、漏扫与假 capability proof 改成 fail-closed production-bound proof。M5 先固定全树 scanner 纪律，M4 建 typed capability，M6 复用该 proof 方式。
+- 批次出口：集中运行一次 build、check、三个 focused requirement suites 与完整阶梯。
 
-### Wave C：测试镜像清零
+### 第 4 次：JS transaction correctness
 
-按 M7A → M7B → M7C → M7D → M7E 串行。它们共同修改 `requirements/managed-session-lifecycle/tests/support/managed-surface.mjs`，禁止并行编辑。
+- 模块：M1。
+- PR：一个独立 PR。
+- 原因：涉及 snapshot、commit race 与 rollback，错误会破坏第三方数据；不与其他行为改动混合。
+- 批次出口：read-only conflict、create race、CAS-safe rollback 三类 counterworld 全部绑定 production transaction。
 
-每项必须：
+### 第 5 次：Change publish correctness
 
-1. 定位当前 production owner 与注册 Surface。
-2. 先增加 production-bound RED；不得在测试中复制 decision、fold、formula 或状态机。
-3. 只增加最窄观察能力。
-4. 迁移该组 consumer。
-5. 删除该组 mirror exports。
-6. 证明剩余 imports/exports 数量下降；M7E 后必须归零并删除 support 文件。
+- 模块：M2。
+- PR：一个独立 PR。
+- 原因：与 M1 同属 stale state/CAS 问题，但 owner、transaction boundary、恢复语义不同。先吸收 M1 的调查结论，再独立 review。
+- 批次出口：只有 fresh witness 可进入 publish gate；review/repair 在 gate 外；ff merge 使用 gate 内 fresh expected head。
+- 波次出口：M1、M2 均合并后，在最新 upstream 统一运行一次完整阶梯。
 
-### Wave D：验证器升级
+### 第 6 次：mirror 清理基线
 
-1. M8 提供共享 JS syntax/binding analyzer。
-2. M9 复用 M8，只增强 Surface binding causality。
-3. 保留当前 HOW exact anchor、proof level、symlink/inactive、consumer authority 与逐 law 规则。
-4. 两项合并后统一完整验证。
+- 模块：M7A。
+- PR：一个独立 PR。
+- 原因：Handle/fold/join 是剩余 mirror 的基础；先建立 Surface 迁移范式并测量 consumer/export 基线。
+- 批次出口：对应 mirror exports 删除，测试直接调用当前 owner。
 
-### Wave E：可选 property pilot
+### 第 7 次：child lifecycle mirrors
 
-M10 仅在 M1—M9 稳定后评估。候选性质优先考虑 prefix mutation、completion/fallback interleaving；不得用 fast-check 重建 production oracle。
+- 模块列表：
+  1. M7B Fork/family/terminal。
+  2. M7C Satellite/Distiller。
+- PR：默认一个 PR，按模块保留独立提交。
+- 原因：两项共享 child ownership、terminal propagation 与同一个 support 文件；合并处理可避免反复改变 mirror 数据模型。
+- 批次出口：相关 consumers 全部迁移，相关 exports 删除，剩余计数写入历史记录。
+
+### 第 8 次：execution adapter mirrors 与最终删除
+
+- 模块列表：
+  1. M7D SyncDelegate。
+  2. M7E PTY/process。
+- PR：默认一个 PR，按模块保留独立提交。
+- 原因：两项是最后的 execution adapter consumers；共同完成 support 文件删除。M7D 必须先于 M7E。
+- 批次出口：imports/exports 均为零，删除 `requirements/managed-session-lifecycle/tests/support/managed-surface.mjs`；在最新 upstream 运行完整阶梯。
+
+M7A → M7B → M7C → M7D → M7E 必须串行。任何迁移不得在测试中复制 decision、fold、formula 或状态机；只能调用注册 production Surface。
+
+### 第 9 次：共享 AST binding analyzer
+
+- 模块列表：
+  1. M8 requirement trace AST。
+  2. M9 Surface Manifest AST。
+- PR：默认一个 PR；shared analyzer、M8 consumer、M9 consumer 各自独立提交。
+- 原因：M9 依赖 M8 的 binding analyzer；分开开发会产生短期重复 analyzer 或未消费基础设施。
+- 批次出口：保留现有 graph、HOW anchor、proof level、symlink/inactive、consumer authority 与逐 law 规则；shadow、dead alias、错误 callback 与其他 law decoy 全部稳定变红；运行完整阶梯。
+
+### 第 10 次：可选 property pilot
+
+- 模块：M10。
+- PR：一个独立可选 PR。
+- 前置：M1—M9 已合并；负责人已确认依赖、property、CI 预算与 seed/path 保存形式。
+- 范围：只选 1—2 个 production-bound property。候选优先考虑 prefix mutation、completion/fallback interleaving；不得用 fast-check 重建 production oracle。
+
+## 4.1 中断与拆分规则
+
+- 一个组合批次内，前一模块已闭合、后一模块显著膨胀时，立即提交前一模块 PR；不让简单成果等待难项。
+- 两个模块只是文件相邻但 owner、WHAT 或失败世界不同，不合并 PR。
+- 组合 PR 中每个模块必须有独立 proof 与 commit；一项失败不得由另一项测试代偿。
+- 每次开始前 fetch upstream；每次 PR 前记录实际 base SHA。禁止长期 stacked PR。
 
 ## 5. 单个模块的 Git 与验证闭环
 
@@ -103,9 +148,9 @@ proof/gate 模块采用 RED fixture → analyzer/gate GREEN → 文档闭合。�
 验证节奏：
 
 - 小编辑不跑全量；完成一组相关改动后跑 focused file/package suite。
-- 一个模块准备 PR 前，集中运行 focused suite、`node scripts/build.mjs`、`node scripts/check.mjs`。
+- 每个模块完成时只跑对应 focused suite；到达 PR 边界后集中运行一次 `node scripts/build.mjs` 与 `node scripts/check.mjs`。
 - 每个 PR 以 GitHub CI 提供独立完整验证。
-- 每个 Wave 合并后，在最新 upstream 单次运行 `npm run format-build-test`。
+- 只在第 1、3、5、8、9 次标记的批次出口，于最新 upstream 单次运行 `npm run format-build-test`。
 - 最终 PR 前再次 fetch upstream、细粒度语义合并、完整阶梯、diff/status 审查。
 
 ## 6. 执行记录
@@ -125,7 +170,7 @@ proof/gate 模块采用 RED fixture → analyzer/gate GREEN → 文档闭合。�
 
 最小 prompt 只需提供：
 
-1. 模块编号，例如 M1。
+1. 批次编号及模块列表，例如“第 7 次：M7B、M7C”。
 2. 本次授权边界：只实现并提交；或同时 push、创建 upstream PR。
 3. 若从中断点恢复：当前 branch、最后一个可信 commit、已完成但未提交的事实。
 4. 只有存在产品歧义时，提供 owner/负责人裁决。无歧义时 Agent 必须从 AGENTS.md、WHAT、HOW、源码和 Git 历史自行调查。
@@ -141,7 +186,7 @@ proof/gate 模块采用 RED fixture → analyzer/gate GREEN → 文档闭合。�
 
 ## 8. 推荐执行 prompt
 
-> 执行 `docs/UPSTREAM-REMAINING-MERGE-PLAN.md` 的 Mx。完整阅读仓库根 AGENTS.md、本计划、对应 `requirements/<package>/` 的 WHY/WHAT/HOW，以及历史合并记录。先 fetch 并以最新 `upstream/master` 为基线，重新确认缺口仍存在；不得粗暴 cherry-pick 旧提交。按 why → what → RED production-bound proof →唯一 owner 实现→HOW/GAP closure 执行。保留可 review 的 RED/GREEN/closure Git 节点。小步骤只跑 focused tests；模块完成后运行 build、check 与对应 requirement suite。记录对 upstream 原文件的每项修改、原因、反例和验证结果。范围限于 Mx；发现相邻问题只记录，不扩张。本次授权为：[只准备本地提交／同时 push 并创建 upstream PR]。
+> 执行 `docs/UPSTREAM-REMAINING-MERGE-PLAN.md` 的第 N 次，模块列表为 `[Mx, My]`。完整阅读仓库根 AGENTS.md、本计划、对应 `requirements/<package>/` 的 WHY/WHAT/HOW，以及历史合并记录。先 fetch 并以最新 `upstream/master` 为基线，重新确认每个缺口仍存在；不得粗暴 cherry-pick 旧提交。严格按本计划的模块顺序与 PR 边界执行。每个模块独立完成 why → what → RED production-bound proof → 唯一 owner 实现 → HOW/GAP closure，并保留可 review 的 RED/GREEN/closure Git 节点。每个模块完成后运行对应 focused suite；到达组合 PR 边界后集中运行一次 build 与 check；只在本计划指定的批次出口运行完整阶梯。记录对 upstream 原文件的每项修改、原因、反例和验证结果。范围限于列出的模块；发现相邻问题只记录，不扩张。若后一模块显著膨胀，按 4.1 先提交已闭合模块。本次授权为：[只准备本地提交／同时 push 并创建 upstream PR]。
 
 恢复中断任务时，在末尾补充：
 
