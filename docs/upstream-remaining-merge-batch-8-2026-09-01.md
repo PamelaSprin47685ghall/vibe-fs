@@ -34,7 +34,10 @@ The deleted PTY mirror decided blank validation, ownership, signal/write/read an
 - Fable build: PASS; 738 sources, 165 registered surfaces.
 - managed-session-lifecycle: PASS; 124/124.
 - `node scripts/check.mjs`: PASS; 700 production files owned, 36 ledger nodes DONE, zero control-pyramid/deadcode/JS-boundary debt, 772 WHAT / 3899 tests traced.
-- Full `npm run format-build-test`: pending final batch-exit run.
+- Real owner-dependency lane: PASS; 27,218 normalized FCS uses, 333 owner edges and 185 explicit contracts. This lane found two missing mutable-resource declarations and a physical domain-to-Host dependency in the first draft. The resources now carry exact `DSL-MUTABLE: resource` classifications, and `SatelliteSurface` physically lives under `OpenCode/Host`; no exception or allowlist was added.
+- Full `WIREIT_CACHE=none npm run format-build-test`: PASS; Fantomas 700 unchanged, build 738/165, authoritative unit 3904/3904, all integration and package suites, Long Stroke e2e, and `npm pack --dry-run` (2019 files, 2.2 MB packed / 10.5 MB unpacked).
+
+The first formal invocation reached valid production/gate verdicts but Wireit 0.14.13 then rejected an already-existing local cache directory. The cache-disabled rerun in the restricted sandbox reached 3903/3904; its sole failure was the existing public Host canary receiving `listen EPERM 127.0.0.1`. The exact cache-disabled command was rerun with loopback permission and passed 3904/3904 plus every later tier without source changes. No cache result, skipped canary or mock substitutes the final verdict.
 
 No baseline, suppression, allowlist, threshold or timeout was changed. No production behavior was weakened to preserve an old test.
 
