@@ -1,9 +1,9 @@
 # Upstream 重构后的语义合并记录
 
-> 日期：2026-08-31  
-> 集成分支：`codex/upstream-refactor-integration`  
+> 日期：2026-08-31
+> 集成分支：`codex/upstream-refactor-integration`
 > 上游基线：`upstream/master@4e5789e1c`（PR 前仍会最后 fetch 确认）
-> 本地旧版本：`codex/pre-upstream-refactor-20260831@4bb19673e`  
+> 本地旧版本：`codex/pre-upstream-refactor-20260831@4bb19673e`
 > 性质：合并与 review 记录；产品语义仍只由 `requirements/<package>/` 定义
 
 ## 1. 合并原则
