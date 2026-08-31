@@ -169,7 +169,7 @@ module ChronicleTool =
         // must reach executeChronicle so the Chronicle owner can produce the
         // typed NoLiveCycle result, terminate the stale session, and let only the
         // outer Host adapter encode that result as an SDK exception (BD-006).
-        fun _ role -> role = Role.Blogger
+        ToolAdmission.OfficeRole(fun _ role -> role = Role.Blogger)
 
     let spec
         (factory: HostToolFactory)

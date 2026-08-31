@@ -38,8 +38,18 @@ test('WHAT[EMR-010] EMR_010_managed_tool_execution_ends_the_current_provider_ste
   )
   assert.match(
     registry,
-    /let executeKnownRole[\s\S]*if spec\.Admission ctx role then[\s\S]*return! original args ctx/,
+    /match spec\.Admission with[\s\S]*OfficeRole[\s\S]*executeOffice[\s\S]*PrivateAttachment[\s\S]*executePrivateAttachment/,
+    'the declared tool authority, not a guessed one, selects the admission path downstream of the boundary',
+  )
+  assert.match(
+    registry,
+    /let executeKnownRole[\s\S]*if officeAdmission ctx role then[\s\S]*return! original args ctx/,
     'after the outer handoff and gates, ToolRegistry still delegates to the original tool body',
+  )
+  assert.match(
+    registry,
+    /let executePrivateAttachment[\s\S]*if attachmentAdmission ctx then[\s\S]*return! original args ctx/,
+    'an internal leaf tool also reaches the original body only after the provider boundary',
   )
 
   const boundarySlice = registry.slice(Math.max(0, boundaryIndex - 500), boundaryIndex + 1000)

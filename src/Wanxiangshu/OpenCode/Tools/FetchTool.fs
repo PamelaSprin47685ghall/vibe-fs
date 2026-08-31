@@ -186,7 +186,8 @@ module FetchTool =
                 fetchInFlight.[shelfmark] <- work
                 work)
 
-    let admission: ToolAdmission = fun _ r -> r = Role.Inspector || r = Role.Coder
+    let admission: ToolAdmission =
+        ToolAdmission.OfficeRole(fun _ r -> r = Role.Inspector || r = Role.Coder)
 
     let spec (factory: HostToolFactory) (workspaceRoot: string) (store: IEventStore) : ToolSpec =
         { Name = "fetch"

@@ -174,7 +174,15 @@ type HostToolContext =
 type HostToolFactory = private HostToolFactory of obj
 type HostSchema = private HostSchema of obj
 
-type ToolAdmission = HostToolContext -> Role -> bool
+/// The authority a tool call is admitted under. ENF-006 keeps the two sources
+/// apart in the type: an office tool is decided by the public Role the Authority
+/// Root established, while an internal leaf tool (Bookkeeper's `js-bookkeeper`)
+/// is decided by owner-held attachment evidence because its session is
+/// HostInternal and holds no public authority profile at all.
+[<RequireQualifiedAccess>]
+type ToolAdmission =
+    | OfficeRole of (HostToolContext -> Role -> bool)
+    | PrivateAttachment of (HostToolContext -> bool)
 
 type ToolSpec =
     { Name: string

@@ -393,10 +393,13 @@ module JsBookkeeperTool =
             | Ok value -> return succeeded language value
         }
 
+    /// KNOWLEDGE-REUSE-006 / ENF-006: the Bookkeeper is an internal leaf whose
+    /// prompt is HostInternal, so its session never holds a public office Role.
+    /// Its authority is the owner-held transaction attachment itself.
     let admission: ToolAdmission =
-        fun ctx _ ->
+        ToolAdmission.PrivateAttachment(fun ctx ->
             not (String.IsNullOrWhiteSpace ctx.SessionId)
-            && BookkeeperRuntime.isAttached ctx.SessionId
+            && BookkeeperRuntime.isAttached ctx.SessionId)
 
     let spec (factory: HostToolFactory) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()

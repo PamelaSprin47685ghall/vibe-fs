@@ -119,21 +119,47 @@ module ToolRegistry =
           "fetch", FetchTool.admission
           "js-bookkeeper", JsBookkeeperTool.admission ]
 
+    let private tryAdmissionFor (specName: string) (bloggerHost: IBloggerRuntimeHost option) : ToolAdmission option =
+        match staticAdmissions bloggerHost |> List.tryFind (fun (name, _) -> name = specName) with
+        | Some(_, admission) -> Some admission
+        | None when specName.StartsWith "js-" && specName <> "js-bookkeeper" ->
+            Some(JsToolSpec.admissionFor (specName.Substring 3))
+        | None -> None
+
+    let private probeContext (sessionId: string) : HostToolContext =
+        { SessionId = sessionId
+          Agent = None
+          ToolCallId = None
+          ProviderRunId = None
+          PromptText = None
+          AttachAbort = fun _ -> id }
+
+    /// ENF-006: the authority the execute gate resolves for a tool, so a
+    /// consumer can tell an office tool from an internal leaf without guessing
+    /// from the tool name.
+    let tryAdmission (specName: string) (bloggerHost: IBloggerRuntimeHost option) : ToolAdmission option =
+        tryAdmissionFor specName bloggerHost
+
+    /// ENF-006: the internal-leaf decision for a session that holds no public
+    /// office profile at all. An office tool is never admitted this way.
+    let privateAttachmentAdmits
+        (specName: string)
+        (bloggerHost: IBloggerRuntimeHost option)
+        (sessionId: string)
+        : bool =
+        match tryAdmissionFor specName bloggerHost with
+        | Some(ToolAdmission.PrivateAttachment predicate) -> predicate (probeContext sessionId)
+        | Some(ToolAdmission.OfficeRole _)
+        | None -> false
+
     /// AGENT-007 role gate, delegates to owner-defined tool admissions.
     /// sessionId is the tool call's Host session; bloggerHost is optional for tests.
     let rolePredicate (specName: string) (bloggerHost: IBloggerRuntimeHost option) (sessionId: string) : Role -> bool =
-        let ctx =
-            { SessionId = sessionId
-              Agent = None
-              ToolCallId = None
-              ProviderRunId = None
-              PromptText = None
-              AttachAbort = fun _ -> id }
-
-        match staticAdmissions bloggerHost |> List.tryFind (fun (name, _) -> name = specName) with
-        | Some(_, admission) -> admission ctx
-        | None when specName.StartsWith "js-" && specName <> "js-bookkeeper" ->
-            JsToolSpec.admissionFor (specName.Substring 3) ctx
+        // ENF-006: an internal leaf tool is admitted by attachment, never by a
+        // public office, so no public Role may ever see it on this surface.
+        match tryAdmissionFor specName bloggerHost with
+        | Some(ToolAdmission.OfficeRole predicate) -> predicate (probeContext sessionId)
+        | Some(ToolAdmission.PrivateAttachment _)
         | None -> fun _ -> false
 
     let create
@@ -226,7 +252,8 @@ module ToolRegistry =
               yield! casebookToolSpecs
               yield! generatedJsSpecs () ]
 
-        // Generic execute gate: delegates tool admission to spec.Admission.
+        // Generic execute gate: every tool declares the authority it is admitted
+        // under, and the registry never invents one the session does not hold.
         let gateExecute (spec: ToolSpec) =
             let original = spec.Execute
 
@@ -236,27 +263,44 @@ module ToolRegistry =
             let denyRole (ctx: HostToolContext) (role: Role) =
                 denied ctx Path.DeniedRole (Map [ "tool", spec.Name; "role", sprintf "%A" role ])
 
-            let executeKnownRole args (ctx: HostToolContext) (role: Role) =
+            let executeKnownRole officeAdmission args (ctx: HostToolContext) (role: Role) =
                 task {
-                    if spec.Admission ctx role then
+                    if officeAdmission ctx role then
                         return! original args ctx
                     else
                         return denyRole ctx role
                 }
 
-            let executeAfterEnsure args (ctx: HostToolContext) =
+            let executeAfterEnsure officeAdmission args (ctx: HostToolContext) =
                 task {
                     match! runtime.EnsureRoleFor ctx with
-                    | Some role -> return! executeKnownRole args ctx role
+                    | Some role -> return! executeKnownRole officeAdmission args ctx role
                     | None -> return denied ctx Path.DeniedUnestablished Map.empty
                 }
 
-            let executeEstablished args (ctx: HostToolContext) =
+            let executeOffice officeAdmission args (ctx: HostToolContext) =
                 task {
                     match runtime.RoleFor ctx with
-                    | Some role -> return! executeKnownRole args ctx role
-                    | None -> return! executeAfterEnsure args ctx
+                    | Some role -> return! executeKnownRole officeAdmission args ctx role
+                    | None -> return! executeAfterEnsure officeAdmission args ctx
                 }
+
+            // The attachment IS the authority. Resolving a public office Role here
+            // would deny the Bookkeeper its own exact tool, because a HostInternal
+            // prompt deliberately installs no public authority profile.
+            let executePrivateAttachment attachmentAdmission args (ctx: HostToolContext) =
+                task {
+                    if attachmentAdmission ctx then
+                        return! original args ctx
+                    else
+                        return denied ctx Path.DeniedUnestablished Map.empty
+                }
+
+            let executeEstablished args (ctx: HostToolContext) =
+                match spec.Admission with
+                | ToolAdmission.OfficeRole officeAdmission -> executeOffice officeAdmission args ctx
+                | ToolAdmission.PrivateAttachment attachmentAdmission ->
+                    executePrivateAttachment attachmentAdmission args ctx
 
             let providerToolBoundary (ctx: HostToolContext) =
                 if String.IsNullOrWhiteSpace ctx.SessionId then

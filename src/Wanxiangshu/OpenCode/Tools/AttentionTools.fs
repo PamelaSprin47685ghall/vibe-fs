@@ -116,7 +116,7 @@ module AttentionTools =
         ToolHostCodec.stringSchemaDescribed (ProviderProse.render language path Map.empty) factory
 
     let admission: ToolAdmission =
-        fun _ (r: Role) -> r <> Role.Blogger && r <> Role.Distiller
+        ToolAdmission.OfficeRole(fun _ (r: Role) -> r <> Role.Blogger && r <> Role.Distiller)
 
     let specs factory journal =
         let language = ProviderLanguageBinding.readGlobalPreference ()

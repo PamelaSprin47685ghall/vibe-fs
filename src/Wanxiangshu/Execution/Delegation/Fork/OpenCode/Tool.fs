@@ -779,8 +779,11 @@ module ForkTool =
                 return! executeOrchestratorAfterGuards scope request context language
         }
 
-    let managerAdmission: ToolAdmission = fun _ r -> r = Role.Manager
-    let orchestratorAdmission: ToolAdmission = fun _ r -> r = Role.Orchestrator
+    let managerAdmission: ToolAdmission =
+        ToolAdmission.OfficeRole(fun _ r -> r = Role.Manager)
+
+    let orchestratorAdmission: ToolAdmission =
+        ToolAdmission.OfficeRole(fun _ r -> r = Role.Orchestrator)
 
     let managerSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()
