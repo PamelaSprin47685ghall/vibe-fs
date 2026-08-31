@@ -54,7 +54,7 @@
 - 原因：后续 PR 必须先有可信 Linux verdict。不得让语义迁移与 CI portability 混在一起。
 - 批次出口：upstream CI 全绿；合并后在最新 master 运行一次 `npm run format-build-test`。
 
-执行事实（2026-08-31）：本地实现成功。最新 upstream 基线上重放后的节点为 RED `c3a39623f`、GREEN `2dbf3c179`、consumer closure `904c0be8a`、记录 `fa0003296`；定向 21/21、Fable build 734 sources / 161 surfaces、text gate 全绿。原基线完整阶梯为 3925/3925、integration/e2e/package 全绿。已随 M3 push 到 [upstream PR #20](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/20)；GitHub Linux CI 与 merge SHA 尚未产生，因此第 1 次尚未进入 upstream，批次外部出口未闭合。
+执行事实（2026-09-01）：本地实现成功。最新 upstream 基线上重放后的节点为 RED `c3a39623f`、GREEN `2dbf3c179`、consumer closure `904c0be8a`、记录 `fa0003296`；定向 21/21、Fable build 734 sources / 161 surfaces、text gate 全绿。原基线完整阶梯为 3925/3925、integration/e2e/package 全绿。已随 M3 push 到 [upstream PR #20](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/20)。旧 GitHub verdict 来自 base 刷新前的 merge ref；本记录节点触发 `upstream/master@fcd5ab11b` 上的新 CI。merge SHA 尚未产生，因此第 1 次尚未进入 upstream，批次外部出口未闭合。
 
 ### 第 2 次：最小 production owner 收敛
 
@@ -63,7 +63,7 @@
 - 原因：改动小、单一 owner、无前置依赖；先验证新的提交、说明和 review 节奏。
 - 批次出口：Decode、Host、Surface 不再拥有 bounds 常量或公式。
 
-执行事实（2026-08-31）：本地批次出口已闭合。RED `4b87c3c0a` 证明原行为测试全绿时三个 consumer 仍可复制 owner；GREEN `eb0e703d6` 将阈值、计数结果、typed rejection 与拒绝公式收敛到 `EnforcerCycle.validateContentBounds`；FCS closure `787a877d6` 声明 injected `byteCount` 的 exact-two trace。behavior-diagnosis 149/149、Fable build、text lane（772 WHAT / 3920 tests）与完整 owner-dep lane 全绿。PR preflight 刷新 Wireit 依赖后，正式阶梯暴露 upstream `fcd5ab11b` 遗留的两条 direct-command oracle（3924/3926）；`45b20b63e` 同时锁定顶层 npm ladder 与 Wireit exact commands，focused verification/distribution 17/17。修正后正式入口又由 freshness gate 暴露 Wireit build 未 fingerprint repository-derived envelope；`51fff4bd8` 将整个 workspace 纳入 build cache key，仅排除自身输出，focused proof 11/11 且正式 build 734 sources / 161 surfaces。最终完整阶梯 3927/3927、integration/harness/package/e2e/pack 全绿；已创建 [upstream PR #20](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/20)。GitHub CI 与 merge SHA 待产生；下一位不得据此声称已进入 upstream。
+执行事实（2026-09-01）：本地批次出口已闭合。RED `4b87c3c0a` 证明原行为测试全绿时三个 consumer 仍可复制 owner；GREEN `eb0e703d6` 将阈值、计数结果、typed rejection 与拒绝公式收敛到 `EnforcerCycle.validateContentBounds`；FCS closure `787a877d6` 声明 injected `byteCount` 的 exact-two trace。behavior-diagnosis 149/149、Fable build、text lane（772 WHAT / 3920 tests）与完整 owner-dep lane 全绿。PR preflight 刷新 Wireit 依赖后，正式阶梯暴露 upstream `fcd5ab11b` 遗留的两条 direct-command oracle（3924/3926）；`45b20b63e` 同时锁定顶层 npm ladder与 Wireit exact commands，focused verification/distribution 17/17。修正后正式入口又由 freshness gate 暴露 Wireit build 未 fingerprint repository-derived envelope；`51fff4bd8` 将整个 workspace 纳入 build cache key，仅排除自身输出，focused proof 11/11 且正式 build 734 sources / 161 surfaces。最终完整阶梯 3927/3927、integration/harness/package/e2e/pack 全绿；已创建 [upstream PR #20](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/20)。当前节点只刷新 GitHub 对最新 base 的 verdict，不改变实现；merge SHA 待产生。
 
 ### 第 3 次：production-bound proof 加固
 
