@@ -19,6 +19,10 @@
 # Local agent runtime (Reasonix / host tooling)
 /.reasonix/
 
+# wireit incremental cache
+/.wireit/
+/reasonix.toml
+
 # Local NuGet / .NET CLI caches (writable sandbox when home is read-only)
 /.nuget/
 /.dotnet-cli/

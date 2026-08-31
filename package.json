@@ -23,7 +23,56 @@
     "access": "restricted"
   },
   "scripts": {
-    "format-build-test": "dotnet tool run fantomas src/Wanxiangshu && node scripts/check.mjs && node scripts/build.mjs && node requirements/verification-system/tests/run.mjs && node requirements/verification-system/tests/integration/run.mjs && node requirements/distribution/tests/integration/package/run.mjs && node scripts/warmup-opencode.mjs && node requirements/verification-system/tests/e2e/entry.test.mjs && npm pack --dry-run"
+    "format-build-test": "npm run format && npm run check && npm run owner-dep && npm run build && node requirements/verification-system/tests/run.mjs && node requirements/verification-system/tests/integration/run.mjs && node requirements/distribution/tests/integration/package/run.mjs && node scripts/warmup-opencode.mjs && node requirements/verification-system/tests/e2e/entry.test.mjs && npm pack --dry-run",
+    "format": "wireit",
+    "check": "wireit",
+    "owner-dep": "wireit",
+    "build": "wireit"
+  },
+  "wireit": {
+    "format": {
+      "command": "dotnet tool run fantomas src/Wanxiangshu",
+      "files": [
+        "src/Wanxiangshu/**/*.fs",
+        "src/Wanxiangshu/**/*.fsproj",
+        ".config/dotnet-tools.json"
+      ],
+      "output": []
+    },
+    "check": {
+      "command": "node scripts/check.mjs",
+      "files": [
+        "scripts/checks/**",
+        "scripts/lib/**",
+        "src/Wanxiangshu/**",
+        "requirements/**",
+        "proposals/**",
+        "AGENTS.md",
+        "package.json"
+      ],
+      "output": []
+    },
+    "owner-dep": {
+      "command": "node scripts/check.mjs --lane=owner-dep",
+      "files": [
+        "scripts/checks/**",
+        "scripts/lib/**",
+        "src/Wanxiangshu/**",
+        "package.json"
+      ],
+      "output": []
+    },
+    "build": {
+      "command": "node scripts/build.mjs",
+      "files": [
+        "scripts/build.mjs",
+        "src/Wanxiangshu/**",
+        "package.json"
+      ],
+      "output": [
+        "dist/**"
+      ]
+    }
   },
   "peerDependencies": {
     "@opencode-ai/plugin": ">=1.17.4"
