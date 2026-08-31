@@ -278,8 +278,11 @@
 
 ## 11. M8/M9 共享 AST binding analyzer（2026-09-01）
 
-- 累计基线仍为 `upstream/master@fcd5ab11b`；M0–M7E 全部保留，没有回退到旧分支。
+- 施工起点为 `upstream/master@fcd5ab11b`；PR 前已语义合入 `upstream/master@d76a4a8b5`。M0–M7E 全部保留，没有回退到旧分支。
 - requirement trace 从自制 lexical tokenizer 切到共享 Acorn AST，只接受真实 `node:test` binding 的直接 registration；15 处动态/间接声明迁成静态测试，原 graph、HOW anchor、proof level、symlink/inactive 与 portfolio 规则保留。
 - Surface Manifest 从 import/use regex 切到 exact lexical provenance + primary WHAT callback use；shadow、dead/nonterminal alias、静态不可达、helper/nested callback、wrong-law decoy 均不能取得 proof authority。
 - 新门禁暴露 14 个既有 helper-hidden proofs；全部迁为命题 callback 直接调用 production Surface。另纠正 `ReconcileSurface` 与 `ReviewTodoSurface` 两个错误 manifest owner/law 登记；production F# 与公开 API 未改。
-- RED/GREEN 节点为 `37ece7962`、`f69f4d480`、`ff0cda20f`、`024684299`。聚焦验证为 requirement trace 19/19、surface charter 19/19、受影响行为 121/121、772 WHAT / 3901 tests、165 surfaces；build 与 `scripts/check.mjs` 全绿。无缓存完整阶梯亦全绿：Fantomas 700 unchanged、27,218 FCS uses / 333 edges / 185 contracts、273/273 integration harness、Long Stroke 57 步 / 5.8s、pack 2019 files。完整事实见 `docs/upstream-remaining-merge-batch-9-2026-09-01.md`。
+- RED/GREEN 节点为 `37ece7962`、`f69f4d480`、`ff0cda20f`、`024684299`。聚焦验证为 requirement trace 19/19、surface charter 19/19、受影响行为 121/121、772 WHAT / 3902 tests、165 surfaces。
+- `5c7ad47cf` 接受 upstream 71-node ReleaseClosure 与旧 migration ledger 删除。首次完整阶梯的两个旧 oracle 正确拒绝 upstream direct command 绕过 owner-dep；`c6db87a44` 恢复 Wireit 四步入口，18/18 proof 变绿，没有削弱断言。
+- 第二次完整阶梯的 owner lane 进一步发现 16 条批次 7/8 Surface 未进入 upstream 新 published-contract 图。`e1ec11045` 发布最窄 PTY/session-port symbols，并删除 Satellite fake port 的伪造 Fatal 返回。Fable 与 22/22 行为 proof 通过；owner lane 为 27,226 strict uses / 624 edges / 778 contracts，全绿。
+- 最终 `WIREIT_CACHE=none npm run format-build-test` 完整通过：Fantomas、text/FCS gates、Fable 738 sources / 165 surfaces、authoritative unit、全部 integration/package、273-case harness、Long Stroke 与 pack 均未跳过。完整事实见 `docs/upstream-remaining-merge-batch-9-2026-09-01.md`。

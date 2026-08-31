@@ -7,12 +7,12 @@
 ## 1. 基线与范围
 
 - 计划基线：`upstream/master@1db90f5e8`。
-- 最近执行基线：`upstream/master@fcd5ab11b`（2026-08-31 fetch；检查器拆为 text/FCS lanes，并引入 Wireit 缓存）。
+- 最近执行基线：`upstream/master@d76a4a8b5`（2026-09-01 fetch；71-node ReleaseClosure、coverage backlog 0，临时 migration ledger 已删除）。
 - 已合并成果：PR #19，merge commit `1db90f5e8`。
 - 旧成果保留分支：`codex/pre-upstream-refactor-20260831@4bb19673e`。
-- 当前集成分支与 upstream tree 无差异。
+- 当前累计集成分支为 `codex/remaining-merge-batch-9-shared-ast`；包含 M0–M9 与最新 upstream 的语义合并。
 - 旧分支的提交不得整段 replay 或粗暴 cherry-pick。每项先由当前 WHAT 判定，再迁入当前唯一 owner。
-- 386-file production coverage backlog 是独立 ReleaseClosure 工作，不进入本计划。
+- upstream 已完成 ReleaseClosure；71 个节点全 DONE、production coverage backlog 为 0。本计划不得恢复旧 backlog 或临时 ledger。
 
 ## 2. 剩余模块
 
@@ -39,7 +39,7 @@
 - PR #19 已迁移的 durable handle identity、dispatch ingress、Host chronology、review witness、blank evidence、Concern、Casebook。
 - Strength DryRun 旧 harness。当前 AGENTS.md 已记录 Strength production、proof、gate 闭环；旧 harness 依赖旧 Runtime。
 - `989b270fd` 删除 HOW exact proof anchors。
-- `954e14fd7`、`6b5a047be` 退役当前仍受 gate 约束的 migration ledger。
+- 已删除的临时 migration ledger、adjudicator 与施工记录；其事实已由 permanent ReleaseClosure/owner gates 接管，不得恢复旧载体。
 - 旧 ProofGraph、RequirementSync、completion gate 删除链。
 - 旧 fast-check/property 试点整批回放。M10 只允许保留能消灭新错误世界的性质。
 
@@ -146,7 +146,7 @@ M7A → M7B → M7C → M7D → M7E 必须串行。任何迁移不得在测试�
 - 原因：M9 依赖 M8 的 binding analyzer；分开开发会产生短期重复 analyzer 或未消费基础设施。
 - 批次出口：保留现有 graph、HOW anchor、proof level、symlink/inactive、consumer authority 与逐 law 规则；shadow、dead alias、错误 callback 与其他 law decoy 全部稳定变红；运行完整阶梯。
 
-执行事实（2026-09-01）：M8/M9 实现闭合。`37ece7962` 先固定 unbound/shadowed/indirect `node:test` 与 shadow/dead-helper/decoy-law surface 假绿；`f69f4d480` 引入唯一共享 Acorn syntax core；`ff0cda20f` 将 requirement trace 切到 binding-aware AST 并把 15 处动态注册迁成静态命题；`024684299` 将 Surface Manifest 切到 lexical provenance + primary callback terminal use，并迁移 14 个脱钩 proof。迁移同时纠正两个既有登记错误：`ReconcileSurface` 的行为 law 为 `STRUCTURED-WORKFLOW-004`；`ReviewTodoSurface` 的 production owner 为 `review-judgement`，其实际跨 owner law 为 `EFFECT-ACCOUNTING-011`。聚焦验证：requirement trace 19/19、surface charter 19/19、受影响行为 121/121、772 WHAT / 3901 tests、165 surfaces、build/check 全绿。无缓存完整阶梯亦全绿：Fantomas 700 unchanged、owner lane 27,218 FCS uses / 333 edges / 185 contracts、Fable 738 sources / 165 surfaces、273/273 integration harness、Long Stroke 57 步 / 5.8s、pack 2019 files。累计 PR 记录见 [batch 9 记录](./upstream-remaining-merge-batch-9-2026-09-01.md)。
+执行事实（2026-09-01）：M8/M9 实现闭合。`37ece7962` 先固定 unbound/shadowed/indirect `node:test` 与 shadow/dead-helper/decoy-law surface 假绿；`f69f4d480` 引入唯一共享 Acorn syntax core；`ff0cda20f` 将 requirement trace 切到 binding-aware AST 并把 15 处动态注册迁成静态命题；`024684299` 将 Surface Manifest 切到 lexical provenance + primary callback terminal use，并迁移 14 个脱钩 proof。迁移同时纠正两个既有登记错误：`ReconcileSurface` 的行为 law 为 `STRUCTURED-WORKFLOW-004`；`ReviewTodoSurface` 的 production owner 为 `review-judgement`，其实际跨 owner law 为 `EFFECT-ACCOUNTING-011`。PR 前合入 `upstream/master@d76a4a8b5`；`c6db87a44` 修复 direct release command 绕过 owner-dep lane，`e1ec11045` 将批次 7/8 Surface 接入新严格 published-contract graph。最终聚焦验证：requirement trace/surface charter 38/38、受影响行为 121/121、772 WHAT / 3902 tests、165 surfaces、owner lane 27,226 strict uses / 624 edges / 778 contracts。最终无缓存完整阶梯全绿。累计 PR 记录见 [batch 9 记录](./upstream-remaining-merge-batch-9-2026-09-01.md)。
 
 ### 第 10 次：可选 property pilot
 
