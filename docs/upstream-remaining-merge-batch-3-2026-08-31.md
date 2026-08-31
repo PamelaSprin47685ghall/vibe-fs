@@ -112,5 +112,5 @@ snapshot locality 只证明存在某个调用点，不能拒绝 missing 或 ambi
 
 ## 7. 外部完成条件
 
-- 本文件记录本地实现与完整阶梯事实。PR URL、GitHub CI 与 merge SHA 在实际发生后追加。
+- 已创建 [upstream PR #21](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/21)。本文件记录本地实现与完整阶梯事实；GitHub CI 与 merge SHA 仍待发生。
 - 没有 merge SHA 前，本批仍未进入 upstream。
