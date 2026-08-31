@@ -1073,8 +1073,9 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Host/SessionsSurface.js',
     owner: 'session-ontology',
-    laws: ['SESSION-ONTOLOGY-006', 'MANAGED-SESSION-016', 'MANAGED-SESSION-017'],
+    laws: ['SESSION-ONTOLOGY-006', 'MANAGED-SESSION-003', 'MANAGED-SESSION-016', 'MANAGED-SESSION-017'],
     lawOwners: {
+      'MANAGED-SESSION-003': 'managed-session-lifecycle',
       'MANAGED-SESSION-016': 'managed-session-lifecycle',
       'MANAGED-SESSION-017': 'managed-session-lifecycle',
     },
