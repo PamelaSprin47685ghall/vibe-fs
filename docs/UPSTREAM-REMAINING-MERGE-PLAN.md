@@ -122,6 +122,8 @@ run `33426540260` 已验证 owner lane 修复：5/5，Linux production scan 146.
 - 原因：两项共享 child ownership、terminal propagation 与同一个 support 文件；合并处理可避免反复改变 mirror 数据模型。
 - 批次出口：相关 consumers 全部迁移，相关 exports 删除，剩余计数写入历史记录。
 
+执行事实（2026-09-01）：本地 M7B/M7C 已闭合。TerminalPolicy 与 Satellite 均先保留缺失 production surface 的 RED，再通过注册 F# surface 调用当前 owner；删除 34 条 fork/family 常量断言、Satellite JavaScript 状态机、Distiller 常量结果与无 production 路径的 semantic-cut literal。managed-session-lifecycle 125/125、build（737 sources / 164 surfaces）、check（772 WHAT / 3900 tests）全绿。只剩 SyncDelegate/PTY 两个 mirror export。发现 upstream 既声明 Retired 绝对不可逆，又以 production test 要求 exact retired binding 为新 work unit 重开；本批不擅自裁决，详见 [batch 7 记录](./upstream-remaining-merge-batch-7-2026-09-01.md)。PR 与 CI 待创建。
+
 ### 第 8 次：execution adapter mirrors 与最终删除
 
 - 模块列表：

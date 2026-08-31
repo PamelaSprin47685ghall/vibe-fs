@@ -114,6 +114,8 @@
 
 ## 6. 执行日志
 
+- M7B/M7C mirror closure：`43884d61f`→`a9a431728`→`7e7fe1d00` 与 `fba887a3d`→`2f0449153`→`a145572b3` 将 terminal、family、Satellite、Distiller assertions 迁到 production owners。删除 34 条常量 fork/family tests、Satellite JS 状态机、Distiller 常量与 literal semantic-cut 假 proof。Fable 737 sources / 164 surfaces、managed-session 125/125、text gate 772 WHAT / 3900 tests 全绿。`MANAGED-SESSION-006` 的 Retired 不可逆条款与 exact retired binding 重开 production 行为存在既有冲突，留待 owner 裁决，未借迁移改语义。
+
 - Durable handle：新增 production-bound rebinding 反例；`LinkageProjection` 对 child/target/byname/role/ownership 任一漂移返回 `HandleIdentityConflict`。合入最新 DELEG-024/027 后，exact binding 保留 upstream 的后续 work-unit 重开语义，同一物理 child 无需 join 即可再次 dispatch；`Abandoned` 仍不可重开。
 - Dispatch ingress identity：proof 从 provider-projection 移回 dispatch owner；只接受 `input.messageID` / `output.message.id` 的唯一 exact nonblank 值，冲突与非契约 carrier fail closed，opaque identity 不 trim。
 - Host latest-run binding：`SessionMessage` 投影 finite `time.created`；latest assistant 按 creation sequence 与 equal-time ID tie-break 判定，缺失/非法 chronology 返回 typed `InsufficientSequence`。Review Surface 复用同一 snapshot decoder，不再维护平行 raw-message adapter。
