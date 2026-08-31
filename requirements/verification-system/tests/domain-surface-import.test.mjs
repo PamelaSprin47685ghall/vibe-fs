@@ -6,9 +6,11 @@ import {
   cursor,
   fallbackProjection,
   fold,
+} from '../../../dist/Participant/Provider/Attempt/Fallback/CursorSurface.js'
+import {
   recordConfirmedFailure,
   snapshot,
-} from '../../../dist/Participant/Provider/Attempt/Fallback/CursorSurface.js'
+} from '../../../dist/Participant/Provider/Attempt/Fallback/HandleSurface.js'
 
 test('WHAT[VERIFICATION-SYSTEM-008] fallback recovery has one importable production surface', () => {
   assert.equal(typeof cursor, 'object')

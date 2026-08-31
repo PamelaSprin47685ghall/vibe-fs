@@ -109,7 +109,7 @@ test('WHAT[BD-017] ENFORCER_153_hot_path_aabb_preserves_target_terminal_identity
   )
   assert.match(
     fallbackWorkflowSrc,
-    /policyFallbackDecision[\s\S]*?recoveryDecision turn failure current requestKind[\s\S]*?FallbackDecision\.NoFallback -> PolicyFallbackDecision\.Exhausted[\s\S]*?FallbackDecision\.AdvanceFallback authorization -> PolicyFallbackDecision\.Authorized authorization[\s\S]*?admitAuthorizedFailure[\s\S]*?FallbackLedger\.recordAuthorizedFailure durable turn\.SessionId authorization error[\s\S]*?admitCurrentFailure/,
+    /policyFallbackDecision[\s\S]*?recoveryDecision turn failure current requestKind[\s\S]*?FallbackDecision\.NoFallback -> PolicyFallbackDecision\.Exhausted[\s\S]*?FallbackDecision\.AdvanceFallback authorization -> PolicyFallbackDecision\.Authorized authorization[\s\S]*?admitAuthorizedFailure[\s\S]*?FallbackLedger\.recordAuthorizedFailure durable ownerSessionId authorization error[\s\S]*?admitCurrentFailure/,
     'the fallback workflow must consume its policy authorization through the canonical ledger operation',
   )
   assert.match(

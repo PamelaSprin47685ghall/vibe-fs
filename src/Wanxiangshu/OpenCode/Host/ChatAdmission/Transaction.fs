@@ -307,6 +307,14 @@ module internal ChatAdmissionTransaction =
         | None
         | Some { Lifecycle = ChatExecutionLifecycle.Accepted } -> AdmissionRequired |> Ok |> Task.FromResult
 
+    // semantic-decorator-owner: managed-chat-execution
+    // semantic-decorator-WHAT: CHATEXEC-003
+    // semantic-decorator-trace-relation: one Accept step before the acceptance attempt and one AcceptedWitness step only after durable acceptance; business trace unchanged
+    // semantic-decorator-proof: requirements/managed-chat-execution/tests/admission-transaction.test.mjs::WHAT[CHATEXEC-003] managed admission has one fixed success order
+    // semantic-decorator-failure-policy: a typed acceptance failure stops the sequence at Accept; the settlement path owns every later step
+    // semantic-decorator-cancel-policy: step notification is synchronous and adds no cancellation boundary
+    // semantic-decorator-deadline-policy: step notification is time-independent and adds no deadline
+    // semantic-decorator-invocation-bound: 2
     let private acceptAdmission observe ports input =
         task {
             observe ChatAdmissionTransactionStep.Accept
@@ -491,6 +499,14 @@ module internal ChatAdmissionTransaction =
             projected.HostProjection
         )
 
+    // semantic-decorator-owner: managed-chat-execution
+    // semantic-decorator-WHAT: CHATEXEC-003
+    // semantic-decorator-trace-relation: one CommitLease step before the lease commit and one Settled step only after it succeeds; business trace unchanged
+    // semantic-decorator-proof: requirements/managed-chat-execution/tests/admission-transaction.test.mjs::WHAT[CHATEXEC-003] managed admission has one fixed success order
+    // semantic-decorator-failure-policy: a commit failure stops the sequence at CommitLease; the compensation path owns every later step
+    // semantic-decorator-cancel-policy: step notification is synchronous and adds no cancellation boundary
+    // semantic-decorator-deadline-policy: step notification is time-independent and adds no deadline
+    // semantic-decorator-invocation-bound: 2
     let private commitAdmission observe ports projected =
         observe ChatAdmissionTransactionStep.CommitLease
 

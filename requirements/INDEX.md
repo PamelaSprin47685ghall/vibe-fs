@@ -140,7 +140,7 @@
 
 # 依赖骨架
 
-这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（144 edges，按本 code block 逐项机器计数）。
+这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（146 edges，按本 code block 逐项机器计数）。
 
 ```text
 requirement-system       → 无
@@ -180,7 +180,7 @@ work-record              → semantic-trace, context-compression, participant-ho
 context-compression      → semantic-trace, provider-projection
 prefix-stability         → provider-projection, context-compression, provider-language, participant-identity
 execution-failure-policy → 无
-provider-attempt-recovery→ participant-identity, execution-failure-policy, execution-model-routing, interaction-authority
+provider-attempt-recovery→ participant-identity, execution-failure-policy, execution-model-routing, interaction-authority, context-compression, prefix-stability
 crash-reconciliation     → durable-events, effect-accounting, structured-workflow, host-boundary
 degeneration-guard       → interaction-authority, dispatch-protocol, host-boundary
 obligation-ledger        → durable-events, effect-accounting, semantic-trace
@@ -208,4 +208,4 @@ guidance-delivery    → provider-projection 删（渲染是下游机制）
 finality             → participant-horizon 保留（隐藏机制=信息准入边界，与 delegation 同型）
 ```
 
-当前 144 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。旧正文曾写“110 edges”，但旧邻接表实际已含 112；前轮以邻接表本身为准纠正计数漂移，本轮随两个 execution owner 落地后按当前邻接表重新机器计数。
+当前 146 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。旧正文曾写“110 edges”，但旧邻接表实际已含 112；前轮以邻接表本身为准纠正计数漂移，上一轮随两个 execution owner 落地后按当前邻接表重新机器计数。本轮补上 `provider-attempt-recovery → context-compression, prefix-stability`：PAR-011/PAR-017/PAR-018 的定义直接需要 Blogger squash 材料、durable open request 生命周期与严格更新的 prefix coverage 这三个 guarantee，此前只在包 HOW/WHY 以已归档 cutover 文档名义出现，未进入骨架。

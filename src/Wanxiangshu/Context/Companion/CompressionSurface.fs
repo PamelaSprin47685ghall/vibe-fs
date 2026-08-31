@@ -83,35 +83,6 @@ module CompressionSurface =
         | "strength-replica" -> Some ProviderRequestKind.StrengthReplica
         | _ -> None
 
-    let private requestKindLabels: string array =
-        [| ProviderRequestKind.WorkMain
-           ProviderRequestKind.BloggerMain
-           ProviderRequestKind.BloggerSquash
-           ProviderRequestKind.InteractionRepair
-           ProviderRequestKind.StrengthReplica |]
-        |> Array.map ProviderRequestKind.label
-
-    let private requestKindMayCarryProbe (kind: string) : bool =
-        requestKindOf kind
-        |> Option.map ProviderRequestKind.mayCarryProbe
-        |> Option.defaultValue false
-
-    let private requestKindLabel (kind: string) : string =
-        requestKindOf kind
-        |> Option.map ProviderRequestKind.label
-        |> Option.defaultValue ""
-
-    let requestKind =
-        box
-            {| workMain = "work-main"
-               bloggerMain = "blogger-main"
-               bloggerSquash = "blogger-squash"
-               interactionRepair = "interaction-repair"
-               strengthReplica = "strength-replica"
-               all = requestKindLabels
-               mayCarryProbe = (fun kind -> requestKindMayCarryProbe kind)
-               label = (fun kind -> requestKindLabel kind) |}
-
     let private requestKindResult value : Result<ProviderRequestKind, string> =
         if isNullish value then
             Ok ProviderRequestKind.WorkMain

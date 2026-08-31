@@ -55,7 +55,7 @@ const inheritedOwnerIdentitySeed = {
   participantIdentity: participantIdentity('InheritedFromOwner'),
 }
 
-const ownerWorld = worldOf([ownerAuthorityAccepted])
+const ownerWorld = project([ownerAuthorityAccepted])
 
 const agentOwnerEnding = (opening) =>
   finality.endingAdmission(ownerWorld, 'agent-owner-root', 'root-1', 'fast-manager', 'deep-manager', 'fast', {

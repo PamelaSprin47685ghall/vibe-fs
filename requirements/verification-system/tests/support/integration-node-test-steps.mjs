@@ -40,9 +40,19 @@ export function integrationNodeTestSteps(root) {
       files: [path.join(root, 'requirements/change-integration/tests/integration/worktree-create.test.mjs')],
     },
     {
+      label: 'branch-fast-forward-adapter.test.mjs (change-integration)',
+      files: [path.join(root, 'requirements/change-integration/tests/integration/branch-fast-forward-adapter.test.mjs')],
+    },
+    {
       label: 'owner-dependencies-fcs.test.mjs (structured-workflow)',
       files: [
         path.join(root, 'requirements/structured-workflow/tests/integration/owner-dependencies-fcs.test.mjs'),
+      ],
+    },
+    {
+      label: 'workflow-constitution-scanners.test.mjs (structured-workflow)',
+      files: [
+        path.join(root, 'requirements/structured-workflow/tests/integration/workflow-constitution-scanners.test.mjs'),
       ],
     },
     {

@@ -657,6 +657,7 @@
     <Compile Include="Execution/Session/ChatExecution/StatusSurface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGroundingRepositorySurface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGroundingSurface.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/HandleSurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/CursorSurface.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtSurface.fs"/>
     <Compile Include="Persistence/Journal/ObligationJournalSurface.fs"/>

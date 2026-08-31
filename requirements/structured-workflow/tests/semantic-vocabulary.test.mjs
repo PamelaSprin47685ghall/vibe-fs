@@ -86,7 +86,7 @@ test('WHAT[STRUCTURED-WORKFLOW-007] every vocabulary binds owner_law_relation_an
     ['ManagerIdle.encourageLabor', 'Mission/Manager/Idle.fs', 'Mission.Manager'],
     ['ReviewerContinuation.ensurePerfectConfirmed', 'Mission/Review/Judgement/Continuation.fs', 'Mission.Review'],
     ['ReviewBarrierWorkflow.reverify', 'Mission/Review/Barrier/Reverify.fs', 'Mission.Review'],
-    ['FallbackLedger.recordConfirmedFailure', 'Participant/Provider/Attempt/Fallback/Ledger.fs', 'Participant.Provider'],
+    ['FallbackLedger.recordAuthorizedFailure', 'Participant/Provider/Attempt/Fallback/Ledger.fs', 'Participant.Provider'],
     ['ProviderRecoveryWorkflow.continueAfterConfirmedFailure', 'Participant/Provider/Attempt/Fallback/Workflow.fs', 'Participant.Provider'],
     ['FinalityCohort.reviewUntilFirstRevisionOrAllConfirmed', 'Mission/Finality/Cohort.fs', 'Mission.Finality'],
     ['SessionRecoveryWorkflow.recoverFamilyDirect', 'Execution/Session/Recovery/Workflow.fs', 'Execution.Session'],

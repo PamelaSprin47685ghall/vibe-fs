@@ -178,7 +178,7 @@
       "owner": "execution-model-routing",
       "what_ids": ["EMR-006", "EMR-009"],
       "intent": {"kind": "process-local-intent", "path": "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs", "symbols": ["acceptPromptExecution"]},
-      "admission": {"kind": "process-local-admission", "path": "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs", "symbols": ["acceptRoutedExecution"]},
+      "admission": {"kind": "process-local-admission", "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs", "symbols": ["bindIntent"]},
       "physical_receipt": {"kind": "physical-identity", "path": "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs", "symbols": ["PhysicalUserMessageId"]},
       "durable_outcome": {"kind": "not-applicable", "reason": "Provider execution binding is attempt-local; business owners persist their own terminal facts."},
       "effect_identity": "SessionId, PhysicalUserMessageId, effective agent, and exact provider model/variant",

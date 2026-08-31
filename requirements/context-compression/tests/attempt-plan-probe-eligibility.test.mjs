@@ -10,7 +10,7 @@ import test from 'node:test'
 import * as planner from '../../../dist/Context/Companion/CompressionSurface.js'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 
-const requestKind = planner.requestKind
+const requestKind = prefix.requestKind
 
 const snapshotAt = (cutoff, { seal = `seal-${cutoff}` } = {}) =>
   prefix.snapshot({

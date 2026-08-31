@@ -160,6 +160,7 @@
         "institutional-learning",
         "interaction-authority",
         "intra-participant-parallelism",
+        "managed-chat-execution",
         "provider-attempt-recovery",
         "requirement-grounding",
         "review-judgement",
@@ -172,6 +173,7 @@
         "StartedAt",
         "Wanxiangshu.Composition.Durable.Fact.AgentFact",
         "Wanxiangshu.Composition.Durable.Fact.AgentFact.Attention",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.ChatExecution",
         "Wanxiangshu.Composition.Durable.Fact.AgentFact.Companion",
         "Wanxiangshu.Composition.Durable.Fact.AgentFact.Concern",
         "Wanxiangshu.Composition.Durable.Fact.AgentFact.Context",
@@ -234,6 +236,7 @@
         "host-boundary",
         "interaction-authority",
         "intra-participant-parallelism",
+        "managed-chat-execution",
         "provider-attempt-recovery",
         "review-judgement",
         "verification-system"
@@ -267,6 +270,7 @@
         "institutional-learning",
         "interaction-authority",
         "intra-participant-parallelism",
+        "managed-chat-execution",
         "managed-session-lifecycle",
         "obligation-ledger",
         "participant-horizon",
@@ -291,6 +295,7 @@
         "Wanxiangshu.Composition.Durable.AgentProjectionSet",
         "Wanxiangshu.Composition.Durable.AgentProjectionSet.Associations",
         "Wanxiangshu.Composition.Durable.AgentProjectionSet.Attention",
+        "Wanxiangshu.Composition.Durable.AgentProjectionSet.ChatExecutions",
         "Wanxiangshu.Composition.Durable.AgentProjectionSet.Concern",
         "Wanxiangshu.Composition.Durable.AgentProjectionSet.DelegationCompletedHandoffs",
         "Wanxiangshu.Composition.Durable.AgentProjectionSet.Fission",
@@ -342,6 +347,7 @@
         "institutional-learning",
         "interaction-authority",
         "intra-participant-parallelism",
+        "managed-chat-execution",
         "managed-session-lifecycle",
         "obligation-ledger",
         "participant-horizon",
@@ -456,6 +462,7 @@
         "Wanxiangshu.Composition.Turn.ReconciledTurn.SessionId",
         "Wanxiangshu.Composition.Turn.ReconciledTurnContext",
         "Wanxiangshu.Composition.Turn.ReconciledTurnContext.Delivery",
+        "Wanxiangshu.Composition.Turn.ReconciledTurnContext.Failure",
         "Wanxiangshu.Composition.Turn.ReconciledTurnContext.Quiescence",
         "Wanxiangshu.Composition.Turn.ReconciledTurnContext.Turn",
         "Wanxiangshu.Composition.Turn.ReconciledTurnDelivery",
@@ -500,6 +507,9 @@
         "verification-system"
       ],
       "symbols": [
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.FailureWakeSource",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.FailureWakeSource.CoarseHostSignal",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.FailureWakeSource.ExactAssistantProjection",
         "Wanxiangshu.Composition.Turn.ReconcileProgram.PublishMaps",
         "Wanxiangshu.Composition.Turn.ReconcileProgram.ReconcileWake",
         "Wanxiangshu.Composition.Turn.ReconcileProgram.ReconcileWake.AbortWake",
@@ -515,6 +525,7 @@
         "Wanxiangshu.Composition.Turn.ReconcileProgram.TurnOutcome.TurnInProgress",
         "Wanxiangshu.Composition.Turn.ReconcileProgram.TurnOutcome.TurnNeedsContinuation",
         "Wanxiangshu.Composition.Turn.ReconcileProgram.isTerminalOutcome",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.mergeWake",
         "Wanxiangshu.Composition.Turn.ReconcileProgram.publishMapsEmpty"
       ],
       "justification": "Composition.Turn publishes exactly these symbols to the listed owners; every unlisted sibling remains private to dispatch-protocol."
@@ -793,8 +804,7 @@
         "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.DecisionEffect.StartedSquash",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.abandonContinuationContext",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.bindContinuationContext",
-        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.materializeContinuationContext",
-        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.reactivateAfterNewRoot"
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.materializeContinuationContext"
       ],
       "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
     },
@@ -806,6 +816,7 @@
       "kind": "published-contract",
       "consumers": [
         "behavior-diagnosis",
+        "cognitive-environment",
         "durable-events",
         "managed-session-lifecycle",
         "provider-attempt-recovery"
@@ -828,7 +839,8 @@
         "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.PromptKey",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.RequestId",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.RequestKind",
-        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.SelectedFrameDigests"
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.SelectedFrameDigests",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequestModule.providerRequestKind"
       ],
       "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
     },
@@ -1152,6 +1164,7 @@
         "context-compression",
         "durable-events",
         "interaction-authority",
+        "managed-chat-execution",
         "obligation-ledger",
         "provider-attempt-recovery"
       ],
@@ -1256,7 +1269,6 @@
       "kind": "published-contract",
       "consumers": [
         "delegation",
-        "dispatch-protocol",
         "finality",
         "host-boundary",
         "intra-participant-parallelism",
@@ -1278,7 +1290,6 @@
         "Wanxiangshu.Context.Trace.XTraceCaptureError",
         "Wanxiangshu.Context.Trace.XTraceCaptureError.Refused",
         "Wanxiangshu.Context.Trace.XTraceCaptureError.StorageFailed",
-        "Wanxiangshu.Context.Trace.XTraceCaptureReceipt",
         "Wanxiangshu.Context.Trace.XTraceCaptureReceipt.CurrentHead",
         "Wanxiangshu.Context.Trace.XTraceMessageCapture.Current",
         "Wanxiangshu.Context.Trace.XTraceMessageObservation.HostMessageId",
@@ -1483,6 +1494,7 @@
         "Wanxiangshu.Execution.Session.Attachment.AttachedSessionRuntime.Remove",
         "Wanxiangshu.Execution.Session.Attachment.AttachedSessionRuntime.RemoveByDelegateSession",
         "Wanxiangshu.Execution.Session.Attachment.AttachedSessionRuntime.TryFind",
+        "Wanxiangshu.Execution.Session.Attachment.AttachedSessionRuntime.TryFindOwner",
         "isUsable",
         "registerParent"
       ],
@@ -1652,7 +1664,6 @@
       ],
       "justification": "The listed owners consume this exact process-local causal-wait port; it carries no durable business state."
     },
-
     {
       "path": "src/Wanxiangshu/Git/Gateway.fs",
       "owner": "change-integration",
@@ -1832,7 +1843,8 @@
       "contract": "Mission.Manager.Life",
       "kind": "published-contract",
       "consumers": [
-        "durable-events"
+        "durable-events",
+        "verification-system"
       ],
       "symbols": [
         "LastWordsDigest",
@@ -2091,7 +2103,7 @@
         "host-boundary"
       ],
       "symbols": [
-        "Wanxiangshu.Mission.Obligation.Todo.OpenCode.MagicTodoHostCodec.isProviderInputRejection"
+        "Wanxiangshu.Mission.Obligation.Todo.OpenCode.MagicTodoHostCodec.ProviderInputRejection"
       ],
       "justification": "Obligation.LedgerContract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
     },
@@ -2601,25 +2613,25 @@
         "cognitive-environment",
         "context-compression",
         "host-boundary",
-        "intra-participant-parallelism",
+        "managed-chat-execution",
         "session-ontology"
       ],
       "symbols": [
-        "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution",
-        "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution.ExternalManaged",
-        "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution.NoRoute",
-        "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution.PluginManaged",
-        "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution.Superseded",
+        "Wanxiangshu.OpenCode.ModelRouting.acquireExecutionAdmission",
         "Wanxiangshu.OpenCode.ModelRouting.bindCapacityChild",
         "Wanxiangshu.OpenCode.ModelRouting.bindCapacityCompanion",
         "Wanxiangshu.OpenCode.ModelRouting.cancelUnacquiredExecution",
+        "Wanxiangshu.OpenCode.ModelRouting.commitExecutionAdmission",
         "Wanxiangshu.OpenCode.ModelRouting.dropCapacityLineage",
         "Wanxiangshu.OpenCode.ModelRouting.endProviderStep",
         "Wanxiangshu.OpenCode.ModelRouting.enterProviderStep",
+        "Wanxiangshu.OpenCode.ModelRouting.executionAdmissionTarget",
         "Wanxiangshu.OpenCode.ModelRouting.hasRuntime",
         "Wanxiangshu.OpenCode.ModelRouting.initialize",
-        "Wanxiangshu.OpenCode.ModelRouting.managedAgentForAdmission",
+        "Wanxiangshu.OpenCode.ModelRouting.observePhysicalResource",
+        "Wanxiangshu.OpenCode.ModelRouting.projectHostModel",
         "Wanxiangshu.OpenCode.ModelRouting.releaseExecution",
+        "Wanxiangshu.OpenCode.ModelRouting.releaseExecutionAdmissionBeforeProvider",
         "Wanxiangshu.OpenCode.ModelRouting.releasePhysicalExecution",
         "Wanxiangshu.OpenCode.ModelRouting.sameTarget",
         "Wanxiangshu.OpenCode.ModelRouting.suppressProviderStep",
@@ -2697,6 +2709,7 @@
       "symbols": [
         "Wanxiangshu.OpenCode.ISessionRuntimeOwner",
         "Wanxiangshu.OpenCode.PluginRuntimeScope",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachChatRecoveryRuntime",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachDurabilityActivation",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachSatelliteRuntime",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachSharedTerminal",
@@ -2706,16 +2719,19 @@
         "Wanxiangshu.OpenCode.PluginRuntimeScope.CompactionSettingGap",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.ConsumeAttemptPlan",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.DisposeAsync",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.DrainChatRecovery",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.EnsureRecoveryDone",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.IsStartupProbeOpen",
-        "Wanxiangshu.OpenCode.PluginRuntimeScope.RecordAttemptPlan",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.RecordCompactionSettingGap",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.RecordPendingAttemptPlan",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.Recovery",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.RequireFamilyRecovery",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.RunBackground",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.RunOwnedWork",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.Satellites",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.Sessions",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.SignalChatRecovery",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.SignalChatRecoverySession",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.Strength",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.SyncDelegateRuntime",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.TrackReconcileShutdown",
@@ -2727,6 +2743,21 @@
       "justification": "Session.Lifecycle publishes exactly these symbols to the listed owners; every unlisted sibling remains private to managed-session-lifecycle."
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/HostSessionDeletion.fs",
+      "owner": "managed-session-lifecycle",
+      "node": "session-lifecycle-recovery-contract",
+      "contract": "Session.Lifecycle",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.HostSessionDeletion.finalizePreparedInspector",
+        "Wanxiangshu.OpenCode.HostSessionDeletion.prepare"
+      ],
+      "justification": "The Host signal boundary observes physical session deletion and must run the two-phase prepare then finalize sequence owned by managed-session-lifecycle; retirement must never be inferred from a Host event or completed outside that owner."
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Host/ProviderRunBinding.fs",
       "owner": "review-assurance",
       "node": "review-assurance-witness-contract",
@@ -2734,7 +2765,6 @@
       "kind": "published-contract",
       "consumers": [
         "host-boundary",
-        "prefix-stability",
         "speculative-investigation"
       ],
       "symbols": [
@@ -2898,10 +2928,10 @@
         "execution-model-routing",
         "finality",
         "host-boundary",
+        "interaction-authority",
         "managed-session-lifecycle",
         "output-distillation",
         "participant-horizon",
-        "participant-identity",
         "process-execution",
         "speculative-investigation",
         "time-capability"
@@ -3200,21 +3230,17 @@
       "law": "WHAT[PAR-016]",
       "proof": "requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs",
       "consumers": [
-        "behavior-diagnosis",
-        "capability-enforcement",
         "context-compression",
-        "delegation",
         "execution-model-routing",
         "interaction-authority",
+        "managed-chat-execution",
         "prefix-stability",
-        "speculative-investigation",
         "verification-system"
       ],
       "symbols": [
         "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.AuthorityAgentPair",
         "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.AuthorityAgentPair.PeerAgent",
         "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.AuthorityAgentPair.SelectedAgent",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.DefaultAutoRecoveryBudget",
         "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackCursor",
         "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackCursor.ConsecutiveFailureCount",
         "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackCursor.Offset",
@@ -3227,21 +3253,12 @@
         "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffsetCodec.toByte",
         "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.effectiveAgent",
         "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.initial",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.isRecoverySlot",
-        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKind",
-        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKind.BloggerMain",
-        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKind.BloggerSquash",
-        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKind.InteractionRepair",
-        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKind.StrengthReplica",
-        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKind.WorkMain",
-        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKindModule.clearsFailureCountOnSuccess",
-        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKindModule.label",
-        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKindModule.mayCarryProbe"
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.isRecoverySlot"
       ],
       "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Cursor symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
     },
     {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs",
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
       "owner": "provider-attempt-recovery",
       "node": "provider-attempt-recovery-cutover",
       "contract": "Provider.AttemptRecovery",
@@ -3250,14 +3267,9 @@
         "behavior-diagnosis"
       ],
       "symbols": [
-        "ConfirmedFailurePort",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.AlreadyRecorded",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.NoActiveRun",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.RecoveryAdvanced",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.RecoveryExhausted"
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderRecoveryWorkflow.admitPolicyAuthorizedFailure"
       ],
-      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed ConfirmedFailurePort symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+      "justification": "The Blogger AABB repair path in behavior-diagnosis must admit its confirmed provider failure through the recovery owner single policy-authorized entry point; recomputing the budget, the durable owner session or the ledger write outside this operation would create a second fallback writer."
     },
     {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs",
@@ -3266,14 +3278,12 @@
       "contract": "Provider.AttemptRecovery",
       "kind": "published-contract",
       "consumers": [
-        "behavior-diagnosis",
         "dispatch-protocol",
         "prefix-stability",
         "speculative-investigation"
       ],
       "symbols": [
         "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackEvidence.effectiveAgent",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackEvidence.mayContinue",
         "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackEvidence.tryCurrentState"
       ],
       "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Evidence symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
@@ -3331,7 +3341,11 @@
         "prefix-stability"
       ],
       "symbols": [
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackLedger.recordConfirmedFailure",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.AlreadyRecorded",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.NoActiveRun",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.RecoveryAdvanced",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.RecoveryExhausted",
         "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackLedger.recordConfirmedSuccess"
       ],
       "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Ledger symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
@@ -3374,6 +3388,7 @@
       "contract": "Provider.AttemptRecovery",
       "kind": "published-contract",
       "consumers": [
+        "cognitive-environment",
         "context-compression",
         "execution-model-routing",
         "host-boundary",
@@ -3386,7 +3401,9 @@
         "Wanxiangshu.Participant.Provider.Attempt.AttemptPlan.NoProbeReason",
         "Wanxiangshu.Participant.Provider.Attempt.AttemptPlan.Profile",
         "Wanxiangshu.Participant.Provider.Attempt.AttemptPlanner.bindProviderRun",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptPlanner.freezeOrdinary",
         "Wanxiangshu.Participant.Provider.Attempt.AttemptPlanner.freezePreInference",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptPlanner.ordinaryRequestKind",
         "Wanxiangshu.Participant.Provider.Attempt.AttemptPlanner.pendingProbeOf",
         "Wanxiangshu.Participant.Provider.Attempt.AttemptPlanner.plan",
         "Wanxiangshu.Participant.Provider.Attempt.AttemptPlanner.probeOf",
@@ -3745,6 +3762,7 @@
         "institutional-learning",
         "interaction-authority",
         "intra-participant-parallelism",
+        "managed-chat-execution",
         "managed-session-lifecycle",
         "obligation-ledger",
         "output-distillation",
@@ -3774,6 +3792,7 @@
         "Wanxiangshu.Persistence.Journal.AgentJournalModule.awaitChangeFromOrCancel",
         "Wanxiangshu.Persistence.Journal.AgentJournalModule.createFromProjection",
         "Wanxiangshu.Persistence.Journal.AgentJournalModule.handleProjection",
+        "Wanxiangshu.Persistence.Journal.AgentJournalModule.isPoisoned",
         "Wanxiangshu.Persistence.Journal.AgentJournalModule.pendingReviewRequirements",
         "Wanxiangshu.Persistence.Journal.AgentJournalModule.revision",
         "Wanxiangshu.Persistence.Journal.AgentJournalModule.runtimeId",
@@ -3784,6 +3803,7 @@
         "Wanxiangshu.Persistence.Journal.JournalAppendFailure.WriteUnknown",
         "Wanxiangshu.Persistence.Journal.JournalAppendFailure.WriterUnavailable",
         "Wanxiangshu.Persistence.Journal.JournalAppendFailureModule.describe",
+        "Wanxiangshu.Persistence.Journal.JournalAppendFailureModule.toExecutionFailure",
         "Wanxiangshu.Persistence.Journal.JournalChange",
         "Wanxiangshu.Persistence.Journal.MagicTodoAppendReceipt.EventId"
       ],
@@ -3808,6 +3828,7 @@
         "host-boundary",
         "institutional-learning",
         "intra-participant-parallelism",
+        "managed-chat-execution",
         "obligation-ledger",
         "prefix-stability",
         "provider-attempt-recovery",
@@ -3850,6 +3871,7 @@
       ],
       "symbols": [
         "Wanxiangshu.Persistence.Journal.EventStoreJournalCodec.JournalEnvelopeEventType",
+        "Wanxiangshu.Persistence.Journal.EventStoreJournalCodec.encode",
         "Wanxiangshu.Persistence.Journal.EventStoreJournalCodec.tryDecode"
       ],
       "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
@@ -3867,7 +3889,8 @@
       "symbols": [
         "Wanxiangshu.Persistence.Journal.EventStoreJournalWriter",
         "Wanxiangshu.Persistence.Journal.EventStoreJournalWriter.create",
-        "Wanxiangshu.Persistence.Journal.EventStoreJournalWriter.resumeOrCreate"
+        "Wanxiangshu.Persistence.Journal.EventStoreJournalWriter.resumeOrCreate",
+        "Wanxiangshu.Persistence.Journal.JournalPayloadClosure.ofFact"
       ],
       "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
     },
@@ -3880,7 +3903,8 @@
       "consumers": [
         "behavior-diagnosis",
         "delegation",
-        "durable-convergence"
+        "durable-convergence",
+        "managed-chat-execution"
       ],
       "symbols": [
         "Wanxiangshu.Persistence.Journal.FactCodec.containsLegacyScoreVectorEntry",
@@ -3965,6 +3989,7 @@
         "dispatch-protocol",
         "guidance-delivery",
         "host-boundary",
+        "managed-chat-execution",
         "obligation-ledger",
         "provider-attempt-recovery",
         "requirement-grounding",
@@ -4532,6 +4557,7 @@
         "interaction-authority",
         "intra-participant-parallelism",
         "knowledge-reuse",
+        "managed-chat-execution",
         "managed-session-lifecycle",
         "office-capability",
         "output-distillation",
@@ -4543,7 +4569,8 @@
         "review-judgement",
         "semantic-trace",
         "speculative-investigation",
-        "time-capability"
+        "time-capability",
+        "verification-system"
       ],
       "symbols": [
         "Wanxiangshu.Foundation.AgentTier",
@@ -4578,6 +4605,7 @@
       "consumers": [
         "action-affordance",
         "capability-enforcement",
+        "context-compression",
         "delegation",
         "execution-model-routing",
         "finality",
@@ -4648,13 +4676,16 @@
         "delegation",
         "execution-model-routing",
         "interaction-authority",
+        "knowledge-reuse",
         "office-capability",
-        "output-distillation"
+        "output-distillation",
+        "session-ontology"
       ],
       "symbols": [
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.allInternalRoles",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.allPublicRoles",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.allRoles",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.bookkeeperNameOf",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.bookkeeperPeerName",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.coderToolNames",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.formatLegacyNameInConfig",
@@ -4676,39 +4707,35 @@
       "justification": "ManagedCatalog publishes the exact machine-name, peer, role-set and Host calling-name boundary consumed across owners; every role/tier decision delegates to the canonical identity vocabulary."
     },
     {
-      "path": "src/Wanxiangshu/Participant/Persona/SessionPersona.fs",
+      "path": "src/Wanxiangshu/Participant/Persona/Identity.fs",
       "owner": "participant-identity",
       "node": "participant-identity-cutover",
-      "contract": "ParticipantIdentity.SessionPersona",
+      "contract": "ParticipantIdentity.Evidence",
       "kind": "published-contract",
       "consumers": [
+        "action-affordance",
+        "context-compression",
+        "delegation",
         "dispatch-protocol",
-        "host-boundary",
-        "session-ontology"
+        "durable-events",
+        "execution-model-routing",
+        "finality",
+        "interaction-authority",
+        "knowledge-reuse",
+        "managed-chat-execution",
+        "managed-session-lifecycle",
+        "provider-attempt-recovery",
+        "verification-system"
       ],
-      "symbols": [
-        "Wanxiangshu.Participant.Persona.PersonaRejectionModule.render",
-        "Wanxiangshu.Participant.Persona.SessionPersona.drop"
+      "symbol_roots": [
+        "Wanxiangshu.Participant.Persona.LegacyAuthorityRootIdentityV1Input",
+        "Wanxiangshu.Participant.Persona.ParticipantIdentityError",
+        "Wanxiangshu.Participant.Persona.ParticipantIdentityEvidence",
+        "Wanxiangshu.Participant.Persona.ParticipantIdentityInput",
+        "Wanxiangshu.Participant.Persona.ParticipantIdentityModule",
+        "Wanxiangshu.Participant.Persona.PersonaOrigin"
       ],
-      "justification": "Foreign owners may render a typed rejection at a Host boundary or drop identity with session lifecycle; issuance, bind-once and inheritance remain participant-identity-owned."
-    },
-    {
-      "path": "src/Wanxiangshu/OpenCode/Host/PersonaBinding.fs",
-      "owner": "participant-identity",
-      "node": "participant-identity-cutover",
-      "contract": "ParticipantIdentity.PersonaBinding",
-      "kind": "published-contract",
-      "consumers": [
-        "dispatch-protocol",
-        "host-boundary",
-        "session-ontology"
-      ],
-      "symbols": [
-        "Wanxiangshu.OpenCode.PersonaBinding.ensureFromAuthority",
-        "Wanxiangshu.OpenCode.PersonaBinding.ensureInherited",
-        "Wanxiangshu.OpenCode.PersonaBinding.ensureRoot"
-      ],
-      "justification": "Host workflows consume only the three typed identity binding operations; conflicts remain PersonaRejection and cannot be swallowed or converted to fallback identity."
+      "justification": "Identity.fs is the single owner of the opaque ParticipantIdentity vocabulary the whole repository consumes: durable acceptance payloads, authority projections, recovery and Host boundaries read identity facts only through this evidence/input/error/origin surface, and the legacy v1 upgrade input is the one migration shape a durable replay may present. Foreign owners consume the vocabulary; construction, inheritance and rehydration stay inside the owner."
     },
     {
       "path": "src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs",
@@ -5034,8 +5061,7 @@
         {
           "path": "src/Wanxiangshu/Composition/Durable/Projection.fs",
           "symbols": [
-            "Wanxiangshu.Composition.Durable.AgentProjectionSet",
-            "Wanxiangshu.Composition.Durable.AgentProjectionSet.Associations"
+            "Wanxiangshu.Composition.Durable.AgentProjectionSet"
           ]
         },
         {
@@ -5116,13 +5142,7 @@
         {
           "path": "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs",
           "symbols": [
-            "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution",
-            "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution.Superseded",
-            "Wanxiangshu.OpenCode.ModelRouting.chatExecutionAdmission",
-            "Wanxiangshu.OpenCode.ModelRouting.endProviderStep",
-            "Wanxiangshu.OpenCode.ModelRouting.projectRoutedModel",
-            "Wanxiangshu.OpenCode.ModelRouting.releasePhysicalExecution",
-            "Wanxiangshu.OpenCode.ModelRouting.routeChatExecution"
+            "Wanxiangshu.OpenCode.ModelRouting.endProviderStep"
           ]
         },
         {
@@ -5133,7 +5153,6 @@
             "Wanxiangshu.OpenCode.PluginRuntimeScope.ArmRecovery",
             "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachLoopSensor",
             "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachMessageVisibility",
-            "Wanxiangshu.OpenCode.PluginRuntimeScope.BloggerRuntimeHost",
             "Wanxiangshu.OpenCode.PluginRuntimeScope.LoopSensor",
             "Wanxiangshu.OpenCode.PluginRuntimeScope.RunBackground",
             "Wanxiangshu.OpenCode.PluginRuntimeScope.Sessions",

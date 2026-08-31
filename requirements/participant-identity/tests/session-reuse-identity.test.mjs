@@ -70,7 +70,7 @@ const acceptedFact = (profile) => ({
         SelectedAgent: profile.participantIdentity.selectedAgent,
         PeerAgent: profile.participantIdentity.peerAgent,
         Role: profile.participantIdentity.canonicalRole,
-        InitialTier: `${profile.participantIdentity.selectedTier[0].toUpperCase()}${profile.participantIdentity.selectedTier.slice(1)}`,
+        InitialTier: profile.participantIdentity.selectedTier,
         Persona: profile.participantIdentity.persona,
         PersonaCatalogVersion: profile.participantIdentity.personaCatalogVersion,
         Origin: profile.participantIdentity.origin,

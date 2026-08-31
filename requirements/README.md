@@ -137,7 +137,7 @@ grounding 由 `requirement-grounding` package 拥有。
 
 ## 依赖骨架
 
-权威依赖清单见各包 HOW.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 144-edge 骨架一致。
+权威依赖清单见各包 HOW.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 146-edge 骨架一致。
 
 ## 运行与验证
 

@@ -14,7 +14,7 @@ import * as attemptPurpose from '../../../dist/Participant/Provider/Attempt/Plan
 
 const planner = compression.attemptPlanner
 const cursor = cursorOwner.cursor
-const requestKind = compression.requestKind
+const requestKind = prefix.requestKind
 const slot = compression
 
 const source = (relative) => readFileSync(new URL(`../../../${relative}`, import.meta.url), 'utf8')

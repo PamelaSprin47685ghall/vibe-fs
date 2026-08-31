@@ -270,7 +270,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] ReviewJournalSurface constructs and projec
       selectedAgent: 'fast-coder',
       peerAgent: 'deep-coder',
       role: 'coder',
-      initialTier: 'Fast',
+      initialTier: 'fast',
     })
   } finally {
     journal.JournalSurface_dispose(opened.journal)

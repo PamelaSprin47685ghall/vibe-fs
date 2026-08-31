@@ -146,7 +146,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 
 以下内容是仍在执行中的架构迁移提案，不是已经完成的 repository law。实施时必须继续受上方正式协议与 `requirements/` 约束。
 
-毕业规则：production cutover + executable proof + hard gate 三者齐全才算完成。完成项立即从本提案缩掉，压成上方“守江山”一条；inventory / baseline / report-only / 文档宣称均不算毕业。截至 2026-08-31，migration ledger 的 36 个已建节点全部 `DONE`；未裁决 production coverage backlog 仍有 458 文件：CoverageA=101、CoverageB=27、CoverageD=101、CoverageE=116、CoverageG=113。第五十七章的 dependency-driven production cutover 路线继续保留，后续进度只以 backlog→node→cutover 闭合为准。
+毕业规则：production cutover + executable proof + hard gate 三者齐全才算完成。完成项立即从本提案缩掉，压成上方“守江山”一条；inventory / baseline / report-only / 文档宣称均不算毕业。截至 2026-08-31，migration ledger 的 36 个已建节点全部 `DONE`；未裁决 production coverage backlog 仍有 386 文件：CoverageA=101、CoverageB=27、CoverageD=101、CoverageE=44、CoverageG=113。第五十七章的 dependency-driven production cutover 路线继续保留，后续进度只以 backlog→node→cutover 闭合为准。
 
 原提案第一章 / Phase 0 的“关键 trace 冻结”已毕业到守江山，不再保留施工长文。以下继续沿用原章节编号，未完成部分保持原意。
 

@@ -1,193 +1,295 @@
-// WHAT[PID-002] — Participant identity has one typed owner; office capability and
-// display text cannot become alternate identity authorities.
+// WHAT[PID-002] — ParticipantIdentity is one opaque owner bound to an exact logical
+// run; authority facts/profiles carry only its IdentitySeed, and no session-scoped
+// cache, registry, second fact owner or raw internal construction may re-create a
+// parallel identity authority.
 
 import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-import {
-  scanFoundationRolesSource,
-  scanParticipantIdentityEntries,
-  scanParticipantIdentityRepo,
-  scanPersonaBindingSource,
-  scanPersonaCatalogSource,
-  scanProductionIdentitySource,
-  scanSessionPersonaSource,
-} from '../../../scripts/checks/participant-identity-boundary.mjs'
+import { scanRepo } from '../../../scripts/checks/participant-identity-boundary.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-const violation = (rule, file, line, text) => ({
-  id: 'participant-identity-owner', rule, file, line, text,
-})
 
-const PERSONAS = [
-  'Integrator', 'Director', 'Coordinator', 'Lead', 'Coder', 'Engineer', 'Scout',
-  'Investigator', 'Technician', 'Operator', 'Navigator', 'Researcher', 'Analyst',
-  'Inquirer', 'Examiner', 'Auditor', 'Scribe', 'Chronicler', 'Condenser',
-  'Distiller', 'Clerk', 'Curator',
-]
+const IDENTITY_OWNER = 'src/Wanxiangshu/Participant/Persona/Identity.fs'
+const AUTHORITY_FACTS = 'src/Wanxiangshu/Interaction/Authority/Facts.fs'
+const AUTHORITY_MODEL = 'src/Wanxiangshu/Interaction/Authority/Model.fs'
+const SURFACE_MANIFEST = 'scripts/lib/test-surface-scan.mjs'
 
-const catalog = `[<RequireQualifiedAccess>]
-type Persona =
-${PERSONAS.map((name) => `    | ${name}`).join('\n')}
+const violation = (file, line, rule, message) => ({ file, line, rule, message })
 
-module PersonaCatalog =
-    let render (persona: Persona) : string =
-        match persona with
-${PERSONAS.map((name) => `        | Persona.${name} -> "${name}"`).join('\n')}
-`
+// Line 1 namespace, 2 ParticipantIdentity, 3 ParticipantIdentityEvidence,
+// 4 module, 5..13 the nine owner API members.
+const identityOwner = [
+  'namespace Wanxiangshu.Participant.Persona',
+  'type ParticipantIdentity = private { Value: string }',
+  'type ParticipantIdentityEvidence = private { Identity: ParticipantIdentity }',
+  'module ParticipantIdentity =',
+  '    let resolveAtRoot value = value',
+  '    let inheritFromOwner value owner = value, owner',
+  '    let rehydrate owner input = owner, input',
+  '    let selectedAgent value = value',
+  '    let peerAgent value = value',
+  '    let role value = value',
+  '    let initialTier value = value',
+  '    let persona value = value',
+  '    let origin value = value',
+].join('\n')
 
-const session = `module SessionPersona =
-    type PersonaRejection =
-        | AlreadyBound of existing: Persona * requested: Persona
-    let private bySession = Dictionary<SessionId, Persona>()
-    let bindOnce (sessionId: SessionId) (persona: Persona) : Result<Persona, PersonaRejection> =
-        match bySession.TryGetValue sessionId with
-        | true, existing when existing = persona -> Ok existing
-        | true, existing -> Error (PersonaRejection.AlreadyBound(existing, persona))
-        | false, _ ->
-            bySession.[sessionId] <- persona
-            Ok persona
-`
+// AuthorityRootAcceptedPayload declared on line 2.
+const authorityFacts = [
+  'namespace Wanxiangshu.Interaction.Authority',
+  'type AuthorityRootAcceptedPayload =',
+  '    { SchemaVersion: int',
+  '      IdentitySeed: PromptIdentitySeed }',
+].join('\n')
 
-const binding = `module PersonaBinding =
-    let bind sessionId persona =
-        match SessionPersona.bindOnce sessionId persona with
-        | Ok bound -> Ok bound
-        | Error rejection -> Error rejection
-`
+// AuthorityExecutionProfile declared on line 3, derivation member on line 6.
+const authorityModel = [
+  'namespace Wanxiangshu.Interaction.Authority',
+  'type IdentitySeed = PromptIdentitySeed',
+  'type AuthorityExecutionProfile =',
+  '    private',
+  '        { StoredIdentitySeed: IdentitySeed }',
+  '    member this.ParticipantIdentity = PromptIdentitySeed.participantIdentity this.StoredIdentitySeed',
+].join('\n')
 
-const roles = `[<RequireQualifiedAccess>]
-type AgentTier = | Fast | Deep
-[<RequireQualifiedAccess>]
-type Role = | Manager | Coder
-module Roles =
-    let roleLabel role = match role with | Role.Manager -> "manager" | Role.Coder -> "coder"
-`
-
-const catalogFile = 'src/Wanxiangshu/Participant/Persona/Catalog.fs'
-const sessionFile = 'src/Wanxiangshu/Participant/Persona/SessionPersona.fs'
-const bindingFile = 'src/Wanxiangshu/OpenCode/Host/PersonaBinding.fs'
-const rolesFile = 'src/Wanxiangshu/Foundation/Roles.fs'
-
-// Final owner shapes are jointly accepted before individual mutation proofs.
-test('WHAT[PID-002] final participant identity owner shapes are accepted', () => {
-  assert.deepEqual(scanParticipantIdentityEntries([
-    { file: catalogFile, source: catalog },
-    { file: sessionFile, source: session },
-    { file: bindingFile, source: binding },
-    { file: rolesFile, source: roles },
-  ]), [])
-})
-
-test('WHAT[PID-002] Catalog requires the closed exhaustive Persona DU', () => {
-  const mutated = catalog.replace('    | Curator\n', '')
-  assert.deepEqual(scanPersonaCatalogSource(catalogFile, mutated), [
-    violation('catalog-closed-persona', catalogFile, 1,
-      'Catalog must declare the exhaustive RequireQualifiedAccess Persona DU'),
-  ])
-})
-
-test('WHAT[PID-002] Catalog requires canonical rendering for every Persona', () => {
-  const mutated = catalog.replace('        | Persona.Curator -> "Curator"\n', '')
-  assert.deepEqual(scanPersonaCatalogSource(catalogFile, mutated), [
-    violation('catalog-canonical-rendering', catalogFile, 27,
-      'Catalog must render every Persona to its canonical name'),
-  ])
-})
-
-test('WHAT[PID-003] SessionPersona storage cannot regress to string', () => {
-  const mutated = session.replace('Dictionary<SessionId, Persona>', 'Dictionary<string, Persona>')
-  assert.deepEqual(scanSessionPersonaSource(sessionFile, mutated), [
-    violation('session-persona-storage', sessionFile, 4,
-      'SessionPersona storage must contain Persona values'),
-  ])
-})
-
-test('WHAT[PID-003] SessionPersona rejection is typed', () => {
-  const mutated = session.replace('Result<Persona, PersonaRejection>', 'Result<Persona, obj>')
-  assert.deepEqual(scanSessionPersonaSource(sessionFile, mutated), [
-    violation('session-typed-rejection', sessionFile, 2,
-      'bindOnce must expose Result<Persona, PersonaRejection>'),
-  ])
-})
-
-test('WHAT[PID-003] SessionPersona rejects Result values with string errors', () => {
-  const mutated = session.replace('Result<Persona, PersonaRejection>', 'Result<Persona, string>')
-  assert.deepEqual(scanSessionPersonaSource(sessionFile, mutated), [
-    violation('session-typed-rejection', sessionFile, 2,
-      'bindOnce must expose Result<Persona, PersonaRejection>'),
-    violation('session-string-rejection', sessionFile, 5, 'Result<Persona, string>'),
-  ])
-})
-
-test('WHAT[PID-003] bind-once conflicts preserve the original value', () => {
-  const mutated = session.replace('Error (PersonaRejection.AlreadyBound(existing, persona))', 'Ok persona')
-  assert.deepEqual(scanSessionPersonaSource(sessionFile, mutated), [
-    violation('session-bind-once', sessionFile, 5,
-      'bindOnce must preserve the original SessionId-scoped Persona'),
-  ])
-})
-
-test('WHAT[PID-003] Host PersonaBinding cannot swallow a typed conflict', () => {
-  const mutated = `module PersonaBinding =
-    let bind sessionId persona =
-        match SessionPersona.bindOnce sessionId persona with
-        | Ok bound -> bound
-        | Error _ -> SessionPersona.tryGet sessionId |> Option.defaultValue persona
-`
-  assert.deepEqual(scanPersonaBindingSource(bindingFile, mutated), [
-    violation('binding-conflict-swallowed', bindingFile, 5,
-      'PersonaBinding must propagate PersonaRejection conflicts'),
-  ])
-})
-
-test('WHAT[PID-002] RoleIdentity.fs is prohibited', () => {
-  const file = 'src/Wanxiangshu/Participant/Persona/RoleIdentity.fs'
-  assert.deepEqual(scanParticipantIdentityEntries([{ file, source: 'module AgentRoleIdentity\n' }]), [
-    violation('legacy-role-identity-file', file, 1, 'RoleIdentity.fs must be absent'),
-  ])
-})
-
-test('WHAT[PID-002] AgentRoleIdentity references are prohibited', () => {
-  const file = 'src/Wanxiangshu/Fixture.fs'
-  assert.deepEqual(scanProductionIdentitySource(file, 'let role = AgentRoleIdentity.toRole value\n'), [
-    violation('legacy-role-identity-reference', file, 1, 'AgentRoleIdentity.'),
-  ])
-})
-
-for (const symbol of ['ToolPermission', 'permissions', 'isAllowed', 'RoleDefinition']) {
-  test(`WHAT[PID-001] Foundation Roles excludes ${symbol} office-capability vocabulary`, () => {
-    assert.deepEqual(scanFoundationRolesSource(rolesFile, `module Roles\nlet value = ${symbol}\n`), [
-      violation('foundation-role-capability', rolesFile, 2, symbol),
-    ])
-  })
+const CLEAN_SHAPE = {
+  [IDENTITY_OWNER]: identityOwner,
+  [AUTHORITY_FACTS]: authorityFacts,
+  [AUTHORITY_MODEL]: authorityModel,
 }
 
-test('WHAT[PID-002] PersonaCatalog output cannot be lowercased into identity authority', () => {
-  const file = 'src/Wanxiangshu/Execution/Fixture.fs'
-  const source = `let identity role tier =
-    PersonaCatalog.persona role tier
-    |> fun value -> value.ToLowerInvariant()
-`
-  assert.deepEqual(scanProductionIdentitySource(file, source), [
-    violation('persona-lowercase-authority', file, 2, 'PersonaCatalog.persona role tier'),
-  ])
+const writeFixture = (root, relativePath, text) => {
+  const path = join(root, relativePath)
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, text)
+}
+
+// Builds a minimal root that the gate accepts, then applies `overrides`:
+// a string replaces the file, `null` removes it from the clean shape.
+const withBoundaryRoot = (overrides, assertScan) => {
+  const root = mkdtempSync(join(tmpdir(), 'participant-identity-boundary-'))
+  try {
+    const shape = { ...CLEAN_SHAPE, ...overrides }
+    for (const [relativePath, text] of Object.entries(shape)) {
+      if (text === null) continue
+      writeFixture(root, relativePath, text)
+    }
+    assertScan(root)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+test('WHAT[PID-002] the merged identity boundary shape is accepted', () => {
+  withBoundaryRoot({}, (root) => assert.deepEqual(scanRepo(root), []))
 })
 
-test('WHAT[PID-002] persona display text cannot authorize production behavior', () => {
-  const file = 'src/Wanxiangshu/Execution/Fixture.fs'
-  const source = 'let authorize candidatePersona expected = if candidatePersona = PersonaCatalog.render expected then true else false\n'
-  assert.deepEqual(scanProductionIdentitySource(file, source), [
-    violation('persona-text-authority', file, 1, source.trim()),
-  ])
-})
-
-test('WHAT[PID-002] production participant identity boundary is clean', () => {
-  assert.deepEqual(
-    scanParticipantIdentityRepo(ROOT),
-    [],
-    'participant-identity-owner debt keeps this proof RED until the production ownership cutover',
+test('WHAT[PID-002] a missing identity owner file is a required-surface violation', () => {
+  withBoundaryRoot({ [IDENTITY_OWNER]: null }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(IDENTITY_OWNER, 1, 'required-surface', 'required identity surface is missing'),
+    ]),
   )
+})
+
+test('WHAT[PID-002] a retired identity production file cannot come back', () => {
+  const retired = 'src/Wanxiangshu/Participant/Persona/SessionPersona.fs'
+  withBoundaryRoot({ [retired]: 'namespace Wanxiangshu.Participant.Persona\n' }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(retired, 1, 'retired-identity-file', 'retired identity production file must not exist'),
+    ]),
+  )
+})
+
+test('WHAT[PID-001] retired identity tokens cannot reappear in production source', () => {
+  const file = 'src/Wanxiangshu/OpenCode/Host/Revival.fs'
+  const source = ['namespace Wanxiangshu.OpenCode.Host', 'let bind (persona: SessionPersona) = persona'].join('\n')
+  withBoundaryRoot({ [file]: source }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(
+        file,
+        2,
+        'retired-identity-token',
+        "retired identity token 'SessionPersona' is forbidden in production source",
+      ),
+    ]),
+  )
+})
+
+test('WHAT[PID-002] the retired session surface cannot be registered as a test surface', () => {
+  const manifest = ['export const SURFACES = [', "  { module: 'Participant/Persona/SessionSurface.js' },", ']'].join('\n')
+  withBoundaryRoot({ [SURFACE_MANIFEST]: manifest }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(
+        SURFACE_MANIFEST,
+        2,
+        'retired-session-surface-registration',
+        "retired surface 'Participant/Persona/SessionSurface.js' must not be registered",
+      ),
+    ]),
+  )
+})
+
+test('WHAT[PID-002] the retired session surface cannot be emitted into dist', () => {
+  const emitted = 'dist/Participant/Persona/SessionSurface.js'
+  withBoundaryRoot({ [emitted]: 'export const surface = {}\n' }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(
+        emitted,
+        1,
+        'retired-session-surface-emission',
+        "retired surface 'Participant/Persona/SessionSurface.js' must not be emitted",
+      ),
+    ]),
+  )
+})
+
+test('WHAT[PID-002] ParticipantIdentity must stay an opaque private record', () => {
+  const leaked = identityOwner.replace('type ParticipantIdentity = private {', 'type ParticipantIdentity = {')
+  withBoundaryRoot({ [IDENTITY_OWNER]: leaked }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(
+        IDENTITY_OWNER,
+        1,
+        'opaque-identity-owner',
+        'ParticipantIdentity must remain an opaque private record',
+      ),
+    ]),
+  )
+})
+
+test('WHAT[PID-003] the identity owner API cannot drop rehydrate', () => {
+  const truncated = identityOwner.replace('    let rehydrate owner input = owner, input\n', '')
+  withBoundaryRoot({ [IDENTITY_OWNER]: truncated }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(IDENTITY_OWNER, 1, 'opaque-identity-api', "ParticipantIdentity owner API is missing 'rehydrate'"),
+    ]),
+  )
+})
+
+test('WHAT[PID-002] AuthorityRootAcceptedPayload must store the IdentitySeed', () => {
+  const seedless = authorityFacts.replace('      IdentitySeed: PromptIdentitySeed }', '      AcceptedAt: int }')
+  withBoundaryRoot({ [AUTHORITY_FACTS]: seedless }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(
+        AUTHORITY_FACTS,
+        2,
+        'authority-identity-seed',
+        'AuthorityRootAcceptedPayload must store IdentitySeed',
+      ),
+    ]),
+  )
+})
+
+test('WHAT[PID-002] AuthorityRootAcceptedPayload cannot flatten IdentitySeed fields', () => {
+  const duplicated = authorityFacts.replace(
+    '      IdentitySeed: PromptIdentitySeed }',
+    '      IdentitySeed: PromptIdentitySeed\n      SelectedAgent: AgentId }',
+  )
+  withBoundaryRoot({ [AUTHORITY_FACTS]: duplicated }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(
+        AUTHORITY_FACTS,
+        2,
+        'flat-identity-duplicate',
+        'AuthorityRootAcceptedPayload duplicates IdentitySeed fields: SelectedAgent',
+      ),
+    ]),
+  )
+})
+
+test('WHAT[PID-002] AuthorityExecutionProfile must derive identity from its seed', () => {
+  const undivided = authorityModel.replace(
+    '    member this.ParticipantIdentity = PromptIdentitySeed.participantIdentity this.StoredIdentitySeed',
+    '    member this.SchemaVersion = 1',
+  )
+  withBoundaryRoot({ [AUTHORITY_MODEL]: undivided }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(
+        AUTHORITY_MODEL,
+        1,
+        'authority-derived-identity',
+        'AuthorityExecutionProfile must derive ParticipantIdentity from IdentitySeed',
+      ),
+    ]),
+  )
+})
+
+test('WHAT[PID-002] a SessionId-keyed identity collection is forbidden', () => {
+  const file = 'src/Wanxiangshu/Interaction/Dispatch/Cache.fs'
+  const source = [
+    'namespace Wanxiangshu.Interaction.Dispatch',
+    'open System.Collections.Generic',
+    'let issued = Dictionary<SessionId, ParticipantIdentityEvidence>()',
+  ].join('\n')
+  withBoundaryRoot({ [file]: source }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(
+        file,
+        3,
+        'session-identity-cache',
+        'SessionId-keyed ParticipantIdentity/IdentitySeed collection is forbidden',
+      ),
+    ]),
+  )
+})
+
+test('WHAT[PID-002] a SessionId-keyed identity registry is forbidden', () => {
+  const file = 'src/Wanxiangshu/Interaction/Dispatch/Registry.fs'
+  const source = [
+    'namespace Wanxiangshu.Interaction.Dispatch',
+    'let identityRegistry (sessionId: SessionId) : ParticipantIdentity option = None',
+  ].join('\n')
+  withBoundaryRoot({ [file]: source }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(
+        file,
+        2,
+        'session-identity-registry',
+        'SessionId-keyed ParticipantIdentity/IdentitySeed registry is forbidden',
+      ),
+    ]),
+  )
+})
+
+test('WHAT[PID-002] a second identity fact owner is forbidden', () => {
+  const file = 'src/Wanxiangshu/Interaction/Authority/Second.fs'
+  const source = [
+    'namespace Wanxiangshu.Interaction.Authority',
+    'let fact = ParticipantIdentityEstablished.name',
+  ].join('\n')
+  withBoundaryRoot({ [file]: source }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(
+        file,
+        2,
+        'duplicate-identity-fact',
+        'ParticipantIdentityEstablished would create a second identity fact owner',
+      ),
+    ]),
+  )
+})
+
+test('WHAT[PID-002] raw identity internals cannot be constructed outside the owner', () => {
+  const file = 'src/Wanxiangshu/Execution/Binding.fs'
+  const source = ['namespace Wanxiangshu.Execution', 'let persona = PersonaName "Coder"'].join('\n')
+  withBoundaryRoot({ [file]: source }, (root) =>
+    assert.deepEqual(scanRepo(root), [
+      violation(
+        file,
+        2,
+        'private-identity-construction',
+        'raw construction of opaque ParticipantIdentity internals is forbidden outside its owner',
+      ),
+    ]),
+  )
+})
+
+test('WHAT[PID-002] the production participant identity boundary is clean', () => {
+  assert.deepEqual(scanRepo(ROOT), [])
 })

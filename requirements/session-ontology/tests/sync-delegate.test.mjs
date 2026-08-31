@@ -102,7 +102,7 @@ test('WHAT[PID-010] SyncDelegate identity inherits its exact owner Persona and v
 test('WHAT[SESSION-ONTOLOGY-012] Bookkeeper is private identity, not a Foundation role', () => {
   assert.equal(persona.isManagedName('fast-bookkeeper'), true)
   assert.equal(roles.allRoleLabels.includes('bookkeeper'), false)
-  assert.equal(roles.managedAgentName('fast', 'bookkeeper'), '')
+  assert.equal(persona.nameOf('fast', 'bookkeeper'), '')
 })
 
 assert.deepEqual(syncDelegateRoles, ['Inspector', 'Coder'])

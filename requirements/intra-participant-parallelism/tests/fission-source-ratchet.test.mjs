@@ -119,19 +119,24 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-014] Degeneration guard remains control
 })
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility comes from ToolPermission.Fission for current office vocabulary', () => {
+  const officeCapability = read('src/Wanxiangshu/Foundation/OfficeCapability.fs')
   const roles = read('src/Wanxiangshu/Foundation/Roles.fs')
   const registry = read('src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs')
   const owner = read('src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs')
   assert.match(registry, /"fission",\s*FissionTool\.admission/)
-  assert.match(owner, /let\s+admission:\s*ToolAdmission\s*=\s*fun\s+_\s+r\s*->\s*Roles\.isAllowed\s+r\s+ToolPermission\.Fission/)
+  assert.match(
+    owner,
+    /let\s+admission:\s*ToolAdmission\s*=\s*fun\s+_\s+r\s*->\s*OfficeCapability\.isAllowed\s+r\s+ToolPermission\.Fission/,
+  )
+  assert.doesNotMatch(roles, /ToolPermission/, 'Roles owns only Role/AgentTier; the permission matrix is OfficeCapability')
 
   for (const role of ['Manager', 'Coder', 'Inspector', 'Browser', 'Inquiry']) {
     const block = new RegExp(`\\| Role\\.${role} ->[\\s\\S]{0,900}?ToolPermission\\.Fission`)
-    assert.match(roles, block, `${role} must own the Fission consequence`)
+    assert.match(officeCapability, block, `${role} must own the Fission consequence`)
   }
   for (const role of ['Orchestrator', 'DevOps', 'Reviewer', 'Blogger', 'Distiller']) {
     const arm = new RegExp(`\\| Role\\.${role} ->([^\\n]*(?:\\n(?!\\s*\\| Role\\.).*){0,16})`)
-    const text = arm.exec(roles)?.[0] ?? ''
+    const text = arm.exec(officeCapability)?.[0] ?? ''
     assert.doesNotMatch(text, /ToolPermission\.Fission/, `${role} must not own Fission`)
   }
 })

@@ -14,6 +14,39 @@ import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 
 const sha256Hex = (value) => createHash('sha256').update(value).digest('hex')
 
+// PID-010: a Blogger leaf root only exists as owner-derived identity evidence.
+// The managed work session must therefore own an active durable Logical Run
+// before its Companion may be dispatched at all.
+const ownerRootSelection = {
+  kind: 'RootSelection',
+  ownerSession: null,
+  ownerLogicalRun: null,
+  ownerAuthorityRoot: null,
+  participantIdentity: {
+    selectedAgent: 'fast-manager',
+    peerAgent: 'deep-manager',
+    canonicalRole: 'manager',
+    selectedTier: 'fast',
+    persona: 'Coordinator',
+    personaCatalogVersion: 1,
+    origin: 'ResolvedAtRoot',
+  },
+}
+
+const acceptOwnerLogicalRun = async (handle, ownerSession) => {
+  const accepted = await dispatch.acceptHumanRootSelection(
+    handle,
+    ownerSession,
+    `msg-root-${ownerSession}`,
+    ownerRootSelection,
+  )
+  assert.equal(accepted.ok, true, accepted.ok ? '' : JSON.stringify(accepted.error))
+  assert.ok(
+    dispatch.projectionObservation(handle, ownerSession).activeLogicalRun,
+    'the owner must hold an active durable Logical Run before its Companion leaf is dispatched',
+  )
+}
+
 const withJournal = async (prefix, writer, runtime, body) => {
   const directory = mkdtempSync(join(tmpdir(), prefix))
   const opened = await journal.JournalSurface_bootWithWriterId(directory, writer, runtime, 4242, '2026-08-30T00:00:00Z')
@@ -28,6 +61,7 @@ const withJournal = async (prefix, writer, runtime, body) => {
 
 test('WHAT[EFFECT-ACCOUNTING-008] Adapter Blogger Coordinator submits one receipt and recovers exact physical acceptance without resend', async () => {
   await withJournal('wxs-blogger-coordinator-', 'writer-blogger-coordinator', 'rt-blogger-coordinator', async (handle) => {
+    const mainSession = 'ses-main-effect-008'
     const bloggerSession = 'ses-blogger-effect-008'
     const physicalUserMessageId = 'msg-blogger-effect-008'
     const submissions = []
@@ -54,13 +88,15 @@ test('WHAT[EFFECT-ACCOUNTING-008] Adapter Blogger Coordinator submits one receip
         childListCalls += 1
         return dispatch.acceptedChild(bloggerSession, 'fast-blogger', 'fast-blogger')
       },
-      FamilyRootOf: () => 'ses-main-effect-008',
+      FamilyRootOf: () => mainSession,
     }
+
+    await acceptOwnerLogicalRun(handle, mainSession)
 
     const decision = await pluginHooks.coordinateBloggerUnresolvedTwice(
       host,
       handle,
-      'ses-main-effect-008',
+      mainSession,
       bloggerSession,
       'request-blogger-effect-008',
     )

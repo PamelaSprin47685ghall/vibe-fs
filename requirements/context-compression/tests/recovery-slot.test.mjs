@@ -14,7 +14,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as slot from '../../../dist/Context/Companion/CompressionSurface.js'
-const requestKind = slot.requestKind
+import * as prefix from '../../../dist/Context/Prefix/Surface.js'
+const requestKind = prefix.requestKind
 const cursor = slot.cursor
 
 // ── arming is a control-flow fact, not a position ───────────────────────────

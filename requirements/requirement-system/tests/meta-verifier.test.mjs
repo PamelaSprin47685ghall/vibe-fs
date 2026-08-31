@@ -48,7 +48,7 @@ const packageNamesFromIndexTables = () => {
   return [...new Set(names)]
 }
 
-/** INDEX.md「# 依赖骨架」后的第一个 code block：当前 144 edge 邻接清单。 */
+/** INDEX.md「# 依赖骨架」后的第一个 code block：当前 146 edge 邻接清单。 */
 const dependencySkeleton = () => {
   const text = read(INDEX_FILE)
   const heading = text.indexOf('# 依赖骨架')

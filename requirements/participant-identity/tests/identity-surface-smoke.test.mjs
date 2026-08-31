@@ -15,7 +15,8 @@ test('WHAT[PID-001] registered identity surfaces load and expose their narrow co
   assert.equal(journalCodec.deserialize('{}').ok, false)
   assert.equal(factCodec.containsLegacyFallbackFields('{}'), false)
   assert.deepEqual(fission.ringMergeOrder(1), [])
-  assert.equal(roles.managedAgentName('fast', 'coder'), 'fast-coder')
+  assert.equal(identity.nameOf('fast', 'coder'), 'fast-coder')
+  assert.deepEqual(roles.allInternalRoleLabels, ['blogger', 'distiller'])
 
   const rejectedAppend = await reviewJournal.appendAgent(null, '', null, '', '', null)
   assert.equal(rejectedAppend.ok, false)

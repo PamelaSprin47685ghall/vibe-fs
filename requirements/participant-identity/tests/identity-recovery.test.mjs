@@ -115,7 +115,7 @@ const legacyHumanRootLine = (profile) => {
   payload.SelectedAgent = 'fast-coder'
   payload.PeerAgent = 'deep-coder'
   payload.CanonicalRole = 'coder'
-  payload.SelectedTier = 'Fast'
+  payload.SelectedTier = 'fast'
   return JSON.stringify(current)
 }
 
