@@ -1,0 +1,1701 @@
+{
+  "nodes": [
+    {
+      "id": "canonical-spine",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Composition/Durable/Fact.fs",
+        "src/Wanxiangshu/Composition/Durable/Fold.fs",
+        "src/Wanxiangshu/Composition/Durable/FoldRejection.fs",
+        "src/Wanxiangshu/Composition/Durable/HostFactFold.fs",
+        "src/Wanxiangshu/Composition/Durable/Projection.fs",
+        "src/Wanxiangshu/Composition/Durable/ProjectionState.fs",
+        "src/Wanxiangshu/Composition/Durable/ProjectionUpdate.fs",
+        "src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs",
+        "src/Wanxiangshu/OpenCode/Host/WorkspaceEventStoreSurface.fs",
+        "src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs",
+        "src/Wanxiangshu/Persistence/EventStore/CodecSurface.fs",
+        "src/Wanxiangshu/Persistence/EventStore/EventStoreHandle.fs",
+        "src/Wanxiangshu/Persistence/EventStore/EventVocabulary.fs",
+        "src/Wanxiangshu/Persistence/EventStore/GitObjectDatabase.fs",
+        "src/Wanxiangshu/Persistence/EventStore/MergeSurface.fs",
+        "src/Wanxiangshu/Persistence/EventStore/Model.fs",
+        "src/Wanxiangshu/Persistence/EventStore/ProcessGitRawStore.fs",
+        "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs",
+        "src/Wanxiangshu/Persistence/EventStore/StrengthSurface.fs",
+        "src/Wanxiangshu/Persistence/EventStore/Surface.fs",
+        "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
+        "src/Wanxiangshu/Persistence/Journal/CodecSurface.fs",
+        "src/Wanxiangshu/Persistence/Journal/Envelope.fs",
+        "src/Wanxiangshu/Persistence/Journal/EventStoreJournalCodec.fs",
+        "src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs",
+        "src/Wanxiangshu/Persistence/Journal/FactCodec.fs",
+        "src/Wanxiangshu/Persistence/Journal/FactCodecSurface.fs",
+        "src/Wanxiangshu/Persistence/Journal/JournalEventStoreBoot.fs",
+        "src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.fs",
+        "src/Wanxiangshu/Persistence/Journal/ObligationJournalSurface.fs",
+        "src/Wanxiangshu/Persistence/Journal/PromptFactCodec.fs",
+        "src/Wanxiangshu/Persistence/Journal/ReviewJournalSurface.fs",
+        "src/Wanxiangshu/Persistence/Journal/RevisionSurface.fs",
+        "src/Wanxiangshu/Persistence/Journal/RuntimePath.fs",
+        "src/Wanxiangshu/Persistence/Journal/SharedAgentJournal.fs",
+        "src/Wanxiangshu/Persistence/Journal/Surface.fs",
+        "src/Wanxiangshu/Persistence/Journal/Writer.fs",
+        "src/Wanxiangshu/Strength/Persistence/Durability.fs",
+        "src/Wanxiangshu/Strength/Persistence/DurabilityPort.fs",
+        "src/Wanxiangshu/Strength/Persistence/Store.fs"
+      ],
+      "proofs": [
+        "requirements/durable-events/tests/canonical-integrator.test.mjs"
+      ],
+      "publishes": [
+        "DurableEvents.Contract",
+        "EventStore.CanonicalIntegrator"
+      ]
+    },
+    {
+      "id": "model-routing-capacity",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs",
+        "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs",
+        "src/Wanxiangshu/OpenCode/Host/ModelRoutingSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/PlannerSurface.fs",
+        "src/Wanxiangshu/Strength/Policy.fs"
+      ],
+      "proofs": [
+        "requirements/execution-model-routing/tests/model-routing-runtime.test.mjs",
+        "requirements/execution-model-routing/tests/model-capacity-exclusivity.test.mjs",
+        "requirements/execution-model-routing/tests/open-code-port-routing.test.mjs"
+      ],
+      "publishes": [
+        "ModelRouting.Contract",
+        "ModelCapacity.BorrowingCapacity"
+      ]
+    },
+    {
+      "id": "execution-quiescence",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Execution/Session/Wait/Await.fs",
+        "src/Wanxiangshu/Execution/Session/Wait/Bridge.fs",
+        "src/Wanxiangshu/Execution/Session/Wait/CausalWait.fs",
+        "src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs",
+        "src/Wanxiangshu/Execution/Session/Wait/Registry.fs",
+        "src/Wanxiangshu/Execution/Session/Wait/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/causal-wait/tests/causal-wait.test.mjs"
+      ],
+      "publishes": [
+        "Session.Quiescence",
+        "CausalWait.Contract"
+      ]
+    },
+    {
+      "id": "plugin-transforms-composition",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/host-boundary/tests/ordered-transform.test.mjs"
+      ],
+      "publishes": [
+        "OpenCode.PluginTransforms"
+      ]
+    },
+    {
+      "id": "interaction-assistance-workflow-cutover",
+      "state": "DONE",
+      "files": [],
+      "proofs": [],
+      "publishes": []
+    },
+    {
+      "id": "review-assurance-witness-contract",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Composition/Turn/Workflow.fs",
+        "src/Wanxiangshu/Mission/Review/Assurance/Surface.fs",
+        "src/Wanxiangshu/Mission/Review/Barrier/Projection.fs",
+        "src/Wanxiangshu/Mission/Review/Barrier/Reverify.fs",
+        "src/Wanxiangshu/Mission/Review/Barrier/Workflow.fs",
+        "src/Wanxiangshu/Mission/Review/OpenCode/HostGuard.fs",
+        "src/Wanxiangshu/Mission/Review/OpenCode/JudgementInbox.fs",
+        "src/Wanxiangshu/Mission/Review/OpenCode/ReviewHostSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/ProviderRunBinding.fs",
+        "src/Wanxiangshu/OpenCode/Host/ProviderRunBindingSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/SharedState.fs"
+      ],
+      "proofs": [
+        "requirements/review-assurance/tests/consumable-review.test.mjs",
+        "requirements/review-judgement/tests/process-review-judgement.test.mjs"
+      ],
+      "publishes": [
+        "Review.Witness",
+        "Review.CandidateContract"
+      ]
+    },
+    {
+      "id": "session-lifecycle-recovery-contract",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Composition/Turn/Scheduler.fs",
+        "src/Wanxiangshu/Execution/Session/Attachment/AttachedRuntime.fs",
+        "src/Wanxiangshu/Execution/Session/Attachment/AttachmentSurface.fs",
+        "src/Wanxiangshu/Execution/Session/Attachment/ReuseScope.fs",
+        "src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs",
+        "src/Wanxiangshu/Execution/Session/Recovery/Coordinator.fs",
+        "src/Wanxiangshu/Execution/Session/Recovery/Surface.fs",
+        "src/Wanxiangshu/Execution/Session/RecoveryClosureProjection.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostSessionDeletion.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs",
+        "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs",
+        "src/Wanxiangshu/OpenCode/Host/TurnRuntimePreparation.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs"
+      ],
+      "proofs": [
+        "requirements/managed-session-lifecycle/tests/session-recovery.test.mjs"
+      ],
+      "publishes": [
+        "Session.Lifecycle",
+        "Session.RecoveryContract"
+      ]
+    },
+    {
+      "id": "opencode-tool-spec-contracts",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/AssumeTool.fs",
+        "src/Wanxiangshu/OpenCode/Tools/BashHoneypotTool.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs",
+        "src/Wanxiangshu/OpenCode/Tools/CoderTool.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ExecutorToolSurface.fs",
+        "src/Wanxiangshu/OpenCode/Tools/FileTools.fs",
+        "src/Wanxiangshu/OpenCode/Tools/FileToolsSurface.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ManagedAgent.fs",
+        "src/Wanxiangshu/OpenCode/Tools/StaticTools.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ToolContext.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ToolSurface.fs"
+      ],
+      "proofs": [
+        "requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs"
+      ],
+      "publishes": [
+        "ToolOwner.ToolSpec"
+      ]
+    },
+    {
+      "id": "opencode-host-signal-bootstrap-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+      ],
+      "proofs": [
+        "requirements/host-boundary/tests/host-signal-bootstrap-composition.test.mjs"
+      ],
+      "publishes": [
+        "OpenCode.HostSignalBootstrap"
+      ]
+    },
+    {
+      "id": "mission-finality-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Mission/Finality/Blessing.fs",
+        "src/Wanxiangshu/Mission/Finality/Cohort.fs",
+        "src/Wanxiangshu/Mission/Finality/Ports.fs",
+        "src/Wanxiangshu/Mission/Finality/Workflow.fs"
+      ],
+      "proofs": [
+        "requirements/finality/tests/lifecycle.test.mjs",
+        "requirements/finality/tests/blessing-admission.test.mjs"
+      ],
+      "publishes": [
+        "Finality.Contract",
+        "Finality.Witness"
+      ]
+    },
+    {
+      "id": "mission-authority-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Admission.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Model.fs"
+      ],
+      "proofs": [
+        "requirements/obligation-ledger/tests/magic-todo.test.mjs",
+        "requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs"
+      ],
+      "publishes": [
+        "Mission.Authority",
+        "Obligation.LedgerContract"
+      ]
+    },
+    {
+      "id": "composition-turn-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Composition/Turn/Binding.fs",
+        "src/Wanxiangshu/Composition/Turn/Observation.fs",
+        "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs",
+        "src/Wanxiangshu/Composition/Turn/Program.fs"
+      ],
+      "proofs": [
+        "requirements/managed-session-lifecycle/tests/attached-session-runtime.test.mjs"
+      ],
+      "publishes": [
+        "Composition.Turn"
+      ]
+    },
+    {
+      "id": "delegation-outcome-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Execution/Delegation/Fork/ChildRun.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/ChildRunProjection.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/JoinDrain.fs",
+        "src/Wanxiangshu/Execution/Delegation/Join.fs"
+      ],
+      "proofs": [
+        "requirements/delegation/tests/join-completion.test.mjs"
+      ],
+      "publishes": [
+        "Delegation.ChildOutcome",
+        "Delegation.Contract"
+      ]
+    },
+    {
+      "id": "context-trace-companion-contract",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Context/Companion/Builder.fs",
+        "src/Wanxiangshu/Context/Companion/Model.fs",
+        "src/Wanxiangshu/Context/Companion/Transform.fs"
+      ],
+      "proofs": [
+        "requirements/context-compression/tests/companion-projection.test.mjs"
+      ],
+      "publishes": [
+        "Context.CompanionContract",
+        "Context.TraceContract"
+      ]
+    },
+    {
+      "id": "context-compression-companion-core-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Context/Companion/CompanionFactFold.fs",
+        "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Fact.fs",
+        "src/Wanxiangshu/Context/Companion/Facts.fs",
+        "src/Wanxiangshu/Context/Companion/FoldSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Host.fs",
+        "src/Wanxiangshu/Context/Companion/HostBlogger.fs",
+        "src/Wanxiangshu/Context/Companion/Identity.fs",
+        "src/Wanxiangshu/Context/Companion/JournalPort.fs",
+        "src/Wanxiangshu/Context/Companion/Projection.fs",
+        "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Prompt.fs",
+        "src/Wanxiangshu/Context/Companion/Runtime.fs",
+        "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs"
+      ],
+      "proofs": [
+        "requirements/context-compression/tests/attempt-plan-probe-eligibility.test.mjs",
+        "requirements/context-compression/tests/companion-projection.test.mjs",
+        "requirements/context-compression/tests/companion-recovery-slot.test.mjs",
+        "requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs",
+        "requirements/context-compression/tests/ctx-opening-floor.test.mjs",
+        "requirements/context-compression/tests/ctx014.test.mjs",
+        "requirements/context-compression/tests/host-compaction-policy.test.mjs",
+        "requirements/context-compression/tests/injected-context-reanchor.test.mjs",
+        "requirements/context-compression/tests/probe-selection.test.mjs",
+        "requirements/context-compression/tests/projection-algebra-blogframes.test.mjs",
+        "requirements/context-compression/tests/recovery-slot.test.mjs",
+        "requirements/context-compression/tests/terminal-validity.test.mjs",
+        "requirements/durable-events/tests/fold-context-recovery.test.mjs"
+      ],
+      "publishes": [
+        "Context.CompanionContract"
+      ]
+    },
+    {
+      "id": "semantic-trace-replayable-contract-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Context/Trace/Cursor.fs",
+        "src/Wanxiangshu/Context/Trace/Model.fs",
+        "src/Wanxiangshu/Context/Trace/Projection.fs",
+        "src/Wanxiangshu/Context/Trace/Capture.fs",
+        "src/Wanxiangshu/Context/Trace/Materialization.fs",
+        "src/Wanxiangshu/Context/Trace/TerminalReporter.fs",
+        "src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fs"
+      ],
+      "proofs": [
+        "requirements/semantic-trace/tests/x-trace.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-capture.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-capture-boundary.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-capture-hardening.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-compaction-survival.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-fold.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-locality.test.mjs",
+        "requirements/semantic-trace/tests/x-trace-provider-run-provenance.test.mjs"
+      ],
+      "publishes": [
+        "SemanticTrace.Contract"
+      ]
+    },
+    {
+      "id": "prefix-stability-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Context/Prefix/Candidate.fs",
+        "src/Wanxiangshu/Context/Prefix/Epoch.fs",
+        "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
+        "src/Wanxiangshu/Context/Prefix/Projection.fs",
+        "src/Wanxiangshu/Context/Prefix/Surface.fs",
+        "src/Wanxiangshu/Context/Prefix/Wire.fs",
+        "src/Wanxiangshu/Context/Prefix/XWireSurface.fs"
+      ],
+      "proofs": [
+        "requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs",
+        "requirements/prefix-stability/tests/g2-inspector-provider-wire-prefix.test.mjs",
+        "requirements/prefix-stability/tests/pair-thought-anchored.test.mjs",
+        "requirements/prefix-stability/tests/pair-thought-transform.test.mjs",
+        "requirements/prefix-stability/tests/prefix-append-only-law.test.mjs",
+        "requirements/prefix-stability/tests/prefix-epoch-todo-checkpoint.test.mjs",
+        "requirements/prefix-stability/tests/prefix-epoch.test.mjs",
+        "requirements/prefix-stability/tests/projection-algebra-step5-digest.test.mjs",
+        "requirements/prefix-stability/tests/system-prompt-stability.test.mjs",
+        "requirements/prefix-stability/tests/xwire-transform-surface.test.mjs"
+      ],
+      "publishes": [
+        "PrefixStability.Contract",
+        "PrefixStability.SurfaceContract"
+      ]
+    },
+    {
+      "id": "strength-prediction-replica-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Strength/Budget.fs",
+        "src/Wanxiangshu/Strength/Events.fs",
+        "src/Wanxiangshu/Strength/Prediction/Predictor.fs",
+        "src/Wanxiangshu/Strength/Replica/Transform.fs"
+      ],
+      "proofs": [
+        "requirements/speculative-investigation/tests/replica-transform.test.mjs"
+      ],
+      "publishes": [
+        "Strength.Contract"
+      ]
+    },
+    {
+      "id": "enforcer-guidance-continuation-contract",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Enforcer/Continuation.fs",
+        "src/Wanxiangshu/Enforcer/Guidance/DeliveryProjection.fs",
+        "src/Wanxiangshu/Enforcer/Guidance/Tip.fs",
+        "src/Wanxiangshu/Enforcer/Rulebook.fs"
+      ],
+      "proofs": [
+        "requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs"
+      ],
+      "publishes": [
+        "Enforcer.ContinuationContract",
+        "PairGuidance.Contract"
+      ]
+    },
+    {
+      "id": "change-integration-host-contracts",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Change/Fact.fs",
+        "src/Wanxiangshu/Change/Facts.fs",
+        "src/Wanxiangshu/Change/Fold.fs",
+        "src/Wanxiangshu/Change/Host/GitAdapter.fs",
+        "src/Wanxiangshu/Change/Host/Host.fs",
+        "src/Wanxiangshu/Change/Host/ReviewRunner.fs",
+        "src/Wanxiangshu/Change/Host/SessionDirectories.fs",
+        "src/Wanxiangshu/Change/Host/Surface.fs",
+        "src/Wanxiangshu/Change/Host/Types.fs",
+        "src/Wanxiangshu/Change/Host/WorktreeCleanup.fs",
+        "src/Wanxiangshu/Change/Job.fs",
+        "src/Wanxiangshu/Change/Program.fs",
+        "src/Wanxiangshu/Change/Projection.fs",
+        "src/Wanxiangshu/Change/Prompts.fs",
+        "src/Wanxiangshu/Change/Recovery.fs",
+        "src/Wanxiangshu/Change/Runtime.fs",
+        "src/Wanxiangshu/Change/Surface.fs",
+        "src/Wanxiangshu/Change/Types.fs",
+        "src/Wanxiangshu/Git/Gateway.fs",
+        "src/Wanxiangshu/Git/IntegrationGate.fs",
+        "src/Wanxiangshu/Git/Operations.fs",
+        "src/Wanxiangshu/Git/Subject.fs",
+        "src/Wanxiangshu/Git/WorktreeResource.fs"
+      ],
+      "proofs": [
+        "requirements/change-integration/tests/job.test.mjs",
+        "requirements/change-integration/tests/git-operations.test.mjs",
+        "requirements/change-integration/tests/integration-gate.test.mjs",
+        "requirements/change-integration/tests/worktree-resource.test.mjs",
+        "requirements/change-integration/tests/runtime.test.mjs"
+      ],
+      "publishes": [
+        "Change.Host.Surface",
+        "Git.Gateway",
+        "Change.IntegrationContract"
+      ]
+    },
+    {
+      "id": "durable-convergence-store-contracts",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Git/Hook/Dispatcher.fs",
+        "src/Wanxiangshu/Git/Hook/Surface.fs",
+        "src/Wanxiangshu/Git/Hook/Sync.fs",
+        "src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs",
+        "src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs",
+        "src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs",
+        "src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs",
+        "src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs",
+        "src/Wanxiangshu/Persistence/EventStore/Store.fs",
+        "src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs"
+      ],
+      "proofs": [
+        "requirements/durable-convergence/tests/event-store-merge.test.mjs",
+        "requirements/durable-convergence/tests/writer-stream-sync.test.mjs",
+        "requirements/durable-convergence/tests/replica-merge-laws.test.mjs",
+        "requirements/durable-convergence/tests/event-store-converge.test.mjs"
+      ],
+      "publishes": [
+        "DurableConvergence.Contract",
+        "EventStore.MergeSurface"
+      ]
+    },
+    {
+      "id": "mission-finality-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs",
+        "src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs",
+        "src/Wanxiangshu/Mission/Finality/Prompt.fs",
+        "src/Wanxiangshu/Mission/Finality/PromptSurface.fs",
+        "src/Wanxiangshu/Mission/Finality/Record.fs",
+        "src/Wanxiangshu/Mission/Finality/Revision.fs",
+        "src/Wanxiangshu/Mission/Finality/Types.fs",
+        "src/Wanxiangshu/Mission/Manager/Background.fs",
+        "src/Wanxiangshu/Mission/Manager/Finality.fs",
+        "src/Wanxiangshu/Mission/Manager/FinalitySurface.fs",
+        "src/Wanxiangshu/Mission/Manager/Idle.fs",
+        "src/Wanxiangshu/Mission/Manager/JobHandoff.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/Admission.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/Facts.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/Projection.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/Prompt.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/Workflow.fs",
+        "src/Wanxiangshu/Mission/Manager/Narrative.fs",
+        "src/Wanxiangshu/Mission/Manager/OpenCode/NarrativeTransform.fs",
+        "src/Wanxiangshu/Mission/Manager/Workflow.fs"
+      ],
+      "proofs": [
+        "requirements/finality/tests/blessing-admission.test.mjs",
+        "requirements/finality/tests/lifecycle.test.mjs",
+        "requirements/finality/tests/manager-finality-disposition.test.mjs"
+      ],
+      "publishes": [
+        "Finality.Contract",
+        "Mission.Manager.Life"
+      ]
+    },
+    {
+      "id": "mission-obligation-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/FinalityCohort.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocalitySurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembraneSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoSemanticSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/ObligationCodec.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/PrefixEpoch.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/obligation-ledger/tests/magic-todo.test.mjs",
+        "requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs",
+        "requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs"
+      ],
+      "publishes": [
+        "Obligation.LedgerContract",
+        "MagicTodo.Surface"
+      ]
+    },
+    {
+      "id": "mission-review-judgement-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Mission/Review/Fact.fs",
+        "src/Wanxiangshu/Mission/Review/Facts.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Challenge.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Continuation.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Evidence.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/RequestIdentity.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Verdict.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs",
+        "src/Wanxiangshu/Mission/Review/OpenCode/JudgeSurface.fs",
+        "src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs",
+        "src/Wanxiangshu/Mission/Review/OpenCode/TerminalAwait.fs",
+        "src/Wanxiangshu/Mission/Review/Ports.fs",
+        "src/Wanxiangshu/Mission/Review/Prompt.fs",
+        "src/Wanxiangshu/Mission/Review/ReviewFactFold.fs",
+        "src/Wanxiangshu/Mission/Review/ReviewTodoSurface.fs"
+      ],
+      "proofs": [
+        "requirements/review-judgement/tests/process-review-judgement.test.mjs",
+        "requirements/review-judgement/tests/judge-tool-contract.test.mjs",
+        "requirements/review-judgement/tests/verdict-tool.test.mjs"
+      ],
+      "publishes": [
+        "Review.Judgement.Workflow",
+        "Review.JudgeTool"
+      ]
+    },
+    {
+      "id": "mission-work-record-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Mission/WorkRecord/Materialize.fs",
+        "src/Wanxiangshu/Mission/WorkRecord/Model.fs",
+        "src/Wanxiangshu/Mission/WorkRecord/OpeningSemanticSurface.fs",
+        "src/Wanxiangshu/Mission/WorkRecord/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/work-record/tests/lifecycle-work-record.test.mjs",
+        "requirements/work-record/tests/work-record-sections.test.mjs"
+      ],
+      "publishes": [
+        "WorkRecord.Surface",
+        "WorkRecord.Model"
+      ]
+    },
+    {
+      "id": "office-capability-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Foundation/OfficeCapability.fs",
+        "src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs"
+      ],
+      "proofs": [
+        "requirements/office-capability/tests/office-capability-integrity.test.mjs",
+        "requirements/office-capability/tests/office-capability-gate.test.mjs",
+        "requirements/office-capability/tests/office-capability-role-law-contract.test.mjs"
+      ],
+      "publishes": [
+        "OfficeCapability.Contract",
+        "OfficeCapabilitySurface.Contract"
+      ]
+    },
+    {
+      "id": "verification-system-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Verification/EventStoreWriterSurface.fs",
+        "src/Wanxiangshu/Verification/TemporalSurface.fs"
+      ],
+      "proofs": [
+        "requirements/verification-system/tests/proof-ladder.test.mjs"
+      ],
+      "publishes": [
+        "VerificationSystem.TemporalSurface",
+        "VerificationSystem.EventStoreWriterSurface"
+      ]
+    },
+    {
+      "id": "external-investigation-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcp.fs",
+        "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfig.fs",
+        "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfigSurface.fs"
+      ],
+      "proofs": [
+        "requirements/external-investigation/tests/browser-provenance-canary.test.mjs",
+        "requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs",
+        "requirements/external-investigation/tests/facts-not-obligations.test.mjs"
+      ],
+      "publishes": [
+        "ExternalInvestigation.McpConfig",
+        "ExternalInvestigation.McpConfigSurface"
+      ]
+    },
+    {
+      "id": "finality-review-cohort-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs"
+      ],
+      "proofs": [
+        "requirements/finality/tests/finality-cohort-law.test.mjs"
+      ],
+      "publishes": [
+        "FinalityReviewCohort.rosterOf",
+        "FinalityReviewCohort.graduatedReviewer",
+        "FinalityReviewCohort.CohortSlot",
+        "FinalityReviewCohort.ReviewerOutcome"
+      ]
+    },
+    {
+      "id": "concern-routing-proven-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Interaction/Concern/Facts.fs",
+        "src/Wanxiangshu/Interaction/Concern/Fold.fs",
+        "src/Wanxiangshu/Interaction/Concern/Projection.fs",
+        "src/Wanxiangshu/Interaction/Concern/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/concern-routing/tests/concern-routing.test.mjs"
+      ],
+      "publishes": [
+        "ConcernRouting.Contract"
+      ]
+    },
+    {
+      "id": "attention-regulation-proven-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Interaction/Attention/Facts.fs",
+        "src/Wanxiangshu/Interaction/Attention/Fold.fs",
+        "src/Wanxiangshu/Interaction/Attention/Projection.fs",
+        "src/Wanxiangshu/Interaction/Attention/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/attention-regulation/tests/attention-regulation.test.mjs"
+      ],
+      "publishes": [
+        "AttentionRegulation.Contract"
+      ]
+    },
+    {
+      "id": "context-compression-blogger-compaction-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Delta.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/DeltaSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/FrameSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/ItemWire.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/OpenCode/PluginScope.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Projection.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Request.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Abandon.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleProjection.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Host.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Toml.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
+        "src/Wanxiangshu/Host/CompactionPolicy.fs",
+        "src/Wanxiangshu/Host/Contract/CompactionPolicySurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostCompactionObserver.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/TerminalValidity.fs"
+      ],
+      "proofs": [
+        "requirements/context-compression/tests/attempt-plan-probe-eligibility.test.mjs",
+        "requirements/context-compression/tests/blog-entry-committed.test.mjs",
+        "requirements/context-compression/tests/blog-projection.test.mjs",
+        "requirements/context-compression/tests/blogger-convergence-gaps.test.mjs",
+        "requirements/context-compression/tests/blogger-delta.test.mjs",
+        "requirements/context-compression/tests/blogger-runtime.test.mjs",
+        "requirements/context-compression/tests/blogger-seal-reactivate.test.mjs",
+        "requirements/context-compression/tests/companion-ordinary-material-surface.test.mjs",
+        "requirements/context-compression/tests/companion-projection.test.mjs",
+        "requirements/context-compression/tests/companion-recovery-slot.test.mjs",
+        "requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs",
+        "requirements/context-compression/tests/ctx-opening-floor.test.mjs",
+        "requirements/context-compression/tests/ctx014.test.mjs",
+        "requirements/context-compression/tests/enforcer-cycle-commit-convergence.test.mjs",
+        "requirements/context-compression/tests/enforcer-cycle-convergence.test.mjs",
+        "requirements/context-compression/tests/enforcer-frame-loader.test.mjs",
+        "requirements/context-compression/tests/enforcer-open-reload.test.mjs",
+        "requirements/context-compression/tests/host-compaction-policy.test.mjs",
+        "requirements/context-compression/tests/injected-context-reanchor.test.mjs",
+        "requirements/context-compression/tests/parked-transform.test.mjs",
+        "requirements/context-compression/tests/probe-selection.test.mjs",
+        "requirements/context-compression/tests/projection-algebra-blogframes.test.mjs",
+        "requirements/context-compression/tests/recovery-slot.test.mjs",
+        "requirements/context-compression/tests/terminal-validity.test.mjs",
+        "requirements/crash-reconciliation/tests/blogger-crash-recovery.test.mjs",
+        "requirements/effect-accounting/tests/external-adapter-boundary.test.mjs",
+        "requirements/host-boundary/tests/host-capability-observation.test.mjs"
+      ],
+      "publishes": [
+        "Context.CompanionContract",
+        "Host.CompactionPolicy",
+        "Provider.TerminalValidity"
+      ]
+    },
+    {
+      "id": "provider-attempt-recovery-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs"
+      ],
+      "proofs": [
+        "requirements/provider-attempt-recovery/tests/abort-residue.test.mjs",
+        "requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs",
+        "requirements/provider-attempt-recovery/tests/cursor.test.mjs",
+        "requirements/provider-attempt-recovery/tests/fallback-aabb-confluence.test.mjs",
+        "requirements/provider-attempt-recovery/tests/fallback-ledger.test.mjs",
+        "requirements/context-compression/tests/companion-recovery-slot.test.mjs",
+        "requirements/structured-workflow/tests/recovery-reentry.test.mjs"
+      ],
+      "publishes": [
+        "Provider.AttemptRecovery"
+      ]
+    },
+    {
+      "id": "provider-language-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/Language.fs",
+        "src/Wanxiangshu/Participant/Provider/LanguageSurface.fs",
+        "src/Wanxiangshu/Participant/Provider/SessionLanguage.fs",
+        "src/Wanxiangshu/Participant/Provider/ProviderResources.fs",
+        "src/Wanxiangshu/Participant/Provider/Prose.fs",
+        "src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs",
+        "src/Wanxiangshu/Resources/ProviderResourceBytes.fs"
+      ],
+      "proofs": [
+        "requirements/provider-language/tests/provider-language.test.mjs",
+        "requirements/provider-language/tests/provider-prose-and-preference.test.mjs",
+        "requirements/provider-language/tests/provider-prose-ownership.test.mjs",
+        "requirements/provider-language/tests/language-parity-gate.test.mjs"
+      ],
+      "publishes": [
+        "Provider.Language",
+        "Distribution.ProviderResourceBytes"
+      ]
+    },
+    {
+      "id": "provider-projection-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/Projection/Model.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Intent.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Planner.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Surface.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProviderProjectionSurface.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProviderWireCapture.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProviderWireDecode.fs",
+        "src/Wanxiangshu/Foundation/LlmFacing.fs",
+        "src/Wanxiangshu/Foundation/SyntheticToml.fs",
+        "src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs"
+      ],
+      "proofs": [
+        "requirements/provider-projection/tests/message-intent-algebra.test.mjs",
+        "requirements/provider-projection/tests/projection-algebra.test.mjs",
+        "requirements/provider-projection/tests/projection.test.mjs",
+        "requirements/provider-projection/tests/provider-projection-boundary.test.mjs"
+      ],
+      "publishes": [
+        "Foundation.LlmFacing",
+        "ProjectionMessageEdit.HostWireEncoding",
+        "ProviderProjection.HostCapture",
+        "ProviderProjection.HostDecode",
+        "ProviderProjection.HostWriteback",
+        "ProviderProjection.Model",
+        "ProviderProjection.Intent",
+        "ProviderProjection.Planner",
+        "ProviderProjection.Renderer",
+        "ProviderProjection.Surface"
+      ]
+    },
+    {
+      "id": "participant-identity-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Foundation/Roles.fs",
+        "src/Wanxiangshu/Foundation/RolesSurface.fs",
+        "src/Wanxiangshu/Participant/Persona/Catalog.fs",
+        "src/Wanxiangshu/Participant/Persona/Identity.fs",
+        "src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs",
+        "src/Wanxiangshu/Participant/Persona/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/participant-identity/tests/catalog.test.mjs",
+        "requirements/participant-identity/tests/identity-boundary-gate.test.mjs",
+        "requirements/participant-identity/tests/identity-lineage.test.mjs",
+        "requirements/participant-identity/tests/identity-recovery.test.mjs",
+        "requirements/participant-identity/tests/identity-surface-smoke.test.mjs",
+        "requirements/participant-identity/tests/participant-identity-consumers.test.mjs",
+        "requirements/participant-identity/tests/participant-identity.test.mjs",
+        "requirements/participant-identity/tests/session-execution-binding.test.mjs",
+        "requirements/participant-identity/tests/session-reuse-composition.test.mjs",
+        "requirements/participant-identity/tests/session-reuse-identity.test.mjs"
+      ],
+      "publishes": [
+        "ParticipantIdentity.RoleVocabulary",
+        "ParticipantIdentity.Persona",
+        "ParticipantIdentity.Evidence",
+        "ParticipantIdentity.LogicalRunIdentity",
+        "ParticipantIdentity.ManagedCatalog",
+        "ParticipantIdentity.RolesSurface",
+        "ParticipantIdentity.Surface"
+      ]
+    },
+    {
+      "id": "interaction-repair-authority-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs",
+        "src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs",
+        "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs"
+      ],
+      "proofs": [
+        "requirements/interaction-authority/tests/completed-turn-classifier.test.mjs",
+        "requirements/interaction-authority/tests/repair-lifecycle.test.mjs"
+      ],
+      "publishes": [
+        "Interaction.Repair.Classification",
+        "Interaction.Repair.Workflow"
+      ]
+    },
+    {
+      "id": "opencode-attention-tool-spec-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/AttentionTools.fs"
+      ],
+      "proofs": [
+        "requirements/attention-regulation/tests/attention-regulation.test.mjs"
+      ],
+      "publishes": [
+        "ToolOwner.ToolSpec"
+      ]
+    },
+    {
+      "id": "opencode-concern-tool-spec-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/ConcernTools.fs"
+      ],
+      "proofs": [
+        "requirements/concern-routing/tests/concern-routing.test.mjs"
+      ],
+      "publishes": [
+        "ToolOwner.ToolSpec"
+      ]
+    },
+    {
+      "id": "dispatch-protocol-prompt-dispatch-contracts",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Interaction/Dispatch/Nudge.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/PhysicalAcceptance.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/MetadataCodec.fs",
+        "src/Wanxiangshu/Interaction/Repair/Port.fs"
+      ],
+      "proofs": [
+        "requirements/dispatch-protocol/tests/send-format.test.mjs"
+      ],
+      "publishes": [
+        "PromptDispatch.RuntimeNudge",
+        "PromptDispatch.PromptPhysicalAcceptance",
+        "PromptDispatch.PromptMetadataCodec",
+        "Interaction.Repair.SendOutcome"
+      ]
+    },
+    {
+      "id": "provider-attempt-recovery-request-kind-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/Attempt/RequestKind.fs"
+      ],
+      "proofs": [
+        "requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs"
+      ],
+      "publishes": [
+        "Provider.RequestKind"
+      ]
+    },
+    {
+      "id": "host-boundary-utility-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Foundation/FatalProcess.fs",
+        "src/Wanxiangshu/Foundation/McpLaunch.fs",
+        "src/Wanxiangshu/Host/Digest.fs"
+      ],
+      "proofs": [
+        "requirements/host-boundary/tests/sphinx-mcp-launch.test.mjs"
+      ],
+      "publishes": [
+        "Foundation.FatalProcess",
+        "Foundation.McpLaunch",
+        "Host.HostDigest"
+      ]
+    },
+    {
+      "id": "time-capability-ports-deadline-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Foundation/Temporal.fs",
+        "src/Wanxiangshu/Process/Deadline.fs",
+        "src/Wanxiangshu/Process/DeadlineSurface.fs"
+      ],
+      "proofs": [
+        "requirements/time-capability/tests/deadline-typed.test.mjs"
+      ],
+      "publishes": [
+        "TimeCapability.Ports",
+        "TimeCapability.Deadline"
+      ]
+    },
+    {
+      "id": "intra-participant-parallelism-foundation-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Foundation/AsyncSupport.fs",
+        "src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs",
+        "src/Wanxiangshu/Foundation/Parallel.fs",
+        "src/Wanxiangshu/Foundation/ParallelSurface.fs",
+        "src/Wanxiangshu/Foundation/TaskResult.fs"
+      ],
+      "proofs": [
+        "requirements/intra-participant-parallelism/tests/foundation-utilities.test.mjs"
+      ],
+      "publishes": [
+        "Foundation.AsyncSupport",
+        "Foundation.Parallel",
+        "Foundation.TaskResult",
+        "Foundation.TaskResultList",
+        "Foundation.TaskValue"
+      ]
+    },
+    {
+      "id": "dispatch-protocol-foundation-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Foundation/Identity.fs",
+        "src/Wanxiangshu/Foundation/Outcome.fs",
+        "src/Wanxiangshu/Foundation/OutcomeSurface.fs"
+      ],
+      "proofs": [
+        "requirements/dispatch-protocol/tests/ingress-identity.test.mjs"
+      ],
+      "publishes": [
+        "Foundation.Identity",
+        "Foundation.Outcome"
+      ]
+    },
+    {
+      "id": "cognitive-environment-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/BloggerChronicleText.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs",
+        "src/Wanxiangshu/Resources/PromptResources.fs",
+        "src/Wanxiangshu/Resources/PromptSurface.fs"
+      ],
+      "proofs": [
+        "requirements/cognitive-environment/tests/blogger-chronicle-text.test.mjs"
+      ],
+      "publishes": [
+        "cognitive-environment.Contract"
+      ]
+    },
+    {
+      "id": "degeneration-guard-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/LoopSensor.fs",
+        "src/Wanxiangshu/OpenCode/Host/LoopSensorSurface.fs",
+        "src/Wanxiangshu/Execution/Session/LoopDetector.fs",
+        "src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fs"
+      ],
+      "proofs": [
+        "requirements/degeneration-guard/tests/loop-detector-memory.test.mjs"
+      ],
+      "publishes": [
+        "degeneration-guard.Contract"
+      ]
+    },
+    {
+      "id": "participant-horizon-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/MessageVisibility.fs",
+        "src/Wanxiangshu/OpenCode/Host/MessageVisibilitySurface.fs",
+        "src/Wanxiangshu/Execution/Session/OpenCode/HorizonSurface.fs",
+        "src/Wanxiangshu/Execution/Session/OpenCode/HorizonTool.fs"
+      ],
+      "proofs": [
+        "requirements/participant-horizon/tests/admission-law.test.mjs"
+      ],
+      "publishes": [
+        "participant-horizon.Contract"
+      ]
+    },
+    {
+      "id": "capability-enforcement-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs",
+        "src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/ManagerConfig.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ToolRegistrySurface.fs"
+      ],
+      "proofs": [
+        "requirements/capability-enforcement/tests/agent-permission-gate.test.mjs"
+      ],
+      "publishes": [
+        "capability-enforcement.Contract"
+      ]
+    },
+    {
+      "id": "execution-model-routing-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs",
+        "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Ledger.fs",
+        "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Model.fs",
+        "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs",
+        "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/execution-model-routing/tests/admission-queue.test.mjs"
+      ],
+      "publishes": [
+        "execution-model-routing.Contract"
+      ]
+    },
+    {
+      "id": "guidance-delivery-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineProjection.fs",
+        "src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs",
+        "src/Wanxiangshu/Enforcer/Guidance/DeliverySurface.fs",
+        "src/Wanxiangshu/Enforcer/Guidance/TipSurface.fs"
+      ],
+      "proofs": [
+        "requirements/guidance-delivery/tests/audience-separation.test.mjs"
+      ],
+      "publishes": [
+        "guidance-delivery.Contract"
+      ]
+    },
+    {
+      "id": "execution-failure-policy-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Execution/Failure/Model.fs",
+        "src/Wanxiangshu/Execution/Failure/Policy.fs",
+        "src/Wanxiangshu/Execution/Failure/Surface.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Failure.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/FailureSurface.fs"
+      ],
+      "proofs": [
+        "requirements/execution-failure-policy/tests/cancel-retry-fallback-stream.property.test.mjs"
+      ],
+      "publishes": [
+        "execution-failure-policy.Contract"
+      ]
+    },
+    {
+      "id": "time-capability-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibration.fs",
+        "src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibrationSurface.fs",
+        "src/Wanxiangshu/Execution/Session/SessionStartedAtLedger.fs",
+        "src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs",
+        "src/Wanxiangshu/Process/PtyTiming.fs",
+        "src/Wanxiangshu/Process/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/time-capability/tests/ambient-time-forbidden.test.mjs"
+      ],
+      "publishes": [
+        "time-capability.Contract"
+      ]
+    },
+    {
+      "id": "session-ontology-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs",
+        "src/Wanxiangshu/Execution/Session/Association.fs",
+        "src/Wanxiangshu/Execution/Session/AssociationSurface.fs",
+        "src/Wanxiangshu/Execution/Session/Ownership.fs"
+      ],
+      "proofs": [
+        "requirements/session-ontology/tests/satellite-kind.test.mjs"
+      ],
+      "publishes": [
+        "session-ontology.Contract"
+      ]
+    },
+    {
+      "id": "output-distillation-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/Distillation.fs",
+        "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs",
+        "src/Wanxiangshu/OpenCode/Tools/DistillationSurface.fs",
+        "src/Wanxiangshu/Host/Contract/ToolResultBound.fs",
+        "src/Wanxiangshu/Process/LargeGate.fs",
+        "src/Wanxiangshu/Process/LargeGateSurface.fs"
+      ],
+      "proofs": [
+        "requirements/output-distillation/tests/distiller-fragment-humility.test.mjs"
+      ],
+      "publishes": [
+        "output-distillation.Contract"
+      ]
+    },
+    {
+      "id": "institutional-learning-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Facts.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Fold.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Projection.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/institutional-learning/tests/institutional-learning.test.mjs"
+      ],
+      "publishes": [
+        "institutional-learning.Contract"
+      ]
+    },
+    {
+      "id": "distribution-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/AssemblyInfo.fs",
+        "src/Wanxiangshu/Resources/EnforcerCatalogResource.fs",
+        "src/Wanxiangshu/Resources/ModelRoutingResource.fs",
+        "src/Wanxiangshu/Resources/PackageMetadata.fs",
+        "src/Wanxiangshu/Resources/PackageResources.fs",
+        "src/Wanxiangshu/Resources/RuntimeResources.fs"
+      ],
+      "proofs": [
+        "requirements/distribution/tests/cwd-independent-resources.test.mjs"
+      ],
+      "publishes": [
+        "distribution.Contract"
+      ]
+    },
+    {
+      "id": "repository-investigation-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/FetchTool.fs",
+        "src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs",
+        "src/Wanxiangshu/Repository/Investigation/Semble/Client.fs",
+        "src/Wanxiangshu/Repository/Investigation/Semble/Mcp.fs",
+        "src/Wanxiangshu/Repository/Investigation/Semble/SearchCodec.fs",
+        "src/Wanxiangshu/Repository/Investigation/Semble/Stdio.fs",
+        "src/Wanxiangshu/Repository/Investigation/SembleSurface.fs",
+        "src/Wanxiangshu/Repository/Investigation/WarmStart/Prompt.fs",
+        "src/Wanxiangshu/Repository/Investigation/WarmStart/Runtime.fs",
+        "src/Wanxiangshu/Repository/Investigation/WarmStartSurface.fs"
+      ],
+      "proofs": [
+        "requirements/repository-investigation/tests/investigation-resource-laws.test.mjs"
+      ],
+      "publishes": [
+        "repository-investigation.Contract"
+      ]
+    },
+    {
+      "id": "intra-participant-parallelism-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Execution/Fission/Admission.fs",
+        "src/Wanxiangshu/Execution/Fission/Fact.fs",
+        "src/Wanxiangshu/Execution/Fission/Facts.fs",
+        "src/Wanxiangshu/Execution/Fission/Fold.fs",
+        "src/Wanxiangshu/Execution/Fission/Model.fs",
+        "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs",
+        "src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs",
+        "src/Wanxiangshu/Execution/Fission/Projection.fs",
+        "src/Wanxiangshu/Execution/Fission/Runtime.fs",
+        "src/Wanxiangshu/Execution/Fission/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/intra-participant-parallelism/tests/fission-domain.test.mjs"
+      ],
+      "publishes": [
+        "intra-participant-parallelism.Contract"
+      ]
+    },
+    {
+      "id": "requirement-grounding-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Gate.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Projection.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Runtime.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Transform.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGroundingRepositorySurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGroundingSurface.fs",
+        "src/Wanxiangshu/Host/Fact.fs",
+        "src/Wanxiangshu/Host/Facts.fs",
+        "src/Wanxiangshu/Requirement/Grounding/Catalog.fs",
+        "src/Wanxiangshu/Requirement/Grounding/Model.fs",
+        "src/Wanxiangshu/Requirement/Grounding/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/requirement-grounding/tests/grounding-delivery.test.mjs"
+      ],
+      "publishes": [
+        "requirement-grounding.Contract"
+      ]
+    },
+    {
+      "id": "interaction-authority-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs",
+        "src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs",
+        "src/Wanxiangshu/Interaction/Authority/Child.fs",
+        "src/Wanxiangshu/Interaction/Authority/Fact.fs",
+        "src/Wanxiangshu/Interaction/Authority/Facts.fs",
+        "src/Wanxiangshu/Interaction/Authority/Fold.fs",
+        "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+        "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+        "src/Wanxiangshu/Interaction/Authority/Model.fs",
+        "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+        "src/Wanxiangshu/Interaction/Authority/Run.fs",
+        "src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs",
+        "src/Wanxiangshu/Interaction/Authority/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/interaction-authority/tests/authority-acceptance-identity.test.mjs"
+      ],
+      "publishes": [
+        "interaction-authority.Contract"
+      ]
+    },
+    {
+      "id": "process-execution-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/ExecutorTool.fs",
+        "src/Wanxiangshu/OpenCode/Tools/PtyTool.fs",
+        "src/Wanxiangshu/Process/NodeProcessHost.fs",
+        "src/Wanxiangshu/Process/NodeProcessWait.fs",
+        "src/Wanxiangshu/Process/ProcessOutput.fs",
+        "src/Wanxiangshu/Process/ProcessRequest.fs",
+        "src/Wanxiangshu/Process/ProcessRunner.fs",
+        "src/Wanxiangshu/Process/Pty.fs",
+        "src/Wanxiangshu/Process/PtyApi.fs",
+        "src/Wanxiangshu/Process/PtyBackend.fs",
+        "src/Wanxiangshu/Process/PtySession.fs",
+        "src/Wanxiangshu/Process/PtySupervisor.fs",
+        "src/Wanxiangshu/Process/PtyTypes.fs",
+        "src/Wanxiangshu/Process/Spool.fs"
+      ],
+      "proofs": [
+        "requirements/process-execution/tests/executor-tool.test.mjs"
+      ],
+      "publishes": [
+        "process-execution.Contract"
+      ]
+    },
+    {
+      "id": "dispatch-protocol-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/JoinGuardSurface.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressCodec.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/RecoverySurface.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
+        "src/Wanxiangshu/Composition/Turn/ReconcilePass.fs",
+        "src/Wanxiangshu/Composition/Turn/ReconcileSurface.fs",
+        "src/Wanxiangshu/Composition/Turn/TurnReconcile.fs",
+        "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
+        "src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs"
+      ],
+      "proofs": [
+        "requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs"
+      ],
+      "publishes": [
+        "dispatch-protocol.Contract"
+      ]
+    },
+    {
+      "id": "managed-chat-execution-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
+        "src/Wanxiangshu/OpenCode/Host/ChatAdmission/TransactionSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs",
+        "src/Wanxiangshu/Execution/Session/ChatExecution/Admission.fs",
+        "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
+        "src/Wanxiangshu/Execution/Session/ChatExecution/Fact.fs",
+        "src/Wanxiangshu/Execution/Session/ChatExecution/Facts.fs",
+        "src/Wanxiangshu/Execution/Session/ChatExecution/Fold.fs",
+        "src/Wanxiangshu/Execution/Session/ChatExecution/Projection.fs",
+        "src/Wanxiangshu/Execution/Session/ChatExecution/Recovery.fs",
+        "src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntime.fs",
+        "src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntimeSurface.fs",
+        "src/Wanxiangshu/Execution/Session/ChatExecution/RecoverySurface.fs",
+        "src/Wanxiangshu/Execution/Session/ChatExecution/Settlement.fs",
+        "src/Wanxiangshu/Execution/Session/ChatExecution/StatusSurface.fs",
+        "src/Wanxiangshu/Execution/Session/ChatExecution/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/managed-chat-execution/tests/acceptance-idempotence.test.mjs"
+      ],
+      "publishes": [
+        "managed-chat-execution.Contract"
+      ]
+    },
+    {
+      "id": "behavior-diagnosis-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Enforcer/BlogSurface.fs",
+        "src/Wanxiangshu/Enforcer/Catalog.fs",
+        "src/Wanxiangshu/Enforcer/ChronicleExecution.fs",
+        "src/Wanxiangshu/Enforcer/Codec.fs",
+        "src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs",
+        "src/Wanxiangshu/Enforcer/Cycle/Commit.fs",
+        "src/Wanxiangshu/Enforcer/Cycle/Decode.fs",
+        "src/Wanxiangshu/Enforcer/Cycle/Model.fs",
+        "src/Wanxiangshu/Enforcer/Cycle/Recovery.fs",
+        "src/Wanxiangshu/Enforcer/Host.fs",
+        "src/Wanxiangshu/Enforcer/Observation.fs",
+        "src/Wanxiangshu/Enforcer/ObservationCollector.fs",
+        "src/Wanxiangshu/Enforcer/ObservationSurface.fs",
+        "src/Wanxiangshu/Enforcer/Projection.fs",
+        "src/Wanxiangshu/Enforcer/Repair.fs",
+        "src/Wanxiangshu/Enforcer/RepairSurface.fs",
+        "src/Wanxiangshu/Enforcer/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/behavior-diagnosis/tests/blog-entry-committed.test.mjs"
+      ],
+      "publishes": [
+        "behavior-diagnosis.Contract"
+      ]
+    },
+    {
+      "id": "speculative-investigation-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Strength/Frame.fs",
+        "src/Wanxiangshu/Strength/Lifecycle.fs",
+        "src/Wanxiangshu/Strength/OpenCode/PluginScope.fs",
+        "src/Wanxiangshu/Strength/OpenCode/Replay.fs",
+        "src/Wanxiangshu/Strength/OpenCode/Settings.fs",
+        "src/Wanxiangshu/Strength/OpenCode/Speculate.fs",
+        "src/Wanxiangshu/Strength/Prediction/BatchCollector.fs",
+        "src/Wanxiangshu/Strength/Prediction/CostModel.fs",
+        "src/Wanxiangshu/Strength/Projection/Model.fs",
+        "src/Wanxiangshu/Strength/Replica/Commit.fs",
+        "src/Wanxiangshu/Strength/Replica/Promotion.fs",
+        "src/Wanxiangshu/Strength/Replica/Runtime.fs",
+        "src/Wanxiangshu/Strength/Replica/TraceRecovery.fs",
+        "src/Wanxiangshu/Strength/Rollout.fs",
+        "src/Wanxiangshu/Strength/Runtime.fs",
+        "src/Wanxiangshu/Strength/Surface.fs",
+        "src/Wanxiangshu/Strength/TurnEvidence.fs"
+      ],
+      "proofs": [
+        "requirements/speculative-investigation/tests/authority-policy.test.mjs"
+      ],
+      "publishes": [
+        "speculative-investigation.Contract"
+      ]
+    },
+    {
+      "id": "knowledge-reuse-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Bookkeeper.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperStaging.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRefreshSurface.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperSurface.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Capture.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/FetchSurface.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Index.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/IndexSurface.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Lifecycle.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/LifecycleSurface.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Model.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/OpenCode/Tools.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Replay.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/SessionDraft.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Surface.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Workflow.fs"
+      ],
+      "proofs": [
+        "requirements/knowledge-reuse/tests/bookkeeper-mechanical.test.mjs"
+      ],
+      "publishes": [
+        "knowledge-reuse.Contract"
+      ]
+    },
+    {
+      "id": "epistemic-reasoning-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Sphinx/Absorb.fs",
+        "src/Wanxiangshu/Sphinx/Bayes.fs",
+        "src/Wanxiangshu/Sphinx/Closure.fs",
+        "src/Wanxiangshu/Sphinx/Codec.fs",
+        "src/Wanxiangshu/Sphinx/DecodePrimitives.fs",
+        "src/Wanxiangshu/Sphinx/Mcp.fs",
+        "src/Wanxiangshu/Sphinx/McpContract.fs",
+        "src/Wanxiangshu/Sphinx/McpServer.fs",
+        "src/Wanxiangshu/Sphinx/Methodology.fs",
+        "src/Wanxiangshu/Sphinx/MonteCarlo.fs",
+        "src/Wanxiangshu/Sphinx/ObservationCodec.fs",
+        "src/Wanxiangshu/Sphinx/Policy.fs",
+        "src/Wanxiangshu/Sphinx/Representation.fs",
+        "src/Wanxiangshu/Sphinx/RuntimeTypes.fs",
+        "src/Wanxiangshu/Sphinx/Search.fs",
+        "src/Wanxiangshu/Sphinx/Session.fs",
+        "src/Wanxiangshu/Sphinx/State.fs",
+        "src/Wanxiangshu/Sphinx/Surface.fs",
+        "src/Wanxiangshu/Sphinx/Types.fs",
+        "src/Wanxiangshu/Sphinx/Value.fs",
+        "src/Wanxiangshu/Sphinx/WireEncode.fs"
+      ],
+      "proofs": [
+        "requirements/epistemic-reasoning/tests/bayes.test.mjs"
+      ],
+      "publishes": [
+        "epistemic-reasoning.Contract"
+      ]
+    },
+    {
+      "id": "repository-programming-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/FileMutationSurface.fs",
+        "src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs",
+        "src/Wanxiangshu/Process/JsSandbox.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/Anchor.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/AnchorFs.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/Capability.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/Description.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/Failure.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/FilesystemSurface.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/GlobFs.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/MutationFs.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/OpenCode/BookkeeperTool.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHostSurface.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/RuntimeSurface.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/Surface.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/Transaction.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/Utf8Fs.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs"
+      ],
+      "proofs": [
+        "requirements/repository-programming/tests/file-mutation-tools.test.mjs"
+      ],
+      "publishes": [
+        "repository-programming.Contract"
+      ]
+    },
+    {
+      "id": "host-boundary-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
+        "src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs",
+        "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs",
+        "src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs",
+        "src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs",
+        "src/Wanxiangshu/OpenCode/Codec/OpencodeTypes.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/ChatParamsSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/Diagnostic.fs",
+        "src/Wanxiangshu/OpenCode/Host/Events.fs",
+        "src/Wanxiangshu/OpenCode/Host/EventsSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/ExplicitResumeSuppression.fs",
+        "src/Wanxiangshu/OpenCode/Host/ExplicitResumeSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/ExplicitSessionResume.fs",
+        "src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/GitTree.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostBoundarySurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostMessageProjection.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostSessionContext.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostSessionContextSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostSignalSubscribeSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostSignalSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/HookPolicy.fs",
+        "src/Wanxiangshu/OpenCode/Host/HookPolicySurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/PluginHost.fs",
+        "src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs",
+        "src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs",
+        "src/Wanxiangshu/OpenCode/Host/PluginSessionScope.fs",
+        "src/Wanxiangshu/OpenCode/Host/ProviderSystemTransform.fs",
+        "src/Wanxiangshu/OpenCode/Host/QuiescenceSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnostics.fs",
+        "src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnosticsSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionSnapshotSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/SharedTerminalBus.fs",
+        "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfig.fs",
+        "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfigSurface.fs",
+        "src/Wanxiangshu/OpenCode/JoinResultRendererSurface.fs",
+        "src/Wanxiangshu/OpenCode/Plugin/Plugin.fs",
+        "src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs",
+        "src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs",
+        "src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs",
+        "src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs",
+        "src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs",
+        "src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs",
+        "src/Wanxiangshu/OpenCode/Signals/HostSignal.fs",
+        "src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs",
+        "src/Wanxiangshu/OpenCode/Signals/HostSignalSubscribe.fs"
+      ],
+      "proofs": [
+        "requirements/host-boundary/tests/chat-hook-settlement.test.mjs"
+      ],
+      "publishes": [
+        "host-boundary.Contract"
+      ]
+    },
+    {
+      "id": "delegation-frontier-keep",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Execution/Agent/Errors.fs",
+        "src/Wanxiangshu/Execution/Agent/Program.fs",
+        "src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs",
+        "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateLedger.fs",
+        "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateProjection.fs",
+        "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/DelegationFactFold.fs",
+        "src/Wanxiangshu/Execution/Delegation/ExecutionFactFold.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fact.fs",
+        "src/Wanxiangshu/Execution/Delegation/Facts.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecoverySurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/CleanBreakSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/AgentOwner.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/BusyNudge.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Join.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/JoinSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/PendingRun.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Pty.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Restart.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/LifecycleSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Model.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinGuard.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Recovery.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Surface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/Controller.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/FoldSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/JoinInterruptRegistry.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/JoinWake.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/Surface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handoff.fs",
+        "src/Wanxiangshu/Execution/Delegation/HandoffIdentity.fs",
+        "src/Wanxiangshu/Execution/Delegation/HandoffLedger.fs",
+        "src/Wanxiangshu/Execution/Delegation/HandoffSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/HostTurnObservedSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
+        "src/Wanxiangshu/Execution/Delegation/OpenCode/DelegatedToolEstimate.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Model.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Batching.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Observation.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Prompt.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Store.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Wait.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs",
+        "src/Wanxiangshu/Execution/Session/AgentCompletion.fs"
+      ],
+      "proofs": [
+        "requirements/delegation/tests/delegated-tool-estimate-facts.test.mjs"
+      ],
+      "publishes": [
+        "delegation.Contract"
+      ]
+    }
+  ],
+  "coverage_backlog": {}
+}

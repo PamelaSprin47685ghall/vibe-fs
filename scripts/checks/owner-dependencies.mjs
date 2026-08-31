@@ -11,7 +11,7 @@ const FSPROJ = join(ROOT, 'src/Wanxiangshu/Wanxiangshu.fsproj')
 const PRODUCTION_ROOT = join(ROOT, 'src/Wanxiangshu')
 const OWNERS = join(ROOT, 'scripts/checks/semantic-owners.json')
 const CONTRACTS = join(ROOT, 'scripts/checks/published-contracts.json')
-const MIGRATION_LEDGER = join(ROOT, 'scripts/checks/migration-ledger.json')
+const RELEASE_CLOSURE_NODES = join(ROOT, 'scripts/checks/release-closure-nodes.json')
 const SYMBOL_SCANNER = join(ROOT, 'scripts/checks/owner-symbol-uses.fsx')
 const FCS_SCRATCH = join(ROOT, '.fable-build/owner-dependencies-fcs')
 const FCS_RESULT = join(FCS_SCRATCH, 'symbol-uses.json')
@@ -1261,9 +1261,9 @@ export function analyzeOwnerDependencies({
 }
 
 function readMigrationState(semanticOwners) {
-  if (!existsSync(MIGRATION_LEDGER)) return undefined
-  const ledger = JSON.parse(readFileSync(MIGRATION_LEDGER, 'utf8'))
-  const nodes = ledger.nodes ?? []
+  if (!existsSync(RELEASE_CLOSURE_NODES)) return undefined
+  const closure = JSON.parse(readFileSync(RELEASE_CLOSURE_NODES, 'utf8'))
+  const nodes = closure.nodes ?? []
   const nodeByPath = []
   const closedPaths = []
   for (const node of nodes)
@@ -1273,7 +1273,7 @@ function readMigrationState(semanticOwners) {
     }
   const ownerByPath = new Map((semanticOwners?.ownership ?? []).map((entry) => [norm(entry.path), entry.owner]))
   const pendingOwners = new Set(
-    Object.values(ledger.coverage_backlog ?? {})
+    Object.values(closure.coverage_backlog ?? {})
       .flat()
       .map(norm)
       .map((path) => ownerByPath.get(path))
