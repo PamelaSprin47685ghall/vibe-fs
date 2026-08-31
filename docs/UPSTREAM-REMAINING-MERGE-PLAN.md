@@ -111,7 +111,7 @@ run `33426540260` 已验证 owner lane 修复：5/5，Linux production scan 146.
 - 原因：Handle/fold/join 是剩余 mirror 的基础；先建立 Surface 迁移范式并测量 consumer/export 基线。
 - 批次出口：对应 mirror exports 删除，测试直接调用当前 owner。
 
-执行事实（2026-09-01）：本地 M7A 已闭合。RED `17d7b517c` 将 `recordAbandon` 首胜 proof 从 fake journal/controller 改为要求 production resource surface；GREEN `57cdf8feb` 增加 opaque `Handle/JournalSurface`，内部调用 canonical EventStore、AgentJournal 与 HandleController；consumer closure `fe2536b20` 将 abandonment、join guard、creation order、hidden recovery、codec 与 fold proofs 迁到注册 production surfaces，删除 291 行 projection/fold/codec/journal/controller/join mirror。managed-session-lifecycle 165/165 全绿。PR 与最终 gate 结果写入本批次报告。
+执行事实（2026-09-01）：本地 M7A 已闭合。RED `17d7b517c` 将 `recordAbandon` 首胜 proof 从 fake journal/controller 改为要求 production resource surface；GREEN `57cdf8feb` 增加 opaque `Handle/JournalSurface`，内部调用 canonical EventStore、AgentJournal 与 HandleController；consumer closure `fe2536b20` 将 abandonment、join guard、creation order、hidden recovery、codec 与 fold proofs 迁到注册 production surfaces，删除 291 行 projection/fold/codec/journal/controller/join mirror。managed-session-lifecycle 165/165、build、check 全绿；已创建 [upstream PR #24](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/24)。当前账号无 upstream merge/rerun 权限，须由 owner 按 #20→#24 合并。
 
 ### 第 7 次：child lifecycle mirrors
 

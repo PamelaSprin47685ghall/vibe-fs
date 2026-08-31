@@ -1,5 +1,7 @@
 # Upstream Remaining Merge — Batch 6
 
+PR: https://github.com/PamelaSprin47685ghall/vibe-fs/pull/24
+
 ## Result
 
 Batch 6 closes M7A on the cumulative batch-5 head `6bde8890b`. It removes the Handle/fold/join test mirror without changing the Handle lifecycle law.
@@ -52,3 +54,5 @@ No baseline, suppression, allowlist, threshold, timeout, or assertion was weaken
 ## Remaining work
 
 M7B–M7E still own the transitional Fork/family/terminal, Satellite/Distiller, SyncDelegate, and PTY/process exports. They remain explicit in `managed-surface.mjs` and will be removed cumulatively in batches 7–8. M8/M9 follows in batch 9.
+
+PR #24 is stacked on #23. Upstream merge and rerun permissions are unavailable to the current account; #20–#24 therefore require owner merge in order.
