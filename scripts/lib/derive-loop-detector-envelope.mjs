@@ -7,12 +7,11 @@ import { loopDetectorRepositoryTexts } from './loop-detector-repository-corpus.m
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const halfLife = 256
-// DG-003: two-sided normal envelope. Both degeneration sides are empirical
-// quantiles of the forward-projected repository corpus D_t, symmetric at the
-// central 95% probability (2.5% discarded on each side).
-const centralProbability = 0.95
-const lowerQuantileProbability = (1 - centralProbability) / 2
-const upperQuantileProbability = 1 - lowerQuantileProbability
+// DG-003: empirical quantile envelope. Low-side 97.5% confidence (lower quantile p=0.025)
+// and high-side 100% (upper quantile p=1.0, maximum corpus value for random anomaly threshold).
+const lowerQuantileProbability = 0.025
+const upperQuantileProbability = 1.0
+const centralProbability = upperQuantileProbability - lowerQuantileProbability
 
 const replayAffine = (tokens, lambda) => {
   if (tokens.length === 0) throw new Error('Loop detector repository corpus has no tokens')
@@ -226,7 +225,7 @@ const artifactSource = (envelope) => `// Generated from the current repository S
 export const vocabularySize = ${envelope.vocabularySize}
 export const halfLife = ${envelope.halfLife.toFixed(1)}
 export const lambda = ${envelope.lambda.toFixed(16)}
-export const centralProbability = ${envelope.centralProbability.toFixed(2)}
+export const centralProbability = ${envelope.centralProbability.toFixed(3)}
 export const lowerQuantileProbability = ${envelope.lowerQuantileProbability.toFixed(3)}
 export const upperQuantileProbability = ${envelope.upperQuantileProbability.toFixed(3)}
 export const normalWeightedDistinctCount = ${envelope.normalPrior.toFixed(14)}

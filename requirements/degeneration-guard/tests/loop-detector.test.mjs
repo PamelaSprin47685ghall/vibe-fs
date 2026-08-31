@@ -12,9 +12,9 @@ import {
 const close = (actual, expected, tolerance = 1e-9) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} != ${expected}`)
 
-const centralProbability = 0.95
-const lowerQuantileProbability = (1 - centralProbability) / 2
-const upperQuantileProbability = 1 - lowerQuantileProbability
+const lowerQuantileProbability = 0.025
+const upperQuantileProbability = 1.0
+const centralProbability = upperQuantileProbability - lowerQuantileProbability
 
 const empiricalQuantile = (values, probability) => {
   const rank = Math.ceil(probability * values.length)
@@ -78,9 +78,9 @@ test('WHAT[DG-004] LOOP_004_runtime_envelope_is_freshly_derived_from_the_current
   const derived = await deriveLoopDetectorEnvelope()
 
   assert.equal(derived.halfLife, 256)
-  assert.equal(derived.centralProbability, 0.95)
+  close(derived.centralProbability, 0.975)
   close(derived.lowerQuantileProbability, 0.025)
-  close(derived.upperQuantileProbability, 0.975)
+  close(derived.upperQuantileProbability, 1.0)
   close(loopDetector.halfLife, derived.halfLife)
   close(loopDetector.lambda, derived.lambda)
   close(loopDetector.normalWeightedDistinctCount, derived.normalPrior)
