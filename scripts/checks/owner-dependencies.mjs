@@ -154,6 +154,58 @@ function normalizeApplicationRange(record, productionFiles) {
 
 const position = (line, column) => line * 1_000_000 + column
 
+// Range evidence is queried millions of times (application target ↔ symbol use ↔ control-flow
+// region). Group it by its exact lookup key and keep each group sorted by (start, end, arrival)
+// so containment queries are a binary search plus a bounded window instead of a full scan.
+const rangeGroups = (records, keyOf, boundsOf) => {
+  const groups = new Map()
+  records.forEach((value, order) => {
+    const key = keyOf(value)
+    const [start, end] = boundsOf(value)
+    const group = groups.get(key)
+    if (group) group.push({ value, order, start, end })
+    else groups.set(key, [{ value, order, start, end }])
+  })
+  for (const group of groups.values())
+    group.sort((left, right) => left.start - right.start || left.end - right.end || left.order - right.order)
+  return groups
+}
+
+const lowerBound = (group, start) => {
+  let low = 0
+  let high = group.length
+  while (low < high) {
+    const middle = (low + high) >> 1
+    if (group[middle].start < start) low = middle + 1
+    else high = middle
+  }
+  return low
+}
+
+const enclosedBy = (groups, key, start, end) => {
+  const group = groups.get(key) ?? []
+  const enclosed = []
+  for (let index = lowerBound(group, start); index < group.length && group[index].start <= end; index += 1)
+    if (group[index].end <= end) enclosed.push(group[index])
+  return enclosed
+}
+
+const firstEnclosedBy = (groups, key, start, end) => {
+  const group = groups.get(key) ?? []
+  for (let index = lowerBound(group, start); index < group.length && group[index].start <= end; index += 1)
+    if (group[index].end <= end) return group[index]
+  return undefined
+}
+
+const byArrival = (left, right) => left.start - right.start || left.order - right.order
+const byOrder = (left, right) => left.order - right.order
+const bySpanDescending = (left, right) => right.end - right.start - (left.end - left.start) || left.order - right.order
+const useBounds = (use) => [position(use.line, use.column), position(use.endLine, use.endColumn)]
+const applicationBounds = (application) => [
+  position(application.startLine, application.startColumn),
+  position(application.endLine, application.endColumn),
+]
+
 const normalizedConsumer = (record, productionFiles, label) => {
   if (!record || typeof record.consumerPath !== 'string') throw new Error(`FCS scanner emitted an invalid ${label}`)
   const consumerPath = repositoryPath(record.consumerPath, `${label} consumer`)
@@ -174,18 +226,29 @@ const normalizeControlFlow = (parsed, productionFiles, applicationUses, applicat
     endLine: integer(record, field(prefix, 'EndLine'), label),
     endColumn: integer(record, field(prefix, 'EndColumn'), label),
   })
-  const contains = (outer, inner) => position(outer.startLine, outer.startColumn) <= position(inner.startLine, inner.startColumn)
-    && position(inner.endLine, inner.endColumn) <= position(outer.endLine, outer.endColumn)
+  const applicationsByConsumer = rangeGroups(applicationUses, (application) => application.consumerPath, applicationBounds)
+  const applicationsByTarget = rangeGroups(
+    applicationUses,
+    (application) => `${application.consumerPath}\0${application.resolvedTarget}`,
+    applicationBounds,
+  )
+  const rangesByConsumer = new Map()
+  for (const application of applicationRanges) {
+    const group = rangesByConsumer.get(application.consumerPath)
+    if (group) group.push(application)
+    else rangesByConsumer.set(application.consumerPath, [application])
+  }
 
   const matchExpressions = (parsed.matchExpressions ?? []).map((record) => {
     const consumerPath = normalizedConsumer(record, productionFiles, 'match expression')
     const matchRange = range(record, '', 'match expression')
     const scrutineeRange = range(record, 'scrutinee', 'match expression')
-    const scrutineeApplication = applicationUses
-      .filter((application) => application.consumerPath === consumerPath && contains(scrutineeRange, application))
-      .sort((left, right) =>
-        (position(right.endLine, right.endColumn) - position(right.startLine, right.startColumn))
-        - (position(left.endLine, left.endColumn) - position(left.startLine, left.startColumn)))[0]
+    const scrutineeApplication = enclosedBy(
+      applicationsByConsumer,
+      consumerPath,
+      position(scrutineeRange.startLine, scrutineeRange.startColumn),
+      position(scrutineeRange.endLine, scrutineeRange.endColumn),
+    ).sort(bySpanDescending)[0]?.value
     if (!Array.isArray(record.clauses)) throw new Error('FCS scanner emitted a match expression without clauses')
     return {
       consumerPath,
@@ -211,14 +274,15 @@ const normalizeControlFlow = (parsed, productionFiles, applicationUses, applicat
   const lambdaExpressions = (parsed.lambdaExpressions ?? []).map((record) => {
     const consumerPath = normalizedConsumer(record, productionFiles, 'lambda expression')
     const lambdaRange = range(record, '', 'lambda expression')
+    const lambdaStart = position(lambdaRange.startLine, lambdaRange.startColumn)
+    const lambdaEnd = position(lambdaRange.endLine, lambdaRange.endColumn)
     return {
       consumerPath,
       ...lambdaRange,
       body: range(record, 'body', 'lambda expression'),
-      invokedBy: applicationRanges.filter((application) =>
-        application.consumerPath === consumerPath
-        && position(application.targetStartLine, application.targetStartColumn) <= position(lambdaRange.startLine, lambdaRange.startColumn)
-        && position(lambdaRange.endLine, lambdaRange.endColumn) <= position(application.targetEndLine, application.targetEndColumn))
+      invokedBy: (rangesByConsumer.get(consumerPath) ?? []).filter((application) =>
+        position(application.targetStartLine, application.targetStartColumn) <= lambdaStart
+        && lambdaEnd <= position(application.targetEndLine, application.targetEndColumn))
         .map((application) => ({
           startLine: application.startLine,
           startColumn: application.startColumn,
@@ -264,14 +328,23 @@ const normalizeControlFlow = (parsed, productionFiles, applicationUses, applicat
     endLine: integer(record, 'endLine', 'function definition'),
     endColumn: integer(record, 'endColumn', 'function definition'),
   }))
+  const definitionsByName = rangeGroups(
+    functionDefinitions,
+    (definition) => `${definition.consumerPath}\0${definition.name}`,
+    applicationBounds,
+  )
   const localFunctionBindings = (parsed.localFunctionBindings ?? []).map((record) => {
     const consumerPath = normalizedConsumer(record, productionFiles, 'local function binding')
     const bindingRange = range(record, '', 'local function binding')
     const scope = range(record, 'scope', 'local function binding')
-    const definition = functionDefinitions.find((candidate) =>
-      candidate.consumerPath === consumerPath
-      && candidate.name === record.name
-      && contains(bindingRange, candidate))
+    const definition = typeof record.name !== 'string'
+      ? undefined
+      : enclosedBy(
+        definitionsByName,
+        `${consumerPath}\0${record.name}`,
+        position(bindingRange.startLine, bindingRange.startColumn),
+        position(bindingRange.endLine, bindingRange.endColumn),
+      ).sort(byOrder)[0]?.value
     return {
       consumerPath,
       name: typeof record.name === 'string' ? record.name : '',
@@ -279,15 +352,19 @@ const normalizeControlFlow = (parsed, productionFiles, applicationUses, applicat
       ...bindingRange,
       body: range(record, 'body', 'local function binding'),
       scope,
-      invokedBy: definition ? applicationUses.filter((application) =>
-        application.consumerPath === consumerPath
-        && application.resolvedTarget === definition.fullSymbol
-        && contains(scope, application)).map((application) => ({
-        startLine: application.startLine,
-        startColumn: application.startColumn,
-        endLine: application.endLine,
-        endColumn: application.endColumn,
-      })) : [],
+      invokedBy: definition
+        ? enclosedBy(
+          applicationsByTarget,
+          `${consumerPath}\0${definition.fullSymbol}`,
+          position(scope.startLine, scope.startColumn),
+          position(scope.endLine, scope.endColumn),
+        ).sort(byOrder).map((entry) => ({
+          startLine: entry.value.startLine,
+          startColumn: entry.value.startColumn,
+          endLine: entry.value.endLine,
+          endColumn: entry.value.endColumn,
+        }))
+        : [],
     }
   }).filter((binding) => binding.fullSymbol !== '')
   return {
@@ -315,69 +392,74 @@ function resolvedApplicationUses(symbolUses, applicationRanges) {
     return [textByFile.get(file), offsetsByFile.get(file)]
   }
 
+  const rangeByOwnRange = new Map()
+  for (const candidate of applicationRanges) {
+    const key = `${candidate.consumerPath}\0${candidate.startLine}\0${candidate.startColumn}\0${candidate.endLine}\0${candidate.endColumn}`
+    if (!rangeByOwnRange.has(key)) rangeByOwnRange.set(key, candidate)
+  }
   const semanticTargetOf = (application) => {
     let semantic = application
     const seen = new Set()
     while (!seen.has(semantic)) {
       seen.add(semantic)
-      const nested = applicationRanges.find((candidate) =>
-        candidate.consumerPath === semantic.consumerPath
-        && candidate.startLine === semantic.targetStartLine
-        && candidate.startColumn === semantic.targetStartColumn
-        && candidate.endLine === semantic.targetEndLine
-        && candidate.endColumn === semantic.targetEndColumn)
+      const nested = rangeByOwnRange.get(
+        `${semantic.consumerPath}\0${semantic.targetStartLine}\0${semantic.targetStartColumn}\0${semantic.targetEndLine}\0${semantic.targetEndColumn}`,
+      )
       if (!nested || seen.has(nested)) break
       semantic = nested
     }
     return semantic
   }
 
+  const addressable = (candidate) =>
+    !candidate.isFromType && !candidate.isFromPattern && !candidate.isFromOpenStatement && !candidate.isNamespace && !candidate.isModule
+  const consumerOf = (use) => use.consumerPath
+  const callableByConsumer = rangeGroups(
+    symbolUses.filter((candidate) =>
+      addressable(candidate) && (candidate.inferredType.includes('->') || candidate.symbolKind === 'FSharpUnionCase')),
+    consumerOf,
+    useBounds,
+  )
+  const addressableByConsumer = rangeGroups(symbolUses.filter(addressable), consumerOf, useBounds)
+
   const resolved = applicationRanges.flatMap((parsed) => {
-    const [text, offsets] = source(parsed.consumerPath)
     const semanticTarget = semanticTargetOf(parsed)
     const targetStart = position(semanticTarget.targetStartLine, semanticTarget.targetStartColumn)
     const targetEnd = position(semanticTarget.targetEndLine, semanticTarget.targetEndColumn)
+    const use = firstEnclosedBy(callableByConsumer, parsed.consumerPath, targetStart, targetEnd)?.value
+    if (!use) return []
     const syntacticTargetStart = position(parsed.targetStartLine, parsed.targetStartColumn)
     const syntacticTargetEnd = position(parsed.targetEndLine, parsed.targetEndColumn)
     const applicationStart = position(parsed.startLine, parsed.startColumn)
     const applicationEnd = position(parsed.endLine, parsed.endColumn)
-    const candidates = symbolUses.filter((candidate) => {
-      if (candidate.consumerPath !== parsed.consumerPath || candidate.isFromType || candidate.isFromPattern || candidate.isFromOpenStatement || candidate.isNamespace || candidate.isModule) return false
-      if (!candidate.inferredType.includes('->') && candidate.symbolKind !== 'FSharpUnionCase') return false
-      return targetStart <= position(candidate.line, candidate.column)
-        && position(candidate.endLine, candidate.endColumn) <= targetEnd
-    })
-    const use = candidates.sort((left, right) =>
-      position(left.line, left.column) - position(right.line, right.column)
-      || position(left.endLine, left.endColumn) - position(right.endLine, right.endColumn))[0]
-    if (!use) return []
 
+    const [text, offsets] = source(parsed.consumerPath)
     const targetOffset = (offsets[semanticTarget.targetStartLine - 1] ?? 0) + semanticTarget.targetStartColumn
     const useEndOffset = (offsets[use.endLine - 1] ?? 0) + use.endColumn
     const targetText = text.slice(targetOffset, useEndOffset)
     const sourceAnchor = /(?:[A-Za-z_][A-Za-z0-9_']*\s*\.\s*)*[A-Za-z_][A-Za-z0-9_']*\s*$/.exec(targetText)?.[0]
       ?.replace(/\s+/g, '') ?? targetText
-    const argumentUses = symbolUses.filter((candidate) => {
-      if (candidate.consumerPath !== parsed.consumerPath || candidate.isFromType || candidate.isFromPattern || candidate.isFromOpenStatement || candidate.isNamespace || candidate.isModule) return false
-      const candidateStart = position(candidate.line, candidate.column)
-      const candidateEnd = position(candidate.endLine, candidate.endColumn)
-      const inApplication = applicationStart <= candidateStart && candidateEnd <= applicationEnd
-      const inTarget = syntacticTargetStart <= candidateStart && candidateEnd <= syntacticTargetEnd
-      return inApplication && !inTarget
-    })
-    const orderedArgumentUses = argumentUses
-      .sort((left, right) => position(left.line, left.column) - position(right.line, right.column))
-      .filter((candidate, index, candidates) => !candidates.slice(0, index).some((prior) =>
-        prior.symbol === candidate.symbol
-        && prior.line === candidate.line
-        && prior.column === candidate.column
-        && prior.endLine === candidate.endLine
-        && prior.endColumn === candidate.endColumn))
-    const argumentIdentifiers = orderedArgumentUses.map((candidate) => candidate.symbol.split('.').at(-1)).filter(Boolean)
-    const argumentTypes = Object.fromEntries(argumentIdentifiers.map((name) => [
-      name,
-      orderedArgumentUses.find((candidate) => candidate.symbol.split('.').at(-1) === name)?.inferredType ?? '',
-    ]))
+    const orderedArgumentUses = []
+    const distinctArgument = new Set()
+    for (const entry of enclosedBy(addressableByConsumer, parsed.consumerPath, applicationStart, applicationEnd)
+      .filter((entry) => !(syntacticTargetStart <= entry.start && entry.end <= syntacticTargetEnd))
+      .sort(byArrival)) {
+      const candidate = entry.value
+      const identity = `${candidate.symbol}\0${candidate.line}\0${candidate.column}\0${candidate.endLine}\0${candidate.endColumn}`
+      if (distinctArgument.has(identity)) continue
+      distinctArgument.add(identity)
+      orderedArgumentUses.push(candidate)
+    }
+    const identifierOf = (candidate) => candidate.symbol.split('.').at(-1)
+    const typeByIdentifier = new Map()
+    for (const candidate of orderedArgumentUses) {
+      const identifier = identifierOf(candidate)
+      if (!typeByIdentifier.has(identifier)) typeByIdentifier.set(identifier, candidate.inferredType)
+    }
+    const argumentIdentifiers = orderedArgumentUses.map(identifierOf).filter(Boolean)
+    const argumentTypes = Object.fromEntries(
+      argumentIdentifiers.map((name) => [name, typeByIdentifier.get(name) ?? '']),
+    )
     return [{
       consumerPath: parsed.consumerPath,
       sourceAnchor,
@@ -399,22 +481,24 @@ function resolvedApplicationUses(symbolUses, applicationRanges) {
     }]
   })
 
-  const containsApplicationInTarget = (outer, inner) =>
-    outer.consumerPath === inner.consumerPath
-    && outer.resolvedTarget === inner.resolvedTarget
-    && position(outer.targetStartLine, outer.targetStartColumn) <= position(inner.startLine, inner.startColumn)
-    && position(inner.endLine, inner.endColumn) <= position(outer.targetEndLine, outer.targetEndColumn)
-    && (outer.startLine !== inner.startLine || outer.startColumn !== inner.startColumn
-      || outer.endLine !== inner.endLine || outer.endColumn !== inner.endColumn)
+  const resolvedByTarget = rangeGroups(
+    resolved,
+    (application) => `${application.consumerPath}\0${application.resolvedTarget}`,
+    applicationBounds,
+  )
   const innerOfCurried = new Set()
   const mergedArguments = new Map()
   const merge = (application) => {
     if (mergedArguments.has(application)) return mergedArguments.get(application)
-    const inner = resolved
-      .filter((candidate) => containsApplicationInTarget(application, candidate))
-      .sort((left, right) =>
-        (position(right.endLine, right.endColumn) - position(right.startLine, right.startColumn))
-        - (position(left.endLine, left.endColumn) - position(left.startLine, left.startColumn)))[0]
+    const inner = enclosedBy(
+      resolvedByTarget,
+      `${application.consumerPath}\0${application.resolvedTarget}`,
+      position(application.targetStartLine, application.targetStartColumn),
+      position(application.targetEndLine, application.targetEndColumn),
+    ).filter((entry) =>
+      entry.value.startLine !== application.startLine || entry.value.startColumn !== application.startColumn
+      || entry.value.endLine !== application.endLine || entry.value.endColumn !== application.endColumn)
+      .sort(bySpanDescending)[0]?.value
     if (inner) innerOfCurried.add(inner)
     const inherited = inner ? merge(inner) : { identifiers: [], types: {} }
     const value = {
