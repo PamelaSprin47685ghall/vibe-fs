@@ -471,6 +471,7 @@
     <Compile Include="Execution/Delegation/Fork/Host/JoinSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/Agent.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/Pty.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Host/HostForkPtySurface.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/State.fs"/>
     <Compile Include="Interaction/Repair/Port.fs"/>
 

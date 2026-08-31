@@ -2206,6 +2206,7 @@
       "src/Wanxiangshu/Execution/Delegation/Fork/Host/JoinSurface.fs",
       "src/Wanxiangshu/Execution/Delegation/Fork/Host/PendingRun.fs",
       "src/Wanxiangshu/Execution/Delegation/Fork/Host/Pty.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs",
       "src/Wanxiangshu/Execution/Delegation/Fork/Host/Restart.fs",
       "src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs",
       "src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs",

@@ -1578,6 +1578,15 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'Execution/Delegation/Fork/Host/HostForkPtySurface.js',
+    owner: 'delegation',
+    laws: ['MANAGED-SESSION-012'],
+    lawOwners: { 'MANAGED-SESSION-012': 'managed-session-lifecycle' },
+    source: 'src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs',
+    representation: 'json',
+    kind: 'resource',
+  },
+  {
     module: 'Interaction/Dispatch/DispatchSurface.js',
     owner: 'dispatch-protocol',
     laws: ['DISPATCH-PROTOCOL-002', 'DISPATCH-PROTOCOL-004', 'DISPATCH-PROTOCOL-005', 'DISPATCH-PROTOCOL-007', 'DISPATCH-PROTOCOL-009', 'EFFECT-ACCOUNTING-008'],
