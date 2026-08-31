@@ -37,6 +37,16 @@ module JsTransactionSurface =
         else
             unbox<obj array> value |> Array.toList |> List.map mutationOf
 
+    let private readSnapshotsOf (value: obj) : JsReadSnapshot list =
+        if isNull value then
+            []
+        else
+            unbox<obj array> value
+            |> Array.toList
+            |> List.map (fun snapshot ->
+                { Path = text (snapshot?path)
+                  Text = text (snapshot?text) })
+
     let private declarationOf (value: obj) : AnchorDeclaration =
         let spec =
             match text (value?kind) with
@@ -103,20 +113,46 @@ module JsTransactionSurface =
         JsTransaction.validateFreshness (currentOf current) (mutationsOf (box mutations))
         |> unitResult
 
-    let preflight (existing: string array) (current: obj) (mutations: obj array) : obj =
-        JsTransaction.preflight (existsOf existing) (currentOf current) (mutationsOf (box mutations))
+    let preflight (existing: string array) (current: obj) (readSnapshots: obj array) (mutations: obj array) : obj =
+        JsTransaction.preflight
+            (existsOf existing)
+            (currentOf current)
+            (readSnapshotsOf (box readSnapshots))
+            (mutationsOf (box mutations))
         |> unitResult
-
-    let private pairToJs (path, value) = box [| box path; box value |]
 
     let commitPlan (mutations: obj array) : obj array =
         JsTransaction.commitPlan (mutationsOf (box mutations))
-        |> List.map pairToJs
+        |> List.map (fun mutation ->
+            match mutation with
+            | JsCommitMutation.RewriteFile(path, expectedCurrent, newText) ->
+                box
+                    {| kind = "rewrite"
+                       path = path
+                       expectedCurrent = expectedCurrent
+                       newText = newText |}
+            | JsCommitMutation.CreateFile(path, newText) ->
+                box
+                    {| kind = "create"
+                       path = path
+                       newText = newText |})
         |> List.toArray
 
     let rollbackPlan (mutations: obj array) : obj array =
         JsTransaction.rollbackPlan (mutationsOf (box mutations))
-        |> List.map (fun (path, value) -> box [| box path; value |> Option.map box |> Option.toObj |])
+        |> List.map (fun mutation ->
+            match mutation with
+            | JsRollbackMutation.RestoreFile(path, expectedCurrent, originalText) ->
+                box
+                    {| kind = "restore"
+                       path = path
+                       expectedCurrent = expectedCurrent
+                       originalText = originalText |}
+            | JsRollbackMutation.RemoveCreatedFile(path, expectedCurrent) ->
+                box
+                    {| kind = "removeCreated"
+                       path = path
+                       expectedCurrent = expectedCurrent |})
         |> List.toArray
 
     let private eventStoreOf (handle: obj) : IEventStore = (unbox<EventStoreHandle> handle).Store

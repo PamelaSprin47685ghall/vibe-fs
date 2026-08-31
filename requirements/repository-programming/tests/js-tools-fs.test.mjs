@@ -209,6 +209,20 @@ test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_commitPlan_rejects_a_create_race_wi
   }
 })
 
+test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_commitPlan_rejects_a_stale_rewrite_without_overwriting', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'external', 'utf8')
+    const result = commitPlan(dir, [
+      { kind: 'rewrite', path: 'a.txt', expectedCurrent: 'snapshot', newText: 'tool' },
+    ])
+    assert.equal(codeOf(result), 'FILE_CHANGED')
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'external')
+  } finally {
+    cleanup()
+  }
+})
+
 test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_rollbackPlan_is_CAS_and_preserves_third_party_changes', () => {
   const { dir, cleanup } = sandbox()
   try {

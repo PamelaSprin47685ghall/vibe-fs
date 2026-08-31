@@ -71,7 +71,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_preflight_covers_read_only_snapshot
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commit_plan_is_exact', () => {
-  const mutations = [rewrite('a.txt', 'oldA', 'newA'), create('b.txt', 'newB')]
+  const mutations = [create('b.txt', 'newB'), rewrite('a.txt', 'oldA', 'newA')]
   assert.deepEqual(commitPlan(mutations), [
     { kind: 'rewrite', path: 'a.txt', expectedCurrent: 'oldA', newText: 'newA' },
     { kind: 'create', path: 'b.txt', newText: 'newB' },
@@ -79,7 +79,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commit_plan_is_exact', () => {
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_rollback_plan_is_exact', () => {
-  const mutations = [rewrite('a.txt', 'oldA', 'newA'), create('b.txt', 'newB')]
+  const mutations = [create('b.txt', 'newB'), rewrite('a.txt', 'oldA', 'newA')]
   // rollback restores rewrites and marks creates for removal, reversed order
   assert.deepEqual(rollbackPlan(mutations), [
     { kind: 'removeCreated', path: 'b.txt', expectedCurrent: 'newB' },

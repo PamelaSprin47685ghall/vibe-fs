@@ -167,6 +167,40 @@ test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_workflow_rejects_a_create_target_ad
   }
 })
 
+test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_workflow_tracks_every_file_scanned_by_grep', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'source.txt'), 'needle', 'utf8')
+    const program = `class Js extends JsProgram {
+  async run() {
+    const matches = await this.grep('needle', '*.txt');
+    this.write('output.txt', String(matches.length));
+    return { count: matches.length };
+  }
+}`
+    const outcome = await runObserved(
+      dir,
+      'Coder',
+      'en',
+      program,
+      2000,
+      4_102_444_800_000,
+      1 << 20,
+      null,
+      async (readPaths) => {
+        assert.deepEqual(readPaths, ['source.txt'])
+        writeFileSync(join(dir, 'source.txt'), 'external', 'utf8')
+      },
+    )
+
+    assert.equal(caseName(outcome), 'Failed')
+    assert.equal(failureCode(outcome), 'FILE_CHANGED')
+    assert.equal(existsSync(join(dir, 'output.txt')), false)
+  } finally {
+    cleanup()
+  }
+})
+
 test('WHAT[REPOSITORY-PROGRAMMING-018] JS085_workflow_file_missing_fails_the_program', async () => {
   const { dir, cleanup } = sandbox()
   try {
