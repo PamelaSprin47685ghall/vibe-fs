@@ -23,7 +23,6 @@ open Wanxiangshu.Strength.Persistence
 
 open Fable.Core
 open Fable.Core.JsInterop
-open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -64,11 +63,19 @@ open Wanxiangshu.Strength.Replica
 /// EventStore owns them (JS-012).
 module JsMutationFs =
 
-    [<Import("readFileSync", "node:fs")>]
-    let private readFileBuffer (path: string) : obj = jsNative
+    type private ResolvedCommitMutation =
+        | ResolvedRewriteFile of path: string * resolvedPath: string * expectedCurrent: string * newText: string
+        | ResolvedCreateFile of path: string * resolvedPath: string * newText: string
+
+    type private ResolvedRollbackMutation =
+        | ResolvedRestoreFile of resolvedPath: string * expectedCurrent: string * originalText: string
+        | ResolvedRemoveCreatedFile of resolvedPath: string * expectedCurrent: string
 
     [<Import("writeFileSync", "node:fs")>]
     let private writeFileSync (path: string) (data: string) : unit = jsNative
+
+    [<Import("writeFileSync", "node:fs")>]
+    let private writeFileWithOptions (path: string) (data: string) (options: obj) : unit = jsNative
 
     [<Import("existsSync", "node:fs")>]
     let private existsSync (path: string) : bool = jsNative
@@ -85,9 +92,6 @@ module JsMutationFs =
     [<Import("isAbsolute", "node:path")>]
     let private pathIsAbsolute (path: string) : bool = jsNative
 
-    [<Emit("new TextDecoder('utf-8', { fatal: true }).decode($0)")>]
-    let private decodeUtf8 (buffer: obj) : string = jsNative
-
     /// Resolve a tool path under root: relative paths join root; absolute
     /// paths resolve as-is (the bindings enforce the inside-root boundary).
     let resolveToolPath (root: string) (path: string) : string =
@@ -103,106 +107,9 @@ module JsMutationFs =
         with _ ->
             false
 
-    let private tryExists (path: string) : bool =
-        try
-            existsSync path
-        with _ ->
-            false
-
-    let private readExistingSnapshot (path: string) (full: string) : Result<string * string option, JsFailure> =
-        try
-            Ok(path, Some(decodeUtf8 (readFileBuffer full)))
-        with _ ->
-            Error(JsFailure.FileReadFailed path)
-
-    let private snapshotOne (resolvePath: string -> string) (path: string) : Result<string * string option, JsFailure> =
-        let full = resolvePath path
-
-        if tryExists full then
-            readExistingSnapshot path full
-        else
-            Ok(path, None)
-
     let private removeIfPresent (full: string) : unit =
         if existsSync full then
             unlinkSync full
-
-    let private writeOrRemove (full: string) (original: string option) : unit =
-        match original with
-        | Some text -> writeFileSync full text
-        | None -> removeIfPresent full
-
-    let private restoreOneQuietly (resolvePath: string -> string) (path: string) (original: string option) : unit =
-        try
-            writeOrRemove (resolvePath path) original
-        with _ ->
-            ()
-
-    let private rollbackApplied (resolvePath: string -> string) (doneList: (string * string option) list) : unit =
-        for (appliedPath, appliedOriginal) in doneList do
-            restoreOneQuietly resolvePath appliedPath appliedOriginal
-
-    let private writeOne
-        (resolvePath: string -> string)
-        (snapshotList: (string * string option) list)
-        (path: string)
-        (newText: string)
-        : Result<string * string option, JsFailure> =
-        let full = resolvePath path
-
-        try
-            writeFileSync full newText
-            Ok(path, snd (List.find (fun (p, _) -> p = path) snapshotList))
-        with _ ->
-            Error JsFailure.TransactionCommitFailed
-
-    let private afterWrite
-        (resolvePath: string -> string)
-        (attempt: Result<string * string option, JsFailure>)
-        (rest: (string * string) list)
-        (doneList: (string * string option) list)
-        (continueApply: (string * string) list -> (string * string option) list -> Result<unit, JsFailure>)
-        : Result<unit, JsFailure> =
-        match attempt with
-        | Ok doneItem -> continueApply rest (doneItem :: doneList)
-        | Error failure ->
-            rollbackApplied resolvePath doneList
-            Error failure
-
-    let private applyWrites
-        (resolvePath: string -> string)
-        (snapshotList: (string * string option) list)
-        (plan: (string * string) list)
-        : Result<unit, JsFailure> =
-        let rec apply (remaining: (string * string) list) (doneList: (string * string option) list) =
-            match remaining with
-            | [] -> Ok()
-            | (path, newText) :: rest ->
-                afterWrite resolvePath (writeOne resolvePath snapshotList path newText) rest doneList apply
-
-        apply plan []
-
-    /// JS-013: apply a commit plan under root — two phases. Phase 1 reads every
-    /// original snapshot; any read failure aborts BEFORE any write (a target
-    /// that cannot be snapshotted cannot be rolled back). Phase 2 writes all
-    /// files; a write failure rolls back every already-written path
-    /// (rewrites restored, creates removed) — all-or-nothing.
-    let commitPlan (root: string) (plan: (string * string) list) : Result<unit, JsFailure> =
-        let resolvePath path = resolveToolPath root path
-
-        result {
-            let! snapshotList = plan |> List.traverseResultM (fun (path, _) -> snapshotOne resolvePath path)
-
-            return! applyWrites resolvePath snapshotList plan
-        }
-
-    let private restorePlanItem (root: string) (path: string) (original: string option) : unit =
-        restoreOneQuietly (resolveToolPath root) path original
-
-    /// JS-015: rollback — restore originals / remove creates, reversed order.
-    let rollbackPlan (root: string) (plan: (string * string option) list) : unit =
-        for (path, original) in plan do
-            restorePlanItem root path original
 
     let private applyRestore (full: string) (restoreTo: string option) : unit =
         match restoreTo with
@@ -215,13 +122,104 @@ module JsMutationFs =
         with _ ->
             ()
 
-    /// JS-015: undo one mutation only when the disk still holds the text we
-    /// wrote (expectedCurrent). If the file was changed by someone else, or we
-    /// never wrote it, nothing is touched — recovery never clobbers external
-    /// edits.
-    let undoIfMatches (root: string) (path: string) (expectedCurrent: string) (restoreTo: string option) : unit =
-        let full = resolveToolPath root path
-
+    let private undoIfMatchesResolved (full: string) (expectedCurrent: string) (restoreTo: string option) : unit =
         match JsUtf8Fs.readUtf8Classified full with
         | Ok current when current = expectedCurrent -> undoMatchingFile full restoreTo
         | _ -> ()
+
+    let undoIfMatches (root: string) (path: string) (expectedCurrent: string) (restoreTo: string option) : unit =
+        undoIfMatchesResolved (resolveToolPath root path) expectedCurrent restoreTo
+
+    let private rollbackResolved mutation =
+        match mutation with
+        | ResolvedRestoreFile(resolvedPath, expectedCurrent, originalText) ->
+            undoIfMatchesResolved resolvedPath expectedCurrent (Some originalText)
+        | ResolvedRemoveCreatedFile(resolvedPath, expectedCurrent) ->
+            undoIfMatchesResolved resolvedPath expectedCurrent None
+
+    let private validateRewrite path resolvedPath expectedCurrent =
+        match JsUtf8Fs.readUtf8Classified resolvedPath with
+        | Ok current when current = expectedCurrent -> None
+        | _ -> Some(JsFailure.FileChanged path)
+
+    let private validateOne mutation =
+        match mutation with
+        | ResolvedRewriteFile(path, resolvedPath, expectedCurrent, _) ->
+            validateRewrite path resolvedPath expectedCurrent
+        | ResolvedCreateFile(path, resolvedPath, _) when existsPath resolvedPath -> Some(JsFailure.FileChanged path)
+        | ResolvedCreateFile _ -> None
+
+    let private validatePlan plan =
+        plan
+        |> List.tryPick validateOne
+        |> function
+            | Some failure -> Error failure
+            | None -> Ok()
+
+    let private validateMutation mutation =
+        match validateOne mutation with
+        | Some failure -> Error failure
+        | None -> Ok mutation
+
+    let private writeRewrite resolvedPath expectedCurrent newText =
+        try
+            writeFileSync resolvedPath newText
+            Ok(ResolvedRestoreFile(resolvedPath, newText, expectedCurrent))
+        with _ ->
+            Error JsFailure.TransactionCommitFailed
+
+    let private writeCreate path resolvedPath newText =
+        try
+            writeFileWithOptions resolvedPath newText (createObj [ "encoding" ==> "utf8"; "flag" ==> "wx" ])
+
+            Ok(ResolvedRemoveCreatedFile(resolvedPath, newText))
+        with
+        | _ when existsPath resolvedPath -> Error(JsFailure.FileChanged path)
+        | _ -> Error JsFailure.TransactionCommitFailed
+
+    let private writeValidated mutation =
+        match mutation with
+        | ResolvedRewriteFile(_, resolvedPath, expectedCurrent, newText) ->
+            writeRewrite resolvedPath expectedCurrent newText
+        | ResolvedCreateFile(path, resolvedPath, newText) -> writeCreate path resolvedPath newText
+
+    let private writeOne mutation =
+        validateMutation mutation |> Result.bind writeValidated
+
+    let private writeOrRollback applied mutation =
+        match writeOne mutation with
+        | Ok rollback -> Ok rollback
+        | Error failure ->
+            applied |> List.iter rollbackResolved
+            Error failure
+
+    let private applyWrites plan =
+        let rec apply remaining applied =
+            match remaining with
+            | [] -> Ok()
+            | mutation :: rest ->
+                writeOrRollback applied mutation
+                |> Result.bind (fun rollback -> apply rest (rollback :: applied))
+
+        apply plan []
+
+    let private resolveCommitMutation root mutation =
+        match mutation with
+        | JsCommitMutation.RewriteFile(path, expectedCurrent, newText) ->
+            ResolvedRewriteFile(path, resolveToolPath root path, expectedCurrent, newText)
+        | JsCommitMutation.CreateFile(path, newText) -> ResolvedCreateFile(path, resolveToolPath root path, newText)
+
+    let private resolveRollbackMutation root mutation =
+        match mutation with
+        | JsRollbackMutation.RestoreFile(path, expectedCurrent, originalText) ->
+            ResolvedRestoreFile(resolveToolPath root path, expectedCurrent, originalText)
+        | JsRollbackMutation.RemoveCreatedFile(path, expectedCurrent) ->
+            ResolvedRemoveCreatedFile(resolveToolPath root path, expectedCurrent)
+
+    let commitPlan (root: string) (plan: JsCommitMutation list) : Result<unit, JsFailure> =
+        let resolvedPlan = plan |> List.map (resolveCommitMutation root)
+
+        validatePlan resolvedPlan |> Result.bind (fun () -> applyWrites resolvedPlan)
+
+    let rollbackPlan (root: string) (plan: JsRollbackMutation list) : unit =
+        plan |> List.map (resolveRollbackMutation root) |> List.iter rollbackResolved

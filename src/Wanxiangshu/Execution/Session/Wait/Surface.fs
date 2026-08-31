@@ -17,6 +17,12 @@ module CausalWaitSurface =
     type private LeaseHandle(lease: IWaitLease) =
         member _.Lease = lease
 
+    type private ObserverHandle(observer: IWaitObserver) =
+        member _.Enter(wait: DiagnosticWait) = observer.Enter wait
+
+    type private SnapshotReaderHandle(reader: IWaitSnapshotReader) =
+        member _.Snapshot() = reader.Snapshot()
+
     [<Emit("$0($1)")>]
     let private call1 (fn: obj) (value: obj) : obj = jsNative
 
@@ -222,9 +228,32 @@ module CausalWaitSurface =
         | "cancelledBy" -> box {| kind = kind; owner = value |}
         | _ -> box {| kind = kind |}
 
-    let enter (registry: obj) (descriptor: obj) : obj =
+    let observerCapability (registry: obj) : obj =
         let handle = registry :?> RegistryHandle
-        LeaseHandle((handle.Registry :> IWaitObserver).Enter(waitOf descriptor)) :> obj
+        ObserverHandle(handle.Registry :> IWaitObserver) :> obj
+
+    let snapshotReaderCapability (registry: obj) : obj =
+        let handle = registry :?> RegistryHandle
+        SnapshotReaderHandle(handle.Registry :> IWaitSnapshotReader) :> obj
+
+    let private requireObserver (value: obj) =
+        match value with
+        | :? ObserverHandle as handle -> handle
+        | _ -> invalidArg "observer" "observer capability required"
+
+    let private requireSnapshotReader (value: obj) =
+        match value with
+        | :? SnapshotReaderHandle as handle -> handle
+        | _ -> invalidArg "reader" "snapshot reader capability required"
+
+    let observerEnter (observer: obj) (descriptor: obj) : obj =
+        LeaseHandle((requireObserver observer).Enter(waitOf descriptor)) :> obj
+
+    let readerSnapshot (reader: obj) : obj =
+        snapshotObject ((requireSnapshotReader reader).Snapshot())
+
+    let enter (registry: obj) (descriptor: obj) : obj =
+        observerEnter (observerCapability registry) descriptor
 
     let markExit (lease: obj) (exit: string) : unit =
         (lease :?> LeaseHandle).Lease.MarkExit(exitOf exit)
@@ -232,8 +261,7 @@ module CausalWaitSurface =
     let dispose (lease: obj) : unit = (lease :?> LeaseHandle).Lease.Dispose()
 
     let snapshot (registry: obj) : obj =
-        let handle = registry :?> RegistryHandle
-        snapshotObject ((handle.Registry :> IWaitSnapshotReader).Snapshot())
+        readerSnapshot (snapshotReaderCapability registry)
 
     let historyCapacity (registry: obj) : int =
         (registry :?> RegistryHandle).Registry.HistoryCapacity
@@ -313,7 +341,3 @@ module CausalWaitSurface =
         snapshotObject (CausalWaitHub.snapshot ())
 
     let hubWriteToWorkspace () : unit = CausalWaitHub.writeToWorkspace ()
-
-    let observerHasSnapshot () = false
-
-    let readerHasSnapshot () = true

@@ -23,26 +23,36 @@ module JsFilesystemSurface =
         | "regex" -> AnchorSpec.Regex(text (value?text))
         | other -> invalidArg "kind" (sprintf "unknown anchor kind: %s" other)
 
-    let private planOf (value: obj) : (string * string) list =
+    let private planOf (value: obj) : JsCommitMutation list =
         if isNull value then
             []
         else
             unbox<obj array> value
             |> Array.toList
             |> List.map (fun item ->
-                let pair = unbox<obj array> item
-                text pair[0], text pair[1])
+                match text (item?kind) with
+                | "rewrite" ->
+                    JsCommitMutation.RewriteFile(text (item?path), text (item?expectedCurrent), text (item?newText))
+                | "create" -> JsCommitMutation.CreateFile(text (item?path), text (item?newText))
+                | other -> invalidArg "kind" (sprintf "unknown commit mutation kind: %s" other))
 
-    let private rollbackOf (value: obj) : (string * string option) list =
+    let private rollbackOf (value: obj) : JsRollbackMutation list =
         if isNull value then
             []
         else
             unbox<obj array> value
             |> Array.toList
             |> List.map (fun item ->
-                let pair = unbox<obj array> item
-                let original = if isNull pair[1] then None else Some(text pair[1])
-                text pair[0], original)
+                match text (item?kind) with
+                | "restore" ->
+                    JsRollbackMutation.RestoreFile(
+                        text (item?path),
+                        text (item?expectedCurrent),
+                        text (item?originalText)
+                    )
+                | "removeCreated" ->
+                    JsRollbackMutation.RemoveCreatedFile(text (item?path), text (item?expectedCurrent))
+                | other -> invalidArg "kind" (sprintf "unknown rollback mutation kind: %s" other))
 
     let readUtf8 (path: string) : obj =
         match JsUtf8Fs.readUtf8Classified path with

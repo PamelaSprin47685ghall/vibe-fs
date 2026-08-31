@@ -54,7 +54,7 @@ test('WHAT[CRASH-019] effect phases name the actual admission and physical opera
     path: 'src/Wanxiangshu/Change/Runtime.fs',
     symbols: ['WorktreeResource.Create', 'WorktreeResource.Adopt'],
   })
-  assert.deepEqual(row(registry, 'branch-fast-forward').admission.symbols, ['publishUnderGate', 'IntegrationGate.acquire'])
+  assert.deepEqual(row(registry, 'branch-fast-forward').admission.symbols, ['publishUnderGate', 'AcquirePublishGate'])
   assert.deepEqual(row(registry, 'branch-fast-forward').physical_receipt.symbols, ['ffMerge'])
   assert.deepEqual(row(registry, 'todo-write').admission.symbols, ['runBeforeTodo', 'PreparedBridge'])
   assert.deepEqual(row(registry, 'todo-write').physical_receipt.symbols, ['runAfterTodo', 'PhysicalSuccessEvidence.LiveAfterSuccess'])

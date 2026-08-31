@@ -685,6 +685,10 @@
       "owner": "delegation"
     },
     {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handle/JournalSurface.fs",
+      "owner": "delegation"
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Delegation/Handle/JoinInterruptRegistry.fs",
       "owner": "delegation"
     },
@@ -846,6 +850,10 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs",
+      "owner": "managed-session-lifecycle"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Attachment/SatelliteSurface.fs",
       "owner": "managed-session-lifecycle"
     },
     {
@@ -1906,6 +1914,10 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs",
+      "owner": "interaction-authority"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/TerminalPolicySurface.fs",
       "owner": "interaction-authority"
     },
     {

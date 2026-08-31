@@ -35,7 +35,7 @@ Missing-Material Filter (同 horizon 已看见的材料逐文件跳过)
 - **native read**：`tool.execute.after` 登记成功 read 的路径；若该路径本身是 package 根级 Markdown，先记为 visible material，再解析其覆盖 package 并只请求未读兄弟材料。
 - **native mutation**：`tool.execute.before` 仅做 fail-open grounding request，以便尽可能在 effect 前冻结当前规范；无论 request 成败都不拒绝、不延期原工具。
 - **js-* read**：sandbox 的 `js.read` 成功后把实际读取路径记录到本次 file-access observation；内部为了 `edit` staging 而读取旧文本不算模型读入。
-- **js-* effect**：transaction 在 preflight 后把显式 read set 与完整 mutation effect set 一并交给同一 observation port；该 port 的错误被吞掉，commit 资格只由 repository-programming 自身事务规则决定。
+- **js-* effect**：transaction 在 preflight 后把显式 read set 与完整 mutation effect set 一并交给同一 observation port；该 port 的错误被吞掉，commit 资格只由 repository-programming 自身事务规则决定。preflight→observation→fresh preflight 的冲突闭包由 `REPOSITORY-PROGRAMMING-014` 拥有；本包只证明完整 effect set 被观察且 observation 失败不阻断合法提交。
 - **顺序**：同一 js-* 调用先登记 read-visible facts，再解析 effect coverage，因此“先读 WHAT.md、再改受覆盖源码”不会把 WHAT.md 自动重复注入。
 
 ### 3. 持久化与前缀保护 (Durable Projection & Prefix Stability)

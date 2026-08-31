@@ -901,7 +901,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Persistence/Journal/FactCodecSurface.js',
     owner: 'durable-events',
-    laws: ['DURABLE-EVENTS-002', 'DURABLE-EVENTS-003', 'DURABLE-EVENTS-005'],
+    laws: ['DURABLE-EVENTS-002', 'DURABLE-EVENTS-003', 'DURABLE-EVENTS-005', 'MANAGED-SESSION-009'],
+    lawOwners: { 'MANAGED-SESSION-009': 'managed-session-lifecycle' },
     source: 'src/Wanxiangshu/Persistence/Journal/FactCodecSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -965,7 +966,9 @@ export const SURFACE_MANIFEST = [
       'DISTILL-009',
       'DISTILL-010',
       'DISTILL-013',
+      'MANAGED-SESSION-010',
     ],
+    lawOwners: { 'MANAGED-SESSION-010': 'managed-session-lifecycle' },
     source: 'src/Wanxiangshu/OpenCode/Tools/DistillationSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -1072,14 +1075,23 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Host/SessionsSurface.js',
     owner: 'session-ontology',
-    laws: ['SESSION-ONTOLOGY-006', 'MANAGED-SESSION-016', 'MANAGED-SESSION-017'],
+    laws: ['SESSION-ONTOLOGY-006', 'MANAGED-SESSION-003', 'MANAGED-SESSION-016', 'MANAGED-SESSION-017'],
     lawOwners: {
+      'MANAGED-SESSION-003': 'managed-session-lifecycle',
       'MANAGED-SESSION-016': 'managed-session-lifecycle',
       'MANAGED-SESSION-017': 'managed-session-lifecycle',
     },
     source: 'src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs',
     representation: 'json',
     kind: 'resource',
+  },
+  {
+    module: 'OpenCode/Host/TerminalPolicySurface.js',
+    owner: 'managed-session-lifecycle',
+    laws: ['MANAGED-SESSION-006'],
+    source: 'src/Wanxiangshu/OpenCode/Host/TerminalPolicySurface.fs',
+    representation: 'json',
+    kind: 'pure',
   },
   {
     module: 'Participant/Provider/Projection/Surface.js',
@@ -1337,7 +1349,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Process/Surface.js',
     owner: 'time-capability',
-    laws: ['TIME-001', 'TIME-002', 'TIME-003', 'TIME-004', 'TIME-005', 'TIME-006', 'TIME-007'],
+    laws: ['TIME-001', 'TIME-002', 'TIME-003', 'TIME-005', 'TIME-006', 'TIME-007'],
     source: 'src/Wanxiangshu/Process/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1482,7 +1494,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Execution/Delegation/Handle/Surface.js',
     owner: 'managed-session-lifecycle',
-    laws: ['MANAGED-SESSION-006', 'MANAGED-SESSION-007', 'MANAGED-SESSION-008', 'MANAGED-SESSION-009', 'MANAGED-SESSION-013', 'MANAGED-SESSION-015'],
+    laws: ['MANAGED-SESSION-006', 'MANAGED-SESSION-007', 'MANAGED-SESSION-008', 'MANAGED-SESSION-009', 'MANAGED-SESSION-010', 'MANAGED-SESSION-013', 'MANAGED-SESSION-015'],
     source: 'src/Wanxiangshu/Execution/Delegation/Handle/Surface.fs',
     representation: 'opaque-capability',
     kind: 'pure',
@@ -1490,10 +1502,18 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Execution/Delegation/Handle/FoldSurface.js',
     owner: 'managed-session-lifecycle',
-    laws: ['MANAGED-SESSION-006', 'MANAGED-SESSION-008', 'MANAGED-SESSION-015'],
+    laws: ['MANAGED-SESSION-006', 'MANAGED-SESSION-008', 'MANAGED-SESSION-009', 'MANAGED-SESSION-015'],
     source: 'src/Wanxiangshu/Execution/Delegation/Handle/FoldSurface.fs',
     representation: 'opaque-capability',
     kind: 'pure',
+  },
+  {
+    module: 'Execution/Delegation/Handle/JournalSurface.js',
+    owner: 'managed-session-lifecycle',
+    laws: ['MANAGED-SESSION-009'],
+    source: 'src/Wanxiangshu/Execution/Delegation/Handle/JournalSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
   },
   {
     module: 'Execution/Session/Attachment/AttachmentSurface.js',
@@ -1503,6 +1523,14 @@ export const SURFACE_MANIFEST = [
     source: 'src/Wanxiangshu/Execution/Session/Attachment/AttachmentSurface.fs',
     representation: 'json',
     kind: 'pure',
+  },
+  {
+    module: 'Execution/Session/Attachment/SatelliteSurface.js',
+    owner: 'managed-session-lifecycle',
+    laws: ['MANAGED-SESSION-002', 'MANAGED-SESSION-003', 'MANAGED-SESSION-011'],
+    source: 'src/Wanxiangshu/Execution/Session/Attachment/SatelliteSurface.fs',
+    representation: 'json',
+    kind: 'resource',
   },
   {
     module: 'OpenCode/JoinResultRendererSurface.js',
