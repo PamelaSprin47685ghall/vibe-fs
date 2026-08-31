@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
 
 import {
-  RAW_TIME_SCAN_LAYERS,
+  RAW_TIME_SCAN_ROOTS,
   collectRawTimeScanEntries,
   scanG4RCeVocabulary,
   scanRawTimeEntries,
@@ -27,8 +27,8 @@ test('WHAT[TIME-004] domain_application_session_contain_no_raw_time_tokens', () 
 })
 
 test('WHAT[TIME-004] collector_reads_the_whole_production_tree_before_allowlisting_adapters', () => {
-  assert.deepEqual([...RAW_TIME_SCAN_LAYERS], ['.'])
-  const entries = collectRawTimeScanEntries(PRODUCTION_ROOT, RAW_TIME_SCAN_LAYERS)
+  assert.deepEqual([...RAW_TIME_SCAN_ROOTS], ['.'])
+  const entries = collectRawTimeScanEntries(PRODUCTION_ROOT, RAW_TIME_SCAN_ROOTS)
   assert.ok(entries.some((entry) => entry.file === 'Process/PtyTiming.fs'))
   assert.ok(entries.some((entry) => entry.file === 'Change/Program.fs'))
 })
@@ -68,7 +68,7 @@ test('WHAT[TIME-004] exact_mutation_is_detected_without_a_directory_allowlist_es
 test('WHAT[TIME-004] missing_production_root_fails_closed', () => {
   const missing = join(PRODUCTION_ROOT, '__missing_time_gate_root__')
   assert.throws(
-    () => collectRawTimeScanEntries(missing, RAW_TIME_SCAN_LAYERS),
+    () => collectRawTimeScanEntries(missing, RAW_TIME_SCAN_ROOTS),
     /raw-time scan root does not exist/,
   )
 })
