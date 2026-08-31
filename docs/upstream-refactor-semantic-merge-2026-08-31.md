@@ -119,3 +119,4 @@
 - Review cohort witness：Finality admission 复用 `ReviewWitness.isQualifiedConfirmationFor`，同时约束 cohort/nested reviewer、barrier、outer/nested tree 与独立 ProviderRun/ToolCall，结构伪造不再升级为 blessing authority。
 - Review physical evidence：`PhysicalUserMessageId.isNonBlank` 成为唯一 predicate，JudgeTool、Direct CE、witness 与 replay qualification 均在写 durable verdict 前 fail closed；空白输入保持 zero-effect。
 - Concern address validity：subscription command 与 `MailboxSubscribed` replay 复用 `validateAddress`；空白 `id/concern` fail closed，不创建 mailbox/announcement。
+- Casebook execution marker：`FetchTool.Execute` 复用 `CasebookFeature.isEnabled`，使直接构造工具也无法绕过 marker；disabled workspace 在 index/replay/event 之前拒绝。
