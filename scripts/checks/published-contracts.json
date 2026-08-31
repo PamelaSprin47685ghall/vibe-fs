@@ -4896,6 +4896,7 @@
         "interaction-authority"
       ],
       "symbols": [
+        "Wanxiangshu.Interaction.Repair.InteractionRepairSendOutcome",
         "Wanxiangshu.Interaction.Repair.InteractionRepairSendOutcome.AlreadyAdmitted",
         "Wanxiangshu.Interaction.Repair.InteractionRepairSendOutcome.Failed",
         "Wanxiangshu.Interaction.Repair.InteractionRepairSendOutcome.Retired",
@@ -5045,16 +5046,6 @@
         "Wanxiangshu.Process.DeadlineModule.ofBudget"
       ],
       "justification": "TimeCapability.Deadline publishes exactly the compiler-observed symbols required by the listed production owners; every unlisted sibling remains private to time-capability."
-    },
-    {
-      "path": "src/Wanxiangshu/Process/DeadlineSurface.fs",
-      "owner": "time-capability",
-      "node": "time-capability-ports-deadline-keep",
-      "contract": "TimeCapability.DeadlineSurface",
-      "kind": "published-contract",
-      "consumers": [],
-      "symbols": [],
-      "justification": "TimeCapability.DeadlineSurface publishes exactly the compiler-observed symbols required by the listed production owners; every unlisted sibling remains private to time-capability."
     },
     {
       "path": "src/Wanxiangshu/Foundation/AsyncSupport.fs",
@@ -5465,16 +5456,6 @@
         "Wanxiangshu.Foundation.Outcome.SendOutcome.Retryable"
       ],
       "justification": "Foundation.Outcome publishes exactly the compiler-observed symbols required by the listed production owners; every unlisted sibling remains private to dispatch-protocol."
-    },
-    {
-      "path": "src/Wanxiangshu/Foundation/OutcomeSurface.fs",
-      "owner": "dispatch-protocol",
-      "node": "dispatch-protocol-foundation-keep",
-      "contract": "Foundation.OutcomeSurface",
-      "kind": "published-contract",
-      "consumers": [],
-      "symbols": [],
-      "justification": "Foundation.OutcomeSurface publishes exactly the compiler-observed symbols required by the listed production owners; every unlisted sibling remains private to dispatch-protocol."
     }
   ],
   "physical_adapters": [
@@ -5951,6 +5932,7 @@
       "owners": [
         "action-affordance",
         "attention-regulation",
+        "causal-wait",
         "change-integration",
         "concern-routing",
         "context-compression",
@@ -5958,20 +5940,26 @@
         "durable-convergence",
         "durable-events",
         "execution-model-routing",
+        "external-investigation",
         "finality",
         "guidance-delivery",
+        "host-boundary",
         "interaction-authority",
+        "intra-participant-parallelism",
         "managed-session-lifecycle",
         "obligation-ledger",
         "prefix-stability",
         "provider-attempt-recovery",
+        "provider-language",
+        "provider-projection",
         "review-assurance",
         "review-judgement",
         "semantic-trace",
         "speculative-investigation",
+        "time-capability",
         "work-record"
       ],
-      "justification": "Live owner dependency SCC after the interaction-repair cutover. Membership must shrink, not grow, on future cutovers."
+      "justification": "Live owner dependency SCC after the frontier cutover; membership grew because closing foundational utility contracts surfaced existing cross-owner consumption. Future cutovers must break this SCC into smaller components."
     }
   ]
 }

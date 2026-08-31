@@ -2122,7 +2122,9 @@
         }
       ],
       "production_callers_to_migrate": [],
-      "proofs": [],
+      "proofs": [
+        "requirements/attention-regulation/tests/attention-regulation.test.mjs"
+      ],
       "architecture_gates": [
         "owner-dependencies",
         "semantic-owners"
@@ -2181,7 +2183,9 @@
         }
       ],
       "production_callers_to_migrate": [],
-      "proofs": [],
+      "proofs": [
+        "requirements/concern-routing/tests/concern-routing.test.mjs"
+      ],
       "architecture_gates": [
         "owner-dependencies",
         "semantic-owners"
@@ -2216,7 +2220,9 @@
       "consumes": [],
       "depends_on": [],
       "production_callers_to_migrate": [],
-      "proofs": [],
+      "proofs": [
+        "requirements/dispatch-protocol/tests/send-format.test.mjs"
+      ],
       "architecture_gates": [
         "owner-dependencies",
         "semantic-owners"
@@ -2248,7 +2254,9 @@
       "consumes": [],
       "depends_on": [],
       "production_callers_to_migrate": [],
-      "proofs": [],
+      "proofs": [
+        "requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs"
+      ],
       "architecture_gates": [
         "owner-dependencies",
         "semantic-owners"
@@ -2281,7 +2289,9 @@
       "consumes": [],
       "depends_on": [],
       "production_callers_to_migrate": [],
-      "proofs": [],
+      "proofs": [
+        "requirements/host-boundary/tests/sphinx-mcp-launch.test.mjs"
+      ],
       "architecture_gates": [
         "owner-dependencies",
         "semantic-owners"
@@ -2310,13 +2320,14 @@
       "classification": "KEEP",
       "publishes": [
         "TimeCapability.Ports",
-        "TimeCapability.Deadline",
-        "TimeCapability.DeadlineSurface"
+        "TimeCapability.Deadline"
       ],
       "consumes": [],
       "depends_on": [],
       "production_callers_to_migrate": [],
-      "proofs": [],
+      "proofs": [
+        "requirements/time-capability/tests/deadline-typed.test.mjs"
+      ],
       "architecture_gates": [
         "owner-dependencies",
         "semantic-owners"
@@ -2355,7 +2366,9 @@
       "consumes": [],
       "depends_on": [],
       "production_callers_to_migrate": [],
-      "proofs": [],
+      "proofs": [
+        "requirements/intra-participant-parallelism/tests/foundation-utilities.test.mjs"
+      ],
       "architecture_gates": [
         "owner-dependencies",
         "semantic-owners"
@@ -2386,8 +2399,7 @@
       "classification": "KEEP",
       "publishes": [
         "Foundation.Identity",
-        "Foundation.Outcome",
-        "Foundation.OutcomeSurface"
+        "Foundation.Outcome"
       ],
       "consumes": [
         "ParticipantIdentity.RoleVocabulary"
@@ -2399,7 +2411,9 @@
         }
       ],
       "production_callers_to_migrate": [],
-      "proofs": [],
+      "proofs": [
+        "requirements/dispatch-protocol/tests/ingress-identity.test.mjs"
+      ],
       "architecture_gates": [
         "owner-dependencies",
         "semantic-owners"
