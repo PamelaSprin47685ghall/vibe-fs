@@ -50,10 +50,10 @@ export function integrationNodeTestSteps(root) {
       label: 'branch-fast-forward-adapter.test.mjs (change-integration)',
       files: [path.join(root, 'requirements/change-integration/tests/integration/branch-fast-forward-adapter.test.mjs')],
     },
-    // Structured-workflow steps below run real `dotnet fsi` F# project checks. Each physical check
-    // is its own file and sequential step so completion renews the verdict watchdog. Combining
-    // several checks in one file hides every leaf verdict behind the file wrapper and turns normal
-    // aggregate runtime into false silence. The wider budget remains local to these checks.
+    // Structured-workflow steps below run real `dotnet fsi` F# project checks. Independent scanners
+    // own separate sequential files; the owner-evidence chain stays together but exposes each
+    // completed physical scan as a nested verdict. Aggregate runtime therefore cannot masquerade
+    // as silence, while any one hung compiler check still meets the same local FCS budget.
     {
       label: 'owner-dependencies-fcs.test.mjs (structured-workflow)',
       files: [

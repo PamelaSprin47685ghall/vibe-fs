@@ -36,6 +36,8 @@
 
 测试与运行期的挂死判据必须基于距离上一次**因果进展**的静默时长，严禁以整个测试套件的绝对墙钟运行时间作为唯一判据。看门狗只能由明确的业务因果事件进行续期（如被消费的剧本步骤、显式断言检查点或事实增长）；底层的原始传输流量、重连心跳或生命周期噪声严禁作为因果进展。背景非阻塞车道的进展只记录不续期。超时发生时必须先完整转储因果诊断状态，随后以非零状态安全退出。
 
+process-isolated test runner 必须区分叶子测试与承载整份文件的 child process：叶子测试的局部 timeout 只能约束该测试，严禁把同一预算施加到文件 wrapper 并把模块加载、调度等待或同文件其他健康测试误判为叶子超时。全 suite backstop 属于外部 supervisor 的物理兜底；它不得通过一个共享 AbortSignal 向每个文件 worker 复制监听器，也不得取代 verdict-silence criterion。需要 timeout-and-forget 的叶子测试必须在自身声明该预算。
+
 ### 禁止退化清单
 
 ```text
@@ -52,6 +54,7 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 数量常量与清单各自维护
 静态门禁的路径判据指向不存在的目录
 延长静默窗口或测试超时以掩盖竞态
+把叶子测试 timeout 作为 process-isolated 文件 wrapper 的总预算
 ```
 
 ## VERIFICATION-SYSTEM-007: 时间确定性
