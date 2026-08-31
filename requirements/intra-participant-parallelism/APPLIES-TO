@@ -18,3 +18,13 @@
 /src/Wanxiangshu/Foundation/ParallelSurface.fs
 
 /src/Wanxiangshu/Foundation/TaskResult.fs
+/src/Wanxiangshu/Execution/Fission/Admission.fs
+/src/Wanxiangshu/Execution/Fission/Fact.fs
+/src/Wanxiangshu/Execution/Fission/Facts.fs
+/src/Wanxiangshu/Execution/Fission/Fold.fs
+/src/Wanxiangshu/Execution/Fission/Model.fs
+/src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs
+/src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs
+/src/Wanxiangshu/Execution/Fission/Projection.fs
+/src/Wanxiangshu/Execution/Fission/Runtime.fs
+/src/Wanxiangshu/Execution/Fission/Surface.fs

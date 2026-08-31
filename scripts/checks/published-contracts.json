@@ -6569,6 +6569,3115 @@
         "Wanxiangshu.Process.VirtualTimerPort.Port"
       ],
       "justification": "time-capability.Contract publishes exactly these symbols to 'verification-system'; every unlisted sibling remains private to time-capability."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortChildren",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateChildSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateSiblingSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.FamilyRootOf",
+        "Wanxiangshu.OpenCode.ISessionHostPort.InterruptAttempt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.IsManagedChild",
+        "Wanxiangshu.OpenCode.ISessionHostPort.ListChildren",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SendPrompt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeFutureTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.TryGetParentSession"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'change-integration'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'provider-attempt-recovery'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortChildren",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateChildSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateSiblingSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.FamilyRootOf",
+        "Wanxiangshu.OpenCode.ISessionHostPort.InterruptAttempt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.IsManagedChild",
+        "Wanxiangshu.OpenCode.ISessionHostPort.ListChildren",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SendPrompt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeFutureTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.TryGetParentSession"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'review-assurance'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "context-compression"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateChildSession"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'context-compression'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortChildren",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateChildSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateSiblingSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.FamilyRootOf",
+        "Wanxiangshu.OpenCode.ISessionHostPort.InterruptAttempt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.IsManagedChild",
+        "Wanxiangshu.OpenCode.ISessionHostPort.ListChildren",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SendPrompt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeFutureTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.TryGetParentSession"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "intra-participant-parallelism"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateSiblingSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.InterruptAttempt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.TryGetParentSession"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'intra-participant-parallelism'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateChildSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.FamilyRootOf",
+        "Wanxiangshu.OpenCode.ISessionHostPort.ListChildren",
+        "Wanxiangshu.OpenCode.ManagedSessionTermination.terminate"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'managed-session-lifecycle'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortChildren",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateChildSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateSiblingSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.FamilyRootOf",
+        "Wanxiangshu.OpenCode.ISessionHostPort.InterruptAttempt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.IsManagedChild",
+        "Wanxiangshu.OpenCode.ISessionHostPort.ListChildren",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SendPrompt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeFutureTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.TryGetParentSession"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'dispatch-protocol'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "interaction-authority"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'interaction-authority'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort",
+        "Wanxiangshu.OpenCode.ISessionHostPort.InterruptAttempt"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'finality'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort",
+        "Wanxiangshu.OpenCode.ISessionHostPort.InterruptAttempt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeFutureTerminal"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'review-judgement'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortChildren",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateChildSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateSiblingSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.FamilyRootOf",
+        "Wanxiangshu.OpenCode.ISessionHostPort.InterruptAttempt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.IsManagedChild",
+        "Wanxiangshu.OpenCode.ISessionHostPort.ListChildren",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SendPrompt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeFutureTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.TryGetParentSession",
+        "Wanxiangshu.OpenCode.InjectedSessionPort",
+        "Wanxiangshu.OpenCode.ManagedSessionTermination.terminate",
+        "familyParent"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "action-affordance"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'action-affordance'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'capability-enforcement'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "knowledge-reuse"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateSiblingSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SendPrompt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeTerminal"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'knowledge-reuse'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionHostPort",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortChildren",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateChildSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateSiblingSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.FamilyRootOf",
+        "Wanxiangshu.OpenCode.ISessionHostPort.InterruptAttempt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.IsManagedChild",
+        "Wanxiangshu.OpenCode.ISessionHostPort.ListChildren",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SendPrompt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeFutureTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.TryGetParentSession"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'speculative-investigation'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Association.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.SessionAssociation",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.empty"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Association.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "context-compression"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.SatelliteKind",
+        "Wanxiangshu.Execution.Session.SatelliteKind.Companion",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.describe",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.isSatellite",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.link",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.tryBloggerOf",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.unlink"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'context-compression'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Association.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "prefix-stability"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.isCompanion"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'prefix-stability'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Association.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.tryBloggerOf",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.tryMainSessionOf"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'behavior-diagnosis'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Association.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "guidance-delivery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.SessionAssociation",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.isCompanion",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.tryBloggerOf",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.tryMainSessionOf"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'guidance-delivery'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Association.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.SatelliteKind",
+        "Wanxiangshu.Execution.Session.SatelliteKind.Companion",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.tryBloggerOf",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.tryMainSessionOf"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'managed-session-lifecycle'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Association.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.tryBloggerOf"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'finality'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Association.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.tryBloggerOf"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'review-judgement'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Association.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "cognitive-environment"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.isCompanion",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.tryMainSessionOf"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'cognitive-environment'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Association.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.tryBloggerOf",
+        "Wanxiangshu.Execution.Session.SessionAssociationProjection.tryMainSessionOf"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'provider-attempt-recovery'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Association.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.SessionAssociation",
+        "Wanxiangshu.Execution.Session.SessionOwnershipClassification.tryClassify",
+        "Wanxiangshu.Execution.Session.StrengthReplicaAssociationHints.executionClass",
+        "Wanxiangshu.Execution.Session.StrengthReplicaAssociationHints.isStrengthReplicaAttachment",
+        "Wanxiangshu.Execution.Session.StrengthReplicaAssociationHints.ownership"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'speculative-investigation'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Ownership.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.AttachmentKind",
+        "Wanxiangshu.Execution.Session.AttachmentKind.SyncCoder",
+        "Wanxiangshu.Execution.Session.AttachmentKind.SyncInspector"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Ownership.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "knowledge-reuse"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.AttachmentKind",
+        "Wanxiangshu.Execution.Session.AttachmentKind.Bookkeeper"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'knowledge-reuse'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Ownership.fs",
+      "owner": "session-ontology",
+      "node": "session-ontology-frontier-keep",
+      "contract": "session-ontology.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.AttachmentKind",
+        "Wanxiangshu.Execution.Session.AttachmentKind.Companion",
+        "Wanxiangshu.Execution.Session.AttachmentKind.StrengthReplica",
+        "Wanxiangshu.Execution.Session.SessionExecutionClass",
+        "Wanxiangshu.Execution.Session.SessionExecutionClass.InternalLeaf",
+        "Wanxiangshu.Execution.Session.SessionExecutionClass.Work",
+        "Wanxiangshu.Execution.Session.SessionOwnership",
+        "Wanxiangshu.Execution.Session.SessionOwnership.Attached",
+        "Wanxiangshu.Execution.Session.SessionOwnership.Root"
+      ],
+      "justification": "session-ontology.Contract publishes exactly these symbols to 'speculative-investigation'; every unlisted sibling remains private to session-ontology."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/Distillation.fs",
+      "owner": "output-distillation",
+      "node": "output-distillation-frontier-keep",
+      "contract": "output-distillation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.Distillation.AwaitAgentTimeoutMs"
+      ],
+      "justification": "output-distillation.Contract publishes exactly these symbols to 'change-integration'; every unlisted sibling remains private to output-distillation."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/Distillation.fs",
+      "owner": "output-distillation",
+      "node": "output-distillation-frontier-keep",
+      "contract": "output-distillation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.Distillation.AwaitAgentTimeoutMs"
+      ],
+      "justification": "output-distillation.Contract publishes exactly these symbols to 'finality'; every unlisted sibling remains private to output-distillation."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/Distillation.fs",
+      "owner": "output-distillation",
+      "node": "output-distillation-frontier-keep",
+      "contract": "output-distillation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "process-execution"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.Distillation.asDistillationRuntime",
+        "Wanxiangshu.OpenCode.Distillation.distillSpool",
+        "Wanxiangshu.OpenCode.Distillation.ofForkRuntime"
+      ],
+      "justification": "output-distillation.Contract publishes exactly these symbols to 'process-execution'; every unlisted sibling remains private to output-distillation."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs",
+      "owner": "output-distillation",
+      "node": "output-distillation-frontier-keep",
+      "contract": "output-distillation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "process-execution"
+      ],
+      "symbols": [
+        "RequirePermit"
+      ],
+      "justification": "output-distillation.Contract publishes exactly these symbols to 'process-execution'; every unlisted sibling remains private to output-distillation."
+    },
+    {
+      "path": "src/Wanxiangshu/Host/Contract/ToolResultBound.fs",
+      "owner": "output-distillation",
+      "node": "output-distillation-frontier-keep",
+      "contract": "output-distillation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Host.Contract.ToolResultBound.bound"
+      ],
+      "justification": "output-distillation.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to output-distillation."
+    },
+    {
+      "path": "src/Wanxiangshu/Host/Contract/ToolResultBound.fs",
+      "owner": "output-distillation",
+      "node": "output-distillation-frontier-keep",
+      "contract": "output-distillation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "knowledge-reuse"
+      ],
+      "symbols": [
+        "Wanxiangshu.Host.Contract.ToolResultBound.bound"
+      ],
+      "justification": "output-distillation.Contract publishes exactly these symbols to 'knowledge-reuse'; every unlisted sibling remains private to output-distillation."
+    },
+    {
+      "path": "src/Wanxiangshu/Process/LargeGate.fs",
+      "owner": "output-distillation",
+      "node": "output-distillation-frontier-keep",
+      "contract": "output-distillation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "process-execution"
+      ],
+      "symbols": [
+        "Wanxiangshu.Process.LargeGate.acquire",
+        "Wanxiangshu.Process.LargeGate.release"
+      ],
+      "justification": "output-distillation.Contract publishes exactly these symbols to 'process-execution'; every unlisted sibling remains private to output-distillation."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs",
+      "owner": "institutional-learning",
+      "node": "institutional-learning-frontier-keep",
+      "contract": "institutional-learning.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.InstitutionalLearningTools.admission",
+        "Wanxiangshu.OpenCode.InstitutionalLearningTools.specs"
+      ],
+      "justification": "institutional-learning.Contract publishes exactly these symbols to 'capability-enforcement'; every unlisted sibling remains private to institutional-learning."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Facts.fs",
+      "owner": "institutional-learning",
+      "node": "institutional-learning-frontier-keep",
+      "contract": "institutional-learning.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Enforcer.InstitutionalLearning.InstitutionalLearningFactCases"
+      ],
+      "justification": "institutional-learning.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to institutional-learning."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Facts.fs",
+      "owner": "institutional-learning",
+      "node": "institutional-learning-frontier-keep",
+      "contract": "institutional-learning.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "attention-regulation"
+      ],
+      "symbols": [
+        "OccurrenceId",
+        "ResurfacedDeferredWorkIds",
+        "SessionId",
+        "Wanxiangshu.Enforcer.InstitutionalLearning.InstitutionalLearningFactCases",
+        "Wanxiangshu.Enforcer.InstitutionalLearning.InstitutionalLearningFactCases.LearningDispositionCommitted"
+      ],
+      "justification": "institutional-learning.Contract publishes exactly these symbols to 'attention-regulation'; every unlisted sibling remains private to institutional-learning."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Fold.fs",
+      "owner": "institutional-learning",
+      "node": "institutional-learning-frontier-keep",
+      "contract": "institutional-learning.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Enforcer.InstitutionalLearning.InstitutionalLearningFactFold.fold"
+      ],
+      "justification": "institutional-learning.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to institutional-learning."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Projection.fs",
+      "owner": "institutional-learning",
+      "node": "institutional-learning-frontier-keep",
+      "contract": "institutional-learning.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Enforcer.InstitutionalLearning.InstitutionalLearningProjection.empty",
+        "Wanxiangshu.Enforcer.InstitutionalLearning.InstitutionalLearningProjectionState"
+      ],
+      "justification": "institutional-learning.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to institutional-learning."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/EnforcerCatalogResource.fs",
+      "owner": "distribution",
+      "node": "distribution-frontier-keep",
+      "contract": "distribution.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis"
+      ],
+      "symbols": [
+        "Wanxiangshu.Resources.EnforcerCatalogResource.composeBloggerSystemPromptFor",
+        "Wanxiangshu.Resources.EnforcerCatalogResource.load",
+        "Wanxiangshu.Resources.EnforcerCatalogResource.loadFor"
+      ],
+      "justification": "distribution.Contract publishes exactly these symbols to 'behavior-diagnosis'; every unlisted sibling remains private to distribution."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/EnforcerCatalogResource.fs",
+      "owner": "distribution",
+      "node": "distribution-frontier-keep",
+      "contract": "distribution.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Resources.EnforcerCatalogResource.composeBloggerSystemPromptFor"
+      ],
+      "justification": "distribution.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to distribution."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/EnforcerCatalogResource.fs",
+      "owner": "distribution",
+      "node": "distribution-frontier-keep",
+      "contract": "distribution.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "institutional-learning"
+      ],
+      "symbols": [
+        "Wanxiangshu.Resources.EnforcerCatalogResource.loadFor"
+      ],
+      "justification": "distribution.Contract publishes exactly these symbols to 'institutional-learning'; every unlisted sibling remains private to distribution."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/ModelRoutingResource.fs",
+      "owner": "distribution",
+      "node": "distribution-frontier-keep",
+      "contract": "distribution.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "execution-model-routing"
+      ],
+      "symbols": [
+        "Wanxiangshu.Resources.ModelRoutingResource.recommendedTemplate"
+      ],
+      "justification": "distribution.Contract publishes exactly these symbols to 'execution-model-routing'; every unlisted sibling remains private to distribution."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/PackageMetadata.fs",
+      "owner": "distribution",
+      "node": "distribution-frontier-keep",
+      "contract": "distribution.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "epistemic-reasoning"
+      ],
+      "symbols": [
+        "Wanxiangshu.Resources.PackageMetadata.version"
+      ],
+      "justification": "distribution.Contract publishes exactly these symbols to 'epistemic-reasoning'; every unlisted sibling remains private to distribution."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/RuntimeResources.fs",
+      "owner": "distribution",
+      "node": "distribution-frontier-keep",
+      "contract": "distribution.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis"
+      ],
+      "symbols": [
+        "Wanxiangshu.Resources.RuntimeResources.EnforcerRules",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.current"
+      ],
+      "justification": "distribution.Contract publishes exactly these symbols to 'behavior-diagnosis'; every unlisted sibling remains private to distribution."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/RuntimeResources.fs",
+      "owner": "distribution",
+      "node": "distribution-frontier-keep",
+      "contract": "distribution.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "guidance-delivery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Resources.RuntimeResourcesModule.enforcerRulesFor"
+      ],
+      "justification": "distribution.Contract publishes exactly these symbols to 'guidance-delivery'; every unlisted sibling remains private to distribution."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/RuntimeResources.fs",
+      "owner": "distribution",
+      "node": "distribution-frontier-keep",
+      "contract": "distribution.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Resources.RuntimeResources.Prompts",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.current",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.install",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.load"
+      ],
+      "justification": "distribution.Contract publishes exactly these symbols to 'capability-enforcement'; every unlisted sibling remains private to distribution."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/RuntimeResources.fs",
+      "owner": "distribution",
+      "node": "distribution-frontier-keep",
+      "contract": "distribution.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Resources.RuntimeResources.Prompts",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.current",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.enforcerRulesFor",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.install",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.load"
+      ],
+      "justification": "distribution.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to distribution."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/RuntimeResources.fs",
+      "owner": "distribution",
+      "node": "distribution-frontier-keep",
+      "contract": "distribution.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "action-affordance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Resources.RuntimeResources.EnforcerRules",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.current"
+      ],
+      "justification": "distribution.Contract publishes exactly these symbols to 'action-affordance'; every unlisted sibling remains private to distribution."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/RuntimeResources.fs",
+      "owner": "distribution",
+      "node": "distribution-frontier-keep",
+      "contract": "distribution.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "cognitive-environment"
+      ],
+      "symbols": [
+        "Wanxiangshu.Resources.RuntimeResources",
+        "Wanxiangshu.Resources.RuntimeResources.EnforcerRules",
+        "Wanxiangshu.Resources.RuntimeResources.EnglishEnforcerRules",
+        "Wanxiangshu.Resources.RuntimeResources.Prompts",
+        "Wanxiangshu.Resources.RuntimeResources.ProviderLanguageRootsReady",
+        "Wanxiangshu.Resources.RuntimeResources.SimplifiedChineseEnforcerRules",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.current",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.install",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.load",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.loadFor"
+      ],
+      "justification": "distribution.Contract publishes exactly these symbols to 'cognitive-environment'; every unlisted sibling remains private to distribution."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/RuntimeResources.fs",
+      "owner": "distribution",
+      "node": "distribution-frontier-keep",
+      "contract": "distribution.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Resources.RuntimeResources.Prompts",
+        "Wanxiangshu.Resources.RuntimeResourcesModule.current"
+      ],
+      "justification": "distribution.Contract publishes exactly these symbols to 'speculative-investigation'; every unlisted sibling remains private to distribution."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/FetchTool.fs",
+      "owner": "repository-investigation",
+      "node": "repository-investigation-frontier-keep",
+      "contract": "repository-investigation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.FetchTool.admission"
+      ],
+      "justification": "repository-investigation.Contract publishes exactly these symbols to 'capability-enforcement'; every unlisted sibling remains private to repository-investigation."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/FetchTool.fs",
+      "owner": "repository-investigation",
+      "node": "repository-investigation-frontier-keep",
+      "contract": "repository-investigation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "knowledge-reuse"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.FetchTool.spec"
+      ],
+      "justification": "repository-investigation.Contract publishes exactly these symbols to 'knowledge-reuse'; every unlisted sibling remains private to repository-investigation."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs",
+      "owner": "repository-investigation",
+      "node": "repository-investigation-frontier-keep",
+      "contract": "repository-investigation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.InspectorTool.spec"
+      ],
+      "justification": "repository-investigation.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to repository-investigation."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs",
+      "owner": "repository-investigation",
+      "node": "repository-investigation-frontier-keep",
+      "contract": "repository-investigation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.InspectorTool.admission",
+        "Wanxiangshu.OpenCode.InspectorTool.spec"
+      ],
+      "justification": "repository-investigation.Contract publishes exactly these symbols to 'capability-enforcement'; every unlisted sibling remains private to repository-investigation."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Investigation/WarmStart/Prompt.fs",
+      "owner": "repository-investigation",
+      "node": "repository-investigation-frontier-keep",
+      "contract": "repository-investigation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Repository.Investigation.WarmStart.RepositoryWarmStartPrompt.isDirectConsumer"
+      ],
+      "justification": "repository-investigation.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to repository-investigation."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Investigation/WarmStart/Runtime.fs",
+      "owner": "repository-investigation",
+      "node": "repository-investigation-frontier-keep",
+      "contract": "repository-investigation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Repository.Investigation.WarmStart.RepositoryWarmStart.appendToBaseDocument"
+      ],
+      "justification": "repository-investigation.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to repository-investigation."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Investigation/WarmStart/Runtime.fs",
+      "owner": "repository-investigation",
+      "node": "repository-investigation-frontier-keep",
+      "contract": "repository-investigation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "action-affordance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Repository.Investigation.WarmStart.RepositoryWarmStart.prepareDocument"
+      ],
+      "justification": "repository-investigation.Contract publishes exactly these symbols to 'action-affordance'; every unlisted sibling remains private to repository-investigation."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Fact.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionFact.FissionExternalAffinityBound"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Facts.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "AggregateWorkRecordDigest",
+        "AggregateWorkRecordRef",
+        "OwnerWorkRecordDigest",
+        "OwnerWorkRecordRef",
+        "PayloadDigest",
+        "PayloadRef",
+        "Wanxiangshu.Execution.Fission.FissionFactCases",
+        "Wanxiangshu.Execution.Fission.FissionFactCases.FissionAdmitted",
+        "Wanxiangshu.Execution.Fission.FissionFactCases.FissionCompletionCaptured",
+        "Wanxiangshu.Execution.Fission.FissionFactCases.FissionConverged",
+        "Wanxiangshu.Execution.Fission.FissionFactCases.FissionLaneMaterialized",
+        "Wanxiangshu.Execution.Fission.FissionFactCases.FissionTakeoverClaimed",
+        "Wanxiangshu.Execution.Fission.FissionFactCases.FissionTakeoverStarted",
+        "WorkRecordDigest",
+        "WorkRecordRef"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Fold.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionFactFold.fold"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Model.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionExternalId.agent"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Model.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionRequestProjection.apply"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.OpenCode.FissionHost.observeLaneTurn",
+        "Wanxiangshu.Execution.Fission.OpenCode.FissionHost.observePhysicalExecutionEnd",
+        "Wanxiangshu.Execution.Fission.OpenCode.FissionHost.routeAttemptAborted",
+        "Wanxiangshu.Execution.Fission.OpenCode.FissionHostRequestProjection.projectExternalManaged",
+        "Wanxiangshu.Execution.Fission.OpenCode.FissionHostRequestProjection.projectPendingManaged"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.OpenCode.FissionHost.observeLaneTurn"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'managed-session-lifecycle'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.OpenCode.FissionTool.admission",
+        "Wanxiangshu.Execution.Fission.OpenCode.FissionTool.spec"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'capability-enforcement'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Projection.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionProjection.empty",
+        "Wanxiangshu.Execution.Fission.FissionProjectionState"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Projection.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionProjection.tryActiveForOwner"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'provider-attempt-recovery'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Projection.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionGroupProjection.ExternalAffinities",
+        "Wanxiangshu.Execution.Fission.FissionProjection.tryGroup"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Projection.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "interaction-authority"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionProjection.tryActiveForOwner",
+        "Wanxiangshu.Execution.Fission.FissionProjection.tryOwnerOfLane"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'interaction-authority'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Projection.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionProjection.tryActiveForOwner"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'dispatch-protocol'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Projection.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionProjection.tryActiveForOwner"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'finality'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Projection.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionProjection.tryActiveForOwner",
+        "Wanxiangshu.Execution.Fission.FissionProjection.tryOwnerOfLane"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'managed-session-lifecycle'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Runtime.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionRuntime.isSilentInterrupt"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'provider-attempt-recovery'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Runtime.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionLaneBinding",
+        "Wanxiangshu.Execution.Fission.FissionLaneBinding.GroupId",
+        "Wanxiangshu.Execution.Fission.FissionLaneBinding.LaneIndex",
+        "Wanxiangshu.Execution.Fission.FissionLaneBinding.OwnerSessionId",
+        "Wanxiangshu.Execution.Fission.FissionRuntime.notifyChildCreated",
+        "Wanxiangshu.Execution.Fission.FissionRuntime.tryLane"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Runtime.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionRuntime.isSilentInterrupt"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'dispatch-protocol'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Runtime.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "interaction-authority"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionRuntime.isSilentInterrupt"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'interaction-authority'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Runtime.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionRuntime.isSilentInterrupt"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'finality'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Runtime.fs",
+      "owner": "intra-participant-parallelism",
+      "node": "intra-participant-parallelism-frontier-keep",
+      "contract": "intra-participant-parallelism.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Fission.FissionRuntime.isSilentInterrupt",
+        "Wanxiangshu.Execution.Fission.FissionRuntime.tryOwner"
+      ],
+      "justification": "intra-participant-parallelism.Contract publishes exactly these symbols to 'managed-session-lifecycle'; every unlisted sibling remains private to intra-participant-parallelism."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Gate.fs",
+      "owner": "requirement-grounding",
+      "node": "requirement-grounding-frontier-keep",
+      "contract": "requirement-grounding.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.after",
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.before"
+      ],
+      "justification": "requirement-grounding.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to requirement-grounding."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Gate.fs",
+      "owner": "requirement-grounding",
+      "node": "requirement-grounding-frontier-keep",
+      "contract": "requirement-grounding.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.programObservation"
+      ],
+      "justification": "requirement-grounding.Contract publishes exactly these symbols to 'capability-enforcement'; every unlisted sibling remains private to requirement-grounding."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Projection.fs",
+      "owner": "requirement-grounding",
+      "node": "requirement-grounding-frontier-keep",
+      "contract": "requirement-grounding.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingFoldRejection",
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingFoldRejection.DuplicateIdentity",
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingFoldRejection.MissingRequest",
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingFoldRejection.NonSequentialOrdinal",
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingProjection.applyAnchored",
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingProjection.applyMaterialObserved",
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingProjection.applyReanchor",
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingProjection.applyRequested",
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingProjection.empty",
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingProjectionState"
+      ],
+      "justification": "requirement-grounding.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to requirement-grounding."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Transform.fs",
+      "owner": "requirement-grounding",
+      "node": "requirement-grounding-frontier-keep",
+      "contract": "requirement-grounding.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingTransform.projectOrTerminate"
+      ],
+      "justification": "requirement-grounding.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to requirement-grounding."
+    },
+    {
+      "path": "src/Wanxiangshu/Host/Fact.fs",
+      "owner": "requirement-grounding",
+      "node": "requirement-grounding-frontier-keep",
+      "contract": "requirement-grounding.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "guidance-delivery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Host.HostFact.PairProgrammingGuidelineAnchored",
+        "Wanxiangshu.Host.HostFact.TipGuidanceDelivered"
+      ],
+      "justification": "requirement-grounding.Contract publishes exactly these symbols to 'guidance-delivery'; every unlisted sibling remains private to requirement-grounding."
+    },
+    {
+      "path": "src/Wanxiangshu/Host/Fact.fs",
+      "owner": "requirement-grounding",
+      "node": "requirement-grounding-frontier-keep",
+      "contract": "requirement-grounding.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "time-capability"
+      ],
+      "symbols": [
+        "Wanxiangshu.Host.HostFact.SessionStartedAtBound"
+      ],
+      "justification": "requirement-grounding.Contract publishes exactly these symbols to 'time-capability'; every unlisted sibling remains private to requirement-grounding."
+    },
+    {
+      "path": "src/Wanxiangshu/Host/Fact.fs",
+      "owner": "requirement-grounding",
+      "node": "requirement-grounding-frontier-keep",
+      "contract": "requirement-grounding.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Host.HostFact.PairProgrammingGuidelineAnchored"
+      ],
+      "justification": "requirement-grounding.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to requirement-grounding."
+    },
+    {
+      "path": "src/Wanxiangshu/Host/Fact.fs",
+      "owner": "requirement-grounding",
+      "node": "requirement-grounding-frontier-keep",
+      "contract": "requirement-grounding.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Host.HostFact.SessionStartedAtBound"
+      ],
+      "justification": "requirement-grounding.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to requirement-grounding."
+    },
+    {
+      "path": "src/Wanxiangshu/Host/Facts.fs",
+      "owner": "requirement-grounding",
+      "node": "requirement-grounding-frontier-keep",
+      "contract": "requirement-grounding.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "CallGap",
+        "CallId",
+        "ConcernPlacement",
+        "MarkerText",
+        "Observation",
+        "Occurrence",
+        "Ordinal",
+        "Presentation",
+        "ResultGap",
+        "SessionId",
+        "Snapshot",
+        "StartedAt",
+        "TipName",
+        "Wanxiangshu.Host.HostFactCases",
+        "Wanxiangshu.Host.HostFactCases.PairProgrammingGuidelineAnchored",
+        "Wanxiangshu.Host.HostFactCases.RequirementGroundingAnchored",
+        "Wanxiangshu.Host.HostFactCases.RequirementGroundingMaterialObserved",
+        "Wanxiangshu.Host.HostFactCases.RequirementGroundingRequested",
+        "Wanxiangshu.Host.HostFactCases.SessionStartedAtBound",
+        "Wanxiangshu.Host.HostFactCases.TipGuidanceDelivered"
+      ],
+      "justification": "requirement-grounding.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to requirement-grounding."
+    },
+    {
+      "path": "src/Wanxiangshu/Host/Facts.fs",
+      "owner": "requirement-grounding",
+      "node": "requirement-grounding-frontier-keep",
+      "contract": "requirement-grounding.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "guidance-delivery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Host.TipPresentation",
+        "Wanxiangshu.Host.TipPresentation.Full",
+        "Wanxiangshu.Host.TipPresentation.IdentityOnly"
+      ],
+      "justification": "requirement-grounding.Contract publishes exactly these symbols to 'guidance-delivery'; every unlisted sibling remains private to requirement-grounding."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.Key",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.ExternalRootIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.HostInternal",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.NoManagedExecution",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.PendingPromptIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.Reject",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey.SessionId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.Key"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "intra-participant-parallelism"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.Key",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.ExternalRootIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.HostInternal",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.NoManagedExecution",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.PendingPromptIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.Reject",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey.SessionId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.Key",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Key"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'intra-participant-parallelism'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.Authority",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.EffectiveAgent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.Key",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.Origin",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.ExternalRootIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.PendingPromptIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.ExplicitAgent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.IsHostCompaction",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.IsHostSynthetic",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.PhysicalUserMessageId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.PromptKey",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.SessionId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.Text",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DurableSnapshot.Authority",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey.PhysicalUserMessageId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey.SessionId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.EffectiveAgent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.IdentitySeed",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.Key",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.Origin",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Claim",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.EffectiveAgent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.IdentitySeed",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Key",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Origin",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.PromptKey",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.resolve"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'dispatch-protocol'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "provider-projection"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.ExplicitAgent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.IsHostCompaction",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.IsHostSynthetic",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.PhysicalUserMessageId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.PromptKey",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.SessionId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.Text"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'provider-projection'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-chat-execution"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.EffectiveAgent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.Key",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.ExternalRootIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.PendingPromptIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey.PhysicalUserMessageId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey.SessionId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.EffectiveAgent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.ExplicitAgent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.IdentitySeed",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.Key",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.Origin",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Claim",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.EffectiveAgent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.IdentitySeed",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Key",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Origin",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.PromptKey"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'managed-chat-execution'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.Key",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.ExternalRootIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.HostInternal",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.NoManagedExecution",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.PendingPromptIntent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.Reject",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.ExplicitAgent",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.PhysicalUserMessageId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.SessionId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.DecodedMessage.Text",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey.PhysicalUserMessageId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey.SessionId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.Key",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.HostInternalEvidence.Origin",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.HostInternalEvidence.PhysicalUserMessageId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.HostInternalEvidence.SessionId",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Key",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Origin",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Rejection",
+        "Wanxiangshu.OpenCode.ChatAdmissionIntent.Rejection.DurableAuthorityUnavailable"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.TerminalPolicy.outstandingBackground",
+        "Wanxiangshu.OpenCode.TerminalPolicy.sessionDead"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'provider-attempt-recovery'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.TerminalPolicy.outstandingBackground",
+        "Wanxiangshu.OpenCode.TerminalPolicy.sessionDead"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'finality'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Child.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.ChildPromptAuthority.ensureForLinkedChild"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'review-assurance'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Fact.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptFact.AuthorityRootAccepted",
+        "Wanxiangshu.Interaction.Authority.PromptFact.PluginPromptAbandoned",
+        "Wanxiangshu.Interaction.Authority.PromptFact.PluginPromptClaimed",
+        "Wanxiangshu.Interaction.Authority.PromptFact.PluginPromptPhysicalAccepted",
+        "Wanxiangshu.Interaction.Authority.PromptFact.PluginPromptSubmitted"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'dispatch-protocol'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Fact.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptFact.AuthorityRootAccepted"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'provider-attempt-recovery'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Fact.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptFact.AuthorityRootAccepted"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Facts.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.AuthorityKind",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.LogicalRunId",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.SchemaVersion",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.SessionId",
+        "Wanxiangshu.Interaction.Authority.PromptFactCases",
+        "Wanxiangshu.Interaction.Authority.PromptFactCases.AuthorityRootAccepted"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Facts.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.AuthorityKind",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.LogicalRunId",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.SchemaVersion",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.SessionId",
+        "Wanxiangshu.Interaction.Authority.PromptAbandonReason",
+        "Wanxiangshu.Interaction.Authority.PromptAbandonReason.SendFailed",
+        "Wanxiangshu.Interaction.Authority.PromptAbandonReason.SupersededBeforePhysicalSend",
+        "Wanxiangshu.Interaction.Authority.PromptFactCases",
+        "Wanxiangshu.Interaction.Authority.PromptFactCases.PluginPromptClaimed"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'dispatch-protocol'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Facts.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.AuthorityKind",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.LogicalRunId",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.SchemaVersion",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.SessionId",
+        "Wanxiangshu.Interaction.Authority.PromptFactCases",
+        "Wanxiangshu.Interaction.Authority.PromptFactCases.AuthorityRootAccepted"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'finality'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Facts.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.AuthorityKind",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.LogicalRunId",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.SchemaVersion",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.SessionId"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'provider-attempt-recovery'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Facts.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.AuthorityKind",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.LogicalRunId",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.SchemaVersion",
+        "Wanxiangshu.Interaction.Authority.AuthorityRootAcceptedPayload.SessionId",
+        "Wanxiangshu.Interaction.Authority.PromptFactCases",
+        "Wanxiangshu.Interaction.Authority.PromptFactCases.AuthorityRootAccepted"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'verification-system'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Fold.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptFactFold.fold"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.RootSelection"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-chat-execution"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerAuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerLogicalRunId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerSessionId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.ParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.InheritedFromOwner",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.RootSelection",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.InheritedFromOwnerInput",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedModule.participantIdentity"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'managed-chat-execution'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerAuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerLogicalRunId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerSessionId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.ParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.RootSelection",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.InheritedFromOwnerInput"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'dispatch-protocol'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerAuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerLogicalRunId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerSessionId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.ParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.InheritedFromOwnerInput",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'finality'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.RootSelection"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'managed-session-lifecycle'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerAuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerLogicalRunId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerSessionId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.ParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.InheritedFromOwner",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.RootSelection",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.InheritedFromOwnerInput",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'provider-attempt-recovery'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerAuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerLogicalRunId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerSessionId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.ParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.InheritedFromOwner",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.RootSelection",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.InheritedFromOwnerInput",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "knowledge-reuse"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.RootSelection"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'knowledge-reuse'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerAuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerLogicalRunId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerSessionId",
+        "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.ParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.InheritedFromOwnerInput",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'verification-system'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.closeCompletedHumanRootManager",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.empty"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "prefix-stability"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.activeProfile"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'prefix-stability'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.DispatchStatus",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.DispatchStatus.Accepted",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.DispatchStatus.Dispatchable",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.DispatchStatus.Pending",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.acceptedDispatchForPhysicalMessage",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.activeProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.dispatchStatusFor",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.projectionFor"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'behavior-diagnosis'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.DispatchStatus",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.DispatchStatus.Accepted",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.DispatchStatus.Dispatchable",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.DispatchStatus.Pending",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.activeProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.dispatchStatusFor",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.pendingDispatchClaim"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "intra-participant-parallelism"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.activeProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.lastAuthorityProfile"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'intra-participant-parallelism'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.activeProfile"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'dispatch-protocol'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.activeProfile"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'finality'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.activeProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.lastAuthorityProfile"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "guidance-delivery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.activeProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.lastAuthorityProfile"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'guidance-delivery'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.activeProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.lastAuthorityProfile"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'managed-session-lifecycle'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.activeProfile"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'speculative-investigation'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration"
+      ],
+      "symbols": [
+        "ContinuationKind"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'change-integration'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "IdentitySeed",
+        "IdentitySeedInput",
+        "RootAuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.LogicalRunId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.PeerAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedTier",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SessionId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.ActiveLogicalRun",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedInput",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedOwner",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.rehydrateIdentitySeed"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol"
+      ],
+      "symbols": [
+        "ContinuationKind",
+        "IdentitySeed",
+        "IdentitySeedInput",
+        "IdentitySeedValidationError",
+        "PromptOrigin",
+        "RootAuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AcceptedDispatch",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AcceptedDispatch.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AcceptedDispatch.Origin",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AcceptedDispatch.PhysicalUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AcceptedDispatch.PromptKey",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AcceptedDispatch.SessionId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.LogicalRunId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.ParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SessionId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.AcceptedDispatches",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.ActiveLogicalRun",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.ClaimSequences",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.PendingClaims",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.ClaimedAtRuntimeStartCount",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.EffectiveAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.LogicalRunId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.Origin",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.PayloadDigest",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.PromptKey",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.Receipt",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.SessionId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.RecoveryTailWindow",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.acceptedDispatchKey",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.claimScopeDigest",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.createAuthorityExecutionProfileFromSeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.derivePromptKey",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.empty",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.gateNudgeAcceptedPhysical",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.gateNudgeAlreadyAdmitted",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.gateNudgePayloadDigest",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedOwner",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.idleAlreadyAdmitted",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.idlePayloadDigest",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.nextClaimSequence",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.originLabel",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.rehydrateIdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.repairAlreadyClaimed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.repairPayloadDigest",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.tryParseContinuationKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.validateInheritedIdentitySeedAgainstActiveOwner"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'dispatch-protocol'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "ContinuationKind",
+        "IdentitySeed",
+        "IdentitySeedInput",
+        "PromptOrigin",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.ProjectionChoice",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.AcceptedContinuationIds",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.buildAttemptExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.createAuthorityExecutionProfileFromSeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.effectiveAgentFor",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedOwner",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.rehydrateIdentitySeed"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'provider-attempt-recovery'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "context-compression"
+      ],
+      "symbols": [
+        "ContinuationKind",
+        "PromptOrigin",
+        "RootAuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.Authority",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.EffectiveAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.ProjectionChoice",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.SystemPromptId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.ToolCapabilitySet",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.ParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.ActiveLogicalRun",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.createAuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.repairPayloadBelongsToRequest"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'context-compression'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "prefix-stability"
+      ],
+      "symbols": [
+        "ContinuationKind",
+        "PromptOrigin",
+        "RootAuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.RequestKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.originLabel",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.toolCapabilitiesFor"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'prefix-stability'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "semantic-trace"
+      ],
+      "symbols": [
+        "ContinuationKind",
+        "PromptOrigin"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'semantic-trace'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis"
+      ],
+      "symbols": [
+        "ContinuationKind",
+        "PromptOrigin",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AcceptedDispatch.Origin",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AcceptedDispatch.PayloadDigest",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AcceptedDispatch.PromptKey",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.LogicalRunId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SessionId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.ClaimSequences",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.repairAlreadyClaimed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.repairPayloadBelongsToRequest",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.repairPayloadDigest"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'behavior-diagnosis'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "ContinuationKind",
+        "IdentitySeed",
+        "PromptOrigin",
+        "RootAuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AcceptedDispatch",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AcceptedDispatch.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AcceptedDispatch.PhysicalUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.PeerAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedTier",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.PendingClaims",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.Origin",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.PayloadDigest",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.PromptKey",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.gateNudgePayloadDigest",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.issueInheritedIdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.toolCapabilitiesFor",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.validateInheritedIdentitySeed"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "intra-participant-parallelism"
+      ],
+      "symbols": [
+        "ContinuationKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.PeerAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'intra-participant-parallelism'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-chat-execution"
+      ],
+      "symbols": [
+        "PromptOrigin",
+        "RootAuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.Authority",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.EffectiveAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.Origin",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.PhysicalUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.SessionId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.LogicalRunId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.ParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SessionId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.ClaimedAtRuntimeStartCount",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.EffectiveAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.LogicalRunId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.Origin",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.PayloadDigest",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.PromptKey",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.Receipt",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.SessionId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.buildAttemptExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.createAuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedOwner",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.originLabel",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.rehydrateIdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.tryParseContinuationKind"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'managed-chat-execution'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.PendingClaims"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'managed-session-lifecycle'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality"
+      ],
+      "symbols": [
+        "ContinuationKind",
+        "IdentitySeed",
+        "IdentitySeedInput",
+        "RootAuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedTier",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.ActiveLogicalRun",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.createAuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.createAuthorityExecutionProfileFromSeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedOwner",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.rehydrateIdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.validateInheritedIdentitySeedAgainstActiveOwner"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'finality'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "review-assurance"
+      ],
+      "symbols": [
+        "ContinuationKind",
+        "PromptOrigin",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.PendingClaims",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.Origin",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.PayloadDigest",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.gateNudgePayloadDigest"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'review-assurance'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "ContinuationKind",
+        "PromptOrigin",
+        "RootAuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.PhysicalUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.ActiveLogicalRun",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.tryParseContinuationKind"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "guidance-delivery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'guidance-delivery'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "cognitive-environment"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.ProjectionChoice",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.ProviderRun",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.RequestKind"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'cognitive-environment'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.toolCapabilitiesFor"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'capability-enforcement'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "execution-model-routing"
+      ],
+      "symbols": [
+        "ContinuationKind",
+        "PromptOrigin",
+        "RootAuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.Authority",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.CanonicalRole",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.RequestKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.SystemPromptId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.ToolCapabilitySet",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.ParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.createAuthorityExecutionProfile"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'execution-model-routing'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "knowledge-reuse"
+      ],
+      "symbols": [
+        "IdentitySeed",
+        "RootAuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.createAuthorityExecutionProfileFromSeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.issueInheritedIdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.validateInheritedIdentitySeedAgainstActiveOwner"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'knowledge-reuse'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.EffectiveAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.RequestKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedTier",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.ActiveLogicalRun",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.issueInheritedIdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.systemPromptIdFor",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.toolCapabilitiesFor"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'speculative-investigation'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "verification-system"
+      ],
+      "symbols": [
+        "IdentitySeed",
+        "IdentitySeedInput",
+        "RootAuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityRootUserMessageId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.IdentitySeed",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.LogicalRunId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.ParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SessionId",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.ActiveLogicalRun",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.LastAuthorityProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedOwner",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.rehydrateIdentitySeed"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'verification-system'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ManagedDelegationAssignment",
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ReviewerGuard"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'change-integration'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.InteractionRepair",
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ProviderRetryAttempt",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.Continuation"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'provider-attempt-recovery'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "context-compression"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ManagedDelegationAssignment",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.AuthorityRoot",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.HumanRoot"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'context-compression'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "prefix-stability"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ProviderRetryAttempt",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.AuthorityRoot",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.Continuation",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.AgentOwnerRoot"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'prefix-stability'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "semantic-trace"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ProviderRetryAttempt",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.Continuation"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'semantic-trace'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.InteractionRepair",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.Continuation"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'behavior-diagnosis'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.BusyAgentNudge",
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.JoinGuard",
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ManagedDelegationAssignment",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.Continuation",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.AgentOwnerRoot"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "intra-participant-parallelism"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.FissionHandoff"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'intra-participant-parallelism'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-chat-execution"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptOrigin",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.AuthorityRoot",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.Continuation",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.HostInternal",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.UnknownOrigin",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.AgentOwnerRoot",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.HumanRoot"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'managed-chat-execution'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.InteractionRepair",
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ManagerIdleEncouragement",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.AuthorityRoot",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.Continuation",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.HostInternal",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.UnknownOrigin",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.AgentOwnerRoot",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.HumanRoot"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'dispatch-protocol'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.FinalitySteer",
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ReviewerGuard",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.AgentOwnerRoot",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.HumanRoot"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'finality'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ReviewerGuard",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.Continuation"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'review-assurance'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.DegenerationGuard",
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ProviderRetryAttempt",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.AuthorityRoot",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.Continuation",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.HostInternal",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.UnknownOrigin",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.AgentOwnerRoot",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.HumanRoot"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "execution-model-routing"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.InteractionRepair",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.AuthorityRoot",
+        "Wanxiangshu.Interaction.Authority.PromptOrigin.Continuation",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.HumanRoot"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'execution-model-routing'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.AgentOwnerRoot",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.HumanRoot"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "knowledge-reuse"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.HumanRoot"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'knowledge-reuse'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.AgentOwnerRoot",
+        "Wanxiangshu.Interaction.Authority.PromptRootAuthorityKind.HumanRoot"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'verification-system'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Run.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-chat-execution"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityRun.AuthorityRegistrationRejection"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'managed-chat-execution'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Run.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityRun.AuthorityRegistrationRejection",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityRun.AuthorityRegistrationRejection.ActiveRunIdentityConflict",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityRun.claimAgentOwnerRoot",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityRun.claimContinuation",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityRun.createAuthorityRoot",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityRun.describeRegistrationRejection",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityRun.resolveAuthorityProfile",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityRun.resolveKnownOrigin"
+      ],
+      "justification": "interaction-authority.Contract publishes exactly these symbols to 'dispatch-protocol'; every unlisted sibling remains private to interaction-authority."
     }
   ],
   "physical_adapters": [
@@ -7053,6 +10162,7 @@
         "context-compression",
         "degeneration-guard",
         "dispatch-protocol",
+        "distribution",
         "durable-convergence",
         "durable-events",
         "execution-failure-policy",
@@ -7061,23 +10171,28 @@
         "finality",
         "guidance-delivery",
         "host-boundary",
+        "institutional-learning",
         "interaction-authority",
         "intra-participant-parallelism",
         "managed-session-lifecycle",
         "obligation-ledger",
+        "output-distillation",
         "participant-horizon",
         "prefix-stability",
         "provider-attempt-recovery",
         "provider-language",
         "provider-projection",
+        "repository-investigation",
+        "requirement-grounding",
         "review-assurance",
         "review-judgement",
         "semantic-trace",
+        "session-ontology",
         "speculative-investigation",
         "time-capability",
         "work-record"
       ],
-      "justification": "Live owner dependency SCC after the ready-frontier batch; membership grew because closing 8 additional owner surfaces surfaced existing cross-owner consumption. Future cutovers must break this SCC into smaller components."
+      "justification": "Live owner dependency SCC after closing 8 additional ready-frontier owner nodes; membership grew as more cross-owner surface contracts closed. Future cutovers must break this SCC into smaller components."
     }
   ]
 }

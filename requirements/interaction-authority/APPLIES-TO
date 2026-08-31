@@ -14,3 +14,16 @@
 /src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs
 /src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs
 /src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs
+/src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs
+/src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs
+/src/Wanxiangshu/Interaction/Authority/Child.fs
+/src/Wanxiangshu/Interaction/Authority/Fact.fs
+/src/Wanxiangshu/Interaction/Authority/Facts.fs
+/src/Wanxiangshu/Interaction/Authority/Fold.fs
+/src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs
+/src/Wanxiangshu/Interaction/Authority/Ledger.fs
+/src/Wanxiangshu/Interaction/Authority/Model.fs
+/src/Wanxiangshu/Interaction/Authority/Origin.fs
+/src/Wanxiangshu/Interaction/Authority/Run.fs
+/src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs
+/src/Wanxiangshu/Interaction/Authority/Surface.fs

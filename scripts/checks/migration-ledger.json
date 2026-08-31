@@ -2846,6 +2846,493 @@
       ],
       "state": "DONE",
       "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "session-ontology-frontier-keep",
+      "primary_owner": "session-ontology",
+      "intent": "session-ontology ready-frontier KEEP: close 6 file(s) with exact published/physical-port contracts derived from FCS evidence.",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs",
+        "src/Wanxiangshu/Execution/Session/Association.fs",
+        "src/Wanxiangshu/Execution/Session/AssociationSurface.fs",
+        "src/Wanxiangshu/Execution/Session/Ownership.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "session-ontology.Contract"
+      ],
+      "consumes": [
+        "Foundation.AsyncSupport",
+        "Foundation.Identity",
+        "Foundation.Outcome",
+        "Foundation.TaskResult",
+        "ModelRouting.Contract",
+        "ParticipantIdentity.ManagedCatalog",
+        "Provider.Language",
+        "cognitive-environment.Contract",
+        "delegation.Contract",
+        "host-boundary.Contract"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/session-ontology/tests/satellite-kind.test.mjs"
+      ],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "closure_evidence": "Published exact symbol contracts from FCS evidence; 6 files removed from coverage_backlog; proof: requirements/session-ontology/tests/satellite-kind.test.mjs.",
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs",
+        "src/Wanxiangshu/Execution/Session/Association.fs",
+        "src/Wanxiangshu/Execution/Session/AssociationSurface.fs",
+        "src/Wanxiangshu/Execution/Session/Ownership.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageD"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "output-distillation-frontier-keep",
+      "primary_owner": "output-distillation",
+      "intent": "output-distillation ready-frontier KEEP: close 6 file(s) with exact published/physical-port contracts derived from FCS evidence.",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/Distillation.fs",
+        "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs",
+        "src/Wanxiangshu/OpenCode/Tools/DistillationSurface.fs",
+        "src/Wanxiangshu/Host/Contract/ToolResultBound.fs",
+        "src/Wanxiangshu/Process/LargeGate.fs",
+        "src/Wanxiangshu/Process/LargeGateSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "output-distillation.Contract"
+      ],
+      "consumes": [
+        "Context.CompanionContract",
+        "DurableEvents.Contract",
+        "Foundation.AsyncSupport",
+        "Foundation.Identity",
+        "Foundation.LlmFacing",
+        "Host.HostDigest",
+        "OfficeCapabilitySurface.Contract",
+        "ParticipantIdentity.ManagedCatalog",
+        "ParticipantIdentity.RoleVocabulary",
+        "Provider.Language",
+        "ToolOwner.ToolSpec",
+        "delegation.Contract",
+        "dispatch-protocol.Contract",
+        "process-execution.Contract",
+        "time-capability.Contract"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/output-distillation/tests/distiller-fragment-humility.test.mjs"
+      ],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "closure_evidence": "Published exact symbol contracts from FCS evidence; 6 files removed from coverage_backlog; proof: requirements/output-distillation/tests/distiller-fragment-humility.test.mjs.",
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Tools/Distillation.fs",
+        "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs",
+        "src/Wanxiangshu/OpenCode/Tools/DistillationSurface.fs",
+        "src/Wanxiangshu/Host/Contract/ToolResultBound.fs",
+        "src/Wanxiangshu/Process/LargeGate.fs",
+        "src/Wanxiangshu/Process/LargeGateSurface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "institutional-learning-frontier-keep",
+      "primary_owner": "institutional-learning",
+      "intent": "institutional-learning ready-frontier KEEP: close 6 file(s) with exact published/physical-port contracts derived from FCS evidence.",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Facts.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Fold.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Projection.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "institutional-learning.Contract"
+      ],
+      "consumes": [
+        "AttentionRegulation.Contract",
+        "DurableEvents.Contract",
+        "Foundation.Identity",
+        "Foundation.LlmFacing",
+        "Foundation.TaskResult",
+        "Host.HostDigest",
+        "ParticipantIdentity.RoleVocabulary",
+        "Provider.Language",
+        "behavior-diagnosis.Contract",
+        "distribution.Contract",
+        "host-boundary.Contract"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/institutional-learning/tests/institutional-learning.test.mjs"
+      ],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "closure_evidence": "Published exact symbol contracts from FCS evidence; 6 files removed from coverage_backlog; proof: requirements/institutional-learning/tests/institutional-learning.test.mjs.",
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Facts.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Fold.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Projection.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Surface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageE"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "distribution-frontier-keep",
+      "primary_owner": "distribution",
+      "intent": "distribution ready-frontier KEEP: close 6 file(s) with exact published/physical-port contracts derived from FCS evidence.",
+      "files": [
+        "src/Wanxiangshu/AssemblyInfo.fs",
+        "src/Wanxiangshu/Resources/EnforcerCatalogResource.fs",
+        "src/Wanxiangshu/Resources/ModelRoutingResource.fs",
+        "src/Wanxiangshu/Resources/PackageMetadata.fs",
+        "src/Wanxiangshu/Resources/PackageResources.fs",
+        "src/Wanxiangshu/Resources/RuntimeResources.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "distribution.Contract"
+      ],
+      "consumes": [
+        "Foundation.LlmFacing",
+        "ParticipantIdentity.RoleVocabulary",
+        "Provider.Language",
+        "behavior-diagnosis.Contract",
+        "cognitive-environment.Contract"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/distribution/tests/cwd-independent-resources.test.mjs"
+      ],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "closure_evidence": "Published exact symbol contracts from FCS evidence; 6 files removed from coverage_backlog; proof: requirements/distribution/tests/cwd-independent-resources.test.mjs.",
+      "touched_paths": [
+        "src/Wanxiangshu/AssemblyInfo.fs",
+        "src/Wanxiangshu/Resources/EnforcerCatalogResource.fs",
+        "src/Wanxiangshu/Resources/ModelRoutingResource.fs",
+        "src/Wanxiangshu/Resources/PackageMetadata.fs",
+        "src/Wanxiangshu/Resources/PackageResources.fs",
+        "src/Wanxiangshu/Resources/RuntimeResources.fs"
+      ],
+      "coverage_tags": [
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "repository-investigation-frontier-keep",
+      "primary_owner": "repository-investigation",
+      "intent": "repository-investigation ready-frontier KEEP: close 10 file(s) with exact published/physical-port contracts derived from FCS evidence.",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/FetchTool.fs",
+        "src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs",
+        "src/Wanxiangshu/Repository/Investigation/Semble/Client.fs",
+        "src/Wanxiangshu/Repository/Investigation/Semble/Mcp.fs",
+        "src/Wanxiangshu/Repository/Investigation/Semble/SearchCodec.fs",
+        "src/Wanxiangshu/Repository/Investigation/Semble/Stdio.fs",
+        "src/Wanxiangshu/Repository/Investigation/SembleSurface.fs",
+        "src/Wanxiangshu/Repository/Investigation/WarmStart/Prompt.fs",
+        "src/Wanxiangshu/Repository/Investigation/WarmStart/Runtime.fs",
+        "src/Wanxiangshu/Repository/Investigation/WarmStartSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "repository-investigation.Contract"
+      ],
+      "consumes": [
+        "DurableConvergence.Contract",
+        "Foundation.Identity",
+        "Foundation.LlmFacing",
+        "Foundation.McpLaunch",
+        "Foundation.Parallel",
+        "Foundation.TaskResult",
+        "OfficeCapability.Contract",
+        "ParticipantIdentity.RoleVocabulary",
+        "Provider.Language",
+        "Session.Lifecycle",
+        "delegation.Contract",
+        "host-boundary.Contract",
+        "knowledge-reuse.Contract"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/repository-investigation/tests/investigation-resource-laws.test.mjs"
+      ],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "closure_evidence": "Published exact symbol contracts from FCS evidence; 10 files removed from coverage_backlog; proof: requirements/repository-investigation/tests/investigation-resource-laws.test.mjs.",
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Tools/FetchTool.fs",
+        "src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs",
+        "src/Wanxiangshu/Repository/Investigation/Semble/Client.fs",
+        "src/Wanxiangshu/Repository/Investigation/Semble/Mcp.fs",
+        "src/Wanxiangshu/Repository/Investigation/Semble/SearchCodec.fs",
+        "src/Wanxiangshu/Repository/Investigation/Semble/Stdio.fs",
+        "src/Wanxiangshu/Repository/Investigation/SembleSurface.fs",
+        "src/Wanxiangshu/Repository/Investigation/WarmStart/Prompt.fs",
+        "src/Wanxiangshu/Repository/Investigation/WarmStart/Runtime.fs",
+        "src/Wanxiangshu/Repository/Investigation/WarmStartSurface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "intra-participant-parallelism-frontier-keep",
+      "primary_owner": "intra-participant-parallelism",
+      "intent": "intra-participant-parallelism ready-frontier KEEP: close 10 file(s) with exact published/physical-port contracts derived from FCS evidence.",
+      "files": [
+        "src/Wanxiangshu/Execution/Fission/Admission.fs",
+        "src/Wanxiangshu/Execution/Fission/Fact.fs",
+        "src/Wanxiangshu/Execution/Fission/Facts.fs",
+        "src/Wanxiangshu/Execution/Fission/Fold.fs",
+        "src/Wanxiangshu/Execution/Fission/Model.fs",
+        "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs",
+        "src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs",
+        "src/Wanxiangshu/Execution/Fission/Projection.fs",
+        "src/Wanxiangshu/Execution/Fission/Runtime.fs",
+        "src/Wanxiangshu/Execution/Fission/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "intra-participant-parallelism.Contract"
+      ],
+      "consumes": [
+        "Composition.Turn",
+        "DurableEvents.Contract",
+        "Foundation.Identity",
+        "Foundation.LlmFacing",
+        "Foundation.Outcome",
+        "Host.HostDigest",
+        "Interaction.Repair.Classification",
+        "ModelRouting.Contract",
+        "OfficeCapability.Contract",
+        "ParticipantIdentity.RoleVocabulary",
+        "Provider.Language",
+        "SemanticTrace.Contract",
+        "Session.Lifecycle",
+        "WorkRecord.Surface",
+        "cognitive-environment.Contract",
+        "degeneration-guard.Contract",
+        "delegation.Contract",
+        "dispatch-protocol.Contract",
+        "host-boundary.Contract",
+        "interaction-authority.Contract",
+        "session-ontology.Contract"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/intra-participant-parallelism/tests/fission-domain.test.mjs"
+      ],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "closure_evidence": "Published exact symbol contracts from FCS evidence; 10 files removed from coverage_backlog; proof: requirements/intra-participant-parallelism/tests/fission-domain.test.mjs.",
+      "touched_paths": [
+        "src/Wanxiangshu/Execution/Fission/Admission.fs",
+        "src/Wanxiangshu/Execution/Fission/Fact.fs",
+        "src/Wanxiangshu/Execution/Fission/Facts.fs",
+        "src/Wanxiangshu/Execution/Fission/Fold.fs",
+        "src/Wanxiangshu/Execution/Fission/Model.fs",
+        "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs",
+        "src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs",
+        "src/Wanxiangshu/Execution/Fission/Projection.fs",
+        "src/Wanxiangshu/Execution/Fission/Runtime.fs",
+        "src/Wanxiangshu/Execution/Fission/Surface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageD"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "requirement-grounding-frontier-keep",
+      "primary_owner": "requirement-grounding",
+      "intent": "requirement-grounding ready-frontier KEEP: close 11 file(s) with exact published/physical-port contracts derived from FCS evidence.",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Gate.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Projection.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Runtime.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Transform.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGroundingRepositorySurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGroundingSurface.fs",
+        "src/Wanxiangshu/Host/Fact.fs",
+        "src/Wanxiangshu/Host/Facts.fs",
+        "src/Wanxiangshu/Requirement/Grounding/Catalog.fs",
+        "src/Wanxiangshu/Requirement/Grounding/Model.fs",
+        "src/Wanxiangshu/Requirement/Grounding/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "requirement-grounding.Contract"
+      ],
+      "consumes": [
+        "ConcernRouting.Contract",
+        "Context.CompanionContract",
+        "DurableEvents.Contract",
+        "Foundation.Identity",
+        "Foundation.LlmFacing",
+        "Foundation.TaskResult",
+        "Host.HostDigest",
+        "ProviderProjection.HostDecode",
+        "guidance-delivery.Contract",
+        "host-boundary.Contract",
+        "repository-programming.Contract"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/requirement-grounding/tests/grounding-delivery.test.mjs"
+      ],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "closure_evidence": "Published exact symbol contracts from FCS evidence; 11 files removed from coverage_backlog; proof: requirements/requirement-grounding/tests/grounding-delivery.test.mjs.",
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Gate.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Projection.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Runtime.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Transform.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGroundingRepositorySurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGroundingSurface.fs",
+        "src/Wanxiangshu/Host/Fact.fs",
+        "src/Wanxiangshu/Host/Facts.fs",
+        "src/Wanxiangshu/Requirement/Grounding/Catalog.fs",
+        "src/Wanxiangshu/Requirement/Grounding/Model.fs",
+        "src/Wanxiangshu/Requirement/Grounding/Surface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "interaction-authority-frontier-keep",
+      "primary_owner": "interaction-authority",
+      "intent": "interaction-authority ready-frontier KEEP: close 14 file(s) with exact published/physical-port contracts derived from FCS evidence.",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs",
+        "src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs",
+        "src/Wanxiangshu/Interaction/Authority/Child.fs",
+        "src/Wanxiangshu/Interaction/Authority/Fact.fs",
+        "src/Wanxiangshu/Interaction/Authority/Facts.fs",
+        "src/Wanxiangshu/Interaction/Authority/Fold.fs",
+        "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+        "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+        "src/Wanxiangshu/Interaction/Authority/Model.fs",
+        "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+        "src/Wanxiangshu/Interaction/Authority/Run.fs",
+        "src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs",
+        "src/Wanxiangshu/Interaction/Authority/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "interaction-authority.Contract"
+      ],
+      "consumes": [
+        "Change.Host.Surface",
+        "Composition.Turn",
+        "DurableEvents.Contract",
+        "Foundation.Identity",
+        "Foundation.TaskResult",
+        "OfficeCapability.Contract",
+        "ParticipantIdentity.Evidence",
+        "ParticipantIdentity.ManagedCatalog",
+        "ParticipantIdentity.RoleVocabulary",
+        "PrefixStability.Contract",
+        "Provider.AttemptRecovery",
+        "Provider.RequestKind",
+        "Review.Witness",
+        "ToolOwner.ToolSpec",
+        "delegation.Contract",
+        "dispatch-protocol.Contract",
+        "intra-participant-parallelism.Contract"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/interaction-authority/tests/authority-acceptance-identity.test.mjs"
+      ],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "closure_evidence": "Published exact symbol contracts from FCS evidence; 14 files removed from coverage_backlog; proof: requirements/interaction-authority/tests/authority-acceptance-identity.test.mjs.",
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs",
+        "src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs",
+        "src/Wanxiangshu/Interaction/Authority/Child.fs",
+        "src/Wanxiangshu/Interaction/Authority/Fact.fs",
+        "src/Wanxiangshu/Interaction/Authority/Facts.fs",
+        "src/Wanxiangshu/Interaction/Authority/Fold.fs",
+        "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+        "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+        "src/Wanxiangshu/Interaction/Authority/Model.fs",
+        "src/Wanxiangshu/Interaction/Authority/Origin.fs",
+        "src/Wanxiangshu/Interaction/Authority/Run.fs",
+        "src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs",
+        "src/Wanxiangshu/Interaction/Authority/Surface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageB"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
     }
   ],
   "debt_face": {
@@ -2869,8 +3356,6 @@
       "src/Wanxiangshu/OpenCode/Codec/OpencodeTypes.fs",
       "src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs",
       "src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs",
-      "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs",
-      "src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs",
       "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
       "src/Wanxiangshu/OpenCode/Host/ChatAdmission/TransactionSurface.fs",
       "src/Wanxiangshu/OpenCode/Host/ChatParamsSurface.fs",
@@ -2900,24 +3385,14 @@
       "src/Wanxiangshu/OpenCode/Host/QuiescenceSurface.fs",
       "src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnostics.fs",
       "src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnosticsSurface.fs",
-      "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Gate.fs",
-      "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Projection.fs",
-      "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Runtime.fs",
-      "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Transform.fs",
-      "src/Wanxiangshu/OpenCode/Host/RequirementGroundingRepositorySurface.fs",
-      "src/Wanxiangshu/OpenCode/Host/RequirementGroundingSurface.fs",
-      "src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs",
       "src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs",
       "src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs",
       "src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs",
       "src/Wanxiangshu/OpenCode/Host/SessionSnapshotSurface.fs",
-      "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
-      "src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs",
       "src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs",
       "src/Wanxiangshu/OpenCode/Host/SharedTerminalBus.fs",
       "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfig.fs",
       "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfigSurface.fs",
-      "src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs",
       "src/Wanxiangshu/OpenCode/JoinResultRendererSurface.fs",
       "src/Wanxiangshu/OpenCode/Plugin/Plugin.fs",
       "src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs",
@@ -2929,29 +3404,12 @@
       "src/Wanxiangshu/OpenCode/Signals/HostSignal.fs",
       "src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs",
       "src/Wanxiangshu/OpenCode/Signals/HostSignalSubscribe.fs",
-      "src/Wanxiangshu/OpenCode/Tools/Distillation.fs",
-      "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs",
-      "src/Wanxiangshu/OpenCode/Tools/DistillationSurface.fs",
       "src/Wanxiangshu/OpenCode/Tools/ExecutorTool.fs",
-      "src/Wanxiangshu/OpenCode/Tools/FetchTool.fs",
       "src/Wanxiangshu/OpenCode/Tools/FileMutationSurface.fs",
       "src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs",
-      "src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs",
-      "src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs",
       "src/Wanxiangshu/OpenCode/Tools/PtyTool.fs"
     ],
     "CoverageB": [
-      "src/Wanxiangshu/Interaction/Authority/Child.fs",
-      "src/Wanxiangshu/Interaction/Authority/Fact.fs",
-      "src/Wanxiangshu/Interaction/Authority/Facts.fs",
-      "src/Wanxiangshu/Interaction/Authority/Fold.fs",
-      "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
-      "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
-      "src/Wanxiangshu/Interaction/Authority/Model.fs",
-      "src/Wanxiangshu/Interaction/Authority/Origin.fs",
-      "src/Wanxiangshu/Interaction/Authority/Run.fs",
-      "src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs",
-      "src/Wanxiangshu/Interaction/Authority/Surface.fs",
       "src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs",
       "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
       "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs",
@@ -3026,19 +3484,7 @@
       "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs",
       "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Wait.fs",
       "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs",
-      "src/Wanxiangshu/Execution/Fission/Admission.fs",
-      "src/Wanxiangshu/Execution/Fission/Fact.fs",
-      "src/Wanxiangshu/Execution/Fission/Facts.fs",
-      "src/Wanxiangshu/Execution/Fission/Fold.fs",
-      "src/Wanxiangshu/Execution/Fission/Model.fs",
-      "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs",
-      "src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs",
-      "src/Wanxiangshu/Execution/Fission/Projection.fs",
-      "src/Wanxiangshu/Execution/Fission/Runtime.fs",
-      "src/Wanxiangshu/Execution/Fission/Surface.fs",
       "src/Wanxiangshu/Execution/Session/AgentCompletion.fs",
-      "src/Wanxiangshu/Execution/Session/Association.fs",
-      "src/Wanxiangshu/Execution/Session/AssociationSurface.fs",
       "src/Wanxiangshu/Execution/Session/ChatExecution/Admission.fs",
       "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
       "src/Wanxiangshu/Execution/Session/ChatExecution/Fact.fs",
@@ -3052,7 +3498,6 @@
       "src/Wanxiangshu/Execution/Session/ChatExecution/Settlement.fs",
       "src/Wanxiangshu/Execution/Session/ChatExecution/StatusSurface.fs",
       "src/Wanxiangshu/Execution/Session/ChatExecution/Surface.fs",
-      "src/Wanxiangshu/Execution/Session/Ownership.fs",
       "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
       "src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs"
     ],
@@ -3067,11 +3512,6 @@
       "src/Wanxiangshu/Enforcer/Cycle/Model.fs",
       "src/Wanxiangshu/Enforcer/Cycle/Recovery.fs",
       "src/Wanxiangshu/Enforcer/Host.fs",
-      "src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs",
-      "src/Wanxiangshu/Enforcer/InstitutionalLearning/Facts.fs",
-      "src/Wanxiangshu/Enforcer/InstitutionalLearning/Fold.fs",
-      "src/Wanxiangshu/Enforcer/InstitutionalLearning/Projection.fs",
-      "src/Wanxiangshu/Enforcer/InstitutionalLearning/Surface.fs",
       "src/Wanxiangshu/Enforcer/Observation.fs",
       "src/Wanxiangshu/Enforcer/ObservationCollector.fs",
       "src/Wanxiangshu/Enforcer/ObservationSurface.fs",
@@ -3098,13 +3538,7 @@
       "src/Wanxiangshu/Strength/TurnEvidence.fs"
     ],
     "CoverageG": [
-      "src/Wanxiangshu/AssemblyInfo.fs",
-      "src/Wanxiangshu/Host/Contract/ToolResultBound.fs",
-      "src/Wanxiangshu/Host/Fact.fs",
-      "src/Wanxiangshu/Host/Facts.fs",
       "src/Wanxiangshu/Process/JsSandbox.fs",
-      "src/Wanxiangshu/Process/LargeGate.fs",
-      "src/Wanxiangshu/Process/LargeGateSurface.fs",
       "src/Wanxiangshu/Process/NodeProcessHost.fs",
       "src/Wanxiangshu/Process/NodeProcessWait.fs",
       "src/Wanxiangshu/Process/ProcessOutput.fs",
@@ -3117,14 +3551,6 @@
       "src/Wanxiangshu/Process/PtySupervisor.fs",
       "src/Wanxiangshu/Process/PtyTypes.fs",
       "src/Wanxiangshu/Process/Spool.fs",
-      "src/Wanxiangshu/Repository/Investigation/Semble/Client.fs",
-      "src/Wanxiangshu/Repository/Investigation/Semble/Mcp.fs",
-      "src/Wanxiangshu/Repository/Investigation/Semble/SearchCodec.fs",
-      "src/Wanxiangshu/Repository/Investigation/Semble/Stdio.fs",
-      "src/Wanxiangshu/Repository/Investigation/SembleSurface.fs",
-      "src/Wanxiangshu/Repository/Investigation/WarmStart/Prompt.fs",
-      "src/Wanxiangshu/Repository/Investigation/WarmStart/Runtime.fs",
-      "src/Wanxiangshu/Repository/Investigation/WarmStartSurface.fs",
       "src/Wanxiangshu/Repository/Knowledge/Casebook/Bookkeeper.fs",
       "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs",
       "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperStaging.fs",
@@ -3164,14 +3590,6 @@
       "src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs",
       "src/Wanxiangshu/Repository/Programming/Js/Utf8Fs.fs",
       "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs",
-      "src/Wanxiangshu/Requirement/Grounding/Catalog.fs",
-      "src/Wanxiangshu/Requirement/Grounding/Model.fs",
-      "src/Wanxiangshu/Requirement/Grounding/Surface.fs",
-      "src/Wanxiangshu/Resources/EnforcerCatalogResource.fs",
-      "src/Wanxiangshu/Resources/ModelRoutingResource.fs",
-      "src/Wanxiangshu/Resources/PackageMetadata.fs",
-      "src/Wanxiangshu/Resources/PackageResources.fs",
-      "src/Wanxiangshu/Resources/RuntimeResources.fs",
       "src/Wanxiangshu/Sphinx/Absorb.fs",
       "src/Wanxiangshu/Sphinx/Bayes.fs",
       "src/Wanxiangshu/Sphinx/Closure.fs",
