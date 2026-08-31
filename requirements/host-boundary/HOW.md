@@ -8,6 +8,7 @@
 - `SessionIdle` 与 `ProviderRetry`：触发单飞调和流程。
 - `AttemptAborted`：撤销当前物理尝试的静止能力，不推进业务重试。
 - `ProviderFailure`：结合快照中的确切助手消息共同确认失败终态。
+- `signals.test.mjs` 直接穿过 `HostSignalSurface` 固定五 case 的完整 JSON 投影、无关输入拒绝与 wrapper wire 形态。abort proof 同场比较 owned/unowned `AttemptAborted` 与可跨 ownership 的 `ProviderFailure`；任何混型都会改变可见路由结果并使测试失败。
 
 ### 2. 快照投影与身份因果解析
 
