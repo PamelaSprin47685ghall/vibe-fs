@@ -160,12 +160,14 @@ module JsMutationFs =
             Error JsFailure.TransactionCommitFailed
 
     let private writeCreate resolvePath path newText =
+        let resolvedPath = resolvePath path
+
         try
-            writeFileWithOptions (resolvePath path) newText (createObj [ "encoding" ==> "utf8"; "flag" ==> "wx" ])
+            writeFileWithOptions resolvedPath newText (createObj [ "encoding" ==> "utf8"; "flag" ==> "wx" ])
 
             Ok(JsRollbackMutation.RemoveCreatedFile(path, newText))
         with
-        | _ when existsPath (resolvePath path) -> Error(JsFailure.FileChanged path)
+        | _ when existsPath resolvedPath -> Error(JsFailure.FileChanged path)
         | _ -> Error JsFailure.TransactionCommitFailed
 
     let private writeValidated resolvePath mutation =
