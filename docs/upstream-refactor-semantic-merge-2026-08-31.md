@@ -110,3 +110,7 @@
 2. Change observable gate 与剩余 managed-session 镜像迁移若显著扩大 diff，是否允许作为后续独立 PR。
 
 在出现实测耦合前不提前扩大范围；本分支会保留足够证据供负责人选择。
+
+## 6. 执行日志
+
+- Durable handle：新增 production-bound terminal/rebinding 反例；`LinkageProjection` 只吸收 exact Active duplicate，identity 漂移返回 `HandleIdentityConflict`，Completed/Abandoned/Retired 均保持不可逆。focused Handle、managed-session、build/check 验证结果记录在对应 Git 节点。
