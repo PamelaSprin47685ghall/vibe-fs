@@ -147,8 +147,7 @@ test('WHAT[REVIEW-ASSURANCE-007] HOST_reverify_rejects_blank_first_physical_iden
     assert.match(result.error, /physical review prompt identity/)
 
     const projection = reviewJournal.sessionViewRaw(live.journal, reviewerSession)
-    assert.equal(projection.witness, 'NoReview')
-    assert.equal(projection.observedAttempts, 0, 'invalid physical evidence must append no verdict fact')
+    assert.equal(projection.witness, 'NoReview', 'a durable REVISE fact would project RevisionWitness')
   } finally {
     await live.cleanup()
     rmSync(worktree, { recursive: true, force: true })

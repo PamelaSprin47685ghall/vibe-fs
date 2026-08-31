@@ -2764,14 +2764,9 @@
       "contract": "Review.Witness",
       "kind": "published-contract",
       "consumers": [
-        "host-boundary",
         "speculative-investigation"
       ],
       "symbols": [
-        "Wanxiangshu.OpenCode.ProviderRunBinding.Rejection",
-        "Wanxiangshu.OpenCode.ProviderRunBinding.Rejection.AmbiguousRun",
-        "Wanxiangshu.OpenCode.ProviderRunBinding.Rejection.NoBindableRun",
-        "Wanxiangshu.OpenCode.ProviderRunBinding.Rejection.NotLatestRun",
         "Wanxiangshu.OpenCode.ProviderRunBinding.bindableRun"
       ],
       "justification": "Review.Witness publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-assurance."
