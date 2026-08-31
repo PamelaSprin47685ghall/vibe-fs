@@ -61,6 +61,8 @@
 
 `scripts/checks/owner-dependencies.mjs` 将 FCS file edge 投影到 `semantic-owners.json`。DONE migration node 的 provider edge 立即进入 strict graph；未完成 provider edge 保留为 `pendingEdges`，不能提前登记为已发布 contract。`scripts/checks/published-contracts.json` 只允许 exact path + exact `symbols` / `symbol_roots`：provider contract 明确 consumer owner，physical adapter 与 composition root 明确 consumer file、target file 与 target symbol。每个声明绑定真实 DONE node、该 node 的 published vocabulary、executable proof 与架构理由；stale symbol、stale consumer、stale target、stale SCC justification 均失败。不存在 wildcard、目录 public、文件名 public、baseline 或 allowlist 通道。
 
+完整阶梯只执行一次 production FCS scan。其 normalized evidence 原子写入 `schemaVersion + runId + inputFingerprint`；fingerprint 绑定 scanner、project、npm dependency lock 与完整 production compile set 内容。后续 owner gates 与 integration proof 只能携 exact run-id 复用该 artifact；证据缺失、schema/run-id/fingerprint 不符或 production file set 漂移全部 fail closed，禁止以第二次昂贵扫描伪造“独立性”。
+
 cycle 只从已授权 semantic-contract edge 构建；physical adapter 与 composition-root wiring 不伪装成领域依赖。门禁同时拒绝 foreign execution-position vocabulary 与 composition-root 对未发布 foreign DU case 的 pattern match。source graph 与 requirement graph 分别输出、分别验证，只共享 owner identity，不要求边集合相等。
 
 ---

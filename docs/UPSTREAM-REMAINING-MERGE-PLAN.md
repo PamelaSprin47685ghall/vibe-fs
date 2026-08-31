@@ -71,6 +71,8 @@ run `33426540260` 已验证 owner lane 修复：5/5，Linux production scan 146.
 
 累计 #21 run `33426894259` 进一步否证 nested verdict 方案：process-isolated file 在 185100ms 仍报告 0 blocking progress，说明 Node 20 只在 file wrapper 退出时交付 leaf 结果。最终方案把 owner fixture、production evidence+reuse、explicit-project isolation 拆成三个物理顺序文件；没有增加预算、重复 production scan或改变断言。
 
+#20/#21 runs `33429721220` / `33429748255` 又发现 `owner-dependencies-reuse.test.mjs` 实际仍启动第二次完整 production scan，Linux 上超过 185s。最终闭环改为阶梯内 single production scan：owner-dep 原子产出 schema v3 normalized evidence；SHA-256 fingerprint 绑定 normalizer、scanner、project、dependency lock 与完整 compile set 内容；integration 读取 exact run-id 并验证 fingerprint 后消费。缺失/stale/schema/run-id/fingerprint/compile-set 错误全部 fail closed。快速合同 56/56、真实 owner-dep 全绿、三项 integration 5.38s 全绿；timeout 不变。
+
 ### 第 3 次：production-bound proof 加固
 
 - 模块列表：
