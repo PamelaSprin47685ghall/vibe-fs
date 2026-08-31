@@ -41,7 +41,7 @@ const PROVIDER_RECOVERY_GATE_FIXTURES = [
   },
   {
     id: 'no-active-run-continues-recovery',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs',
+    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs',
     source: '| ConfirmedFailureOutcome.NoActiveRun -> RecoveryAdmission.ContinueRecovery',
   },
   {
@@ -66,7 +66,7 @@ const PROVIDER_RECOVERY_GATE_FIXTURES = [
   },
   {
     id: 'confirmed-failure-outcome-contract',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs',
+    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs',
     source: [
       'type ConfirmedFailureOutcome =',
       '    | RecoveryAdvanced of RecoveryOpportunity',
@@ -74,8 +74,7 @@ const PROVIDER_RECOVERY_GATE_FIXTURES = [
       '    | AlreadyRecorded',
       '    | NoActiveRun',
       '    | RetryScheduled',
-      'module FallbackLedger =',
-      '    let recordAuthorizedFailure (authorization: ProviderRecoveryAuthorization) : Task<Result<ConfirmedFailureOutcome, string>> = failwith "fixture"',
+      'type ConfirmedFailurePort = SessionId -> ProviderRunIdentity -> string -> Task<Result<ConfirmedFailureOutcome, string>>',
     ].join('\n'),
   },
   {
@@ -87,29 +86,12 @@ const PROVIDER_RECOVERY_GATE_FIXTURES = [
     id: 'workflow-main-session-failure-owner',
     file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
     source: [
-      'let mainSessionId = mainSessionOfBlogger projection turn.SessionId',
-      'let ownerSessionId = mainSessionId |> Option.defaultValue turn.SessionId',
-      'FallbackLedger.recordConfirmedFailure durable AgentPairCursor.DefaultAutoRecoveryBudget ownerSessionId turn.ProviderRun error',
-    ].join('\n'),
-  },
-  {
-    id: 'workflow-failure-ledger-owner-flow',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
-    source: [
-      'let private admitAuthorizedFailure (durable: AgentJournal) (ownerSessionId: SessionId) turn authorization error =',
-      '    task {',
-      '        let! admission = FallbackLedger.recordAuthorizedFailure durable turn.SessionId authorization error',
-      '        return reconcileFailureAdmission durable ownerSessionId admission',
-      '    }',
+      'let ownerSessionId = mainSessionOfBloggerProjection projection turn.SessionId |> Option.defaultValue turn.SessionId',
+      'FallbackLedger.recordAuthorizedFailure durable turn.SessionId authorization error',
     ].join('\n'),
   },
   {
     id: 'interaction-repair-main-session-failure-owner',
-    file: 'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs',
-    source: 'FallbackLedger.recordConfirmedFailure journal budget turn.SessionId turn.ProviderRun reason',
-  },
-  {
-    id: 'interaction-repair-no-fallback-writer',
     file: 'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs',
     source: 'FallbackLedger.recordAuthorizedFailure journal turn.SessionId authorization reason',
   },
@@ -131,12 +113,6 @@ test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_provider_recovery_rules_are_productio
     assert.ok(rule, `missing provider recovery production rule ${id}`)
     assert.ok(rule.fileHint || rule.pathHint, `${id} must carry a narrow production file/path hint`)
   }
-})
-
-test('WHAT[PAR-018] deterministic fold observation is data, not recovery time control', () => {
-  const source = '[<Emit("new Date(0)")>] let private foldObservation () : ObservedAt = jsNative'
-  const hits = scanText(source, 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs')
-  assert.equal(hits.some(({ id }) => id === 'provider-recovery-time-control'), false)
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_reconcile_domain_is_observation_stabilization_not_a_program', () => {

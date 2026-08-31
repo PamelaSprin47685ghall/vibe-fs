@@ -109,6 +109,41 @@ module PromptDispatcher =
             return Result.map ignore result
         }
 
+    let private appendManagedPromptAccepted
+        (journal: AgentJournal)
+        (promptKey: PromptKey)
+        (sessionId: SessionId)
+        (physicalMessageId: PhysicalUserMessageId)
+        : Task<Result<unit, ManagedChatAcceptanceError>> =
+        task {
+            let! appended =
+                AgentJournal.appendAgent
+                    (StreamId.Session sessionId)
+                    None
+                    (PromptFact.PluginPromptPhysicalAccepted
+                        {| PromptKey = promptKey
+                           SessionId = sessionId
+                           PhysicalUserMessageId = physicalMessageId |})
+                    journal
+
+            return
+                appended
+                |> Result.map (fun _ -> PromptPhysicalAcceptance.accepted promptKey physicalMessageId)
+                |> Result.mapError ManagedChatAcceptance.persistenceError
+        }
+
+    let private persistSessionFact
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity option)
+        (fact: AgentFact)
+        : Task<Result<unit, string>> =
+        task {
+            match! AgentJournal.appendAgent (StreamId.Session sessionId) providerRun fact journal with
+            | Ok _ -> return Ok()
+            | Error failure -> return Error(JournalAppendFailure.describe failure)
+        }
+
     let private registrationAppendFailure
         (profile: PromptAuthority.AuthorityExecutionProfile)
         (projection: PromptAuthority.PromptAuthorityProjection)
@@ -206,22 +241,7 @@ module PromptDispatcher =
             (sessionId: SessionId)
             (physicalMessageId: PhysicalUserMessageId)
             : Task<Result<unit, ManagedChatAcceptanceError>> =
-            task {
-                let! appended =
-                    AgentJournal.appendAgent
-                        (StreamId.Session sessionId)
-                        None
-                        (PromptFact.PluginPromptPhysicalAccepted
-                            {| PromptKey = promptKey
-                               SessionId = sessionId
-                               PhysicalUserMessageId = physicalMessageId |})
-                        journal
-
-                return
-                    appended
-                    |> Result.map (fun _ -> PromptPhysicalAcceptance.accepted promptKey physicalMessageId)
-                    |> Result.mapError ManagedChatAcceptance.persistenceError
-            }
+            appendManagedPromptAccepted journal promptKey sessionId physicalMessageId
 
         member private this.RegisterManagedAuthority
             (profile: PromptAuthority.AuthorityExecutionProfile)
@@ -376,11 +396,7 @@ module PromptDispatcher =
             (providerRun: ProviderRunIdentity option)
             (fact: AgentFact)
             : Task<Result<unit, string>> =
-            task {
-                match! AgentJournal.appendAgent (StreamId.Session sessionId) providerRun fact journal with
-                | Ok _ -> return Ok()
-                | Error failure -> return Error(JournalAppendFailure.describe failure)
-            }
+            persistSessionFact journal sessionId providerRun fact
 
         /// PROMPT-004: an Authority Root takes effect.
         ///

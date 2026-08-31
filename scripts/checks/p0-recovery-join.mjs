@@ -398,14 +398,14 @@ export const RULES = [
   {
     id: 'provider-recovery-role-classification',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
-    fileHint: 'Workflow.fs|Ledger.fs',
+    fileHint: 'Workflow.fs|Ledger.fs|ConfirmedFailurePort.fs',
     pattern: /\b(?:Provider|Participant|Persona)?Role\b|\.Role\b/,
     label: 'provider recovery must use typed attempt identity, not role classification',
   },
   {
     id: 'provider-recovery-error-string-classification',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
-    fileHint: 'Workflow.fs|Ledger.fs',
+    fileHint: 'Workflow.fs|Ledger.fs|ConfirmedFailurePort.fs',
     pattern:
       /\b(?:error|reason)\b\s*\.\s*(?:Contains|StartsWith|EndsWith|IndexOf)\b|\b(?:Regex\.)?IsMatch\s*\(\s*(?:error|reason)\b|\bmatch\s+(?:error|reason)\s+with\b|\bif\s+(?:error|reason)\s*=\s*["']/i,
     label: 'provider recovery must not classify attempts from error strings',
@@ -413,7 +413,7 @@ export const RULES = [
   {
     id: 'no-active-run-continues-recovery',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
-    fileHint: 'Workflow.fs|Ledger.fs',
+    fileHint: 'Workflow.fs|Ledger.fs|ConfirmedFailurePort.fs',
     pattern:
       /\|\s*(?:Ok\s+)?(?:ConfirmedFailureOutcome\.)?NoActiveRun\b(?:(?!\n\s*\|)[\s\S]){0,300}->(?:(?!\n\s*\|)[\s\S]){0,300}\bContinueRecovery\b/,
     label: 'ConfirmedFailureOutcome.NoActiveRun must never continue recovery',
@@ -448,11 +448,11 @@ export const RULES = [
   },
   {
     id: 'confirmed-failure-outcome-contract',
-    fileHint: 'Ledger.fs',
+    fileHint: 'ConfirmedFailurePort.fs',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
     pattern:
-      /type\s+ConfirmedFailureOutcome\s*=\s*\r?\n\s*\|\s*RecoveryAdvanced\s+of\s+RecoveryOpportunity\s*\r?\n\s*\|\s*RecoveryExhausted\s*\r?\n\s*\|\s*AlreadyRecorded\s*\r?\n\s*\|\s*NoActiveRun\s*\r?\n(?:\s*\r?\n|\s*\/\/\/[^\n]*\r?\n)*\s*module\s+FallbackLedger\s*=[\s\S]{0,7000}\blet\s+recordAuthorizedFailure\b[\s\S]{0,1000}\bProviderRecoveryAuthorization\b[\s\S]{0,500}\bTask\s*<\s*Result\s*<\s*ConfirmedFailureOutcome\s*,\s*string\s*>\s*>/,
-    label: 'FallbackLedger must own the exact four-case failure outcome and its typed authorized write entry',
+      /type\s+ConfirmedFailureOutcome\s*=\s*\r?\n\s*\|\s*RecoveryAdvanced\s+of\s+RecoveryOpportunity\s*\r?\n\s*\|\s*RecoveryExhausted\s*\r?\n\s*\|\s*AlreadyRecorded\s*\r?\n\s*\|\s*NoActiveRun\s*\r?\n(?:\s*\r?\n|\s*\/\/\/[^\n]*\r?\n)*\s*type\s+ConfirmedFailurePort\s*=[^\n]*Task\s*<\s*Result\s*<\s*ConfirmedFailureOutcome\s*,\s*string\s*>\s*>/,
+    label: 'ConfirmedFailurePort must own the exact typed four-case ConfirmedFailureOutcome contract',
     positive: true,
   },
   {
@@ -465,38 +465,31 @@ export const RULES = [
     positive: true,
   },
   {
+    // The Blogger-main / durably-proven-WorkMain owner resolution and the
+    // policy-licensed append live in one chain: admitPolicyAuthorizedFailure
+    // resolves the exact owner and fails closed to NoActiveRun, and the only
+    // ledger append binds that resolved `ownerSessionId` together with the
+    // typed `ProviderRecoveryAuthorization` issued by ExecutionFailurePolicy
+    // (PAR-019). A raw budget int no longer authorizes an advance.
     id: 'workflow-main-session-failure-owner',
     fileHint: 'Workflow.fs',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
     pattern:
-      /\blet\s+ownerSessionId\s*=\s*mainSessionOfBloggerProjection\s+projection\s+turn\.SessionId\s*\|>\s*Option\.orElseWith\s*\(fun\s*\(\)\s*->\s*FallbackEvidence\.tryCurrentState\s+turn\.SessionId\s+projection\s*\|>\s*Option\.map\s*\(fun\s+_\s*->\s*turn\.SessionId\)\)[\s\S]{0,700}\blet\s+ownerState\s*=\s*ownerSessionId\s*\|>\s*Option\.bind\s*\(fun\s+owner\s*->\s*FallbackEvidence\.tryCurrentState\s+owner\s+projection\s*\|>\s*Option\.map\s*\(fun\s+current\s*->\s*owner\s*,\s*current\)\)[\s\S]{0,500}\bmatch\s+ownerState\s+with\s*\|\s*None\s*->\s*Task\.FromResult\s*\(Ok\s+ConfirmedFailureOutcome\.NoActiveRun\)[\s\S]{0,300}\|\s*Some\s*\(owner\s*,\s*current\)\s*->\s*admitCurrentFailure\s+durable\s+owner\b/,
-    label: 'Fallback Workflow must resolve one Blogger-main or durable WorkMain owner and fail closed without it',
+      /\bFallbackLedger\.recordAuthorizedFailure\s+durable\s+ownerSessionId\s+authorization\s+error\b[\s\S]{0,3000}\blet\s+ownerSessionId\s*=\s*\r?\n\s*mainSessionOfBloggerProjection\s+projection\s+turn\.SessionId\s*\r?\n\s*\|>\s*Option\.orElseWith\s*\(fun\s*\(\)\s*->\s*\r?\n\s*FallbackEvidence\.tryCurrentState\s+turn\.SessionId\s+projection\s*\r?\n\s*\|>\s*Option\.map\s*\(fun\s+_\s*->\s*turn\.SessionId\)\)[\s\S]{0,200}\bmatch\s+ownerSessionId\s+with\s*\r?\n\s*\|\s*None\s*->(?:(?!FallbackLedger)[\s\S]){0,200}?\bConfirmedFailureOutcome\.NoActiveRun\b[\s\S]{0,300}?\|\s*Some\s+owner\s*->[\s\S]{0,400}?\bFallbackEvidence\.tryCurrentState\s+owner\s+projection\b[\s\S]{0,300}?\badmitCurrentFailure\s+durable\s+owner\b/,
+    label: 'Fallback Workflow must append only to a resolved Blogger main or durably proven WorkMain owner',
     positive: true,
   },
   {
-    id: 'workflow-failure-ledger-owner-flow',
-    fileHint: 'Workflow.fs',
-    pathHint: 'Participant/Provider/Attempt/Fallback/',
-    pattern:
-      /\blet\s+private\s+admitAuthorizedFailure[\s\S]{0,400}\(ownerSessionId\s*:\s*SessionId\)[\s\S]{0,700}\bFallbackLedger\.recordAuthorizedFailure\s+durable\s+ownerSessionId\s+authorization\s+error[\s\S]{0,300}\breconcileFailureAdmission\s+durable\s+ownerSessionId\s+admission\b/,
-    label: 'Fallback Workflow must pass the same resolved owner through the sole ledger write and reconciliation',
-    positive: true,
-  },
-  {
+    // InteractionRepair owns no second owner-resolution formula: it records the
+    // confirmed provider failure through the one workflow entry that resolves
+    // the exact main-session owner and consumes the typed policy licence.
     id: 'interaction-repair-main-session-failure-owner',
     fileHint: 'InteractionRepair.fs',
     pathHint: 'Interaction/Repair/',
     pattern:
-      /\bProviderRecoveryWorkflow\.admitPolicyAuthorizedFailure\s+journal\s+turn\s+ExecutionFailure\.ProviderTransient\s+requestKind\s+reason\b/,
-    label: 'InteractionRepair must delegate exact owner resolution and failure admission to ProviderRecoveryWorkflow',
+      /\bProviderRecoveryWorkflow\.admitPolicyAuthorizedFailure\s*\r?\n\s*journal\s*\r?\n\s*turn\s*\r?\n\s*ExecutionFailure\.ProviderTransient\s*\r?\n\s*requestKind\s*\r?\n\s*reason\b/,
+    label: 'InteractionRepair must resolve the exact main-session owner before recording failure',
     positive: true,
-  },
-  {
-    id: 'interaction-repair-no-fallback-writer',
-    fileHint: 'InteractionRepair.fs',
-    pathHint: 'Interaction/Repair/',
-    pattern: /\bFallbackLedger\b/,
-    label: 'InteractionRepair must not bypass ProviderRecoveryWorkflow and write the fallback ledger directly',
   },
 ]
 

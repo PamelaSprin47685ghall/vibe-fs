@@ -158,7 +158,7 @@ module ConcernTools =
         }
 
     let admission: ToolAdmission =
-        fun _ (r: Role) -> r <> Role.Blogger && r <> Role.Distiller
+        ToolAdmission.OfficeRole(fun _ (r: Role) -> r <> Role.Blogger && r <> Role.Distiller)
 
     let specs factory journal =
         let language = ProviderLanguageBinding.readGlobalPreference ()

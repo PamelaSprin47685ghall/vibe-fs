@@ -2,7 +2,8 @@ namespace Wanxiangshu.Participant.Persona
 
 open Wanxiangshu.Foundation
 
-/// DSL-class: Vocabulary — closed participant persona labels.
+/// DSL-class: Vocabulary — the fixed persona catalog, one name per Role × AgentTier
+/// pair plus the two Bookkeeper leaves. No case carries state or ordering.
 [<RequireQualifiedAccess>]
 type Persona =
     | Integrator

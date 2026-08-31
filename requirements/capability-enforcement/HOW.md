@@ -48,7 +48,7 @@ Roles.permissions (Kernel 层单一真相源)
 | ENF-003 | `requirements/capability-enforcement/tests/attempt-plan-authority.test.mjs::WHAT[ENF-003] PROMPT_008_the_request_kind_is_carried_not_inferred` |
 | ENF-004 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs::WHAT[ENF-004] AGENT_010_fast_and_deep_agents_carry_the_same_allow_set` |
 | ENF-005 | `requirements/capability-enforcement/tests/strength-replica-tool-map.test.mjs::WHAT[ENF-005] STRENGTH_004_replica_host_tool_map_denies_everything_then_allows_exact_readonly` |
-| ENF-006 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs::WHAT[ENF-006] HOST_skill_remains_allowed_for_every_managed_role` |
+| ENF-006 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs::WHAT[ENF-006] HOST_skill_remains_allowed_for_every_managed_role`；`requirements/capability-enforcement/tests/internal-leaf-tool-authority.test.mjs::WHAT[ENF-006] internal_leaf_tool_declares_attachment_authority_not_a_public_office` |
 | ENF-007 | `requirements/capability-enforcement/tests/stealth-browser-mcp-wildcard.test.mjs::WHAT[ENF-007] AGENT_026_wildcard_matrix_mechanism` |
 | ENF-008 | `requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs::WHAT[ENF-008] capability_iso_repo_scan_is_green` |
 | ENF-009 | `requirements/capability-enforcement/tests/tool-referential-integrity.test.mjs::WHAT[ENF-009] gate_a_repo_scan_is_green` |

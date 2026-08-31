@@ -360,7 +360,7 @@ module JoinTool =
         }
 
     let admission: ToolAdmission =
-        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Join
+        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Join)
 
     let spec scope =
         { Name = "join"

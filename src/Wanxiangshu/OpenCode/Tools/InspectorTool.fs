@@ -195,7 +195,7 @@ module InspectorTool =
         }
 
     let admission: ToolAdmission =
-        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Inspect
+        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Inspect)
 
     let spec
         (factory: HostToolFactory)

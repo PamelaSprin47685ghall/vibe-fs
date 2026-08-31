@@ -2,6 +2,16 @@
   "version": 1,
   "methods": [
     {
+      "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
+      "symbol": "ChatAdmissionTransaction.acquireAdmission",
+      "classification": "Admission",
+      "result": "Result",
+      "resultSymbol": "AdmissionAcquisitionOutcome",
+      "owner": "managed-chat-execution",
+      "what": "CHATEXEC-003, ENF-015",
+      "whatOwners": { "CHATEXEC-003": "managed-chat-execution", "ENF-015": "capability-enforcement" }
+    },
+    {
       "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
       "symbol": "ReviewWitness.confirm",
       "classification": "Admission",
@@ -912,6 +922,225 @@
       "issuers": [],
       "whatOwners": {
         "ENF-008": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
+      "symbol": "ManagedChatAcceptanceWitness",
+      "anchor": "type ManagedChatAcceptanceWitness =",
+      "classification": "Authority",
+      "class": "Witness",
+      "owner": "managed-chat-execution",
+      "what": "CHATEXEC-004, CHATEXEC-011, ENF-013, ENF-015",
+      "scope": "exact ChatExecutionKey (SessionId + PhysicalUserMessageId) plus the AcceptedChatExecutionEvidence established for it",
+      "freshness": "issued only from an exact projection read of the durable Accepted fact; different established evidence fails closed",
+      "multiplicity": "replayable evidence: an equal acceptance replay yields the same witness and no second append",
+      "consume": "capacity admission re-reads the exact key before any ExecutionAdmissionLease is granted",
+      "durability": "re-derivable from the durable Accepted fact; the witness itself authorizes no append, send or provider call",
+      "admissions": [
+        {
+          "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
+          "symbol": "ChatAdmissionTransaction.acquireAdmission"
+        }
+      ],
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
+          "symbol": "witnessFromProjected",
+          "anchor": "let private witnessFromProjected key attempted =",
+          "owner": "managed-chat-execution"
+        },
+        {
+          "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
+          "symbol": "decide",
+          "anchor": "let private decide key evidence projected =",
+          "owner": "managed-chat-execution"
+        }
+      ],
+      "whatOwners": {
+        "CHATEXEC-004": "managed-chat-execution",
+        "CHATEXEC-011": "managed-chat-execution",
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
+      "symbol": "ManagedChatProviderStartedWitness",
+      "anchor": "type ManagedChatProviderStartedWitness =",
+      "classification": "Authority",
+      "class": "Witness",
+      "owner": "managed-chat-execution",
+      "what": "CHATEXEC-005, ENF-013, ENF-015",
+      "scope": "exact ChatExecutionKey plus the ProviderStartedEvidence binding accepted evidence, ProviderRunIdentity, ProviderRequestKind and projection choice",
+      "freshness": "issued only when the projection lifecycle is ProviderStarted and the established started evidence equals the attempt; a conflicting ProviderRunIdentity fails closed",
+      "multiplicity": "replayable evidence: an equal exact start replay yields the same witness and no second ProviderStarted fact",
+      "consume": "no admission derives authority from it; provider effects are admitted by the durable ProviderStarted fact re-read at the consumption point",
+      "durability": "re-derivable from the durable ProviderStarted fact; the witness itself authorizes no provider call",
+      "admissions": [],
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
+          "symbol": "startedWitness",
+          "anchor": "let private startedWitness key startedEvidence persistence =",
+          "owner": "managed-chat-execution"
+        },
+        {
+          "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
+          "symbol": "existingStart",
+          "anchor": "let private existingStart",
+          "owner": "managed-chat-execution"
+        }
+      ],
+      "whatOwners": {
+        "CHATEXEC-005": "managed-chat-execution",
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
+      "symbol": "ManagedChatTerminalWitness",
+      "anchor": "type ManagedChatTerminalWitness =",
+      "classification": "Authority",
+      "class": "Witness",
+      "owner": "managed-chat-execution",
+      "what": "CHATEXEC-006, ENF-013, ENF-015",
+      "scope": "exact ChatExecutionKey plus the AfterProviderStart terminal evidence and the single projected ChatExecutionTerminalDisposition",
+      "freshness": "issued only when the projected terminal evidence and disposition equal the attempt; a competing disposition fails closed and never overwrites the first fact",
+      "multiplicity": "replayable evidence: one terminal per exact execution, equal replays idempotent",
+      "consume": "no admission derives authority from it; capacity release and Host settlement re-read the durable terminal fact",
+      "durability": "re-derivable from the durable Terminal fact; the witness itself authorizes no release or send",
+      "admissions": [],
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
+          "symbol": "terminalWitness",
+          "anchor": "let private terminalWitness key startedEvidence disposition persistence =",
+          "owner": "managed-chat-execution"
+        },
+        {
+          "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
+          "symbol": "existingTerminal",
+          "anchor": "let private existingTerminal",
+          "owner": "managed-chat-execution"
+        }
+      ],
+      "whatOwners": {
+        "CHATEXEC-006": "managed-chat-execution",
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Settlement.fs",
+      "symbol": "PreProviderTerminalWitness",
+      "anchor": "type PreProviderTerminalWitness =",
+      "classification": "Authority",
+      "class": "Witness",
+      "owner": "managed-chat-execution",
+      "what": "CHATEXEC-007, ENF-013, ENF-015",
+      "scope": "exact ChatExecutionKey plus the PreProvider terminal disposition (Cancelled | Rejected | Failed) established for its accepted evidence",
+      "freshness": "issued only after re-reading the projection: the established evidence, PreProvider terminal evidence and disposition must all equal the settled attempt",
+      "multiplicity": "replayable evidence: one pre-provider terminal per exact execution, equal settlement replays idempotent",
+      "consume": "no admission derives authority from it; the exact capacity fence is released against the durable terminal fact",
+      "durability": "re-derivable from the durable PreProvider Terminal fact; the witness itself authorizes no release or provider call",
+      "admissions": [],
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Settlement.fs",
+          "symbol": "witness",
+          "anchor": "let private witness key evidence disposition persistence =",
+          "owner": "managed-chat-execution"
+        }
+      ],
+      "whatOwners": {
+        "CHATEXEC-007": "managed-chat-execution",
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+      "symbol": "OwnerIdentityWitness",
+      "anchor": "type OwnerIdentityWitness =",
+      "classification": "Authority",
+      "class": "Witness",
+      "owner": "interaction-authority",
+      "what": "INTERACTION-AUTHORITY-011, PID-010, ENF-013, ENF-015",
+      "scope": "the owner's exact SessionId + LogicalRunId + AuthorityRootUserMessageId and the versioned ParticipantIdentityEvidence installed at that Authority Root",
+      "freshness": "the derived root re-validates every owner field and the InheritedFromOwner origin; a mismatch is a typed PromptIdentitySeedValidationError",
+      "multiplicity": "replayable evidence: any number of derived roots may cite the same owner authority root",
+      "consume": "the derived Authority Root admission re-checks the owner's active authority before installing an identity seed",
+      "durability": "re-derivable from the owner's durable AuthorityRootAccepted evidence; the witness itself grants no authority to act",
+      "admissions": [],
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+          "symbol": "inherited",
+          "anchor": "let internal inherited ownerSessionId ownerLogicalRunId ownerAuthorityRootUserMessageId participantIdentity =",
+          "owner": "interaction-authority"
+        }
+      ],
+      "whatOwners": {
+        "INTERACTION-AUTHORITY-011": "interaction-authority",
+        "PID-010": "participant-identity",
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
+      "symbol": "ChatAdmissionBindingReceipt",
+      "anchor": "type internal ChatAdmissionBindingReceipt =",
+      "classification": "Authority",
+      "class": "Receipt",
+      "owner": "managed-chat-execution",
+      "what": "CHATEXEC-003, ENF-013, ENF-015",
+      "scope": "the exact ChatExecutionKey whose SessionExecutionBinding was installed, plus the binding kind that installed it",
+      "freshness": "recorded only after the physical bind step returned Ok for that exact key",
+      "multiplicity": "one receipt per completed bind; compensation unbinds the same exact key instead of reviving the receipt",
+      "consume": "carried to the transaction outcome as proof the bind step completed; it re-authorizes nothing",
+      "durability": "process-local record of a completed effect; never persisted or replayed as authority",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
+          "symbol": "bindingReceipt",
+          "anchor": "let private bindingReceipt intent =",
+          "owner": "managed-chat-execution"
+        }
+      ],
+      "whatOwners": {
+        "CHATEXEC-003": "managed-chat-execution",
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
+      }
+    },
+    {
+      "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
+      "symbol": "HostModelProjectionReceipt",
+      "anchor": "type internal HostModelProjectionReceipt = private | HostModelProjectionReceipt",
+      "classification": "Authority",
+      "class": "Receipt",
+      "owner": "managed-chat-execution",
+      "what": "CHATEXEC-003, ENF-013, ENF-015",
+      "scope": "the one Host model projection performed for the leased routing target of the current transaction",
+      "freshness": "recorded only after ProjectHost returned Ok inside that transaction step",
+      "multiplicity": "one receipt per completed projection; a failed projection compensates instead of minting one",
+      "consume": "carried to the transaction outcome as proof the Host projection completed; it re-authorizes nothing",
+      "durability": "process-local record of a completed effect; never persisted or replayed as authority",
+      "issuers": [
+        {
+          "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
+          "symbol": "projectAdmission",
+          "anchor": "let private projectAdmission observe ports bound =",
+          "owner": "managed-chat-execution"
+        }
+      ],
+      "whatOwners": {
+        "CHATEXEC-003": "managed-chat-execution",
+        "ENF-013": "capability-enforcement",
+        "ENF-015": "capability-enforcement"
       }
     }
   ]

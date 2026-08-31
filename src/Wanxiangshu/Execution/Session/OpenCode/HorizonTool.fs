@@ -228,7 +228,7 @@ module HorizonTool =
         }
 
     let admission: ToolAdmission =
-        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Horizon
+        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Horizon)
 
     let spec scope =
         { Name = "horizon"

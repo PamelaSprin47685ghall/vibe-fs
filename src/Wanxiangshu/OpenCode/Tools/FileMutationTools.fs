@@ -200,10 +200,10 @@ module FileMutationTools =
             Some value
 
     let mvAdmission: ToolAdmission =
-        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Move
+        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Move)
 
     let rmAdmission: ToolAdmission =
-        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Remove
+        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Remove)
 
     let mvSpec (factory: HostToolFactory) : ToolSpec =
         { Name = "mv"

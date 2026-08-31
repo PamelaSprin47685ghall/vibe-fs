@@ -254,7 +254,7 @@ module CoderTool =
         }
 
     let behaviorAdmission: ToolAdmission =
-        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Behavior
+        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Behavior)
 
     let private behaviorSpec
         (name: string)

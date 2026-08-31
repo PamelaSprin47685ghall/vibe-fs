@@ -38,7 +38,8 @@ module AssumeTool =
                 |> LlmFacing.renderInstructions
         }
 
-    let admission: ToolAdmission = fun _ r -> r <> Role.Blogger && r <> Role.Distiller
+    let admission: ToolAdmission =
+        ToolAdmission.OfficeRole(fun _ r -> r <> Role.Blogger && r <> Role.Distiller)
 
     let spec (factory: HostToolFactory) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()

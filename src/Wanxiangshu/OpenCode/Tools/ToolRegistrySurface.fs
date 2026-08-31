@@ -15,6 +15,20 @@ module ToolRegistrySurface =
         | None -> false
         | Some role -> ToolRegistry.rolePredicate toolName None "surface-session" role
 
+    /// ENF-006: which authority the execute gate resolves for a tool. `office`
+    /// needs the session's established public Role; `private-attachment` is an
+    /// internal leaf admitted by owner-held evidence and never holds an office.
+    let admissionAuthority (toolName: string) : string =
+        match ToolRegistry.tryAdmission toolName None with
+        | Some(ToolAdmission.OfficeRole _) -> "office"
+        | Some(ToolAdmission.PrivateAttachment _) -> "private-attachment"
+        | None -> "unknown"
+
+    /// ENF-006: the internal-leaf decision for a session holding no public
+    /// office profile. Office tools always answer false here.
+    let privateAttachmentAdmits (toolName: string) (sessionId: string) : bool =
+        ToolRegistry.privateAttachmentAdmits toolName None sessionId
+
     let private requestKindOf (label: string) : ProviderRequestKind option =
         match label.ToLowerInvariant() with
         | "work-main" -> Some ProviderRequestKind.WorkMain

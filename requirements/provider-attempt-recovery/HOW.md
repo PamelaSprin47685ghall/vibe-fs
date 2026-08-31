@@ -6,7 +6,7 @@
 
 - **ProviderRequestKind + AgentPairCursor**：`src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs` 同时拥有可证明的请求种类与模 4 游标（Offset 0..3 映射到 SideA/SideA'/SideB/SideB'），维护连续失败计数与有限自动恢复预算（默认 12）；`Context/Prefix/Candidate.fs` 不再拥有请求种类。
 - **FallbackLedger**：唯一写入口。负责对 `ProviderRunIdentity` 进行有界去重，追加 `FallbackCursorAdvanced`、`FallbackSucceeded` 或 `FallbackExhausted`。
-- **ConfirmedFailureOutcome**：`Fallback/Ledger.fs` 拥有精确四分支结果 `RecoveryAdvanced | RecoveryExhausted | AlreadyRecorded | NoActiveRun`；所有消费者必须穷尽处理，且 `NoActiveRun` 必须停止，不能继续恢复。
+- **ConfirmedFailurePort**：`src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs` 拥有 `ConfirmedFailureOutcome`，端口返回 `Task<Result<ConfirmedFailureOutcome,string>>`；所有消费者穷尽处理 `RecoveryAdvanced | RecoveryExhausted | AlreadyRecorded | NoActiveRun`，且 `NoActiveRun` 必须停止，不能继续恢复。
 - **RecoverySlot 槽决策**：`src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs` 把刚完成的 failure advance + primed Offset 归约为一次 `RecoveryOpportunity`；`nextBloggerRequest` 以 `BloggerSlotDispatchError` 返回 typed dispatch failure。维护子请求失败与主请求失败均收敛为单次失败槽推进，维护成功不清零计数，主业务成功清零计数并把 A′/B′ 归一到同侧 A/B 普通槽。
 - **历史 replay 边界**：PAR-004 改为成功关闭 A′/B′ 后，旧 journal 中已落盘的 `FallbackSucceeded → A′→B` / `FallbackSucceeded → B′→A` 仍必须可重放。fold 只吸收这一种“成功归一化后 previousOffset 比 canonical cursor 多一步”的历史形状；新 writer 永远从归一化后的 A/B 写 `A→A′` / `B→B′`，不得继续生产旧形状。
 
@@ -28,6 +28,7 @@
 - `src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs`
 - `src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs`
 - `src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs`
+- `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs`
 - `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs`
 - `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs`
 - `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs`
@@ -53,7 +54,7 @@ DEPENDS ON:
 
 | 命题 | 落点测试 |
 |---|---|
-| PAR-001 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-001] FALLBACK_001_the_authority_root_fact_is_what_creates_the_cursor` |
+| PAR-001 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-001] FALLBACK_001_an_active_authority_root_must_close_before_replacement`；`requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-001] FALLBACK_001_the_authority_root_fact_is_what_creates_the_cursor` |
 | PAR-002 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-002] FALLBACK_002_an_offset_outside_zero_to_three_is_not_a_cursor_position` |
 | PAR-003 | `requirements/provider-attempt-recovery/tests/fallback-ledger.test.mjs::WHAT[PAR-003] PAR_FALLBACK_003_same_failure_observed_twice_advances_once` |
 | PAR-004 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-004] FALLBACK_004_failure_advances_the_offset_and_spends_one_unit_of_budget`；`requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-004] FALLBACK_004_success_resets_the_budget_and_normalizes_to_the_same_side_main_slot` |
@@ -65,7 +66,7 @@ DEPENDS ON:
 | PAR-010 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-010] PAR_010_a_failed_squash_fails_the_slot_without_sending_the_main_request`；`requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-010] PAR_010_a_successful_squash_keeps_the_count_and_continues_to_the_main_request` |
 | PAR-011 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-011] PAR_011_fallback_advance_returns_the_fresh_opportunity_and_workflow_never_rebuilds_it_from_cursor_parity`；`requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-011] PAR_011_workmain_recovery_arms_only_after_exact_provider_retry_physical_acceptance` |
 | PAR-012 | `requirements/provider-attempt-recovery/tests/abort-residue.test.mjs::WHAT[PAR-012] PAR_012_an_interrupted_tool_call_is_not_a_confirmed_failure` |
-| PAR-013 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-013] FALLBACK_002_the_cursor_changes_only_the_effective_agent` |
+| PAR-013 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-013] FALLBACK_002_the_cursor_changes_only_the_effective_agent`；`requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-013] attempts derive their system prompt and tools from the participant identity Role` |
 | PAR-014 | `requirements/provider-attempt-recovery/tests/fallback-ledger.test.mjs::WHAT[PAR-014] PAR_014_a_continuation_has_a_unique_accounted_and_budgeted_occasion` |
 | PAR-015 | `requirements/provider-attempt-recovery/tests/fallback-aabb-confluence.test.mjs::WHAT[PAR-015] THEOREM_fallback_independent_sessions_commute_pure_projection` |
 | PAR-016 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-016] PAR_016_success_accounting_requires_proven_request_kind` |

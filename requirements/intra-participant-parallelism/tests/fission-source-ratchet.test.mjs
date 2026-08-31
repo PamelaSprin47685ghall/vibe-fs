@@ -126,7 +126,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility comes fro
   assert.match(registry, /"fission",\s*FissionTool\.admission/)
   assert.match(
     owner,
-    /let\s+admission:\s*ToolAdmission\s*=\s*fun\s+_\s+r\s*->\s*OfficeCapability\.isAllowed\s+r\s+ToolPermission\.Fission/,
+    /let\s+admission:\s*ToolAdmission\s*=\s*ToolAdmission\.OfficeRole\(fun\s+_\s+r\s*->\s*OfficeCapability\.isAllowed\s+r\s+ToolPermission\.Fission\)/,
   )
   assert.doesNotMatch(roles, /ToolPermission/, 'Roles owns only Role/AgentTier; the permission matrix is OfficeCapability')
 

@@ -113,7 +113,7 @@ module ToolHostSurface =
                 { Name = name
                   Description = name
                   Arguments = []
-                  Admission = fun _ _ -> true
+                  Admission = ToolAdmission.OfficeRole(fun _ _ -> true)
                   Execute = fun _ _ -> Task.FromResult name })
 
         let value = ToolHostCodec.registry (factory toolModule) specs
@@ -211,7 +211,7 @@ module ToolHostSurface =
             { Name = name
               Description = description
               Arguments = []
-              Admission = fun _ _ -> true
+              Admission = ToolAdmission.OfficeRole(fun _ _ -> true)
               Execute = fun _ _ -> execute () }
 
         ToolHostCodec.register (factory toolModule) spec

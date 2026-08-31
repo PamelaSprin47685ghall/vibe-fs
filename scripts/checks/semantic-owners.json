@@ -2112,7 +2112,6 @@
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
       "owner": "provider-attempt-recovery"
     },
-
     {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs",
       "owner": "provider-attempt-recovery"

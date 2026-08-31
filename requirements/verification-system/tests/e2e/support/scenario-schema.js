@@ -370,8 +370,10 @@ const compileTurns = (turns) =>
       internal: turn.internal === true,
       // A race path may or may not be reached on a given run (e.g. a restart
       // window where the pre-crash tool already completed). Declared so a
-      // request CAN be answered, but its absence is not an error.
-      optional: step.optional === true,
+      // request CAN be answered, but its absence is not an error. Declarable on
+      // the turn when the request may arrive against ANY step cursor of the
+      // lane: naming one step would claim alignment the scenario cannot know.
+      optional: turn.optional === true || step.optional === true,
       kind: turn.kind ?? 'chat',
       turn: turn.user,
       step: step.runtimeStep ?? stepIndex,
@@ -761,6 +763,9 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     }
     if (turn.internal !== undefined && turn.internal !== true) {
       problems.push(`turn[${index}] internal must be true when present; omit it otherwise`);
+    }
+    if (turn.optional !== undefined && turn.optional !== true) {
+      problems.push(`turn[${index}] optional must be true when present; omit it otherwise`);
     }
     // `tools` and `forbiddenTools` are live wire assertions (runtime-key.js toolsGate):
     // every declared tool must be present on the request, every forbidden one absent.

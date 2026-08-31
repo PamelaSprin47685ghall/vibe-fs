@@ -997,7 +997,7 @@ module FissionTool =
         }
 
     let admission: ToolAdmission =
-        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fission
+        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fission)
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "fission"

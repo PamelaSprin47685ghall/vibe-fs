@@ -247,7 +247,7 @@ module JudgeTool =
         }
 
     let admission: ToolAdmission =
-        fun _ r -> OfficeCapability.isAllowed r ToolPermission.Judge
+        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Judge)
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "judge"

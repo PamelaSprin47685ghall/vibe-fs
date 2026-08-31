@@ -147,6 +147,13 @@ module ProcessEventLog =
     [<Emit("$0.mtimeMs")>]
     let private statMtimeMs (stat: obj) : float = jsNative
 
+    /// Producer-side file activity is a millisecond observation carried by a
+    /// nanosecond file clock: `utimes` cannot store an exact millisecond, so the
+    /// raw readback is always slightly earlier than the value written. Quantize
+    /// to whole milliseconds so the activity a replica publishes in
+    /// `writer-manifest` round-trips through an import unchanged.
+    let private fileActivityMs (stat: obj) : float = statMtimeMs stat |> round
+
     [<Emit("$0.size")>]
     let private statSize (stat: obj) : int = jsNative
 
@@ -559,7 +566,7 @@ module ProcessEventLog =
 
             { Name = name
               StatIdentity = statIdentity stat
-              LastActivityMs = durableTailActivity path |> Option.defaultValue (statMtimeMs stat) })
+              LastActivityMs = durableTailActivity path |> Option.defaultValue (fileActivityMs stat) })
 
     /// Git-index-style physical cache key. It never replaces canonical validation:
     /// a cache miss falls back to reading bytes, while a hit only reuses a snapshot
@@ -601,18 +608,21 @@ module ProcessEventLog =
         let seconds = activityMs / 1000.0
         utimesSync path seconds seconds
 
-    let private currentWriterActivity path = statSync path |> statMtimeMs
+    let private currentWriterActivity path = statSync path |> fileActivityMs
 
     let private someWhen condition value = if condition then Some value else None
 
+    /// Equal bytes describe the same process output, so activity converges
+    /// monotonically toward the earlier observation. An ordinary snapshot already
+    /// carries the identical value, and rewriting the identical activity would churn
+    /// the file's stat identity and force a needless blob rewrite on the next
+    /// materialization, so only a strictly earlier remote observation is a rewrite.
+    let private earlierRemoteActivity current remote = someWhen (remote < current) remote
+
     let private reconcileEqualWriterActivity path incomingActivity =
-        match incomingActivity with
-        | None -> ()
-        | Some remoteActivity ->
-            // Equal bytes describe the same process output. Resolve legacy/fetch
-            // metadata discrepancies monotonically toward the earlier observation;
-            // ordinary snapshots already carry the identical value.
-            setWriterActivity path (min (currentWriterActivity path) remoteActivity)
+        incomingActivity
+        |> Option.bind (fun remote -> earlierRemoteActivity (currentWriterActivity path) remote)
+        |> Option.iter (setWriterActivity path)
 
     /// Merge one whole writer while preserving the producer's activity time from
     /// the remote snapshot. A fetch/import must never make an old writer look new.

@@ -120,3 +120,4 @@
 - Review physical evidence：`PhysicalUserMessageId.isNonBlank` 成为唯一 predicate，JudgeTool、Direct CE、witness 与 replay qualification 均在写 durable verdict 前 fail closed；空白输入保持 zero-effect。
 - Concern address validity：subscription command 与 `MailboxSubscribed` replay 复用 `validateAddress`；空白 `id/concern` fail closed，不创建 mailbox/announcement。
 - Casebook execution marker：`FetchTool.Execute` 复用 `CasebookFeature.isEnabled`，使直接构造工具也无法绕过 marker；disabled workspace 在 index/replay/event 之前拒绝。
+- Final upstream sync：合入 `upstream/master@caa0b7b4f` 的 capability admission、verification budget、Repair 收口与最新静态契约；冲突文件采用 upstream 新 owner 结构，仅迁回仍有效的 Host chronology 规范与本分支行为 proof。
