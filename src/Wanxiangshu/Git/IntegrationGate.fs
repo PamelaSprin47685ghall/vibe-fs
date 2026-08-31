@@ -62,13 +62,16 @@ module IntegrationGate =
                         lockfile
                         path
                         (createObj
-                            [ "realpath", box false
+                            [ "fs", box ProcessEventLog.processAwareFs
+                              "realpath", box false
+                              "stale", box 5000
+                              "update", box 1500
                               "retries",
                               createObj
                                   [ "retries", box 50
-                                    "minTimeout", box 100
-                                    "maxTimeout", box 500
-                                    "factor", box 1 ] ])
+                                    "minTimeout", box 50
+                                    "maxTimeout", box 250
+                                    "factor", box 1.1 ] ])
 
                 return IntegrationGate release
             with ex ->
