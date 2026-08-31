@@ -664,6 +664,7 @@
     <Compile Include="Persistence/Journal/RevisionSurface.fs"/>
     <Compile Include="Persistence/Journal/CodecSurface.fs"/>
     <Compile Include="Persistence/Journal/FactCodecSurface.fs"/>
+    <Compile Include="Execution/Delegation/Handle/JournalSurface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Bookkeeper.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperRefreshSurface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperSurface.fs"/>

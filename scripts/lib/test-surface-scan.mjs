@@ -901,7 +901,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Persistence/Journal/FactCodecSurface.js',
     owner: 'durable-events',
-    laws: ['DURABLE-EVENTS-002', 'DURABLE-EVENTS-003', 'DURABLE-EVENTS-005'],
+    laws: ['DURABLE-EVENTS-002', 'DURABLE-EVENTS-003', 'DURABLE-EVENTS-005', 'MANAGED-SESSION-009'],
+    lawOwners: { 'MANAGED-SESSION-009': 'managed-session-lifecycle' },
     source: 'src/Wanxiangshu/Persistence/Journal/FactCodecSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -1337,7 +1338,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Process/Surface.js',
     owner: 'time-capability',
-    laws: ['TIME-001', 'TIME-002', 'TIME-003', 'TIME-004', 'TIME-005', 'TIME-006', 'TIME-007'],
+    laws: ['TIME-001', 'TIME-002', 'TIME-003', 'TIME-005', 'TIME-006', 'TIME-007'],
     source: 'src/Wanxiangshu/Process/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1490,10 +1491,18 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Execution/Delegation/Handle/FoldSurface.js',
     owner: 'managed-session-lifecycle',
-    laws: ['MANAGED-SESSION-006', 'MANAGED-SESSION-008', 'MANAGED-SESSION-015'],
+    laws: ['MANAGED-SESSION-006', 'MANAGED-SESSION-008', 'MANAGED-SESSION-009', 'MANAGED-SESSION-015'],
     source: 'src/Wanxiangshu/Execution/Delegation/Handle/FoldSurface.fs',
     representation: 'opaque-capability',
     kind: 'pure',
+  },
+  {
+    module: 'Execution/Delegation/Handle/JournalSurface.js',
+    owner: 'managed-session-lifecycle',
+    laws: ['MANAGED-SESSION-009'],
+    source: 'src/Wanxiangshu/Execution/Delegation/Handle/JournalSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
   },
   {
     module: 'Execution/Session/Attachment/AttachmentSurface.js',

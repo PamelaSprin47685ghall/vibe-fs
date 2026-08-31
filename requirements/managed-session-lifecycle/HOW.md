@@ -8,6 +8,7 @@
 - 状态转移为单向不可逆：`Active → CompletedAwaitingJoin → Retired` 与 `Active | CompletedAwaitingJoin → Abandoned`。
 - `HandleController` 作为唯一的写入控制器，保证完成单赋值、墓碑状态原子写入以及对隐藏句柄的视图过滤隔离。
 - `HandleLinked` 只能重用 child、target、byname、role 与 ownership 完全一致的 durable binding；任一 identity 漂移返回 typed `HandleIdentityConflict`。同一 logical person 的新 work unit 可以在原物理 child 上重新进入 `Active`，`Abandoned` 不可重开。
+- Executable proof 只通过注册 surface 穿越 JS 边界：`HandleSurface` 调用真实 `HandleProjection`，`HandleFoldSurface` 调用真实 `ExecutionFactFold`，`Handle/JournalSurface` 以 opaque resource 调用 canonical `EventStore → AgentJournal → HandleController`。测试不得重建 projection、fold、codec、journal、controller 或 join decision。
 
 ### 2. 运行时生命周期管理器
 
@@ -60,4 +61,5 @@
 
 ## GAP
 
+- `GAP-030`（CLOSED）：旧 `tests/support/managed-surface.mjs` 重建了 Handle projection、fact fold、JSON codec、in-memory journal、HandleController 与 join drain；因此测试可以在 production owner 错误时仍由镜像实现自证。现有 consumers 已迁到注册 production surfaces；`recordAbandon` 首胜 proof 穿过真实 canonical EventStore、AgentJournal 与 HandleController；常量 wake trace 已替换成真实 `ExecutionFactFold` replay；对应 mirror exports 全部删除。
 - `GAP-029`（CLOSED）：旧实现把 plugin/process shutdown 与未被内部 successor owner 认领的 `TurnAborted` 都升级成 logical parent cancellation，最终经 `CancelAndDrain → HandleController.cancelChildren` 写入 `HandleAbandoned(ParentCancelled)` 并物理 `AbortSession(child)`。现已拆成 `DetachAndDrain` 与 `CancelAndDrain` 两种互斥权限：process/plugin shutdown 只解绑 observer 与本地资源，保留 durable `Active`；ordinary `TurnAborted` 不再拿到 `abortParent` / `CancelSessionChildren` capability；只有 SessionDeleted、显式 successor-less termination 等明确 logical termination 仍可进入 durable abandon。`shutdown-drain-contract.test.mjs`、`interrupt-boundary.test.mjs` 与真实 fork process-detach oracle 已绿；核心实现落于 `506ab7d36`。

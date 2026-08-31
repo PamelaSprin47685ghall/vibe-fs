@@ -685,6 +685,10 @@
       "owner": "delegation"
     },
     {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handle/JournalSurface.fs",
+      "owner": "delegation"
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Delegation/Handle/JoinInterruptRegistry.fs",
       "owner": "delegation"
     },

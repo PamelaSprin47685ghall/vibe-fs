@@ -26,7 +26,7 @@
 | CHGINT-007 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-007] ORCH_007_the_three_publish_claim_branches_are_evaluated_in_the_clause_order` |
 | CHGINT-008 | `requirements/change-integration/tests/git-operations.test.mjs::WHAT[CHGINT-008] GIT_ff_merge_happy_path_advances_to_candidate` |
 | CHGINT-009 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-009] ORCH_006_the_worktree_is_located_by_identity_and_the_path_is_only_diagnostic` |
-| CHGINT-010 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-010] ORCH_005_a_rebased_candidate_publishes_only_while_the_target_has_not_moved` |
+| CHGINT-010 | `requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-010] review_rounds_run_outside_the_publish_gate`；`requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-010] conflict_repair_runs_outside_the_publish_gate` |
 | CHGINT-011 | `requirements/change-integration/tests/host.test.mjs::WHAT[CHGINT-011] HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result` |
 | CHGINT-012 | `requirements/change-integration/tests/runtime.test.mjs::WHAT[CHGINT-012] ORCH_007_NeedsReview_preserves_the_active_worktree` |
-| CHGINT-013 | `requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs::WHAT[CHGINT-013] THEOREM_stale_target_on_rebased_candidate_discards_witness` |
+| CHGINT-013 | `requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-013] a_CAS_race_discards_the_old_witness_and_runs_a_fresh_round`；`requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs::WHAT[CHGINT-013] THEOREM_stale_target_on_rebased_candidate_discards_witness` |

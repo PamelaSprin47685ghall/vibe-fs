@@ -50,28 +50,39 @@ test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_stale_rewrite_is_a_conflict_with_no
 test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_preflight_orders_rules_and_short_circuits', () => {
   // duplicate intent wins over everything
   assert.equal(
-    codeOf(preflight(['a.txt'], current, [rewrite('a.txt', 'current', 'x'), create('a.txt', 'y')])),
+    codeOf(preflight(['a.txt'], current, [], [rewrite('a.txt', 'current', 'x'), create('a.txt', 'y')])),
     'DUPLICATE_MUTATION_TARGET',
   )
   // missing target beats freshness
-  assert.equal(codeOf(preflight(['a.txt'], current, [rewrite('missing.txt', 'anything', 'x')])), 'FILE_NOT_FOUND')
+  assert.equal(codeOf(preflight(['a.txt'], current, [], [rewrite('missing.txt', 'anything', 'x')])), 'FILE_CHANGED')
   // all good
-  assert.equal(ok(preflight(['a.txt'], current, [rewrite('a.txt', 'current', 'x'), create('b.txt', 'y')])), true)
+  assert.equal(ok(preflight(['a.txt'], current, [], [rewrite('a.txt', 'current', 'x'), create('b.txt', 'y')])), true)
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_preflight_covers_read_only_snapshots_and_create_absence', () => {
+  const changedRead = preflight(
+    ['dependency.txt'],
+    { 'dependency.txt': 'external' },
+    [{ path: 'dependency.txt', text: 'snapshot' }],
+    [],
+  )
+  assert.equal(codeOf(changedRead), 'FILE_CHANGED')
+  assert.equal(codeOf(preflight(['new.txt'], { 'new.txt': 'external' }, [], [create('new.txt', 'tool')])), 'FILE_CHANGED')
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commit_plan_is_exact', () => {
-  const mutations = [rewrite('a.txt', 'oldA', 'newA'), create('b.txt', 'newB')]
+  const mutations = [create('b.txt', 'newB'), rewrite('a.txt', 'oldA', 'newA')]
   assert.deepEqual(commitPlan(mutations), [
-    ['a.txt', 'newA'],
-    ['b.txt', 'newB'],
+    { kind: 'rewrite', path: 'a.txt', expectedCurrent: 'oldA', newText: 'newA' },
+    { kind: 'create', path: 'b.txt', newText: 'newB' },
   ])
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_rollback_plan_is_exact', () => {
-  const mutations = [rewrite('a.txt', 'oldA', 'newA'), create('b.txt', 'newB')]
+  const mutations = [create('b.txt', 'newB'), rewrite('a.txt', 'oldA', 'newA')]
   // rollback restores rewrites and marks creates for removal, reversed order
   assert.deepEqual(rollbackPlan(mutations), [
-    ['b.txt', null],
-    ['a.txt', 'oldA'],
+    { kind: 'removeCreated', path: 'b.txt', expectedCurrent: 'newB' },
+    { kind: 'restore', path: 'a.txt', expectedCurrent: 'newA', originalText: 'oldA' },
   ])
 })

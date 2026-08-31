@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { handleId, handleProjection, roles, sessionId } from './support/managed-surface.mjs'
+import * as HandleSurface from '../../../dist/Execution/Delegation/Handle/Surface.js'
 
 const linkedProjection = () => {
-  const linked = handleProjection.link(handleId.agent('child-1'), sessionId('ses_child'), 'fast-coder', roles.of('Coder'), handleProjection.empty)
+  const linked = HandleSurface.apply(HandleSurface.empty(), {
+    op: 'link', handle: 'agent:child-1', child: 'ses_child', agent: 'fast-coder', role: 'Coder',
+  })
   assert.equal(linked.ok, true)
-  return linked.value
+  return linked.state
 }
 
 test('WHAT[MANAGED-SESSION-006] EXEC_016_listable_handles_are_outstanding_for_manager', () => {
   const projection = linkedProjection()
-  assert.equal(handleProjection.listable(projection).length, 1)
-  assert.equal(handleProjection.joinable(projection).length, 0)
+  assert.deepEqual(HandleSurface.views(projection), { listable: ['agent:child-1'], joinable: [], active: ['agent:child-1'] })
 })
