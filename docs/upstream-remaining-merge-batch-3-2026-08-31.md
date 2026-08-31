@@ -103,6 +103,8 @@ snapshot locality 只证明存在某个调用点，不能拒绝 missing 或 ambi
 
 - 一次本地验证误把 `node scripts/build.mjs` 与读取 `dist` 的 focused tests 并行执行。build 会先清空 `dist`，因此 38 个测试以 module-not-found 失败；这次运行无产品 verdict，不计为 RED 或回归证据。
 - 随后严格串行：build 成功；三个 focused suite 共 316 项中 315 项通过，唯一失败为 sandbox loopback 权限。获准后单独重跑真实 Host canary 2/2。
+- 第一次官方完整阶梯在 unit tier 为 3930/3932。仅两条失败：upstream 已把顶层梯子改成 `npm run format/check/owner-dep/build`，但 distribution 与 verification proof 仍要求重构前的 direct command 字符串。`1d7ca8517` 锁定顶层 npm 顺序与四个 Wireit step 的 exact underlying command；focused 17/17。该修正修改 upstream 原 proof，不修改产品语义。
+- 同一 Wireit 重构只把 `scripts/build.mjs`、F# source 与 `package.json` 计入 build cache key；实际 build 还从全部 Git-tracked source/document 生成 `LoopDetectorEnvelope`。`bed2e510c` 将整个 workspace 纳入 fingerprint，只排除 `dist/` 与 `.fable-build/` 输出，并加入 executable proof；focused 11/11。该修正防止文档或新增目录变化复用陈旧 artifact。
 - 最终 PR 前仍须从本文件已纳入 Git 的树执行官方 `npm run format-build-test`，并记录完整结果。任何红项都必须修正，不能由上述 focused 结果代偿。
 
 ## 7. 外部完成条件
