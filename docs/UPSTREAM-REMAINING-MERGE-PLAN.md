@@ -73,6 +73,8 @@ run `33426540260` 已验证 owner lane 修复：5/5，Linux production scan 146.
 
 #20/#21 runs `33429721220` / `33429748255` 又发现 `owner-dependencies-reuse.test.mjs` 实际仍启动第二次完整 production scan，Linux 上超过 185s。最终闭环改为阶梯内 single production scan：owner-dep 原子产出 schema v3 normalized evidence；SHA-256 fingerprint 绑定 normalizer、scanner、project、dependency lock 与完整 compile set 内容；integration 读取 exact run-id 并验证 fingerprint 后消费。缺失/stale/schema/run-id/fingerprint/compile-set 错误全部 fail closed。快速合同 56/56、真实 owner-dep 全绿、三项 integration 5.38s 全绿；timeout 不变。
 
+#21 run `33432246221` 继续暴露 artifact 只在 reuse proof 内设置，后续 semantic-decorator 子进程仍重复 production scan 并在 185077ms 失败。最终修复把 exact evidence path/run-id 提升到 integration orchestrator 环境；全部默认 production consumers 都复用并验证同一 artifact，explicit fixture project 保持独立扫描。focused composition/plugin/decorator/fixture 3/3，总计 7.72s；正式 integration orchestrator 全绿，harness 273/273。不拆测试掩盖耗时，不增加 timeout。
+
 ### 第 3 次：production-bound proof 加固
 
 - 模块列表：
