@@ -115,7 +115,9 @@ module JsAnchorFs =
           Column: int
           Text: string }
 
-    type JsGrepListing = { Matches: JsGrepHit list }
+    type JsGrepListing =
+        { Matches: JsGrepHit list
+          ReadSnapshots: JsReadSnapshot list }
 
     let private appendLineStartIfNewline (offsets: ResizeArray<int>) (text: string) (i: int) =
         if text.[i] = '\n' then
@@ -187,10 +189,10 @@ module JsAnchorFs =
         locateHits text spec
         |> List.map (fun (index, matched) -> grepHitAt rel offsets index matched)
 
-    let private grepHitsOnPath (root: string) (spec: AnchorSpec) (rel: string) : JsGrepHit list =
+    let private grepPath (root: string) (spec: AnchorSpec) (rel: string) =
         match JsUtf8Fs.readUtf8Classified (pathJoin root rel) with
-        | Error _ -> []
-        | Ok text -> grepHitsOnText rel text spec
+        | Error _ -> None
+        | Ok text -> Some({ Path = rel; Text = text }, grepHitsOnText rel text spec)
 
     /// JS-020: Host grep over gitignore-selected UTF-8 files. Full result —
     /// no internal bound; the Host tool-result bound tail-keeps the tail.
@@ -203,8 +205,11 @@ module JsAnchorFs =
 
         result {
             let! listing = JsGlobFs.glob root globPattern
-            let matches = listing.Paths |> List.collect (grepHitsOnPath root spec)
-            return { Matches = matches }
+            let scanned = listing.Paths |> List.choose (grepPath root spec)
+
+            return
+                { Matches = scanned |> List.collect snd
+                  ReadSnapshots = scanned |> List.map fst }
         }
 
     /// Index of the nth occurrence of an exact needle, scanning forward

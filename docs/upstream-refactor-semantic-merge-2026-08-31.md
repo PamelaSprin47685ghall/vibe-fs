@@ -5,6 +5,7 @@
 > 上游基线：`upstream/master@4e5789e1c`（PR 前仍会最后 fetch 确认）
 > 本地旧版本：`codex/pre-upstream-refactor-20260831@4bb19673e`
 > 性质：合并与 review 记录；产品语义仍只由 `requirements/<package>/` 定义
+> 后续执行入口：[UPSTREAM-REMAINING-MERGE-PLAN.md](./UPSTREAM-REMAINING-MERGE-PLAN.md)
 
 ## 1. 合并原则
 
@@ -113,6 +114,9 @@
 
 ## 6. 执行日志
 
+- M7D/M7E mirror closure：`b680f729f`→`ad5d58437` 与 `8b32a54fe`→`11485ff83`→`5c3eaa9e0` 将 SyncDelegate 与 Host PTY consumers 迁到 production owners，并删除最后的 `managed-surface.mjs`。真实 runtime proofs 分别 5/5 与 11/11；managed-session 124/124。深层 owner gate 在初稿中发现两个未分类 mutable resources，以及放在 domain 路径中的 `SatelliteSurface` Host infrastructure；`3bf732e56` 以 exact resource classification 与 physical `OpenCode/Host` ownership 修正，没有增加 exception。最终完整阶梯：Fantomas 700 unchanged、Fable 738 sources / 165 surfaces、unit 3904/3904、全部 integration/package/Long Stroke/pack 全绿；text gate 772 WHAT / 3899 tests，owner evidence 27,218 uses / 333 edges / 185 contracts。
+- M7B/M7C mirror closure：`43884d61f`→`a9a431728`→`7e7fe1d00` 与 `fba887a3d`→`2f0449153`→`a145572b3` 将 terminal、family、Satellite、Distiller assertions 迁到 production owners。删除 34 条常量 fork/family tests、Satellite JS 状态机、Distiller 常量与 literal semantic-cut 假 proof。Fable 737 sources / 164 surfaces、managed-session 125/125、text gate 772 WHAT / 3900 tests 全绿。`MANAGED-SESSION-006` 的 Retired 不可逆条款与 exact retired binding 重开 production 行为存在既有冲突，留待 owner 裁决，未借迁移改语义。
+
 - Durable handle：新增 production-bound rebinding 反例；`LinkageProjection` 对 child/target/byname/role/ownership 任一漂移返回 `HandleIdentityConflict`。合入最新 DELEG-024/027 后，exact binding 保留 upstream 的后续 work-unit 重开语义，同一物理 child 无需 join 即可再次 dispatch；`Abandoned` 仍不可重开。
 - Dispatch ingress identity：proof 从 provider-projection 移回 dispatch owner；只接受 `input.messageID` / `output.message.id` 的唯一 exact nonblank 值，冲突与非契约 carrier fail closed，opaque identity 不 trim。
 - Host latest-run binding：`SessionMessage` 投影 finite `time.created`；latest assistant 按 creation sequence 与 equal-time ID tie-break 判定，缺失/非法 chronology 返回 typed `InsufficientSequence`。Review Surface 复用同一 snapshot decoder，不再维护平行 raw-message adapter。
@@ -132,6 +136,9 @@
 - Latest upstream control flow：latest upstream 在 `IngressCodec`、`ChatParamsHook`、`PairProgrammingThoughtTransform`、Requirement Grounding Transform 引入 6 个 control-pyramid 命中。以 named Evidence→Decision 与 tuple match 展平，保持原分支顺序和返回值；未增加 suppression/baseline。
 - Prefix proof anchors：latest upstream 重命名 empty-history 与 lone-user 两条 executable test，却未同步 HOW；精确锚点改指现存标题，未以 prose 代替 proof。
 - Pair marker integration fixture：latest upstream 已禁止 empty/lone-user transcript 以 synthetic tool call 开头，但 capability integration 仍用 lone-user 输入断言必注入。fixture 改为 user→assistant→current user，并让真实 `chat.message` 为 current physical id 建立 execution lease；全部 wire 断言保持不变。
+- M0 Linux CI 基线：PR #19 的 Node 20 job 将 `node:test run({ timeout: 2500 })` 的文件 wrapper 误当叶子测试，11 个健康多测试文件在 2500ms 整齐被杀；同一个 suite `AbortSignal` 还向全部 worker 复制 listener。叶子 timeout 改为由需要 timeout-and-forget 的测试自行声明；不变的 300000ms suite backstop 由外部 supervisor 唯一持有。
+- M0 PTY proof：Linux Node 20 下 `bun-pty` 的 Bun-only TypeScript entry 拒绝时序晚于单次 `setImmediate`，原测试把 scheduler tick 当成 completion。测试改为等待 production mailbox 发布的 typed completion；不改 PTY production 或错误类型。
+- M0 proof 自审：RED commit 中两个 fixture 新增 budget import 多退了一层目录，首次 GREEN harness 以 module-load error 暴露。修正后连续 verdict 反例运行约 9s，超过 7s 静默窗仍因 22 个真实 leaf verdict 正常通过。全量 unit 又发现 degradation SSOT 的 exact-list consumer 停在 13 项；已将文本、ID 绑定、数量与行号连续性一起闭合到 14 项。
 
 ## 7. 相对 upstream 的修改、原因与证明
 
@@ -155,6 +162,14 @@
 | Prefix HOW anchors | latest upstream 重命名两条 prefix tests 后，HOW 仍引用已不存在的旧标题；requirement trace fail closed。这是文档迁移遗漏。 | 用现存 exact test title 替换两个 dangling anchors，不增加 prose proof、不改变 WHAT。 | requirement trace 772 WHAT / 3919 declarations closure complete；focused prefix 13/13。 | `dc1e7b12b` |
 | Capability pair-marker fixture | latest upstream 已正式规定 empty/lone-user history 不注入 pair marker，capability integration 却仍用 lone-user 输入要求注入；改成三消息后又因 current user 未获 lease 被 PROMPT-006 正确拒绝。两次红都来自 stale upstream fixture，而非 production。 | 输入改为 user→assistant→current user，并通过真实 `chat.message` 绑定 current user 的 exact physical id。保留 Host-owned `skill`、synthetic、input/status/output、canonical content 的全部断言。 | focused file 9/9；正式 capability integration 聚合 13/13；全量 3925/3925。 | `f14476da0` |
 | Fable/NuGet 网络 | restricted sandbox 下 NuGet vulnerability index 无法访问，出现 NU1900；源码、lockfile 与构建配置均未变。 | 不关闭安全检查、不改 dependency；在允许 NuGet 安全索引的正式验证环境执行相同官方命令。 | 同一 `npm run format-build-test` 完整退出 0；Fable 734 sources / 161 surfaces。 | 无代码提交 |
+| M0 file-wrapper timeout | PR #19 Linux Node 20 把 `run({ timeout: PER_TEST_TIMEOUT_MS })` 施加于 process-isolated file wrapper；同文件模块加载与多个健康 leaf 共享 2500ms 总预算。shared `AbortSignal.timeout` 还产生 `MaxListenersExceededWarning`。 | 从 inner `run()` 移除 file-wrapper timeout 与 shared signal。叶子测试显式持有原 2500ms 预算；external supervisor 持有原 300000ms 物理 backstop。数值零放宽。Node 20 官方 `node:test` 文档确认 process isolation 以 test file 为 child process 单位。 | 正式 harness 273/273；关键 fixture 22 个 leaf 串行约 9s，跨过 7s verdict-silence 窗口仍通过；hung/chatter、overrun、leaked-handle 反例仍在原预算内失败。[Node.js v20 test runner](https://nodejs.org/download/release/v20.19.0/docs/api/test.html) | RED `c0161f5cd`；GREEN `30ca1ce2b` |
+| M0 PTY completion proof | upstream PTY 测试只等一次 `setImmediate`。Linux Node 20 下 Bun-only `bun-pty` loader 的异步拒绝尚未进入 mailbox，前 4 项失败，后 4 项被连带取消。 | 等待注册 production Surface 的 `takeCompletions` 发布 exact `failed` completion，不再用 scheduler tick 代替领域事件。production F# 零修改。 | PTY focused 48/48；最终 unit 中 PTY backend/port 全绿；Long Stroke 57 步通过。 | proof `c0161f5cd` |
+| FCS integration verdict granularity | PR #20 run `33424153110` 已通过 3928/3928 unit；随后 `owner-dependencies-fcs.test.mjs` 在 185100ms 被 verdict-silence watchdog 拒绝。原测试把 production scan、reuse assertions 与第二个 fixture scan 合为一个 verdict，Linux 三段总时长可越过 180s 单段预算。 | 保留 `FCS_PROJECT_CHECK_TIMEOUT_MS=180000` 与 185000ms silence window；只把三个完整因果阶段变为独立 nested verdict。stdout/stderr 不续期，任一真实扫描自身挂起仍按原预算失败。production、scanner、schema、断言与 fail-closed 路径均未修改。 | 正式 FCS test 5/5：fixture 10.9s、production evidence 109.6s、reuse 0.7s、isolation fixture 4.9s，总计 126.1s；最长真实阶段低于原 180s 上限。首次 sandbox run 因 NuGet 网络拒绝失败，不计实现 verdict；联网复跑全绿。 | 本次提交 |
+| FCS scanner file granularity | PR #20 run `33426540260` 证明前项修复有效：owner lane 5/5，Linux production scan 146.8s，整链 156.3s。下一步旧 `workflow-constitution-scanners.test.mjs` 又在 185056ms 被同一 watchdog 拒绝；它把 composition-root、plugin/decorator 与 semantic-decorator fixture 三个独立 scanner 藏在一个 file verdict 后。 | 将三个独立 scanner 拆成三个顺序 integration entry；composition-root、plugin/decorator 与 semantic FCS 各自完成才产生 verdict。保留每项原断言、原 180s 单段预算、185s watchdog 与 300s suite backstop；未修改任何 scanner 或 production。 | `764c6a2cb` 精确下沉第 3 次已审查的拆分；text gate 与正式 GitHub rerun 作为出口。 | `764c6a2cb` |
+| FCS owner physical-file closure | 累计 PR #21 run `33426894259` 证明 nested test 不是 supervisor verdict：尽管源文件已有三个 nested leaves，Node 20 process-isolated file 在 185100ms 仍报告 0 blocking progress。PR #20 run `33426540260` 的 5/5 只证明当次整文件 165.5s 小于窗口，不能证明 nested renewal。 | 将 fixture symbol-resolution、production evidence+reuse、explicit-project isolation 拆为三个物理 test files，并由 integration SSOT 顺序调度。每个文件只有一个有意义的扫描边界；不增加 timeout、不重复 production scan、不改 scanner/schema/assertion。 | 正式 GitHub rerun；本地 text entry-coverage 与三个 focused files。 | 本次提交 |
+| FCS single-production-scan closure | PR #20/#21 runs `33429721220` / `33429748255` 证明 physical-file split 后，`owner-dependencies-reuse.test.mjs` 仍在 integration 内重新执行完整 production scan；Linux 第二次扫描超过 185s silence window。完整阶梯的 owner-dep 阶段此前已完成同一 scan 并原子写出 normalized evidence，重复扫描既不独立也不增加错误世界。 | normalized artifact 升级 schema v3，增加 SHA-256 `inputFingerprint`，绑定 normalizer、FCS scanner、project、npm dependency lock 与完整 production compile set 内容。integration 读取 owner-dep 生成的 exact run-id artifact；缺失、schema/run-id/fingerprint 错误、compile set 漂移全部 fail closed。删除第二次 production scan，不增加 timeout。 | 快速合同 56/56；真实 owner-dep 全绿；fixture/isolation/reuse 3/3，reuse 1.55s、总计 5.38s；wrong fingerprint counterexample 被拒绝。 | 本次提交 |
+| FCS integration artifact propagation | PR #21 run `33432246221` 证明只修改 reuse proof 不足：后续 `semantic-decorator` integration 子进程没有继承 owner-dep artifact 身份，仍会隐式启动另一轮 production FCS scan，并在 185077ms 被拒绝。 | integration orchestrator 在任何 step 前 fail-closed 读取同一 schema-v3 artifact，将 exact path/run-id 传给全部子进程。默认 production scanner 必须复用并验证 fingerprint；显式 fixture project 按 scanner 既有规则忽略 production reuse，仍独立真实编译。 | focused composition-root 0.63s、plugin+decorator 2.22s、semantic fixture 7.66s；正式 integration orchestrator 全绿，harness 273/273。预算、watchdog、scanner 与断言不变。 | 本次提交 |
+| M0 degradation-list closure | 本次 WHAT 新增第 14 条 forbidden degradation，parser registry 与 harness coverage 已更新，但 upstream 的 exact SSOT consumer 仍固定 13 项，最初全量因此 3 项失败。 | 完整迁移 exact text order、ID↔text binding、cardinality 与 source-line continuity；不删断言、不改 parser 使其宽松。 | focused 7/7；最终 authoritative unit 3925/3925。 | `5afc522b8` |
 
 合并后的 owner/authority manifest 收口也修改了 upstream 自动合并结果：`58081dd2a` 删除平行 Host/review consumer，`9bb863337` 删除 8 组重复 authority contract 并保留 upstream 唯一声明。latest upstream 的 process-aware lock contract 加入后，对应证明为 owner dependency 27,093 uses / 333 edges / 185 contracts、authority tests 30/30、authority production scan 全绿。
 
@@ -170,3 +185,93 @@
 - package integration：contents/import/install/resources 全部通过。
 - e2e Long Stroke：57 steps / 7.5s，journal 587/700，SSE 2528/3450；正式入口通过，没有 skip、重复放行或替代 mock 验收。
 - `npm pack --dry-run`：2015 files，package 2.2 MB，unpacked 10.5 MB，成功。
+
+## 9. M0 CI/Linux 可信基线（2026-08-31）
+
+### 9.1 范围与基线
+
+- 分支：`codex/ci-linux-baseline`。
+- 基线：`upstream/master@1db90f5e8`（PR #19 merge commit）。开始与验证前 fetch 均未发现更新的 upstream commit。
+- 修改范围：verification requirement/runner/proof 与 PTY proof。production F#、公开 API、业务预算与 package 内容均未改。
+- 原始证据：PR #19 GitHub Actions run `33376844892`，job `99440146905`。static gates 与 build 已绿；unit 为 3844 pass / 19 fail-or-cancel，失败集中在 2500ms file wrapper 与 PTY loader 时序。
+
+### 9.2 因果修复
+
+1. `c0161f5cd test(ci): expose file-wrapper timeout and PTY tick races`
+   - WHY/WHAT 明确 leaf test、process-isolated file wrapper、verdict-silence supervisor 三层预算边界。
+   - 新增 `VERIFY_004_D_LEAF_TIMEOUT_APPLIED_TO_FILE_WRAPPER`，并绑定可执行 coverage case。
+   - 时间反例要求每个 leaf 持有局部 timeout，但多 leaf 文件总时长超过静默窗；只有真实 verdict feed 才能使其通过。
+   - PTY 测试改为等待 production completion mailbox，删除单 scheduler tick 伪 oracle。
+2. `30ca1ce2b fix(ci): separate leaf timeout from suite supervision`
+   - inner `node:test run()` 只负责 files + concurrency；不再把 leaf timeout 或一个 shared AbortSignal 传给所有 file worker。
+   - external supervisor 以一个 unref physical backstop 持有原 `SUITE_BACKSTOP_MS=300000`；verdict-silence 仍是首要判据。
+   - RED fixture 的 budget import 路径在第一次 GREEN 验证中被证明错误；同提交修正后重跑正式反例。这一点保留在记录中，不把 proof 自身错误伪装成 runner RED。
+3. `5afc522b8 test(ci): close degradation-list consumer`
+   - 全量验证找到未迁移的 exact-list consumer；13→14 的文本、ID、数量、行号一次闭合。
+
+### 9.3 验证阶梯
+
+- RED 阶段：verification harness 271/273，其中 static binding 稳定拒绝旧 `timeout: PER_TEST_TIMEOUT_MS`；behavior fixture 后续发现 import path 错误，因此不把该次 behavioral failure 作为独立根因证据。
+- 修正 proof 后：verification harness 273/273；PTY focused 48/48；degradation-list focused 7/7。
+- `node scripts/build.mjs`：734 F# sources，161 registered surfaces，成功。restricted sandbox 首次仅因 NuGet NU1900 无法访问 vulnerability index 失败；不关闭检查，同命令在允许访问的环境通过。
+- `node scripts/check.mjs`：全绿。27,093 owner uses / 333 edges / 185 contracts；36 个 migration node 均 DONE；0 control-pyramid；0 deadcode；0 JS boundary debt；772 WHAT / 3919 declarations closure。
+- 最终无跳过 `npm run format-build-test`：
+  - Fantomas：696 unchanged，0 error。
+  - authoritative unit：3925/3925。
+  - integration：全绿；real FCS lanes 分别 146.6s 与 180.2s；harness 273/273。
+  - package integration：contents/import/install/resources 全绿。
+  - Long Stroke：57 steps / 7.4s，journal 583/700，SSE 2491/3450。
+  - `npm pack --dry-run`：2015 files，2.2 MB packed，10.5 MB unpacked。
+
+### 9.4 未完成的外部事实
+
+- M0 已随 M3 push 到 [upstream PR #20](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/20)。
+- M0 只有在该 PR 的 GitHub Linux Node 20 CI 实际全绿且合并后才算进入 upstream。本地完整阶梯已闭合实现证据，不代替尚未发生的 CI 与 merge SHA。
+
+## 10. M3 Enforcer bounds 单一 owner（2026-08-31）
+
+### 10.1 最新 upstream 对齐
+
+- 执行分支：`codex/remaining-merge-batch-2`；基线：`upstream/master@fcd5ab11b`。
+- upstream 新增 `4e7570abf` / `fcd5ab11b`，只修改 AGENTS、package/Wireit、`.gitignore` 与 `scripts/check.mjs` lane 编排；没有修改 Enforcer production。由于 PR #19 是 squash merge，本地旧分支与 upstream 不具线性祖先关系；本分支从 `fcd5ab11b` 新建，只按原节点重放计划文档与 M0 的 4 个独立提交，避免再次合并已被 squash 吸收的施工历史。
+- 旧 M3 证据 `40136ef0a` 仅用于定位历史意图；未 cherry-pick。当前 WHY/WHAT/HOW、production owner 与 gate 重新独立审查后实施。
+
+### 10.2 RED → GREEN → FCS closure
+
+1. `4b87c3c0a test(enforcer): expose duplicated content-bound owners`
+   - WHY/WHAT 先定义：Cycle model 唯一拥有阈值、UTF-8 字节计数结果与拒绝分支。
+   - 新增全 Enforcer production tree gate，不只检查三个已知文件。它拒绝 consumer 常量定义、raw threshold、直接 byte-count comparison、Decode/Surface 脱离 shared decision。
+   - synthetic decoy 同时覆盖 Host 常量副本、Decode 公式副本、新增目录中的 renamed raw threshold。
+   - RED 证据：原注册 Surface 行为 4/4 仍绿；gate 同时报告 Model 缺 owner、Decode/Surface 脱离 owner、Decode/Host/Surface 共 7 处副本。证明行为边界值测试不能独自阻止未来漂移。
+2. `eb0e703d6 refactor(enforcer): centralize content-bound decisions`
+   - `Cycle/Model.fs` 新增 `ContentBounds`、`ContentBoundsRejection`、两个 canonical threshold、`validateContentBounds` 与统一错误映射。
+   - `Cycle/Decode.fs` 删除常量与判定公式，真实提交路径调用 shared decision。
+   - `Surface.fs` 只暴露 owner 常量、注入 `LlmFacing.byteCount`、转换 typed result；测试不再验证另一套公式。
+   - `Host.fs` 删除未消费的重复常量。
+   - gate 初版曾把 F# `->` 误认作比较运算符；GREEN 中将模式收紧为带两侧空白的 ` > `，synthetic direct-comparison decoy 保持可失败。
+3. `787a877d6 fix(enforcer): declare byte-count trace contract`
+   - 完整 FCS lane 发现 injected `byteCount` 在同一 decision 中固定调用两次，触发 `semantic-decorator-invariant`。这不是误报：高阶 operation 的 multiplicity 需要 owner law。
+   - 在函数声明处绑定 owner=`behavior-diagnosis`、WHAT=`BD-011`、text→evidence 顺序、executable proof、同步失败语义、无 cancel/deadline、invocation bound=2。没有把计数移回 consumer，没有修改或放宽 analyzer。
+
+### 10.3 对 upstream 原文件的修改理由与证明
+
+| 修改面 | upstream 原状 | 修改理由 | 证明 |
+|---|---|---|---|
+| Enforcer Cycle model | 只拥有 `CanonicalCycle` 与 nonempty 判定；不拥有 BD-011 bounds。 | 安全阈值与拒绝公式必须只有一个可执行真源。 | typed result + exact boundary/multibyte behavior；whole-tree owner gate。 |
+| Decode | 自有两个常量及两个 `byteCount > limit` 分支。 | 真实 commit path 必须消费 model decision，不能与测试 Surface 漂移。 | architecture gate 强制 exact shared call；behavior-diagnosis 149/149。 |
+| Host | 保留两个未消费的 bounds 常量。 | 死副本仍是未来错误 owner；删除尸体。 | whole-tree gate 禁止非 owner constant/raw threshold。 |
+| Surface | 自有两个常量、两次计数与两个拒绝分支。 | Surface 只做 JS representation conversion；错误 vocabulary 与 Decode 同源。 | 注册 Surface 的 exact/boundary/UTF-8 反例；Surface Manifest 161/161。 |
+| verification entry | 无 Enforcer bounds ownership gate。 | 行为测试不能证明未来 consumer 不复制公式。 | synthetic good world + 3 类 decoy；真实旧树 RED、新树 GREEN。 |
+
+### 10.4 实际验证与剩余外部事实
+
+- `dotnet tool run fantomas src/Wanxiangshu`：696 files，2 formatted，0 error；随后目标文件 unchanged。
+- `node scripts/build.mjs`：734 F# sources、161 registered surfaces，成功。
+- `node --test requirements/behavior-diagnosis/tests/*.test.mjs`：149/149。
+- `node scripts/check.mjs`：text lane 全绿；696 production files；772 WHAT / 3920 tests closure；新 gate 扫描 28 个 Enforcer production files，只存在一个 decision owner。
+- `node scripts/check.mjs --lane=owner-dep`：27,091 FCS cross-owner uses、333 owner edges、185 contracts；authority、composition、DSL ownership、semantic decorator 全绿。
+- 最新 upstream 已把 npm scripts 切到 Wireit；本机旧 `node_modules` 最初没有 Wireit，首次 `npm run format` 因 `wireit: command not found` 未启动。PR preflight 使用 `npm ci` 按原 lockfile 重建 153 个依赖，audit 为 0 vulnerability；package/lockfile 无修改。
+- 正式 `npm run format-build-test` 首次运行在 unit tier 报 3924/3926：`proof-ladder.test.mjs` 与 distribution release proof 仍要求 upstream 改造前的 direct Fantomas/check/build 字符串，而 `fcd5ab11b` 已改为 `npm run ...` → Wireit。`45b20b63e` 没有放宽为“出现任一 build 别名即可”；它分别锁定顶层 format→text→FCS→build→unit→integration→package→e2e→pack 顺序，以及四个 Wireit step 的 exact underlying commands。focused verification/distribution 17/17。
+- 修正 oracle 后，正式入口由 build freshness 再次 fail closed：`fcd5ab11b` 的 `wireit.build.files` 只含 `scripts/build.mjs`、F# source 与 `package.json`，但 build 同时从 Git 跟踪的全部源码/文档生成 `LoopDetectorEnvelope.js`；本节文档修改没有使 Wireit cache 失效，旧 dist 被错误复用。`51fff4bd8` 将整个 workspace 纳入 build fingerprint，仅排除 `dist/` 与 `.fable-build/` 自身输出；新增 VERIFICATION-SYSTEM-008 proof 锁定该闭包。focused proof 11/11，`npm run build` 真实重编译 734 sources 并验证 161 surfaces。
+- 最终 PR preflight 从 `2026ee242` 运行单次正式 `npm run format-build-test`：Fantomas 696 unchanged；text/FCS gates 全绿；Fable 734 sources / 161 surfaces；unit 3927/3927；两次真实 FCS integration、harness 273/273、package、唯一 Long Stroke 与 `npm pack --dry-run`（2015 files，2.2 MB）全部通过。
+- M0 与 M3 已合并为同一 [upstream PR #20](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/20)。GitHub CI 与 merge SHA 尚未产生；M3 仍未进入 upstream。

@@ -1,7 +1,7 @@
 /**
  * gate-degradation-cases.mjs — W7: every forbidden degradation has a case, and that is checked.
  *
- * VERIFY-004 lists thirteen degradations under `### 禁止退化清单` (requirements/verification-system/WHAT.md). W7's charge is a
+ * VERIFY-004 lists its degradations under `### 禁止退化清单` (requirements/verification-system/WHAT.md). W7's charge is a
  * failing test per item, and a completeness gate over the set — because a registered case file that
  * contributes nothing looks, in the gate's output, exactly like one whose cases all pass. The
  * placeholder this package started from (`gate-readiness-cases.mjs` was an empty array) is the
@@ -125,6 +125,13 @@ const DEGRADATION_COVERAGE = new Map([
   ],
   ['VERIFY_004_D_STATIC_GATE_PATH_DOES_NOT_EXIST', ['VERIFY-004 every path criterion in the harness resolves on disk']],
   ['VERIFY_004_D_WINDOW_WIDENED_TO_HIDE_A_RACE', ['VERIFY-004 no budget is 兜底-only for a criterion that has a causal signal']],
+  [
+    'VERIFY_004_D_LEAF_TIMEOUT_APPLIED_TO_FILE_WRAPPER',
+    [
+      'VERIFY-004 verdicts actually renew the window, so legitimate slow work is not killed',
+      'VERIFY-004 the runner claims no protection it does not have',
+    ],
+  ],
 ]);
 
 export const degradationCases = [

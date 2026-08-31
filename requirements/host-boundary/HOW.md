@@ -8,10 +8,12 @@
 - `SessionIdle` 与 `ProviderRetry`：触发单飞调和流程。
 - `AttemptAborted`：撤销当前物理尝试的静止能力，不推进业务重试。
 - `ProviderFailure`：结合快照中的确切助手消息共同确认失败终态。
+- `signals.test.mjs` 直接穿过 `HostSignalSurface` 固定五 case 的完整 JSON 投影、无关输入拒绝与 wrapper wire 形态。abort proof 同场比较 owned/unowned `AttemptAborted` 与可跨 ownership 的 `ProviderFailure`；任何混型都会改变可见路由结果并使测试失败。
 
 ### 2. 快照投影与身份因果解析
 
 - **SessionSnapshotPort**：提供一致的消息结构投影，维护工具调用与执行结果的状态对齐。
+- **严格定位证明**：`SessionSnapshotSurface.locateToolCall` 直接调用 `SessionSnapshotPort.locateToolCall`。`session-snapshot-locality.test.mjs` 同时固定唯一目标 + 非目标 decoy、目标缺失、目标多解三个世界；只允许唯一目标返回运行上下文，后两者分别返回 typed `Missing` / `Ambiguous`，禁止 first-match 猜测。
 - **最大序列**：`SessionSnapshotPort` 只接受 finite Host `time.created`；latest assistant 按 `(time.created, id)` 排序，ID 仅作同时间的确定性 tie-break。任一 assistant 缺少合法 creation evidence 时绑定 fail closed。
 - **因果绑定**：公开 `message.updated.properties.info` 同时携带 exact `sessionID`、assistant `id`、exact user `parentID`、`role=assistant` 与 `time.created` 时，边界才发布 exact provider-start observation；任一字段缺失或不匹配即安全失败。
 - **Pre-run transform 边界**：公开顺序为 `chat.message → experimental.chat.messages.transform(user only) → chat.params(可重复) → provider`。Transform 只按 exact `(SessionId, PhysicalUserMessageId)` 冻结 pending attempt plan，绝不建立 `ProviderRunIdentity` 或写 `ProviderStarted`。首次 exact assistant observation 一次性绑定 plan 并先持久 `ProviderStarted`；同一事件若还携带 terminal evidence，只有 start 持久确认后才进入 terminal accounting。

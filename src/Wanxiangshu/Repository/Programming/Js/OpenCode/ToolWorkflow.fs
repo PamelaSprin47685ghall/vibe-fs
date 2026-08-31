@@ -214,6 +214,12 @@ module JsToolWorkflow =
         JsUtf8Fs.readUtf8Classified (JsMutationFs.resolveToolPath root path)
         |> Result.toOption
 
+    let private preflight root readSnapshots mutations =
+        let exists path =
+            JsMutationFs.existsPath (JsMutationFs.resolveToolPath root path)
+
+        JsTransaction.preflight exists (readCurrentText root) readSnapshots mutations
+
     let private commitEphemeral
         (root: string)
         (mutations: JsStagedMutation list)
@@ -235,12 +241,14 @@ module JsToolWorkflow =
     let private commitDurable
         (durable: IJsTransactionPersistence)
         (root: string)
+        (readSnapshots: JsReadSnapshot list)
         (mutations: JsStagedMutation list)
         (value: LlmFacing.Data.Value)
         (prepared: JsTransactionPrepared)
         : Task<Result<LlmFacing.Data.Value * string list * string list, JsFailure>> =
         taskResult {
             let! _ = durable.AppendPrepared prepared |> mapPrepareFailure
+            do! preflight root readSnapshots mutations
             do! JsMutationFs.commitPlan root (JsTransaction.commitPlan mutations)
             let! _ = durable.AppendCommitted prepared.TransactionId |> mapCommitFailure
             return value, rewrittenPaths mutations, createdPaths mutations
@@ -248,6 +256,7 @@ module JsToolWorkflow =
 
     let private commitMutations
         (root: string)
+        (readSnapshots: JsReadSnapshot list)
         (mutations: JsStagedMutation list)
         (value: LlmFacing.Data.Value)
         (persistence: IJsTransactionPersistence option)
@@ -259,7 +268,7 @@ module JsToolWorkflow =
 
         match persistence with
         | None -> commitEphemeral root mutations value |> Task.FromResult
-        | Some durable -> commitDurable durable root mutations value prepared
+        | Some durable -> commitDurable durable root readSnapshots mutations value prepared
 
     let private invokeObservation observe readPaths effectPaths : Task<Result<unit, JsFailure>> =
         task {
@@ -300,28 +309,26 @@ module JsToolWorkflow =
                 taskResult {
                     // DSL-MUTABLE: algorithm-scratch — JS mutation staging accumulator
                     let staging = ResizeArray<JsStagedMutation>()
-                    let modelReads = ResizeArray<string>()
-                    let api = JsToolsBindings.createApi root staging modelReads
+                    let readSnapshots = ResizeArray<JsReadSnapshot>()
+                    let api = JsToolsBindings.createApi root staging readSnapshots
 
                     let! resultJson =
                         JsSandbox.runSurface baseClassSource modelSource api deadlineMs deadlineEpochMs outputBoundBytes
 
                     let! value = JsToolsData.parse resultJson
                     let mutations = staging |> Seq.toList
-                    let readPaths = modelReads |> Seq.distinct |> Seq.toList
+                    let snapshots = readSnapshots |> Seq.toList
+                    let readPaths = snapshots |> List.map _.Path |> List.distinct
                     let effectPaths = mutations |> List.map JsStagedMutation.path |> List.distinct
 
-                    let exists (path: string) : bool =
-                        JsMutationFs.existsPath (JsMutationFs.resolveToolPath root path)
-
-                    do! JsTransaction.preflight exists (readCurrentText root) mutations
-
+                    do! preflight root snapshots mutations
                     do! observeFileAccess fileAccessObservation readPaths effectPaths
+                    do! preflight root snapshots mutations
 
                     if List.isEmpty mutations then
                         return value, [], []
                     else
-                        return! commitMutations root mutations value persistence
+                        return! commitMutations root snapshots mutations value persistence
                 }
 
             match outcome with
