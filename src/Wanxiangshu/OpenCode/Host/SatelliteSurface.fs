@@ -7,7 +7,6 @@ open Fable.Core
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.OpenCode
 
 type private SatelliteSessionPort(physical: bool, conflict: bool, queryError: bool) =
@@ -47,7 +46,9 @@ type private SatelliteSessionPort(physical: bool, conflict: bool, queryError: bo
             { new IDisposable with
                 member _.Dispose() = () }
 
-        member _.SendPrompt(_, _, _) = Task.FromResult(Fatal "unused")
+        member _.SendPrompt(_, _, _) =
+            task { return raise (InvalidOperationException "SatelliteSurface does not send prompts") }
+
         member _.AbortSession _ = Task.FromResult(Ok())
         member _.InterruptAttempt _ = Task.FromResult(Ok())
         member _.IsManagedChild _ = true
