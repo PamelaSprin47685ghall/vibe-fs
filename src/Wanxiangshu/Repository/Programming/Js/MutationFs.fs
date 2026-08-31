@@ -63,6 +63,14 @@ open Wanxiangshu.Strength.Replica
 /// EventStore owns them (JS-012).
 module JsMutationFs =
 
+    type private ResolvedCommitMutation =
+        | ResolvedRewriteFile of path: string * resolvedPath: string * expectedCurrent: string * newText: string
+        | ResolvedCreateFile of path: string * resolvedPath: string * newText: string
+
+    type private ResolvedRollbackMutation =
+        | ResolvedRestoreFile of resolvedPath: string * expectedCurrent: string * originalText: string
+        | ResolvedRemoveCreatedFile of resolvedPath: string * expectedCurrent: string
+
     [<Import("writeFileSync", "node:fs")>]
     let private writeFileSync (path: string) (data: string) : unit = jsNative
 
@@ -122,86 +130,96 @@ module JsMutationFs =
     let undoIfMatches (root: string) (path: string) (expectedCurrent: string) (restoreTo: string option) : unit =
         undoIfMatchesResolved (resolveToolPath root path) expectedCurrent restoreTo
 
-    let private rollbackOne (resolvePath: string -> string) mutation =
+    let private rollbackResolved mutation =
         match mutation with
-        | JsRollbackMutation.RestoreFile(path, expectedCurrent, originalText) ->
-            undoIfMatchesResolved (resolvePath path) expectedCurrent (Some originalText)
-        | JsRollbackMutation.RemoveCreatedFile(path, expectedCurrent) ->
-            undoIfMatchesResolved (resolvePath path) expectedCurrent None
+        | ResolvedRestoreFile(resolvedPath, expectedCurrent, originalText) ->
+            undoIfMatchesResolved resolvedPath expectedCurrent (Some originalText)
+        | ResolvedRemoveCreatedFile(resolvedPath, expectedCurrent) ->
+            undoIfMatchesResolved resolvedPath expectedCurrent None
 
-    let private validateRewrite resolvePath path expectedCurrent =
-        match JsUtf8Fs.readUtf8Classified (resolvePath path) with
+    let private validateRewrite path resolvedPath expectedCurrent =
+        match JsUtf8Fs.readUtf8Classified resolvedPath with
         | Ok current when current = expectedCurrent -> None
         | _ -> Some(JsFailure.FileChanged path)
 
-    let private validateOne (resolvePath: string -> string) mutation =
+    let private validateOne mutation =
         match mutation with
-        | JsCommitMutation.RewriteFile(path, expectedCurrent, _) -> validateRewrite resolvePath path expectedCurrent
-        | JsCommitMutation.CreateFile(path, _) when existsPath (resolvePath path) -> Some(JsFailure.FileChanged path)
-        | JsCommitMutation.CreateFile _ -> None
+        | ResolvedRewriteFile(path, resolvedPath, expectedCurrent, _) ->
+            validateRewrite path resolvedPath expectedCurrent
+        | ResolvedCreateFile(path, resolvedPath, _) when existsPath resolvedPath -> Some(JsFailure.FileChanged path)
+        | ResolvedCreateFile _ -> None
 
-    let private validatePlan resolvePath plan =
+    let private validatePlan plan =
         plan
-        |> List.tryPick (validateOne resolvePath)
+        |> List.tryPick validateOne
         |> function
             | Some failure -> Error failure
             | None -> Ok()
 
-    let private validateMutation resolvePath mutation =
-        match validateOne resolvePath mutation with
+    let private validateMutation mutation =
+        match validateOne mutation with
         | Some failure -> Error failure
         | None -> Ok mutation
 
-    let private writeRewrite resolvePath path expectedCurrent newText =
+    let private writeRewrite resolvedPath expectedCurrent newText =
         try
-            writeFileSync (resolvePath path) newText
-            Ok(JsRollbackMutation.RestoreFile(path, newText, expectedCurrent))
+            writeFileSync resolvedPath newText
+            Ok(ResolvedRestoreFile(resolvedPath, newText, expectedCurrent))
         with _ ->
             Error JsFailure.TransactionCommitFailed
 
-    let private writeCreate resolvePath path newText =
+    let private writeCreate path resolvedPath newText =
         try
-            writeFileWithOptions (resolvePath path) newText (createObj [ "encoding" ==> "utf8"; "flag" ==> "wx" ])
+            writeFileWithOptions resolvedPath newText (createObj [ "encoding" ==> "utf8"; "flag" ==> "wx" ])
 
-            Ok(JsRollbackMutation.RemoveCreatedFile(path, newText))
+            Ok(ResolvedRemoveCreatedFile(resolvedPath, newText))
         with
-        | _ when existsPath (resolvePath path) -> Error(JsFailure.FileChanged path)
+        | _ when existsPath resolvedPath -> Error(JsFailure.FileChanged path)
         | _ -> Error JsFailure.TransactionCommitFailed
 
-    let private writeValidated resolvePath mutation =
+    let private writeValidated mutation =
         match mutation with
-        | JsCommitMutation.RewriteFile(path, expectedCurrent, newText) ->
-            writeRewrite resolvePath path expectedCurrent newText
-        | JsCommitMutation.CreateFile(path, newText) -> writeCreate resolvePath path newText
+        | ResolvedRewriteFile(_, resolvedPath, expectedCurrent, newText) ->
+            writeRewrite resolvedPath expectedCurrent newText
+        | ResolvedCreateFile(path, resolvedPath, newText) -> writeCreate path resolvedPath newText
 
-    let private writeOne resolvePath mutation =
-        validateMutation resolvePath mutation
-        |> Result.bind (writeValidated resolvePath)
+    let private writeOne mutation =
+        validateMutation mutation |> Result.bind writeValidated
 
-    let private writeOrRollback resolvePath applied mutation =
-        match writeOne resolvePath mutation with
+    let private writeOrRollback applied mutation =
+        match writeOne mutation with
         | Ok rollback -> Ok rollback
         | Error failure ->
-            applied |> List.iter (rollbackOne resolvePath)
+            applied |> List.iter rollbackResolved
             Error failure
 
-    let private applyWrites resolvePath plan =
+    let private applyWrites plan =
         let rec apply remaining applied =
             match remaining with
             | [] -> Ok()
             | mutation :: rest ->
-                writeOrRollback resolvePath applied mutation
+                writeOrRollback applied mutation
                 |> Result.bind (fun rollback -> apply rest (rollback :: applied))
 
         apply plan []
 
-    let commitPlan (root: string) (plan: JsCommitMutation list) : Result<unit, JsFailure> =
-        let resolvePath path = resolveToolPath root path
+    let private resolveCommitMutation root mutation =
+        match mutation with
+        | JsCommitMutation.RewriteFile(path, expectedCurrent, newText) ->
+            ResolvedRewriteFile(path, resolveToolPath root path, expectedCurrent, newText)
+        | JsCommitMutation.CreateFile(path, newText) -> ResolvedCreateFile(path, resolveToolPath root path, newText)
 
-        validatePlan resolvePath plan
-        |> Result.bind (fun () -> applyWrites resolvePath plan)
+    let private resolveRollbackMutation root mutation =
+        match mutation with
+        | JsRollbackMutation.RestoreFile(path, expectedCurrent, originalText) ->
+            ResolvedRestoreFile(resolveToolPath root path, expectedCurrent, originalText)
+        | JsRollbackMutation.RemoveCreatedFile(path, expectedCurrent) ->
+            ResolvedRemoveCreatedFile(resolveToolPath root path, expectedCurrent)
+
+    let commitPlan (root: string) (plan: JsCommitMutation list) : Result<unit, JsFailure> =
+        let resolvedPlan = plan |> List.map (resolveCommitMutation root)
+
+        validatePlan resolvedPlan |> Result.bind (fun () -> applyWrites resolvedPlan)
 
     let rollbackPlan (root: string) (plan: JsRollbackMutation list) : unit =
-        let resolvePath path = resolveToolPath root path
-
-        plan |> List.iter (rollbackOne resolvePath)
+        plan |> List.map (resolveRollbackMutation root) |> List.iter rollbackResolved
