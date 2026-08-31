@@ -1,5 +1,7 @@
 import path from 'node:path'
 
+import { FCS_PROJECT_CHECK_TIMEOUT_MS } from '../e2e/support/time-budget.js'
+
 /**
  * The wired node:test integration steps — the single source of truth for which
  * non-child-owned integration tests the entry supervises. Shared by
@@ -10,8 +12,13 @@ import path from 'node:path'
  * VERIFICATION-SYSTEM-009: the wired set is declared once here; the parent entry
  * and the coverage test both read it.
  *
+ * A step may declare `perTestTimeoutMs` when one of its tests legitimately cannot
+ * answer inside the integration default. The entry derives both the child's
+ * node:test bound and its verdict-silence window from that one number, so a step
+ * cannot claim headroom for the dog while telling node:test a shorter story.
+ *
  * @param {string} root repository root (absolute)
- * @returns {{ label: string, files: string[] }[]}
+ * @returns {{ label: string, files: string[], perTestTimeoutMs?: number }[]}
  */
 export function integrationNodeTestSteps(root) {
   return [
@@ -43,17 +50,23 @@ export function integrationNodeTestSteps(root) {
       label: 'branch-fast-forward-adapter.test.mjs (change-integration)',
       files: [path.join(root, 'requirements/change-integration/tests/integration/branch-fast-forward-adapter.test.mjs')],
     },
+    // Both structured-workflow steps below run real `dotnet fsi` F# project checks: an F# project
+    // check over the production tree cannot report a verdict inside the integration default, so the
+    // budget is declared here rather than raised for every step. Measured lanes: 6s + 116s here,
+    // 34s + 107s + 5s next door.
     {
       label: 'owner-dependencies-fcs.test.mjs (structured-workflow)',
       files: [
         path.join(root, 'requirements/structured-workflow/tests/integration/owner-dependencies-fcs.test.mjs'),
       ],
+      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
     },
     {
       label: 'workflow-constitution-scanners.test.mjs (structured-workflow)',
       files: [
         path.join(root, 'requirements/structured-workflow/tests/integration/workflow-constitution-scanners.test.mjs'),
       ],
+      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
     },
     {
       label: 'plugin/file-mutation-tools.test.mjs (repository-programming)',

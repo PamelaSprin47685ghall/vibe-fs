@@ -8,8 +8,10 @@
 // package suite remains independently invocable via
 // node requirements/distribution/tests/integration/package/run.mjs.
 //
-// Silence = WATCHDOG_TIMEOUT_MS (3s), same dog as e2e canary. package/harness own
-// the same 3s criterion inside their entrypoints.
+// Silence per step: the integration default is PER_TEST bound + 5s (20s), the same verdict-fed dog
+// the unit tier uses on a tighter window. A step whose test is a real F# project check declares its
+// own bound in integration-node-test-steps.mjs; nothing widens the window for the other steps.
+// package/harness own their own silence criterion inside their entrypoints.
 
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
@@ -93,14 +95,18 @@ if (!entryCoverage.ok) {
 
 for (const step of nodeTestSteps) {
   console.log(`\n=== integration: ${step.label} ===`)
+  // One knob per step: the per-test bound feeds node:test and the verdict-silence window alike.
+  // Steps that are real compiler invocations declare their own (see integration-node-test-steps.mjs);
+  // everyone else keeps the tight default, so a genuine hang anywhere else still barks in ~20s.
+  const perTestTimeoutMs = step.perTestTimeoutMs ?? INTEGRATION_PER_TEST_TIMEOUT_MS
   await superviseNodeTest({
     files: step.files,
     label: `tests/integration/${step.label}`,
-    silenceMs: Math.max(WATCHDOG_TIMEOUT_MS, INTEGRATION_PER_TEST_TIMEOUT_MS + 5_000),
+    silenceMs: Math.max(WATCHDOG_TIMEOUT_MS, perTestTimeoutMs + 5_000),
     logPrefix: `integration:${step.label}`,
     env: {
       ...process.env,
-      PER_TEST_TIMEOUT_MS: String(INTEGRATION_PER_TEST_TIMEOUT_MS),
+      PER_TEST_TIMEOUT_MS: String(perTestTimeoutMs),
     },
   })
 }

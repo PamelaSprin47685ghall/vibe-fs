@@ -179,6 +179,30 @@ export const SUITE_BACKSTOP_MS = budgetFromEnv('SUITE_BACKSTOP_MS', 300000);
 export const UNIT_VERDICT_SILENCE_MS = budgetFromEnv('UNIT_VERDICT_SILENCE_MS', 5000);
 
 /**
+ * Per-test bound for an integration step whose test IS a real `dotnet fsi` F# project check.
+ *
+ * Scoped on purpose. The integration default (`PER_TEST_TIMEOUT_MS + 5000`, 20s) is the right
+ * criterion for every step that only loads modules and asserts: at 20s such a step is hung, and
+ * the SIGKILL plus the outstanding-file dump name the causal scene. Raising that global to fit a
+ * compiler invocation would buy the FCS steps their headroom by removing the hang criterion from
+ * the other eleven steps — 「超时放大掩盖资源泄漏而非修复因果信号」, and 「延长静默窗口或测试超时以
+ * 掩盖竞态」 (VERIFICATION-SYSTEM-006). So the bound is declared per step, and only the two steps
+ * that invoke FCS carry it.
+ *
+ * The value is measured, not padded to taste. Worst observed lane is
+ * `owner-dependencies-fcs.test.mjs`'s produce-then-reuse test at 116s (one full production-tree
+ * project check plus a fixture project check in the same test); the production-tree scanner lanes
+ * measure 34s and 107s. 180s is ~1.55× the worst lane, which is the headroom a cold or loaded
+ * runner needs and no more — it stays well under `SUITE_BACKSTOP_MS`, so the suite ceiling remains
+ * the 兜底 and the verdict-silence window derived from this stays the primary criterion.
+ *
+ * There is no evidence-reuse shortcut available to these lanes. `FCS_REUSE_PATH_ENV` applies only
+ * to a default production scan, and the expensive lanes are either fixture-project scans (not
+ * reusable by construction) or the producer of the evidence itself.
+ */
+export const FCS_PROJECT_CHECK_TIMEOUT_MS = budgetFromEnv('FCS_PROJECT_CHECK_TIMEOUT_MS', 180000);
+
+/**
  * Fixed probe lattice for `tests/integration/harness/unit-runner-cases.mjs`.
  * Independent of production PER_TEST/UNIT_VERDICT so raising production CI headroom
  * does not collapse fixture headroom (VERIFY-004 inequalities still hold).
