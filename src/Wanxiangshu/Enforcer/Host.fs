@@ -28,10 +28,6 @@ open Wanxiangshu.Persistence.Journal
 /// never create a PromptDispatcher side effect.
 module EnforcerHost =
 
-    /// C4: commit-path UTF-8 safety bounds.
-    let MaxBlogTextBytes = 512 * 1024
-    let MaxEvidenceBytes = 128 * 1024
-
     /// Public: build the staged offer context from the same delta the coordinator
     /// computed. Freezes RequestId + ObservedPrefixEpochId at materialization (C5).
     ///

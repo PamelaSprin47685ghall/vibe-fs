@@ -4,7 +4,7 @@ const ownerPath = 'Cycle/Model.fs'
 const requiredConsumers = ['Cycle/Decode.fs', 'Surface.fs']
 const limitDefinition = /\blet\s+(?:(?:private|internal)\s+)?Max(?:BlogText|Evidence)Bytes\s*=/
 const rawLimit = /(?:512\s*\*\s*1024|128\s*\*\s*1024|524288|131072)/
-const directByteDecision = /(?:LlmFacing\.byteCount|Encoding\.UTF8\.GetByteCount)[^\n]{0,160}>/
+const directByteDecision = /(?:LlmFacing\.byteCount|Encoding\.UTF8\.GetByteCount)[^\n]{0,160}\s>\s/
 const sharedDecision = /EnforcerCycle\.validateContentBounds\s+LlmFacing\.byteCount/
 
 export const inspectEnforcerBoundsSources = (entries) => {
