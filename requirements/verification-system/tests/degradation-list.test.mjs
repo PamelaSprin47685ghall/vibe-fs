@@ -2,7 +2,7 @@
 //
 // W7 has to give every forbidden degradation a gate case, which first requires
 // knowing what the items ARE without a human retyping them. This locks the reader
-// that answers that question: the thirteen items, in SSOT order, whole strings,
+// that answers that question: the fourteen items, in SSOT order, whole strings,
 // plus the id each downstream case will name.
 //
 // The fail-closed tests are the load-bearing ones. `degradation-list.mjs` feeds a
@@ -21,7 +21,7 @@ import {
 } from './e2e/support/degradation-list.mjs'
 
 /**
- * The thirteen items as they stand in requirements/verification-system/WHAT.md today.
+ * The fourteen items as they stand in requirements/verification-system/WHAT.md today.
  *
  * Written out here on purpose, and it is NOT a second source of truth: the
  * production path reads the SSOT, and this array's only job is to fail when that
@@ -41,6 +41,7 @@ const EXPECTED_TEXTS = [
   '数量常量与清单各自维护',
   '静态门禁的路径判据指向不存在的目录',
   '延长静默窗口或测试超时以掩盖竞态',
+  '把叶子测试 timeout 作为 process-isolated 文件 wrapper 的总预算',
 ]
 
 /**
@@ -66,6 +67,10 @@ const EXPECTED_PAIRS = [
   ['VERIFY_004_D_COUNT_CONSTANT_MAINTAINED_APART_FROM_LIST', '数量常量与清单各自维护'],
   ['VERIFY_004_D_STATIC_GATE_PATH_DOES_NOT_EXIST', '静态门禁的路径判据指向不存在的目录'],
   ['VERIFY_004_D_WINDOW_WIDENED_TO_HIDE_A_RACE', '延长静默窗口或测试超时以掩盖竞态'],
+  [
+    'VERIFY_004_D_LEAF_TIMEOUT_APPLIED_TO_FILE_WRAPPER',
+    '把叶子测试 timeout 作为 process-isolated 文件 wrapper 的总预算',
+  ],
 ]
 
 /** A minimal SSOT-shaped document, so the fail-closed paths need no temp files. */
@@ -95,8 +100,8 @@ test('WHAT[VERIFICATION-SYSTEM-006] forbidden degradations are read from the SSO
     EXPECTED_TEXTS,
   )
 
-  assert.equal(DEGRADATIONS.length, 13)
-  assert.equal(EXPECTED_TEXTS.length, 13, 'the expectation itself must hold thirteen items')
+  assert.equal(DEGRADATIONS.length, 14)
+  assert.equal(EXPECTED_TEXTS.length, 14, 'the expectation itself must hold fourteen items')
   assert.equal(SSOT_ORIGIN, 'requirements/verification-system/WHAT.md')
 })
 
@@ -119,7 +124,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] each item records the SSOT line it was read 
 
   assert.deepEqual(
     lines,
-    Array.from({ length: 13 }, (_unused, offset) => lines[0] + offset),
+    Array.from({ length: 14 }, (_unused, offset) => lines[0] + offset),
   )
 })
 

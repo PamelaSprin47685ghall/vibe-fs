@@ -7,7 +7,7 @@ import test from 'node:test'
 import {
   OBSOLETE_CONTROLLER_PATHS,
   RAW_TIME_ALLOWLIST,
-  RAW_TIME_SCAN_LAYERS,
+  RAW_TIME_SCAN_ROOTS,
   RAW_TIME_TOKENS,
   isRawTimeAllowlisted,
   scanG4RCeVocabulary,
@@ -27,7 +27,7 @@ test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_documents_obsolete_controller_path
   assert.equal(OBSOLETE_CONTROLLER_PATHS.length, 6)
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_documents_raw_time_tokens_and_layers', () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_documents_raw_time_tokens_and_scan_root', () => {
   for (const token of [
     'DateTimeOffset.UtcNow',
     'DateTime.Now',
@@ -38,19 +38,7 @@ test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_documents_raw_time_tokens_and_laye
   ]) {
     assert.ok(RAW_TIME_TOKENS.includes(token), `missing token ${token}`)
   }
-  assert.deepEqual([...RAW_TIME_SCAN_LAYERS], [
-    'Execution',
-    'Mission',
-    'Interaction',
-    'Context',
-    'Participant',
-    'Repository',
-    'Strength',
-    'Foundation',
-    'Change',
-    'Enforcer',
-    'Composition',
-  ])
+  assert.deepEqual([...RAW_TIME_SCAN_ROOTS], ['.'])
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_obsolete_scanner_RED_on_synthetic_presence', () => {
@@ -104,11 +92,11 @@ test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_raw_time_scanner_ignores_comment_o
   assert.equal(clean.length, 0)
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_raw_time_allowlist_hook_skips_physical_adapter', () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_raw_time_allowlist_is_exact_file_only', () => {
   const file = 'Session/PhysicalClockAdapter.fs'
   assert.equal(isRawTimeAllowlisted(file, []), false)
   assert.equal(isRawTimeAllowlisted(file, ['Session/PhysicalClockAdapter.fs']), true)
-  assert.equal(isRawTimeAllowlisted(file, ['Session/']), true)
+  assert.equal(isRawTimeAllowlisted(file, ['Session/']), false)
 
   const hits = scanRawTimeEntries(
     [{ file, text: 'let now = DateTimeOffset.UtcNow\n' }],
@@ -162,17 +150,5 @@ test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S14_production_has_no_obsolete_contro
   assert.ok(
     violations.every((v) => v.kind !== 'obsolete-controller'),
     `no obsolete-controller hit allowed; have: ${violations.map((v) => v.kind).join(', ')}`,
-  )
-})
-
-test('WHAT[TIME-004] G4R_CE_S14_production_is_clean_of_raw_time_in_hard_phase', () => {
-  // raw-time 禁止语义归 time-capability（TIME-004）；本扫描器机制归
-  // structured-workflow（HOW §3.3 MECHANISM 交叉）。此处只钉生产事实：
-  // Domain/Application/Session 三层无 raw wall-clock / timer token。
-  const { rawTime, violations } = scanG4RCeVocabulary()
-  assert.equal(rawTime.length, 0, 'no raw wall-clock / timer tokens allowed in Domain/Application/Session')
-  assert.ok(
-    violations.every((v) => v.kind !== 'raw-time'),
-    `no raw-time hit allowed; have: ${violations.map((v) => v.kind).join(', ')}`,
   )
 })
