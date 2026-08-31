@@ -125,9 +125,12 @@ module HandleProjection =
         match sameBinding childSessionId targetAgent byname role ownership existing, existing.Lifecycle with
         | false, _ -> Error HandleIdentityConflict
         | true, Active -> Ok current
-        | true, CompletedAwaitingJoin _ -> Error AlreadyCompleted
         | true, Abandoned _ -> Error AlreadyAbandoned
-        | true, Retired -> Error HandleIsRetired
+        | true, CompletedAwaitingJoin _
+        | true, Retired ->
+            Ok
+                { current with
+                    Handles = Map.add existing.Handle { existing with Lifecycle = Active } current.Handles }
 
     let linkNamed
         (handle: HandleId)

@@ -7,7 +7,7 @@
 子会话生命周期通过 `HandleProjection` 纯函数折叠与 `HandleController` 统一定义：
 - 状态转移为单向不可逆：`Active → CompletedAwaitingJoin → Retired` 与 `Active | CompletedAwaitingJoin → Abandoned`。
 - `HandleController` 作为唯一的写入控制器，保证完成单赋值、墓碑状态原子写入以及对隐藏句柄的视图过滤隔离。
-- `HandleLinked` 仅在 child、target、byname、role 与 ownership 完全一致时幂等重放；任一 identity 漂移返回 typed `HandleIdentityConflict`，任何 lifecycle 重放都不重新激活 terminal。
+- `HandleLinked` 只能重用 child、target、byname、role 与 ownership 完全一致的 durable binding；任一 identity 漂移返回 typed `HandleIdentityConflict`。同一 logical person 的新 work unit 可以在原物理 child 上重新进入 `Active`，`Abandoned` 不可重开。
 
 ### 2. 运行时生命周期管理器
 

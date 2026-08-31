@@ -284,12 +284,16 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_handle_answers_retired_foreve
     HandleSurface.apply(retired, { op: 'complete', handle: HANDLE, kind: 'Terminal' }),
     { ok: false, error: { kind: 'TransitionRejected', reason: 'HandleIsRetired' } },
   )
-  assert.deepEqual(
-    HandleSurface.apply(retired, { op: 'link', handle: HANDLE, child: CHILD, agent: 'fast-coder', role: 'Coder' }),
-    { ok: false, error: { kind: 'TransitionRejected', reason: 'HandleIsRetired' } },
-  )
-  assert.equal(HandleSurface.isRetired(retired, HANDLE), true)
-  assert.equal(stateOf(retired).lifecycle, 'Retired')
+  const reopened = HandleSurface.apply(retired, {
+    op: 'link',
+    handle: HANDLE,
+    child: CHILD,
+    agent: 'fast-coder',
+    role: 'Coder',
+  })
+  assert.equal(reopened.ok, true, `same binding must accept a new work unit: ${JSON.stringify(reopened)}`)
+  assert.equal(HandleSurface.isRetired(reopened.ok ? reopened.state : retired, HANDLE), false)
+  assert.equal(stateOf(reopened.ok ? reopened.state : retired).lifecycle, 'Active')
 })
 
 test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_id_is_distinguishable_from_one_that_never_existed', () => {
