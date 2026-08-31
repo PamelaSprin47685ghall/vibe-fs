@@ -192,8 +192,9 @@ export const UNIT_VERDICT_SILENCE_MS = budgetFromEnv('UNIT_VERDICT_SILENCE_MS', 
  * that invoke FCS carry it.
  *
  * The value is measured, not padded to taste. Production-tree scanner lanes measure 34s and 110s.
- * Tagged evidence production, reuse validation, and the explicit-project isolation scan expose
- * separate verdicts: a completed compiler check is causal progress, while stdout remains background.
+ * Tagged evidence production/reuse and the two fixture scans live in separate test files, because
+ * Node 20 process isolation releases leaf verdicts only when the file wrapper completes. A completed
+ * physical file is causal progress, while nested leaves and stdout remain non-authoritative.
  * 180s is ~1.64× the worst lane, which is the headroom a cold or loaded runner needs and no more —
  * it stays well under `SUITE_BACKSTOP_MS`, so the suite ceiling remains the 兜底 and the
  * verdict-silence window derived from this stays the primary criterion.
