@@ -116,3 +116,4 @@
 - Durable handle：新增 production-bound terminal/rebinding 反例；`LinkageProjection` 只吸收 exact Active duplicate，identity 漂移返回 `HandleIdentityConflict`，Completed/Abandoned/Retired 均保持不可逆。focused Handle、managed-session、build/check 验证结果记录在对应 Git 节点。
 - Dispatch ingress identity：proof 从 provider-projection 移回 dispatch owner；只接受 `input.messageID` / `output.message.id` 的唯一 exact nonblank 值，冲突与非契约 carrier fail closed，opaque identity 不 trim。
 - Host latest-run binding：`SessionMessage` 投影 finite `time.created`；latest assistant 按 creation sequence 与 equal-time ID tie-break 判定，缺失/非法 chronology 返回 typed `InsufficientSequence`。Review Surface 复用同一 snapshot decoder，不再维护平行 raw-message adapter。
+- Review cohort witness：Finality admission 复用 `ReviewWitness.isQualifiedConfirmationFor`，同时约束 cohort/nested reviewer、barrier、outer/nested tree 与独立 ProviderRun/ToolCall，结构伪造不再升级为 blessing authority。

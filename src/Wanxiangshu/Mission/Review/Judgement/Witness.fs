@@ -115,6 +115,24 @@ module ReviewWitness =
     let isDistinctAttempt (barrierId: ReviewBarrierId) (first: VerdictWitness) (second: VerdictWitness) : bool =
         ReviewAttemptIdentity.isDistinctAttempt (attemptIdentity barrierId first) (attemptIdentity barrierId second)
 
+    let isQualifiedConfirmationFor
+        (reviewerSessionId: SessionId)
+        (barrierId: ReviewBarrierId)
+        (gitTreeHash: GitTreeHash)
+        (witness: ReviewWitness)
+        : bool =
+        match witness with
+        | Confirmed confirmed ->
+            confirmed.BarrierId = barrierId
+            && confirmed.GitTreeHash = gitTreeHash
+            && confirmed.First.ReviewerSessionId = reviewerSessionId
+            && confirmed.Second.ReviewerSessionId = reviewerSessionId
+            && confirmed.First.GitTreeHash = gitTreeHash
+            && confirmed.Second.GitTreeHash = gitTreeHash
+            && isDistinctAttempt confirmed.BarrierId confirmed.First confirmed.Second
+        | NoReview
+        | RevisionWitness _ -> false
+
     /// Build completed confirmation only from the direct CE's typed physical edge.
     let confirm
         (barrierId: ReviewBarrierId)
@@ -166,12 +184,9 @@ module ConfirmedReviewWitness =
     /// on the exact same tree.
     let private isConfirmedOnTree
         (expectedTree: GitTreeHash)
-        (_, barrierId: ReviewBarrierId, witness: ReviewWitness)
+        (reviewerSessionId: SessionId, barrierId: ReviewBarrierId, witness: ReviewWitness)
         : bool =
-        match witness with
-        | ReviewWitness.Confirmed confirmed -> confirmed.BarrierId = barrierId && confirmed.GitTreeHash = expectedTree
-        | ReviewWitness.NoReview
-        | ReviewWitness.RevisionWitness _ -> false
+        ReviewWitness.isQualifiedConfirmationFor reviewerSessionId barrierId expectedTree witness
 
     /// Build a ConfirmedReviewWitness from two or more legitimate cohort members' confirmed review witnesses
     /// on the exact same tree.
