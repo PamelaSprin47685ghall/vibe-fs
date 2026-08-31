@@ -2,7 +2,7 @@
 
 > 日期：2026-08-31  
 > 集成分支：`codex/upstream-refactor-integration`  
-> 上游基线：`upstream/master@696e67cad`  
+> 上游基线：`upstream/master@caa0b7b4f`（PR 前仍会最后 fetch 确认）
 > 本地旧版本：`codex/pre-upstream-refactor-20260831@4bb19673e`  
 > 性质：合并与 review 记录；产品语义仍只由 `requirements/<package>/` 定义
 
@@ -36,7 +36,7 @@
 
 - `node scripts/build.mjs`：734 个 F# source、161 个 registered surface，成功。
 - `node scripts/check.mjs`：全部 gate 通过；696 个 production file 全部有唯一 primary owner；F# control-pyramid、dead private binding、JS semantic-boundary debt 均为 0。
-- requirement trace：772 WHAT、3901 executable test declarations，closure complete。
+- requirement trace：772 WHAT、3916 executable test declarations，closure complete。
 - managed chat requirement suite：92 pass / 0 fail。
 - Host admission canary：OpenCode 1.18.18 真实边界通过。
 
@@ -63,7 +63,7 @@
 
 | 优先级 | 旧节点 | 当前 WHAT/owner | 已确认缺口 | 迁移方式 |
 |---:|---|---|---|---|
-| P0 | `f755497b8` + `b2cebe0c3` | MANAGED-SESSION-006/015；`LinkageProjection` | `reactivateExisting` 可重绑 child，并把 `Retired`/`CompletedAwaitingJoin` 改回 Active | typed identity conflict；exact duplicate 幂等；terminal 不可逆 |
+| P0 | `f755497b8` + `b2cebe0c3` | MANAGED-SESSION-006/015；`LinkageProjection` | `reactivateExisting` 可把同一 handle 重绑到另一 child/role/owner | typed identity conflict；只允许 exact durable binding 承接后续 work unit；`Abandoned` 不可重开 |
 | P0 | `90080cecb`—`bc7666685` | DISPATCH-PROTOCOL-004；`PromptIngressCodec` | 接受四个 carrier、空白值并按优先级掩盖冲突；真实 Host 只给 `input.messageID` 与 `output.message.id` | exact opaque 两 carrier；缺失/空白/冲突 fail closed |
 | P0 | `d0ecbac8a`—`d66b3db44` | Host/run-binding；`ProviderRunBinding` | 以 lexical message id 代替 Host `time.created` 判断 latest；空白 physical identity 可通过 | 解析 finite `time.created`；按时间、再按 id tie-break；空白拒绝 |
 | P0 | `262d9bf8c` + `a8fd17ced` | review assurance；`Judgement/Witness` | confirmed cohort 未验证 nested reviewer/tree 与双 attempt 独立性 | 共用一个结构资格判定函数 |
@@ -94,7 +94,7 @@
 
 ## 4. 迁移顺序
 
-1. 先修 identity 与 irreversible terminal：handle、dispatch、Host latest binding、review evidence。
+1. 先修 identity 与 lifecycle boundary：handle、dispatch、Host latest binding、review evidence。
 2. 再修边界副作用：Concern、Casebook、JS transaction。
 3. 收敛单一 decision owner：Enforcer bounds。
 4. 加固已退化 proof：causal wait、ambient time、Host signals；Change 与 managed mirror 视重构耦合度决定本 PR 完成或暂存。
@@ -113,7 +113,7 @@
 
 ## 6. 执行日志
 
-- Durable handle：新增 production-bound terminal/rebinding 反例；`LinkageProjection` 只吸收 exact Active duplicate，identity 漂移返回 `HandleIdentityConflict`，Completed/Abandoned/Retired 均保持不可逆。focused Handle、managed-session、build/check 验证结果记录在对应 Git 节点。
+- Durable handle：新增 production-bound rebinding 反例；`LinkageProjection` 对 child/target/byname/role/ownership 任一漂移返回 `HandleIdentityConflict`。合入最新 DELEG-024/027 后，exact binding 保留 upstream 的后续 work-unit 重开语义，同一物理 child 无需 join 即可再次 dispatch；`Abandoned` 仍不可重开。
 - Dispatch ingress identity：proof 从 provider-projection 移回 dispatch owner；只接受 `input.messageID` / `output.message.id` 的唯一 exact nonblank 值，冲突与非契约 carrier fail closed，opaque identity 不 trim。
 - Host latest-run binding：`SessionMessage` 投影 finite `time.created`；latest assistant 按 creation sequence 与 equal-time ID tie-break 判定，缺失/非法 chronology 返回 typed `InsufficientSequence`。Review Surface 复用同一 snapshot decoder，不再维护平行 raw-message adapter。
 - Review cohort witness：Finality admission 复用 `ReviewWitness.isQualifiedConfirmationFor`，同时约束 cohort/nested reviewer、barrier、outer/nested tree 与独立 ProviderRun/ToolCall，结构伪造不再升级为 blessing authority。
@@ -123,3 +123,38 @@
 - Final upstream sync：合入 `upstream/master@caa0b7b4f` 的 capability admission、verification budget、Repair 收口与最新静态契约；冲突文件采用 upstream 新 owner 结构，仅迁回仍有效的 Host chronology 规范与本分支行为 proof。
 - Ownership closure：删除无人使用的 `HostBoundarySurface.bindableRun` 平行 adapter，Host/review proof 统一走 `ProviderRunBindingSurface`；durable journal surface 不再读取 review-owned `ObservedAttempts`，blank REVISE 以 `NoReview`（合法 REVISE 必为 `RevisionWitness`）证明零 durable verdict。
 - Authority manifest merge：删除自动合并产生的 8 组重复 contract；保留 upstream 唯一声明，并将 `ChatAdmissionBindingReceipt` / `HostModelProjectionReceipt` 的 anchor 与 scope 对齐 exact admission identity、binding kind 与 OpenCode model。
+- Final verification repairs：Fallback owner resolution 恢复为单次 `ownerState` 读取；Requirement Grounding 对存在路径使用 canonical realpath 防 symlink escape，对不存在路径使用同一 lexical workspace 解析，消除 macOS `/var`→`/private/var` 假越界。
+- Portable distribution proof：不再用 case-insensitive filesystem 上会把 `dist/Resources` 误当 `dist/resources` 的 `existsSync`，改为检查 `dist` 的 exact directory entry；仍严格禁止 lowercase 资源副本。
+- Host public-contract canary：普通 sandbox 因 `listen EPERM 127.0.0.1` 失败；授权本机 loopback 后在 OpenCode 1.18.18 真实边界 2/2 通过，确认为环境权限而非产品回归。
+
+## 7. 相对 upstream 的修改、原因与证明
+
+本节专供 upstream 审核。“失败来源”区分 upstream 既有缺口、本地旧语义与新 upstream 的合并冲突、冲突解决回归，以及执行环境限制。
+
+| 修改面 | upstream 原状 / 失败来源 | 修改理由 | 独立证明 | Git 节点 |
+|---|---|---|---|---|
+| Durable handle binding | upstream `reactivateExisting` 会把已有 handle 的 child、target、Byname、role 与 ownership 全部覆盖。本地旧修复又一度过度禁止 `CompletedAwaitingJoin → Active`，与新 upstream DELEG-024/027 冲突，导致 same-Byname proof 失败。 | 保留 upstream “同一 logical person、同一物理 child 立即承接后续 work unit”；仅禁止 durable identity 漂移。`Abandoned` 仍封闭。 | `handle.test.mjs::EXEC_009_one_durable_handle_cannot_be_rebound_to_another_child`；`fork-tool.test.mjs::FORK_TOOL_same_byname_reuse_dispatches_immediately_and_leaves_completion_to_join`；focused 51/51；全量 3922/3922。 | RED `a51ac65fa`；初次 GREEN `6bedfd4c6`；upstream 语义校正 `e73e6b3c5` |
+| Dispatch physical identity | upstream ingress 可接受非 Host 契约 carrier、空白值，并用优先级掩盖 carrier 冲突。 | 真实 Host 边界只允许 `input.messageID` / `output.message.id`；唯一 exact nonblank 值才能成为 opaque physical identity。 | `requirements/dispatch-protocol/tests/ingress-identity.test.mjs` 覆盖 exact、missing、blank、conflict 与 decoy carrier；dispatch focused 197/197。 | RED `06b4c7c99`；GREEN `00947647d` |
+| Host latest provider run | upstream 以 lexical message id 代替 Host `time.created` 判断 latest，空白 physical identity 亦可绑定。 | latest 必须由 Host chronology 决定；equal-time 才用 id tie-break；时序不足返回 typed `InsufficientSequence`。 | `host010-run-id-equivalence.test.mjs`、`seal-bind.test.mjs`、Host identity 16/16；真实 Host canary 通过。 | RED `f44cd284e`；GREEN `0529f0349` |
+| Review cohort / physical evidence | upstream confirmation 未共用 nested reviewer/tree 与独立 attempt 结构资格；blank physical judgement id 可进入 command、witness 或 replay。 | 用一个 `ReviewWitness.isQualifiedConfirmationFor` 决定结构资格；所有 ingress 共用 `PhysicalUserMessageId.isNonBlank`，空白证据 zero-effect。 | `blessing-admission.test.mjs`、`witness.test.mjs`、`host-reverify.test.mjs`；review/finality 66/66；全量中 blank-id 反例通过。 | RED `5900e5547`/`c921ceb0b`；GREEN `659dd7556`/`37ee2400b` |
+| Concern address | upstream command 与 durable `MailboxSubscribed` replay 都可接受 blank id/concern。 | command 与 replay 共用一个 address validator，防止不可寻址 mailbox 进入 durable truth。 | `concern-routing.test.mjs` 的 command/replay 双反例；全量 verification 通过。 | RED `85ee3c3aa`；GREEN `b021d5b73` |
+| Casebook fetch marker | upstream 只在组装路径判断 marker，直接构造 `FetchTool` 可在 disabled workspace 触发 index/replay/event 副作用。 | 最终 effect owner `FetchTool.Execute` 再次消费正式 feature decision，使旁路无法绕过。 | `fetch-tool.test.mjs` 精确直构反例；disabled 时 index/replay/event 计数保持 0。 | RED `ddcd25255`；GREEN `ce1b6b59c` |
+| Fallback owner-state causality | 最新 upstream 代码分别传递 owner 并二次查找 state；合并冲突时接受该片段，丢失本地的 owner/state 同源约束。重施后旧 gate 又因只识别旧源码形状而红。 | 从同一 projection 一次解出 `(owner,current)` 并传到 admission；gate 改为证明该 pair 与 typed authorization 同时到达唯一 ledger append，不用旧排版当 oracle。 | `p0-recovery-join` 697 files / 64 rules 通过；原 malformed direct-owner fixture 仍稳定变红；`recovery-reentry.test.mjs` 5/5；全量 3922/3922。 | production `850f59f40`；gate `f56fdec06` |
+| Requirement Grounding path | upstream 先 canonicalize workspace 为 `/private/var/...`，但不存在的 target 仍保留 `/var/...`；macOS 上同一 workspace 被误判为越界。 | 存在 target 用 canonical realpath，仍 fail closed 防 symlink escape；不存在 target 用同一 lexical workspace 解析，不混用两种 root spelling。 | 新 `scope-resolution.test.mjs::resolves nonexistent paths through a symlinked workspace without allowing symlink escape`；grounding 17/17；全量中同一 proof 通过。 | `73ae95487` |
+| Distribution single-copy proof | upstream 用 `existsSync(dist/resources)` 证明无 lowercase 副本；macOS case-insensitive FS 会把合法 Fable namespace `dist/Resources` 当成命中，这是 upstream proof 误判，不是 production 回归。 | 读取 `dist` 目录项并 exact 比较 lowercase `resources`；仍严格拒绝真实资源副本，不放宽断言。 | focused distribution 4/4；package contents/import/install/resources 全绿；`npm pack --dry-run` 实际检查 2015 files。 | `95fabb42f` |
+| Host admission canary | 失败仅为 sandbox `listen EPERM 127.0.0.1`；没有 upstream 或 production 修改。 | 保留原 canary，用允许 loopback 的正式验证环境重跑，不用 mock 或 skip 掩盖。 | OpenCode 1.18.18 public contract 2/2；全量 runner 中 HOST-BOUNDARY-023 通过。 | 无代码提交 |
+
+合并后的 owner/authority manifest 收口也修改了 upstream 自动合并结果：`58081dd2a` 删除平行 Host/review consumer，`9bb863337` 删除 8 组重复 authority contract 并保留 upstream 唯一声明。对应证明为 owner dependency 27,065 uses / 332 edges / 184 contracts、authority tests 30/30、authority production scan 全绿。
+
+## 8. PR 前完整验证
+
+2026-08-31 修复前次完整门禁暴露的 gate/proof 问题后，从零单次执行 `npm run format-build-test`，未拆分、未跳过长时间 scanner：
+
+- Fantomas：696 unchanged，0 error。
+- `scripts/check.mjs`：全部通过；696 architecture/semantic-owner files；27,065 owner uses；0 control-pyramid；0 deadcode；0 JS boundary debt；772 WHAT / 3916 tests closure。
+- Fable build：734 source files，161 registered surfaces，成功。
+- authoritative verification：3922 pass / 0 fail；含 OpenCode 1.18.18 真实 Host admission canary。
+- integration：全部通过；包含 FCS owner dependency、workflow constitution scanner、durable convergence 与 273-case harness。
+- package integration：contents/import/install/resources 全部通过。
+- e2e Long Stroke：57 steps，journal 601/700，SSE 2495/3450，通过。
+- `npm pack --dry-run`：2015 files，package 2.2 MB，unpacked 10.5 MB，成功。
