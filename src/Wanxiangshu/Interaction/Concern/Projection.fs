@@ -45,7 +45,15 @@ module ConcernProjection =
 
     let tryFindMessage occurrenceId (state: ConcernProjectionState) = Map.tryFind occurrenceId state.Messages
 
-    let subscribe owner occurrenceId id concern (state: ConcernProjectionState) =
+    let private validateAddress id concern =
+        if System.String.IsNullOrWhiteSpace id then
+            Error "concern id must be non-empty"
+        elif System.String.IsNullOrWhiteSpace concern then
+            Error "concern must be non-empty"
+        else
+            Ok()
+
+    let private decideSubscription owner occurrenceId id concern (state: ConcernProjectionState) =
         let semanticConflict =
             Map.tryFind id state.Addresses
             |> Option.exists (fun existing -> existing <> concern)
@@ -64,6 +72,10 @@ module ConcernProjection =
                            OwnerSessionId = owner |}
                 )
             )
+
+    let subscribe owner occurrenceId id concern (state: ConcernProjectionState) =
+        validateAddress id concern
+        |> Result.bind (fun () -> decideSubscription owner occurrenceId id concern state)
 
     let publish sender occurrenceId id message (state: ConcernProjectionState) =
         match activeMailbox id state with
@@ -91,7 +103,7 @@ module ConcernProjection =
         && left.SenderSessionId = right.SenderSessionId
         && left.Message = right.Message
 
-    let private applySubscribed id concern generation ownerSessionId (state: ConcernProjectionState) =
+    let private applyValidatedSubscription id concern generation ownerSessionId (state: ConcernProjectionState) =
         let mailbox =
             { Id = id
               Concern = concern
@@ -110,6 +122,10 @@ module ConcernProjection =
                     Addresses = Map.add id concern state.Addresses
                     Mailboxes = Map.add id mailbox state.Mailboxes
                     KnownGenerations = Map.add generation mailbox state.KnownGenerations }
+
+    let private applySubscribed id concern generation ownerSessionId (state: ConcernProjectionState) =
+        validateAddress id concern
+        |> Result.bind (fun () -> applyValidatedSubscription id concern generation ownerSessionId state)
 
     let private applyPublished occurrenceId generation id senderSessionId body (state: ConcernProjectionState) =
         let message =
