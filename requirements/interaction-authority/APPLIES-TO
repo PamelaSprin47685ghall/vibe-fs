@@ -11,3 +11,6 @@
 /src/Wanxiangshu/Composition/Durable/Fold.fs
 /src/Wanxiangshu/OpenCode/Host/ChatAdmission/**
 /src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs
+/src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs
+/src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs
+/src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs

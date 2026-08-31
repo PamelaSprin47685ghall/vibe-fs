@@ -5,7 +5,6 @@
 /resources/enforcer/**
 /src/Wanxiangshu/Enforcer/**
 /src/Wanxiangshu/Context/Companion/Blogger/**
-/src/Wanxiangshu/Interaction/Repair/**
 /src/Wanxiangshu/Composition/Durable/Fact.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
 /src/Wanxiangshu/Persistence/Journal/FactCodec.fs

@@ -428,7 +428,6 @@
       "contract": "Composition.Turn",
       "kind": "published-contract",
       "consumers": [
-        "behavior-diagnosis",
         "delegation",
         "finality",
         "host-boundary",
@@ -494,10 +493,10 @@
       "contract": "Composition.Turn",
       "kind": "published-contract",
       "consumers": [
-        "behavior-diagnosis",
         "delegation",
         "finality",
         "host-boundary",
+        "interaction-authority",
         "intra-participant-parallelism",
         "managed-session-lifecycle",
         "prefix-stability",
@@ -726,6 +725,7 @@
       "consumers": [
         "behavior-diagnosis",
         "host-boundary",
+        "interaction-authority",
         "provider-attempt-recovery",
         "review-assurance"
       ],
@@ -774,7 +774,8 @@
       "contract": "Context.CompanionContract",
       "kind": "published-contract",
       "consumers": [
-        "behavior-diagnosis"
+        "behavior-diagnosis",
+        "interaction-authority"
       ],
       "symbols": [
         "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerAbandon.openRequest"
@@ -852,6 +853,7 @@
       "kind": "published-contract",
       "consumers": [
         "behavior-diagnosis",
+        "interaction-authority",
         "review-judgement"
       ],
       "symbols": [
@@ -882,6 +884,7 @@
         "capability-enforcement",
         "dispatch-protocol",
         "host-boundary",
+        "interaction-authority",
         "managed-session-lifecycle",
         "provider-attempt-recovery",
         "review-assurance"
@@ -3178,6 +3181,7 @@
         "guidance-delivery",
         "host-boundary",
         "institutional-learning",
+        "interaction-authority",
         "intra-participant-parallelism",
         "knowledge-reuse",
         "obligation-ledger",
@@ -3259,7 +3263,7 @@
       "contract": "Provider.AttemptRecovery",
       "kind": "published-contract",
       "consumers": [
-        "behavior-diagnosis"
+        "interaction-authority"
       ],
       "symbols": [
         "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderRecoveryWorkflow.admitPolicyAuthorizedFailure"
@@ -3331,8 +3335,8 @@
       "contract": "Provider.AttemptRecovery",
       "kind": "published-contract",
       "consumers": [
-        "behavior-diagnosis",
         "finality",
+        "interaction-authority",
         "prefix-stability"
       ],
       "symbols": [
@@ -3461,7 +3465,7 @@
       "contract": "Provider.TerminalValidity",
       "kind": "published-contract",
       "consumers": [
-        "behavior-diagnosis"
+        "interaction-authority"
       ],
       "symbols": [
         "Wanxiangshu.Participant.Provider.Attempt.TerminalValidity.check",
@@ -4549,7 +4553,6 @@
       "consumers": [
         "action-affordance",
         "attention-regulation",
-        "behavior-diagnosis",
         "capability-enforcement",
         "change-integration",
         "cognitive-environment",
@@ -4762,6 +4765,42 @@
         "Wanxiangshu.Participant.Persona.OfficeCapabilitySurface.permissions"
       ],
       "justification": "The two production consumers receive only JS-compatible label projections from the office-capability owner; no F# DU representation or duplicate permission matrix crosses the surface."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-repair-authority-cutover",
+      "contract": "Interaction.Repair.Classification",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol",
+        "intra-participant-parallelism",
+        "review-judgement",
+        "semantic-trace"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Repair.CompletedTurnClassifier.buildTurn",
+        "Wanxiangshu.Interaction.Repair.CompletedTurnClassifier.partsSessionText",
+        "Wanxiangshu.Interaction.Repair.CompletedTurnClassifier.partsText"
+      ],
+      "justification": "Published Interaction.Repair.Classification surface: these symbols are the repair vocabulary consumed by the listed foreign owners; every other detail of Interaction/Repair remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-repair-authority-cutover",
+      "contract": "Interaction.Repair.Workflow",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-session-lifecycle",
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Repair.InteractionRepairWorkflow.repairBloggerProtocol",
+        "Wanxiangshu.Interaction.Repair.InteractionRepairWorkflow.repairIncompleteInteraction",
+        "Wanxiangshu.Interaction.Repair.InteractionRepairWorkflow.repairMissingFinalReport"
+      ],
+      "justification": "Published Interaction.Repair.Workflow surface: these symbols are the repair vocabulary consumed by the listed foreign owners; every other detail of Interaction/Repair remains private to interaction-authority."
     }
   ],
   "physical_adapters": [
@@ -5247,6 +5286,7 @@
         "execution-model-routing",
         "finality",
         "guidance-delivery",
+        "interaction-authority",
         "managed-session-lifecycle",
         "obligation-ledger",
         "prefix-stability",
@@ -5257,7 +5297,7 @@
         "speculative-investigation",
         "work-record"
       ],
-      "justification": "These exact owners form the live mutual bridge between canonical durable aggregation and the feature oracles that consume durable facts and projections, then publish decisions and outcomes back into that canonical aggregation path. This records the current SCC rather than permitting new dependencies: exact membership must shrink on cutover, and any removed bridge edge makes the declaration stale."
+      "justification": "Live owner dependency SCC after the interaction-repair cutover. Membership must shrink, not grow, on future cutovers."
     }
   ]
 }

@@ -2032,6 +2032,51 @@
       ],
       "state": "DONE",
       "result": "CUTOVER"
+    },
+    {
+      "id": "interaction-repair-authority-cutover",
+      "primary_owner": "interaction-authority",
+      "intent": "Move Interaction/Repair slice primary ownership from behavior-diagnosis to interaction-authority and publish the InteractionRepair workflow and CompletedTurn classification contracts.",
+      "files": [
+        "src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs",
+        "src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs",
+        "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs"
+      ],
+      "classification": "MOVE",
+      "publishes": [
+        "Interaction.Repair.Classification",
+        "Interaction.Repair.Workflow"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs",
+        "src/Wanxiangshu/Composition/Turn/TurnReconcile.fs",
+        "src/Wanxiangshu/Context/Trace/Capture.fs",
+        "src/Wanxiangshu/Context/Trace/TerminalReporter.fs",
+        "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs"
+      ],
+      "proofs": [
+        "requirements/interaction-authority/tests/completed-turn-classifier.test.mjs",
+        "requirements/interaction-authority/tests/repair-lifecycle.test.mjs"
+      ],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners",
+        "interaction-repair-invariant"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs",
+        "src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs",
+        "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs"
+      ],
+      "coverage_tags": [
+        "CoverageB"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER"
     }
   ],
   "debt_face": {
@@ -2173,9 +2218,6 @@
       "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs",
       "src/Wanxiangshu/Interaction/Dispatch/RecoverySurface.fs",
       "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
-      "src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs",
-      "src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs",
-      "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs",
       "src/Wanxiangshu/Interaction/Repair/Port.fs"
     ],
     "CoverageD": [
