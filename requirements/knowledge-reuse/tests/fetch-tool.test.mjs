@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -20,8 +20,9 @@ import {
 } from './bookkeeper-session.test.mjs'
 
 const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
-const sandbox = () => {
+const sandbox = ({ enabled = true } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-fetch-'))
+  if (enabled) mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
   const handle = eventStore.create(dir, 'fetch-tool')
   return { dir, handle, cleanup: () => { eventStore.dispose(handle); rmSync(dir, { recursive: true, force: true }) } }
 }
@@ -32,6 +33,7 @@ const execute = (tool, shelfmark) => tool.execute({ shelfmark }, { sessionID: 's
 const assertFresh = (text) => assert.match(text, /No change was found in the evidence this answer depended on\.|这份答案所依赖的证据没有变化。/i)
 const assertRefreshed = (text) => assert.match(text, /The evidence this case depended on had changed\.|这份 case 所依赖的证据已经变化。/i)
 const assertNoCase = (text) => assert.match(text, /The Casebook contains no entry under that shelfmark\.|Casebook 在该 shelfmark 下没有条目。/i)
+const assertUnavailable = (text) => assert.match(text, /could not be read from this execution context|无法从当前执行环境读取/i)
 const assertNoMachineFreshness = (text) => assert.doesNotMatch(text, /\b(session_id|status|freshness|refresh)\s*=/)
 
 test('WHAT[KNOWLEDGE-REUSE-004] CASE004_fetch_uses_shelfmark_and_replays_before_refreshing', async () => {
@@ -81,6 +83,19 @@ test('WHAT[KNOWLEDGE-REUSE-002] CASE004_fetch_returns_exact_canonical_a', async 
 
     const fresh = await execute(tool, shelfmark)
     assert.match(fresh, /answer = "A1"/)
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[KNOWLEDGE-REUSE-009] CASE009_fetch_execution_rejects_a_workspace_without_the_marker', async () => {
+  const { dir, handle, cleanup } = sandbox({ enabled: false })
+  try {
+    const tool = buildTool(dir, handle)
+    const result = await execute(tool, 'Anything · 00000000')
+
+    assertUnavailable(result)
+    assert.equal((await casebook.fetchCase(handle, 10, 'ses')).value, null)
   } finally {
     cleanup()
   }
