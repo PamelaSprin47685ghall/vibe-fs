@@ -64,6 +64,14 @@ Follow-up proof:
 
 This repair adds no semantic-decorator declaration, suppression, allowance, timeout, or duplicated path formula.
 
+### Grounding proof follow-up
+
+PR #22 run `33432275199` passed 3941 tests before one upstream source-layout oracle failed. The oracle searched `ToolWorkflow.fs` for textual positions of `runCore`, `JsTransaction.preflight`, `fileAccessObservation`, and `commitMutations`; the resolved-path refactor changed that layout without changing the public transaction behavior.
+
+`28d3d5d39` replaces that oracle with a stronger production counterexample already validated in cumulative batch 5: the registered grounding repository surface records the complete `alpha + beta` effect set, then deliberately throws from observation. The real repository workflow still commits both files and returns `Succeeded`, proving grounding cannot become mutation admission. Fresh conflict closure remains independently owned by `REPOSITORY-PROGRAMMING-014`.
+
+Follow-up verification: Fable build 734 sources / 161 surfaces; grounding + repository workflow 21/21. This changes upstream's original proof because source ordering was not a behavioral contract and rejected an equivalent production refactor.
+
 ## Remaining work
 
 This PR closes only batch 4 / M1. Batches 5–9 remain separate modules and PRs. `upstream/master` was fetched again immediately before PR creation and remained `fcd5ab11b`; no additional semantic merge was required.
