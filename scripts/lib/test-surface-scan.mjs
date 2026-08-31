@@ -295,8 +295,13 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Execution/Delegation/SyncDelegate/Surface.js',
     owner: 'delegation',
-    laws: ['DELEG-005', 'DELEG-010', 'DELEG-015', 'DELEG-019', 'DELEG-021', 'DELEG-022', 'MANAGED-SESSION-001'],
-    lawOwners: { 'MANAGED-SESSION-001': 'managed-session-lifecycle' },
+    laws: ['DELEG-005', 'DELEG-010', 'DELEG-015', 'DELEG-019', 'DELEG-021', 'DELEG-022', 'MANAGED-SESSION-001', 'MANAGED-SESSION-004', 'MANAGED-SESSION-009', 'MANAGED-SESSION-014'],
+    lawOwners: {
+      'MANAGED-SESSION-001': 'managed-session-lifecycle',
+      'MANAGED-SESSION-004': 'managed-session-lifecycle',
+      'MANAGED-SESSION-009': 'managed-session-lifecycle',
+      'MANAGED-SESSION-014': 'managed-session-lifecycle',
+    },
     source: 'src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
