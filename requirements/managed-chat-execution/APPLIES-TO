@@ -26,3 +26,16 @@
 /src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
 /src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/Admission.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/Fact.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/Facts.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/Fold.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/Projection.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/Recovery.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntime.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntimeSurface.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/RecoverySurface.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/Settlement.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/StatusSurface.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/Surface.fs
