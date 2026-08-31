@@ -12,6 +12,7 @@ import {
   DeterministicEventQueue,
   createDurableWorld,
   dropEphemeral,
+  fallbackFacts,
 } from '../../verification-system/tests/support/temporal-harness.mjs'
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -34,20 +35,7 @@ const identityFor = (session, logical, root, run) => ({
   providerRun: run,
 })
 
-const rootFact = (session, logical, root) => ({
-  family: 'Prompt',
-  case: 'AuthorityRootAccepted',
-  payload: {
-    SessionId: session,
-    LogicalRunId: logical,
-    AuthorityRootUserMessageId: root,
-    AuthorityKind: 'HumanRoot',
-    SelectedAgent: 'fast-coder',
-    PeerAgent: 'deep-coder',
-    CanonicalRole: 'coder',
-    SelectedTier: 'fast',
-  },
-})
+const rootFact = (session, logical, root) => fallbackFacts.authorityRoot({ session, logical, root })
 
 const advanceFact = (session, logical, root, run, previous, next, count) => ({
   family: 'Fallback',

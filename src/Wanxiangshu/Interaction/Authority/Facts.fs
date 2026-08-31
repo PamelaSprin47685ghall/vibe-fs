@@ -3,6 +3,14 @@ namespace Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
+type AuthorityRootAcceptedPayload =
+    { SchemaVersion: int
+      SessionId: SessionId
+      LogicalRunId: LogicalRunId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId
+      AuthorityKind: string
+      IdentitySeed: PromptIdentitySeed }
+
 /// Durable prompt-authority facts. These facts belong to the authority boundary;
 /// Composition only routes the family through the journal's outer union.
 [<RequireQualifiedAccess>]
@@ -23,6 +31,7 @@ type PromptFactCases =
            LogicalRunId: LogicalRunId option
            AuthorityRootUserMessageId: AuthorityRootUserMessageId option
            EffectiveAgent: string option
+           IdentitySeed: PromptIdentitySeed
            PayloadDigest: string |}
     | PluginPromptSubmitted of
         {| PromptKey: PromptKey
@@ -36,12 +45,4 @@ type PromptFactCases =
         {| PromptKey: PromptKey
            SessionId: SessionId
            Reason: PromptAbandonReason |}
-    | AuthorityRootAccepted of
-        {| SessionId: SessionId
-           LogicalRunId: LogicalRunId
-           AuthorityRootUserMessageId: AuthorityRootUserMessageId
-           AuthorityKind: string
-           SelectedAgent: string
-           PeerAgent: string
-           CanonicalRole: string
-           SelectedTier: string |}
+    | AuthorityRootAccepted of AuthorityRootAcceptedPayload

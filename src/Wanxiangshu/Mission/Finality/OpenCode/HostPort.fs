@@ -174,14 +174,13 @@ module FinalityHostPort =
                     return! runtime.SendDeferredFirstPrompt memberInfo.AgentId
                 else
                     match!
-                        runtime.Fork(
-                            memberInfo.AgentId,
-                            Role.Reviewer,
-                            reviewerAgentName,
-                            openingAssignment (),
-                            None,
-                            ownership = HandleOwnership.HostOwnedHidden
-                        )
+                        HostSessionNudge.sendContinuation
+                            scope.Sessions
+                            memberInfo.ReviewerSessionId
+                            (openingAssignment ())
+                            PromptAuthority.ContinuationKind.ReviewerGuard
+                            (scope.DirectoryFor(SessionId.value memberInfo.ReviewerSessionId))
+                            scope.Journal
                     with
                     | Error error -> return Error error
                     | Ok _ -> return Ok()

@@ -50,13 +50,23 @@ test('WHAT[MANAGED-SESSION-018] shutdown detaches session runtimes before journa
 test('WHAT[MANAGED-SESSION-009] provider transform is admitted into plugin shutdown ownership', () => {
   const scope = read('src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs')
   const hooks = read('src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs')
+  const interop = read('src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs')
+  const policy = read('src/Wanxiangshu/OpenCode/Host/HookPolicy.fs')
 
   assert.match(scope, /member this\.RunOwnedWork\(start: unit -> Task\) : Task/)
   assert.match(scope, /let ownedWorkDrain = this\.StopOwnedWorkAndDrain\(\)/)
   assert.match(hooks, /let ownedTransform[\s\S]{0,220}scope\.RunOwnedWork\(fun \(\) -> transform inObj outObj\)/)
   assert.match(
     hooks,
-    /"experimental\.chat\.messages\.transform",\s*box \(fatalHook "plugin-hook-messages-transform-failed" \(curriedHook \(box ownedTransform\)\)\)/,
+    /let messagesTransform\s*=\s*registeredHook HookKey\.MessagesTransform \(curriedHook \(box ownedTransform\)\)/,
+  )
+  assert.match(
+    policy,
+    /\| HookKey\.MessagesTransform ->\s*\{ HostKey = "experimental\.chat\.messages\.transform"\s*DiagnosticOperation = "plugin-hook-messages-transform-failed"/,
+  )
+  assert.match(
+    interop,
+    /let registeredHook key adaptedHook =\s*let metadata = HookPolicy\.metadata key \|> HookPolicy\.validate\s*metadata\.HostKey, policyAwareHook metadata\.DiagnosticOperation adaptedHook/,
   )
 })
 

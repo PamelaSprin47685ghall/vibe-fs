@@ -4,11 +4,13 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 
@@ -39,6 +41,14 @@ module CursorSurface =
     let private optionalText (value: obj) : string option =
         if isNullish value then None else Some(text value)
 
+    let private requiredText argument value =
+        let parsed = text value
+
+        if String.IsNullOrWhiteSpace parsed then
+            invalidArg argument $"missing {argument}"
+
+        parsed
+
     let private optionObj (value: 'a option) : obj =
         match value with
         | None -> null
@@ -50,6 +60,113 @@ module CursorSurface =
             let item = field value name
             if isNullish item then None else Some item)
         |> Option.defaultValue null
+
+    let private participantIdentityOf (value: obj) : ParticipantIdentityEvidence =
+        if isNullish value then
+            invalidArg "identitySeed.participantIdentity" "missing identitySeed.participantIdentity"
+
+        let roleLabel =
+            requiredText "identitySeed.participantIdentity.canonicalRole" (field value "canonicalRole")
+
+        let role =
+            AgentRoleIdentity.roleOfString roleLabel
+            |> Option.defaultWith (fun () -> invalidArg "participantIdentity" $"unknown role '{roleLabel}'")
+            |> Some
+
+        let tierLabel =
+            requiredText "identitySeed.participantIdentity.selectedTier" (field value "selectedTier")
+
+        let initialTier =
+            ManagedAgentCatalog.tryParseTier tierLabel
+            |> Option.defaultWith (fun () -> invalidArg "participantIdentity" $"unknown tier '{tierLabel}'")
+
+        let originLabel =
+            requiredText "identitySeed.participantIdentity.origin" (field value "origin")
+
+        let origin =
+            match originLabel with
+            | "ResolvedAtRoot" -> PersonaOrigin.ResolvedAtRoot
+            | "InheritedFromOwner" -> PersonaOrigin.InheritedFromOwner
+            | _ -> invalidArg "participantIdentity" $"unknown persona origin '{originLabel}'"
+
+        { SelectedAgent = requiredText "identitySeed.participantIdentity.selectedAgent" (field value "selectedAgent")
+          PeerAgent = requiredText "identitySeed.participantIdentity.peerAgent" (field value "peerAgent")
+          Role = role
+          InitialTier = initialTier
+          Persona = requiredText "identitySeed.participantIdentity.persona" (field value "persona")
+          PersonaCatalogVersion = intValue (field value "personaCatalogVersion")
+          Origin = origin }
+        |> ParticipantIdentity.fromInput
+        |> Result.defaultWith (fun error -> invalidArg "participantIdentity" $"invalid participant identity: {error}")
+
+    let private identitySeedOf (value: obj) : PromptAuthority.IdentitySeed =
+        if isNullish value then
+            invalidArg "identitySeed" "missing identitySeed"
+
+        let participantIdentity = participantIdentityOf (field value "participantIdentity")
+        let identityInput = ParticipantIdentity.toInput participantIdentity
+        let ownerSession = field value "ownerSession"
+        let ownerLogicalRun = field value "ownerLogicalRun"
+        let ownerAuthorityRoot = field value "ownerAuthorityRoot"
+
+        let seedInput =
+            match requiredText "identitySeed.kind" (field value "kind") with
+            | "RootSelection" ->
+                if
+                    not (isNullish ownerSession)
+                    || not (isNullish ownerLogicalRun)
+                    || not (isNullish ownerAuthorityRoot)
+                then
+                    invalidArg "identitySeed" "RootSelection cannot carry inherited owner evidence"
+
+                PromptAuthority.IdentitySeedInput.RootSelectionInput identityInput
+            | "InheritedFromOwner" ->
+                PromptAuthority.IdentitySeedInput.InheritedFromOwnerInput
+                    { OwnerSessionId = SessionId.create (requiredText "identitySeed.ownerSession" ownerSession)
+                      OwnerLogicalRunId =
+                        LogicalRunId.create (requiredText "identitySeed.ownerLogicalRun" ownerLogicalRun)
+                      OwnerAuthorityRootUserMessageId =
+                        AuthorityRootUserMessageId.create (
+                            requiredText "identitySeed.ownerAuthorityRoot" ownerAuthorityRoot
+                        )
+                      ParticipantIdentity = identityInput }
+            | kind -> invalidArg "identitySeed" $"unknown identity seed kind '{kind}'"
+
+        PromptAuthority.rehydrateIdentitySeed seedInput
+        |> Result.defaultWith (fun error -> invalidArg "identitySeed" $"invalid identity seed: {error}")
+
+    let private participantIdentityView (identity: ParticipantIdentityEvidence) : obj =
+        box
+            {| selectedAgent = ParticipantIdentity.selectedAgent identity
+               peerAgent = ParticipantIdentity.peerAgent identity
+               canonicalRole = ParticipantIdentity.roleLabel identity
+               selectedTier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+               persona = ParticipantIdentity.persona identity
+               personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
+               origin =
+                match ParticipantIdentity.origin identity with
+                | PersonaOrigin.ResolvedAtRoot -> "ResolvedAtRoot"
+                | PersonaOrigin.InheritedFromOwner -> "InheritedFromOwner" |}
+
+    let private identitySeedView (seed: PromptAuthority.IdentitySeed) : obj =
+        let participantIdentity =
+            PromptAuthority.identitySeedParticipantIdentity seed |> participantIdentityView
+
+        match PromptAuthority.identitySeedOwner seed with
+        | None ->
+            box
+                {| kind = "RootSelection"
+                   ownerSession = null
+                   ownerLogicalRun = null
+                   ownerAuthorityRoot = null
+                   participantIdentity = participantIdentity |}
+        | Some(ownerSession, ownerLogicalRun, ownerAuthorityRoot) ->
+            box
+                {| kind = "InheritedFromOwner"
+                   ownerSession = SessionId.value ownerSession
+                   ownerLogicalRun = LogicalRunId.value ownerLogicalRun
+                   ownerAuthorityRoot = AuthorityRootUserMessageId.value ownerAuthorityRoot
+                   participantIdentity = participantIdentity |}
 
     let private offsetOf (value: obj) : AgentPairCursor.FallbackOffset =
         match intValue value with
@@ -217,31 +334,24 @@ module CursorSurface =
                read = (fun current -> projectionOf current |> projectionView) |}
 
     let authorityRootAccepted (value: obj) : obj =
+        let authorityKind = requiredText "authorityKind" (field value "authorityKind")
+        let identitySeed = identitySeedOf (field value "identitySeed")
+
+        match authorityKind, identitySeed with
+        | "HumanRoot", PromptAuthority.IdentitySeed.RootSelection _
+        | "AgentOwnerRoot", PromptAuthority.IdentitySeed.InheritedFromOwner _ -> ()
+        | "HumanRoot", _ -> invalidArg "identitySeed" "HumanRoot requires a RootSelection identity seed"
+        | "AgentOwnerRoot", _ -> invalidArg "identitySeed" "AgentOwnerRoot requires an inherited owner identity seed"
+        | kind, _ -> invalidArg "authorityKind" $"unknown authority kind '{kind}'"
+
         box
             {| kind = "AuthorityRootAccepted"
+               schemaVersion = 2
                session = text (field value "session")
                logicalRun = text (field value "logicalRun")
                authorityRoot = text (field value "authorityRoot")
-               authorityKind =
-                match text (field value "authorityKind") with
-                | "" -> "HumanRoot"
-                | kind -> kind
-               selectedAgent =
-                match text (field value "selectedAgent") with
-                | "" -> "fast-coder"
-                | agent -> agent
-               peerAgent =
-                match text (field value "peerAgent") with
-                | "" -> "deep-coder"
-                | agent -> agent
-               canonicalRole =
-                match text (field value "canonicalRole") with
-                | "" -> "coder"
-                | role -> role
-               selectedTier =
-                match text (field value "selectedTier") with
-                | "" -> "fast"
-                | tier -> tier |}
+               authorityKind = authorityKind
+               identitySeed = identitySeedView identitySeed |}
 
     let fallbackCursorAdvanced (value: obj) : obj =
         box
@@ -286,14 +396,12 @@ module CursorSurface =
         match text (field value "kind") with
         | "AuthorityRootAccepted" ->
             PromptFact.AuthorityRootAccepted
-                {| SessionId = SessionId.create (text (field value "session"))
-                   LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
-                   AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
-                   AuthorityKind = text (field value "authorityKind")
-                   SelectedAgent = text (field value "selectedAgent")
-                   PeerAgent = text (field value "peerAgent")
-                   CanonicalRole = text (field value "canonicalRole")
-                   SelectedTier = text (field value "selectedTier") |}
+                { SchemaVersion = 2
+                  SessionId = SessionId.create (text (field value "session"))
+                  LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
+                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
+                  AuthorityKind = text (field value "authorityKind")
+                  IdentitySeed = identitySeedOf (field value "identitySeed") }
         | "FallbackCursorAdvanced" ->
             FallbackFact.FallbackCursorAdvanced
                 {| SessionId = SessionId.create (text (field value "session"))
@@ -385,14 +493,25 @@ module CursorSurface =
         task {
             let runtime = PromptDispatcher.forJournal handle.Journal
 
-            let! result =
-                runtime.AcceptHumanRoot
-                    (SessionId.create session)
-                    (PhysicalUserMessageId.create physicalMessage)
-                    (Some agent)
+            let identitySeed =
+                ParticipantIdentity.resolveAtRoot agent
+                |> Result.map PromptAuthority.IdentitySeed.RootSelection
+                |> Result.mapError (sprintf "invalid participant identity: %A")
 
-            return
-                match result with
-                | Ok _ -> box {| ok = true; error = "" |}
-                | Error error -> box {| ok = false; error = error |}
+            match identitySeed with
+            | Error error -> return box {| ok = false; error = error |}
+            | Ok seed ->
+                let! result =
+                    runtime.AcceptHumanRoot
+                        (SessionId.create session)
+                        (PhysicalUserMessageId.create physicalMessage)
+                        (Some seed)
+
+                return
+                    match result with
+                    | Ok _ -> box {| ok = true; error = "" |}
+                    | Error error ->
+                        box
+                            {| ok = false
+                               error = PromptDispatcher.describeHumanRootAcceptanceFailure error |}
         }

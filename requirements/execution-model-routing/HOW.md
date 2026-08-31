@@ -38,20 +38,27 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
    - queue 以 typed capacity/supersession/session events 推进；满载产生 `CapacityQueueFull`，不产生 provider retry/fallback。
    - settlement 解释 `execution-failure-policy` 的 typed command，并以 exact fence 做 retain/release/transfer 的单次原子比较；不提供 count-based cleanup、timer expiry 或 session-wide release。
 
+6. **Immutable snapshot 与 fail-closed reconciliation**：
+   - capacity owner 在同一串行化边界复制 ledger、token state、exact custody、execution、waiter、lineage 与 transition counter，surface 递归冻结该值，不泄漏 dictionary、queue node 或 mutable handle。
+   - `CapacityReconciliation.decide : CapacityInvariantEvidence -> CapacityReconciliationDecision` 只比较 canonical evidence；合法状态返回 `NoOp`，ledger/map、owner/custody、state count 或 counter 不可能态返回 typed `FailClosed`。该函数不持有 runtime，因而不能 repair、清 counter/config 或推进 queue。
+   - commit、release、cancel 的唯一边界 outcome 为 `Applied | AlreadyApplied | StaleFence | Conflict`；同一 counter owner 只按后三类单调累加 duplicate/stale/conflict。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
 |---|---|
 | EMR-001 | `requirements/execution-model-routing/tests/scheduler-module-config.test.mjs` |
 | EMR-002 | `requirements/execution-model-routing/tests/scheduler-module-config.test.mjs` |
-| EMR-003 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs` |
+| EMR-003 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs`；`requirements/execution-model-routing/tests/capacity-restart-soak.test.mjs`；`requirements/execution-model-routing/tests/process-shared-routing.test.mjs` |
 | EMR-004 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs` |
 | EMR-005 | `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs` |
 | EMR-006 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs` |
 | EMR-007 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs`；`requirements/host-boundary/tests/provider-retry-host-edge.test.mjs` |
 | EMR-008 | `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs` |
-| EMR-009 | `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs` |
-| EMR-010 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs`；`requirements/execution-model-routing/tests/tool-provider-step-boundary.test.mjs` |
-| EMR-011 | `requirements/execution-model-routing/tests/durable-admission-order.test.mjs` |
-| EMR-012 | `requirements/execution-model-routing/tests/capacity-fence.test.mjs` |
-| EMR-013 | `requirements/execution-model-routing/tests/bounded-demand-queue.test.mjs` |
+| EMR-009 | `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs`；`requirements/execution-model-routing/tests/process-shared-routing-output.test.mjs` |
+| EMR-010 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs`；`requirements/execution-model-routing/tests/tool-provider-step-boundary.test.mjs`；`requirements/execution-model-routing/tests/capacity-soak.test.mjs` |
+| EMR-011 | `requirements/managed-chat-execution/tests/admission-transaction.test.mjs` |
+| EMR-012 | `requirements/execution-model-routing/tests/execution-admission-lease.test.mjs`；`requirements/execution-model-routing/tests/capacity-lifecycle.test.mjs` |
+| EMR-013 | `requirements/execution-model-routing/tests/admission-queue.test.mjs` |
+| EMR-014 | `requirements/execution-model-routing/tests/capacity-reconciliation.test.mjs`；`requirements/execution-model-routing/tests/capacity-soak.test.mjs` |
+| EMR-015 | `requirements/execution-model-routing/tests/diagnostics.test.mjs` |

@@ -41,6 +41,8 @@ PersistenceFailure(NotCommitted | Committed | Unknown)
 
 `ProviderTransient` 与 `ProviderPermanent` 是仅有可进入 provider retry/fallback 裁决的类别。策略还必须结合 durable budget、breaker 与 request kind 明确选择 `NoRetry | RetryFreshAttempt` 及 `NoFallback | AdvanceFallback`；类别本身不保证一定继续。其余类别始终输出 `NoRetry + NoFallback`。特别地，`AcceptanceUnknown` 只能进入 durable reconciliation，`StreamInterruptedAfterFirstToken` 不得自动重放可能已产生可见 token 的 effect。
 
+任一 `RetryFreshAttempt` / `AdvanceFallback` 必须携带不可由 caller 构造的 authorization，精确绑定一个稳定 logical operation (`LogicalRunId`)、本次 physical attempt (`ProviderRunIdentity`)、request kind 与稳定 policy decision identity。duplicate observation 复用同一 decision identity；下一次真实物理 attempt 必须由 Host 建立 fresh `ProviderRunIdentity`，logical idempotency identity 保持不变。
+
 ## EXECFAIL-004: 容量结算只作用于 exact opaque fence
 
 策略依据 typed ownership 输出 `NoCapacitySettlement | RetainExactFence | ReleaseExactFence`。`ReleaseExactFence` 必须携带本次 admission 所得的不可伪造 fence identity，并由 `execution-model-routing` 原子消费；无 fence、旧 epoch、错误 target 或错误 physical message 均不得释放任何容量。fatality、取消、supersede 与失败恢复都不能使用计数减一、session-wide release 或 best-effort cleanup 代替 exact settlement。

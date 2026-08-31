@@ -16,11 +16,23 @@ test('WHAT[HOST-BOUNDARY-021] HOST_021_plugin_load_graph_has_no_semantic_recover
 
   assert.doesNotMatch(boot, /restoreSessionParents/)
   assert.doesNotMatch(boot, /HookDispatcher\.ensure/)
+  assert.doesNotMatch(boot, /PluginRecoveryWiring\.attach/)
 
   assert.doesNotMatch(signal, /\.Recover\(\)/)
   assert.doesNotMatch(signal, /FissionHost\.recoverGroups/)
   assert.doesNotMatch(workspaceStore, /JsToolsTransactionStore\.recoverCurrent/)
-  assert.doesNotMatch(spike, /PluginRecoveryWiring\.attach/)
+
+  // PluginRecoveryWiring.attach is registration, not recovery execution: load
+  // installs one durability-activation callback and the callback owns the later
+  // background lifecycle notifications. SpikePlugin must not invoke those
+  // lifecycle events directly.
+  assert.match(spike, /PluginRecoveryWiring\.attach boot/)
+  assert.doesNotMatch(spike, /SignalChatRecovery|PluginRuntimeReloaded|CapacityProjectionReplayed/)
+  assert.match(
+    recoveryWiring,
+    /scope\.AttachDurabilityActivation\(fun \(\) ->\s*scope\.RunBackground\(fun \(\) ->/,
+  )
+  assert.equal([...recoveryWiring.matchAll(/AttachDurabilityActivation/g)].length, 1)
   assert.doesNotMatch(recoveryWiring, /restoreLinkedChildren|recoverFamilyDirect|defaultRecoverPromptClaims|defaultRecoverBlogger/)
 })
 

@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Foundation
+open Wanxiangshu.Participant.Persona
 
 type SessionPromptOptions = OpenCodePromptOptions
 
@@ -212,7 +213,9 @@ type InjectedSessionPort
         // reusable container, and the async prompt enqueue must never wait for a
         // provider slot. The sole model/capacity owner is chat.message, where the
         // Host is actually preparing this physical user message for execution.
-        if managedChild sessionId then
+        if SessionExecutionBinding.isUnboundHostAuxiliaryChild sessionId then
+            Ok opts
+        elif managedChild sessionId then
             SessionExecutionBinding.prepareManagedPrompt sessionId opts
         else
             SessionExecutionBinding.prepareUserFacingPrompt sessionId opts
@@ -238,13 +241,20 @@ type InjectedSessionPort
         | Error error -> Task.FromResult(Fatal error)
         | Ok sendOptions -> sendAvailablePort sessionId text sendOptions
 
+    let bindSiblingExecution (ownerSessionId: SessionId) (laneId: SessionId) (agent: string option) =
+        match agent with
+        | Some name when ManagedAgentCatalog.isBookkeeperName name ->
+            SessionExecutionBinding.bind ownerSessionId laneId agent
+        | _ ->
+            SessionExecutionBinding.bindInternalRoot laneId agent
+            ModelRouting.bindCapacityChild ownerSessionId laneId
+
+        ProviderLanguageBinding.ensureInherited ownerSessionId laneId |> ignore
+
     let bindSiblingLane (port: IOpenCodePort) (ownerSessionId: SessionId) (laneId: SessionId) (agent: string option) =
         taskResult {
             try
-                SessionExecutionBinding.bindInternalRoot laneId agent
-                ModelRouting.bindCapacityChild ownerSessionId laneId
-                PersonaBinding.ensureInherited ownerSessionId laneId |> ignore
-                ProviderLanguageBinding.ensureInherited ownerSessionId laneId |> ignore
+                bindSiblingExecution ownerSessionId laneId agent
                 return laneId
             with ex ->
                 do!
@@ -287,7 +297,6 @@ type InjectedSessionPort
             let! childId = port.CreateChildSession hostParentId options
             registerChild rootId childId
             SessionExecutionBinding.bind parentId childId options.Agent
-            PersonaBinding.ensureInherited parentId childId |> ignore
             // HOST-026: inherit owner/commissioner language (parentId), not family root.
             ProviderLanguageBinding.ensureInherited parentId childId |> ignore
             return childId

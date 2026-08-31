@@ -12,7 +12,12 @@ import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.j
 import * as fetchSurface from '../../../dist/Repository/Knowledge/Casebook/FetchSurface.js'
 import * as index from '../../../dist/Repository/Knowledge/Casebook/IndexSurface.js'
 import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
-import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
+import {
+  CANONICAL_A,
+  CANONICAL_Q,
+  installBookkeeperRuntime,
+  scriptedBookkeeperPort,
+} from './bookkeeper-session.test.mjs'
 
 const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
 const sandbox = () => {
@@ -46,7 +51,7 @@ test('WHAT[KNOWLEDGE-REUSE-004] CASE004_fetch_uses_shelfmark_and_replays_before_
 
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
     const { port, createCalls, programCalls } = scriptedBookkeeperPort()
-    bookkeeper.setSessionPort(port)
+    await installBookkeeperRuntime(port, ['s1'])
     const afterChange = await execute(tool, shelfmark)
     assertRefreshed(afterChange)
 
@@ -60,7 +65,7 @@ test('WHAT[KNOWLEDGE-REUSE-004] CASE004_fetch_uses_shelfmark_and_replays_before_
     assertNoCase(missing)
 
   } finally {
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
     cleanup()
   }
 })

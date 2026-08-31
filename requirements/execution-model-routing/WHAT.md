@@ -64,3 +64,11 @@ Managed chat execution 必须先为 exact `(SessionId, PhysicalUserMessageId)` d
 ## EMR-013: Pending demand 是 bounded typed queue
 
 `null` 或暂不可 acquire 的已接受 demand 只能进入有明确上限的 typed queue；entry 必须携带 exact `(SessionId, PhysicalUserMessageId)`、resolved target、lineage 与 supersession identity。队列满返回 typed `CapacityQueueFull` 并交给 failure policy，绝不得丢弃、无限扩容、解析错误文本后 retry/fallback，或借 wall-clock timeout 清退。capacity release、exact supersede、session deletion 与 shutdown 是队列重算/移除事件；队列 correctness 不依赖 polling、sleep 或 elapsed time。
+
+## EMR-014: Capacity snapshot 与 reconciliation 只观察、绝不修复
+
+Capacity owner 必须发布不可变 snapshot：ledger entry、token state、exact execution owner、pending waiter、lineage 与单调 duplicate/stale/conflict transition counter。始终满足 `0 <= active <= ledger entries`，且每个 token、waiter 与 map owner 均可追溯到 snapshot 内同一 exact identity。纯 `Evidence -> Decision` reconciliation 对合法 evidence 返回 `NoOp`；任何 map/ledger divergence、无 owner token/waiter 或不可能计数返回 typed `FailClosed`，不得自动补删 ledger/map、清零 counter/config 或借时间推断。release、commit、cancel 仅返回封闭 outcome `Applied | AlreadyApplied | StaleFence | Conflict`；duplicate 不得二次递减，旧 fence 不得触碰新 execution。
+
+## EMR-015: Reliability query 复用 capacity owner snapshot
+
+Reliability query 的 queue depth、active lease 与 duplicate/stale/conflict fence 数必须逐字段投影 EMR-014 immutable snapshot；diagnostic 模块严禁维护第二份 capacity/release counter、重算不同公式、reset/repair owner state 或把 query result 反馈给 routing。`CapacityQueueFull` observation 是缺失的 process-local monotonic diagnostic counter，只用于观测，不授权 retry/fallback。

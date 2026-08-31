@@ -93,7 +93,7 @@ test('WHAT[STRUCTURED-WORKFLOW-007] every obligation-table vocabulary is a real 
     ['ManagerIdle.encourageLabor', 'Mission/Manager/Idle.fs'],
     ['ReviewerContinuation.ensurePerfectConfirmed', 'Mission/Review/Judgement/Continuation.fs'],
     ['ReviewBarrierWorkflow.reverify', 'Mission/Review/Barrier/Reverify.fs'],
-    ['FallbackLedger.recordConfirmedFailure', 'Participant/Provider/Attempt/Fallback/Ledger.fs'],
+    ['FallbackLedger.recordAuthorizedFailure', 'Participant/Provider/Attempt/Fallback/Ledger.fs'],
     ['ProviderRecoveryWorkflow.continueAfterConfirmedFailure', 'Participant/Provider/Attempt/Fallback/Workflow.fs'],
     ['FinalityCohort.reviewUntilFirstRevisionOrAllConfirmed', 'Mission/Finality/Cohort.fs'],
     ['SessionRecoveryWorkflow.recoverFamilyDirect', 'Execution/Session/Recovery/Workflow.fs'],

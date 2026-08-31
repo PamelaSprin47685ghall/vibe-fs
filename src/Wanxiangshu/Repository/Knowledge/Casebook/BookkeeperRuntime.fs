@@ -54,7 +54,6 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Strength
@@ -82,21 +81,35 @@ module BookkeeperRuntime =
           OwnerSessionId: string
           Attachment: AttachmentKind }
 
+    type private Runtime =
+        { Sessions: ISessionHostPort
+          ResolveActiveOwner: SessionId -> PromptAuthority.AuthorityExecutionProfile option }
+
     let private gate = obj ()
     // DSL-MUTABLE: resource
-    let mutable private sessionPort: ISessionHostPort option = None
+    let mutable private runtime: Runtime option = None
     let private live = Dictionary<string, LiveAttachment>()
+    let private pendingPromptAuthorizations = Dictionary<string, string * string>()
 
-    [<Literal>]
-    let CompletionTimeoutMs = 600_000
+    let private pendingCompletions =
+        Dictionary<string, TaskCompletionSource<Result<unit, string>>>()
 
-    let setSessionPort (port: ISessionHostPort) : unit =
-        lock gate (fun () -> sessionPort <- Some port)
-
-    let resetSessionPort () : unit =
+    let setRuntime
+        (sessions: ISessionHostPort)
+        (resolveActiveOwner: SessionId -> PromptAuthority.AuthorityExecutionProfile option)
+        : unit =
         lock gate (fun () ->
-            sessionPort <- None
-            live.Clear())
+            runtime <-
+                Some
+                    { Sessions = sessions
+                      ResolveActiveOwner = resolveActiveOwner })
+
+    let resetRuntime () : unit =
+        lock gate (fun () ->
+            runtime <- None
+            live.Clear()
+            pendingPromptAuthorizations.Clear()
+            pendingCompletions.Clear())
 
     let bindSession (sessionId: string) (txId: string) (ownerSessionId: string) : unit =
         lock gate (fun () ->
@@ -106,7 +119,39 @@ module BookkeeperRuntime =
                   Attachment = AttachmentKind.Bookkeeper txId })
 
     let unbindSession (sessionId: string) : unit =
-        lock gate (fun () -> live.Remove sessionId |> ignore)
+        lock gate (fun () ->
+            live.Remove sessionId |> ignore
+            pendingPromptAuthorizations.Remove sessionId |> ignore
+            pendingCompletions.Remove sessionId |> ignore)
+
+    let private authorizePrompt (sessionId: SessionId) (agent: string) (text: string) =
+        lock gate (fun () -> pendingPromptAuthorizations.[SessionId.value sessionId] <- agent, text)
+
+    let tryConsumePromptAuthorization
+        (sessionId: SessionId)
+        (explicitAgent: string option)
+        (text: string option)
+        : bool =
+        lock gate (fun () ->
+            let key = SessionId.value sessionId
+
+            match pendingPromptAuthorizations.TryGetValue key, explicitAgent, text with
+            | (true, (expectedAgent, expectedText)), Some agent, Some payload when
+                agent = expectedAgent && payload = expectedText
+                ->
+                pendingPromptAuthorizations.Remove key |> ignore
+                true
+            | _ -> false)
+
+    let completePhysical (sessionId: SessionId) (outcome: Result<unit, string>) : unit =
+        let completion =
+            lock gate (fun () ->
+                match pendingCompletions.TryGetValue(SessionId.value sessionId) with
+                | true, pending -> Some pending
+                | false, _ -> None)
+
+        completion
+        |> Option.iter (fun pending -> AsyncSupport.trySetResult pending outcome |> ignore)
 
     let tryTxId (sessionId: string) : string option =
         lock gate (fun () ->
@@ -122,7 +167,7 @@ module BookkeeperRuntime =
     let isAttached (sessionId: string) : bool =
         lock gate (fun () -> live.ContainsKey sessionId)
 
-    let private currentPort () : ISessionHostPort option = lock gate (fun () -> sessionPort)
+    let private currentRuntime () : Runtime option = lock gate (fun () -> runtime)
 
     let private systemInstructions (ownerSessionId: string) =
         PromptResources.bookkeeperInstructionTextsFor (ProviderProse.languageOf (SessionId.create ownerSessionId))
@@ -207,18 +252,14 @@ module BookkeeperRuntime =
         )
         |> LlmFacing.render
 
+    let private canonicalAgent = ManagedAgentCatalog.bookkeeperNameOf AgentTier.Fast
+
     let private childOptions (txId: string) : OpenCodeChildOptions =
         { Title = Some("bookkeeper:" + txId)
-          Agent = Some "fast-inspector"
+          Agent = Some canonicalAgent
           Directory = None }
 
-    let private promptOptions: OpenCodePromptOptions =
-        { Model = None
-          Agent = Some "fast-inspector"
-          Directory = None
-          Metadata = None
-          Tools = Some(Map.ofList [ "*", false; "js-bookkeeper", true ])
-          BindingIntent = SessionBindingIntent.Preserve }
+    let private exactTools = Map.ofList [ "*", false; "js-bookkeeper", true ]
 
     let private retire (sessions: ISessionHostPort) (childId: SessionId) : Task<unit> =
         task {
@@ -240,14 +281,6 @@ module BookkeeperRuntime =
         | TerminalOutcome.Failed stop -> AsyncSupport.trySetResult completion (Error stop.Reason) |> ignore
         | TerminalOutcome.Aborted stop -> AsyncSupport.trySetResult completion (Error stop.Reason) |> ignore
 
-    let private sendFailureOf =
-        function
-        | Retryable reason -> Some reason
-        | Fatal reason -> Some reason
-        | AcceptanceUnknown reason -> Some reason
-        | AdmittedWithReceipt _
-        | AdmittedWithPhysicalMessage _ -> None
-
     let private awaitCompletion
         (sessions: ISessionHostPort)
         (txId: string)
@@ -256,15 +289,7 @@ module BookkeeperRuntime =
         (disposeSub: unit -> unit)
         : Task<Result<string * string, string>> =
         task {
-            let timedOut: Task<Result<unit, string>> =
-                emitJsExpr
-                    CompletionTimeoutMs
-                    "new Promise(function (resolve) { var t = setTimeout(function () { resolve({ tag: 1, fields: ['bookkeeper transaction timed out'] }); }, $0); if (t && typeof t.unref === 'function') t.unref(); })"
-
-            let finished = completion.Task
-
-            let! waited = (emitJsExpr (finished, timedOut) "Promise.race([$0, $1])": Task<Result<unit, string>>)
-
+            let! waited = completion.Task
             disposeSub ()
 
             match waited with
@@ -278,23 +303,75 @@ module BookkeeperRuntime =
                 return taken
         }
 
-    let private runChild
+    [<RequireQualifiedAccess>]
+    type private BookkeeperPromptReceiptDecision =
+        | AwaitTerminal
+        | Reject of string
+
+    let private decideBookkeeperPromptReceipt (outcome: SendOutcome) : BookkeeperPromptReceiptDecision =
+        match outcome with
+        | Retryable reason
+        | Fatal reason
+        | AcceptanceUnknown reason -> BookkeeperPromptReceiptDecision.Reject reason
+        | AdmittedWithReceipt _
+        | AdmittedWithPhysicalMessage _ -> BookkeeperPromptReceiptDecision.AwaitTerminal
+
+    let private settleBookkeeperPromptReceipt
         (sessions: ISessionHostPort)
         (txId: string)
         (childId: SessionId)
+        (disposeSub: unit -> unit)
+        (decision: BookkeeperPromptReceiptDecision)
+        : Task<Result<unit, string>> =
+        match decision with
+        | BookkeeperPromptReceiptDecision.AwaitTerminal -> Task.FromResult(Ok())
+        | BookkeeperPromptReceiptDecision.Reject reason ->
+            task {
+                disposeSub ()
+                BookkeeperStaging.abort txId
+                do! retire sessions childId
+                return Error reason
+            }
+
+    let private sendBookkeeperPrompt
+        (sessions: ISessionHostPort)
+        (txId: string)
+        (childId: SessionId)
+        (completion: TaskCompletionSource<Result<unit, string>>)
+        (disposeSub: unit -> unit)
+        (promptText: string)
+        (promptOptions: OpenCodePromptOptions)
+        : Task<Result<string * string, string>> =
+        taskResult {
+            let! receipt = sessions.SendPrompt(childId, promptText, promptOptions) |> TaskResultCE.ofTask
+
+            let receiptDecision = decideBookkeeperPromptReceipt receipt
+            do! settleBookkeeperPromptReceipt sessions txId childId disposeSub receiptDecision
+            return! awaitCompletion sessions txId childId completion disposeSub
+        }
+
+    let private runChild
+        (runtime: Runtime)
+        (identitySeed: PromptAuthority.IdentitySeed)
+        (txId: string)
+        (childId: SessionId)
         (kind: BookkeeperRequest)
-        (ownerSessionId: string)
+        (ownerSessionId: SessionId)
         (q: string)
         (a: string)
         (observations: Observation list)
         (extraTranscript: string option)
         : Task<Result<string * string, string>> =
         task {
+            let sessions = runtime.Sessions
             let childKey = SessionId.value childId
-            bindSession childKey txId ownerSessionId
+            let ownerKey = SessionId.value ownerSessionId
+            bindSession childKey txId ownerKey
 
             let completion =
                 TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            lock gate (fun () -> pendingCompletions.[childKey] <- completion)
 
             // DSL-MUTABLE: subscription — bookkeeper terminal subscription
             let mutable subscription: System.IDisposable option = None
@@ -302,54 +379,79 @@ module BookkeeperRuntime =
             subscription <-
                 Some(sessions.SubscribeTerminal(childId, (fun _ outcome -> completeOnOutcome completion outcome)))
 
-            let promptText = envelope kind ownerSessionId q a observations extraTranscript
-            let! sent = sessions.SendPrompt(childId, promptText, promptOptions)
-
             let disposeSub () =
                 subscription |> Option.iter (fun active -> active.Dispose())
                 subscription <- None
+                lock gate (fun () -> pendingCompletions.Remove childKey |> ignore)
 
-            match sendFailureOf sent with
-            | Some reason ->
+            let activeOwner = runtime.ResolveActiveOwner ownerSessionId
+
+            match PromptAuthority.validateInheritedIdentitySeedAgainstActiveOwner activeOwner identitySeed with
+            | Error rejection ->
                 disposeSub ()
                 BookkeeperStaging.abort txId
                 do! retire sessions childId
-                return Error reason
-            | None -> return! awaitCompletion sessions txId childId completion disposeSub
+                return Error(sprintf "bookkeeper identity seed rejected: %A" rejection)
+            | Ok participantIdentity ->
+                let promptOptions: OpenCodePromptOptions =
+                    { Model = None
+                      Agent = Some(ParticipantIdentity.selectedAgent participantIdentity)
+                      Directory = None
+                      Metadata = None
+                      Tools = Some exactTools
+                      BindingIntent = SessionBindingIntent.Preserve }
+
+                let promptText = envelope kind ownerKey q a observations extraTranscript
+                authorizePrompt childId (ParticipantIdentity.selectedAgent participantIdentity) promptText
+
+                return! sendBookkeeperPrompt sessions txId childId completion disposeSub promptText promptOptions
         }
 
-    let private runWithPort
-        (sessions: ISessionHostPort)
+    let private activeOwnerProfile (runtime: Runtime) (ownerSessionId: SessionId) =
+        match runtime.ResolveActiveOwner ownerSessionId with
+        | Some profile -> Ok profile
+        | None -> Error "bookkeeper owner has no active authority profile"
+
+    let private runWithRuntime
+        (runtime: Runtime)
         (kind: BookkeeperRequest)
-        (ownerSessionId: string)
+        (ownerSessionId: SessionId)
         (q: string)
         (a: string)
         (observations: Observation list)
         (extraTranscript: string option)
         : Task<Result<string * string, string>> =
         task {
-            let txId = Guid.NewGuid().ToString("N")
-            BookkeeperStaging.beginTransaction txId q a
+            match
+                activeOwnerProfile runtime ownerSessionId
+                |> Result.bind (fun profile ->
+                    PromptAuthority.issueInheritedIdentitySeed canonicalAgent profile
+                    |> Result.mapError (sprintf "invalid bookkeeper identity seed: %A"))
+            with
+            | Error error -> return Error error
+            | Ok identitySeed ->
+                let txId = Guid.NewGuid().ToString("N")
+                BookkeeperStaging.beginTransaction txId q a
 
-            let! created = sessions.CreateSiblingSession(SessionId.create ownerSessionId, None, childOptions txId)
-
-            match created with
-            | Error err ->
-                BookkeeperStaging.abort txId
-                return Error err
-            | Ok childId -> return! runChild sessions txId childId kind ownerSessionId q a observations extraTranscript
+                match! runtime.Sessions.CreateSiblingSession(ownerSessionId, None, childOptions txId) with
+                | Error error ->
+                    BookkeeperStaging.abort txId
+                    return Error error
+                | Ok childId ->
+                    return!
+                        runChild runtime identitySeed txId childId kind ownerSessionId q a observations extraTranscript
         }
 
     let runTransaction
         (kind: BookkeeperRequest)
-        (ownerSessionId: string)
+        (ownerSessionId: SessionId)
         (q: string)
         (a: string)
         (observations: Observation list)
         (extraTranscript: string option)
         : Task<Result<string * string, string>> =
         task {
-            match currentPort () with
-            | None -> return Error "bookkeeper session port unavailable"
-            | Some sessions -> return! runWithPort sessions kind ownerSessionId q a observations extraTranscript
+            match currentRuntime () with
+            | None -> return Error "bookkeeper runtime unavailable"
+            | Some runtime -> return! runWithRuntime runtime kind ownerSessionId q a observations extraTranscript
         }

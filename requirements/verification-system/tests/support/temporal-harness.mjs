@@ -272,6 +272,22 @@ export const createRecordedProviderPort = () => {
 
 export const foldEnvelopes = (envelopes) => temporal.fold(envelopes)
 
+export const ROOT_SELECTION_IDENTITY_SEED = {
+  Kind: 'RootSelection',
+  OwnerSessionId: null,
+  OwnerLogicalRunId: null,
+  OwnerAuthorityRootUserMessageId: null,
+  ParticipantIdentity: {
+    SelectedAgent: 'fast-coder',
+    PeerAgent: 'deep-coder',
+    Role: 'coder',
+    InitialTier: 'Fast',
+    Persona: 'Coder',
+    PersonaCatalogVersion: 1,
+    Origin: 'ResolvedAtRoot',
+  },
+}
+
 export const envelopesForSession = (
   session,
   facts,
@@ -291,18 +307,16 @@ export const envelopesForSession = (
   })
 
 export const fallbackFacts = {
-  authorityRoot: ({ session = 'ses_a', logical = 'run_L', root = 'msg_u1', kind = 'HumanRoot' } = {}) => ({
+  authorityRoot: ({ session = 'ses_a', logical = 'run_L', root = 'msg_u1' } = {}) => ({
     family: 'Prompt',
     case: 'AuthorityRootAccepted',
     payload: {
+      SchemaVersion: 2,
       SessionId: session,
       LogicalRunId: logical,
       AuthorityRootUserMessageId: root,
-      AuthorityKind: kind,
-      SelectedAgent: 'fast-coder',
-      PeerAgent: 'deep-coder',
-      CanonicalRole: 'coder',
-      SelectedTier: 'fast',
+      AuthorityKind: 'HumanRoot',
+      IdentitySeed: ROOT_SELECTION_IDENTITY_SEED,
     },
   }),
 

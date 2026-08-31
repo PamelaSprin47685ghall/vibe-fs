@@ -18,6 +18,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Execution.Failure
 
 /// One successful fold after append. Wake payload for revision subscribers.
 /// No retained history: only the latest change is kept for the recheck path.
@@ -30,18 +31,17 @@ type MagicTodoAppendReceipt =
       Projection: ProjectionSet }
 
 type JournalAppendFailure =
-    /// PERSIST-002 / PERSIST-003: the write did not complete cleanly. Whether it
-    /// landed is unknown, so the runtime must fail closed and reconcile.
     | WriteUnknown of EventId * JournalFailure
-    /// The caller's event never reached the physical append boundary. This is
-    /// known-not-committed and must not masquerade as storage uncertainty.
     | WriterUnavailable of EventId * JournalUnavailable
-    /// The fact and its ProjectionCutTail reset are both durable. The writer may
-    /// be reusable after restart, but the current process is no longer trusted:
-    /// live append admission trips the process-level invariant fuse immediately.
     | FactRejected of EventId * FoldRejection
 
 module JournalAppendFailure =
+
+    let toExecutionFailure =
+        function
+        | WriterUnavailable _ -> ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted
+        | FactRejected _ -> ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
+        | WriteUnknown _ -> ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown
 
     /// Diagnostic rendering (HOST-007). The ONE place a failed append becomes a
     /// string.

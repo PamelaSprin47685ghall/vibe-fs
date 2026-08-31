@@ -232,24 +232,30 @@ module FissionTool =
         (payload: string)
         =
         task {
-            let dispatcher = PromptDispatcher.forJournal durable
+            let laneProfile =
+                PromptAuthorityLedger.activeProfile lane.SessionId (AgentJournal.snapshot durable).AgentProjections
 
-            match!
-                dispatcher.SendContinuation
-                    scope.Sessions
-                    lane.SessionId
-                    (deliveryPrompt owner completionId payload)
-                    PromptAuthority.ContinuationKind.FissionHandoff
-                    profile
-                    effectiveAgent
-                    (scope.DirectoryFor(SessionId.value lane.SessionId))
-                    PromptDispatcher.AwaitMode.Detached
-                    None
-            with
-            | Error _ -> return ()
-            | Ok _ ->
-                let! _ = appendDelivery durable owner None groupId completionId lane.Index
-                return ()
+            match laneProfile with
+            | None -> return ()
+            | Some activeLaneProfile ->
+                let dispatcher = PromptDispatcher.forJournal durable
+
+                match!
+                    dispatcher.SendContinuation
+                        scope.Sessions
+                        lane.SessionId
+                        (deliveryPrompt owner completionId payload)
+                        PromptAuthority.ContinuationKind.FissionHandoff
+                        activeLaneProfile
+                        activeLaneProfile.SelectedAgent
+                        (scope.DirectoryFor(SessionId.value lane.SessionId))
+                        PromptDispatcher.AwaitMode.Detached
+                        None
+                with
+                | Error _ -> return ()
+                | Ok _ ->
+                    let! _ = appendDelivery durable owner None groupId completionId lane.Index
+                    return ()
         }
 
     let private deliverLaneBody
@@ -681,35 +687,49 @@ module FissionTool =
                 return Ok laneId
         }
 
+    let private classifyLanePublicRole =
+        function
+        | Some role -> Ok role
+        | None -> Error "identity-seed-not-public"
+
+    let private admitLanePublicRole activeOwner identitySeed =
+        PromptAuthority.validateInheritedIdentitySeedAgainstActiveOwner activeOwner identitySeed
+        |> Result.mapError string
+        |> Result.bind (ParticipantIdentity.role >> classifyLanePublicRole)
+
     let private startLanePort
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         (directory: string option)
         (laneId: SessionId)
         (startup: string)
         =
-        task {
-            scope.RunStarted laneId profile.CanonicalRole directory
-            do! XTraceCapture.captureOpening scope.Journal laneId startup []
+        taskResult {
+            let activeOwner =
+                PromptAuthorityLedger.activeProfile profile.SessionId (AgentJournal.snapshot durable).AgentProjections
+
+            let! role = admitLanePublicRole activeOwner identitySeed
+            scope.RunStarted laneId role directory
+
+            do!
+                XTraceCapture.captureOpening scope.Journal laneId startup []
+                |> TaskResultCE.ofTask
 
             let dispatcher = PromptDispatcher.forJournal durable
 
-            match!
-                dispatcher.SendContinuation
+            let! _ =
+                dispatcher.SendAgentOwnerRoot
                     scope.Sessions
                     laneId
                     startup
-                    PromptAuthority.ContinuationKind.FissionHandoff
-                    profile
-                    effectiveAgent
+                    identitySeed
                     directory
                     PromptDispatcher.AwaitMode.Detached
                     None
-            with
-            | Ok _ -> return Ok()
-            | Error error -> return Error error
+
+            return ()
         }
 
     let private abortLanePort (scope: ToolRuntimeScope) (laneId: SessionId) =
@@ -790,6 +810,14 @@ module FissionTool =
         }
         :> Task
 
+    let private classifyAdmissionOutcome =
+        function
+        | Error FissionRejectReason.InvalidOrigin -> Error Path.InvalidOrigin
+        | Error FissionRejectReason.AlreadyFissioned -> Error Path.AlreadyActive
+        | Error FissionRejectReason.CapacityExceeded -> Error Path.Capacity
+        | Error _ -> Error Path.Unavailable
+        | Ok admission -> Ok admission
+
     let private runAdmission
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
@@ -805,49 +833,57 @@ module FissionTool =
         =
         task {
             let effectiveAgent = currentEffectiveAgent profile ctx
-            let groupId = groupIdFor owner toolCallId
 
-            let directory =
-                scope.DirectoryFor ctx.SessionId |> Option.orElse scope.WorkspaceDirectory
-
-            let preCompletionIds =
-                (preAgents |> List.map (fst >> FissionExternalId.agent))
-                @ (prePtys |> List.map FissionExternalId.pty)
-
-            let deps: FissionAdmissionDependencies =
-                { ParentOf = scope.Sessions.TryGetParentSession
-                  OwnerWorkRecord = parentWorkRecordPort scope
-                  CreateLane = createLanePort scope groupId owner effectiveAgent directory parsed.Count
-                  StartLane = startLanePort scope durable profile effectiveAgent directory
-                  AbortLane = abortLanePort scope
-                  SilentInterruptOwner = silentInterruptOwnerPort scope }
-
-            let hooks: FissionAdmissionHooks =
-                { OnLanesCreated =
-                    onLanesCreatedHook durable groupId toolCallId parsed.Count preCompletionIds ctx.ProviderRunId
-                  OnFailed = onFailedHook durable groupId ctx.ProviderRunId }
-
-            let admissionRuntime = FissionAdmission.createWithHooks deps hooks
-
-            match! FissionAdmission.admit admissionRuntime owner parsed with
-            | Error FissionRejectReason.InvalidOrigin -> return consequence language Path.InvalidOrigin
-            | Error FissionRejectReason.AlreadyFissioned -> return consequence language Path.AlreadyActive
-            | Error FissionRejectReason.CapacityExceeded -> return consequence language Path.Capacity
+            match PromptAuthority.issueInheritedIdentitySeed effectiveAgent profile with
             | Error _ -> return consequence language Path.Unavailable
-            | Ok admission ->
-                installPreFissionBroadcasts
-                    scope
-                    durable
-                    profile
-                    effectiveAgent
-                    groupId
-                    owner
-                    admission.Lanes
-                    preAgents
-                    prePtys
-                    ownerRuntime
+            | Ok identitySeed ->
+                let groupId = groupIdFor owner toolCallId
 
-                return tomlObject [ "status", TString "fissioned"; "lane_count", TInt parsed.Count ]
+                let directory =
+                    scope.DirectoryFor ctx.SessionId |> Option.orElse scope.WorkspaceDirectory
+
+                let preCompletionIds =
+                    (preAgents |> List.map (fst >> FissionExternalId.agent))
+                    @ (prePtys |> List.map FissionExternalId.pty)
+
+                let deps: FissionAdmissionDependencies =
+                    { ParentOf = scope.Sessions.TryGetParentSession
+                      OwnerWorkRecord = parentWorkRecordPort scope
+                      CreateLane = createLanePort scope groupId owner effectiveAgent directory parsed.Count
+                      StartLane = startLanePort scope durable profile identitySeed directory
+                      AbortLane = abortLanePort scope
+                      SilentInterruptOwner = silentInterruptOwnerPort scope }
+
+                let hooks: FissionAdmissionHooks =
+                    { OnLanesCreated =
+                        onLanesCreatedHook durable groupId toolCallId parsed.Count preCompletionIds ctx.ProviderRunId
+                      OnFailed = onFailedHook durable groupId ctx.ProviderRunId }
+
+                let admissionRuntime = FissionAdmission.createWithHooks deps hooks
+
+                let! admittedEffect =
+                    taskResult {
+                        let! admissionAttempt =
+                            FissionAdmission.admit admissionRuntime owner parsed |> TaskResultCE.ofTask
+
+                        let! admission = classifyAdmissionOutcome admissionAttempt
+
+                        installPreFissionBroadcasts
+                            scope
+                            durable
+                            profile
+                            effectiveAgent
+                            groupId
+                            owner
+                            admission.Lanes
+                            preAgents
+                            prePtys
+                            ownerRuntime
+
+                        return tomlObject [ "status", TString "fissioned"; "lane_count", TInt parsed.Count ]
+                    }
+
+                return admittedEffect |> Result.defaultWith (consequence language)
         }
 
     let private admitWhenEventPortReady
@@ -896,7 +932,10 @@ module FissionTool =
         (owner: SessionId)
         =
         task {
-            match scope.ActiveProfileFor owner, scope.RuntimeFor ctx with
+            let activeProfile =
+                PromptAuthorityLedger.activeProfile owner (AgentJournal.snapshot durable).AgentProjections
+
+            match activeProfile, scope.RuntimeFor ctx with
             | None, _
             | _, Error _ -> return consequence language Path.Unavailable
             | Some profile, Ok ownerRuntime ->

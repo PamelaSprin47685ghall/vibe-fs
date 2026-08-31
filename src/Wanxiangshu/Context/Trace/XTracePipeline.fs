@@ -29,7 +29,9 @@ module XTracePipeline =
         raise (InvalidOperationException reason)
 
     let private providerRetryOrigin =
-        PromptAuthority.originLabel (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ProviderRetryAttempt)
+        PromptAuthority.originLabel (
+            PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt
+        )
 
     let private isProviderRetryAttempt (rawMessage: obj) =
         ProviderWireDecode.promptOriginOfMessage rawMessage = Some providerRetryOrigin

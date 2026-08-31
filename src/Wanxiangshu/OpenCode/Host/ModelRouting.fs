@@ -8,31 +8,29 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Resources
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Persistence.Journal
-
-type ModelRoutingTarget = { Model: string; Reasoning: string }
-
-[<RequireQualifiedAccess>]
-type ModelRoutingAcquisition =
-    | Acquired of ModelRoutingTarget
-    | Superseded
+open Wanxiangshu.Execution.Failure
+open Wanxiangshu.Execution.Session.ChatExecution
 
 type private ExecutionLease =
     { PhysicalUserMessageId: string option
       Agent: string
       Target: ModelRoutingTarget }
 
-type private PendingDemand =
-    { SessionId: string
-      PhysicalUserMessageId: string
-      Agent: string
-      PreviousTarget: ModelRoutingTarget option
-      Completion: TaskCompletionSource<ModelRoutingAcquisition> }
-
 module ModelRouting =
+
+    let internal failureOfExecutionAdmissionAcquisition =
+        function
+        | ExecutionAdmissionAcquisition.QueueFull -> Some ExecutionFailure.CapacityQueueFull
+        | ExecutionAdmissionAcquisition.Cancelled -> Some ExecutionFailure.UserCancelled
+        | ExecutionAdmissionAcquisition.Superseded -> Some ExecutionFailure.Superseded
+        | ExecutionAdmissionAcquisition.Admitted _
+        | ExecutionAdmissionAcquisition.Queued _ -> None
+
+    let internal capacityOwnership (lease: ExecutionAdmissionLease) =
+        lease
+        |> box
+        |> ExactCapacityFenceReference.Create
+        |> CapacityOwnership.OwnsExactFence
 
     [<Import("homedir", "node:os")>]
     let private homeDir () : string = jsNative
@@ -254,8 +252,9 @@ module ModelRouting =
     let private targetProvider (target: ModelRoutingTarget) =
         target.Model.Substring(0, target.Model.IndexOf '/')
 
-    type ModelRoutingRuntime(scheduler: obj) =
+    type internal ModelRoutingRuntime(scheduler: obj) =
         let gate = obj ()
+        let transitionCounters = CapacityTransitionCounters()
 
         let capacity =
             BorrowingCapacity<ModelRoutingTarget>(CapacityLedger<ModelRoutingTarget>(), targetProvider, (=))
@@ -263,9 +262,8 @@ module ModelRouting =
         let activeBySession = Dictionary<string, ExecutionLease>()
         // DSL-MUTABLE: resource — last physical target map per session
         let lastPhysicalTargetBySession = Dictionary<string, ModelRoutingTarget>()
-        let pending = ResizeArray<PendingDemand>()
-        // DSL-MUTABLE: resource — pending demand map per session
-        let pendingBySession = Dictionary<string, PendingDemand>()
+        let admissionQueue = ExecutionAdmissionQueue(gate, transitionCounters)
+        let admissionOwner = ExecutionCapacityOwner(transitionCounters)
         // DSL-MUTABLE: resource — process-local scheduler poison
         let mutable fatalError: exn option = None
 
@@ -278,33 +276,10 @@ module ModelRouting =
 
         let ensureHealthy () = fatalError |> Option.iter raise
 
-        let removeDemand demand =
-            pending.Remove demand |> ignore
-
-            match pendingBySession.TryGetValue demand.SessionId with
-            | true, current when obj.ReferenceEquals(current, demand) ->
-                pendingBySession.Remove demand.SessionId |> ignore
-            | _ -> ()
-
-        let cancelDemand demand =
-            removeDemand demand
-
-            AsyncSupport.trySetResult demand.Completion ModelRoutingAcquisition.Superseded
-            |> ignore
-
-        let failDemand (error: exn) (demand: PendingDemand) =
-            try
-                demand.Completion.SetException(error)
-            with _ ->
-                ()
-
         let poison (error: exn) =
             fatalError <- Some error
             capacity.Fail error
-            let waiting = pending |> Seq.toArray
-            pending.Clear()
-            pendingBySession.Clear()
-            waiting |> Array.iter (failDemand error)
+            admissionQueue.Fail error
 
         let scheduleOrPoison running agent previous =
             try
@@ -332,55 +307,63 @@ module ModelRouting =
                 poison ex
                 raise ex
 
-        let rememberExecution demand target =
+        let rememberExecution (demand: ExecutionAdmissionDemand) (target: ModelRoutingTarget) =
             activeBySession.[demand.SessionId] <-
                 { PhysicalUserMessageId = Some demand.PhysicalUserMessageId
-                  Agent = demand.Agent
+                  Agent = demand.EffectiveAgent
                   Target = target }
 
             lastPhysicalTargetBySession.[demand.SessionId] <- target
 
-        let commit demand target =
+        let commit (demand: ExecutionAdmissionDemand) (target: ModelRoutingTarget) =
             rememberExecution demand target
-            removeDemand demand
 
-            AsyncSupport.trySetResult demand.Completion (ModelRoutingAcquisition.Acquired target)
-            |> ignore
+            let identity: ExecutionAdmissionExactIdentity =
+                { SessionId = demand.SessionId
+                  PhysicalUserMessageId = demand.PhysicalUserMessageId
+                  EffectiveAgent = demand.EffectiveAgent
+                  Target = target }
 
-        let commitScheduled demand scheduled =
+            let lease =
+                capacity.ExactCredit(demand.SessionId, demand.PhysicalUserMessageId)
+                |> fun credit -> admissionOwner.Issue(identity, credit)
+
+            admissionQueue.Admit(demand.Node, lease) |> ignore
+
+        let commitScheduled (demand: ExecutionAdmissionDemand) (scheduled: ModelRoutingTarget option) =
             match scheduled with
             | None -> false
             | Some target ->
                 commit demand target
                 true
 
-        let schedulePendingDemand demand =
-            if pending.Contains demand then
-                routeFreshOrPoison demand.SessionId None demand.PhysicalUserMessageId demand.Agent demand.PreviousTarget
-                |> commitScheduled demand
-            else
-                false
+        let schedulePendingDemand (demand: ExecutionAdmissionDemand) =
+            routeFreshOrPoison
+                demand.SessionId
+                None
+                demand.PhysicalUserMessageId
+                demand.EffectiveAgent
+                demand.PreviousTarget
+            |> commitScheduled demand
 
         let rec drainDemands () =
             ensureHealthy ()
 
-            pending
-            |> Seq.toArray
+            admissionQueue.Snapshot()
             |> Array.map schedulePendingDemand
             |> Array.exists id
             |> continueDrain
 
         and continueDrain progressed =
-            if progressed && pending.Count > 0 then
+            if progressed && admissionQueue.Count > 0 then
                 drainDemands ()
 
         let retireCurrentExecution sessionId =
             let changed = activeBySession.Remove sessionId
-            capacity.ReleaseSession sessionId
+            capacity.ReleaseSession sessionId |> ignore
 
-            match pendingBySession.TryGetValue sessionId with
-            | true, demand -> cancelDemand demand
-            | false, _ -> ()
+            if admissionQueue.ContainsSession sessionId then
+                admissionQueue.CancelSession sessionId |> ignore
 
             if changed && fatalError.IsNone then
                 drainDemands ()
@@ -390,7 +373,7 @@ module ModelRouting =
                 match activeBySession.TryGetValue sessionId with
                 | true, lease when lease.PhysicalUserMessageId = Some physicalUserMessageId ->
                     let removed = activeBySession.Remove sessionId
-                    capacity.ReleasePhysical(sessionId, physicalUserMessageId)
+                    capacity.ReleasePhysical(sessionId, physicalUserMessageId) |> ignore
                     removed
                 | _ -> false
 
@@ -410,11 +393,22 @@ module ModelRouting =
                         observed
                 )
 
+        let issueAdmission sessionId physicalUserMessageId effectiveAgent target =
+            let identity: ExecutionAdmissionExactIdentity =
+                { SessionId = sessionId
+                  PhysicalUserMessageId = physicalUserMessageId
+                  EffectiveAgent = effectiveAgent
+                  Target = target }
+
+            capacity.ExactCredit(sessionId, physicalUserMessageId)
+            |> fun credit -> admissionOwner.Issue(identity, credit)
+            |> ExecutionAdmissionAcquisition.Admitted
+
         let reuseOrAdoptActiveExecution sessionId physicalUserMessageId agent (lease: ExecutionLease) =
             match lease.PhysicalUserMessageId with
             | Some current when current = physicalUserMessageId ->
                 requireSameAgent sessionId physicalUserMessageId lease.Agent agent
-                Some(Task.FromResult(ModelRoutingAcquisition.Acquired lease.Target))
+                Some(issueAdmission sessionId physicalUserMessageId agent lease.Target)
             | None ->
                 requireSameAgent sessionId physicalUserMessageId lease.Agent agent
 
@@ -426,17 +420,18 @@ module ModelRouting =
 
                 lastPhysicalTargetBySession.[sessionId] <- lease.Target
 
-                Some(Task.FromResult(ModelRoutingAcquisition.Acquired lease.Target))
+                Some(issueAdmission sessionId physicalUserMessageId agent lease.Target)
             | Some _ -> None
 
         let reusePendingExecution sessionId physicalUserMessageId agent =
-            match pendingBySession.TryGetValue sessionId with
-            | true, demand when demand.PhysicalUserMessageId = physicalUserMessageId ->
-                requireSameAgent sessionId physicalUserMessageId demand.Agent agent
-                Some demand.Completion.Task
-            | _ -> None
+            match admissionQueue.TryCurrent sessionId with
+            | Some demand when demand.PhysicalUserMessageId = physicalUserMessageId ->
+                requireSameAgent sessionId physicalUserMessageId demand.EffectiveAgent agent
+                Some(ExecutionAdmissionAcquisition.Queued demand.Node)
+            | Some _
+            | None -> None
 
-        let currentExecutionTask sessionId physicalUserMessageId agent =
+        let currentExecutionOutcome sessionId physicalUserMessageId agent =
             match activeBySession.TryGetValue sessionId with
             | true, lease -> reuseOrAdoptActiveExecution sessionId physicalUserMessageId agent lease
             | false, _ -> reusePendingExecution sessionId physicalUserMessageId agent
@@ -446,10 +441,9 @@ module ModelRouting =
             | true, lease -> lease.PhysicalUserMessageId
             | false, _ -> None
 
-        let cancelCurrentDemand sessionId =
-            match pendingBySession.TryGetValue sessionId with
-            | true, demand -> cancelDemand demand
-            | false, _ -> ()
+        let supersedeCurrentDemand sessionId =
+            if admissionQueue.ContainsSession sessionId then
+                admissionQueue.SupersedeSession sessionId |> ignore
 
         let acquireFreshDemand sessionId oldPhysicalUserMessageId physicalUserMessageId agent =
             let previous = previousTarget sessionId
@@ -464,39 +458,26 @@ module ModelRouting =
                 lastPhysicalTargetBySession.[sessionId] <- target
 
                 drainDemands ()
-                Task.FromResult(ModelRoutingAcquisition.Acquired target)
-            | None ->
-                let completion =
-                    TaskCompletionSource<ModelRoutingAcquisition>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-                let demand =
-                    { SessionId = sessionId
-                      PhysicalUserMessageId = physicalUserMessageId
-                      Agent = agent
-                      PreviousTarget = previous
-                      Completion = completion }
-
-                pending.Add demand
-                pendingBySession.[sessionId] <- demand
-                completion.Task
+                issueAdmission sessionId physicalUserMessageId agent target
+            | None -> admissionQueue.Enqueue(sessionId, physicalUserMessageId, agent, previous)
 
         let acquireManagedTask sessionId physicalUserMessageId agent =
             lock gate (fun () ->
                 ensureHealthy ()
 
-                match currentExecutionTask sessionId physicalUserMessageId agent with
+                match currentExecutionOutcome sessionId physicalUserMessageId agent with
                 | Some current -> current
                 | None ->
                     let oldPhysicalUserMessageId = currentPhysicalUserMessageId sessionId
                     activeBySession.Remove sessionId |> ignore
-                    cancelCurrentDemand sessionId
+                    supersedeCurrentDemand sessionId
                     acquireFreshDemand sessionId oldPhysicalUserMessageId physicalUserMessageId agent)
 
         let acquireManagedSafe sessionId physicalUserMessageId agent =
             try
-                acquireManagedTask sessionId physicalUserMessageId agent
+                acquireManagedTask sessionId physicalUserMessageId agent |> Task.FromResult
             with ex ->
-                failedTask<ModelRoutingAcquisition> ex
+                failedTask<ExecutionAdmissionAcquisition> ex
 
         let tryReserveFresh sessionId agent =
             match reserveFreshOrPoison sessionId agent (previousTarget sessionId) with
@@ -513,7 +494,7 @@ module ModelRouting =
         let tryReserveLocked sessionId agent =
             ensureHealthy ()
 
-            match activeBySession.TryGetValue sessionId, pendingBySession.ContainsKey sessionId with
+            match activeBySession.TryGetValue sessionId, admissionQueue.ContainsSession sessionId with
             | (true, lease), _ when lease.PhysicalUserMessageId.IsNone && lease.Agent = agent -> Some lease.Target
             | (true, _), _ -> None
             | (false, _), true -> None
@@ -524,11 +505,6 @@ module ModelRouting =
             | true, lease when lease.PhysicalUserMessageId = Some physicalUserMessageId && lease.Agent = agent ->
                 Some lease.Target
             | _ -> None
-
-        let cancelPendingLocked sessionId =
-            match pendingBySession.TryGetValue sessionId with
-            | true, demand -> cancelDemand demand
-            | false, _ -> ()
 
         let exactTargetAvailable agent target running =
             match scheduleOrPoison running agent (Some target) with
@@ -562,13 +538,134 @@ module ModelRouting =
             if fatalError.IsNone then
                 drainDemands ()
 
-        member _.AcquireManagedExecution
-            (sessionId: string, physicalUserMessageId: string, agent: string)
-            : Task<ModelRoutingAcquisition> =
-            match normalizeExecutionInput sessionId physicalUserMessageId agent with
-            | Error ex -> failedTask<ModelRoutingAcquisition> ex
-            | Ok(normSessionId, normPhysicalUserMessageId, normAgent) ->
-                acquireManagedSafe normSessionId normPhysicalUserMessageId normAgent
+        let normalizeAdmissionInput sessionId physicalUserMessageId effectiveAgent =
+            normalizeExecutionInput sessionId physicalUserMessageId effectiveAgent
+
+        let completePhysicalRelease sessionId physicalUserMessageId =
+            function
+            | CapacityTransitionOutcome.Applied as applied ->
+                retirePhysicalExecution sessionId physicalUserMessageId
+                drainIfHealthy ()
+                applied
+            | outcome -> outcome
+
+        let releasePhysicalExecutionLocked (sessionId, physicalUserMessageId) =
+            lock gate (fun () ->
+                (match admissionQueue.TryCurrent sessionId with
+                 | Some _ -> admissionQueue.CancelExecution(sessionId, physicalUserMessageId)
+                 | None -> admissionOwner.ReleasePhysical(sessionId, physicalUserMessageId))
+                |> completePhysicalRelease sessionId physicalUserMessageId)
+
+        let capacitySnapshotLocked () =
+            let physical: BorrowingCapacitySnapshot<ModelRoutingTarget> =
+                capacity.InvariantSnapshot()
+
+            let executions: CapacityExactOwnerSnapshot array =
+                activeBySession
+                |> Seq.choose (fun (KeyValue(sessionId, execution)) ->
+                    execution.PhysicalUserMessageId
+                    |> Option.map (fun physicalUserMessageId ->
+                        ({ SessionId = sessionId
+                           PhysicalUserMessageId = physicalUserMessageId
+                           EffectiveAgent = Some execution.Agent }
+                        : CapacityExactOwnerSnapshot)))
+                |> Seq.sortBy (fun owner -> owner.SessionId, owner.PhysicalUserMessageId)
+                |> Seq.toArray
+
+            let effectiveAgentByExecution: Map<string * string, string> =
+                executions
+                |> Array.choose (fun owner ->
+                    owner.EffectiveAgent
+                    |> Option.map (fun agent -> (owner.SessionId, owner.PhysicalUserMessageId), agent))
+                |> Map.ofArray
+
+            let enrichOwner (owner: CapacityExactOwnerSnapshot) : CapacityExactOwnerSnapshot =
+                { owner with
+                    EffectiveAgent =
+                        Map.tryFind (owner.SessionId, owner.PhysicalUserMessageId) effectiveAgentByExecution
+                        |> Option.orElse owner.EffectiveAgent }
+
+            let tokens: CapacityTokenSnapshot<ModelRoutingTarget> array =
+                physical.Tokens
+                |> Array.map (fun token ->
+                    { token with
+                        Owner = enrichOwner token.Owner })
+
+            let custodies: CapacityCustodySnapshot array =
+                physical.Custodies
+                |> Array.map (fun custody ->
+                    { custody with
+                        Owner = enrichOwner custody.Owner })
+
+            let admissionWaiters: CapacityWaiterSnapshot array =
+                admissionQueue.Snapshot()
+                |> Array.map (fun (demand: ExecutionAdmissionDemand) ->
+                    ({ Owner =
+                        ({ SessionId = demand.SessionId
+                           PhysicalUserMessageId = demand.PhysicalUserMessageId
+                           EffectiveAgent = Some demand.EffectiveAgent }
+                        : CapacityExactOwnerSnapshot)
+                       Sequence = demand.Sequence
+                       Kind = "Admission" }
+                    : CapacityWaiterSnapshot))
+
+            let waiters: CapacityWaiterSnapshot array =
+                Array.append
+                    (physical.Waiters
+                     |> Array.map (fun waiter ->
+                         { waiter with
+                             Owner = enrichOwner waiter.Owner }))
+                    admissionWaiters
+                |> Array.sortBy (fun waiter -> waiter.Sequence, waiter.Owner.SessionId)
+
+            let owners: CapacityExactOwnerSnapshot array =
+                seq {
+                    yield! executions
+                    yield! tokens |> Seq.map _.Owner
+                    yield! waiters |> Seq.map _.Owner
+                }
+                |> Seq.distinctBy (fun owner -> owner.SessionId, owner.PhysicalUserMessageId)
+                |> Seq.sortBy (fun owner -> owner.SessionId, owner.PhysicalUserMessageId)
+                |> Seq.toArray
+
+            { LedgerEntries = physical.LedgerEntries
+              Tokens = tokens
+              Custodies = custodies
+              Executions = executions
+              Waiters = waiters
+              Owners = owners
+              Lineage = physical.Lineage
+              IdleCount = physical.IdleCount
+              InFlightCount = physical.InFlightCount
+              RetiringCount = physical.RetiringCount
+              ActiveCount = physical.InFlightCount + physical.RetiringCount
+              Counters = transitionCounters.Snapshot() }
+
+        member _.AcquireExecutionAdmission
+            (sessionId: string, physicalUserMessageId: string, effectiveAgent: string)
+            : Task<ExecutionAdmissionAcquisition> =
+            match normalizeAdmissionInput sessionId physicalUserMessageId effectiveAgent with
+            | Error error -> failedTask<ExecutionAdmissionAcquisition> error
+            | Ok(normSessionId, normPhysicalUserMessageId, normEffectiveAgent) ->
+                acquireManagedSafe normSessionId normPhysicalUserMessageId normEffectiveAgent
+
+        member _.ExecutionAdmissionTarget(lease: ExecutionAdmissionLease) = admissionOwner.Target lease
+
+        member _.CommitExecutionAdmission(lease: ExecutionAdmissionLease, observed: ExecutionAdmissionExactIdentity) =
+            admissionOwner.Commit(lease, observed)
+
+        member _.ReleaseExecutionAdmissionBeforeProvider
+            (lease: ExecutionAdmissionLease, observed: ExecutionAdmissionExactIdentity)
+            =
+            match admissionOwner.ReleaseBeforeProvider(lease, observed) with
+            | CapacityTransitionOutcome.Applied as applied ->
+                lock gate (fun () ->
+                    retirePhysicalExecution lease.Identity.SessionId lease.Identity.PhysicalUserMessageId)
+
+                applied
+            | settlement -> settlement
+
+        member _.ExecutionAdmissionLifecycle(lease: ExecutionAdmissionLease) = admissionOwner.LifecycleName lease
 
         /// Strength-only nonwaiting reservation. It is capacity-bearing, but not
         /// yet a provider execution identity. The exact chat.message later adopts
@@ -586,25 +683,39 @@ module ModelRouting =
 
         /// Physical end signals are cleanup evidence, not the sole correctness
         /// mechanism. A newer chat.message also supersedes this lease atomically.
-        member _.ReleaseExecution(sessionId: string) =
+        member internal _.ReleaseExecution(sessionId: string) =
             normalizeSessionId sessionId
-            |> Option.iter (fun normSessionId ->
+            |> Option.map (fun normSessionId ->
                 lock gate (fun () ->
-                    retireCurrentExecution normSessionId
-                    lastPhysicalTargetBySession.Remove normSessionId |> ignore))
+                    let outcome =
+                        currentPhysicalUserMessageId normSessionId
+                        |> Option.map (fun physical -> admissionOwner.ReleasePhysical(normSessionId, physical))
+                        |> Option.defaultWith (fun () -> admissionQueue.CancelSession normSessionId)
+
+                    match outcome with
+                    | CapacityTransitionOutcome.Applied -> retireCurrentExecution normSessionId
+                    | CapacityTransitionOutcome.AlreadyApplied
+                    | CapacityTransitionOutcome.StaleFence
+                    | CapacityTransitionOutcome.Conflict -> ()
+
+                    lastPhysicalTargetBySession.Remove normSessionId |> ignore
+                    outcome))
+            |> Option.defaultValue CapacityTransitionOutcome.Conflict
 
         /// Exact physical terminal evidence. Unlike force cleanup, this cannot
         /// retire a newer execution or pending demand that happens to reuse the
         /// same SessionId after the terminal event was produced.
-        member _.ReleasePhysicalExecution(sessionId: string, physicalUserMessageId: string) =
-            match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
-            | None -> ()
-            | Some(normSessionId, normPhysicalUserMessageId) ->
-                lock gate (fun () -> retirePhysicalExecution normSessionId normPhysicalUserMessageId)
+        member internal _.ReleasePhysicalExecution(sessionId: string, physicalUserMessageId: string) =
+            normalizePhysicalExecutionKey sessionId physicalUserMessageId
+            |> Option.map releasePhysicalExecutionLocked
+            |> Option.defaultValue CapacityTransitionOutcome.Conflict
 
         member _.CancelPendingExecution(sessionId: string) =
             normalizeSessionId sessionId
-            |> Option.iter (fun normSessionId -> lock gate (fun () -> cancelPendingLocked normSessionId))
+            |> Option.map (fun normSessionId -> lock gate (fun () -> admissionQueue.CancelSession normSessionId))
+            |> Option.defaultValue CapacityTransitionOutcome.Conflict
+
+        member _.CapacitySnapshot() = lock gate capacitySnapshotLocked
 
         member _.BindCapacityChild(parentSessionId: string, childSessionId: string) =
             lock gate (fun () -> capacity.BindChild(parentSessionId, childSessionId))
@@ -650,7 +761,9 @@ module ModelRouting =
                     drainIfHealthy ())
 
         member _.SnapshotOccupied() = lock gate (fun () -> running ())
-        member _.PendingCount = lock gate (fun () -> pending.Count)
+        member _.PendingCount = lock gate (fun () -> admissionQueue.Count)
+        member _.PendingBound = ModelCapacityQueue.MaximumPendingDemands
+        member _.PendingContractVersion = ModelCapacityQueue.ContractVersion
 
     let private sharedGate = obj ()
     // DSL-MUTABLE: resource — process-shared scheduler runtime singleton
@@ -687,13 +800,29 @@ module ModelRouting =
         | Some runtime -> runtime
         | None -> invalidOp "execution-model-routing: scheduler runtime was not initialized during plugin load"
 
-    let acquireManagedExecution (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) (agent: string) =
+    let internal acquireExecutionAdmission
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (effectiveAgent: string)
+        =
         current()
-            .AcquireManagedExecution(
+            .AcquireExecutionAdmission(
                 SessionId.value sessionId,
                 PhysicalUserMessageId.value physicalUserMessageId,
-                agent
+                effectiveAgent
             )
+
+    let internal executionAdmissionTarget (lease: ExecutionAdmissionLease) =
+        current().ExecutionAdmissionTarget lease
+
+    let internal commitExecutionAdmission (lease: ExecutionAdmissionLease) (observed: ExecutionAdmissionExactIdentity) =
+        current().CommitExecutionAdmission(lease, observed)
+
+    let internal releaseExecutionAdmissionBeforeProvider
+        (lease: ExecutionAdmissionLease)
+        (observed: ExecutionAdmissionExactIdentity)
+        =
+        current().ReleaseExecutionAdmissionBeforeProvider(lease, observed)
 
     let hasRuntime () : bool =
         lock sharedGate (fun () -> sharedRuntime.IsSome)
@@ -709,24 +838,51 @@ module ModelRouting =
             runtime.TryLease(SessionId.value sessionId, PhysicalUserMessageId.value physicalUserMessageId, agent)
         | None -> None
 
-    let releaseExecution (sessionId: SessionId) =
+    let internal releaseExecution (sessionId: SessionId) =
         match lock sharedGate (fun () -> sharedRuntime) with
         | Some runtime -> runtime.ReleaseExecution(SessionId.value sessionId)
-        | None -> ()
+        | None -> CapacityTransitionOutcome.AlreadyApplied
 
-    let releasePhysicalExecution (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) =
+    let internal releasePhysicalExecution (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) =
         match lock sharedGate (fun () -> sharedRuntime) with
         | Some runtime ->
             runtime.ReleasePhysicalExecution(
                 SessionId.value sessionId,
                 PhysicalUserMessageId.value physicalUserMessageId
             )
-        | None -> ()
+        | None -> CapacityTransitionOutcome.AlreadyApplied
 
-    let cancelUnacquiredExecution (sessionId: SessionId) =
+    let internal observePhysicalResource (key: ChatExecutionKey) =
+        let observation held =
+            if held then
+                PhysicalResourceObservation.ResourceHeld key
+            else
+                PhysicalResourceObservation.ResourceAbsent key
+
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | None -> PhysicalResourceObservation.ResourceAbsent key
+        | Some runtime ->
+            let sessionId = SessionId.value key.SessionId
+            let physicalUserMessageId = PhysicalUserMessageId.value key.PhysicalUserMessageId
+
+            let exact (owner: CapacityExactOwnerSnapshot) =
+                owner.SessionId = sessionId
+                && owner.PhysicalUserMessageId = physicalUserMessageId
+
+            let snapshot = runtime.CapacitySnapshot()
+
+            let held =
+                snapshot.Owners |> Array.exists exact
+                || snapshot.Custodies |> Array.exists (fun custody -> exact custody.Owner)
+
+            observation held
+
+    let internal cancelUnacquiredExecution (sessionId: SessionId) =
         match lock sharedGate (fun () -> sharedRuntime) with
         | Some runtime -> runtime.CancelPendingExecution(SessionId.value sessionId)
-        | None -> ()
+        | None -> CapacityTransitionOutcome.AlreadyApplied
+
+    let internal capacitySnapshot () = current().CapacitySnapshot()
 
     let bindCapacityChild (parentSessionId: SessionId) (childSessionId: SessionId) =
         match lock sharedGate (fun () -> sharedRuntime) with
@@ -776,118 +932,6 @@ module ModelRouting =
             runtime.SuppressProviderStep(SessionId.value sessionId, PhysicalUserMessageId.value physicalUserMessageId)
         | None -> ()
 
-    [<RequireQualifiedAccess>]
-    type ChatExecutionAdmission =
-        | NoRoute
-        | ExternalManaged of SessionId * PhysicalUserMessageId * string
-        | PluginManaged of PromptAuthority.PromptClaim * PhysicalUserMessageId * string
-        | Rejected of string
-
-    [<RequireQualifiedAccess>]
-    type RoutedChatExecution =
-        | NoRoute
-        | Superseded
-        | ExternalManaged of SessionId * PhysicalUserMessageId * string * OpencodeModel
-        | PluginManaged of PromptAuthority.PromptClaim * PhysicalUserMessageId * string * OpencodeModel
-
-    let managedAgentForAdmission (value: string option) =
-        value
-        |> Option.map (fun agent -> agent.Trim())
-        |> Option.filter (fun agent ->
-            not (String.IsNullOrWhiteSpace agent)
-            && (ManagedAgent.requiredNames |> List.contains agent))
-
-    let private externalAdmission sessionId physicalUserMessageId explicitAgent =
-        match managedAgentForAdmission explicitAgent, physicalUserMessageId with
-        | Some agent, Some physical -> ChatExecutionAdmission.ExternalManaged(sessionId, physical, agent)
-        | Some _, None ->
-            ChatExecutionAdmission.Rejected "EMR-009: managed chat.message has no physical user message id"
-        | None, _ -> ChatExecutionAdmission.NoRoute
-
-    let private agentManagedOfClaim
-        (claim: PromptAuthority.PromptClaim)
-        (physicalUserMessageId: PhysicalUserMessageId option)
-        =
-        match managedAgentForAdmission claim.EffectiveAgent, physicalUserMessageId with
-        | Some agent, Some physical -> ChatExecutionAdmission.PluginManaged(claim, physical, agent)
-        | Some _, None ->
-            ChatExecutionAdmission.Rejected(
-                sprintf
-                    "EMR-009: managed PromptKey %s has no physical user message id"
-                    (PromptKey.value claim.PromptKey)
-            )
-        | None, _ ->
-            ChatExecutionAdmission.Rejected(
-                sprintf "PROMPT-006: PromptKey %s has no managed EffectiveAgent" (PromptKey.value claim.PromptKey)
-            )
-
-    let private pendingAdmission tryPendingClaim durable sessionId physicalUserMessageId promptKey =
-        match tryPendingClaim (Some durable) sessionId promptKey with
-        | None -> ChatExecutionAdmission.NoRoute
-        | Some claim -> agentManagedOfClaim claim physicalUserMessageId
-
-    let private pluginAdmission tryPendingClaim journal sessionId physicalUserMessageId promptKey =
-        match journal with
-        | None -> ChatExecutionAdmission.NoRoute
-        | Some durable -> pendingAdmission tryPendingClaim durable sessionId physicalUserMessageId promptKey
-
-    let chatExecutionAdmission
-        tryPendingClaim
-        journal
-        isHostCompaction
-        (sessionId: SessionId option)
-        (physicalUserMessageId: PhysicalUserMessageId option)
-        (promptKey: PromptKey option)
-        (explicitAgent: string option)
-        =
-        match isHostCompaction, sessionId, promptKey with
-        | true, _, _ -> ChatExecutionAdmission.NoRoute
-        | false, Some sid, Some key -> pluginAdmission tryPendingClaim journal sid physicalUserMessageId key
-        | false, Some sid, None -> externalAdmission sid physicalUserMessageId explicitAgent
-        | _ -> ChatExecutionAdmission.NoRoute
-
-    let private externalRoutedExecution sessionId physical agent =
-        function
-        | ModelRoutingAcquisition.Superseded -> RoutedChatExecution.Superseded
-        | ModelRoutingAcquisition.Acquired target ->
-            RoutedChatExecution.ExternalManaged(sessionId, physical, agent, toOpenCodeModel target)
-
-    let private pluginRoutedExecution claim physical agent =
-        function
-        | ModelRoutingAcquisition.Superseded -> RoutedChatExecution.Superseded
-        | ModelRoutingAcquisition.Acquired target ->
-            RoutedChatExecution.PluginManaged(claim, physical, agent, toOpenCodeModel target)
-
-    /// EMR-009 managed chat.message routing policy. The composition root supplies
-    /// only the two process-local observations that cross into sibling owners;
-    /// admission interpretation and acquisition outcomes stay owned here.
-    let routeChatExecution
-        (observeManagedSession: SessionId -> unit)
-        (observeExternalAgent: SessionId -> string -> unit)
-        (admission: ChatExecutionAdmission)
-        : Task<RoutedChatExecution> =
-        task {
-            match admission with
-            | ChatExecutionAdmission.NoRoute -> return RoutedChatExecution.NoRoute
-            | ChatExecutionAdmission.Rejected error -> return invalidOp error
-            | ChatExecutionAdmission.ExternalManaged(sessionId, physical, agent) ->
-                observeManagedSession sessionId
-                observeExternalAgent sessionId agent
-                let! acquisition = acquireManagedExecution sessionId physical agent
-                return externalRoutedExecution sessionId physical agent acquisition
-            | ChatExecutionAdmission.PluginManaged(claim, physical, agent) ->
-                observeManagedSession claim.SessionId
-                let! acquisition = acquireManagedExecution claim.SessionId physical agent
-                return pluginRoutedExecution claim physical agent acquisition
-        }
-
-    let routedModel =
-        function
-        | RoutedChatExecution.NoRoute
-        | RoutedChatExecution.Superseded -> None
-        | RoutedChatExecution.ExternalManaged(_, _, _, model)
-        | RoutedChatExecution.PluginManaged(_, _, _, model) -> Some model
-
     let private requireOutputMessage output =
         let message = if isNull output then null else output?message
 
@@ -899,9 +943,10 @@ module ModelRouting =
     /// EMR-009 Host projection. Routing owns both which outcomes carry a model
     /// and the exact mutable Host field that receives that model; composition
     /// roots only invoke this published projection.
-    let projectRoutedModel output routed =
-        match routedModel routed with
-        | None -> ()
-        | Some model ->
+    let projectHostModel output model =
+        try
             let message = requireOutputMessage output
             message?model <- box model
+            Ok()
+        with error ->
+            Error error

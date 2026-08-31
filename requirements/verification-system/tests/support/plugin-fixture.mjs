@@ -43,6 +43,13 @@ const setupRoutingHome = (directory) => {
   return routingHome
 }
 
+export const configureManagedPlugin = (hooks) => {
+  const agent = Object.fromEntries(
+    Array.from(managedAgentNames).map((name) => [name, { model: `fixture/${name}-model` }]),
+  )
+  return hooks.config({ agent })
+}
+
 /**
  * The smallest SDK client double: mint child ids, accept prompts. The id list is
  * handed back so tests can address the child a fork actually created.
@@ -180,12 +187,7 @@ export const withExecutablePlugin = async (body, options = {}) => {
       directory,
       events: { listen: () => () => {} },
     })
-    const hostConfig = {
-      agent: Object.fromEntries(
-        Array.from(managedAgentNames).map((name) => [name, { model: `fixture/${name}-model` }]),
-      ),
-    }
-    hooks.config(hostConfig)
+    await configureManagedPlugin(hooks)
     let runtime
     try {
       const journalResult = await journalSurface.JournalSurface_acquireSharedForWorkspace(
@@ -247,7 +249,7 @@ export const withRestartablePlugin = async (body) => {
   const routingHome = setupRoutingHome(directory)
   process.env.HOME = routingHome
   process.env.USERPROFILE = routingHome
-  const liveHooks = []
+  const liveHooks = new Set()
   try {
     execFileSync('git', ['init', '--quiet', directory])
     const createdIds = []
@@ -261,11 +263,37 @@ export const withRestartablePlugin = async (body) => {
         directory,
         events: { listen: () => () => {} },
       })
-      liveHooks.push(hooks)
+      liveHooks.add(hooks)
       return hooks
     }
 
+    const stop = async (hooks) => {
+      if (!liveHooks.delete(hooks)) return
+      await hooks.dispose()
+    }
+
+    const withRuntime = async (action) => {
+      const journalResult = await journalSurface.JournalSurface_acquireSharedForWorkspace(
+        directory,
+        process.pid,
+        new Date().toISOString(),
+      )
+      if (!journalResult?.ok) {
+        throw new Error(`journal acquire rejected: ${journalResult?.error ?? 'unknown error'}`)
+      }
+      try {
+        return await action({
+          journal: journalResult.journal,
+          runtimeId: journalSurface.JournalSurface_runtimeId(journalResult.journal),
+        })
+      } finally {
+        journalSurface.JournalSurface_dispose(journalResult.journal)
+      }
+    }
+
     await body(start, directory, {
+      stop,
+      withRuntime,
       createdIds,
       abortedIds,
       prompts,
@@ -273,7 +301,7 @@ export const withRestartablePlugin = async (body) => {
       pushHostMessage: client.__pushHostMessage,
     })
   } finally {
-    for (const hooks of liveHooks.reverse()) await hooks.dispose()
+    for (const hooks of [...liveHooks].reverse()) await hooks.dispose()
     if (previousHome === undefined) delete process.env.HOME
     else process.env.HOME = previousHome
     if (previousUserProfile === undefined) delete process.env.USERPROFILE
@@ -283,11 +311,18 @@ export const withRestartablePlugin = async (body) => {
 }
 
 /** AGENT-007 layer one: a durable HumanRoot names the session's managed agent. */
-export const acceptAuthorityRoot = async (runtime, sessionId, agent) => {
-  const result = await dispatchSurface.acceptHumanRoot(runtime.journal, sessionId, `root-${sessionId}`, agent)
+export const decideAuthorityRoot = (runtime, sessionId, agent, physicalMessageId = `root-${sessionId}`) =>
+  dispatchSurface.acceptHumanRoot(runtime.journal, sessionId, physicalMessageId, agent)
+
+export const observeAuthority = (runtime, sessionId) =>
+  dispatchSurface.projectionObservation(runtime.journal, sessionId)
+
+export const acceptAuthorityRoot = async (runtime, sessionId, agent, physicalMessageId) => {
+  const result = await decideAuthorityRoot(runtime, sessionId, agent, physicalMessageId)
   if (!result?.ok) {
-    throw new Error(`AcceptHumanRoot(${sessionId}, ${agent}) rejected: ${result?.error ?? 'unknown error'}`)
+    throw new Error(`AcceptHumanRoot(${sessionId}, ${agent}) rejected: ${JSON.stringify(result?.error ?? 'unknown error')}`)
   }
+  return result.profile
 }
 
 /** Bind a managed child session to a parent session in local execution binding. */
@@ -316,7 +351,7 @@ export const acceptChildAgentOwnerRoot = async (runtime, childSessionId, promptK
   }
 }
 
-export const activateLife = async (runtime, sessionId) => {
+export const activateLife = async (runtime, sessionId, openingUserMessageId = `root-${sessionId}`) => {
   const lifeId = `life-${sessionId}`
   const opened = await obligationJournalSurface.appendManagerLifecycle(
     runtime.journal,
@@ -328,7 +363,7 @@ export const activateLife = async (runtime, sessionId) => {
       openingCursorSequence: 0,
       openingTextDigest: 'digest-opening',
       openingTextRef: 'blob-ref',
-      openingUserMessageId: `root-${sessionId}`,
+      openingUserMessageId,
     },
   )
   if (!opened?.ok) throw new Error(`LifeOpened(${sessionId}) rejected: ${opened?.error ?? 'unknown error'}`)
@@ -345,6 +380,24 @@ export const activateLife = async (runtime, sessionId) => {
   )
   if (!activated?.ok) {
     throw new Error(`WorkActivated(${sessionId}) rejected: ${activated?.error ?? 'unknown error'}`)
+  }
+}
+
+export const completeManagerLife = async (runtime, sessionId) => {
+  const completed = await obligationJournalSurface.appendManagerLifecycle(
+    runtime.journal,
+    sessionId,
+    'LifeCompleted',
+    {
+      sessionId,
+      lifeId: `life-${sessionId}`,
+      requestId: `finality-${sessionId}`,
+      terminalRef: `terminal-${sessionId}`,
+      terminalDigest: `digest-terminal-${sessionId}`,
+    },
+  )
+  if (!completed?.ok) {
+    throw new Error(`LifeCompleted(${sessionId}) rejected: ${completed?.error ?? 'unknown error'}`)
   }
 }
 

@@ -66,44 +66,19 @@ open Wanxiangshu.Participant.Persona.AgentRoleIdentity
 /// Existing-child send must use the session's bound managed agent.
 /// Never invent `fast-ROLE` from CanonicalRole; never let the caller overwrite Deep with Fast.
 module HostForkBinding =
-    let tryName (value: string) =
+    let private tryName (value: string) =
         if String.IsNullOrWhiteSpace value then
             None
         else
             Some(value.Trim())
 
-    let private fromHandle (journal: AgentJournal option) (parentId: SessionId) (agentId: string) =
-        journal
-        |> Option.bind (fun durable ->
-            AgentJournal.handleProjection durable parentId
-            |> HandleProjection.tryFind (HandleController.agentHandle agentId)
-            |> Option.bind (fun handle -> tryName handle.TargetAgent))
-
-    let private fromChildRun (runtime: ForkRuntime) (agentId: string) =
-        runtime.List()
-        |> fst
-        |> List.tryFind (fun record -> record.AgentId = agentId)
-        |> Option.bind (fun record -> tryName record.Agent)
-
-    let private fromChildProfile (journal: AgentJournal option) (childId: SessionId) =
+    let managedAgent (journal: AgentJournal option) (childId: SessionId) : string option =
         journal
         |> Option.bind (fun durable ->
             let projections = (AgentJournal.snapshot durable).AgentProjections
 
             PromptAuthorityLedger.activeProfile childId projections
-            |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile childId projections)
             |> Option.bind (fun profile -> tryName profile.SelectedAgent))
-
-    let managedAgent
-        (journal: AgentJournal option)
-        (parentId: SessionId)
-        (runtime: ForkRuntime)
-        (agentId: string)
-        (childId: SessionId)
-        : string option =
-        fromHandle journal parentId agentId
-        |> Option.orElseWith (fun () -> fromChildRun runtime agentId)
-        |> Option.orElseWith (fun () -> fromChildProfile journal childId)
 
 [<AutoOpen>]
 module HostForkAgent =
@@ -278,7 +253,7 @@ module HostForkAgent =
         (run: PendingHostRun)
         (agentId: string)
         (childId: SessionId)
-        (agentName: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         (enrichedPrompt: string)
         (result: ForkResult)
         : Task<Result<ForkResult, string>> =
@@ -288,7 +263,7 @@ module HostForkAgent =
                     runtime.Sessions
                     runtime.Journal
                     childId
-                    agentName
+                    identitySeed
                     (runtime.DirectoryOf agentId)
                     enrichedPrompt
                     (HostForkRunLifecycle.bindAuthorityRoot run)
@@ -307,7 +282,7 @@ module HostForkAgent =
         (runtime: HostForkRuntime)
         (agentId: string)
         (childId: SessionId)
-        (agentName: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         (prompt: string)
         (requirements: string list)
         (enrichedPrompt: string)
@@ -333,19 +308,19 @@ module HostForkAgent =
             if deferSend && isFirstPrompt then
                 runtime.DeferredFirstPrompts.[agentId] <-
                     {| ChildId = childId
-                       AgentName = agentName
+                       IdentitySeed = identitySeed
                        Prompt = enrichedPrompt |}
 
                 return Ok result
             else
-                return! sendFirstPromptOutcome runtime run agentId childId agentName enrichedPrompt result
+                return! sendFirstPromptOutcome runtime run agentId childId identitySeed enrichedPrompt result
         }
 
     let private afterRuntimeFork
         (runtime: HostForkRuntime)
         (agentId: string)
         (childId: SessionId)
-        (agentName: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         (prompt: string)
         (requirements: string list)
         (enrichedPrompt: string)
@@ -366,7 +341,7 @@ module HostForkAgent =
                 runtime
                 agentId
                 childId
-                agentName
+                identitySeed
                 prompt
                 requirements
                 enrichedPrompt
@@ -381,6 +356,7 @@ module HostForkAgent =
         (agentId: string)
         (role: Role)
         (agentName: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
         (prompt: string)
         (requirements: string list)
         (enrichedPrompt: string)
@@ -419,7 +395,7 @@ module HostForkAgent =
                         runtime
                         agentId
                         childId
-                        agentName
+                        identitySeed
                         prompt
                         requirements
                         enrichedPrompt
@@ -445,47 +421,61 @@ module HostForkAgent =
         (expectedToolCalls: int option)
         (preparedHandoff: PreparedDelegationHandoff option)
         : Task<Result<ForkResult, string>> =
+        let interpretChildResult =
+            function
+            | Error error -> Task.FromResult(Error error)
+            | Ok(identitySeed, childId) ->
+                task {
+                    let! linkageRaw =
+                        HandleController.linkNamed
+                            runtime.Journal
+                            runtime.ParentId
+                            agentId
+                            childId
+                            agentName
+                            providerByname
+                            role
+                            handleOwnership
+
+                    let linkageResult =
+                        linkageRaw |> Result.mapError (sprintf "Failed to persist HandleLinked: %s")
+
+                    return!
+                        afterLinkage
+                            runtime
+                            agentId
+                            role
+                            agentName
+                            identitySeed
+                            prompt
+                            requirements
+                            enrichedPrompt
+                            isFirstPrompt
+                            deferSend
+                            expectedToolCalls
+                            preparedHandoff
+                            childId
+                            linkageResult
+                }
+
         task {
             let! childResult =
-                runtime.Sessions.CreateChildSession(
-                    runtime.ParentId,
-                    { Title = Some agentId
-                      Agent = Some agentName
-                      Directory = runtime.DirectoryOf agentId }
-                )
+                taskResult {
+                    let! identitySeed =
+                        HostForkRunLifecycle.issueCurrentOwnerIdentitySeed runtime.Journal runtime.ParentId agentName
 
-            match childResult with
-            | Error err -> return Error err
-            | Ok childId ->
-                let! linkageRaw =
-                    HandleController.linkNamed
-                        runtime.Journal
-                        runtime.ParentId
-                        agentId
-                        childId
-                        agentName
-                        providerByname
-                        role
-                        handleOwnership
+                    let! childId =
+                        runtime.Sessions.CreateChildSession(
+                            runtime.ParentId,
+                            { Title = Some agentId
+                              Agent = Some agentName
+                              Directory = runtime.DirectoryOf agentId }
+                        )
 
-                let linkageResult =
-                    linkageRaw |> Result.mapError (sprintf "Failed to persist HandleLinked: %s")
+                    return identitySeed, childId
+                }
 
-                return!
-                    afterLinkage
-                        runtime
-                        agentId
-                        role
-                        agentName
-                        prompt
-                        requirements
-                        enrichedPrompt
-                        isFirstPrompt
-                        deferSend
-                        expectedToolCalls
-                        preparedHandoff
-                        childId
-                        linkageResult
+            return! interpretChildResult childResult
         }
 
     let private forkExistingChild
@@ -493,7 +483,6 @@ module HostForkAgent =
         (agentId: string)
         (childId: SessionId)
         (role: Role)
-        (agentName: string)
         (prompt: string)
         (enrichedPrompt: string)
         (isFirstPrompt: bool)
@@ -501,34 +490,33 @@ module HostForkAgent =
         (preparedHandoff: PreparedDelegationHandoff option)
         : Task<Result<ForkResult, string>> =
         task {
-            do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
+            match HostForkBinding.managedAgent runtime.Journal childId with
+            | None -> return Error(sprintf "Agent handle '%s' has no active managed agent identity" agentId)
+            | Some sendAgent ->
+                do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
 
-            let sendAgent =
-                HostForkBinding.managedAgent runtime.Journal runtime.ParentId runtime.Runtime agentId childId
-                |> Option.defaultValue agentName
-
-            return!
-                HostForkChildDispatch.sendToExistingChild
-                    runtime.Gate
-                    runtime.PendingRuns
-                    runtime.Journal
-                    runtime.ParentId
-                    runtime.Sessions
-                    runtime.ChildWorkRecordOfRun
-                    runtime.XTraceHead
-                    runtime.TrackOwnedWork
-                    runtime.Runtime
-                    runtime.HandoffPort
-                    runtime.SendChildPrompt
-                    runtime.SendBusyNudge
-                    (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
-                    preparedHandoff
-                    agentId
-                    childId
-                    role
-                    prompt
-                    sendAgent
-                    (if isFirstPrompt then Some enrichedPrompt else None)
+                return!
+                    HostForkChildDispatch.sendToExistingChild
+                        runtime.Gate
+                        runtime.PendingRuns
+                        runtime.Journal
+                        runtime.ParentId
+                        runtime.Sessions
+                        runtime.ChildWorkRecordOfRun
+                        runtime.XTraceHead
+                        runtime.TrackOwnedWork
+                        runtime.Runtime
+                        runtime.HandoffPort
+                        runtime.SendChildPrompt
+                        runtime.SendBusyNudge
+                        (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
+                        preparedHandoff
+                        agentId
+                        childId
+                        role
+                        prompt
+                        sendAgent
+                        (if isFirstPrompt then Some enrichedPrompt else None)
         }
 
     let private forkAfterEnrich
@@ -556,7 +544,6 @@ module HostForkAgent =
                 agentId
                 childId
                 role
-                agentName
                 prompt
                 enrichedPrompt
                 isFirstPrompt
@@ -650,38 +637,40 @@ module HostForkAgent =
         (preparedHandoff: PreparedDelegationHandoff option)
         : Task<Result<ForkResult, string>> =
         task {
-            let providerByname =
+            let providerBynameOpt =
                 runtime.Journal
                 |> Option.bind (fun durable ->
                     AgentJournal.handleProjection durable runtime.ParentId
                     |> HandleProjection.tryFind (HandleController.agentHandle agentId))
                 |> Option.map (fun handle -> handle.Byname)
                 |> Option.filter (String.IsNullOrWhiteSpace >> not)
-                |> Option.defaultValue agentName
 
-            let! linkResult =
-                HandleController.linkNamed
-                    runtime.Journal
-                    runtime.ParentId
-                    agentId
-                    childId
-                    agentName
-                    providerByname
-                    role
-                    runtime.HandleOwnership
+            match providerBynameOpt with
+            | None -> return Error(sprintf "Agent handle '%s' has no provider byname" agentId)
+            | Some providerByname ->
+                let! linkResult =
+                    HandleController.linkNamed
+                        runtime.Journal
+                        runtime.ParentId
+                        agentId
+                        childId
+                        agentName
+                        providerByname
+                        role
+                        runtime.HandleOwnership
 
-            return!
-                reuseAfterRelink
-                    runtime
-                    agentId
-                    childId
-                    role
-                    agentName
-                    prompt
-                    renderedPrompt
-                    wasDormant
-                    preparedHandoff
-                    linkResult
+                return!
+                    reuseAfterRelink
+                        runtime
+                        agentId
+                        childId
+                        role
+                        agentName
+                        prompt
+                        renderedPrompt
+                        wasDormant
+                        preparedHandoff
+                        linkResult
         }
 
     let private reuseLiveChild
@@ -695,23 +684,19 @@ module HostForkAgent =
         (preparedHandoff: PreparedDelegationHandoff option)
         : Task<Result<ForkResult, string>> =
         task {
-            do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
-
-            // The record carries the managed name this handle was forked with.
-            // Rebuilding it from the role would silently downgrade a deep-* agent
-            // to fast-* on reuse.
             let recordOpt =
                 runtime.Runtime.List()
                 |> fst
                 |> List.tryFind (fun agent -> agent.AgentId = agentId)
 
-            let boundAgent =
-                HostForkBinding.managedAgent runtime.Journal runtime.ParentId runtime.Runtime agentId childId
+            let boundAgent = HostForkBinding.managedAgent runtime.Journal childId
 
             match recordOpt, boundAgent with
             | None, _ -> return Error(sprintf "Unknown agent id: %s" agentId)
-            | _, None -> return Error(sprintf "Agent handle '%s' has no managed agent name" agentId)
+            | _, None -> return Error(sprintf "Agent handle '%s' has no active managed agent identity" agentId)
             | Some record, Some agentName ->
+                do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
+
                 return!
                     reuseWithManagedAgent
                         runtime
@@ -727,10 +712,9 @@ module HostForkAgent =
 
     type HostForkRuntime with
 
-        /// Durable binding for an already-linked child. Handle.TargetAgent first,
-        /// then ChildRun.Agent, then the child's Authority SelectedAgent.
-        member this.BoundManagedAgent(agentId: string, childId: SessionId) : string option =
-            HostForkBinding.managedAgent this.Journal this.ParentId this.Runtime agentId childId
+        /// Current durable Authority Root binding for an already-linked child.
+        member this.BoundManagedAgent(childId: SessionId) : string option =
+            HostForkBinding.managedAgent this.Journal childId
 
         /// PROMPT-008: `agent` is the managed agent name the caller selected, and
         /// it is required. Defaulting it to `fast-ROLE` invented a tier, and the

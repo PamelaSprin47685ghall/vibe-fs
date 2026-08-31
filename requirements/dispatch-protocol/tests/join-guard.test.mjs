@@ -10,8 +10,38 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as joinGuard from '../../../dist/Interaction/Dispatch/JoinGuardSurface.js'
+
+const managerRootSelection = {
+  kind: 'RootSelection',
+  ownerSession: null,
+  ownerLogicalRun: null,
+  ownerAuthorityRoot: null,
+  participantIdentity: {
+    selectedAgent: 'fast-manager',
+    peerAgent: 'deep-manager',
+    canonicalRole: 'manager',
+    selectedTier: 'fast',
+    persona: 'Coordinator',
+    personaCatalogVersion: 1,
+    origin: 'ResolvedAtRoot',
+  },
+}
+
+const appendAuthorityRoot = async (handle, session) => {
+  const owner = await dispatch.acceptHumanRootSelection(
+    handle,
+    `${session}-owner`,
+    `msg-${session}-owner`,
+    managerRootSelection,
+  )
+  assert.equal(owner.ok, true, owner.ok ? '' : owner.error)
+  const inherited = authority.issueInheritedIdentitySeed('fast-coder', owner.profile)
+  assert.equal(inherited.ok, true, inherited.ok ? '' : inherited.error)
+  return dispatch.appendAuthorityRoot(handle, session, inherited.value)
+}
 
 const capturingPort = (captured, behaviour = {}) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),
@@ -29,7 +59,7 @@ test('WHAT[DISPATCH-PROTOCOL-007] JNGD_nudge_releases_the_key_when_send_fails_an
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jngd-'))
   const opened = await journal.JournalSurface_bootWithWriterId(dir, 'writer-jg2', 'rt-jg2', 4242, '2026-01-01T00:00:00Z')
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
-  const appended = await dispatch.appendAuthorityRoot(opened.journal, sid, 'fast-coder')
+  const appended = await appendAuthorityRoot(opened.journal, sid)
   assert.equal(appended.ok, true, appended.ok ? '' : JSON.stringify(appended.error))
   try {
     const captured = []
@@ -53,7 +83,7 @@ test('WHAT[DISPATCH-PROTOCOL-007] JNGD_join_gate_dedupes_same_terminal_but_rearm
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jngd-repeat-'))
   const opened = await journal.JournalSurface_bootWithWriterId(dir, 'writer-jg-repeat', 'rt-jg-repeat', 4242, '2026-01-01T00:00:00Z')
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
-  assert.equal((await dispatch.appendAuthorityRoot(opened.journal, sid, 'fast-coder')).ok, true)
+  assert.equal((await appendAuthorityRoot(opened.journal, sid)).ok, true)
   try {
     const captured = []
     const reservations = joinGuard.newReservations()

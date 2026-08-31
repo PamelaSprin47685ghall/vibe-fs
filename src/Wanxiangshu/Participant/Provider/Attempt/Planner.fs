@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Participant.Provider.Attempt
 
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -55,12 +56,12 @@ type AttemptPlan =
 
 /// Pre-inference half of an AttemptPlan.
 ///
-/// `experimental.chat.messages.transform` runs before the Host has created the
-/// assistant message for the provider request, so ProviderRunIdentity cannot be
-/// an input at this boundary. The remaining decision is nevertheless immutable:
+/// The purpose plan is frozen before binding the Host-created assistant message;
+/// ProviderRunIdentity therefore cannot be an input to this constructor. The
+/// remaining decision is nevertheless immutable:
 /// authority/cursor/physical request identity/request kind/prefix choice are all
-/// frozen here, then bound exactly once when a later Host observation supplies
-/// the assistant run identity.
+/// frozen here, then bound exactly once from the Host-created assistant message
+/// present at the transform admission boundary.
 type PendingAttemptPlan =
     { Authority: PromptAuthority.AuthorityExecutionProfile
       Cursor: AgentPairCursor.FallbackCursor
@@ -72,6 +73,12 @@ type PendingAttemptPlan =
 
 [<RequireQualifiedAccess>]
 module AttemptPlanner =
+
+    let ordinaryRequestKind (origin: PromptAuthority.PromptOrigin) =
+        match origin with
+        | PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.InteractionRepair ->
+            ProviderRequestKind.InteractionRepair
+        | _ -> ProviderRequestKind.WorkMain
 
     let private chooseProjection
         (requestKind: ProviderRequestKind)
@@ -109,6 +116,33 @@ module AttemptPlanner =
           RequestKind = requestKind
           ProjectionChoice = choice
           NoProbeReason = noProbeReason }
+
+    let freezeOrdinary
+        (accepted: AcceptedChatExecutionEvidence)
+        (requestKind: ProviderRequestKind)
+        : Result<PendingAttemptPlan, string> =
+        PromptAuthority.createAuthorityExecutionProfileFromSeed
+            accepted.SessionId
+            accepted.LogicalRunId
+            accepted.AuthorityRootUserMessageId
+            accepted.AuthorityKind
+            accepted.IdentitySeed
+        |> Result.map (fun authority ->
+            let fallbackCursor =
+                if accepted.EffectiveAgent = authority.SelectedAgent then
+                    AgentPairCursor.initial
+                else
+                    { AgentPairCursor.initial with
+                        Offset = AgentPairCursor.FallbackOffset.Fork2 }
+
+            freezePreInference
+                authority
+                fallbackCursor
+                accepted.PhysicalUserMessageId
+                accepted.Origin
+                requestKind
+                RecoveryOpportunity.OrdinaryAttempt
+                (fun () -> Error NoCandidateReason.NoCoverage))
 
     /// Complete the immutable attempt profile once Host observation exposes the
     /// exact assistant run for the already-frozen physical request.

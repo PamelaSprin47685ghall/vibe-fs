@@ -2,12 +2,20 @@
 # requirements/participant-identity/** is covered implicitly and must not be listed here.
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
-/src/Wanxiangshu/Participant/Persona/**
+/src/Wanxiangshu/Participant/Persona/Catalog.fs
+/src/Wanxiangshu/Participant/Persona/Identity.fs
+/src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs
+/src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs
+/src/Wanxiangshu/Participant/Persona/RoleIdentity.fs
+/src/Wanxiangshu/Participant/Persona/Surface.fs
 /src/Wanxiangshu/Foundation/Roles.fs
 /src/Wanxiangshu/Foundation/Identity.fs
 /src/Wanxiangshu/Execution/Session/Association.fs
 /src/Wanxiangshu/Execution/Session/AssociationSurface.fs
-/src/Wanxiangshu/OpenCode/Host/PersonaBinding.fs
+/src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs
+/src/Wanxiangshu/Interaction/Authority/Model.fs
+/src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs
+/src/Wanxiangshu/Interaction/Authority/Surface.fs
 /src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs
 /src/Wanxiangshu/OpenCode/Host/Sessions.fs
 /src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs

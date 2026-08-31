@@ -19,6 +19,8 @@
 6. **事件解锁**：WorkMain recovery 只在 linked Blogger 存在 durable open request 时通过 `AgentJournal.awaitChangeFromOrCancel` 订阅 committed journal change；`BlogObservationCommitted`、`BlogObservationsSquashed`、`BloggerRequestAbandoned` 等 fact 到达后重新求值，plugin shutdown 显式注销订阅。无 open producer 立即 retry，不读取 flight/pending，不存在 timeout/polling。
 7. **成功记账**：RequestKind 从 typed request / durable receipt / accepted continuation evidence 证明。Squash/repair success 不写 FallbackSucceeded；WorkMain/BloggerMain success 才清零失败计数。
 8. **身份隔离**：游标变更仅影响下一次派发的 `EffectiveAgent`。每个 attempt 复用同一 durable logical participant run 的 `ParticipantIdentity`、Persona、语言、CanonicalRole、Authority identity 与 system prompt bytes；controller 没有签发新 identity 的能力。
+9. **唯一预算投影**：`LogicalRunId` 是稳定 logical operation identity，Host 创建的 fresh `ProviderRunIdentity` 是 physical attempt identity。`FallbackProjection.ConsecutiveFailureCount < AgentPairCursor.DefaultAutoRecoveryBudget(12)` 是唯一自动恢复预算投影；初始请求计入失败序列，第 12 次失败只写 exhaustion，不发送第 13 次物理请求。因此每个 logical operation 满足 `physicalAttempts ≤ 12`，duplicate ProviderRun observation 由 ledger 幂等吸收且不增加该比值。
+10. **唯一 licence**：`ExecutionFailurePolicy.decide` 以 exact `LogicalRunId + ProviderRunIdentity + ProviderRequestKind` 生成 sealed `ProviderRecoveryAuthorization` 与稳定 `ProviderRecoveryDecisionId`。`FallbackLedger.recordAuthorizedFailure` 只接受该 licence，并复核 logical run；Host retry signal、dispatcher、repair、session recovery 无签发能力。
 
 ## 依赖关系
 
@@ -50,4 +52,4 @@ DEPENDS ON:
 | PAR-016 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs` |
 | PAR-017 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
 | PAR-018 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
-| PAR-019 | `requirements/provider-attempt-recovery/tests/typed-recovery-licence.test.mjs` |
+| PAR-019 | `requirements/provider-attempt-recovery/tests/retry-owner.test.mjs`, `requirements/verification-system/tests/retry-owner.test.mjs` |

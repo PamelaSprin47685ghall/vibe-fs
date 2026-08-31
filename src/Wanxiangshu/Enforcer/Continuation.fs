@@ -16,7 +16,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
 
 /// Session termination capability — same signature as PluginTransforms.fs private type.
@@ -70,7 +69,6 @@ module EnforcerContinuation =
           Owner: SessionId
           BloggerSessionId: SessionId
           RawMessages: obj list
-          ConfirmedFailure: ConfirmedFailurePort option
           RecoveryProbe: AgentJournal -> SessionId -> obj list -> RecoveryStageProbe
           Project: obj list -> ContinuationOutcome
           Stop: string -> ContinuationOutcome
@@ -84,52 +82,6 @@ module EnforcerContinuation =
         match EnforcerCycleDecode.lastAssistantStep rawMessages with
         | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) -> ProviderRunIdentity.create messageId
         | _ -> ProviderRunIdentity.create fallbackId
-
-    /// Evidence → Decision: ConfirmedFailurePort Result → optional admission.
-    let private admissionFromPortResult (sessionKey: string) (result: Result<RecoveryAdmission, string>) =
-        match result with
-        | Ok admission -> Some admission
-        | Error err ->
-            Diagnostic.emit
-                "enforcer-aabb-bridge"
-                [ "session_id", sessionKey; "result", "confirmedFailure port rejected: " + err ]
-
-            None
-
-    /// Evidence → Decision: optional ConfirmedFailurePort → optional admission.
-    let private admitConfirmedFailure
-        (port: ConfirmedFailurePort option)
-        (owner: SessionId)
-        (providerRun: ProviderRunIdentity)
-        (reason: string)
-        (sessionKey: string)
-        : Task<RecoveryAdmission option> =
-        match port with
-        | None ->
-            Diagnostic.emit
-                "enforcer-aabb-bridge"
-                [ "session_id", sessionKey; "result", "no confirmed failure port; " + reason ]
-
-            Task.FromResult None
-        | Some record ->
-            task {
-                let! result = record owner providerRun reason
-                return admissionFromPortResult sessionKey result
-            }
-
-    /// Evidence → Decision: AABB admission → exhaust fatal or continue repair.
-    let private afterAabbAdmission
-        (admission: RecoveryAdmission option)
-        (sessionKey: string)
-        (reason: string)
-        (onExhausted: unit -> Task<'a>)
-        (onContinue: unit -> Task<'a>)
-        : Task<'a> =
-        match admission with
-        | Some RecoveryAdmission.RecoveryExhausted ->
-            Diagnostic.emit "enforcer-aabb-exhausted" [ "session_id", sessionKey; "result", reason ]
-            onExhausted ()
-        | _ -> onContinue ()
 
     let private mainSealedNow (ctx: Context) (sessionKey: string) =
         AgentProjection.mainSealedForBlogger ctx.Owner (AgentJournal.snapshot ctx.Durable).AgentProjections
@@ -204,7 +156,7 @@ module EnforcerContinuation =
         else
             fatalProjectRaw ctx sessionKey currentCtx "blog aabb exhausted; auto-recovery budget spent"
 
-    /// Evidence → Decision: sealed main → seal; else AABB admit then repair/exhaust.
+    /// Evidence → Decision: sealed main → seal; else request-scoped repair/exhaust.
     let private aabbRepair
         (ctx: Context)
         (sessionKey: string)
@@ -218,16 +170,7 @@ module EnforcerContinuation =
                 BloggerRuntimeHost.forceSealRuntime ctx.Scope sessionKey
                 return ctx.Project ctx.RawMessages
             else
-                let providerRun = providerRunFromLastAssistant ctx.RawMessages "unknown-prose-run"
-                let! admission = admitConfirmedFailure ctx.ConfirmedFailure ctx.Owner providerRun reason sessionKey
-
-                return!
-                    afterAabbAdmission
-                        admission
-                        sessionKey
-                        reason
-                        (fun () -> firstAabbOrExhaust ctx sessionKey currentCtx live guaranteedFirstAabb reason)
-                        (fun () -> projectRepairInstruction ctx sessionKey live reason)
+                return! firstAabbOrExhaust ctx sessionKey currentCtx live guaranteedFirstAabb reason
         }
 
     let private sameAabbTerminalReentry
@@ -847,50 +790,17 @@ module EnforcerContinuation =
                 return! dispositionForValidatedCycle ctx mainSessionId sessionKey liveCtx providerRun merged toolCallIds
         }
 
-    /// Evidence → Decision: empty-text AABB admission → exhaust or project repair.
+    /// Evidence → Decision: the request-scoped AABB projection owns its single repair.
     let private finishInjectRepair
         (ctx: Context)
-        (mainSessionId: SessionId)
-        (sessionKey: string)
         (messageId: string)
-        (liveCtx: BloggerRequestContext option)
         (live: BloggerRequestContext)
         : Task<ContinuationOutcome> =
         task {
-            let emptyReason = "blog empty text (ENFORCER-061)"
-
-            let! admission =
-                admitConfirmedFailure
-                    ctx.ConfirmedFailure
-                    mainSessionId
-                    (ProviderRunIdentity.create messageId)
-                    emptyReason
-                    sessionKey
-
-            match admission with
-            | Some RecoveryAdmission.RecoveryExhausted ->
-                Diagnostic.emit "enforcer-aabb-exhausted" [ "session_id", sessionKey; "result", emptyReason ]
-
-                Diagnostic.fatal
-                    "enforcer-cycle-failed"
-                    [ "session_id", sessionKey
-                      "result", "blog aabb exhausted; auto-recovery budget spent" ]
-
-                do!
-                    BloggerAbandon.openRequest
-                        ctx.Durable
-                        mainSessionId
-                        ctx.BloggerSessionId
-                        liveCtx
-                        "blog aabb exhausted; auto-recovery budget spent"
-
-                BloggerRuntimeHost.requireReleaseObservedCurrentRequest ctx.Scope sessionKey
-                return failwith "unreachable: fatalEnd ends the cycle"
-            | _ ->
-                let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId live)
-                let terminalRun = ProviderRunIdentity.create messageId
-                let! rebuilt = resumeWithContext ctx live
-                return ctx.Project(EnforcerRepair.withRepairInstruction rebuilt requestKey terminalRun)
+            let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId live)
+            let terminalRun = ProviderRunIdentity.create messageId
+            let! rebuilt = resumeWithContext ctx live
+            return ctx.Project(EnforcerRepair.withRepairInstruction rebuilt requestKey terminalRun)
         }
 
     let private finishWorking (ctx: Context) (liveCtx: BloggerRequestContext option) : Task<ContinuationOutcome> =
@@ -965,7 +875,7 @@ module EnforcerContinuation =
         (disposition: CycleDisposition)
         : Task<ContinuationOutcome> =
         match disposition with
-        | CycleDisposition.InjectRepair live -> finishInjectRepair ctx mainSessionId sessionKey messageId liveCtx live
+        | CycleDisposition.InjectRepair live -> finishInjectRepair ctx messageId live
         | CycleDisposition.CommitUnknown -> Task.FromResult(ctx.Project ctx.RawMessages)
         | CycleDisposition.AbandonThenCatchUp ->
             resumeCatchUp ctx mainSessionId sessionKey "stale-cycle-catch-up-complete"
@@ -1080,7 +990,6 @@ module EnforcerContinuation =
     let handleContinuation
         (scope: IBloggerRuntimeHost)
         (journal: AgentJournal option)
-        (confirmedFailure: ConfirmedFailurePort option)
         (recoveryProbe: AgentJournal -> SessionId -> obj list -> RecoveryStageProbe)
         (bloggerSessionId: SessionId)
         (rawMessages: obj list)
@@ -1105,7 +1014,6 @@ module EnforcerContinuation =
                   Owner = owner
                   BloggerSessionId = bloggerSessionId
                   RawMessages = rawMessages
-                  ConfirmedFailure = confirmedFailure
                   RecoveryProbe = recoveryProbe
                   Project = project
                   Stop = stop
@@ -1166,7 +1074,7 @@ module EnforcerContinuation =
             physicalUserMessageId
             |> Option.iter (fun physical ->
                 ModelRouting.suppressProviderStep sid physical
-                ModelRouting.releasePhysicalExecution sid physical)
+                ModelRouting.releasePhysicalExecution sid physical |> ignore)
         | Error error ->
             Diagnostic.emit "enforcer-stop-physical-run" [ "session_id", sessionId; "result", "abort-error: " + error ]
 
@@ -1227,28 +1135,7 @@ module EnforcerContinuation =
         task {
             let bloggerMessages = unbox<obj array> outObj?messages |> Array.toList
 
-            let confirmedFailure: ConfirmedFailurePort =
-                fun targetSessionId providerRun reason ->
-                    task {
-                        let! outcome =
-                            FallbackLedger.admitConfirmedFailure
-                                durable
-                                AgentPairCursor.DefaultAutoRecoveryBudget
-                                targetSessionId
-                                providerRun
-                                reason
-
-                        return outcome
-                    }
-
-            let! outcome =
-                handleContinuation
-                    scope.BloggerRuntimeHost
-                    journal
-                    (Some confirmedFailure)
-                    makeRecoveryProbe
-                    sid
-                    bloggerMessages
+            let! outcome = handleContinuation scope.BloggerRuntimeHost journal makeRecoveryProbe sid bloggerMessages
 
             do! applyContinuationOutcome terminateSession sid sessionId bloggerMessages outObj outcome
         }

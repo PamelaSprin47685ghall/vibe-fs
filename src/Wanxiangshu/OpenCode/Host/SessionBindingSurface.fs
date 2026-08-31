@@ -61,6 +61,12 @@ module SessionBindingSurface =
     let observeUserFacingAgent (sessionId: string) (agent: string) : unit =
         SessionExecutionBinding.observeUserFacingAgent (SessionId.create sessionId) agent
 
+    let observeHostAuxiliaryChild (sessionId: string) : unit =
+        SessionExecutionBinding.observeHostAuxiliaryChild (SessionId.create sessionId)
+
+    let isUnboundHostAuxiliaryChild (sessionId: string) : bool =
+        SessionExecutionBinding.isUnboundHostAuxiliaryChild (SessionId.create sessionId)
+
     let tryAgent (sessionId: string) : string =
         SessionExecutionBinding.tryAgent (SessionId.create sessionId)
         |> Option.defaultValue ""
@@ -100,6 +106,21 @@ module SessionBindingSurface =
                 selected
         | None -> invalidArg "model" "PROMPT-006 requires a provider model"
 
+    let acceptExternalExecution
+        (sessionId: string)
+        (physicalUserMessageId: string)
+        (agent: string)
+        (model: obj)
+        : unit =
+        match modelOf model with
+        | Some selected ->
+            SessionExecutionBinding.acceptExternalExecution
+                (SessionId.create sessionId)
+                (PhysicalUserMessageId.create physicalUserMessageId)
+                agent
+                selected
+        | None -> invalidArg "model" "PROMPT-006 requires a provider model"
+
     let beginProviderAttempt (sessionId: string) (physicalUserMessageId: string) (promptKey: string) : obj =
         let physical =
             if String.IsNullOrWhiteSpace physicalUserMessageId then
@@ -126,6 +147,11 @@ module SessionBindingSurface =
         | Some selected ->
             SessionExecutionBinding.validateObservedProvider (SessionId.create sessionId) agent selected
             |> resultObject box
+
+    let exactExecutionBindingCount (sessionId: string) (physicalUserMessageId: string) : int =
+        SessionExecutionBinding.exactExecutionBindingCount
+            (SessionId.create sessionId)
+            (PhysicalUserMessageId.create physicalUserMessageId)
 
     let drop (sessionId: string) : unit =
         SessionExecutionBinding.drop (SessionId.create sessionId)

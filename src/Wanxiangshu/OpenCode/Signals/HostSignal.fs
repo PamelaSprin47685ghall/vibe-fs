@@ -2,6 +2,12 @@ namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Failure
+
+type HostFailureObservation =
+    { SessionId: SessionId
+      Failure: ExecutionFailure
+      Diagnostic: string }
 
 /// FALLBACK-010: `Attempt` is the Host's own retry counter. Diagnostics only —
 /// it may not reach ConsecutiveFailureCount, the budget test, Offset, or the
@@ -9,7 +15,8 @@ open Wanxiangshu.Foundation.Identity
 type RetrySignal =
     { SessionId: SessionId
       Attempt: string
-      Reason: string }
+      Failure: ExecutionFailure
+      Diagnostic: string }
 
 /// FALLBACK-003: Host signals never carry provider-run identity.
 ///
@@ -26,11 +33,11 @@ type RetrySignal =
 type HostSignal =
     | SessionIdle of SessionId
     | ProviderRetry of RetrySignal
-    | ProviderFailure of sessionId: SessionId * reason: string
+    | ProviderFailure of HostFailureObservation
     | SessionDeleted of sessionId: SessionId * parentSessionId: SessionId option
     /// HOST-002/004: operator abort (MessageAbortedError / AbortError) is a
     /// typed signal that revokes the current attempt's idle-derived continuation
     /// capability. It is NOT ProviderFailure (it never advances fallback); it
     /// only means the attempt is no longer eligible to mint/consume a
     /// QuiescencePermit for a missing-final-report / interaction repair.
-    | AttemptAborted of SessionId
+    | AttemptAborted of HostFailureObservation

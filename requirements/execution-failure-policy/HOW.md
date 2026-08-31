@@ -12,13 +12,15 @@
 
 ```text
 ExecutionFailure
-× DurableExecutionPhase
+× DurableExecutionLifecycle
 × CapacityOwnership
 × ProviderRecoveryFacts
 → ExecutionFailureDecision
 ```
 
 输入与输出都是封闭不可变数据；模式匹配穷尽全部 failure constructors 与 `NotCommitted | Committed | Unknown` persistence commit states，并在每个分支构造 retry、fallback、breaker、capacity settlement、message disposition、fatality 六项。`NotCommitted` 分支按 WHAT 固定为 `NoRetry + NoFallback + NoBreakerTransition + RetainExactFence/NoCapacitySettlement + KeepCurrentFact + NoFatality`，不越过被拒绝的 transaction step。provider retry/fallback 只在 provider 两类分支求值。breaker、capacity、message 与 fatality 不允许由解释器二次推导。
+
+Provider recovery 输出携带 sealed `ProviderRecoveryAuthorization`，精确绑定稳定 `LogicalRunId`、本次 fresh `ProviderRunIdentity`、`ProviderRequestKind` 与由三者纯派生的 `ProviderRecoveryDecisionId`。controller 无法自行构造 licence；同一 typed decision 重放得到相同 decision id，新的 physical attempt 必得不同 provider-run/decision identity。
 
 ### Phase-aware ordered interpreter
 
@@ -59,11 +61,11 @@ Already terminal:
 
 | 命题 | 唯一落点测试 |
 |---|---|
-| EXECFAIL-001 | `requirements/execution-failure-policy/tests/persistence-commit-algebra-exhaustiveness.test.mjs` |
-| EXECFAIL-002 | `requirements/execution-failure-policy/tests/six-dimension-decision-matrix.test.mjs` |
-| EXECFAIL-003 | `requirements/execution-failure-policy/tests/provider-recovery-licence.test.mjs` |
-| EXECFAIL-004 | `requirements/execution-failure-policy/tests/exact-capacity-settlement.test.mjs` |
-| EXECFAIL-005 | `requirements/execution-failure-policy/tests/phase-aware-message-disposition.test.mjs` |
-| EXECFAIL-006 | `requirements/execution-failure-policy/tests/phase-aware-settlement-order.test.mjs` |
-| EXECFAIL-007 | `requirements/execution-failure-policy/tests/uncertain-commit-reconciliation.test.mjs` |
-| EXECFAIL-008 | `requirements/execution-failure-policy/tests/event-driven-policy.test.mjs` |
+| EXECFAIL-001 | `requirements/execution-failure-policy/tests/policy.test.mjs`, `requirements/execution-failure-policy/tests/host-codec.test.mjs`, `requirements/execution-failure-policy/tests/provider-mapping.test.mjs` |
+| EXECFAIL-002 | `requirements/execution-failure-policy/tests/policy.test.mjs`, `requirements/execution-failure-policy/tests/cancel-retry-fallback-stream.test.mjs`, `requirements/host-boundary/tests/host-hooks.test.mjs` |
+| EXECFAIL-003 | `requirements/execution-failure-policy/tests/policy.test.mjs`, `requirements/execution-failure-policy/tests/cancel-retry-fallback-stream.property.test.mjs` |
+| EXECFAIL-004 | `requirements/execution-failure-policy/tests/policy.test.mjs`, `requirements/execution-failure-policy/tests/capacity-mapping.test.mjs`, `requirements/host-boundary/tests/chat-hook-settlement.test.mjs` |
+| EXECFAIL-005 | `requirements/execution-failure-policy/tests/policy.test.mjs` |
+| EXECFAIL-006 | `requirements/execution-failure-policy/tests/policy.test.mjs`, `requirements/execution-failure-policy/tests/cancel-retry-fallback-stream.property.test.mjs`, `requirements/host-boundary/tests/chat-hook-settlement.test.mjs` |
+| EXECFAIL-007 | `requirements/execution-failure-policy/tests/policy.test.mjs`, `requirements/execution-failure-policy/tests/persistence-mapping.test.mjs`, `requirements/host-boundary/tests/chat-hook-settlement.test.mjs` |
+| EXECFAIL-008 | `requirements/execution-failure-policy/tests/policy.test.mjs`, `requirements/execution-failure-policy/tests/host-codec.test.mjs`, `requirements/execution-failure-policy/tests/provider-mapping.test.mjs`, `requirements/execution-failure-policy/tests/persistence-mapping.test.mjs` |

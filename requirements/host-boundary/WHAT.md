@@ -10,7 +10,7 @@
 
 ## HOST-BOUNDARY-003: 传输与领域分离且信号仅作唤醒
 
-宿主信号仅作为单向唤醒触发器，不得作为业务事实载体。信号内携带的尝试次数仅供诊断参考，不得直接作为领域的重试或回退计数。
+宿主信号仅作为单向唤醒触发器，不得作为业务事实载体。信号内携带的尝试次数仅供诊断参考，不得直接作为领域的重试或回退计数。coarse `AttemptAborted(SessionId)` 只能撤销当前物理 attempt 的 quiescence capability 并唤醒 reconciler；它没有 exact `PhysicalUserMessageId`，不得把该 session 的全部 current chat execution 投影为 `SessionAborted`，尤其不得终结已被更新 user message 接纳的新 execution。
 
 ## HOST-BOUNDARY-004: TurnUnknown 为对齐私有观测而非业务结局
 
@@ -18,7 +18,7 @@
 
 ## HOST-BOUNDARY-005: Reconciler 单飞快照观测与事件驱动收敛
 
-调和器对每个会话严格保证单飞执行（single-flight），接收到粗粒度信号时执行单次完整快照读取。在无新信号或明确投影边缘时，严禁通过墙钟轮询重复读取快照。
+调和器对每个会话严格保证单飞执行（single-flight），接收到粗粒度信号时执行单次完整快照读取。在无新信号或明确投影边缘时，严禁通过墙钟轮询重复读取快照。Provider failure 的 exact assistant `message.updated` 即使尚无 retry owner 的 terminal disposition，也必须用自身 exact physical identity 发出 typed failure wake；同一 physical 随后的 idle/retry wake 或无 identity 的 coarse failure 不得覆盖它，新 physical 或显式 abort 才能替换它。无 current physical binding 的 coarse failure 不得读取快照或发布 terminal turn，只能等待 exact projection evidence。Exact failure 不得伪装成 managed-chat terminal，也不得因 coarse `session.error` 缺席或 disposition 缺失被丢弃。
 
 ## HOST-BOUNDARY-006: Raw Part 与 ToolParts 状态投影一致性
 
@@ -30,7 +30,7 @@
 
 ## HOST-BOUNDARY-008: Transform 到 ProviderRunIdentity 因果读与唯一性
 
-从快照提取运行身份必须基于严格的因果规则（角色、完成时间、父节点匹配与最大序列）；当且仅当命中唯一候选时方可确认绑定，命中 0 个或多个候选时一律安全失败。`experimental.chat.messages.transform` 属于 provider inference 之前的物理边界，因此该 hook 不得把“当前 assistant run 已经存在”作为业务前置条件，也不得通过 bounded wait 把未来 run 伪装成 projection lag；需要在该 hook 冻结的 recovery 决策必须先以 exact `PhysicalUserMessageId` 保存为未绑定 attempt plan，待后续完整 Host 观测出现 exact `ProviderRunIdentity` 后再一次性绑定。
+从快照提取运行身份必须基于严格的因果规则（角色、完成时间、父节点匹配与最大序列）；当且仅当命中唯一候选时方可确认绑定，命中 0 个或多个候选时一律安全失败。`experimental.chat.messages.transform` 属于 provider inference 之前的物理边界，因此该 hook 不得把“当前 assistant run 已经存在”作为业务前置条件，也不得通过 bounded wait 把未来 run 伪装成 projection lag；需要在该 hook 冻结的 recovery 决策必须先以 exact `PhysicalUserMessageId` 保存为未绑定 attempt plan，同一 physical 的重复 transform 只能复用首次冻结值，不得重算后以冲突终止；待后续完整 Host 观测出现 exact `ProviderRunIdentity` 后再一次性绑定。
 
 ## HOST-BOUNDARY-009: Tool 身份双半边与缺失 Fail-Closed
 
@@ -91,3 +91,11 @@ Typed hook membrane 收到 `FatalAfterSettlement` 后，必须先按同一个 po
 ## HOST-BOUNDARY-023: 业务承诺只建立在公开 Host contract
 
 Requirement、领域状态与恢复策略只能依赖受支持的公开 Hook/SDK 输入输出及真实 canary 已证明的物理行为。private Host field/module、未公开 callback ordering、内部 retry counter、DOM/UI text、toast、spinner 或渲染时机均不得成为 identity、acceptance、provider start、terminal、capacity 或 fatal settlement 的证明；无法由公开 contract 观察的能力视为不存在并 fail closed。
+
+## HOST-BOUNDARY-024: Hook Policy 闭集与可选观测隔离
+
+每个 live Host Hook 必须且只能对应一行 closed metadata，声明 `Security | Workflow | Invariant | Degradable | AuditOnly` criticality、允许的 context/effect、retry permission、capacity owner 与 failure disposition。composition root 按该 closed score 显式静态注册，固定次序不得由 list iteration、动态 middleware 或 service locator 隐藏。Hook identity 权限至多只读，admission 权限至多进入唯一 owned gate；不存在 identity mutation 或 admission bypass。`Security`、`Workflow`、`Invariant` 失败始终经 `policyAwareHook` fail closed，不能降级为 best effort。已证明可选的 Casebook/audit observation 必须置于 typed best-effort boundary；其失败只发送现有 diagnostic，不能改变已完成的 critical Hook result。
+
+## HOST-BOUNDARY-025: 单一因果诊断与显式脱敏
+
+Host 只通过 `ReliabilityDiagnostics.CausalDiagnosticRecord` 发布结构化因果记录。可用事实携带 exact logical run、session、physical user message、provider run、agent、role、request kind、state transition、typed failure/retry/fallback、capacity、recovery 与 persistence commitment；不可用事实必须为 `None/null`，严禁猜测。schema 不接收 prompt、content、token、credential、cookie 或 path 字段；adapter 对允许的自由文本显式脱敏并压成单行。known typed failure 只输出一行 JSON 且无 stack。diagnostic emit/counter/query 失败不得改变 Hook result、admission、retry、recovery、capacity settlement 或 durable fact。

@@ -1,9 +1,12 @@
 namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System.Threading.Tasks
+open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Execution.Failure
+open Wanxiangshu.Execution.Session.ChatExecution
 
 /// Opaque-journal recovery observations for the host recovery boundary.
 /// FallbackLedger remains the sole writer; this surface only projects its
@@ -30,13 +33,41 @@ module FallbackHandleSurface =
         (reason: string)
         : Task<obj> =
         task {
+            let sessionId = SessionId.create session
+            let providerRunId = ProviderRunIdentity.create providerRun
+
             let! result =
-                FallbackLedger.recordConfirmedFailure
-                    handle.Journal
-                    budget
-                    (SessionId.create session)
-                    (ProviderRunIdentity.create providerRun)
-                    reason
+                match FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot handle.Journal) with
+                | None -> Task.FromResult(Ok ConfirmedFailureOutcome.NoActiveRun)
+                | Some current when budget <> defaultAutoRecoveryBudget ->
+                    Task.FromResult(Error "provider recovery budget must equal the declared default")
+                | Some current ->
+                    let available =
+                        if FallbackProjection.mayContinue defaultAutoRecoveryBudget current then
+                            ProviderRecoveryBudget.Available
+                        else
+                            ProviderRecoveryBudget.Exhausted
+
+                    let decision =
+                        ExecutionFailurePolicy.decide
+                            { Failure = ExecutionFailure.ProviderTransient
+                              Lifecycle = DurableExecutionLifecycle.ProviderStarted
+                              ExecutionKey =
+                                { SessionId = sessionId
+                                  PhysicalUserMessageId = PhysicalUserMessageId.create ("proof-" + providerRun) }
+                              Capacity = CapacityOwnership.NoCapacityFence
+                              Provider =
+                                { LogicalRun = current.LogicalRunId
+                                  ProviderRun = providerRunId
+                                  RequestKind = ProviderRequestKind.WorkMain
+                                  RetryBudget = ProviderRecoveryBudget.Exhausted
+                                  FallbackBudget = available
+                                  Breaker = ProviderBreakerState.Closed } }
+
+                    match decision.Fallback with
+                    | FallbackDecision.AdvanceFallback authorization ->
+                        FallbackLedger.recordAuthorizedFailure handle.Journal sessionId authorization reason
+                    | FallbackDecision.NoFallback -> Task.FromResult(Ok ConfirmedFailureOutcome.AlreadyRecorded)
 
             return
                 match result with

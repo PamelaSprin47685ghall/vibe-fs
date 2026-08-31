@@ -454,6 +454,9 @@ module BloggerCoordinator =
                 Task.FromResult DecisionEffect.Sealed
             elif scope.HasFlight key then
                 Task.FromResult DecisionEffect.SkippedInFlight
+            elif BloggerRuntimeHost.hasOpenProducer (Some j) mainId (BloggerRequestContext.bloggerSessionId ctx) then
+                scope.OfferMaterial(key, ctx) |> ignore
+                Task.FromResult DecisionEffect.OfferedParked
             else
                 materializeThenSend scope host journal j mainId key ctx)
 
@@ -475,7 +478,16 @@ module BloggerCoordinator =
         (key: string)
         (ctx: BloggerRequestContext)
         : Task<DecisionEffect> =
-        match BloggerRuntime.decideMaterial (scope.HasParked key) (scope.HasFlight key) ctx with
+        match
+            BloggerRuntime.decideMaterial
+                (BloggerRuntimeHost.hasOpenProducer
+                    journal
+                    (BloggerRequestContext.mainSessionId ctx)
+                    (BloggerRequestContext.bloggerSessionId ctx))
+                (scope.HasParked key)
+                (scope.HasFlight key)
+                ctx
+        with
         | BloggerRuntime.Decision.Start startCtx -> startFrozen scope host journal key startCtx
         | BloggerRuntime.Decision.Offer offerCtx ->
             scope.OfferMaterial(key, offerCtx) |> ignore

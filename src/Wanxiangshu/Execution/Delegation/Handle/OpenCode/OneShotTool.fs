@@ -110,7 +110,13 @@ module OneShotAgentTool =
     /// `Metadata = None` when the scope carried no journal. That prompt was real
     /// but keyless, so PROMPT-011 could not recover it and PromptIngress could only
     /// classify its reply as UnknownOrigin.
-    let private send (scope: ToolRuntimeScope) childId prompt agent directory : Task<Result<PromptKey, string>> =
+    let private send
+        (scope: ToolRuntimeScope)
+        childId
+        prompt
+        (identitySeed: PromptAuthority.IdentitySeed)
+        directory
+        : Task<Result<PromptKey, string>> =
         task {
             match scope.Journal with
             | None -> return Error "No journal: a one-shot agent prompt cannot be claimed"
@@ -122,7 +128,7 @@ module OneShotAgentTool =
                         scope.Sessions
                         childId
                         prompt
-                        agent
+                        identitySeed
                         directory
                         PromptDispatcher.AwaitMode.Detached
                         None
@@ -435,7 +441,12 @@ module OneShotAgentTool =
                 )
             )
 
-            let! sendResult = send scope childId fullPrompt managed.Name directory |> TaskResultCE.ofTask
+            let sendTask =
+                match HostForkRunLifecycle.issueCurrentOwnerIdentitySeed scope.Journal parentId managed.Name with
+                | Ok identitySeed -> send scope childId fullPrompt identitySeed directory
+                | Error error -> Task.FromResult(Error error)
+
+            let! sendResult = sendTask |> TaskResultCE.ofTask
             noteSendFailure succeed sendResult
 
             return! awaitBoundedCompletion scope context childId managed parentWorkRecord roleLabel completion latch

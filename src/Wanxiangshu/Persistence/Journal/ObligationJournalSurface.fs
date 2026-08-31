@@ -88,6 +88,13 @@ module ObligationJournalSurface =
                    LifeId = lifeId
                    ActivationPromptKey = PromptKey.create (text (payload?activationPromptKey))
                    ProtectedPrefixEndSequence = int64 (unbox<int> (payload?protectedPrefixEndSequence)) |}
+        | "LifeCompleted" ->
+            ManagerLifecycleFact.LifeCompleted
+                {| SessionId = sessionId
+                   LifeId = lifeId
+                   RequestId = FinalityRequestId.create (text (payload?requestId))
+                   TerminalRef = BlobRef.create (text (payload?terminalRef))
+                   TerminalDigest = BlobDigest.create (text (payload?terminalDigest)) |}
         | other -> failwith $"ObligationJournalSurface: unknown lifecycle case '{other}'"
 
     let appendManagerLifecycle

@@ -6,7 +6,31 @@ import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.j
 import * as finality from '../../../dist/Mission/Manager/FinalitySurface.js'
 
 const hash = (value) => `H(${value})`
-const root = authority.createAuthorityRoot(hash, 'rt_idle', 'ses_idle', 'HumanRoot', 'root', 'fast-manager').value
+const personas = {
+  'fast-manager': 'Coordinator',
+}
+const rootSelection = (agent) => {
+  const [selectedTier, canonicalRole] = agent.split('-')
+  const peerTier = selectedTier === 'fast' ? 'deep' : 'fast'
+  return {
+    kind: 'RootSelection',
+    ownerSession: null,
+    ownerLogicalRun: null,
+    ownerAuthorityRoot: null,
+    participantIdentity: {
+      selectedAgent: agent,
+      peerAgent: `${peerTier}-${canonicalRole}`,
+      canonicalRole,
+      selectedTier,
+      persona: personas[agent] ?? 'Coordinator',
+      personaCatalogVersion: 1,
+      origin: 'ResolvedAtRoot',
+    },
+  }
+}
+const createdRoot = authority.createAuthorityRoot(hash, 'rt_idle', 'ses_idle', 'HumanRoot', 'root', rootSelection('fast-manager'))
+assert.equal(createdRoot.ok, true, createdRoot.error)
+const root = createdRoot.value
 const register = () => authority.registerAuthority(root, authority.empty)
 
 test('WHAT[INTERACTION-AUTHORITY-012] HOST_004_manager_idle_admission_is_exactly_once_per_terminal', () => {

@@ -373,29 +373,22 @@ module CompressionSurface =
     let private attemptPlanCore (value: obj) : Result<AttemptPlan, string> =
         match roleResult value?role, tierResult value?tier, requestKindResult value?kind with
         | Ok role, Ok tier, Ok requestKind ->
-            let peerTier =
-                if tier = AgentTier.Fast then
-                    AgentTier.Deep
-                else
-                    AgentTier.Fast
-
-            let authority: PromptAuthority.AuthorityExecutionProfile =
-                { SessionId = SessionId.create "surface-session"
-                  LogicalRunId = LogicalRunId.create "surface-run"
-                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "surface-root"
-                  AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
-                  SelectedAgent = Roles.managedAgentName tier role
-                  PeerAgent = Roles.managedAgentName peerTier role
-                  CanonicalRole = role
-                  SelectedTier = tier }
-
             let selectProbe () =
                 if not (isNullish value?probe) then
                     Ok(attemptProbeOf value?probe)
                 else
                     Error(reasonOf value?noCandidateReason)
 
-            Ok(
+            ParticipantIdentity.resolveAtRoot (Roles.managedAgentName tier role)
+            |> Result.mapError (fun error -> sprintf "invalid participant identity: %A" error)
+            |> Result.bind (fun participantIdentity ->
+                PromptAuthority.createAuthorityExecutionProfile
+                    (SessionId.create "surface-session")
+                    (LogicalRunId.create "surface-run")
+                    (AuthorityRootUserMessageId.create "surface-root")
+                    PromptAuthority.RootAuthorityKind.HumanRoot
+                    participantIdentity)
+            |> Result.map (fun authority ->
                 AttemptPlanner.plan
                     authority
                     (cursorOfJs value?cursor)
@@ -407,11 +400,23 @@ module CompressionSurface =
                          RecoveryOpportunity.RecoveryAttempt
                      else
                          RecoveryOpportunity.OrdinaryAttempt)
-                    selectProbe
-            )
+                    selectProbe)
         | Error error, _, _
         | _, Error error, _
         | _, _, Error error -> Error error
+
+    let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
+        box
+            {| selectedAgent = ParticipantIdentity.selectedAgent identity
+               peerAgent = ParticipantIdentity.peerAgent identity
+               canonicalRole = ParticipantIdentity.roleLabel identity
+               selectedTier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+               persona = ParticipantIdentity.persona identity
+               personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
+               origin =
+                match ParticipantIdentity.origin identity with
+                | PersonaOrigin.ResolvedAtRoot -> "ResolvedAtRoot"
+                | PersonaOrigin.InheritedFromOwner -> "InheritedFromOwner" |}
 
     let private attemptPlanView (plan: AttemptPlan) : obj =
         let choice, probeId =
@@ -423,7 +428,13 @@ module CompressionSurface =
             {| choice = choice
                probeId = optionObj probeId
                noProbeReason = optionObj (plan.NoProbeReason |> Option.map reasonName)
-               effectiveAgent = plan.Profile.EffectiveAgent |}
+               effectiveAgent = plan.Profile.EffectiveAgent
+               participantIdentity = participantIdentityToJs plan.Profile.Authority.ParticipantIdentity
+               systemPromptId = SystemPromptId.value plan.Profile.SystemPromptId
+               toolCapabilities =
+                plan.Profile.CanonicalRole
+                |> Roles.roleLabel
+                |> Wanxiangshu.Foundation.RolesSurface.permissions |}
 
     /// Build the production AttemptPlan from plain request labels. The caller
     /// supplies either a probe or a named no-candidate result; the planner itself
@@ -448,6 +459,9 @@ module CompressionSurface =
                    probeId = viewObject?probeId
                    noProbeReason = viewObject?noProbeReason
                    effectiveAgent = viewObject?effectiveAgent
+                   participantIdentity = viewObject?participantIdentity
+                   systemPromptId = viewObject?systemPromptId
+                   toolCapabilities = viewObject?toolCapabilities
                    handle = box (AttemptPlanHandle plan) |}
 
     let private promotableProbeId (value: obj) (outcome: string) : obj =

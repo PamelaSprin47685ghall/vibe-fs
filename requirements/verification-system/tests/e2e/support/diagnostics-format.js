@@ -16,6 +16,7 @@ function formatToolsPreview(tools) {
 function formatEventLine(e) {
   const parts = [`#${e.seq}`, e.time, e.type];
   if (e.sessionID) parts.push(`session=${e.sessionID}`);
+  if (e.parentSessionID) parts.push(`parent=${e.parentSessionID}`);
   if (e.error) {
     const msg = typeof e.error === 'string' ? e.error.slice(0, 80) : JSON.stringify(e.error).slice(0, 80);
     parts.push(`error=${msg}`);

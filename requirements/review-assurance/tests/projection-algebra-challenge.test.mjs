@@ -38,3 +38,16 @@ test('WHAT[REVIEW-ASSURANCE-002] Finality reviewer terminal wait is future-only 
   assert.match(changeHost, /ReviewerTerminalAwait\.awaitFuture deps\.Journal deps\.Sessions occasion Distillation\.AwaitAgentTimeoutMs/)
   assert.doesNotMatch([finalityHost, changeHost].join('\n'), /Subscribe(?:Future)?Terminal\(/)
 })
+
+test('WHAT[FINALITY-009] an ungraduated Reviewer reenters through its active authority continuation', () => {
+  const finalityHost = read('src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs')
+  const startReview = finalityHost.slice(
+    finalityHost.indexOf('let startReview'),
+    finalityHost.indexOf('let awaitTerminal'),
+  )
+
+  assert.match(startReview, /memberInfo\.IsNew[\s\S]*?SendDeferredFirstPrompt/)
+  assert.match(startReview, /HostSessionNudge\.sendContinuation/)
+  assert.match(startReview, /PromptAuthority\.ContinuationKind\.ReviewerGuard/)
+  assert.doesNotMatch(startReview, /runtime\.Fork/)
+})

@@ -55,7 +55,12 @@ test('WHAT[CONTEXT-COMPRESSION-021] CTX_021_future_X_material_waiter_is_deleted_
   assert.doesNotMatch(coordinator, /tryStartSquash|OfferRecoveryMaterial/)
 
   const workflow = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
-  assert.match(workflow, /FallbackLedger\.recordConfirmedFailure/)
+  assert.match(
+    workflow,
+    /let private recoveryDecision[\s\S]*ExecutionFailurePolicy\.decide[\s\S]*let private executeFallbackDecision[\s\S]*FallbackDecision\.AdvanceFallback authorization[\s\S]*FallbackLedger\.recordAuthorizedFailure durable turn\.SessionId authorization error[\s\S]*let private executeAuthorizedRecovery[\s\S]*recoveryDecision turn failure current requestKind[\s\S]*executeFallbackDecision/,
+    'confirmed failure must cross ExecutionFailurePolicy before the fallback ledger records its exact authorization',
+  )
+  assert.doesNotMatch(workflow, /FallbackLedger\.recordConfirmedFailure/)
   assert.match(workflow, /RecoverySlot\.nextBloggerRequest/)
   assert.match(workflow, /replaceFailedBloggerRequest/)
 })

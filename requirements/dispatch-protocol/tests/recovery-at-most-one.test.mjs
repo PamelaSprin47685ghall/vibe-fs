@@ -19,6 +19,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as recovery from '../../../dist/Interaction/Dispatch/RecoverySurface.js'
 
@@ -31,6 +32,36 @@ const capturingPort = (captured) => ({
     return dispatch.admittedWithReceipt('accepted-011')
   },
 })
+
+const inheritedIdentity = {
+  kind: 'RootSelection',
+  ownerSession: null,
+  ownerLogicalRun: null,
+  ownerAuthorityRoot: null,
+  participantIdentity: {
+    selectedAgent: 'fast-manager',
+    peerAgent: 'deep-manager',
+    canonicalRole: 'manager',
+    selectedTier: 'fast',
+    persona: 'Coordinator',
+    personaCatalogVersion: 1,
+    origin: 'ResolvedAtRoot',
+  },
+}
+
+const sendAgentOwnerRoot = async (port, handle, session, text) => {
+  const ownerSession = `${session}_owner`
+  const owner = await dispatch.acceptHumanRootSelection(
+    handle,
+    ownerSession,
+    `msg_${ownerSession}`,
+    inheritedIdentity,
+  )
+  assert.equal(owner.ok, true, owner.ok ? '' : owner.error)
+  const seed = authority.issueInheritedIdentitySeed('fast-coder', owner.profile)
+  assert.equal(seed.ok, true, seed.ok ? '' : seed.error)
+  return dispatch.sendAgentOwnerRoot(port, handle, session, text, seed.value)
+}
 
 /** role=user 消息：PromptKey 落在 metadata（PROMPT-011 的物理落地证据）。 */
 const userMessageWithKey = (id, keyValue) => ({
@@ -47,12 +78,11 @@ test('WHAT[DISPATCH-PROTOCOL-008] DP_008_unproven_outcome_stays_pending_never_re
     assert.equal(first.ok, true, first.ok ? '' : JSON.stringify(first.error))
     try {
       const captured = []
-      const sent = await dispatch.sendAgentOwnerRoot(
+      const sent = await sendAgentOwnerRoot(
         capturingPort(captured),
         first.journal,
         'ses_008',
         'crash before acceptance',
-        'fast-coder',
       )
       assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
       assert.ok(sent.key, 'Detached 仍返回 PromptKey')
@@ -92,12 +122,11 @@ test('WHAT[DISPATCH-PROTOCOL-004] DP_004_physical_acceptance_is_proven_only_by_p
     assert.equal(first.ok, true, first.ok ? '' : JSON.stringify(first.error))
     try {
       const captured = []
-      const sent = await dispatch.sendAgentOwnerRoot(
+      const sent = await sendAgentOwnerRoot(
         capturingPort(captured),
         first.journal,
         'ses_004',
         'crash before acceptance',
-        'fast-coder',
       )
       assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
       assert.ok(sent.key, 'Detached 仍返回 PromptKey')
@@ -133,6 +162,75 @@ test('WHAT[DISPATCH-PROTOCOL-004] DP_004_physical_acceptance_is_proven_only_by_p
   }
 })
 
+test('WHAT[DISPATCH-PROTOCOL-013] DP_013_construction_waits_for_durability_activation_before_explicit_recovery', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-dispatch-activation-'))
+  try {
+    const first = await journal.JournalSurface_bootWithWriterId(
+      base,
+      'writer-dispatch-activation-1',
+      'rt-dispatch-activation-1',
+      4242,
+      '2026-01-01T00:00:00Z',
+    )
+    assert.equal(first.ok, true, first.ok ? '' : JSON.stringify(first.error))
+
+    let key
+    try {
+      const captured = []
+      const sent = await sendAgentOwnerRoot(
+        capturingPort(captured),
+        first.journal,
+        'ses_dispatch_activation',
+        'recover only after durable activation',
+      )
+      assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
+      assert.equal(captured.length, 1)
+      key = sent.key
+    } finally {
+      journal.JournalSurface_dispose(first.journal)
+    }
+
+    const activated = await journal.JournalSurface_bootWithWriterId(
+      base,
+      'writer-dispatch-activation-2',
+      'rt-dispatch-activation-2',
+      4243,
+      BOOT_AFTER_CLAIM,
+    )
+    assert.equal(activated.ok, true, activated.ok ? '' : JSON.stringify(activated.error))
+    try {
+      assert.equal(
+        dispatch.pendingClaimCount(activated.journal, 'ses_dispatch_activation'),
+        1,
+        'constructing the registered dispatch surface must not read Host evidence or start recovery',
+      )
+
+      const outcomes = await recovery.reconcile(activated.journal, [
+        userMessageWithKey('msg_dispatch_activation', key),
+      ])
+      assert.deepEqual(outcomes, [
+        {
+          session: 'ses_dispatch_activation',
+          promptKey: key,
+          outcome: 'Proven',
+          physicalMessageId: 'msg_dispatch_activation',
+          hasReceipt: null,
+          reason: null,
+        },
+      ])
+      assert.equal(
+        dispatch.pendingClaimCount(activated.journal, 'ses_dispatch_activation'),
+        0,
+        'only explicit recovery after successful durable activation may establish PhysicalAccepted',
+      )
+    } finally {
+      journal.JournalSurface_dispose(activated.journal)
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[DISPATCH-PROTOCOL-007] DP_007_restarts_never_auto_abandon_an_unresolved_broken_tool', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dp011b-'))
   try {
@@ -140,12 +238,11 @@ test('WHAT[DISPATCH-PROTOCOL-007] DP_007_restarts_never_auto_abandon_an_unresolv
     assert.equal(first.ok, true, first.ok ? '' : JSON.stringify(first.error))
     try {
       const captured = []
-      const sent = await dispatch.sendAgentOwnerRoot(
+      const sent = await sendAgentOwnerRoot(
         capturingPort(captured),
         first.journal,
         'ses_011b',
         'never lands',
-        'fast-coder',
       )
       assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
       assert.equal(captured.length, 1)

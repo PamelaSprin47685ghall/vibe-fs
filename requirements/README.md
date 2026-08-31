@@ -27,7 +27,7 @@ grounding 由 `requirement-grounding` package 拥有。
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
-## 52 包索引
+## 54 包索引
 
 ### 1. Requirement system
 | Package | 一句话 WHY |
@@ -70,6 +70,7 @@ grounding 由 `requirement-grounding` package 拥有。
 |---|---|
 | [concern-routing](concern-routing/WHAT.md) | concern-addressed mailbox 让发送者不依赖身份拓扑，消息只在下一次 Pair Hint 自然边界交付。 |
 | [interaction-authority](interaction-authority/WHAT.md) | PhysicalUserMessage ≠ AuthorityTurn；typed provenance 才能创建/继续 logical interaction。 |
+| [managed-chat-execution](managed-chat-execution/WHAT.md) | 物理消息的 durable acceptance、provider start、唯一终态与 exact settlement 由消息级执行 owner 统一管理。 |
 | [dispatch-protocol](dispatch-protocol/WHAT.md) | 已获授权 interaction 穿过 unreliable Host 时避免 unknown outcome 复制逻辑效果。 |
 | [durable-events](durable-events/WHAT.md) | immutable facts + atomic commit + deterministic fold = 单一可重放 substrate。 |
 | [effect-accounting](effect-accounting/WHAT.md) | 外部副作用 Requested/Unknown/Accepted 分型；unknown 不能伪装未发生或成功。 |
@@ -95,6 +96,7 @@ grounding 由 `requirement-grounding` package 拥有。
 ### 8. Failure / recovery
 | Package | 一句话 WHY |
 |---|---|
+| [execution-failure-policy](execution-failure-policy/WHAT.md) | 封闭失败类型由唯一纯策略一次性裁决 retry、fallback、capacity、message 与 fatal 后果。 |
 | [provider-attempt-recovery](provider-attempt-recovery/WHAT.md) | attempt 失败后可 bounded 换 execution binding，不改变 authority/personhood。 |
 | [crash-reconciliation](crash-reconciliation/WHAT.md) | 中断后只从 durable facts + 可信物理观察重入普通程序。 |
 | [degeneration-guard](degeneration-guard/WHAT.md) | 未结束 attempt 病态重复时主动止损再交正常 recovery。 |
@@ -135,7 +137,7 @@ grounding 由 `requirement-grounding` package 拥有。
 
 ## 依赖骨架
 
-权威依赖清单见各包 HOW.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 130-edge 骨架一致（0 cycle）。
+权威依赖清单见各包 HOW.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 144-edge 骨架一致。
 
 ## 运行与验证
 

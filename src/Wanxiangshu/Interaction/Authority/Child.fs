@@ -50,35 +50,32 @@ open Wanxiangshu.Foundation.Identity
 /// Physical runtime cleanup must not decide who owns a Logical Run.
 module ChildPromptAuthority =
 
-    /// Register AgentOwnerRoot authority for one proven linked child, idempotently.
-    /// The durable handle is the only source of TargetAgent; no role-to-agent rebuild.
-    let private createLinkedChildAuthority
-        (runtime: PromptDispatcher.Runtime)
-        (turn: ReconciledTurn)
-        (handle: Wanxiangshu.Execution.Delegation.HandleRecord)
-        : System.Threading.Tasks.Task<Result<unit, string>> =
-        match
-            PromptAuthorityRun.createAuthorityRoot
-                HostDigest.sha256Hex
-                runtime.RuntimeId
-                turn.SessionId
-                PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-                turn.PhysicalUserMessageId
-                handle.TargetAgent
-        with
-        | Error error -> System.Threading.Tasks.Task.FromResult(Error error)
-        | Ok profile -> runtime.RegisterAuthority profile
-
     let private registerLinkedChildIfNeeded
         (runtime: PromptDispatcher.Runtime)
         (turn: ReconciledTurn)
         handle
         (activeProfile: PromptAuthority.AuthorityExecutionProfile option)
+        (accepted: PromptAuthority.AcceptedDispatch option)
         : System.Threading.Tasks.Task<Result<unit, string>> =
-        match handle, activeProfile with
-        | None, _
-        | Some _, Some _ -> System.Threading.Tasks.Task.FromResult(Ok())
-        | Some handle, None -> createLinkedChildAuthority runtime turn handle
+        match handle, activeProfile, accepted with
+        | None, _, _
+        | Some _, Some _, _ -> System.Threading.Tasks.Task.FromResult(Ok())
+        | Some _, None, None ->
+            System.Threading.Tasks.Task.FromResult(
+                Error(
+                    sprintf
+                        "Linked child %s has no accepted AgentOwnerRoot claim for physical message %s"
+                        (SessionId.value turn.SessionId)
+                        (PhysicalUserMessageId.value turn.PhysicalUserMessageId)
+                )
+            )
+        | Some _, None, Some claim ->
+            runtime.AcceptPhysicalAgentOwnerRoot
+                claim.PromptKey
+                turn.SessionId
+                turn.PhysicalUserMessageId
+                claim.IdentitySeed
+            |> TaskValue.map (Result.map ignore)
 
     let ensureForLinkedChild
         (journal: AgentJournal option)
@@ -96,6 +93,15 @@ module ChildPromptAuthority =
                 let activeProfile =
                     PromptAuthorityLedger.activeProfile turn.SessionId snapshot.AgentProjections
 
+                let accepted =
+                    PromptAuthorityLedger.acceptedDispatchForPhysicalMessage
+                        turn.SessionId
+                        turn.PhysicalUserMessageId
+                        snapshot.AgentProjections
+                    |> Option.filter (fun claim ->
+                        claim.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
+                                           PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+
                 let runtime = PromptDispatcher.forJournal durable
-                return! registerLinkedChildIfNeeded runtime turn handle activeProfile
+                return! registerLinkedChildIfNeeded runtime turn handle activeProfile accepted
         }

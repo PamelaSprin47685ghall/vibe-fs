@@ -123,28 +123,61 @@ module internal CompanionHostBlogger =
                   ObservedPrefixEpochId = observedEpoch })
 
 
-    let private sendBloggerPrompt
+    let private sendBloggerRoot
         (deps: BloggerDeps)
         (childId: SessionId)
         (prompt: string)
+        (journal: AgentJournal)
+        (dispatcher: PromptDispatcher.Runtime)
         : Task<Result<PromptKey, string>> =
         task {
-            match deps.Journal with
-            | None -> return Error "No journal: a Blogger prompt cannot be claimed"
-            | Some journal ->
-                let dispatcher = PromptDispatcher.forJournal journal
-
+            match
+                HostForkRunLifecycle.issueCurrentOwnerIdentitySeed (Some journal) deps.PrimaryId deps.EffectiveAgent
+            with
+            | Error error -> return Error error
+            | Ok identitySeed ->
                 // PROMPT-007 Detached: Blogger dispatch does not wait for PhysicalAccepted.
                 return!
                     dispatcher.SendAgentOwnerRoot
                         deps.Sessions
                         childId
                         prompt
-                        deps.EffectiveAgent
+                        identitySeed
                         None
                         PromptDispatcher.AwaitMode.Detached
                         None
         }
+
+    let private sendClaimedBloggerPrompt
+        (deps: BloggerDeps)
+        (childId: SessionId)
+        (prompt: string)
+        (journal: AgentJournal)
+        : Task<Result<PromptKey, string>> =
+        let dispatcher = PromptDispatcher.forJournal journal
+
+        match (dispatcher.ProjectionFor childId).ActiveLogicalRun with
+        | Some profile ->
+            dispatcher.SendContinuation
+                deps.Sessions
+                childId
+                prompt
+                PromptAuthority.ContinuationKind.ManagedDelegationAssignment
+                profile
+                profile.SelectedAgent
+                None
+                PromptDispatcher.AwaitMode.Detached
+                None
+        | None -> sendBloggerRoot deps childId prompt journal dispatcher
+
+    let private sendBloggerPrompt
+        (deps: BloggerDeps)
+        (childId: SessionId)
+        (prompt: string)
+        : Task<Result<PromptKey, string>> =
+        match deps.Journal with
+        | None -> Task.FromResult(Error "No journal: a Blogger prompt cannot be claimed")
+        | Some journal -> sendClaimedBloggerPrompt deps childId prompt journal
 
     /// Physical send from frozen typed context (Main or Squash). No terminal wait.
     /// Transform rebuilds the provider view from durable frames + this context.

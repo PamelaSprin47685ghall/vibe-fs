@@ -11,6 +11,7 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Mission.Review.Judgement
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Context.Companion
 
@@ -68,6 +69,87 @@ module ReviewJournalSurface =
         | "Distiller" -> Role.Distiller
         | "Blogger" -> Role.Blogger
         | other -> failwith $"ReviewJournalSurface: unknown role '{other}'"
+
+    let private participantRoleOf value =
+        if isNull value then
+            None
+        else
+            let label = text value
+
+            ManagedAgentCatalog.tryParseRole label
+            |> Option.map Some
+            |> Option.defaultWith (fun () -> failwith $"ReviewJournalSurface: unknown participant role '{label}'")
+
+    let private participantTierOf value =
+        let label = text value
+
+        ManagedAgentCatalog.tryParseTier label
+        |> Option.defaultWith (fun () -> failwith $"ReviewJournalSurface: unknown participant tier '{label}'")
+
+    let private participantOriginOf value =
+        match text value with
+        | "ResolvedAtRoot" -> PersonaOrigin.ResolvedAtRoot
+        | "InheritedFromOwner" -> PersonaOrigin.InheritedFromOwner
+        | other -> failwith $"ReviewJournalSurface: unknown participant origin '{other}'"
+
+    let private participantIdentityInputOf (value: obj) =
+        { SelectedAgent = strField value "selectedAgent"
+          PeerAgent = strField value "peerAgent"
+          Role = participantRoleOf (field value "canonicalRole")
+          InitialTier = participantTierOf (field value "selectedTier")
+          Persona = strField value "persona"
+          PersonaCatalogVersion = unbox<int> (field value "personaCatalogVersion")
+          Origin = participantOriginOf (field value "origin") }
+
+    let private identitySeedOf (payload: obj) =
+        let value = field payload "IdentitySeed"
+
+        let participantIdentity =
+            participantIdentityInputOf (field value "participantIdentity")
+
+        let input =
+            match strField value "kind" with
+            | "RootSelection" -> PromptAuthority.IdentitySeedInput.RootSelectionInput participantIdentity
+            | "InheritedFromOwner" ->
+                PromptAuthority.IdentitySeedInput.InheritedFromOwnerInput
+                    { OwnerSessionId = SessionId.create (strField value "ownerSession")
+                      OwnerLogicalRunId = LogicalRunId.create (strField value "ownerLogicalRun")
+                      OwnerAuthorityRootUserMessageId =
+                        AuthorityRootUserMessageId.create (strField value "ownerAuthorityRoot")
+                      ParticipantIdentity = participantIdentity }
+            | other -> failwith $"ReviewJournalSurface: unknown identity seed kind '{other}'"
+
+        PromptAuthority.rehydrateIdentitySeed input
+        |> Result.defaultWith (fun error -> failwith $"ReviewJournalSurface: invalid identity seed: {error}")
+
+    let private identitySeedView seed =
+        let identity = PromptAuthority.identitySeedParticipantIdentity seed
+
+        let kind, ownerSession, ownerLogicalRun, ownerAuthorityRoot =
+            match PromptAuthority.identitySeedOwner seed with
+            | None -> "RootSelection", null, null, null
+            | Some(sessionId, logicalRunId, authorityRoot) ->
+                "InheritedFromOwner",
+                box (SessionId.value sessionId),
+                box (LogicalRunId.value logicalRunId),
+                box (AuthorityRootUserMessageId.value authorityRoot)
+
+        box
+            {| kind = kind
+               ownerSession = ownerSession
+               ownerLogicalRun = ownerLogicalRun
+               ownerAuthorityRoot = ownerAuthorityRoot
+               participantIdentity =
+                {| selectedAgent = ParticipantIdentity.selectedAgent identity
+                   peerAgent = ParticipantIdentity.peerAgent identity
+                   canonicalRole = ParticipantIdentity.roleLabel identity
+                   selectedTier = ParticipantIdentity.initialTier identity |> ManagedAgentCatalog.wireTierLabel
+                   persona = ParticipantIdentity.persona identity
+                   personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
+                   origin =
+                    match ParticipantIdentity.origin identity with
+                    | PersonaOrigin.ResolvedAtRoot -> "ResolvedAtRoot"
+                    | PersonaOrigin.InheritedFromOwner -> "InheritedFromOwner" |} |}
 
     let private ownershipOf value =
         match text value with
@@ -129,15 +211,13 @@ module ReviewJournalSurface =
         match caseName with
         | "AuthorityRootAccepted" ->
             PromptFact.AuthorityRootAccepted
-                {| SessionId = SessionId.create (strField payload "SessionId")
-                   LogicalRunId = LogicalRunId.create (strField payload "LogicalRunId")
-                   AuthorityRootUserMessageId =
+                { SchemaVersion = unbox<int> (field payload "SchemaVersion")
+                  SessionId = SessionId.create (strField payload "SessionId")
+                  LogicalRunId = LogicalRunId.create (strField payload "LogicalRunId")
+                  AuthorityRootUserMessageId =
                     AuthorityRootUserMessageId.create (strField payload "AuthorityRootUserMessageId")
-                   AuthorityKind = strField payload "AuthorityKind"
-                   SelectedAgent = strField payload "SelectedAgent"
-                   PeerAgent = strField payload "PeerAgent"
-                   CanonicalRole = strField payload "CanonicalRole"
-                   SelectedTier = strField payload "SelectedTier" |}
+                  AuthorityKind = strField payload "AuthorityKind"
+                  IdentitySeed = identitySeedOf payload }
         | other -> failwith $"ReviewJournalSurface: unknown Prompt fact '{other}'"
 
     let private executionFactOf (caseName: string) (payload: obj) : AgentFact =
@@ -234,21 +314,33 @@ module ReviewJournalSurface =
         appendAgent handle sessionId providerRun "Review" caseName payload
 
     let appendAuthorityRoot (handle: JournalHandle) (sessionId: string) (agent: string) : Task<obj> =
-        appendAgent
-            handle
-            sessionId
-            null
-            "Prompt"
-            "AuthorityRootAccepted"
-            (box
-                {| SessionId = sessionId
-                   LogicalRunId = $"run-{sessionId}"
-                   AuthorityRootUserMessageId = $"root-{sessionId}"
-                   AuthorityKind = "AgentOwnerRoot"
-                   SelectedAgent = $"fast-{agent}"
-                   PeerAgent = $"deep-{agent}"
-                   CanonicalRole = agent
-                   SelectedTier = "fast" |})
+        task {
+            let selectedAgent =
+                if String.IsNullOrWhiteSpace agent then
+                    "fast-reviewer"
+                else
+                    $"fast-{agent}"
+
+            match ParticipantIdentity.resolveAtRoot selectedAgent with
+            | Error error ->
+                return
+                    box
+                        {| ok = false
+                           error = $"ReviewJournalSurface: invalid participant identity: {error}" |}
+            | Ok participantIdentity ->
+                let fact =
+                    PromptFact.AuthorityRootAccepted
+                        { SchemaVersion = 2
+                          SessionId = SessionId.create sessionId
+                          LogicalRunId = LogicalRunId.create $"run-{sessionId}"
+                          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create $"root-{sessionId}"
+                          AuthorityKind = "HumanRoot"
+                          IdentitySeed = PromptAuthority.IdentitySeed.RootSelection participantIdentity }
+
+                let! result = AgentJournal.appendAgent (streamOfSession sessionId) None fact handle.Journal
+
+                return appendResult result
+        }
 
     let sessionView (handle: JournalHandle) (sessionId: string) : obj =
         let projection = AgentJournal.snapshot handle.Journal
@@ -299,8 +391,28 @@ module ReviewJournalSurface =
                            evidenceDigest = BlobDigest.value frontier.TerminalDigest |})
                 |> Option.toObj
 
+            let authorityProfile =
+                session.PromptAuthority
+                |> Option.bind (fun authority -> authority.ActiveLogicalRun)
+                |> Option.map (fun authority ->
+                    box
+                        {| session = SessionId.value authority.SessionId
+                           logicalRun = LogicalRunId.value authority.LogicalRunId
+                           authorityRoot = AuthorityRootUserMessageId.value authority.AuthorityRootUserMessageId
+                           authorityKind =
+                            match authority.AuthorityKind with
+                            | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
+                            | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
+                           identitySeed = identitySeedView authority.IdentitySeed
+                           selectedAgent = authority.SelectedAgent
+                           peerAgent = authority.PeerAgent
+                           role = ManagedAgentCatalog.roleLabel authority.CanonicalRole
+                           initialTier = ManagedAgentCatalog.tierLabel authority.SelectedTier |})
+                |> Option.toObj
+
             box
                 {| witness = witnessName
+                   authorityProfile = authorityProfile
                    xTraceHead = xTraceHead
                    xTracePartKinds = xTracePartKinds
                    closedAttempts = closedAttempts

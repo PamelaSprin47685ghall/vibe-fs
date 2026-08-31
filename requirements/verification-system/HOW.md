@@ -47,9 +47,9 @@
 | VERIFICATION-SYSTEM-004 | `requirements/verification-system/tests/deadcode-scan.test.mjs` |
 | VERIFICATION-SYSTEM-005 | `requirements/verification-system/tests/walk-fail-closed.test.mjs` |
 | VERIFICATION-SYSTEM-006 | `requirements/verification-system/tests/e2e-watchdog-feed.test.mjs` |
-| VERIFICATION-SYSTEM-007 | `requirements/verification-system/tests/temporal-harness.test.mjs` |
+| VERIFICATION-SYSTEM-007 | `requirements/verification-system/tests/temporal-harness.test.mjs`；`requirements/verification-system/tests/identity-capacity-interleaving.test.mjs`；`requirements/verification-system/tests/identity-capacity-interleaving.property.test.mjs` |
 | VERIFICATION-SYSTEM-008 | `requirements/verification-system/tests/guide-contract.test.mjs`；`requirements/verification-system/tests/build-freshness.test.mjs` |
-| VERIFICATION-SYSTEM-009 | `requirements/verification-system/tests/integration-entry-coverage.test.mjs` |
+| VERIFICATION-SYSTEM-009 | `requirements/verification-system/tests/integration-entry-coverage.test.mjs`；`requirements/verification-system/tests/repository-closure-gates.test.mjs` |
 | VERIFICATION-SYSTEM-010 | `requirements/verification-system/tests/deadcode-scan.test.mjs` |
 | VERIFICATION-SYSTEM-011 | `requirements/verification-system/tests/coverage-gate.test.mjs` |
 | VERIFICATION-SYSTEM-012 | `requirements/verification-system/tests/no-line-count-check.test.mjs` |

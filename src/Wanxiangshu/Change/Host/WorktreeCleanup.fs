@@ -136,7 +136,7 @@ module OrchestratorSweep =
     let sweepLocked
         (lockPath: string)
         (git: GitPort)
-        (activeJobs: ManagerJobProjection list)
+        (activeJobs: unit -> ManagerJobProjection list)
         : Task<Result<unit, string>> =
         task {
             let! gate = IntegrationGate.acquire lockPath
@@ -144,7 +144,7 @@ module OrchestratorSweep =
             let! outcome =
                 task {
                     try
-                        return! sweepStaleArtifacts git activeJobs
+                        return! sweepStaleArtifacts git (activeJobs ())
                     with ex ->
                         return Error ex.Message
                 }

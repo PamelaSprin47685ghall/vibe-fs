@@ -15,7 +15,12 @@ import * as syncDelegate from '../../../dist/Execution/Delegation/SyncDelegate/S
 import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
 import * as lifecycle from '../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
 import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
-import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
+import {
+  CANONICAL_A,
+  CANONICAL_Q,
+  installBookkeeperRuntime,
+  scriptedBookkeeperPort,
+} from './bookkeeper-session.test.mjs'
 
 const QUESTIONS = [
   ['Who owns PromptAuthority?', 'Host owns PromptAuthority.'],
@@ -40,45 +45,26 @@ const toolModule = {
     },
   },
 }
-const waitFor = async (predicate, message, ms = 2000) => {
-  const deadline = Date.now() + ms
-  while (!predicate()) {
-    if (Date.now() >= deadline) throw new Error(message)
-    await new Promise((resolve) => setImmediate(resolve))
-  }
-}
-
-const settleUntilAccepted = async (runtime, owner, role, answer, runId) => {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    if (await syncDelegate.settle(runtime, owner, role, answer, runId)) return true
-    await new Promise((resolve) => setImmediate(resolve))
-  }
-  return false
-}
-
 test('WHAT[KNOWLEDGE-REUSE-010] G6_inspector_tool_sync_delegate_lifecycle_bookkeeper_fetch', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-g6-inspector-tool-'))
   execFileSync('git', ['init', '--quiet', dir])
   mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
   writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
-  const runtime = await syncDelegate.create(dir)
+  const owner = 'ses_meditator_inspector_tool'
+  const runtime = await syncDelegate.create(dir, [{ sessionId: owner, agent: 'fast-manager' }])
   const bookkeeperPort = scriptedBookkeeperPort()
   try {
     lifecycle.enable(dir)
-    const owner = 'ses_meditator_inspector_tool'
     let delegateId
 
     for (let i = 0; i < QUESTIONS.length; i += 1) {
       const [question, answer] = QUESTIONS[i]
       const pending = syncDelegate.executeInspector(runtime, toolModule, owner, question)
-      await waitFor(() => syncDelegate.childCount(runtime) === 1, `InspectorTool Q${i + 1} did not reuse a single child`)
+      await syncDelegate.awaitPromptCount(runtime, owner, 'Inspector', i + 1)
+      assert.equal(syncDelegate.acceptPrompt(runtime, owner, 'Inspector', i), true)
+      assert.equal(syncDelegate.childCount(runtime), 1, `InspectorTool Q${i + 1} did not reuse a single child`)
       const child = syncDelegate.child(runtime, owner, 'Inspector')
       assert.notEqual(child, null, 'Inspector child must be attached')
-      // child() means the reusable attachment exists; the owner prompt still
-      // needs its asynchronous opening capture before a bounded WorkRecord
-      // can be completed.
-      await new Promise((resolve) => setImmediate(resolve))
-      await new Promise((resolve) => setImmediate(resolve))
       if (i === 0) {
         delegateId = child
       } else {
@@ -86,7 +72,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_inspector_tool_sync_delegate_lifecycle_bookke
       }
 
       lifecycle.notePrompt(delegateId, question)
-      assert.equal(await settleUntilAccepted(runtime, owner, 'Inspector', answer, `asst_q${i + 1}`), true)
+      assert.equal(await syncDelegate.settle(runtime, owner, 'Inspector', answer, `asst_q${i + 1}`), true)
       const text = await pending
       assert.match(text, /Recent work/, `Inspector Q${i + 1} must return the bounded Recent work section`)
       assert.match(text, new RegExp(answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
@@ -104,7 +90,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_inspector_tool_sync_delegate_lifecycle_bookke
     assert.equal(syncDelegate.childCount(runtime), 1, 'Inspector CreateChildSession once')
     lifecycle.collect(delegateId, 'read', { path: 'a.txt' }, 'hello')
 
-    bookkeeper.setSessionPort(bookkeeperPort.port)
+    installBookkeeperRuntime(bookkeeperPort.port, [delegateId])
     const first = await lifecycle.tryFinalize(dir, delegateId)
     assert.equal(first.ok, true, `tryFinalize ok: ${JSON.stringify(first.error)}`)
     assert.equal(bookkeeperPort.createCalls.length, 1, 'detached Bookkeeper sibling lane once')
@@ -125,7 +111,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_inspector_tool_sync_delegate_lifecycle_bookke
     assert.equal(String(fetched.value.a).includes('digest'), false)
     eventStore.dispose(store)
   } finally {
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
     lifecycle.disable()
     syncDelegate.dispose(runtime)
     rmSync(dir, { recursive: true, force: true })

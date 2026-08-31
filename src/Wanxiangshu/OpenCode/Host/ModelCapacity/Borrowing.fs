@@ -5,36 +5,6 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 
-/// The old capacity truth: one opaque token = one occurrence in scheduler `running`.
-/// It knows nothing about sessions, ancestry, borrowing, provider steps, or limits.
-type CapacityLedger<'target>() =
-    let gate = obj ()
-    let entries = Dictionary<int64, 'target>()
-    // DSL-MUTABLE: resource — monotonic opaque capacity-credit identity
-    let mutable nextCredit = 0L
-
-    member _.Acquire(target: 'target) =
-        lock gate (fun () ->
-            nextCredit <- nextCredit + 1L
-            entries.[nextCredit] <- target
-            nextCredit)
-
-    member _.Retarget(credit: int64, target: 'target) =
-        lock gate (fun () ->
-            if entries.ContainsKey credit then
-                entries.[credit] <- target)
-
-    member _.Release(credit: int64) =
-        lock gate (fun () -> entries.Remove credit)
-
-    member _.Entries() =
-        lock gate (fun () ->
-            entries
-            |> Seq.map (fun (KeyValue(credit, target)) -> credit, target)
-            |> Seq.toArray)
-
-    member this.Snapshot() = this.Entries() |> Array.map snd
-
 type private CapacityStep =
     { SessionId: string
       PhysicalUserMessageId: string
@@ -47,30 +17,21 @@ type private CapacityCreditState =
     | Retiring of CapacityStep
 
 type private CapacityCredit<'target> =
-    { Credit: int64
+    { Credit: CapacityCreditId
       mutable OwnerKey: string
       OwnerSessionId: string
       Provider: string
       mutable OwnerTarget: 'target
       mutable State: CapacityCreditState }
 
-type private CapacityStepDemand<'target> =
-    { Sequence: int64
-      SessionId: string
-      PhysicalUserMessageId: string
-      Target: 'target
-      Fence: Set<string>
-      TryOrdinary: 'target array -> bool
-      Completion: TaskCompletionSource<unit> }
-
 type private CapacityCreditSource =
-    { Credit: int64
+    { Credit: CapacityCreditId
       LenderSessionId: string
       Distance: int }
 
 /// Decorates the old ledger with lineage-local borrowing and preemptive recall.
 /// Borrowing changes who may use a token, never how many real tokens exist.
-type BorrowingCapacity<'target>
+type internal BorrowingCapacity<'target>
     (ledger: CapacityLedger<'target>, providerOf: 'target -> string, sameTarget: 'target -> 'target -> bool) =
     let gate = obj ()
     /// DSL-cross-callback-proof: physical resource — capacity lineage used only to route token borrowing/recall
@@ -84,17 +45,29 @@ type BorrowingCapacity<'target>
     // DSL-MUTABLE: resource — exact borrowed execution → actual lender token
     let creditSourceByExecution = Dictionary<string, CapacityCreditSource>()
     // DSL-MUTABLE: resource — at most one owned capacity token per execution
-    let ownedTokenByExecution = Dictionary<string, int64>()
+    let ownedTokenByExecution = Dictionary<string, CapacityCreditId>()
     // DSL-MUTABLE: resource — decorator metadata for ledger tokens
-    let tokens = Dictionary<int64, CapacityCredit<'target>>()
+    let tokens = Dictionary<CapacityCreditId, CapacityCredit<'target>>()
     // DSL-MUTABLE: resource — provider-step admission waiters
-    let waiters = ResizeArray<CapacityStepDemand<'target>>()
-    let mutable nextDemand = 0L
+    let waiters = CapacityStepDemandQueue<'target>()
 
     let executionKey sessionId physicalUserMessageId =
         sessionId + "\u001f" + (physicalUserMessageId |> Option.defaultValue "")
 
     let executionPrefix sessionId = sessionId + "\u001f"
+
+    let executionOwner (key: string) : CapacityExactOwnerSnapshot =
+        let separator = key.IndexOf('\u001f')
+
+        { SessionId = key.Substring(0, separator)
+          PhysicalUserMessageId = key.Substring(separator + 1)
+          EffectiveAgent = None }
+
+    let tokenStateName =
+        function
+        | CapacityCreditState.Idle -> "Idle"
+        | CapacityCreditState.InFlight _ -> "InFlight"
+        | CapacityCreditState.Retiring _ -> "Retiring"
 
     let currentCreditSource (sessionId: string) : CapacityCreditSource option =
         let sources =
@@ -116,7 +89,7 @@ type BorrowingCapacity<'target>
     let clearCreditSource key =
         creditSourceByExecution.Remove key |> ignore
 
-    let clearCreditSourcesForToken (tokenId: int64) =
+    let clearCreditSourcesForToken (tokenId: CapacityCreditId) =
         creditSourceByExecution
         |> Seq.choose (fun (KeyValue(key, source)) -> if source.Credit = tokenId then Some key else None)
         |> Seq.toArray
@@ -272,17 +245,19 @@ type BorrowingCapacity<'target>
 
         withoutTokens hidden, credits
 
-    let ordinaryDecision (route: 'target array -> 'target option) : ('target * CapacityCredit<'target> option) option =
+    let capacityOrdinaryDecision
+        (route: 'target array -> 'target option)
+        : ('target * CapacityCredit<'target> option) option =
         route (ledger.Snapshot()) |> Option.map (fun target -> target, None)
 
     let attributedDecision target (credit: CapacityCredit<'target>) route =
         match route (withoutTokens (Set.singleton credit.Credit)) with
         | Some attributable when sameTarget attributable target -> Some(target, Some credit)
-        | _ -> ordinaryDecision route
+        | _ -> capacityOrdinaryDecision route
 
     let matchingCreditDecision target (credits: Map<string, CapacityCredit<'target>>) route =
         match Map.tryFind (normalizeProvider target) credits with
-        | None -> ordinaryDecision route
+        | None -> capacityOrdinaryDecision route
         | Some credit when credits.Count = 1 -> Some(target, Some credit)
         | Some credit -> attributedDecision target credit route
 
@@ -296,7 +271,7 @@ type BorrowingCapacity<'target>
 
         match Map.isEmpty credits, borrowed with
         | true, target -> target |> Option.map (fun selected -> selected, None)
-        | false, None -> ordinaryDecision route
+        | false, None -> capacityOrdinaryDecision route
         | false, Some target -> matchingCreditDecision target credits route
 
     let acquireOwnedToken sessionId physicalUserMessageId target =
@@ -326,8 +301,11 @@ type BorrowingCapacity<'target>
         ownedTokenByExecution.[newKey] <- token.Credit
 
         match token.State with
-        | CapacityCreditState.Idle -> ledger.Retarget(token.Credit, target)
-        | CapacityCreditState.InFlight _
+        | CapacityCreditState.Idle -> ledger.Retarget(token.Credit, target) |> ignore
+        | CapacityCreditState.InFlight step when step.SessionId = token.OwnerSessionId ->
+            token.State <- CapacityCreditState.Idle
+            ledger.Retarget(token.Credit, target) |> ignore
+        | CapacityCreditState.InFlight _ -> ()
         | CapacityCreditState.Retiring _ -> ()
 
     let finishStep (token: CapacityCredit<'target>) =
@@ -335,7 +313,7 @@ type BorrowingCapacity<'target>
         | CapacityCreditState.Idle -> ()
         | CapacityCreditState.InFlight _ ->
             token.State <- CapacityCreditState.Idle
-            ledger.Retarget(token.Credit, token.OwnerTarget)
+            ledger.Retarget(token.Credit, token.OwnerTarget) |> ignore
         | CapacityCreditState.Retiring _ -> releaseToken token
 
     let reconcileFence sessionId physicalUserMessageId fence =
@@ -366,7 +344,7 @@ type BorrowingCapacity<'target>
     let grant (token: CapacityCredit<'target>) (demand: CapacityStepDemand<'target>) =
         match token.State with
         | CapacityCreditState.Idle ->
-            ledger.Retarget(token.Credit, demand.Target)
+            ledger.Retarget(token.Credit, demand.Target) |> ignore
             rememberGrantedCredit token demand
 
             token.State <-
@@ -380,7 +358,7 @@ type BorrowingCapacity<'target>
         | _ -> invalidOp "execution-model-routing: non-idle capacity token was granted"
 
     let cancelWaiters predicate =
-        waiters
+        waiters.Snapshot()
         |> Seq.filter predicate
         |> Seq.toArray
         |> Array.iter (fun demand ->
@@ -396,7 +374,7 @@ type BorrowingCapacity<'target>
         | _ -> None
 
     let idleBorrowPairs () =
-        waiters
+        waiters.Snapshot()
         |> Seq.collect (fun demand -> tokens.Values |> Seq.choose (borrowPair demand))
         |> Seq.toList
 
@@ -414,7 +392,7 @@ type BorrowingCapacity<'target>
         ownedTokenByExecution.ContainsKey(executionKey demand.SessionId (Some demand.PhysicalUserMessageId))
 
     let tryGrantOrdinary () =
-        waiters
+        waiters.Snapshot()
         |> Seq.sortBy _.Sequence
         |> Seq.tryFind (fun demand -> not (demandOwnsToken demand) && demand.TryOrdinary(ledger.Snapshot()))
         |> Option.map (fun demand ->
@@ -620,24 +598,53 @@ type BorrowingCapacity<'target>
 
     member _.ReleaseSession(sessionId: string) =
         lock gate (fun () ->
+            let prefix = sessionId + "\u001f"
+
+            let existed =
+                waiters.Snapshot() |> Array.exists (fun demand -> demand.SessionId = sessionId)
+                || (ownedTokenByExecution.Keys
+                    |> Seq.exists (fun key -> key.StartsWith(prefix, StringComparison.Ordinal)))
+                || (creditSourceByExecution.Keys
+                    |> Seq.exists (fun key -> key.StartsWith(prefix, StringComparison.Ordinal)))
+
             cancelWaiters (fun demand -> demand.SessionId = sessionId)
             clearCreditSourcesForSession sessionId
 
             ownedTokenByExecution.Keys
-            |> Seq.filter (fun key -> key.StartsWith(sessionId + "\u001f", StringComparison.Ordinal))
+            |> Seq.filter (fun key -> key.StartsWith(prefix, StringComparison.Ordinal))
             |> Seq.toArray
             |> Array.iter retireExecution
 
-            drain ())
+            drain ()
+
+            if existed then
+                CapacityTransitionOutcome.Applied
+            else
+                CapacityTransitionOutcome.AlreadyApplied)
 
     member _.ReleasePhysical(sessionId: string, physicalUserMessageId: string) =
         lock gate (fun () ->
+            let key = executionKey sessionId (Some physicalUserMessageId)
+
+            let existed =
+                ownedTokenByExecution.ContainsKey key
+                || creditSourceByExecution.ContainsKey key
+                || (waiters.Snapshot()
+                    |> Array.exists (fun demand ->
+                        demand.SessionId = sessionId
+                        && demand.PhysicalUserMessageId = physicalUserMessageId))
+
             cancelWaiters (fun demand ->
                 demand.SessionId = sessionId
                 && demand.PhysicalUserMessageId = physicalUserMessageId)
 
-            retireExecution (executionKey sessionId (Some physicalUserMessageId))
-            drain ())
+            retireExecution key
+            drain ()
+
+            if existed then
+                CapacityTransitionOutcome.Applied
+            else
+                CapacityTransitionOutcome.AlreadyApplied)
 
     member _.EnterStep
         (
@@ -649,13 +656,12 @@ type BorrowingCapacity<'target>
         ) : Task =
         lock gate (fun () ->
             reconcileFence sessionId physicalUserMessageId fence
-            nextDemand <- nextDemand + 1L
 
             let completion =
                 TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
 
             let demand =
-                { Sequence = nextDemand
+                { Sequence = waiters.NextSequence()
                   SessionId = sessionId
                   PhysicalUserMessageId = physicalUserMessageId
                   Target = target
@@ -663,9 +669,15 @@ type BorrowingCapacity<'target>
                   TryOrdinary = tryOrdinary
                   Completion = completion }
 
-            waiters.Add demand
-            drain ()
-            completion.Task :> Task)
+            if waiters.TryAdd demand then
+                drain ()
+                completion.Task :> Task
+            else
+                completion.SetException(
+                    InvalidOperationException "execution-model-routing: provider-step capacity queue full"
+                )
+
+                completion.Task :> Task)
 
     member _.EndStep(sessionId: string, physicalUserMessageId: string, providerRun: string) =
         lock gate (fun () ->
@@ -695,11 +707,111 @@ type BorrowingCapacity<'target>
 
             drain ())
 
+    member internal _.ExactCredit(sessionId: string, physicalUserMessageId: string) =
+        lock gate (fun () ->
+            let key = executionKey sessionId (Some physicalUserMessageId)
+
+            match ownedTokenByExecution.TryGetValue key, creditSourceByExecution.TryGetValue key with
+            | (true, credit), _ -> credit
+            | (false, _), (true, source) -> source.Credit
+            | _ ->
+                invalidOp (
+                    sprintf
+                        "execution-model-routing: physical execution %s/%s has no exact capacity credit"
+                        sessionId
+                        physicalUserMessageId
+                ))
+
+    member _.InvariantSnapshot() : BorrowingCapacitySnapshot<'target> =
+        lock gate (fun () ->
+            let ledgerEntries =
+                ledger.Entries()
+                |> Array.map (fun (credit, target) ->
+                    { Credit = CapacityCreditId.value credit
+                      Target = target })
+                |> Array.sortBy _.Credit
+
+            let targetByCredit =
+                ledgerEntries
+                |> Array.map (fun entry -> entry.Credit, entry.Target)
+                |> Map.ofArray
+
+            let tokenSnapshots =
+                tokens.Values
+                |> Seq.map (fun token ->
+                    { Credit = CapacityCreditId.value token.Credit
+                      State = tokenStateName token.State
+                      Owner = executionOwner token.OwnerKey
+                      Target = targetByCredit.[CapacityCreditId.value token.Credit] })
+                |> Seq.sortBy _.Credit
+                |> Seq.toArray
+
+            let ownedCustodies =
+                ownedTokenByExecution
+                |> Seq.map (fun (KeyValue(key, credit)) ->
+                    { Credit = CapacityCreditId.value credit
+                      Owner = executionOwner key })
+
+            let borrowedCustodies =
+                creditSourceByExecution
+                |> Seq.map (fun (KeyValue(key, source)) ->
+                    { Credit = CapacityCreditId.value source.Credit
+                      Owner = executionOwner key })
+
+            let custodies =
+                Seq.append ownedCustodies borrowedCustodies
+                |> Seq.distinctBy (fun custody ->
+                    custody.Credit, custody.Owner.SessionId, custody.Owner.PhysicalUserMessageId)
+                |> Seq.sortBy (fun custody -> custody.Owner.SessionId, custody.Owner.PhysicalUserMessageId)
+                |> Seq.toArray
+
+            let waiterSnapshots =
+                waiters.Snapshot()
+                |> Array.map (fun waiter ->
+                    { Owner =
+                        { SessionId = waiter.SessionId
+                          PhysicalUserMessageId = waiter.PhysicalUserMessageId
+                          EffectiveAgent = None }
+                      Sequence = waiter.Sequence
+                      Kind = "ProviderStep" })
+                |> Array.sortBy _.Sequence
+
+            let lineage =
+                seq {
+                    for KeyValue(child, parent) in parents do
+                        yield
+                            { ParentSessionId = parent
+                              ChildSessionId = child }
+
+                    for KeyValue(owner, companion) in companionSessionByOwner do
+                        yield
+                            { ParentSessionId = owner
+                              ChildSessionId = companion }
+                }
+                |> Seq.distinct
+                |> Seq.sortBy (fun edge -> edge.ChildSessionId, edge.ParentSessionId)
+                |> Seq.toArray
+
+            { LedgerEntries = ledgerEntries
+              Tokens = tokenSnapshots
+              Custodies = custodies
+              Waiters = waiterSnapshots
+              Lineage = lineage
+              IdleCount =
+                tokenSnapshots
+                |> Array.sumBy (fun token -> if token.State = "Idle" then 1 else 0)
+              InFlightCount =
+                tokenSnapshots
+                |> Array.sumBy (fun token -> if token.State = "InFlight" then 1 else 0)
+              RetiringCount =
+                tokenSnapshots
+                |> Array.sumBy (fun token -> if token.State = "Retiring" then 1 else 0) })
+
     member _.Snapshot() = lock gate (fun () -> ledger.Snapshot())
 
     member _.Fail(error: exn) =
         lock gate (fun () ->
-            let pending = waiters |> Seq.toArray
+            let pending = waiters.Snapshot()
             waiters.Clear()
 
             pending

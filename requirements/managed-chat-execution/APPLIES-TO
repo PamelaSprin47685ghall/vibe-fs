@@ -2,18 +2,27 @@
 # requirements/managed-chat-execution/**, including planned executable proofs, is covered implicitly.
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
-/src/Wanxiangshu/OpenCode/Host/ManagedChatExecution*.fs
+/src/Wanxiangshu/Execution/Session/ChatExecution/**
 /src/Wanxiangshu/Interaction/Authority/Model.fs
 /src/Wanxiangshu/Interaction/Authority/Surface.fs
 /src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs
+/src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs
+/src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs
 /src/Wanxiangshu/OpenCode/Host/ModelRouting.fs
-/src/Wanxiangshu/OpenCode/Host/ModelCapacity.fs
+/src/Wanxiangshu/OpenCode/Host/ModelCapacity/**
+/src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnostics.fs
+/src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnosticsSurface.fs
 /src/Wanxiangshu/OpenCode/Host/HostMessageProjection.fs
 /src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
+/src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs
+/src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs
+/src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs
+/src/Wanxiangshu/OpenCode/Host/ChatAdmission/TransactionSurface.fs
 /src/Wanxiangshu/OpenCode/Host/HostSessionDeletion.fs
 /src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs
-/scripts/checks/managed-chat-execution-owner.mjs
+/src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
+/src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs

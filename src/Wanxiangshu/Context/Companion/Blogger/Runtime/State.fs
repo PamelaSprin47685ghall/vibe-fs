@@ -86,10 +86,15 @@ module BloggerRuntime =
     /// module-private so only this factory can construct `DrainWindow.Open`.
     let openDrain (root: AuthorityRootUserMessageId) : DrainWindow = DrainWindow.Open(DrainPermit root)
 
-    /// Pure material routing from physical facts (parked waiter + flight ownership).
-    let decideMaterial (hasParked: bool) (hasFlight: bool) (ctx: BloggerRequestContext) : Decision =
+    /// Pure material routing from durable producer ownership plus physical waiter/flight facts.
+    let decideMaterial
+        (hasOpenProducer: bool)
+        (hasParked: bool)
+        (hasFlight: bool)
+        (ctx: BloggerRequestContext)
+        : Decision =
         if hasFlight then Decision.Skip
-        elif hasParked then Decision.Offer ctx
+        elif hasOpenProducer || hasParked then Decision.Offer ctx
         else Decision.Start ctx
 
     /// Durable handle seal blocks new work unless the drain window is open.

@@ -11,8 +11,14 @@ import { join } from 'node:path'
 import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
 import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
 import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
+import * as bookkeeperRefresh from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRefreshSurface.js'
 import * as lifecycle from '../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
-import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
+import {
+  CANONICAL_A,
+  CANONICAL_Q,
+  installBookkeeperRuntime,
+  scriptedBookkeeperPort,
+} from './bookkeeper-session.test.mjs'
 
 const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
@@ -40,8 +46,8 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup',
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     lifecycle.enable(dir)
     const { port, createCalls, programCalls } = scriptedBookkeeperPort()
-    bookkeeper.setSessionPort(port)
     const key = 'reuse-insp-1'
+    installBookkeeperRuntime(port, [key])
     lifecycle.notePrompt(key, 'Who owns PromptAuthority?')
     lifecycle.collect(key, 'read', { path: 'a.txt' }, 'hello')
     const rawA = 'Host owns PromptAuthority.'
@@ -61,7 +67,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup',
     lifecycle.cleanup(key)
     assert.equal((await casebook.fetchCase(handle, 10, key)).value.a, publishedA)
     writeFileSync(join(dir, 'a.txt'), 'drift', 'utf8')
-    const refreshed = await bookkeeper.refreshStale(handle, dir, key)
+    const refreshed = await bookkeeperRefresh.refreshStale(handle, dir, key)
     assert.equal(refreshed.ok, true)
     assert.equal(refreshed.value, true)
     const after = await casebook.fetchCase(handle, 10, key)
@@ -70,7 +76,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup',
     assert.equal(after.value.observations[0].contentHash, casebook.contentHash('drift'))
     eventStore.dispose(handle)
   } finally {
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
     lifecycle.disable()
     rmSync(dir, { recursive: true, force: true })
   }

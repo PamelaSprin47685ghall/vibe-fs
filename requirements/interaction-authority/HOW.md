@@ -33,7 +33,7 @@
 |---|---|
 | INTERACTION-AUTHORITY-001 | `requirements/interaction-authority/tests/authority-root.test.mjs` |
 | INTERACTION-AUTHORITY-002 | `requirements/interaction-authority/tests/authority-root.test.mjs` |
-| INTERACTION-AUTHORITY-003 | planned: `requirements/interaction-authority/tests/root-identity-acceptance.test.mjs`（single acceptance payload；authority 不推导 identity；append failure 无 orphan） |
+| INTERACTION-AUTHORITY-003 | `requirements/interaction-authority/tests/authority-acceptance-identity.test.mjs`, `requirements/interaction-authority/tests/authority-execution-profile.test.mjs`, `requirements/interaction-authority/tests/authority-root-identity-upgrade.test.mjs` |
 | INTERACTION-AUTHORITY-004 | `requirements/interaction-authority/tests/continuation-origin.test.mjs` |
 | INTERACTION-AUTHORITY-005 | `requirements/interaction-authority/tests/continuation-origin.test.mjs` |
 | INTERACTION-AUTHORITY-006 | `requirements/interaction-authority/tests/authority-root.test.mjs` |
@@ -45,8 +45,8 @@
 | INTERACTION-AUTHORITY-012 | `requirements/interaction-authority/tests/continuation-origin.test.mjs` + `requirements/interaction-authority/tests/authority-root.test.mjs` |
 | INTERACTION-AUTHORITY-013 | `requirements/interaction-authority/tests/continuation-origin.test.mjs` |
 | INTERACTION-AUTHORITY-014 | `requirements/interaction-authority/tests/join-guard-execution.test.mjs` |
-| INTERACTION-AUTHORITY-015 | `requirements/delegation/tests/join-v2-mailbox.test.mjs` |
+| INTERACTION-AUTHORITY-015 | `requirements/interaction-authority/tests/authority-acceptance-identity.test.mjs` |
 | INTERACTION-AUTHORITY-016 | `requirements/interaction-authority/tests/continuation-origin.test.mjs` |
 | INTERACTION-AUTHORITY-017 | `requirements/interaction-authority/tests/continuation-origin.test.mjs` |
-| INTERACTION-AUTHORITY-018 | planned: `requirements/interaction-authority/tests/authority-root-closure.test.mjs`（HumanRoot Manager/managed 与 AgentOwner child/attached/InternalLeaf exact closure；mismatch/idle 拒绝；reconciliation） |
+| INTERACTION-AUTHORITY-018 | `requirements/interaction-authority/tests/logical-run-close.test.mjs` |
 | INTERACTION-AUTHORITY-019 | `requirements/interaction-authority/tests/repair-lifecycle.test.mjs` |

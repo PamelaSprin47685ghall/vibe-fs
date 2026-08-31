@@ -35,6 +35,7 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
@@ -120,7 +121,7 @@ module CasebookLifecycle =
                 let! q', a' =
                     BookkeeperRuntime.runTransaction
                         BookkeeperRequest.CaseFinalize
-                        inspectorSessionId
+                        (SessionId.create inspectorSessionId)
                         lastQ
                         a
                         observations

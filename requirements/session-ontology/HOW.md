@@ -43,4 +43,4 @@ Session projection 只暴露 physical container classification 与 durable assoc
 | SESSION-ONTOLOGY-012 | `requirements/session-ontology/tests/sync-delegate.test.mjs` |
 | SESSION-ONTOLOGY-013 | `requirements/session-ontology/tests/terminal-policy.test.mjs` |
 | SESSION-ONTOLOGY-014 | `requirements/session-ontology/tests/satellite-kind.test.mjs` |
-| SESSION-ONTOLOGY-015 | planned: `requirements/session-ontology/tests/container-reuse-closure-boundary.test.mjs`（association/detach/idle 不关闭；仅 exact AuthorityLogicalRunClosed 后可复用） |
+| SESSION-ONTOLOGY-015 | `requirements/session-ontology/tests/session-reuse-identity.test.mjs` |

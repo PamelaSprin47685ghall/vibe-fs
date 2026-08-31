@@ -38,5 +38,5 @@
 | DISPATCH-PROTOCOL-009 | `requirements/dispatch-protocol/tests/fire-and-forget.test.mjs` |
 | DISPATCH-PROTOCOL-010 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
 | DISPATCH-PROTOCOL-011 | `requirements/dispatch-protocol/tests/send-format.test.mjs` |
-| DISPATCH-PROTOCOL-012 | `requirements/dispatch-protocol/tests/managed-chat-execution-handoff.test.mjs`（计划） |
-| DISPATCH-PROTOCOL-013 | `requirements/dispatch-protocol/tests/durability-activation.test.mjs`（计划） |
+| DISPATCH-PROTOCOL-012 | `requirements/dispatch-protocol/tests/send-format.test.mjs` — `WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_identity_to_managed_execution` |
+| DISPATCH-PROTOCOL-013 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs` — `WHAT[DISPATCH-PROTOCOL-013] DP_013_construction_waits_for_durability_activation_before_explicit_recovery` |

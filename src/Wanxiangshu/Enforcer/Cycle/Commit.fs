@@ -63,6 +63,7 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
+open Wanxiangshu.Execution.Failure
 
 /// How a legalised cycle becomes a durable fact: append-failure
 /// classification, ordinary observation commit and squash commit.
@@ -76,10 +77,25 @@ module EnforcerCycleCommit =
         | CommitUnknown of reason: string
 
     let private classifyAppendFailure (failure: JournalAppendFailure) : CycleCommitOutcome =
-        match failure with
-        | WriteUnknown(_, _) -> CycleCommitOutcome.CommitUnknown(JournalAppendFailure.describe failure)
-        | WriterUnavailable(_, _)
-        | FactRejected(_, _) -> CycleCommitOutcome.KnownNotCommitted(JournalAppendFailure.describe failure)
+        let diagnostic = JournalAppendFailure.describe failure
+
+        match JournalAppendFailure.toExecutionFailure failure with
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted ->
+            CycleCommitOutcome.KnownNotCommitted diagnostic
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed -> CycleCommitOutcome.KnownCommitted
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown ->
+            CycleCommitOutcome.CommitUnknown diagnostic
+        | ExecutionFailure.LocalInvariant
+        | ExecutionFailure.ProtocolRejection
+        | ExecutionFailure.AuthorizationDenied
+        | ExecutionFailure.UserCancelled
+        | ExecutionFailure.Superseded
+        | ExecutionFailure.CapacityQueueFull
+        | ExecutionFailure.ProviderTransient
+        | ExecutionFailure.ProviderPermanent
+        | ExecutionFailure.AcceptanceUnknown
+        | ExecutionFailure.StreamInterruptedAfterFirstToken ->
+            invalidOp "journal append mapped to non-persistence failure"
 
     let private collapseOutcome (result: Result<CycleCommitOutcome, CycleCommitOutcome>) : CycleCommitOutcome =
         match result with

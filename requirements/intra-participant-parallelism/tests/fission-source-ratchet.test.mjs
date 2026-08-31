@@ -66,12 +66,32 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] Host convergence performs ring tak
   assert.doesNotMatch(host, /LastMaterializedLaneIndex/)
   assert.doesNotMatch(projection, /LastMaterializedLaneIndex/)
 
-  const physicalEndAt = bootstrap.indexOf('onPhysicalExecutionEnd =')
-  assert.ok(physicalEndAt >= 0, 'physical execution terminal callback must exist')
-  const physicalEndBlock = bootstrap.slice(physicalEndAt, bootstrap.indexOf('let! subscriptionResult', physicalEndAt))
-  assert.match(physicalEndBlock, /reconciler\.NotifyProjectionChanged\(sessionId, physicalUserMessageId\)/)
-  assert.match(physicalEndBlock, /FissionHost\.observePhysicalExecutionEnd/)
-  assert.doesNotMatch(physicalEndBlock, /FissionProjection\.tryMembershipOfLane|let isCurrentPhysical|let isFissionLane/)
+  const terminalOperationAt = bootstrap.indexOf('let applyObservedTerminal')
+  const terminalOperationEnd = bootstrap.indexOf('let startedEvidenceForTerminal', terminalOperationAt)
+  assert.ok(terminalOperationAt >= 0 && terminalOperationEnd > terminalOperationAt, 'typed terminal operation must exist')
+  const terminalOperation = bootstrap.slice(terminalOperationAt, terminalOperationEnd)
+  assert.ok(terminalOperation.includes('(observation: ExactProviderTerminalObservation)'))
+  const recoveryAt = terminalOperation.indexOf('scope.SignalChatRecovery(')
+  const projectionAt = terminalOperation.indexOf('reconciler.NotifyProjectionChanged(')
+  const fissionAt = terminalOperation.indexOf('FissionHost.observePhysicalExecutionEnd')
+  assert.ok(
+    recoveryAt >= 0 && recoveryAt < projectionAt && projectionAt < fissionAt,
+    'the typed terminal operation must settle recovery, publish the exact projection, then open Fission reconciliation',
+  )
+  assert.match(
+    terminalOperation,
+    /FissionHost\.observePhysicalExecutionEnd[\s\S]{0,400}?observation\.SessionId\s+observation\.PhysicalUserMessageId/,
+  )
+  assert.ok(terminalOperation.includes('(fun sid -> reconciler.Kick(sid, ReconcileProgram.ReconcileWake.RetryWake))'))
+  assert.doesNotMatch(terminalOperation, /FissionProjection\.tryMembershipOfLane|let isCurrentPhysical|let isFissionLane/)
+
+  const terminalSettlementAt = bootstrap.indexOf('let settleExactTerminal')
+  const terminalSettlementEnd = bootstrap.indexOf('let settleObservedTerminal', terminalSettlementAt)
+  assert.ok(terminalSettlementAt >= 0 && terminalSettlementEnd > terminalSettlementAt, 'typed terminal settlement must exist')
+  assert.ok(
+    bootstrap.slice(terminalSettlementAt, terminalSettlementEnd).includes('applyObservedTerminal observation evidence disposition'),
+    'the exact typed terminal callback must invoke the terminal operation',
+  )
   assert.match(host, /let observePhysicalExecutionEnd/)
   assert.match(host, /tryCurrentPhysical sessionId/)
   assert.match(host, /FissionProjection\.tryMembershipOfLane/)
@@ -129,11 +149,11 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] request visibility and tool adapte
   const fissionHost = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
   assert.match(fissionHost, /module FissionHostRequestProjection/)
   assert.match(fissionHost, /FissionRequestProjection\.apply/)
-  assert.match(fissionHost, /ModelRouting\.RoutedChatExecution\.PluginManaged/)
+  assert.match(fissionHost, /ChatAdmissionIntent\.Decision\.PendingPromptIntent/)
   assert.doesNotMatch(bootstrap, /FissionRequestProjection\.apply|tools\?fission\s*<-/)
-  assert.match(bootstrap, /FissionHostRequestProjection\.projectRouted/)
+  assert.match(bootstrap, /FissionHostRequestProjection\.projectPendingManaged/)
   assert.match(bootstrap, /SessionParents\.ContainsKey/)
-  const externalProjectionAt = bootstrap.indexOf('FissionHostRequestProjection.projectExternalManaged hasPhysicalParent decoded output')
+  const externalProjectionAt = bootstrap.indexOf('FissionHostRequestProjection.projectExternalManaged hasPhysicalParent intent output')
   const explicitResumeAt = bootstrap.indexOf('if explicitResume then')
   assert.ok(externalProjectionAt >= 0 && externalProjectionAt < explicitResumeAt, 'root tool deny must precede explicit-resume routing bypass')
 

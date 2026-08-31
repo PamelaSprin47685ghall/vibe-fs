@@ -10,6 +10,7 @@ const recoverySrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Context/Companion/B
 const enforcerSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Continuation.fs'), 'utf8')
 const repairSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Repair.fs'), 'utf8')
 const interactionRepairSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs'), 'utf8')
+const fallbackWorkflowSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs'), 'utf8')
 const sessionNudgeSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs'), 'utf8')
 const pluginTransformsSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs'), 'utf8')
 const probeSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs'), 'utf8')
@@ -92,9 +93,42 @@ test('WHAT[BD-017] ENFORCER_153_hot_path_aabb_preserves_target_terminal_identity
   assert.match(enforcerSrc, /BloggerToolRecovery\.AabbRepairIssued issuedRun when issuedRun = terminalRun/)
   assert.match(enforcerSrc, /BloggerToolRecovery\.AabbRepairIssued _[\s\S]*?aabbRepair ctx sessionKey currentCtx live false/)
   assert.match(enforcerSrc, /aabbRepair ctx sessionKey currentCtx live true \("nudge semantic failure;/)
-  assert.match(interactionRepairSrc, /AabbRepairIssued _ ->[\s\S]*?consumeThenSendBloggerAabb[\s\S]*?false/)
-  assert.match(interactionRepairSrc, /RecoveryExhausted when guaranteedFirstAabb[\s\S]*?sendAabb/)
-  assert.match(interactionRepairSrc, /RecoveryExhausted ->[\s\S]*?exhaustBloggerProtocol/)
+  assert.match(
+    interactionRepairSrc,
+    /\| BloggerRecoveryProbe\.InvalidTerminalRepairState\.AabbRepairIssued _ ->\s+consumeThenSendBloggerAabb\s+host\s+quiescence\s+context\s+sessionPort\s+eventPort\s+durable\s+requestId\s+requestKind\s+false\s+"blogger invalid terminal after AABB"/,
+  )
+  assert.match(
+    interactionRepairSrc,
+    /isInteractionRepairContinuation[\s\S]*?ContinuationKind\.InteractionRepair[\s\S]*?bloggerProviderRequestKind[\s\S]*?BloggerRequestContext\.Main _ -> ProviderRequestKind\.BloggerMain[\s\S]*?BloggerRequestContext\.Squash _ -> ProviderRequestKind\.BloggerSquash[\s\S]*?repairRequestKind[\s\S]*?ProviderRequestKind\.InteractionRepair[\s\S]*?bloggerProviderRequestKind request/,
+    'fallback authorization must classify the current repair turn or its active owned Blogger request',
+  )
+  assert.match(
+    interactionRepairSrc,
+    /ProviderRecoveryWorkflow\.admitPolicyAuthorizedFailure\s+journal\s+turn\s+ExecutionFailure\.ProviderTransient\s+requestKind\s+reason/,
+    'AABB must pass exact current evidence to the fallback workflow owner',
+  )
+  assert.match(
+    fallbackWorkflowSrc,
+    /policyFallbackDecision[\s\S]*?recoveryDecision turn failure current requestKind[\s\S]*?FallbackDecision\.NoFallback -> PolicyFallbackDecision\.Exhausted[\s\S]*?FallbackDecision\.AdvanceFallback authorization -> PolicyFallbackDecision\.Authorized authorization[\s\S]*?admitAuthorizedFailure[\s\S]*?FallbackLedger\.recordAuthorizedFailure durable turn\.SessionId authorization error[\s\S]*?admitCurrentFailure/,
+    'the fallback workflow must consume its policy authorization through the canonical ledger operation',
+  )
+  assert.match(
+    fallbackWorkflowSrc,
+    /outcomeAfterRepeatedAdmission[\s\S]*?FallbackEvidence\.tryCurrentState sessionId \(AgentJournal\.snapshot durable\)[\s\S]*?Some latest when fallbackBudgetOf latest = ProviderRecoveryBudget\.Exhausted ->\s+Ok ConfirmedFailureOutcome\.RecoveryExhausted[\s\S]*?reconcileFailureAdmission[\s\S]*?Ok ConfirmedFailureOutcome\.AlreadyRecorded -> outcomeAfterRepeatedAdmission durable sessionId/,
+    'the owner must return a typed exhausted outcome after a racing ledger admission',
+  )
+  assert.doesNotMatch(interactionRepairSrc, /ExecutionFailurePolicy\.decide|FallbackEvidence\.|FallbackLedger\./)
+  assert.doesNotMatch(interactionRepairSrc + fallbackWorkflowSrc, /FallbackLedger\.recordConfirmedFailure/)
+  assert.match(
+    interactionRepairSrc,
+    /\| Ok ConfirmedFailureOutcome\.RecoveryExhausted when guaranteedFirstAabb -> SendAabb/,
+    'fallback exhaustion cannot steal the guaranteed first protocol AABB',
+  )
+  assert.match(
+    interactionRepairSrc,
+    /match decideBloggerAabbFailure guaranteedFirstAabb confirmedFailure with\s+\| SendAabb -> do! sendAabb \(\)\s+\| ExhaustProtocol ->\s+do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"/,
+    'the named AABB decision must own the physical send/exhaust operation',
+  )
 })
 
 test('WHAT[BD-017] ENFORCER_153_repairState_request_isolation_and_abandon_lifecycle', () => {

@@ -52,62 +52,30 @@ module PromptAuthorityLedger =
 
     let empty = PromptAuthority.empty
 
-    /// PROMPT-004 has exactly two root kinds. An unrecognised label is NOT a
-    /// HumanRoot by default: HOST-001 requires fail-closed, and HumanRoot is the
-    /// most privileged value in this domain.
-    let private tryParseAuthorityKind (value: string) =
+    let private parseAuthorityKind (value: string) =
         match value with
-        | "HumanRoot" -> Some PromptAuthority.RootAuthorityKind.HumanRoot
-        | "AgentOwnerRoot" -> Some PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-        | _ -> None
+        | "HumanRoot" -> Ok PromptAuthority.RootAuthorityKind.HumanRoot
+        | "AgentOwnerRoot" -> Ok PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+        | unknown -> Error(sprintf "unknown authority root kind: %s" unknown)
 
-    /// The recorded peer wins when present; blank facts fall back to the
-    /// parser-proven peer without inferring anything from the role.
-    let private recordedPeerOrDerived (recorded: string) (derived: string) =
-        if System.String.IsNullOrWhiteSpace recorded then
-            derived
-        else
-            recorded
-
-    /// PROMPT-002: an Authority Root took effect and fixed the profile.
-    ///
-    /// An uninterpretable fact leaves the projection alone. A fact naming an
-    /// illegal agent (AGENT-004) or an unknown authority kind is not evidence of
-    /// authority, and building a profile from it would hand the run to whatever
-    /// the defaults happened to be.
     let foldAuthorityRootAccepted
         (projection: PromptAuthority.PromptAuthorityProjection)
-        (fact:
-            {| SessionId: SessionId
-               LogicalRunId: LogicalRunId
-               AuthorityRootUserMessageId: AuthorityRootUserMessageId
-               AuthorityKind: string
-               SelectedAgent: string
-               PeerAgent: string
-               CanonicalRole: string
-               SelectedTier: string |})
-        =
-        match tryParseAuthorityKind fact.AuthorityKind, PromptAuthority.parseAgentName fact.SelectedAgent with
-        | None, _ -> projection
-        | _, Error _ -> projection
-        | Some authorityKind, Ok(name, role, tier, derivedPeer) ->
-            // The recorded peer wins when present. AGENT-003 requires the pair to
-            // be proven during config validation, and the fact preserves what was
-            // proven then; deriving it here would silently repair a journal
-            // written under a different config.
-            let peerAgent = recordedPeerOrDerived fact.PeerAgent derivedPeer
-
-            let profile: PromptAuthority.AuthorityExecutionProfile =
-                { SessionId = fact.SessionId
-                  LogicalRunId = fact.LogicalRunId
-                  AuthorityRootUserMessageId = fact.AuthorityRootUserMessageId
-                  AuthorityKind = authorityKind
-                  SelectedAgent = name
-                  PeerAgent = peerAgent
-                  CanonicalRole = role
-                  SelectedTier = tier }
-
-            PromptAuthorityRun.registerAuthority profile projection
+        (payload: AuthorityRootAcceptedPayload)
+        : Result<PromptAuthority.PromptAuthorityProjection, string> =
+        if payload.SchemaVersion <> 2 then
+            Error(sprintf "unsupported AuthorityRootAccepted schema version: %d" payload.SchemaVersion)
+        else
+            parseAuthorityKind payload.AuthorityKind
+            |> Result.bind (fun authorityKind ->
+                PromptAuthority.createAuthorityExecutionProfileFromSeed
+                    payload.SessionId
+                    payload.LogicalRunId
+                    payload.AuthorityRootUserMessageId
+                    authorityKind
+                    payload.IdentitySeed)
+            |> Result.bind (fun profile ->
+                PromptAuthorityRun.registerAuthority profile projection
+                |> Result.mapError PromptAuthorityRun.describeRegistrationRejection)
 
     /// The named Logical Run reached a durable terminal boundary.
     /// FINALITY-022 / INTERACTION-AUTHORITY-018: a completed HumanRoot Manager
@@ -140,6 +108,7 @@ module PromptAuthorityLedger =
                LogicalRunId: LogicalRunId option
                AuthorityRootUserMessageId: AuthorityRootUserMessageId option
                EffectiveAgent: string option
+               IdentitySeed: PromptIdentitySeed
                PayloadDigest: string |})
         =
         let origin =
@@ -162,6 +131,7 @@ module PromptAuthorityLedger =
                   LogicalRunId = fact.LogicalRunId
                   AuthorityRootUserMessageId = fact.AuthorityRootUserMessageId
                   EffectiveAgent = fact.EffectiveAgent
+                  IdentitySeed = fact.IdentitySeed
                   PayloadDigest = fact.PayloadDigest
                   // PROMPT-005: `Claimed` precedes the Host call, so no transport
                   // receipt can exist yet. `foldPromptSubmitted` attaches it.

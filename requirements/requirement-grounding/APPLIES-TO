@@ -6,8 +6,6 @@
 /src/Wanxiangshu/OpenCode/Host/RequirementGrounding/**
 /src/Wanxiangshu/OpenCode/Host/RequirementGroundingSurface.fs
 /src/Wanxiangshu/OpenCode/Host/RequirementGroundingRepositorySurface.fs
-/src/Wanxiangshu/OpenCode/Host/Facts.fs
-/src/Wanxiangshu/OpenCode/Host/Fact.fs
 /src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs
 /src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs

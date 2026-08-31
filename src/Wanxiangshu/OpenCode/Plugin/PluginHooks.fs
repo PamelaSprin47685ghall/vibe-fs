@@ -98,23 +98,6 @@ open PluginHostInterop
 
 module PluginHooks =
 
-    let private fatalSync operation (action: unit -> unit) =
-        try
-            action ()
-        with ex ->
-            Diagnostic.fatal operation [ "result", ex.Message ]
-            raise ex
-
-    let private fatalTask operation (work: unit -> Task) : Task =
-        task {
-            try
-                do! work ()
-            with ex ->
-                Diagnostic.fatal operation [ "result", ex.Message ]
-                return raise ex
-        }
-        :> Task
-
     /// Host hook surface: chat / transform / config / compaction / text /
     /// tool hooks plus event + dispose, and the optional client tool module.
     let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) (transform: obj -> obj -> Task<unit>) : Task<obj> =
@@ -194,115 +177,17 @@ module PluginHooks =
                             toolOutput
 
                     if casebookEnabled then
-                        collectCasebookObservation toolInput toolOutput
+                        HookPolicy.observeOptional Diagnostic.emit OptionalHookEffect.CasebookObservation (fun () ->
+                            collectCasebookObservation toolInput toolOutput)
+                        |> ignore
                 }
 
             let ownedTransform (inObj: obj) (outObj: obj) : Task =
                 scope.RunOwnedWork(fun () -> transform inObj outObj)
 
-            // HOST-009: the object handed to the Host carries Host hooks and
-            // nothing else.
-            //
-            // Six extra keys used to hang here — `projection`, `events`,
-            // `sessions`, `journal`, `hostEventsSubscription`, `bindRunStarted`.
-            // None is a hook name in the Host's `Hooks` type, so the Host never
-            // read any of them; they were internal ports exposed for test
-            // visibility, which is the one thing VERIFY-008 names as forbidden.
-            // Two had no reader at all. Layer 1–3 tests reach these modules
-            // directly through `dist`.
-            let hooks =
-                createObj
-                    [ "chat.message",
-                      box (fatalHook "plugin-hook-chat-message-failed" (curriedHook wired.ChatMessageHook))
-                      // Pin the request agent's bound model. Host retry reuses
-                      // the same user message; without this pin an agent-less
-                      // retry can resolve to the default build / Fast model.
-                      "chat.params", box (fatalHook "plugin-hook-chat-params-failed" (curriedHook chatParams))
-                      // ONE transform registration.
-                      //
-                      // Both `chat.transform` and this key used to point at the
-                      // same function "for compatibility". Host source has only
-                      // the experimental name — the other is absent from the
-                      // `Hooks` type and triggered nowhere; `prompt.ts:1255` and
-                      // `compaction.ts:350` are the only trigger sites. So the
-                      // extra key was never a fallback; it was a second live
-                      // registration of one hook, and every provider step ran the
-                      // Companion rewrite and the REVIEW-010 seal twice over the
-                      // same message array.
-                      "experimental.chat.messages.transform",
-                      box (fatalHook "plugin-hook-messages-transform-failed" (curriedHook (box ownedTransform)))
-                      // HOST-026 / PROMPT-017: session-bound ProviderLanguage
-                      // replaces only the Wanxiangshu-owned agent system segment.
-                      // Host/AGENTS/system additions remain byte-identical.
-                      "experimental.chat.system.transform",
-                      box (fatalHook "plugin-hook-system-transform-failed" (pairedHook (box systemTransform)))
-                      // HOST-006 prevention layer. The config hook is the only
-                      // place the plugin can reach the compaction settings: the
-                      // Host hands over the live instance-state object and runs
-                      // this before other services (`bootstrap.ts:36`), so a write
-                      // here is in force before anything reads it.
-                      //
-                      // `enforceSettings` reports the first key it could not
-                      // establish. That is carried to the startup probe rather than
-                      // thrown here: HOST-006's verdict needs both halves — the
-                      // settings AND the first turn — and failing at config time
-                      // would report the symptom without the observation.
-                      "config",
-                      box (fun (config: obj) ->
-                          fatalSync "plugin-hook-config-failed" (fun () ->
-                              ManagerConfig.configureManager config |> ignore
-                              scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
-                              ExplicitSessionResume.registerCommand config))
-                      // HOST-006: this hook cannot refuse a compaction — its output
-                      // has no cancel field (`plugin/index.ts:305`) and
-                      // `plugin.trigger` discards the return value. Registered
-                      // anyway so the containment layer has a same-turn signal, and
-                      // so the absence of a veto is documented at the boundary
-                      // rather than inferred from silence.
-                      "experimental.session.compacting",
-                      box (
-                          fatalHook
-                              "plugin-hook-session-compacting-failed"
-                              (pairedHook (box HostCompactionGate.onSessionCompacting))
-                      )
-                      // HOST-006: always `enabled = false`. `compaction.auto=false`
-                      // already makes the replay branch unreachable, but this is the
-                      // one vetoable synthetic-turn injection point, and leaving it
-                      // unanswered relies on an upstream default staying harmless.
-                      "experimental.compaction.autocontinue",
-                      box (
-                          fatalHook
-                              "plugin-hook-compaction-autocontinue-failed"
-                              (pairedHook (box HostCompactionGate.onCompactionAutoContinue))
-                      )
-                      // Magic Todo definition/before/after are one V1 Host
-                      // membrane. Definition must replace both schema surfaces;
-                      // before mutates the original args object in place.
-                      "tool.definition",
-                      box (fatalHook "plugin-hook-tool-definition-failed" (pairedHook (box toolDefinition)))
-                      "tool.execute.before",
-                      box (
-                          classifiedRejectionHook
-                              "plugin-hook-tool-before-failed"
-                              MagicTodoHostCodec.isProviderInputRejection
-                              (pairedHook (box toolBefore))
-                      )
-                      // CASE-003 shares the single after hook key with Magic Todo.
-                      // The checkpoint result is enriched first; observation then
-                      // sees the exact provider-visible result bytes.
-                      "tool.execute.after", box (fatalHook "plugin-hook-tool-after-failed" (pairedHook (box toolAfter))) ]
-
-            hooks?event <- box (fun raw -> fatalSync "plugin-hook-event-failed" (fun () -> wired.ObserveEvent raw))
-
-            // HOST-009 dispose: cancel owned Tasks, kill PTYs/processes, dispose
-            // sessions. `scope.Dispose` owns all of it, and the Host awaits this
-            // hook (`plugin/index.ts:266`), so teardown completes before shutdown
-            // proceeds.
-            hooks?dispose <- box (fun () -> fatalTask "plugin-hook-dispose-failed" (fun () -> scope.DisposeAsync()))
-
             let client = if isNull input then null else input?client
 
-            let configureClient () : Task =
+            let configureClient () : Task<ToolRegistration> =
                 task {
                     let! toolModule = importToolModule ()
 
@@ -351,27 +236,114 @@ module PluginHooks =
                             casebookToolSpecs
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
-                    hooks?tool <- toolRegistration.Tools
-
-                    let adoptExisting parent record =
-                        toolRegistration.Runtime.AdoptExistingChild(parent, record)
-
-                    hooks?``command.execute.before`` <-
-                        fatalHook
-                            "plugin-hook-command-before-failed"
-                            (pairedHook (box (ExplicitSessionResume.before journal snapshotOpt adoptExisting)))
+                    return toolRegistration
                 }
 
-            let guardedClientConfiguration () : Task =
+            let guardedClientConfiguration () : Task<ToolRegistration> =
                 task {
                     try
-                        do! configureClient ()
+                        return! configureClient ()
                     with ex ->
-                        raise (InvalidOperationException(sprintf "Failed to load OpenCode tool module: %s" ex.Message))
+                        return
+                            raise (
+                                InvalidOperationException(sprintf "Failed to load OpenCode tool module: %s" ex.Message)
+                            )
                 }
 
-            if not (isNull client) then
-                do! guardedClientConfiguration ()
+            let! toolRegistration =
+                if isNull client then
+                    Task.FromResult None
+                else
+                    task {
+                        let! registration = guardedClientConfiguration ()
+                        return Some registration
+                    }
+
+            let chatMessage =
+                registeredHook HookKey.ChatMessage (curriedHook wired.ChatMessageHook)
+
+            let chatParamsRegistration =
+                registeredHook HookKey.ChatParams (curriedHook chatParams)
+
+            let messagesTransform =
+                registeredHook HookKey.MessagesTransform (curriedHook (box ownedTransform))
+
+            let systemTransformRegistration =
+                registeredHook HookKey.SystemTransform (pairedHook (box systemTransform))
+
+            let config =
+                registeredHook
+                    HookKey.Config
+                    (unaryHook (
+                        box (fun (config: obj) ->
+                            ManagerConfig.configureManager config |> ignore
+                            scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
+                            ExplicitSessionResume.registerCommand config)
+                    ))
+
+            let sessionCompacting =
+                registeredHook HookKey.SessionCompacting (pairedHook (box HostCompactionGate.onSessionCompacting))
+
+            let compactionAutoContinue =
+                registeredHook
+                    HookKey.CompactionAutoContinue
+                    (pairedHook (box HostCompactionGate.onCompactionAutoContinue))
+
+            let toolDefinitionRegistration =
+                registeredHook HookKey.ToolDefinition (pairedHook (box toolDefinition))
+
+            let toolBeforeRegistration =
+                registeredHook HookKey.ToolBefore (pairedHook (box toolBefore))
+
+            let toolAfterRegistration =
+                registeredHook HookKey.ToolAfter (pairedHook (box toolAfter))
+
+            let event =
+                registeredHook HookKey.Event (unaryHook (box (fun raw -> wired.ObserveEvent raw)))
+
+            let dispose =
+                registeredHook HookKey.Dispose (nullaryHook (box (fun () -> scope.DisposeAsync())))
+
+            let hooks =
+                match toolRegistration with
+                | None ->
+                    createObj
+                        [ chatMessage
+                          chatParamsRegistration
+                          messagesTransform
+                          systemTransformRegistration
+                          config
+                          sessionCompacting
+                          compactionAutoContinue
+                          toolDefinitionRegistration
+                          toolBeforeRegistration
+                          toolAfterRegistration
+                          event
+                          dispose ]
+                | Some registration ->
+                    let adoptExisting parent record =
+                        registration.Runtime.AdoptExistingChild(parent, record)
+
+                    let commandBefore =
+                        registeredHook
+                            HookKey.CommandBefore
+                            (pairedHook (box (ExplicitSessionResume.before journal snapshotOpt adoptExisting)))
+
+                    createObj
+                        [ chatMessage
+                          chatParamsRegistration
+                          messagesTransform
+                          systemTransformRegistration
+                          config
+                          sessionCompacting
+                          compactionAutoContinue
+                          toolDefinitionRegistration
+                          toolBeforeRegistration
+                          toolAfterRegistration
+                          event
+                          dispose
+                          "tool", registration.Tools
+                          commandBefore ]
 
             return box hooks
         }

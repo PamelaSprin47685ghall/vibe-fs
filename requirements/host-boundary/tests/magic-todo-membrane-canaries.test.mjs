@@ -521,13 +521,14 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_N zero bare SessionTodo.update outside the 
 
 test('WHAT[HOST-BOUNDARY-019] CANARY_O no plugin todowrite tool overrides builtin (static)', () => {
   // O: the plugin registers hooks (definition/before/after), not a competing
-  //    tool. The builtin executor remains the physical sink.
+  //    tool. Assert the exact typed HookPolicy composition names rather than
+  //    searching for emitted Host-key strings that PluginHooks no longer owns.
   const pluginHooks = read('src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs')
-  assert.match(pluginHooks, /tool\.definition/, 'plugin registers tool.definition hook')
-  assert.match(pluginHooks, /tool\.execute\.before/, 'plugin registers tool.execute.before hook')
-  assert.match(pluginHooks, /tool\.execute\.after/, 'plugin registers tool.execute.after hook')
+  assert.match(pluginHooks, /registeredHook HookKey\.ToolDefinition \(pairedHook \(box toolDefinition\)\)/, 'plugin registers the typed tool-definition hook')
+  assert.match(pluginHooks, /registeredHook HookKey\.ToolBefore \(pairedHook \(box toolBefore\)\)/, 'plugin registers the typed tool-before hook')
+  assert.match(pluginHooks, /registeredHook HookKey\.ToolAfter \(pairedHook \(box toolAfter\)\)/, 'plugin registers the typed tool-after hook')
   // O: no plugin tool named "todowrite" that would override the builtin
-  assert.doesNotMatch(pluginHooks, /tool\.add.*todowrite|registerTool.*todowrite|name.*['"]todowrite['"].*tool/, 'no plugin todowrite tool override')
+  assert.doesNotMatch(pluginHooks, /(?:tool\.add|registerTool)[\s\S]{0,160}todowrite|(?:name|"tool")\s*[,=:][\s\S]{0,80}['"]todowrite['"]/, 'no plugin todowrite tool override')
   // O: the builtin executor remains the sink — cross-ref host018-no-fork.test.mjs
   //    proves no Host source fork and only public SDK imports.
   const fsproj = read('src/Wanxiangshu/Wanxiangshu.fsproj')

@@ -41,7 +41,7 @@ async function getAllProductionFsFiles(dir) {
 /**
  * ModelCapacity exclusive private knowledge identifiers.
  * These private types, state dictionaries, and algorithm helpers must exist
- * only in src/Wanxiangshu/OpenCode/Host/ModelCapacity.fs and nowhere else.
+ * only in the ModelCapacity owner module set and nowhere else.
  */
 const EXCLUSIVE_PRIVATE_KNOWLEDGE = Object.freeze([
   // Private types & DU states
@@ -56,7 +56,7 @@ const EXCLUSIVE_PRIVATE_KNOWLEDGE = Object.freeze([
   'creditSourceByExecution',
   'companionSessionByOwner',
   'companionOwnerBySession',
-  'nextDemand',
+  'nextCapacityDemandSequence',
 
   // Private borrowing, recall, credit distance & reservation algorithm helpers
   'ancestorDistance',
@@ -78,7 +78,7 @@ const EXCLUSIVE_PRIVATE_KNOWLEDGE = Object.freeze([
   'creditTokens',
   'withoutTokens',
   'schedulingView',
-  'ordinaryDecision',
+  'capacityOrdinaryDecision',
   'attributedDecision',
   'matchingCreditDecision',
   'routeDecision',
@@ -106,22 +106,29 @@ const EXCLUSIVE_PRIVATE_KNOWLEDGE = Object.freeze([
 
 /**
  * Controlled public types.
- * Allowed ONLY in ModelCapacity.fs (owner/producer) and ModelRouting.fs (permitted consumer).
+ * Allowed ONLY in ModelCapacity owner modules and ModelRouting.fs (permitted consumer).
  */
 const CONTROLLED_PUBLIC_TYPES = Object.freeze([
   'CapacityLedger',
   'BorrowingCapacity',
 ])
 
-const OWNER_FILE = 'src/Wanxiangshu/OpenCode/Host/ModelCapacity.fs'
+const OWNER_FILES = Object.freeze([
+  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Model.fs',
+  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Ledger.fs',
+  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs',
+  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs',
+  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs',
+])
 const PERMITTED_CONSUMER_FILES = Object.freeze([
-  OWNER_FILE,
+  ...OWNER_FILES,
   'src/Wanxiangshu/OpenCode/Host/ModelRouting.fs',
 ])
 
 test('WHAT[EMR-010] EMR_010_model_capacity_owner_defines_all_private_borrowing_knowledge', async () => {
-  const ownerAbs = join(repoRoot, OWNER_FILE)
-  const ownerContent = await readFile(ownerAbs, 'utf8')
+  const ownerContent = (
+    await Promise.all(OWNER_FILES.map((file) => readFile(join(repoRoot, file), 'utf8')))
+  ).join('\n')
 
   for (const identifier of EXCLUSIVE_PRIVATE_KNOWLEDGE) {
     const pattern = new RegExp(`\\b${identifier}\\b`)
@@ -150,7 +157,7 @@ test('WHAT[EMR-010] EMR_010_model_capacity_private_knowledge_is_exclusive_to_own
 
   for (const fileAbs of allFsFiles) {
     const relPath = toRelative(fileAbs)
-    if (relPath === OWNER_FILE) {
+    if (OWNER_FILES.includes(relPath)) {
       continue
     }
 
@@ -169,7 +176,7 @@ test('WHAT[EMR-010] EMR_010_model_capacity_private_knowledge_is_exclusive_to_own
   assert.deepEqual(
     violations,
     [],
-    `Private ModelCapacity borrowing/lineage knowledge leaked outside owner file (${OWNER_FILE}). Violations: ${JSON.stringify(violations, null, 2)}`
+    `Private ModelCapacity borrowing/lineage knowledge leaked outside owner modules (${OWNER_FILES.join(', ')}). Violations: ${JSON.stringify(violations, null, 2)}`
   )
 })
 

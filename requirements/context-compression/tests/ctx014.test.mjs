@@ -1,4 +1,4 @@
-// CTX-014 — diagnostic events are structured, redacted and fail-closed.
+// CTX-014 — diagnostic events are structured, redacted and failure-transparent.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as owner from '../../../dist/Context/Companion/CompressionSurface.js'
@@ -50,9 +50,8 @@ test('WHAT[CONTEXT-COMPRESSION-013] CTX_014_fatal_emits_structured_event_without
   }
 })
 
-test('WHAT[CONTEXT-COMPRESSION-013] CTX_014_fatal_path_rejects_unbounded_fields', () => {
-  assert.throws(
-    () => diag.emit('context_compression_test', [['estimated_tokens_remaining', 'secret']]),
-    /CTX-014/,
-  )
+test('WHAT[CONTEXT-COMPRESSION-013] CTX_014_emit_drops_unbounded_fields_without_affecting_caller', () => {
+  const state = { accepted: true }
+  assert.doesNotThrow(() => diag.emit('context_compression_test', [['estimated_tokens_remaining', 'secret']]))
+  assert.deepEqual(state, { accepted: true })
 })

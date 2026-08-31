@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "supportedVersionRange": "1.18.18",
+  "observedVersions": {
+    "opencode": "1.18.18",
+    "plugin": "1.18.18"
+  },
+  "observedResult": "supported",
+  "missingCapability": null,
+  "publicHooks": [
+    "chat.message",
+    "chat.params",
+    "experimental.chat.messages.transform",
+    "event"
+  ],
+  "order": [
+    "chat.message",
+    "experimental.chat.messages.transform",
+    "chat.params",
+    "provider"
+  ],
+  "supportedOrder": [
+    "chat.message",
+    "experimental.chat.messages.transform",
+    "chat.params",
+    "provider"
+  ],
+  "chatMessageOutputKeys": [
+    "message",
+    "parts"
+  ],
+  "terminalEvents": {
+    "providerLifecycle": "message.updated properties.info exact sessionID + id + parentID + assistant role + time.created/time.completed",
+    "success": "message.updated followed by session.idle",
+    "rejection": "session.error"
+  },
+  "duplicateDelivery": "chat.message-is-redelivered-while-transform-and-provider-are-deduplicated"
+}

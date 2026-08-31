@@ -1,6 +1,6 @@
 # Package index
 
-当前设计得到 **52 张 boundary card**。52 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
+当前设计得到 **54 张 boundary card**。54 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
 
 ## 1. Requirement system
 
@@ -48,6 +48,7 @@
 |---|---|
 | `concern-routing` | participant 之间按 concern-addressed mailbox 通信；发送者不依赖身份拓扑，消息只在自然 Pair Hint 边界打断注意力。 |
 | `interaction-authority` | 物理 user-shaped message 不等于 authority；只有 typed provenance 能创建或继续 logical interaction。 |
+| `managed-chat-execution` | 每个物理消息的 durable acceptance、provider start、唯一终态与 exact settlement 必须由消息级执行 owner 统一管理。 |
 | `dispatch-protocol` | 已获授权的 interaction 穿过不可靠 Host 时必须避免 uncertain outcome 复制逻辑效果。 |
 | `durable-events` | durable truth 必须以不可变事实、原子提交与确定性 fold 形成单一可重放 substrate。 |
 | `effect-accounting` | 外部副作用的请求、物理发生与确认必须分型；unknown outcome 不能伪装成未发生或成功。 |
@@ -76,6 +77,7 @@
 
 | Package | 一句话 WHY |
 |---|---|
+| `execution-failure-policy` | 执行失败必须先收敛为封闭类型，再由唯一纯策略一次性裁决 retry、fallback、capacity、message 与 fatal 后果。 |
 | `provider-attempt-recovery` | 单次 provider attempt 已失败后，可在不改变 authority/personhood 的前提下有界换执行绑定继续。 |
 | `crash-reconciliation` | 进程/插件中断后只能从 durable facts 与可信物理观察重新进入普通程序，不能从临时内存或猜测恢复。 |
 | `degeneration-guard` | 尚未结束的 attempt 若 token 多样性越出正常语料经验边界，应在污染更多历史前主动终止并由本包自行要求改写。 |
@@ -138,7 +140,7 @@
 
 # 依赖骨架
 
-这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（130 edges，0 cycle，按本 code block 逐项机器计数）。
+这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（144 edges，按本 code block 逐项机器计数）。
 
 ```text
 requirement-system       → 无
@@ -148,10 +150,10 @@ structured-workflow      → 无
 time-capability          → 无
 causal-wait              → 无
 session-ontology         → 无
-managed-session-lifecycle→ session-ontology, crash-reconciliation
+managed-session-lifecycle→ session-ontology, crash-reconciliation, managed-chat-execution, interaction-authority, participant-identity
 host-boundary            → 无
 participant-identity     → session-ontology
-execution-model-routing  → participant-identity, managed-session-lifecycle, host-boundary
+execution-model-routing  → participant-identity, managed-session-lifecycle, managed-chat-execution, execution-failure-policy, host-boundary
 office-capability        → participant-identity
 capability-enforcement   → office-capability, participant-identity, attention-regulation, concern-routing, institutional-learning
 participant-horizon      → 无
@@ -163,7 +165,8 @@ provider-projection      → participant-horizon, provider-language
 external-investigation   → office-capability, participant-horizon, host-boundary
 concern-routing          → participant-identity, participant-horizon, durable-events
 interaction-authority    → participant-identity, session-ontology
-dispatch-protocol        → interaction-authority, effect-accounting, host-boundary, durable-events
+managed-chat-execution   → durable-events, interaction-authority, participant-identity, execution-model-routing, execution-failure-policy, host-boundary
+dispatch-protocol        → interaction-authority, effect-accounting, host-boundary, durable-events, managed-chat-execution
 effect-accounting        → durable-events
 durable-events           → 无
 durable-convergence      → durable-events
@@ -176,7 +179,8 @@ semantic-trace           → durable-events
 work-record              → semantic-trace, context-compression, participant-horizon
 context-compression      → semantic-trace, provider-projection
 prefix-stability         → provider-projection, context-compression, provider-language, participant-identity
-provider-attempt-recovery→ participant-identity, execution-model-routing, interaction-authority
+execution-failure-policy → 无
+provider-attempt-recovery→ participant-identity, execution-failure-policy, execution-model-routing, interaction-authority
 crash-reconciliation     → durable-events, effect-accounting, structured-workflow, host-boundary
 degeneration-guard       → interaction-authority, dispatch-protocol, host-boundary
 obligation-ledger        → durable-events, effect-accounting, semantic-trace
@@ -204,4 +208,4 @@ guidance-delivery    → provider-projection 删（渲染是下游机制）
 finality             → participant-horizon 保留（隐藏机制=信息准入边界，与 delegation 同型）
 ```
 
-当前 130 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。旧正文曾写“110 edges”，但旧邻接表实际已含 112；本轮以邻接表本身为准纠正计数漂移，并新增 18 edges。
+当前 144 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。旧正文曾写“110 edges”，但旧邻接表实际已含 112；前轮以邻接表本身为准纠正计数漂移，本轮随两个 execution owner 落地后按当前邻接表重新机器计数。

@@ -5,10 +5,11 @@ import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 
 const {
   createRuntime,
-  acquireManaged,
+  acquireExecutionAdmission,
+  executionAdmissionTarget,
+  commitExecutionAdmission,
   tryReserveManaged,
   tryLease,
-  releaseExecution,
   releasePhysicalExecution,
   cancelPendingExecution,
   bindCapacityChild,
@@ -17,11 +18,32 @@ const {
   endProviderStep,
   suppressProviderStep,
   snapshotOccupied,
+  capacitySnapshot,
   pendingCount,
 } = routing
 
 const target = (model = 'provider/shared', reasoning = 'none') => ({ model, reasoning })
 const key = (value) => `${value.model}|${value.reasoning}`
+const acquireManaged = async (runtime, sessionId, physicalUserMessageId, agent) => {
+  const acquisition = await acquireExecutionAdmission(
+    runtime,
+    sessionId,
+    physicalUserMessageId,
+    agent,
+  )
+  if (acquisition.kind !== 'Acquired') return { kind: acquisition.kind, target: null }
+
+  const projected = executionAdmissionTarget(runtime, acquisition.lease)
+  const observed = {
+    sessionId,
+    physicalUserMessageId,
+    effectiveAgent: agent,
+    target: projected,
+  }
+  const settlement = commitExecutionAdmission(runtime, acquisition.lease, observed)
+  assert.ok(['Applied', 'AlreadyApplied'].includes(settlement.kind))
+  return { kind: 'Acquired', target: projected }
+}
 const acquireTarget = async (...args) => {
   const outcome = await acquireManaged(...args)
   assert.equal(outcome.kind, 'Acquired')
@@ -69,6 +91,22 @@ test('WHAT[EMR-006] EMR_006_new_physical_message_supersedes_old_A_B_occupancy_wi
   assert.equal(key(tryLease(runtime, 'session', 'msg-b', 'deep-coder')), 'provider/deep-coder|none')
 })
 
+test('WHAT[EMR-006] EMR_006_retarget_clears_superseded_inflight_step_before_new_provider_step', async () => {
+  const runtime = createRuntime((role) => target(`provider/${role}`))
+
+  await acquireTarget(runtime, 'session', 'msg-a', 'fast-coder')
+  await enterProviderStep(runtime, 'session', 'msg-a', [])
+  await acquireTarget(runtime, 'session', 'msg-b', 'deep-coder')
+
+  const snapshot = capacitySnapshot(runtime)
+  assert.deepEqual(snapshot.tokenStateCounts, { idle: 1, inFlight: 0, retiring: 0 })
+  assert.deepEqual(snapshot.tokens[0].owner, {
+    sessionId: 'session',
+    physicalUserMessageId: 'msg-b',
+    effectiveAgent: 'deep-coder',
+  })
+})
+
 test('WHAT[EMR-006] EMR_006_same_physical_message_cannot_change_effective_agent', async () => {
   const runtime = createRuntime(() => target())
   await acquireTarget(runtime, 'session', 'msg-1', 'fast-coder')
@@ -97,7 +135,7 @@ test('WHAT[EMR-004] EMR_004_required_null_waits_for_an_occupancy_event_then_retr
   assert.equal(settled, false)
   assert.equal(pendingCount(runtime), 1)
 
-  releaseExecution(runtime, 'holder')
+  releasePhysicalExecution(runtime, 'holder', 'msg-holder')
   assert.equal(key(await waiting), 'provider/only|none')
   assert.equal(pendingCount(runtime), 0)
   assert.equal(snapshotOccupied(runtime).length, 1)
@@ -132,7 +170,7 @@ test('WHAT[EMR-004] EMR_004_an_earlier_null_waiter_does_not_head_of_line_block_a
 
   cancelPendingExecution(runtime, 'blocked-session')
   const blockedOutcome = await blocked
-  assert.equal(blockedOutcome.kind, 'Superseded')
+  assert.equal(blockedOutcome.kind, 'Cancelled')
   assert.equal(blockedOutcome.target, null)
 })
 
@@ -202,12 +240,12 @@ test('WHAT[EMR-007] EMR_007_execution_release_is_idempotent_and_wakes_waiters_on
   await acquireTarget(runtime, 'holder', 'msg-holder', 'fast-coder')
   const waiting = acquireTarget(runtime, 'waiter', 'msg-waiter', 'deep-coder')
 
-  releaseExecution(runtime, 'holder')
+  releasePhysicalExecution(runtime, 'holder', 'msg-holder')
   const acquired = await waiting
   assert.equal(acquired.model, 'provider/one')
   assert.equal(snapshotOccupied(runtime).length, 1)
 
-  releaseExecution(runtime, 'holder')
+  releasePhysicalExecution(runtime, 'holder', 'msg-holder')
   assert.equal(snapshotOccupied(runtime).length, 1, 'second release cannot remove somebody else\'s execution')
 })
 
@@ -272,7 +310,7 @@ test('WHAT[EMR-010] EMR_010_lineage_credit_is_free_only_to_descendants_not_globa
   await Promise.resolve()
   assert.equal(settled, false, 'unrelated sessions still see the ancestor token as occupied')
   cancelPendingExecution(runtime, 'stranger')
-  assert.equal((await stranger).kind, 'Superseded')
+  assert.equal((await stranger).kind, 'Cancelled')
 })
 
 test('WHAT[EMR-010] EMR_010_provider_step_handoff_makes_the_same_credit_available_to_a_waiting_descendant', async () => {
@@ -441,7 +479,7 @@ test('WHAT[EMR-010] EMR_010_credit_never_crosses_provider_boundary', async () =>
   await Promise.resolve()
   assert.equal(settled, false)
   cancelPendingExecution(runtime, 'child')
-  assert.equal((await child).kind, 'Superseded')
+  assert.equal((await child).kind, 'Cancelled')
 })
 
 test('WHAT[EMR-010] EMR_010_multi_provider_credit_requires_one_token_attribution', async () => {
@@ -469,7 +507,7 @@ test('WHAT[EMR-010] EMR_010_multi_provider_credit_requires_one_token_attribution
   assert.equal(settled, false, 'a schedule requiring two hidden providers cannot consume one borrowed token')
   assert.equal(snapshotOccupied(runtime).length, 2)
   cancelPendingExecution(runtime, 'leaf')
-  assert.equal((await leaf).kind, 'Superseded')
+  assert.equal((await leaf).kind, 'Cancelled')
 })
 
 test('WHAT[EMR-010] EMR_010_blogger_borrows_the_lender_blogger_when_main_is_borrowed', async () => {
@@ -543,5 +581,5 @@ test('WHAT[EMR-010] EMR_010_blogger_gets_no_companion_credit_when_main_did_not_b
   assert.equal(settled, false, 'a Main that acquired ordinary capacity does not activate companion borrowing')
 
   cancelPendingExecution(runtime, 'child-blogger')
-  assert.equal((await childBlogger).kind, 'Superseded')
+  assert.equal((await childBlogger).kind, 'Cancelled')
 })

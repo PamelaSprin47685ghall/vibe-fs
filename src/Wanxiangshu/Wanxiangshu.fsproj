@@ -18,6 +18,10 @@
     <Compile Include="Foundation/Identity.fs"/>
     <Compile Include="Context/Trace/Cursor.fs"/>
     <Compile Include="Foundation/Roles.fs"/>
+    <Compile Include="Participant/Persona/Catalog.fs"/>
+    <Compile Include="Participant/Persona/ManagedCatalog.fs"/>
+    <Compile Include="Participant/Persona/Identity.fs"/>
+    <Compile Include="Context/Prefix/Types.fs"/>
     <Compile Include="Foundation/RolesSurface.fs"/>
     <Compile Include="Foundation/McpLaunch.fs"/>
     <Compile Include="Foundation/TaskResult.fs"/>
@@ -56,6 +60,8 @@
     <Compile Include="Execution/Delegation/HandoffIdentity.fs"/>
     <Compile Include="Foundation/Outcome.fs"/>
     <Compile Include="Requirement/Grounding/Model.fs"/>
+    <Compile Include="Interaction/Authority/IdentitySeed.fs"/>
+    <Compile Include="Interaction/Authority/Origin.fs"/>
     <Compile Include="Interaction/Authority/Facts.fs"/>
     <Compile Include="Interaction/Attention/Facts.fs"/>
     <Compile Include="Interaction/Concern/Facts.fs"/>
@@ -70,7 +76,12 @@
     <Compile Include="Mission/Manager/Life/Facts.fs"/>
     <Compile Include="Mission/Obligation/Todo/Model.fs"/>
     <Compile Include="Mission/Obligation/Todo/Facts.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Facts.fs"/>
+    <Compile Include="Execution/Failure/Model.fs"/>
+    <Compile Include="Execution/Failure/Policy.fs"/>
+    <Compile Include="Execution/Failure/Surface.fs"/>
     <Compile Include="Composition/Durable/Fact.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Fact.fs"/>
     <Compile Include="Interaction/Authority/Fact.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fs"/>
     <Compile Include="Mission/Review/Fact.fs"/>
@@ -80,7 +91,6 @@
     <Compile Include="Change/Fact.fs"/>
     <Compile Include="Host/Fact.fs"/>
     <Compile Include="Foundation/Temporal.fs"/>
-    <Compile Include="Participant/Persona/Catalog.fs"/>
     <Compile Include="Participant/Provider/Language.fs"/>
     <Compile Include="Participant/Provider/Attempt/Cursor.fs"/>
     <Compile Include="Participant/Provider/Attempt/TerminalValidity.fs"/>
@@ -144,7 +154,6 @@
     <Compile Include="Mission/Review/Judgement/Witness.fs"/>
     <Compile Include="Mission/Review/Judgement/Challenge.fs"/>
     <Compile Include="Mission/Review/Judgement/RequestIdentity.fs"/>
-    <Compile Include="Participant/Persona/ManagedCatalog.fs"/>
     <Compile Include="Participant/Persona/OfficeCapabilitySurface.fs"/>
     <Compile Include="Participant/Persona/Surface.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Prompt.fs"/>
@@ -153,6 +162,8 @@
     <Compile Include="Interaction/Authority/Run.fs"/>
     <Compile Include="Interaction/Authority/RuntimeSurface.fs"/>
     <Compile Include="Execution/Fission/Model.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Failure.fs"/>
+    <Compile Include="Participant/Provider/Attempt/FailureSurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Planner.fs"/>
     <Compile Include="Participant/Provider/Attempt/PlannerSurface.fs"/>
     <Compile Include="Persistence/EventStore/Model.fs"/>
@@ -182,7 +193,10 @@
     <Compile Include="Persistence/EventStore/WriterStreamSync.fs"/>
     <Compile Include="Persistence/EventStore/RetentionSurface.fs"/>
     <Compile Include="OpenCode/Tools/ManagedAgent.fs"/>
+    <Compile Include="OpenCode/Host/ChatAdmission/Intent.fs"/>
+    <Compile Include="OpenCode/Host/ChatAdmission/IntentSurface.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fs"/>
+    <Compile Include="Persistence/Journal/PromptFactCodec.fs"/>
     <Compile Include="Persistence/Journal/FactCodec.fs"/>
     <Compile Include="Persistence/Journal/Envelope.fs"/>
     <Compile Include="Persistence/Journal/EventStoreJournalCodec.fs"/>
@@ -221,6 +235,12 @@
     <Compile Include="Interaction/Attention/Surface.fs"/>
     <Compile Include="Interaction/Concern/Surface.fs"/>
     <Compile Include="Enforcer/InstitutionalLearning/Surface.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Projection.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Recovery.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/RecoveryRuntime.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/RecoverySurface.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/RecoveryRuntimeSurface.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Admission.fs"/>
     <Compile Include="Composition/Durable/Projection.fs"/>
     <Compile Include="Mission/Manager/Life/OpeningFloor.fs"/>
     <Compile Include="Enforcer/Observation.fs"/>
@@ -244,6 +264,7 @@
     <Compile Include="Interaction/Attention/Fold.fs"/>
     <Compile Include="Interaction/Concern/Fold.fs"/>
     <Compile Include="Enforcer/InstitutionalLearning/Fold.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Fold.fs"/>
     <Compile Include="Composition/Durable/Fold.fs"/>
     <Compile Include="Execution/Delegation/Handle/FoldSurface.fs"/>
     <Compile Include="Persistence/Journal/ObligationEnvelopeSurface.fs"/>
@@ -252,6 +273,9 @@
     <Compile Include="Persistence/Journal/JournalEventStoreBoot.fs"/>
     <Compile Include="Persistence/Journal/EventStoreJournalWriter.fs"/>
     <Compile Include="Persistence/Journal/AgentJournal.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Acceptance.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Settlement.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Surface.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateLedger.fs"/>
     <Compile Include="Execution/Session/SessionStartedAtLedger.fs"/>
     <Compile Include="Mission/Review/Barrier/Workflow.fs"/>
@@ -260,8 +284,6 @@
     <Compile Include="Persistence/Journal/RuntimePath.fs"/>
     <Compile Include="Execution/Agent/Errors.fs"/>
     <Compile Include="Execution/Agent/Program.fs"/>
-    <Compile Include="Participant/Persona/SessionPersona.fs"/>
-    <Compile Include="Participant/Persona/SessionSurface.fs"/>
     <Compile Include="Participant/Provider/SessionLanguage.fs"/>
     <Compile Include="Execution/Delegation/Fork/Model.fs"/>
     <Compile Include="Execution/Session/AgentCompletion.fs"/>
@@ -341,7 +363,11 @@
     <Compile Include="OpenCode/Tools/StaticTools.fs"/>
     <Compile Include="OpenCode/Tools/FileTools.fs"/>
     <Compile Include="OpenCode/Codec/OpencodeTypes.fs"/>
-    <Compile Include="OpenCode/Host/ModelCapacity.fs"/>
+    <Compile Include="OpenCode/Host/ModelCapacity/Model.fs"/>
+    <Compile Include="OpenCode/Host/ModelCapacity/Ledger.fs"/>
+    <Compile Include="OpenCode/Host/ModelCapacity/Queue.fs"/>
+    <Compile Include="OpenCode/Host/ModelCapacity/Borrowing.fs"/>
+    <Compile Include="OpenCode/Host/ModelCapacity/Surface.fs"/>
     <Compile Include="OpenCode/Host/ModelRouting.fs"/>
     <Compile Include="OpenCode/Host/StealthBrowserMcpConfig.fs"/>
     <Compile Include="OpenCode/Host/SphinxMcpConfig.fs"/>
@@ -359,6 +385,9 @@
     <Compile Include="OpenCode/Host/PairProgrammingCalibration.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingCalibrationSurface.fs"/>
     <Compile Include="Process/Surface.fs"/>
+    <Compile Include="OpenCode/Host/HookPolicy.fs"/>
+    <Compile Include="OpenCode/Host/ReliabilityDiagnostics.fs"/>
+    <Compile Include="OpenCode/Host/ReliabilityDiagnosticsSurface.fs"/>
     <Compile Include="OpenCode/Host/Diagnostic.fs"/>
     <Compile Include="Context/Companion/CompressionSurface.fs"/>
     <Compile Include="OpenCode/Host/Events.fs"/>
@@ -384,11 +413,10 @@
     <Compile Include="OpenCode/Host/SessionSnapshotSurface.fs"/>
     <Compile Include="OpenCode/Host/ProviderRunBindingSurface.fs"/>
     <Compile Include="OpenCode/Host/OpenCodePort.fs"/>
-    <Compile Include="OpenCode/Host/ModelRoutingSurface.fs"/>
     <Compile Include="OpenCode/Host/SessionExecutionBinding.fs"/>
+    <Compile Include="OpenCode/Host/ModelRoutingSurface.fs"/>
     <Compile Include="OpenCode/Host/SessionBindingSurface.fs"/>
     <Compile Include="OpenCode/Host/ProviderLanguageBinding.fs"/>
-    <Compile Include="OpenCode/Host/PersonaBinding.fs"/>
     <Compile Include="OpenCode/Host/Sessions.fs"/>
     <Compile Include="OpenCode/Host/SessionsSurface.fs"/>
     <Compile Include="OpenCode/Host/HostMessageProjection.fs"/>
@@ -402,6 +430,8 @@
     <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fs"/>
     <Compile Include="Interaction/Dispatch/PhysicalAcceptance.fs"/>
     <Compile Include="Interaction/Dispatch/Dispatcher.fs"/>
+    <Compile Include="OpenCode/Host/ChatAdmission/Transaction.fs"/>
+    <Compile Include="OpenCode/Host/ChatAdmission/TransactionSurface.fs"/>
     <Compile Include="Interaction/Dispatch/Send.fs"/>
     <Compile Include="Strength/Replica/Transform.fs"/>
     <Compile Include="Strength/Replica/Runtime.fs"/>
@@ -443,7 +473,6 @@
     <Compile Include="Execution/Delegation/Fork/Host/Pty.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/State.fs"/>
     <Compile Include="Interaction/Repair/Port.fs"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/ParkedTransform.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Host.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Abandon.fs"/>
@@ -476,6 +505,7 @@
     <Compile Include="OpenCode/Host/PluginSessionScope.fs"/>
     <Compile Include="OpenCode/Host/PluginRecoveryScope.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fs"/>
+    <Compile Include="OpenCode/Host/SessionRecoveryHost.fs"/>
     <Compile Include="OpenCode/Host/PluginRuntimeScope.fs"/>
     <Compile Include="Context/Companion/RuntimeSurface.fs"/>
     <Compile Include="Composition/Turn/Binding.fs"/>
@@ -625,6 +655,7 @@
     <Compile Include="OpenCode/Tools/FileToolsSurface.fs"/>
     <Compile Include="OpenCode/Tools/FileMutationSurface.fs"/>
     <Compile Include="Persistence/Journal/Surface.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/StatusSurface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGroundingRepositorySurface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGroundingSurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/HandleSurface.fs"/>
@@ -636,6 +667,7 @@
     <Compile Include="Persistence/Journal/CodecSurface.fs"/>
     <Compile Include="Persistence/Journal/FactCodecSurface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Bookkeeper.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/BookkeeperRefreshSurface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperSurface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Lifecycle.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/LifecycleSurface.fs"/>
@@ -653,6 +685,7 @@
     <Compile Include="OpenCode/Host/ChatParamsSurface.fs"/>
     <Compile Include="OpenCode/Host/PluginHostInterop.fs"/>
     <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
+    <Compile Include="OpenCode/Host/HookPolicySurface.fs"/>
     <Compile Include="OpenCode/Host/ProviderSystemTransform.fs"/>
     <Compile Include="Participant/Provider/LanguageSurface.fs"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fs"/>

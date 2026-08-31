@@ -50,7 +50,7 @@ Host 因 abort 清理将工具调用标记为 interrupted 的残留记录，严�
 
 ## PAR-013: 换 Peer = 换执行者，不换身份
 
-Fallback 推进仅改变下一次执行的 `EffectiveAgent` 与物理模型目标。同一 durable logical participant run 的 `ParticipantIdentity`、SessionPersona、SessionProviderLanguage、system prompt、CanonicalRole 与 Authority identity 在所有 retry/fallback attempt 中保持严格不变；只有该 run 已 exact terminal closure 后建立的新 run 才能取得新 identity，且机器代数严禁泄漏进 provider horizon。
+Fallback 推进仅改变下一次执行的 `EffectiveAgent` 与物理模型目标。同一 durable logical participant run 的 immutable `ParticipantIdentity`（包括 Persona 与 provenance/version）、SessionProviderLanguage、system prompt、CanonicalRole 与 Authority identity 在所有 retry/fallback attempt 中保持严格不变；Persona 与 provenance/version 必须从该 run 的 durable identity evidence 继承。只有该 run 已 exact terminal closure 后建立的新 run 才能取得新 identity，且机器代数严禁泄漏进 provider horizon。
 
 ## PAR-014: continuation 只在失败记账后、预算允许时
 

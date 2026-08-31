@@ -320,8 +320,15 @@ module CompanionRuntimeSurface =
     let blocksNewRequest (durableSealed: bool) (hasFlightValue: bool) (drainOpenValue: bool) : bool =
         BloggerRuntime.blocksNewRequest durableSealed hasFlightValue drainOpenValue
 
-    let decideMaterial (hasParkedValue: bool) (hasFlightValue: bool) (context: obj) : string =
-        match BloggerRuntime.decideMaterial hasParkedValue hasFlightValue (contextOfJs context) with
+    let decideMaterial
+        (hasOpenProducerValue: bool)
+        (hasParkedValue: bool)
+        (hasFlightValue: bool)
+        (context: obj)
+        : string =
+        match
+            BloggerRuntime.decideMaterial hasOpenProducerValue hasParkedValue hasFlightValue (contextOfJs context)
+        with
         | BloggerRuntime.Decision.Start _ -> "Start"
         | BloggerRuntime.Decision.Skip -> "Skip"
         | BloggerRuntime.Decision.Offer _ -> "Offer"

@@ -35,6 +35,19 @@ const RUN = 'run_L'
 const ROOT = 'msg_u1'
 const PAIR = { selectedAgent: 'fast-coder', peerAgent: 'deep-coder' }
 
+const ROOT_SELECTION_IDENTITY_SEED = {
+  kind: 'RootSelection',
+  participantIdentity: {
+    selectedAgent: 'fast-coder',
+    peerAgent: 'deep-coder',
+    canonicalRole: 'coder',
+    selectedTier: 'fast',
+    persona: 'Coder',
+    personaCatalogVersion: 1,
+    origin: 'ResolvedAtRoot',
+  },
+}
+
 const identityFor = (run, { logical = RUN, root = ROOT } = {}) =>
   cursor.attemptIdentity(SESSION, logical, root, run)
 
@@ -46,10 +59,7 @@ const rootFact = ({ kind = 'HumanRoot', logical = RUN, root = ROOT } = {}) =>
     logicalRun: logical,
     authorityRoot: root,
     authorityKind: kind,
-    selectedAgent: 'fast-coder',
-    peerAgent: 'deep-coder',
-    canonicalRole: 'coder',
-    selectedTier: 'fast',
+    identitySeed: ROOT_SELECTION_IDENTITY_SEED,
   })
 
 const advanceFact = ({ run, previous, next, count, logical = RUN, root = ROOT, reason = 'provider_error' }) =>
@@ -615,7 +625,7 @@ test('WHAT[PAR-005] FALLBACK_005_an_advance_after_exhaustion_is_absorbed_not_app
   )
 })
 
-test('WHAT[PAR-001] FALLBACK_001_a_new_authority_root_replaces_the_cursor_entirely', () => {
+test('WHAT[PAR-001] FALLBACK_001_an_active_authority_root_must_close_before_replacement', () => {
   const folded = foldFacts([
     rootFact(),
     advanceFact({ run: 'run_1', previous: 0, next: 1, count: 1 }),
@@ -623,30 +633,25 @@ test('WHAT[PAR-001] FALLBACK_001_a_new_authority_root_replaces_the_cursor_entire
     rootFact({ logical: 'run_M', root: 'msg_u2' }),
   ])
 
-  assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
-  assert.deepEqual(fallbackOf(folded.value), {
-    logicalRun: 'run_M',
-    authorityRoot: 'msg_u2',
-    offset: 0,
-    failures: 0,
-    dedupeKeys: 0,
-    exhausted: false,
+  assert.deepEqual(folded, {
+    ok: false,
+    error: {
+      Fact: 'AuthorityRootAccepted',
+      Reason: 'active logical run must close before replacement: active=run_L requested=run_M',
+    },
   })
 })
 
 test('WHAT[PAR-007] FALLBACK_007_an_advance_naming_another_run_is_absorbed_not_applied', () => {
-  // Absorbed rather than fatal: a line for a superseded run is what a journal
-  // written across an Authority Root change looks like.
   const folded = foldFacts([
     rootFact(),
-    rootFact({ logical: 'run_M', root: 'msg_u2' }),
-    advanceFact({ run: 'run_1', previous: 0, next: 1, count: 1 }),
+    advanceFact({ run: 'run_1', previous: 0, next: 1, count: 1, logical: 'run_M', root: 'msg_u2' }),
   ])
 
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
   const state = fallbackOf(folded.value)
   assert.deepEqual({ run: state.logicalRun, offset: state.offset, failures: state.failures }, {
-    run: 'run_M',
+    run: 'run_L',
     offset: 0,
     failures: 0,
   })

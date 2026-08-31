@@ -18,6 +18,7 @@ const walkFs = (dir) => {
 
 test('WHAT[MANAGED-SESSION-017] fail-closed interrupt becomes Failed terminal so fork completion wakes parent', () => {
   const sessions = read('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
+  const pluginTransforms = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
   const lifecycle = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs')
   const runtime = read('src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs')
 
@@ -32,7 +33,20 @@ test('WHAT[MANAGED-SESSION-017] fail-closed interrupt becomes Failed terminal so
   )
   assert.doesNotMatch(termination[1], /TerminalStop\.session reason/)
   assert.match(read('src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs'), /currentPhysicalUserMessage sessionId[\s\S]*?PhysicalUserMessageId\.promoteToAuthorityRoot/)
-  assert.match(read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs'), /wired\.CurrentPhysicalUserMessage[\s\S]*?PhysicalUserMessageId\.promoteToAuthorityRoot/)
+
+  const terminatePhysical = pluginTransforms.match(/let terminatePhysical sessionId reason physical =([\s\S]*?)let terminateSession/)
+  assert.ok(terminatePhysical, 'physical managed termination owner must be inspectable')
+  assert.match(
+    terminatePhysical[1],
+    /ManagedSessionTermination\.terminate[\s\S]*?physical\s*\|> PhysicalUserMessageId\.create\s*\|> PhysicalUserMessageId\.promoteToAuthorityRoot/,
+  )
+
+  const terminateSession = pluginTransforms.match(/let terminateSession: SessionTermination =([\s\S]*?)let freezeProviderAttemptPlan/)
+  assert.ok(terminateSession, 'provider termination dispatch must be inspectable')
+  assert.match(
+    terminateSession[1],
+    /wired\.CurrentPhysicalUserMessage\(SessionId\.value sessionId\)\s*\|> Option\.map \(terminatePhysical sessionId reason\)/,
+  )
   assert.match(lifecycle, /let private stopBelongsToRun[\s\S]*?TerminalStop\.belongsTo root stop/)
   assert.match(lifecycle, /\| Failed stop when not \(stopBelongsToRun run stop\) -> Task\.FromResult\(\(\)\)/)
   assert.match(lifecycle, /\| Failed stop -> deliverFailedCompletion/)

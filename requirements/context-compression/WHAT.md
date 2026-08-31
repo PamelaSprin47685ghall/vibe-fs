@@ -70,7 +70,7 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 
 ## CONTEXT-COMPRESSION-018: Blogger catch-up 连续追平；禁止 frozen drain frontier；quiet 只等待事件
 
-一次唤醒可驱动多个 ≤200 KiB 的 Blogger cycle 直至追平当前 Current。每个已提交 cycle 后必须基于最新的 Blog coverage 与 XTrace Current 重新计算下一块，严禁冻结截断线。当前无可消费材料代表暂时 caught-up，在当前执行存活期内必须挂起等待 `MaterialAvailable typedContext | Cancelled` 事件；等待没有 lifetime、deadline 或 timeout。进程死亡不跨进程自动恢复旧 continuation。
+一次唤醒可驱动多个 ≤200 KiB 的 Blogger cycle 直至追平当前 Current。每个已提交 cycle 后必须基于最新的 Blog coverage 与 XTrace Current 重新计算下一块，严禁冻结截断线。当前无可消费材料代表暂时 caught-up，在当前执行存活期内必须挂起等待 `MaterialAvailable typedContext | Cancelled` 事件；等待没有 lifetime、deadline 或 timeout。durable open producer 在两个 physical provider step 之间暂时没有 flight 时，新 X material 必须 stage 为同一 producer 的 `MaterialAvailable`；linked Blogger session 已有 active authority profile 时，后续 material 必须作为该 profile 的 typed continuation 发送。两种情况都禁止发送第二个 Blogger Authority Root。进程死亡不跨进程自动恢复旧 continuation。
 
 ## CONTEXT-COMPRESSION-019: X→Y 后旧辅助注入不跨 horizon 保留
 

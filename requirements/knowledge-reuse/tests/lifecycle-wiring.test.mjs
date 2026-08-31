@@ -12,7 +12,12 @@ import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
 import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
 import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
 import * as lifecycle from '../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
-import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-session.test.mjs'
+import {
+  CANONICAL_A,
+  CANONICAL_Q,
+  installBookkeeperRuntime,
+  scriptedBookkeeperPort,
+} from './bookkeeper-session.test.mjs'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-'))
@@ -35,8 +40,8 @@ test('WHAT[KNOWLEDGE-REUSE-002] lifecycle_notePrompt_noteAnswer_tryFinalize_crea
   try {
     lifecycle.enable(dir)
     const { port } = scriptedBookkeeperPort()
-    bookkeeper.setSessionPort(port)
     const key = 'insp-finalize-1'
+    installBookkeeperRuntime(port, [key])
     lifecycle.notePrompt(key, 'What owns PromptAuthority?')
     lifecycle.collect(key, 'read', { path: 'a.txt' }, 'hello')
     const rawA = 'PromptAuthority is owned by the Host.'
@@ -62,7 +67,7 @@ test('WHAT[KNOWLEDGE-REUSE-002] lifecycle_notePrompt_noteAnswer_tryFinalize_crea
       eventStore.dispose(handle)
     }
   } finally {
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
     lifecycle.disable()
     cleanup()
   }
@@ -107,8 +112,8 @@ test('WHAT[KNOWLEDGE-REUSE-008] lifecycle_touchAccess_and_touchCaseAccess_advanc
   try {
     lifecycle.enable(dir)
     const { port } = scriptedBookkeeperPort()
-    bookkeeper.setSessionPort(port)
     const key = 'insp-access-1'
+    installBookkeeperRuntime(port, [key])
     lifecycle.notePrompt(key, 'Q')
     lifecycle.noteAnswer(key, 'A')
     assert.equal((await lifecycle.tryFinalize(dir, key)).ok, true)
@@ -147,7 +152,7 @@ test('WHAT[KNOWLEDGE-REUSE-008] lifecycle_touchAccess_and_touchCaseAccess_advanc
     }
     assert.ok(host >= direct)
   } finally {
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
     lifecycle.disable()
     cleanup()
   }

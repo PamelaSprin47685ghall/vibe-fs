@@ -54,8 +54,8 @@
 | MANAGED-SESSION-016 | `requirements/managed-session-lifecycle/tests/interrupt-boundary.test.mjs` |
 | MANAGED-SESSION-017 | `requirements/managed-session-lifecycle/tests/interrupt-successor.test.mjs` |
 | MANAGED-SESSION-018 | `requirements/managed-session-lifecycle/tests/shutdown-drain-contract.test.mjs` + `requirements/delegation/tests/fork-tool.test.mjs` |
-| MANAGED-SESSION-019 | `requirements/managed-session-lifecycle/tests/exact-execution-settlement.test.mjs`（计划） |
-| MANAGED-SESSION-020 | `requirements/managed-session-lifecycle/tests/reused-session-run-closure.test.mjs`（计划） |
+| MANAGED-SESSION-019 | `requirements/managed-session-lifecycle/tests/exact-execution-settlement.test.mjs` |
+| MANAGED-SESSION-020 | `requirements/managed-session-lifecycle/tests/reused-session-run-closure.test.mjs` |
 
 ## GAP
 

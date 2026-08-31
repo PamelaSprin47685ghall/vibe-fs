@@ -314,7 +314,10 @@ export class StrictMockProvider {
           console.error(`[SEAL-SYS] prevTail=${prevSys.slice(-160).replace(/\n/g, '\\n')}`);
           console.error(`[SEAL-SYS] nextTail=${nextSys.slice(-160).replace(/\n/g, '\\n')}`);
         } else {
-          console.error(`[SEAL-SYS] equal-content prevLen=${prevSys.length} nextLen=${nextSys.length} prevParts=${JSON.stringify(prevW[0]?.parts)} nextParts=${JSON.stringify(nextW[0]?.parts)}`);
+          console.error(
+            `[SEAL-SYS] equal-content prevLen=${prevSys.length} nextLen=${nextSys.length} `
+            + `prevParts=${prevW[0]?.parts?.length ?? 0} nextParts=${nextW[0]?.parts?.length ?? 0}`,
+          );
         }
         console.error(`[SEAL-DIAG] session=${sessionId} reason=${selection.sealBroken.reason} prev=[${fmt(prev)}] next=[${fmt(next)}]`);
         console.error(`[SEAL-DIFF] ${diffs.join(' || ') || '(no message diff — tools/model differ)'}`);
@@ -430,10 +433,14 @@ export class StrictMockProvider {
       candidates: candidateLabels,
     });
     console.error(`[MOCK-FATAL] first script mismatch: reason=${reason} session=${sessId} parent=${parentSessionId || '-'} model=${JSON.stringify(parsed.model)} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${JSON.stringify(fatal.lastUser)} candidates=${JSON.stringify(candidateLabels)}`);
-    // TEMP DIAG: step cursor investigation (removed after investigation).
     try {
       const roles = msgs.map((m) => `${m.role}`).join(' ');
       console.error(`[MSG-ROLES] ${roles}`);
+      const recentToolResults = msgs
+        .filter((message) => message?.role === 'tool' || message?.role === 'toolResult')
+        .slice(-4)
+        .map((message) => String(message?.content ?? message?.text ?? '').slice(0, 300));
+      console.error(`[MSG-TOOL-RESULTS] ${JSON.stringify(recentToolResults)}`);
     } catch {}
     if (isFirst) {
       const err = new Error(

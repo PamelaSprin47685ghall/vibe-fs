@@ -5,6 +5,33 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Failure
+open Wanxiangshu.Execution.Session.ChatExecution
+
+[<RequireQualifiedAccess>]
+type HostProviderCompletion =
+    | Stop
+    | Length
+    | ContentFiltered
+
+[<RequireQualifiedAccess>]
+type HostProviderTerminalOutcome =
+    | Completed of HostProviderCompletion
+    | Cancelled of ExecutionFailure
+    | Interrupted of ExecutionFailure
+    | ProviderFailure of ExecutionFailure
+
+type ExactProviderTerminalObservation =
+    { SessionId: SessionId
+      PhysicalUserMessageId: PhysicalUserMessageId
+      ProviderRun: ProviderRunIdentity
+      Outcome: HostProviderTerminalOutcome
+      Disposition: ChatExecutionTerminalDisposition option }
+
+type ExactProviderStartObservation =
+    { SessionId: SessionId
+      PhysicalUserMessageId: PhysicalUserMessageId
+      ProviderRun: ProviderRunIdentity }
 
 /// The only module that unwraps raw host `obj` events.
 /// Outputs typed `HostSignal` for the coarse signals:
@@ -88,7 +115,8 @@ module HostEventCodec =
             Some
                 { SessionId = sessionId
                   Attempt = attempt
-                  Reason = reason }
+                  Failure = ExecutionFailure.ProviderTransient
+                  Diagnostic = reason }
 
     let private statusTypeOf (raw: obj) : string option =
         let properties = raw?properties
@@ -147,19 +175,62 @@ module HostEventCodec =
         else
             "provider failure"
 
+    let private statusCodeOf (error: obj) : string =
+        if isNull error then
+            ""
+        elif not (isNull error?status) then
+            string error?status
+        elif not (isNull error?statusCode) then
+            string error?statusCode
+        elif not (isNull error?data) && not (isNull error?data?statusCode) then
+            string error?data?statusCode
+        else
+            ""
+
+    let private failureOf (error: obj) : ExecutionFailure =
+        match errorNameOf error, statusCodeOf error with
+        | ("MessageAbortedError" | "AbortError"), _ -> ExecutionFailure.UserCancelled
+        | "SupersededError", _ -> ExecutionFailure.Superseded
+        | "StreamInterruptedError", _ -> ExecutionFailure.StreamInterruptedAfterFirstToken
+        | ("TimeoutError" | "OverloadedError" | "RateLimitError" | "ProviderUnavailableError"), _ ->
+            ExecutionFailure.ProviderTransient
+        | ("PermissionDeniedError" | "AuthorizationError"), _
+        | _, ("401" | "403") -> ExecutionFailure.AuthorizationDenied
+        | ("ProviderAuthError" | "AuthenticationError" | "InvalidRequestError"), _ -> ExecutionFailure.ProviderPermanent
+        | _, ("408" | "409" | "425" | "429" | "500" | "502" | "503" | "504") -> ExecutionFailure.ProviderTransient
+        | _, ("400" | "402" | "404" | "405" | "406" | "410" | "413" | "415" | "422") ->
+            ExecutionFailure.ProviderPermanent
+        | "ProviderError", _ -> ExecutionFailure.ProviderPermanent
+        | "", "" -> ExecutionFailure.ProtocolRejection
+        | _, _ -> ExecutionFailure.LocalInvariant
+
     let private decodeSessionErrorFor (sessionId: SessionId) (raw: obj) : HostSignal option =
         let properties = raw?properties
         let error = if isNull properties then null else properties?error
-        let name = errorNameOf error
+        let failure = failureOf error
 
-        if name = "MessageAbortedError" || name = "AbortError" then
+        let observation =
+            { SessionId = sessionId
+              Failure = failure
+              Diagnostic = failureReasonOf error }
+
+        match failure with
+        | ExecutionFailure.UserCancelled ->
             // HOST-002/004: operator abort is a typed signal, not a
             // dropped event. It revokes the attempt's idle-derived
             // continuation capability; it must never be mistaken for
             // ProviderFailure (which would wrongly advance fallback).
-            Some(AttemptAborted sessionId)
-        else
-            Some(ProviderFailure(sessionId, failureReasonOf error))
+            Some(AttemptAborted observation)
+        | ExecutionFailure.LocalInvariant
+        | ExecutionFailure.ProtocolRejection
+        | ExecutionFailure.AuthorizationDenied
+        | ExecutionFailure.Superseded
+        | ExecutionFailure.CapacityQueueFull
+        | ExecutionFailure.ProviderTransient
+        | ExecutionFailure.ProviderPermanent
+        | ExecutionFailure.AcceptanceUnknown
+        | ExecutionFailure.StreamInterruptedAfterFirstToken
+        | ExecutionFailure.PersistenceFailure _ -> Some(ProviderFailure observation)
 
     let private decodeSessionError (raw: obj) : HostSignal option =
         match tryReadSessionId raw with
@@ -193,24 +264,6 @@ module HostEventCodec =
         let properties = if isNull raw then null else raw?properties
         if isNull properties then null else properties?info
 
-    let private physicalExecutionTerminalInfo (info: obj) =
-        let assistant = fieldText info "role" = "assistant"
-        let time = if isNull info then null else info?time
-        let completed = not (isNull time) && not (isNull time?completed)
-        let failed = not (isNull info) && not (isNull info?error)
-        let finish = nonEmptyFieldText info "finish"
-
-        let explicitFinalFinish =
-            finish
-            |> Option.exists (fun reason ->
-                String.Equals(reason, "stop", StringComparison.Ordinal)
-                || String.Equals(reason, "length", StringComparison.Ordinal)
-                || String.Equals(reason, "content-filter", StringComparison.Ordinal))
-
-        let finalFinish = not failed && completed && explicitFinalFinish
-
-        assistant && finalFinish
-
     let private providerStepTerminalInfo (info: obj) =
         let assistant = fieldText info "role" = "assistant"
         let time = if isNull info then null else info?time
@@ -235,6 +288,98 @@ module HostEventCodec =
     let private providerRunId (info: obj) =
         nonEmptyFieldText info "id" |> Option.map ProviderRunIdentity.create
 
+    let private hasStartedState (info: obj) =
+        let time = if isNull info then null else info?time
+        not (isNull time) && not (isNull time?created)
+
+    let private completionFromFinish =
+        function
+        | Some "stop" -> Some HostProviderCompletion.Stop
+        | Some "length" -> Some HostProviderCompletion.Length
+        | Some "content-filter" -> Some HostProviderCompletion.ContentFiltered
+        | _ -> None
+
+    let tryDecodeExactProviderStart (rawInput: obj) : ExactProviderStartObservation option =
+        let raw = unwrap rawInput
+        let info = messageInfo raw
+
+        let sessionId =
+            tryReadSessionId raw |> Option.orElseWith (fun () -> messageInfoSessionId info)
+
+        match
+            not (isNull raw)
+            && eventTypeOf raw = "message.updated"
+            && fieldText info "role" = "assistant"
+            && hasStartedState info,
+            sessionId,
+            physicalParentId info,
+            providerRunId info
+        with
+        | true, Some session, Some physical, Some providerRun ->
+            Some
+                { SessionId = session
+                  PhysicalUserMessageId = physical
+                  ProviderRun = providerRun }
+        | _ -> None
+
+    let private completionOf (info: obj) : HostProviderCompletion option =
+        let time = if isNull info then null else info?time
+        let completed = not (isNull time) && not (isNull time?completed)
+
+        nonEmptyFieldText info "finish"
+        |> Option.filter (fun _ -> completed && isNull info?error)
+        |> completionFromFinish
+
+    let private failureTerminalOutcome failure =
+        match failure with
+        | ExecutionFailure.UserCancelled
+        | ExecutionFailure.Superseded ->
+            Some(HostProviderTerminalOutcome.Cancelled failure, Some ChatExecutionTerminalDisposition.Cancelled)
+        | ExecutionFailure.StreamInterruptedAfterFirstToken ->
+            Some(HostProviderTerminalOutcome.Interrupted failure, Some ChatExecutionTerminalDisposition.Failed)
+        | ExecutionFailure.ProviderTransient
+        | ExecutionFailure.ProviderPermanent
+        | ExecutionFailure.LocalInvariant
+        | ExecutionFailure.ProtocolRejection
+        | ExecutionFailure.AuthorizationDenied
+        | ExecutionFailure.CapacityQueueFull
+        | ExecutionFailure.AcceptanceUnknown
+        | ExecutionFailure.PersistenceFailure _ -> Some(HostProviderTerminalOutcome.ProviderFailure failure, None)
+
+    let private terminalOutcomeOf
+        (info: obj)
+        : (HostProviderTerminalOutcome * ChatExecutionTerminalDisposition option) option =
+        match completionOf info with
+        | Some completion ->
+            Some(HostProviderTerminalOutcome.Completed completion, Some ChatExecutionTerminalDisposition.Completed)
+        | None when isNull info || isNull info?error -> None
+        | None -> failureOf info?error |> failureTerminalOutcome
+
+    let tryDecodeExactProviderTerminal (rawInput: obj) : ExactProviderTerminalObservation option =
+        let raw = unwrap rawInput
+        let info = messageInfo raw
+
+        let sessionId =
+            tryReadSessionId raw |> Option.orElseWith (fun () -> messageInfoSessionId info)
+
+        match
+            not (isNull raw)
+            && eventTypeOf raw = "message.updated"
+            && fieldText info "role" = "assistant",
+            sessionId,
+            physicalParentId info,
+            providerRunId info,
+            terminalOutcomeOf info
+        with
+        | true, Some session, Some physical, Some providerRun, Some(outcome, disposition) ->
+            Some
+                { SessionId = session
+                  PhysicalUserMessageId = physical
+                  ProviderRun = providerRun
+                  Outcome = outcome
+                  Disposition = disposition }
+        | _ -> None
+
     let tryDecodeProviderStepEnd (rawInput: obj) : (SessionId * PhysicalUserMessageId * ProviderRunIdentity) option =
         let raw = unwrap rawInput
         let info = messageInfo raw
@@ -253,16 +398,10 @@ module HostEventCodec =
     /// A terminal assistant message carries parentID = the exact physical user
     /// message that caused that provider execution.
     let tryDecodePhysicalExecutionEnd (rawInput: obj) : (SessionId * PhysicalUserMessageId) option =
-        let raw = unwrap rawInput
-        let info = messageInfo raw
-        let isMessageUpdated = not (isNull raw) && eventTypeOf raw = "message.updated"
-        let isTerminal = physicalExecutionTerminalInfo info
-
-        let sessionId =
-            tryReadSessionId raw |> Option.orElseWith (fun () -> messageInfoSessionId info)
-
-        let physicalUserMessageId = physicalParentId info
-
-        match isMessageUpdated, isTerminal, sessionId, physicalUserMessageId with
-        | true, true, Some sessionId, Some physicalUserMessageId -> Some(sessionId, physicalUserMessageId)
-        | _ -> None
+        tryDecodeExactProviderTerminal rawInput
+        |> Option.bind (fun observation ->
+            match observation.Outcome with
+            | HostProviderTerminalOutcome.Completed _ -> Some(observation.SessionId, observation.PhysicalUserMessageId)
+            | HostProviderTerminalOutcome.Cancelled _
+            | HostProviderTerminalOutcome.Interrupted _
+            | HostProviderTerminalOutcome.ProviderFailure _ -> None)

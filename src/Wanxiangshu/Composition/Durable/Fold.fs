@@ -10,6 +10,7 @@ open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
@@ -74,6 +75,11 @@ module Fold =
         | AgentFact.Fallback fallback -> FallbackFactFold.fold projection fallback
         | AgentFact.Review review -> ReviewFactFold.fold projection review
         | AgentFact.Execution execution -> ExecutionFactFold.fold projection execution
+        | AgentFact.ChatExecution chatExecution ->
+            ChatExecutionFactFold.fold projection.ChatExecutions chatExecution
+            |> Result.map (fun updated ->
+                { projection with
+                    ChatExecutions = updated })
         | AgentFact.Orchestrator orchestrator -> OrchestratorFactFold.fold projection orchestrator
         | AgentFact.Companion companion -> CompanionFactFold.fold projection companion
         | AgentFact.Context context -> ContextFactFold.fold projection context

@@ -55,6 +55,13 @@ module BloggerRuntimeHost =
             |> Option.bind (BloggerCycleProjection.tryOpenByBlogger bloggerSessionId)
             |> Option.map (fun request -> bloggerSessionId, request.RequestId))
 
+    let hasOpenProducer (journal: AgentJournal option) (mainSessionId: SessionId) (bloggerSessionId: SessionId) : bool =
+        journal
+        |> Option.exists (fun durable ->
+            cycleStateOfMain (AgentJournal.snapshot durable) mainSessionId
+            |> Option.bind (BloggerCycleProjection.tryOpenByBlogger bloggerSessionId)
+            |> Option.isSome)
+
     let private producerSettlement
         (snapshot: ProjectionSet)
         (mainSessionId: SessionId)

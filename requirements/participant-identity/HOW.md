@@ -37,12 +37,12 @@ exact execution request ───► ExecutionBinding { EffectiveAgent; provider
 |---|---|
 | PID-001 | `requirements/participant-identity/tests/catalog.test.mjs` |
 | PID-002 | `requirements/participant-identity/tests/catalog.test.mjs` |
-| PID-003 | planned: `requirements/participant-identity/tests/identity-root-acceptance.test.mjs`（单一 durable acceptance、append failure 不安装、幂等重放） |
-| PID-004 | planned: `requirements/participant-identity/tests/run-identity-execution-stability.test.mjs`（exact run identity 在 fallback/Strength/援助 binding 切换中逐字段稳定） |
-| PID-005 | planned: `requirements/participant-identity/tests/identity-prompt.test.mjs`（Role × stable Persona；execution 切换稳定） |
-| PID-006 | planned: `requirements/participant-identity/tests/identity-binding-boundary.test.mjs`（stable selected/peer evidence ≠ mutable EffectiveAgent/provider/model/lease） |
+| PID-003 | `requirements/participant-identity/tests/participant-identity.test.mjs`, `requirements/interaction-authority/tests/authority-acceptance-identity.test.mjs` |
+| PID-004 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs` |
+| PID-005 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs` |
+| PID-006 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs` |
 | PID-007 | `requirements/participant-identity/tests/catalog.test.mjs` |
 | PID-008 | `requirements/participant-identity/tests/session-execution-binding.test.mjs` |
 | PID-009 | `requirements/participant-identity/tests/catalog.test.mjs` |
-| PID-010 | planned: `requirements/participant-identity/tests/owner-derived-identity-evidence.test.mjs`（exact owner/run 接受；wrong-owner/wrong-run 拒绝） |
-| PID-011 | planned: `requirements/participant-identity/tests/logical-run-reuse.test.mjs`（durably close run A；同 SessionId 安装不同 run B identity） |
+| PID-010 | `requirements/participant-identity/tests/identity-lineage.test.mjs`, `requirements/participant-identity/tests/identity-recovery.test.mjs` |
+| PID-011 | `requirements/participant-identity/tests/session-reuse-identity.test.mjs`, `requirements/participant-identity/tests/session-reuse-composition.test.mjs` |

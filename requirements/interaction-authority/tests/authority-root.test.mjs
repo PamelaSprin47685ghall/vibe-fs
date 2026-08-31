@@ -5,8 +5,33 @@ import test from 'node:test'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 
 const hash = (value) => `H(${value})`
-const rootFor = (agent = 'fast-coder', physical = 'msg_u1', kind = 'HumanRoot') => {
-  const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', kind, physical, agent)
+const personas = {
+  'fast-coder': 'Coder',
+  'deep-coder': 'Engineer',
+  'deep-reviewer': 'Auditor',
+  'fast-manager': 'Coordinator',
+}
+const rootSelection = (agent) => {
+  const [selectedTier, canonicalRole] = agent.split('-')
+  const peerTier = selectedTier === 'fast' ? 'deep' : 'fast'
+  return {
+    kind: 'RootSelection',
+    ownerSession: null,
+    ownerLogicalRun: null,
+    ownerAuthorityRoot: null,
+    participantIdentity: {
+      selectedAgent: agent,
+      peerAgent: `${peerTier}-${canonicalRole}`,
+      canonicalRole,
+      selectedTier,
+      persona: personas[agent] ?? 'Unknown',
+      personaCatalogVersion: 1,
+      origin: 'ResolvedAtRoot',
+    },
+  }
+}
+const rootFor = (agent = 'fast-coder', physical = 'msg_u1') => {
+  const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', 'HumanRoot', physical, rootSelection(agent))
   assert.equal(result.ok, true, result.error)
   return result.value
 }
@@ -16,10 +41,10 @@ const profile = (value) => ({
   logicalRun: value.logicalRun,
   authorityRoot: value.authorityRoot,
   authorityKind: value.authorityKind,
-  selectedAgent: value.selectedAgent,
-  peerAgent: value.peerAgent,
-  canonicalRole: value.canonicalRole,
-  selectedTier: value.selectedTier,
+  selectedAgent: value.participantIdentity.selectedAgent,
+  peerAgent: value.participantIdentity.peerAgent,
+  canonicalRole: value.participantIdentity.canonicalRole,
+  selectedTier: value.participantIdentity.selectedTier,
 })
 
 const register = (root) => authority.registerAuthority(root, authority.empty)
@@ -28,10 +53,16 @@ const continuation = (key, root, kind = 'ManagerGuard', agent = 'fast-coder', pa
 
 test('WHAT[INTERACTION-AUTHORITY-003] IA_003_malformed_profile_role_tier_and_root_kind_fail_closed', () => {
   const root = rootFor()
-  for (const field of ['canonicalRole', 'selectedTier', 'authorityKind']) {
-    const result = authority.registerAuthority({ ...root, [field]: 'unknown' }, authority.empty)
+  const identity = root.identitySeed.participantIdentity
+  const malformed = [
+    [{ ...root, identitySeed: { ...root.identitySeed, participantIdentity: { ...identity, canonicalRole: 'unknown' } } }, /unknown role/],
+    [{ ...root, identitySeed: { ...root.identitySeed, participantIdentity: { ...identity, selectedTier: 'unknown' } } }, /unknown tier/],
+    [{ ...root, authorityKind: 'unknown' }, /unknown authority root kind/],
+  ]
+  for (const [candidate, expected] of malformed) {
+    const result = authority.registerAuthority(candidate, authority.empty)
     assert.equal(result.ok, false)
-    assert.match(result.error, /unknown (role|tier|authority root kind)/)
+    assert.match(result.error, expected)
   }
 })
 
@@ -46,8 +77,8 @@ test('WHAT[INTERACTION-AUTHORITY-002] IA_002_transport_receipt_shape_is_not_auth
   assert.equal(authority.transportReceiptShape('msg_real'), false)
 })
 
-// INTERACTION-AUTHORITY-003: the root fixes the complete immutable profile.
-test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_derives_peer_role_and_tier_from_selected_agent', () => {
+// INTERACTION-AUTHORITY-003: the accepted root carries the identity owner's immutable evidence.
+test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_carries_resolved_participant_identity', () => {
   assert.deepEqual(profile(rootFor('fast-coder')), {
     session: 'ses_a',
     logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
@@ -70,7 +101,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_derives_peer_role_and_tier_fro
   })
 })
 
-test('WHAT[INTERACTION-AUTHORITY-003] IA_003_new_root_clears_run_scoped_state', () => {
+test('WHAT[INTERACTION-AUTHORITY-003] IA_003_closed_root_replacement_clears_run_scoped_state', () => {
   const first = rootFor()
   let state = register(first)
   const claim = continuation('pk_1', first)
@@ -80,7 +111,15 @@ test('WHAT[INTERACTION-AUTHORITY-003] IA_003_new_root_clears_run_scoped_state', 
   assert.equal(state.acceptedContinuations.length, 1)
 
   const second = rootFor('deep-reviewer', 'msg_u2')
-  const after = authority.registerAuthority(second, state)
+  const premature = authority.registerAuthority(second, state)
+  assert.equal(premature.ok, false)
+  assert.equal(premature.error.kind, 'ActiveRunIdentityConflict')
+  assert.equal(premature.error.active.logicalRun, first.logicalRun)
+  assert.equal(premature.error.requested.logicalRun, second.logicalRun)
+
+  const closed = authority.closeAuthority(first.logicalRun, first.authorityRoot, state)
+  assert.equal(closed.ok, true, closed.ok ? '' : closed.error)
+  const after = authority.registerAuthority(second, closed.value)
   assert.deepEqual(profile(after.activeLogicalRun), profile(second))
   assert.deepEqual(profile(after.lastAuthorityProfile), profile(second))
   assert.equal(after.pendingClaims.length, 0)
@@ -91,18 +130,19 @@ test('WHAT[INTERACTION-AUTHORITY-003] IA_003_new_root_clears_run_scoped_state', 
 // INTERACTION-AUTHORITY-006: unqualified/legacy names fail closed with typed reasons.
 test('WHAT[INTERACTION-AUTHORITY-006] IA_006_bare_and_unknown_agent_names_are_refused', () => {
   for (const name of ['coder', 'manager', 'reviewer']) {
-    const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', 'HumanRoot', 'msg_u1', name)
+    const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', 'HumanRoot', 'msg_u1', rootSelection(name))
     assert.equal(result.ok, false)
   }
   assert.equal(authority.parseAgentName('coder').error.kind, 'LegacyAgentName')
   assert.equal(authority.parseAgentName('nonsense').error.kind, 'Malformed')
-  assert.equal(authority.parseAgentName('unknown-role').error.kind, 'UnknownManagedAgent')
+  assert.equal(authority.parseAgentName('fast-').error.kind, 'Malformed')
+  assert.equal(authority.parseAgentName('fast-unknown').error.kind, 'UnknownManagedAgent')
 })
 
 test('WHAT[INTERACTION-AUTHORITY-006] IA_006_agent_owner_root_claim_rejects_legacy_name', () => {
-  const claim = authority.claimAgentOwnerRoot('pk_b', 'ses_a', 'pd', 'manager')
-  assert.equal(claim.ok, false)
-  assert.match(claim.error, /legacy|managed|fast-\*|deep-\*/i)
+  const inherited = authority.issueInheritedIdentitySeed('manager', rootFor('fast-manager'))
+  assert.equal(inherited.ok, false)
+  assert.match(inherited.error, /legacy|managed|fast-\*|deep-\*/i)
 })
 
 // INTERACTION-AUTHORITY-010: repair identity is durable and bounded by its occasion.
@@ -130,7 +170,10 @@ test('WHAT[INTERACTION-AUTHORITY-010] IA_010_terminal_repair_identity_is_exactly
 })
 
 test('WHAT[INTERACTION-AUTHORITY-016] IA_016_agent_owner_root_has_no_run_before_physical_acceptance', () => {
-  const claim = authority.claimAgentOwnerRoot('pk_owner', 'ses_a', 'pd-owner', 'fast-manager')
+  const owner = rootFor('fast-manager')
+  const inherited = authority.issueInheritedIdentitySeed('fast-manager', owner)
+  assert.equal(inherited.ok, true, inherited.error)
+  const claim = authority.claimAgentOwnerRoot('pk_owner', 'ses_a', 'pd-owner', inherited.value)
   assert.equal(claim.ok, true, claim.error)
   assert.deepEqual(
     {
@@ -143,7 +186,7 @@ test('WHAT[INTERACTION-AUTHORITY-016] IA_016_agent_owner_root_has_no_run_before_
     { origin: 'AuthorityRoot', label: 'AgentOwnerRoot', hasRun: false, hasRoot: false, effectiveAgent: 'fast-manager' },
   )
 
-  let state = authority.registerClaim(claim.value, authority.empty)
+  let state = authority.registerClaim(claim.value, register(owner))
   state = authority.acceptClaim('pk_owner', 'msg_owner', state)
   assert.equal(state.pendingClaims.length, 0)
   assert.equal(state.acceptedContinuations.length, 0)

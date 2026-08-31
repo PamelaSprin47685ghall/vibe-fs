@@ -51,6 +51,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
@@ -80,7 +81,13 @@ module PluginHostWiring =
 
             let completeHost eventPort sessionPort snapshotOpt terminalKey sharedTerminalPort : Task<Host> =
                 task {
-                    BookkeeperRuntime.setSessionPort sessionPort
+                    match boot.Journal with
+                    | Some journal ->
+                        BookkeeperRuntime.setRuntime sessionPort (fun ownerSessionId ->
+                            let projections = (AgentJournal.snapshot journal).AgentProjections
+                            PromptAuthorityLedger.activeProfile ownerSessionId projections)
+                    | None -> BookkeeperRuntime.resetRuntime ()
+
                     scope.AttachSharedTerminal(terminalKey, sharedTerminalPort)
                     scope.AttachSatelliteRuntime(SatelliteRuntime sessionPort)
 
@@ -113,6 +120,14 @@ module PluginHostWiring =
                             strengthDurability
                             scope
                             input
+                            BookkeeperRuntime.tryConsumePromptAuthorization
+                            (fun terminal ->
+                                let outcome =
+                                    match terminal.Outcome with
+                                    | HostProviderTerminalOutcome.Completed _ -> Ok()
+                                    | failure -> Error(sprintf "%A" failure)
+
+                                BookkeeperRuntime.completePhysical terminal.SessionId outcome)
                             workspaceDirectory
                             (Some CasebookLifecycle.tryFinalizeInspector)
                             (Some CasebookLifecycle.cleanupInspector)

@@ -1,16 +1,14 @@
 namespace Wanxiangshu.Participant.Persona
 
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Host
-
 open Wanxiangshu.Foundation
 
-/// AGENT-028: Role × initial selected tier → SessionPersona (resolve-once at create).
-/// Bookkeeper is InternalLeaf — not a public Role; use `bookkeeperPersona`.
+/// AGENT-028: Role × initial selected tier → the persona embedded in ParticipantIdentity.
+/// IdentitySeed resolves it once. Bookkeeper is InternalLeaf — not a public Role;
+/// use `bookkeeperPersona`.
 [<RequireQualifiedAccess>]
 module PersonaCatalog =
 
-    let persona (role: Role) (tier: AgentTier) : string =
+    let personaV1 (role: Role) (tier: AgentTier) : string =
         match role, tier with
         | Role.Orchestrator, AgentTier.Fast -> "Integrator"
         | Role.Orchestrator, AgentTier.Deep -> "Director"
@@ -33,10 +31,14 @@ module PersonaCatalog =
         | Role.Distiller, AgentTier.Fast -> "Condenser"
         | Role.Distiller, AgentTier.Deep -> "Distiller"
 
-    let bookkeeperPersona (tier: AgentTier) : string =
+    let bookkeeperPersonaV1 (tier: AgentTier) : string =
         match tier with
         | AgentTier.Fast -> "Clerk"
         | AgentTier.Deep -> "Curator"
 
-    /// HOST-026 analogue: child / attached / InternalLeaf persona = owner persona.
+    let persona (role: Role) (tier: AgentTier) : string = personaV1 role tier
+
+    let bookkeeperPersona (tier: AgentTier) : string = bookkeeperPersonaV1 tier
+
+    /// HOST-026 analogue: child / attached / InternalLeaf ParticipantIdentity inherits the owner persona.
     let inheritFrom (ownerPersona: string) : string = ownerPersona

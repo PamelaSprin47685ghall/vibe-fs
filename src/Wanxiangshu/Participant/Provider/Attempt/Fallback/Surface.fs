@@ -2,7 +2,9 @@ namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 
@@ -71,52 +73,25 @@ module FallbackSurface =
         task {
             let runtime = PromptDispatcher.forJournal journal
 
-            let! result =
-                runtime.AcceptHumanRoot
-                    (SessionId.create session)
-                    (PhysicalUserMessageId.create physicalMessage)
-                    (Some agent)
+            let identitySeed =
+                ParticipantIdentity.resolveAtRoot agent
+                |> Result.map PromptAuthority.IdentitySeed.RootSelection
+                |> Result.mapError (sprintf "invalid participant identity: %A")
 
-            return
-                match result with
-                | Ok _ -> box {| ok = true; error = "" |}
-                | Error error -> box {| ok = false; error = error |}
-        }
+            match identitySeed with
+            | Error error -> return box {| ok = false; error = error |}
+            | Ok seed ->
+                let! result =
+                    runtime.AcceptHumanRoot
+                        (SessionId.create session)
+                        (PhysicalUserMessageId.create physicalMessage)
+                        (Some seed)
 
-    /// Runtime boundary for host-facing fallback admission. RecoveryAdmission
-    /// and the Result wrapper are projected by the semantic owner, never by a JS
-    /// test reading Fable tags or fields.
-    let admitConfirmedFailure
-        (journal: AgentJournal)
-        (budget: int)
-        (session: string)
-        (providerRun: string)
-        (reason: string)
-        : Task<obj> =
-        task {
-            let! result =
-                FallbackLedger.admitConfirmedFailure
-                    journal
-                    budget
-                    (SessionId.create session)
-                    (ProviderRunIdentity.create providerRun)
-                    reason
-
-            return
-                match result with
-                | Error error ->
-                    box
-                        {| ok = false
-                           value = null
-                           error = error |}
-                | Ok RecoveryAdmission.RecoveryExhausted ->
-                    box
-                        {| ok = true
-                           value = "RecoveryExhausted"
-                           error = "" |}
-                | Ok RecoveryAdmission.ContinueRecovery ->
-                    box
-                        {| ok = true
-                           value = "ContinueRecovery"
-                           error = "" |}
+                return
+                    match result with
+                    | Ok _ -> box {| ok = true; error = "" |}
+                    | Error error ->
+                        box
+                            {| ok = false
+                               error = PromptDispatcher.describeHumanRootAcceptanceFailure error |}
         }

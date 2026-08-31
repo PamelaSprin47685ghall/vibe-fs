@@ -293,8 +293,8 @@ export async function assertLifeCompleted(workDir, label = 'long-stroke') {
 }
 
 /**
- * External injection: hold first coder write incomplete until mgr-labor.0 so
- * drain-before-interrupt cannot harvest a completed child (manager-unhappy /
+ * Hold first coder write incomplete until the active user message is admitted,
+ * so drain-before-interrupt cannot harvest a completed child (manager-unhappy /
  * temporal-ownership holdChild shape). Orch-shell uses coder.0; legacy id
  * child-c1.0 still accepted.
  */
@@ -316,14 +316,9 @@ export async function holdChildC1UntilLabor(scenario) {
   }
   assert.ok(held >= 1, 'long-stroke: holdChildC1UntilLabor needs coder.0 (or legacy child-c1.0)');
 
-  const consume = runtime.consume;
-  const originalConsume = (body, selection, context) => consume.call(runtime, body, selection, context);
-  runtime.consume = (body, selection, context) => {
-    originalConsume(body, selection, context);
-    if (selection?.entry?.id === 'mgr-labor.0') {
-      releaseChild?.();
-      releaseChild = null;
-    }
+  scenario.releaseHeldChild = () => {
+    releaseChild?.();
+    releaseChild = null;
   };
 }
 
@@ -461,16 +456,26 @@ export async function oracleLongStroke(scenario, _ctx) {
     'long-stroke: orch-shell requires exactly one ManagerJobCreated',
   );
   assert.equal(
-    scenario.provider.matchCount('manager-idle.0'),
-    2,
-    'long-stroke determinism: ManagerIdle step 0 is first faulted, then reached again as a later independent idle occasion',
+    scenario.provider.matchCount('manager.0'),
+    1,
+    'long-stroke determinism: the initial Manager step is delivered once',
+  );
+  assert.equal(
+    scenario.provider.matchCount('continue.1'),
+    1,
+    'long-stroke determinism: the interrupted join closes the superseded provider turn exactly once',
+  );
+  assert.equal(
+    scenario.provider.matchCount('manager.1'),
+    1,
+    'long-stroke determinism: the active Manager join owns the sole non-retryable provider fault',
   );
   assert.equal(
     scenario.provider.matchCount('continue.0'),
     1,
-    'long-stroke determinism: the confirmed failure owns exactly one ProviderRetryAttempt continuation',
+    'long-stroke determinism: the confirmed failure advances to exactly one fallback step',
   );
-  for (const id of ['manager-idle.1', 'manager-idle.2', 'manager-idle.3', 'manager-idle.4', 'manager-idle.5']) {
+  for (const id of ['manager-resume.0', 'manager-resume.1', 'manager-resume.2', 'manager-resume.3', 'manager-resume.4', 'manager-resume.5', 'manager-resume.6', 'manager-resume.7', 'manager-resume.8']) {
     assert.equal(
       scenario.provider.matchCount(id),
       1,
@@ -518,13 +523,13 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
   {
     id: 'provider-transient-failure',
     covered: true,
-    injection: '[[fault]] provider-error on manager-idle.0 delivery #1 (sole fault row)',
+    injection: '[[fault]] retryable provider-error on g2-inspector-q1.0 delivery #1',
     oracle: 'assertProviderTransientFailure',
   },
   {
     id: 'fallback',
     covered: true,
-    injection: 'internal continue turn after settled provider-error (fallback.toml shape)',
+    injection: 'non-retryable provider-error on manager.1 followed by continue.0',
     oracle: 'assertFallbackContinuation',
   },
   {
@@ -607,8 +612,6 @@ const G2_Q3_WIRE = '# G2Q3: when does CaseFinalize run?';
 export const G2_A1 = 'G2A1: Host owns PromptAuthority.';
 export const G2_A2 = 'G2A2: Owner session scope for one Inspector.';
 export const G2_A3 = 'G2A3: On owner ReuseScope close.';
-export const G2_BATCH_CANARY_PROMPT =
-  'G2_INSPECTOR_BATCH_CANARY: issue three Inspector charges in one provider response.';
 export const G2_BATCH_Q1 = 'G2B1: establish the first repository fact.';
 export const G2_BATCH_Q2 = 'G2B2: establish the second repository fact.';
 export const G2_BATCH_Q3 = 'G2B3: establish the third repository fact.';

@@ -7,7 +7,53 @@ import test from 'node:test'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 
 const hash = (value) => `H(${value})`
-const root = authority.createAuthorityRoot(hash, 'rt_join', 'ses_jg', 'AgentOwnerRoot', 'root-jg', 'fast-coder').value
+const personas = {
+  'fast-coder': 'Coder',
+  'fast-manager': 'Coordinator',
+}
+const rootSelection = (agent) => {
+  const [selectedTier, canonicalRole] = agent.split('-')
+  const peerTier = selectedTier === 'fast' ? 'deep' : 'fast'
+  return {
+    kind: 'RootSelection',
+    ownerSession: null,
+    ownerLogicalRun: null,
+    ownerAuthorityRoot: null,
+    participantIdentity: {
+      selectedAgent: agent,
+      peerAgent: `${peerTier}-${canonicalRole}`,
+      canonicalRole,
+      selectedTier,
+      persona: personas[agent] ?? 'Unknown',
+      personaCatalogVersion: 1,
+      origin: 'ResolvedAtRoot',
+    },
+  }
+}
+const inheritedSeed = (agent, physical) => {
+  const owner = authority.createAuthorityRoot(
+    hash,
+    'rt_owner',
+    'ses_owner',
+    'HumanRoot',
+    `owner_${physical}`,
+    rootSelection('fast-manager'),
+  )
+  assert.equal(owner.ok, true, owner.error)
+  const inherited = authority.issueInheritedIdentitySeed(agent, owner.value)
+  assert.equal(inherited.ok, true, inherited.error)
+  return inherited.value
+}
+const createdRoot = authority.createAuthorityRoot(
+  hash,
+  'rt_join',
+  'ses_jg',
+  'AgentOwnerRoot',
+  'root-jg',
+  inheritedSeed('fast-coder', 'root-jg'),
+)
+assert.equal(createdRoot.ok, true, createdRoot.error)
+const root = createdRoot.value
 
 test('WHAT[INTERACTION-AUTHORITY-019] gate_nudge_is_exact_terminal_idempotent_and_unbounded_across_fresh_terminals', () => {
   let state = authority.registerAuthority(root, authority.empty)

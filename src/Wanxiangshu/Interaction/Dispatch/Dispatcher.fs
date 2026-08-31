@@ -20,6 +20,7 @@ open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.Recovery
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
@@ -57,6 +58,100 @@ module PromptDispatcher =
 
     let internal originLabel = PromptAuthority.originLabel
 
+    [<RequireQualifiedAccess>]
+    type AuthorityRegistrationFailure =
+        | RegistrationRejected of PromptAuthorityRun.AuthorityRegistrationRejection
+        | PersistenceRejected of string
+
+    [<RequireQualifiedAccess>]
+    type HumanRootAcceptanceFailure =
+        | IdentityRejected of string
+        | AuthorityRegistrationRejected of AuthorityRegistrationFailure
+
+    let describeAuthorityRegistrationFailure =
+        function
+        | AuthorityRegistrationFailure.RegistrationRejected rejection ->
+            PromptAuthorityRun.describeRegistrationRejection rejection
+        | AuthorityRegistrationFailure.PersistenceRejected reason -> reason
+
+    let describeHumanRootAcceptanceFailure =
+        function
+        | HumanRootAcceptanceFailure.IdentityRejected reason -> reason
+        | HumanRootAcceptanceFailure.AuthorityRegistrationRejected failure ->
+            describeAuthorityRegistrationFailure failure
+
+    let private authorityRootFact (profile: PromptAuthority.AuthorityExecutionProfile) =
+        PromptFact.AuthorityRootAccepted
+            { SchemaVersion = 2
+              SessionId = profile.SessionId
+              LogicalRunId = profile.LogicalRunId
+              AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
+              AuthorityKind =
+                match profile.AuthorityKind with
+                | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
+                | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
+              IdentitySeed = profile.IdentitySeed }
+
+    let private registrationDecision
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        : Result<PromptAuthority.AuthorityExecutionProfile, PromptAuthorityRun.AuthorityRegistrationRejection> =
+        PromptAuthorityRun.resolveAuthorityProfile profile projection
+
+    let private appendAuthorityRoot
+        (journal: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : Task<Result<unit, JournalAppendFailure>> =
+        task {
+            let! result =
+                AgentJournal.appendAgent (StreamId.Session profile.SessionId) None (authorityRootFact profile) journal
+
+            return Result.map ignore result
+        }
+
+    let private registrationAppendFailure
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        (failure: JournalAppendFailure)
+        : Result<PromptAuthority.AuthorityExecutionProfile, AuthorityRegistrationFailure> =
+        match registrationDecision profile projection with
+        | Error conflict -> Error(AuthorityRegistrationFailure.RegistrationRejected conflict)
+        | Ok canonical when canonical <> profile -> Ok canonical
+        | Ok _ -> Error(AuthorityRegistrationFailure.PersistenceRejected(JournalAppendFailure.describe failure))
+
+    let private completeRegistrationAppend
+        (canonical: PromptAuthority.AuthorityExecutionProfile)
+        (requested: PromptAuthority.AuthorityExecutionProfile)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        (appendResult: Result<unit, JournalAppendFailure>)
+        : Result<PromptAuthority.AuthorityExecutionProfile, AuthorityRegistrationFailure> =
+        match appendResult with
+        | Ok() -> Ok canonical
+        | Error failure -> registrationAppendFailure requested projection failure
+
+    let private validateAcceptedProfile
+        (identitySeed: PromptAuthority.IdentitySeed)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : Result<PromptAuthority.AuthorityExecutionProfile, ManagedChatAcceptanceError> =
+        if profile.IdentitySeed = identitySeed then
+            Ok profile
+        else
+            Error(
+                ManagedChatAcceptanceError.IntentRejected(
+                    "Continuation managed intent identity does not match the active logical run"
+                )
+            )
+
+    let private requireActiveManagedProfile
+        (profile: PromptAuthority.AuthorityExecutionProfile option)
+        : Result<PromptAuthority.AuthorityExecutionProfile, ManagedChatAcceptanceError> =
+        match profile with
+        | Some accepted -> Ok accepted
+        | None ->
+            Error(
+                ManagedChatAcceptanceError.IntentRejected("Continuation managed intent requires an active logical run")
+            )
+
     /// PROMPT-007: whether the caller waits for PhysicalAccepted.
     ///
     /// Detached = fire-and-forget: claim, authority, persist, idempotence and error
@@ -81,6 +176,9 @@ module PromptDispatcher =
         /// retry automatically because doing so could duplicate physical input.
         | Failed of string
 
+    let internal describeIdentitySeedRejection (rejection: PromptAuthority.IdentitySeedValidationError) =
+        sprintf "AgentOwnerRoot identity seed rejected: %A" rejection
+
     /// The single PROMPT-005 sender.
     ///
     /// Holds no authority state. The previous version kept a `mutable authority`
@@ -103,6 +201,176 @@ module PromptDispatcher =
             |> Option.bind (fun session -> session.PromptAuthority)
             |> Option.defaultValue PromptAuthority.empty
 
+        member private _.AppendManagedPromptAccepted
+            (promptKey: PromptKey)
+            (sessionId: SessionId)
+            (physicalMessageId: PhysicalUserMessageId)
+            : Task<Result<unit, ManagedChatAcceptanceError>> =
+            task {
+                let! appended =
+                    AgentJournal.appendAgent
+                        (StreamId.Session sessionId)
+                        None
+                        (PromptFact.PluginPromptPhysicalAccepted
+                            {| PromptKey = promptKey
+                               SessionId = sessionId
+                               PhysicalUserMessageId = physicalMessageId |})
+                        journal
+
+                return
+                    appended
+                    |> Result.map (fun _ -> PromptPhysicalAcceptance.accepted promptKey physicalMessageId)
+                    |> Result.mapError ManagedChatAcceptance.persistenceError
+            }
+
+        member private this.RegisterManagedAuthority
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            : Task<Result<PromptAuthority.AuthorityExecutionProfile, ManagedChatAcceptanceError>> =
+            let projection = this.ProjectionFor profile.SessionId
+
+            match projection.ActiveLogicalRun with
+            | Some _ ->
+                registrationDecision profile projection
+                |> Result.mapError ManagedChatAcceptanceError.AuthorityRegistrationRejected
+                |> Task.FromResult
+            | None ->
+                task {
+                    let! appended = appendAuthorityRoot journal profile
+
+                    return
+                        appended
+                        |> Result.mapError ManagedChatAcceptance.persistenceError
+                        |> Result.bind (fun () ->
+                            registrationDecision profile (this.ProjectionFor profile.SessionId)
+                            |> Result.mapError ManagedChatAcceptanceError.AuthorityRegistrationRejected)
+                }
+
+        member private this.PromptAlreadyAccepted(evidence: ChatAdmissionIntent.PendingPromptEvidence) =
+            (this.ProjectionFor evidence.Key.SessionId).AcceptedDispatches
+            |> Map.exists (fun _ accepted ->
+                accepted.PromptKey = evidence.PromptKey
+                && accepted.SessionId = evidence.Key.SessionId
+                && accepted.PhysicalUserMessageId = evidence.Key.PhysicalUserMessageId
+                && accepted.IdentitySeed = evidence.IdentitySeed)
+
+        member private this.ExactPromptClaimMatches(evidence: ChatAdmissionIntent.PendingPromptEvidence) =
+            match Map.tryFind evidence.PromptKey (this.ProjectionFor evidence.Key.SessionId).PendingClaims with
+            | Some claim -> claim = evidence.Claim
+            | None -> false
+
+        member private this.AcceptExternalManagedRoot
+            (evidence: ChatAdmissionIntent.ExternalRootEvidence)
+            : Task<Result<PromptAuthority.AuthorityExecutionProfile, ManagedChatAcceptanceError>> =
+            PromptAuthorityRun.createAuthorityRoot
+                HostDigest.sha256Hex
+                this.RuntimeId
+                evidence.Key.SessionId
+                PromptAuthority.RootAuthorityKind.HumanRoot
+                evidence.Key.PhysicalUserMessageId
+                evidence.IdentitySeed
+            |> Result.mapError ManagedChatAcceptanceError.IntentRejected
+            |> Result.map this.RegisterManagedAuthority
+            |> function
+                | Ok pending -> pending
+                | Error error -> Task.FromResult(Error error)
+
+        member private this.AcceptPendingManagedPrompt
+            (evidence: ChatAdmissionIntent.PendingPromptEvidence)
+            : Task<Result<PromptAuthority.AuthorityExecutionProfile, ManagedChatAcceptanceError>> =
+            let appendPhysical () : Task<Result<unit, ManagedChatAcceptanceError>> =
+                if this.PromptAlreadyAccepted evidence then
+                    Task.FromResult(Ok())
+                elif this.ExactPromptClaimMatches evidence then
+                    this.AppendManagedPromptAccepted
+                        evidence.PromptKey
+                        evidence.Key.SessionId
+                        evidence.Key.PhysicalUserMessageId
+                else
+                    Task.FromResult(
+                        Error(
+                            ManagedChatAcceptanceError.IntentRejected(
+                                "Pending managed intent no longer matches its durable prompt claim"
+                            )
+                        )
+                    )
+
+            match evidence.Claim.Origin with
+            | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->
+                taskResult {
+                    let! _ =
+                        this.ValidateAgentOwnerIdentitySeed evidence.IdentitySeed
+                        |> Result.mapError (describeIdentitySeedRejection >> ManagedChatAcceptanceError.IntentRejected)
+
+                    let! profile =
+                        PromptAuthorityRun.createAuthorityRoot
+                            HostDigest.sha256Hex
+                            this.RuntimeId
+                            evidence.Key.SessionId
+                            PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+                            evidence.Key.PhysicalUserMessageId
+                            evidence.IdentitySeed
+                        |> Result.mapError ManagedChatAcceptanceError.IntentRejected
+
+                    do! appendPhysical ()
+                    return! this.RegisterManagedAuthority profile
+                }
+            | PromptAuthority.PromptOrigin.Continuation _ ->
+                taskResult {
+                    let! profile = this.ActiveProfile evidence.Key.SessionId |> requireActiveManagedProfile
+
+                    let acceptedProfileDecision
+                        : Result<PromptAuthority.AuthorityExecutionProfile, ManagedChatAcceptanceError> =
+                        validateAcceptedProfile evidence.IdentitySeed profile
+
+                    let! acceptedProfile = acceptedProfileDecision
+
+                    do! appendPhysical ()
+                    return acceptedProfile
+                }
+            | _ ->
+                Task.FromResult(
+                    Error(
+                        ManagedChatAcceptanceError.IntentRejected(
+                            "Pending managed intent origin is not an AgentOwnerRoot or continuation"
+                        )
+                    )
+                )
+
+        /// Establish all prompt authority facts first, then durable managed-chat
+        /// acceptance, from the one frozen Task14 decision.
+        member this.AcceptManagedChatIntent
+            (intent: ChatAdmissionIntent.Decision)
+            : Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>> =
+            let accept profile physicalMessageId origin effectiveAgent =
+                let evidence =
+                    ManagedChatAcceptance.evidenceFromIntent profile physicalMessageId origin effectiveAgent
+
+                ManagedChatAcceptance.accept
+                    journal
+                    { SessionId = evidence.SessionId
+                      PhysicalUserMessageId = evidence.PhysicalUserMessageId }
+                    evidence
+
+            match intent with
+            | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
+                taskResult {
+                    let! profile = this.AcceptExternalManagedRoot evidence
+                    return! accept profile evidence.Key.PhysicalUserMessageId evidence.Origin evidence.EffectiveAgent
+                }
+            | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
+                accept evidence.Authority evidence.Key.PhysicalUserMessageId evidence.Origin evidence.EffectiveAgent
+            | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
+                taskResult {
+                    let! profile = this.AcceptPendingManagedPrompt evidence
+                    return! accept profile evidence.Key.PhysicalUserMessageId evidence.Origin evidence.EffectiveAgent
+                }
+            | _ ->
+                Task.FromResult(
+                    Error(
+                        ManagedChatAcceptanceError.IntentRejected("AcceptManagedChatIntent requires a managed intent")
+                    )
+                )
+
         member internal _.Persist
             (sessionId: SessionId)
             (providerRun: ProviderRunIdentity option)
@@ -124,48 +392,55 @@ module PromptDispatcher =
         /// REVIEW-007's review requirement is not written here. The fold derives
         /// it from this fact's `AuthorityKind`, so a HumanRoot cannot be recorded
         /// without its requirement appearing with it.
-        member this.RegisterAuthority(profile: PromptAuthority.AuthorityExecutionProfile) : Task<Result<unit, string>> =
-            PersonaBinding.ensureFromAuthority profile |> ignore
+        member this.RegisterAuthority
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            : Task<Result<PromptAuthority.AuthorityExecutionProfile, AuthorityRegistrationFailure>> =
+            match registrationDecision profile (this.ProjectionFor profile.SessionId) with
+            | Error rejection -> Task.FromResult(Error(AuthorityRegistrationFailure.RegistrationRejected rejection))
+            | Ok canonical when canonical <> profile -> Task.FromResult(Ok canonical)
+            | Ok canonical ->
+                task {
+                    let! appended = appendAuthorityRoot journal profile
 
-            PromptFact.AuthorityRootAccepted
-                {| SessionId = profile.SessionId
-                   LogicalRunId = profile.LogicalRunId
-                   AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
-                   AuthorityKind =
-                    match profile.AuthorityKind with
-                    | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> "AgentOwnerRoot"
-                    | PromptAuthority.RootAuthorityKind.HumanRoot -> "HumanRoot"
-                   SelectedAgent = profile.SelectedAgent
-                   PeerAgent = profile.PeerAgent
-                   CanonicalRole = PromptAuthority.roleLabel profile.CanonicalRole
-                   SelectedTier = PromptAuthority.tierLabel profile.SelectedTier |}
-            |> this.Persist profile.SessionId None
+                    return completeRegistrationAppend canonical profile (this.ProjectionFor profile.SessionId) appended
+                }
 
-        /// PROMPT-002: a human root must name a managed agent. There is no
-        /// default, because inferring one is how a human prompt silently acquires
-        /// an agent nobody chose.
+        /// PROMPT-002: a human root carries the one identity resolved at the external boundary.
+        /// There is no default and inherited child evidence is not legal for this path.
         member this.AcceptHumanRoot
             (sessionId: SessionId)
             (physicalMessageId: PhysicalUserMessageId)
-            (explicitAgent: string option)
-            : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
-            let profileResult: Result<PromptAuthority.AuthorityExecutionProfile, string> =
-                explicitAgent
-                |> Option.map (fun agent ->
+            (identitySeed: PromptAuthority.IdentitySeed option)
+            : Task<Result<PromptAuthority.AuthorityExecutionProfile, HumanRootAcceptanceFailure>> =
+            let profileResult: Result<PromptAuthority.AuthorityExecutionProfile, HumanRootAcceptanceFailure> =
+                identitySeed
+                |> Option.map (fun seed ->
                     PromptAuthorityRun.createAuthorityRoot
                         HostDigest.sha256Hex
                         this.RuntimeId
                         sessionId
                         PromptAuthority.RootAuthorityKind.HumanRoot
                         physicalMessageId
-                        agent)
-                |> Option.defaultValue (Error "HumanRoot requires an explicit managed agent (fast-* / deep-*)")
-
+                        seed
+                    |> Result.mapError HumanRootAcceptanceFailure.IdentityRejected)
+                |> Option.defaultValue (
+                    Error(
+                        HumanRootAcceptanceFailure.IdentityRejected(
+                            "HumanRoot requires an explicit root-selection identity seed"
+                        )
+                    )
+                )
 
             taskResult {
                 let! profile = profileResult
-                do! this.RegisterAuthority profile
-                return profile
+
+                let! registered =
+                    task {
+                        let! result = this.RegisterAuthority profile
+                        return Result.mapError HumanRootAcceptanceFailure.AuthorityRegistrationRejected result
+                    }
+
+                return registered
             }
 
         /// PROMPT-005 `Abandoned` for an explicit current-process send failure.
@@ -190,39 +465,56 @@ module PromptDispatcher =
         /// order is the clause - an Authority Root may not take effect until a
         /// real physical message is proven, so `PhysicalAccepted` cannot come
         /// second.
+        member internal this.ValidateAgentOwnerIdentitySeed(identitySeed: PromptAuthority.IdentitySeed) =
+            let activeOwner =
+                PromptAuthority.identitySeedOwner identitySeed
+                |> Option.bind (fun (ownerSessionId, _, _) -> this.ActiveProfile ownerSessionId)
+
+            PromptAuthority.validateInheritedIdentitySeedAgainstActiveOwner activeOwner identitySeed
+
         member internal this.AcceptPhysicalAgentOwnerRoot
             (key: PromptKey)
             (sessionId: SessionId)
             (physicalMessageId: PhysicalUserMessageId)
-            (agent: string)
+            (identitySeed: PromptAuthority.IdentitySeed)
             : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
-            match
-                PromptAuthorityRun.createAuthorityRoot
-                    HostDigest.sha256Hex
-                    this.RuntimeId
-                    sessionId
-                    PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-                    physicalMessageId
-                    agent
-            with
-            | Error error -> Task.FromResult(Error error)
-            | Ok profile ->
-                task {
-                    match!
-                        PromptFact.PluginPromptPhysicalAccepted
-                            {| PromptKey = key
-                               SessionId = sessionId
-                               PhysicalUserMessageId = physicalMessageId |}
-                        |> this.Persist sessionId None
-                    with
-                    | Error error -> return Error error
-                    | Ok() ->
-                        match! this.RegisterAuthority profile with
-                        | Error error -> return Error error
-                        | Ok() ->
-                            PromptPhysicalAcceptance.accepted key physicalMessageId
-                            return Ok profile
-                }
+            let authorityClaimDecision: Result<PromptAuthority.AuthorityExecutionProfile, string> =
+                this.ValidateAgentOwnerIdentitySeed identitySeed
+                |> Result.mapError describeIdentitySeedRejection
+                |> Result.bind (fun _ ->
+                    PromptAuthorityRun.createAuthorityRoot
+                        HostDigest.sha256Hex
+                        this.RuntimeId
+                        sessionId
+                        PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+                        physicalMessageId
+                        identitySeed)
+
+            taskResult {
+                let! profile = authorityClaimDecision
+
+                do!
+                    PromptFact.PluginPromptPhysicalAccepted
+                        {| PromptKey = key
+                           SessionId = sessionId
+                           PhysicalUserMessageId = physicalMessageId |}
+                    |> this.Persist sessionId None
+
+                let authorityRegistrationDecision: Result<ParticipantIdentityEvidence, string> =
+                    this.ValidateAgentOwnerIdentitySeed identitySeed
+                    |> Result.mapError describeIdentitySeedRejection
+
+                let! _ = authorityRegistrationDecision
+
+                let! registered =
+                    task {
+                        let! result = this.RegisterAuthority profile
+                        return Result.mapError describeAuthorityRegistrationFailure result
+                    }
+
+                PromptPhysicalAcceptance.accepted key physicalMessageId
+                return registered
+            }
 
         member this.AcceptAgentOwnerRoot
             (key: PromptKey)
@@ -234,24 +526,48 @@ module PromptDispatcher =
             let acceptClaim
                 (claim: PromptAuthority.PromptClaim)
                 : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
-                match claim.Origin, claim.EffectiveAgent with
-                | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot,
-                  Some agent -> this.AcceptPhysicalAgentOwnerRoot key sessionId physicalMessageId agent
-                | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot, None ->
-                    Task.FromResult(
-                        Error(sprintf "AgentOwnerRoot claim %s carries no effective agent" (PromptKey.value key))
-                    )
+                match claim.Origin with
+                | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->
+                    this.AcceptPhysicalAgentOwnerRoot key sessionId physicalMessageId claim.IdentitySeed
                 | _ ->
                     Task.FromResult(Error(sprintf "PromptKey %s is not a pending AgentOwnerRoot" (PromptKey.value key)))
 
-            let acceptExisting () : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
-                match projection.ActiveLogicalRun with
-                | Some profile -> Task.FromResult(Ok profile)
-                | None -> Task.FromResult(Error(sprintf "Unknown AgentOwnerRoot claim: %s" (PromptKey.value key)))
+            let acceptedClaim =
+                projection.AcceptedDispatches
+                |> Map.tryPick (fun _ accepted ->
+                    if
+                        accepted.PromptKey = key
+                        && accepted.SessionId = sessionId
+                        && accepted.PhysicalUserMessageId = physicalMessageId
+                    then
+                        match accepted.Origin with
+                        | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->
+                            Some accepted
+                        | _ -> None
+                    else
+                        None)
 
-            match Map.tryFind key projection.PendingClaims with
-            | Some claim -> acceptClaim claim
-            | None -> acceptExisting ()
+            let acceptExisting
+                (accepted: PromptAuthority.AcceptedDispatch)
+                : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
+                match projection.ActiveLogicalRun with
+                | Some profile when
+                    profile.AuthorityRootUserMessageId = PhysicalUserMessageId.promoteToAuthorityRoot physicalMessageId
+                    && profile.IdentitySeed = accepted.IdentitySeed
+                    ->
+                    Task.FromResult(Ok profile)
+                | Some _ ->
+                    Task.FromResult(
+                        Error(
+                            sprintf "AgentOwnerRoot claim %s does not match the active child run" (PromptKey.value key)
+                        )
+                    )
+                | None -> this.AcceptPhysicalAgentOwnerRoot key sessionId physicalMessageId accepted.IdentitySeed
+
+            match Map.tryFind key projection.PendingClaims, acceptedClaim with
+            | Some claim, _ -> acceptClaim claim
+            | None, Some accepted -> acceptExisting accepted
+            | None, None -> Task.FromResult(Error(sprintf "Unknown AgentOwnerRoot claim: %s" (PromptKey.value key)))
 
         /// PROMPT-003: a continuation reached physical acceptance. Returns the
         /// kind it was claimed as, read before the fact is written because writing

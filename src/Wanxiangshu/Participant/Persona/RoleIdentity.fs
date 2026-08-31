@@ -21,7 +21,6 @@ open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
-open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
@@ -54,11 +53,30 @@ module AgentRoleIdentity =
 
     let toRole (role: Role) : Role = role
 
-    /// Host wire names (`fast-manager`) parse via Domain SSOT; bare role labels fall back to catalog.
     let private parseRoleName (value: string) : Role option =
-        match PromptAuthority.parseAgentNameTyped value with
-        | Ok parsed -> Some parsed.Role
-        | Error _ -> ManagedAgentCatalog.tryParseRole (value.Trim().ToLowerInvariant())
+        let parseBareRole () =
+            ManagedAgentCatalog.tryParseRole (value.Trim().ToLowerInvariant())
+
+        match ParticipantIdentity.resolveAtRoot value with
+        | Ok identity -> ParticipantIdentity.role identity |> Option.orElseWith parseBareRole
+        | Error ParticipantIdentityError.BlankParticipantName
+        | Error(ParticipantIdentityError.LegacyParticipantName _)
+        | Error(ParticipantIdentityError.MalformedParticipantName _)
+        | Error(ParticipantIdentityError.UnknownParticipantName _)
+        | Error(ParticipantIdentityError.UnsupportedPersonaCatalogVersion _)
+        | Error(ParticipantIdentityError.RoleMismatch _)
+        | Error(ParticipantIdentityError.TierMismatch _)
+        | Error(ParticipantIdentityError.PeerMismatch _)
+        | Error ParticipantIdentityError.BlankPersona
+        | Error(ParticipantIdentityError.PersonaMismatch _)
+        | Error(ParticipantIdentityError.OriginMismatch _)
+        | Error ParticipantIdentityError.OwnerRequired
+        | Error(ParticipantIdentityError.OwnerPersonaMismatch _)
+        | Error(ParticipantIdentityError.OwnerCatalogVersionMismatch _)
+        | Error(ParticipantIdentityError.LegacyRoleMismatch _)
+        | Error(ParticipantIdentityError.LegacyTierMismatch _)
+        | Error(ParticipantIdentityError.UnsupportedLegacyAuthorityKind _)
+        | Error(ParticipantIdentityError.UnprovableLegacyAuthorityIdentity _) -> parseBareRole ()
 
     let roleOfString (value: string) : Role option =
         if String.IsNullOrWhiteSpace value then

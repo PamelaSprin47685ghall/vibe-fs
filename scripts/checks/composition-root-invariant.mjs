@@ -55,6 +55,15 @@ const forbiddenInternalOpens = [
   /^\s*open\s+Wanxiangshu\.Context\.Trace\b/m,
 ]
 
+const fragmentedChatAdmissionPatterns = [
+  /PromptIngress\.create(?:Decision)?Hook/,
+  /ModelRouting\.routeChatExecution/,
+  /AcquireAndCommitRoutedExecution/,
+  /SessionExecutionBinding\.acceptRoutedExecution/,
+  /SessionExecutionBinding\.acceptExternalExecution/,
+  /SessionExecutionBinding\.acceptPromptExecution/,
+  /ModelRouting\.projectRoutedModel/,
+]
 
 let hasViolations = false
 
@@ -63,9 +72,18 @@ for (const file of FILES) {
   const relPath = file.replace(ROOT + '/', '')
   const violations = []
 
-  for (const pattern of [...domainPolicyPatterns, ...pcPatterns, ...forbiddenInternalOpens]) {
+  const patterns = [...domainPolicyPatterns, ...pcPatterns, ...forbiddenInternalOpens]
+  if (relPath.endsWith('HostSignalBootstrap.fs')) patterns.push(...fragmentedChatAdmissionPatterns)
+
+  for (const pattern of patterns) {
     if (pattern.test(text)) {
       violations.push(`forbidden pattern: ${pattern}`)
+    }
+  }
+
+  if (relPath.endsWith('HostSignalBootstrap.fs')) {
+    for (const required of [/ChatAdmissionTransaction\.production/, /ChatAdmissionTransaction\.execute/]) {
+      if (!required.test(text)) violations.push(`missing required pattern: ${required}`)
     }
   }
 

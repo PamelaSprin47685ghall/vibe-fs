@@ -1,7 +1,16 @@
 namespace Wanxiangshu.OpenCode
 
-/// Cross-process tool recovery is deliberately not wired into ordinary plugin
-/// lifecycle. Interrupted tools remain visible failures. Future session resume
-/// is an explicit /continue workflow, not composition-root startup behavior.
+open Wanxiangshu.Execution.Session.ChatExecution
+
 module PluginRecoveryWiring =
-    let disabled = true
+
+    let attach (boot: PluginBoot.Boot) : unit =
+        let scope = boot.Scope
+
+        scope.AttachDurabilityActivation(fun () ->
+            scope.RunBackground(fun () ->
+                task {
+                    do! scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.PluginRuntimeReloaded)
+
+                    do! scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.CapacityProjectionReplayed)
+                }))

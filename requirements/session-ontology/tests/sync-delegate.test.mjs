@@ -3,8 +3,31 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as assoc from '../../../dist/Execution/Session/AssociationSurface.js'
+import * as roles from '../../../dist/Foundation/RolesSurface.js'
+import * as persona from '../../../dist/Participant/Persona/Surface.js'
+import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 
-const roles = ['Inspector', 'Coder']
+const H = (value) => `H(${value})`
+const rootSelection = (agent) => {
+  const resolved = persona.resolveParticipantIdentityAtRoot(agent)
+  assert.equal(resolved.ok, true, resolved.ok ? '' : resolved.error)
+  return {
+    kind: 'RootSelection',
+    ownerSession: null,
+    ownerLogicalRun: null,
+    ownerAuthorityRoot: null,
+    participantIdentity: {
+      selectedAgent: resolved.identity.name,
+      peerAgent: resolved.identity.peer,
+      canonicalRole: resolved.identity.role,
+      selectedTier: resolved.identity.initialTier.toLowerCase(),
+      persona: resolved.identity.persona,
+      personaCatalogVersion: resolved.identity.catalogVersion,
+      origin: resolved.identity.origin,
+    },
+  }
+}
+const syncDelegateRoles = ['Inspector', 'Coder']
 
 test('WHAT[SESSION-ONTOLOGY-003] HOST_008_delegate_role_maps_to_attachment', () => {
   assert.equal(assoc.dedicatedAttachment('Inspector'), 'SyncInspector')
@@ -38,4 +61,48 @@ test('WHAT[SESSION-ONTOLOGY-012] HOST_008_bookkeeper_carries_transaction_id', ()
   assert.deepEqual(assoc.bookkeeperAttachment('tx-42'), { name: 'Bookkeeper', transactionId: 'tx-42' })
 })
 
-assert.deepEqual(roles, ['Inspector', 'Coder'])
+test('WHAT[PID-010] SyncDelegate identity inherits its exact owner Persona and version', () => {
+  const created = authority.createAuthorityRoot(
+    H,
+    'runtime-sync-lineage',
+    'ses_sync_owner',
+    'HumanRoot',
+    'msg_sync_owner',
+    rootSelection('fast-manager'),
+  )
+  assert.equal(created.ok, true, created.ok ? '' : created.error)
+  const owner = created.value
+  const issued = authority.issueInheritedIdentitySeed('deep-inspector', owner)
+  assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
+
+  assert.deepEqual(
+    {
+      selectedAgent: issued.value.participantIdentity.selectedAgent,
+      canonicalRole: issued.value.participantIdentity.canonicalRole,
+      selectedTier: issued.value.participantIdentity.selectedTier,
+      persona: issued.value.participantIdentity.persona,
+      personaCatalogVersion: issued.value.participantIdentity.personaCatalogVersion,
+      ownerSession: issued.value.ownerSession,
+      ownerLogicalRun: issued.value.ownerLogicalRun,
+      ownerAuthorityRoot: issued.value.ownerAuthorityRoot,
+    },
+    {
+      selectedAgent: 'deep-inspector',
+      canonicalRole: 'inspector',
+      selectedTier: 'deep',
+      persona: owner.participantIdentity.persona,
+      personaCatalogVersion: owner.participantIdentity.personaCatalogVersion,
+      ownerSession: owner.session,
+      ownerLogicalRun: owner.logicalRun,
+      ownerAuthorityRoot: owner.authorityRoot,
+    },
+  )
+})
+
+test('WHAT[SESSION-ONTOLOGY-012] Bookkeeper is private identity, not a Foundation role', () => {
+  assert.equal(persona.isManagedName('fast-bookkeeper'), true)
+  assert.equal(roles.allRoleLabels.includes('bookkeeper'), false)
+  assert.equal(roles.managedAgentName('fast', 'bookkeeper'), '')
+})
+
+assert.deepEqual(syncDelegateRoles, ['Inspector', 'Coder'])

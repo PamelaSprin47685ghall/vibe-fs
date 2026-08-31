@@ -144,8 +144,31 @@ async function sendPrompt(scenario, sessionId, prompt) {
     // Back-compat: most scripts still expect a default model on the wire.
     body.model = { providerID: 'test', modelID: 'test-model' };
   }
+  const afterSeq = scenario.events.lastSeq;
   const response = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, { body });
   assert.ok(response.ok, `prompt failed: ${JSON.stringify(response.data)}`);
+
+  if (prompt.resumeAfterIdleText !== undefined) {
+    await scenario.events.awaitEvent((event) => {
+      const eventSession = event.sessionID ?? event.properties?.sessionID;
+      const role = event.properties?.info?.role ?? event.properties?.role;
+      return event.seq > afterSeq && event.type === 'message.updated' && eventSession === sessionId && role === 'user';
+    }, prompt.acceptTimeoutMs ?? 10000);
+    assert.equal(typeof scenario.releaseHeldChild, 'function', 'active prompt requires a held-child release');
+    const beforeIdle = scenario.events.lastSeq;
+    scenario.releaseHeldChild();
+    scenario.releaseHeldChild = null;
+    await scenario.events.awaitEvent((event) => {
+      const eventSession = event.sessionID ?? event.properties?.sessionID;
+      return event.seq > beforeIdle && eventSession === sessionId && isIdleEvent(event);
+    }, prompt.idleTimeoutMs ?? 60000);
+    const resumed = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, {
+      body: { ...body, parts: [{ type: 'text', text: prompt.resumeAfterIdleText }] },
+    });
+    assert.ok(resumed.ok, `prompt resume failed: ${JSON.stringify(resumed.data)}`);
+    return resumed;
+  }
+
   return response;
 }
 
@@ -374,7 +397,12 @@ async function runFlow(scenario, doc, ctx) {
       if (step.startTurn !== false) {
         scenario.turn.start(sid, step.afterSeq ? { afterSeq: step.afterSeq } : undefined);
       }
-      await sendPrompt(scenario, sid, step.prompt);
+      scenario.watchdog?.setWindow(step.timeoutMs ?? null);
+      try {
+        await sendPrompt(scenario, sid, step.prompt);
+      } finally {
+        scenario.watchdog?.setWindow(null);
+      }
       return;
     }
     if (step.restart) {
@@ -387,12 +415,17 @@ async function runFlow(scenario, doc, ctx) {
         : step.session === 'nudge' ? (ctx.nudgeId || ctx.sessions?.nudge)
         : (step.session && ctx.sessions?.[step.session]) || ctx.sessionId;
       const turn = scenario.turn.current(sid) || scenario.turn.start(sid);
-      await turn.awaitTerminal({
-        timeoutMs: step.timeoutMs ?? null,
-        requireActivity: step.requireActivity !== false,
-        requireAssistantTerminal: step.requireAssistantTerminal === true,
-        requireIdleAfterActivity: step.requireIdleAfterActivity !== false,
-      });
+      scenario.watchdog?.setWindow(step.timeoutMs ?? null);
+      try {
+        await turn.awaitTerminal({
+          timeoutMs: step.timeoutMs ?? null,
+          requireActivity: step.requireActivity !== false,
+          requireAssistantTerminal: step.requireAssistantTerminal === true,
+          requireIdleAfterActivity: step.requireIdleAfterActivity !== false,
+        });
+      } finally {
+        scenario.watchdog?.setWindow(null);
+      }
       return;
     }
     if (step.expectSatisfied) {

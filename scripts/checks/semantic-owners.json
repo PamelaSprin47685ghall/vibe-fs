@@ -1,5 +1,5 @@
 {
-  "total": 668,
+  "total": 701,
   "owners": [
     "action-affordance",
     "attention-regulation",
@@ -17,6 +17,7 @@
     "durable-convergence",
     "durable-events",
     "epistemic-reasoning",
+    "execution-failure-policy",
     "execution-model-routing",
     "external-investigation",
     "finality",
@@ -26,6 +27,7 @@
     "interaction-authority",
     "intra-participant-parallelism",
     "knowledge-reuse",
+    "managed-chat-execution",
     "managed-session-lifecycle",
     "obligation-ledger",
     "office-capability",
@@ -352,6 +354,10 @@
     },
     {
       "path": "src/Wanxiangshu/Context/Prefix/Candidate.fs",
+      "owner": "prefix-stability"
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Prefix/Types.fs",
       "owner": "prefix-stability"
     },
     {
@@ -779,6 +785,18 @@
       "owner": "delegation"
     },
     {
+      "path": "src/Wanxiangshu/Execution/Failure/Model.fs",
+      "owner": "execution-failure-policy"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Failure/Policy.fs",
+      "owner": "execution-failure-policy"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Failure/Surface.fs",
+      "owner": "execution-failure-policy"
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Fission/Admission.fs",
       "owner": "intra-participant-parallelism"
     },
@@ -845,6 +863,58 @@
     {
       "path": "src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs",
       "owner": "managed-session-lifecycle"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/Admission.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/Fact.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/Facts.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/Fold.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/Projection.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/Recovery.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntime.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntimeSurface.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/RecoverySurface.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/Settlement.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/StatusSurface.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/Surface.fs",
+      "owner": "managed-chat-execution"
     },
     {
       "path": "src/Wanxiangshu/Execution/Session/LoopDetector.fs",
@@ -1071,11 +1141,19 @@
       "owner": "interaction-authority"
     },
     {
+      "path": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
+      "owner": "interaction-authority"
+    },
+    {
       "path": "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
       "owner": "interaction-authority"
     },
     {
       "path": "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "owner": "interaction-authority"
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Origin.fs",
       "owner": "interaction-authority"
     },
     {
@@ -1511,6 +1589,22 @@
       "owner": "cognitive-environment"
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs",
+      "owner": "interaction-authority"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs",
+      "owner": "interaction-authority"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/TransactionSurface.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs",
       "owner": "execution-model-routing"
     },
@@ -1623,8 +1717,24 @@
       "owner": "participant-horizon"
     },
     {
-      "path": "src/Wanxiangshu/OpenCode/Host/ModelCapacity.fs",
-      "owner": "host-boundary"
+      "path": "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs",
+      "owner": "execution-model-routing"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Ledger.fs",
+      "owner": "execution-model-routing"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Model.fs",
+      "owner": "execution-model-routing"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs",
+      "owner": "execution-model-routing"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs",
+      "owner": "execution-model-routing"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs",
@@ -1663,8 +1773,12 @@
       "owner": "guidance-delivery"
     },
     {
-      "path": "src/Wanxiangshu/OpenCode/Host/PersonaBinding.fs",
-      "owner": "participant-identity"
+      "path": "src/Wanxiangshu/OpenCode/Host/HookPolicy.fs",
+      "owner": "host-boundary"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/HookPolicySurface.fs",
+      "owner": "host-boundary"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs",
@@ -1711,6 +1825,14 @@
       "owner": "host-boundary"
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnostics.fs",
+      "owner": "host-boundary"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnosticsSurface.fs",
+      "owner": "host-boundary"
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Gate.fs",
       "owner": "requirement-grounding"
     },
@@ -1741,6 +1863,10 @@
     {
       "path": "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs",
       "owner": "cognitive-environment"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs",
+      "owner": "managed-chat-execution"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs",
@@ -1967,6 +2093,10 @@
       "owner": "participant-identity"
     },
     {
+      "path": "src/Wanxiangshu/Participant/Persona/Identity.fs",
+      "owner": "participant-identity"
+    },
+    {
       "path": "src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs",
       "owner": "participant-identity"
     },
@@ -1979,14 +2109,6 @@
       "owner": "participant-identity"
     },
     {
-      "path": "src/Wanxiangshu/Participant/Persona/SessionPersona.fs",
-      "owner": "participant-identity"
-    },
-    {
-      "path": "src/Wanxiangshu/Participant/Persona/SessionSurface.fs",
-      "owner": "participant-identity"
-    },
-    {
       "path": "src/Wanxiangshu/Participant/Persona/Surface.fs",
       "owner": "participant-identity"
     },
@@ -1995,8 +2117,12 @@
       "owner": "provider-attempt-recovery"
     },
     {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs",
-      "owner": "provider-attempt-recovery"
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Failure.fs",
+      "owner": "execution-failure-policy"
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/FailureSurface.fs",
+      "owner": "execution-failure-policy"
     },
     {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
@@ -2199,6 +2325,10 @@
       "owner": "durable-events"
     },
     {
+      "path": "src/Wanxiangshu/Persistence/Journal/PromptFactCodec.fs",
+      "owner": "durable-events"
+    },
+    {
       "path": "src/Wanxiangshu/Persistence/Journal/ReviewJournalSurface.fs",
       "owner": "durable-events"
     },
@@ -2332,6 +2462,10 @@
     },
     {
       "path": "src/Wanxiangshu/Repository/Knowledge/Casebook/Bookkeeper.fs",
+      "owner": "knowledge-reuse"
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRefreshSurface.fs",
       "owner": "knowledge-reuse"
     },
     {

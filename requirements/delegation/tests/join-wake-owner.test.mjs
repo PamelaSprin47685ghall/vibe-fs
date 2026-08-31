@@ -11,8 +11,8 @@ test('WHAT[DELEG-015] external chat material join wake is owned by Handle/OpenCo
   const host = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
 
   assert.match(owner, /module JoinWake/)
-  assert.match(owner, /decoded\.SessionId, decoded\.PhysicalUserMessageId, decoded\.PromptKey, decoded\.IsHostCompaction/)
-  assert.match(owner, /registry\.SignalUserMessage sessionId/)
-  assert.match(host, /JoinWake\.observeChatMessage scope\.Sessions\.JoinInterrupts decoded/)
+  assert.match(owner, /ChatAdmissionIntent\.Decision\.ExternalRootIntent evidence/)
+  assert.match(owner, /registry\.SignalUserMessage evidence\.Key\.SessionId/)
+  assert.match(host, /JoinWake\.observeChatMessage scope\.Sessions\.JoinInterrupts intent/)
   assert.doesNotMatch(host, /SignalUserMessage sessionId/)
 })

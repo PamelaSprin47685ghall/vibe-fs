@@ -36,6 +36,22 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
     member _.TryFindByScope(scope: ReuseScopeId, role: SyncDelegateRole) : SessionId option =
         lock gate (fun () -> tryGetLocked scope role |> Option.map fst)
 
+    member _.TryFindOwner(delegateSessionId: SessionId, role: SyncDelegateRole) : SessionId option =
+        let suffix = "\u001f" + roleLabel role
+
+        lock gate (fun () ->
+            bindings
+            |> Seq.tryPick (fun binding ->
+                let delegateId, _ = binding.Value
+
+                if
+                    delegateId = delegateSessionId
+                    && binding.Key.EndsWith(suffix, StringComparison.Ordinal)
+                then
+                    Some(SessionId.create (binding.Key.Substring(0, binding.Key.Length - suffix.Length)))
+                else
+                    None))
+
     member _.Remove(ownerSessionId: SessionId, role: SyncDelegateRole) : bool =
         let scope = ReuseScope.ofSession ownerSessionId
         lock gate (fun () -> bindings.Remove(bindingKey scope role))

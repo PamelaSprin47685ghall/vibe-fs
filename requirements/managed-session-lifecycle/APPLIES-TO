@@ -16,7 +16,6 @@
 /src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs
 /src/Wanxiangshu/OpenCode/Host/TurnRuntimePreparation.fs
 /src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs
-/src/Wanxiangshu/OpenCode/Host/ManagedChatExecution*.fs
 /src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs
 /src/Wanxiangshu/Composition/Turn/Scheduler.fs

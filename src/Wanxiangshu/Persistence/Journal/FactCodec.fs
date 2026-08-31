@@ -8,6 +8,7 @@ open Fable.Core.JsInterop
 open Thoth.Json
 open Wanxiangshu.Foundation
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Host
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Mission.Obligation.Todo
@@ -16,12 +17,14 @@ open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 /// Fact serialization (PERSIST-005).
 module FactCodec =
 
-    let private extra =
+    let private baseExtra =
         { Extra.empty with
             Hash = "system-int64"
             Coders =
                 Extra.empty.Coders
                 |> Map.add "System.Int64" (Encode.boxEncoder Encode.int64, Decode.boxDecoder Decode.int64) }
+
+    let private extra = PromptFactCodec.withCoder baseExtra
 
     let pre050MigrationMessage =
         "Wanxiangshu 0.5.0 does not support pre-0.5.0 runtime journals.\nArchive or remove the old Wanxiangshu runtime journal before starting."
@@ -208,6 +211,22 @@ module FactCodec =
         | Some fact -> Ok fact
         | None -> Decode.Auto.fromString<Fact> (json, extra = extra) |> Result.map pinToUtc
 
+    let validateFact (fact: Fact) : Result<Fact, string> =
+        let validate caseName schemaVersion =
+            if schemaVersion = 1 then
+                Ok fact
+            else
+                Error(sprintf "ChatExecution %s schema version is unsupported: %d" caseName schemaVersion)
+
+        match fact with
+        | Agent(AgentFact.ChatExecution(ChatExecutionFactCases.Accepted payload)) ->
+            validate "Accepted" payload.SchemaVersion
+        | Agent(AgentFact.ChatExecution(ChatExecutionFactCases.ProviderStarted payload)) ->
+            validate "ProviderStarted" payload.SchemaVersion
+        | Agent(AgentFact.ChatExecution(ChatExecutionFactCases.Terminal payload)) ->
+            validate "Terminal" payload.SchemaVersion
+        | _ -> Ok fact
+
     let deserializeFact (json: string) : Result<Fact, string> =
         if containsLegacyFallbackFields json then
             Error pre050MigrationMessage
@@ -218,4 +237,4 @@ module FactCodec =
         elif containsHandleCompletedMissingCompletionFields json then
             Error "HandleCompleted requires CompletionRef and CompletionDigest; decode migration is not supported."
         else
-            deserializeCurrentFact json
+            deserializeCurrentFact json |> Result.bind validateFact

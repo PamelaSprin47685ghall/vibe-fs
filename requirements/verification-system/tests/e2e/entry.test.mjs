@@ -38,7 +38,6 @@ import {
   ADVERSITY_ORACLES,
   ADVERSITY_CHECKLIST,
   G2_INSPECTOR_CANARY_PROMPT,
-  G2_BATCH_CANARY_PROMPT,
   G6_CANONICAL_A,
   G6_CANONICAL_Q,
   retireCompanionForDeletion,
@@ -141,7 +140,7 @@ const preFlowCanaries = async (scenario) => {
     return undefined;
   };
 
-  const inspectorOwner = await scenario.client.createSession({ agent: 'fast-coder' });
+  const inspectorOwner = await scenario.client.createSession({ title: 'G2 inspector owner' });
   const inspectorOwnerId = getSessionId(inspectorOwner);
   assert.ok(inspectorOwnerId, `g2-inspector-owner session creation failed: ${JSON.stringify(inspectorOwner)}`);
   if (!scenario.sessionIds.includes(inspectorOwnerId)) scenario.sessionIds.push(inspectorOwnerId);
@@ -149,20 +148,17 @@ const preFlowCanaries = async (scenario) => {
 
   const inspectorTurn = scenario.turn.start(inspectorOwnerId);
   const inspectorPrompt = await scenario.client.request('POST', `/session/${inspectorOwnerId}/prompt_async`, {
-    body: { parts: [{ type: 'text', text: G2_INSPECTOR_CANARY_PROMPT }], agent: 'fast-coder' },
+    body: {
+      messageID: 'msg-g2-inspector-owner',
+      parts: [{ type: 'text', text: G2_INSPECTOR_CANARY_PROMPT }],
+      agent: 'fast-coder',
+    },
   });
   assert.ok(inspectorPrompt.ok, `g2 inspector prompt failed: ${JSON.stringify(inspectorPrompt.data)}`);
   await inspectorTurn.awaitTerminal();
 
   const g2 = assertG2InspectorPrefixLaw(scenario);
   scenario.g6InspectorSessionId = g2.inspectorSessionId;
-
-  const batchTurn = scenario.turn.start(inspectorOwnerId);
-  const batchPrompt = await scenario.client.request('POST', `/session/${inspectorOwnerId}/prompt_async`, {
-    body: { parts: [{ type: 'text', text: G2_BATCH_CANARY_PROMPT }], agent: 'fast-coder' },
-  });
-  assert.ok(batchPrompt.ok, `g2 inspector batch prompt failed: ${JSON.stringify(batchPrompt.data)}`);
-  await batchTurn.awaitTerminal();
   assertG2InspectorBatchCoalescing(scenario, g2.inspectorSessionId);
   await Promise.all([
     retireCompanionForDeletion(scenario, inspectorOwnerId),

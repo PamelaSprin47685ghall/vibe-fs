@@ -25,7 +25,6 @@ open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
@@ -54,7 +53,6 @@ open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
@@ -126,7 +124,6 @@ type PluginSessionScope() =
         retainedSessionIdentities.Remove sessionId |> ignore
         let sid = SessionId.create sessionId
         SessionProviderLanguage.drop sid
-        SessionPersona.drop sid
 
     /// Session deletion drops every per-instance registry entry for this
     /// session (mirror of DisposeSession's per-session cleanup).

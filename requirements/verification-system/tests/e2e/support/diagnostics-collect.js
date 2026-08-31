@@ -54,6 +54,7 @@ function collectEvents(diag, scenario) {
     time: new Date(e.time || Date.now()).toISOString().slice(11, 23),
     type: e.type,
     sessionID: e.sessionID ? String(e.sessionID).slice(0, 16) : undefined,
+    parentSessionID: e.parentSessionID ? String(e.parentSessionID).slice(0, 16) : undefined,
     error: e.error,
     status: e.status,
   }));

@@ -1,0 +1,441 @@
+namespace Wanxiangshu.Execution.Session.ChatExecution
+
+open System.Collections.Generic
+open System.Threading.Tasks
+open Fable.Core.JsInterop
+open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Execution.Failure
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Participant.Persona
+
+module RecoveryRuntimeSurface =
+
+    let private accepted (suffix: string) : AcceptedChatExecutionEvidence =
+        let identity =
+            ParticipantIdentity.resolveAtRoot "fast-coder"
+            |> Result.defaultWith (fun error -> invalidOp (sprintf "%A" error))
+
+        { SessionId = SessionId.create $"session-{suffix}"
+          LogicalRunId = LogicalRunId.create $"logical-{suffix}"
+          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create $"root-{suffix}"
+          AuthorityKind = PromptRootAuthorityKind.HumanRoot
+          IdentitySeed = RootSelection identity
+          PhysicalUserMessageId = PhysicalUserMessageId.create $"message-{suffix}"
+          Origin = PromptOrigin.AuthorityRoot PromptRootAuthorityKind.HumanRoot
+          EffectiveAgent = "fast-coder" }
+
+    let private keyOf (accepted: AcceptedChatExecutionEvidence) : ChatExecutionKey =
+        { SessionId = accepted.SessionId
+          PhysicalUserMessageId = accepted.PhysicalUserMessageId }
+
+    let private providerStarted
+        (providerRun: string)
+        (accepted: AcceptedChatExecutionEvidence)
+        : ProviderStartedEvidence =
+        { Accepted = accepted
+          ProviderRun = ProviderRunIdentity.create providerRun
+          RequestKind = ProviderRequestKind.WorkMain
+          ProjectionChoice = XProjectionChoice.UseCommittedEpoch }
+
+    let private acceptedState (accepted: AcceptedChatExecutionEvidence) : ChatExecutionState =
+        { Key = keyOf accepted
+          Evidence = accepted
+          ProviderStarted = None
+          TerminalEvidence = None
+          Lifecycle = ChatExecutionLifecycle.Accepted }
+
+    let private startedState (evidence: ProviderStartedEvidence) : ChatExecutionState =
+        { Key = keyOf evidence.Accepted
+          Evidence = evidence.Accepted
+          ProviderStarted = Some evidence
+          TerminalEvidence = None
+          Lifecycle = ChatExecutionLifecycle.ProviderStarted }
+
+    let private terminalState
+        (disposition: ChatExecutionTerminalDisposition)
+        (evidence: ProviderStartedEvidence)
+        : ChatExecutionState =
+        { Key = keyOf evidence.Accepted
+          Evidence = evidence.Accepted
+          ProviderStarted = Some evidence
+          TerminalEvidence = Some(ChatExecutionTerminalEvidence.AfterProviderStart evidence)
+          Lifecycle = ChatExecutionLifecycle.Terminal disposition }
+
+    let private failurePolicy
+        (failure: ExecutionFailure)
+        (retry: ProviderRecoveryBudget)
+        (fallback: ProviderRecoveryBudget)
+        (evidence: ProviderStartedEvidence)
+        : RecoveryPolicyEvidence =
+        ExecutionFailurePolicy.decide
+            { Failure = failure
+              Lifecycle = DurableExecutionLifecycle.ProviderStarted
+              ExecutionKey = keyOf evidence.Accepted
+              Capacity = CapacityOwnership.NoCapacityFence
+              Provider =
+                { LogicalRun = evidence.Accepted.LogicalRunId
+                  ProviderRun = evidence.ProviderRun
+                  RequestKind = evidence.RequestKind
+                  RetryBudget = retry
+                  FallbackBudget = fallback
+                  Breaker = ProviderBreakerState.Closed } }
+        |> RecoveryPolicyEvidence.FailureDecision
+
+    let private scenarioEvidence (scenario: string) : ChatExecutionRecoveryEvidence =
+        let accepted = accepted scenario
+        let started = providerStarted $"provider-{scenario}" accepted
+        let key = keyOf accepted
+        let absent = PhysicalResourceObservation.ResourceAbsent key
+
+        let pending
+            (state: ChatExecutionState)
+            (provider: ProviderPhysicalObservation)
+            (resource: PhysicalResourceObservation)
+            (persistence: PersistenceCommitment)
+            (policy: RecoveryPolicyEvidence)
+            : ChatExecutionRecoveryEvidence =
+            { ExecutionState = state
+              ProviderObservation = provider
+              ResourceObservation = resource
+              PersistenceCommitment = persistence
+              FailureDecisionEvidence = policy }
+
+        match scenario with
+        | "ProviderAlive" ->
+            pending
+                (startedState started)
+                (ProviderPhysicalObservation.ProviderAlive started)
+                absent
+                PersistenceCommitment.NotCommitted
+                RecoveryPolicyEvidence.NoFailureDecision
+        | "AcceptedProviderAlive" ->
+            pending
+                (acceptedState accepted)
+                (ProviderPhysicalObservation.ProviderAlive started)
+                absent
+                PersistenceCommitment.NotCommitted
+                RecoveryPolicyEvidence.NoFailureDecision
+        | "CrashAfterAcceptance" ->
+            pending
+                (acceptedState accepted)
+                (ProviderPhysicalObservation.ProviderAbsent key)
+                absent
+                PersistenceCommitment.NotCommitted
+                RecoveryPolicyEvidence.NoFailureDecision
+        | "RetryEligible" ->
+            pending
+                (startedState started)
+                (ProviderPhysicalObservation.ProviderAbsent key)
+                absent
+                PersistenceCommitment.NotCommitted
+                (failurePolicy
+                    ExecutionFailure.ProviderTransient
+                    ProviderRecoveryBudget.Available
+                    ProviderRecoveryBudget.Exhausted
+                    started)
+        | "ProviderTerminalCompleted" ->
+            pending
+                (startedState started)
+                (ProviderPhysicalObservation.ProviderTerminal(started, ChatExecutionTerminalDisposition.Completed))
+                absent
+                PersistenceCommitment.NotCommitted
+                RecoveryPolicyEvidence.NoFailureDecision
+        | "TerminalResourceHeld" ->
+            pending
+                (terminalState ChatExecutionTerminalDisposition.Completed started)
+                (ProviderPhysicalObservation.ProviderTerminal(started, ChatExecutionTerminalDisposition.Completed))
+                (PhysicalResourceObservation.ResourceHeld key)
+                PersistenceCommitment.Committed
+                RecoveryPolicyEvidence.NoFailureDecision
+        | "TerminalResourceReleased" ->
+            pending
+                (terminalState ChatExecutionTerminalDisposition.Completed started)
+                (ProviderPhysicalObservation.ProviderTerminal(started, ChatExecutionTerminalDisposition.Completed))
+                (PhysicalResourceObservation.ResourceReleased key)
+                PersistenceCommitment.Committed
+                RecoveryPolicyEvidence.NoFailureDecision
+        | "MissingReceipt" ->
+            pending
+                (startedState started)
+                ProviderPhysicalObservation.ReceiptMissing
+                absent
+                PersistenceCommitment.NotCommitted
+                RecoveryPolicyEvidence.NoFailureDecision
+        | "StaleKey" ->
+            let stale =
+                { key with
+                    PhysicalUserMessageId = PhysicalUserMessageId.create "stale-message" }
+
+            pending
+                (startedState started)
+                (ProviderPhysicalObservation.ProviderAbsent stale)
+                absent
+                PersistenceCommitment.NotCommitted
+                RecoveryPolicyEvidence.NoFailureDecision
+        | "StaleProvider" ->
+            pending
+                (startedState started)
+                (ProviderPhysicalObservation.ProviderAlive(providerStarted "stale-provider" accepted))
+                absent
+                PersistenceCommitment.NotCommitted
+                RecoveryPolicyEvidence.NoFailureDecision
+        | "StalePolicy" ->
+            let staleStarted = providerStarted "stale-provider" accepted
+
+            pending
+                (startedState started)
+                (ProviderPhysicalObservation.ProviderAbsent key)
+                absent
+                PersistenceCommitment.NotCommitted
+                (failurePolicy
+                    ExecutionFailure.ProviderTransient
+                    ProviderRecoveryBudget.Available
+                    ProviderRecoveryBudget.Exhausted
+                    staleStarted)
+        | unknown -> invalidArg "scenario" $"unknown lifecycle recovery scenario '{unknown}'"
+
+    let private dispositionName (disposition: ChatExecutionTerminalDisposition) =
+        match disposition with
+        | ChatExecutionTerminalDisposition.Completed -> "Completed"
+        | ChatExecutionTerminalDisposition.Cancelled -> "Cancelled"
+        | ChatExecutionTerminalDisposition.Rejected -> "Rejected"
+        | ChatExecutionTerminalDisposition.Failed -> "Failed"
+
+    let private effectPorts (effects: HashSet<string>) : ChatExecutionRecoveryActionPorts =
+        let once effect =
+            effects.Add effect |> ignore
+            Task.FromResult(()) :> Task
+
+        { ReconcilePhysical =
+            function
+            | PhysicalReconciliationRequest.PersistProviderStarted _ -> once "ReconcilePhysical:PersistProviderStarted"
+            | PhysicalReconciliationRequest.PersistProviderStartedAndTerminal(_, disposition) ->
+                once $"ReconcilePhysical:PersistProviderStartedAndTerminal:{dispositionName disposition}"
+            | PhysicalReconciliationRequest.ReleaseTerminalResource _ ->
+                once "ReconcilePhysical:ReleaseTerminalResource"
+          ResumePreProvider = fun _ -> once "ResumePreProvider"
+          RequeueEligible =
+            function
+            | ProviderRequeueRequest.RetryFreshAttempt _ -> once "RequeueEligible:RetryFreshAttempt"
+            | ProviderRequeueRequest.AdvanceFallback _ -> once "RequeueEligible:AdvanceFallback"
+          Finalize = fun request -> once $"Finalize:{dispositionName request.TerminalDisposition}"
+          MarkManualIntervention = fun request -> once $"MarkManualIntervention:{request.InterventionReason}" }
+
+    let private decisionName (decision: ChatExecutionRecoveryDecision) =
+        match decision with
+        | ChatExecutionRecoveryDecision.Ignore _ -> "Ignore"
+        | ChatExecutionRecoveryDecision.ReconcilePhysical _ -> "ReconcilePhysical"
+        | ChatExecutionRecoveryDecision.ResumePreProvider _ -> "ResumePreProvider"
+        | ChatExecutionRecoveryDecision.RequeueEligible _ -> "RequeueEligible"
+        | ChatExecutionRecoveryDecision.Finalize _ -> "Finalize"
+        | ChatExecutionRecoveryDecision.MarkManualIntervention _ -> "MarkManualIntervention"
+
+    let private run (effects: HashSet<string>) (scenarios: string array) =
+        task {
+            let ports = effectPorts effects
+            let decisions = ResizeArray<string>()
+
+            for scenario in scenarios do
+                let! decision = ChatExecutionRecoveryRuntime.recover ports (scenarioEvidence scenario)
+                decisions.Add(decisionName decision)
+
+            return
+                box
+                    {| decisions = decisions.ToArray()
+                       effects = effects |> Seq.sort |> Seq.toArray |}
+        }
+
+    let recoverScenarios (scenarios: string array) : Task<obj> = run (HashSet<string>()) scenarios
+
+    let recoverAcrossRestart (scenarios: string array) : Task<obj> =
+        task {
+            let effects = HashSet<string>()
+            let midpoint = scenarios.Length / 2
+            let! _ = run effects scenarios.[0 .. midpoint - 1]
+            return! run effects scenarios.[midpoint..]
+        }
+
+    let interpretFailurePolicy
+        (failureLabel: string)
+        (retryBudget: string)
+        (fallbackBudget: string)
+        (commitment: string)
+        (observation: string)
+        : Task<obj> =
+        task {
+            let failure =
+                match failureLabel with
+                | "LocalInvariant" -> ExecutionFailure.LocalInvariant
+                | "UserCancelled" -> ExecutionFailure.UserCancelled
+                | "Superseded" -> ExecutionFailure.Superseded
+                | "CapacityQueueFull" -> ExecutionFailure.CapacityQueueFull
+                | "ProviderTransient" -> ExecutionFailure.ProviderTransient
+                | "ProviderPermanent" -> ExecutionFailure.ProviderPermanent
+                | "StreamInterruptedAfterFirstToken" -> ExecutionFailure.StreamInterruptedAfterFirstToken
+                | value -> invalidArg "failure" $"unknown recovery proof failure '{value}'"
+
+            let budget fieldName =
+                function
+                | "Available" -> ProviderRecoveryBudget.Available
+                | "Exhausted" -> ProviderRecoveryBudget.Exhausted
+                | value -> invalidArg fieldName $"unknown recovery proof budget '{value}'"
+
+            let persistence =
+                match commitment with
+                | "NotCommitted" -> PersistenceCommitment.NotCommitted
+                | "Committed" -> PersistenceCommitment.Committed
+                | "Unknown" -> PersistenceCommitment.Unknown
+                | value -> invalidArg "commitment" $"unknown recovery proof commitment '{value}'"
+
+            let acceptedEvidence = accepted $"policy-{failureLabel}"
+            let started = providerStarted $"provider-policy-{failureLabel}" acceptedEvidence
+            let key = keyOf acceptedEvidence
+
+            let policy =
+                failurePolicy
+                    failure
+                    (budget "retryBudget" retryBudget)
+                    (budget "fallbackBudget" fallbackBudget)
+                    started
+
+            let providerObservation =
+                match observation with
+                | "ExactAbsent" -> ProviderPhysicalObservation.ProviderAbsent key
+                | "ExactTerminal" ->
+                    ProviderPhysicalObservation.ProviderTerminal(started, ChatExecutionTerminalDisposition.Failed)
+                | "LateOldExecution" ->
+                    ProviderPhysicalObservation.ProviderTerminal(
+                        providerStarted "provider-late-old-execution" acceptedEvidence,
+                        ChatExecutionTerminalDisposition.Failed
+                    )
+                | value -> invalidArg "observation" $"unknown recovery proof observation '{value}'"
+
+            let evidence =
+                { ExecutionState = startedState started
+                  ProviderObservation = providerObservation
+                  ResourceObservation = PhysicalResourceObservation.ResourceAbsent key
+                  PersistenceCommitment = persistence
+                  FailureDecisionEvidence = policy }
+
+            let effects = HashSet<string>()
+            let! decision = ChatExecutionRecoveryRuntime.recover (effectPorts effects) evidence
+
+            return
+                box
+                    {| decision = decisionName decision
+                       effects = effects |> Seq.sort |> Seq.toArray |}
+        }
+
+    let admissionCrashPointScenarios
+        (cuts: string array)
+        (restartKind: string)
+        (commitment: string)
+        (capacityOutcome: string)
+        : Task<obj> =
+        task {
+            let persistence =
+                match commitment with
+                | "NotCommitted" -> PersistenceCommitment.NotCommitted
+                | "Committed" -> PersistenceCommitment.Committed
+                | "Unknown" -> PersistenceCommitment.Unknown
+                | value -> invalidArg "commitment" $"unknown persistence commitment '{value}'"
+
+            let outcomes = ResizeArray<obj>()
+
+            let beforeRestart cut =
+                match cut with
+                | "A"
+                | "B" -> 0, 0, false
+                | "C" -> 1, 0, false
+                | "D" -> 1, 1, false
+                | "E"
+                | "F"
+                | "G" -> 1, 1, true
+                | "H"
+                | "I" -> 0, 0, true
+                | value -> invalidArg "cut" $"unknown admission crash cut '{value}'"
+
+            let snapshot cut restarted =
+                let capacity, binding, hostProjected = beforeRestart cut
+
+                box
+                    {| activeCapacity = if restarted then 0 else capacity
+                       providerBinding = if restarted then 0 else binding
+                       hostProjected = if restarted then false else hostProjected |}
+
+            for cut in cuts do
+                if cut = "A" then
+                    outcomes.Add(
+                        box
+                            {| cut = cut
+                               restart = restartKind
+                               decisions = [| "NoDurableExecution"; "NoDurableExecution" |]
+                               effects = [||]
+                               commitment = commitment
+                               capacityOutcome = capacityOutcome
+                               beforeRestart = snapshot cut false
+                               afterRestart = snapshot cut (restartKind = "ProcessRestart") |}
+                    )
+                else
+                    let scenario =
+                        match cut with
+                        | "B"
+                        | "C"
+                        | "D"
+                        | "E" -> "CrashAfterAcceptance"
+                        | "F" -> "ProviderAlive"
+                        | "G" -> "TerminalResourceHeld"
+                        | "H"
+                        | "I" -> "TerminalResourceReleased"
+                        | value -> invalidArg "cut" $"unknown admission crash cut '{value}'"
+
+                    let original = scenarioEvidence scenario
+
+                    let resource =
+                        match capacityOutcome with
+                        | "Applied"
+                        | "AlreadyApplied" -> original.ResourceObservation
+                        | "Conflict"
+                        | "StaleFence"
+                        | "Unknown" -> PhysicalResourceObservation.ResourceUnknown original.ExecutionState.Key
+                        | value -> invalidArg "capacityOutcome" $"unknown capacity outcome '{value}'"
+
+                    let evidence =
+                        { original with
+                            PersistenceCommitment = persistence
+                            ResourceObservation = resource }
+
+                    let effects = HashSet<string>()
+                    let ports = effectPorts effects
+                    let decisions = ResizeArray<string>()
+
+                    for _ in 1..2 do
+                        let! decision = ChatExecutionRecoveryRuntime.recover ports evidence
+                        decisions.Add(decisionName decision)
+
+                    outcomes.Add(
+                        box
+                            {| cut = cut
+                               restart = restartKind
+                               decisions = decisions.ToArray()
+                               effects = effects |> Seq.sort |> Seq.toArray
+                               commitment = commitment
+                               capacityOutcome = capacityOutcome
+                               beforeRestart = snapshot cut false
+                               afterRestart = snapshot cut (restartKind = "ProcessRestart") |}
+                    )
+
+            return box {| scenarios = outcomes.ToArray() |}
+        }
+
+    let lifecycleSignals () =
+        [| "DurabilityActivated"
+           "PluginRuntimeReloaded"
+           "ExactAssistantStarted"
+           "ExactAssistantTerminal"
+           "SessionAborted"
+           "SessionDeleted"
+           "SessionCancelled"
+           "TypedFailureDecision"
+           "CapacityProjectionReplayed" |]

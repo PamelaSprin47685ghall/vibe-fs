@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
 import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
 import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
+import * as bookkeeperRefresh from '../../../dist/Repository/Knowledge/Casebook/BookkeeperRefreshSurface.js'
 import * as lifecycle from '../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
 
 const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
@@ -56,6 +57,19 @@ export const scriptedBookkeeperPort = () => {
   return { port, createCalls, prompts, programCalls }
 }
 
+export const installBookkeeperRuntime = (port, ownerSessionIds) => {
+  const installed = bookkeeper.setRuntime(
+    port,
+    ownerSessionIds.map((sessionId) => ({
+      sessionId,
+      logicalRunId: `bookkeeper-run-${sessionId}`,
+      authorityRootUserMessageId: `bookkeeper-root-${sessionId}`,
+      agent: 'fast-inspector',
+    })),
+  )
+  assert.equal(installed.ok, true, installed.error)
+}
+
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
 const openStore = (dir, writerId) => eventStore.create(join(dir, '.git'), writerId)
 
@@ -67,8 +81,8 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_create_child_once_per_refresh_via_js_boo
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     assert.equal((await casebook.archive(handle, record('s-session-refresh', 'Q keep', 'A keep', [fileRead('a.txt', casebook.contentHash('hello'))]))).ok, true)
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
-    bookkeeper.setSessionPort(port)
-    const refreshed = await bookkeeper.refreshStale(handle, dir, 's-session-refresh')
+    await installBookkeeperRuntime(port, ['s-session-refresh'])
+    const refreshed = await bookkeeperRefresh.refreshStale(handle, dir, 's-session-refresh')
     assert.equal(refreshed.ok, true)
     assert.equal(refreshed.value, true)
     assert.equal(createCalls.length, 1)
@@ -79,7 +93,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_create_child_once_per_refresh_via_js_boo
     assert.equal(fetched.value.q, CANONICAL_Q)
     assert.equal(fetched.value.a, CANONICAL_A)
   } finally {
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
     eventStore.dispose(handle)
     rmSync(dir, { recursive: true, force: true })
   }
@@ -92,8 +106,8 @@ test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_create_child_once_and_cleanup_n
     execFileSync('git', ['init', '--quiet', dir])
     mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
     lifecycle.enable(dir)
-    bookkeeper.setSessionPort(port)
     const key = 'insp-session-fin'
+    await installBookkeeperRuntime(port, [key])
     lifecycle.notePrompt(key, 'Who owns PromptAuthority?')
     lifecycle.noteAnswer(key, 'Host owns PromptAuthority.')
     lifecycle.notePrompt(key, 'Where do Case facts live?')
@@ -116,23 +130,23 @@ test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_create_child_once_and_cleanup_n
     assert.equal(createCalls.length, before)
     eventStore.dispose(handle)
   } finally {
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
     lifecycle.disable()
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
-test('WHAT[KNOWLEDGE-REUSE-005] CASE006_missing_session_port_keeps_old_case', async () => {
+test('WHAT[KNOWLEDGE-REUSE-005] CASE006_missing_runtime_keeps_old_case', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-noport-'))
   const handle = eventStore.create(dir, 'bookkeeper-session-noport')
   try {
-    bookkeeper.resetSessionPort()
+    bookkeeper.resetRuntime()
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     assert.equal((await casebook.archive(handle, record('s-noport', 'Q keep', 'A keep', [fileRead('a.txt', casebook.contentHash('hello'))]))).ok, true)
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
-    const refreshed = await bookkeeper.refreshStale(handle, dir, 's-noport')
+    const refreshed = await bookkeeperRefresh.refreshStale(handle, dir, 's-noport')
     assert.equal(refreshed.ok, false)
-    assert.match(String(refreshed.error), /session port/)
+    assert.match(String(refreshed.error), /runtime unavailable/)
     const fetched = await casebook.fetchCase(handle, 10, 's-noport')
     assert.equal(fetched.value.q, 'Q keep')
     assert.equal(fetched.value.a, 'A keep')

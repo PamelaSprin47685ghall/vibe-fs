@@ -43,7 +43,7 @@ module OrdinaryTurnWorkflow =
             |> Option.bind (fun authority -> Map.tryFind turn.PhysicalUserMessageId authority.AcceptedContinuationIds)
 
         match continuationKind, turn.Role with
-        | Some PromptAuthority.InteractionRepair, _ -> Some ProviderRequestKind.InteractionRepair
+        | Some PromptAuthority.ContinuationKind.InteractionRepair, _ -> Some ProviderRequestKind.InteractionRepair
         // A Blogger terminal without a durable cycle receipt did not prove a
         // business Main or maintenance Squash success. Never clear fallback
         // from Role alone.
@@ -198,6 +198,33 @@ module OrdinaryTurnWorkflow =
         }
         :> Task
 
+    let private handleFailedTurn
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (recoveryScope: IBloggerRuntimeHost)
+        (context: ReconciledTurnContext)
+        (error: string)
+        =
+        match context.Failure with
+        | Some failure ->
+            ProviderRecoveryWorkflow.continueAfterConfirmedFailure
+                sessionPort
+                eventPort
+                journal
+                recoveryScope
+                context.Turn
+                failure
+                error
+                (ProviderProse.documentFor context.Turn.SessionId RuntimeNudge.ProviderRetry Map.empty)
+        | None ->
+            eventPort.NotifyTerminal
+                context.Turn.SessionId
+                (TerminalOutcome.Failed(TerminalStop.forAuthority context.Turn.AuthorityRootUserMessageId error))
+            |> ignore
+
+            Task.FromResult(()) :> Task
+
     let private handleOutcome
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -222,14 +249,7 @@ module OrdinaryTurnWorkflow =
             InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
         | ReconcileProgram.TurnAborted reason -> handleAborted eventPort abortCause turn reason
         | ReconcileProgram.TurnFailed error ->
-            ProviderRecoveryWorkflow.continueAfterConfirmedFailure
-                sessionPort
-                eventPort
-                journal
-                recoveryScope
-                turn
-                error
-                (ProviderProse.documentFor turn.SessionId RuntimeNudge.ProviderRetry Map.empty)
+            handleFailedTurn sessionPort eventPort journal recoveryScope context error
         | ReconcileProgram.TurnCompleted ->
             handleCompleted sessionPort eventPort journal joinGuardNudges hasLivePty quiescence context completeAgent
 

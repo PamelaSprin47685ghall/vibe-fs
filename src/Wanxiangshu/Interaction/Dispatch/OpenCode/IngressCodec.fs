@@ -23,22 +23,7 @@ open Wanxiangshu.Foundation.Identity
 /// Decodes the raw chat.message hook payload before authority policy sees it.
 module PromptIngressCodec =
 
-    /// DSL-state-combination: physical — this is one decoded Host ingress
-    /// message; optional identity fields preserve wire absence and are consumed
-    /// at the adapter boundary, never as a persisted workflow cursor.
-    type DecodedMessage =
-        {
-            SessionId: SessionId option
-            /// chat.message delivers a real physical user message. Typing it as such
-            /// is what stops it being used where a transport receipt would also fit.
-            PhysicalUserMessageId: PhysicalUserMessageId option
-            ExplicitAgent: string option
-            PromptKey: PromptKey option
-            IsHostCompaction: bool
-            /// COMPANION-003/014: the message's text, for OpeningMaterial capture
-            /// at the physical acceptance point. User text parts only.
-            Text: string option
-        }
+    type DecodedMessage = ChatAdmissionIntent.DecodedMessage
 
     let private agentOf (source: obj) : string option =
         if isNull source then
@@ -94,6 +79,10 @@ module PromptIngressCodec =
             |> Option.exists (fun agent -> agent.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
         || (readString message "mode"
             |> Option.exists (fun mode -> mode.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
+
+    let private isHostSynthetic (output: obj) =
+        parts output
+        |> Array.exists (fun part -> isTrue (if isNull part then null else part?synthetic))
 
     let private sessionIdOf (input: obj) (output: obj) =
         let fromSource (source: obj) =
@@ -176,4 +165,5 @@ module PromptIngressCodec =
           ExplicitAgent = [ input; output ] |> List.tryPick agentOf
           PromptKey = promptKeyOf input output
           IsHostCompaction = isHostCompaction output
+          IsHostSynthetic = isHostSynthetic output
           Text = textOf output }

@@ -198,8 +198,11 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             start.ManagerAgent
             start.Worktree
             start.Prompt
-            false
+            true
             start.ExpectedToolCalls
+
+    let sendManagerPrompt (jobId: ManagerJobId) : Task<Result<unit, string>> =
+        runtime.SendDeferredFirstPrompt(managerAgentId jobId)
 
     let finalizeRegisteredWorktree (agentId: string) =
         match worktrees.TryGetValue agentId with
@@ -315,10 +318,15 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             worktrees.[agentId] <- path
             clearStaleHostRun agentId
             adoptChildIfMissing agentId record.ManagerSessionId
-            // The Host pending is advanced by the existing session callbacks.
-            // Do not spawn a second detached waiter: it owns no state transition
-            // and would retain timeout/polling handles after Continue returns.
-            let! _fork = runtime.Fork(agentId, Role.Manager, record.ManagerAgent, prompt, None, firstPrompt = false)
+
+            let! _ =
+                HostSessionNudge.sendContinuation
+                    deps.Sessions
+                    record.ManagerSessionId
+                    prompt
+                    PromptAuthority.ContinuationKind.ManagedDelegationAssignment
+                    (Some path)
+                    deps.Journal
 
             let resolutionDeadline =
                 DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs)
@@ -404,6 +412,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let managerPort: ManagerPort =
         { StartManager = startManager
+          SendManagerPrompt = sendManagerPrompt
           AwaitManager = awaitManager
           Reverify = reverify
           ResumeManager = resumeManager
@@ -456,12 +465,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let lockRepoPath = RuntimePath.gitCommonDir deps.RepoPath
             let sweepLockPath = IntegrationGate.lockPath lockRepoPath (TargetRef.value target)
 
-            let activeJobs =
-                deps.Journal
-                |> Option.map (fun journal ->
-                    OrchestratorProjection.activeJobs (AgentJournal.snapshot journal).AgentProjections.Orchestrator)
-                |> Option.defaultValue []
-
             // Sweep orphaned manager artifacts before resuming jobs, so a
             // resumed job never adopts a worktree the sweep is about to remove.
             let sweepDescriptor =
@@ -477,7 +480,12 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 CausalAwait.awaitTask
                     CausalWaitHub.observer
                     sweepDescriptor
-                    (OrchestratorSweep.sweepLocked sweepLockPath gitPort activeJobs)
+                    (OrchestratorSweep.sweepLocked sweepLockPath gitPort (fun () ->
+                        deps.Journal
+                        |> Option.map (fun journal ->
+                            OrchestratorProjection.activeJobs
+                                (AgentJournal.snapshot journal).AgentProjections.Orchestrator)
+                        |> Option.defaultValue []))
                 |> mapSweepError
 
             let value =

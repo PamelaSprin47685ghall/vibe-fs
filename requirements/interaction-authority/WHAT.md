@@ -41,7 +41,7 @@
 
 ## INTERACTION-AUTHORITY-009: 纯函数永不推断 HumanRoot
 
-来源判定中的纯计算函数绝不推断返回 `HumanRoot`。`HumanRoot` 只能在激活 Profile 缺席且携带合法显式 agent 时由 Ingress 边界授予；处于活跃 Run 中的未知消息绝不可抬升为 Root。
+来源判定中的纯计算函数绝不推断返回新的 `HumanRoot`。`HumanRoot` 只能在激活 Profile 缺席且携带合法显式 agent 时由 Ingress 边界授予；活跃 Run 中携带同一合法 agent 的外部用户消息只能成为绑定既有 Profile 的 `HumanMessage` continuation，缺失或漂移 agent 的未知消息必须拒绝，绝不可抬升为 Root。continuation 接纳后，Host 当前物理 user-message binding 必须推进到该消息，供 reconciler/provider-start 观察 exact 新 execution；既有 Authority Root identity 不变。
 
 ## INTERACTION-AUTHORITY-010: 自动 continuation 稳定 occasion identity 与精确 admission
 

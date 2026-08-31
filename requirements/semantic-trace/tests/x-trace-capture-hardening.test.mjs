@@ -35,8 +35,16 @@ test('WHAT[SEMANTIC-TRACE-002] ProviderRetryAttempt_is_transport_control_not_dur
     'utf8',
   )
 
-  assert.match(source, /PromptAuthority\.ProviderRetryAttempt/)
-  assert.match(source, /ProviderWireDecode\.promptOriginOfMessage/)
+  assert.match(
+    source,
+    /let private providerRetryOrigin\s*=\s*PromptAuthority\.originLabel \(\s*PromptAuthority\.PromptOrigin\.Continuation PromptAuthority\.ContinuationKind\.ProviderRetryAttempt\s*\)/,
+    'retry transport control must be classified by the exact continuation origin',
+  )
+  assert.match(
+    source,
+    /let private isProviderRetryAttempt \(rawMessage: obj\)\s*=\s*ProviderWireDecode\.promptOriginOfMessage rawMessage = Some providerRetryOrigin/,
+    'retry stripping must be driven by the decoded prompt origin',
+  )
   assert.match(source, /if isProviderRetryAttempt rawMessage then[\s\S]*?\{ message with Parts = \[\] \}[\s\S]*?else/)
   assert.match(
     source,

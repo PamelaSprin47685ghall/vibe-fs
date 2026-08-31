@@ -46,65 +46,121 @@ module PromptFactFold =
 
     let private reject = FoldRejection.reject
 
-    let private foldAuthorityRootAccepted
+    let private parseAuthorityKind value =
+        match value with
+        | "HumanRoot" -> Ok PromptAuthority.RootAuthorityKind.HumanRoot
+        | "AgentOwnerRoot" -> Ok PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+        | unknown -> Error(sprintf "unknown authority root kind: %s" unknown)
+
+    let private validateAuthorityRootAccepted schemaVersion authorityKind =
+        if schemaVersion <> 2 then
+            Error(sprintf "unsupported AuthorityRootAccepted schema version: %d" schemaVersion)
+        else
+            parseAuthorityKind authorityKind
+
+    let private validateAcceptedIdentitySeed projection authorityKind seed =
+        match authorityKind, PromptAuthority.identitySeedOwner seed with
+        | PromptAuthority.RootAuthorityKind.HumanRoot, _ -> Ok()
+        | PromptAuthority.RootAuthorityKind.AgentOwnerRoot, None ->
+            Error PromptAuthority.IdentitySeedValidationError.ExpectedInheritedFromOwner
+        | PromptAuthority.RootAuthorityKind.AgentOwnerRoot, Some(ownerSessionId, _, _) ->
+            AgentProjection.tryFind ownerSessionId projection
+            |> Option.bind (fun session -> session.PromptAuthority)
+            |> Option.bind (fun authority -> authority.ActiveLogicalRun)
+            |> fun activeOwner ->
+                PromptAuthority.validateInheritedIdentitySeedAgainstActiveOwner activeOwner seed
+                |> Result.map ignore
+
+    let private admitReviewRequirement
+        (authorityKind: PromptAuthority.RootAuthorityKind)
+        (payload: AuthorityRootAcceptedPayload)
         (projection: AgentProjectionSet)
-        (payload:
-            {| SessionId: SessionId
-               LogicalRunId: LogicalRunId
-               AuthorityRootUserMessageId: AuthorityRootUserMessageId
-               AuthorityKind: string
-               SelectedAgent: string
-               PeerAgent: string
-               CanonicalRole: string
-               SelectedTier: string |})
-        =
-        // FALLBACK-001: a new Authority Root starts a fresh cursor. Done here
-        // rather than by a separate reset fact, because the reset is not an
-        // independent event — it IS this fact.
-        //
-        // REVIEW-007: a HumanRoot also creates a review requirement. An
-        // AgentOwnerRoot does not: the agent that forked the work is
-        // accountable for it, and requiring review of every internal prompt
-        // would make the Guard fire on its own continuations.
-        let withAuthority =
+        : AgentProjectionSet =
+        match authorityKind with
+        | PromptAuthority.RootAuthorityKind.HumanRoot ->
+            updateRequirements
+                payload.SessionId
+                (ReviewRequirementProjection.addRequirement payload.SessionId payload.AuthorityRootUserMessageId)
+                projection
+        | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> projection
+
+    let private classifyClaimOrigin (continuationKind: string) : PromptAuthority.PromptOrigin option =
+        if continuationKind = "AgentOwnerRoot" then
+            Some(PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+        else
+            PromptAuthority.tryParseContinuationKind continuationKind
+            |> Option.map PromptAuthority.PromptOrigin.Continuation
+
+    let private validateClaimOrigin
+        (projection: AgentProjectionSet)
+        (identitySeed: PromptAuthority.IdentitySeed)
+        (origin: PromptAuthority.PromptOrigin option)
+        : Result<PromptAuthority.PromptOrigin option, PromptAuthority.IdentitySeedValidationError> =
+        match origin with
+        | Some(PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot) ->
+            validateAcceptedIdentitySeed projection PromptAuthority.RootAuthorityKind.AgentOwnerRoot identitySeed
+            |> Result.map (fun () -> origin)
+        | _ -> Ok origin
+
+    let private applyValidatedClaimOrigin projection register validation =
+        match validation with
+        | Error error -> reject "PluginPromptClaimed" (sprintf "%A" error)
+        | Ok None -> Ok projection
+        | Ok(Some resolvedOrigin) -> register resolvedOrigin
+
+    let private foldAuthorityRootAccepted (projection: AgentProjectionSet) (payload: AuthorityRootAcceptedPayload) =
+        let currentAuthority =
+            AgentProjection.tryFind payload.SessionId projection
+            |> Option.bind (fun session -> session.PromptAuthority)
+            |> Option.defaultValue PromptAuthorityLedger.empty
+
+        let authorityResult =
+            validateAuthorityRootAccepted payload.SchemaVersion payload.AuthorityKind
+            |> Result.bind (fun authorityKind ->
+                validateAcceptedIdentitySeed projection authorityKind payload.IdentitySeed
+                |> Result.mapError (sprintf "%A")
+                |> Result.bind (fun () -> PromptAuthorityLedger.foldAuthorityRootAccepted currentAuthority payload)
+                |> Result.map (fun authority -> authorityKind, authority))
+
+        match authorityResult with
+        | Error reason -> reject "AuthorityRootAccepted" reason
+        | Ok(authorityKind, authority) ->
             updateSession
                 payload.SessionId
                 (fun session ->
                     { session with
-                        PromptAuthority =
-                            Some(
-                                PromptAuthorityLedger.foldAuthorityRootAccepted
-                                    (Option.defaultValue PromptAuthorityLedger.empty session.PromptAuthority)
-                                    payload
-                            )
+                        PromptAuthority = Some authority
                         Fallback =
                             Some(
                                 FallbackProjection.forAuthority payload.LogicalRunId payload.AuthorityRootUserMessageId
                             ) })
                 projection
-
-        if payload.AuthorityKind = "HumanRoot" then
-            Ok(
-                updateRequirements
-                    payload.SessionId
-                    (ReviewRequirementProjection.addRequirement payload.SessionId payload.AuthorityRootUserMessageId)
-                    withAuthority
-            )
-        else
-            Ok withAuthority
+            |> admitReviewRequirement authorityKind payload
+            |> Ok
 
     let fold (projection: AgentProjectionSet) (fact: PromptFactCases) : Result<AgentProjectionSet, FoldRejection> =
         match fact with
         // ── prompt dispatch ─────────────────────────────────────────────────
 
         | PromptFactCases.PluginPromptClaimed payload ->
-            Ok(
-                updateAuthority
-                    payload.SessionId
-                    (fun authority ->
-                        PromptAuthorityLedger.foldPromptClaimed projection.RuntimeStartCount authority payload)
-                    projection
-            )
+            let register resolvedOrigin =
+                let claim: PromptAuthority.PromptClaim =
+                    { PromptKey = payload.PromptKey
+                      SessionId = payload.SessionId
+                      Origin = resolvedOrigin
+                      LogicalRunId = payload.LogicalRunId
+                      AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
+                      EffectiveAgent = payload.EffectiveAgent
+                      IdentitySeed = payload.IdentitySeed
+                      PayloadDigest = payload.PayloadDigest
+                      Receipt = None
+                      ClaimedAtRuntimeStartCount = projection.RuntimeStartCount }
+
+                Ok(updateAuthority payload.SessionId (PromptAuthorityRun.registerClaim claim) projection)
+
+            classifyClaimOrigin payload.ContinuationKind
+            |> validateClaimOrigin projection payload.IdentitySeed
+            |> applyValidatedClaimOrigin projection register
 
         | PromptFactCases.PluginPromptSubmitted payload ->
             Ok(
