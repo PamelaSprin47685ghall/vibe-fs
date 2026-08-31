@@ -611,12 +611,15 @@ module ProviderRecoveryWorkflow =
                 FallbackEvidence.tryCurrentState turn.SessionId projection
                 |> Option.map (fun _ -> turn.SessionId))
 
-        match ownerSessionId with
+        let ownerState =
+            ownerSessionId
+            |> Option.bind (fun owner ->
+                FallbackEvidence.tryCurrentState owner projection
+                |> Option.map (fun current -> owner, current))
+
+        match ownerState with
         | None -> Task.FromResult(Ok ConfirmedFailureOutcome.NoActiveRun)
-        | Some owner ->
-            FallbackEvidence.tryCurrentState owner projection
-            |> Option.map (admitCurrentFailure durable owner turn failure requestKind error)
-            |> Option.defaultWith (fun () -> Task.FromResult(Ok ConfirmedFailureOutcome.NoActiveRun))
+        | Some(owner, current) -> admitCurrentFailure durable owner turn failure requestKind error current
 
     let private executeFallbackDecision
         (sessionPort: ISessionHostPort)
