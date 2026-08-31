@@ -76,6 +76,59 @@ test('WHAT[FINALITY-002] finality_admission_grants_blessing_for_matching_tree_wi
   assert.equal(admitted.permit.requestId, REQ)
 })
 
+test('WHAT[FINALITY-002] finality_admission_rejects_structurally_forged_confirmations', () => {
+  const first = confirmedWitness(TREE)
+  const second = confirmedWitness2(TREE)
+  const member1 = { reviewer: REVIEWER_1, barrier: BARRIER_1, witness: first }
+  const member2 = { reviewer: REVIEWER_2, barrier: BARRIER_2, witness: second }
+  const counterworlds = [
+    {
+      name: 'cohort reviewer differs from the witnessed reviewer',
+      members: [{ ...member1, reviewer: 'ses_wrong_valid' }, member2],
+    },
+    {
+      name: 'cohort barrier differs from the witnessed barrier',
+      members: [{ ...member1, barrier: 'bar_wrong_valid' }, member2],
+    },
+    {
+      name: 'second verdict names a different reviewer',
+      members: [
+        { ...member1, witness: { ...first, second: { ...first.second, reviewer: REVIEWER_2 } } },
+        member2,
+      ],
+    },
+    {
+      name: 'first verdict names a different tree',
+      members: [
+        { ...member1, witness: { ...first, first: { ...first.first, tree: OTHER_TREE } } },
+        member2,
+      ],
+    },
+    {
+      name: 'both verdicts use the same provider run',
+      members: [
+        { ...member1, witness: { ...first, second: { ...first.second, run: first.first.run } } },
+        member2,
+      ],
+    },
+    {
+      name: 'both verdicts use the same tool call',
+      members: [
+        { ...member1, witness: { ...first, second: { ...first.second, call: first.first.call } } },
+        member2,
+      ],
+    },
+  ]
+
+  for (const counterworld of counterworlds) {
+    assert.deepEqual(
+      finality.projectConfirmedReview(LIFE, REQ, TREE, counterworld.members),
+      { ok: false, error: 'not all cohort reviewers have confirmed dual-PERFECT on the request tree' },
+      counterworld.name,
+    )
+  }
+})
+
 test('WHAT[FINALITY-002] finality_admission_rejects_stale_witness_when_tree_differs', () => {
   const memberWitnesses = [
     { reviewer: REVIEWER_1, barrier: BARRIER_1, witness: confirmedWitness(TREE) },

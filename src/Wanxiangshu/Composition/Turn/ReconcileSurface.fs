@@ -294,6 +294,7 @@ module ReconcileSurface =
           ErrorName = errorName
           Model = None
           ParentId = parentId
+          CreatedAt = None
           Completed = completed
           IsCompaction = false
           PromptKey = None

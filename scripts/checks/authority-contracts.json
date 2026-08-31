@@ -855,8 +855,8 @@
       "class": "Receipt",
       "owner": "managed-chat-execution",
       "what": "CHATEXEC-003, ENF-013, ENF-015",
-      "scope": "the exact ChatExecutionKey whose SessionExecutionBinding was installed, plus the binding kind that installed it",
-      "freshness": "recorded only after the physical bind step returned Ok for that exact key",
+      "scope": "the exact execution admission identity whose SessionExecutionBinding was installed, plus the binding kind that installed it",
+      "freshness": "recorded only after the physical bind step returned Ok for that exact admission identity",
       "multiplicity": "one receipt per completed bind; compensation unbinds the same exact key instead of reviving the receipt",
       "consume": "carried to the transaction outcome as proof the bind step completed; it re-authorizes nothing",
       "durability": "process-local record of a completed effect; never persisted or replayed as authority",
@@ -864,7 +864,7 @@
         {
           "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
           "symbol": "bindingReceipt",
-          "anchor": "let private bindingReceipt intent =",
+          "anchor": "let private bindingReceipt intent identity =",
           "owner": "managed-chat-execution"
         }
       ],
@@ -877,12 +877,12 @@
     {
       "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
       "symbol": "HostModelProjectionReceipt",
-      "anchor": "type internal HostModelProjectionReceipt = private | HostModelProjectionReceipt",
+      "anchor": "type internal HostModelProjectionReceipt =",
       "classification": "Authority",
       "class": "Receipt",
       "owner": "managed-chat-execution",
       "what": "CHATEXEC-003, ENF-013, ENF-015",
-      "scope": "the one Host model projection performed for the leased routing target of the current transaction",
+      "scope": "the exact execution admission identity and OpenCode model projected for the leased routing target of the current transaction",
       "freshness": "recorded only after ProjectHost returned Ok inside that transaction step",
       "multiplicity": "one receipt per completed projection; a failed projection compensates instead of minting one",
       "consume": "carried to the transaction outcome as proof the Host projection completed; it re-authorizes nothing",

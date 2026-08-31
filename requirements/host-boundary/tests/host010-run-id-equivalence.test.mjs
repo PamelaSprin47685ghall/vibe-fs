@@ -7,9 +7,9 @@ const projectMessages = SessionSnapshotSurface.projectMessages
 const bindableRun = ProviderRunBindingSurface.bindableRun
 const observeSequence = ProviderRunBindingSurface.observeSequence
 
-const msg = ({ id, role, parentID, completed = false, summary = false } = {}) => ({
+const msg = ({ id, role, parentID, created = 1, completed = false, summary = false } = {}) => ({
   id, role, parentID,
-  time: completed ? { completed: true } : undefined,
+  time: { created, ...(completed ? { completed: true } : {}) },
   summary,
 })
 
@@ -100,6 +100,35 @@ test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 not-latest rejection is not retr
     error: 'NotLatestRun',
     reads: 1,
   })
+})
+
+test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 latest run follows Host creation time rather than lexical ID or list order', () => {
+  const physical = 'msg_user_1'
+  const olderCandidate = msg({ id: 'zzz-older', role: 'assistant', parentID: physical, created: 10 })
+  const newerAssistant = msg({ id: 'aaa-newer', role: 'assistant', parentID: 'msg_other', created: 20 })
+
+  for (const messages of [
+    [olderCandidate, newerAssistant],
+    [newerAssistant, olderCandidate],
+  ]) {
+    assert.deepEqual(bindableRun(physical, projectMessages(messages)), {
+      ok: false,
+      error: 'NotLatestRun',
+    })
+  }
+})
+
+test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 invalid Host creation sequence fails closed', () => {
+  const physical = 'msg_user_1'
+
+  for (const created of [null, '20', Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.deepEqual(
+      bindableRun(physical, projectMessages([
+        msg({ id: 'asst-invalid-sequence', role: 'assistant', parentID: physical, created }),
+      ])),
+      { ok: false, error: 'InsufficientSequence' },
+    )
+  }
 })
 
 test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 compaction is not retried as projector lag', () => {

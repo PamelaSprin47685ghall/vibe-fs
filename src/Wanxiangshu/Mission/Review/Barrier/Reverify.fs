@@ -56,6 +56,12 @@ module ReviewBarrierWorkflow =
         else
             Error "judge delivery came from a different Reviewer session"
 
+    let private validatePhysicalIdentity (judgement: ReviewJudgement) =
+        if PhysicalUserMessageId.isNonBlank judgement.PhysicalUserMessageId then
+            Ok()
+        else
+            Error "judge delivery lacks a physical review prompt identity"
+
     let private validateExpectedPhysical expectedPhysical (judgement: ReviewJudgement) =
         match expectedPhysical with
         | None -> Ok()
@@ -63,8 +69,17 @@ module ReviewBarrierWorkflow =
         | Some _ -> Error "judgement came from a different physical review prompt than the owning CE expected"
 
     let private validateFirst request expectedPhysical judgement =
-        validateReviewer request judgement
+        validatePhysicalIdentity judgement
+        |> Result.bind (fun () -> validateReviewer request judgement)
         |> Result.bind (fun () -> validateExpectedPhysical expectedPhysical judgement)
+
+    let private validateDistinctAttempt (first: ReviewJudgement) (second: ReviewJudgement) =
+        if first.ProviderRun = second.ProviderRun then
+            Error "second judgement reused the first ProviderRunIdentity"
+        elif first.ToolCallId = second.ToolCallId then
+            Error "second judgement reused the first ToolCallId"
+        else
+            Ok()
 
     let private validateSecond
         (request: ReviewBarrierRequest)
@@ -72,13 +87,10 @@ module ReviewBarrierWorkflow =
         (expectedPhysical: PhysicalUserMessageId)
         (second: ReviewJudgement)
         =
-        if first.ProviderRun = second.ProviderRun then
-            Error "second judgement reused the first ProviderRunIdentity"
-        elif first.ToolCallId = second.ToolCallId then
-            Error "second judgement reused the first ToolCallId"
-        else
-            validateReviewer request second
-            |> Result.bind (fun () -> validateExpectedPhysical (Some expectedPhysical) second)
+        validatePhysicalIdentity second
+        |> Result.bind (fun () -> validateDistinctAttempt first second)
+        |> Result.bind (fun () -> validateReviewer request second)
+        |> Result.bind (fun () -> validateExpectedPhysical (Some expectedPhysical) second)
 
     let private validateDelivery
         (validation: ReviewJudgement -> Result<unit, string>)

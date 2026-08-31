@@ -5,6 +5,7 @@
 `concern-routing` 通过极简的 durable mailbox 事实流构建动态路由：
 
 1. **事实投影**：
+   - `validateAddress(id, concern)` 是 command 与 durable replay 共用的非空地址判定，非法地址在产生或折叠事实前拒绝。
    - `ConcernAddressDeclared(id, concern)`：记录全局唯一的地址语义映射。
    - `Subscribed(generation, id, ownerParticipant)`：显式代次的 mailbox 绑定。
    - `Published(messageOccurrence, generation, id, senderParticipant, message)`：挂靠到具体代次的消息事实。

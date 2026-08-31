@@ -23,6 +23,9 @@
    - durable substrate activation 成功后才启动 claim reconciliation；它只由 durable claim 或 Host physical evidence 事件推进。
    - `PhysicalAccepted` 建立后，把 exact `(SessionId, PhysicalUserMessageId)`、`PromptKey` 与原子 `AttemptExecutionProfile`（含完整版本化 `ParticipantIdentityEvidence`）交给 `managed-chat-execution`。容量、execution binding、provider start、failure disposition 与 settlement 均由其 owner 处理，dispatch 不保存镜像状态。
 
+5. **Host physical identity 解码**：
+   `PromptIngressCodec` 只读取 Host 1.18.18 契约中的 `input.messageID` 与 `output.message.id`。空白 carrier 视为缺失；两个非空 carrier 必须保持原始字节完全一致。缺失、冲突、仅有非契约字段时均不生成 `PhysicalUserMessageId`。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
@@ -30,7 +33,7 @@
 | DISPATCH-PROTOCOL-001 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-001] DP_001_every_send_member_lives_on_the_prompt_dispatcher_runtime` |
 | DISPATCH-PROTOCOL-002 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-002] DP_002_submit_records_the_receipt_without_resolving_the_claim`；`requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-002] DP_002_abandon_removes_the_claim_and_leaves_the_active_run_alone`；`requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-002] DP_002_claim_records_payload_digest_and_effective_agent` |
 | DISPATCH-PROTOCOL-003 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-003] DP_003_receipt_shape_distinguishes_admission_from_physical_identity` |
-| DISPATCH-PROTOCOL-004 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs::WHAT[DISPATCH-PROTOCOL-004] DP_004_physical_acceptance_is_proven_only_by_physical_message` |
+| DISPATCH-PROTOCOL-004 | `requirements/dispatch-protocol/tests/ingress-identity.test.mjs::WHAT[DISPATCH-PROTOCOL-004] ingress_accepts_the_exact_nonblank_Host_identity`；`requirements/dispatch-protocol/tests/ingress-identity.test.mjs::WHAT[DISPATCH-PROTOCOL-004] ingress_rejects_missing_or_blank_Host_identity`；`requirements/dispatch-protocol/tests/ingress-identity.test.mjs::WHAT[DISPATCH-PROTOCOL-004] ingress_rejects_conflicting_Host_identity_carriers`；`requirements/dispatch-protocol/tests/ingress-identity.test.mjs::WHAT[DISPATCH-PROTOCOL-004] ingress_ignores_non_contract_identity_decoys`；`requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs::WHAT[DISPATCH-PROTOCOL-004] DP_004_physical_acceptance_is_proven_only_by_physical_message` |
 | DISPATCH-PROTOCOL-005 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-005] DP_005_prompt_key_is_deterministic_and_moves_with_every_component`；`requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-005] DP_005_claim_scope_names_exactly_session_run_origin_and_payload` |
 | DISPATCH-PROTOCOL-006 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-006] DP_006_abandon_keeps_the_claim_sequence_consumed`；`requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs::WHAT[DISPATCH-PROTOCOL-006] DP_006_claim_sequence_advances_on_registration_not_on_resolution` |
 | DISPATCH-PROTOCOL-007 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs::WHAT[DISPATCH-PROTOCOL-007] DP_007_restarts_never_auto_abandon_an_unresolved_broken_tool` |

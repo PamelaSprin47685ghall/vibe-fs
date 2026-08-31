@@ -280,6 +280,7 @@ export const SURFACE_MANIFEST = [
       'PAR-013',
       'PAR-014',
       'PAR-016',
+      'PAR-019',
       'EFFECT-ACCOUNTING-004',
       'VERIFICATION-SYSTEM-008',
     ],
@@ -1546,7 +1547,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Interaction/Dispatch/DispatchSurface.js',
     owner: 'dispatch-protocol',
-    laws: ['DISPATCH-PROTOCOL-002', 'DISPATCH-PROTOCOL-005', 'DISPATCH-PROTOCOL-007', 'DISPATCH-PROTOCOL-009', 'EFFECT-ACCOUNTING-008'],
+    laws: ['DISPATCH-PROTOCOL-002', 'DISPATCH-PROTOCOL-004', 'DISPATCH-PROTOCOL-005', 'DISPATCH-PROTOCOL-007', 'DISPATCH-PROTOCOL-009', 'EFFECT-ACCOUNTING-008'],
     lawOwners: { 'EFFECT-ACCOUNTING-008': 'effect-accounting' },
     source: 'src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs',
     representation: 'opaque-capability',

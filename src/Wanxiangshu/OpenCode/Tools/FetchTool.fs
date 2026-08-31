@@ -200,7 +200,9 @@ module FetchTool =
                     let language = lang ctx
                     let shelfmark = args.Text "shelfmark"
 
-                    if String.IsNullOrWhiteSpace shelfmark then
+                    if not (CasebookFeature.isEnabled workspaceRoot) then
+                        return unavailable language
+                    elif String.IsNullOrWhiteSpace shelfmark then
                         return ToolHostCodec.tomlObjectWithInstructions [ prose language Path.ShelfmarkRequired ] []
                     else
                         return! getOrCreateFlightWork language workspaceRoot store shelfmark

@@ -2764,14 +2764,9 @@
       "contract": "Review.Witness",
       "kind": "published-contract",
       "consumers": [
-        "host-boundary",
         "speculative-investigation"
       ],
       "symbols": [
-        "Wanxiangshu.OpenCode.ProviderRunBinding.Rejection",
-        "Wanxiangshu.OpenCode.ProviderRunBinding.Rejection.AmbiguousRun",
-        "Wanxiangshu.OpenCode.ProviderRunBinding.Rejection.NoBindableRun",
-        "Wanxiangshu.OpenCode.ProviderRunBinding.Rejection.NotLatestRun",
         "Wanxiangshu.OpenCode.ProviderRunBinding.bindableRun"
       ],
       "justification": "Review.Witness publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-assurance."
@@ -3598,6 +3593,20 @@
         "Wanxiangshu.Persistence.EventStore.ProcessEventLogModule.readStreams"
       ],
       "justification": "DurableConvergence.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-convergence."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs",
+      "owner": "durable-convergence",
+      "node": "durable-convergence-store-contracts",
+      "contract": "DurableConvergence.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.ProcessEventLogModule.processAwareFs"
+      ],
+      "justification": "Change integration consumes only the process-aware proper-lockfile adapter so a dead publishing process cannot leave the repository branch gate stale; no event stream reader or durable state capability crosses this contract."
     },
     {
       "path": "src/Wanxiangshu/Persistence/EventStore/ProcessGitRawStore.fs",

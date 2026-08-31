@@ -320,6 +320,23 @@ test('WHAT[ENF-015] an effect in another declaration does not correlate with a w
   assert.ok(!ids(problems).includes('witness-direct-effect-without-admission'))
 })
 
+test('WHAT[ENF-015] a type boundary keeps unrelated member effects outside the preceding declaration', () => {
+  const file = 'witness-separated-by-type.fs'
+  const problems = scanEntries([entry('positive-six-classes.fs'), entry(file)], positiveManifest, {
+    symbolUses: [{
+      consumerPath: file,
+      providerPaths: ['positive-six-classes.fs'],
+      symbol: 'Fixture.CurrentWitness',
+      symbolKind: 'FSharpEntity',
+      line: 11,
+      isFromPattern: false,
+      isFromType: true,
+    }],
+    applicationUses: [taskSend(file, 9, 'payload')],
+  })
+  assert.ok(!ids(problems).includes('witness-direct-effect-without-admission'))
+})
+
 test('WHAT[ENF-015] identity-shaped arguments do not substitute for a registered typed admission seam', () => {
   const problems = scanEntries(
     [entry('positive-six-classes.fs'), entry('witness-ignored-identity-args.fs')],

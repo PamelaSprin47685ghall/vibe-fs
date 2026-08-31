@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -39,6 +39,20 @@ test('WHAT[REQUIREMENT-GROUNDING-002] treats a package own requirements subtree 
   } finally { cleanup() }
 })
 
+test('WHAT[REQUIREMENT-GROUNDING-002] resolves nonexistent paths through a symlinked workspace without allowing symlink escape', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const real = join(dir, 'real')
+    const alias = join(dir, 'alias')
+    mkdirSync(real)
+    symlinkSync(real, alias, 'dir')
+    pkg(alias, 'alpha', '/src/**\n')
+
+    assert.deepEqual(grounding.resolvePackages(alias, join(alias, 'src', 'future.fs')), ['alpha'])
+    assert.deepEqual(grounding.resolvePackages(alias, join(dir, 'outside.fs')), [])
+  } finally { cleanup() }
+})
+
 test('WHAT[REQUIREMENT-GROUNDING-003] evaluates APPLIES-TO as ordered positive wildmatch includes with bang exclusions', () => {
   const { dir, cleanup } = sandbox()
   try {
@@ -57,4 +71,3 @@ test('WHAT[REQUIREMENT-GROUNDING-004] returns every overlapping package in deter
     assert.deepEqual(grounding.resolvePackages(dir, join(dir, 'src', 'shared', 'x.fs')), ['alpha', 'zeta'])
   } finally { cleanup() }
 })
-

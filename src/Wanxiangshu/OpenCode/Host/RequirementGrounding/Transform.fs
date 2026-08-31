@@ -244,23 +244,26 @@ module RequirementGroundingTransform =
         else
             rawMessages
 
+    let private appendRequestedAtCurrentPlacement journal sessionId realMessages providerId history pending =
+        taskResult {
+            let! placementOpt = PairProgrammingThoughtTransform.decideCurrentPlacement realMessages
+
+            match placementOpt with
+            | None -> return replay providerId realMessages history
+            | Some(callGap, resultGap) ->
+                do! appendRequested journal sessionId callGap resultGap pending
+
+                let committed =
+                    RequirementGroundingRuntime.occurrences journal (SessionId.create sessionId)
+
+                return replay providerId realMessages committed
+        }
+
     let private anchorRequested journal sessionId realMessages providerId history pending =
         if List.isEmpty pending then
             Task.FromResult(Ok(replay providerId realMessages history))
         else
-            taskResult {
-                let! placementOpt = PairProgrammingThoughtTransform.decideCurrentPlacement realMessages
-
-                match placementOpt with
-                | None -> return replay providerId realMessages history
-                | Some(callGap, resultGap) ->
-                    do! appendRequested journal sessionId callGap resultGap pending
-
-                    let committed =
-                        RequirementGroundingRuntime.occurrences journal (SessionId.create sessionId)
-
-                    return replay providerId realMessages committed
-            }
+            appendRequestedAtCurrentPlacement journal sessionId realMessages providerId history pending
 
     let tryProject
         (journal: AgentJournal)

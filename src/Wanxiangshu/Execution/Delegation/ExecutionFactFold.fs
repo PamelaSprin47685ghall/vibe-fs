@@ -54,6 +54,7 @@ module ExecutionFactFold =
         | Error AlreadyCompleted
         | Error AlreadyAbandoned
         | Error HandleIsRetired -> Ok projection
+        | Error HandleIdentityConflict -> reject factName "one handle cannot change its durable binding"
         | Error UnknownHandle -> reject factName "handle completion or retirement for a handle that was never linked"
         | Error NotCompleted -> reject factName "join retired a handle that had no completion (EXEC-004)"
 

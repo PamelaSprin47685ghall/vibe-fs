@@ -124,6 +124,7 @@ module CompletedTurnSurface =
           ErrorName = optionalText value?errorName
           Model = optionalModel value?model
           ParentId = optionalText value?parentId
+          CreatedAt = None
           Completed =
             if isNull value?completed then
                 false

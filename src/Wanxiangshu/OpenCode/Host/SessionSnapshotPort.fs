@@ -46,6 +46,7 @@ type SessionMessage =
         /// `parentID`. For an assistant message this is the user message that caused
         /// the provider run (HOST-010 binding, condition 3).
         ParentId: string option
+        CreatedAt: float option
         /// `time.completed` is set. The Host writes it only when the run ends or is
         /// interrupted, so an unset value at `messages.transform` time identifies the
         /// run about to be sent (REVIEW-010).
@@ -79,6 +80,15 @@ module SessionSnapshotPort =
         else
             let text = unbox<string> value
             if String.IsNullOrWhiteSpace text then None else Some text
+
+    let private readFiniteNumber (value: obj) =
+        if
+            not (isNull value)
+            && emitJsExpr value "typeof $0 === 'number' && Number.isFinite($0)"
+        then
+            Some(unbox<float> value)
+        else
+            None
 
     let private infoOf (raw: obj) =
         if isNull raw then null
@@ -248,6 +258,15 @@ module SessionSnapshotPort =
 
         not (isNull (timeOf info)) || not (isNull (timeOf raw))
 
+    let private createdAtOf (info: obj) (raw: obj) =
+        let createdOf (source: obj) =
+            if isNull source || isNull source?time then
+                None
+            else
+                readFiniteNumber source?time?created
+
+        createdOf info |> Option.orElseWith (fun () -> createdOf raw)
+
     let private isCompactionOf (info: obj) (raw: obj) =
         // Same Fable constraint as `errorNameOf`: no if-branches inside list
         // literals (they compile to a discarded JS comma expression).
@@ -331,6 +350,7 @@ module SessionSnapshotPort =
                       ParentId =
                         readString (if isNull info then null else info?parentID)
                         |> Option.orElse (readString raw?parentID)
+                      CreatedAt = createdAtOf info raw
                       Completed = completedOf info raw
                       IsCompaction = isCompactionOf info raw
                       PromptKey = promptKeyOf info raw

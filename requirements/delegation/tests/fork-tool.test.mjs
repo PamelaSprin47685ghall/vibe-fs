@@ -193,7 +193,7 @@ test('WHAT[DELEG-026] FORK_TOOL_transport_receipt_without_physical_acceptance_ke
 
     assert.doesNotMatch(result, /could not complete the charge|could not be placed|无法托付/i)
     assert.doesNotMatch(result, /uncertain|不确定|may already have been accepted/i)
-    assert.match(result, /现已接下这项托付|has accepted/i)
+    assert.match(result, /carries this charge now|现已接下这项托付/i)
     assert.equal(forkTool.childCount(runtime), 1)
     assert.equal(forkTool.promptCount(runtime), 1)
     assert.equal(
@@ -254,4 +254,3 @@ test('WHAT[MANAGED-SESSION-018] FORK_TOOL_process_detach_preserves_durable_activ
     forkTool.disposeRuntime(runtime)
   }
 })
-

@@ -26,7 +26,9 @@ test('WHAT[PAR-003] Enforcer protocol repair does not own fallback accounting', 
 test('WHAT[PAR-003] workflow records Blogger child failure against one resolved durable main owner and never continues NoActiveRun', () => {
   assert.match(workflow, /let\s+projection\s*=\s*AgentJournal\.snapshot durable/)
   assert.match(workflow, /tryMainSessionOf[\s\S]*projection\.AgentProjections\.Associations/)
-  assert.match(workflow, /match ownerSessionId with\s*\| None -> Task\.FromResult\(Ok ConfirmedFailureOutcome\.NoActiveRun\)/)
+  assert.match(workflow, /ownerSessionId\s*\|>\s*Option\.bind[\s\S]*tryCurrentState owner projection[\s\S]*Option\.map \(fun current -> owner, current\)/)
+  assert.match(workflow, /match ownerState with\s*\| None -> Task\.FromResult\(Ok ConfirmedFailureOutcome\.NoActiveRun\)/)
+  assert.match(workflow, /\| Some\(owner, current\) -> admitCurrentFailure durable owner turn failure requestKind error current/)
   assert.match(workflow, /recordAuthorizedFailure[\s\S]*ownerSessionId[\s\S]*authorization/)
   assert.doesNotMatch(workflow, /Option\.defaultValue turn\.SessionId/)
   assert.match(workflow, /ConfirmedFailureOutcome\.NoActiveRun\s*->[\s\S]*notifyFailure/)

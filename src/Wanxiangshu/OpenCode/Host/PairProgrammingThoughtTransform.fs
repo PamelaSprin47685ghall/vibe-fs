@@ -673,11 +673,15 @@ module PairProgrammingThoughtTransform =
             Ok(gapCtor address, gapCtor address)
         | None -> Error errorMsg
 
-    let private decideFromBatchEnds (lastIsUser: bool) (restIsEmpty: bool) (last: obj) (resultRun: obj list) (callRun: obj list) =
+    let private decideFromBatchEnds
+        (lastIsUser: bool)
+        (restIsEmpty: bool)
+        (last: obj)
+        (resultRun: obj list)
+        (callRun: obj list)
+        =
         match List.rev resultRun, List.rev callRun with
-        | lastResult :: _, lastCall :: _ ->
-            gapsAfterToolBatch lastCall lastResult
-            |> Result.map Some
+        | lastResult :: _, lastCall :: _ -> gapsAfterToolBatch lastCall lastResult |> Result.map Some
         | _ when lastIsUser && restIsEmpty ->
             // When there is nothing before the last user message, do not inject
             // (matches cursor path) to avoid beginning the transcript with a tool call.
@@ -868,6 +872,36 @@ module PairProgrammingThoughtTransform =
             || (rawMessages |> List.exists messageRoleIsInternal)
         | _ -> rawMessages |> List.exists messageRoleIsInternal
 
+    let private commitCurrentPairPlacement
+        providerId
+        history
+        visibleHistory
+        append
+        sessionId
+        markerText
+        concernPlacement
+        realMessages
+        =
+        taskResult {
+            let! placementOpt = decideCurrentPlacement realMessages
+
+            match placementOpt with
+            | None -> return! replay providerId realMessages visibleHistory
+            | Some(callGap, resultGap) ->
+                return!
+                    commitPairInjection
+                        providerId
+                        history
+                        visibleHistory
+                        append
+                        sessionId
+                        markerText
+                        concernPlacement
+                        realMessages
+                        callGap
+                        resultGap
+        }
+
     // ── 入口 ─────────────────────────────────────────────────────────────────
 
     /// HOST-013 commit 顺序（fail closed）：
@@ -946,23 +980,16 @@ module PairProgrammingThoughtTransform =
             if isInternalSessionOrMessage journal sessionId rawMessages then
                 return! replay providerId realMessages visibleHistory
             else
-                let! placementOpt = decideCurrentPlacement realMessages
-
-                match placementOpt with
-                | None -> return! replay providerId realMessages visibleHistory
-                | Some(callGap, resultGap) ->
-                    return!
-                        commitPairInjection
-                            providerId
-                            history
-                            visibleHistory
-                            append
-                            sessionId
-                            markerText
-                            concernPlacement
-                            realMessages
-                            callGap
-                            resultGap
+                return!
+                    commitCurrentPairPlacement
+                        providerId
+                        history
+                        visibleHistory
+                        append
+                        sessionId
+                        markerText
+                        concernPlacement
+                        realMessages
         }
 
     // ── Pair guideline injection (migrated from PluginTransforms composition root) ──

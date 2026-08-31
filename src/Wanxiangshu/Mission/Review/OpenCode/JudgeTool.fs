@@ -118,14 +118,15 @@ module JudgeTool =
         let physicalUserMsg =
             if hasSession then
                 scope.CurrentPhysicalUserMessage context.SessionId
+                |> Option.map PhysicalUserMessageId.create
+                |> Option.filter PhysicalUserMessageId.isNonBlank
             else
                 None
 
         let isSubmitted =
             hasSession
             && (physicalUserMsg
-                |> Option.exists (fun messageId ->
-                    scope.HasVerdictSubmitted(context.SessionId, PhysicalUserMessageId.create messageId)))
+                |> Option.exists (fun messageId -> scope.HasVerdictSubmitted(context.SessionId, messageId)))
 
         match
             isReviewer, hasSession, isSubmitted, verdict, context.ToolCallId, context.ProviderRunId, physicalUserMsg
@@ -140,7 +141,7 @@ module JudgeTool =
         | true, true, false, Ok value, Some toolCallId, Some providerRunId, Some physicalUserMessageId ->
             ExecutionDecision.Proceed
                 { ReviewerSessionId = SessionId.create context.SessionId
-                  PhysicalUserMessageId = PhysicalUserMessageId.create physicalUserMessageId
+                  PhysicalUserMessageId = physicalUserMessageId
                   ProviderRun = providerRunId
                   ToolCallId = toolCallId
                   Verdict = value }
@@ -160,8 +161,9 @@ module JudgeTool =
             projectionSessionIdOpt
             |> Option.bind (fun sessionId ->
                 currentPhysicalUserMessage sessionId
-                |> Option.map (fun physicalUserMessageId ->
-                    SessionId.create sessionId, PhysicalUserMessageId.create physicalUserMessageId))
+                |> Option.map PhysicalUserMessageId.create
+                |> Option.filter PhysicalUserMessageId.isNonBlank
+                |> Option.map (fun physicalUserMessageId -> SessionId.create sessionId, physicalUserMessageId))
 
         let submitted =
             currentRequest

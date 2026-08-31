@@ -91,6 +91,11 @@ test('WHAT[REVIEW-ASSURANCE-001] REVIEW_003_confirmation_still_requires_distinct
   assert.equal(confirmed({ second: sameCall }), null)
 })
 
+test('WHAT[REVIEW-ASSURANCE-007] REVIEW_003_confirmation_rejects_blank_physical_identity_evidence', () => {
+  assert.equal(confirmed({ firstPhysical: '   ' }), null)
+  assert.equal(confirmed({ secondPhysical: '   ' }), null)
+})
+
 test('WHAT[REVIEW-ASSURANCE-005] REVIEW_006_confirmed_witness_is_self_contained_typed_evidence', () => {
   const value = confirmed()
   const read = review.readWitness(value)

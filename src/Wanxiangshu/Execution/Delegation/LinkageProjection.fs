@@ -81,6 +81,7 @@ type AgentLinkageProjection =
 /// Why a lifecycle transition was refused.
 type HandleTransitionRejection =
     | UnknownHandle
+    | HandleIdentityConflict
     /// EXEC-009: retired is terminal. Re-linking a retired id is the failure
     /// mode the tombstone exists to prevent.
     | HandleIsRetired
@@ -98,8 +99,21 @@ module HandleProjection =
         { Handles = Map.empty
           NextCreationOrder = 0 }
 
-    let private reactivateExisting
-        (handle: HandleId)
+    let private sameBinding
+        (childSessionId: SessionId)
+        (targetAgent: string)
+        (byname: string)
+        (role: Role)
+        (ownership: HandleOwnership)
+        (existing: HandleRecord)
+        =
+        existing.ChildSessionId = childSessionId
+        && existing.TargetAgent = targetAgent
+        && existing.Byname = byname
+        && existing.CanonicalRole = role
+        && existing.Ownership = ownership
+
+    let private replayExistingLink
         (childSessionId: SessionId)
         (targetAgent: string)
         (byname: string)
@@ -108,24 +122,15 @@ module HandleProjection =
         (current: AgentLinkageProjection)
         (existing: HandleRecord)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
-        match existing.Lifecycle with
-        | Retired
-        | Active
-        | CompletedAwaitingJoin _ ->
+        match sameBinding childSessionId targetAgent byname role ownership existing, existing.Lifecycle with
+        | false, _ -> Error HandleIdentityConflict
+        | true, Active -> Ok current
+        | true, Abandoned _ -> Error AlreadyAbandoned
+        | true, CompletedAwaitingJoin _
+        | true, Retired ->
             Ok
-                { Handles =
-                    Map.add
-                        handle
-                        { existing with
-                            ChildSessionId = childSessionId
-                            TargetAgent = targetAgent
-                            Byname = byname
-                            CanonicalRole = role
-                            Ownership = ownership
-                            Lifecycle = Active }
-                        current.Handles
-                  NextCreationOrder = current.NextCreationOrder }
-        | Abandoned _ -> Error AlreadyAbandoned
+                { current with
+                    Handles = Map.add existing.Handle { existing with Lifecycle = Active } current.Handles }
 
     let linkNamed
         (handle: HandleId)
@@ -155,7 +160,7 @@ module HandleProjection =
                           LastCompletion = None }
                         current.Handles
                   NextCreationOrder = order + 1 }
-        | Some existing -> reactivateExisting handle childSessionId targetAgent byname role ownership current existing
+        | Some existing -> replayExistingLink childSessionId targetAgent byname role ownership current existing
 
     /// Compatibility for internal callers that do not need a separate
     /// presentation identity. Provider-facing fork/commission use linkNamed.

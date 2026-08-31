@@ -64,10 +64,14 @@ const withSession = (messages, sessionID = 'ses-capability-manager') =>
     },
   }))
 
-const admitManagedRoot = async (hooks, sessionID = 'ses-capability-manager') => {
+const admitManagedRoot = async (
+  hooks,
+  sessionID = 'ses-capability-manager',
+  physicalMessageID = `root-${sessionID}`,
+) => {
   const output = {
     message: {
-      id: `root-${sessionID}`,
+      id: physicalMessageID,
       role: 'user',
       sessionID,
       agent: 'fast-manager',
@@ -201,11 +205,13 @@ test('WHAT[ENF-006] MANAGER_pair_marker_borrows_host_skill_with_empty_name_and_k
     },
   }
   await withPluginClient(client, async (hooks) => {
-    await admitManagedRoot(hooks)
+    await admitManagedRoot(hooks, 'ses-capability-manager', 'steer-ses-capability-manager')
     assert.equal(hooks.tool.skill, undefined, 'skill remains Host-owned')
     const transformed = {
       messages: withSession([
-        { role: 'user', info: { id: 'root-ses-capability-manager' }, parts: [{ type: 'text', text: 'hello' }] },
+        { role: 'user', info: { id: 'root-ses-capability-manager' }, parts: [{ type: 'text', text: 'start' }] },
+        { role: 'assistant', info: { id: 'assistant-ses-capability-manager' }, parts: [{ type: 'text', text: 'ready' }] },
+        { role: 'user', info: { id: 'steer-ses-capability-manager' }, parts: [{ type: 'text', text: 'continue' }] },
       ]),
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)

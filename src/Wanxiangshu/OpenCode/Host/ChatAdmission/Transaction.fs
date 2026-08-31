@@ -19,10 +19,11 @@ type internal ChatAdmissionBindingKind =
 
 type internal ChatAdmissionBindingReceipt =
     private
-        { Key: ChatExecutionKey
+        { Identity: ExecutionAdmissionExactIdentity
           Kind: ChatAdmissionBindingKind }
 
-type internal HostModelProjectionReceipt = private | HostModelProjectionReceipt
+type internal HostModelProjectionReceipt =
+    private | HostModelProjectionReceipt of ExecutionAdmissionExactIdentity * OpencodeModel
 
 [<RequireQualifiedAccess>]
 /// DSL-class: ExternalSignal
@@ -242,8 +243,8 @@ module internal ChatAdmissionTransaction =
             return! Error(compensationError createError unbindError released)
         }
 
-    let private bindingReceipt intent =
-        { Key = intentKey intent
+    let private bindingReceipt intent identity =
+        { Identity = identity
           Kind =
             match intent with
             | ChatAdmissionIntent.Decision.ExternalRootIntent _ -> ChatAdmissionBindingKind.ExternalRoot
@@ -444,7 +445,7 @@ module internal ChatAdmissionTransaction =
         with
         | Ok() ->
             { Targeted = targeted
-              Binding = bindingReceipt targeted.Leased.Accepted.Input.Intent }
+              Binding = bindingReceipt targeted.Leased.Accepted.Input.Intent targeted.Identity }
             |> Ok
             |> Task.FromResult
         | Error error ->
@@ -462,7 +463,7 @@ module internal ChatAdmissionTransaction =
         match effect (fun () -> ports.ProjectHost bound.Targeted.Model) with
         | Ok() ->
             { Bound = bound
-              HostProjection = HostModelProjectionReceipt }
+              HostProjection = HostModelProjectionReceipt(bound.Targeted.Identity, bound.Targeted.Model) }
             |> Ok
             |> Task.FromResult
         | Error error ->

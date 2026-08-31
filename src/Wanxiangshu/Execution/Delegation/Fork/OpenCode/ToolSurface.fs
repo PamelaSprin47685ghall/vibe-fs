@@ -474,6 +474,7 @@ module ForkToolSurface =
           ErrorName = None
           Model = None
           ParentId = None
+          CreatedAt = None
           Completed = true
           IsCompaction = false
           PromptKey = None

@@ -64,8 +64,8 @@ module GroundingCatalog =
         else
             pathResolve (pathJoin (root, path))
 
-    let private workspaceRelative root path =
-        let relative = pathRelative (root, absolutePath root path) |> slash
+    let private relativeWithin root absolute =
+        let relative = pathRelative (root, absolute) |> slash
 
         if relative = "" then
             Some ""
@@ -77,6 +77,15 @@ module GroundingCatalog =
             None
         else
             Some relative
+
+    let private workspaceRelative workspace canonicalRoot path =
+        let lexicalRoot = pathResolve workspace
+        let absolute = absolutePath lexicalRoot path
+
+        try
+            realpathSync absolute |> relativeWithin canonicalRoot
+        with _ ->
+            relativeWithin lexicalRoot absolute
 
     let private matches pattern path =
         match JsGlobFs.matchesPathPattern pattern path with
@@ -171,7 +180,7 @@ module GroundingCatalog =
     let resolve workspace path =
         let root = canonicalWorkspace workspace
 
-        match workspaceRelative root path with
+        match workspaceRelative workspace root path with
         | None -> []
         | Some relativePath -> discover root |> List.filter (packageMatches relativePath) |> List.sortBy _.Name
 
@@ -230,7 +239,7 @@ module GroundingCatalog =
         let packages = discover root
 
         paths
-        |> List.choose (workspaceRelative root)
+        |> List.choose (workspaceRelative workspace root)
         |> List.collect (fun relativePath -> packages |> List.filter (packageMatches relativePath))
         |> List.groupBy _.Name
         |> List.sortBy fst
@@ -240,7 +249,9 @@ module GroundingCatalog =
 
     let materialsForExactPaths workspace paths =
         let root = canonicalWorkspace workspace
-        let relativePaths = paths |> List.choose (workspaceRelative root) |> Set.ofList
+
+        let relativePaths =
+            paths |> List.choose (workspaceRelative workspace root) |> Set.ofList
 
         discover root
         |> List.collect (fun package ->

@@ -284,11 +284,14 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_handle_answers_retired_foreve
     HandleSurface.apply(retired, { op: 'complete', handle: HANDLE, kind: 'Terminal' }),
     { ok: false, error: { kind: 'TransitionRejected', reason: 'HandleIsRetired' } },
   )
-  // Retired handles are reusable — same agent id reopens on the same child session
-  // (HandleLinked re-append → Active) for the next work unit. The tombstone is
-  // the prior LastCompletion blob, not a ban on further Labor.
-  const reopened = HandleSurface.apply(retired, { op: 'link', handle: HANDLE, child: CHILD, agent: 'fast-coder', role: 'Coder' })
-  assert.equal(reopened.ok, true, `Retired handle must be reopenable for reuse, got ${JSON.stringify(reopened)}`)
+  const reopened = HandleSurface.apply(retired, {
+    op: 'link',
+    handle: HANDLE,
+    child: CHILD,
+    agent: 'fast-coder',
+    role: 'Coder',
+  })
+  assert.equal(reopened.ok, true, `same binding must accept a new work unit: ${JSON.stringify(reopened)}`)
   assert.equal(HandleSurface.isRetired(reopened.ok ? reopened.state : retired, HANDLE), false)
   assert.equal(stateOf(reopened.ok ? reopened.state : retired).lifecycle, 'Active')
 })
@@ -322,14 +325,28 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_child_session_is_still_recogn
   assert.equal(isSome(HandleSurface.tryFindByChildSession(retired, sessionId('ses_other'))), false)
 })
 
-test('WHAT[MANAGED-SESSION-015] EXEC_009_relinking_a_live_handle_rebinds_it_rather_than_duplicating', () => {
-  // Restart recovery re-links the same handle id to the same session. That must
-  // be idempotent for a live handle — and refused only once retired.
+test('WHAT[MANAGED-SESSION-015] EXEC_009_replaying_the_exact_live_link_is_idempotent', () => {
   const state = linkOn(HandleSurface.empty())
   const relinked = linkOn(state)
 
   assert.equal(HandleSurface.linkedChildren(relinked).length, 1)
   assert.deepEqual(stateOf(relinked), stateOf(state))
+})
+
+test('WHAT[MANAGED-SESSION-015] EXEC_009_one_durable_handle_cannot_be_rebound_to_another_child', () => {
+  const state = linkOn(HandleSurface.empty())
+
+  assert.deepEqual(
+    HandleSurface.apply(state, {
+      op: 'link',
+      handle: HANDLE,
+      child: sessionId('ses_other'),
+      agent: 'fast-coder',
+      role: 'Coder',
+    }),
+    { ok: false, error: { kind: 'TransitionRejected', reason: 'HandleIdentityConflict' } },
+  )
+  assert.equal(stateOf(state).child, 'ses_c')
 })
 
 test('WHAT[MANAGED-SESSION-006] EXEC_009_linked_children_lists_every_child_ever_linked', () => {

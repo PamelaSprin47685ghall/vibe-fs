@@ -467,15 +467,16 @@ export const RULES = [
   {
     // The Blogger-main / durably-proven-WorkMain owner resolution and the
     // policy-licensed append live in one chain: admitPolicyAuthorizedFailure
-    // resolves the exact owner and fails closed to NoActiveRun, and the only
-    // ledger append binds that resolved `ownerSessionId` together with the
+    // resolves the exact owner together with its current durable state and
+    // fails closed to NoActiveRun, and the only ledger append binds that
+    // resolved `ownerSessionId` together with the
     // typed `ProviderRecoveryAuthorization` issued by ExecutionFailurePolicy
     // (PAR-019). A raw budget int no longer authorizes an advance.
     id: 'workflow-main-session-failure-owner',
     fileHint: 'Workflow.fs',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
     pattern:
-      /\bFallbackLedger\.recordAuthorizedFailure\s+durable\s+ownerSessionId\s+authorization\s+error\b[\s\S]{0,3000}\blet\s+ownerSessionId\s*=\s*\r?\n\s*mainSessionOfBloggerProjection\s+projection\s+turn\.SessionId\s*\r?\n\s*\|>\s*Option\.orElseWith\s*\(fun\s*\(\)\s*->\s*\r?\n\s*FallbackEvidence\.tryCurrentState\s+turn\.SessionId\s+projection\s*\r?\n\s*\|>\s*Option\.map\s*\(fun\s+_\s*->\s*turn\.SessionId\)\)[\s\S]{0,200}\bmatch\s+ownerSessionId\s+with\s*\r?\n\s*\|\s*None\s*->(?:(?!FallbackLedger)[\s\S]){0,200}?\bConfirmedFailureOutcome\.NoActiveRun\b[\s\S]{0,300}?\|\s*Some\s+owner\s*->[\s\S]{0,400}?\bFallbackEvidence\.tryCurrentState\s+owner\s+projection\b[\s\S]{0,300}?\badmitCurrentFailure\s+durable\s+owner\b/,
+      /\bFallbackLedger\.recordAuthorizedFailure\s+durable\s+ownerSessionId\s+authorization\s+error\b[\s\S]{0,3000}\blet\s+ownerSessionId\s*=\s*\r?\n\s*mainSessionOfBloggerProjection\s+projection\s+turn\.SessionId\s*\r?\n\s*\|>\s*Option\.orElseWith\s*\(fun\s*\(\)\s*->\s*\r?\n\s*FallbackEvidence\.tryCurrentState\s+turn\.SessionId\s+projection\s*\r?\n\s*\|>\s*Option\.map\s*\(fun\s+_\s*->\s*turn\.SessionId\)\)[\s\S]{0,200}\blet\s+ownerState\s*=\s*\r?\n\s*ownerSessionId\s*\r?\n\s*\|>\s*Option\.bind\s*\(fun\s+owner\s*->\s*\r?\n\s*FallbackEvidence\.tryCurrentState\s+owner\s+projection\s*\r?\n\s*\|>\s*Option\.map\s*\(fun\s+current\s*->\s*owner\s*,\s*current\)\)[\s\S]{0,160}\bmatch\s+ownerState\s+with\s*\r?\n\s*\|\s*None\s*->(?:(?!FallbackLedger)[\s\S]){0,200}?\bConfirmedFailureOutcome\.NoActiveRun\b[\s\S]{0,300}?\|\s*Some\s*\(\s*owner\s*,\s*current\s*\)\s*->[\s\S]{0,200}?\badmitCurrentFailure\s+durable\s+owner\s+turn\s+failure\s+requestKind\s+error\s+current\b/,
     label: 'Fallback Workflow must append only to a resolved Blogger main or durably proven WorkMain owner',
     positive: true,
   },

@@ -125,18 +125,25 @@ const declarationRows = (file, text) => {
 
 const declarationSpans = (text) => {
   const lines = stripFSharpNonCode(text).split('\n')
-  const declarations = []
+  const markers = []
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]
     const hit = /^\s*(?:let\s+(?:(?:private|internal|inline)\s+)*|member\s+(?:(?:private|internal)\s+)*(?:[A-Za-z_][A-Za-z0-9_']*\.)?)([A-Za-z_][A-Za-z0-9_']*)\b/.exec(line)
-    if (hit) declarations.push({ symbol: hit[1], start: index, indent: line.search(/\S/) })
-  }
-  return declarations.map((decl, index) => {
-    let end = lines.length
-    for (let next = index + 1; next < declarations.length; next += 1) {
-      if (declarations[next].indent <= decl.indent) { end = declarations[next].start; break }
+    if (hit) {
+      markers.push({ symbol: hit[1], start: index, indent: line.search(/\S/), declaration: true })
+      continue
     }
-    return { ...decl, end, code: lines.slice(decl.start, end).join('\n') }
+    if (/^\s*(?:namespace|module|type)\b/.test(line)) {
+      markers.push({ start: index, indent: line.search(/\S/), declaration: false })
+    }
+  }
+  return markers.flatMap((decl, index) => {
+    if (!decl.declaration) return []
+    let end = lines.length
+    for (let next = index + 1; next < markers.length; next += 1) {
+      if (markers[next].indent <= decl.indent) { end = markers[next].start; break }
+    }
+    return [{ symbol: decl.symbol, start: decl.start, indent: decl.indent, end, code: lines.slice(decl.start, end).join('\n') }]
   })
 }
 
@@ -433,7 +440,7 @@ export const scanEntries = (entries, manifest, evidence = {}) => {
         }
       } else {
         const mintPatterns = [
-          new RegExp(`\\b${symbol}\\s*(?:\\(|\\{\\||(?=[A-Za-z_"']))`, 'g'),
+          new RegExp(`\\b${symbol}\\s*(?:\\(|\\{\\|)`, 'g'),
           new RegExp(`\\b${symbol}\\.issue\\b`, 'g'),
         ]
         for (const mintPattern of mintPatterns) {

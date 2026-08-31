@@ -223,6 +223,7 @@ module HandleSurface =
     let private rejectionName (rejection: HandleTransitionRejection) : string =
         match rejection with
         | UnknownHandle -> "UnknownHandle"
+        | HandleIdentityConflict -> "HandleIdentityConflict"
         | HandleIsRetired -> "HandleIsRetired"
         | AlreadyCompleted -> "AlreadyCompleted"
         | AlreadyAbandoned -> "AlreadyAbandoned"

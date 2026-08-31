@@ -27,31 +27,6 @@ module HostBoundarySurface =
             {| sessionId = sessionId
                agent = agent |> Option.defaultValue null |}
 
-    let private bindableRejection =
-        function
-        | ProviderRunBinding.Rejection.NoBindableRun -> "NoBindableRun", 0
-        | ProviderRunBinding.Rejection.AmbiguousRun count -> "AmbiguousRun", count
-        | ProviderRunBinding.Rejection.NotLatestRun -> "NotLatestRun", 0
-
-    let bindableRun (physicalUserMessageId: string) (rawMessages: obj array) : obj =
-        match
-            ProviderRunBinding.bindableRun physicalUserMessageId (SessionSnapshotPort.projectMessages rawMessages)
-        with
-        | Ok run ->
-            box
-                {| ok = true
-                   runId = run.Id
-                   error = null
-                   count = 0 |}
-        | Error rejection ->
-            let error, count = bindableRejection rejection
-
-            box
-                {| ok = false
-                   runId = null
-                   error = error
-                   count = count |}
-
     let private toolState =
         function
         | SnapshotToolPartState.Pending -> box {| kind = "pending"; value = null |}

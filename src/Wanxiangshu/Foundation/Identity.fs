@@ -263,6 +263,7 @@ module Identity =
     module PhysicalUserMessageId =
         let create (value: string) = PhysicalUserMessageId value
         let value (PhysicalUserMessageId v) = v
+        let isNonBlank (PhysicalUserMessageId v) = not (String.IsNullOrWhiteSpace v)
 
         /// Promote a physical message to Authority Root.
         ///
