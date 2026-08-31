@@ -96,7 +96,17 @@ test('WHAT[CAUSAL-008] CAUSAL_008_fresh_registry_starts_empty_no_durable_state',
   assert.equal(snapshot.sequence, 0)
 })
 
-test('WHAT[CAUSAL-004] CAUSAL_004_observer_surface_has_no_snapshot', () => {
-  assert.equal(causal.observerHasSnapshot(), false)
-  assert.equal(causal.readerHasSnapshot(), true)
+test('WHAT[CAUSAL-004] CAUSAL_004_observer_and_reader_capabilities_are_not_interchangeable', () => {
+  const registry = causal.createRegistry()
+  const observer = causal.observerCapability(registry)
+  const reader = causal.snapshotReaderCapability(registry)
+  assertOpaque(observer, 'wait observer capability')
+  assertOpaque(reader, 'wait snapshot reader capability')
+
+  assert.throws(() => causal.observerEnter(reader, descriptor('A')), /observer capability required/)
+  assert.throws(() => causal.readerSnapshot(observer), /snapshot reader capability required/)
+
+  const lease = causal.observerEnter(observer, descriptor('A'))
+  assert.equal(causal.readerSnapshot(reader).active.length, 1)
+  causal.dispose(lease)
 })

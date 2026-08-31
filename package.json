@@ -65,9 +65,9 @@
     "build": {
       "command": "node scripts/build.mjs",
       "files": [
-        "scripts/build.mjs",
-        "src/Wanxiangshu/**",
-        "package.json"
+        "**/*",
+        "!dist/**",
+        "!.fable-build/**"
       ],
       "output": [
         "dist/**"

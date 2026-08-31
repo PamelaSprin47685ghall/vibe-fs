@@ -37,3 +37,40 @@ test('WHAT[HOST-BOUNDARY-009] TODO-004 rejects a call id observed in more than o
   assert.equal(located.error, 'Ambiguous')
   assert.equal(located.toolCallId, 'call_todo')
 })
+
+test('WHAT[HOST-BOUNDARY-020] snapshot location accepts exactly one target and fails closed for missing or ambiguous evidence', () => {
+  const exact = SessionSnapshotSurface.projectMessages([
+    assistantToolMessage({ messageID: 'asst_target', partID: 'part_target' }),
+    assistantToolMessage({ messageID: 'asst_decoy', partID: 'part_decoy', callID: 'call_other' }),
+    { info: { id: 'user_decoy', role: 'user' }, parts: [{ type: 'tool', id: 'part_user', callID: 'call_todo', tool: 'auto-injected' }] },
+  ])
+  assert.deepEqual(SessionSnapshotSurface.locateToolCall('call_todo', exact), {
+    ok: true,
+    providerRun: 'asst_target',
+    hostToolPartId: 'part_target',
+    toolCallId: 'call_todo',
+    toolName: 'auto-injected',
+    inputCanonical: 'null',
+    state: 'pending',
+  })
+
+  const missing = SessionSnapshotSurface.projectMessages([
+    assistantToolMessage({ messageID: 'asst_decoy', partID: 'part_decoy', callID: 'call_other' }),
+  ])
+  assert.deepEqual(SessionSnapshotSurface.locateToolCall('call_todo', missing), {
+    ok: false,
+    error: 'Missing',
+    toolCallId: 'call_todo',
+  })
+
+  const ambiguous = SessionSnapshotSurface.projectMessages([
+    assistantToolMessage({ messageID: 'asst_first', partID: 'part_first' }),
+    assistantToolMessage({ messageID: 'asst_second', partID: 'part_second' }),
+    assistantToolMessage({ messageID: 'asst_decoy', partID: 'part_decoy', callID: 'call_other' }),
+  ])
+  assert.deepEqual(SessionSnapshotSurface.locateToolCall('call_todo', ambiguous), {
+    ok: false,
+    error: 'Ambiguous',
+    toolCallId: 'call_todo',
+  })
+})

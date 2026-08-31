@@ -42,7 +42,7 @@ built-in 与 institutional rule 的本地化语言叶子遵循同一合同进入
 
 ## BD-011: fail-closed 内容硬界约束
 
-单 cycle 内容硬界约束（违背则 fail-closed 并报 `enforcer-cycle-failed`）：规范化日志文本不得超过 512 KiB UTF-8 字节；证据字段不得超过 128 KiB UTF-8 字节。硬界属于安全防线，严禁演化为业务层面的启发式评分参数。
+单 cycle 内容硬界约束（违背则 fail-closed 并报 `enforcer-cycle-failed`）：规范化日志文本不得超过 512 KiB UTF-8 字节；证据字段不得超过 128 KiB UTF-8 字节。阈值、UTF-8 字节计数结果与拒绝分支必须由 Cycle model 的单一纯 decision 拥有；提交解码器与 semantic surface 只能消费该 decision，严禁复制常量或判定公式。硬界属于安全防线，严禁演化为业务层面的启发式评分参数。
 
 ## BD-012: BlogObservationCommitted 是唯一原子 cycle 事实
 
