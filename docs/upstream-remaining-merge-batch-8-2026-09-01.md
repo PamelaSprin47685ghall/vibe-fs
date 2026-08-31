@@ -4,6 +4,8 @@
 
 Batch 8 closes M7D and M7E on cumulative batch-7 head `1b437db25`. Every consumer of `requirements/managed-session-lifecycle/tests/support/managed-surface.mjs` now calls a registered production surface, so the mirror file is deleted.
 
+Upstream delivery: cumulative [PR #26](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/26). It supersedes the implementation content of #20–#25; merge SHA remains owner-controlled.
+
 ## Production boundaries added or extended
 
 - `SyncDelegateSurface` adds three narrow operations on its existing opaque runtime: stage the exact deleted Inspector, inspect the scope-close child, and cancel one session. All state transitions remain in `SyncDelegateRuntime`, `SyncDelegateCallStore` and `AttachedSessionRuntime`.
