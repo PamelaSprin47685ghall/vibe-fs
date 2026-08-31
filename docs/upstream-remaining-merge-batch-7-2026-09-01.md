@@ -1,5 +1,7 @@
 # Upstream Remaining Merge — Batch 7
 
+PR: https://github.com/PamelaSprin47685ghall/vibe-fs/pull/25
+
 ## Result
 
 Batch 7 closes M7B and M7C on cumulative batch-6 head `59a6f2f92`. Fork/family/terminal and Satellite/Distiller tests no longer obtain verdicts from JavaScript lifecycle mirrors.
@@ -57,4 +59,4 @@ This is a pre-existing upstream semantic conflict, not introduced by the mirror 
 
 Only `syncDelegateLifecycle` and `ptyLifecycle` remain in `tests/support/managed-surface.mjs`. Batch 8 migrates those consumers and deletes the support file. Batch 9 then upgrades both proof gates to shared AST binding analysis.
 
-This PR is stacked on #24. The current account cannot merge upstream PRs; the owner must merge the cumulative chain in dependency order.
+PR #25 is stacked on #24. The current account cannot merge upstream PRs; the owner must merge the cumulative chain in dependency order.
