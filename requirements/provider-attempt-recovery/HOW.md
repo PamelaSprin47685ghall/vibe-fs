@@ -6,7 +6,7 @@
 
 - **ProviderRequestKind + AgentPairCursor**：`src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs` 同时拥有可证明的请求种类与模 4 游标（Offset 0..3 映射到 SideA/SideA'/SideB/SideB'），维护连续失败计数与有限自动恢复预算（默认 12）；`Context/Prefix/Candidate.fs` 不再拥有请求种类。
 - **FallbackLedger**：唯一写入口。负责对 `ProviderRunIdentity` 进行有界去重，追加 `FallbackCursorAdvanced`、`FallbackSucceeded` 或 `FallbackExhausted`。
-- **ConfirmedFailurePort**：`src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs` 拥有 `ConfirmedFailureOutcome`，端口返回 `Task<Result<ConfirmedFailureOutcome,string>>`；所有消费者穷尽处理 `RecoveryAdvanced | RecoveryExhausted | AlreadyRecorded | NoActiveRun`，且 `NoActiveRun` 必须停止，不能继续恢复。
+- **ConfirmedFailureOutcome**：`Fallback/Ledger.fs` 拥有精确四分支结果 `RecoveryAdvanced | RecoveryExhausted | AlreadyRecorded | NoActiveRun`；所有消费者必须穷尽处理，且 `NoActiveRun` 必须停止，不能继续恢复。
 - **RecoverySlot 槽决策**：`src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs` 把刚完成的 failure advance + primed Offset 归约为一次 `RecoveryOpportunity`；`nextBloggerRequest` 以 `BloggerSlotDispatchError` 返回 typed dispatch failure。维护子请求失败与主请求失败均收敛为单次失败槽推进，维护成功不清零计数，主业务成功清零计数并把 A′/B′ 归一到同侧 A/B 普通槽。
 - **历史 replay 边界**：PAR-004 改为成功关闭 A′/B′ 后，旧 journal 中已落盘的 `FallbackSucceeded → A′→B` / `FallbackSucceeded → B′→A` 仍必须可重放。fold 只吸收这一种“成功归一化后 previousOffset 比 canonical cursor 多一步”的历史形状；新 writer 永远从归一化后的 A/B 写 `A→A′` / `B→B′`，不得继续生产旧形状。
 
@@ -28,7 +28,6 @@
 - `src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs`
 - `src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs`
 - `src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs`
-- `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs`
 - `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs`
 - `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs`
 - `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs`

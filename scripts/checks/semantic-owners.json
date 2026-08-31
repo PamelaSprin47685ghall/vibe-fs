@@ -2130,10 +2130,6 @@
       "owner": "provider-attempt-recovery"
     },
     {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/HandleSurface.fs",
-      "owner": "provider-attempt-recovery"
-    },
-    {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
       "owner": "provider-attempt-recovery"
     },

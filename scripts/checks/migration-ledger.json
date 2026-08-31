@@ -1729,7 +1729,6 @@
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/HandleSurface.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
@@ -1792,7 +1791,7 @@
         "semantic-owners.mjs",
         "js-surface-manifest.mjs"
       ],
-      "closure_evidence": "All 12 surviving paths are owned by provider-attempt-recovery; both obsolete proof surfaces are deleted, CursorSurface.fs is the sole recovery JS proof surface, and all provider-attempt-recovery laws are bound to exact executable proofs and the p0 recovery re-entry gate.",
+      "closure_evidence": "All 11 surviving paths are owned by provider-attempt-recovery; both obsolete proof surfaces are deleted, CursorSurface.fs is the sole recovery JS proof surface, and all provider-attempt-recovery laws are bound to exact executable proofs and the p0 recovery re-entry gate.",
       "touched_paths": [
         "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
@@ -1800,7 +1799,6 @@
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/HandleSurface.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",

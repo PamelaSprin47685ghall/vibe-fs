@@ -398,14 +398,14 @@ export const RULES = [
   {
     id: 'provider-recovery-role-classification',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
-    fileHint: 'Workflow.fs|Ledger.fs|ConfirmedFailurePort.fs',
+    fileHint: 'Workflow.fs|Ledger.fs',
     pattern: /\b(?:Provider|Participant|Persona)?Role\b|\.Role\b/,
     label: 'provider recovery must use typed attempt identity, not role classification',
   },
   {
     id: 'provider-recovery-error-string-classification',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
-    fileHint: 'Workflow.fs|Ledger.fs|ConfirmedFailurePort.fs',
+    fileHint: 'Workflow.fs|Ledger.fs',
     pattern:
       /\b(?:error|reason)\b\s*\.\s*(?:Contains|StartsWith|EndsWith|IndexOf)\b|\b(?:Regex\.)?IsMatch\s*\(\s*(?:error|reason)\b|\bmatch\s+(?:error|reason)\s+with\b|\bif\s+(?:error|reason)\s*=\s*["']/i,
     label: 'provider recovery must not classify attempts from error strings',
@@ -413,7 +413,7 @@ export const RULES = [
   {
     id: 'no-active-run-continues-recovery',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
-    fileHint: 'Workflow.fs|Ledger.fs|ConfirmedFailurePort.fs',
+    fileHint: 'Workflow.fs|Ledger.fs',
     pattern:
       /\|\s*(?:Ok\s+)?(?:ConfirmedFailureOutcome\.)?NoActiveRun\b(?:(?!\n\s*\|)[\s\S]){0,300}->(?:(?!\n\s*\|)[\s\S]){0,300}\bContinueRecovery\b/,
     label: 'ConfirmedFailureOutcome.NoActiveRun must never continue recovery',
@@ -448,11 +448,11 @@ export const RULES = [
   },
   {
     id: 'confirmed-failure-outcome-contract',
-    fileHint: 'ConfirmedFailurePort.fs',
+    fileHint: 'Ledger.fs',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
     pattern:
-      /type\s+ConfirmedFailureOutcome\s*=\s*\r?\n\s*\|\s*RecoveryAdvanced\s+of\s+RecoveryOpportunity\s*\r?\n\s*\|\s*RecoveryExhausted\s*\r?\n\s*\|\s*AlreadyRecorded\s*\r?\n\s*\|\s*NoActiveRun\s*\r?\n(?:\s*\r?\n|\s*\/\/\/[^\n]*\r?\n)*\s*type\s+ConfirmedFailurePort\s*=[^\n]*Task\s*<\s*Result\s*<\s*ConfirmedFailureOutcome\s*,\s*string\s*>\s*>/,
-    label: 'ConfirmedFailurePort must own the exact typed four-case ConfirmedFailureOutcome contract',
+      /type\s+ConfirmedFailureOutcome\s*=\s*\r?\n\s*\|\s*RecoveryAdvanced\s+of\s+RecoveryOpportunity\s*\r?\n\s*\|\s*RecoveryExhausted\s*\r?\n\s*\|\s*AlreadyRecorded\s*\r?\n\s*\|\s*NoActiveRun\s*\r?\n(?:\s*\r?\n|\s*\/\/\/[^\n]*\r?\n)*\s*module\s+FallbackLedger\s*=[\s\S]{0,7000}\blet\s+recordAuthorizedFailure\b[\s\S]{0,1000}\bProviderRecoveryAuthorization\b[\s\S]{0,500}\bTask\s*<\s*Result\s*<\s*ConfirmedFailureOutcome\s*,\s*string\s*>\s*>/,
+    label: 'FallbackLedger must own the exact four-case failure outcome and its typed authorized write entry',
     positive: true,
   },
   {

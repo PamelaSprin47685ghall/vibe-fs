@@ -39,8 +39,7 @@ export const scanRetryOwnership = (root) => {
     if (/FallbackLedger\.(?:record|admit)AuthorizedFailure/.test(text)) {
       const allowed =
         path === 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs' ||
-        path === 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/HandleSurface.fs' ||
-        path === 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Surface.fs'
+        path === 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs'
       if (!allowed) violations.push(`${path}: unauthorized fallback ledger caller`)
     }
 

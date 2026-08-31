@@ -263,15 +263,6 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
-    module: 'Participant/Provider/Attempt/Fallback/HandleSurface.js',
-    owner: 'provider-attempt-recovery',
-    laws: ['PAR-001', 'PAR-003', 'PAR-005', 'PAR-014', 'PAR-019', 'VERIFICATION-SYSTEM-008'],
-    lawOwners: { 'VERIFICATION-SYSTEM-008': 'verification-system' },
-    source: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/HandleSurface.fs',
-    representation: 'opaque-capability',
-    kind: 'resource',
-  },
-  {
     module: 'Participant/Provider/Attempt/Fallback/CursorSurface.js',
     owner: 'provider-attempt-recovery',
     laws: [
@@ -289,6 +280,7 @@ export const SURFACE_MANIFEST = [
       'PAR-013',
       'PAR-014',
       'PAR-016',
+      'PAR-019',
       'EFFECT-ACCOUNTING-004',
       'VERIFICATION-SYSTEM-008',
     ],

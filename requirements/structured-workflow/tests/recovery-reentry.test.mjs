@@ -41,7 +41,7 @@ const PROVIDER_RECOVERY_GATE_FIXTURES = [
   },
   {
     id: 'no-active-run-continues-recovery',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs',
+    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs',
     source: '| ConfirmedFailureOutcome.NoActiveRun -> RecoveryAdmission.ContinueRecovery',
   },
   {
@@ -66,7 +66,7 @@ const PROVIDER_RECOVERY_GATE_FIXTURES = [
   },
   {
     id: 'confirmed-failure-outcome-contract',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs',
+    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs',
     source: [
       'type ConfirmedFailureOutcome =',
       '    | RecoveryAdvanced of RecoveryOpportunity',
@@ -74,7 +74,8 @@ const PROVIDER_RECOVERY_GATE_FIXTURES = [
       '    | AlreadyRecorded',
       '    | NoActiveRun',
       '    | RetryScheduled',
-      'type ConfirmedFailurePort = SessionId -> ProviderRunIdentity -> string -> Task<Result<ConfirmedFailureOutcome, string>>',
+      'module FallbackLedger =',
+      '    let recordAuthorizedFailure (authorization: ProviderRecoveryAuthorization) : Task<Result<ConfirmedFailureOutcome, string>> = failwith "fixture"',
     ].join('\n'),
   },
   {
@@ -130,6 +131,12 @@ test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_provider_recovery_rules_are_productio
     assert.ok(rule, `missing provider recovery production rule ${id}`)
     assert.ok(rule.fileHint || rule.pathHint, `${id} must carry a narrow production file/path hint`)
   }
+})
+
+test('WHAT[PAR-018] deterministic fold observation is data, not recovery time control', () => {
+  const source = '[<Emit("new Date(0)")>] let private foldObservation () : ObservedAt = jsNative'
+  const hits = scanText(source, 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs')
+  assert.equal(hits.some(({ id }) => id === 'provider-recovery-time-control'), false)
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_reconcile_domain_is_observation_stabilization_not_a_program', () => {

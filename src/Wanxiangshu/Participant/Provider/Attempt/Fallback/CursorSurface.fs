@@ -10,6 +10,8 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Execution.Failure
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
@@ -20,11 +22,16 @@ open Wanxiangshu.Persistence.Journal
 [<RequireQualifiedAccess>]
 module CursorSurface =
 
+    let defaultAutoRecoveryBudget = AgentPairCursor.DefaultAutoRecoveryBudget
+
     type private ProjectionHandle(projection: FallbackProjection) =
         member _.Value = projection
 
     [<Emit("$0 == null")>]
     let private isNullish (value: obj) : bool = jsNative
+
+    [<Emit("new Date(0)")>]
+    let private foldObservation () : ObservedAt = jsNative
 
     let private field (value: obj) (name: string) : obj =
         if isNullish value then
@@ -229,6 +236,75 @@ module CursorSurface =
                dedupeKeys = List.length projection.RecentFailureKeys
                exhausted = projection.Exhausted
                handle = box (ProjectionHandle projection) |}
+
+    let private outcomeName outcome =
+        match outcome with
+        | ConfirmedFailureOutcome.RecoveryAdvanced _ -> "Advanced"
+        | ConfirmedFailureOutcome.RecoveryExhausted -> "Exhausted"
+        | ConfirmedFailureOutcome.AlreadyRecorded -> "AlreadyRecorded"
+        | ConfirmedFailureOutcome.NoActiveRun -> "NoActiveRun"
+
+    let recordConfirmedFailure
+        (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
+        (budget: int)
+        (session: string)
+        (providerRun: string)
+        (reason: string)
+        : Task<obj> =
+        task {
+            let sessionId = SessionId.create session
+            let providerRunId = ProviderRunIdentity.create providerRun
+
+            let! result =
+                match FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot handle.Journal) with
+                | None -> Task.FromResult(Ok ConfirmedFailureOutcome.NoActiveRun)
+                | Some _ when budget <> defaultAutoRecoveryBudget ->
+                    Task.FromResult(Error "provider recovery budget must equal the declared default")
+                | Some current ->
+                    let available =
+                        if FallbackProjection.mayContinue defaultAutoRecoveryBudget current then
+                            ProviderRecoveryBudget.Available
+                        else
+                            ProviderRecoveryBudget.Exhausted
+
+                    let decision =
+                        ExecutionFailurePolicy.decide
+                            { Failure = ExecutionFailure.ProviderTransient
+                              Lifecycle = DurableExecutionLifecycle.ProviderStarted
+                              ExecutionKey =
+                                { SessionId = sessionId
+                                  PhysicalUserMessageId = PhysicalUserMessageId.create ("proof-" + providerRun) }
+                              Capacity = CapacityOwnership.NoCapacityFence
+                              Provider =
+                                { LogicalRun = current.LogicalRunId
+                                  ProviderRun = providerRunId
+                                  RequestKind = ProviderRequestKind.WorkMain
+                                  RetryBudget = ProviderRecoveryBudget.Exhausted
+                                  FallbackBudget = available
+                                  Breaker = ProviderBreakerState.Closed } }
+
+                    match decision.Fallback with
+                    | FallbackDecision.AdvanceFallback authorization ->
+                        FallbackLedger.recordAuthorizedFailure handle.Journal sessionId authorization reason
+                    | FallbackDecision.NoFallback -> Task.FromResult(Ok ConfirmedFailureOutcome.AlreadyRecorded)
+
+            return
+                match result with
+                | Ok outcome ->
+                    box
+                        {| ok = true
+                           outcome = outcomeName outcome |}
+                | Error error -> box {| ok = false; error = error |}
+        }
+
+    let snapshot (handle: Wanxiangshu.Persistence.Journal.JournalHandle) (session: string) : obj =
+        match FallbackEvidence.tryCurrentState (SessionId.create session) (AgentJournal.snapshot handle.Journal) with
+        | None -> null
+        | Some current ->
+            box
+                {| offset = AgentPairCursor.FallbackOffsetCodec.toByte current.Cursor.Offset
+                   failures = current.Cursor.ConsecutiveFailureCount
+                   exhausted = current.Exhausted |}
 
     let private projectionOf (value: obj) : FallbackProjection =
         let handle = field value "handle"
@@ -437,7 +513,7 @@ module CursorSurface =
 
         { RuntimeId = RuntimeId.create "rt-fallback-surface"
           LocalSeq = LocalSeq.create sequence
-          ObservedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+          ObservedAt = foldObservation ()
           EventId = EventId.create ($"fallback-{sequence}")
           Stream = StreamId.Session session
           ProviderRun = providerRun
