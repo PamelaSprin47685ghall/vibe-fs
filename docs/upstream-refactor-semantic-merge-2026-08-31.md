@@ -133,6 +133,9 @@
 - Latest upstream control flow：latest upstream 在 `IngressCodec`、`ChatParamsHook`、`PairProgrammingThoughtTransform`、Requirement Grounding Transform 引入 6 个 control-pyramid 命中。以 named Evidence→Decision 与 tuple match 展平，保持原分支顺序和返回值；未增加 suppression/baseline。
 - Prefix proof anchors：latest upstream 重命名 empty-history 与 lone-user 两条 executable test，却未同步 HOW；精确锚点改指现存标题，未以 prose 代替 proof。
 - Pair marker integration fixture：latest upstream 已禁止 empty/lone-user transcript 以 synthetic tool call 开头，但 capability integration 仍用 lone-user 输入断言必注入。fixture 改为 user→assistant→current user，并让真实 `chat.message` 为 current physical id 建立 execution lease；全部 wire 断言保持不变。
+- M0 Linux CI 基线：PR #19 的 Node 20 job 将 `node:test run({ timeout: 2500 })` 的文件 wrapper 误当叶子测试，11 个健康多测试文件在 2500ms 整齐被杀；同一个 suite `AbortSignal` 还向全部 worker 复制 listener。叶子 timeout 改为由需要 timeout-and-forget 的测试自行声明；不变的 300000ms suite backstop 由外部 supervisor 唯一持有。
+- M0 PTY proof：Linux Node 20 下 `bun-pty` 的 Bun-only TypeScript entry 拒绝时序晚于单次 `setImmediate`，原测试把 scheduler tick 当成 completion。测试改为等待 production mailbox 发布的 typed completion；不改 PTY production 或错误类型。
+- M0 proof 自审：RED commit 中两个 fixture 新增 budget import 多退了一层目录，首次 GREEN harness 以 module-load error 暴露。修正后连续 verdict 反例运行约 9s，超过 7s 静默窗仍因 22 个真实 leaf verdict 正常通过。全量 unit 又发现 degradation SSOT 的 exact-list consumer 停在 13 项；已将文本、ID 绑定、数量与行号连续性一起闭合到 14 项。
 
 ## 7. 相对 upstream 的修改、原因与证明
 
@@ -156,6 +159,9 @@
 | Prefix HOW anchors | latest upstream 重命名两条 prefix tests 后，HOW 仍引用已不存在的旧标题；requirement trace fail closed。这是文档迁移遗漏。 | 用现存 exact test title 替换两个 dangling anchors，不增加 prose proof、不改变 WHAT。 | requirement trace 772 WHAT / 3919 declarations closure complete；focused prefix 13/13。 | `dc1e7b12b` |
 | Capability pair-marker fixture | latest upstream 已正式规定 empty/lone-user history 不注入 pair marker，capability integration 却仍用 lone-user 输入要求注入；改成三消息后又因 current user 未获 lease 被 PROMPT-006 正确拒绝。两次红都来自 stale upstream fixture，而非 production。 | 输入改为 user→assistant→current user，并通过真实 `chat.message` 绑定 current user 的 exact physical id。保留 Host-owned `skill`、synthetic、input/status/output、canonical content 的全部断言。 | focused file 9/9；正式 capability integration 聚合 13/13；全量 3925/3925。 | `f14476da0` |
 | Fable/NuGet 网络 | restricted sandbox 下 NuGet vulnerability index 无法访问，出现 NU1900；源码、lockfile 与构建配置均未变。 | 不关闭安全检查、不改 dependency；在允许 NuGet 安全索引的正式验证环境执行相同官方命令。 | 同一 `npm run format-build-test` 完整退出 0；Fable 734 sources / 161 surfaces。 | 无代码提交 |
+| M0 file-wrapper timeout | PR #19 Linux Node 20 把 `run({ timeout: PER_TEST_TIMEOUT_MS })` 施加于 process-isolated file wrapper；同文件模块加载与多个健康 leaf 共享 2500ms 总预算。shared `AbortSignal.timeout` 还产生 `MaxListenersExceededWarning`。 | 从 inner `run()` 移除 file-wrapper timeout 与 shared signal。叶子测试显式持有原 2500ms 预算；external supervisor 持有原 300000ms 物理 backstop。数值零放宽。Node 20 官方 `node:test` 文档确认 process isolation 以 test file 为 child process 单位。 | 正式 harness 273/273；关键 fixture 22 个 leaf 串行约 9s，跨过 7s verdict-silence 窗口仍通过；hung/chatter、overrun、leaked-handle 反例仍在原预算内失败。[Node.js v20 test runner](https://nodejs.org/download/release/v20.19.0/docs/api/test.html) | RED `c0161f5cd`；GREEN `30ca1ce2b` |
+| M0 PTY completion proof | upstream PTY 测试只等一次 `setImmediate`。Linux Node 20 下 Bun-only `bun-pty` loader 的异步拒绝尚未进入 mailbox，前 4 项失败，后 4 项被连带取消。 | 等待注册 production Surface 的 `takeCompletions` 发布 exact `failed` completion，不再用 scheduler tick 代替领域事件。production F# 零修改。 | PTY focused 48/48；最终 unit 中 PTY backend/port 全绿；Long Stroke 57 步通过。 | proof `c0161f5cd` |
+| M0 degradation-list closure | 本次 WHAT 新增第 14 条 forbidden degradation，parser registry 与 harness coverage 已更新，但 upstream 的 exact SSOT consumer 仍固定 13 项，最初全量因此 3 项失败。 | 完整迁移 exact text order、ID↔text binding、cardinality 与 source-line continuity；不删断言、不改 parser 使其宽松。 | focused 7/7；最终 authoritative unit 3925/3925。 | `5afc522b8` |
 
 合并后的 owner/authority manifest 收口也修改了 upstream 自动合并结果：`58081dd2a` 删除平行 Host/review consumer，`9bb863337` 删除 8 组重复 authority contract 并保留 upstream 唯一声明。latest upstream 的 process-aware lock contract 加入后，对应证明为 owner dependency 27,093 uses / 333 edges / 185 contracts、authority tests 30/30、authority production scan 全绿。
 
@@ -171,3 +177,45 @@
 - package integration：contents/import/install/resources 全部通过。
 - e2e Long Stroke：57 steps / 7.5s，journal 587/700，SSE 2528/3450；正式入口通过，没有 skip、重复放行或替代 mock 验收。
 - `npm pack --dry-run`：2015 files，package 2.2 MB，unpacked 10.5 MB，成功。
+
+## 9. M0 CI/Linux 可信基线（2026-08-31）
+
+### 9.1 范围与基线
+
+- 分支：`codex/ci-linux-baseline`。
+- 基线：`upstream/master@1db90f5e8`（PR #19 merge commit）。开始与验证前 fetch 均未发现更新的 upstream commit。
+- 修改范围：verification requirement/runner/proof 与 PTY proof。production F#、公开 API、业务预算与 package 内容均未改。
+- 原始证据：PR #19 GitHub Actions run `33376844892`，job `99440146905`。static gates 与 build 已绿；unit 为 3844 pass / 19 fail-or-cancel，失败集中在 2500ms file wrapper 与 PTY loader 时序。
+
+### 9.2 因果修复
+
+1. `c0161f5cd test(ci): expose file-wrapper timeout and PTY tick races`
+   - WHY/WHAT 明确 leaf test、process-isolated file wrapper、verdict-silence supervisor 三层预算边界。
+   - 新增 `VERIFY_004_D_LEAF_TIMEOUT_APPLIED_TO_FILE_WRAPPER`，并绑定可执行 coverage case。
+   - 时间反例要求每个 leaf 持有局部 timeout，但多 leaf 文件总时长超过静默窗；只有真实 verdict feed 才能使其通过。
+   - PTY 测试改为等待 production completion mailbox，删除单 scheduler tick 伪 oracle。
+2. `30ca1ce2b fix(ci): separate leaf timeout from suite supervision`
+   - inner `node:test run()` 只负责 files + concurrency；不再把 leaf timeout 或一个 shared AbortSignal 传给所有 file worker。
+   - external supervisor 以一个 unref physical backstop 持有原 `SUITE_BACKSTOP_MS=300000`；verdict-silence 仍是首要判据。
+   - RED fixture 的 budget import 路径在第一次 GREEN 验证中被证明错误；同提交修正后重跑正式反例。这一点保留在记录中，不把 proof 自身错误伪装成 runner RED。
+3. `5afc522b8 test(ci): close degradation-list consumer`
+   - 全量验证找到未迁移的 exact-list consumer；13→14 的文本、ID、数量、行号一次闭合。
+
+### 9.3 验证阶梯
+
+- RED 阶段：verification harness 271/273，其中 static binding 稳定拒绝旧 `timeout: PER_TEST_TIMEOUT_MS`；behavior fixture 后续发现 import path 错误，因此不把该次 behavioral failure 作为独立根因证据。
+- 修正 proof 后：verification harness 273/273；PTY focused 48/48；degradation-list focused 7/7。
+- `node scripts/build.mjs`：734 F# sources，161 registered surfaces，成功。restricted sandbox 首次仅因 NuGet NU1900 无法访问 vulnerability index 失败；不关闭检查，同命令在允许访问的环境通过。
+- `node scripts/check.mjs`：全绿。27,093 owner uses / 333 edges / 185 contracts；36 个 migration node 均 DONE；0 control-pyramid；0 deadcode；0 JS boundary debt；772 WHAT / 3919 declarations closure。
+- 最终无跳过 `npm run format-build-test`：
+  - Fantomas：696 unchanged，0 error。
+  - authoritative unit：3925/3925。
+  - integration：全绿；real FCS lanes 分别 146.6s 与 180.2s；harness 273/273。
+  - package integration：contents/import/install/resources 全绿。
+  - Long Stroke：57 steps / 7.4s，journal 583/700，SSE 2491/3450。
+  - `npm pack --dry-run`：2015 files，2.2 MB packed，10.5 MB unpacked。
+
+### 9.4 未完成的外部事实
+
+- 本轮授权只包含本地实现与提交；未 push、未创建 PR。
+- M0 只有在 GitHub Linux Node 20 CI 实际全绿且合并后才算进入 upstream。本地完整阶梯已闭合实现证据，不代替这个尚未发生的外部事实。
