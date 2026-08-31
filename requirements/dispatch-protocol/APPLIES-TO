@@ -15,3 +15,7 @@
 /src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs
+
+/src/Wanxiangshu/Foundation/Outcome.fs
+
+/src/Wanxiangshu/Foundation/OutcomeSurface.fs

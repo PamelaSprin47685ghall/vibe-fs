@@ -15,3 +15,7 @@
 /src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs
 /scripts/checks/architecture.mjs
 /scripts/checks/hook-policy.mjs
+
+/src/Wanxiangshu/Foundation/McpLaunch.fs
+
+/src/Wanxiangshu/Host/Digest.fs

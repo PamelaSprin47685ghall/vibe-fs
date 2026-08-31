@@ -10,3 +10,11 @@
 /src/Wanxiangshu/OpenCode/Host/Sessions.fs
 /src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
 /resources/provider/tool/fission/**
+
+/src/Wanxiangshu/Foundation/AsyncSupport.fs
+
+/src/Wanxiangshu/Foundation/Parallel.fs
+
+/src/Wanxiangshu/Foundation/ParallelSurface.fs
+
+/src/Wanxiangshu/Foundation/TaskResult.fs

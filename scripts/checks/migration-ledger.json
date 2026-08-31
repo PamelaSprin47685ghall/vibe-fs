@@ -2077,6 +2077,344 @@
       ],
       "state": "DONE",
       "result": "CUTOVER"
+    },
+    {
+      "id": "opencode-attention-tool-spec-cutover",
+      "primary_owner": "attention-regulation",
+      "intent": "AttentionTools already exposes admission and specs that ToolRegistry calls. All cross-owner utility imports are already listed consumers of attention-regulation in published-contracts.json. This cutover declares the ToolOwner.ToolSpec contract entry.",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/AttentionTools.fs"
+      ],
+      "classification": "ADAPTER",
+      "publishes": [
+        "ToolOwner.ToolSpec"
+      ],
+      "consumes": [
+        "DurableEvents.Contract",
+        "Provider.Language",
+        "Foundation.LlmFacing",
+        "ParticipantIdentity.RoleVocabulary"
+      ],
+      "depends_on": [
+        {
+          "id": "opencode-tool-spec-contracts",
+          "kind": "contract"
+        },
+        {
+          "id": "attention-regulation-proven-keep",
+          "kind": "contract"
+        },
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        },
+        {
+          "id": "provider-language-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "provider-projection-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "participant-identity-cutover",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [],
+      "proofs": [],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Tools/AttentionTools.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER",
+      "closure_evidence": "Proof pending: node node scripts/build.mjs, node scripts/check.mjs, and npm run format-build-test to be run by orchestrator."
+    },
+    {
+      "id": "opencode-concern-tool-spec-cutover",
+      "primary_owner": "concern-routing",
+      "intent": "ConcernTools already exposes admission and specs that ToolRegistry calls. All cross-owner utility imports are already listed consumers of concern-routing in published-contracts.json. This cutover declares the ToolOwner.ToolSpec contract entry.",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/ConcernTools.fs"
+      ],
+      "classification": "ADAPTER",
+      "publishes": [
+        "ToolOwner.ToolSpec"
+      ],
+      "consumes": [
+        "DurableEvents.Contract",
+        "Provider.Language",
+        "Foundation.LlmFacing",
+        "ParticipantIdentity.RoleVocabulary"
+      ],
+      "depends_on": [
+        {
+          "id": "opencode-tool-spec-contracts",
+          "kind": "contract"
+        },
+        {
+          "id": "concern-routing-proven-keep",
+          "kind": "contract"
+        },
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        },
+        {
+          "id": "provider-language-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "provider-projection-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "participant-identity-cutover",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [],
+      "proofs": [],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Tools/ConcernTools.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER",
+      "closure_evidence": "Proof pending: node node scripts/build.mjs, node scripts/check.mjs, and npm run format-build-test to be run by orchestrator."
+    },
+    {
+      "id": "dispatch-protocol-prompt-dispatch-contracts",
+      "primary_owner": "dispatch-protocol",
+      "intent": "This cluster has external consumers that are already active DONE nodes and only compile edges to Foundation/Identity base types. Hardening these surfaces as published contracts unlocks the remaining dispatch runtime core.",
+      "files": [
+        "src/Wanxiangshu/Interaction/Dispatch/Nudge.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/PhysicalAcceptance.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/MetadataCodec.fs",
+        "src/Wanxiangshu/Interaction/Repair/Port.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "PromptDispatch.RuntimeNudge",
+        "PromptDispatch.PromptPhysicalAcceptance",
+        "PromptDispatch.PromptMetadataCodec",
+        "Interaction.Repair.SendOutcome"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Interaction/Dispatch/Nudge.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/PhysicalAcceptance.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/MetadataCodec.fs",
+        "src/Wanxiangshu/Interaction/Repair/Port.fs"
+      ],
+      "coverage_tags": [
+        "CoverageB"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "closure_evidence": "Proof pending: node node scripts/build.mjs, node scripts/check.mjs, and npm run format-build-test to be run by orchestrator."
+    },
+    {
+      "id": "provider-attempt-recovery-request-kind-keep",
+      "primary_owner": "provider-attempt-recovery",
+      "intent": "RequestKind.fs defines the pure vocabulary type ProviderRequestKind. Publishing it as Provider.RequestKind removes the last raw cross-owner import to provider-attempt-recovery and unblocks failure-policy and Strength work.",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/Attempt/RequestKind.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Provider.RequestKind"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Participant/Provider/Attempt/RequestKind.fs"
+      ],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "closure_evidence": "Proof pending: node node scripts/build.mjs, node scripts/check.mjs, and npm run format-build-test to be run by orchestrator."
+    },
+    {
+      "id": "host-boundary-utility-keep",
+      "primary_owner": "host-boundary",
+      "intent": "Pure physical/utility contracts with no owner imports. Each file exports a narrow public API already consumed through those public APIs.",
+      "files": [
+        "src/Wanxiangshu/Foundation/FatalProcess.fs",
+        "src/Wanxiangshu/Foundation/McpLaunch.fs",
+        "src/Wanxiangshu/Host/Digest.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Foundation.FatalProcess",
+        "Foundation.McpLaunch",
+        "Host.HostDigest"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Foundation/FatalProcess.fs",
+        "src/Wanxiangshu/Foundation/McpLaunch.fs",
+        "src/Wanxiangshu/Host/Digest.fs"
+      ],
+      "coverage_tags": [
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "closure_evidence": "Proof pending: node node scripts/build.mjs, node scripts/check.mjs, and npm run format-build-test to be run by orchestrator."
+    },
+    {
+      "id": "time-capability-ports-deadline-keep",
+      "primary_owner": "time-capability",
+      "intent": "Pure time-capability contracts with no owner imports. Foundation/Temporal defines IDeadlineHandle, ITimerPort, IClockPort; Process/Deadline and Process/DeadlineSurface define the typed deadline and its JS boundary.",
+      "files": [
+        "src/Wanxiangshu/Foundation/Temporal.fs",
+        "src/Wanxiangshu/Process/Deadline.fs",
+        "src/Wanxiangshu/Process/DeadlineSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "TimeCapability.Ports",
+        "TimeCapability.Deadline",
+        "TimeCapability.DeadlineSurface"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Foundation/Temporal.fs",
+        "src/Wanxiangshu/Process/Deadline.fs",
+        "src/Wanxiangshu/Process/DeadlineSurface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "closure_evidence": "Proof pending: node node scripts/build.mjs, node scripts/check.mjs, and npm run format-build-test to be run by orchestrator."
+    },
+    {
+      "id": "intra-participant-parallelism-foundation-keep",
+      "primary_owner": "intra-participant-parallelism",
+      "intent": "Pure task/parallel utility contracts with no owner imports. AsyncSupport, Parallel, TaskResultCE, TaskResultList, and TaskValue helpers are already consumed through public APIs.",
+      "files": [
+        "src/Wanxiangshu/Foundation/AsyncSupport.fs",
+        "src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs",
+        "src/Wanxiangshu/Foundation/Parallel.fs",
+        "src/Wanxiangshu/Foundation/ParallelSurface.fs",
+        "src/Wanxiangshu/Foundation/TaskResult.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Foundation.AsyncSupport",
+        "Foundation.Parallel",
+        "Foundation.TaskResult",
+        "Foundation.TaskResultList",
+        "Foundation.TaskValue"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Foundation/AsyncSupport.fs",
+        "src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs",
+        "src/Wanxiangshu/Foundation/Parallel.fs",
+        "src/Wanxiangshu/Foundation/ParallelSurface.fs",
+        "src/Wanxiangshu/Foundation/TaskResult.fs"
+      ],
+      "coverage_tags": [
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "closure_evidence": "Proof pending: node node scripts/build.mjs, node scripts/check.mjs, and npm run format-build-test to be run by orchestrator."
+    },
+    {
+      "id": "dispatch-protocol-foundation-keep",
+      "primary_owner": "dispatch-protocol",
+      "intent": "Typed identity and outcome vocabulary under one owner. Foundation/Outcome and Foundation/OutcomeSurface consume ParticipantIdentity.RoleVocabulary (already DONE).",
+      "files": [
+        "src/Wanxiangshu/Foundation/Identity.fs",
+        "src/Wanxiangshu/Foundation/Outcome.fs",
+        "src/Wanxiangshu/Foundation/OutcomeSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Foundation.Identity",
+        "Foundation.Outcome",
+        "Foundation.OutcomeSurface"
+      ],
+      "consumes": [
+        "ParticipantIdentity.RoleVocabulary"
+      ],
+      "depends_on": [
+        {
+          "id": "participant-identity-cutover",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [],
+      "proofs": [],
+      "architecture_gates": [
+        "owner-dependencies",
+        "semantic-owners"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Foundation/Identity.fs",
+        "src/Wanxiangshu/Foundation/Outcome.fs",
+        "src/Wanxiangshu/Foundation/OutcomeSurface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "closure_evidence": "Proof pending: node node scripts/build.mjs, node scripts/check.mjs, and npm run format-build-test to be run by orchestrator."
     }
   ],
   "debt_face": {
@@ -2179,8 +2517,6 @@
       "src/Wanxiangshu/OpenCode/Signals/HostSignal.fs",
       "src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs",
       "src/Wanxiangshu/OpenCode/Signals/HostSignalSubscribe.fs",
-      "src/Wanxiangshu/OpenCode/Tools/AttentionTools.fs",
-      "src/Wanxiangshu/OpenCode/Tools/ConcernTools.fs",
       "src/Wanxiangshu/OpenCode/Tools/Distillation.fs",
       "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs",
       "src/Wanxiangshu/OpenCode/Tools/DistillationSurface.fs",
@@ -2210,15 +2546,11 @@
       "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
       "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs",
       "src/Wanxiangshu/Interaction/Dispatch/JoinGuardSurface.fs",
-      "src/Wanxiangshu/Interaction/Dispatch/Nudge.fs",
       "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressCodec.fs",
-      "src/Wanxiangshu/Interaction/Dispatch/OpenCode/MetadataCodec.fs",
       "src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs",
-      "src/Wanxiangshu/Interaction/Dispatch/PhysicalAcceptance.fs",
       "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs",
       "src/Wanxiangshu/Interaction/Dispatch/RecoverySurface.fs",
-      "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
-      "src/Wanxiangshu/Interaction/Repair/Port.fs"
+      "src/Wanxiangshu/Interaction/Dispatch/Send.fs"
     ],
     "CoverageD": [
       "src/Wanxiangshu/Composition/Turn/ReconcilePass.fs",
@@ -2348,7 +2680,6 @@
       "src/Wanxiangshu/Enforcer/Repair.fs",
       "src/Wanxiangshu/Enforcer/RepairSurface.fs",
       "src/Wanxiangshu/Enforcer/Surface.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/RequestKind.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/Failure.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/FailureSurface.fs",
       "src/Wanxiangshu/Strength/Frame.fs",
@@ -2371,23 +2702,9 @@
     ],
     "CoverageG": [
       "src/Wanxiangshu/AssemblyInfo.fs",
-      "src/Wanxiangshu/Foundation/AsyncSupport.fs",
-      "src/Wanxiangshu/Foundation/FatalProcess.fs",
-      "src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs",
-      "src/Wanxiangshu/Foundation/Identity.fs",
-      "src/Wanxiangshu/Foundation/McpLaunch.fs",
-      "src/Wanxiangshu/Foundation/Outcome.fs",
-      "src/Wanxiangshu/Foundation/OutcomeSurface.fs",
-      "src/Wanxiangshu/Foundation/Parallel.fs",
-      "src/Wanxiangshu/Foundation/ParallelSurface.fs",
-      "src/Wanxiangshu/Foundation/TaskResult.fs",
-      "src/Wanxiangshu/Foundation/Temporal.fs",
       "src/Wanxiangshu/Host/Contract/ToolResultBound.fs",
-      "src/Wanxiangshu/Host/Digest.fs",
       "src/Wanxiangshu/Host/Fact.fs",
       "src/Wanxiangshu/Host/Facts.fs",
-      "src/Wanxiangshu/Process/Deadline.fs",
-      "src/Wanxiangshu/Process/DeadlineSurface.fs",
       "src/Wanxiangshu/Process/JsSandbox.fs",
       "src/Wanxiangshu/Process/LargeGate.fs",
       "src/Wanxiangshu/Process/LargeGateSurface.fs",
