@@ -63,7 +63,7 @@
 - 原因：改动小、单一 owner、无前置依赖；先验证新的提交、说明和 review 节奏。
 - 批次出口：Decode、Host、Surface 不再拥有 bounds 常量或公式。
 
-执行事实（2026-08-31）：本地批次出口已闭合。RED `4b87c3c0a` 证明原行为测试全绿时三个 consumer 仍可复制 owner；GREEN `eb0e703d6` 将阈值、计数结果、typed rejection 与拒绝公式收敛到 `EnforcerCycle.validateContentBounds`；FCS closure `787a877d6` 声明 injected `byteCount` 的 exact-two trace。behavior-diagnosis 149/149、Fable build、text lane（772 WHAT / 3920 tests）与完整 owner-dep lane 全绿。PR preflight 刷新 Wireit 依赖后，正式阶梯暴露 upstream `fcd5ab11b` 遗留的两条 direct-command oracle（3924/3926）；`45b20b63e` 同时锁定顶层 npm ladder 与 Wireit exact commands，focused verification/distribution 17/17。未 push、无 PR/CI/merge SHA；下一位不得据此声称已进入 upstream。
+执行事实（2026-08-31）：本地批次出口已闭合。RED `4b87c3c0a` 证明原行为测试全绿时三个 consumer 仍可复制 owner；GREEN `eb0e703d6` 将阈值、计数结果、typed rejection 与拒绝公式收敛到 `EnforcerCycle.validateContentBounds`；FCS closure `787a877d6` 声明 injected `byteCount` 的 exact-two trace。behavior-diagnosis 149/149、Fable build、text lane（772 WHAT / 3920 tests）与完整 owner-dep lane 全绿。PR preflight 刷新 Wireit 依赖后，正式阶梯暴露 upstream `fcd5ab11b` 遗留的两条 direct-command oracle（3924/3926）；`45b20b63e` 同时锁定顶层 npm ladder 与 Wireit exact commands，focused verification/distribution 17/17。修正后正式入口又由 freshness gate 暴露 Wireit build 未 fingerprint repository-derived envelope；`51fff4bd8` 将整个 workspace 纳入 build cache key，仅排除自身输出，focused proof 11/11 且正式 build 734 sources / 161 surfaces。未 push、无 PR/CI/merge SHA；下一位不得据此声称已进入 upstream。
 
 ### 第 3 次：production-bound proof 加固
 
