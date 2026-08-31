@@ -160,24 +160,9 @@ module HostForkRunLifecycle =
         | DurableDispatchObservation.Pending claim ->
             classifyPendingSend durable childId payloadDigest identitySeed claim onAccepted accepted error
 
-    let private decideAcceptedDispatchObservation =
-        function
-        | DurableDispatchObservation.Accepted _ -> AgentOwnerDispatchOutcome.Accepted
-        | DurableDispatchObservation.IdentityMismatch ->
-            AgentOwnerDispatchOutcome.Rejected "Durable child dispatch identity witness does not match this owner run"
-        | DurableDispatchObservation.Pending _ ->
-            AgentOwnerDispatchOutcome.AcceptanceUncertain
-                "Transport accepted the child dispatch before durable physical acceptance was observed"
-        | DurableDispatchObservation.Dispatchable ->
-            AgentOwnerDispatchOutcome.Rejected "Accepted child dispatch has no durable acceptance evidence"
-
-    let private observeDurableAcceptedDispatch durable childId prompt identitySeed =
-        durableDispatchObservation durable childId (HostDigest.sha256Hex prompt) identitySeed
-        |> decideAcceptedDispatchObservation
-
     let private interpretDispatchResult durable childId identitySeed prompt onAccepted =
         function
-        | Ok _ -> observeDurableAcceptedDispatch durable childId prompt identitySeed
+        | Ok _ -> AgentOwnerDispatchOutcome.Accepted
         | Error error -> classifySendError durable childId identitySeed prompt onAccepted error
 
     let private sendAgentOwnerRootWithJournal

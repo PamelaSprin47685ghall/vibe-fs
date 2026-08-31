@@ -164,7 +164,8 @@ test('WHAT[DELEG-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_p
     )
 
     assert.doesNotMatch(result, /could not be placed|无法托付/i)
-    assert.match(result, /may already have been accepted|可能已经接收/i)
+    assert.match(result, /uncertain|不确定/i)
+    assert.match(result, /may already have been accepted|可能已/i)
     assert.equal(forkTool.childCount(runtime), 1)
     assert.equal(forkTool.promptCount(runtime), 1, 'physical Host send was attempted exactly once')
     assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')
@@ -191,7 +192,8 @@ test('WHAT[DELEG-026] FORK_TOOL_transport_receipt_without_physical_acceptance_ke
     )
 
     assert.doesNotMatch(result, /could not complete the charge|could not be placed|无法托付/i)
-    assert.match(result, /may already have been accepted|可能已经接收/i)
+    assert.doesNotMatch(result, /uncertain|不确定|may already have been accepted/i)
+    assert.match(result, /现已接下这项托付|has accepted/i)
     assert.equal(forkTool.childCount(runtime), 1)
     assert.equal(forkTool.promptCount(runtime), 1)
     assert.equal(

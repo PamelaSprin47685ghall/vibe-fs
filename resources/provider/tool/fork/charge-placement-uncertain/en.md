@@ -1,1 +1,1 @@
-The charge may already have been accepted by {{name}}. Keep this same participant: recovery owns the uncertain dispatch, so do not fork a replacement for the same charge.
+Dispatch receipt for {{name}} is uncertain (the charge may already have been accepted). Recovery owns this dispatch anomaly: keep this same participant and do not fork a replacement for the same charge (report to developers if unexpected).
