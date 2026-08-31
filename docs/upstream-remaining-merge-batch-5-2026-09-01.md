@@ -35,6 +35,7 @@ The last counterexample distinguishes the correct loop from two shortcuts that e
 - focused Change + external-effect suite — PASS; 114/114.
 - production program gate-scope suite — PASS; 3/3.
 - cumulative Repository Programming + Change + external-effect suite — PASS; 225/225.
+- final formal-branch Repository Programming + Requirement Grounding + Change + external-effect suite — PASS; 242/242 after an elevated rebuild; the first sandboxed rebuild failed only because NuGet vulnerability metadata was unreachable (`NU1900`).
 - `npm run format-build-test` — PASS on disposable validation branch `codex/validation-batch-5-cumulative@6eb23996e`: format 696/696 unchanged; 36 static gates; owner dependency scan; build; unit 3935/3935; all requirement integration suites; 273/273 verification harness cases; Host e2e; package integration; `npm pack --dry-run`.
 
 The disposable validation branch contained `90c451bcc`, the already-reviewed Wireit proof correction from the earlier cumulative PR. It is not duplicated in this batch. Without that prerequisite, upstream's stale release test still expects the pre-Wireit command layout even though the production scripts have already moved to Wireit.
@@ -48,4 +49,4 @@ No baseline, suppression, allowlist, threshold, timeout, or assertion was weaken
 
 ## Remaining work
 
-This PR adds batch 5 / M2 on top of batch 4. Batches 6–9 will continue cumulatively after the preceding PRs are merged. Final upstream refresh and PR identity are recorded in a follow-up documentation commit immediately before publication.
+This PR adds batch 5 / M2 on top of batch 4. Batches 6–9 will continue cumulatively after the preceding PRs are merged. The final refresh found `upstream/master` unchanged at `fcd5ab11b`; PR identity is recorded in a follow-up documentation commit immediately after publication.
