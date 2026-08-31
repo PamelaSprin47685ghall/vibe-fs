@@ -92,6 +92,8 @@ run `33426540260` 已验证 owner lane 修复：5/5，Linux production scan 146.
 
 执行事实（2026-09-01）：本地 M1 行为闭合后，累计 Linux production-evidence run 发现本 PR 新增的 `writeCreate` 会在失败分类中再次调用注入的 `resolvePath`。`847850587` 未用 trace contract 掩盖，而是将 commit/rollback 逻辑路径一次解析成 private typed mutation，使 preflight、逐项重验、write、failure classification、CAS rollback 共用 exact resolved path。Fable build、13/13 transaction proofs、真实 owner production scan+reuse（107.5s）与 format 全绿；修复需传播到第 5 次累计头后重新取得 #22/#23 verdict。
 
+#22 run `33432275199` 又发现 upstream 原有 requirement-grounding proof 依赖 `ToolWorkflow.fs` 的源码字符串顺序，等价的 resolved-path 重构使其误红。`28d3d5d39` 下沉累计第5次已验证的 production counterexample：真实 grounding observer 先记录完整 effect set 再主动失败，repository transaction 仍提交并返回 `Succeeded`。Fable build 与 focused 21/21 全绿；没有恢复旧排版或削弱行为断言。
+
 ### 第 5 次：Change publish correctness
 
 - 模块：M2。
