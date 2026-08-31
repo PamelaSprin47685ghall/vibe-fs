@@ -1,0 +1,10 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/institutional-learning/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs
+/src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs
+/src/Wanxiangshu/Enforcer/InstitutionalLearning/Facts.fs
+/src/Wanxiangshu/Enforcer/InstitutionalLearning/Fold.fs
+/src/Wanxiangshu/Enforcer/InstitutionalLearning/Projection.fs
+/src/Wanxiangshu/Enforcer/InstitutionalLearning/Surface.fs

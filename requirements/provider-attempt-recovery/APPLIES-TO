@@ -15,3 +15,5 @@
 /requirements/context-compression/tests/recovery-slot.test.mjs
 /requirements/verification-system/tests/retry-owner.test.mjs
 /scripts/checks/retry-owner.mjs
+
+/src/Wanxiangshu/Participant/Provider/Attempt/RequestKind.fs

@@ -113,7 +113,6 @@ const WIRED_ALLOWLIST = new Set([
   'fsharp-control-pyramid-guide.mjs', // guide lib：被 fsharp-control-pyramid.mjs import
   'js-surface-manifest.mjs', // post-build gate：由 build.mjs 在 fable precompile 后调用（依赖 dist 产物，不能 pre-build）
   'legacy-horizon-census.mjs', // census tool：由 OBL-007 历史 detector 退出验证调用
-  'migration-ledger.mjs', // temporary Wave 0 validation tool — not wired into check.mjs; delete after Wave 11
 ])
 
 /** 解析 check.mjs 的 checks 数组，返回 wired basename 清单（保持声明顺序）。 */

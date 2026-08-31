@@ -1234,15 +1234,15 @@
     },
     {
       "path": "src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs",
-      "owner": "behavior-diagnosis"
+      "owner": "interaction-authority"
     },
     {
       "path": "src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs",
-      "owner": "behavior-diagnosis"
+      "owner": "interaction-authority"
     },
     {
       "path": "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs",
-      "owner": "behavior-diagnosis"
+      "owner": "interaction-authority"
     },
     {
       "path": "src/Wanxiangshu/Interaction/Repair/Port.fs",

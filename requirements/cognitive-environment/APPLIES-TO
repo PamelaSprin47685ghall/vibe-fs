@@ -13,3 +13,5 @@
 /scripts/checks/semantic-anchors.mjs
 /scripts/checks/language-parity-gate.mjs
 /scripts/checks/prompt-depth-ratchet.mjs
+/src/Wanxiangshu/OpenCode/Host/BloggerChronicleText.fs
+/src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs

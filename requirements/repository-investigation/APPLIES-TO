@@ -9,3 +9,11 @@
 /resources/provider/tool/inspect/**
 /resources/provider/lifecycle/warm-start/**
 /scripts/checks/semantic-anchors.mjs
+/src/Wanxiangshu/Repository/Investigation/Semble/Client.fs
+/src/Wanxiangshu/Repository/Investigation/Semble/Mcp.fs
+/src/Wanxiangshu/Repository/Investigation/Semble/SearchCodec.fs
+/src/Wanxiangshu/Repository/Investigation/Semble/Stdio.fs
+/src/Wanxiangshu/Repository/Investigation/SembleSurface.fs
+/src/Wanxiangshu/Repository/Investigation/WarmStart/Prompt.fs
+/src/Wanxiangshu/Repository/Investigation/WarmStart/Runtime.fs
+/src/Wanxiangshu/Repository/Investigation/WarmStartSurface.fs

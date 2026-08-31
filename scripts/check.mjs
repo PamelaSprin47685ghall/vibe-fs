@@ -36,7 +36,6 @@ const checks = [
   join(root, 'checks/dsl-ownership.mjs'),
   join(root, 'checks/authority-boundary.mjs'),
   join(root, 'checks/fsharp-control-pyramid.mjs'),
-  join(root, 'checks/migration-ledger.mjs'),
   join(root, 'checks/plugin-transforms-invariant.mjs'),
   join(root, 'checks/interaction-repair-invariant.mjs'),
   join(root, 'checks/retry-owner.mjs'),
