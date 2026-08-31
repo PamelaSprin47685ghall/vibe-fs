@@ -49,4 +49,4 @@ No baseline, suppression, allowlist, threshold, timeout, or assertion was weaken
 
 ## Remaining work
 
-This PR closes only batch 4 / M1. Batches 5–9 remain separate modules and PRs. Before opening this PR, upstream must be fetched again; any newly merged changes will be integrated semantically and recorded here.
+This PR closes only batch 4 / M1. Batches 5–9 remain separate modules and PRs. `upstream/master` was fetched again immediately before PR creation and remained `fcd5ab11b`; no additional semantic merge was required.
