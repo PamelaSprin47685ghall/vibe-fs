@@ -128,7 +128,11 @@ module JsToolsBindings =
 
     /// Build the api object for one sandbox run. `staging` collects every
     /// mutation the program makes; the caller commits or discards it.
-    let createApi (root: string) (staging: ResizeArray<JsStagedMutation>) (modelReads: ResizeArray<string>) : obj =
+    let createApi
+        (root: string)
+        (staging: ResizeArray<JsStagedMutation>)
+        (readSnapshots: ResizeArray<JsReadSnapshot>)
+        : obj =
         createObj
             [ "js"
               ==> createObj
@@ -137,7 +141,7 @@ module JsToolsBindings =
                             result {
                                 let! full = resolveInside root path
                                 let! text = JsUtf8Fs.readUtf8Classified full
-                                modelReads.Add path
+                                readSnapshots.Add { Path = path; Text = text }
 
                                 return
                                     createObj
@@ -161,6 +165,7 @@ module JsToolsBindings =
                                 let! spec = anchorOf needle
                                 do! requireNonEmptyExact spec
                                 let! listing = JsAnchorFs.grep root spec globPattern
+                                listing.ReadSnapshots |> List.iter readSnapshots.Add
 
                                 let matches =
                                     listing.Matches
@@ -187,8 +192,13 @@ module JsToolsBindings =
                             |> renderOutcome
                         "write"
                         ==> fun (path: string) (text: string) ->
-                            match resolveInside root path with
-                            | Error failure -> failureObj failure
-                            | Ok _ ->
+                            result {
+                                let! full = resolveInside root path
+
+                                if JsMutationFs.existsPath full then
+                                    return! Error(JsFailure.FileAlreadyExists path)
+
                                 staging.Add(JsStagedMutation.Create(path, text))
-                                createObj [ "ok" ==> true ] ] ]
+                                return createObj [ "ok" ==> true ]
+                            }
+                            |> renderOutcome ] ]

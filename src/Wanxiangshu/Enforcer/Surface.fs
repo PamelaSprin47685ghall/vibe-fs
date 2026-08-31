@@ -150,8 +150,8 @@ module EnforcerSurface =
         let textValue = text value?mergedText
         not (System.String.IsNullOrWhiteSpace textValue)
 
-    let maxBlogTextBytes = 512 * 1024
-    let maxEvidenceBytes = 128 * 1024
+    let maxBlogTextBytes = EnforcerCycle.MaxBlogTextBytes
+    let maxEvidenceBytes = EnforcerCycle.MaxEvidenceBytes
 
     /// Compose the derived Blogger rulebook prompt for a base and locale.
     /// Locale values are semantic strings, not ProviderLanguage wire cases.
@@ -174,24 +174,18 @@ module EnforcerSurface =
 
     /// UTF-8 byte limits enforced before a cycle can be committed.
     let validateBounds (textValue: string) (evidenceValue: string option) : obj =
-        let textBytes = LlmFacing.byteCount textValue
-
-        let evidenceBytes =
-            evidenceValue |> Option.map LlmFacing.byteCount |> Option.defaultValue 0
-
-        if textBytes > maxBlogTextBytes then
+        match
+            EnforcerCycle.validateContentBounds LlmFacing.byteCount textValue (evidenceValue |> Option.defaultValue "")
+        with
+        | Error rejection ->
             box
                 {| ok = false
-                   error = sprintf "MaxBlogTextBytes=%d" maxBlogTextBytes |}
-        elif evidenceBytes > maxEvidenceBytes then
-            box
-                {| ok = false
-                   error = sprintf "MaxEvidenceBytes=%d" maxEvidenceBytes |}
-        else
+                   error = EnforcerCycle.contentBoundsError rejection |}
+        | Ok bounds ->
             box
                 {| ok = true
-                   textBytes = textBytes
-                   evidenceBytes = evidenceBytes |}
+                   textBytes = bounds.TextBytes
+                   evidenceBytes = bounds.EvidenceBytes |}
 
     /// Provider-run identity is a required semantic identifier, not a fallback
     /// to tool-call or session ids.

@@ -74,6 +74,7 @@ const NAMED = new Map([
   ['数量常量与清单各自维护', 'VERIFY_004_D_COUNT_CONSTANT_MAINTAINED_APART_FROM_LIST'],
   ['静态门禁的路径判据指向不存在的目录', 'VERIFY_004_D_STATIC_GATE_PATH_DOES_NOT_EXIST'],
   ['延长静默窗口或测试超时以掩盖竞态', 'VERIFY_004_D_WINDOW_WIDENED_TO_HIDE_A_RACE'],
+  ['把叶子测试 timeout 作为 process-isolated 文件 wrapper 的总预算', 'VERIFY_004_D_LEAF_TIMEOUT_APPLIED_TO_FILE_WRAPPER'],
 ]);
 
 const FENCE_OPEN = '```text';

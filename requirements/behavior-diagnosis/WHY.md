@@ -14,6 +14,7 @@
 4. **配对与无损压缩**：诊断 tip 与工作日志 frame 是不可分割的配对观察视图；历史压缩（squash）仅转换表示形式，绝不凭空派生新的诊断事件。
 5. **有界协议修复**：无效 cycle 只能通过受控的 idle nudge 与 AABB 机制进行有界修复，不演化为不受控的自主循环。
 6. **Snapshot 冻结**：Blogger participant life 在创建时冻结对应的 `RulebookRevision`，保证 system prompt、工具枚举与解码器完全同源同构；新规则的生效推迟至 fresh life。
+7. **硬界单一所有权**：内容字节数、阈值与拒绝分支由 Cycle model 的同一纯 decision 决定；提交解码器与 JS semantic surface 只能消费该 decision。
 
 ## 边界与失效模式
 

@@ -1337,7 +1337,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Process/Surface.js',
     owner: 'time-capability',
-    laws: ['TIME-001', 'TIME-002', 'TIME-003', 'TIME-004', 'TIME-005', 'TIME-006', 'TIME-007'],
+    laws: ['TIME-001', 'TIME-002', 'TIME-003', 'TIME-005', 'TIME-006', 'TIME-007'],
     source: 'src/Wanxiangshu/Process/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
