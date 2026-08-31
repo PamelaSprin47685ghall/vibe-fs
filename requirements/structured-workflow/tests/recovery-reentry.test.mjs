@@ -86,15 +86,14 @@ const PROVIDER_RECOVERY_GATE_FIXTURES = [
     id: 'workflow-main-session-failure-owner',
     file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
     source: [
-      'let mainSessionId = mainSessionOfBlogger projection turn.SessionId',
-      'let ownerSessionId = mainSessionId |> Option.defaultValue turn.SessionId',
-      'FallbackLedger.recordConfirmedFailure durable AgentPairCursor.DefaultAutoRecoveryBudget ownerSessionId turn.ProviderRun error',
+      'let ownerSessionId = mainSessionOfBloggerProjection projection turn.SessionId |> Option.defaultValue turn.SessionId',
+      'FallbackLedger.recordAuthorizedFailure durable turn.SessionId authorization error',
     ].join('\n'),
   },
   {
     id: 'interaction-repair-main-session-failure-owner',
     file: 'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs',
-    source: 'FallbackLedger.recordConfirmedFailure journal budget turn.SessionId turn.ProviderRun reason',
+    source: 'FallbackLedger.recordAuthorizedFailure journal turn.SessionId authorization reason',
   },
 ]
 

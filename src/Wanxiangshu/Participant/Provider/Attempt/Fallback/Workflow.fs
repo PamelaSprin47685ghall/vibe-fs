@@ -614,9 +614,9 @@ module ProviderRecoveryWorkflow =
         match ownerSessionId with
         | None -> Task.FromResult(Ok ConfirmedFailureOutcome.NoActiveRun)
         | Some owner ->
-            match FallbackEvidence.tryCurrentState owner projection with
-            | None -> Task.FromResult(Ok ConfirmedFailureOutcome.NoActiveRun)
-            | Some current -> admitCurrentFailure durable owner turn failure requestKind error current
+            FallbackEvidence.tryCurrentState owner projection
+            |> Option.map (admitCurrentFailure durable owner turn failure requestKind error)
+            |> Option.defaultWith (fun () -> Task.FromResult(Ok ConfirmedFailureOutcome.NoActiveRun))
 
     let private executeFallbackDecision
         (sessionPort: ISessionHostPort)

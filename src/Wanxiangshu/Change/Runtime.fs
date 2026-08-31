@@ -62,6 +62,22 @@ module private OrchestratorRuntimeDecisions =
                 return Error error
         }
 
+    /// `AdoptCreated` re-enters an admission whose `WorktreeCreated` is already
+    /// durable, so it owes no second fact. Every other reconciliation still owes
+    /// the fact for the physical worktree it just acquired.
+    let pendingWorktreeCreatedFact (decision: WorktreeReconciliationDecision) fact =
+        match decision with
+        | WorktreeReconciliationDecision.AdoptCreated -> None
+        | _ -> Some fact
+
+    /// A journaled admission has durable worktree evidence, so a failed manager
+    /// start leaves the physical worktree for recovery. Without a journal nothing
+    /// records the worktree, so failure must release it.
+    let releaseWorktreeUnlessJournaled journalPort worktree operation =
+        journalPort
+        |> Option.map (fun _ -> operation)
+        |> Option.defaultWith (fun () -> operation |> releaseWorktreeOnError worktree)
+
 /// Runtime owner for ManagerJob resources. Every job runs the sequential
 /// direct-CE OrchestratorProgram workflow; the mailbox contains only final post-FF verdicts.
 ///
@@ -210,6 +226,72 @@ type Orchestrator
                     |> Task.FromResult
                 | _ -> Ok() |> Task.FromResult
 
+            let acquireWorktree () =
+                match decision with
+                | WorktreeReconciliationDecision.RequestThenCreate
+                | WorktreeReconciliationDecision.CreateAfterProvenMissing ->
+                    WorktreeResource.Create(git, jobId, path)
+                    |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to create worktree")
+                | WorktreeReconciliationDecision.AdoptThenRecordCreated
+                | WorktreeReconciliationDecision.AdoptCreated ->
+                    Ok(WorktreeResource.Adopt(git, identity, path)) |> Task.FromResult
+                | WorktreeReconciliationDecision.Reject failure ->
+                    Error(integration "Worktree reconciliation rejected" (reconciliationFailure failure))
+                    |> Task.FromResult
+
+            let persistWorktreeCreated createdFact =
+                appendFact StreamId.Workspace createdFact
+                |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to persist worktree created")
+
+            let recordWorktreeCreated (worktree: WorktreeResource) =
+                OrchestratorFact.WorktreeCreated
+                    {| ManagerJobId = jobId
+                       WorktreeIdentity = worktree.Identity
+                       WorktreePath = path |}
+                |> OrchestratorRuntimeDecisions.pendingWorktreeCreatedFact decision
+                |> Option.map persistWorktreeCreated
+                |> Option.defaultWith (fun () -> Ok() |> Task.FromResult)
+                |> OrchestratorRuntimeDecisions.releaseWorktreeOnError worktree
+
+            let startManager (worktree: WorktreeResource) =
+                taskResult {
+                    // The Manager session is created before the job fact because
+                    // ORCH-006 persists its SessionId. Its first prompt remains
+                    // deferred until ManagerJobCreated is durable.
+                    let! managerSessionId =
+                        manager.StartManager
+                            { JobId = jobId
+                              ManagerAgent = managerAgent
+                              Worktree = path
+                              Prompt = prompt
+                              ExpectedToolCalls = expectedToolCalls }
+                        |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to start manager")
+
+                    let fact =
+                        OrchestratorFact.ManagerJobCreated
+                            {| ManagerJobId = jobId
+                               ManagerSessionId = managerSessionId
+                               ManagerAgent = managerAgent
+                               Byname = byname
+                               WorktreeIdentity = worktree.Identity
+                               WorktreePath = path
+                               TargetRef = targetRef
+                               TargetBranchFrozen = TargetRef.value targetRef |}
+
+                    do!
+                        appendFact StreamId.Workspace fact
+                        |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to persist manager job")
+
+                    let job =
+                        { JobId = jobId
+                          ManagerSessionId = managerSessionId
+                          ManagerAgent = managerAgent
+                          TargetRef = targetRef
+                          Worktree = worktree }
+
+                    return job
+                }
+
             return!
                 task {
                     let! admissionGate = IntegrationGate.acquire gatePath
@@ -219,98 +301,15 @@ type Orchestrator
                             try
                                 return!
                                     taskResult {
-                                        let! worktree =
-                                            match decision with
-                                            | WorktreeReconciliationDecision.RequestThenCreate
-                                            | WorktreeReconciliationDecision.CreateAfterProvenMissing ->
-                                                WorktreeResource.Create(git, jobId, path)
-                                                |> OrchestratorRuntimeDecisions.mapTaskError (
-                                                    integration "Failed to create worktree"
-                                                )
-                                            | WorktreeReconciliationDecision.AdoptThenRecordCreated
-                                            | WorktreeReconciliationDecision.AdoptCreated ->
-                                                Ok(WorktreeResource.Adopt(git, identity, path)) |> Task.FromResult
-                                            | WorktreeReconciliationDecision.Reject failure ->
-                                                Error(
-                                                    integration
-                                                        "Worktree reconciliation rejected"
-                                                        (reconciliationFailure failure)
-                                                )
-                                                |> Task.FromResult
-
-                                        let shouldRecordCreated =
-                                            match decision with
-                                            | WorktreeReconciliationDecision.AdoptCreated -> false
-                                            | _ -> true
-
-                                        let createdFact =
-                                            OrchestratorFact.WorktreeCreated
-                                                {| ManagerJobId = jobId
-                                                   WorktreeIdentity = worktree.Identity
-                                                   WorktreePath = path |}
-
-                                        do!
-                                            (if shouldRecordCreated then
-                                                 appendFact StreamId.Workspace createdFact
-                                                 |> OrchestratorRuntimeDecisions.mapTaskError (
-                                                     integration "Failed to persist worktree created"
-                                                 )
-                                             else
-                                                 Ok() |> Task.FromResult)
-                                            |> OrchestratorRuntimeDecisions.releaseWorktreeOnError worktree
-
-                                        if journalPort.IsSome then
-                                            worktree.MarkDurable()
-
-                                        let startManager =
-                                            taskResult {
-                                                // The Manager session is created before the job fact because
-                                                // ORCH-006 persists its SessionId. Its first prompt remains
-                                                // deferred until ManagerJobCreated is durable.
-                                                let! managerSessionId =
-                                                    manager.StartManager
-                                                        { JobId = jobId
-                                                          ManagerAgent = managerAgent
-                                                          Worktree = path
-                                                          Prompt = prompt
-                                                          ExpectedToolCalls = expectedToolCalls }
-                                                    |> OrchestratorRuntimeDecisions.mapTaskError (
-                                                        integration "Failed to start manager"
-                                                    )
-
-                                                let fact =
-                                                    OrchestratorFact.ManagerJobCreated
-                                                        {| ManagerJobId = jobId
-                                                           ManagerSessionId = managerSessionId
-                                                           ManagerAgent = managerAgent
-                                                           Byname = byname
-                                                           WorktreeIdentity = worktree.Identity
-                                                           WorktreePath = path
-                                                           TargetRef = targetRef
-                                                           TargetBranchFrozen = TargetRef.value targetRef |}
-
-                                                do!
-                                                    appendFact StreamId.Workspace fact
-                                                    |> OrchestratorRuntimeDecisions.mapTaskError (
-                                                        integration "Failed to persist manager job"
-                                                    )
-
-                                                let job =
-                                                    { JobId = jobId
-                                                      ManagerSessionId = managerSessionId
-                                                      ManagerAgent = managerAgent
-                                                      TargetRef = targetRef
-                                                      Worktree = worktree }
-
-                                                return job
-                                            }
+                                        let! worktree = acquireWorktree ()
+                                        do! recordWorktreeCreated worktree
+                                        journalPort |> Option.iter (fun _ -> worktree.MarkDurable())
 
                                         return!
-                                            if journalPort.IsSome then
-                                                startManager
-                                            else
-                                                startManager
-                                                |> OrchestratorRuntimeDecisions.releaseWorktreeOnError worktree
+                                            startManager worktree
+                                            |> OrchestratorRuntimeDecisions.releaseWorktreeUnlessJournaled
+                                                journalPort
+                                                worktree
                                     }
                             with ex ->
                                 return Error(integration "Manager admission failed" ex.Message)

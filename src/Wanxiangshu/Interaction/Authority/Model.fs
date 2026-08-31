@@ -40,9 +40,7 @@ module PromptAuthority =
     type ContinuationKind = PromptContinuationKind
     type PromptOrigin = Wanxiangshu.Interaction.Authority.PromptOrigin
 
-    type OwnerIdentityWitness = Wanxiangshu.Interaction.Authority.OwnerIdentityWitness
     type IdentitySeed = PromptIdentitySeed
-    type OwnerIdentityWitnessInput = Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput
     type IdentitySeedInput = PromptIdentitySeedInput
     type IdentitySeedValidationError = PromptIdentitySeedValidationError
 

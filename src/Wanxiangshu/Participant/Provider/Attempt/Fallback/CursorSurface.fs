@@ -13,6 +13,8 @@ open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Execution.Failure
+open Wanxiangshu.Execution.Session.ChatExecution
 
 /// JSON/opaque owner boundary for the pure fallback cursor and its durable fold.
 /// Cursor/projection identities and journal facts never cross as Fable records,
@@ -437,7 +439,7 @@ module CursorSurface =
 
         { RuntimeId = RuntimeId.create "rt-fallback-surface"
           LocalSeq = LocalSeq.create sequence
-          ObservedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+          ObservedAt = Unchecked.defaultof<_>
           EventId = EventId.create ($"fallback-{sequence}")
           Stream = StreamId.Session session
           ProviderRun = providerRun
@@ -515,3 +517,77 @@ module CursorSurface =
                             {| ok = false
                                error = PromptDispatcher.describeHumanRootAcceptanceFailure error |}
         }
+
+    let private outcomeName outcome =
+        match outcome with
+        | ConfirmedFailureOutcome.RecoveryAdvanced _ -> "Advanced"
+        | ConfirmedFailureOutcome.RecoveryExhausted -> "Exhausted"
+        | ConfirmedFailureOutcome.AlreadyRecorded -> "AlreadyRecorded"
+        | ConfirmedFailureOutcome.NoActiveRun -> "NoActiveRun"
+
+    /// Record one confirmed provider failure through the production ledger using
+    /// an opaque JournalHandle. Only `ExecutionFailurePolicy` may licence the
+    /// advance, and no F# Result/DU crosses the boundary.
+    let recordConfirmedFailure
+        (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
+        (budget: int)
+        (session: string)
+        (providerRun: string)
+        (reason: string)
+        : Task<obj> =
+        task {
+            let sessionId = SessionId.create session
+            let providerRunId = ProviderRunIdentity.create providerRun
+
+            let! result =
+                match FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot handle.Journal) with
+                | None -> Task.FromResult(Ok ConfirmedFailureOutcome.NoActiveRun)
+                | Some _ when budget <> AgentPairCursor.DefaultAutoRecoveryBudget ->
+                    Task.FromResult(Error "provider recovery budget must equal the declared default")
+                | Some current ->
+                    let available =
+                        if FallbackProjection.mayContinue AgentPairCursor.DefaultAutoRecoveryBudget current then
+                            ProviderRecoveryBudget.Available
+                        else
+                            ProviderRecoveryBudget.Exhausted
+
+                    let decision =
+                        ExecutionFailurePolicy.decide
+                            { Failure = ExecutionFailure.ProviderTransient
+                              Lifecycle = DurableExecutionLifecycle.ProviderStarted
+                              ExecutionKey =
+                                { SessionId = sessionId
+                                  PhysicalUserMessageId = PhysicalUserMessageId.create ("proof-" + providerRun) }
+                              Capacity = CapacityOwnership.NoCapacityFence
+                              Provider =
+                                { LogicalRun = current.LogicalRunId
+                                  ProviderRun = providerRunId
+                                  RequestKind = ProviderRequestKind.WorkMain
+                                  RetryBudget = ProviderRecoveryBudget.Exhausted
+                                  FallbackBudget = available
+                                  Breaker = ProviderBreakerState.Closed } }
+
+                    match decision.Fallback with
+                    | FallbackDecision.AdvanceFallback authorization ->
+                        FallbackLedger.recordAuthorizedFailure handle.Journal sessionId authorization reason
+                    | FallbackDecision.NoFallback -> Task.FromResult(Ok ConfirmedFailureOutcome.AlreadyRecorded)
+
+            return
+                match result with
+                | Ok outcome ->
+                    box
+                        {| ok = true
+                           outcome = outcomeName outcome |}
+                | Error error -> box {| ok = false; error = error |}
+        }
+
+    /// Read the durable fallback cursor for one session without exposing the
+    /// projection record, map, or closed offset representation.
+    let snapshot (handle: Wanxiangshu.Persistence.Journal.JournalHandle) (session: string) : obj =
+        match FallbackEvidence.tryCurrentState (SessionId.create session) (AgentJournal.snapshot handle.Journal) with
+        | None -> null
+        | Some current ->
+            box
+                {| offset = AgentPairCursor.FallbackOffsetCodec.toByte current.Cursor.Offset
+                   failures = current.Cursor.ConsecutiveFailureCount
+                   exhausted = current.Exhausted |}

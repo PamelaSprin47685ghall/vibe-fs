@@ -63,6 +63,7 @@ open Wanxiangshu.Resources
 
 module internal CompanionHostBlogger =
 
+    /// DSL-class: PhysicalHandle — Host dispatch handles only: `Sessions`/`Durable` own the Host session and durable ports, `PrimaryId`/`EffectiveAgent` are physical dispatch coordinates, `EnsureBlogger` owns the child session creation task, `Gate` is the process-local lock object, `Companion` is the process-local runtime cell, `Journal` owns the durable journal writer; owner context-compression, law CONTEXT-COMPRESSION-024, proof blogger-runtime.
     type BloggerDeps =
         { Sessions: ISessionHostPort
           PrimaryId: SessionId

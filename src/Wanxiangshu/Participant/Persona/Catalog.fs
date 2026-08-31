@@ -2,6 +2,8 @@ namespace Wanxiangshu.Participant.Persona
 
 open Wanxiangshu.Foundation
 
+/// DSL-class: Vocabulary — the fixed persona catalog, one name per Role × AgentTier
+/// pair plus the two Bookkeeper leaves. No case carries state or ordering.
 [<RequireQualifiedAccess>]
 type Persona =
     | Integrator
@@ -117,7 +119,8 @@ module PersonaCatalog =
 
     let personaV1 (role: Role) (tier: AgentTier) : string = persona role tier |> Persona.render
 
-    let bookkeeperPersonaV1 (tier: AgentTier) : string = bookkeeperPersona tier |> Persona.render
+    let bookkeeperPersonaV1 (tier: AgentTier) : string =
+        bookkeeperPersona tier |> Persona.render
 
     /// HOST-026 analogue: child / attached / InternalLeaf ParticipantIdentity inherits the owner persona.
     let inheritFrom (ownerPersona: string) : string = ownerPersona

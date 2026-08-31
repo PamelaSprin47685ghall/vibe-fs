@@ -465,20 +465,29 @@ export const RULES = [
     positive: true,
   },
   {
+    // The Blogger-main / durably-proven-WorkMain owner resolution and the
+    // policy-licensed append live in one chain: admitPolicyAuthorizedFailure
+    // resolves the exact owner and fails closed to NoActiveRun, and the only
+    // ledger append binds that resolved `ownerSessionId` together with the
+    // typed `ProviderRecoveryAuthorization` issued by ExecutionFailurePolicy
+    // (PAR-019). A raw budget int no longer authorizes an advance.
     id: 'workflow-main-session-failure-owner',
     fileHint: 'Workflow.fs',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
     pattern:
-      /\blet\s+mainSessionId\s*=\s*mainSessionOfBlogger\s+projection\s+turn\.SessionId\b[\s\S]{0,500}\blet\s+ownerSessionId\s*=\s*match\s+mainSessionId\s+with\s*\|\s*Some\s+\w+\s*->\s*Some\s+\w+\s*\|\s*None\s*->[\s\S]{0,300}\bFallbackEvidence\.tryCurrentState\s+turn\.SessionId\s+projection\b[\s\S]{0,200}\bOption\.map\s*\(fun\s+_\s*->\s*turn\.SessionId\)[\s\S]{0,500}\bmatch\s+ownerSessionId\s+with\s*\|\s*None\s*->(?:(?!FallbackLedger\.recordConfirmedFailure)[\s\S]){1,500}\|\s*Some\s+(\w+)\s*->[\s\S]{0,500}\bFallbackLedger\.recordConfirmedFailure\s+durable\s+AgentPairCursor\.DefaultAutoRecoveryBudget\s+\1\b/,
+      /\bFallbackLedger\.recordAuthorizedFailure\s+durable\s+ownerSessionId\s+authorization\s+error\b[\s\S]{0,3000}\blet\s+ownerSessionId\s*=\s*\r?\n\s*mainSessionOfBloggerProjection\s+projection\s+turn\.SessionId\s*\r?\n\s*\|>\s*Option\.orElseWith\s*\(fun\s*\(\)\s*->\s*\r?\n\s*FallbackEvidence\.tryCurrentState\s+turn\.SessionId\s+projection\s*\r?\n\s*\|>\s*Option\.map\s*\(fun\s+_\s*->\s*turn\.SessionId\)\)[\s\S]{0,200}\bmatch\s+ownerSessionId\s+with\s*\r?\n\s*\|\s*None\s*->(?:(?!FallbackLedger)[\s\S]){0,200}?\bConfirmedFailureOutcome\.NoActiveRun\b[\s\S]{0,300}?\|\s*Some\s+owner\s*->[\s\S]{0,400}?\bFallbackEvidence\.tryCurrentState\s+owner\s+projection\b[\s\S]{0,300}?\badmitCurrentFailure\s+durable\s+owner\b/,
     label: 'Fallback Workflow must append only to a resolved Blogger main or durably proven WorkMain owner',
     positive: true,
   },
   {
+    // InteractionRepair owns no second owner-resolution formula: it records the
+    // confirmed provider failure through the one workflow entry that resolves
+    // the exact main-session owner and consumes the typed policy licence.
     id: 'interaction-repair-main-session-failure-owner',
     fileHint: 'InteractionRepair.fs',
     pathHint: 'Interaction/Repair/',
     pattern:
-      /\bSessionAssociationProjection\.tryMainSessionOf\b[\s\S]{0,2500}\bmatch\s+mainSessionId\s+with\b[\s\S]{0,500}\|\s*Some\s+mainSessionId\s*->[\s\S]{0,500}\bFallbackLedger\.recordConfirmedFailure\s+journal\s+AgentPairCursor\.DefaultAutoRecoveryBudget\s+mainSessionId\b/,
+      /\bProviderRecoveryWorkflow\.admitPolicyAuthorizedFailure\s*\r?\n\s*journal\s*\r?\n\s*turn\s*\r?\n\s*ExecutionFailure\.ProviderTransient\s*\r?\n\s*requestKind\s*\r?\n\s*reason\b/,
     label: 'InteractionRepair must resolve the exact main-session owner before recording failure',
     positive: true,
   },
