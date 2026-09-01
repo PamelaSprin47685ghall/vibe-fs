@@ -4,10 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Resources
-open Wanxiangshu.Resources
 open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
 
 /// mv / rm — Coder-only file mutation tools (AGENT-016/017/018).

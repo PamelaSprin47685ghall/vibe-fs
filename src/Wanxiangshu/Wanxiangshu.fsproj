@@ -815,6 +815,7 @@
     <Compile Include="Strength/Replica/Transform.fs"/>
     <Compile Include="Strength/Replica/Runtime.fsi"/>
     <Compile Include="Strength/Replica/Runtime.fs"/>
+    <Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fsi"/>
     <Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fs"/>
     <Compile Include="OpenCode/Codec/ProviderProjectionSurface.fs"/>
     <Compile Include="OpenCode/Host/HostSessionContext.fsi"/>
@@ -835,6 +836,7 @@
     <Compile Include="Mission/Obligation/Todo/MagicTodoLocalitySurface.fs"/>
     <Compile Include="Mission/Obligation/LedgerWorkflow.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoMembrane.fs"/>
+    <Compile Include="Interaction/Dispatch/Ingress.fsi"/>
     <Compile Include="Interaction/Dispatch/Ingress.fs"/>
     <Compile Include="Interaction/Authority/Child.fsi"/>
     <Compile Include="Interaction/Authority/Child.fs"/>
@@ -848,6 +850,7 @@
     <Compile Include="Execution/Delegation/SyncDelegate/Workflow.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Runtime.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Runtime.fs"/>
+    <Compile Include="Interaction/Dispatch/Recovery.fsi"/>
     <Compile Include="Interaction/Dispatch/Recovery.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/PendingRun.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Host/PendingRun.fs"/>
@@ -878,6 +881,7 @@
     <Compile Include="Execution/Delegation/Fork/Host/HostForkPtySurface.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/State.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/State.fs"/>
+    <Compile Include="Interaction/Repair/Port.fsi"/>
     <Compile Include="Interaction/Repair/Port.fs"/>
 
     <Compile Include="Context/Companion/Blogger/Runtime/ParkedTransform.fsi"/>
@@ -921,6 +925,7 @@
     <Compile Include="Context/Companion/Blogger/BloggerCrashSurface.fs"/>
     <Compile Include="Enforcer/ObservationSurface.fsi" />
     <Compile Include="Enforcer/ObservationSurface.fs"/>
+    <Compile Include="Execution/Session/Recovery/Workflow.fsi"/>
     <Compile Include="Execution/Session/Recovery/Workflow.fs"/>
     <Compile Include="Execution/Session/Recovery/Surface.fsi"/>
     <Compile Include="Execution/Session/Recovery/Surface.fs"/>
@@ -937,10 +942,12 @@
     <Compile Include="OpenCode/Host/PluginSessionScope.fs"/>
     <Compile Include="OpenCode/Host/PluginRecoveryScope.fsi"/>
     <Compile Include="OpenCode/Host/PluginRecoveryScope.fs"/>
+    <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fsi"/>
     <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fs"/>
     <Compile Include="OpenCode/Host/SessionRecoveryHost.fs"/>
     <Compile Include="OpenCode/Host/PluginRuntimeScope.fs"/>
     <Compile Include="Context/Companion/RuntimeSurface.fs"/>
+    <Compile Include="Composition/Turn/Binding.fsi"/>
     <Compile Include="Composition/Turn/Binding.fs"/>
     <Compile Include="Enforcer/Host.fsi" />
     <Compile Include="Enforcer/Host.fs"/>
@@ -951,7 +958,9 @@
     <Compile Include="Context/Companion/Transform.fs"/>
     <Compile Include="Mission/Review/OpenCode/HostGuard.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinGuard.fs"/>
+    <Compile Include="Composition/Turn/TurnReconcile.fsi"/>
     <Compile Include="Composition/Turn/TurnReconcile.fs"/>
+    <Compile Include="Composition/Turn/ReconcilePass.fsi"/>
     <Compile Include="Composition/Turn/ReconcilePass.fs"/>
     <Compile Include="Composition/Turn/Scheduler.fs"/>
     <Compile Include="Composition/Turn/ReconcileSurface.fs"/>
@@ -1055,6 +1064,7 @@
     <Compile Include="Enforcer/BlogSurface.fs"/>
     <Compile Include="Mission/Review/OpenCode/JudgeTool.fs"/>
     <Compile Include="Mission/Finality/OpenCode/Tool.fs"/>
+    <Compile Include="OpenCode/Tools/FileMutationTools.fsi"/>
     <Compile Include="OpenCode/Tools/FileMutationTools.fs"/>
     <Compile Include="OpenCode/Tools/BashHoneypotTool.fs"/>
     <Compile Include="OpenCode/Tools/AssumeTool.fs"/>
@@ -1098,7 +1108,9 @@
     <Compile Include="Repository/Knowledge/Casebook/Workflow.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Index.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Index.fs"/>
+    <Compile Include="Repository/Programming/Js/ToolsBindings.fsi"/>
     <Compile Include="Repository/Programming/Js/ToolsBindings.fs"/>
+    <Compile Include="Repository/Programming/Js/TransactionStore.fsi"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>
     <Compile Include="Persistence/EventStore/CanonicalIntegrator.fs"/>
     <Compile Include="Persistence/EventStore/EventStoreHandle.fsi"/>
@@ -1111,11 +1123,15 @@
     <Compile Include="Repository/Knowledge/Casebook/IndexSurface.fs"/>
     <Compile Include="Persistence/EventStore/CodecSurface.fs"/>
     <Compile Include="Persistence/EventStore/MergeSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/OpenCode/ToolWorkflow.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolWorkflow.fs"/>
+    <Compile Include="Repository/Programming/Js/OpenCode/BookkeeperTool.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/BookkeeperTool.fs"/>
+    <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fs"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStore.fs"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/GeneratorSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/GeneratorSurface.fs"/>
     <Compile Include="Repository/Programming/Js/RuntimeSurface.fs"/>
     <Compile Include="Repository/Programming/Js/FilesystemSurface.fs"/>

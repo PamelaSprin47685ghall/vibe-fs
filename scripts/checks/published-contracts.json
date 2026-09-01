@@ -172,6 +172,11 @@
       "justification": "Signed Node vm adapter support for the repository-programming contract; vm imports, sentinel decoding and error-classification helpers remain private behind the F# signature."
     },
     {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs",
+      "owner": "repository-programming",
+      "justification": "Signed JS sandbox API bindings for opencode tool workflows and the repository-programming runtime; Node path/UTF-8/glob/mutation adapters remain private behind the F# signature."
+    },
+    {
       "path": "src/Wanxiangshu/AssemblyInfo.fs",
       "owner": "distribution",
       "justification": "Assembly attribute carrier has no callable runtime surface; its sibling signature keeps the distribution leaf locality structurally signed."
@@ -802,6 +807,16 @@
       "path": "src/Wanxiangshu/Repository/Knowledge/Casebook/SessionDraft.fs",
       "owner": "knowledge-reuse",
       "justification": "Signed process-local Casebook draft staging registry consumed only by the knowledge-reuse Casebook workflow; it holds no durable writer, Host effect or cross-owner authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs",
+      "owner": "dispatch-protocol",
+      "justification": "Detached prompt claim reconciliation over durable PromptAuthority projection and an injected Host snapshot; it proves pending claims from physical evidence or leaves them pending, owns no runtime authority, and never resends."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs",
+      "owner": "dispatch-protocol",
+      "justification": "Direct-CE family recovery workflow that composes prompt-claim recovery, blogger crash recovery, handle and job family queries through injected ports; it carries no independent runtime authority or physical effect."
     }
   ],
   "compiler_boundary_localities": [
@@ -849,6 +864,11 @@
       "owner": "dispatch-protocol",
       "locality": "execution-session-recovery-model",
       "justification": "Recovery family algebra, pure turn reconciliation vocabulary, physical prompt acceptance and the durable PromptDispatcher send runtime form one fully signed dispatch-protocol contract locality over graduated identity, Host, session, routing, managed-chat and journal contracts; private persistence/send helpers and obsolete monolith imports remain hidden or removed."
+    },
+    {
+      "owner": "dispatch-protocol",
+      "locality": "interaction-dispatch-opencode-ingresscodec",
+      "justification": "OpenCode prompt ingress codec, chat-admission intent resolution, durable prompt recovery, interaction-repair send outcome, session nudge runtime, turn binding/reconcile/pass and session recovery workflow form one fully signed dispatch-protocol contract locality over graduated identity, Host, session, authority, durable projection and composition-turn contracts; monolith/obsolete imports have been removed and private helpers remain signature-hidden."
     },
     {
       "owner": "session-ontology",
@@ -1119,6 +1139,11 @@
       "owner": "provider-language",
       "locality": "participant-provider-language",
       "justification": "Provider language vocabulary, session bind-once authority, packaged bilingual resources, prose rendering and Host language binding are fully published signed contracts whose only compile dependencies are graduated identity, distribution and provider-projection localities."
+    },
+    {
+      "owner": "repository-programming",
+      "locality": "opencode-tools-filemutationtools",
+      "justification": "JS opencode file mutation, sandbox bindings, durable transaction store, tool workflow, bookkeeper tool, tool host and generator surface are fully signed; their compile closure uses graduated repository-programming-js-capability, foundation-identity, host-boundary, office-capability, durable-events, knowledge-reuse, provider-language and participant-identity localities."
     },
     {
       "owner": "distribution",
