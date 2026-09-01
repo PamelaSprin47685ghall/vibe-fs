@@ -299,7 +299,9 @@
     <Compile Include="Persistence/Journal/EventStoreJournalCodec.fs"/>
     <Compile Include="Context/Companion/Projection.fs"/>
     <Compile Include="Context/Trace/Projection.fs"/>
+    <Compile Include="Mission/Manager/Life/Projection.fsi"/>
     <Compile Include="Mission/Manager/Life/Projection.fs"/>
+    <Compile Include="Mission/Manager/Life/Admission.fsi"/>
     <Compile Include="Mission/Manager/Life/Admission.fs"/>
     <Compile Include="Mission/Obligation/Todo/Projection.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Projection.fs"/>

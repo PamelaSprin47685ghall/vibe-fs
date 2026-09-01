@@ -1,11 +1,9 @@
 namespace Wanxiangshu.Mission.Manager.Life
 
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Finality
 
 /// Evidence that one physical message is the active HumanRoot itself, not merely
 /// another user-shaped message observed while a HumanRoot run happens to exist.
