@@ -442,6 +442,7 @@
     <Compile Include="Interaction/Concern/Fold.fs"/>
     <Compile Include="Enforcer/InstitutionalLearning/Fold.fsi"/>
     <Compile Include="Enforcer/InstitutionalLearning/Fold.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Fold.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Fold.fs"/>
     <Compile Include="Composition/Durable/Fold.fs"/>
     <Compile Include="Execution/Delegation/Handle/FoldSurface.fs"/>
@@ -452,7 +453,9 @@
     <Compile Include="Persistence/Journal/EventStoreJournalWriter.fs"/>
     <Compile Include="Persistence/Journal/AgentJournal.fsi"/>
     <Compile Include="Persistence/Journal/AgentJournal.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Acceptance.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Acceptance.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Settlement.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Settlement.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Surface.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateLedger.fs"/>

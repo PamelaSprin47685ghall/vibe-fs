@@ -354,6 +354,11 @@
   ],
   "compiler_boundary_localities": [
     {
+      "owner": "managed-chat-execution",
+      "locality": "execution-session-chatexecution-fold",
+      "justification": "Managed chat durable fold, exact acceptance/provider lifecycle witnesses and pre-provider settlement form a fully signed contract locality over graduated identity, authority, persistence, request-kind and prefix contracts; single-flight and decision internals remain signature-hidden while typed persistence seams stay owner-internal."
+    },
+    {
       "owner": "provider-attempt-recovery",
       "locality": "participant-provider-attempt-planner",
       "justification": "Provider attempt planning, fallback durable fold and bounded read evidence form a fully signed recovery locality over graduated authority, chat-execution, prefix and fallback fact contracts; unconsumed evidence helpers and implementation-only decision plumbing are hidden by signatures."
