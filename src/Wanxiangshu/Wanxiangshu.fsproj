@@ -597,6 +597,7 @@
     <Compile Include="Enforcer/Surface.fs"/>
     <Compile Include="Resources/RuntimeResources.fsi"/>
     <Compile Include="Resources/RuntimeResources.fs"/>
+    <Compile Include="Resources/PromptSurface.fsi"/>
     <Compile Include="Resources/PromptSurface.fs"/>
     <Compile Include="Mission/Finality/PromptSurface.fs"/>
     <Compile Include="Git/IntegrationGate.fs"/>
@@ -710,6 +711,7 @@
     <Compile Include="OpenCode/Host/ProviderRunBindingSurface.fs"/>
     <Compile Include="OpenCode/Host/OpenCodePort.fsi"/>
     <Compile Include="OpenCode/Host/OpenCodePort.fs"/>
+    <Compile Include="OpenCode/Host/SessionExecutionBinding.fsi"/>
     <Compile Include="OpenCode/Host/SessionExecutionBinding.fs"/>
     <Compile Include="OpenCode/Host/ModelRoutingSurface.fs"/>
     <Compile Include="OpenCode/Host/SessionBindingSurface.fs"/>
@@ -1018,6 +1020,7 @@
     <Compile Include="OpenCode/Plugin/PluginHostWiring.fs"/>
     <Compile Include="OpenCode/Plugin/PluginSessionWiring.fs"/>
     <Compile Include="OpenCode/Plugin/PluginRecoveryWiring.fs"/>
+    <Compile Include="OpenCode/Host/BloggerChronicleText.fsi"/>
     <Compile Include="OpenCode/Host/BloggerChronicleText.fs"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fs"/>
     <Compile Include="OpenCode/Plugin/PluginHooks.fs"/>

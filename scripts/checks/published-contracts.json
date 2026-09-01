@@ -565,9 +565,19 @@
       "path": "src/Wanxiangshu/OpenCode/Host/LoopSensorSurface.fs",
       "owner": "degeneration-guard",
       "justification": "Signed JS-native process-local degeneration guard proof surface; callback and Promise representation helpers remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/PromptSurface.fs",
+      "owner": "cognitive-environment",
+      "justification": "Signed JS-native prompt-resource projection surface over canonical bilingual prompt resources; package installation and representation helpers remain private and it owns no Host execution authority."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "cognitive-environment",
+      "locality": "resources-promptsurface",
+      "justification": "Prompt resource projection, managed session execution binding and bounded Blogger chronicle injection form a fully signed cognitive-environment locality over graduated Host, routing, managed-chat, journal, identity and provider contracts; process-local execution registries and representation helpers remain signature-hidden."
+    },
     {
       "owner": "execution-model-routing",
       "locality": "opencode-host-opencodeport",
