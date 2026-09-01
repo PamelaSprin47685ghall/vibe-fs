@@ -2,6 +2,11 @@
   "schema_version": 1,
   "compile_contract_support": [
     {
+      "path": "src/Wanxiangshu/Change/Fact.fs",
+      "owner": "change-integration",
+      "justification": "Signed owner-local routing constructors from Change durable facts into the canonical AgentFact union; they add no independent semantic or persistence authority."
+    },
+    {
       "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs",
       "owner": "institutional-learning",
       "justification": "Signed pure institutional-learning disposition/revision decision over the Enforcer catalog; it holds no runtime authority or physical state."
@@ -193,6 +198,16 @@
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "requirement-grounding",
+      "locality": "host-fact",
+      "justification": "Requirement-grounding Host fact constructors and projection form a signed locality over the graduated grounding model and durable routing union; no runtime Host policy enters the compile boundary."
+    },
+    {
+      "owner": "change-integration",
+      "locality": "change-fact",
+      "justification": "Change routing constructors, orchestrator projection and canonical Git subject primitives form a signed locality over graduated Change facts, identity and durable routing; the routing bridge is explicit signed owner-local support."
+    },
     {
       "owner": "durable-events",
       "locality": "composition-durable-fact",

@@ -141,7 +141,9 @@
     <Compile Include="Execution/Delegation/Fact.fs"/>
     <Compile Include="Context/Companion/Fact.fs"/>
     <Compile Include="Execution/Fission/Fact.fs"/>
+    <Compile Include="Change/Fact.fsi"/>
     <Compile Include="Change/Fact.fs"/>
+    <Compile Include="Host/Fact.fsi"/>
     <Compile Include="Host/Fact.fs"/>
     <Compile Include="Foundation/Temporal.fsi"/>
     <Compile Include="Foundation/Temporal.fs"/>
@@ -303,6 +305,7 @@
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fs"/>
     <Compile Include="Execution/Delegation/LinkageProjection.fs"/>
     <Compile Include="Execution/Delegation/Handle/Surface.fs"/>
+    <Compile Include="Change/Projection.fsi"/>
     <Compile Include="Change/Projection.fs"/>
     <Compile Include="Execution/Session/Association.fsi"/>
     <Compile Include="Execution/Session/Association.fs"/>
@@ -314,6 +317,7 @@
     <Compile Include="Context/Companion/Blogger/Runtime/CycleSurface.fs"/>
     <Compile Include="OpenCode/Host/PairProgramming/GuidelineProjection.fs"/>
     <Compile Include="OpenCode/Host/PairProgramming/GuidelineSurface.fs"/>
+    <Compile Include="OpenCode/Host/RequirementGrounding/Projection.fsi"/>
     <Compile Include="OpenCode/Host/RequirementGrounding/Projection.fs"/>
     <Compile Include="Enforcer/Guidance/DeliveryProjection.fs"/>
     <Compile Include="Enforcer/Guidance/DeliverySurface.fs"/>
@@ -379,6 +383,7 @@
     <Compile Include="Execution/Session/SessionStartedAtLedger.fs"/>
     <Compile Include="Mission/Review/Barrier/Workflow.fs"/>
     <Compile Include="Persistence/Journal/SharedAgentJournal.fs"/>
+    <Compile Include="Git/Subject.fsi"/>
     <Compile Include="Git/Subject.fs"/>
     <Compile Include="Persistence/Journal/RuntimePath.fs"/>
     <Compile Include="Execution/Agent/Errors.fs"/>
