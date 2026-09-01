@@ -341,6 +341,7 @@
     <Compile Include="Repository/Programming/Js/Anchor.fs"/>
     <Compile Include="Repository/Programming/Js/Transaction.fsi"/>
     <Compile Include="Repository/Programming/Js/Transaction.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Model.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Model.fs"/>
     <Compile Include="Persistence/EventStore/StoreTypes.fsi"/>
     <Compile Include="Persistence/EventStore/StoreTypes.fs"/>
@@ -755,7 +756,9 @@
     <Compile Include="OpenCode/Host/HostSignalSubscribeSurface.fs"/>
     <Compile Include="Composition/Turn/Observation.fsi"/>
     <Compile Include="Composition/Turn/Observation.fs"/>
+    <Compile Include="Strength/TurnEvidence.fsi"/>
     <Compile Include="Strength/TurnEvidence.fs"/>
+    <Compile Include="Strength/Lifecycle.fsi"/>
     <Compile Include="Strength/Lifecycle.fs"/>
     <Compile Include="Strength/Replica/TraceRecovery.fsi"/>
     <Compile Include="Strength/Replica/TraceRecovery.fs"/>
@@ -794,6 +797,7 @@
     <Compile Include="Repository/Investigation/WarmStart/Runtime.fs"/>
     <Compile Include="Repository/Investigation/WarmStartSurface.fsi"/>
     <Compile Include="Repository/Investigation/WarmStartSurface.fs"/>
+    <Compile Include="Strength/OpenCode/Replay.fsi"/>
     <Compile Include="Strength/OpenCode/Replay.fs"/>
     <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fsi"/>
     <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fs"/>
@@ -912,6 +916,7 @@
     <Compile Include="Execution/Session/Recovery/Coordinator.fs"/>
     <Compile Include="Enforcer/Cycle/BloggerProbe.fsi" />
     <Compile Include="Enforcer/Cycle/BloggerProbe.fs"/>
+    <Compile Include="Context/Companion/Blogger/BloggerCrashRecovery.fsi"/>
     <Compile Include="Context/Companion/Blogger/BloggerCrashRecovery.fs"/>
     <Compile Include="Context/Companion/Blogger/BloggerCrashSurface.fs"/>
     <Compile Include="Enforcer/ObservationSurface.fsi" />
@@ -924,7 +929,9 @@
     <Compile Include="OpenCode/Host/SharedState.fs"/>
     <Compile Include="OpenCode/Host/SharedStateSurface.fsi"/>
     <Compile Include="OpenCode/Host/SharedStateSurface.fs"/>
+    <Compile Include="Context/Companion/Blogger/OpenCode/PluginScope.fsi"/>
     <Compile Include="Context/Companion/Blogger/OpenCode/PluginScope.fs"/>
+    <Compile Include="Strength/OpenCode/PluginScope.fsi"/>
     <Compile Include="Strength/OpenCode/PluginScope.fs"/>
     <Compile Include="OpenCode/Host/PluginSessionScope.fsi"/>
     <Compile Include="OpenCode/Host/PluginSessionScope.fs"/>
@@ -937,6 +944,7 @@
     <Compile Include="Composition/Turn/Binding.fs"/>
     <Compile Include="Enforcer/Host.fsi" />
     <Compile Include="Enforcer/Host.fs"/>
+    <Compile Include="Context/Companion/Blogger/MainContext.fsi"/>
     <Compile Include="Context/Companion/Blogger/MainContext.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Coordinator.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Coordinator.fs"/>
@@ -1073,14 +1081,22 @@
     <Compile Include="Repository/Programming/Js/AnchorFs.fs"/>
     <Compile Include="Repository/Programming/Js/MutationFs.fsi"/>
     <Compile Include="Repository/Programming/Js/MutationFs.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Capture.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Capture.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Store.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Store.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Replay.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Replay.fs"/>
     <Compile Include="Enforcer/ObservationCollector.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/SessionDraft.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/SessionDraft.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/BookkeeperStaging.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperStaging.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/BookkeeperRuntime.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperRuntime.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Workflow.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Workflow.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Index.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Index.fs"/>
     <Compile Include="Repository/Programming/Js/ToolsBindings.fs"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>

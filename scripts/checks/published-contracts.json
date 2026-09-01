@@ -797,6 +797,11 @@
       "path": "src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs",
       "owner": "host-boundary",
       "justification": "Signed JS-native boundary for HOST-BOUNDARY-010 / HOST-012 shared cross-instance state; the physical Map/Set/atom singletons in SharedState remain signature-hidden and only narrow put/get/clear/root operations cross the edge."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Knowledge/Casebook/SessionDraft.fs",
+      "owner": "knowledge-reuse",
+      "justification": "Signed process-local Casebook draft staging registry consumed only by the knowledge-reuse Casebook workflow; it holds no durable writer, Host effect or cross-owner authority."
     }
   ],
   "compiler_boundary_localities": [
@@ -1261,6 +1266,11 @@
       "justification": "Companion host, runtime state, parked transform, runtime host, abandon, coordinator, model, journal port and fact folds form a fully signed context-compression companion runtime locality over graduated companion facts, Blogger request/projection, durable journal, session attachment, identity and Host contracts; physical host effects and runtime implementation details remain signature-hidden."
     },
     {
+      "owner": "context-compression",
+      "locality": "context-companion-foldsurface",
+      "justification": "Blogger crash recovery window classifier, main-context materialization and OpenCode plugin runtime scope form a fully signed context-compression Blogger locality over graduated companion runtime, semantic trace, durable journal and Host contracts; physical flight/drain registries and mutable runtime state remain signature-hidden."
+    },
+    {
       "owner": "review-assurance",
       "locality": "opencode-host-providerrunbinding",
       "justification": "Physical provider-run binding, JS-native surface and cross-instance shared state form one fully signed review-assurance locality over graduated identity, Host snapshot, session and context-compression contracts; private helper functions and mutable registry internals remain signature-hidden."
@@ -1279,6 +1289,16 @@
       "owner": "host-boundary",
       "locality": "opencode-host-sharedstatesurface",
       "justification": "SharedStateSurface, PluginSessionScope, PluginRecoveryScope and GitTree form one fully signed Host boundary locality over graduated identity, chat-execution, recovery, provider-attempt, provider-language, review-assurance and review-judgement contracts; cross-instance singletons, per-instance registries and Git implementation details remain signature-hidden."
+    },
+    {
+      "owner": "knowledge-reuse",
+      "locality": "repository-knowledge-casebook-model",
+      "justification": "Casebook model, capture, store, replay, staging, bookkeeper runtime, workflow and index form one fully signed knowledge-reuse locality over graduated identity, Host, session, provider, persistence-event-store and repository-programming contracts; process-local mutable registries and Node interop helpers remain signature-hidden."
+    },
+    {
+      "owner": "speculative-investigation",
+      "locality": "strength-turnevidence",
+      "justification": "Strength turn evidence, lifecycle, Host-boundary replay and plugin scope form one fully signed speculative-investigation locality over graduated prediction, replica, projection, frame, event, durability, Host, semantic trace and provider-projection contracts; counterfactual and replay helpers remain signature-hidden."
     }
   ],
   "contracts": [
