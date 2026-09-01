@@ -185,6 +185,7 @@
     <Compile Include="Context/Trace/Model.fs"/>
     <Compile Include="Mission/Obligation/Todo/ObligationCodec.fsi"/>
     <Compile Include="Mission/Obligation/Todo/ObligationCodec.fs"/>
+    <Compile Include="Mission/Obligation/Todo/PrefixEpoch.fsi"/>
     <Compile Include="Mission/Obligation/Todo/PrefixEpoch.fs"/>
     <Compile Include="Mission/Obligation/Todo/Surface.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Surface.fs"/>
@@ -249,7 +250,9 @@
     <Compile Include="Context/Companion/Blogger/DeltaSurface.fs"/>
     <Compile Include="Context/Companion/Blogger/Request.fsi"/>
     <Compile Include="Context/Companion/Blogger/Request.fs"/>
+    <Compile Include="Context/Prefix/ProbeSelection.fsi"/>
     <Compile Include="Context/Prefix/ProbeSelection.fs"/>
+    <Compile Include="Context/Prefix/Projection.fsi"/>
     <Compile Include="Context/Prefix/Projection.fs"/>
     <Compile Include="Mission/Review/Judgement/Witness.fsi"/>
     <Compile Include="Mission/Review/Judgement/Witness.fs"/>
@@ -337,6 +340,7 @@
     <Compile Include="Context/Companion/Blogger/Projection.fsi"/>
     <Compile Include="Context/Companion/Blogger/Projection.fs"/>
     <Compile Include="Context/Companion/Blogger/FrameSurface.fs"/>
+    <Compile Include="Context/Prefix/Epoch.fsi"/>
     <Compile Include="Context/Prefix/Epoch.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fs"/>
@@ -509,6 +513,7 @@
     <Compile Include="Participant/Provider/Prose.fsi"/>
     <Compile Include="Participant/Provider/Prose.fs"/>
     <Compile Include="Context/Companion/ProjectionSurface.fs"/>
+    <Compile Include="Context/Prefix/Surface.fsi"/>
     <Compile Include="Context/Prefix/Surface.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoSemanticSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/Surface.fs"/>

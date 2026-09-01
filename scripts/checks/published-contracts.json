@@ -285,9 +285,24 @@
       "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs",
       "owner": "obligation-ledger",
       "justification": "Signed JS-native codec facade over the published MagicTodo fact codec; it owns no projection resource or additional semantic authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Prefix/Projection.fs",
+      "owner": "prefix-stability",
+      "justification": "Signed pure prefix projection algebra over committed/probe snapshots and todo-write retention facts; it owns no Host resource, durable writer, or process authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Prefix/Surface.fs",
+      "owner": "prefix-stability",
+      "justification": "Signed JS-native facade over prefix candidate, epoch and projection contracts; dynamic decode/boxing helpers remain private and no additional semantic authority is granted."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "prefix-stability",
+      "locality": "mission-obligation-todo-prefixepoch",
+      "justification": "Prefix candidate selection, epoch fold, TodoCheckpoint rebase helpers and projection algebra form a fully signed locality over graduated identity, obligation, context-compression and request-kind contracts; Projection and Surface are explicit pure/representation support."
+    },
     {
       "owner": "behavior-diagnosis",
       "locality": "enforcer-projection",
