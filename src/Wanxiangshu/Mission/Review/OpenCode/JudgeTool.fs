@@ -101,50 +101,95 @@ module JudgeTool =
             Task.FromResult(notReceived context Path.CouldNotBind)
 
     [<RequireQualifiedAccess>]
-    type private ExecutionDecision =
-        | Refused of reasonPath: string
+    type ExecutionRejection =
+        | NotFromReviewer
+        | NoActiveIdentity
+        | VerdictMustBePerfectOrRevise
+        | CouldNotBind
+
+    [<RequireQualifiedAccess>]
+    type ExecutionDecision =
+        | Refused of ExecutionRejection
         | AlreadyJudged
         | Proceed of ReviewJudgement
 
-    let private decideExecution
+    type ExecutionEvidence =
+        { Role: Role option
+          SessionId: string
+          IsSubmitted: bool
+          Verdict: Result<ReviewGuardVerdict, string>
+          ToolCallId: ToolCallId option
+          ProviderRunId: ProviderRunIdentity option
+          PhysicalUserMessageId: string option }
+
+    let decideExecution (evidence: ExecutionEvidence) : ExecutionDecision =
+        let physicalUserMessageId =
+            evidence.PhysicalUserMessageId
+            |> Option.map PhysicalUserMessageId.create
+            |> Option.filter PhysicalUserMessageId.isNonBlank
+
+        let currentRequestSubmitted =
+            evidence.IsSubmitted && Option.isSome physicalUserMessageId
+
+        match
+            evidence.Role = Some Role.Reviewer,
+            String.IsNullOrWhiteSpace evidence.SessionId,
+            currentRequestSubmitted,
+            evidence.Verdict,
+            evidence.ToolCallId,
+            evidence.ProviderRunId,
+            physicalUserMessageId
+        with
+        | false, _, _, _, _, _, _ -> ExecutionDecision.Refused ExecutionRejection.NotFromReviewer
+        | _, true, _, _, _, _, _ -> ExecutionDecision.Refused ExecutionRejection.NoActiveIdentity
+        | _, _, true, _, _, _, _ -> ExecutionDecision.AlreadyJudged
+        | _, _, false, Error _, _, _, _ -> ExecutionDecision.Refused ExecutionRejection.VerdictMustBePerfectOrRevise
+        | _, _, false, Ok _, None, _, _
+        | _, _, false, Ok _, _, None, _
+        | _, _, false, Ok _, _, _, None -> ExecutionDecision.Refused ExecutionRejection.CouldNotBind
+        | true, false, false, Ok verdict, Some toolCallId, Some providerRunId, Some physical ->
+            ExecutionDecision.Proceed
+                { ReviewerSessionId = SessionId.create evidence.SessionId
+                  PhysicalUserMessageId = physical
+                  ProviderRun = providerRunId
+                  ToolCallId = toolCallId
+                  Verdict = verdict }
+
+    let rejectionPath (rejection: ExecutionRejection) =
+        match rejection with
+        | ExecutionRejection.NotFromReviewer -> Path.NotFromReviewer
+        | ExecutionRejection.NoActiveIdentity -> Path.NoActiveIdentity
+        | ExecutionRejection.VerdictMustBePerfectOrRevise -> Path.VerdictMustBePerfectOrRevise
+        | ExecutionRejection.CouldNotBind -> Path.CouldNotBind
+
+    let rejectionName (rejection: ExecutionRejection) =
+        match rejection with
+        | ExecutionRejection.NotFromReviewer -> "NotFromReviewer"
+        | ExecutionRejection.NoActiveIdentity -> "NoActiveIdentity"
+        | ExecutionRejection.VerdictMustBePerfectOrRevise -> "VerdictMustBePerfectOrRevise"
+        | ExecutionRejection.CouldNotBind -> "CouldNotBind"
+
+    let private executionEvidence
         (scope: ToolRuntimeScope)
         (args: HostToolArguments)
         (context: HostToolContext)
-        : ExecutionDecision =
-        let isReviewer = scope.RoleFor context = Some Role.Reviewer
-        let hasSession = not (String.IsNullOrWhiteSpace context.SessionId)
-        let verdict = StaticTools.reviewerVerdictOfString (args.Text "verdict")
-
-        let physicalUserMsg =
-            if hasSession then
-                scope.CurrentPhysicalUserMessage context.SessionId
-                |> Option.map PhysicalUserMessageId.create
-                |> Option.filter PhysicalUserMessageId.isNonBlank
-            else
+        : ExecutionEvidence =
+        let physicalUserMessageId =
+            if String.IsNullOrWhiteSpace context.SessionId then
                 None
+            else
+                scope.CurrentPhysicalUserMessage context.SessionId
 
-        let isSubmitted =
-            hasSession
-            && (physicalUserMsg
-                |> Option.exists (fun messageId -> scope.HasVerdictSubmitted(context.SessionId, messageId)))
-
-        match
-            isReviewer, hasSession, isSubmitted, verdict, context.ToolCallId, context.ProviderRunId, physicalUserMsg
-        with
-        | false, _, _, _, _, _, _ -> ExecutionDecision.Refused Path.NotFromReviewer
-        | _, false, _, _, _, _, _ -> ExecutionDecision.Refused Path.NoActiveIdentity
-        | _, _, true, _, _, _, _ -> ExecutionDecision.AlreadyJudged
-        | _, _, _, Error _, _, _, _ -> ExecutionDecision.Refused Path.VerdictMustBePerfectOrRevise
-        | _, _, _, _, None, _, _
-        | _, _, _, _, _, None, _
-        | _, _, _, _, _, _, None -> ExecutionDecision.Refused Path.CouldNotBind
-        | true, true, false, Ok value, Some toolCallId, Some providerRunId, Some physicalUserMessageId ->
-            ExecutionDecision.Proceed
-                { ReviewerSessionId = SessionId.create context.SessionId
-                  PhysicalUserMessageId = physicalUserMessageId
-                  ProviderRun = providerRunId
-                  ToolCallId = toolCallId
-                  Verdict = value }
+        { Role = scope.RoleFor context
+          SessionId = context.SessionId
+          IsSubmitted =
+            physicalUserMessageId
+            |> Option.exists (fun value ->
+                scope.HasVerdictSubmitted(context.SessionId, PhysicalUserMessageId.create value))
+          Verdict = StaticTools.reviewerVerdictOfString (args.Text "verdict")
+          ToolCallId = context.ToolCallId
+          ProviderRunId = context.ProviderRunId
+          PhysicalUserMessageId = physicalUserMessageId }
 
     [<RequireQualifiedAccess>]
     type private SubmittedInterruptDecision =
@@ -239,8 +284,8 @@ module JudgeTool =
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            match decideExecution scope args context with
-            | ExecutionDecision.Refused reason -> return notReceived context reason
+            match executionEvidence scope args context |> decideExecution with
+            | ExecutionDecision.Refused rejection -> return notReceived context (rejectionPath rejection)
             | ExecutionDecision.AlreadyJudged -> return alreadyJudged context
             | ExecutionDecision.Proceed judgement -> return! dispatchJudgement scope context judgement
         }
