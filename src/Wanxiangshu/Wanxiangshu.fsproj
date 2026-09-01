@@ -140,6 +140,7 @@
     <Compile Include="Mission/Review/Fact.fs"/>
     <Compile Include="Execution/Delegation/Fact.fs"/>
     <Compile Include="Context/Companion/Fact.fs"/>
+    <Compile Include="Execution/Fission/Fact.fsi"/>
     <Compile Include="Execution/Fission/Fact.fs"/>
     <Compile Include="Change/Fact.fsi"/>
     <Compile Include="Change/Fact.fs"/>
@@ -238,6 +239,7 @@
     <Compile Include="Interaction/Authority/Surface.fs"/>
     <Compile Include="Interaction/Authority/Run.fs"/>
     <Compile Include="Interaction/Authority/RuntimeSurface.fs"/>
+    <Compile Include="Execution/Fission/Model.fsi"/>
     <Compile Include="Execution/Fission/Model.fs"/>
     <Compile Include="Participant/Provider/Attempt/Failure.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Failure.fs"/>
@@ -321,6 +323,7 @@
     <Compile Include="OpenCode/Host/RequirementGrounding/Projection.fs"/>
     <Compile Include="Enforcer/Guidance/DeliveryProjection.fs"/>
     <Compile Include="Enforcer/Guidance/DeliverySurface.fs"/>
+    <Compile Include="Execution/Fission/Projection.fsi"/>
     <Compile Include="Execution/Fission/Projection.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateSurface.fs"/>
