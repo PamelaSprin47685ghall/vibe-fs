@@ -344,10 +344,13 @@
     <Compile Include="Persistence/EventStore/CanonicalEventCodec.fs"/>
     <Compile Include="Persistence/EventStore/EventVocabulary.fsi"/>
     <Compile Include="Persistence/EventStore/EventVocabulary.fs"/>
+    <Compile Include="Persistence/EventStore/ProcessEventLog.fsi"/>
     <Compile Include="Persistence/EventStore/ProcessEventLog.fs"/>
+    <Compile Include="Persistence/EventStore/EventKWayMerge.fsi"/>
     <Compile Include="Persistence/EventStore/EventKWayMerge.fs"/>
     <Compile Include="Persistence/EventStore/IntegrationKernel.fsi"/>
     <Compile Include="Persistence/EventStore/IntegrationKernel.fs"/>
+    <Compile Include="Persistence/EventStore/Store.fsi"/>
     <Compile Include="Persistence/EventStore/Store.fs"/>
     <Compile Include="Strength/Persistence/Store.fs"/>
     <Compile Include="Strength/Persistence/Durability.fs"/>
@@ -355,7 +358,9 @@
     <Compile Include="Persistence/EventStore/GitObjectDatabase.fs"/>
     <Compile Include="Persistence/EventStore/ProcessGitRawStore.fsi"/>
     <Compile Include="Persistence/EventStore/ProcessGitRawStore.fs"/>
+    <Compile Include="Persistence/EventStore/WriterStreamSync.fsi"/>
     <Compile Include="Persistence/EventStore/WriterStreamSync.fs"/>
+    <Compile Include="Persistence/EventStore/RetentionSurface.fsi"/>
     <Compile Include="Persistence/EventStore/RetentionSurface.fs"/>
     <Compile Include="OpenCode/Tools/ManagedAgent.fsi"/>
     <Compile Include="OpenCode/Tools/ManagedAgent.fs"/>
@@ -479,7 +484,9 @@
     <Compile Include="Execution/Delegation/ExecutionFactFold.fs"/>
     <Compile Include="Change/Fold.fsi"/>
     <Compile Include="Change/Fold.fs"/>
+    <Compile Include="Context/Companion/CompanionFactFold.fsi"/>
     <Compile Include="Context/Companion/CompanionFactFold.fs"/>
+    <Compile Include="Context/Companion/Blogger/ContextFactFold.fsi"/>
     <Compile Include="Context/Companion/Blogger/ContextFactFold.fs"/>
     <Compile Include="Composition/Durable/HostFactFold.fs"/>
     <Compile Include="Execution/Delegation/DelegationFactFold.fsi"/>
@@ -644,7 +651,9 @@
     <Compile Include="Git/Hook/Sync.fs"/>
     <Compile Include="Git/Hook/Dispatcher.fs"/>
     <Compile Include="Git/Hook/Surface.fs"/>
+    <Compile Include="Context/Companion/Model.fsi"/>
     <Compile Include="Context/Companion/Model.fs"/>
+    <Compile Include="Context/Companion/Runtime.fsi"/>
     <Compile Include="Context/Companion/Runtime.fs"/>
     <Compile Include="OpenCode/Tools/ToolContext.fs"/>
     <Compile Include="OpenCode/Tools/StaticTools.fsi"/>
@@ -848,11 +857,15 @@
     <Compile Include="Execution/Delegation/Fork/Host/Pty.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Host/Pty.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/HostForkPtySurface.fs"/>
+    <Compile Include="Context/Companion/Blogger/Runtime/State.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/State.fs"/>
     <Compile Include="Interaction/Repair/Port.fs"/>
 
+    <Compile Include="Context/Companion/Blogger/Runtime/ParkedTransform.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/ParkedTransform.fs"/>
+    <Compile Include="Context/Companion/Blogger/Runtime/Host.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Host.fs"/>
+    <Compile Include="Context/Companion/Blogger/Runtime/Abandon.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Abandon.fs"/>
     <Compile Include="OpenCode/Host/LoopSensor.fsi"/>
     <Compile Include="OpenCode/Host/LoopSensor.fs"/>
@@ -869,8 +882,11 @@
     <Compile Include="Enforcer/Cycle/Recovery.fs"/>
     <Compile Include="Enforcer/Repair.fs"/>
     <Compile Include="Enforcer/RepairSurface.fs"/>
+    <Compile Include="Context/Companion/HostBlogger.fsi"/>
     <Compile Include="Context/Companion/HostBlogger.fs"/>
+    <Compile Include="Context/Companion/JournalPort.fsi"/>
     <Compile Include="Context/Companion/JournalPort.fs"/>
+    <Compile Include="Context/Companion/Host.fsi"/>
     <Compile Include="Context/Companion/Host.fs"/>
     <Compile Include="Execution/Session/Recovery/Coordinator.fsi"/>
     <Compile Include="Execution/Session/Recovery/Coordinator.fs"/>
@@ -895,6 +911,7 @@
     <Compile Include="Composition/Turn/Binding.fs"/>
     <Compile Include="Enforcer/Host.fs"/>
     <Compile Include="Context/Companion/Blogger/MainContext.fs"/>
+    <Compile Include="Context/Companion/Blogger/Runtime/Coordinator.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Coordinator.fs"/>
     <Compile Include="Context/Companion/Transform.fs"/>
     <Compile Include="Mission/Review/OpenCode/HostGuard.fs"/>

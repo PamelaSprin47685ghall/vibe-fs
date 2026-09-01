@@ -187,6 +187,12 @@
       "justification": "Pure canonical-integrator contract types and structural projection algebra; carries no runtime handle, process state, or physical effect."
     },
     {
+      "path": "src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs",
+      "owner": "durable-convergence",
+      "contract": "DurableConvergence.Contract",
+      "justification": "Signed durable-convergence JS-native retention/sync test surface and adapter seam; internal writer-stream sync and process event log mechanics remain signature-hidden."
+    },
+    {
       "path": "src/Wanxiangshu/Foundation/RolesSurface.fs",
       "owner": "participant-identity",
       "justification": "Signed JS-native projection of participant identity vocabulary; no runtime state or effect authority."
@@ -721,6 +727,11 @@
       "owner": "output-distillation",
       "contract": "output-distillation.Contract",
       "justification": "LargeGate surface is the output-distillation projection of the process-execution large gate capability; the signed surface hides the process runner internals."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Runtime.fs",
+      "owner": "context-compression",
+      "justification": "Signed pure Companion runtime cell with guarded memory, durable port callbacks and Blogger lifecycle hooks; all physical Host dispatch, satellite binding and child session creation remain signature-hidden behind the Host surface."
     }
   ],
   "compiler_boundary_localities": [
@@ -1168,6 +1179,16 @@
       "owner": "output-distillation",
       "locality": "process-largegatesurface",
       "justification": "LargeGate surface and its Distillation runtime support form one signed output-distillation locality over graduated delegation and context contracts; owner-local implementation details remain signature-hidden."
+    },
+    {
+      "owner": "durable-convergence",
+      "locality": "persistence-eventstore-processeventlog",
+      "justification": "Local append log, k-way merge, canonical integrator contract, local store port, writer stream sync and retention JS surface form one fully signed durable-convergence storage locality over graduated identity, event-model, store-types and task-result contracts; Node fs interop and internal merge heap mechanics remain signature-hidden."
+    },
+    {
+      "owner": "context-compression",
+      "locality": "context-companion-companionfactfold",
+      "justification": "Companion host, runtime state, parked transform, runtime host, abandon, coordinator, model, journal port and fact folds form a fully signed context-compression companion runtime locality over graduated companion facts, Blogger request/projection, durable journal, session attachment, identity and Host contracts; physical host effects and runtime implementation details remain signature-hidden."
     }
   ],
   "contracts": [

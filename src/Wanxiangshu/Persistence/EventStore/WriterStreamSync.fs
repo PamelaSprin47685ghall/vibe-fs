@@ -1,19 +1,13 @@
 namespace Wanxiangshu.Persistence.EventStore
 
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Foundation
-open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Strength.Persistence
-
 open System
+open System.Collections.Generic
 open System.Text
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
+open Wanxiangshu.Foundation
 
 /// DURABLE-CONVERGENCE-002/003/007/008/011.
 /// Sync is deliberately physical: complete WriterId NDJSON files and payload
