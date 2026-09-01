@@ -315,6 +315,7 @@
     <Compile Include="Persistence/EventStore/RetentionSurface.fs"/>
     <Compile Include="OpenCode/Tools/ManagedAgent.fsi"/>
     <Compile Include="OpenCode/Tools/ManagedAgent.fs"/>
+    <Compile Include="OpenCode/Host/ChatAdmission/Intent.fsi"/>
     <Compile Include="OpenCode/Host/ChatAdmission/Intent.fs"/>
     <Compile Include="OpenCode/Host/ChatAdmission/IntentSurface.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fsi"/>
@@ -426,6 +427,7 @@
     <Compile Include="Participant/Provider/Attempt/Fallback/FallbackFactFold.fs"/>
     <Compile Include="Mission/Review/ReviewFactFold.fs"/>
     <Compile Include="Execution/Delegation/ExecutionFactFold.fs"/>
+    <Compile Include="Change/Fold.fsi"/>
     <Compile Include="Change/Fold.fs"/>
     <Compile Include="Context/Companion/CompanionFactFold.fs"/>
     <Compile Include="Context/Companion/Blogger/ContextFactFold.fs"/>
@@ -435,6 +437,7 @@
     <Compile Include="Interaction/Attention/Fold.fs"/>
     <Compile Include="Interaction/Concern/Fold.fsi"/>
     <Compile Include="Interaction/Concern/Fold.fs"/>
+    <Compile Include="Enforcer/InstitutionalLearning/Fold.fsi"/>
     <Compile Include="Enforcer/InstitutionalLearning/Fold.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Fold.fs"/>
     <Compile Include="Composition/Durable/Fold.fs"/>
@@ -535,6 +538,7 @@
     <Compile Include="Process/PtyBackend.fs"/>
     <Compile Include="Process/PtyApi.fsi"/>
     <Compile Include="Process/PtyApi.fs"/>
+    <Compile Include="Change/Types.fsi"/>
     <Compile Include="Change/Types.fs"/>
     <Compile Include="Resources/PackageResources.fsi"/>
     <Compile Include="Resources/PackageResources.fs"/>
@@ -769,6 +773,7 @@
     <Compile Include="Context/Trace/TerminalReporter.fs"/>
     <Compile Include="Mission/Review/Judgement/Workflow.fs"/>
     <Compile Include="Mission/Review/OpenCode/TerminalAwait.fs"/>
+    <Compile Include="OpenCode/Host/TerminalPolicy.fsi"/>
     <Compile Include="OpenCode/Host/TerminalPolicy.fs"/>
     <Compile Include="OpenCode/Host/TerminalPolicySurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fs"/>
@@ -855,6 +860,7 @@
     <Compile Include="OpenCode/Tools/AttentionTools.fs"/>
     <Compile Include="OpenCode/Tools/ConcernTools.fsi"/>
     <Compile Include="OpenCode/Tools/ConcernTools.fs"/>
+    <Compile Include="OpenCode/Tools/InstitutionalLearningTools.fsi"/>
     <Compile Include="OpenCode/Tools/InstitutionalLearningTools.fs"/>
     <Compile Include="OpenCode/Tools/ToolSurface.fs"/>
     <Compile Include="Execution/Fission/OpenCode/Tool.fs"/>

@@ -312,6 +312,11 @@
       "justification": "Signed pure composition-fold support for Concern facts; only the canonical durable integrator consumes the projection transition and no physical/runtime effect is owned here."
     },
     {
+      "path": "src/Wanxiangshu/Change/Fold.fs",
+      "owner": "change-integration",
+      "justification": "Signed pure canonical durable fold support for orchestrator facts; it owns no Git, Host, Journal writer, or runtime authority and is consumed only through composition wiring."
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Agent/Errors.fs",
       "owner": "delegation",
       "justification": "Signed child-agent execution error/context vocabulary used only inside delegation runtime composition; it publishes no additional foreign contract."
@@ -343,6 +348,21 @@
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "change-integration",
+      "locality": "change-fold",
+      "justification": "Orchestrator Host port/result vocabulary and its pure durable fold form a signed change-integration contract locality over graduated change facts, identity, durable projection and journal contracts."
+    },
+    {
+      "owner": "institutional-learning",
+      "locality": "enforcer-institutionallearning-fold",
+      "justification": "Institutional-learning durable fold plus celebrate/regret ToolSpec publication form a fully signed locality over graduated learning facts, attention, language, Host codec and durable journal contracts."
+    },
+    {
+      "owner": "interaction-authority",
+      "locality": "opencode-host-chatadmission-intent",
+      "justification": "Managed chat admission intent algebra and terminal admission policy are fully signed interaction-authority contracts over graduated identity, participant, delegation, change and durable projection boundaries."
+    },
     {
       "owner": "attention-regulation",
       "locality": "interaction-attention-fold",

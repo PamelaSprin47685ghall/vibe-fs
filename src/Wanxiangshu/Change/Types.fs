@@ -1,25 +1,9 @@
 namespace Wanxiangshu.Change
 
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Barrier
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Persistence
-open Wanxiangshu.Strength.Replica
-
 open System.Threading.Tasks
-open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
 
 /// What one ManagerJob's publication attempt resolved to.
