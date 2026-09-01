@@ -144,6 +144,7 @@
     <Compile Include="Mission/Review/Fact.fsi"/>
     <Compile Include="Mission/Review/Fact.fs"/>
     <Compile Include="Execution/Delegation/Fact.fs"/>
+    <Compile Include="Context/Companion/Fact.fsi"/>
     <Compile Include="Context/Companion/Fact.fs"/>
     <Compile Include="Execution/Fission/Fact.fsi"/>
     <Compile Include="Execution/Fission/Fact.fs"/>
@@ -157,6 +158,7 @@
     <Compile Include="Participant/Provider/Language.fs"/>
     <Compile Include="Participant/Provider/Attempt/Cursor.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Cursor.fs"/>
+    <Compile Include="Participant/Provider/Attempt/TerminalValidity.fsi"/>
     <Compile Include="Participant/Provider/Attempt/TerminalValidity.fs"/>
     <Compile Include="Enforcer/Catalog.fsi"/>
     <Compile Include="Enforcer/Catalog.fs"/>
@@ -171,6 +173,7 @@
     <Compile Include="Execution/Delegation/Fork/ChildRecovery.fs"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecoverySurface.fs"/>
     <Compile Include="Composition/Turn/Program.fs"/>
+    <Compile Include="Host/CompactionPolicy.fsi"/>
     <Compile Include="Host/CompactionPolicy.fs"/>
     <Compile Include="Participant/Provider/Projection/Model.fsi"/>
     <Compile Include="Participant/Provider/Projection/Model.fs"/>
@@ -219,11 +222,16 @@
     <Compile Include="Interaction/Dispatch/Nudge.fs"/>
     <Compile Include="Execution/Session/LoopDetector.fs"/>
     <Compile Include="Execution/Delegation/Fork/Payload.fs"/>
+    <Compile Include="Context/Companion/Blogger/Toml.fsi"/>
     <Compile Include="Context/Companion/Blogger/Toml.fs"/>
+    <Compile Include="Context/Companion/Blogger/ItemWire.fsi"/>
     <Compile Include="Context/Companion/Blogger/ItemWire.fs"/>
     <Compile Include="Context/Companion/Blogger/TomlSurface.fs"/>
+    <Compile Include="Context/Companion/Prompt.fsi"/>
     <Compile Include="Context/Companion/Prompt.fs"/>
+    <Compile Include="Context/Companion/Identity.fsi"/>
     <Compile Include="Context/Companion/Identity.fs"/>
+    <Compile Include="Context/Companion/Builder.fsi"/>
     <Compile Include="Context/Companion/Builder.fs"/>
     <Compile Include="Enforcer/Rulebook.fsi"/>
     <Compile Include="Enforcer/Rulebook.fs"/>
@@ -231,8 +239,10 @@
     <Compile Include="Participant/Provider/Projection/Planner.fs"/>
     <Compile Include="Participant/Provider/Projection/Renderer.fsi"/>
     <Compile Include="Participant/Provider/Projection/Renderer.fs"/>
+    <Compile Include="Context/Companion/Blogger/Delta.fsi"/>
     <Compile Include="Context/Companion/Blogger/Delta.fs"/>
     <Compile Include="Context/Companion/Blogger/DeltaSurface.fs"/>
+    <Compile Include="Context/Companion/Blogger/Request.fsi"/>
     <Compile Include="Context/Companion/Blogger/Request.fs"/>
     <Compile Include="Context/Prefix/ProbeSelection.fs"/>
     <Compile Include="Context/Prefix/Projection.fs"/>
@@ -305,6 +315,7 @@
     <Compile Include="Persistence/Journal/FactCodec.fs"/>
     <Compile Include="Persistence/Journal/Envelope.fs"/>
     <Compile Include="Persistence/Journal/EventStoreJournalCodec.fs"/>
+    <Compile Include="Context/Companion/Projection.fsi"/>
     <Compile Include="Context/Companion/Projection.fs"/>
     <Compile Include="Context/Trace/Projection.fs"/>
     <Compile Include="Mission/Manager/Life/Projection.fsi"/>
@@ -317,6 +328,7 @@
     <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionSurface.fsi"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionSurface.fs"/>
+    <Compile Include="Context/Companion/Blogger/Projection.fsi"/>
     <Compile Include="Context/Companion/Blogger/Projection.fs"/>
     <Compile Include="Context/Companion/Blogger/FrameSurface.fs"/>
     <Compile Include="Context/Prefix/Epoch.fs"/>
@@ -333,6 +345,7 @@
     <Compile Include="Mission/Review/Barrier/Projection.fsi"/>
     <Compile Include="Mission/Review/Barrier/Projection.fs"/>
     <Compile Include="Enforcer/Projection.fs"/>
+    <Compile Include="Context/Companion/Blogger/Runtime/CycleProjection.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/CycleProjection.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/CycleSurface.fs"/>
     <Compile Include="OpenCode/Host/PairProgramming/GuidelineProjection.fsi"/>
