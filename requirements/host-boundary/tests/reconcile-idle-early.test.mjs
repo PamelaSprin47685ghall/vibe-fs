@@ -42,6 +42,21 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_projection_edge_drives_exactly_one_
   })
 })
 
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_without_projection_edge_reads_once_and_exposes_no_counter', async () => {
+  const result = await ReconcileSurface.idleProvisionalWithoutProjectionEdgeScenario()
+  assert.deepEqual(result, {
+    snapshotReads: 1,
+    observed: true,
+    outcome: 'TurnInProgress',
+  })
+
+  const decision = ReconcileSurface.decideStep(
+    ReconcileSurface.retryWake(),
+    ReconcileSurface.evidenceProvisional('TurnInProgress'),
+  )
+  assert.deepEqual(decision, { name: 'StopPass' })
+})
+
 test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_projection_edge_delivers_the_next_failed_provider_run_to_AABB', async () => {
   const result = await ReconcileSurface.failureProjectionEdgeScenario()
 
