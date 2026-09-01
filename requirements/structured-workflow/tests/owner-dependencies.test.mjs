@@ -255,6 +255,21 @@ test('WHAT[STRUCTURED-WORKFLOW-011] owner graph comparison reports exact added a
   })
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-011] graph JSON without a baseline is directly reusable as the next baseline', () => {
+  const snapshot = {
+    schemaVersion: 1,
+    owners: ['alpha'],
+    semanticEdges: [],
+    stronglyConnectedComponents: [],
+  }
+
+  assert.strictEqual(ownerDependencyGate.ownerGraphDocument(snapshot), snapshot)
+  assert.deepEqual(ownerDependencyGate.ownerGraphDocument(snapshot, { addedEdges: [], removedEdges: [] }), {
+    current: snapshot,
+    delta: { addedEdges: [], removedEdges: [] },
+  })
+})
+
 test('WHAT[STRUCTURED-WORKFLOW-011] semantic owner manifest contains no handwritten file total', () => {
   const manifest = JSON.parse(readFileSync(new URL('../../../scripts/checks/semantic-owners.json', import.meta.url), 'utf8'))
 
