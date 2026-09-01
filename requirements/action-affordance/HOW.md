@@ -13,6 +13,12 @@
 3. **边界镜像机制**：
    - Canonical 权限后果由 `office-capability` 唯一定义；本包在调用边界（如 `fork`、`inspect` 描述）中镜像其负边界与职能分工，防止跨角色误用。
 
+4. **`assume` 的 jq 画板实现**：
+   - `AssumeTool` 只公开两个必填 jq program：`update` 与 `query`。当前进程持有一个唯一 JSON 根值；不建立第二套 workspace/record/revision DSL。
+   - jq 语义由 `jq-wasm` 提供的 jq 1.8.2 实现直接承担，避免另外引入 Process 子系统或依赖宿主机安装 jq 二进制。
+   - 每次调用串行执行：旧根值 → `update`。`update` 必须恰好得到一个 JSON output，随后替换根值；再以新根值 → `query`，返回其零/一/多 outputs。`query` 失败不回滚已成功的 `update`。纯查询使用 `update = "."`。
+   - 长篇 jq 画板使用指南继续由 `resources/provider/tool/assume/description/{en,zh-CN}.md` 拥有；F# 只实现机器语义，不复制散文规则。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
@@ -30,3 +36,4 @@
 | ACTION-AFFORDANCE-011 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-011] AA_prompt_021_callers_see_the_boundary_mirror_not_just_callee_role_law` |
 | ACTION-AFFORDANCE-012 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-012] AA_prompt_020_inspect_caller_forbidden_charge_is_named` |
 | ACTION-AFFORDANCE-013 | `requirements/action-affordance/tests/tool-description-anchors.test.mjs::WHAT[ACTION-AFFORDANCE-013] gate_c_tool_description_anchor_parity_detects_missing_zh_id` |
+| ACTION-AFFORDANCE-014 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-014] AA_assume_contract_is_update_then_query_over_one_free_form_canvas` |

@@ -64,13 +64,34 @@ test('WHAT[ACTION-AFFORDANCE-001] AA_prompt_020_tool_descriptions_carry_contract
 test('WHAT[ACTION-AFFORDANCE-001] AA_assume_contract_answers_act_fit_boundary_return_and_argument', () => {
   for (const locale of LOCALES) {
     const description = readTool('assume', locale)
-    const argument = read(`resources/provider/tool/assume/arg-assumption/${locale}.md`)
+    const update = read(`resources/provider/tool/assume/arg-update/${locale}.md`)
+    const query = read(`resources/provider/tool/assume/arg-query/${locale}.md`)
 
-    assert.match(description, /钉成当前工作假设|Pin a judgment/i, 'act must be explicit')
-    assert.match(description, /先抽象|Abstract first/i, 'fit must be explicit')
-    assert.match(description, /不是求证|not verification/i, 'nearby act not performed must be explicit')
-    assert.match(description, /不是.*证明|does not establish.*proven/is, 'successful return must stay bounded')
-    assert.match(argument, /当前判断|current judgment/i, 'argument semantics must be explicit')
+    assert.match(description, /持久.*JSON.*画板|persistent.*JSON.*canvas/is, 'act must be explicit')
+    assert.match(description, /非线性|non-linear/i, 'fit must be explicit')
+    assert.match(description, /没有.*预定义.*schema|no predefined schema/is, 'nearby ontology must not be imposed')
+    assert.match(description, /先.*update.*后.*query|update.*first.*query/is, 'update-before-query order must be explicit')
+    assert.match(description, /先抽象.*执行.*验证|abstract.*execute.*verify/is, 'old assume commitment contract must survive')
+    assert.match(update, /jq/i, 'update must identify jq syntax')
+    assert.match(update, /当前画板|current workspace/i, 'update must identify dot input semantics')
+    assert.match(query, /更新后|updated workspace/i, 'query must identify post-update input semantics')
+  }
+})
+
+test('WHAT[ACTION-AFFORDANCE-014] AA_assume_contract_is_update_then_query_over_one_free_form_canvas', () => {
+  for (const locale of LOCALES) {
+    const description = readTool('assume', locale)
+    const update = read(`resources/provider/tool/assume/arg-update/${locale}.md`)
+    const query = read(`resources/provider/tool/assume/arg-query/${locale}.md`)
+
+    assert.match(description, /唯一.*画板|one.*workspace/is)
+    assert.match(description, /两个.*必填|two required/i)
+    assert.match(description, /update.*恰好一个|update.*exactly one/is)
+    assert.match(description, /update\s*=\s*["“]?\.["”]?|update.*`\.`/is)
+    assert.match(description, /query.*零.*一个.*多个|query.*zero.*one.*multiple/is)
+    assert.match(description, /query.*失败.*不.*回滚|query.*fail.*does not roll back/is)
+    assert.match(description, /jq.*先验|jq.*prior/i)
+    assert.doesNotMatch(update + query, /assumption/i)
   }
 })
 

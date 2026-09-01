@@ -68,7 +68,7 @@ Reviewer 的提示词由 Role Law 与评审账本组合而成。双重确认（D
 - 使用统一的中文（或对应绑定语言）思考纪律。
 - 暴露 `todowrite` 时，将其视为实时事实账本：一旦工作义务或焦点发生变化，必须先更新账本再执行后续操作。
 - 持续维护就绪前沿（Ready Frontier）：一旦子任务 A 解锁后继 A1，A1 立即并发发出，不等待同批次其它未完成任务；依赖图仅为事实快照，不构成人为的阶段屏障。
-- 先在思考中完成抽象再通过 `assume` 做出承诺，在缺乏实质性新证据时不得无故动摇判断。
+- 先抽象，再 `assume`：形成将据以行动的判断或需要跨轮保留的结构后，用同一次 `assume(update, query)` 把它写入 jq 画板并取回下一步需要观察的视图；没有实质新信息时不反复推翻已经钉住的判断。复杂写作、研究、设计、规划可借此维护非线性结构，简单任务不为使用工具而制造结构。
 - 空名称 `skill({ name: "" })` 仅作为内部合成 wire 标识，模型不可主动调用，真实存在的非空 skill 工具保持完全可用。
 
 ## COGNITIVE-ENVIRONMENT-014: delegated tool estimate 是校准提示，不是服从预算
@@ -81,4 +81,4 @@ Reviewer 的提示词由 Role Law 与评审账本组合而成。双重确认（D
 
 ## COGNITIVE-ENVIRONMENT-016: Pair Hint 只保留微原语的高频触发，不重复完整心理合同
 
-在暴露相应工具动作时，Pair Hint 仅保留对 `assume`、`enough`、`abandon`、`defer`、`celebrate`/`regret` 及 `subscribe`/`publish` 的短触发提醒，避免在每轮交互中重复注入长篇心理建设文本。
+在暴露相应工具动作时，Pair Hint 仅保留对 `assume`、`enough`、`abandon`、`defer`、`celebrate`/`regret` 及 `subscribe`/`publish` 的短触发提醒。`assume` 的 jq 语法、双程序执行细节、画板设计原则与长篇使用指南只存在于工具描述，不在每轮交互中重复注入。

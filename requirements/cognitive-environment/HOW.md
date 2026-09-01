@@ -17,7 +17,7 @@ PromptResources.systemForRole (语言 lang, 角色 role)
    - System Prompt 仅包含身份与知识层，Tools 描述由 ToolRegistry 独立注入，Runtime 与 Mission 材料通过会话上下文传递。
 
 2. **Pair Hint 注入机制**：
-   - 结对提示词通过 HOST-013 机制以合成 `skill` 内容的形式注入模型输入前沿，保证协作纪律、就绪前沿无阻塞并发以及假设承诺规则的高显著性。
+   - 结对提示词通过 HOST-013 机制以合成 `skill` 内容的形式注入模型输入前沿，保证协作纪律、就绪前沿无阻塞并发，并仅用一句高显著性提示提醒复杂非线性工作可转入 `assume` jq 画板；完整画板方法与持久化语义留在工具描述，避免每轮重复灌输。
    - 对特定白名单模型的局部辅助提示（如 Blogger 的 chronicle-direct text nudge）仅在当次 transform 阶段临时注入并随后清除。
 
 ## 验证与测试落点

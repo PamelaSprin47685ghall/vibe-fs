@@ -1,0 +1,1 @@
+A jq program that transforms the current persistent JSON workspace/canvas. The current workspace is `.`. This program runs first and must emit exactly one JSON value; that value becomes the new canvas. Use `.` for a no-op update when you only want to query existing state.

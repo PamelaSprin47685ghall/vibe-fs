@@ -188,30 +188,24 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_encourages_filling_concurrenc
   }
 })
 
-test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_teaches_abstract_then_commit_without_wavering', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_points_non_linear_work_to_assume_without_repeating_the_manual', () => {
   for (const locale of ['en', 'zh-CN']) {
     const hint = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
     const description = read(`resources/provider/tool/assume/description/${locale}.md`)
-    const committed = read(`resources/provider/tool/assume/committed/${locale}.md`)
 
-    assert.match(hint, /抽象|abstract/i)
-    assert.match(hint, /笃定|commit/i)
     assert.match(hint, /`assume`/)
-    assert.match(hint, /不产生新知识|produces no new knowledge/i)
-    assert.match(hint, /新证据|new (?:evidence|information)/i)
-    assert.doesNotMatch(hint, /多米诺|domino/i, 'the repeated hint should offload the long psychological argument')
+    assert.match(hint, /jq/i)
+    assert.match(hint, /非线性|non-linear/i)
+    assert.match(hint, /复杂|complex/i)
+    assert.match(hint, /抽象|abstract/i)
+    assert.match(hint, /执行.*验证|execute.*verify/is)
+    assert.match(hint, /犹豫不产生新知识|hesitation produces no new knowledge/i)
+    assert.doesNotMatch(hint, /map\(|select\(|setpath|delpaths/i, 'the repeated hint must leave jq mechanics to the tool description')
 
-    assert.match(description, /独立|independent/i)
-    assert.match(description, /依赖|dependenc/i)
-    assert.match(description, /领域判断|domain decisions/i)
-    assert.match(description, /机械执行|mechanical execution/i)
+    assert.match(description, /update.*query/is)
+    assert.match(description, /持久.*JSON.*画板|persistent.*JSON.*canvas/is)
+    assert.match(description, /schema/i)
     assert.match(description, /犹豫不产生新知识|hesitation produces no new knowledge/i)
-    assert.match(description, /多米诺|domino/i)
-    assert.match(description, /抽象.*笃定.*执行.*验证|abstract.*commit.*execute.*verify/is)
-
-    assert.match(committed, /新证据|new evidence/i)
-    assert.match(committed, /犹豫.*不.*新知识|hesitation produces no new knowledge/is)
-    assert.match(committed, /抽象.*笃定.*执行.*验证|abstract.*commit.*execute.*verify/is)
   }
 })
 
@@ -261,18 +255,12 @@ test('WHAT[COGNITIVE-ENVIRONMENT-016] CE_016_pair_hint_retains_brief_trigger_wit
     const hint = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
     const assumeDesc = read(`resources/provider/tool/assume/description/${locale}.md`)
 
-    // Pair hint must include the brief trigger for micro-primitives like assume
     assert.match(hint, /`assume`/)
-    assert.match(hint, /抽象|abstract/i)
-    assert.match(hint, /笃定|commit/i)
+    assert.match(hint, /jq/i)
+    assert.doesNotMatch(hint, /map\(|select\(|setpath|delpaths/i, `${locale} pair hint must not repeat jq manual`)
 
-    // Pair hint must offload long psychological argument (e.g. domino chain, extended psychological essay)
-    assert.doesNotMatch(hint, /多米诺|domino/i, `${locale} pair hint must not repeat long psychological contract`)
-    assert.doesNotMatch(hint, /经验丰富|experienced participant/i, `${locale} pair hint must not repeat long essay`)
-
-    // The full psychological reasoning lives in tool descriptions, not in the recurring per-turn hint
-    assert.match(assumeDesc, /多米诺|domino/i, `${locale} tool description carries the complete psychological reasoning`)
-    assert.match(assumeDesc, /经验丰富|experienced participant/i, `${locale} tool description carries the complete psychological reasoning`)
-    assert.match(assumeDesc, /抽象.*笃定.*执行.*验证|abstract.*commit.*execute.*verify/is)
+    assert.match(assumeDesc, /update.*query/is)
+    assert.match(assumeDesc, /map\(|select\(|setpath|delpaths/i, `${locale} tool description carries the detailed jq guidance`)
+    assert.match(assumeDesc, /经验丰富|experienced participant/i, `${locale} tool description preserves the old commitment psychology`)
   }
 })

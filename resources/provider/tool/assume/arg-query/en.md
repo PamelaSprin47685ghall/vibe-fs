@@ -1,0 +1,1 @@
+A jq program evaluated after `update` has successfully replaced the canvas. Its input `.` is the updated workspace. It may emit zero, one, or multiple JSON values; those outputs are returned in jq order and do not further modify the canvas.

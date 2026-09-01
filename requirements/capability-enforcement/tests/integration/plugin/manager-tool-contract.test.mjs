@@ -109,7 +109,7 @@ test('WHAT[ENF-010] MANAGER_host_schemas_are_present_for_every_declared_argument
       commission: ['calling', 'name', 'charge', 'expected_tool_calls'],
       chronicle: ['entry', 'tip'],
       'bash-honeypot': [],
-      assume: ['assumption'],
+      assume: ['update', 'query'],
       enough: ['decision'],
       abandon: ['commitment'],
       defer: ['new_work'],
@@ -127,18 +127,60 @@ test('WHAT[ENF-010] MANAGER_host_schemas_are_present_for_every_declared_argument
   })
 })
 
-test('WHAT[ENF-010] ASSUME_commits_an_abstracted_judgment_without_granting_new_authority', async () => {
+test('WHAT[ENF-010] ASSUME_updates_then_queries_one_persistent_jq_canvas_in_one_call', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'manager-assume', 'fast-manager')
 
-    const result = await hooks.tool.assume.execute(
-      { assumption: 'A and B are independent; execute them concurrently.' },
+    const first = await hooks.tool.assume.execute(
+      {
+        update: '{ideas:["compressed memory","random access"]}',
+        query: '.ideas | map(select(test("memory")))',
+      },
+      { sessionID: 'manager-assume', agent: 'fast-manager' },
+    )
+    const second = await hooks.tool.assume.execute(
+      { update: '.', query: '.ideas[1]' },
+      { sessionID: 'manager-assume', agent: 'fast-manager' },
+    )
+    const scalar = await hooks.tool.assume.execute(
+      { update: '"hello"', query: '.' },
+      { sessionID: 'manager-assume', agent: 'fast-manager' },
+    )
+    const scalarRead = await hooks.tool.assume.execute(
+      { update: '.', query: '.' },
+      { sessionID: 'manager-assume', agent: 'fast-manager' },
+    )
+    await assert.rejects(
+      hooks.tool.assume.execute(
+        { update: '{committed:true}', query: 'error("query failed")' },
+        { sessionID: 'manager-assume', agent: 'fast-manager' },
+      ),
+      /assume query failed after update committed/,
+    )
+    const afterQueryFailure = await hooks.tool.assume.execute(
+      { update: '.', query: '.committed' },
+      { sessionID: 'manager-assume', agent: 'fast-manager' },
+    )
+    await assert.rejects(
+      hooks.tool.assume.execute(
+        { update: 'empty', query: '.' },
+        { sessionID: 'manager-assume', agent: 'fast-manager' },
+      ),
+      /assume update must produce exactly one JSON value/,
+    )
+    const afterRejectedUpdate = await hooks.tool.assume.execute(
+      { update: '.', query: '.committed' },
       { sessionID: 'manager-assume', agent: 'fast-manager' },
     )
 
-    assert.match(result, /Committed: A and B are independent; execute them concurrently\./)
-    assert.match(result, /Without new evidence/i)
-    assert.match(result, /Abstract → commit → execute → verify/)
+    assert.match(first, /compressed memory/)
+    assert.doesNotMatch(first, /random access/)
+    assert.match(second, /random access/)
+    assert.doesNotMatch(second, /compressed memory/)
+    assert.equal(scalar, '"hello"')
+    assert.equal(scalarRead, '"hello"')
+    assert.equal(afterQueryFailure, 'true')
+    assert.equal(afterRejectedUpdate, 'true')
   })
 })
 

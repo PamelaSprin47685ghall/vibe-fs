@@ -18,7 +18,7 @@
 - **五层正交组合**：World、Role、Library、Runtime、Mission 各属单一主权威，按规范顺序组装。
 - **工具清单不入 Role 章节**：System Prompt 聚焦自我模型与职责边界，不机械枚举瞬时工具列表。
 - **Role Law 跨档恒定**：同一 Office 的 fast 与 deep 档共享相同的自我模型与 Role Law。
-- **Pair Hint 作为核心 Craft 载体**：规范协作求助、持续维护就绪前沿（Ready Frontier）的无阻塞并发调度，以及先抽象再承诺的思维纪律。
+- **Pair Hint 作为核心 Craft 载体**：规范协作求助、持续维护就绪前沿（Ready Frontier）的无阻塞并发调度，并在复杂非线性任务出现时提醒参与者可用 `assume` 的持久 jq 画板外化、重排和反复编辑中间结构，而不是把聊天 token 流误当唯一工作内存。
 
 ## 破裂后果
 
