@@ -91,6 +91,8 @@ module LoopDetector =
           WeightedDistinctTokenCount = detector.WeightedDistinctTokenCount
           Step = detector.Step }
 
+    let trackedTokenCount (detector: Detector) = detector.LastSeenTokenStep.Count
+
     /// Pure fold over one token. Only LastSeenTokenStep is algorithm scratch.
     let private pushToken (detector: Detector) (token: int) : Detector =
         let step = detector.Step + 1

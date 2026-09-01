@@ -53,7 +53,7 @@ module LoopDetectorSurface =
         box (DetectorHandle(LoopDetector.create ()))
 
     let trackedTokenCount (handle: obj) : int =
-        (handle :?> DetectorHandle).Detector.LastSeenTokenStep.Count
+        (handle :?> DetectorHandle).Detector |> LoopDetector.trackedTokenCount
 
     let evaluate (handle: obj) : obj =
         let detector = (handle :?> DetectorHandle).Detector

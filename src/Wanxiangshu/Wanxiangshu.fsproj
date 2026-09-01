@@ -247,6 +247,7 @@
     <Compile Include="Host/Contract/CompactionPolicySurface.fs"/>
     <Compile Include="Interaction/Dispatch/Nudge.fsi"/>
     <Compile Include="Interaction/Dispatch/Nudge.fs"/>
+    <Compile Include="Execution/Session/LoopDetector.fsi"/>
     <Compile Include="Execution/Session/LoopDetector.fs"/>
     <Compile Include="Execution/Delegation/Fork/Payload.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Payload.fs"/>
@@ -683,6 +684,7 @@
     <Compile Include="OpenCode/Codec/HostEventCodec.fs"/>
     <Compile Include="OpenCode/Codec/LoopEventCodec.fsi"/>
     <Compile Include="OpenCode/Codec/LoopEventCodec.fs"/>
+    <Compile Include="Execution/Session/LoopDetectorSurface.fsi"/>
     <Compile Include="Execution/Session/LoopDetectorSurface.fs"/>
     <Compile Include="OpenCode/Codec/HostMessageCodec.fsi"/>
     <Compile Include="OpenCode/Codec/HostMessageCodec.fs"/>
@@ -706,6 +708,7 @@
     <Compile Include="OpenCode/Host/SessionSnapshotSurface.fsi"/>
     <Compile Include="OpenCode/Host/SessionSnapshotSurface.fs"/>
     <Compile Include="OpenCode/Host/ProviderRunBindingSurface.fs"/>
+    <Compile Include="OpenCode/Host/OpenCodePort.fsi"/>
     <Compile Include="OpenCode/Host/OpenCodePort.fs"/>
     <Compile Include="OpenCode/Host/SessionExecutionBinding.fs"/>
     <Compile Include="OpenCode/Host/ModelRoutingSurface.fs"/>
@@ -784,7 +787,9 @@
     <Compile Include="Context/Companion/Blogger/Runtime/ParkedTransform.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Host.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Abandon.fs"/>
+    <Compile Include="OpenCode/Host/LoopSensor.fsi"/>
     <Compile Include="OpenCode/Host/LoopSensor.fs"/>
+    <Compile Include="OpenCode/Host/LoopSensorSurface.fsi"/>
     <Compile Include="OpenCode/Host/LoopSensorSurface.fs"/>
     <Compile Include="OpenCode/Host/MessageVisibility.fsi"/>
     <Compile Include="OpenCode/Host/MessageVisibility.fs"/>
