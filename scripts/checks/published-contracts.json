@@ -308,6 +308,11 @@
       "justification": "Signed codec support for PromptAuthority identity-seed serialization inside the durable Journal contract; custom Thoth encoders/decoders stay private and no writer, projection, or runtime authority is introduced."
     },
     {
+      "path": "src/Wanxiangshu/Composition/Durable/HostFactFold.fs",
+      "owner": "durable-events",
+      "justification": "Signed pure Host fact fold support consumed by the published durable composition fold; it owns no journal, store, or runtime effect and keeps private all Host-specific projection transition helpers."
+    },
+    {
       "path": "src/Wanxiangshu/Interaction/Attention/Fold.fs",
       "owner": "attention-regulation",
       "justification": "Signed pure composition-fold support for Attention and institutional-learning facts; only the canonical durable integrator consumes these projection transitions and no physical/runtime effect is owned here."
@@ -787,6 +792,11 @@
       "path": "src/Wanxiangshu/Enforcer/ObservationSurface.fs",
       "owner": "behavior-diagnosis",
       "justification": "Signed JS-facing projection surface that renders enforcement and blog state to host objects; pure value transforms, no authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native boundary for HOST-BOUNDARY-010 / HOST-012 shared cross-instance state; the physical Map/Set/atom singletons in SharedState remain signature-hidden and only narrow put/get/clear/root operations cross the edge."
     }
   ],
   "compiler_boundary_localities": [
@@ -934,6 +944,11 @@
       "owner": "durable-events",
       "locality": "composition-durable-projection",
       "justification": "The bounded session/workspace projection aggregate is a one-file signed composition contract over already-graduated owner projections; it contains no fold routing, persistence implementation, runtime resource, or physical effect."
+    },
+    {
+      "owner": "durable-events",
+      "locality": "strength-persistence-durabilityport",
+      "justification": "Strength durable persistence port, store adapter, journal writer, event-store handle and the Host/fact folds they consume form a fully signed durable-events locality over graduated identity, strength, journal, event-store, projection and Host fact contracts; implementation helpers remain signature-hidden."
     },
     {
       "owner": "interaction-authority",
@@ -1259,6 +1274,11 @@
       "owner": "behavior-diagnosis",
       "locality": "enforcer-codec",
       "justification": "Enforcer blog-call codec, chronicle execution, cycle model/decode/commit/recovery, repair, surface and host wiring form one fully signed behavior-diagnosis locality over graduated enforcer-catalog, enforcer-projection, context-compression, identity, journal and failure contracts; JS representation surfaces are signed support and all internal projection implementation remains signature-hidden."
+    },
+    {
+      "owner": "host-boundary",
+      "locality": "opencode-host-sharedstatesurface",
+      "justification": "SharedStateSurface, PluginSessionScope, PluginRecoveryScope and GitTree form one fully signed Host boundary locality over graduated identity, chat-execution, recovery, provider-attempt, provider-language, review-assurance and review-judgement contracts; cross-instance singletons, per-instance registries and Git implementation details remain signature-hidden."
     }
   ],
   "contracts": [
@@ -13100,10 +13120,7 @@
       ],
       "symbols": [
         "Wanxiangshu.Strength.Projection.StrengthProjection",
-        "Wanxiangshu.Strength.Projection.StrengthProjectionModule.empty",
-        "Wanxiangshu.Strength.Projection.StrengthProjectionModule.isPromoted",
-        "Wanxiangshu.Strength.Projection.StrengthProjectionModule.tryDecisionForTarget",
-        "Wanxiangshu.Strength.Projection.StrengthProjectionModule.tryTraceRange"
+        "Wanxiangshu.Strength.Projection.StrengthProjectionModule.empty"
       ],
       "justification": "speculative-investigation.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to speculative-investigation."
     },

@@ -1,1 +1,34 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner><WanxiangshuOwnerLocality>opencode-host-sharedstatesurface</WanxiangshuOwnerLocality></PropertyGroup><ItemGroup><ProjectReference Include="Wanxiangshu.Owner.change-integration.change-fact.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptsurface.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-handle-surface.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-fact.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-planner.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.review-assurance.opencode-host-providerrunbinding.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-fact.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-reviewfactfold.fsproj"/><Compile Include="OpenCode/Host/SharedStateSurface.fs"/><Compile Include="OpenCode/Host/PluginSessionScope.fs"/><Compile Include="OpenCode/Host/PluginRecoveryScope.fs"/><Compile Include="OpenCode/Host/GitTree.fs"/></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>opencode-host-sharedstatesurface</WanxiangshuOwnerLocality>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptsurface.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-handle-surface.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-planner.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.review-assurance.opencode-host-providerrunbinding.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-reviewfactfold.fsproj"/>
+    <Compile Include="OpenCode/Host/SharedStateSurface.fsi"/>
+    <Compile Include="OpenCode/Host/SharedStateSurface.fs"/>
+    <Compile Include="OpenCode/Host/PluginSessionScope.fsi"/>
+    <Compile Include="OpenCode/Host/PluginSessionScope.fs"/>
+    <Compile Include="OpenCode/Host/PluginRecoveryScope.fsi"/>
+    <Compile Include="OpenCode/Host/PluginRecoveryScope.fs"/>
+    <Compile Include="OpenCode/Host/GitTree.fsi"/>
+    <Compile Include="OpenCode/Host/GitTree.fs"/>
+  </ItemGroup>
+</Project>

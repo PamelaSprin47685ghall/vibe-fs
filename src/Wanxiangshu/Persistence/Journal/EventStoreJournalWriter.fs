@@ -5,54 +5,24 @@ open System.Text
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-open Wanxiangshu.Strength.Projection
-open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Host
-open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Outcome
+open Wanxiangshu.Host
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Context.Companion
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Mission.Obligation.Todo
 
 /// Local payload writer for EventStore journals.
 /// `BlobRef` keeps the long-standing `blobs/<handle>` application shape, while
 /// `<handle>` is now the local content-addressed PayloadRef. Git OIDs do not
 /// participate in runtime durability.
+[<Sealed>]
 type EventStoreBlobWriter private (store: IEventStore) =
     let writePayload (content: string) =
         let digest = BlobDigest.create (HostDigest.sha256Hex content)
@@ -203,6 +173,7 @@ module private JournalWriterDisposal =
 /// It never enumerates history and never folds facts itself. CanonicalIntegrator
 /// owns both boot replay and live integration; this type only assigns journal
 /// envelope identity/sequence and appends one universal EventEnvelope.
+[<Sealed>]
 type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blobWriter: IBlobWriter, store: IEventStore)
     =
     let gate = obj ()

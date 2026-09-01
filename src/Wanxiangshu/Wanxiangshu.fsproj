@@ -327,6 +327,7 @@
     <Compile Include="Strength/Replica/Commit.fs"/>
     <Compile Include="Strength/Replica/Promotion.fsi"/>
     <Compile Include="Strength/Replica/Promotion.fs"/>
+    <Compile Include="Strength/Persistence/DurabilityPort.fsi"/>
     <Compile Include="Strength/Persistence/DurabilityPort.fs"/>
     <Compile Include="Repository/Programming/Js/Capability.fsi"/>
     <Compile Include="Repository/Programming/Js/Capability.fs"/>
@@ -355,7 +356,9 @@
     <Compile Include="Persistence/EventStore/IntegrationKernel.fs"/>
     <Compile Include="Persistence/EventStore/Store.fsi"/>
     <Compile Include="Persistence/EventStore/Store.fs"/>
+    <Compile Include="Strength/Persistence/Store.fsi"/>
     <Compile Include="Strength/Persistence/Store.fs"/>
+    <Compile Include="Strength/Persistence/Durability.fsi"/>
     <Compile Include="Strength/Persistence/Durability.fs"/>
     <Compile Include="Persistence/EventStore/GitObjectDatabase.fsi"/>
     <Compile Include="Persistence/EventStore/GitObjectDatabase.fs"/>
@@ -492,6 +495,7 @@
     <Compile Include="Context/Companion/CompanionFactFold.fs"/>
     <Compile Include="Context/Companion/Blogger/ContextFactFold.fsi"/>
     <Compile Include="Context/Companion/Blogger/ContextFactFold.fs"/>
+    <Compile Include="Composition/Durable/HostFactFold.fsi"/>
     <Compile Include="Composition/Durable/HostFactFold.fs"/>
     <Compile Include="Execution/Delegation/DelegationFactFold.fsi"/>
     <Compile Include="Execution/Delegation/DelegationFactFold.fs"/>
@@ -503,12 +507,15 @@
     <Compile Include="Enforcer/InstitutionalLearning/Fold.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Fold.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Fold.fs"/>
+    <Compile Include="Composition/Durable/Fold.fsi"/>
     <Compile Include="Composition/Durable/Fold.fs"/>
     <Compile Include="Execution/Delegation/Handle/FoldSurface.fs"/>
     <Compile Include="Persistence/Journal/ObligationEnvelopeSurface.fs"/>
     <Compile Include="Context/Companion/FoldSurface.fs"/>
     <Compile Include="Execution/Delegation/HostTurnObservedSurface.fs"/>
+    <Compile Include="Persistence/Journal/JournalEventStoreBoot.fsi"/>
     <Compile Include="Persistence/Journal/JournalEventStoreBoot.fs"/>
+    <Compile Include="Persistence/Journal/EventStoreJournalWriter.fsi"/>
     <Compile Include="Persistence/Journal/EventStoreJournalWriter.fs"/>
     <Compile Include="Persistence/Journal/AgentJournal.fsi"/>
     <Compile Include="Persistence/Journal/AgentJournal.fs"/>
@@ -915,10 +922,13 @@
     <Compile Include="Execution/Delegation/Join.fs"/>
     <Compile Include="OpenCode/Host/SharedState.fsi"/>
     <Compile Include="OpenCode/Host/SharedState.fs"/>
+    <Compile Include="OpenCode/Host/SharedStateSurface.fsi"/>
     <Compile Include="OpenCode/Host/SharedStateSurface.fs"/>
     <Compile Include="Context/Companion/Blogger/OpenCode/PluginScope.fs"/>
     <Compile Include="Strength/OpenCode/PluginScope.fs"/>
+    <Compile Include="OpenCode/Host/PluginSessionScope.fsi"/>
     <Compile Include="OpenCode/Host/PluginSessionScope.fs"/>
+    <Compile Include="OpenCode/Host/PluginRecoveryScope.fsi"/>
     <Compile Include="OpenCode/Host/PluginRecoveryScope.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fs"/>
     <Compile Include="OpenCode/Host/SessionRecoveryHost.fs"/>
@@ -981,6 +991,7 @@
     <Compile Include="Mission/Finality/Workflow.fs"/>
     <Compile Include="Mission/Manager/FinalitySurface.fs"/>
     <Compile Include="Composition/Turn/Workflow.fs"/>
+    <Compile Include="OpenCode/Host/GitTree.fsi"/>
     <Compile Include="OpenCode/Host/GitTree.fs"/>
     <Compile Include="OpenCode/Host/HostCompactionGate.fs"/>
     <Compile Include="Context/Prefix/Wire.fs"/>
@@ -1074,6 +1085,7 @@
     <Compile Include="Repository/Programming/Js/ToolsBindings.fs"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>
     <Compile Include="Persistence/EventStore/CanonicalIntegrator.fs"/>
+    <Compile Include="Persistence/EventStore/EventStoreHandle.fsi"/>
     <Compile Include="Persistence/EventStore/EventStoreHandle.fs"/>
     <Compile Include="Persistence/EventStore/Surface.fs"/>
     <Compile Include="Persistence/EventStore/StrengthSurface.fs"/>

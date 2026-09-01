@@ -26,9 +26,6 @@ type StrengthPreparedRequest =
       AnchorDigest: string
       Bundle: StrengthFrameBundle }
 
-/// STRENGTH-006..008: durable Strength capability exposed to Application/Host.
-/// The port contains no storage identity. Persist owns EventStore, payload closure,
-/// append outcomes and material codecs; callers only ask domain-level questions.
 type StrengthDurabilityPort =
     { LoadProjection: unit -> Task<Result<StrengthProjection, string>>
       LoadFrameBundle: StrengthCandidatePrepared -> Task<Result<StrengthFrameBundle, string>>
