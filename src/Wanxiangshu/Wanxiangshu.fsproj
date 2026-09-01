@@ -438,6 +438,7 @@
     <Compile Include="Enforcer/Observation.fsi"/>
     <Compile Include="Enforcer/Observation.fs"/>
     <Compile Include="Composition/Bridges/FinalityReview/FinalityReviewCohort.fs"/>
+    <Compile Include="Execution/Session/RecoveryClosureProjection.fsi"/>
     <Compile Include="Execution/Session/RecoveryClosureProjection.fs"/>
     <Compile Include="Interaction/Authority/Ledger.fsi"/>
     <Compile Include="Interaction/Authority/Ledger.fs"/>
@@ -530,8 +531,11 @@
     <Compile Include="Execution/Session/Wait/Await.fs"/>
     <Compile Include="Execution/Session/Wait/Surface.fsi"/>
     <Compile Include="Execution/Session/Wait/Surface.fs"/>
+    <Compile Include="Execution/Session/Attachment/ReuseScope.fsi"/>
     <Compile Include="Execution/Session/Attachment/ReuseScope.fs"/>
+    <Compile Include="Execution/Session/Attachment/AttachedRuntime.fsi"/>
     <Compile Include="Execution/Session/Attachment/AttachedRuntime.fs"/>
+    <Compile Include="Execution/Session/Attachment/AttachmentSurface.fsi"/>
     <Compile Include="Execution/Session/Attachment/AttachmentSurface.fs"/>
     <Compile Include="Strength/Runtime.fs"/>
     <Compile Include="Execution/Delegation/Fork/Recovery.fsi"/>
@@ -741,7 +745,9 @@
     <Compile Include="Repository/Investigation/WarmStartSurface.fsi"/>
     <Compile Include="Repository/Investigation/WarmStartSurface.fs"/>
     <Compile Include="Strength/OpenCode/Replay.fs"/>
+    <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fsi"/>
     <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fs"/>
+    <Compile Include="OpenCode/Host/SatelliteSurface.fsi"/>
     <Compile Include="OpenCode/Host/SatelliteSurface.fs"/>
     <Compile Include="Interaction/Dispatch/PhysicalAcceptance.fsi"/>
     <Compile Include="Interaction/Dispatch/PhysicalAcceptance.fs"/>
@@ -819,12 +825,14 @@
     <Compile Include="Context/Companion/HostBlogger.fs"/>
     <Compile Include="Context/Companion/JournalPort.fs"/>
     <Compile Include="Context/Companion/Host.fs"/>
+    <Compile Include="Execution/Session/Recovery/Coordinator.fsi"/>
     <Compile Include="Execution/Session/Recovery/Coordinator.fs"/>
     <Compile Include="Enforcer/Cycle/BloggerProbe.fs"/>
     <Compile Include="Context/Companion/Blogger/BloggerCrashRecovery.fs"/>
     <Compile Include="Context/Companion/Blogger/BloggerCrashSurface.fs"/>
     <Compile Include="Enforcer/ObservationSurface.fs"/>
     <Compile Include="Execution/Session/Recovery/Workflow.fs"/>
+    <Compile Include="Execution/Session/Recovery/Surface.fsi"/>
     <Compile Include="Execution/Session/Recovery/Surface.fs"/>
     <Compile Include="Execution/Delegation/Join.fs"/>
     <Compile Include="OpenCode/Host/SharedState.fs"/>

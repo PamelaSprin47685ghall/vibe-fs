@@ -580,9 +580,34 @@
       "path": "src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs",
       "owner": "session-ontology",
       "justification": "Signed JS-native session-family and managed-interrupt proof surface over the published session Host port; controlled physical probes expose values only and own no production session registry."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Attachment/AttachmentSurface.fs",
+      "owner": "managed-session-lifecycle",
+      "justification": "Signed JS-native proof surface over attached-session observation, reuse and reconciliation; controlled scenario callbacks stay representation-only and own no production session registry."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/SatelliteSurface.fs",
+      "owner": "managed-session-lifecycle",
+      "justification": "Signed JS-native proof surface over the Companion satellite runtime; controlled physical Host probes remain test representation and own no durable attachment truth."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Recovery/Coordinator.fs",
+      "owner": "managed-session-lifecycle",
+      "justification": "Signed process-local single-flight coordinator for exact family recovery roots; the in-flight dictionary is hidden and no recovery semantic fact is stored here."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Recovery/Surface.fs",
+      "owner": "managed-session-lifecycle",
+      "justification": "Signed JS-native proof projection over the published SessionRecovery algebra; object decoding/rendering remains private and cannot mint recovery authority outside the typed owner."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "managed-session-lifecycle",
+      "locality": "execution-session-recoveryclosureprojection",
+      "justification": "Recovery closure discovery, reusable attached-session and Companion satellite physical runtimes, family recovery single-flight and their JS proof surfaces form one fully signed managed-session locality over graduated dispatch recovery, session, identity and durable projection contracts; mutable registries and representation helpers remain signature-hidden."
+    },
     {
       "owner": "interaction-authority",
       "locality": "interaction-authority-fold",
