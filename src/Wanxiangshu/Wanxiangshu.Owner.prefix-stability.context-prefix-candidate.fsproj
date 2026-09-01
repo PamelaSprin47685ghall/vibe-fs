@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <Compile Include="Context/Prefix/Candidate.fsi"/>
     <Compile Include="Context/Prefix/Candidate.fs"/>
   </ItemGroup>
 </Project>

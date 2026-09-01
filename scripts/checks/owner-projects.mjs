@@ -172,43 +172,46 @@ export function checkOwnerProjects() {
     contractSupportPaths.add(source)
   }
   const contractSafePaths = new Set([...contractPaths, ...contractSupportPaths])
-  const compilerBoundaryOwners = new Set()
-  for (const entry of contractManifest.compiler_boundary_owners ?? []) {
+  const compilerBoundaryProjects = new Set()
+  const compilerBoundaryKeys = new Set()
+  for (const entry of contractManifest.compiler_boundary_localities ?? []) {
     const owner = entry?.owner ?? ''
-    if (!owner || compilerBoundaryOwners.has(owner)) {
-      fail(`compiler boundary owner is missing or duplicated: ${owner || '<missing>'}`)
+    const locality = entry?.locality ?? ''
+    const key = `${owner}\0${locality}`
+    if (!owner || !locality || compilerBoundaryKeys.has(key)) {
+      fail(`compiler boundary locality is missing or duplicated: ${owner || '<missing>'}/${locality || '<missing>'}`)
       continue
     }
     if (typeof entry.justification !== 'string' || entry.justification.trim().length < 16) {
-      fail(`${owner}: compiler boundary owner requires an architectural justification`)
+      fail(`${owner}/${locality}: compiler boundary locality requires an architectural justification`)
     }
-    compilerBoundaryOwners.add(owner)
-  }
-  for (const owner of compilerBoundaryOwners) {
-    const ownedProjects = [...projects.values()].filter((project) => project.owner === owner)
-    if (ownedProjects.length === 0) {
-      fail(`${owner}: compiler boundary owner has no owner-locality project`)
+    compilerBoundaryKeys.add(key)
+    const ownedProjects = [...projects.values()].filter((project) => project.owner === owner && project.locality === locality)
+    if (ownedProjects.length !== 1) {
+      fail(`${owner}/${locality}: compiler boundary locality must resolve to exactly one owner project, found ${ownedProjects.length}`)
       continue
     }
-    for (const project of ownedProjects) {
-      for (const source of project.compile) {
-        const signature = source.replace(/\.fs$/, '.fsi')
-        if (!project.signatures.includes(signature) || !existsSync(join(ROOT, signature))) {
-          fail(`${source}: compiler boundary owner '${owner}' requires a sibling .fsi in the same locality`)
-        }
-        if (!contractSafePaths.has(source)) {
-          fail(`${source}: compiler boundary owner '${owner}' source is neither published contract nor signed support`)
-        }
+    const project = ownedProjects[0]
+    compilerBoundaryProjects.add(project.projectPath)
+    for (const source of project.compile) {
+      const signature = source.replace(/\.fs$/, '.fsi')
+      if (!project.signatures.includes(signature) || !existsSync(join(ROOT, signature))) {
+        fail(`${source}: compiler boundary locality '${owner}/${locality}' requires a sibling .fsi in the same locality`)
+      }
+      if (!contractSafePaths.has(source)) {
+        fail(`${source}: compiler boundary locality '${owner}/${locality}' source is neither published contract nor signed support`)
       }
     }
   }
-  const contractProjects = new Set(
-    [...contractPaths]
-      .filter((source) => compilerBoundaryOwners.has(semanticOwner.get(source)))
-      .map((source) => projectOfSource.get(source))
-      .filter(Boolean),
-  )
-  const contractClosure = projectClosure(projects, contractProjects)
+  const contractClosure = projectClosure(projects, compilerBoundaryProjects)
+  for (const projectPath of contractClosure) {
+    if (!compilerBoundaryProjects.has(projectPath)) {
+      const project = projects.get(projectPath)
+      fail(
+        `${repoPath(projectPath)}: compiler boundary closure dependency ${project?.owner ?? '<unknown>'}/${project?.locality ?? '<unknown>'} is not itself a graduated compiler-boundary locality`,
+      )
+    }
+  }
   const contractLeakSources = [...contractClosure]
     .flatMap((projectPath) => projects.get(projectPath)?.compile ?? [])
     .filter((source) => !contractSafePaths.has(source))
@@ -246,12 +249,12 @@ export function checkOwnerProjects() {
     const extra = emitSources.filter((value) => !expected.has(value))
     fail(`${repoPath(AGGREGATE)}: emit/owner compile-set drift missing=[${missing.slice(0, 8).join(', ')}] extra=[${extra.slice(0, 8).join(', ')}]`)
   }
-  for (const owner of compilerBoundaryOwners) {
-    for (const [source, semantic] of semanticOwner) {
-      if (semantic !== owner) continue
+  for (const projectPath of compilerBoundaryProjects) {
+    const project = projects.get(projectPath)
+    for (const source of project?.compile ?? []) {
       const signature = source.replace(/\.fs$/, '.fsi')
       if (!emit.signatures.includes(signature)) {
-        fail(`${signature}: compiler boundary owner '${owner}' signature is missing from flattened Fable emit`)
+        fail(`${signature}: compiler boundary locality '${project.owner}/${project.locality}' signature is missing from flattened Fable emit`)
       }
     }
   }
@@ -267,8 +270,8 @@ export function checkOwnerProjects() {
     projectCount: projects.size,
     sourceCount: projectOfSource.size,
     projectReferenceCount: [...projects.values()].reduce((count, project) => count + project.references.length, 0),
+    compilerBoundaryLocalityCount: compilerBoundaryProjects.size,
     contractSupportSourceCount: contractSupportPaths.size,
-    compilerBoundaryOwnerCount: compilerBoundaryOwners.size,
     contractLeakSourceCount: contractLeakSources.length,
   }
 }

@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Mission.Review
 
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// REVIEW-001: the judge tool accepts exactly these verdicts.

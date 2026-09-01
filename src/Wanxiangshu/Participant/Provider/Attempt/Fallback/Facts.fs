@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Durable fallback facts owned by the provider-attempt fallback boundary.

@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Context.Prefix
 
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// COMPANION-009: the frozen companion memory that replaces X's raw prefix, and

@@ -4,6 +4,7 @@
     <WanxiangshuOwnerLocality>context-trace-cursor</WanxiangshuOwnerLocality>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Context/Trace/Cursor.fsi"/>
     <Compile Include="Context/Trace/Cursor.fs"/>
   </ItemGroup>
 </Project>

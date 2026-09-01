@@ -1,13 +1,5 @@
 namespace Wanxiangshu.Enforcer
 
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-
 /// Rulebook folder SSOT: directory basename = TipName = provider field = durable RuleId.
 /// Rule payload is full enforcer.md + main.md texts; LexicalOrder is folder order 1..N.
 type EnforcerRule =

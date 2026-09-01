@@ -1,7 +1,5 @@
 namespace Wanxiangshu.Sphinx
 
-open Wanxiangshu.Foundation
-
 open System
 
 /// AGENT-030: Sphinx MCP identity and local launch command.

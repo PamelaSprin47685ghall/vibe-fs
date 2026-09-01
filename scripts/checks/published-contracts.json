@@ -15,12 +15,143 @@
       "path": "src/Wanxiangshu/Participant/Persona/Surface.fs",
       "owner": "participant-identity",
       "justification": "Signed JS-native participant identity representation boundary; pure parsing and projection over canonical identity."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Rulebook.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed pure observation-pairing algebra consumed only by behavior-diagnosis siblings; it carries no runtime state, physical effect, or foreign contract grant."
+    },
+    {
+      "path": "src/Wanxiangshu/Foundation/OutcomeSurface.fs",
+      "owner": "dispatch-protocol",
+      "justification": "Signed JS-native projection of dispatch outcome vocabulary; it is pure representation support and grants no additional foreign semantic contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Attention/Surface.fs",
+      "owner": "attention-regulation",
+      "justification": "Signed JS-native projection over the attention contract; it owns no additional semantic authority and grants no foreign contract beyond the typed attention vocabulary."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Concern/Surface.fs",
+      "owner": "concern-routing",
+      "justification": "Signed JS-native projection over the concern contract; it carries no process authority and grants no foreign contract beyond the typed concern vocabulary."
+    },
+    {
+      "path": "src/Wanxiangshu/Foundation/ParallelSurface.fs",
+      "owner": "intra-participant-parallelism",
+      "justification": "Signed JS-native adapter over bounded parallelism; semaphore and Promise completion machinery remain private implementation and the surface grants no additional semantic contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Process/DeadlineSurface.fs",
+      "owner": "time-capability",
+      "justification": "Signed JS-native projection of the opaque Deadline contract; it parses boundary timestamps but owns no new timing authority or foreign semantic contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Foundation/SyntheticToml.fs",
+      "owner": "provider-projection",
+      "justification": "Signed canonical synthetic TOML representation support; encoder scratch and UTF-8 counting internals remain private and this helper grants no additional foreign semantic contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs",
+      "owner": "provider-projection",
+      "justification": "Signed JS-native projection of the canonical SyntheticToml renderer; it adds no semantic authority or foreign contract beyond representation."
     }
   ],
-  "compiler_boundary_owners": [
+  "compiler_boundary_localities": [
     {
       "owner": "participant-identity",
+      "locality": "foundation-roles",
       "justification": "Leaf semantic owner with zero ProjectReference dependencies; every production source is signed and is either published contract or signed compile-contract support."
+    },
+    {
+      "owner": "office-capability",
+      "locality": "foundation-officecapability",
+      "justification": "Two-file capability vocabulary owner whose only compile dependency is the graduated participant-identity contract; both production sources are published contracts with F# signatures."
+    },
+    {
+      "owner": "epistemic-reasoning",
+      "locality": "sphinx-mcp",
+      "justification": "Foreign-facing Sphinx MCP identity/launch contract is a one-file leaf locality with zero semantic source dependencies; Sphinx runtime remains in the owner-local runtime project."
+    },
+    {
+      "owner": "semantic-trace",
+      "locality": "context-trace-cursor",
+      "justification": "Foundational XTrace cursor/range vocabulary is a one-file leaf locality with zero semantic source dependencies and an explicit F# signature."
+    },
+    {
+      "owner": "speculative-investigation",
+      "locality": "strength-budget",
+      "justification": "Strength request-budget and cost-value algebra are pure leaf contracts with zero semantic source dependencies; both files are explicitly signed."
+    },
+    {
+      "owner": "behavior-diagnosis",
+      "locality": "enforcer-catalog",
+      "justification": "Enforcer catalog contract plus owner-local observation pairing support are pure zero-dependency algebra; both files are explicitly signed and the support file grants no foreign contract."
+    },
+    {
+      "owner": "dispatch-protocol",
+      "locality": "foundation-identity",
+      "justification": "Foundational dispatch identities, outcomes, nudge vocabulary and metadata codec depend only on the graduated participant-identity contract; all sources are signed and OutcomeSurface is pure signed representation support."
+    },
+    {
+      "owner": "change-integration",
+      "locality": "change-facts",
+      "justification": "Change durable fact vocabulary is a one-file signed contract whose only compile dependency is the graduated foundation-identity locality."
+    },
+    {
+      "owner": "context-compression",
+      "locality": "context-companion-facts",
+      "justification": "Companion and context durable fact vocabularies form one signed file whose only compile dependency is graduated foundation identity."
+    },
+    {
+      "owner": "durable-events",
+      "locality": "persistence-eventstore-model",
+      "justification": "EventStore envelope and opaque payload/stream identities are a signed model locality depending only on graduated foundation identity plus package JSON vocabulary."
+    },
+    {
+      "owner": "prefix-stability",
+      "locality": "context-prefix-candidate",
+      "justification": "Prefix snapshot/probe candidate vocabulary is a one-file signed contract depending only on graduated foundation identity."
+    },
+    {
+      "owner": "review-judgement",
+      "locality": "mission-review-facts",
+      "justification": "Review durable fact and verdict vocabulary is a one-file signed contract depending only on graduated foundation identity."
+    },
+    {
+      "owner": "session-ontology",
+      "locality": "execution-session-ownership",
+      "justification": "Session execution-class and attachment ownership vocabulary is a one-file signed contract depending only on graduated foundation identity."
+    },
+    {
+      "owner": "provider-attempt-recovery",
+      "locality": "participant-provider-attempt-requestkind",
+      "justification": "Provider request-kind and fallback durable-fact vocabularies form a signed two-file contract locality whose only compile dependency is graduated foundation identity."
+    },
+    {
+      "owner": "attention-regulation",
+      "locality": "interaction-attention-facts",
+      "justification": "Attention durable facts and projection contract plus JS-native surface form a signed locality depending only on graduated foundation identity."
+    },
+    {
+      "owner": "concern-routing",
+      "locality": "interaction-concern-facts",
+      "justification": "Concern durable facts and projection contract plus JS-native surface form a signed locality depending only on graduated foundation identity."
+    },
+    {
+      "owner": "intra-participant-parallelism",
+      "locality": "foundation-taskresult",
+      "justification": "TaskResult CE, Fable task helpers, bounded parallelism and Fission durable facts form a signed foundational locality; only the JS-native parallel surface is signed support and runtime semaphore internals remain private."
+    },
+    {
+      "owner": "time-capability",
+      "locality": "foundation-temporal",
+      "justification": "Clock/deadline capabilities, session-start projection and registered Node/virtual timing adapters form one signed locality depending only on graduated bounded-task primitives; DeadlineSurface is signed representation support."
+    },
+    {
+      "owner": "provider-projection",
+      "locality": "participant-provider-projection-model",
+      "justification": "Provider wire/semantic model, projection intents, canonical LLM/TOML representation, planner and renderer form a signed locality depending only on graduated foundation identity; representation support is explicitly signed."
     }
   ],
   "contracts": [

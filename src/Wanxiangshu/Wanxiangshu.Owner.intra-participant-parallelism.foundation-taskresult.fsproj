@@ -5,11 +5,17 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <Compile Include="Foundation/TaskResult.fsi"/>
     <Compile Include="Foundation/TaskResult.fs"/>
+    <Compile Include="Foundation/FsToolkitFableCompat.fsi"/>
     <Compile Include="Foundation/FsToolkitFableCompat.fs"/>
+    <Compile Include="Foundation/Parallel.fsi"/>
     <Compile Include="Foundation/Parallel.fs"/>
+    <Compile Include="Foundation/ParallelSurface.fsi"/>
     <Compile Include="Foundation/ParallelSurface.fs"/>
+    <Compile Include="Foundation/AsyncSupport.fsi"/>
     <Compile Include="Foundation/AsyncSupport.fs"/>
+    <Compile Include="Execution/Fission/Facts.fsi"/>
     <Compile Include="Execution/Fission/Facts.fs"/>
   </ItemGroup>
 </Project>

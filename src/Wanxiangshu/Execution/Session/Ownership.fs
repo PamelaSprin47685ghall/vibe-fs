@@ -1,8 +1,5 @@
 namespace Wanxiangshu.Execution.Session
 
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Foundation
-
 open Wanxiangshu.Foundation.Identity
 
 /// HOST-008: orthogonal session ownership — ExecutionClass × Ownership.

@@ -5,8 +5,11 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <Compile Include="Interaction/Attention/Facts.fsi"/>
     <Compile Include="Interaction/Attention/Facts.fs"/>
+    <Compile Include="Interaction/Attention/Projection.fsi"/>
     <Compile Include="Interaction/Attention/Projection.fs"/>
+    <Compile Include="Interaction/Attention/Surface.fsi"/>
     <Compile Include="Interaction/Attention/Surface.fs"/>
   </ItemGroup>
 </Project>

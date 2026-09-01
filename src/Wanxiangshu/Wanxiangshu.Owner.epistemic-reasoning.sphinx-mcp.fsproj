@@ -5,7 +5,7 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.distribution.assemblyinfo.fsproj"/>
+    <Compile Include="Sphinx/Mcp.fsi"/>
     <Compile Include="Sphinx/Mcp.fs"/>
   </ItemGroup>
 </Project>

@@ -5,10 +5,15 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <Compile Include="Foundation/Identity.fsi"/>
     <Compile Include="Foundation/Identity.fs"/>
+    <Compile Include="Foundation/Outcome.fsi"/>
     <Compile Include="Foundation/Outcome.fs"/>
+    <Compile Include="Interaction/Dispatch/Nudge.fsi"/>
     <Compile Include="Interaction/Dispatch/Nudge.fs"/>
+    <Compile Include="Interaction/Dispatch/OpenCode/MetadataCodec.fsi"/>
     <Compile Include="Interaction/Dispatch/OpenCode/MetadataCodec.fs"/>
+    <Compile Include="Foundation/OutcomeSurface.fsi"/>
     <Compile Include="Foundation/OutcomeSurface.fs"/>
   </ItemGroup>
 </Project>

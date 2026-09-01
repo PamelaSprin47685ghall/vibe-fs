@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Execution.Fission
 
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Durable facts for one logical participant's temporary physical lanes.

@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Change
 
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Durable orchestration facts owned by the Change/orchestrator boundary.
