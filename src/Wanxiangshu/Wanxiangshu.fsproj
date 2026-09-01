@@ -272,6 +272,7 @@
     <Compile Include="Persistence/EventStore/ProcessGitRawStore.fs"/>
     <Compile Include="Persistence/EventStore/WriterStreamSync.fs"/>
     <Compile Include="Persistence/EventStore/RetentionSurface.fs"/>
+    <Compile Include="OpenCode/Tools/ManagedAgent.fsi"/>
     <Compile Include="OpenCode/Tools/ManagedAgent.fs"/>
     <Compile Include="OpenCode/Host/ChatAdmission/Intent.fs"/>
     <Compile Include="OpenCode/Host/ChatAdmission/IntentSurface.fs"/>
@@ -469,6 +470,7 @@
     <Compile Include="Context/Companion/Model.fs"/>
     <Compile Include="Context/Companion/Runtime.fs"/>
     <Compile Include="OpenCode/Tools/ToolContext.fs"/>
+    <Compile Include="OpenCode/Tools/StaticTools.fsi"/>
     <Compile Include="OpenCode/Tools/StaticTools.fs"/>
     <Compile Include="OpenCode/Tools/FileTools.fs"/>
     <Compile Include="OpenCode/Codec/OpencodeTypes.fsi"/>
@@ -493,9 +495,13 @@
     <Compile Include="OpenCode/Codec/CanonicalJsonSurface.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/MetadataCodec.fsi"/>
     <Compile Include="Interaction/Dispatch/OpenCode/MetadataCodec.fs"/>
+    <Compile Include="OpenCode/Codec/ProviderWireDecode.fsi"/>
     <Compile Include="OpenCode/Codec/ProviderWireDecode.fs"/>
+    <Compile Include="OpenCode/Codec/ProviderWireCapture.fsi"/>
     <Compile Include="OpenCode/Codec/ProviderWireCapture.fs"/>
+    <Compile Include="OpenCode/Codec/ProjectionMessageEdit.fsi"/>
     <Compile Include="OpenCode/Codec/ProjectionMessageEdit.fs"/>
+    <Compile Include="Participant/Provider/Projection/Surface.fsi"/>
     <Compile Include="Participant/Provider/Projection/Surface.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingCalibration.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingCalibrationSurface.fs"/>

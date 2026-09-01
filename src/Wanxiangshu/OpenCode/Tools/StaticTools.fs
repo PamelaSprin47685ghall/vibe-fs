@@ -1,17 +1,12 @@
 namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Sphinx
-open Wanxiangshu.Composition.Durable
 
 open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation
 open Wanxiangshu.Mission.Review
-open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Identity
 
 module NodeFs =
     [<Import("readFileSync", "fs")>]
@@ -36,8 +31,6 @@ module NodeFs =
     let rmSync (path: string, options: obj) : unit = jsNative
 
 module StaticTools =
-
-    open Wanxiangshu.Foundation
 
     /// One permission may expand to several provider verb names (Pty, Behavior, Exec).
     let toolNames (p: ToolPermission) : string list =

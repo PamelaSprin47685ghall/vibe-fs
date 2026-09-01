@@ -169,6 +169,16 @@
   ],
   "compiler_boundary_localities": [
     {
+      "owner": "action-affordance",
+      "locality": "opencode-tools-managedagent",
+      "justification": "Managed-agent identity and static tool/permission projection are fully signed action-affordance contracts; their compile closure is limited to graduated role/persona, office, review, Sphinx and stealth-browser vocabularies."
+    },
+    {
+      "owner": "provider-projection",
+      "locality": "opencode-codec-providerwiredecode",
+      "justification": "Raw Host wire decoding/capture, projection write-back and JS projection surface are fully signed provider-projection contracts depending only on graduated identity, Host codec and provider projection model boundaries."
+    },
+    {
       "owner": "participant-horizon",
       "locality": "opencode-host-messagevisibility",
       "justification": "Message-visibility event wake and bounded timer backstop are a signed Host capability locality depending only on graduated identity, Host codec, async and timing boundaries; the JS handle facade is signed support."
