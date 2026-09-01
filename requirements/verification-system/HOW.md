@@ -39,6 +39,14 @@
 
 `tests/no-line-count-check.test.mjs` 结构化验证仓库的所有门禁与检查套件中，不存在任何形式的文件行数或尺寸限制逻辑，确保质量保障专注于真实的架构语义和规范不变量。
 
+### 7. Production-bound property testing
+
+只有纯代数、幂等、单调、prefix、round-trip、排列或有限事件竞争进入 property testing。generator 只构造输入；property 直接调用注册 production Surface，并以 WHAT 已独立声明的关系或 typed rejection 判断输出。若 expected result 只能通过复制 production algorithm 得到，改用固定反例、类型约束、shared analyzer 或更高层契约测试。
+
+每项 property 保留最小固定正例与边界反例；生成域显式覆盖 production 代数的全部构造。固定独立 seed 与 `numRuns`；`fc.assert` 的失败报告保留 seed 与 shrink path。高风险性质用一个精确错误 mutant 验证 oracle 可红，再以返回的 seed/path 重放最小反例。shrunk counterexample 若代表历史缺陷，转成普通固定 regression；property 继续搜索邻域。
+
+静态 ownership/absence、真实 Host/网络/进程与语义仍有争议的命题不使用 property testing。不得建立全仓 mutation framework，不得把随机次数解释为 exhaustive/comprehensive，也不得依赖传递依赖取得 property runner。
+
 ---
 
 ## 验证与测试落点
