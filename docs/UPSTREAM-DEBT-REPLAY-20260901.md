@@ -4,30 +4,34 @@
 
 - Replay branch: `codex/upstream-debt-replay-20260901`
 - Initial audit base: `ff85615e9a8dc0c94447eb55960a72deb46ed9db`
-- Final replay base: `8caee37ca` (four later boundary-signing commits included)
+- Final replay base: `1d4d810c7` (eight later boundary-signing commits included)
 - Preserved source branch: `codex/upstream-debt-audit-20260901`
 - Method: inspect the refactored owner/signature/project boundary first, then replay only residual semantics. No merge commit or blind cherry-pick is used.
 - Final integration rule: fetch `upstream/master` again, reconcile any tail semantically, run the full validation ladder, then open one cumulative PR.
 
 ## Final upstream-tail reconciliation
 
-Immediately before release validation, upstream advanced by four commits:
+Immediately before release validation, upstream advanced in two four-commit tails:
 
 - `93c28fe71` signs the fission runtime boundary;
 - `55ed50b56` signs the provider-attempt planner boundary;
 - `c05948501` signs the managed-chat execution boundary;
-- `8caee37ca` signs time and model-routing boundaries.
+- `8caee37ca` signs time and model-routing boundaries;
+- `b21d0dc2f` signs Host and Sphinx runtime boundaries;
+- `b97f06006` signs OpenCode and degeneration boundaries;
+- `fbf24db46` signs the cognitive prompt boundary;
+- `1d4d810c7` signs the session ontology boundary.
 
-These commits add or tighten `.fsi` files, owner project membership, and exact published contracts. They do not touch P2 reconciliation, P5 Judge, the A0 analyzer implementation, or the durable-tail proof. `scripts/checks/published-contracts.json` is the sole path changed by both histories: upstream adds contracts for its new signatures; A0 adds exact declarations for pre-existing FCS uses exposed by earlier signatures. The cumulative branch was rebased node-by-node onto `8caee37ca`; Git applied all 14 nodes without conflict, preserving both disjoint contract sets. No upstream production code was reverted or compatibility layer introduced.
+These commits add or tighten `.fsi` files, owner project membership, and exact published contracts. They do not touch P2 reconciliation, P5 Judge, the A0 analyzer implementation, or the durable-tail proof. `scripts/checks/published-contracts.json` is the sole path changed by both histories: upstream adds contracts for its new signatures; A0 adds exact declarations for pre-existing FCS uses exposed by earlier signatures. The cumulative branch was rebased node-by-node first onto `8caee37ca`, then onto `1d4d810c7`; Git applied all 19 replay and release-fix nodes without conflict, preserving both disjoint contract sets. No upstream production code was reverted or compatibility layer introduced.
 
 ## Module ledger
 
 | Module | Old source nodes | Latest-upstream finding | Replay nodes | State |
 | --- | --- | --- | --- | --- |
-| P2 causal reconciliation | `a6445f214`, `3f481417a`, `b855d9891` | Compiler owner projects were added, but `Reread`, counter parameters, recursive snapshot reads, and the test-local mirror remained. | `59668a626`, `1912f3f91`, `858628cd5` | GREEN; closure recorded here |
-| P5 Judge decision ownership | `6b93b752d`, `f3b2372d1`, `2b405f573` | The owner project existed, but `JudgeTool` used a private decision while `JudgeSurface.validateContext` implemented a disconnected approximation. | `3fa18b66a`, `41efd2115`, `967767969` | GREEN; closure recorded here |
-| A0 owner graph | `5ab743901`, `975762df3`, `1ca0a8be5`, `cd1878ce4`, `af4de1d79` | Compiler projects now enforce the locality DAG, but exact FCS semantic-edge snapshots, deltas, and derived manifest counts remained absent. | `61e6bb0c2`, `bf6a413bf`, `d7463bf99`, `b7d37bb95`, `d191abc62`, `6f71d0a4d` | GREEN; closure recorded here |
-| P6B evidence/property work | `3c2581088`, `bfd81120e`, `e22f07982`, `c6b10c89e` | Failure/capacity finite proofs remain stronger than random sampling; durable incomplete-tail space remains uncovered. | `aba41360c`, `2e16baf71` | GREEN; two NO-GO decisions and one GO recorded here |
+| P2 causal reconciliation | `a6445f214`, `3f481417a`, `b855d9891` | Compiler owner projects were added, but `Reread`, counter parameters, recursive snapshot reads, and the test-local mirror remained. | `ffb846594`, `38276e4ef`, `744578f6e` | GREEN; closure recorded here |
+| P5 Judge decision ownership | `6b93b752d`, `f3b2372d1`, `2b405f573` | The owner project existed, but `JudgeTool` used a private decision while `JudgeSurface.validateContext` implemented a disconnected approximation. | `e3f3ea840`, `18f1b1f14`, `e9fbc9fa8` | GREEN; closure recorded here |
+| A0 owner graph | `5ab743901`, `975762df3`, `1ca0a8be5`, `cd1878ce4`, `af4de1d79` | Compiler projects now enforce the locality DAG, but exact FCS semantic-edge snapshots, deltas, and derived manifest counts remained absent. | `df013fcc4`, `cd1e8e4b1`, `99344ecbd`, `58958f04f`, `8841fd018`, `af8aaed99` | GREEN; closure recorded here |
+| P6B evidence/property work | `3c2581088`, `bfd81120e`, `e22f07982`, `c6b10c89e` | Failure/capacity finite proofs remain stronger than random sampling; durable incomplete-tail space remains uncovered. | `e07d24afb`, `cf992a381` | GREEN; two NO-GO decisions and one GO recorded here |
 
 ## P2 — causal edges are the only snapshot-read authority
 
@@ -42,7 +46,7 @@ The replay intentionally changes existing upstream production and proof files. T
 
 Those boundaries compiled, but the implementation still exposed a `Reread` decision and counter-shaped API. `ReconcilePass` still contained recursive reread/error bookkeeping, while `Scheduler` forced the budgets to zero. The result happened to read once in production but kept a second, illegal mechanism in the model and public proof surface.
 
-### RED — `59668a626`
+### RED — `ffb846594`
 
 Added one production-bound counterexample for `HOST-BOUNDARY-005`:
 
@@ -58,7 +62,7 @@ node --test requirements/host-boundary/tests/reconcile-idle-early.test.mjs
 TypeError: ReconcileSurface.idleProvisionalWithoutProjectionEdgeScenario is not a function
 ```
 
-### GREEN — `1912f3f91`
+### GREEN — `38276e4ef`
 
 - Deleted `ReconcileDecision.Reread` and its candidate/counter helpers.
 - Reduced `decideStep` from `(wake, rereadsRemaining, evidence)` to `(wake, evidence)`.
@@ -96,7 +100,7 @@ The replay intentionally changes existing upstream `JudgeTool.fs`, `JudgeSurface
 - `JudgeSurface.validateContext` separately modeled role/session/tree booleans that the Tool did not consume;
 - four tests proved only that mirror and could stay green if the real Tool decision regressed.
 
-### RED — `3fa18b66a`
+### RED — `e3f3ea840`
 
 Added production-Surface counterexamples for the complete execution evidence:
 
@@ -107,7 +111,7 @@ Added production-Surface counterexamples for the complete execution evidence:
 
 Observed before production change: `4 pass, 3 fail`; all three new tests failed because `JudgeSurface.decideExecution` did not exist.
 
-### GREEN — `41efd2115`
+### GREEN — `18f1b1f14`
 
 - Extracted `ExecutionEvidence → ExecutionDecision` as the single pure decision in `JudgeTool`.
 - Replaced raw prose paths in the decision with `ExecutionRejection` cases and one rejection-to-resource mapping.
@@ -144,10 +148,10 @@ The retained residual law belongs to the FCS semantic-use oracle, which remains 
 
 ### RED/GREEN sequence
 
-- `61e6bb0c2` RED: 39 tests, 36 pass, 3 fail for absent exact SCC facts, absent added/removed edge comparison, and the handwritten `semantic-owners.json.total`.
-- `bf6a413bf` GREEN: derive the owner count; produce a versioned, sorted, duplicate-free graph with exact SCC members/internal edges; compare exact edge keys. Result: 39/39.
-- `d7463bf99` RED: 40 tests, 39 pass, 1 fail because no-baseline JSON could not be reused directly as a baseline.
-- `b7d37bb95` GREEN: emit the bare snapshot without a baseline and `{ current, delta }` only for a comparison. Result: 40/40.
+- `df013fcc4` RED: 39 tests, 36 pass, 3 fail for absent exact SCC facts, absent added/removed edge comparison, and the handwritten `semantic-owners.json.total`.
+- `cd1e8e4b1` GREEN: derive the owner count; produce a versioned, sorted, duplicate-free graph with exact SCC members/internal edges; compare exact edge keys. Result: 39/39.
+- `99344ecbd` RED: 40 tests, 39 pass, 1 fail because no-baseline JSON could not be reused directly as a baseline.
+- `58958f04f` GREEN: emit the bare snapshot without a baseline and `{ current, delta }` only for a comparison. Result: 40/40.
 
 ### Real-repository canary and upstream refactor drift
 
@@ -156,7 +160,7 @@ The first real `--graph-json` scan proved the CLI shape but exited nonzero on 11
 - 10 exact FCS uses had signed `.fsi/fsproj` boundaries but incomplete `published-contracts.json` entries;
 - `OwnerIdentityWitness` still named the removed `let internal inherited ...` issuer after upstream commit `3c585e24a` replaced it with `PromptIdentitySeed.inheritFromOwner`.
 
-`d191abc62` fixes only those metadata declarations:
+`8841fd018` fixes only those metadata declarations:
 
 - add `durable-events` to the existing Change projection contract;
 - publish the existing `ReviewRequirementProjection` type to its existing `durable-events` consumer;
@@ -199,7 +203,7 @@ The current owners and proofs were re-audited instead of replaying the old docum
 
 The latest upstream already contains the 21-test closed-algebra suite, the 216-case deterministic cross-boundary matrix, and three exact mutants. The core domain is finite and enumerable. A fast-check generator would either sample less than the existing table or reproduce the recovery state machine. No repository change is justified solely to adopt the tool.
 
-### P6B-3 durable writer tails — GO (`aba41360c`)
+### P6B-3 durable writer tails — GO (`e07d24afb`)
 
 The latest WHAT still forbids every incomplete NDJSON tail and skip-corrupt continuation, while no property covered canonical payload × arbitrary cut position. The replay adds:
 
@@ -221,9 +225,9 @@ The 216-case failure matrix contains dimensions that do not affect the policy in
 
 ## Release-sink findings in upstream code
 
-The first complete `npm run format-build-test` exposed failures that exist on `upstream/master@8caee37ca`; none were introduced by P2, P5, A0, or P6B. They are changed in this PR because the upstream release entry cannot otherwise complete. Each correction is isolated from the replay modules.
+The first complete `npm run format-build-test` exposed failures that existed on the initial release base `upstream/master@8caee37ca`; none were introduced by P2, P5, A0, or P6B. They are changed in this PR because the upstream release entry cannot otherwise complete. Each correction is isolated from the replay modules and remains necessary on `1d4d810c7`.
 
-### Verification gates — `0dbc20d77`
+### Verification gates — `663466799`
 
 1. `ctx-capacity-observation-forbidden.test.mjs` scanned every production file for the generic word `tokenizer`. It rejected `Execution/Session/LoopDetector.fs`, although that file is owned by `degeneration-guard` and uses tokenization to detect repetition—not to observe model context capacity. Deleting or renaming that production dependency would damage a valid owner to satisfy an over-broad oracle. The corrected proof obtains exact `context-compression` files from `semantic-owners.json` and applies the same forbidden vocabulary only to the owner governed by CONTEXT-COMPRESSION-001. Empty ownership fails closed.
 2. `proof-ladder.test.mjs` required `owner-dependencies.mjs` to be textually adjacent to `semantic-owners.mjs`. Upstream's valid `owner-projects.mjs` DAG gate now sits between them. Evidence causality requires only `semantic-owners < owner-dependencies < every FCS consumer`; the corrected assertion states that order without rejecting an independent intervening gate.
@@ -231,13 +235,13 @@ The first complete `npm run format-build-test` exposed failures that exist on `u
 
 RED from the first release sink: 3861/3865 unit tests, with these three code failures plus one sandbox-only localhost EPERM. GREEN focused run with localhost permission: CTX + proof ladder + installed OpenCode canary, 15/15. The canary proved the EPERM was environmental; no Host assertion was changed.
 
-### Isolated compiler tool home — `6b6bb570d`
+### Isolated compiler tool home — `01d93700e`
 
 `run-inner.mjs` intentionally replaces `HOME`/`USERPROFILE` so tests cannot read developer OpenCode configuration. That also hid the .NET local-tool store from child compiler canaries. Direct `owner-project-compiler-boundary.test.mjs` passed, while the same test under the integration inner runner failed before compilation with “Run dotnet tool restore”.
 
 The fix freezes `DOTNET_CLI_HOME` from the caller before replacing application `HOME`. OpenCode remains isolated; only the dedicated .NET tool location survives. The exact `run-inner.mjs → owner-project-compiler-boundary.test.mjs` path then passed all nine positive/negative Fable project cases in 27.7s. The final complete integration repeated the same proof in 27.3s.
 
-### Mandatory formatting — `5829d1de9`
+### Mandatory formatting — `8016a1d00`
 
 The repository release entry runs Fantomas before every other layer. Its first pass normalized 107 `.fsi` files and three `.fs` files, including signatures present before and added by the upstream boundary-signing tail. The changes are layout-only and were isolated into one style commit; the next pass reported 978 files unchanged. Fable compiled the normalized tree successfully. This commit intentionally modifies upstream-authored files because otherwise every release run regenerates the same dirty tree.
 
@@ -247,8 +251,8 @@ One uninterrupted, localhost-enabled `npm run format-build-test` completed with 
 
 ```text
 format/check: clean; 773 WHAT; 3914 executable proof declarations
-owner dependency scan: 29167 exact FCS cross-owner uses; 0 pending; 778 contracts
-build: 1016 F# source inputs; 165 registered surfaces; 772 emitted modules linked
+owner dependency scan: 29330 exact FCS cross-owner uses; 0 pending; 778 contracts
+build: 1069 F# source inputs; 165 registered surfaces; 772 emitted modules linked
 unit: 3865 passed, 0 failed
 integration: every registered suite passed, including the real owner-project compiler boundary
 package integration: all suites passed
