@@ -319,6 +319,16 @@
       "justification": "The bounded session/workspace projection aggregate is a one-file signed composition contract over already-graduated owner projections; it contains no fold routing, persistence implementation, runtime resource, or physical effect."
     },
     {
+      "owner": "interaction-authority",
+      "locality": "interaction-authority-ledger",
+      "justification": "Prompt-authority durable folds and bounded dispatch queries are a one-file signed contract over graduated identity, authority fact, fission and durable projection localities; historical monolith-only opens were removed so the compile closure names only real dependencies."
+    },
+    {
+      "owner": "obligation-ledger",
+      "locality": "mission-manager-life-openingfloor",
+      "justification": "Manager opening-floor derivation is a one-file signed pure projection contract over graduated lifecycle, MagicTodo, XTrace, identity and durable projection localities; monolith-only imports were removed and no Host/runtime effect enters the closure."
+    },
+    {
       "owner": "prefix-stability",
       "locality": "mission-obligation-todo-prefixepoch",
       "justification": "Prefix candidate selection, epoch fold, TodoCheckpoint rebase helpers and projection algebra form a fully signed locality over graduated identity, obligation, context-compression and request-kind contracts; Projection and Surface are explicit pure/representation support."
@@ -15998,7 +16008,7 @@
     {
       "path": "src/Wanxiangshu/Execution/Delegation/Fork/RuntimeContract.fs",
       "owner": "delegation",
-      "node": "delegation-frontier-keep",
+      "node": "delegation-runtime-contract-followup",
       "contract": "delegation.Contract",
       "kind": "published-contract",
       "consumers": [
@@ -16012,7 +16022,7 @@
     {
       "path": "src/Wanxiangshu/Execution/Delegation/Fork/RuntimeContract.fs",
       "owner": "delegation",
-      "node": "delegation-frontier-keep",
+      "node": "delegation-runtime-contract-followup",
       "contract": "delegation.Contract",
       "kind": "published-contract",
       "consumers": [

@@ -405,11 +405,13 @@
     <Compile Include="Execution/Session/ChatExecution/Admission.fs"/>
     <Compile Include="Composition/Durable/Projection.fsi"/>
     <Compile Include="Composition/Durable/Projection.fs"/>
+    <Compile Include="Mission/Manager/Life/OpeningFloor.fsi"/>
     <Compile Include="Mission/Manager/Life/OpeningFloor.fs"/>
     <Compile Include="Enforcer/Observation.fsi"/>
     <Compile Include="Enforcer/Observation.fs"/>
     <Compile Include="Composition/Bridges/FinalityReview/FinalityReviewCohort.fs"/>
     <Compile Include="Execution/Session/RecoveryClosureProjection.fs"/>
+    <Compile Include="Interaction/Authority/Ledger.fsi"/>
     <Compile Include="Interaction/Authority/Ledger.fs"/>
     <Compile Include="Persistence/Journal/Writer.fsi"/>
     <Compile Include="Persistence/Journal/Writer.fs"/>

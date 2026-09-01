@@ -1695,6 +1695,20 @@
       "publishes": [
         "delegation.Contract"
       ]
+    },
+    {
+      "id": "delegation-runtime-contract-followup",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Execution/Delegation/Fork/RuntimeContract.fs"
+      ],
+      "proofs": [
+        "requirements/delegation/tests/reconcile-supervisor-await-agent.test.mjs",
+        "requirements/structured-workflow/tests/owner-project-boundaries.test.mjs"
+      ],
+      "publishes": [
+        "delegation.Contract"
+      ]
     }
   ],
   "coverage_backlog": {}
