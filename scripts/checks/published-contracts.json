@@ -2,6 +2,21 @@
   "schema_version": 1,
   "compile_contract_support": [
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineSurface.fs",
+      "owner": "guidance-delivery",
+      "justification": "Signed JS-native facade over the pair-programming guideline projection; dynamic representation helpers remain private and no additional guidance authority is granted."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Guidance/DeliverySurface.fs",
+      "owner": "guidance-delivery",
+      "justification": "Signed JS-native facade over restart-safe tip delivery projection; boxing/parsing helpers remain private and it adds no semantic authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
+      "owner": "provider-attempt-recovery",
+      "justification": "Signed owner-local routing constructors from fallback durable facts into the canonical AgentFact union; they add no independent recovery authority."
+    },
+    {
       "path": "src/Wanxiangshu/Change/Fact.fs",
       "owner": "change-integration",
       "justification": "Signed owner-local routing constructors from Change durable facts into the canonical AgentFact union; they add no independent semantic or persistence authority."
@@ -198,6 +213,16 @@
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "guidance-delivery",
+      "locality": "opencode-host-pairprogramming-guidelineprojection",
+      "justification": "Pair-programming guideline and tip-delivery projections are signed guidance contracts over graduated identity and grounding vocabularies; JS-native surfaces are explicit signed support."
+    },
+    {
+      "owner": "provider-attempt-recovery",
+      "locality": "participant-provider-attempt-fallback-fact",
+      "justification": "Fallback routing, cursor, recovery-slot decisions and durable projection are signed recovery contracts over graduated identity, request-kind and durable routing; the AgentFact bridge is explicit owner-local support."
+    },
     {
       "owner": "intra-participant-parallelism",
       "locality": "execution-fission-fact",

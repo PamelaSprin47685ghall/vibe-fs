@@ -7,9 +7,13 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Cursor.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Cursor.fs"/>
+    <Compile Include="Participant/Provider/Attempt/RecoverySlot.fsi"/>
     <Compile Include="Participant/Provider/Attempt/RecoverySlot.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fs"/>
   </ItemGroup>
 </Project>

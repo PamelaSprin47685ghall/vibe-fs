@@ -1,13 +1,5 @@
 namespace Wanxiangshu.Participant.Provider.Attempt
 
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-
 /// FALLBACK-012 / CTX-006: is this recovery slot armed.
 ///
 /// Not persistent state, not a field on the cursor, never written to the journal.

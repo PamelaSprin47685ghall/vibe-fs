@@ -136,6 +136,7 @@
     <Compile Include="Composition/Durable/Fact.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Fact.fs"/>
     <Compile Include="Interaction/Authority/Fact.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fs"/>
     <Compile Include="Mission/Review/Fact.fs"/>
     <Compile Include="Execution/Delegation/Fact.fs"/>
@@ -150,6 +151,7 @@
     <Compile Include="Foundation/Temporal.fs"/>
     <Compile Include="Participant/Provider/Language.fsi"/>
     <Compile Include="Participant/Provider/Language.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Cursor.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Cursor.fs"/>
     <Compile Include="Participant/Provider/Attempt/TerminalValidity.fs"/>
     <Compile Include="Enforcer/Catalog.fsi"/>
@@ -159,6 +161,7 @@
     <Compile Include="Enforcer/Codec.fs"/>
     <Compile Include="Enforcer/ChronicleExecution.fs"/>
     <Compile Include="Enforcer/Cycle/Model.fs"/>
+    <Compile Include="Participant/Provider/Attempt/RecoverySlot.fsi"/>
     <Compile Include="Participant/Provider/Attempt/RecoverySlot.fs"/>
     <Compile Include="Execution/Session/Recovery/Model.fs"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecovery.fs"/>
@@ -304,6 +307,7 @@
     <Compile Include="Context/Companion/Blogger/Projection.fs"/>
     <Compile Include="Context/Companion/Blogger/FrameSurface.fs"/>
     <Compile Include="Context/Prefix/Epoch.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fs"/>
     <Compile Include="Execution/Delegation/LinkageProjection.fs"/>
     <Compile Include="Execution/Delegation/Handle/Surface.fs"/>
@@ -317,11 +321,15 @@
     <Compile Include="Enforcer/Projection.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/CycleProjection.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/CycleSurface.fs"/>
+    <Compile Include="OpenCode/Host/PairProgramming/GuidelineProjection.fsi"/>
     <Compile Include="OpenCode/Host/PairProgramming/GuidelineProjection.fs"/>
+    <Compile Include="OpenCode/Host/PairProgramming/GuidelineSurface.fsi"/>
     <Compile Include="OpenCode/Host/PairProgramming/GuidelineSurface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGrounding/Projection.fsi"/>
     <Compile Include="OpenCode/Host/RequirementGrounding/Projection.fs"/>
+    <Compile Include="Enforcer/Guidance/DeliveryProjection.fsi"/>
     <Compile Include="Enforcer/Guidance/DeliveryProjection.fs"/>
+    <Compile Include="Enforcer/Guidance/DeliverySurface.fsi"/>
     <Compile Include="Enforcer/Guidance/DeliverySurface.fs"/>
     <Compile Include="Execution/Fission/Projection.fsi"/>
     <Compile Include="Execution/Fission/Projection.fs"/>
