@@ -328,6 +328,7 @@
     <Compile Include="Execution/Session/Association.fs"/>
     <Compile Include="Execution/Session/AssociationSurface.fsi"/>
     <Compile Include="Execution/Session/AssociationSurface.fs"/>
+    <Compile Include="Mission/Review/Barrier/Projection.fsi"/>
     <Compile Include="Mission/Review/Barrier/Projection.fs"/>
     <Compile Include="Enforcer/Projection.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/CycleProjection.fs"/>
