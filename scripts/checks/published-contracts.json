@@ -584,6 +584,11 @@
   ],
   "compiler_boundary_localities": [
     {
+      "owner": "interaction-authority",
+      "locality": "interaction-authority-fold",
+      "justification": "PromptAuthority durable fold, completed-turn classification and linked-child authority restoration form one fully signed interaction-authority contract locality over graduated dispatch, identity, durable projection and review-barrier contracts; classification helpers and child recovery plumbing remain signature-bounded without importing unrelated runtime owners."
+    },
+    {
       "owner": "dispatch-protocol",
       "locality": "execution-session-recovery-model",
       "justification": "Recovery family algebra, pure turn reconciliation vocabulary, physical prompt acceptance and the durable PromptDispatcher send runtime form one fully signed dispatch-protocol contract locality over graduated identity, Host, session, routing, managed-chat and journal contracts; private persistence/send helpers and obsolete monolith imports remain hidden or removed."

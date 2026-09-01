@@ -451,6 +451,7 @@
     <Compile Include="Execution/Fission/Fold.fs"/>
     <Compile Include="Composition/Durable/ProjectionUpdate.fsi"/>
     <Compile Include="Composition/Durable/ProjectionUpdate.fs"/>
+    <Compile Include="Interaction/Authority/Fold.fsi"/>
     <Compile Include="Interaction/Authority/Fold.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/FallbackFactFold.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/FallbackFactFold.fs"/>
@@ -760,6 +761,7 @@
     <Compile Include="OpenCode/Host/HostBoundarySurface.fs"/>
     <Compile Include="OpenCode/Host/HostSessionContextSurface.fsi"/>
     <Compile Include="OpenCode/Host/HostSessionContextSurface.fs"/>
+    <Compile Include="Interaction/Repair/CompletedTurn.fsi"/>
     <Compile Include="Interaction/Repair/CompletedTurn.fs"/>
     <Compile Include="Interaction/Repair/CompletedTurnSurface.fs"/>
     <Compile Include="Context/Trace/Capture.fs"/>
@@ -769,6 +771,7 @@
     <Compile Include="Mission/Obligation/LedgerWorkflow.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoMembrane.fs"/>
     <Compile Include="Interaction/Dispatch/Ingress.fs"/>
+    <Compile Include="Interaction/Authority/Child.fsi"/>
     <Compile Include="Interaction/Authority/Child.fs"/>
     <Compile Include="OpenCode/Host/QuiescenceSurface.fsi"/>
     <Compile Include="OpenCode/Host/QuiescenceSurface.fs"/>
