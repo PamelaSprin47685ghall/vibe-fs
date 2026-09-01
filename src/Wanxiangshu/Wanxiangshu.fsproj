@@ -76,6 +76,7 @@
     <Compile Include="Foundation/AsyncSupport.fsi"/>
     <Compile Include="Foundation/AsyncSupport.fs"/>
     <Compile Include="Foundation/FatalProcess.fs"/>
+    <Compile Include="Execution/Session/Wait/CausalWait.fsi"/>
     <Compile Include="Execution/Session/Wait/CausalWait.fs"/>
     <Compile Include="Execution/Session/Ownership.fsi"/>
     <Compile Include="Execution/Session/Ownership.fs"/>
@@ -360,11 +361,16 @@
     <Compile Include="Process/DeadlineSurface.fs"/>
     <Compile Include="Process/PtyTiming.fsi"/>
     <Compile Include="Process/PtyTiming.fs"/>
+    <Compile Include="Execution/Session/Wait/CompletionMailbox.fsi"/>
     <Compile Include="Execution/Session/Wait/CompletionMailbox.fs"/>
     <Compile Include="Execution/Delegation/Handle/JoinInterruptRegistry.fs"/>
+    <Compile Include="Execution/Session/Wait/Bridge.fsi"/>
     <Compile Include="Execution/Session/Wait/Bridge.fs"/>
+    <Compile Include="Execution/Session/Wait/Registry.fsi"/>
     <Compile Include="Execution/Session/Wait/Registry.fs"/>
+    <Compile Include="Execution/Session/Wait/Await.fsi"/>
     <Compile Include="Execution/Session/Wait/Await.fs"/>
+    <Compile Include="Execution/Session/Wait/Surface.fsi"/>
     <Compile Include="Execution/Session/Wait/Surface.fs"/>
     <Compile Include="Execution/Session/Attachment/ReuseScope.fs"/>
     <Compile Include="Execution/Session/Attachment/AttachedRuntime.fs"/>
