@@ -214,6 +214,11 @@
   ],
   "compiler_boundary_localities": [
     {
+      "owner": "interaction-authority",
+      "locality": "interaction-authority-fact",
+      "justification": "Prompt fact routing, immutable authority/attempt profiles, claim identity decisions and pure authority-run transitions are fully signed contracts over graduated identity, prefix, office, participant and fallback boundaries."
+    },
+    {
       "owner": "guidance-delivery",
       "locality": "opencode-host-pairprogramming-guidelineprojection",
       "justification": "Pair-programming guideline and tip-delivery projections are signed guidance contracts over graduated identity and grounding vocabularies; JS-native surfaces are explicit signed support."

@@ -13,8 +13,11 @@
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.context-prefix-candidate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
+    <Compile Include="Interaction/Authority/Fact.fsi"/>
     <Compile Include="Interaction/Authority/Fact.fs"/>
+    <Compile Include="Interaction/Authority/Model.fsi"/>
     <Compile Include="Interaction/Authority/Model.fs"/>
+    <Compile Include="Interaction/Authority/Run.fsi"/>
     <Compile Include="Interaction/Authority/Run.fs"/>
   </ItemGroup>
 </Project>

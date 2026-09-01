@@ -135,6 +135,7 @@
     <Compile Include="Composition/Durable/Fact.fsi"/>
     <Compile Include="Composition/Durable/Fact.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Fact.fs"/>
+    <Compile Include="Interaction/Authority/Fact.fsi"/>
     <Compile Include="Interaction/Authority/Fact.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fs"/>
@@ -238,8 +239,10 @@
     <Compile Include="Participant/Persona/Surface.fsi"/>
     <Compile Include="Participant/Persona/Surface.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Prompt.fs"/>
+    <Compile Include="Interaction/Authority/Model.fsi"/>
     <Compile Include="Interaction/Authority/Model.fs"/>
     <Compile Include="Interaction/Authority/Surface.fs"/>
+    <Compile Include="Interaction/Authority/Run.fsi"/>
     <Compile Include="Interaction/Authority/Run.fs"/>
     <Compile Include="Interaction/Authority/RuntimeSurface.fs"/>
     <Compile Include="Execution/Fission/Model.fsi"/>
