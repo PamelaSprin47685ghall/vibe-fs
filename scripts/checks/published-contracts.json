@@ -600,9 +600,19 @@
       "path": "src/Wanxiangshu/Execution/Session/Recovery/Surface.fs",
       "owner": "managed-session-lifecycle",
       "justification": "Signed JS-native proof projection over the published SessionRecovery algebra; object decoding/rendering remains private and cannot mint recovery authority outside the typed owner."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/WorkRecord/OpeningSemanticSurface.fs",
+      "owner": "work-record",
+      "justification": "Signed JS-native projection of opening evidence and deterministic lifecycle-work-record composition; object decoding stays private and the surface owns no durable trace or coverage state."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "work-record",
+      "locality": "mission-workrecord-model",
+      "justification": "Lifecycle work-record vocabulary, XTrace-backed full/bounded materialization and the opening semantic proof surface form one fully signed work-record locality over graduated semantic trace, durable projection, finality and obligation contracts; blob/frame rendering helpers remain signature-hidden."
+    },
     {
       "owner": "semantic-trace",
       "locality": "context-trace-capture",

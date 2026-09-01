@@ -214,6 +214,7 @@
     <Compile Include="Mission/Obligation/Todo/Surface.fs"/>
     <Compile Include="Mission/Obligation/Todo/Admission.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Admission.fs"/>
+    <Compile Include="Mission/WorkRecord/Model.fsi"/>
     <Compile Include="Mission/WorkRecord/Model.fs"/>
     <Compile Include="Mission/Obligation/Todo/FinalityCohort.fsi"/>
     <Compile Include="Mission/Obligation/Todo/FinalityCohort.fs"/>
@@ -883,8 +884,10 @@
     <Compile Include="Mission/Manager/OpenCode/NarrativeTransform.fs"/>
     <Compile Include="Mission/Finality/Types.fs"/>
     <Compile Include="Mission/Finality/Ports.fs"/>
+    <Compile Include="Mission/WorkRecord/Materialize.fsi"/>
     <Compile Include="Mission/WorkRecord/Materialize.fs"/>
     <Compile Include="Execution/Delegation/HandoffLedger.fs"/>
+    <Compile Include="Mission/WorkRecord/OpeningSemanticSurface.fsi"/>
     <Compile Include="Mission/WorkRecord/OpeningSemanticSurface.fs"/>
     <Compile Include="Mission/Finality/Record.fs"/>
     <Compile Include="Mission/Finality/Cohort.fs"/>
