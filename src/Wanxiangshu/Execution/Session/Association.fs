@@ -2,7 +2,6 @@ namespace Wanxiangshu.Execution.Session
 
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// HOST-008 / COMPANION-002: which kind of managed session this is.

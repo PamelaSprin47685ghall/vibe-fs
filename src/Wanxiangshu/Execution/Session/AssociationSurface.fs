@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Execution.Session
 
 open Fable.Core.JsInterop
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 
