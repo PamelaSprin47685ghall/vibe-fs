@@ -1,8 +1,6 @@
 namespace Wanxiangshu.Repository.Investigation.Semble
 
 open Wanxiangshu.Foundation
-open Wanxiangshu.Sphinx
-
 open System
 
 /// AGENT-027: internal Semble MCP identity, launch command, and search hit.

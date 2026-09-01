@@ -1,18 +1,5 @@
 namespace Wanxiangshu.Repository.Investigation.Semble
 
-open Wanxiangshu.Change
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Git
-open Wanxiangshu.Git.Hook
-open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Obligation.Todo.OpenCode
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Resources
-open Wanxiangshu.Strength.Persistence
-
 open System
 open System.Threading.Tasks
 open Fable.Core

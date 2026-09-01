@@ -2,6 +2,36 @@
   "schema_version": 1,
   "compile_contract_support": [
     {
+      "path": "src/Wanxiangshu/Repository/Investigation/Semble/Mcp.fs",
+      "owner": "repository-investigation",
+      "justification": "Signed Semble MCP launch/search-hit vocabulary used only inside repository investigation; env parsing helpers remain private and it grants no foreign semantic authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Investigation/Semble/SearchCodec.fs",
+      "owner": "repository-investigation",
+      "justification": "Signed pure decoder from MCP result payloads to Semble hit values; dynamic parsing helpers remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Investigation/Semble/Stdio.fs",
+      "owner": "repository-investigation",
+      "justification": "Signed one-shot stdio MCP adapter; each call owns and terminates its child process, while driver source and Promise plumbing remain private with no process-local registry."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Investigation/Semble/Client.fs",
+      "owner": "repository-investigation",
+      "justification": "Signed stateless Semble client adapter over launch decisions, one-shot stdio and result decoding; environment and invocation helpers remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Investigation/SembleSurface.fs",
+      "owner": "repository-investigation",
+      "justification": "Signed JS-native facade over the internal Semble adapter; launch/hit conversion helpers remain private and no new investigation authority is granted."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Investigation/WarmStartSurface.fs",
+      "owner": "repository-investigation",
+      "justification": "Signed JS-native facade over repository warm-start rendering and injected search capability; plain-data conversion and role parsing remain private."
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Session/ChatExecution/Fact.fs",
       "owner": "managed-chat-execution",
       "justification": "Signed owner-local routing constructors from managed chat facts into the canonical AgentFact union; they add no independent execution authority."
@@ -228,6 +258,11 @@
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "repository-investigation",
+      "locality": "repository-investigation-semble-mcp",
+      "justification": "Repository warm-start prompt/runtime plus the internal Semble search stack form a fully signed locality. Physical MCP transport is one-shot and stateless; all process, Promise, dynamic decode and JS facade internals are signature-bounded, while foreign consumers remain limited to the published warm-start contract."
+    },
     {
       "owner": "review-assurance",
       "locality": "mission-review-barrier-projection",

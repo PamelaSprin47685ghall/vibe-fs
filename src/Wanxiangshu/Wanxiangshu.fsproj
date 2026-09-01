@@ -71,6 +71,7 @@
     <Compile Include="Sphinx/McpContract.fs"/>
     <Compile Include="Sphinx/McpServer.fs"/>
     <Compile Include="Sphinx/Surface.fs"/>
+    <Compile Include="Repository/Investigation/Semble/Mcp.fsi"/>
     <Compile Include="Repository/Investigation/Semble/Mcp.fs"/>
     <Compile Include="Foundation/Parallel.fsi"/>
     <Compile Include="Foundation/Parallel.fs"/>
@@ -193,6 +194,7 @@
     <Compile Include="Execution/Delegation/Handoff.fs"/>
     <Compile Include="Foundation/SyntheticTomlSurface.fsi"/>
     <Compile Include="Foundation/SyntheticTomlSurface.fs"/>
+    <Compile Include="Repository/Investigation/WarmStart/Prompt.fsi"/>
     <Compile Include="Repository/Investigation/WarmStart/Prompt.fs"/>
     <Compile Include="Mission/Manager/Narrative.fsi"/>
     <Compile Include="Mission/Manager/Narrative.fs"/>
@@ -586,11 +588,17 @@
     <Compile Include="OpenCode/Host/Sessions.fs"/>
     <Compile Include="OpenCode/Host/SessionsSurface.fs"/>
     <Compile Include="OpenCode/Host/HostMessageProjection.fs"/>
+    <Compile Include="Repository/Investigation/Semble/SearchCodec.fsi"/>
     <Compile Include="Repository/Investigation/Semble/SearchCodec.fs"/>
+    <Compile Include="Repository/Investigation/Semble/Stdio.fsi"/>
     <Compile Include="Repository/Investigation/Semble/Stdio.fs"/>
+    <Compile Include="Repository/Investigation/Semble/Client.fsi"/>
     <Compile Include="Repository/Investigation/Semble/Client.fs"/>
+    <Compile Include="Repository/Investigation/SembleSurface.fsi"/>
     <Compile Include="Repository/Investigation/SembleSurface.fs"/>
+    <Compile Include="Repository/Investigation/WarmStart/Runtime.fsi"/>
     <Compile Include="Repository/Investigation/WarmStart/Runtime.fs"/>
+    <Compile Include="Repository/Investigation/WarmStartSurface.fsi"/>
     <Compile Include="Repository/Investigation/WarmStartSurface.fs"/>
     <Compile Include="Strength/OpenCode/Replay.fs"/>
     <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fs"/>

@@ -10,13 +10,21 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
+    <Compile Include="Repository/Investigation/Semble/Mcp.fsi"/>
     <Compile Include="Repository/Investigation/Semble/Mcp.fs"/>
+    <Compile Include="Repository/Investigation/WarmStart/Prompt.fsi"/>
     <Compile Include="Repository/Investigation/WarmStart/Prompt.fs"/>
+    <Compile Include="Repository/Investigation/Semble/SearchCodec.fsi"/>
     <Compile Include="Repository/Investigation/Semble/SearchCodec.fs"/>
+    <Compile Include="Repository/Investigation/Semble/Stdio.fsi"/>
     <Compile Include="Repository/Investigation/Semble/Stdio.fs"/>
+    <Compile Include="Repository/Investigation/Semble/Client.fsi"/>
     <Compile Include="Repository/Investigation/Semble/Client.fs"/>
+    <Compile Include="Repository/Investigation/SembleSurface.fsi"/>
     <Compile Include="Repository/Investigation/SembleSurface.fs"/>
+    <Compile Include="Repository/Investigation/WarmStart/Runtime.fsi"/>
     <Compile Include="Repository/Investigation/WarmStart/Runtime.fs"/>
+    <Compile Include="Repository/Investigation/WarmStartSurface.fsi"/>
     <Compile Include="Repository/Investigation/WarmStartSurface.fs"/>
   </ItemGroup>
 </Project>
