@@ -1,6 +1,6 @@
 # Fast-check GO / NO-GO — upstream replay 2026-09-01
 
-本文件记录 property-testing 的工具选择证据，不定义产品语义。语义仅来自对应 `requirements/<package>/WHAT.md`。复核基线为 `upstream/master@ff85615e9a8dc0c94447eb55960a72deb46ed9db`。
+本文件记录 property-testing 的工具选择证据，不定义产品语义。语义仅来自对应 `requirements/<package>/WHAT.md`。初次复核基线为 `ff85615e9a8dc0c94447eb55960a72deb46ed9db`；提交前已重放到 `upstream/master@8caee37ca`。
 
 ## 判定规则
 
@@ -39,7 +39,7 @@
 
 ## P6B-3 — durable writer-tail truncation
 
-结论：`GO`。实现节点：`2dee337b9`。
+结论：`GO`。实现节点：`aba41360c`。
 
 ### 缺口与输入域
 

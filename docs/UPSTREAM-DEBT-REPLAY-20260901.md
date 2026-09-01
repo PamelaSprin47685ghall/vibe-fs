@@ -3,19 +3,31 @@
 ## Scope and ancestry
 
 - Replay branch: `codex/upstream-debt-replay-20260901`
-- Frozen upstream base: `ff85615e9a8dc0c94447eb55960a72deb46ed9db`
+- Initial audit base: `ff85615e9a8dc0c94447eb55960a72deb46ed9db`
+- Final replay base: `8caee37ca` (four later boundary-signing commits included)
 - Preserved source branch: `codex/upstream-debt-audit-20260901`
 - Method: inspect the refactored owner/signature/project boundary first, then replay only residual semantics. No merge commit or blind cherry-pick is used.
 - Final integration rule: fetch `upstream/master` again, reconcile any tail semantically, run the full validation ladder, then open one cumulative PR.
+
+## Final upstream-tail reconciliation
+
+Immediately before release validation, upstream advanced by four commits:
+
+- `93c28fe71` signs the fission runtime boundary;
+- `55ed50b56` signs the provider-attempt planner boundary;
+- `c05948501` signs the managed-chat execution boundary;
+- `8caee37ca` signs time and model-routing boundaries.
+
+These commits add or tighten `.fsi` files, owner project membership, and exact published contracts. They do not touch P2 reconciliation, P5 Judge, the A0 analyzer implementation, or the durable-tail proof. `scripts/checks/published-contracts.json` is the sole path changed by both histories: upstream adds contracts for its new signatures; A0 adds exact declarations for pre-existing FCS uses exposed by earlier signatures. The cumulative branch was rebased node-by-node onto `8caee37ca`; Git applied all 14 nodes without conflict, preserving both disjoint contract sets. No upstream production code was reverted or compatibility layer introduced.
 
 ## Module ledger
 
 | Module | Old source nodes | Latest-upstream finding | Replay nodes | State |
 | --- | --- | --- | --- | --- |
-| P2 causal reconciliation | `a6445f214`, `3f481417a`, `b855d9891` | Compiler owner projects were added, but `Reread`, counter parameters, recursive snapshot reads, and the test-local mirror remained. | `0ae4a2686`, `e51dade3f` | GREEN; closure recorded here |
-| P5 Judge decision ownership | `6b93b752d`, `f3b2372d1`, `2b405f573` | The owner project existed, but `JudgeTool` used a private decision while `JudgeSurface.validateContext` implemented a disconnected approximation. | `be83da934`, `58c6cc429` | GREEN; closure recorded here |
-| A0 owner graph | `5ab743901`, `975762df3`, `1ca0a8be5`, `cd1878ce4`, `af4de1d79` | Compiler projects now enforce the locality DAG, but exact FCS semantic-edge snapshots, deltas, and derived manifest counts remained absent. | `a52fccc3d`, `249865007`, `0b4681b72`, `3f786d29a` | GREEN; closure recorded here |
-| P6B evidence/property work | `3c2581088`, `bfd81120e`, `e22f07982`, `c6b10c89e` | Failure/capacity finite proofs remain stronger than random sampling; durable incomplete-tail space remains uncovered. | `2dee337b9` | GREEN; two NO-GO decisions and one GO recorded here |
+| P2 causal reconciliation | `a6445f214`, `3f481417a`, `b855d9891` | Compiler owner projects were added, but `Reread`, counter parameters, recursive snapshot reads, and the test-local mirror remained. | `59668a626`, `1912f3f91`, `858628cd5` | GREEN; closure recorded here |
+| P5 Judge decision ownership | `6b93b752d`, `f3b2372d1`, `2b405f573` | The owner project existed, but `JudgeTool` used a private decision while `JudgeSurface.validateContext` implemented a disconnected approximation. | `3fa18b66a`, `41efd2115`, `967767969` | GREEN; closure recorded here |
+| A0 owner graph | `5ab743901`, `975762df3`, `1ca0a8be5`, `cd1878ce4`, `af4de1d79` | Compiler projects now enforce the locality DAG, but exact FCS semantic-edge snapshots, deltas, and derived manifest counts remained absent. | `61e6bb0c2`, `bf6a413bf`, `d7463bf99`, `b7d37bb95`, `d191abc62`, `6f71d0a4d` | GREEN; closure recorded here |
+| P6B evidence/property work | `3c2581088`, `bfd81120e`, `e22f07982`, `c6b10c89e` | Failure/capacity finite proofs remain stronger than random sampling; durable incomplete-tail space remains uncovered. | `aba41360c`, `2e16baf71` | GREEN; two NO-GO decisions and one GO recorded here |
 
 ## P2 — causal edges are the only snapshot-read authority
 
@@ -30,7 +42,7 @@ The replay intentionally changes existing upstream production and proof files. T
 
 Those boundaries compiled, but the implementation still exposed a `Reread` decision and counter-shaped API. `ReconcilePass` still contained recursive reread/error bookkeeping, while `Scheduler` forced the budgets to zero. The result happened to read once in production but kept a second, illegal mechanism in the model and public proof surface.
 
-### RED — `0ae4a2686`
+### RED — `59668a626`
 
 Added one production-bound counterexample for `HOST-BOUNDARY-005`:
 
@@ -46,7 +58,7 @@ node --test requirements/host-boundary/tests/reconcile-idle-early.test.mjs
 TypeError: ReconcileSurface.idleProvisionalWithoutProjectionEdgeScenario is not a function
 ```
 
-### GREEN — `e51dade3f`
+### GREEN — `1912f3f91`
 
 - Deleted `ReconcileDecision.Reread` and its candidate/counter helpers.
 - Reduced `decideStep` from `(wake, rereadsRemaining, evidence)` to `(wake, evidence)`.
@@ -84,7 +96,7 @@ The replay intentionally changes existing upstream `JudgeTool.fs`, `JudgeSurface
 - `JudgeSurface.validateContext` separately modeled role/session/tree booleans that the Tool did not consume;
 - four tests proved only that mirror and could stay green if the real Tool decision regressed.
 
-### RED — `be83da934`
+### RED — `3fa18b66a`
 
 Added production-Surface counterexamples for the complete execution evidence:
 
@@ -95,7 +107,7 @@ Added production-Surface counterexamples for the complete execution evidence:
 
 Observed before production change: `4 pass, 3 fail`; all three new tests failed because `JudgeSurface.decideExecution` did not exist.
 
-### GREEN — `58c6cc429`
+### GREEN — `41efd2115`
 
 - Extracted `ExecutionEvidence → ExecutionDecision` as the single pure decision in `JudgeTool`.
 - Replaced raw prose paths in the decision with `ExecutionRejection` cases and one rejection-to-resource mapping.
@@ -132,10 +144,10 @@ The retained residual law belongs to the FCS semantic-use oracle, which remains 
 
 ### RED/GREEN sequence
 
-- `a52fccc3d` RED: 39 tests, 36 pass, 3 fail for absent exact SCC facts, absent added/removed edge comparison, and the handwritten `semantic-owners.json.total`.
-- `249865007` GREEN: derive the owner count; produce a versioned, sorted, duplicate-free graph with exact SCC members/internal edges; compare exact edge keys. Result: 39/39.
-- `0b4681b72` RED: 40 tests, 39 pass, 1 fail because no-baseline JSON could not be reused directly as a baseline.
-- `3f786d29a` GREEN: emit the bare snapshot without a baseline and `{ current, delta }` only for a comparison. Result: 40/40.
+- `61e6bb0c2` RED: 39 tests, 36 pass, 3 fail for absent exact SCC facts, absent added/removed edge comparison, and the handwritten `semantic-owners.json.total`.
+- `bf6a413bf` GREEN: derive the owner count; produce a versioned, sorted, duplicate-free graph with exact SCC members/internal edges; compare exact edge keys. Result: 39/39.
+- `d7463bf99` RED: 40 tests, 39 pass, 1 fail because no-baseline JSON could not be reused directly as a baseline.
+- `b7d37bb95` GREEN: emit the bare snapshot without a baseline and `{ current, delta }` only for a comparison. Result: 40/40.
 
 ### Real-repository canary and upstream refactor drift
 
@@ -144,7 +156,7 @@ The first real `--graph-json` scan proved the CLI shape but exited nonzero on 11
 - 10 exact FCS uses had signed `.fsi/fsproj` boundaries but incomplete `published-contracts.json` entries;
 - `OwnerIdentityWitness` still named the removed `let internal inherited ...` issuer after upstream commit `3c585e24a` replaced it with `PromptIdentitySeed.inheritFromOwner`.
 
-`4749912f7` fixes only those metadata declarations:
+`d191abc62` fixes only those metadata declarations:
 
 - add `durable-events` to the existing Change projection contract;
 - publish the existing `ReviewRequirementProjection` type to its existing `durable-events` consumer;
@@ -187,7 +199,7 @@ The current owners and proofs were re-audited instead of replaying the old docum
 
 The latest upstream already contains the 21-test closed-algebra suite, the 216-case deterministic cross-boundary matrix, and three exact mutants. The core domain is finite and enumerable. A fast-check generator would either sample less than the existing table or reproduce the recovery state machine. No repository change is justified solely to adopt the tool.
 
-### P6B-3 durable writer tails — GO (`2dee337b9`)
+### P6B-3 durable writer tails — GO (`aba41360c`)
 
 The latest WHAT still forbids every incomplete NDJSON tail and skip-corrupt continuation, while no property covered canonical payload × arbitrary cut position. The replay adds:
 
