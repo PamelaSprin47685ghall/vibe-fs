@@ -1,8 +1,5 @@
 namespace Wanxiangshu.Enforcer
 
-open Wanxiangshu.Enforcer.Cycle
-
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// ENFORCER-045/154: one committed enforcement cycle, derived from BlogObservationCommitted.

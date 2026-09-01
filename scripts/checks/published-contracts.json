@@ -2,6 +2,16 @@
   "schema_version": 1,
   "compile_contract_support": [
     {
+      "path": "src/Wanxiangshu/Enforcer/Observation.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed pure observation projection that pairs already-durable enforcement tips with Companion frames; it owns no store, Host resource, or runtime authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/Model.fs",
+      "owner": "semantic-trace",
+      "justification": "Signed pure semantic trace model and renderer over canonical provider semantic messages; it carries no durable writer, Host state, or process resource."
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs",
       "owner": "delegation",
       "justification": "Signed pure child-recovery evidence and resolution algebra used by delegation-owned recovery workflows; snapshot/host observations are values only and no process resource is held."
@@ -278,6 +288,16 @@
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "behavior-diagnosis",
+      "locality": "enforcer-projection",
+      "justification": "Enforcement durable projection plus pure observation pairing support are fully signed and depend only on graduated catalog, context-compression and identity contracts."
+    },
+    {
+      "owner": "semantic-trace",
+      "locality": "context-trace-model",
+      "justification": "Semantic XTrace model and durable projection are fully signed; the model is pure support and the projection depends only on graduated cursor, identity, provider-projection and context-compression contracts."
+    },
     {
       "owner": "delegation",
       "locality": "execution-delegation-fact",

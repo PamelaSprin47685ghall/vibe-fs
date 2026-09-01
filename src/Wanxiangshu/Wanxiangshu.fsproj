@@ -181,6 +181,7 @@
     <Compile Include="Participant/Provider/Projection/Model.fs"/>
     <Compile Include="Participant/Provider/Projection/Intent.fsi"/>
     <Compile Include="Participant/Provider/Projection/Intent.fs"/>
+    <Compile Include="Context/Trace/Model.fsi"/>
     <Compile Include="Context/Trace/Model.fs"/>
     <Compile Include="Mission/Obligation/Todo/ObligationCodec.fsi"/>
     <Compile Include="Mission/Obligation/Todo/ObligationCodec.fs"/>
@@ -321,6 +322,7 @@
     <Compile Include="Persistence/Journal/EventStoreJournalCodec.fs"/>
     <Compile Include="Context/Companion/Projection.fsi"/>
     <Compile Include="Context/Companion/Projection.fs"/>
+    <Compile Include="Context/Trace/Projection.fsi"/>
     <Compile Include="Context/Trace/Projection.fs"/>
     <Compile Include="Mission/Manager/Life/Projection.fsi"/>
     <Compile Include="Mission/Manager/Life/Projection.fs"/>
@@ -349,6 +351,7 @@
     <Compile Include="Execution/Session/AssociationSurface.fs"/>
     <Compile Include="Mission/Review/Barrier/Projection.fsi"/>
     <Compile Include="Mission/Review/Barrier/Projection.fs"/>
+    <Compile Include="Enforcer/Projection.fsi"/>
     <Compile Include="Enforcer/Projection.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/CycleProjection.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/CycleProjection.fs"/>
@@ -394,6 +397,7 @@
     <Compile Include="Execution/Session/ChatExecution/Admission.fs"/>
     <Compile Include="Composition/Durable/Projection.fs"/>
     <Compile Include="Mission/Manager/Life/OpeningFloor.fs"/>
+    <Compile Include="Enforcer/Observation.fsi"/>
     <Compile Include="Enforcer/Observation.fs"/>
     <Compile Include="Composition/Bridges/FinalityReview/FinalityReviewCohort.fs"/>
     <Compile Include="Execution/Session/RecoveryClosureProjection.fs"/>
