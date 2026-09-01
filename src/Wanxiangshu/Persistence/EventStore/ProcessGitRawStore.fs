@@ -1,11 +1,7 @@
 namespace Wanxiangshu.Persistence.EventStore
 
 open Wanxiangshu.Enforcer
-open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Strength.Persistence
 
 open System
 open System.Text

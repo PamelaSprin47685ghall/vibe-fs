@@ -337,8 +337,11 @@
     <Compile Include="Repository/Programming/Js/Transaction.fsi"/>
     <Compile Include="Repository/Programming/Js/Transaction.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Model.fs"/>
+    <Compile Include="Persistence/EventStore/StoreTypes.fsi"/>
     <Compile Include="Persistence/EventStore/StoreTypes.fs"/>
+    <Compile Include="Persistence/EventStore/CanonicalEventCodec.fsi"/>
     <Compile Include="Persistence/EventStore/CanonicalEventCodec.fs"/>
+    <Compile Include="Persistence/EventStore/EventVocabulary.fsi"/>
     <Compile Include="Persistence/EventStore/EventVocabulary.fs"/>
     <Compile Include="Persistence/EventStore/ProcessEventLog.fs"/>
     <Compile Include="Persistence/EventStore/EventKWayMerge.fs"/>
@@ -347,7 +350,9 @@
     <Compile Include="Persistence/EventStore/Store.fs"/>
     <Compile Include="Strength/Persistence/Store.fs"/>
     <Compile Include="Strength/Persistence/Durability.fs"/>
+    <Compile Include="Persistence/EventStore/GitObjectDatabase.fsi"/>
     <Compile Include="Persistence/EventStore/GitObjectDatabase.fs"/>
+    <Compile Include="Persistence/EventStore/ProcessGitRawStore.fsi"/>
     <Compile Include="Persistence/EventStore/ProcessGitRawStore.fs"/>
     <Compile Include="Persistence/EventStore/WriterStreamSync.fs"/>
     <Compile Include="Persistence/EventStore/RetentionSurface.fs"/>

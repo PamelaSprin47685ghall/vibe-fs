@@ -665,9 +665,19 @@
       "path": "src/Wanxiangshu/Strength/Replica/Transform.fs",
       "owner": "speculative-investigation",
       "justification": "Signed replica transform boundary over the owner-local Strength runtime and published Host session port; Host object encoding and batch-planning helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/GitObjectDatabase.fs",
+      "owner": "durable-events",
+      "justification": "Signed physical Git loose-object and ref storage support behind the published raw-store contract; Node crypto/fs/zlib primitives and packed-object fallback plumbing remain signature-hidden."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "durable-events",
+      "locality": "persistence-eventstore-storetypes",
+      "justification": "Canonical event bytes and vocabulary, typed Git object/ref storage contracts, direct Git object-database support and the process raw-store adapter form one fully signed durable-events storage locality over graduated identity, event-model, task-result and Strength event contracts; caches, Node interop and CLI fallback mechanics remain signature-hidden."
+    },
     {
       "owner": "speculative-investigation",
       "locality": "strength-prediction-predictor",

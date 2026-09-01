@@ -3,7 +3,6 @@ namespace Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Handle
@@ -81,7 +80,7 @@ module HostForkAgentOwner =
     let sendFirstPrompt sessions journal childId identitySeed directory prompt =
         sendFirstPromptCore sessions journal childId identitySeed directory prompt None None
 
-    let sendFirstPromptObserved sessions journal childId identitySeed directory prompt onAccepted onDetachedFailure =
+    let sendFirstPromptObserved sessions journal childId identitySeed directory prompt onAccepted =
         HostForkRunLifecycle.sendAgentOwnerRootObserved
             sessions
             journal
