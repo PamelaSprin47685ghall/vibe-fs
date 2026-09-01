@@ -15,7 +15,7 @@
 | P2 causal reconciliation | `a6445f214`, `3f481417a`, `b855d9891` | Compiler owner projects were added, but `Reread`, counter parameters, recursive snapshot reads, and the test-local mirror remained. | `0ae4a2686`, `e51dade3f` | GREEN; closure recorded here |
 | P5 Judge decision ownership | `6b93b752d`, `f3b2372d1`, `2b405f573` | The owner project existed, but `JudgeTool` used a private decision while `JudgeSurface.validateContext` implemented a disconnected approximation. | `be83da934`, `58c6cc429` | GREEN; closure recorded here |
 | A0 owner graph | `5ab743901`, `975762df3`, `1ca0a8be5`, `cd1878ce4`, `af4de1d79` | Compiler projects now enforce the locality DAG, but exact FCS semantic-edge snapshots, deltas, and derived manifest counts remained absent. | `a52fccc3d`, `249865007`, `0b4681b72`, `3f786d29a` | GREEN; closure recorded here |
-| P6B evidence/property work | `3c2581088`, `bfd81120e`, `e22f07982`, `c6b10c89e` | Pending re-audit against current execution-failure, capacity, and durable-event owners. | — | Pending |
+| P6B evidence/property work | `3c2581088`, `bfd81120e`, `e22f07982`, `c6b10c89e` | Failure/capacity finite proofs remain stronger than random sampling; durable incomplete-tail space remains uncovered. | `2dee337b9` | GREEN; two NO-GO decisions and one GO recorded here |
 
 ## P2 — causal edges are the only snapshot-read authority
 
@@ -178,3 +178,31 @@ OK
 ```
 
 The 46-owner semantic SCC does not contradict the 148-locality compiler DAG. The former reports owner-level semantic use across published contracts; the latter is the physical compile-reference topology that must remain acyclic. Conflating them would either hide semantic coupling or weaken compiler enforcement.
+
+## P6B — property testing only where it adds a new oracle
+
+The current owners and proofs were re-audited instead of replaying the old documentation verbatim. Detailed evidence is in `docs/FAST-CHECK-GO-NO-GO.md`.
+
+### P6B-2 execution failure — NO-GO
+
+The latest upstream already contains the 21-test closed-algebra suite, the 216-case deterministic cross-boundary matrix, and three exact mutants. The core domain is finite and enumerable. A fast-check generator would either sample less than the existing table or reproduce the recovery state machine. No repository change is justified solely to adopt the tool.
+
+### P6B-3 durable writer tails — GO (`2dee337b9`)
+
+The latest WHAT still forbids every incomplete NDJSON tail and skip-corrupt continuation, while no property covered canonical payload × arbitrary cut position. The replay adds:
+
+- 300 fixed-seed production-encoded event streams;
+- arbitrary non-empty suffix truncation by UTF-8 byte, including cuts inside multibyte characters;
+- the real `.git/wanxiang/events` physical layout and retained-writer reader;
+- a skip-corrupt-tail mutant that must fail and replay from its shrink path;
+- direct HOW links for DURABLE-EVENTS-004/007.
+
+Focused result: 2/2 in about 0.18s. No production code, Surface, or dependency changed.
+
+### P6B-4 capacity — NO-GO
+
+The latest upstream still has the exact lifecycle table, wrong-identity decoys, stale-newer counterexample, 3,808-operation admission soak, 832-operation lineage soak, 16-process restart soak, and exhaustive 720 causal orderings. The focused bundle passes 20/20. A stateful generator would need a second queue/fence ownership model and its shrinking would primarily expose invalid test schedules. The existing deterministic proofs remain the smaller and stronger description.
+
+### Intentional limitation
+
+The 216-case failure matrix contains dimensions that do not affect the policy input and a small mirrored effect mapping. It remains mutation-sensitive and production-bound, but its count is not claimed as 216 distinct policy worlds. This is documented debt for the next modification of that owner, not a reason to broaden this upstream replay.
