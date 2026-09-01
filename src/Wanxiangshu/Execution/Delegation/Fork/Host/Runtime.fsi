@@ -82,7 +82,13 @@ type HostForkRuntime =
     member internal TrackOwnedWork: work: (unit -> Task) -> unit
 
     member internal SendChildPrompt:
-        (string -> SessionId -> Role -> PromptAuthority.IdentitySeed -> string -> (PhysicalUserMessageId -> unit) -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
+        (string
+            -> SessionId
+            -> Role
+            -> PromptAuthority.IdentitySeed
+            -> string
+            -> (PhysicalUserMessageId -> unit)
+            -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
 
     member internal SendBusyNudge: (string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
     member internal ParentAbortToken: int
