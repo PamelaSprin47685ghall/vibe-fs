@@ -7,15 +7,25 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
+    <Compile Include="Mission/Obligation/Todo/Model.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Model.fs"/>
+    <Compile Include="Mission/Obligation/Todo/Facts.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Facts.fs"/>
+    <Compile Include="Mission/Obligation/Todo/ObligationCodec.fsi"/>
     <Compile Include="Mission/Obligation/Todo/ObligationCodec.fs"/>
+    <Compile Include="Mission/Obligation/Todo/Surface.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Surface.fs"/>
+    <Compile Include="Mission/Obligation/Todo/Admission.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Admission.fs"/>
+    <Compile Include="Mission/Obligation/Todo/FinalityCohort.fsi"/>
     <Compile Include="Mission/Obligation/Todo/FinalityCohort.fs"/>
+    <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fsi"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fs"/>
+    <Compile Include="Mission/Obligation/Todo/Projection.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Projection.fs"/>
+    <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fsi"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs"/>
+    <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionSurface.fsi"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionSurface.fs"/>
   </ItemGroup>
 </Project>

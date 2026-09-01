@@ -2,7 +2,6 @@ namespace Wanxiangshu.Mission.Obligation.Todo
 
 open Thoth.Json
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts

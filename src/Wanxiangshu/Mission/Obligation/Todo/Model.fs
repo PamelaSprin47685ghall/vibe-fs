@@ -4,7 +4,6 @@ open Wanxiangshu.Context.Trace
 
 open System
 open System.Text
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Magic Todo Checkpoint Protocol — GrandRewrite clean-break algebra.

@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
-open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection
 
 /// JS-native projection and typed-fact owner for Magic Todo.
@@ -30,6 +29,7 @@ module private MagicTodoProjectionEncoding =
                    field = field |}
         | MagicTodoFoldRejection.LegacySeedAfterCheckpoint -> box {| code = "LegacySeedAfterCheckpoint" |}
 
+[<Sealed>]
 type MagicTodoProjectionHandle private (state: MagicTodoProjection.MagicTodoProjectionState) =
     // DSL-MUTABLE: resource — opaque projection handle current state
     let mutable current = state

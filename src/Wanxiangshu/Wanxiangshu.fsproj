@@ -110,7 +110,9 @@
     <Compile Include="Host/Facts.fs"/>
     <Compile Include="Mission/Manager/Life/Facts.fsi"/>
     <Compile Include="Mission/Manager/Life/Facts.fs"/>
+    <Compile Include="Mission/Obligation/Todo/Model.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Model.fs"/>
+    <Compile Include="Mission/Obligation/Todo/Facts.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Facts.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Facts.fs"/>
     <Compile Include="Execution/Failure/Model.fs"/>
@@ -149,11 +151,15 @@
     <Compile Include="Participant/Provider/Projection/Intent.fsi"/>
     <Compile Include="Participant/Provider/Projection/Intent.fs"/>
     <Compile Include="Context/Trace/Model.fs"/>
+    <Compile Include="Mission/Obligation/Todo/ObligationCodec.fsi"/>
     <Compile Include="Mission/Obligation/Todo/ObligationCodec.fs"/>
     <Compile Include="Mission/Obligation/Todo/PrefixEpoch.fs"/>
+    <Compile Include="Mission/Obligation/Todo/Surface.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Surface.fs"/>
+    <Compile Include="Mission/Obligation/Todo/Admission.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Admission.fs"/>
     <Compile Include="Mission/WorkRecord/Model.fs"/>
+    <Compile Include="Mission/Obligation/Todo/FinalityCohort.fsi"/>
     <Compile Include="Mission/Obligation/Todo/FinalityCohort.fs"/>
     <Compile Include="Foundation/SyntheticToml.fsi"/>
     <Compile Include="Foundation/SyntheticToml.fs"/>
@@ -250,6 +256,7 @@
     <Compile Include="OpenCode/Tools/ManagedAgent.fs"/>
     <Compile Include="OpenCode/Host/ChatAdmission/Intent.fs"/>
     <Compile Include="OpenCode/Host/ChatAdmission/IntentSurface.fs"/>
+    <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fsi"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fs"/>
     <Compile Include="Persistence/Journal/PromptFactCodec.fs"/>
     <Compile Include="Persistence/Journal/FactCodec.fs"/>
@@ -259,8 +266,11 @@
     <Compile Include="Context/Trace/Projection.fs"/>
     <Compile Include="Mission/Manager/Life/Projection.fs"/>
     <Compile Include="Mission/Manager/Life/Admission.fs"/>
+    <Compile Include="Mission/Obligation/Todo/Projection.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Projection.fs"/>
+    <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fsi"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs"/>
+    <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionSurface.fsi"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionSurface.fs"/>
     <Compile Include="Context/Companion/Blogger/Projection.fs"/>
     <Compile Include="Context/Companion/Blogger/FrameSurface.fs"/>

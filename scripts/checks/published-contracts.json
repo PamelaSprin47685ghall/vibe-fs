@@ -90,6 +90,31 @@
       "path": "src/Wanxiangshu/Execution/Session/Wait/Surface.fs",
       "owner": "causal-wait",
       "justification": "Signed JS-native facade over causal-wait contracts; registry/lease wrappers and JS invocation helpers remain private and the surface grants no additional semantic contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/ObligationCodec.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed pure JSON codec over the obligation model; decoder internals remain private and no runtime authority is introduced."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/Surface.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed provider-facing representation support over the obligation model; path/schema/compatibility rendering grants no additional durable authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/Admission.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed pure admission decision algebra; Host localization and Journal effects remain outside this file, so it carries no physical runtime authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/FinalityCohort.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed empty compatibility namespace retained in compile order; it exposes no values, state, effect, or foreign contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed JS-native codec facade over the published MagicTodo fact codec; it owns no projection resource or additional semantic authority."
     }
   ],
   "compiler_boundary_localities": [
@@ -232,6 +257,11 @@
       "owner": "causal-wait",
       "locality": "execution-session-wait-causalwait",
       "justification": "Causal wait vocabulary, mailbox/observer capabilities and await mechanisms depend only on graduated completion, identity, task and timing boundaries; diagnostics bridge and JS facade are explicitly signed support."
+    },
+    {
+      "owner": "obligation-ledger",
+      "locality": "mission-obligation-todo-model",
+      "justification": "Obligation model/facts/codec/projection and published JS projection capability depend only on graduated identity, trace and event-store model localities; codec/admission/representation helpers are explicitly signed support."
     }
   ],
   "contracts": [
