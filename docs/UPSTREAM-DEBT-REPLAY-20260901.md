@@ -14,7 +14,7 @@
 | --- | --- | --- | --- | --- |
 | P2 causal reconciliation | `a6445f214`, `3f481417a`, `b855d9891` | Compiler owner projects were added, but `Reread`, counter parameters, recursive snapshot reads, and the test-local mirror remained. | `0ae4a2686`, `e51dade3f` | GREEN; closure recorded here |
 | P5 Judge decision ownership | `6b93b752d`, `f3b2372d1`, `2b405f573` | The owner project existed, but `JudgeTool` used a private decision while `JudgeSurface.validateContext` implemented a disconnected approximation. | `be83da934`, `58c6cc429` | GREEN; closure recorded here |
-| A0 owner graph | `5ab743901`, `975762df3`, `1ca0a8be5`, `cd1878ce4`, `af4de1d79` | Upstream now has compiler-enforced owner projects; only residual, non-duplicated value may be replayed. | — | Pending |
+| A0 owner graph | `5ab743901`, `975762df3`, `1ca0a8be5`, `cd1878ce4`, `af4de1d79` | Compiler projects now enforce the locality DAG, but exact FCS semantic-edge snapshots, deltas, and derived manifest counts remained absent. | `a52fccc3d`, `249865007`, `0b4681b72`, `3f786d29a` | GREEN; closure recorded here |
 | P6B evidence/property work | `3c2581088`, `bfd81120e`, `e22f07982`, `c6b10c89e` | Pending re-audit against current execution-failure, capacity, and durable-event owners. | — | Pending |
 
 ## P2 — causal edges are the only snapshot-read authority
@@ -121,3 +121,60 @@ all gates pass; 773 WHAT; 3912 executable tests; closure complete
 ```
 
 The first combined run also found a local environment mismatch: upstream had added locked `jq-wasm@3.0.0-jq-1.8.2`, but the pre-fetch `node_modules` did not contain it. `npm ci` restored the exact lockfile dependency; the unchanged real Tool suite then passed 8/8. No dependency manifest or upstream production logic was changed for this environment repair.
+
+## A0 — exact semantic graph facts beside the compiler DAG
+
+### What the upstream refactor superseded
+
+Upstream's `owner-projects.mjs` and 148 owner-locality projects now provide the stronger structural law: every production source belongs to one locality; foreign project references are explicit; contract closure excludes runtime/private sources; the compiler project graph is a DAG. A0 does not recreate that responsibility.
+
+The retained residual law belongs to the FCS semantic-use oracle, which remains required by AGENTS until every exact symbol/consumer promise can be checked without white-box evidence. It answers a different review question: “Which semantic owner edges changed in this PR, and what exact SCC does the current source graph contain?”
+
+### RED/GREEN sequence
+
+- `a52fccc3d` RED: 39 tests, 36 pass, 3 fail for absent exact SCC facts, absent added/removed edge comparison, and the handwritten `semantic-owners.json.total`.
+- `249865007` GREEN: derive the owner count; produce a versioned, sorted, duplicate-free graph with exact SCC members/internal edges; compare exact edge keys. Result: 39/39.
+- `0b4681b72` RED: 40 tests, 39 pass, 1 fail because no-baseline JSON could not be reused directly as a baseline.
+- `3f786d29a` GREEN: emit the bare snapshot without a baseline and `{ current, delta }` only for a comparison. Result: 40/40.
+
+### Real-repository canary and upstream refactor drift
+
+The first real `--graph-json` scan proved the CLI shape but exited nonzero on 11 pre-existing upstream metadata violations. None came from A0 analysis logic:
+
+- 10 exact FCS uses had signed `.fsi/fsproj` boundaries but incomplete `published-contracts.json` entries;
+- `OwnerIdentityWitness` still named the removed `let internal inherited ...` issuer after upstream commit `3c585e24a` replaced it with `PromptIdentitySeed.inheritFromOwner`.
+
+`4749912f7` fixes only those metadata declarations:
+
+- add `durable-events` to the existing Change projection contract;
+- publish the existing `ReviewRequirementProjection` type to its existing `durable-events` consumer;
+- publish `HostToolFactory` and `ToolSpec` to the three Tool owners whose `.fsi` signatures already expose those exact types;
+- update the authority issuer symbol/anchor to the current production declaration.
+
+No production logic, wildcard, baseline, suppression, runtime/private symbol, or project edge was added.
+
+### Proof and gates
+
+```text
+owner-dependencies
+OK — 29002 FCS cross-owner uses; 0 pending; 778 contracts
+49 owners; 621 unique semantic edges; 1 justified semantic SCC
+
+owner-projects
+OK — 148 localities; 701 sources; 1771 refs; compiler DAG
+
+graph replay canary
+bare snapshot: 49 owners / 621 edges
+same-snapshot comparison: +0 / -0
+
+authority-boundary
+OK
+
+composition-root-invariant
+OK
+
+semantic-decorator-invariant
+OK
+```
+
+The 46-owner semantic SCC does not contradict the 148-locality compiler DAG. The former reports owner-level semantic use across published contracts; the latter is the physical compile-reference topology that must remain acyclic. Conflating them would either hide semantic coupling or weaken compiler enforcement.
