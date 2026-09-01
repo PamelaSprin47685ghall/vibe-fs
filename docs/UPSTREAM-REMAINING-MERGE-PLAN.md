@@ -10,7 +10,7 @@
 - 最近执行基线：`upstream/master@d76a4a8b5`（2026-09-01 fetch；71-node ReleaseClosure、coverage backlog 0，临时 migration ledger 已删除）。
 - 已合并成果：PR #19，merge commit `1db90f5e8`。
 - 旧成果保留分支：`codex/pre-upstream-refactor-20260831@4bb19673e`。
-- 当前累计集成分支为 `codex/remaining-merge-batch-9-shared-ast`；包含 M0–M9 与最新 upstream 的语义合并。
+- 当前累计集成分支为 `codex/remaining-merge-batch-10-fast-check`；从第 9 次最终节点继续，包含 M0–M10 与最新 upstream 的语义合并。
 - 旧分支的提交不得整段 replay 或粗暴 cherry-pick。每项先由当前 WHAT 判定，再迁入当前唯一 owner。
 - upstream 已完成 ReleaseClosure；71 个节点全 DONE、production coverage backlog 为 0。本计划不得恢复旧 backlog 或临时 ledger。
 
@@ -32,7 +32,7 @@
 | M7E PTY/process mirror | 同上 | 测试重建 PTY/process lifecycle | 迁到当前 process-execution owner；consumer 归零后删除 support 文件 |
 | M8 requirement trace AST | `a5cdf4c02` 等 | tokenizer 不能可靠证明 test binding identity | 保留现有 graph/HOW/level 规则，只升级 binding analysis |
 | M9 Surface Manifest AST | `96625a5e5`、`85469391e` | shadow、dead helper、其他 law use 可制造假因果 | exact import provenance 与 primary test callback terminal use |
-| M10 fast-check pilot，可选 | `743cab7be`、`3224331a7`、`b3039fe85`、`2760853e4` 等 | 现有 deterministic suite 对少数大状态空间缺少 shrinking | 仅选择 1—2 个 production-bound property；证明新增价值后引入直接依赖 |
+| M10 fast-check pilot，已实施 | `743cab7be`、`3224331a7`、`b3039fe85`、`2760853e4` 等 | 现有 deterministic suite 对 completion race 与 wire mutation 缺少生成、shrinking、replay | exact direct dependency；仅保留两个 production-bound property 与定向 mutant |
 
 ## 3. 明确不迁移
 
@@ -148,12 +148,14 @@ M7A → M7B → M7C → M7D → M7E 必须串行。任何迁移不得在测试�
 
 执行事实（2026-09-01）：M8/M9 实现闭合。`37ece7962` 先固定 unbound/shadowed/indirect `node:test` 与 shadow/dead-helper/decoy-law surface 假绿；`f69f4d480` 引入唯一共享 Acorn syntax core；`ff0cda20f` 将 requirement trace 切到 binding-aware AST 并把 15 处动态注册迁成静态命题；`024684299` 将 Surface Manifest 切到 lexical provenance + primary callback terminal use，并迁移 14 个脱钩 proof。迁移同时纠正两个既有登记错误：`ReconcileSurface` 的行为 law 为 `STRUCTURED-WORKFLOW-004`；`ReviewTodoSurface` 的 production owner 为 `review-judgement`，其实际跨 owner law 为 `EFFECT-ACCOUNTING-011`。PR 前合入 `upstream/master@d76a4a8b5`；`c6db87a44` 修复 direct release command 绕过 owner-dep lane，`e1ec11045` 将批次 7/8 Surface 接入新严格 published-contract graph。最终聚焦验证：requirement trace/surface charter 38/38、受影响行为 121/121、772 WHAT / 3902 tests、165 surfaces、owner lane 27,226 strict uses / 624 edges / 778 contracts。最终无缓存完整阶梯全绿。累计 [upstream PR #27](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/27) 完整包含 #20–#26；owner 只需合并 #27。详细记录见 [batch 9 记录](./upstream-remaining-merge-batch-9-2026-09-01.md)。
 
-### 第 10 次：可选 property pilot
+### 第 10 次：property pilot
 
 - 模块：M10。
-- PR：一个独立可选 PR。
-- 前置：M1—M9 已合并；负责人已确认依赖、property、CI 预算与 seed/path 保存形式。
+- PR：若 M1—M9 已合并则独立；否则从第 9 次最终节点创建累计 PR。
+- 前置：M1—M9 已闭合；负责人已明确要求实施，并明确在第 9 次未合并时从其 PR 版本继续。
 - 范围：只选 1—2 个 production-bound property。候选优先考虑 prefix mutation、completion/fallback interleaving；不得用 fast-check 重建 production oracle。
+
+执行事实（2026-09-01）：M10 本地闭合。`6e4126b4c` 精确固定 direct `fast-check@4.9.0`；`8391e8e6a` 删除 251 行 test-local handle/deadline 状态机，改为通过注册 Handle Surface 生成三类 handle 与 2—64 个 completion arrivals；`9ad1d1df6` 通过 Provider Projection Surface 生成全部五类 WirePart，并逐字段破坏历史；`d23929a90` 使 accept-late 与 length-only mutant 的 shrunk seed/path 被实际重放；`bd2b67f4a` 固化 production-bound property 适用边界。固定政策为 invariant 1000 runs、mutant 100 runs、每条固定 seed、失败保存并重放 `seed + counterexamplePath`。focused property 9/9、managed-session 125/125、trace/surface 38/38、772 WHAT / 3904 tests、165 surfaces、build/text/owner gates 全绿；允许 loopback 的完整阶梯 authoritative unit 3856/3856，integration/package/harness/e2e/pack 全绿。首次受限 sandbox 的唯一失败为 Host canary `listen EPERM 127.0.0.1`，同一用例授权后通过，未修改 production。详细记录见 [batch 10 记录](./upstream-remaining-merge-batch-10-2026-09-01.md)。PR 尚待创建。
 
 ## 4.1 中断与拆分规则
 
@@ -209,7 +211,7 @@ proof/gate 模块采用 RED fixture → analyzer/gate GREEN → 文档闭合。�
 - fetch/read upstream：按当前环境权限执行；网络授权失败时申请许可。
 - push、创建或修改 PR：prompt 必须明确授权。
 - 删除远端分支、强推、覆盖历史：本计划不授权。
-- M10 引入 npm 依赖：必须单独确认。
+- M10 引入 npm 依赖：已由负责人“实现第 10 次”的明确指令确认；后续新增 property/dependency 仍需独立论证。
 
 ## 8. 推荐执行 prompt
 
@@ -221,11 +223,11 @@ proof/gate 模块采用 RED fixture → analyzer/gate GREEN → 文档闭合。�
 
 ## 9. M10 专用补充输入
 
-M10 除通用 prompt 外还需负责人确认：
+M10 的四项输入已在 2026-09-01 执行中闭合：
 
-- 是否接受新增直接 npm dependency；
-- 选择哪 1—2 个 property；
-- CI 时间预算；
-- 失败 seed/path 的保存形式。
+- 接受 exact direct `fast-check@4.9.0` dev dependency；
+- property 为 `MANAGED-SESSION-007` completion first-wins 与 `PREFIX-STABILITY-001` wire append-only/history mutation；
+- 每条 invariant 1000 runs，每条定向 mutant 100 runs，focused 重复运行总成本约 0.37—0.62s；
+- 固定 seed；失败使用 fast-check 原生 `seed + counterexamplePath`，并在测试内实际 replay。
 
-未收到这四项裁决，M10 保持可选，不阻塞 M0—M9。
+M10 不恢复旧 property 套件，不建立全仓 mutation framework；新增候选仍需先证明状态空间、独立 oracle 与 CI 增量价值。

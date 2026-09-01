@@ -84,13 +84,13 @@
 | `c11511e98` + `0b87de296` | Host snapshot locality 与 signal closed-set 的测试只看弱分类/部分路径 | 绑定当前 Host Surface 的 exact/missing/ambiguous 与完整 typed shape |
 | `91503a3f1` | `tests/support/managed-surface.mjs` 仍有 Fork/Satellite/PTY/Terminal/SyncDelegate 镜像 | 分别迁到当前注册 Surface；全部 consumer 清零后删除镜像 |
 
-### 3.5 先暂存在本地的框架级改动
+### 3.5 框架级改动的执行状态
 
-| 主题 | 暂存原因 | 恢复条件 |
+| 主题 | 当前事实 | 证据 / 后续条件 |
 |---|---|---|
-| Acorn-based requirement trace parser | 当前 lexical parser 同时承担 HOW exact anchor、proof level、symlink/inactive 检查；整段回放会丢掉老板新增规则 | 先写针对当前 parser 的 local-shadow/dead-binding RED，再最小引入 AST binding identity，不能替换新规则 |
-| AST Surface Manifest binding | 当前 manifest 已有 consumer authority 与逐 law 规则；旧 scanner 不能直接覆盖 | 以 shared analyzer 方式只增强 import/use binding，保留现有授权模型 |
-| `fast-check@4.9.0` 全套 property 试点 | upstream 已删除依赖且当前自有 deterministic generator 全绿；PR 前立即恢复依赖会扩大供应链与 review 面 | 行为缺陷迁完后选 1—2 个状态空间确实需要生成的 owner 做独立提交，并提供 shrinking/replay 价值证据 |
+| Acorn-based requirement trace parser | M8 已完成；保留 HOW exact anchor、proof level、symlink/inactive，binding 改由 shared AST core 判断 | 见 batch 9 与 PR #27 |
+| AST Surface Manifest binding | M9 已完成；保留 consumer authority 与逐 law 规则，增加 exact import provenance 与 callback terminal use | 见 batch 9 与 PR #27 |
+| `fast-check@4.9.0` property 试点 | M10 已完成；没有回放旧套件，只覆盖 completion first-wins 与 provider wire history mutation | exact direct dependency；固定 seed/budget；shrunk path 实际 replay；见 batch 10 |
 | Strength DryRun 大型 harness | Strength identity、audit、recovery 已被重构，旧 harness 强依赖旧 Runtime 结构 | 先为当前 source-regex proof 写精确 counterworld；若确实 false-green，再按新 runtime 重建最小 harness |
 
 ## 4. 迁移顺序
@@ -99,20 +99,21 @@
 2. 再修边界副作用：Concern、Casebook、JS transaction。
 3. 收敛单一 decision owner：Enforcer bounds。
 4. 加固已退化 proof：causal wait、ambient time、Host signals；Change 与 managed mirror 视重构耦合度决定本 PR 完成或暂存。
-5. 行为与 proof 稳定后再决定是否引入 fast-check/Acorn，避免同时改变产品逻辑、测试 oracle 与验证器。
+5. 行为与 proof 稳定后引入 Acorn shared analyzer；再以独立 M10 引入两个 production-bound fast-check property，没有同时修改产品逻辑。
 
 每个节点更新本文件中的状态与实际验证。无法安全完成的节点保持在旧分支，不以兼容层伪装已合并。
 
 ## 5. 待负责人决定
 
-当前没有阻塞 P0/P1 行为迁移的产品决策。PR 边界接近时可能需要两项取舍：
+当前没有阻塞 P0/P1 行为迁移的产品决策。原框架依赖取舍已经闭合：Acorn 随 M8/M9 shared AST binding 引入；fast-check 拆为后续 M10 property pilot，二者均未与产品逻辑修改混合。
 
-1. 是否把 Acorn/fast-check 两个 npm 依赖放入本次重构 PR，还是拆成后续 proof-hardening PR。
-2. Change observable gate 与剩余 managed-session 镜像迁移若显著扩大 diff，是否允许作为后续独立 PR。
+剩余产品取舍只有 Change observable gate 是否允许作为后续独立 PR；managed-session 镜像迁移已经闭合。
 
 在出现实测耦合前不提前扩大范围；本分支会保留足够证据供负责人选择。
 
 ## 6. 执行日志
+
+- M10 property pilot：`6e4126b4c`→`8391e8e6a`→`9ad1d1df6`→`d23929a90`→`bd2b67f4a` 精确固定 `fast-check@4.9.0`，将 completion race 与 provider wire mutation 两个大输入空间绑定到注册 production Surface。删除 251 行 test-local handle/deadline 状态机；generator 只生产输入，WHAT relation/typed rejection 充当 oracle。两个定向 mutant 均被杀死并用 shrunk seed/path 实际重放。property 9/9、managed-session 125/125、trace/surface 38/38、772 WHAT / 3904 tests、165 surfaces、build/text/owner gates 与完整阶梯全绿；production F# 未修改。完整记录见 `docs/upstream-remaining-merge-batch-10-2026-09-01.md`。
 
 - M7D/M7E mirror closure：`b680f729f`→`ad5d58437` 与 `8b32a54fe`→`11485ff83`→`5c3eaa9e0` 将 SyncDelegate 与 Host PTY consumers 迁到 production owners，并删除最后的 `managed-surface.mjs`。真实 runtime proofs 分别 5/5 与 11/11；managed-session 124/124。深层 owner gate 在初稿中发现两个未分类 mutable resources，以及放在 domain 路径中的 `SatelliteSurface` Host infrastructure；`3bf732e56` 以 exact resource classification 与 physical `OpenCode/Host` ownership 修正，没有增加 exception。最终完整阶梯：Fantomas 700 unchanged、Fable 738 sources / 165 surfaces、unit 3904/3904、全部 integration/package/Long Stroke/pack 全绿；text gate 772 WHAT / 3899 tests，owner evidence 27,218 uses / 333 edges / 185 contracts。
 - M7B/M7C mirror closure：`43884d61f`→`a9a431728`→`7e7fe1d00` 与 `fba887a3d`→`2f0449153`→`a145572b3` 将 terminal、family、Satellite、Distiller assertions 迁到 production owners。删除 34 条常量 fork/family tests、Satellite JS 状态机、Distiller 常量与 literal semantic-cut 假 proof。Fable 737 sources / 164 surfaces、managed-session 125/125、text gate 772 WHAT / 3900 tests 全绿。`MANAGED-SESSION-006` 的 Retired 不可逆条款与 exact retired binding 重开 production 行为存在既有冲突，留待 owner 裁决，未借迁移改语义。
