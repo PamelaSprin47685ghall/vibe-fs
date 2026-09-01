@@ -2,6 +2,16 @@
   "schema_version": 1,
   "compile_contract_support": [
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/MessageVisibilitySurface.fs",
+      "owner": "participant-horizon",
+      "justification": "Signed JS-native handle facade over the message-visibility hub; the mutable waiter registry and timer handles remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfigSurface.fs",
+      "owner": "external-investigation",
+      "justification": "Signed JS-native projection of stealth-browser launch/config decisions; it adds no investigation authority beyond the typed launch adapter."
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs",
       "owner": "host-boundary",
       "justification": "Signed JS-native facade over canonical JSON representation; normalization internals remain private and it grants no additional semantic authority."
@@ -158,6 +168,16 @@
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "participant-horizon",
+      "locality": "opencode-host-messagevisibility",
+      "justification": "Message-visibility event wake and bounded timer backstop are a signed Host capability locality depending only on graduated identity, Host codec, async and timing boundaries; the JS handle facade is signed support."
+    },
+    {
+      "owner": "external-investigation",
+      "locality": "opencode-host-stealthbrowsermcp",
+      "justification": "Stealth-browser MCP identity, environment launch decision and Host config adapter form a signed external-investigation locality depending only on the graduated Host/Foundation launch vocabulary; the JS projection is signed support."
+    },
     {
       "owner": "host-boundary",
       "locality": "host-digest",

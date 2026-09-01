@@ -45,6 +45,7 @@
     <Compile Include="Foundation/TaskResult.fs"/>
     <Compile Include="Foundation/FsToolkitFableCompat.fsi"/>
     <Compile Include="Foundation/FsToolkitFableCompat.fs"/>
+    <Compile Include="OpenCode/Host/StealthBrowserMcp.fsi"/>
     <Compile Include="OpenCode/Host/StealthBrowserMcp.fs"/>
     <Compile Include="Resources/PackageMetadata.fsi"/>
     <Compile Include="Resources/PackageMetadata.fs"/>
@@ -478,9 +479,11 @@
     <Compile Include="OpenCode/Host/ModelCapacity/Borrowing.fs"/>
     <Compile Include="OpenCode/Host/ModelCapacity/Surface.fs"/>
     <Compile Include="OpenCode/Host/ModelRouting.fs"/>
+    <Compile Include="OpenCode/Host/StealthBrowserMcpConfig.fsi"/>
     <Compile Include="OpenCode/Host/StealthBrowserMcpConfig.fs"/>
     <Compile Include="OpenCode/Host/SphinxMcpConfig.fs"/>
     <Compile Include="OpenCode/Host/SphinxMcpConfigSurface.fs"/>
+    <Compile Include="OpenCode/Host/StealthBrowserMcpConfigSurface.fsi"/>
     <Compile Include="OpenCode/Host/StealthBrowserMcpConfigSurface.fs"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfig.fs"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfigSurface.fs"/>
@@ -598,7 +601,9 @@
     <Compile Include="Context/Companion/Blogger/Runtime/Abandon.fs"/>
     <Compile Include="OpenCode/Host/LoopSensor.fs"/>
     <Compile Include="OpenCode/Host/LoopSensorSurface.fs"/>
+    <Compile Include="OpenCode/Host/MessageVisibility.fsi"/>
     <Compile Include="OpenCode/Host/MessageVisibility.fs"/>
+    <Compile Include="OpenCode/Host/MessageVisibilitySurface.fsi"/>
     <Compile Include="OpenCode/Host/MessageVisibilitySurface.fs"/>
     <Compile Include="Enforcer/Guidance/Tip.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtTransform.fs"/>
