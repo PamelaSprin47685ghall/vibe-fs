@@ -45,6 +45,9 @@ process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
 // Isolate HOME / USERPROFILE for the node:test inner runner so any test or
 // pre-import that touches ~/.config/opencode defaults to a throwaway temporary
 // directory rather than the developer's real user configuration directory.
+// Keep the .NET CLI tool store independent: compiler canaries must still resolve
+// the repository-pinned local Fable tool after application HOME is isolated.
+process.env.DOTNET_CLI_HOME ??= process.env.HOME
 const runnerTestHome = mkdtempSync(join(tmpdir(), 'wxs-runner-home-'))
 const runnerRoutingDir = join(runnerTestHome, '.config', 'opencode')
 mkdirSync(runnerRoutingDir, { recursive: true })
