@@ -139,6 +139,7 @@
     <Compile Include="Interaction/Authority/Fact.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fs"/>
+    <Compile Include="Mission/Review/Fact.fsi"/>
     <Compile Include="Mission/Review/Fact.fs"/>
     <Compile Include="Execution/Delegation/Fact.fs"/>
     <Compile Include="Context/Companion/Fact.fs"/>
@@ -197,6 +198,7 @@
     <Compile Include="Mission/Manager/Life/Prompt.fsi"/>
     <Compile Include="Mission/Manager/Life/Prompt.fs"/>
     <Compile Include="Mission/Finality/Prompt.fs"/>
+    <Compile Include="Mission/Review/Prompt.fsi"/>
     <Compile Include="Mission/Review/Prompt.fs"/>
     <Compile Include="Strength/Budget.fsi"/>
     <Compile Include="Strength/Budget.fs"/>
@@ -231,8 +233,11 @@
     <Compile Include="Context/Companion/Blogger/Request.fs"/>
     <Compile Include="Context/Prefix/ProbeSelection.fs"/>
     <Compile Include="Context/Prefix/Projection.fs"/>
+    <Compile Include="Mission/Review/Judgement/Witness.fsi"/>
     <Compile Include="Mission/Review/Judgement/Witness.fs"/>
+    <Compile Include="Mission/Review/Judgement/Challenge.fsi"/>
     <Compile Include="Mission/Review/Judgement/Challenge.fs"/>
+    <Compile Include="Mission/Review/Judgement/RequestIdentity.fsi"/>
     <Compile Include="Mission/Review/Judgement/RequestIdentity.fs"/>
     <Compile Include="Participant/Persona/OfficeCapabilitySurface.fsi"/>
     <Compile Include="Participant/Persona/OfficeCapabilitySurface.fs"/>

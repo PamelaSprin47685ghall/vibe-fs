@@ -219,6 +219,11 @@
   ],
   "compiler_boundary_localities": [
     {
+      "owner": "review-judgement",
+      "locality": "mission-review-fact",
+      "justification": "Review fact routing, canonical review prompt path, witnessed dual-PERFECT confirmation, challenge rendering and judgement request identity are fully signed review contracts over graduated identity, durable routing and provider representation boundaries."
+    },
+    {
       "owner": "finality",
       "locality": "mission-manager-life-projection",
       "justification": "Manager Life durable projection/fold plus pure opening/ending admission support are signed over graduated identity, lifecycle facts, authority and trace boundaries."
