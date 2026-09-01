@@ -3,7 +3,6 @@ namespace Wanxiangshu.Participant.Provider.Attempt
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation.Identity
 

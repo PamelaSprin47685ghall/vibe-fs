@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Participant.Provider.Attempt
 
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation.Identity
 

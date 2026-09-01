@@ -1,8 +1,8 @@
 namespace Wanxiangshu.Execution.Failure
 
-open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Participant.Provider.Attempt
 
 [<RequireQualifiedAccess>]
 type PersistenceCommitment =
@@ -11,7 +11,6 @@ type PersistenceCommitment =
     | Unknown
 
 [<RequireQualifiedAccess>]
-/// DSL-class: Evidence
 type ExecutionFailure =
     | LocalInvariant
     | ProtocolRejection
@@ -33,9 +32,9 @@ type DurableExecutionLifecycle =
     | Terminal
 
 [<Sealed>]
-type ExactCapacityFenceReference private (value: obj) =
-    member internal _.Value = value
-    static member internal Create(value: obj) = ExactCapacityFenceReference(value)
+type ExactCapacityFenceReference =
+    member internal Value: obj
+    static member internal Create: value: obj -> ExactCapacityFenceReference
 
 [<RequireQualifiedAccess>]
 type CapacityOwnership =
@@ -68,26 +67,19 @@ type ExecutionFailureInput =
       Provider: ProviderRecoveryFacts }
 
 [<Sealed>]
-type ProviderRecoveryDecisionId private (value: string) =
-    member internal _.Value = value
-    static member internal Create(value: string) = ProviderRecoveryDecisionId(value)
+type ProviderRecoveryDecisionId =
+    member internal Value: string
+    static member internal Create: value: string -> ProviderRecoveryDecisionId
 
 [<Sealed>]
-type ProviderRecoveryAuthorization
-    private
-    (
-        decisionId: ProviderRecoveryDecisionId,
-        logicalRun: LogicalRunId,
-        providerRun: ProviderRunIdentity,
-        requestKind: ProviderRequestKind
-    ) =
-    member _.DecisionId = decisionId
-    member _.LogicalRun = logicalRun
-    member _.ProviderRun = providerRun
-    member _.RequestKind = requestKind
-
-    static member internal Create(decisionId, logicalRun, providerRun, requestKind) =
-        ProviderRecoveryAuthorization(decisionId, logicalRun, providerRun, requestKind)
+type ProviderRecoveryAuthorization =
+    member DecisionId: ProviderRecoveryDecisionId
+    member LogicalRun: LogicalRunId
+    member ProviderRun: ProviderRunIdentity
+    member RequestKind: ProviderRequestKind
+    static member internal Create:
+        decisionId: ProviderRecoveryDecisionId * logicalRun: LogicalRunId * providerRun: ProviderRunIdentity * requestKind: ProviderRequestKind ->
+        ProviderRecoveryAuthorization
 
 [<RequireQualifiedAccess>]
 type RetryDecision =

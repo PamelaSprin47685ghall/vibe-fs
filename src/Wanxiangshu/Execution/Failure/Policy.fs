@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Execution.Failure
 
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity

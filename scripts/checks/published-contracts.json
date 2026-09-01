@@ -2,6 +2,21 @@
   "schema_version": 1,
   "compile_contract_support": [
     {
+      "path": "src/Wanxiangshu/Execution/Failure/Surface.fs",
+      "owner": "execution-failure-policy",
+      "justification": "Signed JS-native projection over the execution-failure decision contract; parsing and rendering helpers remain private and it grants no additional semantic authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Failure.fs",
+      "owner": "execution-failure-policy",
+      "justification": "Signed pure provider-failure evidence mapper consumed only by the same owner locality; it introduces no independent recovery authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/FailureSurface.fs",
+      "owner": "execution-failure-policy",
+      "justification": "Signed JS-native facade over the owner-local provider-failure mapper; parsing and projection helpers remain private."
+    },
+    {
       "path": "src/Wanxiangshu/Repository/Programming/Js/Capability.fs",
       "owner": "repository-programming",
       "justification": "Signed filesystem-capability projection and fragment registry support; it derives only from the canonical ToolPermission contract and adds no independent authority decision."
@@ -133,6 +148,11 @@
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "execution-failure-policy",
+      "locality": "execution-failure-model",
+      "justification": "Execution failure evidence, retry/fallback/breaker/capacity/message decisions and provider-failure mapping form a signed policy locality whose only compile dependencies are graduated identity, managed-chat evidence and provider request-kind contracts."
+    },
     {
       "owner": "managed-chat-execution",
       "locality": "execution-session-chatexecution-facts",

@@ -119,8 +119,11 @@
     <Compile Include="Mission/Obligation/Todo/Facts.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Facts.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Facts.fs"/>
+    <Compile Include="Execution/Failure/Model.fsi"/>
     <Compile Include="Execution/Failure/Model.fs"/>
+    <Compile Include="Execution/Failure/Policy.fsi"/>
     <Compile Include="Execution/Failure/Policy.fs"/>
+    <Compile Include="Execution/Failure/Surface.fsi"/>
     <Compile Include="Execution/Failure/Surface.fs"/>
     <Compile Include="Composition/Durable/Fact.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Fact.fs"/>
@@ -225,7 +228,9 @@
     <Compile Include="Interaction/Authority/Run.fs"/>
     <Compile Include="Interaction/Authority/RuntimeSurface.fs"/>
     <Compile Include="Execution/Fission/Model.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Failure.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Failure.fs"/>
+    <Compile Include="Participant/Provider/Attempt/FailureSurface.fsi"/>
     <Compile Include="Participant/Provider/Attempt/FailureSurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Planner.fs"/>
     <Compile Include="Participant/Provider/Attempt/PlannerSurface.fs"/>
