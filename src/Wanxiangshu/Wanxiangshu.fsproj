@@ -90,6 +90,7 @@
     <Compile Include="Execution/Delegation/HandoffIdentity.fs"/>
     <Compile Include="Foundation/Outcome.fsi"/>
     <Compile Include="Foundation/Outcome.fs"/>
+    <Compile Include="Requirement/Grounding/Model.fsi"/>
     <Compile Include="Requirement/Grounding/Model.fs"/>
     <Compile Include="Interaction/Authority/IdentitySeed.fsi"/>
     <Compile Include="Interaction/Authority/IdentitySeed.fs"/>
@@ -101,6 +102,7 @@
     <Compile Include="Interaction/Attention/Facts.fs"/>
     <Compile Include="Interaction/Concern/Facts.fsi"/>
     <Compile Include="Interaction/Concern/Facts.fs"/>
+    <Compile Include="Enforcer/InstitutionalLearning/Facts.fsi"/>
     <Compile Include="Enforcer/InstitutionalLearning/Facts.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Facts.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Facts.fs"/>
@@ -114,6 +116,7 @@
     <Compile Include="Execution/Fission/Facts.fs"/>
     <Compile Include="Change/Facts.fsi"/>
     <Compile Include="Change/Facts.fs"/>
+    <Compile Include="Host/Facts.fsi"/>
     <Compile Include="Host/Facts.fs"/>
     <Compile Include="Mission/Manager/Life/Facts.fsi"/>
     <Compile Include="Mission/Manager/Life/Facts.fs"/>
@@ -147,6 +150,7 @@
     <Compile Include="Participant/Provider/Attempt/TerminalValidity.fs"/>
     <Compile Include="Enforcer/Catalog.fsi"/>
     <Compile Include="Enforcer/Catalog.fs"/>
+    <Compile Include="Enforcer/InstitutionalLearning/Enhancer.fsi"/>
     <Compile Include="Enforcer/InstitutionalLearning/Enhancer.fs"/>
     <Compile Include="Enforcer/Codec.fs"/>
     <Compile Include="Enforcer/ChronicleExecution.fs"/>
@@ -321,11 +325,13 @@
     <Compile Include="Interaction/Attention/Projection.fs"/>
     <Compile Include="Interaction/Concern/Projection.fsi"/>
     <Compile Include="Interaction/Concern/Projection.fs"/>
+    <Compile Include="Enforcer/InstitutionalLearning/Projection.fsi"/>
     <Compile Include="Enforcer/InstitutionalLearning/Projection.fs"/>
     <Compile Include="Interaction/Attention/Surface.fsi"/>
     <Compile Include="Interaction/Attention/Surface.fs"/>
     <Compile Include="Interaction/Concern/Surface.fsi"/>
     <Compile Include="Interaction/Concern/Surface.fs"/>
+    <Compile Include="Enforcer/InstitutionalLearning/Surface.fsi"/>
     <Compile Include="Enforcer/InstitutionalLearning/Surface.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Projection.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Recovery.fs"/>
@@ -748,7 +754,9 @@
     <Compile Include="Repository/Programming/Js/Utf8Fs.fs"/>
     <Compile Include="Repository/Programming/Js/GlobFs.fsi"/>
     <Compile Include="Repository/Programming/Js/GlobFs.fs"/>
+    <Compile Include="Requirement/Grounding/Catalog.fsi"/>
     <Compile Include="Requirement/Grounding/Catalog.fs"/>
+    <Compile Include="Requirement/Grounding/Surface.fsi"/>
     <Compile Include="Requirement/Grounding/Surface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGrounding/Runtime.fs"/>
     <Compile Include="OpenCode/Host/RequirementGrounding/Gate.fs"/>

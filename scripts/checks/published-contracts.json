@@ -2,6 +2,31 @@
   "schema_version": 1,
   "compile_contract_support": [
     {
+      "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs",
+      "owner": "institutional-learning",
+      "justification": "Signed pure institutional-learning disposition/revision decision over the Enforcer catalog; it holds no runtime authority or physical state."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Surface.fs",
+      "owner": "institutional-learning",
+      "justification": "Signed JS-native facade over institutional-learning facts/projection/decision; boxed projection helpers remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Requirement/Grounding/Model.fs",
+      "owner": "requirement-grounding",
+      "justification": "Signed grounding identity/material model shared by the owner locality; it is immutable vocabulary and carries no independent runtime authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Requirement/Grounding/Catalog.fs",
+      "owner": "requirement-grounding",
+      "justification": "Signed requirement-package catalog adapter; filesystem primitives and pattern-matching internals remain private while the owner-visible discovery/materialization contract is explicit."
+    },
+    {
+      "path": "src/Wanxiangshu/Requirement/Grounding/Surface.fs",
+      "owner": "requirement-grounding",
+      "justification": "Signed JS-native facade over the grounding catalog; it grants no additional semantic or durable authority."
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Host/MessageVisibilitySurface.fs",
       "owner": "participant-horizon",
       "justification": "Signed JS-native handle facade over the message-visibility hub; the mutable waiter registry and timer handles remain private."
@@ -168,6 +193,16 @@
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "institutional-learning",
+      "locality": "enforcer-institutionallearning-facts",
+      "justification": "Institutional-learning durable facts and projection plus pure enhancer and JS facade form a signed locality depending only on graduated Enforcer catalog, identity and Host digest boundaries."
+    },
+    {
+      "owner": "requirement-grounding",
+      "locality": "requirement-grounding-model",
+      "justification": "Requirement grounding material/occurrence model, Host durable facts, package catalog and JS facade form a signed locality depending only on graduated concern, identity, Host digest and repository-programming contracts."
+    },
     {
       "owner": "action-affordance",
       "locality": "opencode-tools-managedagent",
