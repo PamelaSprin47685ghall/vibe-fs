@@ -81,28 +81,23 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_provider_failure_with_exact_current_assistant
   })
 })
 
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_has_no_counter_driven_snapshot_polling', () => {
-  for (const remaining of [8, 4, 2, 1]) {
-    const error = ReconcileSurface.decideStep(
-      idleWake,
-      remaining,
-      ReconcileSurface.evidenceSnapshotError('projection unavailable'),
-    )
-    assert.equal(ReconcileSurface.decisionName(error), 'StopPass')
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_snapshot_error_and_no_turn_stop_current_pass', () => {
+  const error = ReconcileSurface.decideStep(
+    idleWake,
+    ReconcileSurface.evidenceSnapshotError('projection unavailable'),
+  )
+  assert.equal(ReconcileSurface.decisionName(error), 'StopPass')
 
-    const noTurn = ReconcileSurface.decideStep(
-      ReconcileSurface.failureWake(),
-      remaining,
-      ReconcileSurface.evidenceNoTurn(),
-    )
-    assert.equal(ReconcileSurface.decisionName(noTurn), 'StopPass')
-  }
+  const noTurn = ReconcileSurface.decideStep(
+    ReconcileSurface.failureWake(),
+    ReconcileSurface.evidenceNoTurn(),
+  )
+  assert.equal(ReconcileSurface.decisionName(noTurn), 'StopPass')
 })
 
 test('WHAT[HOST-BOUNDARY-005] EXEC_only_idle_can_publish_a_nonterminal_current_assistant', () => {
   const idle = ReconcileSurface.decideStep(
     idleWake,
-    99,
     ReconcileSurface.evidenceProvisional('TurnInProgress'),
   )
   assert.equal(ReconcileSurface.decisionName(idle), 'Publish')
@@ -114,7 +109,6 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_only_idle_can_publish_a_nonterminal_current_a
   ]) {
     const decision = ReconcileSurface.decideStep(
       wake,
-      99,
       ReconcileSurface.evidenceProvisional('TurnInProgress'),
     )
     assert.equal(ReconcileSurface.decisionName(decision), 'StopPass')
@@ -124,7 +118,6 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_only_idle_can_publish_a_nonterminal_current_a
 test('WHAT[HOST-BOUNDARY-005] mutation_canary_terminal_evidence_still_publishes', () => {
   const decision = ReconcileSurface.decideStep(
     ReconcileSurface.failureWake(),
-    99,
     ReconcileSurface.evidenceTerminal('TurnFailed'),
   )
   assert.equal(ReconcileSurface.decisionName(decision), 'Publish')
@@ -135,18 +128,18 @@ test('WHAT[HOST-BOUNDARY-005] terminal provider failure publishes only with matc
 
   assert.equal(
     ReconcileSurface.decisionName(
-      ReconcileSurface.decideStep(ReconcileSurface.failureWakeFor('failed-physical'), 1, terminal),
+      ReconcileSurface.decideStep(ReconcileSurface.failureWakeFor('failed-physical'), terminal),
     ),
     'Publish',
   )
   assert.equal(
     ReconcileSurface.decisionName(
-      ReconcileSurface.decideStep(ReconcileSurface.failureWakeFor('other-physical'), 1, terminal),
+      ReconcileSurface.decideStep(ReconcileSurface.failureWakeFor('other-physical'), terminal),
     ),
     'StopPass',
   )
   assert.equal(
-    ReconcileSurface.decisionName(ReconcileSurface.decideStep(ReconcileSurface.retryWake(), 1, terminal)),
+    ReconcileSurface.decisionName(ReconcileSurface.decideStep(ReconcileSurface.retryWake(), terminal)),
     'StopPass',
   )
 })

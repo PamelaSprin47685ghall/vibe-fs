@@ -98,7 +98,6 @@ module ReconcileProgram =
     /// which repair prompt business should send.
     [<RequireQualifiedAccess>]
     type ReconcileDecision =
-        | Reread of clearContinuationCandidate: bool * rereadsRemaining: int
         | Publish
         | StopPass
 
@@ -142,16 +141,11 @@ module ReconcileProgram =
     let tryFailureWitnessReason wake turn =
         tryFailureWitness wake turn |> Option.map snd
 
-    let private decideExhaustedRetryable (_rereadsRemaining: int) (exhausted: ReconcileDecision) =
-        // HOST-BOUNDARY-005: no read is authorized by a counter. A later read
-        // needs a new coarse Host signal or exact projection-change edge.
-        exhausted
-
-    let private exhaustedUnknownDecision (wake: ReconcileWake) =
+    let private unknownDecision (wake: ReconcileWake) =
         match wake with
         | ReconcileWake.IdleWake _ ->
             // Classic black hole: SessionIdle + assistant reasoning +
-            // finish=None + rereads exhausted. Observation is stable —
+            // finish=None. Observation is stable —
             // Publish to business; never StopPass silently. Whether to
             // send missing-final-report is TurnWorkflow / InteractionRepair.
             ReconcileDecision.Publish
@@ -164,9 +158,7 @@ module ReconcileProgram =
             // terminal publishes normally.
             ReconcileDecision.StopPass
 
-    let private decideExhaustedUnknown (wake: ReconcileWake) (_rereadsRemaining: int) = exhaustedUnknownDecision wake
-
-    let private decideExhaustedProvisional (wake: ReconcileWake) =
+    let private provisionalDecision (wake: ReconcileWake) =
         match wake with
         | ReconcileWake.IdleWake _ ->
             // Idle is the only wake that proves the exact current physical
@@ -188,19 +180,18 @@ module ReconcileProgram =
         | _ -> false
 
     /// Reconcile decision for one snapshot observation. Production Scheduler
-    /// supplies a single read per causal edge (HOST-BOUNDARY-005); the remaining
-    /// counter stays only as a pure compatibility surface for historical tests.
+    /// supplies a single read per causal edge (HOST-BOUNDARY-005).
     ///
     /// 不变量（GLORY-070 / HOST-004 rev.3 / rabbit §7）：SessionIdle 被消费后只允许
-    /// 产生一个稳定观测交接或明确 fail closed；因果重读耗尽绝不静默 StopPass 一个带
-    /// idle evidence 的稳定 `Unknown`。`Unknown`（finish=None）耗尽后只有在 `IdleWake`
+    /// 产生一个稳定观测交接或明确 fail closed；带 idle evidence 的稳定 `Unknown`
+    /// 只有在 `IdleWake`
     /// 下 `Publish` 给业务（TurnWorkflow / InteractionRepair 决定是否 repair）；
     /// `Retry` wake 只证明 provider lifecycle edge；`FailureWake` 还携带 signal 到达时冻结的
     /// physical user identity。只有该 physical 与 snapshot exact current assistant 一致时，
     /// Unknown / Provisional 才被收敛成 TurnFailed；否则仍 StopPass 等待 causal edge。
     /// 两者都不授予 idle repair 权。普通 Unknown / Provisional 只有 IdleWake 可 Publish；
     /// `SnapshotError` / `NoTurn` 同样 StopPass。
-    let decideStep (wake: ReconcileWake) (rereadsRemaining: int) (evidence: ReconcileEvidence) : ReconcileDecision =
+    let decideStep (wake: ReconcileWake) (evidence: ReconcileEvidence) : ReconcileDecision =
         let hasFailureWitness =
             match evidence with
             | ReconcileEvidence.Provisional observed
@@ -226,25 +217,16 @@ module ReconcileProgram =
             ReconcileDecision.Publish
         | false, ReconcileEvidence.Terminal _ when failedTerminalRequiresWitness -> ReconcileDecision.StopPass
         | false, ReconcileEvidence.Terminal _ -> ReconcileDecision.Publish
-        | false, (ReconcileEvidence.SnapshotError _ | ReconcileEvidence.NoTurn) ->
-            decideExhaustedRetryable rereadsRemaining ReconcileDecision.StopPass
-        | false, ReconcileEvidence.Provisional _ ->
-            decideExhaustedRetryable rereadsRemaining (decideExhaustedProvisional wake)
-        | false, ReconcileEvidence.Unknown _ -> decideExhaustedUnknown wake rereadsRemaining
+        | false, (ReconcileEvidence.SnapshotError _ | ReconcileEvidence.NoTurn) -> ReconcileDecision.StopPass
+        | false, ReconcileEvidence.Provisional _ -> provisionalDecision wake
+        | false, ReconcileEvidence.Unknown _ -> unknownDecision wake
         | false, ReconcileEvidence.SessionCleared -> ReconcileDecision.StopPass
         | true, _ -> ReconcileDecision.StopPass
 
     let decisionName (decision: ReconcileDecision) : string =
         match decision with
-        | ReconcileDecision.Reread _ -> "Reread"
         | ReconcileDecision.Publish -> "Publish"
         | ReconcileDecision.StopPass -> "StopPass"
-
-    let clearsContinuationCandidate (decision: ReconcileDecision) : bool =
-        match decision with
-        | ReconcileDecision.Reread(clear, _) -> clear
-        | ReconcileDecision.Publish
-        | ReconcileDecision.StopPass -> false
 
     let consumeKey (turn: PublishTurn) : string =
         String.Concat(
