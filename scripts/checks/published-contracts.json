@@ -295,9 +295,19 @@
       "path": "src/Wanxiangshu/Context/Prefix/Surface.fs",
       "owner": "prefix-stability",
       "justification": "Signed JS-native facade over prefix candidate, epoch and projection contracts; dynamic decode/boxing helpers remain private and no additional semantic authority is granted."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/PromptFactCodec.fs",
+      "owner": "durable-events",
+      "justification": "Signed codec support for PromptAuthority identity-seed serialization inside the durable Journal contract; custom Thoth encoders/decoders stay private and no writer, projection, or runtime authority is introduced."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "durable-events",
+      "locality": "persistence-journal-promptfactcodec",
+      "justification": "Journal fact/envelope codecs, EventStore lift, writer ports, bounded projection update algebra and shared AgentJournal/runtime-path adapters form a fully signed durable physical-port locality over graduated contracts; PromptFactCodec is explicit codec support and process-local waiters, dictionaries, path interop and decode helpers remain signature-hidden."
+    },
     {
       "owner": "process-execution",
       "locality": "process-processrequest",
