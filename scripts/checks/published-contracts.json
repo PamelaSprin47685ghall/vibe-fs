@@ -300,9 +300,64 @@
       "path": "src/Wanxiangshu/Persistence/Journal/PromptFactCodec.fs",
       "owner": "durable-events",
       "justification": "Signed codec support for PromptAuthority identity-seed serialization inside the durable Journal contract; custom Thoth encoders/decoders stay private and no writer, projection, or runtime authority is introduced."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Attention/Fold.fs",
+      "owner": "attention-regulation",
+      "justification": "Signed pure composition-fold support for Attention and institutional-learning facts; only the canonical durable integrator consumes these projection transitions and no physical/runtime effect is owned here."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Concern/Fold.fs",
+      "owner": "concern-routing",
+      "justification": "Signed pure composition-fold support for Concern facts; only the canonical durable integrator consumes the projection transition and no physical/runtime effect is owned here."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Agent/Errors.fs",
+      "owner": "delegation",
+      "justification": "Signed child-agent execution error/context vocabulary used only inside delegation runtime composition; it publishes no additional foreign contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Agent/Program.fs",
+      "owner": "delegation",
+      "justification": "Signed direct-CE child execution helper over the delegation-owned AgentError vocabulary; cancellation and exception mapping remain explicit and no runtime registry is exposed."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/ChildRun.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local physical child-run aggregate and one-shot completion cell; mutable session/cancellation resources stay inside delegation runtime and are not a foreign semantic contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/ChildRunProjection.fs",
+      "owner": "delegation",
+      "justification": "Signed pure projection from delegation-owned ChildRun physical state to the existing AgentRecord contract; it introduces no authority or durable state."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Recovery.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local physical recovery helpers rebuilding ChildRun resources from durable linkage without minting durable completion or foreign authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs",
+      "owner": "delegation",
+      "justification": "Signed delegation runtime backend implementation behind the published ForkRuntime capability shell; mutable registries, mailbox and physical timing remain hidden behind the sibling signature."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "attention-regulation",
+      "locality": "interaction-attention-fold",
+      "justification": "Attention durable fold algebra and its Host tool vocabulary form a fully signed locality over graduated facts, journal, identity, provider and tool-host contracts; the fold is explicit composition support and tool execution helpers remain hidden."
+    },
+    {
+      "owner": "concern-routing",
+      "locality": "interaction-concern-fold",
+      "justification": "Concern durable fold algebra and its Host tool vocabulary form a fully signed locality over graduated facts, journal, identity, provider and tool-host contracts; the fold is explicit composition support and tool execution helpers remain hidden."
+    },
+    {
+      "owner": "delegation",
+      "locality": "execution-delegation-fork-runtime",
+      "justification": "Delegation child-run execution, recovery, projection and mutable ForkRuntime backend form one signed owner-local runtime locality behind RuntimeContract; its compile closure contains only graduated delegation, identity, causal-wait and time-capability contracts."
+    },
     {
       "owner": "durable-events",
       "locality": "persistence-journal-promptfactcodec",

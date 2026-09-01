@@ -19,14 +19,14 @@ module ForkRecovery =
         Map.add agentId run agents
 
     /// Cancel in-flight busy work only. Keep handle Active; do not fill completion.
-    let markInterrupted agentId (_reason: string) agents =
+    let markInterrupted (agentId: string) (_reason: string) (agents: Map<string, ChildRun>) =
         match Map.tryFind agentId agents with
         | None -> agents
         | Some run ->
             ChildRun.cancel run
             agents
 
-    let bindChildSession agentId (childSessionId: SessionId) agents =
+    let bindChildSession (agentId: string) (childSessionId: SessionId) (agents: Map<string, ChildRun>) =
         match Map.tryFind agentId agents with
         | Some run -> ChildRun.bindSession run childSessionId
         | None -> ()

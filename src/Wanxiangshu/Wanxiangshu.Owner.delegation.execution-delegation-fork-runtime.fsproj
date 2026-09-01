@@ -11,11 +11,17 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <Compile Include="Execution/Agent/Errors.fsi"/>
     <Compile Include="Execution/Agent/Errors.fs"/>
+    <Compile Include="Execution/Agent/Program.fsi"/>
     <Compile Include="Execution/Agent/Program.fs"/>
+    <Compile Include="Execution/Delegation/Fork/ChildRun.fsi"/>
     <Compile Include="Execution/Delegation/Fork/ChildRun.fs"/>
+    <Compile Include="Execution/Delegation/Fork/ChildRunProjection.fsi"/>
     <Compile Include="Execution/Delegation/Fork/ChildRunProjection.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Recovery.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Recovery.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Runtime.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Runtime.fs"/>
   </ItemGroup>
 </Project>

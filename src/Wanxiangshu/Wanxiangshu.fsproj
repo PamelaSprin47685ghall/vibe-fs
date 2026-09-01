@@ -431,7 +431,9 @@
     <Compile Include="Context/Companion/Blogger/ContextFactFold.fs"/>
     <Compile Include="Composition/Durable/HostFactFold.fs"/>
     <Compile Include="Execution/Delegation/DelegationFactFold.fs"/>
+    <Compile Include="Interaction/Attention/Fold.fsi"/>
     <Compile Include="Interaction/Attention/Fold.fs"/>
+    <Compile Include="Interaction/Concern/Fold.fsi"/>
     <Compile Include="Interaction/Concern/Fold.fs"/>
     <Compile Include="Enforcer/InstitutionalLearning/Fold.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Fold.fs"/>
@@ -456,7 +458,9 @@
     <Compile Include="Git/Subject.fs"/>
     <Compile Include="Persistence/Journal/RuntimePath.fsi"/>
     <Compile Include="Persistence/Journal/RuntimePath.fs"/>
+    <Compile Include="Execution/Agent/Errors.fsi"/>
     <Compile Include="Execution/Agent/Errors.fs"/>
+    <Compile Include="Execution/Agent/Program.fsi"/>
     <Compile Include="Execution/Agent/Program.fs"/>
     <Compile Include="Participant/Provider/SessionLanguage.fsi"/>
     <Compile Include="Participant/Provider/SessionLanguage.fs"/>
@@ -465,8 +469,10 @@
     <Compile Include="Execution/Session/AgentCompletion.fsi"/>
     <Compile Include="Execution/Session/AgentCompletion.fs"/>
     <Compile Include="Execution/Delegation/Handle/Controller.fs"/>
+    <Compile Include="Execution/Delegation/Fork/ChildRun.fsi"/>
     <Compile Include="Execution/Delegation/Fork/ChildRun.fs"/>
     <Compile Include="Execution/Delegation/Fork/LifecycleSurface.fs"/>
+    <Compile Include="Execution/Delegation/Fork/ChildRunProjection.fsi"/>
     <Compile Include="Execution/Delegation/Fork/ChildRunProjection.fs"/>
     <Compile Include="Process/Deadline.fsi"/>
     <Compile Include="Process/Deadline.fs"/>
@@ -491,7 +497,9 @@
     <Compile Include="Execution/Session/Attachment/AttachedRuntime.fs"/>
     <Compile Include="Execution/Session/Attachment/AttachmentSurface.fs"/>
     <Compile Include="Strength/Runtime.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Recovery.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Recovery.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Runtime.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Runtime.fs"/>
     <Compile Include="Execution/Fission/Admission.fs"/>
     <Compile Include="Execution/Fission/Runtime.fs"/>
@@ -843,7 +851,9 @@
     <Compile Include="OpenCode/Tools/FileMutationTools.fs"/>
     <Compile Include="OpenCode/Tools/BashHoneypotTool.fs"/>
     <Compile Include="OpenCode/Tools/AssumeTool.fs"/>
+    <Compile Include="OpenCode/Tools/AttentionTools.fsi"/>
     <Compile Include="OpenCode/Tools/AttentionTools.fs"/>
+    <Compile Include="OpenCode/Tools/ConcernTools.fsi"/>
     <Compile Include="OpenCode/Tools/ConcernTools.fs"/>
     <Compile Include="OpenCode/Tools/InstitutionalLearningTools.fs"/>
     <Compile Include="OpenCode/Tools/ToolSurface.fs"/>
