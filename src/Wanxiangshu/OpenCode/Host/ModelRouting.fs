@@ -943,7 +943,7 @@ module ModelRouting =
     /// EMR-009 Host projection. Routing owns both which outcomes carry a model
     /// and the exact mutable Host field that receives that model; composition
     /// roots only invoke this published projection.
-    let projectHostModel output model =
+    let projectHostModel (output: obj) (model: OpencodeModel) =
         try
             let message = requireOutputMessage output
             message?model <- box model

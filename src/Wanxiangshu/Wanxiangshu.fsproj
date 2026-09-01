@@ -215,6 +215,7 @@
     <Compile Include="Strength/Budget.fs"/>
     <Compile Include="Strength/Prediction/CostModel.fsi"/>
     <Compile Include="Strength/Prediction/CostModel.fs"/>
+    <Compile Include="Strength/Policy.fsi"/>
     <Compile Include="Strength/Policy.fs"/>
     <Compile Include="Strength/Prediction/Predictor.fs"/>
     <Compile Include="Strength/Rollout.fs"/>
@@ -279,6 +280,7 @@
     <Compile Include="Participant/Provider/Attempt/FailureSurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Planner.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Planner.fs"/>
+    <Compile Include="Participant/Provider/Attempt/PlannerSurface.fsi"/>
     <Compile Include="Participant/Provider/Attempt/PlannerSurface.fs"/>
     <Compile Include="Persistence/EventStore/Model.fsi"/>
     <Compile Include="Persistence/EventStore/Model.fs"/>
@@ -459,6 +461,7 @@
     <Compile Include="Execution/Session/ChatExecution/Settlement.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Surface.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateLedger.fs"/>
+    <Compile Include="Execution/Session/SessionStartedAtLedger.fsi"/>
     <Compile Include="Execution/Session/SessionStartedAtLedger.fs"/>
     <Compile Include="Mission/Review/Barrier/Workflow.fs"/>
     <Compile Include="Persistence/Journal/SharedAgentJournal.fsi"/>
@@ -594,11 +597,17 @@
     <Compile Include="OpenCode/Tools/FileTools.fs"/>
     <Compile Include="OpenCode/Codec/OpencodeTypes.fsi"/>
     <Compile Include="OpenCode/Codec/OpencodeTypes.fs"/>
+    <Compile Include="OpenCode/Host/ModelCapacity/Model.fsi"/>
     <Compile Include="OpenCode/Host/ModelCapacity/Model.fs"/>
+    <Compile Include="OpenCode/Host/ModelCapacity/Ledger.fsi"/>
     <Compile Include="OpenCode/Host/ModelCapacity/Ledger.fs"/>
+    <Compile Include="OpenCode/Host/ModelCapacity/Queue.fsi"/>
     <Compile Include="OpenCode/Host/ModelCapacity/Queue.fs"/>
+    <Compile Include="OpenCode/Host/ModelCapacity/Borrowing.fsi"/>
     <Compile Include="OpenCode/Host/ModelCapacity/Borrowing.fs"/>
+    <Compile Include="OpenCode/Host/ModelCapacity/Surface.fsi"/>
     <Compile Include="OpenCode/Host/ModelCapacity/Surface.fs"/>
+    <Compile Include="OpenCode/Host/ModelRouting.fsi"/>
     <Compile Include="OpenCode/Host/ModelRouting.fs"/>
     <Compile Include="OpenCode/Host/StealthBrowserMcpConfig.fsi"/>
     <Compile Include="OpenCode/Host/StealthBrowserMcpConfig.fs"/>
@@ -622,8 +631,11 @@
     <Compile Include="OpenCode/Codec/ProjectionMessageEdit.fs"/>
     <Compile Include="Participant/Provider/Projection/Surface.fsi"/>
     <Compile Include="Participant/Provider/Projection/Surface.fs"/>
+    <Compile Include="OpenCode/Host/PairProgrammingCalibration.fsi"/>
     <Compile Include="OpenCode/Host/PairProgrammingCalibration.fs"/>
+    <Compile Include="OpenCode/Host/PairProgrammingCalibrationSurface.fsi"/>
     <Compile Include="OpenCode/Host/PairProgrammingCalibrationSurface.fs"/>
+    <Compile Include="Process/Surface.fsi"/>
     <Compile Include="Process/Surface.fs"/>
     <Compile Include="OpenCode/Host/HookPolicy.fs"/>
     <Compile Include="OpenCode/Host/ReliabilityDiagnostics.fs"/>

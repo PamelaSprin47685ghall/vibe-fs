@@ -350,9 +350,54 @@
       "path": "src/Wanxiangshu/Execution/Fission/Admission.fs",
       "owner": "intra-participant-parallelism",
       "justification": "Signed Fission admission boundary: lane creation/start/abort are explicit injected capabilities, while the process-local single-flight registry and startup helpers remain hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibrationSurface.fs",
+      "owner": "time-capability",
+      "justification": "Signed JS-native representation surface over pair calibration composition and localized elapsed/estimate prose; nullish and language decode helpers remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Process/Surface.fs",
+      "owner": "time-capability",
+      "justification": "Signed JS-native verification facade for the existing time/process semantic surface; opaque handle implementation types and JS invocation helpers remain hidden while the registered public resource operations stay stable."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/PlannerSurface.fs",
+      "owner": "execution-model-routing",
+      "justification": "Signed JS-native proof adapter over the graduated attempt-planner and participant-identity contracts; label decoding and JSON projection remain representation-only and introduce no second planning authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Ledger.fs",
+      "owner": "execution-model-routing",
+      "justification": "Signed owner-local physical ledger for opaque capacity credits; its mutable map and monotonic identifiers are process resources behind the model-routing capability and publish no foreign business policy."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs",
+      "owner": "execution-model-routing",
+      "justification": "Signed bounded process-local admission/provider-step queue support; waiter collections and queue fences stay inside execution-model-routing and expose no durable or foreign semantic state."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs",
+      "owner": "execution-model-routing",
+      "justification": "Signed owner-local capacity borrowing resource behind the routing contract; lineage, custody, waiter and token registries remain process-local implementation and cannot become foreign authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs",
+      "owner": "execution-model-routing",
+      "justification": "Signed owner-local execution-capacity lifecycle interpreter over the published model types; lease registry and transition mechanics remain hidden behind routing operations and add no second foreign contract."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "execution-model-routing",
+      "locality": "strength-policy",
+      "justification": "Strength policy, attempt-plan proof projection and the model-capacity routing runtime form one fully signed execution-model-routing locality over graduated identity, failure, managed-chat, request-kind, prefix and budget contracts; scheduler, borrowing, queue, lease and JS/Host implementation remain signature-hidden."
+    },
+    {
+      "owner": "time-capability",
+      "locality": "execution-session-sessionstartedatledger",
+      "justification": "Session-start durable binding, pair calibration and the registered JS-native time/process verification facade form a fully signed locality over graduated temporal, process, causal-wait, identity, journal and provider contracts; physical handle classes and representation helpers remain signature-hidden."
+    },
     {
       "owner": "managed-chat-execution",
       "locality": "execution-session-chatexecution-fold",

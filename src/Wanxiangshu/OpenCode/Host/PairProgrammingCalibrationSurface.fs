@@ -29,7 +29,7 @@ module PairProgrammingCalibrationSurface =
             guideline
 
     let renderToolEstimate (language: string) (remaining: obj) : string =
-        PairProgrammingCalibration.renderToolEstimate (languageOf language) (int64 (string remaining))
+        PairProgrammingCalibration.renderToolEstimate (languageOf language) (int (string remaining))
 
     let renderElapsed (language: string) (elapsedMilliseconds: obj) : string =
         PairProgrammingCalibration.renderElapsed (languageOf language) (float (string elapsedMilliseconds))

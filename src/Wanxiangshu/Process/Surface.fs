@@ -9,7 +9,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -497,7 +496,8 @@ module ProcessSurface =
             return resultView (box result)
         }
 
-    let run = runWithHost
+    let run (command: obj) (estimate: obj) (context: obj) (token: obj) : Task<obj> =
+        runWithHost command estimate context token
 
     let private childOf (value: obj) = (value :?> ChildHandle).Child
 
@@ -760,7 +760,7 @@ module ProcessSurface =
                   Message = message }
         )
 
-    let ptySignalParse = signalParse
+    let ptySignalParse (name: string) : obj = signalParse name
 
     let ptySignalView (name: string) : obj =
         match PtySignal.tryParse name with
@@ -1091,11 +1091,11 @@ module ProcessSurface =
         | ClosedImmediate -> box {| kind = "ClosedImmediate" |}
         | Park _ -> box {| kind = "Park" |}
 
-    let ptySessionCreate = sessionCreate
-    let ptySessionView = sessionView
-    let ptySessionSetClosed = sessionSetClosed
-    let ptySessionSetBackend = sessionSetBackend
-    let ptySessionPushPending = sessionPushPending
+    let ptySessionCreate (id: string) (backend: obj) : obj = sessionCreate id backend
+    let ptySessionView (session: obj) : obj = sessionView session
+    let ptySessionSetClosed (session: obj) (closed: bool) : unit = sessionSetClosed session closed
+    let ptySessionSetBackend (session: obj) (backend: obj) : unit = sessionSetBackend session backend
+    let ptySessionPushPending (session: obj) (command: obj) : unit = sessionPushPending session command
 
     let sessionExitPending (session: obj) : bool = not ((sessionOf session).ExitCompleted)
 
@@ -1104,8 +1104,8 @@ module ProcessSurface =
         value.ExitCompleted <- true
         value.ExitCompletion.SetResult()
 
-    let ptySessionExitPending = sessionExitPending
-    let ptySessionResolveExit = sessionResolveExit
+    let ptySessionExitPending (session: obj) : bool = sessionExitPending session
+    let ptySessionResolveExit (session: obj) : unit = sessionResolveExit session
 
     let sessionPendingView (session: obj) : obj array =
         (sessionOf session).Pending

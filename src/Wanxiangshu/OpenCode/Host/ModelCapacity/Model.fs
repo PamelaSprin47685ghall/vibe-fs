@@ -52,7 +52,7 @@ type internal ExecutionAdmissionLease
     member internal _.Fence = fence
     member internal _.Identity = identity
 
-    static member internal Create(owner, capacityCredit, leaseId, fence, identity) =
+    static member internal Create(owner: obj, capacityCredit, leaseId, fence, identity) =
         ExecutionAdmissionLease(owner, capacityCredit, leaseId, fence, identity)
 
 [<Struct; StructuralEquality; StructuralComparison>]
@@ -86,7 +86,7 @@ type internal ExecutionAdmissionQueueNode
     member internal _.PhysicalUserMessageId = physicalUserMessageId
     member internal _.Completion = completion
 
-    static member internal Create(owner, nodeId, fence, sessionId, physicalUserMessageId, completion) =
+    static member internal Create(owner: obj, nodeId, fence, sessionId, physicalUserMessageId, completion) =
         ExecutionAdmissionQueueNode(owner, nodeId, fence, sessionId, physicalUserMessageId, completion)
 
 and [<RequireQualifiedAccess>] internal ExecutionAdmissionAcquisition =
