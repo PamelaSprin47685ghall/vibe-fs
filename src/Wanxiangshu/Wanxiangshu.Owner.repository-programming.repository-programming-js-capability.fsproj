@@ -7,16 +7,27 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
+    <Compile Include="Repository/Programming/Js/Capability.fsi"/>
     <Compile Include="Repository/Programming/Js/Capability.fs"/>
+    <Compile Include="Repository/Programming/Js/Description.fsi"/>
     <Compile Include="Repository/Programming/Js/Description.fs"/>
+    <Compile Include="Repository/Programming/Js/Surface.fsi"/>
     <Compile Include="Repository/Programming/Js/Surface.fs"/>
+    <Compile Include="Repository/Programming/Js/Failure.fsi"/>
     <Compile Include="Repository/Programming/Js/Failure.fs"/>
+    <Compile Include="Repository/Programming/Js/Anchor.fsi"/>
     <Compile Include="Repository/Programming/Js/Anchor.fs"/>
+    <Compile Include="Repository/Programming/Js/Transaction.fsi"/>
     <Compile Include="Repository/Programming/Js/Transaction.fs"/>
+    <Compile Include="Process/JsSandbox.fsi"/>
     <Compile Include="Process/JsSandbox.fs"/>
+    <Compile Include="Repository/Programming/Js/Utf8Fs.fsi"/>
     <Compile Include="Repository/Programming/Js/Utf8Fs.fs"/>
+    <Compile Include="Repository/Programming/Js/GlobFs.fsi"/>
     <Compile Include="Repository/Programming/Js/GlobFs.fs"/>
+    <Compile Include="Repository/Programming/Js/AnchorFs.fsi"/>
     <Compile Include="Repository/Programming/Js/AnchorFs.fs"/>
+    <Compile Include="Repository/Programming/Js/MutationFs.fsi"/>
     <Compile Include="Repository/Programming/Js/MutationFs.fs"/>
   </ItemGroup>
 </Project>

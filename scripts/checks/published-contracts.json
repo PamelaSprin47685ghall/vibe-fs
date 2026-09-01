@@ -2,6 +2,21 @@
   "schema_version": 1,
   "compile_contract_support": [
     {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/Capability.fs",
+      "owner": "repository-programming",
+      "justification": "Signed filesystem-capability projection and fragment registry support; it derives only from the canonical ToolPermission contract and adds no independent authority decision."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/Description.fs",
+      "owner": "repository-programming",
+      "justification": "Signed canonical LLM-visible JS tool description renderer; template composition internals stay hidden and this representation support owns no runtime filesystem authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Process/JsSandbox.fs",
+      "owner": "repository-programming",
+      "justification": "Signed Node vm adapter support for the repository-programming contract; vm imports, sentinel decoding and error-classification helpers remain private behind the F# signature."
+    },
+    {
       "path": "src/Wanxiangshu/AssemblyInfo.fs",
       "owner": "distribution",
       "justification": "Assembly attribute carrier has no callable runtime surface; its sibling signature keeps the distribution leaf locality structurally signed."
@@ -118,6 +133,11 @@
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "repository-programming",
+      "locality": "repository-programming-js-capability",
+      "justification": "JS repository-programming capability, failure, anchor, transaction and filesystem adapter contracts are fully signed; their only external compile dependencies are graduated identity and office-capability localities."
+    },
     {
       "owner": "distribution",
       "locality": "resources-enforcercatalogresource",
