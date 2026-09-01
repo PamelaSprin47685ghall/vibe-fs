@@ -32,10 +32,7 @@ module ProjectionIntent =
     val replaceMessageBase: key: string -> rows: ProjectionMessageRow list -> ProjectionIntent
 
     val insertMessageRows:
-        key: string ->
-        anchor: ProjectionMessageAnchor ->
-        rows: ProjectionMessageRow list ->
-        ProjectionIntent
+        key: string -> anchor: ProjectionMessageAnchor -> rows: ProjectionMessageRow list -> ProjectionIntent
 
 [<RequireQualifiedAccess>]
 type ProjectionConflict =

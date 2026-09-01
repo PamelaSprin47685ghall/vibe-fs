@@ -339,8 +339,13 @@ type private ForkRuntimeBackendState
         member this.UnregisterPty ptyId = this.UnregisterPty ptyId
         member this.Restore(agentId, role, agent) = this.Restore(agentId, role, agent)
         member this.MarkInterrupted(agentId, reason) = this.MarkInterrupted(agentId, reason)
-        member this.BindChildSession(agentId, childSessionId) = this.BindChildSession(agentId, childSessionId)
-        member this.AwaitAgent(agentId, timeoutMs) = this.AwaitAgent(agentId, ?timeoutMs = timeoutMs)
+
+        member this.BindChildSession(agentId, childSessionId) =
+            this.BindChildSession(agentId, childSessionId)
+
+        member this.AwaitAgent(agentId, timeoutMs) =
+            this.AwaitAgent(agentId, ?timeoutMs = timeoutMs)
+
         member this.CancelAgent agentId = this.CancelAgent agentId
         member this.List() = this.List()
         member this.IsCancelled = this.IsCancelled

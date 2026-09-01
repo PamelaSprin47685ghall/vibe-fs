@@ -10,7 +10,7 @@ module PromptAuthorityLedger =
     val foldAuthorityRootAccepted:
         projection: PromptAuthority.PromptAuthorityProjection ->
         payload: AuthorityRootAcceptedPayload ->
-        Result<PromptAuthority.PromptAuthorityProjection, string>
+            Result<PromptAuthority.PromptAuthorityProjection, string>
 
     val closeCompletedHumanRootManager:
         projection: PromptAuthority.PromptAuthorityProjection -> PromptAuthority.PromptAuthorityProjection
@@ -27,7 +27,7 @@ module PromptAuthorityLedger =
                EffectiveAgent: string option
                IdentitySeed: PromptIdentitySeed
                PayloadDigest: string |} ->
-        PromptAuthority.PromptAuthorityProjection
+            PromptAuthority.PromptAuthorityProjection
 
     val foldPromptSubmitted:
         projection: PromptAuthority.PromptAuthorityProjection ->
@@ -35,7 +35,7 @@ module PromptAuthorityLedger =
             {| PromptKey: PromptKey
                SessionId: SessionId
                Receipt: TransportReceipt |} ->
-        PromptAuthority.PromptAuthorityProjection
+            PromptAuthority.PromptAuthorityProjection
 
     val foldPromptPhysicalAccepted:
         projection: PromptAuthority.PromptAuthorityProjection ->
@@ -43,7 +43,7 @@ module PromptAuthorityLedger =
             {| PromptKey: PromptKey
                SessionId: SessionId
                PhysicalUserMessageId: PhysicalUserMessageId |} ->
-        PromptAuthority.PromptAuthorityProjection
+            PromptAuthority.PromptAuthorityProjection
 
     val foldPromptAbandoned:
         projection: PromptAuthority.PromptAuthorityProjection ->
@@ -51,7 +51,7 @@ module PromptAuthorityLedger =
             {| PromptKey: PromptKey
                SessionId: SessionId
                Reason: PromptAbandonReason |} ->
-        PromptAuthority.PromptAuthorityProjection
+            PromptAuthority.PromptAuthorityProjection
 
     val projectionFor:
         sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.PromptAuthorityProjection option
@@ -66,7 +66,7 @@ module PromptAuthorityLedger =
         sessionId: SessionId ->
         promptKey: PromptKey ->
         agentProjections: AgentProjectionSet ->
-        PromptAuthority.PromptClaim option
+            PromptAuthority.PromptClaim option
 
     [<RequireQualifiedAccess>]
     type DispatchStatus =
@@ -78,13 +78,13 @@ module PromptAuthorityLedger =
         sessionId: SessionId ->
         payloadDigest: string ->
         agentProjections: AgentProjectionSet ->
-        PromptAuthority.PromptClaim option
+            PromptAuthority.PromptClaim option
 
     val acceptedDispatchForPhysicalMessage:
         sessionId: SessionId ->
         physicalUserMessageId: PhysicalUserMessageId ->
         agentProjections: AgentProjectionSet ->
-        PromptAuthority.AcceptedDispatch option
+            PromptAuthority.AcceptedDispatch option
 
     val dispatchStatusFor:
         sessionId: SessionId -> payloadDigest: string -> agentProjections: AgentProjectionSet -> DispatchStatus

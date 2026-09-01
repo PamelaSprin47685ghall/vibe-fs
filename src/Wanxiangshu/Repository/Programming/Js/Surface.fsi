@@ -16,13 +16,15 @@ module JsToolGenerator =
     val membersFor: capabilities: Set<JsCapability> -> JsCapabilityFragment list
     val toolNameFor: roleName: string -> string
     val renderBaseClass: prose: JsCanonicalDescription.Prose -> capabilities: Set<JsCapability> -> string
+
     val renderDescription:
         prose: JsCanonicalDescription.Prose -> roleName: string -> capabilities: Set<JsCapability> -> string
+
     val renderExamples:
         _prose: JsCanonicalDescription.Prose -> roleName: string -> capabilities: Set<JsCapability> -> string list
+
     val generate:
         roleName: string -> capabilities: Set<ToolPermission> -> prose: JsCanonicalDescription.Prose -> JsSurface option
-    val isGeneratedToolName:
-        roleName: string -> capabilities: Set<ToolPermission> -> toolName: string -> bool
-    val memberBinding:
-        roleName: string -> capabilities: Set<ToolPermission> -> memberName: string -> string option
+
+    val isGeneratedToolName: roleName: string -> capabilities: Set<ToolPermission> -> toolName: string -> bool
+    val memberBinding: roleName: string -> capabilities: Set<ToolPermission> -> memberName: string -> string option

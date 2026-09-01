@@ -55,5 +55,4 @@ type OpencodeToolExecuteInput =
       sessionID: string
       callID: string }
 
-type OpencodeToolExecuteOutput =
-    { mutable args: obj }
+type OpencodeToolExecuteOutput = { mutable args: obj }

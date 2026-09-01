@@ -10,11 +10,11 @@ type AgentRunResult =
       Directory: string option
       TerminalText: string
       TurnFormalText: string }
+
     member IsValid: bool
 
 type AgentRunFailure =
-    { SessionId: SessionId
-      Reason: string }
+    { SessionId: SessionId; Reason: string }
 
 module Outcome =
     type SendOutcome =

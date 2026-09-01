@@ -25,7 +25,11 @@ module ExecutionFact =
                ParentSessionId: SessionId |} ->
             AgentFact
 
-    val inline HandleRetired: payload: {| Handle: HandleId; ParentSessionId: SessionId |} -> AgentFact
+    val inline HandleRetired:
+        payload:
+            {| Handle: HandleId
+               ParentSessionId: SessionId |} ->
+            AgentFact
 
     val inline HandleAbandoned:
         payload:
@@ -62,11 +66,28 @@ module ExecutionFact =
             AgentFact
 
     val inline HostTurnObserved:
-        payload: {| ObservedAt: System.DateTimeOffset; ProviderRun: ProviderRunIdentity option; SessionId: SessionId |} -> AgentFact
+        payload:
+            {| ObservedAt: System.DateTimeOffset
+               ProviderRun: ProviderRunIdentity option
+               SessionId: SessionId |} ->
+            AgentFact
 
 module DelegationFact =
-    val inline DelegatedToolEstimateReplaced: payload: {| ExpectedToolCalls: int; SessionId: SessionId |} -> AgentFact
-    val inline DelegatedToolCallObserved: payload: {| SessionId: SessionId; ToolCallId: ToolCallId |} -> AgentFact
+    val inline DelegatedToolEstimateReplaced:
+        payload:
+            {| ExpectedToolCalls: int
+               SessionId: SessionId |} ->
+            AgentFact
+
+    val inline DelegatedToolCallObserved:
+        payload:
+            {| SessionId: SessionId
+               ToolCallId: ToolCallId |} ->
+            AgentFact
 
     val inline DelegationHandoffCompleted:
-        payload: {| ParentEndExclusive: int64; ParentSessionId: SessionId; Route: DelegationHandoffRoute |} -> AgentFact
+        payload:
+            {| ParentEndExclusive: int64
+               ParentSessionId: SessionId
+               Route: DelegationHandoffRoute |} ->
+            AgentFact

@@ -73,7 +73,7 @@ module DiagnosticWait =
         producer: CausalProducerRef ->
         escapes: WaitEscape list ->
         source: string ->
-        DiagnosticWait
+            DiagnosticWait
 
 type CausalFrontierKind =
     | ExternalProducerFrontier

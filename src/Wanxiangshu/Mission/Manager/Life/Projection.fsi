@@ -75,9 +75,11 @@ type ManagerLifeFoldRejection =
 
 module ManagerLifecycleProjection =
     val empty: ManagerLifeProjection
+
     val fold:
         state: ManagerLifeProjection ->
         fact: ManagerLifecycleFact ->
-        Result<ManagerLifeProjection, ManagerLifeFoldRejection>
+            Result<ManagerLifeProjection, ManagerLifeFoldRejection>
+
     val isOpen: request: FinalityRequestProjection -> bool
     val isLifeArchived: projection: ManagerLifeProjection -> bool

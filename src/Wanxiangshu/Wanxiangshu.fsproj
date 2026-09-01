@@ -588,6 +588,7 @@
     <Compile Include="Process/ProcessOutput.fs"/>
     <Compile Include="Process/ProcessRunner.fsi"/>
     <Compile Include="Process/ProcessRunner.fs"/>
+    <Compile Include="Process/LargeGateSurface.fsi"/>
     <Compile Include="Process/LargeGateSurface.fs"/>
     <Compile Include="Process/JsSandbox.fsi"/>
     <Compile Include="Process/JsSandbox.fs"/>
@@ -957,7 +958,9 @@
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fs"/>
     <Compile Include="Execution/Delegation/Handle/OpenCode/JoinWake.fs"/>
     <Compile Include="OpenCode/Host/HostSignalBootstrap.fs"/>
+    <Compile Include="OpenCode/Tools/DistillationRuntime.fsi"/>
     <Compile Include="OpenCode/Tools/DistillationRuntime.fs"/>
+    <Compile Include="OpenCode/Tools/Distillation.fsi"/>
     <Compile Include="OpenCode/Tools/Distillation.fs"/>
     <Compile Include="Change/Host/GitAdapter.fs"/>
     <Compile Include="Change/Host/WorktreeCleanup.fs"/>

@@ -8,9 +8,4 @@ module ParallelSurface =
     val cancelledToken: unit -> obj
     val cancel: token: obj -> unit
 
-    val mapBounded:
-        maxConcurrency: int ->
-        action: obj ->
-        items: obj array ->
-        token: obj ->
-        Task<obj array>
+    val mapBounded: maxConcurrency: int -> action: obj -> items: obj array -> token: obj -> Task<obj array>

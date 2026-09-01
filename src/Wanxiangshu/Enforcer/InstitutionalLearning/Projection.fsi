@@ -17,10 +17,14 @@ type InstitutionalLearningProjectionState =
 [<RequireQualifiedAccess>]
 module InstitutionalLearningProjection =
     val empty: InstitutionalLearningProjectionState
+
     val tryFind:
         sessionId: SessionId ->
         occurrenceId: string ->
-        state: InstitutionalLearningProjectionState -> LearningRecord option
+        state: InstitutionalLearningProjectionState ->
+            LearningRecord option
+
     val apply:
         fact: InstitutionalLearningFactCases ->
-        state: InstitutionalLearningProjectionState -> InstitutionalLearningProjectionState
+        state: InstitutionalLearningProjectionState ->
+            InstitutionalLearningProjectionState

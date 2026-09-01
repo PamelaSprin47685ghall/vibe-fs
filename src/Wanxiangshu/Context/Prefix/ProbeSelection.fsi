@@ -23,6 +23,6 @@ module PrefixProbeSelection =
         frozenRecordPrefixRef: BlobRef ->
         frozenRecordPrefixDigest: BlobDigest ->
         recomputeDigest: (int -> string) ->
-        Result<PrefixProbe, NoCandidateReason>
+            Result<PrefixProbe, NoCandidateReason>
 
     val describeNoCandidate: reason: NoCandidateReason -> string

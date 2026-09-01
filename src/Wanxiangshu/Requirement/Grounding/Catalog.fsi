@@ -1,9 +1,7 @@
 namespace Wanxiangshu.Requirement.Grounding
 
 module GroundingCatalog =
-    type ScopeRule =
-        { Include: bool
-          Pattern: string }
+    type ScopeRule = { Include: bool; Pattern: string }
 
     type PackageDescriptor =
         { Name: string
@@ -15,5 +13,4 @@ module GroundingCatalog =
     val resolve: workspace: string -> path: string -> PackageDescriptor list
     val materialize: workspace: string -> packageName: string -> GroundingSnapshot
     val snapshotsForPaths: workspace: string -> paths: string list -> GroundingSnapshot list
-    val materialsForExactPaths:
-        workspace: string -> paths: string list -> (GroundingSnapshot * GroundingMaterial) list
+    val materialsForExactPaths: workspace: string -> paths: string list -> (GroundingSnapshot * GroundingMaterial) list

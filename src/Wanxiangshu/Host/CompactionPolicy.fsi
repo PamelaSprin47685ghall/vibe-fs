@@ -19,6 +19,14 @@ module HostCompactionPolicy =
     val requiredSettings: CompactionSetting list
     val autoContinueEnabled: bool
     val isContainableCompaction: isCompaction: bool -> bool
-    val nextReanchor: observed: ProviderRunIdentity list -> isReanchored: (ProviderRunIdentity -> bool) -> ProviderRunIdentity option
-    val judgeFirstTurn: unavailable: CompactionSetting option -> session: SessionId -> pseudoRunsOnFirstTurn: int -> CompactionGateVerdict
+
+    val nextReanchor:
+        observed: ProviderRunIdentity list -> isReanchored: (ProviderRunIdentity -> bool) -> ProviderRunIdentity option
+
+    val judgeFirstTurn:
+        unavailable: CompactionSetting option ->
+        session: SessionId ->
+        pseudoRunsOnFirstTurn: int ->
+            CompactionGateVerdict
+
     val describeVerdict: verdict: CompactionGateVerdict -> string

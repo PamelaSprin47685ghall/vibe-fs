@@ -23,7 +23,9 @@ module ChildRecovery =
         | ProvenFailed of agentId: string * handle: HandleId * childSession: SessionId * body: string
 
     module TerminalEvidence =
-        val completed: agentId: string -> handle: HandleId -> childSession: SessionId -> body: string -> TerminalEvidence
+        val completed:
+            agentId: string -> handle: HandleId -> childSession: SessionId -> body: string -> TerminalEvidence
+
         val failed: agentId: string -> handle: HandleId -> childSession: SessionId -> body: string -> TerminalEvidence
 
     type CompletedPayload =
@@ -82,6 +84,7 @@ module ChildRecovery =
         val finality: c: JoinableCompletion -> ChildFinality
         val kind: c: JoinableCompletion -> HandleCompletionKind
         val body: c: JoinableCompletion -> string option
+
         val fromDecoded:
             agentId: string ->
             handle: HandleId ->
@@ -89,6 +92,7 @@ module ChildRecovery =
             decoded: DurableAgentCompletionV2 ->
             encodedBody: string ->
                 JoinableCompletion
+
         val tryFromProvenTerminal: evidence: TerminalEvidence -> Result<JoinableCompletion, string>
 
     [<RequireQualifiedAccess>]
@@ -115,8 +119,13 @@ module ChildRecovery =
         | RecoveryInFlight
         | SessionActive
 
-    type ProvenAbandonment = { Handle: HandleId; Reason: HandleAbandonReason }
-    type ActiveChildReceipt = { Handle: HandleId; ChildSession: SessionId }
+    type ProvenAbandonment =
+        { Handle: HandleId
+          Reason: HandleAbandonReason }
+
+    type ActiveChildReceipt =
+        { Handle: HandleId
+          ChildSession: SessionId }
 
     type RecoveryDependency =
         | AwaitingTerminalEvidence of HandleId * SessionId

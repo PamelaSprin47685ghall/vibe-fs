@@ -9,6 +9,9 @@ type DelegatedToolEstimateProjectionState =
 [<RequireQualifiedAccess>]
 module DelegatedToolEstimateProjection =
     val replace: expectedToolCalls: int -> DelegatedToolEstimateProjectionState
-    val observe: toolCallId: ToolCallId -> state: DelegatedToolEstimateProjectionState -> DelegatedToolEstimateProjectionState
+
+    val observe:
+        toolCallId: ToolCallId -> state: DelegatedToolEstimateProjectionState -> DelegatedToolEstimateProjectionState
+
     val remaining: state: DelegatedToolEstimateProjectionState -> int
     val countedCallCount: state: DelegatedToolEstimateProjectionState -> int

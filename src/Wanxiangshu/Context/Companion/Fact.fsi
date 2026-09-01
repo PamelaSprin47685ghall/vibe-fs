@@ -5,7 +5,11 @@ open Wanxiangshu.Foundation.Identity
 
 module CompanionFact =
     val inline CompanionBloggerLinked:
-        payload: {| SessionId: SessionId; BloggerSessionId: SessionId; BloggerAgent: string |} -> AgentFact
+        payload:
+            {| SessionId: SessionId
+               BloggerSessionId: SessionId
+               BloggerAgent: string |} ->
+            AgentFact
 
     val inline CompanionBloggerClosed: payload: {| SessionId: SessionId |} -> AgentFact
 

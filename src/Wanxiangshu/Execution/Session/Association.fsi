@@ -4,8 +4,7 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
-type SatelliteKind =
-    | Companion
+type SatelliteKind = | Companion
 
 [<RequireQualifiedAccess>]
 type ManagedSessionKind =
@@ -42,16 +41,18 @@ module SessionAssociationProjection =
         satelliteSessionId: SessionId ->
         parentOfMain: SessionId option ->
         current: Map<SessionId, SessionAssociation> ->
-        Result<Map<SessionId, SessionAssociation>, AssociationRejection>
+            Result<Map<SessionId, SessionAssociation>, AssociationRejection>
 
     val link:
         mainSessionId: SessionId ->
         bloggerSessionId: SessionId ->
         parentOfMain: SessionId option ->
         current: Map<SessionId, SessionAssociation> ->
-        Result<Map<SessionId, SessionAssociation>, AssociationRejection>
+            Result<Map<SessionId, SessionAssociation>, AssociationRejection>
 
-    val unlink: mainSessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> Map<SessionId, SessionAssociation>
+    val unlink:
+        mainSessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> Map<SessionId, SessionAssociation>
+
     val describe: rejection: AssociationRejection -> string
 
 module SessionOwnershipClassification =
@@ -61,7 +62,7 @@ module SessionOwnershipClassification =
     val tryClassify:
         sessionId: SessionId ->
         current: Map<SessionId, SessionAssociation> ->
-        (SessionExecutionClass * SessionOwnership option) option
+            (SessionExecutionClass * SessionOwnership option) option
 
 module SyncDelegateAssociationHints =
     val dedicatedExecutionClass: SessionExecutionClass

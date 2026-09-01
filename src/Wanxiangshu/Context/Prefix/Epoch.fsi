@@ -23,14 +23,14 @@ module PrefixEpochProjection =
         nextEpoch: PrefixEpochId ->
         candidate: PrefixSnapshot ->
         state: ActivePrefixEpoch ->
-        Result<ActivePrefixEpoch, PrefixFoldRejection>
+            Result<ActivePrefixEpoch, PrefixFoldRejection>
 
     val applyReanchor:
         previousEpoch: PrefixEpochId ->
         nextEpoch: PrefixEpochId ->
         observedRun: ProviderRunIdentity ->
         state: ActivePrefixEpoch ->
-        Result<ActivePrefixEpoch, PrefixFoldRejection>
+            Result<ActivePrefixEpoch, PrefixFoldRejection>
 
     val isReanchored: run: ProviderRunIdentity -> state: ActivePrefixEpoch -> bool
     val hasSnapshot: state: ActivePrefixEpoch -> bool

@@ -25,9 +25,10 @@ module ManagerLifeAdmission =
         lifecycle: ManagerLifeProjection ->
         profile: PromptAuthority.AuthorityExecutionProfile option ->
         messageId: PhysicalUserMessageId ->
-        HumanRootOpeningEvidence option
+            HumanRootOpeningEvidence option
+
     val ending:
         lifecycle: ManagerLifeProjection ->
         profile: PromptAuthority.AuthorityExecutionProfile option ->
         opening: XTraceOpeningEvidence option ->
-        EndingLifeAdmission
+            EndingLifeAdmission

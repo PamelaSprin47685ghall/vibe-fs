@@ -5,12 +5,10 @@ open Wanxiangshu.Repository.Programming.Js
 
 module JsSandbox =
     val wrapProgram: baseClassSource: string -> modelSource: string -> deadlineEpochMs: int64 -> string
+
     val run:
-        wrappedSource: string ->
-        api: obj ->
-        deadlineMs: int ->
-        outputBoundBytes: int ->
-        Task<Result<string, JsFailure>>
+        wrappedSource: string -> api: obj -> deadlineMs: int -> outputBoundBytes: int -> Task<Result<string, JsFailure>>
+
     val runSurface:
         baseClassSource: string ->
         modelSource: string ->
@@ -18,4 +16,4 @@ module JsSandbox =
         deadlineMs: int ->
         deadlineEpochMs: int64 ->
         outputBoundBytes: int ->
-        Task<Result<string, JsFailure>>
+            Task<Result<string, JsFailure>>

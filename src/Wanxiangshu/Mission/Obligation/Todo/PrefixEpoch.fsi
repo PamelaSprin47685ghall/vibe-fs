@@ -6,8 +6,7 @@ open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 
 module MagicTodoPrefixEpoch =
-    val todoCheckpointEvidence:
-        trigger: TodoWriteId -> previousCommitted: TodoWriteId option -> PrefixEvidenceKind
+    val todoCheckpointEvidence: trigger: TodoWriteId -> previousCommitted: TodoWriteId option -> PrefixEvidenceKind
 
     val requiresLag1Rebase: previousCommitted: TodoWriteId option -> bool
 
@@ -21,4 +20,4 @@ module MagicTodoPrefixEpoch =
         yBundleRef: BlobRef ->
         yBundleDigest: BlobDigest ->
         providerPrefixDigest: string ->
-        PrefixRebaseCommittedV2
+            PrefixRebaseCommittedV2

@@ -40,24 +40,21 @@ type AgentJournal =
         stream: StreamId ->
         providerRun: ProviderRunIdentity option ->
         fact: AgentFact ->
-        Task<Result<ProjectionSet, JournalAppendFailure>>
+            Task<Result<ProjectionSet, JournalAppendFailure>>
 
     member AppendMagicTodo:
         stream: StreamId ->
         providerRun: ProviderRunIdentity option ->
         fact: MagicTodoFact ->
-        Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>>
+            Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>>
 
     member AppendManagerLifecycle:
-        stream: StreamId ->
-        fact: ManagerLifecycleFact ->
-        Task<Result<ProjectionSet, JournalAppendFailure>>
+        stream: StreamId -> fact: ManagerLifecycleFact -> Task<Result<ProjectionSet, JournalAppendFailure>>
 
     member AwaitChangeFrom: fromRevision: JournalRevision -> Task<JournalChange>
 
     member AwaitChangeFromOrCancel:
-        fromRevision: JournalRevision * cancellation: CancellationToken ->
-        Task<JournalChange option>
+        fromRevision: JournalRevision * cancellation: CancellationToken -> Task<JournalChange option>
 
     member WriteBlob: content: string -> Task<Result<BlobWriteReceipt, string>>
     member IsPoisoned: bool
@@ -68,30 +65,27 @@ type AgentJournal =
     member Writer: IJournalWriter
 
 module AgentJournal =
-    val createFromProjection:
-        writer: IJournalWriter ->
-        projection: ProjectionSet ->
-        Result<AgentJournal, FoldRejection>
+    val createFromProjection: writer: IJournalWriter -> projection: ProjectionSet -> Result<AgentJournal, FoldRejection>
 
     val appendAgent:
         stream: StreamId ->
         providerRun: ProviderRunIdentity option ->
         fact: AgentFact ->
         journal: AgentJournal ->
-        Task<Result<ProjectionSet, JournalAppendFailure>>
+            Task<Result<ProjectionSet, JournalAppendFailure>>
 
     val appendMagicTodo:
         stream: StreamId ->
         providerRun: ProviderRunIdentity option ->
         fact: MagicTodoFact ->
         journal: AgentJournal ->
-        Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>>
+            Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>>
 
     val appendManagerLifecycle:
         stream: StreamId ->
         fact: ManagerLifecycleFact ->
         journal: AgentJournal ->
-        Task<Result<ProjectionSet, JournalAppendFailure>>
+            Task<Result<ProjectionSet, JournalAppendFailure>>
 
     val snapshot: journal: AgentJournal -> ProjectionSet
     val revision: journal: AgentJournal -> JournalRevision
@@ -102,7 +96,7 @@ module AgentJournal =
         fromRevision: JournalRevision ->
         cancellation: CancellationToken ->
         journal: AgentJournal ->
-        Task<JournalChange option>
+            Task<JournalChange option>
 
     val handleProjection: journal: AgentJournal -> sessionId: SessionId -> AgentLinkageProjection
     val runtimeId: journal: AgentJournal -> RuntimeId

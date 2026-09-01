@@ -5,15 +5,13 @@ open Wanxiangshu.Foundation.Identity
 type SemanticCutPlan = { ResetJson: string }
 
 type IntegrationRule =
-    {
-        Name: string
-        Initial: obj
-        Accepts: EventEnvelope -> bool
-        FaultScope: EventEnvelope -> string
-        Integrate: obj -> EventEnvelope -> Result<obj, string>
-        PlanCut: obj -> EventEnvelope -> string -> bool -> Result<SemanticCutPlan, string>
-        ApplyCut: obj -> string -> Result<obj, string>
-    }
+    { Name: string
+      Initial: obj
+      Accepts: EventEnvelope -> bool
+      FaultScope: EventEnvelope -> string
+      Integrate: obj -> EventEnvelope -> Result<obj, string>
+      PlanCut: obj -> EventEnvelope -> string -> bool -> Result<SemanticCutPlan, string>
+      ApplyCut: obj -> string -> Result<obj, string> }
 
 type StructuralProjection = { Heads: Map<string, Set<EventId>> }
 
@@ -40,4 +38,4 @@ type ICanonicalIntegrator =
 
 [<RequireQualifiedAccess>]
 module IntegrationCurrent =
-    val tryGet<'T>: key: string -> integrator: ICanonicalIntegrator -> 'T option
+    val tryGet<'T> : key: string -> integrator: ICanonicalIntegrator -> 'T option

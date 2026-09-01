@@ -35,7 +35,9 @@ type OrchestratorFactCases =
         {| ManagerJobId: ManagerJobId
            CandidateCommit: CommitHash
            ResultingTargetHead: CommitHash |}
-    | JobFailed of {| ManagerJobId: ManagerJobId; Reason: string |}
+    | JobFailed of
+        {| ManagerJobId: ManagerJobId
+           Reason: string |}
     | JobAbandoned of {| ManagerJobId: ManagerJobId |}
     | WorktreeCreateRequested of
         {| ManagerJobId: ManagerJobId

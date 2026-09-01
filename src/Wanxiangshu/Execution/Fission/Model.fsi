@@ -45,7 +45,13 @@ type FissionDelivery =
 
 module FissionDelivery =
     val empty: laneCount: int -> FissionDelivery
-    val mark: completionId: string -> laneIndex: int -> delivery: FissionDelivery -> Result<FissionDelivery, FissionDeliveryError>
+
+    val mark:
+        completionId: string ->
+        laneIndex: int ->
+        delivery: FissionDelivery ->
+            Result<FissionDelivery, FissionDeliveryError>
+
     val pendingTargets: completionId: string -> delivery: FissionDelivery -> int list
 
 [<RequireQualifiedAccess>]
@@ -56,7 +62,13 @@ type FissionWorkBundle = private FissionWorkBundle of Map<int, string>
 
 module FissionWorkBundle =
     val empty: FissionWorkBundle
-    val add: laneIndex: int -> workRecordRef: string -> bundle: FissionWorkBundle -> Result<FissionWorkBundle, FissionBundleError>
+
+    val add:
+        laneIndex: int ->
+        workRecordRef: string ->
+        bundle: FissionWorkBundle ->
+            Result<FissionWorkBundle, FissionBundleError>
+
     val merge: left: FissionWorkBundle -> right: FissionWorkBundle -> Result<FissionWorkBundle, FissionBundleError>
     val keys: bundle: FissionWorkBundle -> int list
     val entries: bundle: FissionWorkBundle -> (int * string) list
@@ -98,7 +110,7 @@ module FissionConvergence =
         preFissionCompletionIds: string list ->
         bundle: FissionWorkBundle ->
         delivery: FissionDelivery ->
-        bool
+            bool
 
 [<RequireQualifiedAccess>]
 module FissionRequestProjection =

@@ -25,9 +25,13 @@ module RequirementGroundingProjection =
     val nextOrdinal: RequirementGroundingProjectionState -> int64
     val applyReanchor: RequirementGroundingProjectionState -> RequirementGroundingProjectionState
     val applyRequested: GroundingSnapshot -> RequirementGroundingProjectionState -> RequirementGroundingProjectionState
+
     val applyMaterialObserved:
-        RequirementGroundingMaterialObserved -> RequirementGroundingProjectionState -> RequirementGroundingProjectionState
+        RequirementGroundingMaterialObserved ->
+        RequirementGroundingProjectionState ->
+            RequirementGroundingProjectionState
+
     val applyAnchored:
         RequirementGroundingOccurrence ->
         RequirementGroundingProjectionState ->
-        Result<RequirementGroundingProjectionState, RequirementGroundingFoldRejection>
+            Result<RequirementGroundingProjectionState, RequirementGroundingFoldRejection>

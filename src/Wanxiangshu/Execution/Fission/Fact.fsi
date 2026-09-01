@@ -39,10 +39,20 @@ module FissionFact =
             AgentFact
 
     val inline FissionCompletionDelivered:
-        payload: {| GroupId: string; OwnerSessionId: SessionId; CompletionId: string; LaneIndex: int |} -> AgentFact
+        payload:
+            {| GroupId: string
+               OwnerSessionId: SessionId
+               CompletionId: string
+               LaneIndex: int |} ->
+            AgentFact
 
     val inline FissionExternalAffinityBound:
-        payload: {| GroupId: string; OwnerSessionId: SessionId; ExternalId: string; LaneIndex: int |} -> AgentFact
+        payload:
+            {| GroupId: string
+               OwnerSessionId: SessionId
+               ExternalId: string
+               LaneIndex: int |} ->
+            AgentFact
 
     val inline FissionTakeoverClaimed:
         payload:
@@ -77,4 +87,8 @@ module FissionFact =
             AgentFact
 
     val inline FissionFailed:
-        payload: {| GroupId: string; OwnerSessionId: SessionId; Reason: string |} -> AgentFact
+        payload:
+            {| GroupId: string
+               OwnerSessionId: SessionId
+               Reason: string |} ->
+            AgentFact

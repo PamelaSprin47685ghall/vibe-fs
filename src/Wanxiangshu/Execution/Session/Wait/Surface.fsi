@@ -25,12 +25,7 @@ module CausalWaitSurface =
     val awaitTask: registry: obj -> descriptor: obj -> pending: obj -> Task<obj>
 
     val untilSignalOrDeadline:
-        registry: obj ->
-        descriptor: obj ->
-        deadline: obj ->
-        tryRead: obj ->
-        awaitSignal: obj ->
-        Task<obj>
+        registry: obj -> descriptor: obj -> deadline: obj -> tryRead: obj -> awaitSignal: obj -> Task<obj>
 
     val writeSnapshot: workspace: string -> registry: obj -> unit
     val hubSetWorkspace: workspace: obj -> unit

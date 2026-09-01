@@ -16,21 +16,18 @@ module AttentionProjection =
     val pending: sessionId: SessionId -> state: AttentionProjectionState -> DeferredWorkItem list
 
     val tryFind:
-        sessionId: SessionId ->
-        occurrenceId: string ->
-        state: AttentionProjectionState ->
-        DeferredWorkItem option
+        sessionId: SessionId -> occurrenceId: string -> state: AttentionProjectionState -> DeferredWorkItem option
 
     val record:
         sessionId: SessionId ->
         occurrenceId: string ->
         text: string ->
         state: AttentionProjectionState ->
-        AttentionProjectionState
+            AttentionProjectionState
 
     val resurface:
         sessionId: SessionId ->
         learningOccurrence: string ->
         workIds: string list ->
         state: AttentionProjectionState ->
-        AttentionProjectionState
+            AttentionProjectionState

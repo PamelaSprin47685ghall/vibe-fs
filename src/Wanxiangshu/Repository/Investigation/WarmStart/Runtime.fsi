@@ -46,13 +46,33 @@ module RepositoryWarmStart =
             Task<Result<string, string>>
 
     val prepare:
-        sessionId: SessionId -> role: Role -> workspaceDirectory: string option -> keywordsRaw: string -> charge: string -> Task<Result<string, string>>
+        sessionId: SessionId ->
+        role: Role ->
+        workspaceDirectory: string option ->
+        keywordsRaw: string ->
+        charge: string ->
+            Task<Result<string, string>>
 
     val prepareDocument:
-        sessionId: SessionId -> role: Role -> workspaceDirectory: string option -> keywordsRaw: string -> charge: string -> Task<Result<LlmFacing.Document, string>>
+        sessionId: SessionId ->
+        role: Role ->
+        workspaceDirectory: string option ->
+        keywordsRaw: string ->
+        charge: string ->
+            Task<Result<LlmFacing.Document, string>>
 
     val appendToBase:
-        sessionId: SessionId -> role: Role -> workspaceDirectory: string option -> keywordsRaw: string -> basePrompt: string -> Task<Result<string, string>>
+        sessionId: SessionId ->
+        role: Role ->
+        workspaceDirectory: string option ->
+        keywordsRaw: string ->
+        basePrompt: string ->
+            Task<Result<string, string>>
 
     val appendToBaseDocument:
-        sessionId: SessionId -> role: Role -> workspaceDirectory: string option -> keywordsRaw: string -> baseDocument: LlmFacing.Document -> Task<Result<LlmFacing.Document, string>>
+        sessionId: SessionId ->
+        role: Role ->
+        workspaceDirectory: string option ->
+        keywordsRaw: string ->
+        baseDocument: LlmFacing.Document ->
+            Task<Result<LlmFacing.Document, string>>

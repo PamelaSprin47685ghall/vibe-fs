@@ -24,10 +24,7 @@ module ManagerNarrative =
     val firstBirth: userTextRaw: string -> planningTableDocument: string -> NarrativeProjection
 
     val reawakening:
-        userTextRaw: string ->
-        reawakeningDocument: string ->
-        planningTableDocument: string ->
-        NarrativeProjection
+        userTextRaw: string -> reawakeningDocument: string -> planningTableDocument: string -> NarrativeProjection
 
     val wrapT1AcceptedResult: t1RevelationInstructions: string list -> todoWriteResult: string -> string
     val renderText: projection: NarrativeProjection -> string

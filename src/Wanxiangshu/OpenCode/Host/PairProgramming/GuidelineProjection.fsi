@@ -28,6 +28,7 @@ module GuidelineProjection =
     val nextOrdinal: GuidelineProjectionState -> int64
     val applyReanchor: GuidelineProjectionState -> GuidelineProjectionState
     val restoreVisibilityFloor: int64 -> GuidelineProjectionState -> GuidelineProjectionState
+
     val apply:
         ordinal: int64 ->
         callId: ToolCallId ->
@@ -35,4 +36,4 @@ module GuidelineProjection =
         callGap: TranscriptGap ->
         resultGap: TranscriptGap ->
         state: GuidelineProjectionState ->
-        Result<GuidelineProjectionState, GuidelineFoldRejection>
+            Result<GuidelineProjectionState, GuidelineFoldRejection>

@@ -21,13 +21,15 @@ type FallbackAdvanceRejection =
 
 module FallbackProjection =
     val forAuthority: logicalRunId: LogicalRunId -> authorityRoot: AuthorityRootUserMessageId -> FallbackProjection
+
     val applyAdvance:
         identity: FallbackAttemptIdentity ->
         previousOffset: AgentPairCursor.FallbackOffset ->
         nextOffset: AgentPairCursor.FallbackOffset ->
         consecutiveFailureCount: int ->
         current: FallbackProjection ->
-        Result<FallbackProjection, FallbackAdvanceRejection>
+            Result<FallbackProjection, FallbackAdvanceRejection>
+
     val applyExhausted: current: FallbackProjection -> FallbackProjection
     val recordSuccess: current: FallbackProjection -> FallbackProjection
     val mayContinue: budget: int -> current: FallbackProjection -> bool

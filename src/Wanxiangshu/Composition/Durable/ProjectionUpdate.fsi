@@ -10,34 +10,31 @@ open Wanxiangshu.Mission.Review.Barrier
 
 module ProjectionUpdate =
     val prefixOutcome:
-        factName: string ->
-        projection: 'a ->
-        result: Result<'a, PrefixFoldRejection> ->
-        Result<'a, FoldRejection>
+        factName: string -> projection: 'a -> result: Result<'a, PrefixFoldRejection> -> Result<'a, FoldRejection>
 
     val updateSession:
         sessionId: SessionId ->
         apply: (SessionAgentProjection -> SessionAgentProjection) ->
         projection: AgentProjectionSet ->
-        AgentProjectionSet
+            AgentProjectionSet
 
     val updateCompanion:
         sessionId: SessionId ->
         apply: (CompanionProjection -> CompanionProjection) ->
         projection: AgentProjectionSet ->
-        AgentProjectionSet
+            AgentProjectionSet
 
     val tryUpdateBlog:
         sessionId: SessionId ->
         apply: (BlogProjectionState -> Result<BlogProjectionState, 'rejection>) ->
         projection: AgentProjectionSet ->
-        Result<AgentProjectionSet, 'rejection>
+            Result<AgentProjectionSet, 'rejection>
 
     val tryUpdatePrefix:
         sessionId: SessionId ->
         apply: (ActivePrefixEpoch -> Result<ActivePrefixEpoch, 'rejection>) ->
         projection: AgentProjectionSet ->
-        Result<AgentProjectionSet, 'rejection>
+            Result<AgentProjectionSet, 'rejection>
 
     val retireAuxiliaryInjectionVisibility: session: SessionAgentProjection -> SessionAgentProjection
 
@@ -45,28 +42,28 @@ module ProjectionUpdate =
         sessionId: SessionId ->
         apply: (ReviewGuardProjection -> ReviewGuardProjection) ->
         projection: AgentProjectionSet ->
-        AgentProjectionSet
+            AgentProjectionSet
 
     val bindTerminalFrontier:
         sessionId: SessionId ->
         terminalRef: BlobRef ->
         terminalDigest: BlobDigest ->
         projection: AgentProjectionSet ->
-        AgentProjectionSet
+            AgentProjectionSet
 
     val updateRequirements:
         sessionId: SessionId ->
         apply: (ReviewRequirementProjection -> ReviewRequirementProjection) ->
         projection: AgentProjectionSet ->
-        AgentProjectionSet
+            AgentProjectionSet
 
     val updateOrchestrator:
         apply: (OrchestratorProjection -> OrchestratorProjection) ->
         projection: AgentProjectionSet ->
-        AgentProjectionSet
+            AgentProjectionSet
 
     val updateAuthority:
         sessionId: SessionId ->
         apply: (PromptAuthority.PromptAuthorityProjection -> PromptAuthority.PromptAuthorityProjection) ->
         projection: AgentProjectionSet ->
-        AgentProjectionSet
+            AgentProjectionSet

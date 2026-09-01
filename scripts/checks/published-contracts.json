@@ -715,6 +715,12 @@
       "path": "src/Wanxiangshu/Execution/Delegation/Fork/Host/AgentOwner.fs",
       "owner": "delegation",
       "justification": "Signed owner-local AgentOwner Host composition support over typed child identity and dispatch contracts; callback plumbing remains hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Process/LargeGateSurface.fs",
+      "owner": "output-distillation",
+      "contract": "output-distillation.Contract",
+      "justification": "LargeGate surface is the output-distillation projection of the process-execution large gate capability; the signed surface hides the process runner internals."
     }
   ],
   "compiler_boundary_localities": [
@@ -1157,6 +1163,11 @@
       "owner": "obligation-ledger",
       "locality": "mission-obligation-todo-model",
       "justification": "Obligation model/facts/codec/projection and published JS projection capability depend only on graduated identity, trace and event-store model localities; codec/admission/representation helpers are explicitly signed support."
+    },
+    {
+      "owner": "output-distillation",
+      "locality": "process-largegatesurface",
+      "justification": "LargeGate surface and its Distillation runtime support form one signed output-distillation locality over graduated delegation and context contracts; owner-local implementation details remain signature-hidden."
     }
   ],
   "contracts": [
@@ -1239,7 +1250,8 @@
         "dispatch-protocol",
         "finality",
         "interaction-authority",
-        "managed-session-lifecycle"
+        "managed-session-lifecycle",
+        "durable-events"
       ],
       "symbols": [
         "RebasedCommit",
@@ -3349,7 +3361,8 @@
         "Wanxiangshu.Mission.Review.Barrier.ReviewTerminalFrontier.TerminalDigest",
         "Wanxiangshu.Mission.Review.Barrier.ReviewTerminalFrontier.TerminalRef",
         "Wanxiangshu.Mission.Review.Barrier.VerdictRejection.DuplicateAttempt",
-        "Wanxiangshu.Mission.Review.Barrier.VerdictRejection.NotDistinctAttempt"
+        "Wanxiangshu.Mission.Review.Barrier.VerdictRejection.NotDistinctAttempt",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementProjection"
       ],
       "justification": "Review.Witness publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-assurance."
     },

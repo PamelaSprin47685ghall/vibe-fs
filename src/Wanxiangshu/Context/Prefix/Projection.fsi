@@ -31,13 +31,13 @@ module XPrefixProjection =
         snapshot: PrefixSnapshot option ->
         memoryPreamble: string ->
         frozenRecordPrefixBody: string ->
-        PrefixProjectionIntent
+            PrefixProjectionIntent
 
     val forChoice:
         choice: XProjectionChoice ->
         committed: PrefixSnapshot option ->
         memoryPreamble: string ->
         frozenRecordPrefixBody: string ->
-        PrefixProjectionIntent
+            PrefixProjectionIntent
 
     val requiredBlob: choice: XProjectionChoice -> committed: PrefixSnapshot option -> BlobRef option

@@ -78,16 +78,21 @@ module XTraceProjection =
     val partKinds: state: XTraceProjectionState -> string list
     val internal latestTerminal: state: XTraceProjectionState -> XTraceTerminalRef option
     val latestTerminalEvidence: state: XTraceProjectionState -> XTraceTerminalEvidence option
+
     val internal terminalForProviderRun:
         providerRun: ProviderRunIdentity -> state: XTraceProjectionState -> XTraceTerminalRef option
+
     val terminalEvidenceForProviderRun:
         providerRun: ProviderRunIdentity -> state: XTraceProjectionState -> XTraceTerminalEvidence option
+
     val applyOpening:
         assignment: string ->
         requirements: string list ->
         state: XTraceProjectionState ->
             Result<XTraceProjectionState, XTraceFoldRejection>
+
     val provenanceGeneration: provenance: string -> int
+
     val applyPart:
         cursorSequence: int64 ->
         role: string ->
@@ -103,27 +108,33 @@ module XTraceProjection =
         textDigest: BlobDigest ->
         state: XTraceProjectionState ->
             Result<XTraceProjectionState, XTraceFoldRejection>
+
     val applyTerminal:
         textRef: BlobRef ->
         textDigest: BlobDigest ->
         providerRun: ProviderRunIdentity ->
         state: XTraceProjectionState ->
             Result<XTraceProjectionState, XTraceFoldRejection>
+
     val internal currentGenerationParts: parts: XTracePartRef list -> XTracePartRef list
     val currentGenerationSemanticParts: state: XTraceProjectionState -> XTraceSemanticPartView list
+
     val providerRunParts:
         providerRun: ProviderRunIdentity -> state: XTraceProjectionState -> XTraceSemanticPartView list
+
     val toolResultParts:
         providerRun: ProviderRunIdentity ->
         toolCallId: ToolCallId ->
         state: XTraceProjectionState ->
             XTraceSemanticPartView list
+
     val toolPartsForHostIdentity:
         providerRun: ProviderRunIdentity ->
         toolCallId: ToolCallId ->
         hostToolPartId: HostToolPartId ->
         state: XTraceProjectionState ->
             XTraceSemanticPartView list
+
     val internal tryHostMessageId: part: XTracePartRef -> string option
     val tryHostMessageIdAt: cursor: XTraceCursor -> state: XTraceProjectionState -> string option
     val partsForHostMessageIds: messageIds: Set<string> -> state: XTraceProjectionState -> XTraceSemanticPartView list

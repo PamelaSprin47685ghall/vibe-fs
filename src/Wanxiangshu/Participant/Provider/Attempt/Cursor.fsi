@@ -45,15 +45,13 @@ module AgentPairCursor =
     val sideSequence: count: int -> ModelSide list
     val atOffset: offset: FallbackOffset -> FallbackCursor
     val forNewAuthorityRoot: FallbackCursor
+
     val isValidAdvance:
-        previousOffset: FallbackOffset ->
-        nextOffset: FallbackOffset ->
-        previousCount: int ->
-        nextCount: int ->
-        bool
+        previousOffset: FallbackOffset -> nextOffset: FallbackOffset -> previousCount: int -> nextCount: int -> bool
+
     val attemptIdentity:
         sessionId: SessionId ->
         logicalRunId: LogicalRunId ->
         authorityRoot: AuthorityRootUserMessageId ->
         providerRun: ProviderRunIdentity ->
-        FallbackAttemptIdentity
+            FallbackAttemptIdentity

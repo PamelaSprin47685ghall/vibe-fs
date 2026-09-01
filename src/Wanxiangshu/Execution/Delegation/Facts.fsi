@@ -22,8 +22,7 @@ type HandleAbandonReason =
     | HostSessionGone
 
 [<RequireQualifiedAccess>]
-type FalseCompletionReason =
-    | LegacyAbortWasObservation
+type FalseCompletionReason = | LegacyAbortWasObservation
 
 type ExecutionFactCases =
     | HandleLinked of
@@ -40,7 +39,9 @@ type ExecutionFactCases =
            Kind: HandleCompletionKind
            CompletionRef: BlobRef option
            CompletionDigest: BlobDigest option |}
-    | HandleRetired of {| ParentSessionId: SessionId; Handle: HandleId |}
+    | HandleRetired of
+        {| ParentSessionId: SessionId
+           Handle: HandleId |}
     | HandleAbandoned of
         {| ParentSessionId: SessionId
            Handle: HandleId
@@ -69,8 +70,12 @@ type ExecutionFactCases =
            ObservedAt: DateTimeOffset |}
 
 type DelegationFactCases =
-    | DelegatedToolEstimateReplaced of {| SessionId: SessionId; ExpectedToolCalls: int |}
-    | DelegatedToolCallObserved of {| SessionId: SessionId; ToolCallId: ToolCallId |}
+    | DelegatedToolEstimateReplaced of
+        {| SessionId: SessionId
+           ExpectedToolCalls: int |}
+    | DelegatedToolCallObserved of
+        {| SessionId: SessionId
+           ToolCallId: ToolCallId |}
     | DelegationHandoffCompleted of
         {| ParentSessionId: SessionId
            Route: DelegationHandoffRoute

@@ -10,9 +10,7 @@ module ProviderProjection =
         | WireToolResult of callId: ToolCallId * resultCanonical: string
         | WireMedia of mediaType: string option * contentDigest: string
 
-    type WireMessage =
-        { Role: string
-          Parts: WirePart list }
+    type WireMessage = { Role: string; Parts: WirePart list }
 
     type ProviderWireProjection =
         { ProviderId: string option

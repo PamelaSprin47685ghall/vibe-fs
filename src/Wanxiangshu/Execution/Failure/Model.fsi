@@ -77,9 +77,13 @@ type ProviderRecoveryAuthorization =
     member LogicalRun: LogicalRunId
     member ProviderRun: ProviderRunIdentity
     member RequestKind: ProviderRequestKind
+
     static member internal Create:
-        decisionId: ProviderRecoveryDecisionId * logicalRun: LogicalRunId * providerRun: ProviderRunIdentity * requestKind: ProviderRequestKind ->
-        ProviderRecoveryAuthorization
+        decisionId: ProviderRecoveryDecisionId *
+        logicalRun: LogicalRunId *
+        providerRun: ProviderRunIdentity *
+        requestKind: ProviderRequestKind ->
+            ProviderRecoveryAuthorization
 
 [<RequireQualifiedAccess>]
 type RetryDecision =

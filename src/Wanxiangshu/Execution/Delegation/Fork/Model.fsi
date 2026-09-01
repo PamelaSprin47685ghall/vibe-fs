@@ -17,6 +17,7 @@ type ForkResult =
     | Nudged of agentId: string
     | DispatchUncertain of agentId: string
     | NotFound of agentId: string
+
     member AgentId: string
 
 [<RequireQualifiedAccess>]

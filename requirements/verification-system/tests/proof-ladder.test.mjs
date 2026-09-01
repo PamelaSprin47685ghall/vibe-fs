@@ -112,6 +112,7 @@ const WIRED_ALLOWLIST = new Set([
   'semantic-anchors.mjs', // catalog：被各 gate import 的 anchor 清单，不直接 spawn
   'fsharp-control-pyramid-guide.mjs', // guide lib：被 fsharp-control-pyramid.mjs import
   'js-surface-manifest.mjs', // post-build gate：由 build.mjs 在 fable precompile 后调用（依赖 dist 产物，不能 pre-build）
+  'js-module-linkage.mjs', // post-build linkage gate: invoked by build.mjs after Fable emit, cannot run pre-build
   'legacy-horizon-census.mjs', // census tool：由 OBL-007 历史 detector 退出验证调用
 ])
 

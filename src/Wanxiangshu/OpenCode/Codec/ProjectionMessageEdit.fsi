@@ -10,22 +10,20 @@ module ProjectionMessageEdit =
         coveredHostMessageIds: string list ->
         insertAfterHostMessageId: string option ->
         syntheticMessageId: string ->
-        memory: string -> obj list
+        memory: string ->
+            obj list
 
     val suppressHostMessagesByIds: rawMessages: obj list -> messageIds: Set<string> -> obj list
 
     val tryApplyRenderedMessages:
-        sessionId: string ->
-        sha256: (string -> string) ->
-        rendered: RenderedMessages -> Result<obj list, string>
+        sessionId: string -> sha256: (string -> string) -> rendered: RenderedMessages -> Result<obj list, string>
 
     module HostWireEncoding =
         val tryEncodeNonToolParts: parts: WirePart list -> Result<obj list, string>
+
         val completedToolPart:
-            callId: ToolCallId ->
-            name: string ->
-            argsCanonical: string ->
-            resultCanonical: string -> obj
+            callId: ToolCallId -> name: string -> argsCanonical: string -> resultCanonical: string -> obj
+
         val rawMessage:
             sessionId: string ->
             sha256: (string -> string) ->
@@ -33,10 +31,12 @@ module ProjectionMessageEdit =
             message: WireMessage ->
             hostId: string option ->
             role: string ->
-            parts: obj list -> obj
+            parts: obj list ->
+                obj
 
     val tryApplyRenderedInsertionsPreservingBase:
         sessionId: string ->
         sha256: (string -> string) ->
         rawMessages: obj list ->
-        rendered: RenderedMessages -> Result<obj list, string>
+        rendered: RenderedMessages ->
+            Result<obj list, string>

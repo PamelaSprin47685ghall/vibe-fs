@@ -2,8 +2,7 @@ namespace Wanxiangshu.Context.Companion
 
 open Wanxiangshu.Foundation.Identity
 
-type CompanionProjection =
-    { BloggerSessionId: SessionId option }
+type CompanionProjection = { BloggerSessionId: SessionId option }
 
 module CompanionProjection =
     val empty: CompanionProjection

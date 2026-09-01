@@ -5,7 +5,11 @@ open Wanxiangshu.Foundation.Identity
 [<RequireQualifiedAccess>]
 type FissionGroupTerminal =
     | Open
-    | Converged of terminalLane: SessionId * providerRun: ProviderRunIdentity * aggregateRef: BlobRef * aggregateDigest: BlobDigest
+    | Converged of
+        terminalLane: SessionId *
+        providerRun: ProviderRunIdentity *
+        aggregateRef: BlobRef *
+        aggregateDigest: BlobDigest
     | Failed of reason: string
 
 [<CLIMutable>]
@@ -63,9 +67,9 @@ module FissionProjection =
     val tryActiveForOwner: owner: SessionId -> state: FissionProjectionState -> FissionGroupProjection option
     val tryLatestForOwner: owner: SessionId -> state: FissionProjectionState -> FissionGroupProjection option
     val tryOwnerOfLane: lane: SessionId -> state: FissionProjectionState -> SessionId option
-    val tryMembershipOfLane:
-        lane: SessionId -> state: FissionProjectionState -> (FissionGroupProjection * int) option
+    val tryMembershipOfLane: lane: SessionId -> state: FissionProjectionState -> (FissionGroupProjection * int) option
+
     val fold:
         state: FissionProjectionState ->
         fact: FissionFactCases ->
-        Result<FissionProjectionState, FissionProjectionRejection>
+            Result<FissionProjectionState, FissionProjectionRejection>
