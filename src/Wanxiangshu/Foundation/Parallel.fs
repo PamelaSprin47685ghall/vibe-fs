@@ -9,7 +9,9 @@ module Defer =
     open Fable.Core
 
     [<Emit("Promise.resolve().then($0)")>]
-    let defer<'T> (work: unit -> Task<'T>) : Task<'T> = jsNative
+    let private deferPhysical<'T> (work: unit -> Task<'T>) : Task<'T> = jsNative
+
+    let defer<'T> (work: unit -> Task<'T>) : Task<'T> = deferPhysical work
 
 type private JsTcs<'T>() =
     // DSL-MUTABLE: resource — one-shot promise completion flag

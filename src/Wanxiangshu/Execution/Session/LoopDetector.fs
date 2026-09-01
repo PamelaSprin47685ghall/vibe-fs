@@ -9,7 +9,7 @@ open Fable.Core.JsInterop
 module LoopDetector =
 
     module private TokenEncoding =
-        [<Import("encode", "./GptTokens.js")>]
+        [<Import("encode", "gpt-tokenizer/encoding/o200k_base")>]
         let encode (_text: string) : int[] = jsNative
 
     module private RepositoryEnvelope =

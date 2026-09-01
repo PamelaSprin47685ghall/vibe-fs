@@ -197,4 +197,6 @@ module ExplicitResumeSuppression =
       const parts = Array.isArray(last?.parts) ? last.parts : [];
       return parts.some((part) => part?.metadata?.wanxiangshu_explicit_resume === true);
     })()""")>]
-    let isCurrentMaterial (_output: obj) : bool = jsNative
+    let private isCurrentMaterialPhysical (_output: obj) : bool = jsNative
+
+    let isCurrentMaterial output = isCurrentMaterialPhysical output

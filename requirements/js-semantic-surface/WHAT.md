@@ -27,3 +27,5 @@
 ## JS-SEMANTIC-SURFACE-006: Fable runtime representation 不属于 semantic contract
 
 编译器的代码生成约定（包括模块名称前缀、DU 标签序数、内部反射元数据及修饰后的实例方法名）不属于产品语义契约的组成部分。语义测试中严禁出现针对底层运行时表示属性（如 `.tag`、`.fields`、`.cases()`）的硬编码感知与断言。只有专属的编译器产物校验测试（compiler verification quarantine）才具备直接消费底层编译产物的特殊资格。
+
+Fable 发射成功不构成 JavaScript 模块链接成功。每次 production build 必须对完整 `dist/**/*.js` ESM 图执行 fail-closed linkage proof：所有相对 import 必须解析到 `dist/` 内真实模块；所有 named import 必须由目标模块真实 named-export；禁止生成依赖仓库源码树、未打包 sibling 或其它 `dist/` 外相对文件的运行时边。该 proof 属于 compiler/build quarantine，不把生成符号提升为产品 semantic contract。

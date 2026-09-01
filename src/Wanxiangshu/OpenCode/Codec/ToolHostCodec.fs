@@ -221,7 +221,9 @@ module ToolHostCodec =
     let private defineHidden (target: obj) (name: string) (value: obj) : unit = jsNative
 
     [<Emit("Math.random().toString(36).slice(2, 8)")>]
-    let newHandleId () : string = jsNative
+    let private newHandleIdPhysical () : string = jsNative
+
+    let newHandleId () : string = newHandleIdPhysical ()
 
     let private tryUnboxString (raw: obj) (name: string) =
         try

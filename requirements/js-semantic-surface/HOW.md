@@ -36,6 +36,10 @@
 
 仅限 `requirements/verification-system/tests/` 下专门验证编译器生成正确性的测试，才允许直接接触 `dist` 产物。任何产品包的 `tests/support` 或夹具均不得作为二级隔离区绕过边界规则。
 
+### 6. ESM 模块链接门禁（`js-module-linkage`）
+
+`scripts/checks/js-module-linkage.mjs` 在 Fable 发射后解析完整 `dist/**/*.js`：相对 import 必须留在 `dist/` package closure 内并命中真实模块；named import 必须命中目标模块真实 named-export。`scripts/build.mjs` 在 `js-surface-manifest` 后执行该 gate，使 `.fsi` cutover 后出现的 Fable Emit/Import export 消失、错误相对路径与源码树依赖在 build 阶段直接 RED，而不是等 plugin integration 或 npm 安装后才由 Node ESM loader 报错。
+
 ---
 
 ## 验证与测试落点
@@ -47,4 +51,4 @@
 | JS-SEMANTIC-SURFACE-003 | `requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_law_owner_surface_registry`；`requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_every_registered_surface_has_a_contract_test`；`requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or_unauthorized_evidence`；`requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003c_usesSurface_rejects_dead_string_and_recognizes_active_imports`；`requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003f_shadow_and_nonterminal_alias_cannot_forge_surface_use`；`requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003f_only_the_primary_owner_law_callback_can_bind_surface_evidence`；`requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003d_manifest_rejects_unauthorized_active_consumer`；`requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003e_manifest_rejects_stale_consumer_metadata` |
 | JS-SEMANTIC-SURFACE-004 | `requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004_helper_not_directly_tested`；`requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004b_support_to_support_transitive_edge_is_scanned` |
 | JS-SEMANTIC-SURFACE-005 | `requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-005] JS_SURFACE_005_js_native_representation_rules` |
-| JS-SEMANTIC-SURFACE-006 | `requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-006] JS_SURFACE_006_fable_representation_not_contract` |
+| JS-SEMANTIC-SURFACE-006 | `requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-006] JS_SURFACE_006_fable_representation_not_contract`；`requirements/js-semantic-surface/tests/surface-charter.test.mjs::WHAT[JS-SEMANTIC-SURFACE-006] JS_SURFACE_006_emitted_relative_imports_are_package_closed_and_named_exports_link` |

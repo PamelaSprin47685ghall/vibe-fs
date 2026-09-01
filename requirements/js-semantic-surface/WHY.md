@@ -32,3 +32,4 @@
 3. 语义测试依赖混淆的导出符号名称进行动态查找或调用。
 4. 为了满足测试的访问便利，而在生产代码中随意将内部实现导出为 public。
 5. 新增 Surface 但未在 Manifest 中完成注册，或缺少对应的契约测试对其公开接口进行完整锁定。
+6. Fable 类型检查与发射成功，但生成的 ESM consumer named-import 一个 provider 实际未导出的符号，或生成相对 import 逃出 npm package 的 `dist/` 闭包；这种产物直到真实 Node 加载才爆炸，说明“编译成功”不能替代模块链接证明。

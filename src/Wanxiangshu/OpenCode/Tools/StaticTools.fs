@@ -10,25 +10,39 @@ open Wanxiangshu.Mission.Review
 
 module NodeFs =
     [<Import("readFileSync", "fs")>]
-    let readFileSync (path: string, encoding: string) : string = jsNative
+    let private readFileSyncPhysical (path: string, encoding: string) : string = jsNative
 
     [<Import("writeFileSync", "fs")>]
-    let writeFileSync (path: string, data: string, encoding: string) : unit = jsNative
+    let private writeFileSyncPhysical (path: string, data: string, encoding: string) : unit = jsNative
 
     [<Import("existsSync", "fs")>]
-    let existsSync (path: string) : bool = jsNative
+    let private existsSyncPhysical (path: string) : bool = jsNative
 
     [<Import("statSync", "fs")>]
-    let statSync (path: string) : obj = jsNative
+    let private statSyncPhysical (path: string) : obj = jsNative
 
     [<Import("readdirSync", "fs")>]
-    let readdirSync (path: string) : obj = jsNative
+    let private readdirSyncPhysical (path: string) : obj = jsNative
 
     [<Import("renameSync", "fs")>]
-    let renameSync (source: string, destination: string) : unit = jsNative
+    let private renameSyncPhysical (source: string, destination: string) : unit = jsNative
 
     [<Import("rmSync", "fs")>]
-    let rmSync (path: string, options: obj) : unit = jsNative
+    let private rmSyncPhysical (path: string, options: obj) : unit = jsNative
+
+    let readFileSync (path: string, encoding: string) = readFileSyncPhysical (path, encoding)
+
+    let writeFileSync (path: string, data: string, encoding: string) =
+        writeFileSyncPhysical (path, data, encoding)
+
+    let existsSync (path: string) = existsSyncPhysical path
+    let statSync (path: string) = statSyncPhysical path
+    let readdirSync (path: string) = readdirSyncPhysical path
+
+    let renameSync (source: string, destination: string) =
+        renameSyncPhysical (source, destination)
+
+    let rmSync (path: string, options: obj) = rmSyncPhysical (path, options)
 
 module StaticTools =
 

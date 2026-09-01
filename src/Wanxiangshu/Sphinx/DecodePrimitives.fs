@@ -6,13 +6,17 @@ open FsToolkit.ErrorHandling
 module DecodePrimitives =
 
     [<Emit("$0 == null")>]
-    let isNullish (value: obj) : bool = jsNative
+    let private isNullishPhysical (value: obj) : bool = jsNative
 
     [<Emit("typeof $0")>]
-    let jsType (value: obj) : string = jsNative
+    let private jsTypePhysical (value: obj) : string = jsNative
 
     [<Emit("Array.isArray($0)")>]
-    let isArray (value: obj) : bool = jsNative
+    let private isArrayPhysical (value: obj) : bool = jsNative
+
+    let isNullish value = isNullishPhysical value
+    let jsType value = jsTypePhysical value
+    let isArray value = isArrayPhysical value
 
     [<Emit("Object.keys($0)")>]
     let private keys (value: obj) : string array = jsNative

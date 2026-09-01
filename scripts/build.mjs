@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 
 import { run as runSurfaceManifest } from './checks/js-surface-manifest.mjs'
+import { run as runModuleLinkage } from './checks/js-module-linkage.mjs'
 import {
   writeLoopDetectorEnvelopeArtifact,
 } from './lib/derive-loop-detector-envelope.mjs'
@@ -208,6 +209,9 @@ async function verifyArtifacts() {
   // JS-SEMANTIC-SURFACE-003/005: dist surface manifest validation (post-compile).
   if (runSurfaceManifest({ root }) !== 0) {
     fail('js-surface-manifest: dist surface manifest validation failed')
+  }
+  if (runModuleLinkage({ root }) !== 0) {
+    fail('js-module-linkage: emitted ESM graph is not package-closed')
   }
 }
 
