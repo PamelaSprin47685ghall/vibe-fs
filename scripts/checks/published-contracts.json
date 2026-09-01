@@ -2,6 +2,16 @@
   "schema_version": 1,
   "compile_contract_support": [
     {
+      "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native facade over canonical JSON representation; normalization internals remain private and it grants no additional semantic authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native facade over the typed ToolHost codec; opaque argument/context handles and dynamic schema/TOML conversion helpers remain private."
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Failure/Surface.fs",
       "owner": "execution-failure-policy",
       "justification": "Signed JS-native projection over the execution-failure decision contract; parsing and rendering helpers remain private and it grants no additional semantic authority."
@@ -148,6 +158,11 @@
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "host-boundary",
+      "locality": "host-digest",
+      "justification": "Host digest, MCP launch, fatal-process fuse, OpenCode message/event/tool codecs and host signal vocabulary form a signed Host contract locality whose compile dependencies are graduated identity, failure, managed-chat, tool-result and provider-projection boundaries."
+    },
     {
       "owner": "execution-failure-policy",
       "locality": "execution-failure-model",

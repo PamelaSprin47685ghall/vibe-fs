@@ -16,6 +16,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fsi"/>
     <Compile Include="AssemblyInfo.fs"/>
+    <Compile Include="Host/Digest.fsi"/>
     <Compile Include="Host/Digest.fs"/>
     <Compile Include="Foundation/Identity.fsi"/>
     <Compile Include="Foundation/Identity.fs"/>
@@ -38,6 +39,7 @@
     <Compile Include="Participant/Provider/Attempt/RequestKind.fs"/>
     <Compile Include="Foundation/RolesSurface.fsi"/>
     <Compile Include="Foundation/RolesSurface.fs"/>
+    <Compile Include="Foundation/McpLaunch.fsi"/>
     <Compile Include="Foundation/McpLaunch.fs"/>
     <Compile Include="Foundation/TaskResult.fsi"/>
     <Compile Include="Foundation/TaskResult.fs"/>
@@ -75,6 +77,7 @@
     <Compile Include="Foundation/ParallelSurface.fs"/>
     <Compile Include="Foundation/AsyncSupport.fsi"/>
     <Compile Include="Foundation/AsyncSupport.fs"/>
+    <Compile Include="Foundation/FatalProcess.fsi"/>
     <Compile Include="Foundation/FatalProcess.fs"/>
     <Compile Include="Execution/Session/Wait/CausalWait.fsi"/>
     <Compile Include="Execution/Session/Wait/CausalWait.fs"/>
@@ -467,6 +470,7 @@
     <Compile Include="OpenCode/Tools/ToolContext.fs"/>
     <Compile Include="OpenCode/Tools/StaticTools.fs"/>
     <Compile Include="OpenCode/Tools/FileTools.fs"/>
+    <Compile Include="OpenCode/Codec/OpencodeTypes.fsi"/>
     <Compile Include="OpenCode/Codec/OpencodeTypes.fs"/>
     <Compile Include="OpenCode/Host/ModelCapacity/Model.fs"/>
     <Compile Include="OpenCode/Host/ModelCapacity/Ledger.fs"/>
@@ -480,7 +484,9 @@
     <Compile Include="OpenCode/Host/StealthBrowserMcpConfigSurface.fs"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfig.fs"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfigSurface.fs"/>
+    <Compile Include="OpenCode/Codec/CanonicalJson.fsi"/>
     <Compile Include="OpenCode/Codec/CanonicalJson.fs"/>
+    <Compile Include="OpenCode/Codec/CanonicalJsonSurface.fsi"/>
     <Compile Include="OpenCode/Codec/CanonicalJsonSurface.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/MetadataCodec.fsi"/>
     <Compile Include="Interaction/Dispatch/OpenCode/MetadataCodec.fs"/>
@@ -500,10 +506,14 @@
     <Compile Include="OpenCode/Host/Events.fs"/>
     <Compile Include="OpenCode/Host/SharedTerminalBus.fs"/>
     <Compile Include="OpenCode/Host/EventsSurface.fs"/>
+    <Compile Include="OpenCode/Signals/HostSignal.fsi"/>
     <Compile Include="OpenCode/Signals/HostSignal.fs"/>
+    <Compile Include="OpenCode/Codec/HostEventCodec.fsi"/>
     <Compile Include="OpenCode/Codec/HostEventCodec.fs"/>
+    <Compile Include="OpenCode/Codec/LoopEventCodec.fsi"/>
     <Compile Include="OpenCode/Codec/LoopEventCodec.fs"/>
     <Compile Include="Execution/Session/LoopDetectorSurface.fs"/>
+    <Compile Include="OpenCode/Codec/HostMessageCodec.fsi"/>
     <Compile Include="OpenCode/Codec/HostMessageCodec.fs"/>
     <Compile Include="Mission/Obligation/Todo/OpenCode/HostCodec.fs"/>
     <Compile Include="Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs"/>
@@ -687,7 +697,9 @@
     <Compile Include="Change/Recovery.fs"/>
     <Compile Include="Change/Host/ReviewRunner.fs"/>
     <Compile Include="Change/Host/Host.fs"/>
+    <Compile Include="OpenCode/Codec/ToolHostCodec.fsi"/>
     <Compile Include="OpenCode/Codec/ToolHostCodec.fs"/>
+    <Compile Include="OpenCode/Codec/ToolHostSurface.fsi"/>
     <Compile Include="OpenCode/Codec/ToolHostSurface.fs"/>
     <Compile Include="Execution/Delegation/OpenCode/DelegatedToolEstimate.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs"/>

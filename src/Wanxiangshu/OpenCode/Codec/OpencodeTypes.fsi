@@ -1,8 +1,5 @@
 namespace Wanxiangshu.OpenCode
 
-open System
-open Fable.Core
-
 type OpencodeModel =
     { providerID: string
       modelID: string
@@ -58,4 +55,5 @@ type OpencodeToolExecuteInput =
       sessionID: string
       callID: string }
 
-type OpencodeToolExecuteOutput = { mutable args: obj }
+type OpencodeToolExecuteOutput =
+    { mutable args: obj }

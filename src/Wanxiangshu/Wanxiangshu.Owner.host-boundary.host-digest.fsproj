@@ -10,17 +10,29 @@
     <ProjectReference Include="Wanxiangshu.Owner.output-distillation.host-contract-toolresultbound.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
+    <Compile Include="Host/Digest.fsi"/>
     <Compile Include="Host/Digest.fs"/>
+    <Compile Include="Foundation/McpLaunch.fsi"/>
     <Compile Include="Foundation/McpLaunch.fs"/>
+    <Compile Include="Foundation/FatalProcess.fsi"/>
     <Compile Include="Foundation/FatalProcess.fs"/>
+    <Compile Include="OpenCode/Codec/OpencodeTypes.fsi"/>
     <Compile Include="OpenCode/Codec/OpencodeTypes.fs"/>
+    <Compile Include="OpenCode/Codec/CanonicalJson.fsi"/>
     <Compile Include="OpenCode/Codec/CanonicalJson.fs"/>
+    <Compile Include="OpenCode/Codec/CanonicalJsonSurface.fsi"/>
     <Compile Include="OpenCode/Codec/CanonicalJsonSurface.fs"/>
+    <Compile Include="OpenCode/Signals/HostSignal.fsi"/>
     <Compile Include="OpenCode/Signals/HostSignal.fs"/>
+    <Compile Include="OpenCode/Codec/HostEventCodec.fsi"/>
     <Compile Include="OpenCode/Codec/HostEventCodec.fs"/>
+    <Compile Include="OpenCode/Codec/LoopEventCodec.fsi"/>
     <Compile Include="OpenCode/Codec/LoopEventCodec.fs"/>
+    <Compile Include="OpenCode/Codec/HostMessageCodec.fsi"/>
     <Compile Include="OpenCode/Codec/HostMessageCodec.fs"/>
+    <Compile Include="OpenCode/Codec/ToolHostCodec.fsi"/>
     <Compile Include="OpenCode/Codec/ToolHostCodec.fs"/>
+    <Compile Include="OpenCode/Codec/ToolHostSurface.fsi"/>
     <Compile Include="OpenCode/Codec/ToolHostSurface.fs"/>
   </ItemGroup>
 </Project>

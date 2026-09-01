@@ -45,7 +45,7 @@ module ToolHostSurface =
     [<Emit("(($0.value ?? $0.fields[0]).value ?? ($0.value ?? $0.fields[0]))")>]
     let private schemaValue (schema: obj) : obj = jsNative
 
-    let private factory toolModule = ToolHostCodec.factory toolModule
+    let private factory (toolModule: obj) = ToolHostCodec.factory toolModule
 
     let schemaString toolModule =
         ToolHostCodec.stringSchema (factory toolModule) |> schemaValue
