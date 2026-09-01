@@ -3,7 +3,6 @@ namespace Wanxiangshu.Execution.Agent
 open System
 open System.Threading
 open System.Threading.Tasks
-open Wanxiangshu.Foundation
 
 /// Production Agent program — now expressed as functions, not a Flow AST.
 ///

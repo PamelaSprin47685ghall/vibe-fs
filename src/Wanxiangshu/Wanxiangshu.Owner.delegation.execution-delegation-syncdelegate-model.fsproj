@@ -8,12 +8,13 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-ownership.fsproj"/>
+    <Compile Include="Execution/Delegation/SyncDelegate/Model.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Model.fs"/>
+    <Compile Include="Execution/Delegation/HandoffIdentity.fsi"/>
     <Compile Include="Execution/Delegation/HandoffIdentity.fs"/>
+    <Compile Include="Execution/Delegation/Facts.fsi"/>
     <Compile Include="Execution/Delegation/Facts.fs"/>
-    <Compile Include="Execution/Delegation/SyncDelegate/Prompt.fs"/>
-    <Compile Include="Execution/Agent/Errors.fs"/>
-    <Compile Include="Execution/Agent/Program.fs"/>
+    <Compile Include="Execution/Session/AgentCompletion.fsi"/>
     <Compile Include="Execution/Session/AgentCompletion.fs"/>
   </ItemGroup>
 </Project>

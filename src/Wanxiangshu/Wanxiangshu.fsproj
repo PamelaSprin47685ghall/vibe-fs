@@ -79,7 +79,9 @@
     <Compile Include="Execution/Session/Wait/CausalWait.fs"/>
     <Compile Include="Execution/Session/Ownership.fsi"/>
     <Compile Include="Execution/Session/Ownership.fs"/>
+    <Compile Include="Execution/Delegation/SyncDelegate/Model.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Model.fs"/>
+    <Compile Include="Execution/Delegation/HandoffIdentity.fsi"/>
     <Compile Include="Execution/Delegation/HandoffIdentity.fs"/>
     <Compile Include="Foundation/Outcome.fsi"/>
     <Compile Include="Foundation/Outcome.fs"/>
@@ -96,6 +98,7 @@
     <Compile Include="Participant/Provider/Attempt/Fallback/Facts.fs"/>
     <Compile Include="Mission/Review/Facts.fsi"/>
     <Compile Include="Mission/Review/Facts.fs"/>
+    <Compile Include="Execution/Delegation/Facts.fsi"/>
     <Compile Include="Execution/Delegation/Facts.fs"/>
     <Compile Include="Context/Companion/Facts.fsi"/>
     <Compile Include="Context/Companion/Facts.fs"/>
@@ -343,6 +346,7 @@
     <Compile Include="Participant/Provider/SessionLanguage.fsi"/>
     <Compile Include="Participant/Provider/SessionLanguage.fs"/>
     <Compile Include="Execution/Delegation/Fork/Model.fs"/>
+    <Compile Include="Execution/Session/AgentCompletion.fsi"/>
     <Compile Include="Execution/Session/AgentCompletion.fs"/>
     <Compile Include="Execution/Delegation/Handle/Controller.fs"/>
     <Compile Include="Execution/Delegation/Fork/ChildRun.fs"/>
@@ -403,6 +407,7 @@
     <Compile Include="Mission/Obligation/Todo/MagicTodoSemanticSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/Surface.fs"/>
     <Compile Include="Execution/Delegation/HandoffSurface.fs"/>
+    <Compile Include="Resources/PromptResources.fsi"/>
     <Compile Include="Resources/PromptResources.fs"/>
     <Compile Include="Resources/EnforcerCatalogResource.fs"/>
     <Compile Include="Enforcer/Surface.fs"/>

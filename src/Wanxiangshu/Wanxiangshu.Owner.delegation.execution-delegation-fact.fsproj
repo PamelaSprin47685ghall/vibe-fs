@@ -21,6 +21,8 @@
     <Compile Include="Execution/Delegation/LinkageProjection.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fs"/>
     <Compile Include="Execution/Delegation/Fork/Model.fs"/>
+    <Compile Include="Execution/Agent/Errors.fs"/>
+    <Compile Include="Execution/Agent/Program.fs"/>
     <Compile Include="Execution/Delegation/Fork/ChildRun.fs"/>
     <Compile Include="Execution/Delegation/Fork/ChildRunProjection.fs"/>
     <Compile Include="Execution/Delegation/Fork/Recovery.fs"/>

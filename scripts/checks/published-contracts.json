@@ -70,9 +70,19 @@
       "path": "src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs",
       "owner": "provider-projection",
       "justification": "Signed JS-native projection of the canonical SyntheticToml renderer; it adds no semantic authority or foreign contract beyond representation."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/HandoffIdentity.fs",
+      "owner": "delegation",
+      "justification": "Signed opaque handoff-route value required by delegation durable facts; constructor mechanics remain private and the type grants no standalone foreign behavior contract."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "cognitive-environment",
+      "locality": "resources-promptresources",
+      "justification": "Canonical provider prompt composition is a one-file signed contract whose only compile dependencies are graduated role vocabulary, provider language/resources and LLM-facing representation."
+    },
     {
       "owner": "provider-language",
       "locality": "participant-provider-language",
@@ -187,6 +197,11 @@
       "owner": "finality",
       "locality": "mission-manager-life-facts",
       "justification": "Manager lifecycle durable facts and narrative contract plus owner-local prompt-path support depend only on graduated foundation identity and LLM-facing representation; all implementation details are signature-bounded."
+    },
+    {
+      "owner": "delegation",
+      "locality": "execution-delegation-syncdelegate-model",
+      "justification": "SyncDelegate model, durable delegation facts and terminal completion vocabulary depend only on graduated identity/projection/session contracts; task control-flow helpers and prompt runtime were moved out before signature cutover."
     }
   ],
   "contracts": [

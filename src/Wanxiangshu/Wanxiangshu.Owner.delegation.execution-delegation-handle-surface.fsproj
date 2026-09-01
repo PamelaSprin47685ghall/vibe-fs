@@ -43,6 +43,7 @@
     <Compile Include="Execution/Delegation/Handle/JoinInterruptRegistry.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Wait.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Store.fs"/>
+    <Compile Include="Execution/Delegation/SyncDelegate/Prompt.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Workflow.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Runtime.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/PendingRun.fs"/>

@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 
 open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 
 open Wanxiangshu.Foundation.Identity
