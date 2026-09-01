@@ -95,9 +95,12 @@ module PromptAuthority =
         (canonicalChildName: string)
         (owner: AuthorityExecutionProfile)
         : Result<IdentitySeed, ParticipantIdentityError> =
-        ParticipantIdentity.inheritFromOwner canonicalChildName owner.ParticipantIdentity
-        |> Result.map (fun identity ->
-            PromptIdentitySeed.inherited owner.SessionId owner.LogicalRunId owner.AuthorityRootUserMessageId identity)
+        PromptIdentitySeed.inheritFromOwner
+            canonicalChildName
+            owner.SessionId
+            owner.LogicalRunId
+            owner.AuthorityRootUserMessageId
+            owner.ParticipantIdentity
 
     let validateInheritedIdentitySeedAgainstActiveOwner
         (ownerOption: AuthorityExecutionProfile option)
@@ -128,10 +131,6 @@ module PromptAuthority =
 
     let validateInheritedIdentitySeed owner seed =
         validateInheritedIdentitySeedAgainstActiveOwner (Some owner) seed
-
-    let internal identitySeedInput = PromptIdentitySeed.toInput
-
-    let internal rehydrateIdentitySeed = PromptIdentitySeed.rehydrate
 
     let createAuthorityExecutionProfileFromSeed
         (sessionId: SessionId)

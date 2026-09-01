@@ -134,7 +134,7 @@ module CursorSurface =
                       ParticipantIdentity = identityInput }
             | kind -> invalidArg "identitySeed" $"unknown identity seed kind '{kind}'"
 
-        PromptAuthority.rehydrateIdentitySeed seedInput
+        PromptIdentitySeed.rehydrate seedInput
         |> Result.defaultWith (fun error -> invalidArg "identitySeed" $"invalid identity seed: {error}")
 
     let private participantIdentityView (identity: ParticipantIdentityEvidence) : obj =

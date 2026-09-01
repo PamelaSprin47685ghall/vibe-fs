@@ -87,7 +87,7 @@ module FactCodecSurface =
                   OwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (value?ownerAuthorityRoot))
                   ParticipantIdentity = identityInput }
         | other -> failwith $"FactCodecSurface: unknown identity seed '{other}'"
-        |> PromptAuthority.rehydrateIdentitySeed
+        |> PromptIdentitySeed.rehydrate
         |> Result.defaultWith (fun error -> failwith $"FactCodecSurface: invalid identity seed: {error}")
 
     let private identityToJs evidence =

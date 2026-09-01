@@ -162,7 +162,7 @@ module DispatchSurface =
                       OwnerAuthorityRootUserMessageId =
                         AuthorityRootUserMessageId.create (text value?ownerAuthorityRoot)
                       ParticipantIdentity = ParticipantIdentity.toInput identity }
-                |> PromptAuthority.rehydrateIdentitySeed
+                |> PromptIdentitySeed.rehydrate
                 |> Result.mapError (fun error -> sprintf "Invalid identity seed: %A" error))
         | unknown -> Error(sprintf "Unknown identity seed kind: %s" unknown)
 

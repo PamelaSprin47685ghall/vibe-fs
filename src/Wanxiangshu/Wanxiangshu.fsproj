@@ -87,8 +87,11 @@
     <Compile Include="Foundation/Outcome.fsi"/>
     <Compile Include="Foundation/Outcome.fs"/>
     <Compile Include="Requirement/Grounding/Model.fs"/>
+    <Compile Include="Interaction/Authority/IdentitySeed.fsi"/>
     <Compile Include="Interaction/Authority/IdentitySeed.fs"/>
+    <Compile Include="Interaction/Authority/Origin.fsi"/>
     <Compile Include="Interaction/Authority/Origin.fs"/>
+    <Compile Include="Interaction/Authority/Facts.fsi"/>
     <Compile Include="Interaction/Authority/Facts.fs"/>
     <Compile Include="Interaction/Attention/Facts.fsi"/>
     <Compile Include="Interaction/Attention/Facts.fs"/>

@@ -134,6 +134,11 @@
   ],
   "compiler_boundary_localities": [
     {
+      "owner": "interaction-authority",
+      "locality": "interaction-authority-identityseed",
+      "justification": "Prompt identity seed, origin and durable authority-fact vocabulary are fully signed and depend only on graduated foundation identity plus participant identity; serialization and rehydration now publish directly from the IdentitySeed owner instead of leaking through Model internal aliases."
+    },
+    {
       "owner": "repository-programming",
       "locality": "repository-programming-js-capability",
       "justification": "JS repository-programming capability, failure, anchor, transaction and filesystem adapter contracts are fully signed; their only external compile dependencies are graduated identity and office-capability localities."
@@ -8792,7 +8797,8 @@
         "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput",
         "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.InheritedFromOwnerInput",
         "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput",
-        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedModule.participantIdentity"
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedModule.participantIdentity",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedModule.rehydrate"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'managed-chat-execution'; every unlisted sibling remains private to interaction-authority."
     },
@@ -8811,7 +8817,8 @@
         "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerSessionId",
         "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.ParticipantIdentity",
         "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.RootSelection",
-        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.InheritedFromOwnerInput"
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.InheritedFromOwnerInput",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedModule.rehydrate"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'dispatch-protocol'; every unlisted sibling remains private to interaction-authority."
     },
@@ -8830,7 +8837,8 @@
         "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerSessionId",
         "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.ParticipantIdentity",
         "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.InheritedFromOwnerInput",
-        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput"
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedModule.rehydrate"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'finality'; every unlisted sibling remains private to interaction-authority."
     },
@@ -8865,7 +8873,8 @@
         "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.InheritedFromOwner",
         "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.RootSelection",
         "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.InheritedFromOwnerInput",
-        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput"
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedModule.rehydrate"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'provider-attempt-recovery'; every unlisted sibling remains private to interaction-authority."
     },
@@ -8888,7 +8897,9 @@
         "Wanxiangshu.Interaction.Authority.PromptIdentitySeed.RootSelection",
         "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput",
         "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.InheritedFromOwnerInput",
-        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput"
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedModule.rehydrate",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedModule.toInput"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to interaction-authority."
     },
@@ -8921,7 +8932,8 @@
         "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.OwnerSessionId",
         "Wanxiangshu.Interaction.Authority.OwnerIdentityWitnessInput.ParticipantIdentity",
         "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.InheritedFromOwnerInput",
-        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput"
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedInput.RootSelectionInput",
+        "Wanxiangshu.Interaction.Authority.PromptIdentitySeedModule.rehydrate"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'verification-system'; every unlisted sibling remains private to interaction-authority."
     },
@@ -9135,10 +9147,8 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SessionId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.ActiveLogicalRun",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedInput",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedOwner",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.rehydrateIdentitySeed"
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to interaction-authority."
     },
@@ -9204,7 +9214,6 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.idlePayloadDigest",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.nextClaimSequence",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.originLabel",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.rehydrateIdentitySeed",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.repairAlreadyClaimed",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.repairPayloadDigest",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.tryParseContinuationKind",
@@ -9235,8 +9244,7 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.createAuthorityExecutionProfileFromSeed",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.effectiveAgentFor",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedOwner",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.rehydrateIdentitySeed"
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'provider-attempt-recovery'; every unlisted sibling remains private to interaction-authority."
     },
@@ -9423,7 +9431,6 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedOwner",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.originLabel",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.rehydrateIdentitySeed",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.tryParseContinuationKind"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'managed-chat-execution'; every unlisted sibling remains private to interaction-authority."
@@ -9469,7 +9476,6 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.createAuthorityExecutionProfile",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.createAuthorityExecutionProfileFromSeed",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedOwner",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.rehydrateIdentitySeed",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.validateInheritedIdentitySeedAgainstActiveOwner"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'finality'; every unlisted sibling remains private to interaction-authority."
@@ -9649,8 +9655,7 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.ActiveLogicalRun",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.LastAuthorityProfile",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedOwner",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.rehydrateIdentitySeed"
+        "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'verification-system'; every unlisted sibling remains private to interaction-authority."
     },

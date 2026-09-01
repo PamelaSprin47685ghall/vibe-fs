@@ -146,7 +146,7 @@ module TemporalSurface =
                       ParticipantIdentity = identityInput }
             | kind -> failwith $"TemporalSurface: unknown identity seed kind '{kind}'"
 
-        PromptAuthority.rehydrateIdentitySeed seedInput
+        PromptIdentitySeed.rehydrate seedInput
         |> Result.defaultWith (fun error -> failwith $"TemporalSurface: invalid identity seed: {error}")
 
     let private identitySeedToJs (seed: PromptAuthority.IdentitySeed) : obj =

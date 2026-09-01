@@ -111,7 +111,7 @@ module Surface =
                       ParticipantIdentity = participantInput }
             | kind -> invalidArg "identitySeed.kind" $"unknown identity seed kind '{kind}'"
 
-        PromptAuthority.rehydrateIdentitySeed input
+        PromptIdentitySeed.rehydrate input
         |> Result.defaultWith (fun error -> invalidArg "identitySeed" $"{error}")
 
     let private projectionChoiceOf (value: obj) =

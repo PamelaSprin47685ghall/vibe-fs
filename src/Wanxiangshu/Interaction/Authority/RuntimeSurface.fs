@@ -113,7 +113,7 @@ module RuntimeSurface =
 
             seedInput
             |> Result.bind (
-                PromptAuthority.rehydrateIdentitySeed
+                PromptIdentitySeed.rehydrate
                 >> Result.mapError (sprintf "invalid identity seed: %A")
             ))
 

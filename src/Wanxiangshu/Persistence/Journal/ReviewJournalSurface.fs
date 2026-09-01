@@ -119,7 +119,7 @@ module ReviewJournalSurface =
                       ParticipantIdentity = participantIdentity }
             | other -> failwith $"ReviewJournalSurface: unknown identity seed kind '{other}'"
 
-        PromptAuthority.rehydrateIdentitySeed input
+        PromptIdentitySeed.rehydrate input
         |> Result.defaultWith (fun error -> failwith $"ReviewJournalSurface: invalid identity seed: {error}")
 
     let private identitySeedView seed =

@@ -94,7 +94,7 @@ module PromptFactCodec =
               "SelectedAgent", Encode.string input.SelectedAgent ]
 
     let private identitySeedEncoder seed =
-        match PromptAuthority.identitySeedInput seed with
+        match PromptIdentitySeed.toInput seed with
         | PromptIdentitySeedInput.RootSelectionInput _ ->
             Encode.array
                 [| Encode.string "RootSelection"
@@ -195,7 +195,7 @@ module PromptFactCodec =
                               ParticipantIdentity = get.Required.Field "ParticipantIdentity" identityInputDecoder }))
             | kind -> Decode.fail (sprintf "identity seed kind is unknown: %s" kind))
         |> Decode.andThen (fun input ->
-            match PromptAuthority.rehydrateIdentitySeed input with
+            match PromptIdentitySeed.rehydrate input with
             | Ok seed -> Decode.succeed seed
             | Error error -> Decode.fail (identityErrorMessage error))
 

@@ -45,12 +45,20 @@ type PromptIdentitySeedValidationError =
 [<RequireQualifiedAccess>]
 module PromptIdentitySeed =
 
-    let internal inherited ownerSessionId ownerLogicalRunId ownerAuthorityRootUserMessageId participantIdentity =
-        InheritedFromOwner
-            { StoredOwnerSessionId = ownerSessionId
-              StoredOwnerLogicalRunId = ownerLogicalRunId
-              StoredOwnerAuthorityRootUserMessageId = ownerAuthorityRootUserMessageId
-              StoredParticipantIdentity = participantIdentity }
+    let inheritFromOwner
+        canonicalChildName
+        ownerSessionId
+        ownerLogicalRunId
+        ownerAuthorityRootUserMessageId
+        ownerParticipantIdentity
+        =
+        ParticipantIdentity.inheritFromOwner canonicalChildName ownerParticipantIdentity
+        |> Result.map (fun participantIdentity ->
+            InheritedFromOwner
+                { StoredOwnerSessionId = ownerSessionId
+                  StoredOwnerLogicalRunId = ownerLogicalRunId
+                  StoredOwnerAuthorityRootUserMessageId = ownerAuthorityRootUserMessageId
+                  StoredParticipantIdentity = participantIdentity })
 
     let participantIdentity seed =
         match seed with
@@ -63,7 +71,7 @@ module PromptIdentitySeed =
         | InheritedFromOwner witness ->
             Some(witness.OwnerSessionId, witness.OwnerLogicalRunId, witness.OwnerAuthorityRootUserMessageId)
 
-    let internal toInput seed =
+    let toInput seed =
         match seed with
         | RootSelection identity -> RootSelectionInput(ParticipantIdentity.toInput identity)
         | InheritedFromOwner witness ->
@@ -81,16 +89,16 @@ module PromptIdentitySeed =
             )
         | PersonaOrigin.InheritedFromOwner -> Ok identity
 
-    let internal rehydrate input : Result<PromptIdentitySeed, ParticipantIdentityError> =
+    let rehydrate input : Result<PromptIdentitySeed, ParticipantIdentityError> =
         match input with
         | RootSelectionInput identityInput ->
             ParticipantIdentity.rehydrate None identityInput |> Result.map RootSelection
         | InheritedFromOwnerInput witnessInput ->
             ParticipantIdentity.fromInput witnessInput.ParticipantIdentity
             |> Result.bind validateInheritedOrigin
-            |> Result.map (
-                inherited
-                    witnessInput.OwnerSessionId
-                    witnessInput.OwnerLogicalRunId
-                    witnessInput.OwnerAuthorityRootUserMessageId
-            )
+            |> Result.map (fun participantIdentity ->
+                InheritedFromOwner
+                    { StoredOwnerSessionId = witnessInput.OwnerSessionId
+                      StoredOwnerLogicalRunId = witnessInput.OwnerLogicalRunId
+                      StoredOwnerAuthorityRootUserMessageId = witnessInput.OwnerAuthorityRootUserMessageId
+                      StoredParticipantIdentity = participantIdentity })

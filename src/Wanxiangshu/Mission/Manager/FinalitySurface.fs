@@ -94,7 +94,7 @@ module FinalitySurface =
                 match str (value?kind) with
                 | "RootSelection" ->
                     PromptAuthority.IdentitySeedInput.RootSelectionInput identity
-                    |> PromptAuthority.rehydrateIdentitySeed
+                    |> PromptIdentitySeed.rehydrate
                     |> Result.mapError (fun error -> sprintf "invalid identity seed: %A" error)
                 | "InheritedFromOwner" ->
                     PromptAuthority.IdentitySeedInput.InheritedFromOwnerInput
@@ -103,7 +103,7 @@ module FinalitySurface =
                           OwnerAuthorityRootUserMessageId =
                             AuthorityRootUserMessageId.create (str (value?ownerAuthorityRoot))
                           ParticipantIdentity = identity }
-                    |> PromptAuthority.rehydrateIdentitySeed
+                    |> PromptIdentitySeed.rehydrate
                     |> Result.mapError (fun error -> sprintf "invalid identity seed: %A" error)
                 | kind -> Error(sprintf "unknown identity seed kind: %s" kind))
 
