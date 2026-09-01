@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-import { analyzeOwnerDependencies } from '../../../scripts/checks/owner-dependencies.mjs'
+import * as ownerDependencyGate from '../../../scripts/checks/owner-dependencies.mjs'
+
+const { analyzeOwnerDependencies } = ownerDependencyGate
 
 const file = (path) => ({ path })
 
@@ -203,6 +206,59 @@ test('WHAT[STRUCTURED-WORKFLOW-011] an exact live owner-cycle justification is a
   ])
 
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] owner graph facts expose exact SCC membership and unique internal edges', () => {
+  const result = ownerCycleFixture([
+    {
+      owners: ['alpha', 'beta'],
+      justification: 'The exact two-owner SCC remains visible until one semantic direction is removed.',
+    },
+  ])
+
+  assert.deepEqual(result.ownerGraph, {
+    schemaVersion: 1,
+    owners: ['alpha', 'beta'],
+    semanticEdges: [
+      { consumer: 'alpha', provider: 'beta' },
+      { consumer: 'beta', provider: 'alpha' },
+    ],
+    stronglyConnectedComponents: [
+      {
+        owners: ['alpha', 'beta'],
+        internalUniqueEdges: [
+          { consumer: 'alpha', provider: 'beta' },
+          { consumer: 'beta', provider: 'alpha' },
+        ],
+      },
+    ],
+  })
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] owner graph comparison reports exact added and removed semantic edges', () => {
+  const baseline = {
+    schemaVersion: 1,
+    owners: ['alpha', 'beta'],
+    semanticEdges: [{ consumer: 'alpha', provider: 'beta' }],
+    stronglyConnectedComponents: [],
+  }
+  const current = {
+    schemaVersion: 1,
+    owners: ['alpha', 'beta'],
+    semanticEdges: [{ consumer: 'beta', provider: 'alpha' }],
+    stronglyConnectedComponents: [],
+  }
+
+  assert.deepEqual(ownerDependencyGate.compareOwnerGraphs(baseline, current), {
+    addedEdges: [{ consumer: 'beta', provider: 'alpha' }],
+    removedEdges: [{ consumer: 'alpha', provider: 'beta' }],
+  })
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] semantic owner manifest contains no handwritten file total', () => {
+  const manifest = JSON.parse(readFileSync(new URL('../../../scripts/checks/semantic-owners.json', import.meta.url), 'utf8'))
+
+  assert.equal(Object.hasOwn(manifest, 'total'), false)
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] strict contract cycles remain live while their owners have migration backlog', () => {
