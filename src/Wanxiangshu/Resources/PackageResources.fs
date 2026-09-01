@@ -1,15 +1,5 @@
 namespace Wanxiangshu.Resources
 
-open Wanxiangshu.Change
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Git
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Strength.Persistence
-
 open System
 open Fable.Core
 open Fable.Core.JsInterop

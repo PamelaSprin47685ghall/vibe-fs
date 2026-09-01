@@ -2,6 +2,16 @@
   "schema_version": 1,
   "compile_contract_support": [
     {
+      "path": "src/Wanxiangshu/AssemblyInfo.fs",
+      "owner": "distribution",
+      "justification": "Assembly attribute carrier has no callable runtime surface; its sibling signature keeps the distribution leaf locality structurally signed."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/PackageResources.fs",
+      "owner": "distribution",
+      "justification": "Signed package-resource adapter support shared by distribution-owned resource contracts; Node fs/path implementation details remain hidden behind the signature."
+    },
+    {
       "path": "src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs",
       "owner": "durable-convergence",
       "justification": "Pure canonical-integrator contract types and structural projection algebra; carries no runtime handle, process state, or physical effect."
@@ -63,6 +73,11 @@
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "distribution",
+      "locality": "assemblyinfo",
+      "justification": "Leaf distribution locality: package metadata and resource byte adapters have no foreign compile dependencies; every source is signed and Node resource implementation remains signature-bounded."
+    },
     {
       "owner": "participant-identity",
       "locality": "foundation-roles",
