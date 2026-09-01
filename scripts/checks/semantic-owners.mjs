@@ -54,4 +54,4 @@ if (stale.length > 0) {
   process.exit(1)
 }
 
-console.log(`semantic-owners: OK — ${productionFiles.length} files, ${manifest.owners.length} owners`)
+console.log(`semantic-owners: OK — ${productionFiles.length} files, ${new Set(manifestMap.values()).size} owners`)

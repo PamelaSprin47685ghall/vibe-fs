@@ -739,6 +739,59 @@ function stronglyConnectedComponents(nodes, edges) {
   return components.filter((component) => component.length > 1)
 }
 
+const ownerEdgeKey = ({ consumer, provider }) => `${consumer}\0${provider}`
+
+const exactOwnerEdges = (edges, label) => {
+  if (!Array.isArray(edges)) throw new Error(`${label} must be an array`)
+  const normalized = edges.map((edge) => {
+    if (
+      !edge ||
+      typeof edge.consumer !== 'string' ||
+      edge.consumer.length === 0 ||
+      typeof edge.provider !== 'string' ||
+      edge.provider.length === 0 ||
+      edge.consumer === edge.provider
+    ) throw new Error(`${label} contains an invalid owner edge`)
+    return { consumer: edge.consumer, provider: edge.provider }
+  })
+  const keys = normalized.map(ownerEdgeKey)
+  if (new Set(keys).size !== keys.length) throw new Error(`${label} contains duplicate owner edges`)
+  return normalized.sort((left, right) => ownerEdgeKey(left).localeCompare(ownerEdgeKey(right)))
+}
+
+const ownerGraphSnapshot = (owners, semanticEdges, components) => ({
+  schemaVersion: 1,
+  owners: [...owners].sort(),
+  semanticEdges: exactOwnerEdges(semanticEdges, 'semantic owner graph'),
+  stronglyConnectedComponents: components.map((component) => {
+    const members = new Set(component)
+    return {
+      owners: [...component].sort(),
+      internalUniqueEdges: exactOwnerEdges(
+        semanticEdges.filter((edge) => members.has(edge.consumer) && members.has(edge.provider)),
+        'SCC internal owner graph',
+      ),
+    }
+  }),
+})
+
+const validatedOwnerGraph = (value, label) => {
+  if (value?.schemaVersion !== 1 || !Array.isArray(value.owners) || !Array.isArray(value.stronglyConnectedComponents))
+    throw new Error(`${label} is not an owner graph snapshot with schemaVersion 1`)
+  return { ...value, semanticEdges: exactOwnerEdges(value.semanticEdges, `${label} semanticEdges`) }
+}
+
+export function compareOwnerGraphs(baseline, current) {
+  const before = validatedOwnerGraph(baseline, 'baseline owner graph')
+  const after = validatedOwnerGraph(current, 'current owner graph')
+  const beforeByKey = new Map(before.semanticEdges.map((edge) => [ownerEdgeKey(edge), edge]))
+  const afterByKey = new Map(after.semanticEdges.map((edge) => [ownerEdgeKey(edge), edge]))
+  return {
+    addedEdges: [...afterByKey].filter(([key]) => !beforeByKey.has(key)).map(([, edge]) => edge),
+    removedEdges: [...beforeByKey].filter(([key]) => !afterByKey.has(key)).map(([, edge]) => edge),
+  }
+}
+
 function authorizationOf(value, label, fail) {
   const symbols = value?.symbols ?? []
   const symbolRoots = value?.symbol_roots ?? []
@@ -1283,6 +1336,7 @@ export function analyzeOwnerDependencies({
     cycleOwnerEdges,
     requirementOwnerEdges,
     cycles,
+    ownerGraph: ownerGraphSnapshot(cycleOwners, cycleOwnerEdges, cycles),
     contracts: contractEntries.length,
   }
 }
@@ -1325,12 +1379,31 @@ function readProductionInput() {
 function runCli() {
   try {
     const result = analyzeOwnerDependencies(readProductionInput())
-    if (process.argv.includes('--json')) console.log(JSON.stringify(result, null, 2))
-    else if (result.ok)
+    const graphBaseArgument = process.argv.find((argument) => argument.startsWith('--graph-base='))
+    const graphDelta = graphBaseArgument
+      ? compareOwnerGraphs(
+          JSON.parse(readFileSync(resolve(graphBaseArgument.slice('--graph-base='.length)), 'utf8')),
+          result.ownerGraph,
+        )
+      : undefined
+    if (process.argv.includes('--graph-json')) console.log(JSON.stringify({ current: result.ownerGraph, delta: graphDelta }, null, 2))
+    else if (process.argv.includes('--json')) console.log(JSON.stringify(result, null, 2))
+    else if (result.ok) {
       console.log(
         `owner-dependencies: OK — ${result.sourceEdges.length} FCS cross-owner uses, ${result.pendingEdges.length} pending-provider uses, ${result.strictEdges.length} strict uses, ${result.sourceOwnerEdges.length} owner edges, ${result.contracts} contracts, ${result.cycles.length} justified cycles`,
       )
-    else {
+      console.log(
+        `owner graph: ${result.ownerGraph.owners.length} owners, ${result.ownerGraph.semanticEdges.length} unique semantic edges`,
+      )
+      for (const component of result.ownerGraph.stronglyConnectedComponents)
+        console.log(
+          `  SCC: ${component.owners.length} owners, ${component.internalUniqueEdges.length} unique internal edges; members=[${component.owners.join(', ')}]`,
+        )
+      if (graphDelta)
+        console.log(
+          `owner graph delta: +${graphDelta.addedEdges.length}/-${graphDelta.removedEdges.length}; added=[${graphDelta.addedEdges.map(({ consumer, provider }) => `${consumer} -> ${provider}`).join(', ')}]; removed=[${graphDelta.removedEdges.map(({ consumer, provider }) => `${consumer} -> ${provider}`).join(', ')}]`,
+        )
+    } else {
       console.error(`owner-dependencies: ${result.violations.length} violation(s)`)
       for (const violation of result.violations) console.error(`  ${violation.code}: ${violation.message}`)
     }
