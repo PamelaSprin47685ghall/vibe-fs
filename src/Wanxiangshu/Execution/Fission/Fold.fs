@@ -1,7 +1,5 @@
 namespace Wanxiangshu.Execution.Fission
 
-open Wanxiangshu.Execution.Session.Recovery
-
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Composition.Durable
 

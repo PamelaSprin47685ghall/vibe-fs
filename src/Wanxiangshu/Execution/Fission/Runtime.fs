@@ -1,22 +1,5 @@
 namespace Wanxiangshu.Execution.Fission
 
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
-
 open System
 open System.Collections.Generic
 open Wanxiangshu.Foundation.Identity
@@ -55,7 +38,7 @@ module FissionRuntime =
     let private handleKey ownerSessionId handleId =
         SessionId.value ownerSessionId + "\u001f" + handleId
 
-    let private deliveryKey groupId completionId laneIndex =
+    let private deliveryKey groupId completionId (laneIndex: int) =
         groupId + "\u001f" + completionId + "\u001f" + string laneIndex
 
     let private disposeSafely (resource: IDisposable) =
@@ -126,10 +109,10 @@ module FissionRuntime =
 
             resources.Add resource)
 
-    let tryBeginDelivery groupId completionId laneIndex =
+    let tryBeginDelivery groupId completionId (laneIndex: int) =
         lock gate (fun () -> deliveryClaims.Add(deliveryKey groupId completionId laneIndex))
 
-    let endDelivery groupId completionId laneIndex =
+    let endDelivery groupId completionId (laneIndex: int) =
         lock gate (fun () -> deliveryClaims.Remove(deliveryKey groupId completionId laneIndex) |> ignore)
 
     let tryBeginTakeover groupId =

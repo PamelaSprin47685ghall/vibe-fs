@@ -345,9 +345,19 @@
       "path": "src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs",
       "owner": "delegation",
       "justification": "Signed delegation runtime backend implementation behind the published ForkRuntime capability shell; mutable registries, mailbox and physical timing remain hidden behind the sibling signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Admission.fs",
+      "owner": "intra-participant-parallelism",
+      "justification": "Signed Fission admission boundary: lane creation/start/abort are explicit injected capabilities, while the process-local single-flight registry and startup helpers remain hidden."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "intra-participant-parallelism",
+      "locality": "execution-fission-fold",
+      "justification": "Fission admission, owner-local runtime indexes and durable fold form one fully signed locality over graduated identity, fission fact, durable projection and task contracts; process-local registries remain signature-hidden and no foreign runtime implementation enters the dependency closure."
+    },
     {
       "owner": "change-integration",
       "locality": "change-fold",

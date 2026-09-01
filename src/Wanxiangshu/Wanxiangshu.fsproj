@@ -420,6 +420,7 @@
     <Compile Include="Composition/Durable/ProjectionState.fs"/>
     <Compile Include="Composition/Durable/FoldRejection.fsi"/>
     <Compile Include="Composition/Durable/FoldRejection.fs"/>
+    <Compile Include="Execution/Fission/Fold.fsi"/>
     <Compile Include="Execution/Fission/Fold.fs"/>
     <Compile Include="Composition/Durable/ProjectionUpdate.fsi"/>
     <Compile Include="Composition/Durable/ProjectionUpdate.fs"/>
@@ -504,7 +505,9 @@
     <Compile Include="Execution/Delegation/Fork/Recovery.fs"/>
     <Compile Include="Execution/Delegation/Fork/Runtime.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Runtime.fs"/>
+    <Compile Include="Execution/Fission/Admission.fsi"/>
     <Compile Include="Execution/Fission/Admission.fs"/>
+    <Compile Include="Execution/Fission/Runtime.fsi"/>
     <Compile Include="Execution/Fission/Runtime.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Evidence.fs"/>
     <Compile Include="Mission/Review/Ports.fs"/>
