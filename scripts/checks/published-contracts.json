@@ -584,6 +584,11 @@
   ],
   "compiler_boundary_localities": [
     {
+      "owner": "dispatch-protocol",
+      "locality": "execution-session-recovery-model",
+      "justification": "Recovery family algebra, pure turn reconciliation vocabulary, physical prompt acceptance and the durable PromptDispatcher send runtime form one fully signed dispatch-protocol contract locality over graduated identity, Host, session, routing, managed-chat and journal contracts; private persistence/send helpers and obsolete monolith imports remain hidden or removed."
+    },
+    {
       "owner": "session-ontology",
       "locality": "opencode-host-sessionbindingsurface",
       "justification": "The published session Host port, injected physical session adapter and JS binding/family proof surfaces form one fully signed session-ontology locality over graduated cognitive binding, Host, routing, identity and provider contracts; parent/child registries and transport helpers remain signature-hidden."
