@@ -1,20 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation.Fork
 
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Host
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-
-open Wanxiangshu.Foundation
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// P0-RECOVERY-JOIN-001 + clean-break: Aborted is observation, not durable finality.

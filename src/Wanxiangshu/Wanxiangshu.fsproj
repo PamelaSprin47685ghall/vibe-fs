@@ -143,6 +143,7 @@
     <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fs"/>
     <Compile Include="Mission/Review/Fact.fsi"/>
     <Compile Include="Mission/Review/Fact.fs"/>
+    <Compile Include="Execution/Delegation/Fact.fsi"/>
     <Compile Include="Execution/Delegation/Fact.fs"/>
     <Compile Include="Context/Companion/Fact.fsi"/>
     <Compile Include="Context/Companion/Fact.fs"/>
@@ -170,6 +171,7 @@
     <Compile Include="Participant/Provider/Attempt/RecoverySlot.fsi"/>
     <Compile Include="Participant/Provider/Attempt/RecoverySlot.fs"/>
     <Compile Include="Execution/Session/Recovery/Model.fs"/>
+    <Compile Include="Execution/Delegation/Fork/ChildRecovery.fsi"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecovery.fs"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecoverySurface.fs"/>
     <Compile Include="Composition/Turn/Program.fs"/>
@@ -194,6 +196,7 @@
     <Compile Include="Foundation/SyntheticToml.fs"/>
     <Compile Include="Foundation/LlmFacing.fsi"/>
     <Compile Include="Foundation/LlmFacing.fs"/>
+    <Compile Include="Execution/Delegation/Handoff.fsi"/>
     <Compile Include="Execution/Delegation/Handoff.fs"/>
     <Compile Include="Foundation/SyntheticTomlSurface.fsi"/>
     <Compile Include="Foundation/SyntheticTomlSurface.fs"/>
@@ -221,6 +224,7 @@
     <Compile Include="Interaction/Dispatch/Nudge.fsi"/>
     <Compile Include="Interaction/Dispatch/Nudge.fs"/>
     <Compile Include="Execution/Session/LoopDetector.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Payload.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Payload.fs"/>
     <Compile Include="Context/Companion/Blogger/Toml.fsi"/>
     <Compile Include="Context/Companion/Blogger/Toml.fs"/>
@@ -334,6 +338,7 @@
     <Compile Include="Context/Prefix/Epoch.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fs"/>
+    <Compile Include="Execution/Delegation/LinkageProjection.fsi"/>
     <Compile Include="Execution/Delegation/LinkageProjection.fs"/>
     <Compile Include="Execution/Delegation/Handle/Surface.fs"/>
     <Compile Include="Change/Projection.fsi"/>
@@ -360,6 +365,7 @@
     <Compile Include="Enforcer/Guidance/DeliverySurface.fs"/>
     <Compile Include="Execution/Fission/Projection.fsi"/>
     <Compile Include="Execution/Fission/Projection.fs"/>
+    <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fsi"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateSurface.fs"/>
     <Compile Include="Execution/Session/SessionStartedAtProjection.fsi"/>
@@ -432,6 +438,7 @@
     <Compile Include="Execution/Agent/Program.fs"/>
     <Compile Include="Participant/Provider/SessionLanguage.fsi"/>
     <Compile Include="Participant/Provider/SessionLanguage.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Model.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Model.fs"/>
     <Compile Include="Execution/Session/AgentCompletion.fsi"/>
     <Compile Include="Execution/Session/AgentCompletion.fs"/>
@@ -447,6 +454,8 @@
     <Compile Include="Process/PtyTiming.fs"/>
     <Compile Include="Execution/Session/Wait/CompletionMailbox.fsi"/>
     <Compile Include="Execution/Session/Wait/CompletionMailbox.fs"/>
+    <Compile Include="Execution/Delegation/Fork/RuntimeContract.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/RuntimeContract.fs"/>
     <Compile Include="Execution/Delegation/Handle/JoinInterruptRegistry.fs"/>
     <Compile Include="Execution/Session/Wait/Bridge.fsi"/>
     <Compile Include="Execution/Session/Wait/Bridge.fs"/>

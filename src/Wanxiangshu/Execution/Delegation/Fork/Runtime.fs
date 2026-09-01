@@ -1,27 +1,12 @@
 namespace Wanxiangshu.Execution.Delegation.Fork
 
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
 
 open System
 open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Agent
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Process
@@ -99,7 +84,7 @@ module private ForkRuntimeControl =
 /// agent wake-only + PTY PtyJoinItem queue (GREEN-5).
 ///
 /// All public members are thread-safe (lockObj synchronizes map/mailbox access).
-type ForkRuntime
+type private ForkRuntimeBackendState
     (
         ?runner: string -> Role -> string option -> Task<AgentCompletionOutcome>,
         ?listener: RunCompletion -> unit,
@@ -338,3 +323,34 @@ type ForkRuntime
             cancelAllAgentsAndClearPtys () |> ForkRuntimeControl.cleanupAgentIds cleanupPort
 
     member this.Close() : unit = this.Cancel()
+
+    interface IForkRuntimeBackend with
+        member this.Fork(agentId, role, agent, prompt, runWork) =
+            this.Fork(agentId, role, agent, ?prompt = prompt, ?runWork = runWork)
+
+        member this.WaitForSignal interrupt = this.WaitForSignal interrupt
+        member this.WaitForWake() = this.WaitForWake()
+        member this.PulseWake() = this.PulseWake()
+        member this.PulseAgentHandle handle = this.PulseAgentHandle handle
+        member this.PublishPtyCompletion item = this.PublishPtyCompletion item
+        member this.DrainAgentWakes maxCount = this.DrainAgentWakes maxCount
+        member this.DrainPtyCompletions maxCount = this.DrainPtyCompletions maxCount
+        member this.RegisterPty pty = this.RegisterPty pty
+        member this.UnregisterPty ptyId = this.UnregisterPty ptyId
+        member this.Restore(agentId, role, agent) = this.Restore(agentId, role, agent)
+        member this.MarkInterrupted(agentId, reason) = this.MarkInterrupted(agentId, reason)
+        member this.BindChildSession(agentId, childSessionId) = this.BindChildSession(agentId, childSessionId)
+        member this.AwaitAgent(agentId, timeoutMs) = this.AwaitAgent(agentId, ?timeoutMs = timeoutMs)
+        member this.CancelAgent agentId = this.CancelAgent agentId
+        member this.List() = this.List()
+        member this.IsCancelled = this.IsCancelled
+        member this.ActiveRunCount = this.ActiveRunCount
+        member this.PendingCompletionCount = this.PendingCompletionCount
+        member this.PendingPtyCount = this.PendingPtyCount
+        member this.Cancel() = this.Cancel()
+
+[<RequireQualifiedAccess>]
+module ForkRuntimeBackend =
+
+    let create (clock: IClockPort) : ForkRuntime =
+        ForkRuntime(backend = (ForkRuntimeBackendState(clock = clock) :> IForkRuntimeBackend))

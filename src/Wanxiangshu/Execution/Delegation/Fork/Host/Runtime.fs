@@ -74,7 +74,7 @@ type HostForkRuntime
         ?clock: IClockPort
     ) as this =
     let clockPort = defaultArg clock (PtyTiming.nodeClockPort ())
-    let runtime = ForkRuntime(clock = clockPort)
+    let runtime = ForkRuntimeBackend.create clockPort
     // DSL-MUTABLE: resource — live child session registry by agent id
     let children = Dictionary<string, SessionId>()
     // DSL-MUTABLE: resource — process-owned agent handle set

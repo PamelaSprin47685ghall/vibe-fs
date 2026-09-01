@@ -2,6 +2,21 @@
   "schema_version": 1,
   "compile_contract_support": [
     {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs",
+      "owner": "delegation",
+      "justification": "Signed pure child-recovery evidence and resolution algebra used by delegation-owned recovery workflows; snapshot/host observations are values only and no process resource is held."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handoff.fs",
+      "owner": "delegation",
+      "justification": "Signed reusable-handoff cursor/window and prompt-document algebra; it declares injected preparation/checkpoint ports and owns no physical child runtime or mutable registry."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs",
+      "owner": "delegation",
+      "justification": "Signed fork-child instruction/data renderer over canonical LlmFacing documents; it is representation support and carries no child-run or Host runtime authority."
+    },
+    {
       "path": "src/Wanxiangshu/Context/Companion/Blogger/Toml.fs",
       "owner": "context-compression",
       "justification": "Signed canonical Blogger-local TOML/LLM representation support; encoder helpers remain private and it grants no additional semantic or runtime authority."
@@ -263,6 +278,11 @@
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "delegation",
+      "locality": "execution-delegation-fact",
+      "justification": "Delegation facts, linkage/estimate/fork model contracts plus pure child-recovery, handoff and payload support are fully signed. ForkRuntime is now a dependency-inverted capability shell in RuntimeContract; mutable agents, PTYs, completion mailbox and recovery implementation live only in the sibling execution-delegation-fork-runtime locality, so foreign closure contains no delegation runtime source."
+    },
     {
       "owner": "context-compression",
       "locality": "context-companion-fact",
@@ -15921,7 +15941,7 @@
       "justification": "delegation.Contract publishes exactly these symbols to 'capability-enforcement'; every unlisted sibling remains private to delegation."
     },
     {
-      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs",
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/RuntimeContract.fs",
       "owner": "delegation",
       "node": "delegation-frontier-keep",
       "contract": "delegation.Contract",
@@ -15935,7 +15955,7 @@
       "justification": "delegation.Contract publishes exactly these symbols to 'output-distillation'; every unlisted sibling remains private to delegation."
     },
     {
-      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs",
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/RuntimeContract.fs",
       "owner": "delegation",
       "node": "delegation-frontier-keep",
       "contract": "delegation.Contract",
