@@ -570,9 +570,24 @@
       "path": "src/Wanxiangshu/Resources/PromptSurface.fs",
       "owner": "cognitive-environment",
       "justification": "Signed JS-native prompt-resource projection surface over canonical bilingual prompt resources; package installation and representation helpers remain private and it owns no Host execution authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs",
+      "owner": "session-ontology",
+      "justification": "Signed JS-native projection of the canonical SessionExecutionBinding contract; dynamic model/result translation remains private and the surface owns no second binding state."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs",
+      "owner": "session-ontology",
+      "justification": "Signed JS-native session-family and managed-interrupt proof surface over the published session Host port; controlled physical probes expose values only and own no production session registry."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "session-ontology",
+      "locality": "opencode-host-sessionbindingsurface",
+      "justification": "The published session Host port, injected physical session adapter and JS binding/family proof surfaces form one fully signed session-ontology locality over graduated cognitive binding, Host, routing, identity and provider contracts; parent/child registries and transport helpers remain signature-hidden."
+    },
     {
       "owner": "cognitive-environment",
       "locality": "resources-promptsurface",

@@ -714,10 +714,13 @@
     <Compile Include="OpenCode/Host/SessionExecutionBinding.fsi"/>
     <Compile Include="OpenCode/Host/SessionExecutionBinding.fs"/>
     <Compile Include="OpenCode/Host/ModelRoutingSurface.fs"/>
+    <Compile Include="OpenCode/Host/SessionBindingSurface.fsi"/>
     <Compile Include="OpenCode/Host/SessionBindingSurface.fs"/>
     <Compile Include="OpenCode/Host/ProviderLanguageBinding.fsi"/>
     <Compile Include="OpenCode/Host/ProviderLanguageBinding.fs"/>
+    <Compile Include="OpenCode/Host/Sessions.fsi"/>
     <Compile Include="OpenCode/Host/Sessions.fs"/>
+    <Compile Include="OpenCode/Host/SessionsSurface.fsi"/>
     <Compile Include="OpenCode/Host/SessionsSurface.fs"/>
     <Compile Include="OpenCode/Host/HostMessageProjection.fsi"/>
     <Compile Include="OpenCode/Host/HostMessageProjection.fs"/>
