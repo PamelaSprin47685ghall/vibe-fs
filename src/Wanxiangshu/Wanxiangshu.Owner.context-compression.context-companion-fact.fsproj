@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>context-compression</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>context-companion-fact</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
+    <Compile Include="Context/Companion/Fact.fs"/>
+    <Compile Include="Participant/Provider/Attempt/TerminalValidity.fs"/>
+    <Compile Include="Host/CompactionPolicy.fs"/>
+    <Compile Include="Context/Companion/Blogger/Toml.fs"/>
+    <Compile Include="Context/Companion/Blogger/ItemWire.fs"/>
+    <Compile Include="Context/Companion/Prompt.fs"/>
+    <Compile Include="Context/Companion/Identity.fs"/>
+    <Compile Include="Context/Companion/Builder.fs"/>
+    <Compile Include="Context/Companion/Blogger/Delta.fs"/>
+    <Compile Include="Context/Companion/Blogger/Request.fs"/>
+    <Compile Include="Context/Companion/Projection.fs"/>
+    <Compile Include="Context/Companion/Blogger/Projection.fs"/>
+    <Compile Include="Context/Companion/Blogger/Runtime/CycleProjection.fs"/>
+  </ItemGroup>
+</Project>

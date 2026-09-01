@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><WanxiangshuSemanticOwner>speculative-investigation</WanxiangshuSemanticOwner><WanxiangshuOwnerLocality>strength-budget</WanxiangshuOwnerLocality></PropertyGroup><ItemGroup><Compile Include="Strength/Budget.fs"/><Compile Include="Strength/Prediction/CostModel.fs"/></ItemGroup></Project>

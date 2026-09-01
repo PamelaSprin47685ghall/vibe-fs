@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>epistemic-reasoning</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>sphinx-mcp</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.distribution.assemblyinfo.fsproj"/>
+    <Compile Include="Sphinx/Mcp.fs"/>
+  </ItemGroup>
+</Project>

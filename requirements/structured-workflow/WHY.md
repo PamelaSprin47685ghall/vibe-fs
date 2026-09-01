@@ -25,6 +25,7 @@
 - **root 宽而浅**：composition root 可看见大量 construction/topology/order/lifetime wiring，但不得因此拥有 foreign policy；深语义必须回到 owner，不能以 LOC/import-count 代替语义审查。
 - **以可观察效果证明流程**：流程的正确性完全由领域事实、端口交互、调用 trace 与最终状态证明，不由内部解释器运行到了哪一步来定义。
 - **依赖必须穿过 owner 海关**：编译引用只说明实现依赖，requirement 引用只说明命题前提；两张图不可混同。跨 owner 的生产依赖必须落到 owner 明确承诺的 published contract、physical port/adapter 或 composition-root wiring。语言层面的 `public`、目录位置和 `Surface.fs` 文件名都不构成授权。
+- **owner 海关最终必须由 compile-input boundary + F# signature 承载**：semantic owner 仍负责命题与 contract 承诺；production file 另有恰一个 owner-boundary locality，每个 locality 恰一个 fsproj。`Wanxiangshu.fsproj` 只作为 Fable emit 的扁平副本再次列出同一 compile set，不参与 owner topology。Fable 会递归 source-merge ProjectReference closure，所以 `internal`、top-level `module private` 与 `DisableTransitiveProjectReferences` 都不是跨工程 firewall；`.fsi` 则会在 source-merge 后真实隐藏未签名 implementation symbol，但 signature-only project 不能充当可消费 header，仍需真实 contract implementation。foreign semantic owner 只能引用 dependency-inverted 的 contract/adapter locality；这些 locality 及其 transitive closure 不能反向引用 provider runtime/private locality。provider runtime 依赖 contract，而不是 contract 依赖 runtime。只有 runtime source 完全不在 foreign consumer 的 Fable closure 中，且 contract implementation 由 `.fsi` 封口，漏 reference / 越 runtime boundary / sibling implementation access 才会由 compiler 直接拒绝。`published-contracts` 继续约束语言无法表达的 per-consumer exact symbol 承诺。
 
 ## 核心不变量与违约状态（RED）
 

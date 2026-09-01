@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>causal-wait</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-session-wait-causalwait</WanxiangshuOwnerLocality>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <Compile Include="Execution/Session/Wait/CausalWait.fs"/>
+    <Compile Include="Execution/Session/Wait/CompletionMailbox.fs"/>
+    <Compile Include="Execution/Session/Wait/Bridge.fs"/>
+    <Compile Include="Execution/Session/Wait/Registry.fs"/>
+    <Compile Include="Execution/Session/Wait/Await.fs"/>
+    <Compile Include="Execution/Session/Wait/Surface.fs"/>
+  </ItemGroup>
+</Project>

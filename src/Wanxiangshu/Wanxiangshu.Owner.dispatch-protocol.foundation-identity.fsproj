@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>dispatch-protocol</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>foundation-identity</WanxiangshuOwnerLocality>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <Compile Include="Foundation/Identity.fs"/>
+    <Compile Include="Foundation/Outcome.fs"/>
+    <Compile Include="Interaction/Dispatch/Nudge.fs"/>
+    <Compile Include="Interaction/Dispatch/OpenCode/MetadataCodec.fs"/>
+    <Compile Include="Foundation/OutcomeSurface.fs"/>
+  </ItemGroup>
+</Project>

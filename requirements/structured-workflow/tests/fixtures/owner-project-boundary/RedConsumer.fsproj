@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
+    <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="FSharp.Core" Version="10.1.203"/>
+    <PackageReference Include="Fable.Core" Version="5.0.0"/>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="Provider.fsproj"/>
+    <Compile Include="RedConsumer.fs"/>
+  </ItemGroup>
+</Project>

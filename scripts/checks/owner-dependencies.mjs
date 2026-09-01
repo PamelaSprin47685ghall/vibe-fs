@@ -27,6 +27,7 @@ const EXECUTION_POSITION = /(?:^|[._/])(Stage|Step|Cursor|Registry|NextAction|Re
 
 const norm = (path) => path.replace(/\\/g, '/')
 const meaningful = (value) => typeof value === 'string' && value.trim().length >= 16
+const semanticSourcePath = (path) => path.endsWith('.fsi') ? path.slice(0, -1) : path
 
 function repositoryPath(path, label) {
   const normalized = norm(relative(ROOT, resolve(path)))
@@ -124,9 +125,9 @@ function normalizeSymbolUse(record, productionFiles) {
   if (typeof record.symbol !== 'string' || record.symbol.length === 0)
     throw new Error('FCS scanner emitted a symbol use without symbol')
 
-  const consumerPath = repositoryPath(record.consumerPath, 'symbol consumer')
-  const providerPaths = [...new Set(record.providerPaths.map((path) => repositoryPath(path, 'symbol provider')))].sort()
-  const declarationPaths = [...new Set((record.declarationPaths ?? record.providerPaths).map((path) => repositoryPath(path, 'symbol declaration')))].sort()
+  const consumerPath = semanticSourcePath(repositoryPath(record.consumerPath, 'symbol consumer'))
+  const providerPaths = [...new Set(record.providerPaths.map((path) => semanticSourcePath(repositoryPath(path, 'symbol provider'))))].sort()
+  const declarationPaths = [...new Set((record.declarationPaths ?? record.providerPaths).map((path) => semanticSourcePath(repositoryPath(path, 'symbol declaration'))))].sort()
   if (!productionFiles.has(consumerPath)) throw new Error(`${consumerPath}: FCS consumer is outside the production compile set`)
   for (const path of providerPaths)
     if (!productionFiles.has(path)) throw new Error(`${path}: FCS provider is outside the production compile set`)
@@ -157,7 +158,7 @@ function normalizeSymbolUse(record, productionFiles) {
 
 function normalizeApplicationRange(record, productionFiles) {
   if (!record || typeof record.consumerPath !== 'string') throw new Error('FCS scanner emitted an invalid application range')
-  const consumerPath = repositoryPath(record.consumerPath, 'application consumer')
+  const consumerPath = semanticSourcePath(repositoryPath(record.consumerPath, 'application consumer'))
   if (!productionFiles.has(consumerPath)) throw new Error(`${consumerPath}: FCS application is outside the production compile set`)
   return {
     consumerPath,
@@ -228,7 +229,7 @@ const applicationBounds = (application) => [
 
 const normalizedConsumer = (record, productionFiles, label) => {
   if (!record || typeof record.consumerPath !== 'string') throw new Error(`FCS scanner emitted an invalid ${label}`)
-  const consumerPath = repositoryPath(record.consumerPath, `${label} consumer`)
+  const consumerPath = semanticSourcePath(repositoryPath(record.consumerPath, `${label} consumer`))
   if (!productionFiles.has(consumerPath)) throw new Error(`${consumerPath}: FCS ${label} is outside the production compile set`)
   return consumerPath
 }
@@ -589,10 +590,10 @@ export function scanProjectSymbolUses({
     ]
     if (!Array.isArray(parsed.productionFiles) || normalizedArrays.some((key) => !Array.isArray(parsed[key])))
       throw new Error('FCS normalized evidence has an invalid shape')
-    const productionFiles = parsed.productionFiles.map((path) => {
+    const productionFiles = [...new Set(parsed.productionFiles.map((path) => {
       if (typeof path !== 'string') throw new Error('FCS normalized evidence has an invalid production path')
-      return norm(path)
-    }).sort()
+      return semanticSourcePath(norm(path))
+    }))].sort()
     comparePathSets([...expectedPaths].sort(), productionFiles, 'FCS production file set')
     const applicationConsumerSet = applicationConsumers
       ? new Set(applicationConsumers.map((path) => repositoryPath(path, 'application consumer')))
@@ -649,7 +650,9 @@ export function scanProjectSymbolUses({
   if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.productionFiles) || !Array.isArray(parsed.symbolUses))
     throw new Error('FCS owner dependency result has an invalid shape')
 
-  const productionFiles = parsed.productionFiles.map((path) => repositoryPath(path, 'FCS production source')).sort()
+  const productionFiles = [...new Set(parsed.productionFiles.map((path) =>
+    semanticSourcePath(repositoryPath(path, 'FCS production source')),
+  ))].sort()
   comparePathSets([...expectedPaths].sort(), productionFiles, 'FCS production file set')
   const productionSet = new Set(productionFiles)
   const symbolUses = parsed.symbolUses.map((record) => normalizeSymbolUse(record, productionSet))

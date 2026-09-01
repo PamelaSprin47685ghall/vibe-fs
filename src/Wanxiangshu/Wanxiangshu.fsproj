@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuEmitProject>true</WanxiangshuEmitProject>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Wanxiangshu</RootNamespace>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
@@ -18,13 +19,18 @@
     <Compile Include="Foundation/Identity.fs"/>
     <Compile Include="OpenCode/Host/SessionQuiescenceGate.fs"/>
     <Compile Include="Context/Trace/Cursor.fs"/>
+    <Compile Include="Foundation/Roles.fsi"/>
     <Compile Include="Foundation/Roles.fs"/>
     <Compile Include="Foundation/OfficeCapability.fs"/>
+    <Compile Include="Participant/Persona/Catalog.fsi"/>
     <Compile Include="Participant/Persona/Catalog.fs"/>
+    <Compile Include="Participant/Persona/ManagedCatalog.fsi"/>
     <Compile Include="Participant/Persona/ManagedCatalog.fs"/>
+    <Compile Include="Participant/Persona/Identity.fsi"/>
     <Compile Include="Participant/Persona/Identity.fs"/>
     <Compile Include="Context/Prefix/Candidate.fs"/>
     <Compile Include="Participant/Provider/Attempt/RequestKind.fs"/>
+    <Compile Include="Foundation/RolesSurface.fsi"/>
     <Compile Include="Foundation/RolesSurface.fs"/>
     <Compile Include="Foundation/McpLaunch.fs"/>
     <Compile Include="Foundation/TaskResult.fs"/>
@@ -156,6 +162,7 @@
     <Compile Include="Mission/Review/Judgement/Challenge.fs"/>
     <Compile Include="Mission/Review/Judgement/RequestIdentity.fs"/>
     <Compile Include="Participant/Persona/OfficeCapabilitySurface.fs"/>
+    <Compile Include="Participant/Persona/Surface.fsi"/>
     <Compile Include="Participant/Persona/Surface.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Prompt.fs"/>
     <Compile Include="Interaction/Authority/Model.fs"/>
@@ -185,6 +192,7 @@
     <Compile Include="Persistence/EventStore/EventVocabulary.fs"/>
     <Compile Include="Persistence/EventStore/ProcessEventLog.fs"/>
     <Compile Include="Persistence/EventStore/EventKWayMerge.fs"/>
+    <Compile Include="Persistence/EventStore/IntegrationKernel.fsi"/>
     <Compile Include="Persistence/EventStore/IntegrationKernel.fs"/>
     <Compile Include="Persistence/EventStore/Store.fs"/>
     <Compile Include="Strength/Persistence/Store.fs"/>

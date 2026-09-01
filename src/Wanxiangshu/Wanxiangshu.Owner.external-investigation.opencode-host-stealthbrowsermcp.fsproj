@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>external-investigation</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>opencode-host-stealthbrowsermcp</WanxiangshuOwnerLocality>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <Compile Include="OpenCode/Host/StealthBrowserMcp.fs"/>
+    <Compile Include="OpenCode/Host/StealthBrowserMcpConfig.fs"/>
+    <Compile Include="OpenCode/Host/StealthBrowserMcpConfigSurface.fs"/>
+  </ItemGroup>
+</Project>

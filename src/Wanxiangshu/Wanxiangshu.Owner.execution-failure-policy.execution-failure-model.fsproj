@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>execution-failure-policy</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-failure-model</WanxiangshuOwnerLocality>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
+    <Compile Include="Execution/Failure/Model.fs"/>
+    <Compile Include="Execution/Failure/Policy.fs"/>
+    <Compile Include="Execution/Failure/Surface.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Failure.fs"/>
+    <Compile Include="Participant/Provider/Attempt/FailureSurface.fs"/>
+  </ItemGroup>
+</Project>

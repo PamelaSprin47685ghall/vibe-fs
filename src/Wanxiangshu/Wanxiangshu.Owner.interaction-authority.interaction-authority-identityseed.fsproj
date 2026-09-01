@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>interaction-authority</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>interaction-authority-identityseed</WanxiangshuOwnerLocality>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <Compile Include="Interaction/Authority/IdentitySeed.fs"/>
+    <Compile Include="Interaction/Authority/Origin.fs"/>
+    <Compile Include="Interaction/Authority/Facts.fs"/>
+  </ItemGroup>
+</Project>

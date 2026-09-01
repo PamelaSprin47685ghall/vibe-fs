@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>office-capability</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>foundation-officecapability</WanxiangshuOwnerLocality>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <Compile Include="Foundation/OfficeCapability.fs"/>
+    <Compile Include="Participant/Persona/OfficeCapabilitySurface.fs"/>
+  </ItemGroup>
+</Project>

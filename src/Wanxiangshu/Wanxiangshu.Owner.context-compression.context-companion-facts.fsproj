@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>context-compression</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>context-companion-facts</WanxiangshuOwnerLocality>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <Compile Include="Context/Companion/Facts.fs"/>
+  </ItemGroup>
+</Project>

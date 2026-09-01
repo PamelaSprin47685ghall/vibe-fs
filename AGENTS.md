@@ -597,25 +597,25 @@ git status 只含本次应交付变化。
 
 ---
 
-57.15 终局：多工程化，编译器接管 owner 边，拆掉白盒 check
+57.15 终局：多工程化，编译输入接管 owner 边，拆掉白盒 check
 
 ReleaseClosure 不是架构终点。本节是路线图的最终章：single-project 只是把全部越权成本集中在 FCS 白盒扫描（owner-dependencies / fsharp-control-pyramid）上运行的过渡态；终局是把这层扫描管辖的命题逐步转译进编译边界，让语言接管，然后拆除扫描本身。
 
 终局形态：
 
-一个 owner（或 57.5 裁决合并后的 owner locality）对应一个 fsproj；跨 owner 消费只经 ProjectReference + public contract 符号；`internal` 恢复为 owner 域可见性——owner 内部跨文件协作合法、对外不可见，这正是单工程时代 F# 缺失的那级可见性。owner 领土内部 DU/helper 不再被迫 public，越权 import 从 gate 红变成编译红。
+一个 owner（或 57.5 裁决出的 contract/runtime/adapter owner locality）对应一个 fsproj；跨 owner 消费只经 ProjectReference + public contract locality。这里必须服从本仓 Fable-only 的真实编译语义：Fable 5 会递归把 ProjectReference closure 的源码合并进顶层 project check，因此 ProjectReference 本身**不是 .NET assembly visibility firewall**，`internal`、top-level `module private` 与 `DisableTransitiveProjectReferences` 都不会阻断这条 source closure。真正可用的终局边界是 compile-input boundary + F# signature：foreign owner 只能引用 dependency-inverted 的 contract/adapter locality，且该 locality 的 transitive ProjectReference closure 不得包含 provider runtime/private locality；contract implementation 必须由 sibling `.fsi` 封口，未签名 implementation symbol 即使被 source-merge 也编译红。signature-only project 不会形成可消费模块，因此 contract 必须有真实自包含 implementation；正确依赖方向始终是 runtime → contract。
 
 顺序不可颠倒：
 
-1. 工程引用图必须是 DAG。当前 published-contracts.json 登记的 20-owner SCC（action-affordance … work-record，"membership must shrink on cutover"）必须先按 57.5 三选一收敛到无环：合并 locality、提取窄 bridge 单向化、或删假边。环未清零之前立工程 = 立即编译死锁。这是多工程的唯一硬前置，也是 debt-zero 主线既定工作，不是额外负担。
-2. 按 57.11 owner-local rotation 逐个立工程：一个 owner 子图满足 canonical owner established、direct consumers cut over、old references = 0，即把该 owner 从 Wanxiangshu.fsproj 拆出独立 fsproj 并接入 ProjectReference。一次一个 owner，禁止全仓一次性大爆炸拆分。
-3. 每拆一个工程，owner-dependencies 的管辖面同步收缩一次：该 owner 的值域/可见性命题转由编译器证明，FCS 边检查只保留 contract 面的承诺命题（consumer 登记、反向指认、cross-owner contract 验证）。contract 符号逐步 `[<RequireQualifiedAccess>]` Surface 化后，承诺面也可降为词法判定。
+1. 工程引用图必须是 DAG。SCC 数字只能来自当次 executable owner-dependencies 事实，禁止把旧文档中的成员数当现状。live SCC 必须按 57.5 三选一收敛：合并同一 sovereignty locality、提取窄 contract/runtime/adapter locality 单向化、或删假边。允许一个 semantic owner 因真实编译方向被裁成少数有名称的 localities；禁止 `phase-1/2/3` 式编号切片冒充 architecture。
+2. 按 57.11 owner-local rotation 逐个立 owner-boundary 工程：一个 locality 满足 canonical owner established、direct consumers cut over、old references = 0，即建立独立 fsproj 并接入 owner ProjectReference DAG。Fable emit 仍由 `Wanxiangshu.fsproj` 一次 flatten 全部 production source；这是 Fable-only 的物理发射优化，不是 owner graph，compile set 必须与 owner projects 并集精确相等，且 owner project 禁止引用 emit project。graduated owner 的每个 production `.fs` 必须有 sibling `.fsi`，并同时进入 owner project 与 flattened emit；owner cutover 时实际跑一次该 owner project，release 常规路径由 flat build 验 signature↔implementation + 静态 project gate 守 topology，禁止每次 release 重复解析百级 ProjectReference 图制造编译税。
+3. foreign ProjectReference 只允许指向 provider 的 published contract / physical-port locality，或 exact composition-root wiring 所需的 narrow adapter locality；provider runtime locality 不得出现在普通 foreign dependency 的 direct **或 transitive** closure。contract/adapter locality 自身不得 ProjectReference provider runtime/private locality；若 contract 行为需要 runtime，必须反转为 runtime 实现 contract 声明的 capability/port。每拆一个 locality，owner-dependencies 的管辖面同步收缩；ProjectReference 缺失/多余、compile coverage、project SCC 与 foreign runtime closure 由继任 hard gate + locality compiler check 接管。exact symbol/consumer 承诺仍由 published-contracts 守，直到其 Surface 已窄到可由非白盒机制完整判定。
 
 拆 check 的准确语义：
 
-拆除对象是白盒 FCS 扫描的独有职责——全仓名字解析证明"0 unauthorized cross-owner internal import"。当该命题被多工程编译边界 + internal 可见性完整接管（每个 owner 恰一 fsproj、ProjectReference 图即 owner 图、越权即编译失败）时，owner-symbol-uses.fsx 反射扫描器、FCS 归一化 evidence 管线、OMP_FCS_* 复用机制整体删除。published-contracts 登记与其余 35 个 gate（spec/deadcode/requirement-trace 等）不随多工程消失：它们守的是语言不承载的承诺与规范命题。禁令：不允许用"多工程会守边界"提前删除任何 gate——只有该 gate 的命题被证明已由编译边界完整接管时才拆，且删除前必须演示编译器在原 gate 的红场景下确实变红。
+拆除对象是白盒 FCS 扫描的独有职责——全仓名字解析证明"0 unauthorized cross-owner source import"。当该命题被**signed owner locality + ProjectReference compile-input DAG**完整接管（每个 production file 恰一 owner locality、graduated owner 每个 source 有 `.fsi`、emit compile set 与 locality 并集一致、foreign owner 只拿 contract/adapter locality、漏写 ProjectReference/越过 runtime boundary/访问未签名 sibling implementation 均编译失败）时，owner-symbol-uses.fsx 反射扫描器、FCS 归一化 evidence 管线、OMP_FCS_* 复用机制整体删除。禁止用 flattened emit Fable 的成功代替 topology proof，也禁止用 .NET build 绕过本仓 Fable-only 约束。published-contracts 登记与其余 gate（spec/deadcode/requirement-trace 等）不随多工程消失：per-consumer exact symbol 承诺仍属语言外 policy，直到其继任非白盒 gate 完整接管。
 
-毕业标准沿用三件套：production cutover（owner 迁入独立工程且生产树无旧路径）+ executable proof（编译边界红点证明 + 工程图与 owner 图一致性的机械验证）+ hard gate（工程图 DAG/单 owner 单工程约束固化进 check.mjs 的继任者）。三者齐全前，本节是远期目标，不授权任何"先删 check 再拆工程"的倒置施工。
+毕业标准沿用三件套：production cutover（每个 production source 恰一 owner-boundary locality，flattened emit 与其并集一致）+ executable proof（public contract 可编译、缺失/越权 ProjectReference 的 consumer 独立 Fable check 必须红；同时有 canary 固定 Fable source-merge 可见性事实）+ hard gate（compile coverage、locality 单 owner、foreign contract-only transitive closure、工程 DAG 固化进 check.mjs 继任者）。三者齐全前，不授权任何"先删 check 再拆工程"的倒置施工。
 
 
 

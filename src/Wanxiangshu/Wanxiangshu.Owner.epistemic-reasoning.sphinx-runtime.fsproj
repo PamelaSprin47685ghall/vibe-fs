@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>epistemic-reasoning</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>sphinx-runtime</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.distribution.assemblyinfo.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-mcp.fsproj"/>
+    <Compile Include="Sphinx/Types.fs"/>
+    <Compile Include="Sphinx/RuntimeTypes.fs"/>
+    <Compile Include="Sphinx/State.fs"/>
+    <Compile Include="Sphinx/Methodology.fs"/>
+    <Compile Include="Sphinx/Bayes.fs"/>
+    <Compile Include="Sphinx/Search.fs"/>
+    <Compile Include="Sphinx/MonteCarlo.fs"/>
+    <Compile Include="Sphinx/Representation.fs"/>
+    <Compile Include="Sphinx/Value.fs"/>
+    <Compile Include="Sphinx/Absorb.fs"/>
+    <Compile Include="Sphinx/Closure.fs"/>
+    <Compile Include="Sphinx/Policy.fs"/>
+    <Compile Include="Sphinx/DecodePrimitives.fs"/>
+    <Compile Include="Sphinx/ObservationCodec.fs"/>
+    <Compile Include="Sphinx/WireEncode.fs"/>
+    <Compile Include="Sphinx/Codec.fs"/>
+    <Compile Include="Sphinx/Session.fs"/>
+    <Compile Include="Sphinx/McpContract.fs"/>
+    <Compile Include="Sphinx/McpServer.fs"/>
+    <Compile Include="Sphinx/Surface.fs"/>
+  </ItemGroup>
+</Project>

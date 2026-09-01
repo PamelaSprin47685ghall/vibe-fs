@@ -9,6 +9,7 @@ import { walk } from '../lib/walk.mjs'
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
 const SRC_ROOT = 'src'
 const FSPROJ = 'src/Wanxiangshu/Wanxiangshu.fsproj'
+const OWNER_FSPROJ = /^src\/Wanxiangshu\/Wanxiangshu\.Owner\..+\.fsproj$/
 const PURE_DIRS = [`${PRODUCTION_ROOT}/Foundation/`]
 const RESOURCE_DIR = `${PRODUCTION_ROOT}/Resources/`
 const UPPER_NAMESPACES = ['Wanxiangshu.OpenCode', 'Wanxiangshu.Session', 'Wanxiangshu.Process']
@@ -70,23 +71,48 @@ const productionFs = productionFiles.filter(isFs).map(norm)
   for (const file of outside) fail('source-root', `${norm(file)}: F# source outside ${PRODUCTION_ROOT}/`)
 }
 
-// ② each .fs compiled exactly once; ③ no missing declared files
+// ② each .fs belongs to exactly one owner-locality project; flattened Fable emit mirrors the same set.
 {
   if (!existsSync(FSPROJ)) {
     fail('fsproj-drift', `${FSPROJ} does not exist`)
   } else {
-    const text = read(FSPROJ)
-    const declared = [...text.matchAll(/Include="([^"]+\.fs)"/g)].map((m) => norm(`${PRODUCTION_ROOT}/${m[1]}`))
+    const aggregate = read(FSPROJ)
+    if (!/<WanxiangshuEmitProject>true<\/WanxiangshuEmitProject>/.test(aggregate)) {
+      fail('fsproj-drift', `${FSPROJ}: flattened Fable emitter marker is missing`)
+    }
+    if (/<ProjectReference\s+Include=/.test(aggregate)) {
+      fail('fsproj-drift', `${FSPROJ}: flattened Fable emitter must not ProjectReference owner localities`)
+    }
+    const ownerProjects = productionFiles.filter((file) => OWNER_FSPROJ.test(norm(file)))
+    if (ownerProjects.length < 2) fail('fsproj-drift', `${PRODUCTION_ROOT}: owner-locality projects missing`)
+    const declared = ownerProjects.flatMap((project) => {
+      const text = read(project)
+      return [...text.matchAll(/<Compile\s+Include="([^"]+\.fs)"\s*\/?\s*>/g)].map((m) =>
+        norm(`${PRODUCTION_ROOT}/${m[1]}`),
+      )
+    })
     const counts = new Map()
     for (const path of declared) counts.set(path, (counts.get(path) ?? 0) + 1)
     const onDisk = new Set(productionFs)
 
     for (const [path, n] of counts) {
-      if (n > 1) fail('fsproj-drift', `${FSPROJ}: '${path}' declared ${n} times`)
-      if (!onDisk.has(path)) fail('fsproj-drift', `${FSPROJ}: declares '${path}' which does not exist`)
+      if (n > 1) fail('fsproj-drift', `${path}: compiled by ${n} owner-locality projects`)
+      if (!onDisk.has(path)) fail('fsproj-drift', `owner-locality project declares '${path}' which does not exist`)
     }
     for (const path of onDisk) {
-      if (!counts.has(path)) fail('fsproj-drift', `${path}: on disk but not compiled by ${FSPROJ}`)
+      if (!counts.has(path)) fail('fsproj-drift', `${path}: on disk but not compiled by an owner-locality project`)
+    }
+
+    const emitDeclared = [...aggregate.matchAll(/<Compile\s+Include="([^"]+\.fs)"\s*\/?\s*>/g)].map((m) =>
+      norm(`${PRODUCTION_ROOT}/${m[1]}`),
+    )
+    const emitSet = new Set(emitDeclared)
+    if (emitSet.size !== emitDeclared.length) fail('fsproj-drift', `${FSPROJ}: duplicate production Compile entry`)
+    for (const path of onDisk) {
+      if (!emitSet.has(path)) fail('fsproj-drift', `${FSPROJ}: flattened emit misses '${path}'`)
+    }
+    for (const path of emitSet) {
+      if (!onDisk.has(path)) fail('fsproj-drift', `${FSPROJ}: flattened emit declares missing '${path}'`)
     }
   }
 }

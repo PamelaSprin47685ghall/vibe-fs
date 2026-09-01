@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>repository-programming</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>repository-programming-js-capability</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
+    <Compile Include="Repository/Programming/Js/Capability.fs"/>
+    <Compile Include="Repository/Programming/Js/Description.fs"/>
+    <Compile Include="Repository/Programming/Js/Surface.fs"/>
+    <Compile Include="Repository/Programming/Js/Failure.fs"/>
+    <Compile Include="Repository/Programming/Js/Anchor.fs"/>
+    <Compile Include="Repository/Programming/Js/Transaction.fs"/>
+    <Compile Include="Process/JsSandbox.fs"/>
+    <Compile Include="Repository/Programming/Js/Utf8Fs.fs"/>
+    <Compile Include="Repository/Programming/Js/GlobFs.fs"/>
+    <Compile Include="Repository/Programming/Js/AnchorFs.fs"/>
+    <Compile Include="Repository/Programming/Js/MutationFs.fs"/>
+  </ItemGroup>
+</Project>

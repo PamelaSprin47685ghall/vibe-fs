@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>intra-participant-parallelism</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>foundation-taskresult</WanxiangshuOwnerLocality>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <Compile Include="Foundation/TaskResult.fs"/>
+    <Compile Include="Foundation/FsToolkitFableCompat.fs"/>
+    <Compile Include="Foundation/Parallel.fs"/>
+    <Compile Include="Foundation/ParallelSurface.fs"/>
+    <Compile Include="Foundation/AsyncSupport.fs"/>
+    <Compile Include="Execution/Fission/Facts.fs"/>
+  </ItemGroup>
+</Project>

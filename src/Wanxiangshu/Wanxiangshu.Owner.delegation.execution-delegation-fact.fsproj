@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-delegation-fact</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-causalwait.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <Compile Include="Execution/Delegation/Fact.fs"/>
+    <Compile Include="Execution/Delegation/Fork/ChildRecovery.fs"/>
+    <Compile Include="Execution/Delegation/Handoff.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Payload.fs"/>
+    <Compile Include="Execution/Delegation/LinkageProjection.fs"/>
+    <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Model.fs"/>
+    <Compile Include="Execution/Delegation/Fork/ChildRun.fs"/>
+    <Compile Include="Execution/Delegation/Fork/ChildRunProjection.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Recovery.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Runtime.fs"/>
+  </ItemGroup>
+</Project>

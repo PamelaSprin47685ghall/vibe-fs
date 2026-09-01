@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-delegation-syncdelegate-model</WanxiangshuOwnerLocality>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-ownership.fsproj"/>
+    <Compile Include="Execution/Delegation/SyncDelegate/Model.fs"/>
+    <Compile Include="Execution/Delegation/HandoffIdentity.fs"/>
+    <Compile Include="Execution/Delegation/Facts.fs"/>
+    <Compile Include="Execution/Delegation/SyncDelegate/Prompt.fs"/>
+    <Compile Include="Execution/Agent/Errors.fs"/>
+    <Compile Include="Execution/Agent/Program.fs"/>
+    <Compile Include="Execution/Session/AgentCompletion.fs"/>
+  </ItemGroup>
+</Project>

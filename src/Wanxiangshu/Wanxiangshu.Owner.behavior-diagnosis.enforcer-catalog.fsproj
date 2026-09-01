@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><WanxiangshuSemanticOwner>behavior-diagnosis</WanxiangshuSemanticOwner><WanxiangshuOwnerLocality>enforcer-catalog</WanxiangshuOwnerLocality></PropertyGroup><ItemGroup><Compile Include="Enforcer/Catalog.fs"/><Compile Include="Enforcer/Rulebook.fs"/></ItemGroup></Project>

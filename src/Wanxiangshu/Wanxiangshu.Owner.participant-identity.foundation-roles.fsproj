@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>participant-identity</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>foundation-roles</WanxiangshuOwnerLocality>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Foundation/Roles.fsi"/>
+    <Compile Include="Foundation/Roles.fs"/>
+    <Compile Include="Participant/Persona/Catalog.fsi"/>
+    <Compile Include="Participant/Persona/Catalog.fs"/>
+    <Compile Include="Participant/Persona/ManagedCatalog.fsi"/>
+    <Compile Include="Participant/Persona/ManagedCatalog.fs"/>
+    <Compile Include="Participant/Persona/Identity.fsi"/>
+    <Compile Include="Participant/Persona/Identity.fs"/>
+    <Compile Include="Foundation/RolesSurface.fsi"/>
+    <Compile Include="Foundation/RolesSurface.fs"/>
+    <Compile Include="Participant/Persona/Surface.fsi"/>
+    <Compile Include="Participant/Persona/Surface.fs"/>
+  </ItemGroup>
+</Project>

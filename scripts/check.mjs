@@ -32,6 +32,7 @@ const checks = [
   join(root, 'checks/participant-identity-boundary.mjs'),
   join(root, 'checks/provider-projection-boundary.mjs'),
   join(root, 'checks/semantic-owners.mjs'),
+  join(root, 'checks/owner-projects.mjs'),
   join(root, 'checks/owner-dependencies.mjs'),
   join(root, 'checks/dsl-ownership.mjs'),
   join(root, 'checks/authority-boundary.mjs'),

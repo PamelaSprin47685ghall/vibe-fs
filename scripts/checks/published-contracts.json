@@ -1,5 +1,28 @@
 {
   "schema_version": 1,
+  "compile_contract_support": [
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs",
+      "owner": "durable-convergence",
+      "justification": "Pure canonical-integrator contract types and structural projection algebra; carries no runtime handle, process state, or physical effect."
+    },
+    {
+      "path": "src/Wanxiangshu/Foundation/RolesSurface.fs",
+      "owner": "participant-identity",
+      "justification": "Signed JS-native projection of participant identity vocabulary; no runtime state or effect authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Persona/Surface.fs",
+      "owner": "participant-identity",
+      "justification": "Signed JS-native participant identity representation boundary; pure parsing and projection over canonical identity."
+    }
+  ],
+  "compiler_boundary_owners": [
+    {
+      "owner": "participant-identity",
+      "justification": "Leaf semantic owner with zero ProjectReference dependencies; every production source is signed and is either published contract or signed compile-contract support."
+    }
+  ],
   "contracts": [
     {
       "path": "src/Wanxiangshu/Change/Facts.fs",

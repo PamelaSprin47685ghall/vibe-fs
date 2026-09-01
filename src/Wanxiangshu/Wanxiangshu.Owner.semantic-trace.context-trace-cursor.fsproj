@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>semantic-trace</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>context-trace-cursor</WanxiangshuOwnerLocality>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Context/Trace/Cursor.fs"/>
+  </ItemGroup>
+</Project>

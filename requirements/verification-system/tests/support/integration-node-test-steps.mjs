@@ -97,6 +97,13 @@ export function integrationNodeTestSteps(root) {
       perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
     },
     {
+      label: 'owner-project-compiler-boundary.test.mjs (structured-workflow)',
+      files: [
+        path.join(root, 'requirements/structured-workflow/tests/integration/owner-project-compiler-boundary.test.mjs'),
+      ],
+      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
+    },
+    {
       label: 'plugin/file-mutation-tools.test.mjs (repository-programming)',
       files: [path.join(root, 'requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs')],
     },
