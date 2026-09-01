@@ -134,6 +134,11 @@
   ],
   "compiler_boundary_localities": [
     {
+      "owner": "managed-chat-execution",
+      "locality": "execution-session-chatexecution-facts",
+      "justification": "Managed chat acceptance, provider-start and terminal evidence are a one-file signed durable contract; all compile dependencies are graduated identity, authority, prefix and provider-attempt vocabularies."
+    },
+    {
       "owner": "interaction-authority",
       "locality": "interaction-authority-identityseed",
       "justification": "Prompt identity seed, origin and durable authority-fact vocabulary are fully signed and depend only on graduated foundation identity plus participant identity; serialization and rehydration now publish directly from the IdentitySeed owner instead of leaking through Model internal aliases."

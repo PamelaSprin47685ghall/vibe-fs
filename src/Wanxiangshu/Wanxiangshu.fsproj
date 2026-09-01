@@ -117,6 +117,7 @@
     <Compile Include="Mission/Obligation/Todo/Model.fs"/>
     <Compile Include="Mission/Obligation/Todo/Facts.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Facts.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Facts.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Facts.fs"/>
     <Compile Include="Execution/Failure/Model.fs"/>
     <Compile Include="Execution/Failure/Policy.fs"/>

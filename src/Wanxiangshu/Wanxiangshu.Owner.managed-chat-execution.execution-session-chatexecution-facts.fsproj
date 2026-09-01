@@ -9,6 +9,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.context-prefix-candidate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
+    <Compile Include="Execution/Session/ChatExecution/Facts.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Facts.fs"/>
   </ItemGroup>
 </Project>
