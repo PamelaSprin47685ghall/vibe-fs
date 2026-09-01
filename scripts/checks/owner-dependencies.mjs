@@ -792,6 +792,8 @@ export function compareOwnerGraphs(baseline, current) {
   }
 }
 
+export const ownerGraphDocument = (current, delta) => delta === undefined ? current : { current, delta }
+
 function authorizationOf(value, label, fail) {
   const symbols = value?.symbols ?? []
   const symbolRoots = value?.symbol_roots ?? []
@@ -1386,7 +1388,7 @@ function runCli() {
           result.ownerGraph,
         )
       : undefined
-    if (process.argv.includes('--graph-json')) console.log(JSON.stringify({ current: result.ownerGraph, delta: graphDelta }, null, 2))
+    if (process.argv.includes('--graph-json')) console.log(JSON.stringify(ownerGraphDocument(result.ownerGraph, graphDelta), null, 2))
     else if (process.argv.includes('--json')) console.log(JSON.stringify(result, null, 2))
     else if (result.ok) {
       console.log(
