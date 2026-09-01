@@ -67,10 +67,10 @@ module AgentProjection =
         sessionId: SessionId ->
         apply: (SessionAgentProjection -> SessionAgentProjection) ->
         projection: AgentProjectionSet ->
-        AgentProjectionSet
+            AgentProjectionSet
 
     val tryUpdate:
         sessionId: SessionId ->
         apply: (SessionAgentProjection -> Result<SessionAgentProjection, 'rejection>) ->
         projection: AgentProjectionSet ->
-        Result<AgentProjectionSet, 'rejection>
+            Result<AgentProjectionSet, 'rejection>

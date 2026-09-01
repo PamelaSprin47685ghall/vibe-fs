@@ -2,9 +2,7 @@ namespace Wanxiangshu.Process
 
 open System
 
-type PtyOptions =
-    { Cols: int
-      Rows: int }
+type PtyOptions = { Cols: int; Rows: int }
 
 and Command =
     { FileName: string
@@ -15,11 +13,9 @@ and Command =
       Deadline: Deadline option
       PtyOptions: PtyOptions option }
 
-and EstimatedRuntime =
-    | RuntimeSeconds of float
+and EstimatedRuntime = RuntimeSeconds of float
 
-and EstimatedOutput =
-    | OutputBytes of int64
+and EstimatedOutput = OutputBytes of int64
 
 and [<RequireQualifiedAccess>] EstimatedMemory =
     | Medium

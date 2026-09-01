@@ -6,5 +6,7 @@ type SessionStartedAtProjectionState = private SessionStartedAtProjectionState o
 
 [<RequireQualifiedAccess>]
 module SessionStartedAtProjection =
-    val bind: startedAt: DateTimeOffset -> current: SessionStartedAtProjectionState option -> SessionStartedAtProjectionState
+    val bind:
+        startedAt: DateTimeOffset -> current: SessionStartedAtProjectionState option -> SessionStartedAtProjectionState
+
     val startedAt: state: SessionStartedAtProjectionState -> DateTimeOffset

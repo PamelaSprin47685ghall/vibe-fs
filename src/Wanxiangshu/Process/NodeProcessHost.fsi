@@ -19,7 +19,7 @@ module NodeProcessHost =
         onStdout: (byte array -> unit) ->
         onStderr: (byte array -> unit) ->
         ct: CancellationToken ->
-        Task<Result<ChildProcess, string>>
+            Task<Result<ChildProcess, string>>
 
     val tempPath: unit -> string
     val writeFile: path: string -> data: byte array -> unit
@@ -27,8 +27,4 @@ module NodeProcessHost =
     val deleteFile: path: string -> unit
     val readFileSyncChunks: path: string -> chunkSize: int -> consume: (byte array -> unit) -> unit
 
-    val readFileAsyncChunks:
-        path: string ->
-        chunkSize: int ->
-        consume: (byte array -> Task<unit>) ->
-        Task<unit>
+    val readFileAsyncChunks: path: string -> chunkSize: int -> consume: (byte array -> Task<unit>) -> Task<unit>

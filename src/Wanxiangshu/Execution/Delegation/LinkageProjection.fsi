@@ -72,9 +72,7 @@ module HandleProjection =
             Result<AgentLinkageProjection, HandleTransitionRejection>
 
     val retire:
-        handle: HandleId ->
-        current: AgentLinkageProjection ->
-            Result<AgentLinkageProjection, HandleTransitionRejection>
+        handle: HandleId -> current: AgentLinkageProjection -> Result<AgentLinkageProjection, HandleTransitionRejection>
 
     val rejectFalseCompletion:
         handle: HandleId ->

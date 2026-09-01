@@ -42,8 +42,13 @@ type IForkRuntimeBackend =
 type private UnavailableForkRuntimeBackend() =
     interface IForkRuntimeBackend with
         member _.Fork(agentId, _, _, _, _) = ForkResult.NotFound agentId
-        member _.WaitForSignal _ = Task.FromResult MailboxWakeReason.MailboxCancelled
-        member _.WaitForWake() = Task.FromResult MailboxWakeReason.MailboxCancelled
+
+        member _.WaitForSignal _ =
+            Task.FromResult MailboxWakeReason.MailboxCancelled
+
+        member _.WaitForWake() =
+            Task.FromResult MailboxWakeReason.MailboxCancelled
+
         member _.PulseWake() = ()
         member _.PulseAgentHandle _ = ()
         member _.PublishPtyCompletion _ = ()
@@ -54,7 +59,10 @@ type private UnavailableForkRuntimeBackend() =
         member _.Restore(_, _, _) = ()
         member _.MarkInterrupted(_, _) = ()
         member _.BindChildSession(_, _) = ()
-        member _.AwaitAgent(agentId, _) = Task.FromResult(Error(sprintf "ForkRuntime backend unavailable: %s" agentId))
+
+        member _.AwaitAgent(agentId, _) =
+            Task.FromResult(Error(sprintf "ForkRuntime backend unavailable: %s" agentId))
+
         member _.CancelAgent _ = ()
         member _.List() = [], []
         member _.IsCancelled = true
@@ -67,7 +75,8 @@ type private UnavailableForkRuntimeBackend() =
 /// supplied by delegation runtime composition; the default is deliberately inert.
 [<Sealed>]
 type ForkRuntime(?backend: IForkRuntimeBackend) =
-    let backend = defaultArg backend (UnavailableForkRuntimeBackend() :> IForkRuntimeBackend)
+    let backend =
+        defaultArg backend (UnavailableForkRuntimeBackend() :> IForkRuntimeBackend)
 
     member _.Fork
         (agentId: string, role: Role, agent: string, ?prompt: string, ?runWork: unit -> Task<AgentCompletionOutcome>)
@@ -84,8 +93,13 @@ type ForkRuntime(?backend: IForkRuntimeBackend) =
     member _.RegisterPty(pty: PtyRecord) = backend.RegisterPty pty
     member _.UnregisterPty(ptyId: string) = backend.UnregisterPty ptyId
     member _.Restore(agentId: string, role: Role, agent: string) = backend.Restore(agentId, role, agent)
-    member _.MarkInterrupted(agentId: string, reason: string) = backend.MarkInterrupted(agentId, reason)
-    member _.BindChildSession(agentId: string, childSessionId: SessionId) = backend.BindChildSession(agentId, childSessionId)
+
+    member _.MarkInterrupted(agentId: string, reason: string) =
+        backend.MarkInterrupted(agentId, reason)
+
+    member _.BindChildSession(agentId: string, childSessionId: SessionId) =
+        backend.BindChildSession(agentId, childSessionId)
+
     member _.AwaitAgent(agentId: string, ?timeoutMs: int) = backend.AwaitAgent(agentId, timeoutMs)
     member _.CancelAgent(agentId: string) = backend.CancelAgent agentId
     member _.List() = backend.List()

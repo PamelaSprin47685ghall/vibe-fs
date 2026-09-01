@@ -75,7 +75,7 @@ module AgentCompletion =
         providerRun: ProviderRunIdentity ->
         workRecord: string ->
         directory: string option ->
-        AgentCompletionOutcome
+            AgentCompletionOutcome
 
     val failed:
         agentId: string ->
@@ -84,7 +84,7 @@ module AgentCompletion =
         childSessionId: SessionId option ->
         code: string ->
         message: string ->
-        AgentCompletionOutcome
+            AgentCompletionOutcome
 
     val ofSimpleText: agentId: string -> runId: string -> role: Role -> text: string -> AgentCompletionOutcome
     val ofSimpleError: agentId: string -> runId: string -> role: Role -> message: string -> AgentCompletionOutcome

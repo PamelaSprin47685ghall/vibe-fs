@@ -73,10 +73,17 @@ module MagicTodo =
         t1CallCursor: XTraceCursor ->
         t1ToolCallId: ToolCallId ->
         parts: TracePartAnchor list ->
-        XTraceCursor
+            XTraceCursor
 
     val effectiveOpeningFloor:
-        bool -> bool -> XTraceCursor -> XTraceCursor option -> ToolCallId option -> int64 -> TracePartAnchor list -> XTraceCursor option
+        bool ->
+        bool ->
+        XTraceCursor ->
+        XTraceCursor option ->
+        ToolCallId option ->
+        int64 ->
+        TracePartAnchor list ->
+            XTraceCursor option
 
     val bloggerEffectiveStart: recordCoverage: RecordCoverage -> workRecordStartCursor: XTraceCursor -> XTraceCursor
     val requirePlanCommitmentBeforeFirstSuicide: planCommitted: bool -> Result<unit, MagicTodoReject>

@@ -50,14 +50,15 @@ module ToolHostCodec =
     val enumSchema: values: string list -> factory: HostToolFactory -> HostSchema
     val enumSchemaDescribed: values: string list -> description: string -> factory: HostToolFactory -> HostSchema
     val optionalEnumSchema: values: string list -> factory: HostToolFactory -> HostSchema
+
     val optionalEnumSchemaDescribed:
         values: string list -> description: string -> factory: HostToolFactory -> HostSchema
+
     val managedOrHandleSchema: values: string list -> factory: HostToolFactory -> HostSchema
     val optionalStringSchema: factory: HostToolFactory -> HostSchema
     val optionalStringSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val optionalNumberSchema: factory: HostToolFactory -> HostSchema
-    val optionalNonNegativeIntegerSchemaDescribed:
-        description: string -> factory: HostToolFactory -> HostSchema
+    val optionalNonNegativeIntegerSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val optionalStringArraySchema: factory: HostToolFactory -> HostSchema
     val stringArraySchema: factory: HostToolFactory -> HostSchema
     val register: factory: HostToolFactory -> spec: ToolSpec -> obj

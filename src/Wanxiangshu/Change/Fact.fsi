@@ -41,7 +41,11 @@ module OrchestratorFact =
             AgentFact
 
     val inline PublishClaimed:
-        payload: {| ManagerJobId: ManagerJobId; TargetRef: TargetRef; ExpectedHead: CommitHash |} -> AgentFact
+        payload:
+            {| ManagerJobId: ManagerJobId
+               TargetRef: TargetRef
+               ExpectedHead: CommitHash |} ->
+            AgentFact
 
     val inline Published:
         payload:
@@ -50,7 +54,12 @@ module OrchestratorFact =
                ResultingTargetHead: CommitHash |} ->
             AgentFact
 
-    val inline JobFailed: payload: {| ManagerJobId: ManagerJobId; Reason: string |} -> AgentFact
+    val inline JobFailed:
+        payload:
+            {| ManagerJobId: ManagerJobId
+               Reason: string |} ->
+            AgentFact
+
     val inline JobAbandoned: payload: {| ManagerJobId: ManagerJobId |} -> AgentFact
 
     val inline WorktreeCreateRequested:

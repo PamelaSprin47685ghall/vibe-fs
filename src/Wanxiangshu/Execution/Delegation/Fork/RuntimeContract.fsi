@@ -39,9 +39,15 @@ type IForkRuntimeBackend =
 [<Sealed>]
 type ForkRuntime =
     new: ?backend: IForkRuntimeBackend -> ForkRuntime
+
     member Fork:
-        agentId: string * role: Role * agent: string * ?prompt: string * ?runWork: (unit -> Task<AgentCompletionOutcome>) ->
+        agentId: string *
+        role: Role *
+        agent: string *
+        ?prompt: string *
+        ?runWork: (unit -> Task<AgentCompletionOutcome>) ->
             ForkResult
+
     member WaitForSignal: interrupt: Task<JoinInterruptReason> -> Task<MailboxWakeReason>
     member WaitForWake: unit -> Task<MailboxWakeReason>
     member PulseWake: unit -> unit

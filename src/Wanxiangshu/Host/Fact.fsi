@@ -18,16 +18,32 @@ module HostFact =
             AgentFact
 
     val inline RequirementGroundingRequested:
-        payload: {| SessionId: SessionId; Snapshot: GroundingSnapshot |} -> AgentFact
+        payload:
+            {| SessionId: SessionId
+               Snapshot: GroundingSnapshot |} ->
+            AgentFact
 
     val inline RequirementGroundingMaterialObserved:
-        payload: {| SessionId: SessionId; Observation: RequirementGroundingMaterialObserved |} -> AgentFact
+        payload:
+            {| SessionId: SessionId
+               Observation: RequirementGroundingMaterialObserved |} ->
+            AgentFact
 
     val inline RequirementGroundingAnchored:
-        payload: {| SessionId: SessionId; Occurrence: RequirementGroundingOccurrence |} -> AgentFact
+        payload:
+            {| SessionId: SessionId
+               Occurrence: RequirementGroundingOccurrence |} ->
+            AgentFact
 
     val inline TipGuidanceDelivered:
-        payload: {| SessionId: SessionId; TipName: string; Presentation: TipPresentation |} -> AgentFact
+        payload:
+            {| SessionId: SessionId
+               TipName: string
+               Presentation: TipPresentation |} ->
+            AgentFact
 
     val inline SessionStartedAtBound:
-        payload: {| SessionId: SessionId; StartedAt: System.DateTimeOffset |} -> AgentFact
+        payload:
+            {| SessionId: SessionId
+               StartedAt: System.DateTimeOffset |} ->
+            AgentFact

@@ -11,12 +11,12 @@ module ProjectionRenderer =
         _snapshot: ProjectionSnapshot ->
         baseMessages: ProviderProjection.WireMessage list ->
         intents: ProjectionIntent list ->
-        RenderedMessages
+            RenderedMessages
 
     val renderMessagesWithIntents:
         snapshot: ProjectionSnapshot ->
         baseMessages: ProviderProjection.WireMessage list ->
         intents: ProjectionIntent list ->
-        ProviderProjection.WireMessage list
+            ProviderProjection.WireMessage list
 
     val cutoffDigest: sha256: (string -> string) -> snapshot: ProjectionSnapshot -> cutoff: int -> string

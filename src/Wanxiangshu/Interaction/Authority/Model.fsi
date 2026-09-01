@@ -39,30 +39,35 @@ module PromptAuthority =
 
     val identitySeedParticipantIdentity: (IdentitySeed -> ParticipantIdentityEvidence)
     val identitySeedOwner: (IdentitySeed -> (SessionId * LogicalRunId * AuthorityRootUserMessageId) option)
+
     val issueInheritedIdentitySeed:
         canonicalChildName: string -> owner: AuthorityExecutionProfile -> Result<IdentitySeed, ParticipantIdentityError>
+
     val validateInheritedIdentitySeedAgainstActiveOwner:
         ownerOption: AuthorityExecutionProfile option ->
         seed: IdentitySeed ->
-        Result<ParticipantIdentityEvidence, IdentitySeedValidationError>
+            Result<ParticipantIdentityEvidence, IdentitySeedValidationError>
+
     val validateInheritedIdentitySeed:
         owner: AuthorityExecutionProfile ->
         seed: IdentitySeed ->
-        Result<ParticipantIdentityEvidence, IdentitySeedValidationError>
+            Result<ParticipantIdentityEvidence, IdentitySeedValidationError>
+
     val createAuthorityExecutionProfileFromSeed:
         sessionId: SessionId ->
         logicalRunId: LogicalRunId ->
         authorityRootUserMessageId: AuthorityRootUserMessageId ->
         authorityKind: RootAuthorityKind ->
         identitySeed: IdentitySeed ->
-        Result<AuthorityExecutionProfile, string>
+            Result<AuthorityExecutionProfile, string>
+
     val createAuthorityExecutionProfile:
         sessionId: SessionId ->
         logicalRunId: LogicalRunId ->
         authorityRootUserMessageId: AuthorityRootUserMessageId ->
         authorityKind: RootAuthorityKind ->
         participantIdentity: ParticipantIdentityEvidence ->
-        Result<AuthorityExecutionProfile, string>
+            Result<AuthorityExecutionProfile, string>
 
     type AttemptExecutionProfile =
         { Authority: AuthorityExecutionProfile
@@ -130,21 +135,26 @@ module PromptAuthority =
 
     val parseAgentNameTyped: value: string -> Result<ParsedAgentName, AgentNameRejection>
     val parseAgentName: value: string -> Result<string * Role * AgentTier * string, string>
+
     val stableLogicalRunId:
         sha256: (string -> string) ->
         runtimeId: RuntimeId ->
         sessionId: SessionId ->
         authorityRoot: AuthorityRootUserMessageId ->
-        LogicalRunId
+            LogicalRunId
+
     val agentPair: profile: AuthorityExecutionProfile -> AgentPairCursor.AuthorityAgentPair
     val RecoveryTailWindow: int
+
     val claimScopeDigest:
         sessionId: SessionId ->
         logicalRunId: LogicalRunId option ->
         origin: PromptOrigin ->
         payloadDigest: string ->
-        string
+            string
+
     val nextClaimSequence: scope: string -> projection: PromptAuthorityProjection -> int
+
     val derivePromptKey:
         sha256: (string -> string) ->
         sessionId: SessionId ->
@@ -154,12 +164,16 @@ module PromptAuthority =
         effectiveAgent: string option ->
         payloadDigest: string ->
         claimSequence: int ->
-        PromptKey
+            PromptKey
+
     val effectiveAgentFor: profile: AuthorityExecutionProfile -> cursor: AgentPairCursor.FallbackCursor -> string
+
     val repairPayloadDigest:
         requestId: BloggerRequestId -> terminalProviderRun: ProviderRunIdentity -> repairKind: string -> string
+
     val repairPayloadBelongsToRequest: requestId: BloggerRequestId -> payloadDigest: string -> bool
     val gateNudgePayloadDigest: gateKind: string -> terminalProviderRun: ProviderRunIdentity -> string
+
     val gateNudgeAlreadyAdmitted:
         sessionId: SessionId ->
         logicalRunId: LogicalRunId ->
@@ -167,14 +181,16 @@ module PromptAuthority =
         gateKind: string ->
         terminalProviderRun: ProviderRunIdentity ->
         projection: PromptAuthorityProjection ->
-        bool
+            bool
+
     val gateNudgeAcceptedPhysical:
         sessionId: SessionId ->
         continuation: ContinuationKind ->
         gateKind: string ->
         terminalProviderRun: ProviderRunIdentity ->
         projection: PromptAuthorityProjection ->
-        PhysicalUserMessageId option
+            PhysicalUserMessageId option
+
     val repairAlreadyClaimed:
         sessionId: SessionId ->
         logicalRunId: LogicalRunId ->
@@ -182,9 +198,11 @@ module PromptAuthority =
         terminalProviderRun: ProviderRunIdentity ->
         repairKind: string ->
         projection: PromptAuthorityProjection ->
-        bool
+            bool
+
     val idlePayloadDigest:
         lifeId: ManagerLifeId -> conditionKey: string -> terminalProviderRun: ProviderRunIdentity -> string
+
     val idleAlreadyAdmitted:
         sessionId: SessionId ->
         logicalRunId: LogicalRunId ->
@@ -192,9 +210,11 @@ module PromptAuthority =
         conditionKey: string ->
         terminalProviderRun: ProviderRunIdentity ->
         projection: PromptAuthorityProjection ->
-        bool
+            bool
+
     val systemPromptIdFor: role: Role -> SystemPromptId
     val toolCapabilitiesFor: role: Role -> requestKind: ProviderRequestKind -> Set<ToolPermission>
+
     val buildAttemptExecutionProfile:
         authority: AuthorityExecutionProfile ->
         cursor: AgentPairCursor.FallbackCursor ->
@@ -203,4 +223,4 @@ module PromptAuthority =
         origin: PromptOrigin ->
         requestKind: ProviderRequestKind ->
         choice: XProjectionChoice ->
-        AttemptExecutionProfile
+            AttemptExecutionProfile

@@ -37,7 +37,5 @@ module HostEventCodec =
     val tryMessageSessionId: rawInput: obj -> SessionId option
     val tryDecodeExactProviderStart: rawInput: obj -> ExactProviderStartObservation option
     val tryDecodeExactProviderTerminal: rawInput: obj -> ExactProviderTerminalObservation option
-    val tryDecodeProviderStepEnd:
-        rawInput: obj -> (SessionId * PhysicalUserMessageId * ProviderRunIdentity) option
-    val tryDecodePhysicalExecutionEnd:
-        rawInput: obj -> (SessionId * PhysicalUserMessageId) option
+    val tryDecodeProviderStepEnd: rawInput: obj -> (SessionId * PhysicalUserMessageId * ProviderRunIdentity) option
+    val tryDecodePhysicalExecutionEnd: rawInput: obj -> (SessionId * PhysicalUserMessageId) option

@@ -24,7 +24,11 @@ module CompanionIdentity =
             string
 
     val instructionMessageId:
-        sha256: (string -> string) -> bloggerSessionId: SessionId -> frameEpoch: FrameEpochId -> requestKind: string -> string
+        sha256: (string -> string) ->
+        bloggerSessionId: SessionId ->
+        frameEpoch: FrameEpochId ->
+        requestKind: string ->
+            string
 
     val newWorkMessageId: sha256: (string -> string) -> bloggerSessionId: SessionId -> deltaDigest: BlobDigest -> string
     val previousTipMessageId: sha256: (string -> string) -> bloggerSessionId: SessionId -> cycleId: string -> string

@@ -22,8 +22,10 @@ module ProviderWireCapture =
     val decodeCapturedMessageView: rawMessages: obj list -> CapturedWireMessage list
     val wireMessageView: captured: CapturedWireMessage list -> ProviderWireProjection
     val lastUserMessageId: rawMessages: obj list -> PhysicalUserMessageId option
+
     val tryPhysicalParentOfProviderRun:
         providerRun: ProviderRunIdentity -> rawMessages: obj list -> PhysicalUserMessageId option
+
     val trySemanticTurnOfHostMessageId: messageId: string -> rawMessages: obj list -> int option
     val lastUserPromptKey: rawMessages: obj list -> PromptKey option
     val formalText: rawObj: obj -> string

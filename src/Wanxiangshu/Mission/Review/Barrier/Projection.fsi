@@ -95,6 +95,4 @@ module ReviewRequirementProjection =
             ReviewRequirementProjection
 
     val clearOnConfirmation:
-        providerRun: ProviderRunIdentity ->
-        current: ReviewRequirementProjection ->
-            ReviewRequirementProjection
+        providerRun: ProviderRunIdentity -> current: ReviewRequirementProjection -> ReviewRequirementProjection

@@ -12,7 +12,7 @@ module CausalAwait =
         descriptor: DiagnosticWait ->
         primary: Task<'T> ->
         escape: Task<DiagnosticWaitExit> ->
-        Task<Result<'T, DiagnosticWaitExit>>
+            Task<Result<'T, DiagnosticWaitExit>>
 
     val untilSignalOrDeadline:
         observer: IWaitObserver ->
@@ -20,4 +20,4 @@ module CausalAwait =
         deadline: IDeadlineHandle ->
         tryRead: (unit -> 'T option) ->
         awaitSignal: (unit -> Task<unit>) ->
-        Task<Result<'T, DiagnosticWaitExit>>
+            Task<Result<'T, DiagnosticWaitExit>>

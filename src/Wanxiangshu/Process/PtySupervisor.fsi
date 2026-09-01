@@ -24,26 +24,16 @@ module PtySupervisor =
     val spawnSync: supervisor: PtySupervisor -> command: string -> cwd: string -> obj
 
     val failPending:
-        entries: (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list ->
-        reason: string ->
-        unit
+        entries: (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list -> reason: string -> unit
 
     val takePending:
-        supervisor: PtySupervisor ->
-        id: PtyId ->
-        (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list
+        supervisor: PtySupervisor -> id: PtyId -> (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list
 
     val drop:
-        supervisor: PtySupervisor ->
-        id: PtyId ->
-        (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list
+        supervisor: PtySupervisor -> id: PtyId -> (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list
 
     val applyLive:
-        supervisor: PtySupervisor ->
-        port: PtyPort ->
-        id: PtyId ->
-        command: PtyCommand ->
-        Task<Result<unit, string>>
+        supervisor: PtySupervisor -> port: PtyPort -> id: PtyId -> command: PtyCommand -> Task<Result<unit, string>>
 
     val attach:
         supervisor: PtySupervisor ->
@@ -51,6 +41,6 @@ module PtySupervisor =
         id: PtyId ->
         term: obj ->
         exitTcs: TaskCompletionSource<unit> ->
-        unit
+            unit
 
     val cancelAll: supervisor: PtySupervisor -> unit

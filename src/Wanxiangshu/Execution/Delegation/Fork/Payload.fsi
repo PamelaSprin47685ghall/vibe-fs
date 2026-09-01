@@ -23,6 +23,7 @@ module ForkChildPayload =
     val RequirementsPath: string
     val document: prose: ForkChildInstructions -> input: ForkChildAssignment -> LlmFacing.Document
     val render: prose: ForkChildInstructions -> input: ForkChildAssignment -> string
+
     val relay:
         prose: ForkChildInstructions ->
         assignment: string ->
@@ -31,6 +32,7 @@ module ForkChildPayload =
         requirements: string list ->
         payload: string option ->
             string
+
     val relayDocument:
         prose: ForkChildInstructions ->
         assignment: string ->

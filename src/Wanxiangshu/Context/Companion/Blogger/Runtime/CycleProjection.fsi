@@ -37,6 +37,17 @@ module BloggerCycleProjection =
     val empty: BloggerCycleProjectionState
     val tryOpenByBlogger: bloggerId: SessionId -> state: BloggerCycleProjectionState -> OpenBloggerRequest option
     val tryReceipt: run: ProviderRunIdentity -> state: BloggerCycleProjectionState -> BloggerCycleReceipt option
-    val materialize: openReq: OpenBloggerRequest -> state: BloggerCycleProjectionState -> Result<BloggerCycleProjectionState, string>
-    val abandon: requestId: BloggerRequestId -> bloggerSessionId: SessionId -> state: BloggerCycleProjectionState -> BloggerCycleProjectionState
-    val recordReceipt: receipt: BloggerCycleReceipt -> state: BloggerCycleProjectionState -> Result<BloggerCycleProjectionState, string>
+
+    val materialize:
+        openReq: OpenBloggerRequest -> state: BloggerCycleProjectionState -> Result<BloggerCycleProjectionState, string>
+
+    val abandon:
+        requestId: BloggerRequestId ->
+        bloggerSessionId: SessionId ->
+        state: BloggerCycleProjectionState ->
+            BloggerCycleProjectionState
+
+    val recordReceipt:
+        receipt: BloggerCycleReceipt ->
+        state: BloggerCycleProjectionState ->
+            Result<BloggerCycleProjectionState, string>

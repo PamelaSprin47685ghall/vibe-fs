@@ -263,8 +263,7 @@ module ReconcilePass =
         task {
             match isCurrent sessionId generation, result with
             | false, _ -> ()
-            | true, Error error ->
-                logError "RECONCILE-SNAPSHOT" (sprintf "snapshot failed: %s" (string error))
+            | true, Error error -> logError "RECONCILE-SNAPSHOT" (sprintf "snapshot failed: %s" (string error))
             | true, Ok messages ->
                 do!
                     handleSnapshotSuccess

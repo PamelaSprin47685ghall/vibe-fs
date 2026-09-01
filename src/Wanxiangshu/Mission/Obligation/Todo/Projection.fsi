@@ -55,7 +55,10 @@ module MagicTodoProjection =
     val empty: MagicTodoProjectionState
     val emptyLife: lifeId: ManagerLifeId -> LifeMagicTodoState
     val tryLife: lifeId: ManagerLifeId -> state: MagicTodoProjectionState -> LifeMagicTodoState option
-    val ensureLife: lifeId: ManagerLifeId -> state: MagicTodoProjectionState -> LifeMagicTodoState * MagicTodoProjectionState
+
+    val ensureLife:
+        lifeId: ManagerLifeId -> state: MagicTodoProjectionState -> LifeMagicTodoState * MagicTodoProjectionState
+
     val isPlanCommitted: life: LifeMagicTodoState -> bool
     val acceptedEvidence: checkpoint: CheckpointRecord -> AcceptedCheckpointEvidence option
     val isAccepted: checkpoint: CheckpointRecord -> bool
@@ -64,20 +67,20 @@ module MagicTodoProjection =
         preparedFactRef: EventId ->
         payload: TodoWritePrepared ->
         state: MagicTodoProjectionState ->
-        Result<MagicTodoProjectionState, MagicTodoFoldRejection>
+            Result<MagicTodoProjectionState, MagicTodoFoldRejection>
 
     val foldAccepted:
         payload: TodoWriteAccepted ->
         state: MagicTodoProjectionState ->
-        Result<MagicTodoProjectionState, MagicTodoFoldRejection>
+            Result<MagicTodoProjectionState, MagicTodoFoldRejection>
 
     val foldLegacySeed:
         payload: LegacyTodoSeedAdopted ->
         state: MagicTodoProjectionState ->
-        Result<MagicTodoProjectionState, MagicTodoFoldRejection>
+            Result<MagicTodoProjectionState, MagicTodoFoldRejection>
 
     val fold:
         envelopeEventId: EventId ->
         state: MagicTodoProjectionState ->
         fact: MagicTodoFact ->
-        Result<MagicTodoProjectionState, MagicTodoFoldRejection>
+            Result<MagicTodoProjectionState, MagicTodoFoldRejection>

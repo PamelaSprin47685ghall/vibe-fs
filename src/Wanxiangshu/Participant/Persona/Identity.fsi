@@ -59,12 +59,17 @@ module ParticipantIdentity =
     val origin: ParticipantIdentityEvidence -> PersonaOrigin
     val toInput: ParticipantIdentityEvidence -> ParticipantIdentityInput
     val resolveAtRoot: string -> Result<ParticipantIdentityEvidence, ParticipantIdentityError>
-    val inheritFromOwner: string -> ParticipantIdentityEvidence -> Result<ParticipantIdentityEvidence, ParticipantIdentityError>
+
+    val inheritFromOwner:
+        string -> ParticipantIdentityEvidence -> Result<ParticipantIdentityEvidence, ParticipantIdentityError>
+
     val rehydrate:
         ParticipantIdentityEvidence option ->
         ParticipantIdentityInput ->
-        Result<ParticipantIdentityEvidence, ParticipantIdentityError>
+            Result<ParticipantIdentityEvidence, ParticipantIdentityError>
+
     val fromInput: ParticipantIdentityInput -> Result<ParticipantIdentityEvidence, ParticipantIdentityError>
     val legacyAgentOwnerRootUnprovableMessage: string
+
     val upgradeLegacyV1Root:
         LegacyAuthorityRootIdentityV1Input -> Result<ParticipantIdentityEvidence, ParticipantIdentityError>

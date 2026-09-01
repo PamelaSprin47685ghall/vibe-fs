@@ -11,7 +11,7 @@ module SharedAgentJournal =
         processId: int ->
         startedAt: DateTimeOffset ->
         openJournal: (RuntimeId -> int -> DateTimeOffset -> Task<Result<AgentJournal, FoldRejection>>) ->
-        Task<Result<AgentJournal, FoldRejection>>
+            Task<Result<AgentJournal, FoldRejection>>
 
     val releaseAsync: journal: AgentJournal option -> Task
     val release: journal: AgentJournal option -> unit

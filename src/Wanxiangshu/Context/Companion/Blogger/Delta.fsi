@@ -2,9 +2,7 @@ namespace Wanxiangshu.Context.Companion.Blogger
 
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 
-type SemanticCursor =
-    { TurnIndex: int
-      PartIndex: int }
+type SemanticCursor = { TurnIndex: int; PartIndex: int }
 
 type BloggerDeltaChunk =
     { Items: BloggerDeltaItem list

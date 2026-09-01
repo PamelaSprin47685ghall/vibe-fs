@@ -14,10 +14,7 @@ type StrengthValueInputs =
       Risk1: float
       Risk2: float }
 
-type StrengthValueEstimate =
-    { V0: float
-      V1: float
-      V2: float }
+type StrengthValueEstimate = { V0: float; V1: float; V2: float }
 
 module StrengthCostModel =
     val estimateFrom: inputs: StrengthValueInputs -> StrengthValueEstimate
@@ -35,4 +32,4 @@ module StrengthCostModel =
         delay2: float ->
         risk1: float ->
         risk2: float ->
-        StrengthValueEstimate
+            StrengthValueEstimate

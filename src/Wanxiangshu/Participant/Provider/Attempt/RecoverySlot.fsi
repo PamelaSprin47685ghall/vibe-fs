@@ -39,11 +39,13 @@ module RecoverySlot =
     val isArmed: arming: SlotArming -> bool
     val opportunity: arming: SlotArming -> offset: AgentPairCursor.FallbackOffset -> RecoveryOpportunity
     val mayRecover: arming: SlotArming -> offset: AgentPairCursor.FallbackOffset -> hasMaterial: bool -> bool
+
     val nextBloggerRequest:
         failedKind: ProviderRequestKind ->
         nextOpportunity: RecoveryOpportunity ->
         hasSquashMaterial: bool ->
-        Result<ProviderRequestKind, BloggerSlotDispatchError>
+            Result<ProviderRequestKind, BloggerSlotDispatchError>
+
     val onSquashOutcome: outcome: AttemptOutcome -> SlotDecision
     val onMainOutcome: kind: ProviderRequestKind -> aabbConsumed: bool -> outcome: AttemptOutcome -> SlotDecision
     val advancesCursor: decision: SlotDecision -> bool

@@ -4,7 +4,9 @@ open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
 type TerminalOutcome =
-    | Published of {| CandidateCommit: CommitHash; ResultingTargetHead: CommitHash |}
+    | Published of
+        {| CandidateCommit: CommitHash
+           ResultingTargetHead: CommitHash |}
     | Failed of reason: string
     | Abandoned
 
@@ -17,7 +19,9 @@ type ManagerJobProjection =
       WorktreePath: WorktreePath
       TargetRef: TargetRef
       TargetBranchFrozen: string
-      CandidateReady: {| CandidateCommit: CommitHash; PreRebaseReviewBarrierId: ReviewBarrierId |} option
+      CandidateReady:
+          {| CandidateCommit: CommitHash
+             PreRebaseReviewBarrierId: ReviewBarrierId |} option
       ConflictDetected:
           {| CandidateCommit: CommitHash
              TargetHeadSnapshot: CommitHash
@@ -27,13 +31,19 @@ type ManagerJobProjection =
           {| RebasedCommit: CommitHash
              TargetHeadSnapshot: CommitHash
              PostRebaseReviewBarrierId: ReviewBarrierId |} option
-      PublishClaimed: {| RebasedCommit: CommitHash; ExpectedHead: CommitHash |} option
+      PublishClaimed:
+          {| RebasedCommit: CommitHash
+             ExpectedHead: CommitHash |} option
       Terminal: TerminalOutcome option }
 
 [<RequireQualifiedAccess>]
 type WorktreeEffectStatus =
-    | Requested of {| ManagerJobId: ManagerJobId; WorktreePath: WorktreePath |}
-    | Created of {| ManagerJobId: ManagerJobId; WorktreePath: WorktreePath |}
+    | Requested of
+        {| ManagerJobId: ManagerJobId
+           WorktreePath: WorktreePath |}
+    | Created of
+        {| ManagerJobId: ManagerJobId
+           WorktreePath: WorktreePath |}
 
 [<RequireQualifiedAccess>]
 type WorktreeReconciliationObservation =
@@ -81,18 +91,23 @@ module OrchestratorProjection =
     val tryFind: ManagerJobId -> OrchestratorProjection -> ManagerJobProjection option
     val tryFindByByname: string -> OrchestratorProjection -> ManagerJobProjection option
     val tryWorktreeEffect: WorktreeIdentity -> OrchestratorProjection -> WorktreeEffectStatus option
+
     val decideWorktreeReconciliation:
         ManagerJobId ->
         WorktreeIdentity ->
         WorktreePath ->
         WorktreeReconciliationObservation ->
-        WorktreeReconciliationDecision
+            WorktreeReconciliationDecision
+
     val requestWorktree:
         WorktreeIdentity -> WorktreePath -> ManagerJobId -> OrchestratorProjection -> OrchestratorProjection
+
     val acceptWorktree:
         WorktreeIdentity -> WorktreePath -> ManagerJobId -> OrchestratorProjection -> OrchestratorProjection
+
     val tryFindByManagerSession: SessionId -> OrchestratorProjection -> ManagerJobProjection option
     val activeJobs: OrchestratorProjection -> ManagerJobProjection list
+
     val createJob:
         {| ManagerJobId: ManagerJobId
            ManagerSessionId: SessionId
@@ -103,12 +118,15 @@ module OrchestratorProjection =
            TargetRef: TargetRef
            TargetBranchFrozen: string |} ->
         OrchestratorProjection ->
-        OrchestratorProjection
+            OrchestratorProjection
+
     val recordCandidateReady:
         ManagerJobId ->
-        {| CandidateCommit: CommitHash; PreRebaseReviewBarrierId: ReviewBarrierId |} ->
+        {| CandidateCommit: CommitHash
+           PreRebaseReviewBarrierId: ReviewBarrierId |} ->
         OrchestratorProjection ->
-        OrchestratorProjection
+            OrchestratorProjection
+
     val recordConflictDetected:
         ManagerJobId ->
         {| CandidateCommit: CommitHash
@@ -116,19 +134,23 @@ module OrchestratorProjection =
            ConflictFiles: string list
            DiagnosticsDigest: string |} ->
         OrchestratorProjection ->
-        OrchestratorProjection
+            OrchestratorProjection
+
     val recordRebasedCandidateReady:
         ManagerJobId ->
         {| RebasedCommit: CommitHash
            TargetHeadSnapshot: CommitHash
            PostRebaseReviewBarrierId: ReviewBarrierId |} ->
         OrchestratorProjection ->
-        OrchestratorProjection
+            OrchestratorProjection
+
     val recordPublishClaimed:
         ManagerJobId ->
-        {| RebasedCommit: CommitHash; ExpectedHead: CommitHash |} ->
+        {| RebasedCommit: CommitHash
+           ExpectedHead: CommitHash |} ->
         OrchestratorProjection ->
-        OrchestratorProjection
+            OrchestratorProjection
+
     val recordTerminal: ManagerJobId -> TerminalOutcome -> OrchestratorProjection -> OrchestratorProjection
     val classifyRebasedCandidate: CommitHash option -> CommitHash -> CommitHash -> RebasedCandidateReality
     val classifyPublishClaim: CommitHash option -> CommitHash -> CommitHash -> PublishClaimReality

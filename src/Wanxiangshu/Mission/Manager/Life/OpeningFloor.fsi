@@ -10,12 +10,12 @@ module ManagerOpeningFloor =
         life: LifeProjection ->
         magic: MagicTodoProjection.LifeMagicTodoState option ->
         xTrace: XTraceProjectionState ->
-        XTraceCursor option
+            XTraceCursor option
 
     val effectiveOpeningFloor:
         life: LifeProjection option ->
         _magicTodo: MagicTodoProjection.MagicTodoProjectionState ->
         _xTrace: XTraceProjectionState ->
-        XTraceCursor option
+            XTraceCursor option
 
     val floorSequence: sessionId: SessionId -> projections: AgentProjectionSet -> int64 option

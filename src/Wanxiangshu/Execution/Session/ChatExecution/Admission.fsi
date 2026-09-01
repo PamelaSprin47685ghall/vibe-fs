@@ -28,4 +28,4 @@ module ChatAdmission =
         message: ChatAdmissionMessage ->
         attemptedEvidence: AcceptedChatExecutionEvidence ->
         suppliedState: ChatExecutionState option ->
-        Result<ChatAdmissionIntent, ChatAdmissionError>
+            Result<ChatAdmissionIntent, ChatAdmissionError>

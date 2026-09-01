@@ -41,7 +41,7 @@ module ConcernProjection =
         id: string ->
         concern: string ->
         state: ConcernProjectionState ->
-        Result<ConcernFactCases option, string>
+            Result<ConcernFactCases option, string>
 
     val publish:
         sender: SessionId ->
@@ -49,12 +49,9 @@ module ConcernProjection =
         id: string ->
         message: string ->
         state: ConcernProjectionState ->
-        Result<ConcernFactCases, string>
+            Result<ConcernFactCases, string>
 
-    val applyFact:
-        fact: ConcernFactCases ->
-        state: ConcernProjectionState ->
-        Result<ConcernProjectionState, string>
+    val applyFact: fact: ConcernFactCases -> state: ConcernProjectionState -> Result<ConcernProjectionState, string>
 
     val prepareFragments: recipient: SessionId -> state: ConcernProjectionState -> ConcernPreparedFragments
 
@@ -62,4 +59,4 @@ module ConcernProjection =
         recipient: SessionId ->
         batch: ConcernPlacementBatch ->
         state: ConcernProjectionState ->
-        Result<ConcernProjectionState, string>
+            Result<ConcernProjectionState, string>

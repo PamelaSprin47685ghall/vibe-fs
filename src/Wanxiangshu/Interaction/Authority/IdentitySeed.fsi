@@ -42,13 +42,11 @@ module PromptIdentitySeed =
         ownerLogicalRunId: LogicalRunId ->
         ownerAuthorityRootUserMessageId: AuthorityRootUserMessageId ->
         ownerParticipantIdentity: ParticipantIdentityEvidence ->
-        Result<PromptIdentitySeed, ParticipantIdentityError>
+            Result<PromptIdentitySeed, ParticipantIdentityError>
 
     val participantIdentity: seed: PromptIdentitySeed -> ParticipantIdentityEvidence
 
-    val owner:
-        seed: PromptIdentitySeed ->
-        (SessionId * LogicalRunId * AuthorityRootUserMessageId) option
+    val owner: seed: PromptIdentitySeed -> (SessionId * LogicalRunId * AuthorityRootUserMessageId) option
 
     val toInput: seed: PromptIdentitySeed -> PromptIdentitySeedInput
     val rehydrate: input: PromptIdentitySeedInput -> Result<PromptIdentitySeed, ParticipantIdentityError>

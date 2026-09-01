@@ -45,4 +45,4 @@ module MagicTodoAdmission =
         existingPrepared: ExistingPrepared option ->
         localized: AdmissionLocalizedToolCall ->
         submitted: ObligationList ->
-        AdmissionOutcome<ObligationPrepareSuccess>
+            AdmissionOutcome<ObligationPrepareSuccess>

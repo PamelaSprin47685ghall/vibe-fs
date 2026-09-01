@@ -17,7 +17,11 @@ module PromptFact =
             AgentFact
 
     val inline PluginPromptSubmitted:
-        payload: {| PromptKey: PromptKey; SessionId: SessionId; Receipt: TransportReceipt |} -> AgentFact
+        payload:
+            {| PromptKey: PromptKey
+               SessionId: SessionId
+               Receipt: TransportReceipt |} ->
+            AgentFact
 
     val inline PluginPromptPhysicalAccepted:
         payload:
@@ -27,6 +31,10 @@ module PromptFact =
             AgentFact
 
     val inline PluginPromptAbandoned:
-        payload: {| PromptKey: PromptKey; SessionId: SessionId; Reason: PromptAbandonReason |} -> AgentFact
+        payload:
+            {| PromptKey: PromptKey
+               SessionId: SessionId
+               Reason: PromptAbandonReason |} ->
+            AgentFact
 
     val AuthorityRootAccepted: payload: AuthorityRootAcceptedPayload -> AgentFact

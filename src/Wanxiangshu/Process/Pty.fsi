@@ -7,9 +7,7 @@ open Wanxiangshu.OpenCode
 
 type PtyPort =
     new:
-        ?mailboxSender: (PtyJoinItem -> unit) *
-        ?handler: PtyBackendHandler *
-        ?agentProvider: (unit -> AgentRecord list) ->
+        ?mailboxSender: (PtyJoinItem -> unit) * ?handler: PtyBackendHandler * ?agentProvider: (unit -> AgentRecord list) ->
             PtyPort
 
     member AddMailboxSender: sender: (PtyJoinItem -> unit) -> unit
