@@ -116,7 +116,7 @@ module State =
                     { state.Budget with
                         UsedCost = min state.Budget.MaxCost (state.Budget.UsedCost + max 0.0 action.Cost) } }
 
-    let addDependency dependencyKey semanticKey dependencies =
+    let addDependency (dependencyKey: string) (semanticKey: string) (dependencies: Map<string, Set<string>>) =
         let existing =
             dependencies |> Map.tryFind dependencyKey |> Option.defaultValue Set.empty
 

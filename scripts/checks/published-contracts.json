@@ -385,9 +385,184 @@
       "path": "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs",
       "owner": "execution-model-routing",
       "justification": "Signed owner-local execution-capacity lifecycle interpreter over the published model types; lease registry and transition mechanics remain hidden behind routing operations and add no second foreign contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Types.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed owner-local epistemic vocabulary for questions, evidence, findings, hypotheses, candidate actions and synthesis; it publishes no foreign authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/RuntimeTypes.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed owner-local kernel request, observation, budget, solver-state and canonical-answer algebra used only inside the Sphinx runtime locality."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/State.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure epistemic-state construction and bounded update helpers; normalization and dependency bookkeeping remain owner-local domain mechanics."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Methodology.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure methodology library and activation scoring; method definitions are owner-local reasoning policy with no Host or durable effect."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Bayes.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure Bayesian belief update support over explicit hypotheses and evidence; numerical helpers and normalization remain hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Search.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure A-star and epistemic frontier support; queue and lineage implementation stays inside the owner-local algorithm boundary."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/MonteCarlo.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure Monte Carlo search model and epistemic-node projection; selection, rollout and backup helpers remain hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Representation.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure equivalence, Pareto and representative optimization support for Sphinx cognitive actions."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Value.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure answer-loss and action-value policy support; internal grounding and dependency-discount helpers remain hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Absorb.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure observation absorption transition over the epistemic state; merge and validation helpers remain owner-local."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Closure.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed bounded fixed-point closure over absorbed epistemic state with no external effect."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Policy.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed kernel start/resume/decision policy returning explicit state plus yield/answer/error outcomes; internal selection helpers remain hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/DecodePrimitives.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed JS wire decode primitives with explicit obj input and typed Result output; raw property helpers stay private."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/ObservationCodec.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed observation decoder from free JS values into the closed Sphinx observation algebra; per-record decoder helpers remain hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/WireEncode.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed JS-native request and canonical-answer encoding support; per-field representation helpers remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Codec.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed owner-local codec facade delegating only observation decode and request/answer encoding."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Session.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed process-local Sphinx session capability with typed start/resume/status/cancel outcomes; session registry and wire helpers remain hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/McpContract.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed owner-local MCP DTO and error projection contract translating kernel/session outcomes without owning transport or scheduling."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/McpServer.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed physical MCP server adapter over the separate sphinx-mcp contract and SessionStore; SDK/zod/stdio interop stays hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Surface.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed JS-native semantic surface over the Sphinx kernel, session, algorithms and MCP adapter; opaque StoreHandle and Fable representation helpers remain hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfigSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native projection over the published Sphinx MCP Host configuration contract; launch decoding and representation translation add no separate policy authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/HookPolicy.fs",
+      "owner": "host-boundary",
+      "justification": "Signed owner-local closed Hook metadata and failure policy table; validation and optional-effect handling stay inside the Host boundary."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnostics.fs",
+      "owner": "host-boundary",
+      "justification": "Signed diagnostic vocabulary, counters and pure reliability projection over already-published execution/capacity evidence; it owns no recovery authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnosticsSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native diagnostic projection surface; dynamic decode, redaction and environment visibility helpers remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/HookPolicySurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native Hook policy proof surface over the canonical HookPolicy table; string translation owns no additional hook semantics."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/EventsSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native terminal-event proof surface over the published event observation port and shared terminal bus."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs",
+      "owner": "host-boundary",
+      "justification": "Signed Host signal ownership adapter and process-local router; raw codec adaptation remains bounded to published typed signal evidence."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/HostSignalSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native projection of typed Host signal decoding/adaptation; it introduces no second signal classifier."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Signals/HostSignalSubscribe.fs",
+      "owner": "host-boundary",
+      "justification": "Signed physical Host signal subscription capability with typed health/disposal result; dynamic listener invocation remains hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/HostSignalSubscribeSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native subscription proof surface over HostSignalSubscribe; callback/disposer representation helpers stay private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/HostBoundarySurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native Host boundary proof surface over message projection, role resolution and exact tool-call location."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/HostSessionContextSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native projection of HostSessionContext role/session decoding; undefined representation stays private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/QuiescenceSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native proof surface over the opaque process-local quiescence permit capability and its typed transitions."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "host-boundary",
+      "locality": "opencode-host-sessionquiescencegate",
+      "justification": "Host quiescence capability, Hook/diagnostic policy, terminal event bus, signal adaptation/subscription, exact session snapshots and Host projection surfaces form one fully signed Host boundary locality over graduated identity, time, model-routing, chat-execution and Sphinx MCP contracts; dynamic Host/JS representation and process-local registries remain signature-hidden."
+    },
+    {
+      "owner": "epistemic-reasoning",
+      "locality": "sphinx-runtime",
+      "justification": "The Sphinx epistemic kernel, algorithms, codecs, process-local session capability, MCP adapter and JS semantic surface are fully signed and depend only on the assembly metadata plus the already-graduated sphinx-mcp contract; mutable registries, SDK interop and representation helpers remain signature-hidden."
+    },
     {
       "owner": "execution-model-routing",
       "locality": "strength-policy",

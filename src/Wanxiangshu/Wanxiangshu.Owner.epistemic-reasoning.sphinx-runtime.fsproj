@@ -7,25 +7,45 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.distribution.assemblyinfo.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-mcp.fsproj"/>
+    <Compile Include="Sphinx/Types.fsi"/>
     <Compile Include="Sphinx/Types.fs"/>
+    <Compile Include="Sphinx/RuntimeTypes.fsi"/>
     <Compile Include="Sphinx/RuntimeTypes.fs"/>
+    <Compile Include="Sphinx/State.fsi"/>
     <Compile Include="Sphinx/State.fs"/>
+    <Compile Include="Sphinx/Methodology.fsi"/>
     <Compile Include="Sphinx/Methodology.fs"/>
+    <Compile Include="Sphinx/Bayes.fsi"/>
     <Compile Include="Sphinx/Bayes.fs"/>
+    <Compile Include="Sphinx/Search.fsi"/>
     <Compile Include="Sphinx/Search.fs"/>
+    <Compile Include="Sphinx/MonteCarlo.fsi"/>
     <Compile Include="Sphinx/MonteCarlo.fs"/>
+    <Compile Include="Sphinx/Representation.fsi"/>
     <Compile Include="Sphinx/Representation.fs"/>
+    <Compile Include="Sphinx/Value.fsi"/>
     <Compile Include="Sphinx/Value.fs"/>
+    <Compile Include="Sphinx/Absorb.fsi"/>
     <Compile Include="Sphinx/Absorb.fs"/>
+    <Compile Include="Sphinx/Closure.fsi"/>
     <Compile Include="Sphinx/Closure.fs"/>
+    <Compile Include="Sphinx/Policy.fsi"/>
     <Compile Include="Sphinx/Policy.fs"/>
+    <Compile Include="Sphinx/DecodePrimitives.fsi"/>
     <Compile Include="Sphinx/DecodePrimitives.fs"/>
+    <Compile Include="Sphinx/ObservationCodec.fsi"/>
     <Compile Include="Sphinx/ObservationCodec.fs"/>
+    <Compile Include="Sphinx/WireEncode.fsi"/>
     <Compile Include="Sphinx/WireEncode.fs"/>
+    <Compile Include="Sphinx/Codec.fsi"/>
     <Compile Include="Sphinx/Codec.fs"/>
+    <Compile Include="Sphinx/Session.fsi"/>
     <Compile Include="Sphinx/Session.fs"/>
+    <Compile Include="Sphinx/McpContract.fsi"/>
     <Compile Include="Sphinx/McpContract.fs"/>
+    <Compile Include="Sphinx/McpServer.fsi"/>
     <Compile Include="Sphinx/McpServer.fs"/>
+    <Compile Include="Sphinx/Surface.fsi"/>
     <Compile Include="Sphinx/Surface.fs"/>
   </ItemGroup>
 </Project>

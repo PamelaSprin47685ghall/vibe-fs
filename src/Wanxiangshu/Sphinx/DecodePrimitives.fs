@@ -14,9 +14,9 @@ module DecodePrimitives =
     [<Emit("Array.isArray($0)")>]
     let private isArrayPhysical (value: obj) : bool = jsNative
 
-    let isNullish value = isNullishPhysical value
-    let jsType value = jsTypePhysical value
-    let isArray value = isArrayPhysical value
+    let isNullish (value: obj) = isNullishPhysical value
+    let jsType (value: obj) = jsTypePhysical value
+    let isArray (value: obj) = isArrayPhysical value
 
     [<Emit("Object.keys($0)")>]
     let private keys (value: obj) : string array = jsNative
@@ -31,35 +31,35 @@ module DecodePrimitives =
         let found = get value (box name)
         if isNullish found then None else Some found
 
-    let asString value =
+    let asString (value: obj) =
         if jsType value = "string" then
             Ok(unbox<string> value)
         else
             Error "expected string"
 
-    let asFloat value =
+    let asFloat (value: obj) =
         if jsType value = "number" && isFiniteNumber value then
             Ok(unbox<float> value)
         else
             Error "expected finite number"
 
-    let asBool value =
+    let asBool (value: obj) =
         if jsType value = "boolean" then
             Ok(unbox<bool> value)
         else
             Error "expected boolean"
 
-    let required name decoder value =
+    let required (name: string) (decoder: obj -> Result<'value, string>) (value: obj) =
         match field name value with
         | None -> Error($"{name} required")
         | Some raw -> decoder raw |> Result.mapError (fun error -> $"{name}: {error}")
 
-    let optional name decoder fallback value =
+    let optional (name: string) (decoder: obj -> Result<'value, string>) (fallback: 'value) (value: obj) =
         match field name value with
         | None -> Ok fallback
         | Some raw -> decoder raw |> Result.mapError (fun error -> $"{name}: {error}")
 
-    let asArray decoder value =
+    let asArray (decoder: obj -> Result<'value, string>) (value: obj) =
         if not (isArray value) then
             Error "expected array"
         else
@@ -76,9 +76,9 @@ module DecodePrimitives =
                 (Ok [])
             |> Result.map List.rev
 
-    let stringList value = asArray asString value
+    let stringList (value: obj) = asArray asString value
 
-    let stringMap value =
+    let stringMap (value: obj) =
         if isNullish value || jsType value <> "object" || isArray value then
             Error "expected object"
         else
@@ -106,7 +106,7 @@ module DecodePrimitives =
         | "Other" -> Some QuestionForm.Other
         | _ -> None
 
-    let formMap value =
+    let formMap (value: obj) =
         result {
             let! raw = stringMap value
 

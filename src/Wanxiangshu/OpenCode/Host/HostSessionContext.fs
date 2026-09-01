@@ -4,22 +4,6 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
 
 module HostSessionContext =
 
@@ -35,7 +19,7 @@ module HostSessionContext =
         |> Option.filter (String.IsNullOrWhiteSpace >> not)
         |> Option.bind parseRole
 
-    let read raw =
+    let read (raw: obj) =
         let event = if isNull raw || isNull raw?event then raw else raw?event
         let properties = if isNull event then null else event?properties
 

@@ -159,6 +159,7 @@ module private SessionInterop =
         | InquiryResult.Answered answer -> LookupOutcome.Found(handle, SessionStatus.Answered(answer, entry.State))
         | _ -> LookupOutcome.Found(handle, SessionStatus.Active entry.State)
 
+[<Sealed>]
 type SessionStore() =
     // DSL-MUTABLE: resource — Sphinx session registry by handle.
     let sessions = Dictionary<string, SessionEntry>()
@@ -231,5 +232,5 @@ module Session =
 
     let start question = defaultStore.Start question
 
-    let resume handle observation =
+    let resume (handle: string) (observation: obj) =
         defaultStore.Resume(handle, observation)

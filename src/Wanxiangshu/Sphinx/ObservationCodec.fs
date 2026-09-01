@@ -21,7 +21,7 @@ module ObservationCodec =
                   Intents = intents }
         }
 
-    let decodeSemanticAssessment raw =
+    let decodeSemanticAssessment (raw: obj) =
         decodeAssessment raw |> Result.map SemanticAssessmentObservation
 
     let private decodeCandidate raw =
@@ -116,13 +116,13 @@ module ObservationCodec =
                   Prior = if Double.IsNaN prior then None else Some prior }
         }
 
-    let decodeCandidates raw =
+    let decodeCandidates (raw: obj) =
         result {
             let! items = required "items" (asArray decodeCandidate) raw
             return CandidatesObservation items
         }
 
-    let decodeInvestigation raw =
+    let decodeInvestigation (raw: obj) =
         result {
             let! actionKey = required "actionKey" asString raw
             let! semanticAssessment = optional "semanticAssessment" (decodeAssessment >> Result.map Some) None raw
@@ -141,7 +141,7 @@ module ObservationCodec =
                       Candidates = candidates }
         }
 
-    let decodeSynthesis raw =
+    let decodeSynthesis (raw: obj) =
         result {
             let! text = required "text" asString raw
             let! findingKeys = optional "findingKeys" stringList [] raw
@@ -163,7 +163,7 @@ module ObservationCodec =
         | Ok "Synthesis" -> decodeSynthesis raw
         | Ok kind -> Error($"unknown observation.type: {kind}")
 
-    let decode raw =
+    let decode (raw: obj) =
         if isNullish raw || jsType raw <> "object" || isArray raw then
             Error "observation must be object"
         else

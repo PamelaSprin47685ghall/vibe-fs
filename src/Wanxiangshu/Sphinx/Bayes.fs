@@ -104,7 +104,7 @@ module Bayes =
         | Some _ -> true
         | None -> false
 
-    let posteriorFor key state =
+    let posteriorFor key (state: EpistemicState) =
         state.Bayesian |> Option.bind (fun belief -> Map.tryFind key belief.Posterior)
 
     let frozenInference (hypotheses: Hypothesis list) (evidence: Evidence list) =

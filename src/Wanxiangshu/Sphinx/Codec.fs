@@ -2,8 +2,8 @@ namespace Wanxiangshu.Sphinx
 
 module Codec =
 
-    let decodeObservation = ObservationCodec.decode
+    let decodeObservation (raw: obj) = ObservationCodec.decode raw
 
-    let requestObject = WireEncode.requestObject
+    let requestObject (request: Request) = WireEncode.requestObject request
 
-    let answerObject = WireEncode.answerObject
+    let answerObject (answer: CanonicalAnswer) = WireEncode.answerObject answer
