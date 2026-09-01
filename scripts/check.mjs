@@ -39,6 +39,7 @@ const checks = [
   join(root, 'checks/plugin-transforms-invariant.mjs'),
   join(root, 'checks/interaction-repair-invariant.mjs'),
   join(root, 'checks/retry-owner.mjs'),
+  join(root, 'checks/enforcer-bounds-owner.mjs'),
   join(root, 'checks/composition-root-invariant.mjs'),
   join(root, 'checks/hook-policy.mjs'),
   join(root, 'checks/semantic-decorator-invariant.mjs'),

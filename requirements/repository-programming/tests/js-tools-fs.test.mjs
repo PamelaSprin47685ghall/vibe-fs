@@ -152,8 +152,8 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_all_or_nothing', () => {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
     // commit two files
     const plan = [
-      ['a.txt', 'newA'],
-      ['b.txt', 'newB'],
+      { kind: 'rewrite', path: 'a.txt', expectedCurrent: 'oldA', newText: 'newA' },
+      { kind: 'create', path: 'b.txt', newText: 'newB' },
     ]
     assert.equal(ok(commitPlan(dir, plan)), true)
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'newA')
@@ -170,10 +170,10 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_aborts_before_write_when
     // a directory target cannot be snapshotted → Phase 1 aborts BEFORE any write
     mkdirSync(join(dir, 'blocked'))
     const plan = [
-      ['a.txt', 'newA'],
-      ['blocked', 'nope'],
+      { kind: 'rewrite', path: 'a.txt', expectedCurrent: 'oldA', newText: 'newA' },
+      { kind: 'rewrite', path: 'blocked', expectedCurrent: 'old', newText: 'nope' },
     ]
-    assert.equal(codeOf(commitPlan(dir, plan)), 'FILE_READ_FAILED')
+    assert.equal(codeOf(commitPlan(dir, plan)), 'FILE_CHANGED')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'oldA', 'no write happened at all')
   } finally {
     cleanup()
@@ -187,8 +187,8 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_rolls_back_written_files
     // second target's parent directory does not exist → write fails → the
     // already-written first file must be rolled back (all-or-nothing)
     const plan = [
-      ['a.txt', 'newA'],
-      ['x/y.txt', 'nope'],
+      { kind: 'rewrite', path: 'a.txt', expectedCurrent: 'oldA', newText: 'newA' },
+      { kind: 'create', path: 'x/y.txt', newText: 'nope' },
     ]
     assert.equal(codeOf(commitPlan(dir, plan)), 'TRANSACTION_COMMIT_FAILED')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'oldA', 'first write rolled back')
@@ -197,22 +197,57 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_rolls_back_written_files
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_rollbackPlan_restores_originals_and_removes_creates', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_commitPlan_rejects_a_create_race_without_overwriting', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'new.txt'), 'external', 'utf8')
+    const result = commitPlan(dir, [{ kind: 'create', path: 'new.txt', newText: 'tool' }])
+    assert.equal(codeOf(result), 'FILE_CHANGED')
+    assert.equal(readFileSync(join(dir, 'new.txt'), 'utf8'), 'external')
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_commitPlan_rejects_a_stale_rewrite_without_overwriting', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'external', 'utf8')
+    const result = commitPlan(dir, [
+      { kind: 'rewrite', path: 'a.txt', expectedCurrent: 'snapshot', newText: 'tool' },
+    ])
+    assert.equal(codeOf(result), 'FILE_CHANGED')
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'external')
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_rollbackPlan_is_CAS_and_preserves_third_party_changes', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
     // simulate a partial commit, then roll back
-    commitPlan(dir, [
-      ['a.txt', 'newA'],
-      ['b.txt', 'newB'],
+    writeFileSync(join(dir, 'c.txt'), 'oldC', 'utf8')
+    const committed = commitPlan(dir, [
+      { kind: 'rewrite', path: 'a.txt', expectedCurrent: 'oldA', newText: 'newA' },
+      { kind: 'create', path: 'b.txt', newText: 'newB' },
+      { kind: 'rewrite', path: 'c.txt', expectedCurrent: 'oldC', newText: 'newC' },
     ])
+    assert.equal(ok(committed), true)
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'newA')
+    assert.equal(readFileSync(join(dir, 'b.txt'), 'utf8'), 'newB')
+    assert.equal(readFileSync(join(dir, 'c.txt'), 'utf8'), 'newC')
+    writeFileSync(join(dir, 'c.txt'), 'third-party', 'utf8')
     const rollback = [
-      ['b.txt', undefined],
-      ['a.txt', 'oldA'],
+      { kind: 'restore', path: 'c.txt', expectedCurrent: 'newC', originalText: 'oldC' },
+      { kind: 'removeCreated', path: 'b.txt', expectedCurrent: 'newB' },
+      { kind: 'restore', path: 'a.txt', expectedCurrent: 'newA', originalText: 'oldA' },
     ]
     rollbackPlan(dir, rollback)
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'oldA')
     assert.equal(existsSync(join(dir, 'b.txt')), false)
+    assert.equal(readFileSync(join(dir, 'c.txt'), 'utf8'), 'third-party')
   } finally {
     cleanup()
   }

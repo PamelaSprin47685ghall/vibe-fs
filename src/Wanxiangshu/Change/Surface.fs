@@ -8,6 +8,8 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Process
 open Wanxiangshu.Git
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Durable.Fact
 
 /// JS-native boundary for change integration. Job projections and git/worktree
 /// resources stay behind opaque handles; answers and failures are plain objects.
@@ -547,3 +549,240 @@ module ChangeSurface =
 
     let disposeGate (gate: obj) : Task<unit> =
         task { do! ((gate :?> GateHandle).Gate :> IAsyncDisposable).DisposeAsync() }
+
+    type private GateScopeObservation(beforeAcquire: unit -> unit) =
+        let reviewGateHeld = ResizeArray<bool>()
+        let repairGateHeld = ResizeArray<bool>()
+        let ffMergeGateHeld = ResizeArray<bool>()
+        // DSL-MUTABLE: resource — state of the injected publish-gate lease
+        let mutable gateHeld = false
+        // DSL-MUTABLE: resource — number of publish-gate leases acquired
+        let mutable acquisitionCount = 0
+        // DSL-MUTABLE: resource — number of publish-gate leases released
+        let mutable releaseCount = 0
+
+        member _.GateHeld = gateHeld
+        member _.ReviewGateHeld = reviewGateHeld.ToArray()
+        member _.RepairGateHeld = repairGateHeld.ToArray()
+        member _.FfMergeGateHeld = ffMergeGateHeld.ToArray()
+        member _.AcquireCount = acquisitionCount
+        member _.ReleaseCount = releaseCount
+        member _.ObserveReview() = reviewGateHeld.Add gateHeld
+        member _.ObserveRepair() = repairGateHeld.Add gateHeld
+        member _.ObserveFfMerge() = ffMergeGateHeld.Add gateHeld
+
+        member _.Acquire() : Task<PublishGateLease> =
+            task {
+                if gateHeld then
+                    invalidOp "publish gate acquired while already held"
+
+                beforeAcquire ()
+                gateHeld <- true
+                acquisitionCount <- acquisitionCount + 1
+
+                return
+                    { Release =
+                        fun () ->
+                            task {
+                                if not gateHeld then
+                                    invalidOp "publish gate released while not held"
+
+                                gateHeld <- false
+                                releaseCount <- releaseCount + 1
+                            } }
+            }
+
+    let private observableGit
+        (observation: GateScopeObservation)
+        (targetHead: unit -> CommitHash)
+        (observeRebase: unit -> unit)
+        (observeFf: CommitHash -> unit)
+        : GitPort =
+        let targetRef = TargetRef.create "refs/heads/main"
+        let candidate = CommitHash.create "candidate"
+
+        { IsDirty = fun _ -> Task.FromResult false
+          CreateWorktree = fun _ _ -> Task.FromResult(Ok(WorktreeIdentity.create "manager/change-proof"))
+          FreezeTargetBranch = fun () -> Task.FromResult(Ok targetRef)
+          Rebase =
+            fun _ _ ->
+                observeRebase ()
+                Task.FromResult(Ok())
+          FfMerge =
+            fun _ _ expectedHead ->
+                observation.ObserveFfMerge()
+                observeFf expectedHead
+                Task.FromResult(Ok candidate)
+          ConflictedFiles = fun _ -> Task.FromResult(Ok [ "src/conflict.fs" ])
+          RemoveWorktree = fun _ -> Task.FromResult(Ok())
+          HasRebaseHead = fun _ -> Task.FromResult false
+          ListWorktrees = fun () -> Task.FromResult(Ok [])
+          ListManagerBranches = fun () -> Task.FromResult(Ok [])
+          DeleteBranch = fun _ -> Task.FromResult(Ok())
+          ReadHead = fun _ -> Task.FromResult(Ok candidate)
+          GetTargetHead = fun _ -> Task.FromResult(Ok(targetHead ())) }
+
+    let private observableManager (observation: GateScopeObservation) : ManagerPort =
+        { StartManager = fun _ -> Task.FromResult(Ok(SessionId.create "manager-session"))
+          SendManagerPrompt = fun _ -> Task.FromResult(Ok())
+          AwaitManager = fun _ -> Task.FromResult(Ok())
+          Reverify =
+            fun _ _ _ _ ->
+                observation.ObserveReview()
+                Task.FromResult(Ok())
+          ResumeManager =
+            fun _ _ _ ->
+                observation.ObserveRepair()
+                Task.FromResult(Ok())
+          TerminateChildren = fun _ -> Task.FromResult(()) }
+
+    let private observableJob git jobId =
+        { JobId = jobId
+          ManagerSessionId = SessionId.create "manager-session"
+          ManagerAgent = "fast-manager"
+          TargetRef = TargetRef.create "refs/heads/main"
+          Worktree =
+            WorktreeResource.Adopt(
+                git,
+                WorktreeIdentity.create ("manager/" + ManagerJobId.value jobId),
+                WorktreePath.create ("/tmp/" + ManagerJobId.value jobId)
+            ) }
+
+    let private conflictSnapshot (job: ManagerJob) =
+        let created =
+            OrchestratorProjection.createJob
+                {| ManagerJobId = job.JobId
+                   ManagerSessionId = job.ManagerSessionId
+                   ManagerAgent = job.ManagerAgent
+                   Byname = "Road"
+                   WorktreeIdentity = job.Worktree.Identity
+                   WorktreePath = job.Worktree.Path
+                   TargetRef = job.TargetRef
+                   TargetBranchFrozen = TargetRef.value job.TargetRef |}
+                OrchestratorProjection.empty
+
+        let conflicted =
+            OrchestratorProjection.recordConflictDetected
+                job.JobId
+                {| CandidateCommit = CommitHash.create "candidate-before-conflict"
+                   TargetHeadSnapshot = CommitHash.create "old-target-head"
+                   ConflictFiles = [ "src/conflict.fs" ]
+                   DiagnosticsDigest = "conflict-digest" |}
+                created
+
+        { Fold.empty with
+            AgentProjections =
+                { Fold.empty.AgentProjections with
+                    Orchestrator = conflicted } }
+
+    let private gateScopeSnapshot scenario job =
+        match scenario with
+        | "fresh" -> Fold.empty
+        | "conflict-recovery" -> conflictSnapshot job
+        | unknown -> invalidArg "scenario" ("unknown gate-scope scenario: " + unknown)
+
+    let private verdictKind verdict =
+        match verdict with
+        | OrchestratorVerdict.Published _ -> "Published"
+        | OrchestratorVerdict.RejectedDirty _ -> "RejectedDirty"
+        | OrchestratorVerdict.NeedsReview _ -> "NeedsReview"
+        | OrchestratorVerdict.IntegrationFailed _ -> "IntegrationFailed"
+        | OrchestratorVerdict.Empty -> "Empty"
+
+    let observeProgramGateScope (scenario: string) : Task<obj> =
+        task {
+            let observation = GateScopeObservation(ignore)
+
+            let git =
+                observableGit observation (fun () -> CommitHash.create "target-head") ignore ignore
+
+            let manager = observableManager observation
+            let job = observableJob git (ManagerJobId.create "chgint-010")
+
+            let deps =
+                { Git = git
+                  Manager = manager
+                  AppendFact = fun _ _ -> Task.FromResult(Ok())
+                  Snapshot = fun () -> gateScopeSnapshot scenario job
+                  AcquirePublishGate = observation.Acquire }
+
+            let! verdict = OrchestratorProgram.run deps job
+
+            return
+                box
+                    {| verdict = verdictKind verdict
+                       reviewGateHeld = observation.ReviewGateHeld
+                       repairGateHeld = observation.RepairGateHeld
+                       ffMergeGateHeld = observation.FfMergeGateHeld
+                       gateAcquireCount = observation.AcquireCount
+                       gateReleaseCount = observation.ReleaseCount
+                       gateHeldAfterRun = observation.GateHeld |}
+        }
+
+    type private MovedTargetWorld() =
+        let rebasedTargetSnapshots = ResizeArray<string>()
+        let postRebaseBarrierIds = ResizeArray<string>()
+        let ffExpectedHeads = ResizeArray<string>()
+        let firstTargetHead = CommitHash.create "target-head-1"
+        let advancedTargetHead = CommitHash.create "target-head-2"
+        // DSL-MUTABLE: resource — target ref owned by the external Git world
+        let mutable targetHead = firstTargetHead
+        // DSL-MUTABLE: algorithm-scratch — production rebase observations
+        let mutable rebaseCount = 0
+
+        member _.TargetHead = targetHead
+        member _.RebaseCount = rebaseCount
+        member _.RebasedTargetSnapshots = rebasedTargetSnapshots.ToArray()
+        member _.PostRebaseBarrierIds = postRebaseBarrierIds.ToArray()
+        member _.FfExpectedHeads = ffExpectedHeads.ToArray()
+
+        member _.AdvanceBeforeFirstGateGrant() =
+            if targetHead = firstTargetHead then
+                targetHead <- advancedTargetHead
+
+        member _.ObserveRebase() = rebaseCount <- rebaseCount + 1
+
+        member _.ObserveFf(expectedHead: CommitHash) =
+            ffExpectedHeads.Add(CommitHash.value expectedHead)
+
+        member _.ObserveFact(fact: AgentFact) =
+            match fact with
+            | AgentFact.Orchestrator(OrchestratorFactCases.RebasedCandidateReady payload) ->
+                rebasedTargetSnapshots.Add(CommitHash.value payload.TargetHeadSnapshot)
+                postRebaseBarrierIds.Add(ReviewBarrierId.value payload.PostRebaseReviewBarrierId)
+            | _ -> ()
+
+    let observeMovedTargetRecovery () : Task<obj> =
+        task {
+            let world = MovedTargetWorld()
+            let observation = GateScopeObservation(world.AdvanceBeforeFirstGateGrant)
+
+            let git =
+                observableGit observation (fun () -> world.TargetHead) world.ObserveRebase world.ObserveFf
+
+            let manager = observableManager observation
+            let job = observableJob git (ManagerJobId.create "chgint-013")
+
+            let deps =
+                { Git = git
+                  Manager = manager
+                  AppendFact =
+                    fun _ fact ->
+                        world.ObserveFact fact
+                        Task.FromResult(Ok())
+                  Snapshot = fun () -> Fold.empty
+                  AcquirePublishGate = observation.Acquire }
+
+            let! verdict = OrchestratorProgram.run deps job
+
+            return
+                box
+                    {| verdict = verdictKind verdict
+                       postRebaseBarrierIds = world.PostRebaseBarrierIds
+                       rebasedTargetSnapshots = world.RebasedTargetSnapshots
+                       rebaseCount = world.RebaseCount
+                       ffExpectedHeads = world.FfExpectedHeads
+                       gateAcquireCount = observation.AcquireCount
+                       gateReleaseCount = observation.ReleaseCount
+                       gateHeldAfterRun = observation.GateHeld |}
+        }

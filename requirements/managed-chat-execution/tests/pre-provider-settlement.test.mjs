@@ -27,8 +27,8 @@ const cases = [
   ['PluginReplay', 'Rejected'],
 ]
 
-for (const [failure, disposition] of cases) {
-  test(`WHAT[CHATEXEC-007] ${failure} settles the exact accepted execution before provider start`, async () => {
+test('WHAT[CHATEXEC-007] each typed pre-provider failure settles the exact accepted execution', async () => {
+  for (const [failure, disposition] of cases) {
     const result = await transaction.preProviderSettlementScenario(evidence(failure), failure, 'Exact')
 
     const projected = executionStatus.queryFacts(
@@ -52,8 +52,8 @@ for (const [failure, disposition] of cases) {
     })
     assert.equal(result.failure.kind, failure)
     assert.ok(['Recoverable', 'Permanent'].includes(result.failure.classification))
-  })
-}
+  }
+})
 
 test('WHAT[CHATEXEC-007] rejects raw AGENT-028 before it can enter a legal managed flow', async () => {
   const result = await transaction.preProviderSettlementScenario(

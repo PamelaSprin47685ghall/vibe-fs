@@ -71,7 +71,13 @@ test('WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_pac
   // watchdog、晋级纪律）归 verification-system；本断言只锁「release proof 覆盖 closure」。
   const pipeline = pkg.scripts['format-build-test']
   assert.equal(typeof pipeline, 'string', 'format-build-test must exist')
-  assert.match(pipeline, /node scripts\/build\.mjs/, 'release proof must build')
+  assert.match(pipeline, /npm run build/, 'release proof must invoke the registered build step')
+  assert.equal(pkg.scripts.build, 'wireit', 'the registered build step must execute through Wireit')
+  assert.equal(
+    pkg.wireit?.build?.command,
+    'node scripts/build.mjs',
+    'the Wireit build step must resolve to the clean Fable build owner',
+  )
   assert.match(
     pipeline,
     /node requirements\/distribution\/tests\/integration\/package\/run\.mjs/,

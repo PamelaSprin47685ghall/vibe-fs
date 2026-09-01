@@ -6707,10 +6707,18 @@
       ],
       "symbols": [
         "Wanxiangshu.OpenCode.ISessionHostPort",
+        "Wanxiangshu.OpenCode.ISessionHostPort.AbortChildren",
         "Wanxiangshu.OpenCode.ISessionHostPort.AbortSession",
         "Wanxiangshu.OpenCode.ISessionHostPort.CreateChildSession",
+        "Wanxiangshu.OpenCode.ISessionHostPort.CreateSiblingSession",
         "Wanxiangshu.OpenCode.ISessionHostPort.FamilyRootOf",
+        "Wanxiangshu.OpenCode.ISessionHostPort.InterruptAttempt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.IsManagedChild",
         "Wanxiangshu.OpenCode.ISessionHostPort.ListChildren",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SendPrompt",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeFutureTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.SubscribeTerminal",
+        "Wanxiangshu.OpenCode.ISessionHostPort.TryGetParentSession",
         "Wanxiangshu.OpenCode.ManagedSessionTermination.terminate"
       ],
       "justification": "session-ontology.Contract publishes exactly these symbols to 'managed-session-lifecycle'; every unlisted sibling remains private to session-ontology."
@@ -9978,12 +9986,15 @@
         "Wanxiangshu.Process.PtyPort",
         "Wanxiangshu.Process.PtyPort.AddMailboxSender",
         "Wanxiangshu.Process.PtyPort.CloseAll",
+        "Wanxiangshu.Process.PtyPort.Complete",
         "Wanxiangshu.Process.PtyPort.Exists",
         "Wanxiangshu.Process.PtyPort.Fork",
         "Wanxiangshu.Process.PtyPort.Known",
         "Wanxiangshu.Process.PtyPort.Read",
+        "Wanxiangshu.Process.PtyPort.ReadResult",
         "Wanxiangshu.Process.PtyPort.Send",
         "cwd",
+        "handler",
         "ptyId"
       ],
       "justification": "process-execution.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to process-execution."
@@ -10117,6 +10128,20 @@
       "contract": "process-execution.Contract",
       "kind": "published-contract",
       "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Process.PtySupervisorModule.signalName"
+      ],
+      "justification": "process-execution.Contract publishes the terminal signal renderer used by the delegation Host adapter; every unlisted sibling remains private to process-execution."
+    },
+    {
+      "path": "src/Wanxiangshu/Process/PtySupervisor.fs",
+      "owner": "process-execution",
+      "node": "process-execution-frontier-keep",
+      "contract": "process-execution.Contract",
+      "kind": "published-contract",
+      "consumers": [
         "time-capability"
       ],
       "symbols": [
@@ -10151,7 +10176,9 @@
       ],
       "symbols": [
         "Wanxiangshu.Process.PtyCommand",
+        "Wanxiangshu.Process.PtyCommand.Read",
         "Wanxiangshu.Process.PtyCommand.Signal",
+        "Wanxiangshu.Process.PtyCommand.Spawn",
         "Wanxiangshu.Process.PtyCommand.Write",
         "Wanxiangshu.Process.PtyId",
         "Wanxiangshu.Process.PtyId.Create",
@@ -10160,7 +10187,8 @@
         "Wanxiangshu.Process.PtyRead.Closed",
         "Wanxiangshu.Process.PtyRead.Id",
         "Wanxiangshu.Process.PtyRead.Output",
-        "Wanxiangshu.Process.PtySignal"
+        "Wanxiangshu.Process.PtySignal",
+        "Wanxiangshu.Process.PtySignalModule.tryParse"
       ],
       "justification": "process-execution.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to process-execution."
     },

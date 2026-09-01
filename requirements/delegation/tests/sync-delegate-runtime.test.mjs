@@ -25,8 +25,8 @@ const remainsPending = async (promise) =>
     new Promise((resolve) => setImmediate(() => resolve({ kind: 'pending' }))),
   ])
 
-for (const role of ['Inspector', 'Coder']) {
-  test(`WHAT[DELEG-021] SYNC_RUNTIME_${role.toLowerCase()}_invoke_admits_one_managed_child_and_settles_answer`, async () => {
+test('WHAT[DELEG-021] SYNC_RUNTIME_each_supported_role_admits_one_managed_child_and_settles_answer', async () => {
+  for (const role of ['Inspector', 'Coder']) {
     const owner = `owner-sync-${role.toLowerCase()}`
     const h = await live(owner)
     try {
@@ -41,8 +41,8 @@ for (const role of ['Inspector', 'Coder']) {
       assert.match(result.value, /Recent work/)
       assert.match(result.value, new RegExp(`${role} answer`))
     } finally { sync.dispose(h) }
-  })
-}
+  }
+})
 
 test('WHAT[DELEG-025] SYNC_RUNTIME_late_failure_from_previous_authority_root_cannot_fail_reused_call', async () => {
   const h = await live('owner-failure-causality')

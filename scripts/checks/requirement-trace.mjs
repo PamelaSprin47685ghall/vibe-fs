@@ -60,7 +60,8 @@ if (explain) {
     print(`test\n  ${rel(file)}:${targetLine}\n\nnot a test call site`)
     process.exit(1)
   }
-  print(`test\n  ${rel(file)}:${test.line}\n  ${test.title ?? '(dynamic or missing title)'}\n  state: ${test.state}`)
+  print(`test\n  ${rel(file)}:${test.line}\n  ${test.title ?? '(dynamic or missing title)'}\n  state: ${test.state}${test.issue ? ` (${test.issue})` : ''}`)
+  if (test.state === 'invalid') process.exit(1)
   if (test.whatIds.length === 0) {
     print('\nproves\n  (no WHAT[<ID>] owner declared)')
     process.exit(1)
@@ -116,6 +117,9 @@ for (const conflict of graph.duplicateWhats) {
 // owner tag.
 for (const test of graph.tests) {
   if (!inScope(test.file)) continue
+  if (test.state === 'invalid') {
+    add(rel(test.file), test.line, 'TRACE_INVALID_TEST_CALL', `"${test.title ?? '(missing title)'}" is not an eligible node:test declaration: ${test.issue}`)
+  }
   if (test.whatIds.length === 0) {
     add(rel(test.file), test.line, 'TRACE_ORPHAN_TEST', `"${test.title ?? '(missing title)'}" has no WHAT[<ID>] owner`)
   }
@@ -184,25 +188,26 @@ if (report) {
   for (const test of graph.tests) {
     const pkg = packageOf(test.file)
     if (!inScope(pkg)) continue
-    if (!perPackage.has(pkg)) perPackage.set(pkg, { active: 0, skipped: 0, todo: 0, tagged: 0, orphan: 0, unproved: 0 })
+    if (!perPackage.has(pkg)) perPackage.set(pkg, { active: 0, skipped: 0, todo: 0, invalid: 0, tagged: 0, orphan: 0, unproved: 0 })
     const row = perPackage.get(pkg)
     if (test.state === 'active') row.active++
     else if (test.state === 'skip') row.skipped++
-    else row.todo++
+    else if (test.state === 'todo') row.todo++
+    else row.invalid++
     if (test.whatIds.length === 1) row.tagged++
     if (test.whatIds.length === 0) row.orphan++
   }
   for (const what of graph.unproved) {
     if (what.deleted || !inScope(what.package)) continue
-    const row = perPackage.get(what.package) ?? { active: 0, skipped: 0, todo: 0, tagged: 0, orphan: 0, unproved: 0 }
+    const row = perPackage.get(what.package) ?? { active: 0, skipped: 0, todo: 0, invalid: 0, tagged: 0, orphan: 0, unproved: 0 }
     row.unproved++
     perPackage.set(what.package, row)
   }
-  print('package                   WHAT   active tests   tagged   skipped   todo   orphan calls   unproved WHAT')
+  print('package                   WHAT   active tests   tagged   skipped   todo   invalid   orphan calls   unproved WHAT')
   for (const [pkg, row] of [...perPackage.entries()].sort()) {
     const whats = [...graph.whats.values()].filter((what) => what.package === pkg && !what.deleted).length
     print(
-      `${pkg.padEnd(25)} ${String(whats).padStart(4)} ${String(row.active).padStart(12)} ${String(row.tagged).padStart(7)} ${String(row.skipped).padStart(9)} ${String(row.todo).padStart(6)} ${String(row.orphan).padStart(14)} ${String(row.unproved).padStart(13)}`,
+      `${pkg.padEnd(25)} ${String(whats).padStart(4)} ${String(row.active).padStart(12)} ${String(row.tagged).padStart(7)} ${String(row.skipped).padStart(9)} ${String(row.todo).padStart(6)} ${String(row.invalid).padStart(9)} ${String(row.orphan).padStart(14)} ${String(row.unproved).padStart(13)}`,
     )
   }
   print('')

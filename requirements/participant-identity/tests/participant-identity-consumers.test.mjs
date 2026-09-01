@@ -5,6 +5,7 @@ import * as Attempt from '../../../dist/Context/Companion/CompressionSurface.js'
 import * as Fallback from '../../../dist/Participant/Provider/Attempt/Fallback/CursorSurface.js'
 import * as Dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as Fission from '../../../dist/Execution/Fission/Surface.js'
+import * as Authority from '../../../dist/Interaction/Authority/Surface.js'
 import * as Runtime from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as Strength from '../../../dist/Strength/Surface.js'
 import * as Persona from '../../../dist/Participant/Persona/Surface.js'
@@ -73,6 +74,8 @@ test('WHAT[PID-005] provider planning selects the system prompt and tool set fro
   assert.equal(deepCoder.systemPromptId, fastCoder.systemPromptId)
   assert.deepEqual(deepCoder.toolCapabilities, fastCoder.toolCapabilities)
   assert.equal(reviewer.systemPromptId, reviewer.participantIdentity.canonicalRole)
+  assert.equal(Authority.systemPromptIdForRole(fastCoder.participantIdentity.canonicalRole), fastCoder.systemPromptId)
+  assert.equal(Authority.systemPromptIdForRole(reviewer.participantIdentity.canonicalRole), reviewer.systemPromptId)
   assert.notDeepEqual(reviewer.toolCapabilities, fastCoder.toolCapabilities)
   assert.equal(fastCoder.toolCapabilities.includes('Write'), true)
   assert.equal(reviewer.toolCapabilities.includes('Judge'), true)

@@ -12,15 +12,25 @@ import * as workRecord from '../../../dist/Mission/WorkRecord/Surface.js'
 
 const SEM = 'ses_bounded_lwr'
 
-const withJournal = async (fn) => {
+const openJournal = async () => {
   const dir = mkdtempSync(join(tmpdir(), 'lwr-bounded-'))
   const created = await journal.JournalSurface_boot(dir, 'rt_bounded_lwr', 4242, '2026-01-01T00:00:00Z')
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
+  return {
+    handle: created.journal,
+    close: () => {
+      journal.JournalSurface_dispose(created.journal)
+      rmSync(dir, { recursive: true, force: true })
+    },
+  }
+}
+
+const withJournal = async (fn) => {
+  const opened = await openJournal()
   try {
-    return await fn(created.journal)
+    return await fn(opened.handle)
   } finally {
-    journal.JournalSurface_dispose(created.journal)
-    rmSync(dir, { recursive: true, force: true })
+    opened.close()
   }
 }
 
@@ -81,30 +91,30 @@ const seedTwoInvocations = async (handle) => {
   return { s1, s2, inv1Through, inv2Through }
 }
 
-test('WHAT[WORK-RECORD-002] COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames', async () => {
-  await withJournal(async (journal) => {
-    const { s1, s2, inv1Through, inv2Through } = await seedTwoInvocations(journal)
-    // CURRENT Y through == inv2 StartInclusive. Inclusive-through keeps it;
-    // treating Next as exclusive (through > Start) would drop CURRENT_Y_INV2.
-    assert.equal(s1, inv1Through + 1, 'CURRENT Y through must equal StartInclusive')
-    await commitY(journal, { from: inv1Through, to: s1, body: 'CURRENT_Y_INV2', n: 2 })
+test('WHAT[WORK-RECORD-002] COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames', async (context) => {
+  const opened = await openJournal()
+  context.after(opened.close)
+  const { s1, s2, inv1Through, inv2Through } = await seedTwoInvocations(opened.handle)
+  // CURRENT Y through == inv2 StartInclusive. Inclusive-through keeps it;
+  // treating Next as exclusive (through > Start) would drop CURRENT_Y_INV2.
+  assert.equal(s1, inv1Through + 1, 'CURRENT Y through must equal StartInclusive')
+  await commitY(opened.handle, { from: inv1Through, to: s1, body: 'CURRENT_Y_INV2', n: 2 })
 
-    const full = await workRecord.lifecycleWorkRecord(journal, SEM, false)
-    assert.equal(typeof full, 'string')
-    assert.match(full, /PRIOR_Y_INV1/, 'unbounded Chronicle still holds the prior Y frame')
-    assert.match(full, /CURRENT_Y_INV2/)
+  const full = await workRecord.lifecycleWorkRecord(opened.handle, SEM, false)
+  assert.equal(typeof full, 'string')
+  assert.match(full, /PRIOR_Y_INV1/, 'unbounded Chronicle still holds the prior Y frame')
+  assert.match(full, /CURRENT_Y_INV2/)
 
-    const bounded = await workRecord.lifecycleWorkRecordBounded(journal, SEM, {
-      StartInclusive: { Sequence: s1 },
-      EndExclusive: { Sequence: s2 },
-    })
-    assert.equal(typeof bounded, 'string')
-    assert.match(bounded, /Chronicle\nCURRENT_Y_INV2/)
-    assert.doesNotMatch(bounded, /PRIOR_Y_INV1/)
-    assert.doesNotMatch(bounded, /inv1 work/)
-    assert.match(bounded, /inv2 work/)
-    assert.doesNotMatch(bounded, /^Opening\n/m)
+  const bounded = await workRecord.lifecycleWorkRecordBounded(opened.handle, SEM, {
+    StartInclusive: { Sequence: s1 },
+    EndExclusive: { Sequence: s2 },
   })
+  assert.equal(typeof bounded, 'string')
+  assert.match(bounded, /Chronicle\nCURRENT_Y_INV2/)
+  assert.doesNotMatch(bounded, /PRIOR_Y_INV1/)
+  assert.doesNotMatch(bounded, /inv1 work/)
+  assert.match(bounded, /inv2 work/)
+  assert.doesNotMatch(bounded, /^Opening\n/m)
 })
 
 test('WHAT[WORK-RECORD-016] COMPANION_015_bounded_review_consumes_request_range_not_session_head', async () => {

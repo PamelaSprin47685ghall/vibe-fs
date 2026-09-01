@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as intent from '../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 
 const hash = (value) => `H(${value})`
@@ -174,6 +175,7 @@ test('WHAT[INTERACTION-AUTHORITY-007] IA_007_unknown_origin_changes_no_projectio
   const state = register(root)
   const before = JSON.stringify(state)
   assert.equal(authority.resolveKnownOrigin('msg_never_proven', 'pk_never_proven', false, state), 'UnknownOrigin')
+  assert.deepEqual(intent.resolve({ sessionId: 'ses_a', physicalUserMessageId: 'msg_never_proven', explicitAgent: null, promptKey: null, hostCompaction: false, hostSynthetic: false }, { available: true, activeAgent: 'fast-coder', activeKind: 'HumanRoot', claims: [], acceptedContinuations: [] }), { case: 'Reject', reason: 'UnknownOriginWhileActive' })
   assert.equal(JSON.stringify(state), before)
 })
 

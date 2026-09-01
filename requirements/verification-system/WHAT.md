@@ -36,6 +36,8 @@
 
 测试与运行期的挂死判据必须基于距离上一次**因果进展**的静默时长，严禁以整个测试套件的绝对墙钟运行时间作为唯一判据。看门狗只能由明确的业务因果事件进行续期（如被消费的剧本步骤、显式断言检查点或事实增长）；底层的原始传输流量、重连心跳或生命周期噪声严禁作为因果进展。背景非阻塞车道的进展只记录不续期。超时发生时必须先完整转储因果诊断状态，随后以非零状态安全退出。
 
+process-isolated test runner 必须区分叶子测试与承载整份文件的 child process：叶子测试的局部 timeout 只能约束该测试，严禁把同一预算施加到文件 wrapper 并把模块加载、调度等待或同文件其他健康测试误判为叶子超时。全 suite backstop 属于外部 supervisor 的物理兜底；它不得通过一个共享 AbortSignal 向每个文件 worker 复制监听器，也不得取代 verdict-silence criterion。需要 timeout-and-forget 的叶子测试必须在自身声明该预算。
+
 ### 禁止退化清单
 
 ```text
@@ -52,6 +54,7 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 数量常量与清单各自维护
 静态门禁的路径判据指向不存在的目录
 延长静默窗口或测试超时以掩盖竞态
+把叶子测试 timeout 作为 process-isolated 文件 wrapper 的总预算
 ```
 
 ## VERIFICATION-SYSTEM-007: 时间确定性
@@ -61,6 +64,8 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 ## VERIFICATION-SYSTEM-008: 契约面语言边界
 
 生产代码与测试代码之间存在严格的契约面语言边界：生产代码以 `.fs` 编写，语义测试以 `.mjs` 编写并直接消费编译产物（dist）。编译器输出的内部符号、中间结构与内部映射关系不属于对外契约，语义测试只能通过正式注册的 Owner 契约面（公开纯函数、序列化契约、公开端口）访问系统。测试断言必须针对完整数据结构或规范序列化文本，严禁进行仅断言真值的脆弱验证。当测试消费的编译产物落后于源码时，运行器必须拒绝执行并 fail-closed。
+
+属性测试的 generator 只能描述合法输入域、边界输入或精确非法 mutation，不得实现 expected decision。property 必须以 WHAT 独立声明的代数、变形关系或 typed rejection 判断注册 production Surface 的结果；严禁在测试内重建状态机、formula、decoder 或 detector 作为平行 oracle。无限或组合爆炸输入域必须固定 seed 与有限 run budget，失败必须输出并可重放 shrink path；有限小域优先穷举。无法说明 oracle 独立性的命题不得用随机生成伪装 comprehensive proof。
 
 ## VERIFICATION-SYSTEM-009: 静态门禁命中真实路径
 

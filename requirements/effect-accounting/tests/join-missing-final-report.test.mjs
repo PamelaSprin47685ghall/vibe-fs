@@ -28,8 +28,8 @@ const remainsPending = async (run, message) => {
 }
 
 test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_MissingFinalReport_Failed_keeps_run_pending_not_failed', async () => {
-  const run = makeRun('agent-mfr', 'ses_mfr_child', 'ses_mfr_parent')
-  await lifecycle.complete(run, { kind: 'Failed', message: 'MISSING_FINAL_REPORT' })
+  const run = lifecycleModule.HostForkRunLifecycleSurface_create({ agentId: 'agent-mfr', childId: 'ses_mfr_child', parentId: 'ses_mfr_parent' })
+  await lifecycleModule.HostForkRunLifecycleSurface_complete(run, { kind: 'Failed', message: 'MISSING_FINAL_REPORT' })
   await remainsPending(run, 'MISSING_FINAL_REPORT')
 })
 

@@ -6,8 +6,6 @@ import test from 'node:test'
 
 import * as surface from '../../../dist/OpenCode/Host/RequirementGroundingRepositorySurface.js'
 
-const workflowSource = readFileSync(new URL('../../../src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs', import.meta.url), 'utf8')
-
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wanxiang-grounding-js-'))
   for (const name of ['alpha', 'beta']) mkdirSync(join(dir, 'requirements', name), { recursive: true })
@@ -34,7 +32,7 @@ const program = `class Js extends JsProgram {
 test('WHAT[REQUIREMENT-GROUNDING-009] js-* mutations commit normally while grounding observes the full effect set without admission', async () => {
   const { dir, cleanup } = sandbox()
   try {
-    const result = await surface.runFirstAttempt(dir, 'js-union', program)
+    const result = await surface.runWithObservationFailure(dir, 'js-union', program)
     assert.equal(result.caseName, 'Succeeded')
     assert.equal(result.failureCode, null)
     assert.deepEqual(result.pendingPackages, ['alpha', 'beta'])
@@ -44,11 +42,6 @@ test('WHAT[REQUIREMENT-GROUNDING-009] js-* mutations commit normally while groun
     assert.equal(readFileSync(join(dir, 'src', 'alpha', 'a.txt'), 'utf8'), 'a0')
     assert.equal(readFileSync(join(dir, 'src', 'beta', 'b.txt'), 'utf8'), 'b0')
 
-    const runCoreAt = workflowSource.indexOf('let private runCore')
-    const preflightAt = workflowSource.indexOf('JsTransaction.preflight', runCoreAt)
-    const observationAt = workflowSource.indexOf('fileAccessObservation', preflightAt)
-    const commitAt = workflowSource.indexOf('commitMutations', observationAt)
-    assert.ok(runCoreAt >= 0 && preflightAt > runCoreAt && observationAt > preflightAt && commitAt > observationAt)
     surface.dispose(result.runtime)
   } finally { cleanup() }
 })

@@ -11,6 +11,8 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { SURFACE_CONSUMERS, SURFACE_MANIFEST } from '../lib/test-surface-scan.mjs'
+import { isFunction, parseModule, walkSyntax } from '../lib/js-syntax.mjs'
+import { scanTestSource, whatHeadings } from '../lib/requirement-trace.mjs'
 import { walk } from '../lib/walk.mjs'
 
 export const WHAT_ID = /^#{1,6}\s+([A-Z][A-Z0-9-]*-\d{3}(?:[A-Z]|-[A-Z0-9]+)?)\b/gm
@@ -46,24 +48,9 @@ export const whatIds = (text) => {
 export const proofHasLaw = (text, law) =>
   text.split('\n').some((line) => line.includes('|') && new RegExp(`\\b${escapeRegExp(law)}\\b`).test(line))
 
-const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
-
-/** Remove string literals so a binding name inside a string is not a use.
- *
- * Single/double-quoted strings do not span newlines in JS; template literals do.
- */
-const stripStrings = (text) =>
-  text
-    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
-    .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
-    .replace(/`(?:[^`\\]|\\.)*`/g, '``')
-
 /** Require a direct static/dynamic import in a .test.mjs source, not a comment. */
 export const importsSurface = (source, module) => {
-  if (!source.includes(`dist/${module}`)) return false
-  const target = escapeRegExp(module)
-  const importPattern = new RegExp(`(?:\\bfrom\\s*|\\bimport\\s*\\(\\s*)['"][^'"]*dist/${target}['"]`)
-  return importPattern.test(stripComments(source))
+  return analyzeSurface(source, module).imports.length > 0
 }
 
 /**
@@ -76,53 +63,233 @@ export const importsSurface = (source, module) => {
  * Recognizes default, namespace, and named import forms (including `as`).
  */
 export const usesSurface = (source, module) => {
-  if (!source.includes(`dist/${module}`)) return false
-  const text = stripComments(source)
-  const target = escapeRegExp(module)
+  return analyzeSurface(source, module).uses.length > 0
+}
 
-  // Static import: `import <clause> from '...dist/<module>'`
-  // The clause cannot contain another `import` keyword (that would be a
-  // different statement), so we exclude it from the capture.
-  const staticPattern = new RegExp(`\\bimport\\s+((?:(?!\\bimport\\b)[\\s\\S])+?)\\s+from\\s*['"][^'"]*dist/${target}['"]`, 'g')
-  let match
-  while ((match = staticPattern.exec(text)) !== null) {
-    const clause = match[1].trim()
-    const bindings = []
-    // Namespace: `* as ns`
-    const namespace = clause.match(/\*\s+as\s+([A-Za-z_$][\w$]*)/)
-    if (namespace) bindings.push(namespace[1])
-    // Named: `{ a, b as c }`
-    const named = clause.match(/\{([\s\S]*)\}/)
-    if (named) {
-      for (const item of named[1].split(',')) {
-        const local = item.trim().split(/\s+as\s+/).at(-1)?.trim()
-        if (local && /^[A-Za-z_$][\w$]*$/.test(local)) bindings.push(local)
-      }
-    }
-    // Default: the identifier before `{` or `*`, if any
-    const defaultBinding = clause.match(/^([A-Za-z_$][\w$]*)\s*(?:,|$|\{|\*)/)
-    if (defaultBinding) bindings.push(defaultBinding[1])
-    const rest = text.slice(match.index + match[0].length)
-    const codeAfter = stripStrings(rest)
-    if (bindings.some((binding) => new RegExp(`\\b${escapeRegExp(binding)}\\b`).test(codeAfter))) return true
+const moduleSpecifierMatches = (value, module) =>
+  typeof value === 'string' && (value === `dist/${module}` || value.endsWith(`/dist/${module}`))
+
+const patternIdentifiers = (pattern) => {
+  if (!pattern) return []
+  switch (pattern.type) {
+    case 'Identifier': return [pattern]
+    case 'AssignmentPattern': return patternIdentifiers(pattern.left)
+    case 'RestElement': return patternIdentifiers(pattern.argument)
+    case 'ArrayPattern': return pattern.elements.flatMap(patternIdentifiers)
+    case 'ObjectPattern': return pattern.properties.flatMap((property) =>
+      property.type === 'RestElement' ? patternIdentifiers(property.argument) : patternIdentifiers(property.value))
+    default: return []
   }
+}
 
-  // Dynamic import assigned to a variable: `const m = import('...dist/<module>')`
-  const dynamicPattern = new RegExp(`\\b(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:await\\s+)?import\\s*\\(\\s*['"][^'"]*dist/${target}['"]\\s*\\)`, 'g')
-  while ((match = dynamicPattern.exec(text)) !== null) {
-    const rest = text.slice(match.index + match[0].length)
-    if (new RegExp(`\\b${escapeRegExp(match[1])}\\b`).test(stripStrings(rest))) return true
+const isBlockScope = (node) =>
+  node?.type === 'Program'
+  || node?.type === 'BlockStatement'
+  || node?.type === 'CatchClause'
+  || node?.type === 'ForStatement'
+  || node?.type === 'ForInStatement'
+  || node?.type === 'ForOfStatement'
+  || node?.type === 'SwitchStatement'
+  || node?.type === 'StaticBlock'
+
+const nearestScope = (ancestors, predicate) => {
+  for (let index = ancestors.length - 1; index >= 0; index--) {
+    if (predicate(ancestors[index])) return { node: ancestors[index], depth: index }
   }
+  return null
+}
 
-  // Destructured dynamic import: `const { a, b } = import('...dist/<module>')`
-  const destructuredPattern = new RegExp(`\\b(?:const|let|var)\\s+\\{([^}]+)\\}\\s*=\\s*(?:await\\s+)?import\\s*\\(\\s*['"][^'"]*dist/${target}['"]\\s*\\)`, 'g')
-  while ((match = destructuredPattern.exec(text)) !== null) {
-    const rest = text.slice(match.index + match[0].length)
-    const bindings = match[1].split(',').map((item) => item.trim().split(/\s+as\s+|\s*:\s*/).at(-1)?.trim()).filter(Boolean)
-    const codeAfter = stripStrings(rest)
-    if (bindings.some((binding) => new RegExp(`\\b${escapeRegExp(binding)}\\b`).test(codeAfter))) return true
+const strictObjectTargets = (pattern) => {
+  if (pattern.type !== 'ObjectPattern') return null
+  const targets = []
+  for (const property of pattern.properties) {
+    if (property.type !== 'Property' || property.computed || property.kind !== 'init' || property.method || property.value.type !== 'Identifier') return null
+    targets.push(property.value)
+  }
+  return targets
+}
+
+const contains = (outer, inner) => outer && outer.start <= inner.start && inner.end <= outer.end
+const unwrapAwait = (node) => node?.type === 'AwaitExpression' ? node.argument : node
+
+const referenceIdentifier = (node, parent) => {
+  if (node.type !== 'Identifier' || parent === null) return false
+  if (parent.type === 'MemberExpression' && parent.property === node && !parent.computed) return false
+  if (parent.type === 'Property' && parent.key === node && !parent.computed && !parent.shorthand) return false
+  if ((parent.type === 'MethodDefinition' || parent.type === 'PropertyDefinition') && parent.key === node && !parent.computed) return false
+  if (parent.type === 'LabeledStatement' || parent.type === 'BreakStatement' || parent.type === 'ContinueStatement') return false
+  if (parent.type === 'MetaProperty' || parent.type === 'ImportSpecifier' || parent.type === 'ImportDefaultSpecifier') return false
+  if (parent.type === 'ImportNamespaceSpecifier' || parent.type === 'ExportSpecifier') return false
+  return true
+}
+
+const assignmentTarget = (node, ancestors) => ancestors.some((ancestor) =>
+  (ancestor.type === 'AssignmentExpression' && contains(ancestor.left, node))
+  || (ancestor.type === 'UpdateExpression' && contains(ancestor.argument, node))
+  || ((ancestor.type === 'ForInStatement' || ancestor.type === 'ForOfStatement') && contains(ancestor.left, node))
+  || (ancestor.type === 'UnaryExpression' && ancestor.operator === 'delete' && contains(ancestor.argument, node)))
+
+const terminalCall = (node, ancestors) => {
+  for (let index = ancestors.length - 1; index >= 0; index--) {
+    const ancestor = ancestors[index]
+    if (ancestor.type !== 'CallExpression' || !contains(ancestor, node)) continue
+    const callee = ancestor.callee.type === 'ChainExpression' ? ancestor.callee.expression : ancestor.callee
+    return !(contains(callee, node) && callee.type === 'MemberExpression' && !callee.computed && callee.property.type === 'Identifier' && callee.property.name === 'bind')
   }
   return false
+}
+
+const inNonterminalInitializer = (node, ancestors) => ancestors.some((ancestor) =>
+  ancestor.type === 'VariableDeclarator' && contains(ancestor.init, node) && !terminalCall(node, ancestors))
+
+const voidRead = (node, ancestors) => ancestors.some((ancestor) =>
+  ancestor.type === 'UnaryExpression' && ancestor.operator === 'void' && contains(ancestor.argument, node) && !terminalCall(node, ancestors))
+
+const literalBoolean = (node) => node?.type === 'Literal' && typeof node.value === 'boolean' ? node.value : null
+
+const staticallyUnreachable = (node, ancestors) => ancestors.some((ancestor) => {
+  if (ancestor.type === 'IfStatement') {
+    const condition = literalBoolean(ancestor.test)
+    return (condition === false && contains(ancestor.consequent, node)) || (condition === true && contains(ancestor.alternate, node))
+  }
+  if (ancestor.type === 'ConditionalExpression') {
+    const condition = literalBoolean(ancestor.test)
+    return (condition === false && contains(ancestor.consequent, node)) || (condition === true && contains(ancestor.alternate, node))
+  }
+  if (ancestor.type === 'LogicalExpression' && contains(ancestor.right, node)) {
+    const left = literalBoolean(ancestor.left)
+    return (ancestor.operator === '&&' && left === false) || (ancestor.operator === '||' && left === true)
+  }
+  if (ancestor.type === 'WhileStatement') return literalBoolean(ancestor.test) === false && contains(ancestor.body, node)
+  if (ancestor.type === 'ForStatement') return literalBoolean(ancestor.test) === false && contains(ancestor.body, node)
+  return false
+})
+
+const analysisCache = new WeakMap()
+
+const analyzeSurface = (source, module, syntax) => {
+  if (!source.includes(`dist/${module}`)) return { imports: [], uses: [] }
+  const program = syntax ?? parseModule(source)
+  let byModule = analysisCache.get(program)
+  if (!byModule) {
+    byModule = new Map()
+    analysisCache.set(program, byModule)
+  }
+  if (byModule.has(module)) return byModule.get(module)
+
+  const bindings = []
+  const bindingIdentifiers = new WeakSet()
+  const bindingByIdentifier = new WeakMap()
+  const ancestorsByNode = new WeakMap()
+  const declarators = []
+  const imports = []
+  const addBinding = (identifier, scope, declarationEnd, surface = false) => {
+    if (!identifier || !scope || bindingByIdentifier.has(identifier)) return bindingByIdentifier.get(identifier)
+    const binding = { name: identifier.name, scope: scope.node, depth: scope.depth, declarationEnd, surface }
+    bindings.push(binding)
+    bindingIdentifiers.add(identifier)
+    bindingByIdentifier.set(identifier, binding)
+    return binding
+  }
+  const outerBlock = (ancestors) => nearestScope(ancestors, isBlockScope)
+  const functionOrProgram = (ancestors) => nearestScope(ancestors, (node) => isFunction(node) || node.type === 'Program')
+
+  walkSyntax(program, (node, parent, _key, ancestors) => {
+    ancestorsByNode.set(node, ancestors)
+    if (node.type === 'ImportDeclaration') {
+      const surface = moduleSpecifierMatches(node.source.value, module)
+      if (surface) imports.push(node)
+      const scope = { node: program, depth: 0 }
+      for (const specifier of node.specifiers) addBinding(specifier.local, scope, node.end, surface)
+      return
+    }
+    if (node.type === 'ImportExpression' && moduleSpecifierMatches(node.source?.value, module)) imports.push(node)
+    if (node.type === 'VariableDeclarator') {
+      const declaration = parent
+      const scope = declaration.kind === 'var' ? functionOrProgram(ancestors) : outerBlock(ancestors)
+      for (const identifier of patternIdentifiers(node.id)) addBinding(identifier, scope, node.end)
+      declarators.push({ node, declaration })
+      return
+    }
+    if (node.type === 'FunctionDeclaration') {
+      addBinding(node.id, outerBlock(ancestors), node.end)
+      const scope = { node, depth: ancestors.length }
+      for (const identifier of node.params.flatMap(patternIdentifiers)) addBinding(identifier, scope, node.end)
+      return
+    }
+    if (node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
+      const scope = { node, depth: ancestors.length }
+      if (node.type === 'FunctionExpression') addBinding(node.id, scope, node.end)
+      for (const identifier of node.params.flatMap(patternIdentifiers)) addBinding(identifier, scope, node.end)
+      return
+    }
+    if (node.type === 'ClassDeclaration') addBinding(node.id, outerBlock(ancestors), node.end)
+    else if (node.type === 'ClassExpression') addBinding(node.id, { node, depth: ancestors.length }, node.end)
+    else if (node.type === 'CatchClause') {
+      const scope = { node, depth: ancestors.length }
+      for (const identifier of patternIdentifiers(node.param)) addBinding(identifier, scope, node.end)
+    }
+  })
+
+  const resolveBinding = (identifier) => {
+    const ancestors = ancestorsByNode.get(identifier) ?? []
+    const scopes = new Set(ancestors)
+    return bindings
+      .filter((binding) => binding.name === identifier.name && scopes.has(binding.scope))
+      .sort((left, right) => right.depth - left.depth)[0] ?? null
+  }
+  const targetsOf = (pattern) => {
+    const identifiers = pattern.type === 'Identifier' ? [pattern] : strictObjectTargets(pattern)
+    if (identifiers === null) return null
+    const targets = identifiers.map((identifier) => bindingByIdentifier.get(identifier)).filter(Boolean)
+    return targets.length === identifiers.length ? targets : null
+  }
+
+  for (const { node, declaration } of declarators) {
+    if (declaration.kind !== 'const') continue
+    const imported = unwrapAwait(node.init)
+    if (imported?.type !== 'ImportExpression' || !moduleSpecifierMatches(imported.source?.value, module)) continue
+    for (const target of targetsOf(node.id) ?? []) target.surface = true
+  }
+
+  const aliasSources = new WeakSet()
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const { node, declaration } of declarators) {
+      if (declaration.kind !== 'const' || !node.init) continue
+      const targets = targetsOf(node.id)
+      if (targets === null) continue
+      let identifier = null
+      if (node.init.type === 'Identifier') identifier = node.init
+      else if (node.init.type === 'MemberExpression' && !node.init.computed && !node.init.optional && node.init.object.type === 'Identifier' && node.init.property.type === 'Identifier') identifier = node.init.object
+      if (identifier === null) continue
+      const sourceBinding = resolveBinding(identifier)
+      if (!sourceBinding?.surface || sourceBinding.declarationEnd > node.init.start) continue
+      aliasSources.add(identifier)
+      for (const target of targets) {
+        if (target.surface) continue
+        target.surface = true
+        changed = true
+      }
+    }
+  }
+
+  const uses = []
+  walkSyntax(program, (node, parent, _key, ancestors) => {
+    if (!referenceIdentifier(node, parent) || bindingIdentifiers.has(node) || aliasSources.has(node)) return
+    const binding = resolveBinding(node)
+    if (!binding?.surface || assignmentTarget(node, ancestors) || inNonterminalInitializer(node, ancestors) || voidRead(node, ancestors)) return
+    if (staticallyUnreachable(node, ancestors)) return
+    uses.push({ position: node.start, functions: ancestors.filter(isFunction) })
+  })
+
+  const analysis = {
+    imports: [...new Map(imports.map((node) => [node.start, node])).values()],
+    uses: [...new Map(uses.map((use) => [use.position, use])).values()].sort((left, right) => left.position - right.position),
+  }
+  byModule.set(module, analysis)
+  return analysis
 }
 
 const sourceCompileStem = (source) => {
@@ -139,7 +306,12 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
   const fsproj = existsSync(fsprojPath) ? readFileSync(fsprojPath, 'utf8') : ''
   const executableFiles = walk(requirements, ['.test.mjs', '.mjs', '.js']).map(normalize)
   const executableSources = executableFiles.map((file) => ({ file, source: readFileSync(file, 'utf8') }))
-  const testSources = executableSources.filter(({ file }) => file.endsWith('.test.mjs'))
+  const testSources = executableSources
+    .filter(({ file }) => file.endsWith('.test.mjs'))
+    .map(({ file, source }) => {
+      const syntax = parseModule(source, file)
+      return { file, source, syntax, declarations: scanTestSource(file, source, syntax) }
+    })
   const seenModules = new Set()
 
   if (!Array.isArray(manifest)) {
@@ -149,10 +321,12 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
   // Reject consumer metadata for modules no longer in the manifest. A stale
   // SURFACE_CONSUMERS entry grants phantom import authority to a surface that
   // no longer exists.
-  const manifestModules = new Set(manifest.map((entry) => entry?.module).filter(Boolean))
-  for (const consumerModule of Object.keys(SURFACE_CONSUMERS)) {
-    if (!manifestModules.has(consumerModule)) {
-      fail(`${consumerModule}: stale SURFACE_CONSUMERS entry for unregistered module`)
+  if (manifest === SURFACE_MANIFEST) {
+    const manifestModules = new Set(manifest.map((entry) => entry?.module).filter(Boolean))
+    for (const consumerModule of Object.keys(SURFACE_CONSUMERS)) {
+      if (!manifestModules.has(consumerModule)) {
+        fail(`${consumerModule}: stale SURFACE_CONSUMERS entry for unregistered module`)
+      }
     }
   }
 
@@ -183,8 +357,7 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
       continue
     }
 
-    const ids = new Set(whatIds(read(root, ownerWhatPath)))
-        const laws = Array.isArray(entry.laws) ? entry.laws : []
+    const laws = Array.isArray(entry.laws) ? entry.laws : []
     const lawOwners = entry.lawOwners && typeof entry.lawOwners === 'object' ? entry.lawOwners : {}
     for (const law of laws) {
       const lawOwner = typeof lawOwners[law] === 'string' ? lawOwners[law] : entry.owner
@@ -193,7 +366,7 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
         fail(`${label}: law ${law} owner WHAT is missing (${lawWhatPath})`)
         continue
       }
-      const lawIds = new Set(whatIds(read(root, lawWhatPath)))
+      const lawIds = new Set(whatHeadings(read(root, lawWhatPath)).map(({ id }) => id))
       if (!lawIds.has(law)) fail(`${label}: law ${law} is absent from ${lawWhatPath}`)
     }
 
@@ -211,43 +384,64 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
       fail(`${label}: ${compileStem}.fs is not compiled by Wanxiangshu.fsproj`)
     }
 
-    const importedBy = typeof entry.module === 'string' ? testSources.filter(({ source }) => importsSurface(source, entry.module)) : []
-    const activeBy = typeof entry.module === 'string' ? testSources.filter(({ source }) => usesSurface(source, entry.module)) : []
+    const importedBy = typeof entry.module === 'string'
+      ? testSources.filter(({ source, syntax }) => analyzeSurface(source, entry.module, syntax).imports.length > 0)
+      : []
     const consumerPackages = new Set(
       typeof entry.module === 'string' && Array.isArray(SURFACE_CONSUMERS[entry.module]) ? SURFACE_CONSUMERS[entry.module] : [],
     )
 
-    /** A consumer is authorized when it carries a surface law WHAT tag and
-     * lives under the law owner's tests directory, or when its package is
-     * declared as an explicit cross-owner consumer. */
-    const isAuthorizedConsumer = ({ file, source }) => {
-      const sourceLaws = new Set(whatIds(source))
-      const lawAuthorized = laws.some((law) => {
-        const lawOwner = typeof lawOwners[law] === 'string' ? lawOwners[law] : entry.owner
-        return sourceLaws.has(law) && file.startsWith(`${requirements}/${lawOwner}/tests/`)
-      })
-      if (lawAuthorized) return true
-      const pkg = packageOfTestFile(file, requirements)
-      return pkg !== null && consumerPackages.has(pkg)
+    const directUses = []
+    if (typeof entry.module === 'string') {
+      for (const testSource of importedBy) {
+        for (const use of analyzeSurface(testSource.source, entry.module, testSource.syntax).uses) {
+          const declaration = testSource.declarations
+            .filter(({ bodyStart, bodyEnd }) => Number.isInteger(bodyStart) && bodyStart <= use.position && use.position < bodyEnd)
+            .sort((left, right) => (left.bodyEnd - left.bodyStart) - (right.bodyEnd - right.bodyStart))[0]
+          const nestedClosure = declaration && use.functions.some(
+            (fn) => declaration.bodyStart <= fn.start && fn.end <= declaration.bodyEnd,
+          )
+          if (declaration && !nestedClosure) directUses.push({ file: testSource.file, declaration })
+        }
+      }
+    }
+    const uniqueDirectUses = [...new Map(directUses.map((use) => [`${use.file}:${use.declaration.start}`, use])).values()]
+    const activeUses = uniqueDirectUses.filter(({ declaration }) => declaration.state === 'active')
+    const isLawProof = ({ file, declaration }) => {
+      if (declaration.whatIds.length !== 1) return false
+      const law = declaration.whatIds[0]
+      if (!laws.includes(law)) return false
+      const lawOwner = typeof lawOwners[law] === 'string' ? lawOwners[law] : entry.owner
+      return packageOfTestFile(file, requirements) === lawOwner
+    }
+    const lawProofs = activeUses.filter(isLawProof)
+    const ownerPackages = new Set([
+      entry.owner,
+      ...laws.map((law) => typeof lawOwners[law] === 'string' ? lawOwners[law] : entry.owner),
+    ])
+    const isAllowedUse = (use) => {
+      if (isLawProof(use)) return true
+      const pkg = packageOfTestFile(use.file, requirements)
+      return pkg !== null && (ownerPackages.has(pkg) || consumerPackages.has(pkg))
     }
 
-    const authorizedBy = activeBy.filter(isAuthorizedConsumer)
     if (typeof entry.module === 'string' && importedBy.length === 0) {
       fail(`${label}: no .test.mjs imports the registered surface`)
-    } else if (typeof entry.module === 'string' && activeBy.length === 0) {
+    } else if (typeof entry.module === 'string' && activeUses.length === 0) {
       fail(`${label}: surface import has no active executable use in a .test.mjs`)
-    } else if (typeof entry.module === 'string' && authorizedBy.length === 0) {
-      fail(`${label}: no active contract test WHAT law authorizes this surface`)
+    }
+    if (typeof entry.module === 'string' && lawProofs.length === 0) {
+      fail(`${label}: no active owner-law declaration has a production-bound surface use`)
     }
 
     // Per-consumer rejection: every active import must be law-authorized or
     // declared as an explicit cross-owner consumer. An unrelated test that
     // merely imports the surface is a false green, not proof.
     if (typeof entry.module === 'string') {
-      for (const consumer of activeBy) {
-        if (!isAuthorizedConsumer(consumer)) {
-          const pkg = packageOfTestFile(consumer.file, requirements) ?? '?'
-          fail(`${label}: unauthorized active import from ${relativePath(consumer.file, root)} (package ${pkg} has no law or declared consumer edge)`)
+      for (const use of activeUses) {
+        if (!isAllowedUse(use)) {
+          const pkg = packageOfTestFile(use.file, requirements) ?? '?'
+          fail(`${label}: unauthorized active import use from ${relativePath(use.file, root)}:${use.declaration.line} (package ${pkg} has no law or declared consumer edge)`)
         }
       }
     }

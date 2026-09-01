@@ -45,6 +45,18 @@ type JsStagedMutation =
     | Rewrite of path: string * originalText: string * newText: string
     | Create of path: string * text: string
 
+type JsReadSnapshot = { Path: string; Text: string }
+
+[<RequireQualifiedAccess>]
+type JsCommitMutation =
+    | RewriteFile of path: string * expectedCurrent: string * newText: string
+    | CreateFile of path: string * newText: string
+
+[<RequireQualifiedAccess>]
+type JsRollbackMutation =
+    | RestoreFile of path: string * expectedCurrent: string * originalText: string
+    | RemoveCreatedFile of path: string * expectedCurrent: string
+
 module JsStagedMutation =
 
     let path (mutation: JsStagedMutation) : string =
@@ -105,37 +117,69 @@ module JsTransaction =
             | Some failure -> Error failure
             | None -> Ok()
 
+    let private validateReadSnapshots
+        (readCurrent: string -> string option)
+        (snapshots: JsReadSnapshot list)
+        : Result<unit, JsFailure> =
+        snapshots
+        |> List.tryPick (fun snapshot ->
+            if readCurrent snapshot.Path = Some snapshot.Text then
+                None
+            else
+                Some(JsFailure.FileChanged snapshot.Path))
+        |> function
+            | Some failure -> Error failure
+            | None -> Ok()
+
+    let private validateCommitExistence (exists: string -> bool) (mutations: JsStagedMutation list) =
+        mutations
+        |> List.tryPick (fun mutation ->
+            match mutation with
+            | JsStagedMutation.Rewrite(path, _, _) when not (exists path) -> Some(JsFailure.FileChanged path)
+            | JsStagedMutation.Create(path, _) when exists path -> Some(JsFailure.FileChanged path)
+            | _ -> None)
+        |> function
+            | Some failure -> Error failure
+            | None -> Ok()
+
     /// JS-013: full preflight — every rule must pass before any file effect.
     let preflight
         (exists: string -> bool)
         (readCurrent: string -> string option)
+        (readSnapshots: JsReadSnapshot list)
         (mutations: JsStagedMutation list)
         : Result<unit, JsFailure> =
         validateSingleIntent mutations
         |> Result.bind (fun validated ->
-            validateTargets exists validated
+            validateReadSnapshots readCurrent readSnapshots
+            |> Result.bind (fun () -> validateCommitExistence exists validated)
             |> Result.bind (fun () -> validateFreshness readCurrent validated))
 
     /// JS-013: the commit plan — one write per mutation, in declaration order.
     /// The adapter applies this plan; a failure anywhere rolls the whole plan
     /// back (rollback restores each original text).
-    let commitPlan (mutations: JsStagedMutation list) : (string * string) list =
-        mutations
+    let private canonicalOrder mutations =
+        mutations |> List.sortBy JsStagedMutation.path
+
+    let commitPlan (mutations: JsStagedMutation list) : JsCommitMutation list =
+        canonicalOrder mutations
         |> List.map (fun mutation ->
             match mutation with
-            | JsStagedMutation.Rewrite(path, _, newText) -> path, newText
-            | JsStagedMutation.Create(path, text) -> path, text)
+            | JsStagedMutation.Rewrite(path, originalText, newText) ->
+                JsCommitMutation.RewriteFile(path, originalText, newText)
+            | JsStagedMutation.Create(path, text) -> JsCommitMutation.CreateFile(path, text))
 
     /// JS-015: rollback plan — restore every original text (rewrites only;
     /// creates are removed by the adapter). Order is reversed so a partial
     /// commit unwinds last-write-first.
-    let rollbackPlan (mutations: JsStagedMutation list) : (string * string option) list =
-        mutations
+    let rollbackPlan (mutations: JsStagedMutation list) : JsRollbackMutation list =
+        canonicalOrder mutations
         |> List.rev
         |> List.map (fun mutation ->
             match mutation with
-            | JsStagedMutation.Rewrite(path, originalText, _) -> path, Some originalText
-            | JsStagedMutation.Create(path, _) -> path, None)
+            | JsStagedMutation.Rewrite(path, originalText, newText) ->
+                JsRollbackMutation.RestoreFile(path, newText, originalText)
+            | JsStagedMutation.Create(path, text) -> JsRollbackMutation.RemoveCreatedFile(path, text))
 
 /// DSL-class: DurableFact — JS-012/015: identity of one js-* transaction.
 type JsTransactionId = private JsTransactionId of string

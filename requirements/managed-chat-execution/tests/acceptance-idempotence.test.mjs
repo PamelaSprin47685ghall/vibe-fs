@@ -159,8 +159,8 @@ test('WHAT[CHATEXEC-004] established evidence conflict is typed and appends noth
   assert.equal(result.witness, null)
 })
 
-for (const outcome of ['NotAttempted', 'CommitUnknown']) {
-  test(`WHAT[CHATEXEC-004] persistence ${outcome} does not acquire capacity after journal uncertainty`, async () => {
+test('WHAT[CHATEXEC-004] each uncertain persistence outcome acquires no capacity', async () => {
+  for (const outcome of ['NotAttempted', 'CommitUnknown']) {
     const result = await accepted(evidence(), outcome)
 
     assert.equal(result.ok, false)
@@ -169,5 +169,5 @@ for (const outcome of ['NotAttempted', 'CommitUnknown']) {
     assert.equal(result.capacityEffectCount, 0)
     assert.equal(result.hostEffectCount, 0)
     assert.equal(result.trace.includes('Witness'), false)
-  })
-}
+  }
+})

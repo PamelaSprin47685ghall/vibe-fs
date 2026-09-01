@@ -81,7 +81,7 @@ test('WHAT[INTERACTION-AUTHORITY-005] exhaustive chat admission intent table', (
   ]
 
   for (const row of cases) {
-    assert.deepEqual(decide(row.decoded, row.durable), row.expected, row.label)
+    assert.deepEqual(intent.resolve(row.decoded, row.durable ?? snapshot()), row.expected, row.label)
   }
 })
 

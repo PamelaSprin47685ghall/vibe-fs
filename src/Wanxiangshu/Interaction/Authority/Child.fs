@@ -100,7 +100,7 @@ module ChildPromptAuthority =
                         snapshot.AgentProjections
                     |> Option.filter (fun claim ->
                         claim.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
-                                           PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                            PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
 
                 let runtime = PromptDispatcher.forJournal durable
                 return! registerLinkedChildIfNeeded runtime turn handle activeProfile accepted

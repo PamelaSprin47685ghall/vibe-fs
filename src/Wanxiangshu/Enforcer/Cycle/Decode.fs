@@ -56,10 +56,6 @@ open Wanxiangshu.Foundation.Identity
 /// validated merged blog cycle. Pure — never appends to the journal.
 module EnforcerCycleDecode =
 
-    /// C4: commit-path UTF-8 safety bounds.
-    let MaxBlogTextBytes = 512 * 1024
-    let MaxEvidenceBytes = 128 * 1024
-
     [<Literal>]
     let EmptyTextError =
         "blog cycle text is empty after canonicalisation (ENFORCER-043)"
@@ -228,12 +224,10 @@ module EnforcerCycleDecode =
         : Result<EnforcerCycle.CanonicalCycle * ToolCallId list, string> =
         if not (EnforcerCycle.isValidCycle cycle) then
             Error EmptyTextError
-        elif LlmFacing.byteCount cycle.MergedText > MaxBlogTextBytes then
-            Error(sprintf "blog cycle text exceeds MaxBlogTextBytes=%d" MaxBlogTextBytes)
-        elif LlmFacing.byteCount cycle.MergedEvidence > MaxEvidenceBytes then
-            Error(sprintf "blog cycle evidence exceeds MaxEvidenceBytes=%d" MaxEvidenceBytes)
         else
-            Ok(cycle, [ callId ])
+            EnforcerCycle.validateContentBounds LlmFacing.byteCount cycle.MergedText cycle.MergedEvidence
+            |> Result.mapError EnforcerCycle.contentBoundsError
+            |> Result.map (fun _ -> cycle, [ callId ])
 
     let private validateSingleCall
         (calls: (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list)

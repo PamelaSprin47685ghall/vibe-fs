@@ -63,38 +63,38 @@ test('WHAT[PROVIDER-PROJECTION-007] Strength namespace imports are rejected prec
   )
 })
 
-for (const [label, source, reference] of [
-  ['Context', 'open Wanxiangshu.Context.Prefix', 'Wanxiangshu.Context.Prefix'],
-  ['Enforcer', 'open Wanxiangshu.Enforcer', 'Wanxiangshu.Enforcer'],
-  ['Interaction', 'open Wanxiangshu.Interaction.Dispatch', 'Wanxiangshu.Interaction.Dispatch'],
-  ['Strength reference', 'let frame = Wanxiangshu.Strength.Frame.empty', 'Wanxiangshu.Strength.Frame.empty'],
-  ['Session Recovery', 'open Wanxiangshu.Execution.Session.Recovery', 'Wanxiangshu.Execution.Session.Recovery'],
-]) {
-  test(`WHAT[PROVIDER-PROJECTION-007] ${label} owner references are rejected precisely`, () => {
+test('WHAT[PROVIDER-PROJECTION-007] each foreign owner reference is rejected precisely', () => {
+  for (const [source, reference] of [
+    ['open Wanxiangshu.Context.Prefix', 'Wanxiangshu.Context.Prefix'],
+    ['open Wanxiangshu.Enforcer', 'Wanxiangshu.Enforcer'],
+    ['open Wanxiangshu.Interaction.Dispatch', 'Wanxiangshu.Interaction.Dispatch'],
+    ['let frame = Wanxiangshu.Strength.Frame.empty', 'Wanxiangshu.Strength.Frame.empty'],
+    ['open Wanxiangshu.Execution.Session.Recovery', 'Wanxiangshu.Execution.Session.Recovery'],
+  ]) {
     assert.deepEqual(
       violationFor(`module Fixture\n${source}\n`),
       [expectedViolation('foreign-owner-reference', 2, reference)],
     )
-  })
-}
+  }
+})
 
-for (const name of [
-  'ActivatePrefixEpoch',
-  'InsertBlogFrames',
-  'BlogFramesIntent',
-  'InsertRepair',
-  'SuppressTransportOnly',
-  'ReanchorAfterCompaction',
-  'CompanionProjectionBuilder',
-  'ProjectionConstants.RepairInstruction',
-]) {
-  test(`WHAT[PROVIDER-PROJECTION-007] foreign materialization ${name} is rejected precisely`, () => {
+test('WHAT[PROVIDER-PROJECTION-007] each foreign materialization is rejected precisely', () => {
+  for (const name of [
+    'ActivatePrefixEpoch',
+    'InsertBlogFrames',
+    'BlogFramesIntent',
+    'InsertRepair',
+    'SuppressTransportOnly',
+    'ReanchorAfterCompaction',
+    'CompanionProjectionBuilder',
+    'ProjectionConstants.RepairInstruction',
+  ]) {
     assert.deepEqual(
       violationFor(`module Fixture\nlet value = ${name}\n`),
       [expectedViolation('foreign-materialization', 2, name)],
     )
-  })
-}
+  }
+})
 
 test('WHAT[PROVIDER-PROJECTION-007] Strength writeback API names are rejected precisely', () => {
   assert.deepEqual(
@@ -103,31 +103,23 @@ test('WHAT[PROVIDER-PROJECTION-007] Strength writeback API names are rejected pr
   )
 })
 
-for (const [label, phrase] of [
-  ['Host adapter policy', 'Strength Host adapter'],
-  ['tool policy', 'Strength tool'],
-  ['replica view policy', 'Replica provider view'],
-]) {
-  test(`WHAT[PROVIDER-PROJECTION-007] ${label} vocabulary is rejected precisely`, () => {
+test('WHAT[PROVIDER-PROJECTION-007] each Strength policy phrase is rejected precisely', () => {
+  for (const phrase of ['Strength Host adapter', 'Strength tool', 'Replica provider view']) {
     assert.deepEqual(
       violationFor(`module Fixture\nlet error = "${phrase}"\n`),
       [expectedViolation('strength-policy-vocabulary', 2, phrase)],
     )
-  })
-}
+  }
+})
 
-for (const [label, identifier] of [
-  ['retry', 'retryDecision'],
-  ['recovery', 'RecoveryDisposition'],
-  ['lifecycle', 'advanceLifecycle'],
-]) {
-  test(`WHAT[PROVIDER-PROJECTION-007] ${label} decision identifiers are rejected precisely`, () => {
+test('WHAT[PROVIDER-PROJECTION-007] each policy decision identifier is rejected precisely', () => {
+  for (const identifier of ['retryDecision', 'RecoveryDisposition', 'advanceLifecycle']) {
     assert.deepEqual(
       violationFor(`module Fixture\nlet ${identifier} value = value\n`),
       [expectedViolation('policy-identifier', 2, identifier)],
     )
-  })
-}
+  }
+})
 
 test('WHAT[PROVIDER-PROJECTION-007] projection conflict lifecycle vocabulary remains legal', () => {
   assert.deepEqual(

@@ -24,7 +24,8 @@
 ### 3. 双向证据追踪系统（`requirement-trace`）
 
 `scripts/checks/requirement-trace.mjs` 与 `tests/requirement-trace.test.mjs` 实现规范与测试的双向映射：
-- 扫描全量测试用例调用点（`test()` / `t.test()`），提取 `WHAT[<PACKAGE-NNN>]` 标签并验证其唯一性与合法性。
+- 由共享 Acorn syntax core 解析全量测试；只有真实 `node:test` import 绑定上的顶层 `test()`，或其 callback 参数绑定上的直接 `t.test()`，才能取得命题权威。遮蔽绑定、间接注册、缺 callback、动态 skip/todo 与未绑定 context 一律 fail-closed。
+- 从合格调用点提取 `WHAT[<PACKAGE-NNN>]` 标签并验证其唯一性与合法性；字符串、注释、regex、方法同名与 template body 均不能伪造测试。
 - 为每个命题 ID 保留全部定义位置；仅为恰有一个定义的 ID 建立权威映射，同包重复与跨包多 owner 均以全部位置 fail-closed。
 - 识别并阻断未关联命题的孤儿测试、多 primary 标签的歧义测试以及无有效测试覆盖的休眠命题。
 - 由共享的精确标题解析器解析 `HOW.md` 的 `(path, title)` 锚点；裸路径、零匹配或多匹配均产生缺失/悬空证明诊断且不取得 HOW 权威，同一命题可以保留多个独立证明边。
@@ -56,4 +57,4 @@
 | REQUIREMENT-SYSTEM-015 | `requirements/requirement-system/tests/change-lifecycle.test.mjs::WHAT[REQUIREMENT-SYSTEM-015] AGENTS.md keeps the small-fix exemption` |
 | REQUIREMENT-SYSTEM-016 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-016] declared DEPENDS ON stays within the INDEX skeleton` |
 | REQUIREMENT-SYSTEM-017 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-017] meta-verifier executes as the machine proof` |
-| REQUIREMENT-SYSTEM-018 | `requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] exact proof-title resolution is reusable and never guesses`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] graph preserves proof portfolios and rejects orphan or multi-primary tests`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects stale anchors` |
+| REQUIREMENT-SYSTEM-018 | `requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] only executable node:test bindings with callbacks create active trace declarations`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] exact proof-title resolution is reusable and never guesses`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] graph preserves proof portfolios and rejects orphan or multi-primary tests`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects stale anchors` |

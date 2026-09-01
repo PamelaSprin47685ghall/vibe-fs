@@ -15,15 +15,25 @@ process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
 
 const sha256Hex = (value) => createHash('sha256').update(value).digest('hex')
 
-const withJournal = async (body, runtime = 'rt_magic_todo_membrane') => {
+const openJournal = async (runtime = 'rt_magic_todo_membrane') => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-obligation-membrane-'))
   const boot = await journal.JournalSurface_boot(directory, runtime, 4242, '2026-08-11T00:00:00Z')
   assert.equal(boot.ok, true, boot.ok ? '' : boot.error)
+  return {
+    handle: boot.journal,
+    close: () => {
+      journal.JournalSurface_dispose(boot.journal)
+      rmSync(directory, { recursive: true, force: true })
+    },
+  }
+}
+
+const withJournal = async (body, runtime = 'rt_magic_todo_membrane') => {
+  const opened = await openJournal(runtime)
   try {
-    return await body(boot.journal)
+    return await body(opened.handle)
   } finally {
-    journal.JournalSurface_dispose(boot.journal)
-    rmSync(directory, { recursive: true, force: true })
+    opened.close()
   }
 }
 
@@ -190,14 +200,14 @@ const acceptPlanningFalseCheckpoint = async (handle, session, life, callText) =>
   return { planning, accepted }
 }
 
-test('WHAT[OBLIGATION-LEDGER-016] first accepted planComplete=false stays at the Planning Table without commitment', async () => {
-  await withJournal(async (handle) => {
-    const session = 'ses-magic-todo-planning-false'
-    const life = 'life-magic-todo-planning-false'
-    await openLife(handle, session, life)
-    await acceptPlanningFalseCheckpoint(handle, session, life, 'call-magic-todo-planning-false')
-    assert.equal(membrane.MagicTodoMembraneSurface_snapshot(handle, life).firstPlanCommitment, null)
-  })
+test('WHAT[OBLIGATION-LEDGER-016] first accepted planComplete=false stays at the Planning Table without commitment', async (context) => {
+  const opened = await openJournal()
+  context.after(opened.close)
+  const session = 'ses-magic-todo-planning-false'
+  const life = 'life-magic-todo-planning-false'
+  await openLife(opened.handle, session, life)
+  await acceptPlanningFalseCheckpoint(opened.handle, session, life, 'call-magic-todo-planning-false')
+  assert.equal(membrane.MagicTodoMembraneSurface_snapshot(opened.handle, life).firstPlanCommitment, null)
 })
 
 test('WHAT[OBLIGATION-LEDGER-026] accepted planComplete=false carries no T1 entrustment revelation (revelation is reserved for the first accepted true)', async () => {

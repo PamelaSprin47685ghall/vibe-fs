@@ -521,7 +521,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] stale migration node, proof, and vocabulary 
   assert.ok(codes(migrationContractFixture({ publishes: [] })).includes('contract-vocabulary-mismatch'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] migration proofs must be existing repository test files for their package', async (t) => {
+test('WHAT[STRUCTURED-WORKFLOW-011] migration proofs must be existing repository test files for their package', () => {
   const invalidProofs = [
     ['null proof collection', null],
     ['prose instead of an array', 'verified manually by the migration owner'],
@@ -534,10 +534,9 @@ test('WHAT[STRUCTURED-WORKFLOW-011] migration proofs must be existing repository
     ['non-test file', ['requirements/structured-workflow/tests/fixtures/owner-dependencies/Provider.fs']],
   ]
 
-  for (const [name, proofs] of invalidProofs)
-    await t.test(`WHAT[STRUCTURED-WORKFLOW-011] ${name}`, () => {
-      assert.ok(codes(migrationContractFixture({ proofs })).includes('contract-without-proof'))
-    })
+  for (const [name, proofs] of invalidProofs) {
+    assert.ok(codes(migrationContractFixture({ proofs })).includes('contract-without-proof'), name)
+  }
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] wildcard authorizations and stale consumer grants fail closed', () => {
