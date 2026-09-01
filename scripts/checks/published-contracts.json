@@ -142,6 +142,11 @@
       "justification": "Signed JS-native facade over the typed ToolHost codec; opaque argument/context handles and dynamic schema/TOML conversion helpers remain private."
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Codec/ProviderProjectionSurface.fs",
+      "owner": "provider-projection",
+      "justification": "Signed JS-native facade over the provider projection codec; raw Host object decoding and internal wire/part conversion helpers remain signature-hidden and it grants no additional semantic authority."
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Failure/Surface.fs",
       "owner": "execution-failure-policy",
       "justification": "Signed JS-native projection over the execution-failure decision contract; parsing and rendering helpers remain private and it grants no additional semantic authority."
@@ -175,6 +180,36 @@
       "path": "src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs",
       "owner": "repository-programming",
       "justification": "Signed JS sandbox API bindings for opencode tool workflows and the repository-programming runtime; Node path/UTF-8/glob/mutation adapters remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/RuntimeSurface.fs",
+      "owner": "repository-programming",
+      "justification": "JS-native runtime surface for sandbox bindings, staged mutation observation and bounded program execution; opaque handle and Node interop helpers remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/FilesystemSurface.fs",
+      "owner": "repository-programming",
+      "justification": "JS-native filesystem surface for UTF-8, glob, anchor and mutation plan operations; Node fs/path adapters and anchor parsing remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs",
+      "owner": "repository-programming",
+      "justification": "JS-native transaction surface for anchor, intent, preflight and durable EventStore projection; F# unions and internal persistence helpers remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs",
+      "owner": "repository-programming",
+      "justification": "JS-native workflow surface for generated js-* program execution and outcome observation; internal FileAccessObservation plumbing and JsToolOutcome union remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHostSurface.fs",
+      "owner": "repository-programming",
+      "justification": "JS-native tool-host surface for generated js-* registration, metadata and bounded execution; ToolSpec and Host factory internals remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/FileMutationSurface.fs",
+      "owner": "repository-programming",
+      "justification": "JS-native mv/rm tool surface for registration, argument vocabulary and bounded execution; ToolSpec and Host factory internals remain private behind the F# signature."
     },
     {
       "path": "src/Wanxiangshu/AssemblyInfo.fs",
@@ -836,6 +871,11 @@
       "justification": "Strength prediction, rollout, frame/event/projection algebra and decision-local replica transform/runtime form one fully signed speculative-investigation locality over graduated identity, Host, session, provider-projection, model-routing and budget contracts; predictor maps, transform plumbing and replica in-flight state remain signature-hidden."
     },
     {
+      "owner": "durable-convergence",
+      "locality": "persistence-eventstore-canonicalintegrator",
+      "justification": "Canonical event integrator, single-envelope replay and prepared-live commit over graduated process event log and k-way merge contracts form one fully signed durable-convergence locality; rule registration, builder internals and process-local mutable state remain signature-hidden."
+    },
+    {
       "owner": "interaction-authority",
       "locality": "authority-runtime-surface",
       "justification": "Authority lifecycle, completed-turn classification, chat-admission and terminal-policy JS semantic projections form one fully signed interaction-authority runtime surface over already graduated dispatch, identity and Host contracts; all dynamic decoding and Fable representation helpers remain signature-hidden."
@@ -1091,6 +1131,11 @@
       "justification": "Raw Host wire decoding/capture, projection write-back and JS projection surface are fully signed provider-projection contracts depending only on graduated identity, Host codec and provider projection model boundaries."
     },
     {
+      "owner": "provider-projection",
+      "locality": "opencode-codec-providerprojectionsurface",
+      "justification": "JS-native provider projection surface is a fully signed provider-projection contract depending on graduated identity, Host codec, provider wire decode/capture and projection model boundaries; dynamic wire and Host message conversion helpers remain signature-hidden."
+    },
+    {
       "owner": "participant-horizon",
       "locality": "opencode-host-messagevisibility",
       "justification": "Message-visibility event wake and bounded timer backstop are a signed Host capability locality depending only on graduated identity, Host codec, async and timing boundaries; the JS handle facade is signed support."
@@ -1144,6 +1189,11 @@
       "owner": "repository-programming",
       "locality": "opencode-tools-filemutationtools",
       "justification": "JS opencode file mutation, sandbox bindings, durable transaction store, tool workflow, bookkeeper tool, tool host and generator surface are fully signed; their compile closure uses graduated repository-programming-js-capability, foundation-identity, host-boundary, office-capability, durable-events, knowledge-reuse, provider-language and participant-identity localities."
+    },
+    {
+      "owner": "repository-programming",
+      "locality": "js-programming-runtime-surface",
+      "justification": "JS repository-programming runtime, filesystem, transaction, workflow, tool-host and mv/rm surfaces are fully signed; their compile closure uses graduated repository-programming-js-capability, opencode-tools-filemutationtools, durable-events, host-boundary and knowledge-reuse localities."
     },
     {
       "owner": "distribution",

@@ -817,6 +817,7 @@
     <Compile Include="Strength/Replica/Runtime.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fsi"/>
     <Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fs"/>
+    <Compile Include="OpenCode/Codec/ProviderProjectionSurface.fsi"/>
     <Compile Include="OpenCode/Codec/ProviderProjectionSurface.fs"/>
     <Compile Include="OpenCode/Host/HostSessionContext.fsi"/>
     <Compile Include="OpenCode/Host/HostSessionContext.fs"/>
@@ -1112,6 +1113,7 @@
     <Compile Include="Repository/Programming/Js/ToolsBindings.fs"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fsi"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>
+    <Compile Include="Persistence/EventStore/CanonicalIntegrator.fsi"/>
     <Compile Include="Persistence/EventStore/CanonicalIntegrator.fs"/>
     <Compile Include="Persistence/EventStore/EventStoreHandle.fsi"/>
     <Compile Include="Persistence/EventStore/EventStoreHandle.fs"/>
@@ -1133,12 +1135,18 @@
     <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fs"/>
     <Compile Include="Repository/Programming/Js/GeneratorSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/GeneratorSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/RuntimeSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/RuntimeSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/FilesystemSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/FilesystemSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/TransactionSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/TransactionSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/WorkflowSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/WorkflowSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/OpenCode/ToolHostSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHostSurface.fs"/>
     <Compile Include="OpenCode/Tools/FileToolsSurface.fs"/>
+    <Compile Include="OpenCode/Tools/FileMutationSurface.fsi"/>
     <Compile Include="OpenCode/Tools/FileMutationSurface.fs"/>
     <Compile Include="Persistence/Journal/Surface.fs"/>
     <Compile Include="Execution/Session/ChatExecution/StatusSurface.fs"/>
