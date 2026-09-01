@@ -1118,6 +1118,7 @@
     <Compile Include="Persistence/EventStore/EventStoreHandle.fsi"/>
     <Compile Include="Persistence/EventStore/EventStoreHandle.fs"/>
     <Compile Include="Persistence/EventStore/Surface.fs"/>
+    <Compile Include="Persistence/EventStore/StrengthSurface.fsi"/>
     <Compile Include="Persistence/EventStore/StrengthSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/ToolSurface.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Surface.fs"/>
@@ -1131,6 +1132,7 @@
     <Compile Include="Repository/Programming/Js/OpenCode/BookkeeperTool.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fs"/>
+    <Compile Include="OpenCode/Host/WorkspaceEventStore.fsi"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStore.fs"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fs"/>
     <Compile Include="Repository/Programming/Js/GeneratorSurface.fsi"/>
@@ -1148,12 +1150,14 @@
     <Compile Include="OpenCode/Tools/FileToolsSurface.fs"/>
     <Compile Include="OpenCode/Tools/FileMutationSurface.fsi"/>
     <Compile Include="OpenCode/Tools/FileMutationSurface.fs"/>
+    <Compile Include="Persistence/Journal/Surface.fsi"/>
     <Compile Include="Persistence/Journal/Surface.fs"/>
     <Compile Include="Execution/Session/ChatExecution/StatusSurface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGroundingRepositorySurface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGroundingSurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/CursorSurface.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtSurface.fs"/>
+    <Compile Include="Persistence/Journal/ObligationJournalSurface.fsi"/>
     <Compile Include="Persistence/Journal/ObligationJournalSurface.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoMembraneSurface.fs"/>
     <Compile Include="Persistence/Journal/RevisionSurface.fs"/>

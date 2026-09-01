@@ -1374,6 +1374,11 @@
       "owner": "speculative-investigation",
       "locality": "strength-turnevidence",
       "justification": "Strength turn evidence, lifecycle, Host-boundary replay and plugin scope form one fully signed speculative-investigation locality over graduated prediction, replica, projection, frame, event, durability, Host, semantic trace and provider-projection contracts; counterfactual and replay helpers remain signature-hidden."
+    },
+    {
+      "owner": "durable-events",
+      "locality": "persistence-eventstore-surface",
+      "justification": "EventStore and journal surfaces expose the durable-events canonical spine to Host, journal and strength consumers: workspace EventStore acquisition, journal boot/dispose, MagicTodo obligation journal operations, and the Strength durability bridge over an opaque EventStore handle; implementation helpers remain signature-hidden."
     }
   ],
   "contracts": [
