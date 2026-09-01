@@ -83,8 +83,12 @@ test('WHAT[MANAGED-SESSION-007] every completion race preserves the first produc
 
 test('WHAT[MANAGED-SESSION-007] first-wins property rejects a last-wins mutant with a replayable shrink path', () => {
   const empty = handles.empty()
-  const mutationResult = fc.check(
-    fc.property(handleKind, token, completionKind, completionKind, (kind, suffix, firstKind, lateKind) => {
+  const lastWinsProperty = fc.property(
+    handleKind,
+    token,
+    completionKind,
+    completionKind,
+    (kind, suffix, firstKind, lateKind) => {
       const handle = makeHandle(kind, `mutant-${suffix}`)
       const linked = link(empty, handle, `mutant-child-${suffix}`)
       const first = handles.apply(linked, { op: 'complete', handle, kind: firstKind })
@@ -96,12 +100,20 @@ test('WHAT[MANAGED-SESSION-007] first-wins property rejects a last-wins mutant w
       })
       const lastWinsMutant = productionLate.ok ? productionLate : { ok: true, state: first.state }
       assertLateCompletionRejected(lastWinsMutant)
-    }),
-    { seed: 0x4d534c08, numRuns: 100 },
+    },
   )
+  const mutationResult = fc.check(lastWinsProperty, { seed: 0x4d534c08, numRuns: 100 })
 
   assert.equal(mutationResult.failed, true)
   assert.equal(mutationResult.seed, 0x4d534c08)
   assert.notEqual(mutationResult.counterexamplePath, '')
   assert.ok(mutationResult.counterexample.length > 0)
+  assert.equal(
+    fc.check(lastWinsProperty, {
+      seed: mutationResult.seed,
+      path: mutationResult.counterexamplePath,
+      numRuns: 1,
+    }).failed,
+    true,
+  )
 })
