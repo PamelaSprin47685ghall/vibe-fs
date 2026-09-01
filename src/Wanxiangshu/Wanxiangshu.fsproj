@@ -770,7 +770,9 @@
     <Compile Include="Interaction/Repair/CompletedTurn.fsi"/>
     <Compile Include="Interaction/Repair/CompletedTurn.fs"/>
     <Compile Include="Interaction/Repair/CompletedTurnSurface.fs"/>
+    <Compile Include="Context/Trace/Capture.fsi"/>
     <Compile Include="Context/Trace/Capture.fs"/>
+    <Compile Include="Context/Trace/Materialization.fsi"/>
     <Compile Include="Context/Trace/Materialization.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoLocality.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoLocalitySurface.fs"/>
@@ -860,6 +862,7 @@
     <Compile Include="Mission/Review/Barrier/Reverify.fs"/>
     <Compile Include="Mission/Review/Judgement/Evidence.fs"/>
     <Compile Include="Mission/Review/Judgement/Continuation.fs"/>
+    <Compile Include="Context/Trace/TerminalReporter.fsi"/>
     <Compile Include="Context/Trace/TerminalReporter.fs"/>
     <Compile Include="Mission/Review/Judgement/Workflow.fs"/>
     <Compile Include="Mission/Review/OpenCode/TerminalAwait.fs"/>

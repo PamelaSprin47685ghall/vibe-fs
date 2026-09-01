@@ -604,6 +604,11 @@
   ],
   "compiler_boundary_localities": [
     {
+      "owner": "semantic-trace",
+      "locality": "context-trace-capture",
+      "justification": "Typed XTrace capture receipts, canonical trace materialization and terminal reporting form one fully signed semantic-trace contract locality over graduated Host observation, dispatch, durable journal, projection and identity contracts; blob IO plumbing, positional/stable capture algorithms and obsolete monolith imports remain signature-hidden or removed."
+    },
+    {
       "owner": "managed-session-lifecycle",
       "locality": "execution-session-recoveryclosureprojection",
       "justification": "Recovery closure discovery, reusable attached-session and Companion satellite physical runtimes, family recovery single-flight and their JS proof surfaces form one fully signed managed-session locality over graduated dispatch recovery, session, identity and durable projection contracts; mutable registries and representation helpers remain signature-hidden."
