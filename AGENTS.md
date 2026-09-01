@@ -101,6 +101,8 @@
 
 本小节覆盖上方“下一任第一动作”对 57.15 的旧现场描述；上方 ReleaseClosure / reliability attribution 仍是历史事实。此 checkpoint 刻意保存两个 `RUNNING` locality 的未完成签名施工，**提交进 Git ≠ node DONE**。通常 `compiler_boundary_localities` 是毕业事实源；但本 checkpoint 恰好冻结在 EventStore 已被并发 writer **预登记**、compiler 仍红的中间点，因此该一条登记是明确的 provisional exception，必须以 executable proof 补绿后才恢复为可信 graduation。恢复施工时禁止把 checkpoint 中的 `.fsi` 或 provisional manifest entry 当成 DONE。
 
+**接管续记 — 2026-09-01：** 上述 provisional exception 与两个 RUNNING locality 均已闭合，下方相关段落仅保留历史取证，不再描述当前施工状态。`durable-events/persistence-eventstore-storetypes` 已完成 `606`-source owner Fable、EventStore focused proof `65/65`、flat build/linkage 与全 `check.mjs`；`delegation/execution-delegation-handle-surface` 已完成 `690`-source owner Fable、delegation proof `125/125`、crash/recovery proof `79/79`、flat build/linkage 与全 `check.mjs`。delegation `.fsi` 首次让 foreign consumers 真正受 extension signature 约束，并暴露 `Agent.fsi` 漏写 implementation 已有的 `[<AutoOpen>]`；补齐该 signature attribute 后 flat build恢复，无需修改 consumer，也未新增 ProjectReference。当前可信 graduation = **`88 / 148` locality、`397 / 701` production `.fs`**，剩余 `60` locality；当前 READY 恰为 `output-distillation/process-largegatesurface`（3）、`durable-convergence/persistence-eventstore-processeventlog`（6）、`context-compression/context-companion-companionfactfold`（12）。后续实时 frontier 仍必须由 `compiler_boundary_localities` + owner-project DAG 机械重算，禁止继续使用本 checkpoint 的 `62 locality` 表作为当前状态。
+
 - checkpoint 前已提交 HEAD：`0b0786ffc refactor: sign strength predictor boundary`。该 committed state 已完成 57.15 的 **有效 `86 / 148`** compiler-boundary locality，覆盖 `369 / 701` production `.fs`；有效剩余 `62` locality。当前未提交现场因 EventStore provisional pre-registration 使 manifest 机械显示 `87 / 148`、`374 / 701`，这 5 个 source 尚未通过 owner compiler，不得计入 DONE。owner graph 保持 `148 localities / 701 sources / 1771 refs / DAG`。
 - 本日 57.15 已闭合的后段 checkpoint 包括：`b21d0dc2f` host+sphinx、`b97f06006` OpenCode+degeneration、`fbf24db46` cognitive prompt、`1d4d810c7` session ontology、`cff43e134` dispatch recovery、`33a6e7705` interaction-authority fold、`1de054f22` managed-session recovery、`a771067d9` semantic trace capture、`8f110ed93` work record、`2eb703fa2` interaction-authority runtime surface、`0b0786ffc` strength predictor。更早本次接管还闭合了 RuntimeContract follow-up、authority/opening、delegation runtime、fission、provider attempt、managed chat、time/strength、ESM linkage gate 与 `assume(update, query)` jq canvas。
 - 当前 committed `0b0786ffc` 的验证事实：Strength predictor owner project isolated Fable 绿；flat `node scripts/build.mjs` 绿（`1109` compile inputs，`165` registered JS surfaces，`772` emitted ESM modules linkage 绿）；`node scripts/check.mjs` 全绿（deadcode 0、raw-time 0、JS boundary debt 0、requirement trace `773 WHAT / 3909 tests`）。`requirements/speculative-investigation/tests/*.mjs` 中 8 个不依赖后继 Surface artifact 的 proof 绿；其余 16 个仅因尚未毕业的 `Strength/Surface.js`、`Participant/Provider/Projection/Surface.js`、`OpenCode/Codec/ProviderProjectionSurface.js` 不在 flat emit 而 `ERR_MODULE_NOT_FOUND`，不是 assertion red。等对应 locality 毕业后必须重跑整包。
@@ -108,7 +110,7 @@
 - 白盒 FCS 终局尚未拆：`scripts/check.mjs --lane=owner-dep` 仍保留 `owner-dependencies / authority-boundary / composition-root-invariant / dsl-ownership / semantic-decorator-invariant` 派生链，`owner-symbol-uses.fsx`、normalized evidence、`OMP_FCS_*` 仍在。57.15 全部 `148 / 148` locality 未签完前禁止删；签完后必须整体删除白盒 scanner + evidence/reuse pipeline，而非只删 scanner 留派生税。`published-contracts.json` 的 exact consumer/symbol policy 不随之自动删除。
 - 本 checkpoint 前所有本仓 Fable/build/check 进程已主动停止；无后台验收可被当作后续事实。恢复后从明确命令重新验证。
 
-#### 当前两个 READY / RUNNING 节点
+#### checkpoint 当时的两个 READY / RUNNING 节点（现均已闭合，仅保留历史取证）
 
 1. `durable-events/persistence-eventstore-storetypes` — `5 fs`，仍未毕业。
    - 5/5 sibling `.fsi` 已存在并接入 owner project：`StoreTypes`、`CanonicalEventCodec`、`EventVocabulary`、`GitObjectDatabase`、`ProcessGitRawStore`。
@@ -136,7 +138,7 @@
 7. `148 / 148` 后才进入 FCS retirement：证明每个 production `.fs` 恰一 owner locality、每个毕业 source 有 sibling `.fsi`、flat emit = owner union、foreign closure contract-only、缺失/越权 ProjectReference 与访问未签名 implementation 的 canary 都红；然后删除 `owner-symbol-uses.fsx` + normalized evidence + `OMP_FCS_*` + 依赖白盒 evidence 的派生 gate 逻辑，保留/迁移语言外 exact policy。
 8. 全局唯一 sink：`node scripts/check.mjs` → `node scripts/build.mjs` → `node requirements/verification-system/tests/run.mjs` → `npm run format-build-test`。最后重跑曾被未毕业 Surface 阻断的 package suites；清理 `.fable-build`/临时输出与所有 checkpoint-only 未完成状态；工作区干净后才宣称 57.15 终局。
 
-#### 剩余 62 locality obligation ledger
+#### checkpoint 时剩余 62 locality obligation ledger（历史快照；当前以 manifest + owner-project DAG 为准）
 
 格式：`fs数 owner/locality ← 尚未完成的直接前置`。`-` 表示当前 READY。此表来自 checkpoint 当下可执行 owner-project DAG；后续只有真实 contract/ownership/compile/closure 因果才可改边。
 

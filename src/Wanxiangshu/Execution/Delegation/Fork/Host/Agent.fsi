@@ -10,6 +10,7 @@ open Wanxiangshu.Persistence.Journal
 module HostForkBinding =
     val managedAgent: journal: AgentJournal option -> childId: SessionId -> string option
 
+[<AutoOpen>]
 module HostForkAgent =
     type HostForkRuntime with
         member BoundManagedAgent: childId: SessionId -> string option

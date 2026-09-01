@@ -670,9 +670,59 @@
       "path": "src/Wanxiangshu/Persistence/EventStore/GitObjectDatabase.fs",
       "owner": "durable-events",
       "justification": "Signed physical Git loose-object and ref storage support behind the published raw-store contract; Node crypto/fs/zlib primitives and packed-object fallback plumbing remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Wait.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local synchronous delegate wait algebra over explicit child outcomes; waiter implementation details remain hidden and no foreign recovery authority is published."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Store.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local SyncDelegate process store for exact session/run coordination; mutable storage mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Prompt.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local SyncDelegate prompt preparation support over published identity and dispatch contracts; rendering helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local SyncDelegate workflow composition over typed delegation contracts; orchestration helpers remain hidden and no second workflow authority is exported."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Host/BusyNudge.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local busy-nudge delivery support behind exact child-run identity and dispatch contracts; Host representation details remain hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local completion codec support for delegation handle outcomes; dynamic wire decoding remains signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handle/JoinDrain.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local join-drain coordination support over typed handle completion evidence; process-local drain mechanics remain hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local child recovery workflow over the published recovery-family contract; recovery orchestration internals remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Host/AgentOwner.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local AgentOwner Host composition support over typed child identity and dispatch contracts; callback plumbing remains hidden."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "delegation",
+      "locality": "execution-delegation-handle-surface",
+      "justification": "Delegation handle, SyncDelegate and Host fork lifecycle contracts plus their owner-local recovery, wait, codec and composition support form one fully signed delegation locality over graduated identity, dispatch, recovery, Host and session contracts; process registries, callbacks and obsolete monolith imports remain signature-hidden or removed."
+    },
     {
       "owner": "durable-events",
       "locality": "persistence-eventstore-storetypes",
@@ -5782,7 +5832,7 @@
       "symbols": [
         "Wanxiangshu.Participant.Persona.PersonaCatalog.persona"
       ],
-      "justification": "Delegation consumes only the canonical Role \u00d7 AgentTier to Persona decision; Persona rendering and parsing remain identity-owner boundary mechanics."
+      "justification": "Delegation consumes only the canonical Role × AgentTier to Persona decision; Persona rendering and parsing remain identity-owner boundary mechanics."
     },
     {
       "path": "src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs",
@@ -14290,7 +14340,9 @@
         "Wanxiangshu.OpenCode.ToolSpec.Arguments",
         "Wanxiangshu.OpenCode.ToolSpec.Description",
         "Wanxiangshu.OpenCode.ToolSpec.Execute",
-        "Wanxiangshu.OpenCode.ToolSpec.Name"
+        "Wanxiangshu.OpenCode.ToolSpec.Name",
+        "Wanxiangshu.OpenCode.HostToolFactory",
+        "Wanxiangshu.OpenCode.ToolSpec"
       ],
       "justification": "host-boundary.Contract publishes exactly these symbols to 'attention-regulation'; every unlisted sibling remains private to host-boundary."
     },
@@ -14317,7 +14369,9 @@
         "Wanxiangshu.OpenCode.ToolSpec.Arguments",
         "Wanxiangshu.OpenCode.ToolSpec.Description",
         "Wanxiangshu.OpenCode.ToolSpec.Execute",
-        "Wanxiangshu.OpenCode.ToolSpec.Name"
+        "Wanxiangshu.OpenCode.ToolSpec.Name",
+        "Wanxiangshu.OpenCode.HostToolFactory",
+        "Wanxiangshu.OpenCode.ToolSpec"
       ],
       "justification": "host-boundary.Contract publishes exactly these symbols to 'concern-routing'; every unlisted sibling remains private to host-boundary."
     },
@@ -14448,7 +14502,9 @@
         "Wanxiangshu.OpenCode.ToolSpec.Arguments",
         "Wanxiangshu.OpenCode.ToolSpec.Description",
         "Wanxiangshu.OpenCode.ToolSpec.Execute",
-        "Wanxiangshu.OpenCode.ToolSpec.Name"
+        "Wanxiangshu.OpenCode.ToolSpec.Name",
+        "Wanxiangshu.OpenCode.HostToolFactory",
+        "Wanxiangshu.OpenCode.ToolSpec"
       ],
       "justification": "host-boundary.Contract publishes exactly these symbols to 'institutional-learning'; every unlisted sibling remains private to host-boundary."
     },
