@@ -74,4 +74,4 @@ prefix 侧没有复制 production equality/canonicalization 公式。generator �
 
 ## PR 边界
 
-PR #27 尚未进入 upstream，故本批无法在 Git 图上成为独立于 M0—M9 的 PR；它将作为从 #27 最终节点继续的累计 PR。owner 只应合并最新累计 PR，再关闭旧 PR，避免重复应用提交链。PR URL 在创建后补入本节。
+PR #27 尚未进入 upstream，故本批无法在 Git 图上成为独立于 M0—M9 的 PR；[upstream PR #28](https://github.com/PamelaSprin47685ghall/vibe-fs/pull/28) 是从 #27 最终节点继续的累计 PR。owner 只应合并 #28，再关闭 #27 及更早累计 PR，避免重复应用提交链。
