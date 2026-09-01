@@ -19,6 +19,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.requirement-grounding-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-facts.fsproj"/>
+    <Compile Include="Composition/Durable/Fact.fsi"/>
     <Compile Include="Composition/Durable/Fact.fs"/>
   </ItemGroup>
 </Project>

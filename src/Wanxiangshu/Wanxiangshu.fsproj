@@ -132,6 +132,7 @@
     <Compile Include="Execution/Failure/Policy.fs"/>
     <Compile Include="Execution/Failure/Surface.fsi"/>
     <Compile Include="Execution/Failure/Surface.fs"/>
+    <Compile Include="Composition/Durable/Fact.fsi"/>
     <Compile Include="Composition/Durable/Fact.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Fact.fs"/>
     <Compile Include="Interaction/Authority/Fact.fs"/>
