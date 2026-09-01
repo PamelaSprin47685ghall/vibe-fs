@@ -299,6 +299,11 @@
   ],
   "compiler_boundary_localities": [
     {
+      "owner": "process-execution",
+      "locality": "process-processrequest",
+      "justification": "Process request algebra, Node spawn/wait/spool/output runners and PTY physical ports form a fully signed physical-adapter locality; OS/JS timer, process, buffer, session and callback implementation remains signature-bounded over graduated managed-agent, delegation, timing, task and output-bound contracts."
+    },
+    {
       "owner": "durable-events",
       "locality": "composition-durable-projection",
       "justification": "The bounded session/workspace projection aggregate is a one-file signed composition contract over already-graduated owner projections; it contains no fold routing, persistence implementation, runtime resource, or physical effect."
