@@ -354,6 +354,11 @@
   ],
   "compiler_boundary_localities": [
     {
+      "owner": "provider-attempt-recovery",
+      "locality": "participant-provider-attempt-planner",
+      "justification": "Provider attempt planning, fallback durable fold and bounded read evidence form a fully signed recovery locality over graduated authority, chat-execution, prefix and fallback fact contracts; unconsumed evidence helpers and implementation-only decision plumbing are hidden by signatures."
+    },
+    {
       "owner": "intra-participant-parallelism",
       "locality": "execution-fission-fold",
       "justification": "Fission admission, owner-local runtime indexes and durable fold form one fully signed locality over graduated identity, fission fact, durable projection and task contracts; process-local registries remain signature-hidden and no foreign runtime implementation enters the dependency closure."
