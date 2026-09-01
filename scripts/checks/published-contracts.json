@@ -74,6 +74,11 @@
   ],
   "compiler_boundary_localities": [
     {
+      "owner": "provider-language",
+      "locality": "participant-provider-language",
+      "justification": "Provider language vocabulary, session bind-once authority, packaged bilingual resources, prose rendering and Host language binding are fully published signed contracts whose only compile dependencies are graduated identity, distribution and provider-projection localities."
+    },
+    {
       "owner": "distribution",
       "locality": "assemblyinfo",
       "justification": "Leaf distribution locality: package metadata and resource byte adapters have no foreign compile dependencies; every source is signed and Node resource implementation remains signature-bounded."

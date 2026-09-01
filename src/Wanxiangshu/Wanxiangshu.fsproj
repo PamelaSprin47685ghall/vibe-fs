@@ -124,6 +124,7 @@
     <Compile Include="Host/Fact.fs"/>
     <Compile Include="Foundation/Temporal.fsi"/>
     <Compile Include="Foundation/Temporal.fs"/>
+    <Compile Include="Participant/Provider/Language.fsi"/>
     <Compile Include="Participant/Provider/Language.fs"/>
     <Compile Include="Participant/Provider/Attempt/Cursor.fs"/>
     <Compile Include="Participant/Provider/Attempt/TerminalValidity.fs"/>
@@ -339,6 +340,7 @@
     <Compile Include="Persistence/Journal/RuntimePath.fs"/>
     <Compile Include="Execution/Agent/Errors.fs"/>
     <Compile Include="Execution/Agent/Program.fs"/>
+    <Compile Include="Participant/Provider/SessionLanguage.fsi"/>
     <Compile Include="Participant/Provider/SessionLanguage.fs"/>
     <Compile Include="Execution/Delegation/Fork/Model.fs"/>
     <Compile Include="Execution/Session/AgentCompletion.fs"/>
@@ -392,7 +394,9 @@
     <Compile Include="Resources/ProviderResourceBytes.fs"/>
     <Compile Include="Resources/ModelRoutingResource.fsi"/>
     <Compile Include="Resources/ModelRoutingResource.fs"/>
+    <Compile Include="Participant/Provider/ProviderResources.fsi"/>
     <Compile Include="Participant/Provider/ProviderResources.fs"/>
+    <Compile Include="Participant/Provider/Prose.fsi"/>
     <Compile Include="Participant/Provider/Prose.fs"/>
     <Compile Include="Context/Companion/ProjectionSurface.fs"/>
     <Compile Include="Context/Prefix/Surface.fs"/>
@@ -478,6 +482,7 @@
     <Compile Include="OpenCode/Host/SessionExecutionBinding.fs"/>
     <Compile Include="OpenCode/Host/ModelRoutingSurface.fs"/>
     <Compile Include="OpenCode/Host/SessionBindingSurface.fs"/>
+    <Compile Include="OpenCode/Host/ProviderLanguageBinding.fsi"/>
     <Compile Include="OpenCode/Host/ProviderLanguageBinding.fs"/>
     <Compile Include="OpenCode/Host/Sessions.fs"/>
     <Compile Include="OpenCode/Host/SessionsSurface.fs"/>
