@@ -75,9 +75,19 @@
       "path": "src/Wanxiangshu/Execution/Delegation/HandoffIdentity.fs",
       "owner": "delegation",
       "justification": "Signed opaque handoff-route value required by delegation durable facts; constructor mechanics remain private and the type grants no standalone foreign behavior contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/AssociationSurface.fs",
+      "owner": "session-ontology",
+      "justification": "Signed JS-native projection over the durable session-association contract; parser/boxing helpers stay private and the surface grants no additional foreign semantic contract."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "distribution",
+      "locality": "resources-enforcercatalogresource",
+      "justification": "Localized Enforcer rulebook loading and installed runtime-resource bundle are signed distribution contracts whose compile closure is entirely graduated catalog, prompt, package-resource, language and LLM-facing localities."
+    },
     {
       "owner": "cognitive-environment",
       "locality": "resources-promptresources",
@@ -202,6 +212,11 @@
       "owner": "delegation",
       "locality": "execution-delegation-syncdelegate-model",
       "justification": "SyncDelegate model, durable delegation facts and terminal completion vocabulary depend only on graduated identity/projection/session contracts; task control-flow helpers and prompt runtime were moved out before signature cutover."
+    },
+    {
+      "owner": "session-ontology",
+      "locality": "execution-session-association",
+      "justification": "Durable Work/Companion association and ownership-classification contract depends only on graduated identity, session-ownership and SyncDelegate model localities; the JS-native surface is signed representation support."
     }
   ],
   "contracts": [

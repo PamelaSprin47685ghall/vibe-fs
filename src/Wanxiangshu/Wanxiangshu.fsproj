@@ -268,7 +268,9 @@
     <Compile Include="Execution/Delegation/LinkageProjection.fs"/>
     <Compile Include="Execution/Delegation/Handle/Surface.fs"/>
     <Compile Include="Change/Projection.fs"/>
+    <Compile Include="Execution/Session/Association.fsi"/>
     <Compile Include="Execution/Session/Association.fs"/>
+    <Compile Include="Execution/Session/AssociationSurface.fsi"/>
     <Compile Include="Execution/Session/AssociationSurface.fs"/>
     <Compile Include="Mission/Review/Barrier/Projection.fs"/>
     <Compile Include="Enforcer/Projection.fs"/>
@@ -409,8 +411,10 @@
     <Compile Include="Execution/Delegation/HandoffSurface.fs"/>
     <Compile Include="Resources/PromptResources.fsi"/>
     <Compile Include="Resources/PromptResources.fs"/>
+    <Compile Include="Resources/EnforcerCatalogResource.fsi"/>
     <Compile Include="Resources/EnforcerCatalogResource.fs"/>
     <Compile Include="Enforcer/Surface.fs"/>
+    <Compile Include="Resources/RuntimeResources.fsi"/>
     <Compile Include="Resources/RuntimeResources.fs"/>
     <Compile Include="Resources/PromptSurface.fs"/>
     <Compile Include="Mission/Finality/PromptSurface.fs"/>
