@@ -835,8 +835,8 @@
       "issuers": [
         {
           "file": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
-          "symbol": "inherited",
-          "anchor": "let internal inherited ownerSessionId ownerLogicalRunId ownerAuthorityRootUserMessageId participantIdentity =",
+          "symbol": "inheritFromOwner",
+          "anchor": "let inheritFromOwner",
           "owner": "interaction-authority"
         }
       ],
