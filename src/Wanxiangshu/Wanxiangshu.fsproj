@@ -241,9 +241,13 @@
     <Compile Include="Strength/Prediction/CostModel.fs"/>
     <Compile Include="Strength/Policy.fsi"/>
     <Compile Include="Strength/Policy.fs"/>
+    <Compile Include="Strength/Prediction/Predictor.fsi"/>
     <Compile Include="Strength/Prediction/Predictor.fs"/>
+    <Compile Include="Strength/Rollout.fsi"/>
     <Compile Include="Strength/Rollout.fs"/>
+    <Compile Include="Strength/Frame.fsi"/>
     <Compile Include="Strength/Frame.fs"/>
+    <Compile Include="Strength/Prediction/BatchCollector.fsi"/>
     <Compile Include="Strength/Prediction/BatchCollector.fs"/>
     <Compile Include="Host/Contract/ToolResultBound.fsi"/>
     <Compile Include="Host/Contract/ToolResultBound.fs"/>
@@ -311,9 +315,13 @@
     <Compile Include="Participant/Provider/Attempt/PlannerSurface.fs"/>
     <Compile Include="Persistence/EventStore/Model.fsi"/>
     <Compile Include="Persistence/EventStore/Model.fs"/>
+    <Compile Include="Strength/Events.fsi"/>
     <Compile Include="Strength/Events.fs"/>
+    <Compile Include="Strength/Projection/Model.fsi"/>
     <Compile Include="Strength/Projection/Model.fs"/>
+    <Compile Include="Strength/Replica/Commit.fsi"/>
     <Compile Include="Strength/Replica/Commit.fs"/>
+    <Compile Include="Strength/Replica/Promotion.fsi"/>
     <Compile Include="Strength/Replica/Promotion.fs"/>
     <Compile Include="Strength/Persistence/DurabilityPort.fs"/>
     <Compile Include="Repository/Programming/Js/Capability.fsi"/>
@@ -541,6 +549,7 @@
     <Compile Include="Execution/Session/Attachment/AttachedRuntime.fs"/>
     <Compile Include="Execution/Session/Attachment/AttachmentSurface.fsi"/>
     <Compile Include="Execution/Session/Attachment/AttachmentSurface.fs"/>
+    <Compile Include="Strength/Runtime.fsi"/>
     <Compile Include="Strength/Runtime.fs"/>
     <Compile Include="Execution/Delegation/Fork/Recovery.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Recovery.fs"/>
@@ -714,6 +723,7 @@
     <Compile Include="Composition/Turn/Observation.fs"/>
     <Compile Include="Strength/TurnEvidence.fs"/>
     <Compile Include="Strength/Lifecycle.fs"/>
+    <Compile Include="Strength/Replica/TraceRecovery.fsi"/>
     <Compile Include="Strength/Replica/TraceRecovery.fs"/>
     <Compile Include="OpenCode/Host/SessionSnapshotPort.fsi"/>
     <Compile Include="OpenCode/Host/SessionSnapshotPort.fs"/>
@@ -761,7 +771,9 @@
     <Compile Include="OpenCode/Host/ChatAdmission/TransactionSurface.fs"/>
     <Compile Include="Interaction/Dispatch/Send.fsi"/>
     <Compile Include="Interaction/Dispatch/Send.fs"/>
+    <Compile Include="Strength/Replica/Transform.fsi"/>
     <Compile Include="Strength/Replica/Transform.fs"/>
+    <Compile Include="Strength/Replica/Runtime.fsi"/>
     <Compile Include="Strength/Replica/Runtime.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fs"/>
     <Compile Include="OpenCode/Codec/ProviderProjectionSurface.fs"/>

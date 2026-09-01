@@ -630,9 +630,49 @@
       "path": "src/Wanxiangshu/OpenCode/Host/TerminalPolicySurface.fs",
       "owner": "interaction-authority",
       "justification": "Signed JS-native proof surface over the canonical terminal policy for no-journal probes; it owns no session lifecycle state or effect authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Prediction/Predictor.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed pure bounded predictor state and frozen feature algebra for Strength opportunities; map representation and update mechanics remain hidden behind the sibling signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Rollout.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed pure rollout mode/config and explicit-cost projection over the graduated Strength policy/cost model; it owns no runtime or durable authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Prediction/BatchCollector.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed pure collector for complete readonly provider-request batches; call/result correlation helpers remain signature-hidden and no Host resource is owned here."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Replica/Commit.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed pure append-evidence decision algebra for Prepared and Promotion durability outcomes; transport and store effects remain outside this decision owner."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Replica/Promotion.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed pure exact-provider-run promotion decision over typed output evidence; it owns no provider transport or persistence effect."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Replica/TraceRecovery.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed pure semantic XTrace range recovery over a frozen Strength frame bundle; contiguous-match mechanics stay implementation-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Replica/Transform.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed replica transform boundary over the owner-local Strength runtime and published Host session port; Host object encoding and batch-planning helpers remain signature-hidden."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "speculative-investigation",
+      "locality": "strength-prediction-predictor",
+      "justification": "Strength prediction, rollout, frame/event/projection algebra and decision-local replica transform/runtime form one fully signed speculative-investigation locality over graduated identity, Host, session, provider-projection, model-routing and budget contracts; predictor maps, transform plumbing and replica in-flight state remain signature-hidden."
+    },
     {
       "owner": "interaction-authority",
       "locality": "authority-runtime-surface",
