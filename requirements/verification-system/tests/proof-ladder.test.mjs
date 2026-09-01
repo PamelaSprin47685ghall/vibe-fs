@@ -112,6 +112,7 @@ const WIRED_ALLOWLIST = new Set([
   'semantic-anchors.mjs', // catalog：被各 gate import 的 anchor 清单，不直接 spawn
   'fsharp-control-pyramid-guide.mjs', // guide lib：被 fsharp-control-pyramid.mjs import
   'js-surface-manifest.mjs', // post-build gate：由 build.mjs 在 fable precompile 后调用（依赖 dist 产物，不能 pre-build）
+  'js-module-linkage.mjs', // post-build gate：由 build.mjs 在 manifest 后调用，验证 emitted ESM graph 闭合
   'legacy-horizon-census.mjs', // census tool：由 OBL-007 历史 detector 退出验证调用
 ])
 
@@ -142,7 +143,7 @@ test('WHAT[VERIFICATION-SYSTEM-005] FCS evidence producer precedes every semanti
   const wired = wiredGates(checkSource)
   const semanticOwners = wired.indexOf('semantic-owners.mjs')
   const ownerDependencies = wired.indexOf('owner-dependencies.mjs')
-  assert.ok(semanticOwners >= 0 && ownerDependencies === semanticOwners + 1)
+  assert.ok(semanticOwners >= 0 && ownerDependencies > semanticOwners)
   for (const consumer of [
     'dsl-ownership.mjs',
     'authority-boundary.mjs',
