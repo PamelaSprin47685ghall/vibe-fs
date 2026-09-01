@@ -732,6 +732,61 @@
       "path": "src/Wanxiangshu/Context/Companion/Runtime.fs",
       "owner": "context-compression",
       "justification": "Signed pure Companion runtime cell with guarded memory, durable port callbacks and Blogger lifecycle hooks; all physical Host dispatch, satellite binding and child session creation remain signature-hidden behind the Host surface."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ProviderRunBindingSurface.fs",
+      "owner": "review-assurance",
+      "justification": "Signed JS-native boundary for HOST-BOUNDARY-008 causal provider-run binding; rejection encoding, snapshot catch-up and internal SessionSnapshotSurface handle access remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/ReviewFactFold.fs",
+      "owner": "review-judgement",
+      "justification": "Signed review durable fold support over ReviewFactCases and the session projection aggregate; fold routing and projection helpers remain private and it grants no foreign semantic authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Judgement/Evidence.fs",
+      "owner": "review-judgement",
+      "justification": "Signed pure reviewer evidence predicate over durable projection and finality lifecycle state; it owns no runtime state or physical effect and exposes only the continuation-open decision."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Judgement/Continuation.fs",
+      "owner": "review-judgement",
+      "justification": "Signed reviewer continuation nudge vocabulary over injected continuation ports; it owns no durable writer or Host runtime and grants no foreign contract beyond the typed port."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Codec.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed pure blog call codec that canonicalizes raw provider tool arguments against the catalog; produces no durable side effects and owns no store or authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Cycle/Model.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed pure enforcer cycle model and bounds validation used only within behavior-diagnosis codec paths; no store or authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Surface.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed JS-facing enforcer surface that exposes decoded calls, cycles, and bounds to the host; pure value transforms, no authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Cycle/Decode.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed pure assistant-step decoder that rebuilds canonical blog calls from the provider transcript; no durable side effects or authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Cycle/Commit.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed cycle commit writer that appends BlogObservationCommitted facts through the journal; authority is derived from the caller's already-validated request context."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/RepairSurface.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed JS-facing repair classifier that maps raw messages to a repair verdict object; pure value transform, no authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/ObservationSurface.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed JS-facing projection surface that renders enforcement and blog state to host objects; pure value transforms, no authority."
     }
   ],
   "compiler_boundary_localities": [
@@ -1189,6 +1244,21 @@
       "owner": "context-compression",
       "locality": "context-companion-companionfactfold",
       "justification": "Companion host, runtime state, parked transform, runtime host, abandon, coordinator, model, journal port and fact folds form a fully signed context-compression companion runtime locality over graduated companion facts, Blogger request/projection, durable journal, session attachment, identity and Host contracts; physical host effects and runtime implementation details remain signature-hidden."
+    },
+    {
+      "owner": "review-assurance",
+      "locality": "opencode-host-providerrunbinding",
+      "justification": "Physical provider-run binding, JS-native surface and cross-instance shared state form one fully signed review-assurance locality over graduated identity, Host snapshot, session and context-compression contracts; private helper functions and mutable registry internals remain signature-hidden."
+    },
+    {
+      "owner": "review-judgement",
+      "locality": "mission-review-reviewfactfold",
+      "justification": "Review fact fold, physical review ports, verdict recording, reviewer evidence/continuation and terminal await form one fully signed review-judgement locality over graduated identity, durable projection, semantic trace and Host session contracts; owner-local workflow details and Host implementation remain signature-hidden."
+    },
+    {
+      "owner": "behavior-diagnosis",
+      "locality": "enforcer-codec",
+      "justification": "Enforcer blog-call codec, chronicle execution, cycle model/decode/commit/recovery, repair, surface and host wiring form one fully signed behavior-diagnosis locality over graduated enforcer-catalog, enforcer-projection, context-compression, identity, journal and failure contracts; JS representation surfaces are signed support and all internal projection implementation remains signature-hidden."
     }
   ],
   "contracts": [
@@ -5866,7 +5936,7 @@
       "symbols": [
         "Wanxiangshu.Participant.Persona.PersonaCatalog.persona"
       ],
-      "justification": "Delegation consumes only the canonical Role × AgentTier to Persona decision; Persona rendering and parsing remain identity-owner boundary mechanics."
+      "justification": "Delegation consumes only the canonical Role \u00d7 AgentTier to Persona decision; Persona rendering and parsing remain identity-owner boundary mechanics."
     },
     {
       "path": "src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs",

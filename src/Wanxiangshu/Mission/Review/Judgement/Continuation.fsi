@@ -20,25 +20,18 @@ module ReviewerContinuation =
     /// terminal ProviderRun together identify the reminder occasion. Closed
     /// continuation capability is a no-op (Finality may have revoked the
     /// challenge after a sibling REVISE).
-    let ensureVerdictSubmitted
-        (port: ReviewerContinuationPort)
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        (terminalProviderRun: ProviderRunIdentity)
-        (reviewerKey: string)
-        : Task<Result<unit, string>> =
-        task {
-            if not (ReviewerEvidence.continuationOpen journal reviewerKey) then
-                return Ok()
-            else
-                return! port.NudgeMissingVerdict sessionId terminalProviderRun
-        }
+    val ensureVerdictSubmitted:
+        port: ReviewerContinuationPort ->
+        journal: AgentJournal option ->
+        sessionId: SessionId ->
+        terminalProviderRun: ProviderRunIdentity ->
+        reviewerKey: string ->
+            Task<Result<unit, string>>
 
-    let ensurePerfectConfirmed
-        (port: ReviewerContinuationPort)
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        (terminalProviderRun: ProviderRunIdentity)
-        (reviewerKey: string)
-        : Task<Result<unit, string>> =
-        ensureVerdictSubmitted port journal sessionId terminalProviderRun reviewerKey
+    val ensurePerfectConfirmed:
+        port: ReviewerContinuationPort ->
+        journal: AgentJournal option ->
+        sessionId: SessionId ->
+        terminalProviderRun: ProviderRunIdentity ->
+        reviewerKey: string ->
+            Task<Result<unit, string>>

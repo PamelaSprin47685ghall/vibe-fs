@@ -2,7 +2,7 @@ namespace Wanxiangshu.Mission.Review
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Review
+open Wanxiangshu.OpenCode
 
 /// Review-facing tree capability. Infrastructure owns the physical Git adapter;
 /// Application only sees the read contract.
