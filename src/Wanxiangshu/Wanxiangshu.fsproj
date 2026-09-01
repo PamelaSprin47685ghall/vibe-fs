@@ -399,6 +399,7 @@
     <Compile Include="Execution/Session/ChatExecution/RecoveryRuntimeSurface.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Admission.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Admission.fs"/>
+    <Compile Include="Composition/Durable/Projection.fsi"/>
     <Compile Include="Composition/Durable/Projection.fs"/>
     <Compile Include="Mission/Manager/Life/OpeningFloor.fs"/>
     <Compile Include="Enforcer/Observation.fsi"/>
