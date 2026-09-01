@@ -1,23 +1,6 @@
 namespace Wanxiangshu.Mission.Manager.Life
 
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Repository.Investigation.WarmStart
 
 /// GLORY-019/029 + SURFACE-004: Manager continuation prompt owner.
 /// Prose meaning lives in `resources/provider/lifecycle/manager/**` (PROMPT-019).

@@ -2,7 +2,6 @@ namespace Wanxiangshu.Mission.Manager.Life
 
 open Wanxiangshu.Foundation.Identity
 
-/// Durable Manager Life facts owned by the Manager lifecycle boundary.
 [<RequireQualifiedAccess>]
 type ManagerLifecycleFact =
     | LifeOpened of

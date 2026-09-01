@@ -1,22 +1,5 @@
 namespace Wanxiangshu.Mission.Manager
 
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Host
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Repository.Investigation.WarmStart
-
 open System
 open Wanxiangshu.Foundation
 

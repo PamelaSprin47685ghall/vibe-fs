@@ -102,6 +102,7 @@
     <Compile Include="Change/Facts.fsi"/>
     <Compile Include="Change/Facts.fs"/>
     <Compile Include="Host/Facts.fs"/>
+    <Compile Include="Mission/Manager/Life/Facts.fsi"/>
     <Compile Include="Mission/Manager/Life/Facts.fs"/>
     <Compile Include="Mission/Obligation/Todo/Model.fs"/>
     <Compile Include="Mission/Obligation/Todo/Facts.fs"/>
@@ -155,7 +156,9 @@
     <Compile Include="Foundation/SyntheticTomlSurface.fsi"/>
     <Compile Include="Foundation/SyntheticTomlSurface.fs"/>
     <Compile Include="Repository/Investigation/WarmStart/Prompt.fs"/>
+    <Compile Include="Mission/Manager/Narrative.fsi"/>
     <Compile Include="Mission/Manager/Narrative.fs"/>
+    <Compile Include="Mission/Manager/Life/Prompt.fsi"/>
     <Compile Include="Mission/Manager/Life/Prompt.fs"/>
     <Compile Include="Mission/Finality/Prompt.fs"/>
     <Compile Include="Mission/Review/Prompt.fs"/>
@@ -168,6 +171,7 @@
     <Compile Include="Strength/Rollout.fs"/>
     <Compile Include="Strength/Frame.fs"/>
     <Compile Include="Strength/Prediction/BatchCollector.fs"/>
+    <Compile Include="Host/Contract/ToolResultBound.fsi"/>
     <Compile Include="Host/Contract/ToolResultBound.fs"/>
     <Compile Include="Host/Contract/CompactionPolicySurface.fs"/>
     <Compile Include="Interaction/Dispatch/Nudge.fsi"/>
@@ -364,6 +368,7 @@
     <Compile Include="Mission/Review/Ports.fs"/>
     <Compile Include="Mission/Review/OpenCode/JudgementInbox.fs"/>
     <Compile Include="Process/ProcessRequest.fs"/>
+    <Compile Include="Process/LargeGate.fsi"/>
     <Compile Include="Process/LargeGate.fs"/>
     <Compile Include="Process/NodeProcessHost.fs"/>
     <Compile Include="Process/NodeProcessWait.fs"/>

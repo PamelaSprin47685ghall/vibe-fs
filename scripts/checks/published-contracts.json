@@ -17,6 +17,11 @@
       "justification": "Signed JS-native participant identity representation boundary; pure parsing and projection over canonical identity."
     },
     {
+      "path": "src/Wanxiangshu/Mission/Manager/Life/Prompt.fs",
+      "owner": "finality",
+      "justification": "Signed owner-local Manager lifecycle prompt-path vocabulary; it depends only on the published ManagerNarrative path contract and carries no runtime authority or physical effect."
+    },
+    {
       "path": "src/Wanxiangshu/Enforcer/Rulebook.fs",
       "owner": "behavior-diagnosis",
       "justification": "Signed pure observation-pairing algebra consumed only by behavior-diagnosis siblings; it carries no runtime state, physical effect, or foreign contract grant."
@@ -152,6 +157,16 @@
       "owner": "provider-projection",
       "locality": "participant-provider-projection-model",
       "justification": "Provider wire/semantic model, projection intents, canonical LLM/TOML representation, planner and renderer form a signed locality depending only on graduated foundation identity; representation support is explicitly signed."
+    },
+    {
+      "owner": "output-distillation",
+      "locality": "host-contract-toolresultbound",
+      "justification": "Tool-result byte/line bounding and the single-holder large-process gate depend only on graduated LLM-facing and async-support contracts; implementation details remain hidden by F# signatures."
+    },
+    {
+      "owner": "finality",
+      "locality": "mission-manager-life-facts",
+      "justification": "Manager lifecycle durable facts and narrative contract plus owner-local prompt-path support depend only on graduated foundation identity and LLM-facing representation; all implementation details are signature-bounded."
     }
   ],
   "contracts": [
