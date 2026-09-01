@@ -218,3 +218,43 @@ The latest upstream still has the exact lifecycle table, wrong-identity decoys, 
 ### Intentional limitation
 
 The 216-case failure matrix contains dimensions that do not affect the policy input and a small mirrored effect mapping. It remains mutation-sensitive and production-bound, but its count is not claimed as 216 distinct policy worlds. This is documented debt for the next modification of that owner, not a reason to broaden this upstream replay.
+
+## Release-sink findings in upstream code
+
+The first complete `npm run format-build-test` exposed failures that exist on `upstream/master@8caee37ca`; none were introduced by P2, P5, A0, or P6B. They are changed in this PR because the upstream release entry cannot otherwise complete. Each correction is isolated from the replay modules.
+
+### Verification gates — `0dbc20d77`
+
+1. `ctx-capacity-observation-forbidden.test.mjs` scanned every production file for the generic word `tokenizer`. It rejected `Execution/Session/LoopDetector.fs`, although that file is owned by `degeneration-guard` and uses tokenization to detect repetition—not to observe model context capacity. Deleting or renaming that production dependency would damage a valid owner to satisfy an over-broad oracle. The corrected proof obtains exact `context-compression` files from `semantic-owners.json` and applies the same forbidden vocabulary only to the owner governed by CONTEXT-COMPRESSION-001. Empty ownership fails closed.
+2. `proof-ladder.test.mjs` required `owner-dependencies.mjs` to be textually adjacent to `semantic-owners.mjs`. Upstream's valid `owner-projects.mjs` DAG gate now sits between them. Evidence causality requires only `semantic-owners < owner-dependencies < every FCS consumer`; the corrected assertion states that order without rejecting an independent intervening gate.
+3. `scripts/checks/js-module-linkage.mjs` is executed by `scripts/build.mjs` after compilation, beside `js-surface-manifest.mjs`, but the proof-ladder inventory omitted it from the build-owned allowlist. The corrected inventory names the already-wired gate; it does not suppress or bypass it.
+
+RED from the first release sink: 3861/3865 unit tests, with these three code failures plus one sandbox-only localhost EPERM. GREEN focused run with localhost permission: CTX + proof ladder + installed OpenCode canary, 15/15. The canary proved the EPERM was environmental; no Host assertion was changed.
+
+### Isolated compiler tool home — `6b6bb570d`
+
+`run-inner.mjs` intentionally replaces `HOME`/`USERPROFILE` so tests cannot read developer OpenCode configuration. That also hid the .NET local-tool store from child compiler canaries. Direct `owner-project-compiler-boundary.test.mjs` passed, while the same test under the integration inner runner failed before compilation with “Run dotnet tool restore”.
+
+The fix freezes `DOTNET_CLI_HOME` from the caller before replacing application `HOME`. OpenCode remains isolated; only the dedicated .NET tool location survives. The exact `run-inner.mjs → owner-project-compiler-boundary.test.mjs` path then passed all nine positive/negative Fable project cases in 27.7s. The final complete integration repeated the same proof in 27.3s.
+
+### Mandatory formatting — `5829d1de9`
+
+The repository release entry runs Fantomas before every other layer. Its first pass normalized 107 `.fsi` files and three `.fs` files, including signatures present before and added by the upstream boundary-signing tail. The changes are layout-only and were isolated into one style commit; the next pass reported 978 files unchanged. Fable compiled the normalized tree successfully. This commit intentionally modifies upstream-authored files because otherwise every release run regenerates the same dirty tree.
+
+## Final validation
+
+One uninterrupted, localhost-enabled `npm run format-build-test` completed with exit 0 after all fixes:
+
+```text
+format/check: clean; 773 WHAT; 3914 executable proof declarations
+owner dependency scan: 29167 exact FCS cross-owner uses; 0 pending; 778 contracts
+build: 1016 F# source inputs; 165 registered surfaces; 772 emitted modules linked
+unit: 3865 passed, 0 failed
+integration: every registered suite passed, including the real owner-project compiler boundary
+package integration: all suites passed
+installed OpenCode warmup/canary: 1.18.18
+Long Stroke e2e: passed
+npm pack --dry-run: 2020 files; 2.2 MB packed; 10.6 MB unpacked
+```
+
+No baseline, suppression, allowlist for semantic debt, compatibility facade, test retry, timeout increase, or production bypass was introduced.
