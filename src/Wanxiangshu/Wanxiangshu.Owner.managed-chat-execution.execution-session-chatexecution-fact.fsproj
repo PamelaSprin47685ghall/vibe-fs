@@ -13,10 +13,15 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.context-prefix-candidate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
+    <Compile Include="Execution/Session/ChatExecution/Fact.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Fact.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Projection.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Projection.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Recovery.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Recovery.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/RecoveryRuntime.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/RecoveryRuntime.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Admission.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Admission.fs"/>
   </ItemGroup>
 </Project>

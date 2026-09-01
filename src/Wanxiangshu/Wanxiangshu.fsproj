@@ -134,6 +134,7 @@
     <Compile Include="Execution/Failure/Surface.fs"/>
     <Compile Include="Composition/Durable/Fact.fsi"/>
     <Compile Include="Composition/Durable/Fact.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Fact.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Fact.fs"/>
     <Compile Include="Interaction/Authority/Fact.fsi"/>
     <Compile Include="Interaction/Authority/Fact.fs"/>
@@ -359,11 +360,15 @@
     <Compile Include="Interaction/Concern/Surface.fs"/>
     <Compile Include="Enforcer/InstitutionalLearning/Surface.fsi"/>
     <Compile Include="Enforcer/InstitutionalLearning/Surface.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Projection.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Projection.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Recovery.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Recovery.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/RecoveryRuntime.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/RecoveryRuntime.fs"/>
     <Compile Include="Execution/Session/ChatExecution/RecoverySurface.fs"/>
     <Compile Include="Execution/Session/ChatExecution/RecoveryRuntimeSurface.fs"/>
+    <Compile Include="Execution/Session/ChatExecution/Admission.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Admission.fs"/>
     <Compile Include="Composition/Durable/Projection.fs"/>
     <Compile Include="Mission/Manager/Life/OpeningFloor.fs"/>
