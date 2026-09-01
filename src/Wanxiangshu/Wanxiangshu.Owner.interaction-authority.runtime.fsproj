@@ -14,10 +14,15 @@
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.opencode-host-chatadmission-intent.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <Compile Include="Interaction/Authority/Surface.fsi"/>
     <Compile Include="Interaction/Authority/Surface.fs"/>
+    <Compile Include="Interaction/Authority/RuntimeSurface.fsi"/>
     <Compile Include="Interaction/Authority/RuntimeSurface.fs"/>
+    <Compile Include="Interaction/Repair/CompletedTurnSurface.fsi"/>
     <Compile Include="Interaction/Repair/CompletedTurnSurface.fs"/>
+    <Compile Include="OpenCode/Host/ChatAdmission/IntentSurface.fsi"/>
     <Compile Include="OpenCode/Host/ChatAdmission/IntentSurface.fs"/>
+    <Compile Include="OpenCode/Host/TerminalPolicySurface.fsi"/>
     <Compile Include="OpenCode/Host/TerminalPolicySurface.fs"/>
   </ItemGroup>
 </Project>

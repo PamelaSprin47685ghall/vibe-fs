@@ -605,9 +605,39 @@
       "path": "src/Wanxiangshu/Mission/WorkRecord/OpeningSemanticSurface.fs",
       "owner": "work-record",
       "justification": "Signed JS-native projection of opening evidence and deterministic lifecycle-work-record composition; object decoding stays private and the surface owns no durable trace or coverage state."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Surface.fs",
+      "owner": "interaction-authority",
+      "justification": "Signed JS-native system-prompt identity projection over the canonical Role vocabulary; it owns no authority state or Host resource."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs",
+      "owner": "interaction-authority",
+      "justification": "Signed JS-native projection of authority profiles, claims, identity seeds and lifecycle decisions; object decoding and Fable representation remain private behind the published interaction-authority algebra."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs",
+      "owner": "interaction-authority",
+      "justification": "Signed JS-native projection of the published completed-turn classifier; Host object decoding and result rendering remain private and no second repair decision is introduced."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs",
+      "owner": "interaction-authority",
+      "justification": "Signed JS-native projection of ChatAdmissionIntent decisions over durable authority snapshots; dynamic Host decoding remains private and cannot bypass the typed admission owner."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/TerminalPolicySurface.fs",
+      "owner": "interaction-authority",
+      "justification": "Signed JS-native proof surface over the canonical terminal policy for no-journal probes; it owns no session lifecycle state or effect authority."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "interaction-authority",
+      "locality": "authority-runtime-surface",
+      "justification": "Authority lifecycle, completed-turn classification, chat-admission and terminal-policy JS semantic projections form one fully signed interaction-authority runtime surface over already graduated dispatch, identity and Host contracts; all dynamic decoding and Fable representation helpers remain signature-hidden."
+    },
     {
       "owner": "work-record",
       "locality": "mission-workrecord-model",

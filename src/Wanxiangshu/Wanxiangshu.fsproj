@@ -293,9 +293,11 @@
     <Compile Include="Execution/Delegation/SyncDelegate/Prompt.fs"/>
     <Compile Include="Interaction/Authority/Model.fsi"/>
     <Compile Include="Interaction/Authority/Model.fs"/>
+    <Compile Include="Interaction/Authority/Surface.fsi"/>
     <Compile Include="Interaction/Authority/Surface.fs"/>
     <Compile Include="Interaction/Authority/Run.fsi"/>
     <Compile Include="Interaction/Authority/Run.fs"/>
+    <Compile Include="Interaction/Authority/RuntimeSurface.fsi"/>
     <Compile Include="Interaction/Authority/RuntimeSurface.fs"/>
     <Compile Include="Execution/Fission/Model.fsi"/>
     <Compile Include="Execution/Fission/Model.fs"/>
@@ -345,6 +347,7 @@
     <Compile Include="OpenCode/Tools/ManagedAgent.fs"/>
     <Compile Include="OpenCode/Host/ChatAdmission/Intent.fsi"/>
     <Compile Include="OpenCode/Host/ChatAdmission/Intent.fs"/>
+    <Compile Include="OpenCode/Host/ChatAdmission/IntentSurface.fsi"/>
     <Compile Include="OpenCode/Host/ChatAdmission/IntentSurface.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fsi"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fs"/>
@@ -770,6 +773,7 @@
     <Compile Include="OpenCode/Host/HostSessionContextSurface.fs"/>
     <Compile Include="Interaction/Repair/CompletedTurn.fsi"/>
     <Compile Include="Interaction/Repair/CompletedTurn.fs"/>
+    <Compile Include="Interaction/Repair/CompletedTurnSurface.fsi"/>
     <Compile Include="Interaction/Repair/CompletedTurnSurface.fs"/>
     <Compile Include="Context/Trace/Capture.fsi"/>
     <Compile Include="Context/Trace/Capture.fs"/>
@@ -869,6 +873,7 @@
     <Compile Include="Mission/Review/OpenCode/TerminalAwait.fs"/>
     <Compile Include="OpenCode/Host/TerminalPolicy.fsi"/>
     <Compile Include="OpenCode/Host/TerminalPolicy.fs"/>
+    <Compile Include="OpenCode/Host/TerminalPolicySurface.fsi"/>
     <Compile Include="OpenCode/Host/TerminalPolicySurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fs"/>
     <Compile Include="Enforcer/Continuation.fs"/>
