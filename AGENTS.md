@@ -148,592 +148,330 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 - 工作区可能包含用户改动。修改前查看 `git status` 和相关 diff；保留无关改动。
 - 自动提交 git commit。允许推送 `master`；禁止 force push master。
 
-# ReleaseClosure 声明与永久宪法
+目标定为：
 
-ReleaseClosure 已达成：71 个语义迁移节点全部 `DONE`，coverage backlog 为 0，`npm run format-build-test` 全绿；临时 migration DAG ledger 与 `.omo/plans/agents-debt-zero-release-closure.md` 已删除，原 ledger 的施工事实已固化为永久 architecture gate。以下三章从已毕业的临时迁移提案中提取并作为仓库永久宪法保留。
+> 多工程负责语义边界；Contract/Runtime 反转负责缩小源码闭包；扁平投影负责规避 Fable 的 `ProjectReference` 图税。
 
-## DAG 施工调度宪法
+## 最终结构
 
-第五十七章：DAG 驱动全仓重构——ready 即执行，无全局 wave barrier
+```text
+                     ┌────────────→ Consumer.Runtime
+Domain.Contract ─────┤
+                     └────────────→ Provider.Runtime
 
-wave 的根本缺陷不是“阶段”这个词，而是全局 barrier：A 与 B 无依赖，只因同属不同 wave 就被强制串行；某个大区域剩一个慢节点，会饿死其它区域全部可执行工作。
+CompositionRoot.Runtime
+  → Consumer.Runtime
+  → Provider.Runtime
+```
 
-从本章开始，施工顺序只来自真实依赖图。目录只负责 coverage，不负责 scheduling。只有 production cutover 算进度。
+禁止：
 
-定义 migration DAG：
+```text
+Consumer.Runtime → Provider.Runtime
+Provider.Contract → Provider.Runtime
+Contract → Host / Adapter / Workflow / Persistence implementation
+```
 
-G = (V, E)
+例如 EventStore：
 
-V = semantic cutover nodes
-E = 必须先成立的真实 prerequisite
+```text
+EventStore.Contract
+  EventEnvelope
+  EventStreamId
+  AppendRequest
+  AppendResult
+  EventStorePort
 
-任意时刻：
+EventStore.Runtime
+  → EventStore.Contract
+  CanonicalEventCodec
+  GitObjectDatabase
+  ProcessGitRawStore
 
-READY = { v ∈ V | deps(v) 全 DONE }
+Mission.Runtime
+  → EventStore.Contract
 
-调度器持续从 READY 取节点执行。不存在“等同组全部完成再进入下一组”。
+Host.Composition
+  → Mission.Runtime
+  → EventStore.Runtime
+  注入 EventStorePort
+```
 
----
+这样修改 `Mission.Runtime` 时，其编译闭包不再包含 Git、Process、EventStore 实现；修改 `EventStore.Runtime` 时，也不需要编译 Mission。
 
-57.1 DAG 节点——最小可独立交付 semantic slice
+## 编译模型
 
-一个节点不是目录，不是 package，不是“做完 Interaction”。
+仍然只保留 F# → Fable：
 
-一个节点必须能独立回答：
-owner 是谁；迁哪条 law/knowledge/authority；发布什么 contract；迁哪些 callers；删什么旧路径；用什么 proof 闭合。
+```text
+owner fsproj DAG
+    ↓ 计算所需源码闭包
+零 ProjectReference 的临时 flat fsproj
+    ↓
+单次 Fable compile/watch
+```
 
-节点固定字段：
+不能直接执行：
 
-id
-primary owner
-intent / WHAT proposition
-current files
-target files/modules
-classification = KEEP / MOVE / SPLIT / DELETE / COMPOSITION-ROOT / ADAPTER
-publishes
-consumes
-depends_on
-production callers to migrate
-proofs
-architecture gates
-touched paths
-coverage tags
-state = PENDING / READY / RUNNING / DONE
-result = CUTOVER / DELETED / PROVEN-KEEP
+```bash
+fable Some.Owner.fsproj
+```
 
-`coverage tags` 只用于证明全仓没漏，如 OpenCode / Interaction / Mission / Execution / Context / Persistence / Platform；禁止拿 tag 生成先后顺序。
+因为这会让 Fable/MSBuild 递归解析几十个 `ProjectReference`。之前实测，同一组 223 个 `.fs`：
 
-`depends_on` 必须能用一句因果命题解释。解释不了的边就删。
+```text
+原生 56-project graph：83.27s
+扁平源码投影：        13.13s
+```
 
-KEEP 不是默认值。PROVEN-KEEP 必须证明：单一 owner、边界凝聚、foreign callers 只经 published contract、无重复知识。
+所以**反转解决闭包大小，flat projection 解决工程图开销**，两者缺一不可。
 
----
+## 能获得什么加速
 
-57.2 节点内部固定闭环
+### 明确能加速
 
-每个 cutover node 内部仍严格串行：
+- 单 owner 开发编译
+- focused test 前编译
+- PR impact compile
+- 修改 provider runtime，但 consumer contract 未变
+- 不涉及 composition root 的局部开发
+- watch 启动后的持续编辑
 
-1. 读对应 WHY / WHAT / HOW + 当前 proof。
-2. 先补会因旧实现而失败、因目标边界而通过的最低层 proof。
-3. 把 decision / vocabulary / capability / effect ownership 搬到唯一 owner。
-4. 建最终形态的最窄 published contract；foreign owner 只见 outcome / evidence / witness / capability / port。
-5. 一次迁完该节点声明的全部 production callers。
-6. 同节点删除旧 implementation、旧 alias、旧 adapter、旧 compatibility path；禁止临时 facade。
-7. 跑 owner proof + affected architecture gate + `node scripts/check.mjs` + `node scripts/build.mjs`。
-8. 绿后提交，state=DONE；立即释放所有后继节点。
+之前 EventStore 原型已经证明：
 
-节点不能用 inventory / report / baseline / gate-only commit 伪装完成。
+```text
+反转前：
+69 projects
+284 production .fs
+18.15s clean
 
----
+反转后原型：
+4 projects
+14 production .fs
+5.58s clean
+```
 
-57.3 只有四类合法依赖边
+### 不承诺的部分
 
-Contract edge：
+全量 release clean build 仍然需要编译全部 production F# 源码：
 
-Provider publishes C
-→ Consumer may cut over to C
+```text
+node scripts/build.mjs
+```
 
-Consumer 只依赖 C 已成为最终 contract，不依赖 Provider 整个目录“全部重构完”。
+如果总源码量不变，它不可能凭拆工程神奇地从 38s 变成 5s。正确目标是：
 
-Ownership edge：
+```text
+局部开发：显著加速
+全量发布：不因多工程而减速
+```
 
-duplicated knowledge K
-→ canonical owner K established
-→ foreign copies may be deleted
+全量构建继续只用一个 flattened emitter，一次编译全部源码，绝不逐 owner 编译 148 次。
 
-先确定唯一知识 owner，再删消费者复制品。
+## Contract 的硬标准
 
-Physical/compile edge：
+Contract locality 必须满足：
 
-new module/type/path must exist
-→ dependent compile edge may migrate
+1. 只包含类型、port、capability、request/result、稳定 vocabulary。
+2. 不包含数据库、Git、文件、网络、Host、进程、工作流实现。
+3. 不引用自己的 Runtime。
+4. 传递闭包也不得包含自己的 Runtime。
+5. 不为了复用四个字符串引用一整个业务 runtime。
+6. 每个公开实现由 `.fsi` 封口。
+7. Contract 可以依赖更基础的 Contract，但不能依赖 adapter。
+8. Composition root 是唯一同时看见 Contract 与具体 Runtime 的位置。
 
-只表达编译上不可逆的前置，不表达“习惯上先做”。
+特别注意：
 
-Closure edge：
+```text
+Contract ≠ 把 Runtime 文件改名为 Surface
+```
 
-all nodes in exact closure scope DONE
-→ local hard-cut / rotation / requirement-sync / release node may run
+现在一些标为 `contract` 的 locality 仍混有 Controller、Workflow、Store、Host、PTY、Recovery；这种必须真拆。
 
-closure scope 必须最小。一个 owner 的目录 rotation 只等该 owner 与其直接 consumers 稳定，不等全仓。
+## 接口应该偏粗，不要把实现细节泄漏出去
 
-禁止边：
+错误：
 
-same top-level directory
-same old wave
-“看起来应该先做”
-“先把基础设施全部做完”
-“等另一个团队/区域整体结束”
+```fsharp
+type EventStorePort =
+    abstract ReadGitObject: ...
+    abstract ParseJournalLine: ...
+    abstract OpenProcess: ...
+    abstract ResolveRef: ...
+```
 
-没有 contract/ownership/compile/closure 因果，就没有 edge。
+这只是把 Runtime 内部结构搬进 Contract。
 
----
+正确：
 
-57.4 并发铁律——最大化 ready frontier，不制造假依赖
+```fsharp
+type AppendRequest = {
+    StreamId: EventStreamId
+    ExpectedVersion: StreamVersion
+    Events: NonEmptyList<EventEnvelope>
+}
 
-∀ READY 节点，只要 touched paths 不冲突，就应并行。
+type AppendResult =
+    | Appended of StreamVersion
+    | VersionConflict of actual: StreamVersion
+    | Rejected of AppendRejection
 
-同文件重叠编辑不是 semantic dependency，只是短期 edit mutex：一个节点持锁，另一个保持 READY；锁释放后 rebase/复查上下文再执行。禁止为了避免 merge conflict 给整个 owner/目录加永久 DAG 边。
+type EventStorePort = {
+    Append: AppendRequest -> JS.Promise<AppendResult>
+    Read: ReadRequest -> JS.Promise<ReadResult>
+}
+```
 
-多节点共享同一 public contract 时，先抽一个 canonical owner node；消费者形成 fan-out：
+消费者只认识业务效果，不认识 Git、文件路径、process、codec 和恢复步骤。
 
-OwnerContract
- ├→ ConsumerA
- ├→ ConsumerB
- ├→ ConsumerC
- └→ ConsumerD
+## 变更影响规则
 
-禁止写成：
+需要区分 `.fs` 与 `.fsi`：
 
-OwnerContract → A → B → C → D
+### 只改 Runtime `.fs`，`.fsi` 不变
 
-除非 B 真的依赖 A 的产物。
+```text
+编译 Runtime 自身 closure
+不编译普通 consumers
+```
 
-多前置汇合使用 join：
+### 改 Contract `.fsi`
 
-ReviewWitness ─┐
-CandidatePort ─┼→ FinalityCutover
-DrainEvidence ─┤
-Authority ─────┘
+```text
+Contract
+  + 所有 reverse consumers
+  + 它们所需的 forward contract closure
+```
 
-Finality 不应等待 Todo、Repository、Sphinx 等无关节点。
+这些输入合并成一个 flat project，只启动一次 Fable。
 
-调度优先级：
-1. 解锁后继最多的 contract/owner node。
-2. 位于当前 critical path 的节点。
-3. 小而独立、可快速释放 fan-out 的节点。
-4. 最后才做不解锁生产 cutover 的纯整理。
+### 改 fsproj、props、package lock、Fable 版本
 
----
+保守走全量 flattened compile。
 
-57.5 DAG 必须保持无环
+## 需要加的架构门禁
 
-migration graph 出现 cycle 不是“互相等一下”，而是架构债被显式暴露。
+至少固定以下规则：
 
-A → B → C → A 时只能三选一：
+```text
+contract-runtime-direction
+  Contract 的直接/传递闭包不得包含 Runtime
 
-1. 三者其实同一 semantic sovereignty → 合并 owner/node locality。
-2. 真实双向物理协作 → 提取窄 published bridge，把语义依赖变单向。
-3. 某条边是假依赖 → 删除。
+foreign-runtime-reference
+  外域普通 consumer 不得引用 provider Runtime
 
-禁止用 baseline、allowlist、temporary facade、双写、双 runtime 打断 cycle。
+composition-only-runtime-binding
+  只有 composition root 可绑定 foreign Runtime
 
-新节点/新边加入 ledger 时必须立即检查 acyclic；发现 cycle 先裁决图，再写生产代码。
+contract-closure-budget
+  Contract 闭包不得无界增长
 
----
+owner-compile-flat-only
+  owner/impact compile 禁止把原生 ProjectReference 图交给 Fable
 
-57.6 Ledger 不再有“先做完 inventory 才能施工”的总 barrier
+compile-input-union
+  flat project 输入必须与计算出的 owner closure 精确一致
 
-migration ledger 逐 semantic slice 增量建立。一个 slice 一旦完成 owner 裁决、依赖识别、proof freeze，就可进入 READY；不必等 src/Wanxiangshu 100% inventory 完成。
+implementation-change-impact
+  Runtime .fs 改动且签名不变时，consumer 不进入 impact set
 
-但全仓 coverage 是 release invariant：最终每个 production `.fs` 必须被至少一个 node 覆盖，且最终归于恰一个 primary owner。
+signature-change-impact
+  Contract .fsi 改动时，reverse consumers 必须全部进入 impact set
+```
 
-semantic-owners.json 只能作为候选 owner inventory。文件被填 owner ≠ ownership 已正确；必须由源码职责、WHAT owner、foreign imports 三者共同裁决。
+## 第一批拆分
 
-ownership-adjudication.json 多 owner 列表只算 governance/APPLIES-TO evidence，不得冒充 primary ownership。
+### 1. EventStore
 
-热点 proof freeze 至少覆盖：
-PluginTransforms exact trace
-Assistance abort → fresh idle → successor trace
-ModelRouting capacity trace
-CanonicalIntegrator boot/live equivalence
-shutdown/drain
-recovery re-entry
+从当前混装 locality 中拆出：
 
----
+```text
+EventStore.Model.Contract
+EventStore.Port.Contract
+EventStore.Core.Runtime
+EventStore.Git.Runtime
+EventStore.EventVocabulary.Contract
+Strength.EventVocabulary.Contract
+```
 
-57.7 Coverage matrix——覆盖全部 production，但绝不代表执行顺序
+重点删除：
 
-Coverage A — OpenCode composition shell
+```text
+EventStore → Strength.Predictor.Runtime
+```
 
-OpenCode/Plugin/PluginTransforms.fs
-OpenCode/Host/HostSignalBootstrap.fs
-OpenCode/Tools/ToolRegistry.fs
-OpenCode/Host/PairProgrammingThoughtTransform.fs
-OpenCode/Host/ModelRouting.fs
-OpenCode/Host/ModelCapacity.fs
-PluginBoot / PluginHostWiring / PluginRecoveryWiring / PluginSessionWiring
-OpenCode/Host/Tools/Signals/Codec collaborators
+四个 event type 字符串不应拖入 261 个额外 `.fs`。
 
-Coverage B — Interaction
+### 2. Delegation
 
-Interaction/Dispatch/OpenCode/AssistanceHost.fs
-Interaction/Dispatch/OpenCode/NeedHelpSensor.fs
-Interaction/Dispatch/Send.fs
-Interaction/Dispatch/Dispatcher.fs
-Interaction/Dispatch/Recovery.fs
-Interaction/Dispatch/PhysicalAcceptance.fs
-Interaction/Authority/*
-Interaction/Repair/*
+当前 `execution-delegation-handle-surface` 实际混有 23 个实现文件，应拆成：
 
-Coverage C — Mission
+```text
+Delegation.Contract
+Delegation.Fold
+Delegation.Sync.Runtime
+Delegation.Fork.Runtime
+Delegation.Host.Adapter
+Delegation.Pty.Adapter
+Delegation.Recovery.Runtime
+```
 
-Mission/Manager/*
-Mission/Finality/*
-Mission/Review/*
-Mission/Obligation/*
-Mission/WorkRecord/*
+普通 consumer 只引用 `Delegation.Contract`，不能引用 Fork、PTY、Host 或 Store。
 
-Coverage D — Execution + Composition
+### 3. Host Session Quiescence
 
-Execution/Session/*
-Execution/Delegation/*
-Execution/Fission/*
-Composition/Turn/*
+拆成：
 
-Coverage E — Context + Strength + Enforcer + Participant
+```text
+Host.Session.Contract
+Host.Signal.Contract
+Host.Diagnostics.Runtime
+Host.Signal.Adapter
+Host.Session.Runtime
+Sphinx.Host.Adapter
+```
 
-Context/*
-Strength/*
-Enforcer/*
-Participant/*
+避免一个 quiescence consumer 连带编译 Sphinx、诊断、消息投影与整个 Host runtime。
 
-Coverage F — Persistence + Change + Git
+## 验收标准
 
-Persistence/*
-Change/*
-Git/*
+每次切一个 locality，必须拿数字验收：
 
-Coverage G — Platform + remaining production
+```text
+before closure projects / .fs / clean seconds
+after  closure projects / .fs / clean seconds
+```
 
-Process/*
-Repository/*
-Sphinx/*
-Foundation/*
-Resources/*
-Host/*
-Requirement/Grounding/*
-Verification/*
-以及所有未被 A–F 覆盖的 production file。
+建议预算：
 
-任何 Coverage 都可同时产生 READY 节点。禁止 A→B→C→D→E→F→G 的人工串行。
+```text
+Contract locality：
+  transitive production .fs ≤ 100
+  目标 clean compile ≤ 8s
 
----
+Focused runtime locality：
+  transitive production .fs ≤ 185
+  目标 clean compile ≤ 10s
 
-57.8 推荐初始 DAG——按真实 contract fan-out，不按目录排队
+超过全仓 60%：
+  不伪装为 focused compile，直接使用 full flat build/watch
+```
 
-以下只是 seed topology，最终 edge 必须以实际源码/import/WHAT 为证据，不得把示例本身变新教条。
+最终路线就定为：
 
-Context.TraceContract ───────────────┐
-Context.CompanionContract ──────────┤
-Context.PrefixContract ─────────────┤
-Strength.Contract ──────────────────┤
-Enforcer.ContinuationContract ──────┤
-PairGuidance.Contract ──────────────┤
-RequirementGrounding.Contract ──────┼→ OpenCode.PluginTransformsCutover
-Participant.ProviderProjection ─────┘
+```text
+真 Contract/Runtime 反转
+    +
+粗粒度 typed port
+    +
+composition root 注入
+    +
+owner/impact flat projection
+    +
+Fable watch
+    +
+一次全量 release build
+```
 
-ModelRouting.Contract ──────────────┐
-Session.RecoveryContract ───────────┤
-Fission.Contract ───────────────────┤
-Finality.Contract ──────────────────┤
-Assistance.Contract ────────────────┼→ OpenCode.HostSignalBootstrapCutover
-HostSignalPhysicalContract ─────────┘
-
-ToolOwner*.ToolSpec ────────────────→ OpenCode.ToolRegistryCutover
-
-Interaction.Authority ──────────────┐
-NeedHelp.Observation ───────────────┤
-Session.Quiescence ─────────────────┤
-Consultation.Contract ──────────────┼→ Assistance.WorkflowCutover
-AdviceDelivery.Contract ────────────┘
-
-Review.Witness ─────────────────────┐
-Git.CandidateContract ──────────────┤
-HandleDrain.Evidence ───────────────┤
-Mission.Authority ──────────────────┼→ Finality.Cutover
-Durability.Contract ────────────────┘
-
-Session.Lifecycle ──────────────────┐
-Delegation.ChildOutcome ────────────┤
-Fission.Lifecycle ──────────────────┼→ Composition.TurnCutover
-Participant.Binding ────────────────┤
-Context.Contracts ──────────────────┤
-Strength.Contract ──────────────────┘
-
-CanonicalIntegrator 已是守江山事实，因此 feature durable cleanup 不需要等待“Persistence 整包重构”；只要依赖的 canonical EventStore contract 已存在，各 feature 可独立删除 history reader / duplicate replay / private backend。
-
----
-
-57.9 关键节点的目标约束
-
-PluginTransformsCutover：
-root 只保留 typed mode + 固定顺序 + owner-published calls + Host shape；禁止 ITransformMiddleware / dynamic pipeline / service locator / giant capability bag。XTrace / Companion / Enforcer / Strength / Pair guidance / Requirement grounding 的 semantic decision 必须回 owner。ordered transform proof 必须锁死。
-
-HostSignalBootstrapCutover：
-只保留 construct / subscribe / route typed signal / drain / dispose。model/recovery/fission/finality/assistance policy 全部由 owner contract 提供。
-
-ToolRegistryCutover：
-tool owner 发布 ToolSpec + admission；registry 只 aggregate + Host projection，不拥有业务 availability。
-
-Assistance.WorkflowCutover：
-保持 AssistanceAbortClaim exact identity、abort 不消费、fresh idle 后 consume once、late child 不复活 owner。workflow 输入只含 assistance 自己的 evidence / witness / capability / ports；不得 import Git/Review/Todo/Strength/Fork internals。
-
-Mission nodes：
-Review 生产 review witness；Finality 只消费 typed facts/projection/witness；Todo canonical → Host compatibility 单向；Manager 只 orchestration；WorkRecord 只 materialization/opening。FinalitySurface / MagicTodoMembrane / DedicatedTodoRuntime 按 semantic slice 裁决，不按 LOC 拆。
-
-Execution nodes：
-Session 拥有 association/attachment/wait/recovery；Delegation 拥有 child run/handle/join/recovery durable facts；Fission 拥有 admission/lane/takeover/delivery claim；Turn 只 orchestration。父流程只消费 child outcome/evidence/capability，不读 Stage/Step/cursor/registry presence。
-
-Context/Strength/Enforcer/Participant nodes：
-Trace/Prefix/Companion、Budget/Prediction/Replica/Persistence、Rulebook/Continuation/Guidance、Persona/Provider Language/Attempt/Projection 分别归主。大 Surface 逐语义 operation 切，不让 Surface 因“方便”拥有多个 owner law。
-
-Persistence/Change/Git nodes：
-CanonicalIntegrator 保持唯一 full-history interpreter；feature 只提供 single-event oracle。Journal 只管 append/flush/close/poison 物理 durability。Change 经 ports 使用 Git/Review/Session；Git 只管 repository physical operations/integration/worktree。禁止双写、影子 store、feature 私有 replay、snapshot/state cell 冒充 truth。
-
-Platform nodes：
-Process 只发布 PTY/process/deadline/gate/spool physical primitives；Repository 分 investigation/knowledge/programming；Sphinx 分 epistemic domain 与 MCP/codec/session adapter；Foundation 只留真正通用 primitive；Resources 只 materialize resources；Host 顶层只 host contract/projection；Requirement/Grounding 只归 grounding owner；Verification 只 proof primitive/temporal harness。
-
----
-
-57.10 Hard cut 不再是全仓末尾阶段，而是每个子图的局部 closure
-
-每个 owner/cutover node DONE 后，立刻创建或释放对应 hard-cut node：
-
-OwnerCutover
-  → OwnerDependencyGate
-  → OwnerTreeRotation
-  → OwnerRequirementSync
-
-但三者是否完全串行取决于真实依赖。若 requirement 文档同步只依赖 owner contract 稳定，可与物理目录 rotation 并行；若 rotation 改测试路径，则 requirement proof-link 更新依赖 rotation。
-
-OwnerDependencyGate 必须验证：
-每个 production file 恰一 primary owner。
-cross-owner dependency 只落 published contract。
-composition root 只 wiring/order/lifetime，不 match foreign internals。
-foreign owner 不消费 Stage/Step/cursor/registry presence。
-unjustified owner cycle = 0。
-migration baseline / allowlist 对该 closure scope = 0。
-
-不允许“等所有 production cutover 完成后再统一发现依赖图错误”。边界一旦迁完，就立刻 harden。
-
----
-
-57.11 Physical Tree Rotation 改成 owner-local rotation
-
-不再等“全仓 owner graph 稳定”。某 owner 子图满足：
-
-canonical owner established
-direct consumers cut over
-old references = 0
-local dependency gate green
-
-即可搬目录。
-
-rotation node：
-1. 按 primary owner + runtime locality MOVE/SPLIT。
-2. 更新 Wanxiangshu.fsproj compile order 与 namespace/module references。
-3. 删除旧目录、空壳 Surface、过渡 facade、alias、namespace wrapper。
-4. 合并只因历史原因分离的同 owner 微模块。
-5. grep 旧 path / namespace / symbol = 0 production references。
-
-不同 owner 的 rotation touched paths 不冲突时可并行。
-
----
-
-57.12 Requirement / proof graph 同步也改成 owner-local closure
-
-不再“最后统一改宪法”。owner contract 稳定后即可同步它自己的 WHY/WHAT/HOW/proof：
-
-OwnerCutover
-  ├→ RequirementSync
-  └→ ProofGraphSync
-
-structured-workflow 的 universal meta law 是唯一需要跨 owner 汇总的部分；owner-specific law 一旦所有权确定就立即迁回真实 package。
-
-每个 RequirementSync node 必须：
-1. 分类 Universal Structural Law / Owner-specific Law / Historical-Garbage。
-2. APPLIES-TO = governance scope ≠ production ownership。
-3. 每条保留 WHAT 有最低足够 proof。
-4. 删除 stale path/module/behavior normative prose。
-5. 删除该 owner 已无用途的 baseline/census/temporary allowlist。
-6. 故意破坏关键边界，证明 gate/test 会红；恢复后提交。
-
----
-
-57.13 节点拆分与动态发现
-
-DAG 允许施工中发现新节点，但不允许偷偷扩大 RUNNING 节点到大泥球。
-
-若发现一个节点包含两个可独立 owner/law：停止继续扩张，拆成 A/B 两节点，补真实 edge，再继续。
-
-若发现新 dependency：
-未开始节点 → 直接加边并重新计算 READY。
-RUNNING 节点 → 若前置事实尚未满足，停止该节点，在安全边界拆出 prerequisite；禁止靠临时 adapter 绕过。
-DONE 节点 → 不可改写历史语义；创建 follow-up node 修正，并把暴露出的 invariant 加 hard gate。
-
-DAG ledger 是施工事实，不是永恒架构文档。最终 release 后删除；architecture truth 回到代码、requirements、semantic owner manifest 与机械 gate。
-
----
-
-57.14 全仓完成条件——只有一个 global sink
-
-全局唯一必须等待所有节点的地方是 ReleaseClosure。
-
-ReleaseClosure depends on：
-全部 production coverage nodes DONE。
-全部 owner dependency closure DONE。
-全部需要的 tree rotation DONE。
-全部 requirement/proof sync DONE。
-migration baseline / temporary allowlist = 0。
-old namespace / old path / deleted symbol production refs = 0。
-本次迁移 TODO/FIXME/compatibility shim = 0。
-bounded compatibility 只有 named external/durable creditor + evidence + writer policy + exit condition。
-Chapter 92 Definition of Done 全成立。
-
-最终验证：
-1. node scripts/check.mjs
-2. node scripts/build.mjs
-3. node requirements/verification-system/tests/run.mjs
-4. npm run format-build-test
-
-`npm run format-build-test` 是 release sink：format + checks + build + verification integration + package integration + warmup + e2e + npm pack --dry-run 整条通过。
-
-最后人工审查：
-git diff 无临时调试/迁移脚手架。
-git status 只含本次应交付变化。
-删除临时 migration DAG ledger。
-
-最终完成标准只有一句：
-
-&gt; 所有 semantic cutover 节点沿真实依赖 DAG 闭合；独立节点并发执行，局部子图随完成随 harden/rotate/sync；最终 ReleaseClosure 全梯度通过。全仓不存在人为 wave barrier，也不存在下一轮“真正的重构还没开始”。
-
-
----
-
-57.15 终局：多工程化，编译输入接管 owner 边，拆掉白盒 check
-
-ReleaseClosure 不是架构终点。本节是路线图的最终章：single-project 只是把全部越权成本集中在 FCS 白盒扫描（`owner-dependencies` / `fsharp-control-pyramid`）上运行的过渡态；终局是把这层扫描管辖的命题逐步转译进编译边界，让语言接管，然后拆除扫描本身。**57.15 已完成**：148 个 owner locality 已全部毕业，白盒 FCS 扫描链路（`owner-symbol-uses.fsx`、`OMP_FCS_*`、`.fable-build/*-fcs`、`composition-root-invariant.mjs`）已整体删除；`owner-contracts.mjs` 与 `owner-projects.mjs` 接任 contract registry 与 owner locality DAG 验证。
-
-终局形态：
-
-一个 owner（或 57.5 裁决出的 contract/runtime/adapter owner locality）对应一个 fsproj；跨 owner 消费只经 ProjectReference + public contract locality。这里必须服从本仓 Fable-only 的真实编译语义：Fable 5 会递归把 ProjectReference closure 的源码合并进顶层 project check，因此 ProjectReference 本身**不是 .NET assembly visibility firewall**，`internal`、top-level `module private` 与 `DisableTransitiveProjectReferences` 都不会阻断这条 source closure。真正可用的终局边界是 compile-input boundary + F# signature：foreign owner 只能引用 dependency-inverted 的 contract/adapter locality，且该 locality 的 transitive ProjectReference closure 不得包含 provider runtime/private locality；contract implementation 必须由 sibling `.fsi` 封口，未签名 implementation symbol 即使被 source-merge 也编译红。signature-only project 不会形成可消费模块，因此 contract 必须有真实自包含 implementation；正确依赖方向始终是 runtime → contract。
-
-顺序不可颠倒：
-
-1. 工程引用图必须是 DAG。SCC 数字只能来自当次 executable `owner-contracts.mjs` / `owner-projects.mjs` 事实，禁止把旧文档中的成员数当现状。live SCC 必须按 57.5 三选一收敛：合并同一 sovereignty locality、提取窄 contract/runtime/adapter locality 单向化、或删假边。允许一个 semantic owner 因真实编译方向被裁成少数有名称的 localities；禁止 `phase-1/2/3` 式编号切片冒充 architecture。
-2. 按 57.11 owner-local rotation 逐个立 owner-boundary 工程：一个 locality 满足 canonical owner established、direct consumers cut over、old references = 0，即建立独立 fsproj 并接入 owner ProjectReference DAG。Fable emit 仍由 `Wanxiangshu.fsproj` 一次 flatten 全部 production source；这是 Fable-only 的物理发射优化，不是 owner graph，compile set 必须与 owner projects 并集精确相等，且 owner project 禁止引用 emit project。graduated owner 的每个 production `.fs` 必须有 sibling `.fsi`，并同时进入 owner project 与 flattened emit；owner cutover 时由 `node scripts/compile-owner.mjs <owner-fsproj>` 从 ProjectReference DAG 机械投影精确 transitive closure，再按 `Wanxiangshu.fsproj` 规范顺序生成零 ProjectReference 隔离工程真实跑 Fable。ProjectReference 图仍是编译输入事实源，投影只消除 Fable 重复解析百级 MSBuild 图的偶然税；release 常规路径由 flat build 验 signature↔implementation + 静态 project gate 守 topology。
-3. foreign ProjectReference 只允许指向 provider 的 published contract / physical-port locality，或 exact composition-root wiring 所需的 narrow adapter locality；provider runtime locality 不得出现在普通 foreign dependency 的 direct **或 transitive** closure。contract/adapter locality 自身不得 ProjectReference provider runtime/private locality；若 contract 行为需要 runtime，必须反转为 runtime 实现 contract 声明的 capability/port。每拆一个 locality，`owner-contracts.mjs` 与 `owner-projects.mjs` 的管辖面同步收缩；ProjectReference 缺失/多余、compile coverage、project SCC 与 foreign runtime closure 由继任 hard gate + locality compiler check 接管。exact symbol/consumer 承诺仍由 `published-contracts.json` 与 `owner-contracts.mjs` 静态门控守护，直到其 Surface 已窄到可由非白盒机制完整判定。
-
-拆 check 的准确语义：
-
-拆除对象是白盒 FCS 扫描的独有职责——全仓名字解析证明"0 unauthorized cross-owner source import"。该命题已被**signed owner locality + ProjectReference compile-input DAG**完整接管（每个 production file 恰一 owner locality、graduated owner 每个 source 有 `.fsi`、emit compile set 与 locality 并集一致、foreign owner 只拿 contract/adapter locality、漏写 ProjectReference/越过 runtime boundary/访问未签名 sibling implementation 均编译失败），因此 `owner-symbol-uses.fsx` 反射扫描器、FCS 归一化 evidence 管线、`OMP_FCS_*` 复用机制已整体删除。禁止用 flattened emit Fable 的成功代替 topology proof，也禁止用 .NET build 绕过本仓 Fable-only 约束。`published-contracts.json` 登记与其余 gate（spec/deadcode/requirement-trace 等）不随多工程消失：per-consumer exact symbol 承诺由 `owner-contracts.mjs` 静态验证，直到其继任非白盒 gate 完整接管。
-
-毕业标准沿用三件套：production cutover（每个 production source 恰一 owner-boundary locality，flattened emit 与其并集一致）+ executable proof（public contract 可编译、缺失/越权 ProjectReference 的 consumer 独立 Fable check 必须红；同时有 canary 固定 Fable source-merge 可见性事实）+ hard gate（compile coverage、locality 单 owner、foreign contract-only transitive closure、工程 DAG 固化进 `check.mjs` 继任者）。**三者已齐全：57.15 已完成，白盒 FCS 扫描已删除，语言/编译器与非白盒 `owner-contracts.mjs` / `owner-projects.mjs` 已接任。**
-
-
-
-## 架构宪法
-
-第九十一章：最终 Architecture Constitution
-
-如果要我把整个重构压缩成十条不可破坏的宪法，我会写：
-
-I.   Every accepted semantic proposition has exactly one owner.
-
-II.  Every production capability has exactly one authority owner.
-
-III. Witness proves; Capability authorizes.
-
-IV.  Business control flow is host-language CE, never a second runtime.
-
-V.   Cross-workflow seams expose outcomes/evidence/capabilities,
-     never execution position.
-
-VI.  Higher-order composition is local and owner-named.
-     No anonymous semantic middleware.
-
-VII. Durable history stores facts.
-    Process-local gates store temporary authority.
-    Never confuse the two.
-
-VIII. Feature owners integrate one event.
-      Canonical Integrator alone interprets history.
-
-IX.  Physical reality enters only through explicit ports/adapters
-     and leaves as typed observation/receipt.
-
-X.   Every mechanically decidable architectural invariant
-     must eventually become a failing gate.
-
-这十条比“DDD / Clean Architecture / Hexagonal / Onion”任何标签都更适合你这个系统。
-
-
-
-## 教科书级 Definition of Done
-
-第九十二章：最终 Definition of Done——什么叫“教科书级”
-
-不是：
-
-所有文件 &lt; 300 行
-所有函数 &lt; 20 行
-所有 package 零循环
-所有 class 消失
-所有 mutable 消失
-
-而是下面这些全部成立。
-
-Semantic Ownership
-
-0 unowned normative propositions
-0 multi-owner normative propositions
-0 unowned production semantic modules
-
-Dependency Integrity
-
-0 unauthorized cross-owner internal imports
-0 hidden semantic dependency edges
-
-CE
-
-0 business workflow runtimes
-0 stored program-counter state
-0 cross-module Stage/NextAction seams
-
-Capability
-
-all high-risk effect authority typed
-all one-shot process capabilities owner-validated
-no process capability persisted as durable fact
-
-Witness
-
-subject/version identity explicit where required
-no stale witness directly authorizes current effect
-
-Decorator
-
-0 anonymous semantic middleware
-every trace-altering wrapper has owner + law + proof
-
-Composition
-
-wide roots are explicit
-roots contain wiring/order, not foreign policy
-
-Durability
-
-one event substrate
-one canonical integrator
-zero feature-owned history loops
-
-Verification
-
-every WHAT law has owned proof
-every proof is at the lowest adequate ladder level
-every critical gate is demonstrably red
-
-Crash
-
-every acknowledged durable effect survives restart
-every ambiguous external cut has an explicit reconciliation law
-no recovery path guesses hidden workflow position
-
-达到这个状态，我会很愿意称它：
-
-教科书级 Algebraic Capability Architecture
-
-而且不是“代码看起来函数式”。
-
-是整个仓库具有可证明的语义拓扑。
+不做 JS 链接，不造第二套包系统；只把现在“名义多工程、实际源码全透传”改成“消费者只看到 contract 源码闭包”。
