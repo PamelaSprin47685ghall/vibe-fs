@@ -1,4 +1,44 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><WanxiangshuSemanticOwner>knowledge-reuse</WanxiangshuSemanticOwner><WanxiangshuOwnerLocality>repository-knowledge-casebook-model</WanxiangshuOwnerLocality><WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind></PropertyGroup><ItemGroup>
-<ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptresources.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-processeventlog.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.durable-events.strength-persistence-durabilityport.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.opencode-host-opencodeport.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-ownership.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionbindingsurface.fsproj"/>
-<Compile Include="Repository/Knowledge/Casebook/Model.fs"/><Compile Include="Repository/Knowledge/Casebook/Capture.fs"/><Compile Include="Repository/Knowledge/Casebook/Store.fs"/><Compile Include="Repository/Knowledge/Casebook/Replay.fs"/><Compile Include="Repository/Knowledge/Casebook/SessionDraft.fs"/><Compile Include="Repository/Knowledge/Casebook/BookkeeperStaging.fs"/><Compile Include="Repository/Knowledge/Casebook/BookkeeperRuntime.fs"/><Compile Include="Repository/Knowledge/Casebook/Workflow.fs"/><Compile Include="Repository/Knowledge/Casebook/Index.fs"/>
-</ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>knowledge-reuse</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>repository-knowledge-casebook-model</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptresources.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-processeventlog.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.strength-persistence-durabilityport.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.opencode-host-opencodeport.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-ownership.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionbindingsurface.fsproj"/>
+    <Compile Include="Repository/Knowledge/Casebook/Model.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/Model.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Capture.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/Capture.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Store.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/Store.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Replay.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/Replay.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/SessionDraft.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/SessionDraft.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/BookkeeperStaging.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/BookkeeperStaging.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/BookkeeperRuntime.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/BookkeeperRuntime.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Workflow.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/Workflow.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Index.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/Index.fs"/>
+  </ItemGroup>
+</Project>

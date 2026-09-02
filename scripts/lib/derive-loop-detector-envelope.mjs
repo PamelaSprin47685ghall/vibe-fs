@@ -222,6 +222,9 @@ export const deriveLoopDetectorEnvelope = async (root = defaultRoot) => {
 
 const artifactSource = (envelope) => `// Generated from the current repository SSOT by scripts/build.mjs.
 // Ephemeral build input; never hand-edit or copy these values into tracked source.
+import { encode } from 'gpt-tokenizer/encoding/o200k_base'
+export { encode }
+
 export const vocabularySize = ${envelope.vocabularySize}
 export const halfLife = ${envelope.halfLife.toFixed(1)}
 export const lambda = ${envelope.lambda.toFixed(16)}

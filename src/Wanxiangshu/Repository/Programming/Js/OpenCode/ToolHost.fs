@@ -1,86 +1,12 @@
 namespace Wanxiangshu.Repository.Programming.Js.OpenCode
 
-open Wanxiangshu.Change
-open Wanxiangshu.Change.Host
-open Wanxiangshu.Context.Companion.Blogger.OpenCode
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
-open Wanxiangshu.Execution.Delegation.Handle.OpenCode
-open Wanxiangshu.Execution.Delegation.OpenCode
-open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
-open Wanxiangshu.Execution.Fission.OpenCode
-open Wanxiangshu.Execution.Session.OpenCode
-open Wanxiangshu.Git
-open Wanxiangshu.Git.Hook
-open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Finality.OpenCode
-open Wanxiangshu.Mission.Manager.OpenCode
-open Wanxiangshu.Mission.Obligation.Todo.OpenCode
-open Wanxiangshu.Mission.Review.OpenCode
-open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Strength.OpenCode
-open Wanxiangshu.Strength.Persistence
-
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-open Wanxiangshu.Strength.Projection
-open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.Fork.Host
-open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Resources
-open Wanxiangshu.Resources
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Repository.Programming.Js
 
 /// Coexistence seam between builtin filesystem fallbacks and generated js-*.
 /// GrandRewrite keeps read/edit/write/glob/grep as normal primitive fallback:
@@ -95,7 +21,10 @@ module BuiltinToolDescriptionHook =
     let BuiltinFilesystemTools =
         set [ "read"; "edit"; "write"; "glob"; "grep"; "patch" ]
 
-    let annotate (_builtinName: string) (description: string) (_jsRoleToolName: string) : string = description
+    let annotate (builtinName: string) (description: string) (jsRoleToolName: string) : string =
+        ignore builtinName
+        ignore jsRoleToolName
+        description
 
     /// JS-003: the hook must not recommend a tool the provider cannot see.
     /// `visibleToolNames` is the current Attempt's tool set; a recommendation

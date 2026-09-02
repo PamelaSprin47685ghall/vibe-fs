@@ -12,11 +12,8 @@ import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
-import { scanProjectSymbolUses } from './owner-dependencies.mjs'
 
 export const PRODUCTION_ROOT = 'src/Wanxiangshu'
-const FCS_SCRATCH = join('.fable-build', 'dsl-ownership-fcs')
-const FCS_RESULT = join(FCS_SCRATCH, 'symbol-uses.json')
 const norm = (p) => p.replace(/\\/g, '/')
 
 /**
@@ -1268,11 +1265,7 @@ const runCli = () => {
     file,
     text: readFileSync(file, 'utf8'),
   }))
-  const compilerEvidence = scanProjectSymbolUses({
-    scratchRoot: FCS_SCRATCH,
-    resultPath: FCS_RESULT,
-  })
-  const violations = scanFiles(entries, compilerEvidence)
+  const violations = scanFiles(entries, undefined)
   const byGate = groupByGate(violations)
   const write = threshold >= 0 ? console.log : console.error
 

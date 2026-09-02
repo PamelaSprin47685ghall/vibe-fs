@@ -3,11 +3,9 @@ namespace Wanxiangshu.Change.Host
 open System
 open System.Threading.Tasks
 open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Change
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Git
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 

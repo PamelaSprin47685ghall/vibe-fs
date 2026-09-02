@@ -5,10 +5,7 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Resources
-open ToolHostCodec
 
 /// One process-local persistent JSON canvas interpreted by jq.
 module AssumeTool =

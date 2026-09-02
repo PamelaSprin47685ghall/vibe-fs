@@ -41,13 +41,21 @@
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-budget.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-prediction-predictor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <Compile Include="Strength/Persistence/DurabilityPort.fsi"/>
     <Compile Include="Strength/Persistence/DurabilityPort.fs"/>
+    <Compile Include="Strength/Persistence/Store.fsi"/>
     <Compile Include="Strength/Persistence/Store.fs"/>
+    <Compile Include="Strength/Persistence/Durability.fsi"/>
     <Compile Include="Strength/Persistence/Durability.fs"/>
+    <Compile Include="Composition/Durable/HostFactFold.fsi"/>
     <Compile Include="Composition/Durable/HostFactFold.fs"/>
+    <Compile Include="Composition/Durable/Fold.fsi"/>
     <Compile Include="Composition/Durable/Fold.fs"/>
+    <Compile Include="Persistence/Journal/JournalEventStoreBoot.fsi"/>
     <Compile Include="Persistence/Journal/JournalEventStoreBoot.fs"/>
+    <Compile Include="Persistence/Journal/EventStoreJournalWriter.fsi"/>
     <Compile Include="Persistence/Journal/EventStoreJournalWriter.fs"/>
+    <Compile Include="Persistence/EventStore/EventStoreHandle.fsi"/>
     <Compile Include="Persistence/EventStore/EventStoreHandle.fs"/>
   </ItemGroup>
 </Project>

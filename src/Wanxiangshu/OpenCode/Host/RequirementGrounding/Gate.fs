@@ -2,7 +2,6 @@ namespace Wanxiangshu.OpenCode.Host.RequirementGrounding
 
 open System
 open System.Threading.Tasks
-open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
@@ -40,12 +39,22 @@ module RequirementGroundingGate =
           Requested = 0
           Packages = [] }
 
-    let private requestMatched journal workspace sessionId paths =
+    let private requestMatched
+        (journal: AgentJournal option)
+        (workspace: string)
+        (sessionId: string)
+        (paths: string list)
+        : Task<Result<RequirementGroundingDecision, string>> =
         match journal with
         | None -> Task.FromResult(Error "requirement grounding requires a durable journal")
         | Some durable -> RequirementGroundingRuntime.requestPaths durable workspace (SessionId.create sessionId) paths
 
-    let private request journal workspace sessionId paths =
+    let private request
+        (journal: AgentJournal option)
+        (workspace: string)
+        (sessionId: string)
+        (paths: string list)
+        : Task<Result<RequirementGroundingDecision, string>> =
         let matched =
             if List.isEmpty paths then
                 []
@@ -57,7 +66,12 @@ module RequirementGroundingGate =
         else
             requestMatched journal workspace sessionId paths
 
-    let private observeReads journal workspace sessionId paths =
+    let private observeReads
+        (journal: AgentJournal option)
+        (workspace: string)
+        (sessionId: string)
+        (paths: string list)
+        : Task<Result<RequirementGroundingDecision, string>> =
         match journal with
         | None -> Task.FromResult(Error "requirement grounding requires a durable journal")
         | Some durable ->
@@ -72,10 +86,20 @@ module RequirementGroundingGate =
                 return ()
         }
 
-    let decideMutation journal workspace sessionId paths =
+    let decideMutation
+        (journal: AgentJournal option)
+        (workspace: string)
+        (sessionId: string)
+        (paths: string list)
+        : Task<Result<RequirementGroundingDecision, string>> =
         request journal workspace sessionId paths
 
-    let decideRead journal workspace sessionId paths =
+    let decideRead
+        (journal: AgentJournal option)
+        (workspace: string)
+        (sessionId: string)
+        (paths: string list)
+        : Task<Result<RequirementGroundingDecision, string>> =
         if List.isEmpty paths then
             Task.FromResult(Ok emptyDecision)
         else
@@ -139,7 +163,13 @@ module RequirementGroundingGate =
         | Some _ when String.IsNullOrWhiteSpace sessionId -> Task.FromResult(())
         | Some root -> ignoreDecision (fun () -> decideRead journal root sessionId (observationPaths toolName args))
 
-    let programObservation journal workspace sessionId readPaths effectPaths : Task<unit> =
+    let programObservation
+        (journal: AgentJournal option)
+        (workspace: string)
+        (sessionId: string)
+        (readPaths: string list)
+        (effectPaths: string list)
+        : Task<unit> =
         task {
             if not (List.isEmpty readPaths) then
                 do! ignoreDecision (fun () -> decideRead journal workspace sessionId readPaths)

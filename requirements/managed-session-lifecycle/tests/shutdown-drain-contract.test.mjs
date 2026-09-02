@@ -66,7 +66,7 @@ test('WHAT[MANAGED-SESSION-009] provider transform is admitted into plugin shutd
   )
   assert.match(
     interop,
-    /let registeredHook key adaptedHook =\s*let metadata = HookPolicy\.metadata key \|> HookPolicy\.validate\s*metadata\.HostKey, policyAwareHook metadata\.DiagnosticOperation adaptedHook/,
+    /let registeredHook \(key: HookKey\) \(adaptedHook: obj\) : string \* obj =\s*let metadata = HookPolicy\.metadata key \|> HookPolicy\.validate\s*metadata\.HostKey, policyAwareHook metadata\.DiagnosticOperation adaptedHook/,
   )
 })
 

@@ -10,11 +10,17 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
+    <Compile Include="Repository/Programming/Js/RuntimeSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/RuntimeSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/FilesystemSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/FilesystemSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/TransactionSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/TransactionSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/WorkflowSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/WorkflowSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/OpenCode/ToolHostSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHostSurface.fs"/>
+    <Compile Include="OpenCode/Tools/FileMutationSurface.fsi"/>
     <Compile Include="OpenCode/Tools/FileMutationSurface.fs"/>
   </ItemGroup>
 </Project>

@@ -40,6 +40,7 @@ import {
 // explicitly so tests can inspect the fatal classification and durable aftermath
 // without killing the whole test tier. Production code never infers this from
 // NODE_TEST_CONTEXT or any other Host-owned environment variable.
+const originalHome = process.env.HOME || process.env.USERPROFILE
 process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
 
 // Isolate HOME / USERPROFILE for the node:test inner runner so any test or
@@ -61,6 +62,7 @@ writeFileSync(
 )
 process.env.HOME = runnerTestHome
 process.env.USERPROFILE = runnerTestHome
+if (originalHome) process.env.DOTNET_CLI_HOME = originalHome
 
 process.on('exit', () => {
   try { rmSync(runnerTestHome, { recursive: true, force: true }) } catch {}

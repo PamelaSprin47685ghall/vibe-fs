@@ -8,11 +8,10 @@ open Fable.Core.JsInterop
 [<RequireQualifiedAccess>]
 module LoopDetector =
 
-    module private TokenEncoding =
-        [<Import("encode", "gpt-tokenizer/encoding/o200k_base")>]
+    module private RepositoryEnvelope =
+        [<Import("encode", "#wanxiangshu-loop-detector-envelope")>]
         let encode (_text: string) : int[] = jsNative
 
-    module private RepositoryEnvelope =
         [<Import("vocabularySize", "#wanxiangshu-loop-detector-envelope")>]
         let vocabularySize: int = jsNative
 
@@ -112,7 +111,7 @@ module LoopDetector =
         // DSL-MUTABLE: algorithm-scratch — fold accumulator over token stream
         let mutable acc = detector
 
-        for token in TokenEncoding.encode text do
+        for token in RepositoryEnvelope.encode text do
             acc <- pushToken acc token
 
         acc

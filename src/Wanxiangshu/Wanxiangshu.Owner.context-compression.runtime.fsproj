@@ -30,15 +30,25 @@
     <ProjectReference Include="Wanxiangshu.Owner.review-assurance.opencode-host-providerrunbinding.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
+    <Compile Include="Host/Contract/CompactionPolicySurface.fsi"/>
     <Compile Include="Host/Contract/CompactionPolicySurface.fs"/>
+    <Compile Include="Context/Companion/Blogger/TomlSurface.fsi"/>
     <Compile Include="Context/Companion/Blogger/TomlSurface.fs"/>
+    <Compile Include="Context/Companion/Blogger/DeltaSurface.fsi"/>
     <Compile Include="Context/Companion/Blogger/DeltaSurface.fs"/>
+    <Compile Include="Context/Companion/Blogger/FrameSurface.fsi"/>
     <Compile Include="Context/Companion/Blogger/FrameSurface.fs"/>
+    <Compile Include="Context/Companion/Blogger/Runtime/CycleSurface.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/CycleSurface.fs"/>
+    <Compile Include="Context/Companion/FoldSurface.fsi"/>
     <Compile Include="Context/Companion/FoldSurface.fs"/>
+    <Compile Include="Context/Companion/ProjectionSurface.fsi"/>
     <Compile Include="Context/Companion/ProjectionSurface.fs"/>
+    <Compile Include="Context/Companion/CompressionSurface.fsi"/>
     <Compile Include="Context/Companion/CompressionSurface.fs"/>
+    <Compile Include="Context/Companion/Blogger/BloggerCrashSurface.fsi"/>
     <Compile Include="Context/Companion/Blogger/BloggerCrashSurface.fs"/>
+    <Compile Include="Context/Companion/RuntimeSurface.fsi"/>
     <Compile Include="Context/Companion/RuntimeSurface.fs"/>
   </ItemGroup>
 </Project>

@@ -8,7 +8,7 @@
 
 `tests/proof-ladder.test.mjs` 对全局构建与测试命令链（`package.json` 中的 `format-build-test` 及 `scripts/check.mjs`）进行强约束：
 - 严格锁定第 0 层静态门禁、第 1–3 层纯逻辑与时序单元测试、第 4 层单入点物理 Long Stroke 与第 5 层 Release 构建的执行顺序。
-- `format/check/owner-dep/build` 允许经 Wireit 缓存调度，但 proof 同时锁定顶层 `npm run` 顺序与每个 Wireit step 的 exact command；间接调度不得隐藏、替换或跳过 Fantomas、text gate、FCS gate 与 clean Fable build。
+- `format/check/build` 允许经 Wireit 缓存调度，但 proof 同时锁定顶层 `npm run` 顺序与每个 Wireit step 的 exact command；间接调度不得隐藏、替换或跳过 Fantomas、text gate、owner contract gate 与 clean Fable build。FCS 白盒扫描已在 57.15 终局整体删除。
 - build fingerprint 覆盖整个 workspace，仅排除自身 `dist/` 与 `.fable-build/` 输出；因为 `LoopDetectorEnvelope` 从 Git 跟踪的全部源码/文档语料派生，按固定目录枚举输入会让新增目录或文档修改错误复用旧 artifact。
 - 确保 `scripts/check.mjs` 中注册的所有门禁脚本路径在磁盘上真实存在，且任何门禁失败时其非零退出码均能正确向上传播（fail-closed）。
 - `scripts/checks/proof-levels.json` 独立保存精确 `(path, title, what_id) → level` 分类；共享 resolver 对缺失或重复键返回无权威结果，registry validator 阻断形状、层序与键歧义，外部登记行只能匹配该分类而不能自我改标。

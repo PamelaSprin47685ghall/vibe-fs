@@ -13,7 +13,5 @@ type WorkLogObservation =
 [<RequireQualifiedAccess>]
 module RulebookObservation =
     val pairTipsAndFrames: tips: string list -> frames: (string * string option) list -> ObservationUnit list
-
     val ofTipsAndFrames: tips: (string * string) list -> frameDigests: string list -> WorkLogObservation list
-
     val workLogFromUnits: tipCycles: (string * string) list -> units: ObservationUnit list -> WorkLogObservation list

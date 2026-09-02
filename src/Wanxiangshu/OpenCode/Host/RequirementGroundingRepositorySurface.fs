@@ -17,7 +17,7 @@ module RequirementGroundingRepositorySurface =
         member _.Workspace = workspace
         member _.SessionId = sessionId
 
-    let private runtimeOf value = unbox<RuntimeHandle> value
+    let private runtimeOf (value: obj) = unbox<RuntimeHandle> value
 
     let private boot workspace sessionId =
         task {
@@ -37,7 +37,7 @@ module RequirementGroundingRepositorySurface =
                 return Ok(RuntimeHandle(handle, workspace, sessionId))
         }
 
-    let dispose runtime =
+    let dispose (runtime: obj) : unit =
         JournalSurface.dispose (runtimeOf runtime).Handle
 
     let private summary (runtime: RuntimeHandle) (outcome: JsToolWorkflow.JsToolOutcome) =
@@ -66,7 +66,7 @@ module RequirementGroundingRepositorySurface =
                 |> List.toArray
                created = created |}
 
-    let private runAttempt failObservation workspace sessionId program : Task<obj> =
+    let private runAttempt failObservation (workspace: string) (sessionId: string) (program: string) : Task<obj> =
         task {
             match! boot workspace sessionId with
             | Error error -> return raise (InvalidOperationException error)
@@ -102,8 +102,8 @@ module RequirementGroundingRepositorySurface =
                     return summary runtime outcome
         }
 
-    let runFirstAttempt workspace sessionId program : Task<obj> =
+    let runFirstAttempt (workspace: string) (sessionId: string) (program: string) : Task<obj> =
         runAttempt false workspace sessionId program
 
-    let runWithObservationFailure workspace sessionId program : Task<obj> =
+    let runWithObservationFailure (workspace: string) (sessionId: string) (program: string) : Task<obj> =
         runAttempt true workspace sessionId program

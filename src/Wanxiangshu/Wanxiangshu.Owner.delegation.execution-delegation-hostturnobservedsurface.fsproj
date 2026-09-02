@@ -42,14 +42,23 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionbindingsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <Compile Include="Execution/Delegation/Join.fsi"/>
     <Compile Include="Execution/Delegation/Join.fs"/>
+    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinGuard.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinGuard.fs"/>
+    <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fs"/>
+    <Compile Include="Execution/Delegation/Handle/OpenCode/JoinWake.fsi"/>
     <Compile Include="Execution/Delegation/Handle/OpenCode/JoinWake.fs"/>
+    <Compile Include="Execution/Delegation/OpenCode/DelegatedToolEstimate.fsi"/>
     <Compile Include="Execution/Delegation/OpenCode/DelegatedToolEstimate.fs"/>
+    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs"/>
+    <Compile Include="Execution/Delegation/Fork/OpenCode/Tool.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/Tool.fs"/>
+    <Compile Include="Execution/Delegation/Fork/OpenCode/JoinTool.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinTool.fs"/>
+    <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Batching.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Batching.fs"/>
   </ItemGroup>
 </Project>

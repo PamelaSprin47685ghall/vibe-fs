@@ -12,15 +12,15 @@ open Wanxiangshu.Strength.Persistence
 [<RequireQualifiedAccess>]
 module EventStoreStrengthSurface =
 
-    let internal storeOf (value: obj) : IEventStore = (unbox<EventStoreHandle> value).Store
+    let storeOf (value: obj) : IEventStore = (unbox<EventStoreHandle> value).Store
 
-    let internal writePayload (value: obj) (bytes: byte array) : Task<Result<PayloadRef, string>> =
+    let writePayload (value: obj) (bytes: byte array) : Task<Result<PayloadRef, string>> =
         (storeOf value).WritePayload bytes
 
-    let internal readPayload (value: obj) (payloadRef: PayloadRef) : Task<Result<byte[] option, string>> =
+    let readPayload (value: obj) (payloadRef: PayloadRef) : Task<Result<byte[] option, string>> =
         (storeOf value).ReadPayload payloadRef
 
-    let internal current (value: obj) (key: string) : obj option = (storeOf value).TryCurrent key
+    let current (value: obj) (key: string) : obj option = (storeOf value).TryCurrent key
 
-    let internal durability (value: obj) : StrengthDurabilityPort =
+    let durability (value: obj) : StrengthDurabilityPort =
         StrengthDurability.create (storeOf value)

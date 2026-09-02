@@ -7,7 +7,6 @@ open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
 open Wanxiangshu.Persistence.Journal
 
 /// HOST-006 Host adapter: force the compaction settings off, refuse the compaction
@@ -97,7 +96,7 @@ module HostCompactionGate =
     /// a compaction only when its pseudo-run appears in a later snapshot; with one, the
     /// containment layer has a same-turn signal it can log against, and the absence of
     /// a cancel field is documented at the boundary rather than inferred.
-    let onSessionCompacting (input: obj) (_output: obj) : unit =
+    let onSessionCompacting (input: obj) (output: obj) : unit =
         let sessionId =
             if isNull input || isNull input?sessionID then
                 "<unknown>"
@@ -112,7 +111,7 @@ module HostCompactionGate =
     /// replay branch unreachable, so this is belt and braces — but it is the only
     /// vetoable synthetic-turn injection point, and an unanswered hook relies on an
     /// upstream default staying harmless.
-    let onCompactionAutoContinue (_input: obj) (output: obj) : unit =
+    let onCompactionAutoContinue (input: obj) (output: obj) : unit =
         output?enabled <- box HostCompactionPolicy.autoContinueEnabled
 
     /// HOST-007 diagnostic for a reanchor that could not be appended.

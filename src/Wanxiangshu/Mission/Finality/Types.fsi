@@ -1,0 +1,58 @@
+namespace Wanxiangshu.Mission.Finality
+
+open Wanxiangshu.Change
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Review
+
+/// Outcome of one FinalityRequest drive (GLORY-044/055/060/061).
+///
+/// Extracted from Infrastructure `FinalityController` (rabbit §12.2) so
+/// Application owns the vocabulary before the workflow body moves.
+type FinalityOutcome =
+    | Rejected of prompt: string
+    | Blessed of prompt: string
+
+/// One enlisted cohort member with the durable identities the driver needs.
+type EnlistedMember =
+    { ReviewerSessionId: SessionId
+      BarrierId: ReviewBarrierId
+      ReviewerOrdinal: int
+      AgentId: string
+      IsNew: bool }
+
+/// Physical reviewer session prepared by the Host before Application records
+/// enlistment and opens the barrier.
+type PreparedReviewer =
+    { ReviewerSessionId: SessionId
+      IsNew: bool }
+
+/// One Reviewer's terminal business result for a Finality member round.
+/// REVISE is a legal result (`RevisionRequired`), never an infrastructure error.
+/// Canonical work-record text is the rendered LWR string (GLORY-060).
+type MemberJudgement =
+    | Confirmed of workRecord: string
+    | RevisionRequired of workRecord: string
+    | Unavailable of reason: string
+
+/// Pure enlist inputs for one cohort slot — no Host/OpenCode surface (rabbit §12.3).
+type FinalityReviewerRequest =
+    { ManagerSessionId: SessionId
+      LifeId: ManagerLifeId
+      RequestId: FinalityRequestId
+      RequestTree: GitTreeHash
+      AgentId: string
+      ReviewerSessionId: SessionId option
+      ReviewerOrdinal: int
+      IsNew: bool }
+
+/// Failure to admit a blessing for finality.
+type BlessingAdmissionFailure =
+    | StaleWitness of currentTree: GitTreeHash * witnessTree: GitTreeHash
+    | IncompleteCohort of reason: string
+
+/// One-shot process capability / permit granting authority to record finality blessing.
+type BlessingPermit =
+    private | BlessingPermit of
+        {| LifeId: ManagerLifeId
+           RequestId: FinalityRequestId
+           GitTreeHash: GitTreeHash |}

@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import test from 'node:test'
+import { compileOwnerProject } from '../../../../scripts/lib/owner-compile.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../../..')
 const FIXTURE = join(ROOT, 'requirements/structured-workflow/tests/fixtures/owner-project-boundary')
@@ -64,4 +65,67 @@ test('WHAT[STRUCTURED-WORKFLOW-011] independent Fable checks enforce compile-inp
   const signatureOnly = compile('SignatureOnlyGreenConsumer.fsproj')
   assert.notEqual(signatureOnly.status, 0, 'Fable does not materialize a consumable module from a signature-only project')
   assert.match(`${signatureOnly.stdout}\n${signatureOnly.stderr}`, /SignedProvider|not defined/i)
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] flat closure compilation compiles transitive closure green and keeps unreferenced sources red', async () => {
+  const emitterPath = join(FIXTURE, 'Emitter.fsproj')
+  const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-owner-flat-compile-'))
+  const rootPropsPath = join(ROOT, 'Directory.Build.props')
+
+  try {
+    // 1. LeakyConsumer projected closure compiles GREEN
+    const greenResult = await compileOwnerProject({
+      projectPath: join(FIXTURE, 'LeakyConsumer.fsproj'),
+      aggregatePath: emitterPath,
+      scratchRoot,
+      rootPropsPath,
+      stdio: 'pipe',
+    })
+    assert.equal(greenResult.ok, true, `LeakyConsumer flat closure must compile GREEN\n${greenResult.stdout}\n${greenResult.stderr}`)
+    assert.equal(greenResult.code, 0)
+
+    // 2. RedConsumer stays RED although Runtime.fs exists in Emitter.fsproj (because Runtime.fsproj is outside its closure)
+    const redResult = await compileOwnerProject({
+      projectPath: join(FIXTURE, 'RedConsumer.fsproj'),
+      aggregatePath: emitterPath,
+      scratchRoot,
+      rootPropsPath,
+      stdio: 'pipe',
+    })
+    assert.equal(redResult.ok, false, 'RedConsumer without ProjectReference to Runtime must fail compile')
+    assert.notEqual(redResult.code, 0)
+    assert.match(`${redResult.stdout}\n${redResult.stderr}`, /Runtime|secretValue|not defined/i)
+
+    // 3. Stale ProjectReference fails before Fable
+    const staleFsprojPath = join(scratchRoot, 'StaleConsumer.fsproj')
+    writeFileSync(
+      staleFsprojPath,
+      `<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="NonExistentProvider.fsproj"/>
+    <Compile Include="${join(FIXTURE, 'RedConsumer.fs')}"/>
+  </ItemGroup>
+</Project>`,
+      'utf8',
+    )
+
+    await assert.rejects(
+      async () => {
+        await compileOwnerProject({
+          projectPath: staleFsprojPath,
+          aggregatePath: emitterPath,
+          scratchRoot,
+          rootPropsPath,
+          stdio: 'pipe',
+        })
+      },
+      /Missing ProjectReference.*NonExistentProvider\.fsproj/i,
+      'stale ProjectReference must fail before Fable compilation',
+    )
+  } finally {
+    rmSync(scratchRoot, { recursive: true, force: true })
+  }
 })

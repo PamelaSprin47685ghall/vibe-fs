@@ -24,8 +24,11 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-capture.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
+    <Compile Include="Context/Companion/Blogger/BloggerCrashRecovery.fsi"/>
     <Compile Include="Context/Companion/Blogger/BloggerCrashRecovery.fs"/>
+    <Compile Include="Context/Companion/Blogger/OpenCode/PluginScope.fsi"/>
     <Compile Include="Context/Companion/Blogger/OpenCode/PluginScope.fs"/>
+    <Compile Include="Context/Companion/Blogger/MainContext.fsi"/>
     <Compile Include="Context/Companion/Blogger/MainContext.fs"/>
   </ItemGroup>
 </Project>

@@ -1,0 +1,88 @@
+namespace Wanxiangshu.Change
+
+open System.Threading.Tasks
+
+module ChangeSurface =
+    val fact: kind: string -> payload: obj -> obj
+
+    val empty: unit -> obj
+
+    val createJob: projection: obj -> payload: obj -> obj
+
+    val recordFact: projection: obj -> job: string -> value: obj -> obj
+
+    val find: projection: obj -> job: string -> obj
+
+    val activeJobs: projection: obj -> obj array
+
+    val classifyRebasedCandidate: head: obj -> rebasedCommit: string -> targetHeadSnapshot: string -> obj
+
+    val classifyPublishClaim: head: obj -> rebasedCommit: string -> expectedHead: string -> obj
+
+    val requestWorktree: projection: obj -> identity: string -> path: string -> job: string -> obj
+
+    val acceptWorktree: projection: obj -> identity: string -> path: string -> job: string -> obj
+
+    val worktreeEffect: projection: obj -> identity: string -> obj
+
+    val worktreeReconciliationDecision: job: string -> identity: string -> path: string -> evidence: obj -> obj
+
+    val fold: events: obj array -> obj
+
+    val unwrapFold: result: obj -> obj
+
+    val createGit: repo: string -> runner: obj -> obj
+
+    val gitIsDirty: git: obj -> path: string -> Task<bool>
+
+    val gitFreezeTargetBranch: git: obj -> Task<obj>
+
+    val gitRebase: git: obj -> path: string -> targetRef: string -> Task<obj>
+
+    val gitFfMerge: git: obj -> path: string -> targetRef: string -> expectedHead: string -> Task<obj>
+
+    val gitConflictedFiles: git: obj -> path: string -> Task<obj>
+
+    val gitHasRebaseHead: git: obj -> path: string -> Task<bool>
+
+    val gitReadHead: git: obj -> path: string -> Task<obj>
+
+    val gitGetTargetHead: git: obj -> targetRef: string -> Task<obj>
+
+    val gitCreateWorktree: git: obj -> job: string -> path: string -> Task<obj>
+
+    val gitRemoveWorktree: git: obj -> path: string -> Task<obj>
+
+    val gitDeleteBranch: git: obj -> identity: string -> Task<obj>
+
+    val worktreeIdentityOf: job: string -> string
+
+    val gitListWorktrees: git: obj -> Task<obj>
+
+    val gitListManagerBranches: git: obj -> Task<obj>
+
+    val worktreeCreate: git: obj -> job: string -> path: string -> Task<obj>
+
+    val worktreeAdopt: git: obj -> identity: string -> path: string -> obj
+
+    val worktreePath: resource: obj -> string
+
+    val worktreeIdentity: resource: obj -> string
+
+    val worktreeMarkDurable: resource: obj -> unit
+
+    val worktreeRelease: resource: obj -> Task<obj>
+
+    val worktreeDispose: resource: obj -> Task<unit>
+
+    val lockPath: repo: string -> branch: string -> string
+
+    val acquireGate: path: string -> Task<obj>
+
+    val releaseGate: gate: obj -> Task<unit>
+
+    val disposeGate: gate: obj -> Task<unit>
+
+    val observeProgramGateScope: scenario: string -> Task<obj>
+
+    val observeMovedTargetRecovery: unit -> Task<obj>

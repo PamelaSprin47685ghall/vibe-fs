@@ -2,10 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.Resources
-open Wanxiangshu.Resources
 open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
 open ToolHostCodec
 

@@ -1,6 +1,7 @@
 import path from 'node:path'
 
-import { FCS_PROJECT_CHECK_TIMEOUT_MS } from '../e2e/support/time-budget.js'
+import { PROJECT_CHECK_TIMEOUT_MS } from '../e2e/support/time-budget.js'
+
 
 /**
  * The wired node:test integration steps — the single source of truth for which
@@ -50,58 +51,13 @@ export function integrationNodeTestSteps(root) {
       label: 'branch-fast-forward-adapter.test.mjs (change-integration)',
       files: [path.join(root, 'requirements/change-integration/tests/integration/branch-fast-forward-adapter.test.mjs')],
     },
-    // Structured-workflow steps below run real `dotnet fsi` F# project checks. Each bounded physical
-    // phase owns a separate sequential file because Node 20 process isolation withholds nested leaf
-    // verdicts until the file wrapper exits. Aggregate runtime therefore cannot masquerade as silence,
-    // while any one hung compiler check still meets the same local FCS budget.
-    {
-      label: 'owner-dependencies-fcs.test.mjs (structured-workflow)',
-      files: [
-        path.join(root, 'requirements/structured-workflow/tests/integration/owner-dependencies-fcs.test.mjs'),
-      ],
-      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
-    },
-    {
-      label: 'owner-dependencies-reuse.test.mjs (structured-workflow)',
-      files: [
-        path.join(root, 'requirements/structured-workflow/tests/integration/owner-dependencies-reuse.test.mjs'),
-      ],
-      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
-    },
-    {
-      label: 'owner-dependencies-isolation.test.mjs (structured-workflow)',
-      files: [
-        path.join(root, 'requirements/structured-workflow/tests/integration/owner-dependencies-isolation.test.mjs'),
-      ],
-      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
-    },
-    {
-      label: 'composition-root-scanner.test.mjs (structured-workflow)',
-      files: [
-        path.join(root, 'requirements/structured-workflow/tests/integration/composition-root-scanner.test.mjs'),
-      ],
-      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
-    },
-    {
-      label: 'plugin-decorator-scanners.test.mjs (structured-workflow)',
-      files: [
-        path.join(root, 'requirements/structured-workflow/tests/integration/plugin-decorator-scanners.test.mjs'),
-      ],
-      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
-    },
-    {
-      label: 'semantic-decorator-fcs.test.mjs (structured-workflow)',
-      files: [
-        path.join(root, 'requirements/structured-workflow/tests/integration/semantic-decorator-fcs.test.mjs'),
-      ],
-      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
-    },
+    // Structured-workflow owner project boundary proof compiles real owner localities with Fable.
     {
       label: 'owner-project-compiler-boundary.test.mjs (structured-workflow)',
       files: [
         path.join(root, 'requirements/structured-workflow/tests/integration/owner-project-compiler-boundary.test.mjs'),
       ],
-      perTestTimeoutMs: FCS_PROJECT_CHECK_TIMEOUT_MS,
+      perTestTimeoutMs: PROJECT_CHECK_TIMEOUT_MS,
     },
     {
       label: 'plugin/file-mutation-tools.test.mjs (repository-programming)',

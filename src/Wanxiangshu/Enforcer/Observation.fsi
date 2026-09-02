@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Enforcer
 
 open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
 module ObservationProjection =

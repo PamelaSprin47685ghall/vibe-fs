@@ -9,7 +9,10 @@
       "resultSymbol": "AdmissionAcquisitionOutcome",
       "owner": "managed-chat-execution",
       "what": "CHATEXEC-003, ENF-015",
-      "whatOwners": { "CHATEXEC-003": "managed-chat-execution", "ENF-015": "capability-enforcement" }
+      "whatOwners": {
+        "CHATEXEC-003": "managed-chat-execution",
+        "ENF-015": "capability-enforcement"
+      }
     },
     {
       "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
@@ -19,7 +22,10 @@
       "resultSymbol": "ReviewWitness",
       "owner": "review-judgement",
       "what": "FINALITY-002, ENF-015",
-      "whatOwners": { "FINALITY-002": "finality", "ENF-015": "capability-enforcement" }
+      "whatOwners": {
+        "FINALITY-002": "finality",
+        "ENF-015": "capability-enforcement"
+      }
     },
     {
       "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
@@ -29,7 +35,10 @@
       "resultSymbol": "BlessingPermit",
       "owner": "finality",
       "what": "FINALITY-002, ENF-015",
-      "whatOwners": { "FINALITY-002": "finality", "ENF-015": "capability-enforcement" }
+      "whatOwners": {
+        "FINALITY-002": "finality",
+        "ENF-015": "capability-enforcement"
+      }
     },
     {
       "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
@@ -39,7 +48,10 @@
       "resultSymbol": "BlessingPermit",
       "owner": "finality",
       "what": "FINALITY-002, ENF-015",
-      "whatOwners": { "FINALITY-002": "finality", "ENF-015": "capability-enforcement" }
+      "whatOwners": {
+        "FINALITY-002": "finality",
+        "ENF-015": "capability-enforcement"
+      }
     },
     {
       "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
@@ -49,7 +61,10 @@
       "resultSymbol": "BlessingPermit",
       "owner": "finality",
       "what": "FINALITY-002, ENF-015",
-      "whatOwners": { "FINALITY-002": "finality", "ENF-015": "capability-enforcement" }
+      "whatOwners": {
+        "FINALITY-002": "finality",
+        "ENF-015": "capability-enforcement"
+      }
     },
     {
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
@@ -57,7 +72,9 @@
       "classification": "Effect",
       "owner": "durable-events",
       "what": "ENF-015",
-      "whatOwners": { "ENF-015": "capability-enforcement" }
+      "whatOwners": {
+        "ENF-015": "capability-enforcement"
+      }
     },
     {
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
@@ -65,7 +82,9 @@
       "classification": "Effect",
       "owner": "durable-events",
       "what": "ENF-015",
-      "whatOwners": { "ENF-015": "capability-enforcement" }
+      "whatOwners": {
+        "ENF-015": "capability-enforcement"
+      }
     },
     {
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
@@ -73,7 +92,9 @@
       "classification": "Effect",
       "owner": "durable-events",
       "what": "ENF-015",
-      "whatOwners": { "ENF-015": "capability-enforcement" }
+      "whatOwners": {
+        "ENF-015": "capability-enforcement"
+      }
     },
     {
       "file": "src/Wanxiangshu/Mission/Finality/Record.fs",
@@ -81,7 +102,9 @@
       "classification": "Effect",
       "owner": "finality",
       "what": "ENF-015",
-      "whatOwners": { "ENF-015": "capability-enforcement" }
+      "whatOwners": {
+        "ENF-015": "capability-enforcement"
+      }
     },
     {
       "file": "src/Wanxiangshu/Mission/Finality/Ports.fs",
@@ -89,7 +112,9 @@
       "classification": "Effect",
       "owner": "finality",
       "what": "ENF-015",
-      "whatOwners": { "ENF-015": "capability-enforcement" }
+      "whatOwners": {
+        "ENF-015": "capability-enforcement"
+      }
     },
     {
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
@@ -97,7 +122,9 @@
       "classification": "DurableSink",
       "owner": "durable-events",
       "what": "ENF-019",
-      "whatOwners": { "ENF-019": "capability-enforcement" }
+      "whatOwners": {
+        "ENF-019": "capability-enforcement"
+      }
     },
     {
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
@@ -105,7 +132,9 @@
       "classification": "DurableSink",
       "owner": "durable-events",
       "what": "ENF-019",
-      "whatOwners": { "ENF-019": "capability-enforcement" }
+      "whatOwners": {
+        "ENF-019": "capability-enforcement"
+      }
     },
     {
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
@@ -113,7 +142,9 @@
       "classification": "DurableSink",
       "owner": "durable-events",
       "what": "ENF-019",
-      "whatOwners": { "ENF-019": "capability-enforcement" }
+      "whatOwners": {
+        "ENF-019": "capability-enforcement"
+      }
     },
     {
       "file": "src/Wanxiangshu/Mission/Finality/Record.fs",
@@ -121,7 +152,9 @@
       "classification": "DurableSink",
       "owner": "finality",
       "what": "ENF-019",
-      "whatOwners": { "ENF-019": "capability-enforcement" }
+      "whatOwners": {
+        "ENF-019": "capability-enforcement"
+      }
     }
   ],
   "contracts": [
@@ -555,6 +588,12 @@
           "symbol": "commitPrepared",
           "anchor": "{ Cuts = prepared.Cuts }",
           "owner": "durable-convergence"
+        },
+        {
+          "file": "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs",
+          "symbol": "empty",
+          "anchor": "let empty = { Cuts = [] }",
+          "owner": "durable-events"
         }
       ],
       "whatOwners": {

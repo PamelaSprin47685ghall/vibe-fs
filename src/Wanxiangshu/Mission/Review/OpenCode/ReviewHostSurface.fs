@@ -4,19 +4,13 @@ open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Change
-open Wanxiangshu.Change.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Review.Barrier
-open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Host.Contract
 open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Persistence.Journal
 
-/// Host-owned review guard boundary. Journal capabilities, transport ports, and
-/// SharedState reservations remain opaque; semantic outcomes are plain records.
-[<RequireQualifiedAccess>]
 module ReviewHostSurface =
 
     let private outcomeView outcome : obj =

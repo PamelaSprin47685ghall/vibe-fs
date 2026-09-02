@@ -26,7 +26,7 @@ export const budgetCases = [
         PER_TEST_TIMEOUT_MS: 2500,
         SUITE_BACKSTOP_MS: 300000,
         UNIT_VERDICT_SILENCE_MS: 5000,
-        FCS_PROJECT_CHECK_TIMEOUT_MS: 180000,
+        PROJECT_CHECK_TIMEOUT_MS: 180000,
         UNIT_RUNNER_PROBE_PER_TEST_MS: 2000,
         UNIT_RUNNER_PROBE_SILENCE_MS: 7000,
         UNIT_RUNNER_PROBE_TIGHT_SILENCE_MS: 3500,
@@ -95,9 +95,9 @@ export const budgetCases = [
         'a stage budget at or above the total startup 兜底 makes the ladder decorative (VERIFY-004)',
       );
       assertTrue(
-        budget.FCS_PROJECT_CHECK_TIMEOUT_MS > budget.PER_TEST_TIMEOUT_MS
-          && budget.FCS_PROJECT_CHECK_TIMEOUT_MS < budget.SUITE_BACKSTOP_MS,
-        'the FCS step bound is a per-step exception above the ordinary per-test bound and below the ' +
+        budget.PROJECT_CHECK_TIMEOUT_MS > budget.PER_TEST_TIMEOUT_MS
+          && budget.PROJECT_CHECK_TIMEOUT_MS < budget.SUITE_BACKSTOP_MS,
+        'the project-check step bound is a per-step exception above the ordinary per-test bound and below the ' +
           'suite 兜底; at or above the backstop it would become the only criterion those steps have',
       );
     },

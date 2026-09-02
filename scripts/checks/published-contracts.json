@@ -87,6 +87,16 @@
       "justification": "Signed JS-native facade over restart-safe tip delivery projection; boxing/parsing helpers remain private and it adds no semantic authority."
     },
     {
+      "path": "src/Wanxiangshu/Enforcer/Guidance/Tip.fs",
+      "owner": "guidance-delivery",
+      "justification": "Signed pure Main tip guidance resolution over durable journal and session association; it owns no Host resource or runtime authority beyond the published EnforcerTipGuidance contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Guidance/TipSurface.fs",
+      "owner": "guidance-delivery",
+      "justification": "Signed JS-native facade over Main tip guidance delivery; journal handle boxing and fact translation helpers remain private and it adds no semantic authority."
+    },
+    {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
       "owner": "provider-attempt-recovery",
       "justification": "Signed owner-local routing constructors from fallback durable facts into the canonical AgentFact union; they add no independent recovery authority."
@@ -142,6 +152,11 @@
       "justification": "Signed JS-native facade over the typed ToolHost codec; opaque argument/context handles and dynamic schema/TOML conversion helpers remain private."
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Codec/ProviderProjectionSurface.fs",
+      "owner": "provider-projection",
+      "justification": "Signed JS-native facade over the provider projection codec; raw Host object decoding and internal wire/part conversion helpers remain signature-hidden and it grants no additional semantic authority."
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Failure/Surface.fs",
       "owner": "execution-failure-policy",
       "justification": "Signed JS-native projection over the execution-failure decision contract; parsing and rendering helpers remain private and it grants no additional semantic authority."
@@ -172,6 +187,41 @@
       "justification": "Signed Node vm adapter support for the repository-programming contract; vm imports, sentinel decoding and error-classification helpers remain private behind the F# signature."
     },
     {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs",
+      "owner": "repository-programming",
+      "justification": "Signed JS sandbox API bindings for opencode tool workflows and the repository-programming runtime; Node path/UTF-8/glob/mutation adapters remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/RuntimeSurface.fs",
+      "owner": "repository-programming",
+      "justification": "JS-native runtime surface for sandbox bindings, staged mutation observation and bounded program execution; opaque handle and Node interop helpers remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/FilesystemSurface.fs",
+      "owner": "repository-programming",
+      "justification": "JS-native filesystem surface for UTF-8, glob, anchor and mutation plan operations; Node fs/path adapters and anchor parsing remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs",
+      "owner": "repository-programming",
+      "justification": "JS-native transaction surface for anchor, intent, preflight and durable EventStore projection; F# unions and internal persistence helpers remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs",
+      "owner": "repository-programming",
+      "justification": "JS-native workflow surface for generated js-* program execution and outcome observation; internal FileAccessObservation plumbing and JsToolOutcome union remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHostSurface.fs",
+      "owner": "repository-programming",
+      "justification": "JS-native tool-host surface for generated js-* registration, metadata and bounded execution; ToolSpec and Host factory internals remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/FileMutationSurface.fs",
+      "owner": "repository-programming",
+      "justification": "JS-native mv/rm tool surface for registration, argument vocabulary and bounded execution; ToolSpec and Host factory internals remain private behind the F# signature."
+    },
+    {
       "path": "src/Wanxiangshu/AssemblyInfo.fs",
       "owner": "distribution",
       "justification": "Assembly attribute carrier has no callable runtime surface; its sibling signature keeps the distribution leaf locality structurally signed."
@@ -185,6 +235,12 @@
       "path": "src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs",
       "owner": "durable-convergence",
       "justification": "Pure canonical-integrator contract types and structural projection algebra; carries no runtime handle, process state, or physical effect."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs",
+      "owner": "durable-convergence",
+      "contract": "DurableConvergence.Contract",
+      "justification": "Signed durable-convergence JS-native retention/sync test surface and adapter seam; internal writer-stream sync and process event log mechanics remain signature-hidden."
     },
     {
       "path": "src/Wanxiangshu/Foundation/RolesSurface.fs",
@@ -300,6 +356,11 @@
       "path": "src/Wanxiangshu/Persistence/Journal/PromptFactCodec.fs",
       "owner": "durable-events",
       "justification": "Signed codec support for PromptAuthority identity-seed serialization inside the durable Journal contract; custom Thoth encoders/decoders stay private and no writer, projection, or runtime authority is introduced."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Durable/HostFactFold.fs",
+      "owner": "durable-events",
+      "justification": "Signed pure Host fact fold support consumed by the published durable composition fold; it owns no journal, store, or runtime effect and keeps private all Host-specific projection transition helpers."
     },
     {
       "path": "src/Wanxiangshu/Interaction/Attention/Fold.fs",
@@ -580,9 +641,990 @@
       "path": "src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs",
       "owner": "session-ontology",
       "justification": "Signed JS-native session-family and managed-interrupt proof surface over the published session Host port; controlled physical probes expose values only and own no production session registry."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Attachment/AttachmentSurface.fs",
+      "owner": "managed-session-lifecycle",
+      "justification": "Signed JS-native proof surface over attached-session observation, reuse and reconciliation; controlled scenario callbacks stay representation-only and own no production session registry."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/SatelliteSurface.fs",
+      "owner": "managed-session-lifecycle",
+      "justification": "Signed JS-native proof surface over the Companion satellite runtime; controlled physical Host probes remain test representation and own no durable attachment truth."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Recovery/Coordinator.fs",
+      "owner": "managed-session-lifecycle",
+      "justification": "Signed process-local single-flight coordinator for exact family recovery roots; the in-flight dictionary is hidden and no recovery semantic fact is stored here."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Recovery/Surface.fs",
+      "owner": "managed-session-lifecycle",
+      "justification": "Signed JS-native proof projection over the published SessionRecovery algebra; object decoding/rendering remains private and cannot mint recovery authority outside the typed owner."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/WorkRecord/OpeningSemanticSurface.fs",
+      "owner": "work-record",
+      "justification": "Signed JS-native projection of opening evidence and deterministic lifecycle-work-record composition; object decoding stays private and the surface owns no durable trace or coverage state."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Surface.fs",
+      "owner": "interaction-authority",
+      "justification": "Signed JS-native system-prompt identity projection over the canonical Role vocabulary; it owns no authority state or Host resource."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs",
+      "owner": "interaction-authority",
+      "justification": "Signed JS-native projection of authority profiles, claims, identity seeds and lifecycle decisions; object decoding and Fable representation remain private behind the published interaction-authority algebra."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs",
+      "owner": "interaction-authority",
+      "justification": "Signed JS-native projection of the published completed-turn classifier; Host object decoding and result rendering remain private and no second repair decision is introduced."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs",
+      "owner": "interaction-authority",
+      "justification": "Signed JS-native projection of ChatAdmissionIntent decisions over durable authority snapshots; dynamic Host decoding remains private and cannot bypass the typed admission owner."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/TerminalPolicySurface.fs",
+      "owner": "interaction-authority",
+      "justification": "Signed JS-native proof surface over the canonical terminal policy for no-journal probes; it owns no session lifecycle state or effect authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Prediction/Predictor.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed pure bounded predictor state and frozen feature algebra for Strength opportunities; map representation and update mechanics remain hidden behind the sibling signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Rollout.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed pure rollout mode/config and explicit-cost projection over the graduated Strength policy/cost model; it owns no runtime or durable authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Prediction/BatchCollector.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed pure collector for complete readonly provider-request batches; call/result correlation helpers remain signature-hidden and no Host resource is owned here."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Replica/Commit.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed pure append-evidence decision algebra for Prepared and Promotion durability outcomes; transport and store effects remain outside this decision owner."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Replica/Promotion.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed pure exact-provider-run promotion decision over typed output evidence; it owns no provider transport or persistence effect."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Replica/TraceRecovery.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed pure semantic XTrace range recovery over a frozen Strength frame bundle; contiguous-match mechanics stay implementation-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Replica/Transform.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed replica transform boundary over the owner-local Strength runtime and published Host session port; Host object encoding and batch-planning helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/GitObjectDatabase.fs",
+      "owner": "durable-events",
+      "justification": "Signed physical Git loose-object and ref storage support behind the published raw-store contract; Node crypto/fs/zlib primitives and packed-object fallback plumbing remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Wait.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local synchronous delegate wait algebra over explicit child outcomes; waiter implementation details remain hidden and no foreign recovery authority is published."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Store.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local SyncDelegate process store for exact session/run coordination; mutable storage mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Prompt.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local SyncDelegate prompt preparation support over published identity and dispatch contracts; rendering helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local SyncDelegate workflow composition over typed delegation contracts; orchestration helpers remain hidden and no second workflow authority is exported."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Host/BusyNudge.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local busy-nudge delivery support behind exact child-run identity and dispatch contracts; Host representation details remain hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local completion codec support for delegation handle outcomes; dynamic wire decoding remains signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handle/JoinDrain.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local join-drain coordination support over typed handle completion evidence; process-local drain mechanics remain hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local child recovery workflow over the published recovery-family contract; recovery orchestration internals remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Host/AgentOwner.fs",
+      "owner": "delegation",
+      "justification": "Signed owner-local AgentOwner Host composition support over typed child identity and dispatch contracts; callback plumbing remains hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Process/LargeGateSurface.fs",
+      "owner": "output-distillation",
+      "contract": "output-distillation.Contract",
+      "justification": "LargeGate surface is the output-distillation projection of the process-execution large gate capability; the signed surface hides the process runner internals."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Runtime.fs",
+      "owner": "context-compression",
+      "justification": "Signed pure Companion runtime cell with guarded memory, durable port callbacks and Blogger lifecycle hooks; all physical Host dispatch, satellite binding and child session creation remain signature-hidden behind the Host surface."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ProviderRunBindingSurface.fs",
+      "owner": "review-assurance",
+      "justification": "Signed JS-native boundary for HOST-BOUNDARY-008 causal provider-run binding; rejection encoding, snapshot catch-up and internal SessionSnapshotSurface handle access remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/ReviewFactFold.fs",
+      "owner": "review-judgement",
+      "justification": "Signed review durable fold support over ReviewFactCases and the session projection aggregate; fold routing and projection helpers remain private and it grants no foreign semantic authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Judgement/Evidence.fs",
+      "owner": "review-judgement",
+      "justification": "Signed pure reviewer evidence predicate over durable projection and finality lifecycle state; it owns no runtime state or physical effect and exposes only the continuation-open decision."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Judgement/Continuation.fs",
+      "owner": "review-judgement",
+      "justification": "Signed reviewer continuation nudge vocabulary over injected continuation ports; it owns no durable writer or Host runtime and grants no foreign contract beyond the typed port."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Codec.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed pure blog call codec that canonicalizes raw provider tool arguments against the catalog; produces no durable side effects and owns no store or authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Cycle/Model.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed pure enforcer cycle model and bounds validation used only within behavior-diagnosis codec paths; no store or authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Surface.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed JS-facing enforcer surface that exposes decoded calls, cycles, and bounds to the host; pure value transforms, no authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Cycle/Decode.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed pure assistant-step decoder that rebuilds canonical blog calls from the provider transcript; no durable side effects or authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Cycle/Commit.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed cycle commit writer that appends BlogObservationCommitted facts through the journal; authority is derived from the caller's already-validated request context."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/RepairSurface.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed JS-facing repair classifier that maps raw messages to a repair verdict object; pure value transform, no authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/ObservationSurface.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed JS-facing projection surface that renders enforcement and blog state to host objects; pure value transforms, no authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native boundary for HOST-BOUNDARY-010 / HOST-012 shared cross-instance state; the physical Map/Set/atom singletons in SharedState remain signature-hidden and only narrow put/get/clear/root operations cross the edge."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Knowledge/Casebook/SessionDraft.fs",
+      "owner": "knowledge-reuse",
+      "justification": "Signed process-local Casebook draft staging registry consumed only by the knowledge-reuse Casebook workflow; it holds no durable writer, Host effect or cross-owner authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs",
+      "owner": "dispatch-protocol",
+      "justification": "Detached prompt claim reconciliation over durable PromptAuthority projection and an injected Host snapshot; it proves pending claims from physical evidence or leaves them pending, owns no runtime authority, and never resends."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs",
+      "owner": "dispatch-protocol",
+      "justification": "Direct-CE family recovery workflow that composes prompt-claim recovery, blogger crash recovery, handle and job family queries through injected ports; it carries no independent runtime authority or physical effect."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/WorkRecord/Surface.fs",
+      "owner": "work-record",
+      "justification": "Signed JS-native WorkRecord surface over durable XTrace capture, blogger observation, and lifecycle projection; dynamic object decoding and trace internals remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed pure canonical envelope/fold helpers for MagicTodo and ManagerLifecycle facts; no journal handle or runtime effect is exposed."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/Surface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native process-local EventStore surface over an opaque EventStore handle; canonical store ref and append/read/head operations are exposed."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/CodecSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native canonical EventEnvelope codec surface; normalization and identity comparison helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/MergeSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native k-way EventEnvelope merge surface; writer name tie-breaking and causal ordering helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/WorkspaceEventStoreSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed workspace journal handle and host acquisition surface; runtime path and EventStore boot mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/RevisionSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native journal revision subscription surface; the journal capability and envelope internals remain opaque."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/CodecSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native journal envelope/EventEnvelope codec surface; F# unions and Fable collections do not cross the boundary."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/FactCodecSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native fact compatibility decode surface; canonical encode/decode and legacy detection helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/ReviewJournalSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native review journal append/projection surface; review facts and session views cross as plain family/case/payload values."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fs",
+      "owner": "semantic-trace",
+      "justification": "Signed JS-native semantic-trace proof surface over the canonical XTrace projection/capture contracts; typed projection representation and cursor mechanics remain signature-hidden from foreign owners."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoSemanticSurface.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed JS-native semantic projection for MagicTodo admission and obligation state; F# domain representation and decoding helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed Host-facing MagicTodo facade over the canonical Host codec and durable locality; raw host objects and internal parsing mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed durable localization support for one MagicTodo Host callback; journal projection and identity plumbing remain owner-local implementation detail."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocalitySurface.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed JS-native projection over MagicTodo locality results; typed locality state and durable implementation remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed obligation ledger workflow over the canonical durable projection and mission lifecycle facts; no foreign runtime authority is introduced."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembraneSurface.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed JS-native facade over the canonical MagicTodo membrane; host boxing and response projection remain boundary mechanics only."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
+      "owner": "provider-attempt-recovery",
+      "justification": "Signed JS-native fallback cursor projection over the canonical attempt cursor and recovery-slot algebra; typed cursor representation remains signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/OpenCode/HostGuard.fs",
+      "owner": "review-assurance",
+      "justification": "Signed Host review guard support over the canonical barrier, dispatch and durable journal contracts; filesystem and Host boundary mechanics remain owner-local implementation detail."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Assurance/Surface.fs",
+      "owner": "review-assurance",
+      "justification": "Signed JS-native review assurance projection over canonical review, barrier and judgement contracts; Fable object conversion remains signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/OpenCode/ReviewHostSurface.fs",
+      "owner": "review-assurance",
+      "justification": "Signed Host-facing review assurance facade over the canonical review barrier workflow; transport boxing and journal capability mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/ExecutorToolSurface.fs",
+      "owner": "action-affordance",
+      "justification": "Signed JS-native semantic surface for provider execution verbs and tool dispatch; distillation invocation and process execution resources remain signature-hidden behind the interface."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/ToolContext.fs",
+      "owner": "action-affordance",
+      "justification": "Signed tool execution context and input/output payload models; cancellation tokens, workspace paths and session identifiers are value representations carrying no independent authority."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/FileTools.fs",
+      "owner": "action-affordance",
+      "justification": "Signed factory module for standard filesystem read, write, and edit tools; ToolSpec definitions and handler wiring remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/ToolSurface.fs",
+      "owner": "action-affordance",
+      "justification": "Signed JS-native static contract surface exposing capability-owned tool specifications and catalog metadata; dynamic Host schemas remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/FileToolsSurface.fs",
+      "owner": "action-affordance",
+      "justification": "Signed JS-native output boundary for builtin filesystem tools; Host ToolContext and cancellation token management remain private implementation resources."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Continuation.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed Enforcer continuation and cycle recovery workflow support; journal fact persistence, Host tool records and BlogProjection interactions remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/BlogSurface.fs",
+      "owner": "behavior-diagnosis",
+      "justification": "Signed JS-native owner boundary for the Blogger/chronicle contract and recovery evidence; Host tool records, journal facts and typed identities remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs",
+      "owner": "capability-enforcement",
+      "justification": "Signed managed-agent Host config gate and catalog projection support; non-model field validation stays owner-local and physical model routing remains delegated."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs",
+      "owner": "capability-enforcement",
+      "justification": "Signed JS-native Host-config boundary translating managed-agent capability projections and catalog results to plain data; model fields remain in caller config."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/ToolRegistrySurface.fs",
+      "owner": "capability-enforcement",
+      "justification": "Signed JS-native execution-gate surface for tool role predicates; tool catalog resolution and role authorization decisions remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Git/IntegrationGate.fs",
+      "owner": "change-integration",
+      "justification": "Signed cross-process publish serialization gate represented as an async-disposable resource; lock acquisition and release mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Git/WorktreeResource.fs",
+      "owner": "change-integration",
+      "justification": "Signed disposable Manager worktree resource adapter; directory allocation, cleanup idempotency and process execution remain private behind the signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Job.fs",
+      "owner": "change-integration",
+      "justification": "Signed Manager execution job model and worktree resource bindings; job state transitions and publication metadata remain owner-internal value representations."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Prompts.fs",
+      "owner": "change-integration",
+      "justification": "Signed orchestrator prompt builder for merge conflict resumption; template construction stays private and it carries no independent runtime authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Program.fs",
+      "owner": "change-integration",
+      "justification": "Signed change integration program orchestrating worktree creation, review barriers, rebasing, and fast-forward publication; execution details remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Runtime.fs",
+      "owner": "change-integration",
+      "justification": "Signed orchestrator runtime coordinating Git operations, Manager ports, and journal persistence across change lifecycles; runtime event dispatch remains private."
+    },
+    {
+      "path": "src/Wanxiangshu/Git/Operations.fs",
+      "owner": "change-integration",
+      "justification": "Signed Git operations port factory over repository command execution; runner invocation and process piping mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Surface.fs",
+      "owner": "change-integration",
+      "justification": "Signed JS-native facade for change-integration durable facts and job projection queries; typed projection unions remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Host/GitAdapter.fs",
+      "owner": "change-integration",
+      "justification": "Signed Git process adapter support for orchestrator commands and rebase head inspection; CLI process execution mechanics remain private behind the signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Host/WorktreeCleanup.fs",
+      "owner": "change-integration",
+      "justification": "Signed sweeping support for orphaned worktrees and branches; disk cleanup execution remains strictly driven by durable job state without foreign authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Host/SessionDirectories.fs",
+      "owner": "change-integration",
+      "justification": "Signed session directory registry mapping orchestrator and review session IDs to filesystem workspaces; in-memory tracking remains signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Recovery.fs",
+      "owner": "change-integration",
+      "justification": "Signed lazy journal recovery adapter for persisted Manager jobs; family recovery permit verification and event replay remain private implementation details."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Host/ReviewRunner.fs",
+      "owner": "change-integration",
+      "justification": "Signed review runner driving review barriers and outcome evaluation for change integration; barrier polling and journal interaction remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Host/Surface.fs",
+      "owner": "change-integration",
+      "justification": "Signed JS-native host harness surface translating plain JavaScript port observations into orchestrator runtime interactions; typed ports remain opaque."
+    },
+    {
+      "path": "src/Wanxiangshu/Host/Contract/CompactionPolicySurface.fs",
+      "owner": "context-compression",
+      "justification": "Signed JS-native boundary for host compaction prevention and containment policy; F# verdict unions and provider identity mapping remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
+      "owner": "context-compression",
+      "justification": "Signed JS-native semantic surface for Blogger delta TOML rendering; delta part conversion and formatting helpers remain private implementation details."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/DeltaSurface.fs",
+      "owner": "context-compression",
+      "justification": "Signed JS-native delta owner surface translating plain message parts into internal BloggerDelta cursors and chunks; union representations stay private."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/FrameSurface.fs",
+      "owner": "context-compression",
+      "justification": "Signed JS-native frame owner surface exchanging JSON-shaped projection snapshots; BlogProjection collections and identity types remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleSurface.fs",
+      "owner": "context-compression",
+      "justification": "Signed JS-native Blogger cycle effect surface exposing counts and rejection text; materialization internals and receipt identities remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/FoldSurface.fs",
+      "owner": "context-compression",
+      "justification": "Signed JS-native fold oracle for companion durable recovery; translates plain fact envelopes to projection summaries while keeping fold mechanics private."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs",
+      "owner": "context-compression",
+      "justification": "Signed JS-native companion projection surface exposing prompt lines and Blogger plan summaries; synthetic identities and prompt wrappers stay signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
+      "owner": "context-compression",
+      "justification": "Signed JS-native compression decision surface for attempt choice and recovery-slot dispatch; internal compression state and decision logic remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashSurface.fs",
+      "owner": "context-compression",
+      "justification": "Signed JS-native crash-window classifier surface returning stable failure case names; request identifiers and provider details remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs",
+      "owner": "context-compression",
+      "justification": "Signed JS-native runtime owner surface for Blogger park, flight, and drain resources; physical resource handles remain opaque behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Join.fs",
+      "owner": "delegation",
+      "justification": "Signed delegation join workflow and waiter orchestration; child completion observation and session recovery integration remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecoverySurface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native child recovery surface resolving durable snapshot observations into resolution names; trace events and terminal proofs stay private."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handle/Surface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native projection boundary for durable delegation handle lifecycle; state maps and handle unions remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateSurface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native replay surface for delegated tool call estimation; estimate calculation and call sequence tracking remain private implementation details."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handle/FoldSurface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native fold replay boundary invoking production ExecutionFactFold directly; internal state unions and fold mechanics stay signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/HostTurnObservedSurface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native plain-data encoder for HostTurnObserved durable facts; typed execution fact unions remain private behind the signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/LifecycleSurface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native lifecycle snapshot surface for child runs; completion cells and cancellation tokens remain opaque runtime resources."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Surface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native semantic surface for fork child payload generation; prompt assembly and attachment rendering remain private implementation details."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/HandoffSurface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native handoff surface for window calculations, prompt rendering and range validation; handoff mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Host/Restart.fs",
+      "owner": "delegation",
+      "justification": "Signed host fork restart workflow coordinating child recovery and session restoration; runtime reattachment mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Host/JoinSurface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native join admission surface validating recovery permits; FamilyRecoveryPermit and HostForkRuntime remain opaque implementation details."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native PTY scenario execution surface for host forks; process spawning and stream redirection remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinSurface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native join wire surface rendering batch completions and error outcomes; DTO unions stay private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/CleanBreakSurface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native clean-break surface decoding legacy child completion payloads; DTO unions remain private behind the signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs",
+      "owner": "delegation",
+      "justification": "Signed one-shot tool lifecycle manager handling subscription, terminal awaiting, and disposal for synchronous agents; execution details stay private."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native test harness surface for Manager fork tools; Host runtime configuration and tool dispatch remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native runtime harness for synchronous delegation; Host sessions, journal writers, and completion turns stay opaque behind the signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handle/JournalSurface.fs",
+      "owner": "delegation",
+      "justification": "Signed handle journal resource wrapper and lifecycle management module; journal stream interactions remain private behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs",
+      "owner": "delegation",
+      "justification": "Signed JS-native owner boundary for pending host fork run lifecycle; terminal admission decisions and run state remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Turn/ReconcileSurface.fs",
+      "owner": "dispatch-protocol",
+      "justification": "Signed JS-native turn reconciliation boundary for classifiers, evidence, wakes, and publish seals; idle permits and map representations stay private."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Dispatch/JoinGuardSurface.fs",
+      "owner": "dispatch-protocol",
+      "justification": "Signed JS-native join guard boundary managing reservation capabilities; HostJoinGuard decisions remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Dispatch/RecoverySurface.fs",
+      "owner": "dispatch-protocol",
+      "justification": "Signed JS-native recovery boundary projecting host transcript evidence; PromptRecovery claims and outcomes remain private behind the signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Git/Hook/Sync.fs",
+      "owner": "durable-convergence",
+      "justification": "Signed standalone Git hook synchronization entry points executing WriterStreamSync; process invocation and hook protocol details remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Git/Hook/Dispatcher.fs",
+      "owner": "durable-convergence",
+      "justification": "Signed hook dispatcher module ensuring Git hook membrane installation at startup; hook template paths and environment bindings remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Git/Hook/Surface.fs",
+      "owner": "durable-convergence",
+      "justification": "Signed JS-native hook installation surface classifying existing hooks; discriminated unions and filesystem paths remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ModelRoutingSurface.fs",
+      "owner": "execution-model-routing",
+      "justification": "Signed JS-native model routing surface managing shared execution admission and target resolution; model capacity and routing state remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Finality/Prompt.fs",
+      "owner": "finality",
+      "justification": "Signed Finality prompt path and template vocabulary module; resource path literals and prompt rendering helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs",
+      "owner": "finality",
+      "justification": "Signed pure cohort algebra for Finality requests; durable enlistment evaluation and cohort state transformations remain private implementation details."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Finality/PromptSurface.fs",
+      "owner": "finality",
+      "justification": "Signed JS-native surface for Manager and Finality provider prose rendering; template resolution and resource loading stay signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Manager/Background.fs",
+      "owner": "finality",
+      "justification": "Signed Manager background settlement workflow coordinating turn completion before exit; journal writes and turn passes remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Manager/Idle.fs",
+      "owner": "finality",
+      "justification": "Signed Manager idle lifecycle workflow handling turn waiting and wake-up transitions; journal interactions remain private behind the signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Manager/JobHandoff.fs",
+      "owner": "finality",
+      "justification": "Signed Manager job handoff module processing orchestrator evidence upon task completion; handoff decisions stay signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Manager/Life/Workflow.fs",
+      "owner": "finality",
+      "justification": "Signed Manager Life workflow orchestrating blessed life completion and authority transitions; journal event appending remains private."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Manager/Finality.fs",
+      "owner": "finality",
+      "justification": "Signed Manager-side ownership boundary module during active Finality requests; lifecycle operation gating remains signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Finality/Record.fs",
+      "owner": "finality",
+      "justification": "Signed Finality journal recording module appending lifecycle and verdict events to durable storage; event encoding remains private."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Finality/Cohort.fs",
+      "owner": "finality",
+      "justification": "Signed Finality cohort coordinator managing review barrier registration and participant reviews; cohort state transitions remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Finality/Revision.fs",
+      "owner": "finality",
+      "justification": "Signed Finality revision handler managing rejection and revision steering workflows; review outcome processing remains signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
+      "owner": "finality",
+      "justification": "Signed Finality admission blessing verifier validating review consensus and manager state; verification logic remains private behind the signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Finality/Workflow.fs",
+      "owner": "finality",
+      "justification": "Signed Finality master workflow orchestrating cohort enlistment, review barriers, and blessing or revision cycles; workflow state stays private."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Manager/FinalitySurface.fs",
+      "owner": "finality",
+      "justification": "Signed JS-native semantic surface for Finality lifecycle events and world fold operations; world state handles remain opaque."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs",
+      "owner": "finality",
+      "justification": "Signed OpenCode host adapter factory for Finality workflows; ToolRuntimeScope and ManagerNarrative port bindings remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native Host boundary surface for Fission turn absorption; event port wiring and turn observation mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ExplicitSessionResume.fs",
+      "owner": "host-boundary",
+      "justification": "Signed explicit session resume executor handling user-visible restart requests; journal re-reading and dispatch mechanics remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs",
+      "owner": "host-boundary",
+      "justification": "Signed Host signal bootstrap module wiring journal subscriptions, replica listeners, and shutdown handlers; channel mechanics remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/JoinResultRendererSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native entry-local join rendering surface formatting agent completion work records; item union types remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ExplicitResumeSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native boundary for explicit restart command registration and execution; journal capabilities remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native pair-programming thought surface projecting thought messages; journal store initialization details remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/PluginHost.fs",
+      "owner": "host-boundary",
+      "justification": "Signed PluginHost environment and workspace inspection module; process ID and directory resolution helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatParamsSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native observation surface for chat.params binding barriers; parameter mutation and validation remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs",
+      "owner": "host-boundary",
+      "justification": "Signed interop bridge linking Host event streams, journal persistence, and execution failures; interop wiring remains private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs",
+      "owner": "host-boundary",
+      "justification": "Signed PluginBoot lifecycle phase capturing load-time capabilities and journal options; environment validation stays signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs",
+      "owner": "host-boundary",
+      "justification": "Signed composition root handle assembling Host ports, journal subscriptions, and strength event listeners; wiring details stay private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs",
+      "owner": "host-boundary",
+      "justification": "Signed session wiring module attaching SyncDelegate and StrengthReplica runtimes when durable journals exist; attachment mechanics stay private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs",
+      "owner": "host-boundary",
+      "justification": "Signed recovery wiring module attaching crash and session recovery listeners at plugin startup; recovery handlers remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs",
+      "owner": "host-boundary",
+      "justification": "Signed plugin transform pipelines coordinating prefix stability, semantic trace, and strength transforms; transform state stays signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs",
+      "owner": "host-boundary",
+      "justification": "Signed plugin hook factory constructing OpenCode chat, transform, config, and compaction hooks; hook implementations remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs",
+      "owner": "host-boundary",
+      "justification": "Signed composition root for plugin assembly orchestrating boot, wiring, hooks, and runtime scopes; assembly details remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native observation surface for Blogger and hook adapter proofs; observation types remain opaque behind the F# signature."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Plugin/Plugin.fs",
+      "owner": "host-boundary",
+      "justification": "Signed main plugin entry point and Fable default export initializing PluginBoot and lifecycle hooks; bootstrap mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Fission/Surface.fs",
+      "owner": "intra-participant-parallelism",
+      "justification": "Signed JS-native semantic surface for intra-participant Fission prompt parsing and lifecycle state; admission runtimes remain opaque capabilities."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRefreshSurface.fs",
+      "owner": "knowledge-reuse",
+      "justification": "Signed JS-native refresh surface for stale Bookkeeper index entries; store scanning and index update routines remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperSurface.fs",
+      "owner": "knowledge-reuse",
+      "justification": "Signed JS-native owner boundary for Bookkeeper staged provider transactions; session ports and staging snapshots remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Knowledge/Casebook/LifecycleSurface.fs",
+      "owner": "knowledge-reuse",
+      "justification": "Signed JS-native lifecycle boundary for Casebook draft and observation flows; draft storage and collector state stay signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Knowledge/Casebook/FetchSurface.fs",
+      "owner": "knowledge-reuse",
+      "justification": "Signed JS-native provider fetch boundary; Casebook index queries and replay handling remain signature-hidden behind the interface."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Knowledge/Casebook/Surface.fs",
+      "owner": "knowledge-reuse",
+      "justification": "Signed JS-native semantic surface for Casebook normalization, facts, and event models; underlying union types remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Repository/Knowledge/Casebook/IndexSurface.fs",
+      "owner": "knowledge-reuse",
+      "justification": "Signed JS-native Casebook index boundary exposing shelfmarks and questions; durable session identities remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/RecoverySurface.fs",
+      "owner": "managed-chat-execution",
+      "justification": "Signed JS-native recovery decision surface for chat execution scenarios; failure classification and recovery rules remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/RecoveryRuntimeSurface.fs",
+      "owner": "managed-chat-execution",
+      "justification": "Signed JS-native runtime recovery surface for restart and failure policy interpretation; runtime replay mechanics stay private."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/Surface.fs",
+      "owner": "managed-chat-execution",
+      "justification": "Signed JS-native surface for chat fact canonicalization, folds, and admission checks; fact fold mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/TransactionSurface.fs",
+      "owner": "managed-chat-execution",
+      "justification": "Signed JS-native transaction surface for chat admission and pre-provider settlement scenarios; settlement logic remains private."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/ChatExecution/StatusSurface.fs",
+      "owner": "managed-chat-execution",
+      "justification": "Signed JS-native status query surface evaluating journal handles and serialized facts; journal inspection remains signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/TurnRuntimePreparation.fs",
+      "owner": "managed-session-lifecycle",
+      "justification": "Signed turn runtime preparation module disposing previous turn resources and preparing runtime context; cleanup details stay signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs",
+      "owner": "managed-session-lifecycle",
+      "justification": "Signed host turn observer module evaluating reconciled turn outcomes and coordinating review triggers; observation logic remains private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/DistillationSurface.fs",
+      "owner": "output-distillation",
+      "justification": "Signed JS-native owner surface for Distiller role contracts and tool permission translation; fixed-cost runtime internals stay signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/OpenCode/HorizonSurface.fs",
+      "owner": "participant-horizon",
+      "justification": "Signed JS-native horizon output surface rendering agent rosters and horizons into provider prose; Handle and Journal types stay private."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Prefix/XWireSurface.fs",
+      "owner": "prefix-stability",
+      "justification": "Signed JS-native XWire surface for covered prefix digests and presentation horizons; projection models and retry calculations stay private."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/LanguageSurface.fs",
+      "owner": "provider-language",
+      "justification": "Signed JS-native provider language surface parsing localized resources and session language bindings; provider language state remains signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Runtime.fs",
+      "owner": "requirement-grounding",
+      "justification": "Signed requirement grounding runtime decision and workflow coordinator; grounding needs evaluation and journal updates remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/RequirementGroundingRepositorySurface.fs",
+      "owner": "requirement-grounding",
+      "justification": "Signed JS-native repository surface for grounding attempt execution and observation failure handling; runtime disposal stays private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/RequirementGroundingSurface.fs",
+      "owner": "requirement-grounding",
+      "justification": "Signed JS-native surface for grounding journal lifecycle and path request resolution; journal handles remain opaque behind the signature."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/OpenCode/JudgeSurface.fs",
+      "owner": "review-judgement",
+      "justification": "Signed JS-native judge tool surface exposing verdict schemas and parsers; ToolRuntimeScope and HostToolCodec remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/ReviewTodoSurface.fs",
+      "owner": "review-judgement",
+      "justification": "Signed JS-native Magic Todo review surface translating todo facts and IDs for integration tests; todo representation remains signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/OpenCode/Settings.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed Strength rollout settings and canary fingerprint configuration module; cost metadata parsing remains signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Surface.fs",
+      "owner": "speculative-investigation",
+      "justification": "Signed JS-native semantic surface for Strength predictions, rendered messages, and outcome applications; internal registries remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Verification/EventStoreWriterSurface.fs",
+      "owner": "verification-system",
+      "justification": "Signed EventStore temporal verification surface for physical journal writer release and retention proofs; storage mechanics remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Verification/TemporalSurface.fs",
+      "owner": "verification-system",
+      "justification": "Signed JS-native temporal verification surface for deterministic virtual timer and clock capabilities; event store internals remain signature-hidden."
     }
   ],
   "compiler_boundary_localities": [
+    {
+      "owner": "delegation",
+      "locality": "execution-delegation-handle-surface",
+      "justification": "Delegation handle, SyncDelegate and Host fork lifecycle contracts plus their owner-local recovery, wait, codec and composition support form one fully signed delegation locality over graduated identity, dispatch, recovery, Host and session contracts; process registries, callbacks and obsolete monolith imports remain signature-hidden or removed."
+    },
+    {
+      "owner": "durable-events",
+      "locality": "persistence-eventstore-storetypes",
+      "justification": "Canonical event bytes and vocabulary, typed Git object/ref storage contracts, direct Git object-database support and the process raw-store adapter form one fully signed durable-events storage locality over graduated identity, event-model, task-result and Strength event contracts; caches, Node interop and CLI fallback mechanics remain signature-hidden."
+    },
+    {
+      "owner": "speculative-investigation",
+      "locality": "strength-prediction-predictor",
+      "justification": "Strength prediction, rollout, frame/event/projection algebra and decision-local replica transform/runtime form one fully signed speculative-investigation locality over graduated identity, Host, session, provider-projection, model-routing and budget contracts; predictor maps, transform plumbing and replica in-flight state remain signature-hidden."
+    },
+    {
+      "owner": "durable-convergence",
+      "locality": "persistence-eventstore-canonicalintegrator",
+      "justification": "Canonical event integrator, single-envelope replay and prepared-live commit over graduated process event log and k-way merge contracts form one fully signed durable-convergence locality; rule registration, builder internals and process-local mutable state remain signature-hidden."
+    },
+    {
+      "owner": "interaction-authority",
+      "locality": "authority-runtime-surface",
+      "justification": "Authority lifecycle, completed-turn classification, chat-admission and terminal-policy JS semantic projections form one fully signed interaction-authority runtime surface over already graduated dispatch, identity and Host contracts; all dynamic decoding and Fable representation helpers remain signature-hidden."
+    },
+    {
+      "owner": "work-record",
+      "locality": "mission-workrecord-model",
+      "justification": "Lifecycle work-record vocabulary, XTrace-backed full/bounded materialization and the opening semantic proof surface form one fully signed work-record locality over graduated semantic trace, durable projection, finality and obligation contracts; blob/frame rendering helpers remain signature-hidden."
+    },
+    {
+      "owner": "semantic-trace",
+      "locality": "context-trace-capture",
+      "justification": "Typed XTrace capture receipts, canonical trace materialization and terminal reporting form one fully signed semantic-trace contract locality over graduated Host observation, dispatch, durable journal, projection and identity contracts; blob IO plumbing, positional/stable capture algorithms and obsolete monolith imports remain signature-hidden or removed."
+    },
+    {
+      "owner": "managed-session-lifecycle",
+      "locality": "execution-session-recoveryclosureprojection",
+      "justification": "Recovery closure discovery, reusable attached-session and Companion satellite physical runtimes, family recovery single-flight and their JS proof surfaces form one fully signed managed-session locality over graduated dispatch recovery, session, identity and durable projection contracts; mutable registries and representation helpers remain signature-hidden."
+    },
+    {
+      "owner": "interaction-authority",
+      "locality": "interaction-authority-fold",
+      "justification": "PromptAuthority durable fold, completed-turn classification and linked-child authority restoration form one fully signed interaction-authority contract locality over graduated dispatch, identity, durable projection and review-barrier contracts; classification helpers and child recovery plumbing remain signature-bounded without importing unrelated runtime owners."
+    },
+    {
+      "owner": "dispatch-protocol",
+      "locality": "execution-session-recovery-model",
+      "justification": "Recovery family algebra, pure turn reconciliation vocabulary, physical prompt acceptance and the durable PromptDispatcher send runtime form one fully signed dispatch-protocol contract locality over graduated identity, Host, session, routing, managed-chat and journal contracts; private persistence/send helpers and obsolete monolith imports remain hidden or removed."
+    },
+    {
+      "owner": "dispatch-protocol",
+      "locality": "interaction-dispatch-opencode-ingresscodec",
+      "justification": "OpenCode prompt ingress codec, chat-admission intent resolution, durable prompt recovery, interaction-repair send outcome, session nudge runtime, turn binding/reconcile/pass and session recovery workflow form one fully signed dispatch-protocol contract locality over graduated identity, Host, session, authority, durable projection and composition-turn contracts; monolith/obsolete imports have been removed and private helpers remain signature-hidden."
+    },
     {
       "owner": "session-ontology",
       "locality": "opencode-host-sessionbindingsurface",
@@ -684,6 +1726,11 @@
       "justification": "The bounded session/workspace projection aggregate is a one-file signed composition contract over already-graduated owner projections; it contains no fold routing, persistence implementation, runtime resource, or physical effect."
     },
     {
+      "owner": "durable-events",
+      "locality": "strength-persistence-durabilityport",
+      "justification": "Strength durable persistence port, store adapter, journal writer, event-store handle and the Host/fact folds they consume form a fully signed durable-events locality over graduated identity, strength, journal, event-store, projection and Host fact contracts; implementation helpers remain signature-hidden."
+    },
+    {
       "owner": "interaction-authority",
       "locality": "interaction-authority-ledger",
       "justification": "Prompt-authority durable folds and bounded dispatch queries are a one-file signed contract over graduated identity, authority fact, fission and durable projection localities; historical monolith-only opens were removed so the compile closure names only real dependencies."
@@ -754,6 +1801,11 @@
       "justification": "Pair-programming guideline and tip-delivery projections are signed guidance contracts over graduated identity and grounding vocabularies; JS-native surfaces are explicit signed support."
     },
     {
+      "owner": "guidance-delivery",
+      "locality": "enforcer-guidance-tip",
+      "justification": "Main tip guidance resolution, pair-programming thought transform and JS-native tip delivery surface form a fully signed guidance-delivery locality over graduated behavior-diagnosis, session-ontology, requirement-grounding and host-boundary contracts; durable journal helpers and internal wire parsers remain signature-hidden."
+    },
+    {
       "owner": "provider-attempt-recovery",
       "locality": "participant-provider-attempt-fallback-fact",
       "justification": "Fallback routing, cursor, recovery-slot decisions and durable projection are signed recovery contracts over graduated identity, request-kind and durable routing; the AgentFact bridge is explicit owner-local support."
@@ -797,6 +1849,11 @@
       "owner": "provider-projection",
       "locality": "opencode-codec-providerwiredecode",
       "justification": "Raw Host wire decoding/capture, projection write-back and JS projection surface are fully signed provider-projection contracts depending only on graduated identity, Host codec and provider projection model boundaries."
+    },
+    {
+      "owner": "provider-projection",
+      "locality": "opencode-codec-providerprojectionsurface",
+      "justification": "JS-native provider projection surface is a fully signed provider-projection contract depending on graduated identity, Host codec, provider wire decode/capture and projection model boundaries; dynamic wire and Host message conversion helpers remain signature-hidden."
     },
     {
       "owner": "participant-horizon",
@@ -847,6 +1904,16 @@
       "owner": "provider-language",
       "locality": "participant-provider-language",
       "justification": "Provider language vocabulary, session bind-once authority, packaged bilingual resources, prose rendering and Host language binding are fully published signed contracts whose only compile dependencies are graduated identity, distribution and provider-projection localities."
+    },
+    {
+      "owner": "repository-programming",
+      "locality": "opencode-tools-filemutationtools",
+      "justification": "JS opencode file mutation, sandbox bindings, durable transaction store, tool workflow, bookkeeper tool, tool host and generator surface are fully signed; their compile closure uses graduated repository-programming-js-capability, foundation-identity, host-boundary, office-capability, durable-events, knowledge-reuse, provider-language and participant-identity localities."
+    },
+    {
+      "owner": "repository-programming",
+      "locality": "js-programming-runtime-surface",
+      "justification": "JS repository-programming runtime, filesystem, transaction, workflow, tool-host and mv/rm surfaces are fully signed; their compile closure uses graduated repository-programming-js-capability, opencode-tools-filemutationtools, durable-events, host-boundary and knowledge-reuse localities."
     },
     {
       "owner": "distribution",
@@ -977,6 +2044,271 @@
       "owner": "obligation-ledger",
       "locality": "mission-obligation-todo-model",
       "justification": "Obligation model/facts/codec/projection and published JS projection capability depend only on graduated identity, trace and event-store model localities; codec/admission/representation helpers are explicitly signed support."
+    },
+    {
+      "owner": "output-distillation",
+      "locality": "process-largegatesurface",
+      "justification": "LargeGate surface and its Distillation runtime support form one signed output-distillation locality over graduated delegation and context contracts; owner-local implementation details remain signature-hidden."
+    },
+    {
+      "owner": "durable-convergence",
+      "locality": "persistence-eventstore-processeventlog",
+      "justification": "Local append log, k-way merge, canonical integrator contract, local store port, writer stream sync and retention JS surface form one fully signed durable-convergence storage locality over graduated identity, event-model, store-types and task-result contracts; Node fs interop and internal merge heap mechanics remain signature-hidden."
+    },
+    {
+      "owner": "context-compression",
+      "locality": "context-companion-companionfactfold",
+      "justification": "Companion host, runtime state, parked transform, runtime host, abandon, coordinator, model, journal port and fact folds form a fully signed context-compression companion runtime locality over graduated companion facts, Blogger request/projection, durable journal, session attachment, identity and Host contracts; physical host effects and runtime implementation details remain signature-hidden."
+    },
+    {
+      "owner": "context-compression",
+      "locality": "context-companion-foldsurface",
+      "justification": "Blogger crash recovery window classifier, main-context materialization and OpenCode plugin runtime scope form a fully signed context-compression Blogger locality over graduated companion runtime, semantic trace, durable journal and Host contracts; physical flight/drain registries and mutable runtime state remain signature-hidden."
+    },
+    {
+      "owner": "review-assurance",
+      "locality": "opencode-host-providerrunbinding",
+      "justification": "Physical provider-run binding, JS-native surface and cross-instance shared state form one fully signed review-assurance locality over graduated identity, Host snapshot, session and context-compression contracts; private helper functions and mutable registry internals remain signature-hidden."
+    },
+    {
+      "owner": "review-judgement",
+      "locality": "mission-review-reviewfactfold",
+      "justification": "Review fact fold, physical review ports, verdict recording, reviewer evidence/continuation and terminal await form one fully signed review-judgement locality over graduated identity, durable projection, semantic trace and Host session contracts; owner-local workflow details and Host implementation remain signature-hidden."
+    },
+    {
+      "owner": "behavior-diagnosis",
+      "locality": "enforcer-codec",
+      "justification": "Enforcer blog-call codec, chronicle execution, cycle model/decode/commit/recovery, repair, surface and host wiring form one fully signed behavior-diagnosis locality over graduated enforcer-catalog, enforcer-projection, context-compression, identity, journal and failure contracts; JS representation surfaces are signed support and all internal projection implementation remains signature-hidden."
+    },
+    {
+      "owner": "host-boundary",
+      "locality": "opencode-host-sharedstatesurface",
+      "justification": "SharedStateSurface, PluginSessionScope, PluginRecoveryScope and GitTree form one fully signed Host boundary locality over graduated identity, chat-execution, recovery, provider-attempt, provider-language, review-assurance and review-judgement contracts; cross-instance singletons, per-instance registries and Git implementation details remain signature-hidden."
+    },
+    {
+      "owner": "knowledge-reuse",
+      "locality": "repository-knowledge-casebook-model",
+      "justification": "Casebook model, capture, store, replay, staging, bookkeeper runtime, workflow and index form one fully signed knowledge-reuse locality over graduated identity, Host, session, provider, persistence-event-store and repository-programming contracts; process-local mutable registries and Node interop helpers remain signature-hidden."
+    },
+    {
+      "owner": "speculative-investigation",
+      "locality": "strength-turnevidence",
+      "justification": "Strength turn evidence, lifecycle, Host-boundary replay and plugin scope form one fully signed speculative-investigation locality over graduated prediction, replica, projection, frame, event, durability, Host, semantic trace and provider-projection contracts; counterfactual and replay helpers remain signature-hidden."
+    },
+    {
+      "owner": "durable-events",
+      "locality": "persistence-eventstore-surface",
+      "justification": "EventStore and journal surfaces expose the durable-events canonical spine to Host, journal and strength consumers: workspace EventStore acquisition, journal boot/dispose, MagicTodo obligation journal operations, and the Strength durability bridge over an opaque EventStore handle; implementation helpers remain signature-hidden."
+    },
+    {
+      "owner": "work-record",
+      "locality": "mission-workrecord-surface",
+      "justification": "JS-native WorkRecord capture and projection surface over graduated semantic trace, durable journal, identity, provider-projection, and work-record model contracts; dynamic decoding and cursor internals remain signature-hidden."
+    },
+    {
+      "owner": "semantic-trace",
+      "locality": "context-trace-semantictracesurface",
+      "justification": "SemanticTrace JS proof surface is fully signed over graduated trace capture/model/cursor and durable journal contracts; projection representation, Fable interop and cursor implementation details remain signature-hidden."
+    },
+    {
+      "owner": "durable-events",
+      "locality": "durable-runtime-surface",
+      "justification": "durable-events runtime surface: EventStore, journal codec, review, obligation and workspace journal JS-native surfaces form a fully signed locality over graduated event-store, journal, projection, identity and Host contracts; dynamic decoding and Fable interop helpers remain signature-hidden."
+    },
+    {
+      "owner": "managed-chat-execution",
+      "locality": "opencode-host-chatadmission-transaction",
+      "justification": "Managed chat admission transaction, host model projection, capacity lease lifecycle and post-admission recovery host form a fully signed contract locality over graduated chat execution, authority, model-routing and failure-policy boundaries; private step/lease helpers remain signature-hidden."
+    },
+    {
+      "owner": "obligation-ledger",
+      "locality": "mission-obligation-todo-magictodosemanticsurface",
+      "justification": "MagicTodo semantic/Host surfaces, durable locality, ledger workflow and membrane form one fully signed obligation-ledger locality over graduated identity, durable projection, mission lifecycle, prefix, provider and semantic-trace contracts; raw Host decoding and locality internals remain signature-hidden."
+    },
+    {
+      "owner": "provider-attempt-recovery",
+      "locality": "participant-provider-attempt-fallback-ledger",
+      "justification": "Fallback ledger/workflow and cursor surface form one fully signed provider-attempt-recovery locality over graduated context, durable journal, execution-failure, session, authority, provider-language and attempt contracts; obsolete monolith imports were removed and cursor/runtime internals remain signature-hidden."
+    },
+    {
+      "owner": "review-assurance",
+      "locality": "mission-review-barrier-workflow",
+      "justification": "Review barrier workflow, judgement inbox, Host guard, reverify path and assurance/Host surfaces form one fully signed review-assurance locality over graduated change, dispatch, durable journal, authority, provider and review contracts; filesystem, Host object and projection mechanics remain signature-hidden."
+    },
+    {
+      "owner": "action-affordance",
+      "locality": "opencode-tools-executortoolsurface",
+      "justification": "The executor tool, chronicle tool, bash honeypot tool and assume tool form one fully signed action-affordance capability locality over graduated identity, Host and tool-context contracts; execution harnesses and dynamic schema bindings remain signature-hidden."
+    },
+    {
+      "owner": "action-affordance",
+      "locality": "tool-runtime-surface",
+      "justification": "Executor tool surface, tool context, builtin file tools, tool static contract surface and file tools surface form one fully signed action-affordance runtime locality over graduated identity, Host and permission contracts; process handles and cancellation tokens remain signature-hidden."
+    },
+    {
+      "owner": "behavior-diagnosis",
+      "locality": "enforcer-continuation",
+      "justification": "Enforcer continuation workflow, BlogSurface and observation collector form one fully signed behavior-diagnosis locality over graduated companion, identity, Host and journal contracts; diagnostic state and chronicle persistence mechanics remain signature-hidden."
+    },
+    {
+      "owner": "capability-enforcement",
+      "locality": "opencode-host-managedagentconfig",
+      "justification": "Managed-agent host config gate, config surface, tool registry, tool registry surface and manager config form one fully signed capability-enforcement locality over graduated identity, Host and tool-permission contracts; agent catalog resolution and role predicates remain signature-hidden."
+    },
+    {
+      "owner": "change-integration",
+      "locality": "git-integrationgate",
+      "justification": "Integration gate, worktree resource, job model, prompts, orchestrator program, runtime, Git operations/gateway, change surfaces, Git adapter, worktree cleanup, session directories, recovery and review runner form one fully signed change-integration locality over graduated identity, Git, journal, process and review contracts; process execution and lock details remain signature-hidden."
+    },
+    {
+      "owner": "context-compression",
+      "locality": "context-companion-runtimesurface",
+      "justification": "Companion transform, Host compaction gate and Host compaction observer form one fully signed context-compression locality over graduated identity, Host, prefix and journal contracts; compaction thresholds and event listeners remain signature-hidden."
+    },
+    {
+      "owner": "context-compression",
+      "locality": "context-compression-runtime-surface",
+      "justification": "Compaction policy surface, Blogger TOML/delta/frame/cycle surfaces, fold surface, projection surface, compression surface, crash surface and companion runtime surface form one fully signed context-compression locality over graduated identity, Host, prefix and journal contracts; chunker cursors and runtime handles remain signature-hidden."
+    },
+    {
+      "owner": "delegation",
+      "locality": "execution-delegation-hostturnobservedsurface",
+      "justification": "Delegation join workflow, fork join guard, sync delegate observation, join wake, delegated tool estimation, join result rendering, fork tool and batching form one fully signed delegation locality over graduated identity, dispatch, session and journal contracts; child process management and batching internals remain signature-hidden."
+    },
+    {
+      "owner": "delegation",
+      "locality": "delegation-runtime-surface",
+      "justification": "Child recovery surface, handle surface, tool estimate surface, handle fold surface, HostTurnObserved surface, lifecycle surface, payload surface, handoff surface, restart workflow, join surface, PTY surface, clean break surface, one-shot tool, fork tool surface, sync delegate surface, journal surface and run lifecycle surface form one fully signed delegation locality over graduated identity, dispatch, session, recovery and journal contracts; child runtimes, PTY pipelines and private permits remain signature-hidden."
+    },
+    {
+      "owner": "dispatch-protocol",
+      "locality": "composition-turn-reconcilesurface",
+      "justification": "Turn reconcile surface, dispatch surface, join guard surface and recovery surface form one fully signed dispatch-protocol locality over graduated identity, Host, session and journal contracts; reservation maps and wake permits remain signature-hidden."
+    },
+    {
+      "owner": "durable-convergence",
+      "locality": "git-hook-sync",
+      "justification": "Git hook synchronization entry point, hook dispatcher and hook installation surface form one fully signed durable-convergence locality over graduated Git, process and journal contracts; hook process invocation and environment details remain signature-hidden."
+    },
+    {
+      "owner": "execution-model-routing",
+      "locality": "opencode-host-modelroutingsurface",
+      "justification": "Model routing surface and chat params hook form one fully signed execution-model-routing locality over graduated identity, Host and session contracts; execution admission queues and model capacity mappings remain signature-hidden."
+    },
+    {
+      "owner": "finality",
+      "locality": "mission-finality-prompt",
+      "justification": "Finality prompt, review cohort algebra, prompt surface, background/idle managers, job handoff, life workflow, manager finality, finality record/cohort/revision/blessing/workflow, finality surface and OpenCode host port form one fully signed finality locality over graduated change, identity, journal, review and trace contracts; lifecycle gates and cohort state remain signature-hidden."
+    },
+    {
+      "owner": "host-boundary",
+      "locality": "opencode-host-fissionhostsurface",
+      "justification": "Fission host surface, explicit resume suppression and explicit session resume form one fully signed host-boundary locality over graduated delegation, identity, dispatch and journal contracts; turn observation and restart execution mechanics remain signature-hidden."
+    },
+    {
+      "owner": "host-boundary",
+      "locality": "opencode-host-hostsignalbootstrap",
+      "justification": "Host signal bootstrap, join result renderer surface, explicit resume surface, pair programming thought surface, plugin host, chat params surface, plugin host interop, provider system transform, plugin boot, host wiring, session wiring, recovery wiring, transforms, hooks, spike plugin, hooks surface and plugin entry point form one fully signed host-boundary locality over graduated identity, journal, review, strength and trace contracts; host event streams and plugin wiring details remain signature-hidden."
+    },
+    {
+      "owner": "interaction-authority",
+      "locality": "interaction-repair-interactionrepair",
+      "justification": "Interaction repair workflow forms one fully signed interaction-authority locality over graduated identity, Host, session and journal contracts; error classification and nudge generation mechanics remain signature-hidden."
+    },
+    {
+      "owner": "intra-participant-parallelism",
+      "locality": "execution-fission-opencode-host",
+      "justification": "Fission OpenCode host adapter, fission semantic surface and fission tool form one fully signed intra-participant-parallelism locality over graduated identity, Host, session and journal contracts; admission runtimes and child execution mechanics remain signature-hidden."
+    },
+    {
+      "owner": "knowledge-reuse",
+      "locality": "repository-knowledge-casebook-bookkeeper",
+      "justification": "Casebook bookkeeper and lifecycle modules form one fully signed knowledge-reuse locality over graduated identity, Host, journal and repository contracts; indexing queues and draft storage mechanics remain signature-hidden."
+    },
+    {
+      "owner": "knowledge-reuse",
+      "locality": "repository-knowledge-casebook-lifecyclesurface",
+      "justification": "Casebook OpenCode tools module forms one fully signed knowledge-reuse locality over graduated identity, Host and tool-context contracts; tool registration and parameter parsing mechanics remain signature-hidden."
+    },
+    {
+      "owner": "knowledge-reuse",
+      "locality": "casebook-runtime-surface",
+      "justification": "Casebook bookkeeper refresh surface, bookkeeper surface, lifecycle surface, fetch surface, semantic surface and index surface form one fully signed knowledge-reuse locality over graduated identity, Host, journal and repository contracts; staging snapshots and index queries remain signature-hidden."
+    },
+    {
+      "owner": "managed-chat-execution",
+      "locality": "managed-chat-runtime-surface",
+      "justification": "Chat recovery surface, recovery runtime surface, semantic surface, transaction surface and status surface form one fully signed managed-chat-execution locality over graduated identity, Host, journal and session contracts; failure policies and transaction scenarios remain signature-hidden."
+    },
+    {
+      "owner": "managed-session-lifecycle",
+      "locality": "opencode-host-pluginruntimescope",
+      "justification": "Plugin runtime scope, turn scheduler and tool runtime scope form one fully signed managed-session-lifecycle locality over graduated identity, Host and turn contracts; scheduler state and scope lifecycles remain signature-hidden."
+    },
+    {
+      "owner": "managed-session-lifecycle",
+      "locality": "opencode-host-turnruntimepreparation",
+      "justification": "Turn runtime preparation, host turn observer and host session deletion form one fully signed managed-session-lifecycle locality over graduated identity, Host, journal, review and turn contracts; cleanup hooks and turn observation policies remain signature-hidden."
+    },
+    {
+      "owner": "output-distillation",
+      "locality": "opencode-tools-distillationsurface",
+      "justification": "Distillation tool surface forms one fully signed output-distillation locality over graduated identity, Host and tool-context contracts; role permission translation and fixed-cost execution details remain signature-hidden."
+    },
+    {
+      "owner": "participant-horizon",
+      "locality": "execution-session-opencode-horizontool",
+      "justification": "Horizon tool and horizon surface form one fully signed participant-horizon locality over graduated identity, Host, journal and session contracts; roster rendering and horizon projection mechanics remain signature-hidden."
+    },
+    {
+      "owner": "prefix-stability",
+      "locality": "context-prefix-wire",
+      "justification": "Prefix wire and XWire surface form one fully signed prefix-stability locality over graduated identity, Host, prefix and session contracts; presentation horizons and retry message identification remain signature-hidden."
+    },
+    {
+      "owner": "process-execution",
+      "locality": "opencode-tools-ptytool",
+      "justification": "PTY tool and executor tool form one fully signed process-execution locality over graduated identity, Host, process and tool-context contracts; PTY streaming and child process lifecycle remain signature-hidden."
+    },
+    {
+      "owner": "provider-attempt-recovery",
+      "locality": "composition-turn-ordinaryturnworkflow",
+      "justification": "Ordinary turn workflow forms one fully signed provider-attempt-recovery locality over graduated identity, Host, journal, recovery and turn contracts; turn execution loops and fallback policies remain signature-hidden."
+    },
+    {
+      "owner": "provider-language",
+      "locality": "participant-provider-languagesurface",
+      "justification": "Provider language surface forms one fully signed provider-language locality over graduated identity, Host and provider contracts; language parsing and localized resource bindings remain signature-hidden."
+    },
+    {
+      "owner": "repository-investigation",
+      "locality": "opencode-tools-inspectortool",
+      "justification": "Inspector tool and fetch tool form one fully signed repository-investigation locality over graduated identity, Host, repository and tool-context contracts; inspection adapters and network retrieval remain signature-hidden."
+    },
+    {
+      "owner": "requirement-grounding",
+      "locality": "opencode-host-requirementgrounding-runtime",
+      "justification": "Requirement grounding runtime, gate, transform, repository surface and grounding surface form one fully signed requirement-grounding locality over graduated identity, Host, journal and requirement contracts; grounding evaluation and journal interaction remain signature-hidden."
+    },
+    {
+      "owner": "review-assurance",
+      "locality": "composition-turn-workflow",
+      "justification": "Review turn workflow forms one fully signed review-assurance locality over graduated identity, Host, journal, review and turn contracts; review barrier synchronization and turn outcome transitions remain signature-hidden."
+    },
+    {
+      "owner": "review-judgement",
+      "locality": "mission-review-opencode-judgetool",
+      "justification": "Judge tool, judge surface and review todo surface form one fully signed review-judgement locality over graduated identity, Host, journal, obligation and review contracts; schema validation and todo mapping remain signature-hidden."
+    },
+    {
+      "owner": "speculative-investigation",
+      "locality": "strength-opencode-settings",
+      "justification": "Strength settings, speculate module and strength surface form one fully signed speculative-investigation locality over graduated identity, Host, session and strength contracts; rollout treatment calculation and prediction mechanics remain signature-hidden."
+    },
+    {
+      "owner": "verification-system",
+      "locality": "verification-eventstorewritersurface",
+      "justification": "EventStore writer surface and temporal verification surface form one fully signed verification-system locality over graduated journal, temporal and verification contracts; virtual timers and writer release proofs remain signature-hidden."
     }
   ],
   "contracts": [
@@ -1057,10 +2389,10 @@
       "consumers": [
         "delegation",
         "dispatch-protocol",
-        "durable-events",
         "finality",
         "interaction-authority",
-        "managed-session-lifecycle"
+        "managed-session-lifecycle",
+        "durable-events"
       ],
       "symbols": [
         "RebasedCommit",
@@ -3161,7 +4493,6 @@
         "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementInput",
         "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementInput.AuthorityRootUserMessageId",
         "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementInput.SourceSessionId",
-        "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementProjection",
         "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementProjectionModule.addRequirement",
         "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementProjectionModule.clearOnConfirmation",
         "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementProjectionModule.empty",
@@ -3171,7 +4502,8 @@
         "Wanxiangshu.Mission.Review.Barrier.ReviewTerminalFrontier.TerminalDigest",
         "Wanxiangshu.Mission.Review.Barrier.ReviewTerminalFrontier.TerminalRef",
         "Wanxiangshu.Mission.Review.Barrier.VerdictRejection.DuplicateAttempt",
-        "Wanxiangshu.Mission.Review.Barrier.VerdictRejection.NotDistinctAttempt"
+        "Wanxiangshu.Mission.Review.Barrier.VerdictRejection.NotDistinctAttempt",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementProjection"
       ],
       "justification": "Review.Witness publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-assurance."
     },
@@ -5654,7 +6986,7 @@
       "symbols": [
         "Wanxiangshu.Participant.Persona.PersonaCatalog.persona"
       ],
-      "justification": "Delegation consumes only the canonical Role \u00d7 AgentTier to Persona decision; Persona rendering and parsing remain identity-owner boundary mechanics."
+      "justification": "Delegation consumes only the canonical Role × AgentTier to Persona decision; Persona rendering and parsing remain identity-owner boundary mechanics."
     },
     {
       "path": "src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs",
@@ -12818,10 +14150,7 @@
       ],
       "symbols": [
         "Wanxiangshu.Strength.Projection.StrengthProjection",
-        "Wanxiangshu.Strength.Projection.StrengthProjectionModule.empty",
-        "Wanxiangshu.Strength.Projection.StrengthProjectionModule.isPromoted",
-        "Wanxiangshu.Strength.Projection.StrengthProjectionModule.tryDecisionForTarget",
-        "Wanxiangshu.Strength.Projection.StrengthProjectionModule.tryTraceRange"
+        "Wanxiangshu.Strength.Projection.StrengthProjectionModule.empty"
       ],
       "justification": "speculative-investigation.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to speculative-investigation."
     },
@@ -14155,16 +15484,16 @@
         "Wanxiangshu.OpenCode.HostToolContext.ProviderRunId",
         "Wanxiangshu.OpenCode.HostToolContext.SessionId",
         "Wanxiangshu.OpenCode.HostToolContext.ToolCallId",
-        "Wanxiangshu.OpenCode.HostToolFactory",
         "Wanxiangshu.OpenCode.ToolAdmission",
         "Wanxiangshu.OpenCode.ToolAdmission.OfficeRole",
         "Wanxiangshu.OpenCode.ToolHostCodec.stringSchemaDescribed",
-        "Wanxiangshu.OpenCode.ToolSpec",
         "Wanxiangshu.OpenCode.ToolSpec.Admission",
         "Wanxiangshu.OpenCode.ToolSpec.Arguments",
         "Wanxiangshu.OpenCode.ToolSpec.Description",
         "Wanxiangshu.OpenCode.ToolSpec.Execute",
-        "Wanxiangshu.OpenCode.ToolSpec.Name"
+        "Wanxiangshu.OpenCode.ToolSpec.Name",
+        "Wanxiangshu.OpenCode.HostToolFactory",
+        "Wanxiangshu.OpenCode.ToolSpec"
       ],
       "justification": "host-boundary.Contract publishes exactly these symbols to 'attention-regulation'; every unlisted sibling remains private to host-boundary."
     },
@@ -14184,16 +15513,16 @@
         "Wanxiangshu.OpenCode.HostToolContext.ProviderRunId",
         "Wanxiangshu.OpenCode.HostToolContext.SessionId",
         "Wanxiangshu.OpenCode.HostToolContext.ToolCallId",
-        "Wanxiangshu.OpenCode.HostToolFactory",
         "Wanxiangshu.OpenCode.ToolAdmission",
         "Wanxiangshu.OpenCode.ToolAdmission.OfficeRole",
         "Wanxiangshu.OpenCode.ToolHostCodec.stringSchemaDescribed",
-        "Wanxiangshu.OpenCode.ToolSpec",
         "Wanxiangshu.OpenCode.ToolSpec.Admission",
         "Wanxiangshu.OpenCode.ToolSpec.Arguments",
         "Wanxiangshu.OpenCode.ToolSpec.Description",
         "Wanxiangshu.OpenCode.ToolSpec.Execute",
-        "Wanxiangshu.OpenCode.ToolSpec.Name"
+        "Wanxiangshu.OpenCode.ToolSpec.Name",
+        "Wanxiangshu.OpenCode.HostToolFactory",
+        "Wanxiangshu.OpenCode.ToolSpec"
       ],
       "justification": "host-boundary.Contract publishes exactly these symbols to 'concern-routing'; every unlisted sibling remains private to host-boundary."
     },
@@ -14317,16 +15646,16 @@
         "Wanxiangshu.OpenCode.HostToolContext.ProviderRunId",
         "Wanxiangshu.OpenCode.HostToolContext.SessionId",
         "Wanxiangshu.OpenCode.HostToolContext.ToolCallId",
-        "Wanxiangshu.OpenCode.HostToolFactory",
         "Wanxiangshu.OpenCode.ToolAdmission",
         "Wanxiangshu.OpenCode.ToolAdmission.OfficeRole",
         "Wanxiangshu.OpenCode.ToolHostCodec.stringSchemaDescribed",
-        "Wanxiangshu.OpenCode.ToolSpec",
         "Wanxiangshu.OpenCode.ToolSpec.Admission",
         "Wanxiangshu.OpenCode.ToolSpec.Arguments",
         "Wanxiangshu.OpenCode.ToolSpec.Description",
         "Wanxiangshu.OpenCode.ToolSpec.Execute",
-        "Wanxiangshu.OpenCode.ToolSpec.Name"
+        "Wanxiangshu.OpenCode.ToolSpec.Name",
+        "Wanxiangshu.OpenCode.HostToolFactory",
+        "Wanxiangshu.OpenCode.ToolSpec"
       ],
       "justification": "host-boundary.Contract publishes exactly these symbols to 'institutional-learning'; every unlisted sibling remains private to host-boundary."
     },
@@ -17577,58 +18906,5 @@
       "justification": "host-boundary wires only the listed foreign symbols in this composition root; it owns no foreign decision law."
     }
   ],
-  "requirement_dependencies": [],
-  "owner_cycle_justifications": [
-    {
-      "owners": [
-        "action-affordance",
-        "attention-regulation",
-        "behavior-diagnosis",
-        "capability-enforcement",
-        "causal-wait",
-        "change-integration",
-        "cognitive-environment",
-        "concern-routing",
-        "context-compression",
-        "degeneration-guard",
-        "delegation",
-        "dispatch-protocol",
-        "distribution",
-        "durable-convergence",
-        "durable-events",
-        "epistemic-reasoning",
-        "execution-failure-policy",
-        "execution-model-routing",
-        "external-investigation",
-        "finality",
-        "guidance-delivery",
-        "host-boundary",
-        "institutional-learning",
-        "interaction-authority",
-        "intra-participant-parallelism",
-        "knowledge-reuse",
-        "managed-chat-execution",
-        "managed-session-lifecycle",
-        "obligation-ledger",
-        "output-distillation",
-        "participant-horizon",
-        "prefix-stability",
-        "process-execution",
-        "provider-attempt-recovery",
-        "provider-language",
-        "provider-projection",
-        "repository-investigation",
-        "repository-programming",
-        "requirement-grounding",
-        "review-assurance",
-        "review-judgement",
-        "semantic-trace",
-        "session-ontology",
-        "speculative-investigation",
-        "time-capability",
-        "work-record"
-      ],
-      "justification": "Final live owner dependency SCC after all ready-frontier KEEP cutovers; cross-owner surface contracts span this strongly connected component. Future architecture work must break cycles into DAGs."
-    }
-  ]
+  "requirement_dependencies": []
 }

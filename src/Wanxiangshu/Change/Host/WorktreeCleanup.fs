@@ -1,28 +1,9 @@
 namespace Wanxiangshu.Change.Host
 
-open Wanxiangshu.Context.Companion.Blogger.OpenCode
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
-open Wanxiangshu.Execution.Fission.OpenCode
-open Wanxiangshu.Git
-open Wanxiangshu.Git.Hook
-open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Manager.OpenCode
-open Wanxiangshu.Mission.Obligation.Todo.OpenCode
-open Wanxiangshu.Mission.Review.OpenCode
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Resources
-open Wanxiangshu.Strength.OpenCode
-open Wanxiangshu.Strength.Persistence
-
 open System.Threading.Tasks
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Change
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Git
 
 /// Remove worktrees and branches no active ManagerJob owns.
 ///

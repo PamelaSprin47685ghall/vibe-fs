@@ -1,18 +1,9 @@
 namespace Wanxiangshu.Git
 
-open Wanxiangshu.Change
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Resources
-open Wanxiangshu.Strength.Persistence
-
 open System
 open System.Threading.Tasks
 open Fable.Core
+open Wanxiangshu.Change
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Process
@@ -126,13 +117,13 @@ module WorktreeCommands =
     let private failure stdout stderr =
         if String.IsNullOrWhiteSpace stderr then stdout else stderr
 
-    let isDirty runner (path: WorktreePath) =
+    let isDirty (runner: Command -> Task<int * string * string>) (path: WorktreePath) =
         task {
             let! code, stdout, _ = runner (command (Some(WorktreePath.value path)) [ "status"; "--porcelain" ])
             return code = 0 && not (String.IsNullOrWhiteSpace stdout)
         }
 
-    let create runner repo (jobId: ManagerJobId) (path: WorktreePath) =
+    let create (runner: Command -> Task<int * string * string>) repo (jobId: ManagerJobId) (path: WorktreePath) =
         task {
             let identity = identityOf jobId
 
@@ -153,7 +144,7 @@ module WorktreeCommands =
             return outcome code stdout stderr |> Result.map (fun () -> identity)
         }
 
-    let remove runner (path: WorktreePath) =
+    let remove (runner: Command -> Task<int * string * string>) (path: WorktreePath) =
         task {
             let! code, stdout, stderr =
                 runner (command None [ "worktree"; "remove"; "--force"; WorktreePath.value path ])
@@ -183,7 +174,7 @@ module WorktreeCommands =
 
         loop [] None None lines
 
-    let list runner repo () =
+    let list (runner: Command -> Task<int * string * string>) repo () =
         task {
             let! code, stdout, stderr = runner (command (Some repo) [ "worktree"; "list"; "--porcelain" ])
 
@@ -197,7 +188,7 @@ module WorktreeCommands =
                     |> Ok
         }
 
-    let listBranches runner repo () =
+    let listBranches (runner: Command -> Task<int * string * string>) repo () =
         task {
             let! code, stdout, stderr = runner (command (Some repo) [ "branch"; "--list"; "manager/*" ])
 
@@ -220,7 +211,7 @@ module WorktreeCommands =
                     |> Ok
         }
 
-    let deleteBranch runner repo (identity: WorktreeIdentity) =
+    let deleteBranch (runner: Command -> Task<int * string * string>) repo (identity: WorktreeIdentity) =
         task {
             let! code, stdout, stderr = runner (command (Some repo) [ "branch"; "-D"; WorktreeIdentity.value identity ])
 

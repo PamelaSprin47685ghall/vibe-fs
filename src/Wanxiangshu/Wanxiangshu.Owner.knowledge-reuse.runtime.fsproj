@@ -20,11 +20,17 @@
     <ProjectReference Include="Wanxiangshu.Owner.repository-investigation.opencode-tools-inspectortool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionbindingsurface.fsproj"/>
+    <Compile Include="Repository/Knowledge/Casebook/BookkeeperRefreshSurface.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperRefreshSurface.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/BookkeeperSurface.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperSurface.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/LifecycleSurface.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/LifecycleSurface.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/FetchSurface.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/FetchSurface.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Surface.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Surface.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/IndexSurface.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/IndexSurface.fs"/>
   </ItemGroup>
 </Project>

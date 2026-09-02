@@ -328,14 +328,14 @@ module PluginHostInterop =
     [<Emit("(args, context) => { const handle = (err) => { $2($0, err); throw err; }; try { return Promise.resolve($1(args, context)).catch(handle); } catch (err) { return handle(err); } }")>]
     let private guardedPolicyAwareHook (operation: string) (fn: obj) (onError: string -> obj -> unit) : obj = jsNative
 
-    let policyAwareHook operation (adaptedHook: obj) : obj =
+    let policyAwareHook (operation: string) (adaptedHook: obj) : obj =
         guardedPolicyAwareHook operation adaptedHook handleHookFailure
 
-    let registeredHook key adaptedHook =
+    let registeredHook (key: HookKey) (adaptedHook: obj) : string * obj =
         let metadata = HookPolicy.metadata key |> HookPolicy.validate
         metadata.HostKey, policyAwareHook metadata.DiagnosticOperation adaptedHook
 
-    let projectionSessionIdFromMessages (output: obj) =
+    let projectionSessionIdFromMessages (output: obj) : string option =
         ProviderWireDecode.projectionSessionIdFromMessages output
 
     let toolHooks

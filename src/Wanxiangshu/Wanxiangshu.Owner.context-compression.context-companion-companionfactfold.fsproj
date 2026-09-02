@@ -35,17 +35,29 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionbindingsurface.fsproj"/>
+    <Compile Include="Context/Companion/CompanionFactFold.fsi"/>
     <Compile Include="Context/Companion/CompanionFactFold.fs"/>
+    <Compile Include="Context/Companion/Blogger/ContextFactFold.fsi"/>
     <Compile Include="Context/Companion/Blogger/ContextFactFold.fs"/>
+    <Compile Include="Context/Companion/Model.fsi"/>
     <Compile Include="Context/Companion/Model.fs"/>
+    <Compile Include="Context/Companion/Runtime.fsi"/>
     <Compile Include="Context/Companion/Runtime.fs"/>
+    <Compile Include="Context/Companion/Blogger/Runtime/State.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/State.fs"/>
+    <Compile Include="Context/Companion/Blogger/Runtime/ParkedTransform.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/ParkedTransform.fs"/>
+    <Compile Include="Context/Companion/Blogger/Runtime/Host.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Host.fs"/>
+    <Compile Include="Context/Companion/Blogger/Runtime/Abandon.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Abandon.fs"/>
+    <Compile Include="Context/Companion/HostBlogger.fsi"/>
     <Compile Include="Context/Companion/HostBlogger.fs"/>
+    <Compile Include="Context/Companion/JournalPort.fsi"/>
     <Compile Include="Context/Companion/JournalPort.fs"/>
+    <Compile Include="Context/Companion/Host.fsi"/>
     <Compile Include="Context/Companion/Host.fs"/>
+    <Compile Include="Context/Companion/Blogger/Runtime/Coordinator.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Coordinator.fs"/>
   </ItemGroup>
 </Project>

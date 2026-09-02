@@ -45,7 +45,6 @@ test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the five layer
   assert.deepEqual(normalized, [
     'npm run format', // format
     'npm run check', // L0 text gates
-    'npm run owner-dep', // L0 FCS owner-dependency gates
     'npm run build', // build（dist 生产字节）
     'node requirements/verification-system/tests/run.mjs', // L1 pure laws + L2 temporal + L3 adapter 契约面
     'node requirements/verification-system/tests/integration/run.mjs',
@@ -56,15 +55,14 @@ test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the five layer
   ])
 
   assert.deepEqual(
-    Object.fromEntries(['format', 'check', 'owner-dep', 'build'].map((name) => [name, scripts[name]])),
-    { format: 'wireit', check: 'wireit', 'owner-dep': 'wireit', build: 'wireit' },
+    Object.fromEntries(['format', 'check', 'build'].map((name) => [name, scripts[name]])),
+    { format: 'wireit', check: 'wireit', build: 'wireit' },
   )
   assert.deepEqual(
-    Object.fromEntries(['format', 'check', 'owner-dep', 'build'].map((name) => [name, wireit[name]?.command])),
+    Object.fromEntries(['format', 'check', 'build'].map((name) => [name, wireit[name]?.command])),
     {
       format: 'dotnet tool run fantomas src/Wanxiangshu',
       check: 'node scripts/check.mjs',
-      'owner-dep': 'node scripts/check.mjs --lane=owner-dep',
       build: 'node scripts/build.mjs',
     },
   )
@@ -112,7 +110,7 @@ const WIRED_ALLOWLIST = new Set([
   'semantic-anchors.mjs', // catalog：被各 gate import 的 anchor 清单，不直接 spawn
   'fsharp-control-pyramid-guide.mjs', // guide lib：被 fsharp-control-pyramid.mjs import
   'js-surface-manifest.mjs', // post-build gate：由 build.mjs 在 fable precompile 后调用（依赖 dist 产物，不能 pre-build）
-  'js-module-linkage.mjs', // post-build gate：由 build.mjs 在 manifest 后调用，验证 emitted ESM graph 闭合
+  'js-module-linkage.mjs', // post-build linkage gate: invoked by build.mjs after Fable emit, cannot run pre-build
   'legacy-horizon-census.mjs', // census tool：由 OBL-007 历史 detector 退出验证调用
 ])
 
@@ -138,20 +136,17 @@ test('WHAT[VERIFICATION-SYSTEM-009] every wired gate path exists', () => {
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-005] FCS evidence producer precedes every semantic consumer gate', () => {
+test('WHAT[VERIFICATION-SYSTEM-005] owner-contracts producer precedes every semantic consumer gate', () => {
   const checkSource = read('scripts/check.mjs')
   const wired = wiredGates(checkSource)
   const semanticOwners = wired.indexOf('semantic-owners.mjs')
-  const ownerDependencies = wired.indexOf('owner-dependencies.mjs')
-  assert.ok(semanticOwners >= 0 && ownerDependencies > semanticOwners)
+  const ownerContracts = wired.indexOf('owner-contracts.mjs')
+  assert.ok(semanticOwners >= 0 && ownerContracts === semanticOwners + 1)
   for (const consumer of [
     'dsl-ownership.mjs',
     'authority-boundary.mjs',
-    'composition-root-invariant.mjs',
     'semantic-decorator-invariant.mjs',
-  ]) assert.ok(ownerDependencies < wired.indexOf(consumer), `${consumer} must run after the one FCS evidence producer`)
-  assert.match(checkSource, /delete env\.OMP_FCS_REUSE_PATH[\s\S]*script\.endsWith\('owner-dependencies\.mjs'\)/)
-  assert.match(checkSource, /if \(ownerEvidenceReady\)[\s\S]*env\.OMP_FCS_REUSE_PATH = fcsEvidencePath/)
+  ]) assert.ok(ownerContracts < wired.indexOf(consumer), `${consumer} must run after the contract registry gate`)
 })
 
 test('WHAT[VERIFICATION-SYSTEM-010] wired gate count has a non-shrinking floor', () => {

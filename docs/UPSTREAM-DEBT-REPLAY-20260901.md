@@ -4,10 +4,25 @@
 
 - Replay branch: `codex/upstream-debt-replay-20260901`
 - Initial audit base: `ff85615e9a8dc0c94447eb55960a72deb46ed9db`
-- Final replay base: `1d4d810c7` (eight later boundary-signing commits included)
+- Original PR base: `1d4d810c7` (eight later boundary-signing commits included)
+- Current upstream sync base: `db20ac5f0` (24 additional 57.15 commits included)
 - Preserved source branch: `codex/upstream-debt-audit-20260901`
-- Method: inspect the refactored owner/signature/project boundary first, then replay only residual semantics. No merge commit or blind cherry-pick is used.
-- Final integration rule: fetch `upstream/master` again, reconcile any tail semantically, run the full validation ladder, then open one cumulative PR.
+- Method: the original PR replayed residual semantics node-by-node. The 2026-09-02 refresh merges the public upstream tail and resolves each overlap against its current owner law; no blind cherry-pick or compatibility path is used.
+- Final integration rule: reconcile the current upstream tail semantically, run the full validation ladder, then update the cumulative PR.
+
+## 2026-09-02 upstream resync
+
+Upstream advanced from `1d4d810c7` to `db20ac5f0` by 24 commits. The tail completes 57.15, signs all 148 owner localities, and replaces the white-box FCS pipeline with `owner-contracts.mjs` + `owner-projects.mjs`.
+
+The merge policy follows that completed ownership cutover:
+
+- delete the retired `owner-dependencies.mjs` implementation and its FCS graph-snapshot tests;
+- retain `owner-contracts.mjs` as the exact contract owner and `owner-projects.mjs` as the structural locality-DAG owner;
+- update the proof ladder to require `semantic-owners → owner-contracts → semantic consumers`;
+- preserve the PR's independent P2, P5, and P6B production-bound proofs;
+- treat the `Rulebook.fsi` overlap as layout-only and accept the upstream signature layout.
+
+This is a clean break. The old FCS graph path is not adapted, mirrored, or kept as a second oracle.
 
 ## Final upstream-tail reconciliation
 
@@ -30,7 +45,7 @@ These commits add or tighten `.fsi` files, owner project membership, and exact p
 | --- | --- | --- | --- | --- |
 | P2 causal reconciliation | `a6445f214`, `3f481417a`, `b855d9891` | Compiler owner projects were added, but `Reread`, counter parameters, recursive snapshot reads, and the test-local mirror remained. | `ffb846594`, `38276e4ef`, `744578f6e` | GREEN; closure recorded here |
 | P5 Judge decision ownership | `6b93b752d`, `f3b2372d1`, `2b405f573` | The owner project existed, but `JudgeTool` used a private decision while `JudgeSurface.validateContext` implemented a disconnected approximation. | `e3f3ea840`, `18f1b1f14`, `e9fbc9fa8` | GREEN; closure recorded here |
-| A0 owner graph | `5ab743901`, `975762df3`, `1ca0a8be5`, `cd1878ce4`, `af4de1d79` | Compiler projects now enforce the locality DAG, but exact FCS semantic-edge snapshots, deltas, and derived manifest counts remained absent. | `df013fcc4`, `cd1e8e4b1`, `99344ecbd`, `58958f04f`, `8841fd018`, `af8aaed99` | GREEN; closure recorded here |
+| A0 owner graph | `5ab743901`, `975762df3`, `1ca0a8be5`, `cd1878ce4`, `af4de1d79` | 57.15 retired the white-box FCS pipeline and assigned the law to exact contract metadata plus compiler-locality boundaries. | `df013fcc4`, `cd1e8e4b1`, `99344ecbd`, `58958f04f`, `8841fd018`, `af8aaed99` | SUPERSEDED; legacy implementation and proofs removed during resync |
 | P6B evidence/property work | `3c2581088`, `bfd81120e`, `e22f07982`, `c6b10c89e` | Failure/capacity finite proofs remain stronger than random sampling; durable incomplete-tail space remains uncovered. | `e07d24afb`, `cf992a381` | GREEN; two NO-GO decisions and one GO recorded here |
 
 ## P2 — causal edges are the only snapshot-read authority
@@ -138,62 +153,16 @@ all gates pass; 773 WHAT; 3912 executable tests; closure complete
 
 The first combined run also found a local environment mismatch: upstream had added locked `jq-wasm@3.0.0-jq-1.8.2`, but the pre-fetch `node_modules` did not contain it. `npm ci` restored the exact lockfile dependency; the unchanged real Tool suite then passed 8/8. No dependency manifest or upstream production logic was changed for this environment repair.
 
-## A0 — exact semantic graph facts beside the compiler DAG
+## A0 — superseded by the 57.15 ownership cutover
 
-### What the upstream refactor superseded
+The A0 replay was valid against `1d4d810c7`: the production gate still consumed FCS symbol-use evidence, so graph snapshots and deltas extended its existing owner. Upstream commit `a211643f6` changes that premise and closes the migration:
 
-Upstream's `owner-projects.mjs` and 148 owner-locality projects now provide the stronger structural law: every production source belongs to one locality; foreign project references are explicit; contract closure excludes runtime/private sources; the compiler project graph is a DAG. A0 does not recreate that responsibility.
+- `owner-symbol-uses.fsx`, `owner-dependencies.mjs`, `composition-root-invariant.mjs`, and their evidence/reuse lane are deleted;
+- `owner-contracts.mjs` validates the exact published contract, symbol, consumer, and release-closure declarations;
+- `owner-projects.mjs` validates source coverage, one-owner locality, foreign contract-only references, flattened Fable closure, and an acyclic project graph;
+- production checks no longer derive a white-box semantic-use graph.
 
-The retained residual law belongs to the FCS semantic-use oracle, which remains required by AGENTS until every exact symbol/consumer promise can be checked without white-box evidence. It answers a different review question: “Which semantic owner edges changed in this PR, and what exact SCC does the current source graph contain?”
-
-### RED/GREEN sequence
-
-- `df013fcc4` RED: 39 tests, 36 pass, 3 fail for absent exact SCC facts, absent added/removed edge comparison, and the handwritten `semantic-owners.json.total`.
-- `cd1e8e4b1` GREEN: derive the owner count; produce a versioned, sorted, duplicate-free graph with exact SCC members/internal edges; compare exact edge keys. Result: 39/39.
-- `99344ecbd` RED: 40 tests, 39 pass, 1 fail because no-baseline JSON could not be reused directly as a baseline.
-- `58958f04f` GREEN: emit the bare snapshot without a baseline and `{ current, delta }` only for a comparison. Result: 40/40.
-
-### Real-repository canary and upstream refactor drift
-
-The first real `--graph-json` scan proved the CLI shape but exited nonzero on 11 pre-existing upstream metadata violations. None came from A0 analysis logic:
-
-- 10 exact FCS uses had signed `.fsi/fsproj` boundaries but incomplete `published-contracts.json` entries;
-- `OwnerIdentityWitness` still named the removed `let internal inherited ...` issuer after upstream commit `3c585e24a` replaced it with `PromptIdentitySeed.inheritFromOwner`.
-
-`8841fd018` fixes only those metadata declarations:
-
-- add `durable-events` to the existing Change projection contract;
-- publish the existing `ReviewRequirementProjection` type to its existing `durable-events` consumer;
-- publish `HostToolFactory` and `ToolSpec` to the three Tool owners whose `.fsi` signatures already expose those exact types;
-- update the authority issuer symbol/anchor to the current production declaration.
-
-No production logic, wildcard, baseline, suppression, runtime/private symbol, or project edge was added.
-
-### Proof and gates
-
-```text
-owner-dependencies
-OK — 29002 FCS cross-owner uses; 0 pending; 778 contracts
-49 owners; 621 unique semantic edges; 1 justified semantic SCC
-
-owner-projects
-OK — 148 localities; 701 sources; 1771 refs; compiler DAG
-
-graph replay canary
-bare snapshot: 49 owners / 621 edges
-same-snapshot comparison: +0 / -0
-
-authority-boundary
-OK
-
-composition-root-invariant
-OK
-
-semantic-decorator-invariant
-OK
-```
-
-The 46-owner semantic SCC does not contradict the 148-locality compiler DAG. The former reports owner-level semantic use across published contracts; the latter is the physical compile-reference topology that must remain acyclic. Conflating them would either hide semantic coupling or weaken compiler enforcement.
+Keeping A0 after this cutover would recreate a retired owner and a second source of truth. Its implementation, CLI, and four graph-specific unit proofs are therefore removed. The replay commits remain in history as evidence of the earlier base; they are not part of the current executable architecture.
 
 ## P6B — property testing only where it adds a new oracle
 
@@ -223,14 +192,14 @@ The latest upstream still has the exact lifecycle table, wrong-identity decoys, 
 
 The 216-case failure matrix contains dimensions that do not affect the policy input and a small mirrored effect mapping. It remains mutation-sensitive and production-bound, but its count is not claimed as 216 distinct policy worlds. This is documented debt for the next modification of that owner, not a reason to broaden this upstream replay.
 
-## Release-sink findings in upstream code
+## Release-sink findings on the original PR base
 
-The first complete `npm run format-build-test` exposed failures that existed on the initial release base `upstream/master@8caee37ca`; none were introduced by P2, P5, A0, or P6B. They are changed in this PR because the upstream release entry cannot otherwise complete. Each correction is isolated from the replay modules and remains necessary on `1d4d810c7`.
+The first complete `npm run format-build-test` exposed failures that existed on `upstream/master@8caee37ca`; none were introduced by P2, P5, A0, or P6B. This section records why they were changed before the 57.15 resync. Where upstream now owns an equivalent or stronger rule, the upstream implementation wins.
 
 ### Verification gates — `663466799`
 
 1. `ctx-capacity-observation-forbidden.test.mjs` scanned every production file for the generic word `tokenizer`. It rejected `Execution/Session/LoopDetector.fs`, although that file is owned by `degeneration-guard` and uses tokenization to detect repetition—not to observe model context capacity. Deleting or renaming that production dependency would damage a valid owner to satisfy an over-broad oracle. The corrected proof obtains exact `context-compression` files from `semantic-owners.json` and applies the same forbidden vocabulary only to the owner governed by CONTEXT-COMPRESSION-001. Empty ownership fails closed.
-2. `proof-ladder.test.mjs` required `owner-dependencies.mjs` to be textually adjacent to `semantic-owners.mjs`. Upstream's valid `owner-projects.mjs` DAG gate now sits between them. Evidence causality requires only `semantic-owners < owner-dependencies < every FCS consumer`; the corrected assertion states that order without rejecting an independent intervening gate.
+2. The earlier proof-ladder correction ordered `owner-dependencies.mjs` after `semantic-owners.mjs`. It is now superseded: 57.15 deletes that gate and requires `owner-contracts.mjs` immediately after `semantic-owners.mjs`, before every semantic consumer.
 3. `scripts/checks/js-module-linkage.mjs` is executed by `scripts/build.mjs` after compilation, beside `js-surface-manifest.mjs`, but the proof-ladder inventory omitted it from the build-owned allowlist. The corrected inventory names the already-wired gate; it does not suppress or bypass it.
 
 RED from the first release sink: 3861/3865 unit tests, with these three code failures plus one sandbox-only localhost EPERM. GREEN focused run with localhost permission: CTX + proof ladder + installed OpenCode canary, 15/15. The canary proved the EPERM was environmental; no Host assertion was changed.
@@ -245,7 +214,7 @@ The fix freezes `DOTNET_CLI_HOME` from the caller before replacing application `
 
 The repository release entry runs Fantomas before every other layer. Its first pass normalized 107 `.fsi` files and three `.fs` files, including signatures present before and added by the upstream boundary-signing tail. The changes are layout-only and were isolated into one style commit; the next pass reported 978 files unchanged. Fable compiled the normalized tree successfully. This commit intentionally modifies upstream-authored files because otherwise every release run regenerates the same dirty tree.
 
-## Final validation
+## Original validation before the 57.15 resync
 
 One uninterrupted, localhost-enabled `npm run format-build-test` completed with exit 0 after all fixes:
 
@@ -262,3 +231,23 @@ npm pack --dry-run: 2020 files; 2.2 MB packed; 10.6 MB unpacked
 ```
 
 No baseline, suppression, allowlist for semantic debt, compatibility facade, test retry, timeout increase, or production bypass was introduced.
+
+## 2026-09-02 resync validation
+
+The 57.15 tail initially exposed two stale signature families: upstream's new `.fsi` files still declared the removed P2 reread counters and hid the P5 shared execution decision. The signatures were narrowed to the already-proved production semantics; no implementation rollback or adapter was added.
+
+The final localhost-enabled `npm run format-build-test` completed with exit 0:
+
+```text
+format: 1402 files unchanged
+checks: 773 WHAT; 3909 executable proof declarations; closure complete
+owner-contracts: 778 contracts; 0 requirement dependencies
+owner-projects: 148 localities; 701 sources; 1770 refs; DAG
+build: 1440 F# inputs; 165 registered surfaces; 772 emitted modules linked
+unit: 3865 passed; 0 failed
+integration: all registered suites passed; owner-project compiler boundary 2/2; harness 273/273
+Long Stroke e2e: 57 steps in 7.5s; journal 596/700; SSE 2567/3450
+npm pack --dry-run: 2020 files; 2.2 MB packed; 10.6 MB unpacked
+```
+
+The first sandboxed run reached 3864/3865 and failed only because the real OpenCode canary could not bind `127.0.0.1` (`EPERM`). Re-running the identical release sink with localhost permission passed that canary and every later layer. No assertion or timeout was changed.

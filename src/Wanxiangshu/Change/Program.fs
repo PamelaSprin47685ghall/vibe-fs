@@ -1,34 +1,12 @@
 namespace Wanxiangshu.Change
 
-open Wanxiangshu.Git
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Barrier
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Persistence
-open Wanxiangshu.Strength.Replica
-
 open System
-open System.Threading
 open System.Threading.Tasks
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.Change
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Identity
-
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Identity
 
 /// ORCH-004/005/006/007: worktree → review → rebase → fresh review → short-CAS
 /// ff-only publish.

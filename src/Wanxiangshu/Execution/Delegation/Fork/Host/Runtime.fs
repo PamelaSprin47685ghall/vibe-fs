@@ -5,7 +5,6 @@ open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Handle
@@ -303,11 +302,6 @@ type HostForkRuntime
                 | true, run -> Some run
                 | false, _ -> None)
 
-        let failPendingRun error =
-            match pendingRunForAgent () with
-            | Some run -> this.FailRun(run, error)
-            | None -> Task.FromResult(()) :> Task
-
         let deliverDeferredPrompt
             (pending:
                 {| ChildId: SessionId
@@ -326,7 +320,6 @@ type HostForkRuntime
                         (fun physical ->
                             pendingRunForAgent ()
                             |> Option.iter (fun run -> HostForkRunLifecycle.bindAuthorityRoot run physical))
-                        failPendingRun
 
                 return
                     match sent with

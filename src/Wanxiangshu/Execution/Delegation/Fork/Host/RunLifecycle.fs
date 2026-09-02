@@ -4,7 +4,6 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Handle
@@ -242,8 +241,8 @@ module HostForkRunLifecycle =
         =
         sendAgentOwnerRootObserved sessions journal childId identitySeed directory prompt onAccepted
 
-    let childPromptSender sessions parentId journal directoryOf =
-        fun agentId childId (_role: Role) identitySeed prompt onAccepted ->
+    let childPromptSender sessions parentId journal (directoryOf: string -> string option) =
+        fun (agentId: string) childId (_role: Role) identitySeed prompt onAccepted ->
             sendChildPrompt sessions parentId journal childId identitySeed (directoryOf agentId) prompt onAccepted
 
     let bindAuthorityRoot (run: PendingHostRun) (physical: PhysicalUserMessageId) =

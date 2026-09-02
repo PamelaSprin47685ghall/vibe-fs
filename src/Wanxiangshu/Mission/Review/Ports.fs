@@ -1,24 +1,8 @@
 namespace Wanxiangshu.Mission.Review
 
-open Wanxiangshu.Change
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Review.Barrier
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Persistence
-open Wanxiangshu.Strength.Replica
-
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Review
 
 /// Review-facing tree capability. Infrastructure owns the physical Git adapter;
 /// Application only sees the read contract.

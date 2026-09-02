@@ -30,9 +30,13 @@
     <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
+    <Compile Include="Persistence/EventStore/StrengthSurface.fsi"/>
     <Compile Include="Persistence/EventStore/StrengthSurface.fs"/>
+    <Compile Include="OpenCode/Host/WorkspaceEventStore.fsi"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStore.fs"/>
+    <Compile Include="Persistence/Journal/Surface.fsi"/>
     <Compile Include="Persistence/Journal/Surface.fs"/>
+    <Compile Include="Persistence/Journal/ObligationJournalSurface.fsi"/>
     <Compile Include="Persistence/Journal/ObligationJournalSurface.fs"/>
   </ItemGroup>
 </Project>
