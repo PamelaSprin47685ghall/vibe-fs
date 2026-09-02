@@ -183,11 +183,14 @@ test('WHAT[STRUCTURED-WORKFLOW-011] flat projection rejects missing or stale Pro
   }
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection materialization escapes XML metacharacters in paths and strips emitter identity', () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection materialization escapes XML metacharacters, strips emitter identity, and binds source bytes into isolated fingerprints', () => {
   const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-xml-metachar-proof-'))
   try {
+    const signatureFile = join(scratchRoot, 'Special&Signature.fsi')
+    writeFileSync(signatureFile, 'namespace Special\nmodule SpecialSource\nval x : int\n', 'utf8')
+
     const compileFile = join(scratchRoot, 'Special&Source.fs')
-    writeFileSync(compileFile, 'module SpecialSource\nlet x = 1\n', 'utf8')
+    writeFileSync(compileFile, 'namespace Special\nmodule SpecialSource\nlet x = 1\n', 'utf8')
 
     const rootPropsPath = join(scratchRoot, 'Root&<Props>\'Test".props')
     writeFileSync(rootPropsPath, '<Project />', 'utf8')
@@ -201,6 +204,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection materialization escape
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Special&amp;Signature.fsi" />
     <Compile Include="Special&amp;Source.fs" />
   </ItemGroup>
 </Project>`,
@@ -215,6 +219,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection materialization escape
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Special&amp;Signature.fsi" />
     <Compile Include="Special&amp;Source.fs" />
   </ItemGroup>
 </Project>`,
@@ -226,21 +231,26 @@ test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection materialization escape
       aggregatePath,
     })
 
-    // Planner resolves the real decoded ampersand filename
+    // Planner resolves the real decoded ampersand filenames in canonical order
+    const normalizedSignatureFile = resolve(signatureFile).replace(/\\/g, '/')
     const normalizedCompileFile = resolve(compileFile).replace(/\\/g, '/')
-    assert.deepEqual(plan.compileItems, [normalizedCompileFile])
+    assert.deepEqual(plan.compileItems, [normalizedSignatureFile, normalizedCompileFile])
     assert.ok(
-      plan.compileItems[0].endsWith('/Special&Source.fs'),
-      'planner must resolve real decoded ampersand filename',
+      plan.compileItems[0].endsWith('/Special&Signature.fsi'),
+      'planner must resolve real decoded signature filename',
+    )
+    assert.ok(
+      plan.compileItems[1].endsWith('/Special&Source.fs'),
+      'planner must resolve real decoded source filename',
     )
 
-    const materialized = materializeOwnerCompile(plan, {
+    const initialMaterialized = materializeOwnerCompile(plan, {
       scratchRoot,
       rootPropsPath,
     })
 
-    const generatedXml = readFileSync(materialized.projectPath, 'utf8')
-    const scratchProps = readFileSync(join(materialized.scratchDir, 'Directory.Build.props'), 'utf8')
+    const generatedXml = readFileSync(initialMaterialized.projectPath, 'utf8')
+    const scratchProps = readFileSync(join(initialMaterialized.scratchDir, 'Directory.Build.props'), 'utf8')
 
     // Materialized project strips WanxiangshuEmitProject identity
     assert.match(readFileSync(aggregatePath, 'utf8'), /<WanxiangshuEmitProject>true<\/WanxiangshuEmitProject>/)
@@ -250,20 +260,38 @@ test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection materialization escape
       'materialized project must strip WanxiangshuEmitProject emitter identity',
     )
 
-    // Compile Include attribute escaping proof
+    // Compile Include attribute escaping proof for signature and implementation
+    const expectedSigAttr = normalizedSignatureFile
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;')
     const expectedCompileAttr = normalizedCompileFile
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;')
+
+    assert.ok(expectedSigAttr.includes('&amp;'))
     assert.ok(expectedCompileAttr.includes('&amp;'))
-    const compileMatch = generatedXml.match(/<Compile Include="([^"]*)"\s*\/>/)
-    assert.ok(compileMatch, 'generated XML must contain Compile element with Include attribute')
-    assert.equal(compileMatch[1], expectedCompileAttr)
-    assert.doesNotMatch(compileMatch[1], /[<>'"]/)
-    assert.doesNotMatch(compileMatch[1], /&(?!(amp|lt|gt|quot|apos);)/)
-    assert.ok(!generatedXml.includes(`Include="${normalizedCompileFile}"`), 'generated XML must not contain raw unescaped Compile Include attribute')
+    assert.match(
+      generatedXml,
+      new RegExp(`<Compile Include="${expectedSigAttr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\s*/>`),
+    )
+    assert.match(
+      generatedXml,
+      new RegExp(`<Compile Include="${expectedCompileAttr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\s*/>`),
+    )
+    assert.ok(
+      !generatedXml.includes(`Include="${normalizedSignatureFile}"`),
+      'generated XML must not contain raw unescaped signature Include attribute',
+    )
+    assert.ok(
+      !generatedXml.includes(`Include="${normalizedCompileFile}"`),
+      'generated XML must not contain raw unescaped Compile Include attribute',
+    )
 
     // Root props Import attribute escaping proof
     const normalizedRootPropsPath = resolve(rootPropsPath).replace(/\\/g, '/')
@@ -280,6 +308,106 @@ test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection materialization escape
     assert.doesNotMatch(propsMatch[1], /[<>'"]/)
     assert.doesNotMatch(propsMatch[1], /&(?!(amp|lt|gt|quot|apos);)/)
     assert.ok(!scratchProps.includes(`Project="${normalizedRootPropsPath}"`), 'Directory.Build.props must not contain raw unescaped Import Project attribute')
+
+    // 1. Invalidation proof: mutating signature file bytes invalidates fingerprint and isolates scratch/output
+    writeFileSync(signatureFile, 'namespace Special\nmodule SpecialSource\nval x : int\nval y : string\n', 'utf8')
+    const materializedAfterSigChange = materializeOwnerCompile(plan, {
+      scratchRoot,
+      rootPropsPath,
+    })
+    assert.notEqual(
+      materializedAfterSigChange.fingerprint,
+      initialMaterialized.fingerprint,
+      'signature source byte change must invalidate fingerprint',
+    )
+    assert.notEqual(
+      materializedAfterSigChange.scratchDir,
+      initialMaterialized.scratchDir,
+      'signature source byte change must isolate scratch directory',
+    )
+    assert.notEqual(
+      materializedAfterSigChange.projectPath,
+      initialMaterialized.projectPath,
+      'signature source byte change must isolate project path',
+    )
+    assert.notEqual(
+      materializedAfterSigChange.outputPath,
+      initialMaterialized.outputPath,
+      'signature source byte change must isolate output path',
+    )
+    assert.notEqual(
+      materializedAfterSigChange.assetsPath,
+      initialMaterialized.assetsPath,
+      'signature source byte change must isolate assets path',
+    )
+
+    // 2. Invalidation proof: mutating implementation source file bytes invalidates fingerprint and isolates scratch/output
+    writeFileSync(compileFile, 'namespace Special\nmodule SpecialSource\nlet x = 2\nlet y = "hello"\n', 'utf8')
+    const materializedAfterSrcChange = materializeOwnerCompile(plan, {
+      scratchRoot,
+      rootPropsPath,
+    })
+    assert.notEqual(
+      materializedAfterSrcChange.fingerprint,
+      materializedAfterSigChange.fingerprint,
+      'implementation source byte change must invalidate fingerprint',
+    )
+    assert.notEqual(
+      materializedAfterSrcChange.fingerprint,
+      initialMaterialized.fingerprint,
+      'implementation source byte change must invalidate initial fingerprint',
+    )
+    assert.notEqual(
+      materializedAfterSrcChange.scratchDir,
+      materializedAfterSigChange.scratchDir,
+      'implementation source byte change must isolate scratch directory',
+    )
+    assert.notEqual(
+      materializedAfterSrcChange.projectPath,
+      materializedAfterSigChange.projectPath,
+      'implementation source byte change must isolate project path',
+    )
+    assert.notEqual(
+      materializedAfterSrcChange.outputPath,
+      materializedAfterSigChange.outputPath,
+      'implementation source byte change must isolate output path',
+    )
+    assert.notEqual(
+      materializedAfterSrcChange.assetsPath,
+      materializedAfterSigChange.assetsPath,
+      'implementation source byte change must isolate assets path',
+    )
+
+    // 3. Cache stability proof: unchanged inputs with same plan must produce identical fingerprint and reuse scratch/output
+    const materializedStable = materializeOwnerCompile(plan, {
+      scratchRoot,
+      rootPropsPath,
+    })
+    assert.equal(
+      materializedStable.fingerprint,
+      materializedAfterSrcChange.fingerprint,
+      'unchanged inputs must preserve deterministic fingerprint',
+    )
+    assert.equal(
+      materializedStable.scratchDir,
+      materializedAfterSrcChange.scratchDir,
+      'unchanged inputs must reuse scratch directory',
+    )
+    assert.equal(
+      materializedStable.projectPath,
+      materializedAfterSrcChange.projectPath,
+      'unchanged inputs must reuse project path',
+    )
+    assert.equal(
+      materializedStable.outputPath,
+      materializedAfterSrcChange.outputPath,
+      'unchanged inputs must reuse output path',
+    )
+    assert.equal(
+      materializedStable.assetsPath,
+      materializedAfterSrcChange.assetsPath,
+      'unchanged inputs must reuse assets path',
+    )
 
     // Fail-closed unknown-entity assertion
     const unknownEntityPath = join(scratchRoot, 'UnknownEntity.fsproj')

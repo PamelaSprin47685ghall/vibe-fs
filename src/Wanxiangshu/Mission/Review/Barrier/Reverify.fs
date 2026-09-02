@@ -2,7 +2,6 @@ namespace Wanxiangshu.Mission.Review.Barrier
 
 open System.Threading.Tasks
 open Fable.Core.JsInterop
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Review

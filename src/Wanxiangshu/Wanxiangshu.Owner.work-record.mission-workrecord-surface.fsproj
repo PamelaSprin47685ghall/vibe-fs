@@ -12,6 +12,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-capture.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.work-record.mission-workrecord-model.fsproj"/>
+    <Compile Include="Mission/WorkRecord/Surface.fsi"/>
     <Compile Include="Mission/WorkRecord/Surface.fs"/>
   </ItemGroup>
 </Project>

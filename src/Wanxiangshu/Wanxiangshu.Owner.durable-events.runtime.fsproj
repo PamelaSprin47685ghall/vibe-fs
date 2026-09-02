@@ -31,14 +31,23 @@
     <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
+    <Compile Include="Persistence/Journal/ObligationEnvelopeSurface.fsi"/>
     <Compile Include="Persistence/Journal/ObligationEnvelopeSurface.fs"/>
+    <Compile Include="Persistence/EventStore/Surface.fsi"/>
     <Compile Include="Persistence/EventStore/Surface.fs"/>
+    <Compile Include="Persistence/EventStore/CodecSurface.fsi"/>
     <Compile Include="Persistence/EventStore/CodecSurface.fs"/>
+    <Compile Include="Persistence/EventStore/MergeSurface.fsi"/>
     <Compile Include="Persistence/EventStore/MergeSurface.fs"/>
+    <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fsi"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fs"/>
+    <Compile Include="Persistence/Journal/RevisionSurface.fsi"/>
     <Compile Include="Persistence/Journal/RevisionSurface.fs"/>
+    <Compile Include="Persistence/Journal/CodecSurface.fsi"/>
     <Compile Include="Persistence/Journal/CodecSurface.fs"/>
+    <Compile Include="Persistence/Journal/FactCodecSurface.fsi"/>
     <Compile Include="Persistence/Journal/FactCodecSurface.fs"/>
+    <Compile Include="Persistence/Journal/ReviewJournalSurface.fsi"/>
     <Compile Include="Persistence/Journal/ReviewJournalSurface.fs"/>
   </ItemGroup>
 </Project>

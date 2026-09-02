@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process'
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(MODULE_DIR, '../..')
 
-export const SCHEMA_VERSION = 'owner-compile-v1'
+export const SCHEMA_VERSION = 'owner-compile-v2'
 export const DEFAULT_AGGREGATE_PATH = path.resolve(REPO_ROOT, 'src/Wanxiangshu/Wanxiangshu.fsproj')
 export const DEFAULT_SCRATCH_ROOT = path.resolve(REPO_ROOT, '.fable-build/owner-compile')
 export const DEFAULT_ROOT_PROPS_PATH = path.resolve(REPO_ROOT, 'Directory.Build.props')
@@ -335,28 +335,6 @@ export function planOwnerCompile({ projectPath, aggregatePath = DEFAULT_AGGREGAT
 
   const sortedProjectPaths = [...closureProjects.keys()].sort()
 
-  // Validate each closure project's own ordered Compile sequence is a subsequence of the filtered aggregate sequence
-  const aggregateIndexMap = new Map()
-  for (let i = 0; i < orderedCompileItems.length; i++) {
-    aggregateIndexMap.set(orderedCompileItems[i], i)
-  }
-
-  for (const projectPath of sortedProjectPaths) {
-    const project = closureProjects.get(projectPath)
-    const items = project.compileItems
-    for (let i = 0; i < items.length - 1; i++) {
-      const prevSrc = items[i]
-      const nextSrc = items[i + 1]
-      const prevIdx = aggregateIndexMap.get(prevSrc)
-      const nextIdx = aggregateIndexMap.get(nextSrc)
-      if (prevIdx > nextIdx) {
-        throw new Error(
-          `Compile order mismatch in ${project.path}: "${prevSrc}" appears before "${nextSrc}" in project, but appears after it in aggregate order (aggregate indices: ${prevIdx} vs ${nextIdx})`
-        )
-      }
-    }
-  }
-
   const projectContents = new Map()
   for (const [p, parsed] of closureProjects.entries()) {
     projectContents.set(p, parsed.rawText)
@@ -424,7 +402,7 @@ function generateFlatProjectXml(aggregateContent, aggregatePath, orderedCompileI
  * Materializes the flat owner project into a fingerprint-isolated scratch directory.
  *
  * Fingerprint binds: runner schema, candidate path, all closure project paths+contents,
- * aggregate contents, and root props.
+ * aggregate contents, root props, and exact ordered compile item bytes.
  */
 export function materializeOwnerCompile(plan, {
   scratchRoot = DEFAULT_SCRATCH_ROOT,
@@ -459,7 +437,13 @@ export function materializeOwnerCompile(plan, {
   }
 
   for (const item of plan.compileItems) {
+    if (!fs.existsSync(item)) {
+      throw new Error(`Compile source file does not exist: ${item}`)
+    }
     hasher.update(`compileItem:${item}\n`)
+    const fileBytes = fs.readFileSync(item)
+    hasher.update(fileBytes)
+    hasher.update('\n')
   }
 
   const fingerprint = hasher.digest('hex')

@@ -1,12 +1,9 @@
 namespace Wanxiangshu.Mission.Review.Barrier
 
-open Wanxiangshu.Composition.Durable
-
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Review
 open Wanxiangshu.Persistence.Journal
 
 /// REVIEW-003: the single writer of `ReviewBarrierStarted`.

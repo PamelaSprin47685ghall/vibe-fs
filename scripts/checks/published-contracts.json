@@ -87,6 +87,16 @@
       "justification": "Signed JS-native facade over restart-safe tip delivery projection; boxing/parsing helpers remain private and it adds no semantic authority."
     },
     {
+      "path": "src/Wanxiangshu/Enforcer/Guidance/Tip.fs",
+      "owner": "guidance-delivery",
+      "justification": "Signed pure Main tip guidance resolution over durable journal and session association; it owns no Host resource or runtime authority beyond the published EnforcerTipGuidance contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Guidance/TipSurface.fs",
+      "owner": "guidance-delivery",
+      "justification": "Signed JS-native facade over Main tip guidance delivery; journal handle boxing and fact translation helpers remain private and it adds no semantic authority."
+    },
+    {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
       "owner": "provider-attempt-recovery",
       "justification": "Signed owner-local routing constructors from fallback durable facts into the canonical AgentFact union; they add no independent recovery authority."
@@ -852,6 +862,111 @@
       "path": "src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs",
       "owner": "dispatch-protocol",
       "justification": "Direct-CE family recovery workflow that composes prompt-claim recovery, blogger crash recovery, handle and job family queries through injected ports; it carries no independent runtime authority or physical effect."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/WorkRecord/Surface.fs",
+      "owner": "work-record",
+      "justification": "Signed JS-native WorkRecord surface over durable XTrace capture, blogger observation, and lifecycle projection; dynamic object decoding and trace internals remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed pure canonical envelope/fold helpers for MagicTodo and ManagerLifecycle facts; no journal handle or runtime effect is exposed."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/Surface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native process-local EventStore surface over an opaque EventStore handle; canonical store ref and append/read/head operations are exposed."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/CodecSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native canonical EventEnvelope codec surface; normalization and identity comparison helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/MergeSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native k-way EventEnvelope merge surface; writer name tie-breaking and causal ordering helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/WorkspaceEventStoreSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed workspace journal handle and host acquisition surface; runtime path and EventStore boot mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/RevisionSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native journal revision subscription surface; the journal capability and envelope internals remain opaque."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/CodecSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native journal envelope/EventEnvelope codec surface; F# unions and Fable collections do not cross the boundary."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/FactCodecSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native fact compatibility decode surface; canonical encode/decode and legacy detection helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/ReviewJournalSurface.fs",
+      "owner": "durable-events",
+      "justification": "Signed JS-native review journal append/projection surface; review facts and session views cross as plain family/case/payload values."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fs",
+      "owner": "semantic-trace",
+      "justification": "Signed JS-native semantic-trace proof surface over the canonical XTrace projection/capture contracts; typed projection representation and cursor mechanics remain signature-hidden from foreign owners."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoSemanticSurface.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed JS-native semantic projection for MagicTodo admission and obligation state; F# domain representation and decoding helpers remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed Host-facing MagicTodo facade over the canonical Host codec and durable locality; raw host objects and internal parsing mechanics remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed durable localization support for one MagicTodo Host callback; journal projection and identity plumbing remain owner-local implementation detail."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocalitySurface.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed JS-native projection over MagicTodo locality results; typed locality state and durable implementation remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed obligation ledger workflow over the canonical durable projection and mission lifecycle facts; no foreign runtime authority is introduced."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembraneSurface.fs",
+      "owner": "obligation-ledger",
+      "justification": "Signed JS-native facade over the canonical MagicTodo membrane; host boxing and response projection remain boundary mechanics only."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
+      "owner": "provider-attempt-recovery",
+      "justification": "Signed JS-native fallback cursor projection over the canonical attempt cursor and recovery-slot algebra; typed cursor representation remains signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/OpenCode/HostGuard.fs",
+      "owner": "review-assurance",
+      "justification": "Signed Host review guard support over the canonical barrier, dispatch and durable journal contracts; filesystem and Host boundary mechanics remain owner-local implementation detail."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Assurance/Surface.fs",
+      "owner": "review-assurance",
+      "justification": "Signed JS-native review assurance projection over canonical review, barrier and judgement contracts; Fable object conversion remains signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/OpenCode/ReviewHostSurface.fs",
+      "owner": "review-assurance",
+      "justification": "Signed Host-facing review assurance facade over the canonical review barrier workflow; transport boxing and journal capability mechanics remain signature-hidden."
     }
   ],
   "compiler_boundary_localities": [
@@ -1084,6 +1199,11 @@
       "owner": "guidance-delivery",
       "locality": "opencode-host-pairprogramming-guidelineprojection",
       "justification": "Pair-programming guideline and tip-delivery projections are signed guidance contracts over graduated identity and grounding vocabularies; JS-native surfaces are explicit signed support."
+    },
+    {
+      "owner": "guidance-delivery",
+      "locality": "enforcer-guidance-tip",
+      "justification": "Main tip guidance resolution, pair-programming thought transform and JS-native tip delivery surface form a fully signed guidance-delivery locality over graduated behavior-diagnosis, session-ontology, requirement-grounding and host-boundary contracts; durable journal helpers and internal wire parsers remain signature-hidden."
     },
     {
       "owner": "provider-attempt-recovery",
@@ -1379,6 +1499,41 @@
       "owner": "durable-events",
       "locality": "persistence-eventstore-surface",
       "justification": "EventStore and journal surfaces expose the durable-events canonical spine to Host, journal and strength consumers: workspace EventStore acquisition, journal boot/dispose, MagicTodo obligation journal operations, and the Strength durability bridge over an opaque EventStore handle; implementation helpers remain signature-hidden."
+    },
+    {
+      "owner": "work-record",
+      "locality": "mission-workrecord-surface",
+      "justification": "JS-native WorkRecord capture and projection surface over graduated semantic trace, durable journal, identity, provider-projection, and work-record model contracts; dynamic decoding and cursor internals remain signature-hidden."
+    },
+    {
+      "owner": "semantic-trace",
+      "locality": "context-trace-semantictracesurface",
+      "justification": "SemanticTrace JS proof surface is fully signed over graduated trace capture/model/cursor and durable journal contracts; projection representation, Fable interop and cursor implementation details remain signature-hidden."
+    },
+    {
+      "owner": "durable-events",
+      "locality": "durable-runtime-surface",
+      "justification": "durable-events runtime surface: EventStore, journal codec, review, obligation and workspace journal JS-native surfaces form a fully signed locality over graduated event-store, journal, projection, identity and Host contracts; dynamic decoding and Fable interop helpers remain signature-hidden."
+    },
+    {
+      "owner": "managed-chat-execution",
+      "locality": "opencode-host-chatadmission-transaction",
+      "justification": "Managed chat admission transaction, host model projection, capacity lease lifecycle and post-admission recovery host form a fully signed contract locality over graduated chat execution, authority, model-routing and failure-policy boundaries; private step/lease helpers remain signature-hidden."
+    },
+    {
+      "owner": "obligation-ledger",
+      "locality": "mission-obligation-todo-magictodosemanticsurface",
+      "justification": "MagicTodo semantic/Host surfaces, durable locality, ledger workflow and membrane form one fully signed obligation-ledger locality over graduated identity, durable projection, mission lifecycle, prefix, provider and semantic-trace contracts; raw Host decoding and locality internals remain signature-hidden."
+    },
+    {
+      "owner": "provider-attempt-recovery",
+      "locality": "participant-provider-attempt-fallback-ledger",
+      "justification": "Fallback ledger/workflow and cursor surface form one fully signed provider-attempt-recovery locality over graduated context, durable journal, execution-failure, session, authority, provider-language and attempt contracts; obsolete monolith imports were removed and cursor/runtime internals remain signature-hidden."
+    },
+    {
+      "owner": "review-assurance",
+      "locality": "mission-review-barrier-workflow",
+      "justification": "Review barrier workflow, judgement inbox, Host guard, reverify path and assurance/Host surfaces form one fully signed review-assurance locality over graduated change, dispatch, durable journal, authority, provider and review contracts; filesystem, Host object and projection mechanics remain signature-hidden."
     }
   ],
   "contracts": [
@@ -6056,7 +6211,7 @@
       "symbols": [
         "Wanxiangshu.Participant.Persona.PersonaCatalog.persona"
       ],
-      "justification": "Delegation consumes only the canonical Role \u00d7 AgentTier to Persona decision; Persona rendering and parsing remain identity-owner boundary mechanics."
+      "justification": "Delegation consumes only the canonical Role × AgentTier to Persona decision; Persona rendering and parsing remain identity-owner boundary mechanics."
     },
     {
       "path": "src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs",

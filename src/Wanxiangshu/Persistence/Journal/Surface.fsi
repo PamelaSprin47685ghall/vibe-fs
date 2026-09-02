@@ -14,7 +14,10 @@ type JournalHandle =
 module JournalSurface =
     val mapAppendFailure: value: obj -> obj
     val acquireSharedForWorkspace: workspace: string -> processId: int -> startedAt: string -> Task<obj>
-    val bootWithWriterId: commonDir: string -> writerId: string -> runtimeId: string -> processId: int -> startedAt: string -> Task<obj>
+
+    val bootWithWriterId:
+        commonDir: string -> writerId: string -> runtimeId: string -> processId: int -> startedAt: string -> Task<obj>
+
     val boot: commonDir: string -> runtimeId: string -> processId: int -> startedAt: string -> Task<obj>
     val dispose: handle: JournalHandle -> unit
     val runtimeId: handle: JournalHandle -> string
