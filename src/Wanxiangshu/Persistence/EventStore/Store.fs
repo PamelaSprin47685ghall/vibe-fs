@@ -4,20 +4,6 @@ open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation.Identity
 
-/// Application-facing local EventStore port.
-/// DURABLE-EVENTS-004/005/013/017/019: local append is one complete NDJSON-line
-/// append to the process writer file followed by commit of the already-validated
-/// canonical Integrator transition. Git transport/object identity is absent here.
-type IEventStore =
-    abstract Append: events: EventEnvelope list -> Task<Result<AppendReceipt, AppendError>>
-    abstract WritePayload: content: byte[] -> Task<Result<PayloadRef, string>>
-    abstract ReadPayload: payloadRef: PayloadRef -> Task<Result<byte[] option, string>>
-    abstract TryCurrent: key: string -> obj option
-    abstract TryEvent: eventId: EventId -> EventEnvelope option
-    abstract TryHeads: streamId: EventStreamId -> EventId list
-    abstract TryHead: streamId: EventStreamId -> EventId option
-    abstract AllHeads: unit -> EventId list
-
 [<RequireQualifiedAccess>]
 module EventStore =
 

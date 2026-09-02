@@ -12,7 +12,7 @@ open Wanxiangshu.OpenCode
 
 module internal SyncDelegateWorkflow =
     type Dependencies =
-        { Attached: AttachedSessionRuntime
+        { Attached: IAttachedSessionPort
           ResolveOwnerTier: SessionId -> AgentTier option
           ObserveChild:
               SessionId -> ReuseScopeId -> SyncDelegateRole -> string -> Task<Result<AttachedChildObservation, string>>
@@ -31,6 +31,7 @@ module internal SyncDelegateWorkflow =
           ReplaceToolEstimate: SessionId -> int option -> Task<unit>
           SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<PreparedDelegationHandoff, string>>
           CheckpointCompletedHandoff: SessionId -> PreparedDelegationHandoff -> Task<Result<unit, string>>
+          TripFatal: string -> string -> unit
           ResolveBoundAgent: SessionId -> string option
           DescribeWait: SyncDelegateWait -> DiagnosticWait
           SubscribeFutureTerminal: SessionId -> TerminalCompletionListener -> IDisposable }

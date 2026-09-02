@@ -12,17 +12,17 @@ module QuiescenceSurface =
 
     let create () : SessionQuiescenceGate = SessionQuiescenceGate()
 
-    let beginAttempt (gate: SessionQuiescenceGate) (sessionId: string) : unit =
+    let beginAttempt (gate: ISessionQuiescenceGate) (sessionId: string) : unit =
         gate.BeginProviderAttempt(SessionId.create sessionId)
 
     let observePhysicalMessage
-        (gate: SessionQuiescenceGate)
+        (gate: ISessionQuiescenceGate)
         (sessionId: string)
         (physicalUserMessageId: string)
         : unit =
         gate.ObservePhysicalUserMessage(SessionId.create sessionId, PhysicalUserMessageId.create physicalUserMessageId)
 
-    let observeIdle (gate: SessionQuiescenceGate) (sessionId: string) : QuiescencePermit =
+    let observeIdle (gate: ISessionQuiescenceGate) (sessionId: string) : QuiescencePermit =
         gate.ObserveIdle(SessionId.create sessionId)
 
     let private failureName =
@@ -44,14 +44,16 @@ module QuiescenceSurface =
                 {| accepted = false
                    failure = failureName failure |}
 
-    let tryConsume (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : obj = gate.TryConsume permit |> resultView
+    let tryConsume (gate: ISessionQuiescenceGate) (permit: QuiescencePermit) : obj =
+        gate.TryConsume permit |> resultView
 
-    let tryRelease (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : obj = gate.TryRelease permit |> resultView
+    let tryRelease (gate: ISessionQuiescenceGate) (permit: QuiescencePermit) : obj =
+        gate.TryRelease permit |> resultView
 
     let livePermitCount (gate: SessionQuiescenceGate) : int = gate.LivePermitCount
 
-    let revoke (gate: SessionQuiescenceGate) (sessionId: string) : unit =
+    let revoke (gate: ISessionQuiescenceGate) (sessionId: string) : unit =
         gate.RevokeCurrentAttempt(SessionId.create sessionId)
 
-    let dropSession (gate: SessionQuiescenceGate) (sessionId: string) : unit =
+    let dropSession (gate: ISessionQuiescenceGate) (sessionId: string) : unit =
         gate.DropSession(SessionId.create sessionId)

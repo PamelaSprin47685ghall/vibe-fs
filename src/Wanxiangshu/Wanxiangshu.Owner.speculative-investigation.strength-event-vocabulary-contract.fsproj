@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>speculative-investigation</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>strength-event-vocabulary-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Strength/EventVocabulary.fsi"/>
+    <Compile Include="Strength/EventVocabulary.fs"/>
+  </ItemGroup>
+</Project>

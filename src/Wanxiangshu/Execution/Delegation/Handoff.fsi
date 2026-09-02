@@ -7,6 +7,10 @@ open Wanxiangshu.Foundation.Identity
 
 type DelegationHandoffWindow = { Range: XTraceRange; IsInitial: bool }
 
+type DelegationWorkRecordCapability =
+    { ParentWorkRecord: SessionId -> Task<string option>
+      ParentWorkRecordBounded: SessionId -> XTraceRange -> Task<string option> }
+
 type PreparedDelegationHandoff =
     { Route: DelegationHandoffRoute
       ParentStartInclusive: XTraceCursor

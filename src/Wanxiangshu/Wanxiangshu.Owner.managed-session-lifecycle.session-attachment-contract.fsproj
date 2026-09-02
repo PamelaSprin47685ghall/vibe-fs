@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>managed-session-lifecycle</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>session-attachment-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <Compile Include="Execution/Session/Attachment/ReuseScope.fsi"/>
+    <Compile Include="Execution/Session/Attachment/ReuseScope.fs"/>
+  </ItemGroup>
+</Project>

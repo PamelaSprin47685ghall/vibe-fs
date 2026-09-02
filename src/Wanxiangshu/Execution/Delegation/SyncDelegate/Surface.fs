@@ -556,17 +556,24 @@ module SyncDelegateSurface =
                     range
                     providerRun
 
+            let workRecordCapability: DelegationWorkRecordCapability =
+                { ParentWorkRecord =
+                    fun sessionId -> LifecycleWorkRecordProjection.lifecycleWorkRecord (Some journal) sessionId true
+                  ParentWorkRecordBounded =
+                    fun sessionId range ->
+                        LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) sessionId range }
+
             let runtime =
                 new SyncDelegateRuntime(
                     sessions,
                     dispatcher,
                     journal,
-                    attached,
+                    (attached :> IAttachedSessionPort),
                     (fun _ -> Some AgentTier.Fast),
                     (fun _ _ -> ()),
                     gate,
                     workRecordFor,
-                    DelegationHandoffLedger.port journal,
+                    DelegationHandoffLedger.port workRecordCapability journal,
                     workspaceDirectory = directory
                 )
 

@@ -402,7 +402,7 @@ module HostSessionNudge =
     /// HOST-004 + GLORY-029: idle-derived Manager encouragement with exact-terminal
     /// idempotency and no cross-terminal count limit.
     let private sendIdleManagerWithProfile
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
@@ -437,7 +437,7 @@ module HostSessionNudge =
             |> TaskValue.map (gateIdleOutcome (fun () -> quiescence.TryRelease permit))
 
     let trySendIdleManagerEncouragement
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
@@ -547,7 +547,7 @@ module HostSessionNudge =
     /// terminal is suppressed. A fresh terminal remains eligible while the gate
     /// owner still says the condition is unsatisfied.
     let trySendIdleGateContinuation
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
@@ -576,7 +576,7 @@ module HostSessionNudge =
     /// budget: duplicate delivery of one terminal is idempotent, while every
     /// fresh terminal may remind again until the gate is satisfied.
     let trySendIdleGateRepair
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
@@ -603,7 +603,7 @@ module HostSessionNudge =
     /// occasion identity distinguishes same-terminal re-entry from a new bad
     /// terminal without leaking repair budget across Blogger requests.
     let private sendIdleInteractionRepairWithProfile
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
@@ -638,7 +638,7 @@ module HostSessionNudge =
             |> TaskValue.map (gateIdleOutcome (fun () -> quiescence.TryRelease permit))
 
     let trySendIdleInteractionRepair
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)

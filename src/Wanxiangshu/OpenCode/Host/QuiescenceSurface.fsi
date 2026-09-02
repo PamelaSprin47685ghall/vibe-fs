@@ -4,14 +4,14 @@ open Wanxiangshu.Foundation
 
 module QuiescenceSurface =
     val create: unit -> SessionQuiescenceGate
-    val beginAttempt: gate: SessionQuiescenceGate -> sessionId: string -> unit
+    val beginAttempt: gate: ISessionQuiescenceGate -> sessionId: string -> unit
 
     val observePhysicalMessage:
-        gate: SessionQuiescenceGate -> sessionId: string -> physicalUserMessageId: string -> unit
+        gate: ISessionQuiescenceGate -> sessionId: string -> physicalUserMessageId: string -> unit
 
-    val observeIdle: gate: SessionQuiescenceGate -> sessionId: string -> QuiescencePermit
-    val tryConsume: gate: SessionQuiescenceGate -> permit: QuiescencePermit -> obj
-    val tryRelease: gate: SessionQuiescenceGate -> permit: QuiescencePermit -> obj
+    val observeIdle: gate: ISessionQuiescenceGate -> sessionId: string -> QuiescencePermit
+    val tryConsume: gate: ISessionQuiescenceGate -> permit: QuiescencePermit -> obj
+    val tryRelease: gate: ISessionQuiescenceGate -> permit: QuiescencePermit -> obj
     val livePermitCount: gate: SessionQuiescenceGate -> int
-    val revoke: gate: SessionQuiescenceGate -> sessionId: string -> unit
-    val dropSession: gate: SessionQuiescenceGate -> sessionId: string -> unit
+    val revoke: gate: ISessionQuiescenceGate -> sessionId: string -> unit
+    val dropSession: gate: ISessionQuiescenceGate -> sessionId: string -> unit

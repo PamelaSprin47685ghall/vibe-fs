@@ -27,7 +27,7 @@ module ManagerIdle =
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         nudgeSent: HashSet<string> ->
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
         life: LifeProjection ->
             Task

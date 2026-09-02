@@ -2,7 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>managed-chat-execution</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>managed-chat-runtime-surface</WanxiangshuOwnerLocality>
-    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptsurface.fsproj"/>

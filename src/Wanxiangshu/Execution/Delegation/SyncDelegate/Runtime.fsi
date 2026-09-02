@@ -20,10 +20,10 @@ type SyncDelegateRuntime =
         sessions: ISessionHostPort *
         dispatcher: PromptDispatcher.Runtime *
         journal: AgentJournal *
-        attached: AttachedSessionRuntime *
+        attached: IAttachedSessionPort *
         resolveOwnerTier: (SessionId -> AgentTier option) *
         onDelegateReady: (SessionId -> string -> unit) *
-        quiescence: SessionQuiescenceGate *
+        quiescence: ISessionQuiescenceGate *
         workRecordFor: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
         handoff: ReusableHandoffPort *
         ?workspaceDirectory: string *
@@ -32,7 +32,7 @@ type SyncDelegateRuntime =
         ?onInspectorCleanup: (string -> unit) ->
             SyncDelegateRuntime
 
-    member Attached: AttachedSessionRuntime
+    member Attached: IAttachedSessionPort
 
     member ObserveProviderToolCall:
         ownerSessionId: SessionId * providerRun: ProviderRunIdentity * role: SyncDelegateRole * callId: ToolCallId ->

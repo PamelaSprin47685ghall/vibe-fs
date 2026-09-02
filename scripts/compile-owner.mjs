@@ -26,6 +26,7 @@ Options:
   --output, -o <path>    Output directory for compiled artifacts
   --plan-only            Only compute and print compilation plan as JSON
   --materialize-only     Only materialize scratch project and print metadata as JSON
+  --watch                Keep one Fable process watching the materialized flat project
   --help, -h             Show this help message
 `)
 }
@@ -38,6 +39,7 @@ function parseArgs(args) {
   let outputDir = null
   let planOnly = false
   let materializeOnly = false
+  let watch = false
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]
@@ -48,6 +50,8 @@ function parseArgs(args) {
       planOnly = true
     } else if (arg === '--materialize-only') {
       materializeOnly = true
+    } else if (arg === '--watch') {
+      watch = true
     } else if (arg === '--aggregate' || arg.startsWith('--aggregate=')) {
       let val
       if (arg.startsWith('--aggregate=')) {
@@ -136,6 +140,7 @@ function parseArgs(args) {
     outputDir,
     planOnly,
     materializeOnly,
+    watch,
   }
 }
 
@@ -188,6 +193,7 @@ async function main() {
       scratchRoot: options.scratchRoot,
       rootPropsPath: options.rootPropsPath,
       outputDir: options.outputDir,
+      watch: options.watch,
     })
 
     if (!result.ok) {

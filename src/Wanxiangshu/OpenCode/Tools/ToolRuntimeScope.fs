@@ -65,7 +65,13 @@ type ToolRuntimeScope
     let childRecordForRun sessionId range providerRun =
         LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun journal sessionId range providerRun
 
-    let reusableHandoff = journal |> Option.map DelegationHandoffLedger.port
+    let workRecordCapability: DelegationWorkRecordCapability =
+        { ParentWorkRecord = fun sessionId -> LifecycleWorkRecordProjection.lifecycleWorkRecord journal sessionId true
+          ParentWorkRecordBounded =
+            fun sessionId range -> LifecycleWorkRecordProjection.lifecycleWorkRecordBounded journal sessionId range }
+
+    let reusableHandoff =
+        journal |> Option.map (DelegationHandoffLedger.port workRecordCapability)
 
     let terminalPort = eventPort
     let finalityTimeoutMs = finalityReviewerTimeoutMs

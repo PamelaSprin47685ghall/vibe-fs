@@ -2,6 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>obligation-ledger</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-obligation-todo-model</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>

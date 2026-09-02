@@ -55,6 +55,7 @@
 /src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnostics.fs
 /src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnosticsSurface.fs
 /src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs
+/src/Wanxiangshu/OpenCode/Host/SessionSnapshot.fs
 /src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs
 /src/Wanxiangshu/OpenCode/Host/SessionSnapshotSurface.fs
 /src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs

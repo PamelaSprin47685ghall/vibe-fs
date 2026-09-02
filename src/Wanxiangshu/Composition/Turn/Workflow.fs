@@ -37,7 +37,7 @@ module TurnWorkflow =
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
         (abortCause: AbortCause)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         : Task =
         task {

@@ -2,6 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>distribution</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>assemblyinfo</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fsi"/>

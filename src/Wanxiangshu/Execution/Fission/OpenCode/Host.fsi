@@ -60,7 +60,7 @@ module FissionHost =
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         joinGuardNudges: HashSet<string> ->
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         permit: QuiescencePermit option ->
         abortCause: AbortCause ->
         turn: ReconciledTurn ->

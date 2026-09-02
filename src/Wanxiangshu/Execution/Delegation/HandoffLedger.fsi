@@ -7,9 +7,13 @@ open Wanxiangshu.Persistence.Journal
 [<RequireQualifiedAccess>]
 module DelegationHandoffLedger =
     val prepare:
-        journal: AgentJournal -> parent: SessionId -> route: DelegationHandoffRoute -> Task<PreparedDelegationHandoff>
+        workRecord: DelegationWorkRecordCapability ->
+        journal: AgentJournal ->
+        parent: SessionId ->
+        route: DelegationHandoffRoute ->
+            Task<PreparedDelegationHandoff>
 
     val checkpointCompleted:
         journal: AgentJournal -> parent: SessionId -> handoff: PreparedDelegationHandoff -> Task<Result<unit, string>>
 
-    val port: journal: AgentJournal -> ReusableHandoffPort
+    val port: workRecord: DelegationWorkRecordCapability -> journal: AgentJournal -> ReusableHandoffPort

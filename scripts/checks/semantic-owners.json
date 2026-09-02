@@ -1709,6 +1709,10 @@
       "owner": "capability-enforcement"
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/Message.fs",
+      "owner": "host-boundary"
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Host/MessageVisibility.fs",
       "owner": "participant-horizon"
     },
@@ -1742,6 +1746,10 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/ModelRoutingSurface.fs",
+      "owner": "execution-model-routing"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/OpenCodeContract.fs",
       "owner": "execution-model-routing"
     },
     {
@@ -1869,6 +1877,18 @@
       "owner": "managed-chat-execution"
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/SessionContract.fs",
+      "owner": "host-boundary"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/SessionHostPort.fs",
+      "owner": "host-boundary"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/SessionSnapshot.fs",
+      "owner": "host-boundary"
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs",
       "owner": "host-boundary"
     },
@@ -1974,6 +1994,10 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs",
+      "owner": "host-boundary"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Signals/EventContract.fs",
       "owner": "host-boundary"
     },
     {
@@ -2237,6 +2261,10 @@
       "owner": "durable-events"
     },
     {
+      "path": "src/Wanxiangshu/Persistence/EventStore/GitTypes.fs",
+      "owner": "durable-events"
+    },
+    {
       "path": "src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs",
       "owner": "durable-convergence"
     },
@@ -2249,8 +2277,12 @@
       "owner": "durable-events"
     },
     {
+      "path": "src/Wanxiangshu/Persistence/EventStore/Port.fs",
+      "owner": "durable-events"
+    },
+    {
       "path": "src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs",
-      "owner": "durable-convergence"
+      "owner": "durable-events"
     },
     {
       "path": "src/Wanxiangshu/Persistence/EventStore/ProcessGitRawStore.fs",
@@ -2262,7 +2294,7 @@
     },
     {
       "path": "src/Wanxiangshu/Persistence/EventStore/Store.fs",
-      "owner": "durable-convergence"
+      "owner": "durable-events"
     },
     {
       "path": "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs",
@@ -2750,6 +2782,10 @@
     },
     {
       "path": "src/Wanxiangshu/Strength/Budget.fs",
+      "owner": "speculative-investigation"
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/EventVocabulary.fs",
       "owner": "speculative-investigation"
     },
     {

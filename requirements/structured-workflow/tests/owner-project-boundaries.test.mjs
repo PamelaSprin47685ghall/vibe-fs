@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
-import { checkOwnerProjects } from '../../../scripts/checks/owner-projects.mjs'
+import { checkOwnerProjects, projectArchitectureViolations } from '../../../scripts/checks/owner-projects.mjs'
 import { planOwnerCompile, materializeOwnerCompile, compileOwnerProject } from '../../../scripts/lib/owner-compile.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../..')
@@ -34,6 +34,41 @@ test('WHAT[STRUCTURED-WORKFLOW-011] owner-locality project graph is complete, au
   assert.equal(result.ok, true, result.violations.join('\n'))
   assert.ok(result.sourceCount > 0, 'owner-locality graph must cover production sources')
   assert.equal(result.contractLeakSourceCount, 0, 'published contract compile closure must contain no runtime/private source')
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] locality kinds enforce contract purity, direction, and closure budget', () => {
+  const contract = resolve('/architecture/Contract.fsproj')
+  const nestedContract = resolve('/architecture/NestedContract.fsproj')
+  const runtime = resolve('/architecture/Runtime.fsproj')
+  const foreignRuntime = resolve('/architecture/ForeignRuntime.fsproj')
+  const composition = resolve('/architecture/Composition.fsproj')
+  const missing = resolve('/architecture/Missing.fsproj')
+  const project = (projectPath, owner, kind, compile, references = []) => ({
+    projectPath,
+    owner,
+    kind,
+    compile,
+    references,
+  })
+
+  const violations = projectArchitectureViolations(
+    new Map([
+      [runtime, project(runtime, 'provider', 'runtime', ['Runtime.fs'])],
+      [foreignRuntime, project(foreignRuntime, 'foreign', 'runtime', ['ForeignRuntime.fs'])],
+      [nestedContract, project(nestedContract, 'provider', 'contract', ['NestedA.fs', 'NestedB.fs'], [runtime])],
+      [contract, project(contract, 'consumer', 'contract', ['Contract.fs'], [nestedContract, foreignRuntime])],
+      [composition, project(composition, 'composition', 'composition', ['Composition.fs'], [foreignRuntime])],
+      [missing, project(missing, 'missing', '', ['Missing.fs'])],
+    ]),
+    { contractSourceBudget: 2 },
+  )
+
+  assert.ok(violations.some((violation) => /Missing\.fsproj: missing WanxiangshuOwnerLocalityKind/.test(violation)))
+  assert.ok(violations.some((violation) => /Contract\.fsproj: contract closure contains non-contract .*Runtime\.fsproj/.test(violation)))
+  assert.ok(violations.some((violation) => /Contract\.fsproj: contract closure contains non-contract .*ForeignRuntime\.fsproj/.test(violation)))
+  assert.ok(violations.some((violation) => /Contract\.fsproj: contract closure has 5 production \.fs; budget is 2/.test(violation)))
+  assert.ok(violations.some((violation) => /Contract\.fsproj -> .*ForeignRuntime\.fsproj: only composition may reference foreign runtime/.test(violation)))
+  assert.ok(!violations.some((violation) => /\/Composition\.fsproj -> .*ForeignRuntime\.fsproj/.test(violation)))
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection planner produces exact closure and canonical aggregate order', () => {

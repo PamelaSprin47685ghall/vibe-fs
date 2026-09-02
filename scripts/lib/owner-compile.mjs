@@ -352,6 +352,255 @@ export function planOwnerCompile({ projectPath, aggregatePath = DEFAULT_AGGREGAT
   }
 }
 
+const FULL_IMPACT_BASENAMES = new Set([
+  'Directory.Build.props',
+  'Directory.Build.targets',
+  'package.json',
+  'package-lock.json',
+  'pnpm-lock.yaml',
+  'yarn.lock',
+])
+
+function requiresFullImpact(changedPath, aggregatePath) {
+  const basename = path.basename(changedPath)
+  return changedPath === aggregatePath
+    || path.extname(changedPath).toLowerCase() === '.fsproj'
+    || FULL_IMPACT_BASENAMES.has(basename)
+    || /(?:^|\/)\.config\/dotnet-tools\.json$/.test(changedPath)
+}
+
+function discoverOwnerProjects(projectDirectory, aggregatePath) {
+  const resolvedDirectory = norm(projectDirectory)
+  if (!fs.existsSync(resolvedDirectory) || !fs.statSync(resolvedDirectory).isDirectory()) {
+    throw new Error(`Owner project directory does not exist: ${resolvedDirectory}`)
+  }
+
+  return fs.readdirSync(resolvedDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.fsproj'))
+    .map((entry) => norm(path.join(resolvedDirectory, entry.name)))
+    .filter((projectPath) => projectPath !== aggregatePath)
+    .sort()
+}
+
+function impactPlan({
+  mode,
+  aggregate,
+  projects,
+  roots,
+  selectedProjects,
+  changedPaths,
+  reason,
+}) {
+  const selectedSources = new Set(
+    [...selectedProjects].flatMap((projectPath) => projects.get(projectPath).compileItems),
+  )
+  const compileItems = mode === 'full'
+    ? aggregate.compileItems
+    : aggregate.compileItems.filter((sourcePath) => selectedSources.has(sourcePath))
+  const projectPaths = [...selectedProjects].sort()
+
+  return {
+    mode,
+    reason,
+    changedPaths,
+    rootProjectPaths: [...roots].sort(),
+    candidatePath: aggregate.path,
+    projectPath: aggregate.path,
+    candidateBasename: 'Wanxiangshu.Impact.fsproj',
+    aggregatePath: aggregate.path,
+    projectPaths,
+    compileItems,
+    projectContents: new Map(projectPaths.map((projectPath) => [projectPath, projects.get(projectPath).rawText])),
+    aggregateContent: aggregate.rawText,
+  }
+}
+
+/**
+ * Computes one flat compile input for a set of changed files.
+ *
+ * Implementation-only .fs changes select the owning locality and its forward
+ * closure. Signature changes select every reverse consumer, then union each
+ * selected root's forward closure. Toolchain/topology changes and impact sets
+ * above fullThreshold select the aggregate input.
+ */
+export function planImpactCompile({
+  changedPaths,
+  projectDirectory,
+  aggregatePath = DEFAULT_AGGREGATE_PATH,
+  fullThreshold = 0.6,
+} = {}) {
+  if (!Array.isArray(changedPaths) || changedPaths.length === 0) {
+    throw new Error('changedPaths must contain at least one path for planImpactCompile')
+  }
+  if (!(fullThreshold > 0 && fullThreshold <= 1)) {
+    throw new Error(`fullThreshold must be within (0, 1], got ${fullThreshold}`)
+  }
+
+  const aggregate = parseAggregateProject(aggregatePath)
+  const resolvedProjectDirectory = norm(projectDirectory ?? path.dirname(aggregate.path))
+  const normalizedChanges = [...new Set(changedPaths.map((changedPath) => norm(changedPath)))].sort()
+  const projectPaths = discoverOwnerProjects(resolvedProjectDirectory, aggregate.path)
+  const projects = new Map(projectPaths.map((projectPath) => [projectPath, parseProjectFile(projectPath)]))
+  const sourceOwner = new Map()
+
+  for (const [projectPath, project] of projects) {
+    for (const sourcePath of project.compileItems) {
+      const existingOwner = sourceOwner.get(sourcePath)
+      if (existingOwner) {
+        throw new Error(
+          `Duplicate Compile item across owner projects: "${sourcePath}" is compiled by both ${existingOwner} and ${projectPath}`,
+        )
+      }
+      sourceOwner.set(sourcePath, projectPath)
+    }
+
+    for (const reference of project.references) {
+      if (!projects.has(reference)) {
+        throw new Error(`Owner project ${projectPath} references project outside owner topology: ${reference}`)
+      }
+    }
+  }
+
+  const allProjects = new Set(projectPaths)
+  if (normalizedChanges.some((changedPath) => requiresFullImpact(changedPath, aggregate.path))) {
+    return impactPlan({
+      mode: 'full',
+      aggregate,
+      projects,
+      roots: allProjects,
+      selectedProjects: allProjects,
+      changedPaths: normalizedChanges,
+      reason: 'toolchain-or-project-change',
+    })
+  }
+
+  const reverseReferences = new Map(projectPaths.map((projectPath) => [projectPath, new Set()]))
+  for (const [consumerPath, project] of projects) {
+    for (const providerPath of project.references) {
+      reverseReferences.get(providerPath).add(consumerPath)
+    }
+  }
+
+  const changedSet = new Set(normalizedChanges)
+  const roots = new Set()
+
+  const addReverseConsumers = (projectPath) => {
+    const pending = [projectPath]
+    while (pending.length > 0) {
+      const current = pending.pop()
+      if (roots.has(current)) {
+        continue
+      }
+      roots.add(current)
+      pending.push(...reverseReferences.get(current))
+    }
+  }
+
+  for (const changedPath of normalizedChanges) {
+    const ownerProject = sourceOwner.get(changedPath)
+    if (!ownerProject) {
+      if (['.fs', '.fsi'].includes(path.extname(changedPath).toLowerCase())) {
+        return impactPlan({
+          mode: 'full',
+          aggregate,
+          projects,
+          roots: allProjects,
+          selectedProjects: allProjects,
+          changedPaths: normalizedChanges,
+          reason: 'unmapped-source-change',
+        })
+      }
+      continue
+    }
+
+    const extension = path.extname(changedPath).toLowerCase()
+    const siblingSignature = extension === '.fs' ? `${changedPath.slice(0, -3)}.fsi` : null
+    const signatureChanged = extension === '.fsi'
+      || (siblingSignature !== null && changedSet.has(siblingSignature))
+      || (siblingSignature !== null && !fs.existsSync(siblingSignature))
+
+    if (signatureChanged) {
+      addReverseConsumers(ownerProject)
+    } else {
+      roots.add(ownerProject)
+    }
+  }
+
+  if (roots.size === 0) {
+    return impactPlan({
+      mode: 'none',
+      aggregate,
+      projects,
+      roots,
+      selectedProjects: new Set(),
+      changedPaths: normalizedChanges,
+      reason: 'no-production-impact',
+    })
+  }
+
+  const selectedProjects = new Set()
+  const visiting = new Set()
+
+  const addForwardClosure = (projectPath, stack) => {
+    if (visiting.has(projectPath)) {
+      const cycleStart = stack.indexOf(projectPath)
+      throw new Error(`ProjectReference cycle detected: ${[...stack.slice(cycleStart), projectPath].join(' -> ')}`)
+    }
+    if (selectedProjects.has(projectPath)) {
+      return
+    }
+
+    visiting.add(projectPath)
+    stack.push(projectPath)
+    for (const reference of projects.get(projectPath).references) {
+      addForwardClosure(reference, stack)
+    }
+    stack.pop()
+    visiting.delete(projectPath)
+    selectedProjects.add(projectPath)
+  }
+
+  for (const rootProject of roots) {
+    addForwardClosure(rootProject, [])
+  }
+
+  const aggregateSet = new Set(aggregate.compileItems)
+  for (const projectPath of selectedProjects) {
+    for (const sourcePath of projects.get(projectPath).compileItems) {
+      if (!aggregateSet.has(sourcePath)) {
+        throw new Error(`Impact compile item absent from aggregate project: "${sourcePath}" (compiled in ${projectPath})`)
+      }
+    }
+  }
+
+  const selectedProductionCount = [...selectedProjects]
+    .flatMap((projectPath) => projects.get(projectPath).compileItems)
+    .filter((sourcePath) => sourcePath.endsWith('.fs')).length
+  const aggregateProductionCount = aggregate.compileItems.filter((sourcePath) => sourcePath.endsWith('.fs')).length
+
+  if (selectedProductionCount / aggregateProductionCount > fullThreshold) {
+    return impactPlan({
+      mode: 'full',
+      aggregate,
+      projects,
+      roots,
+      selectedProjects: allProjects,
+      changedPaths: normalizedChanges,
+      reason: 'impact-exceeds-full-threshold',
+    })
+  }
+
+  return impactPlan({
+    mode: 'focused',
+    aggregate,
+    projects,
+    roots,
+    selectedProjects,
+    changedPaths: normalizedChanges,
+    reason: 'focused-impact',
+  })
+}
+
 /**
  * Atomically writes content to filePath only if content changed.
  */
@@ -600,8 +849,10 @@ export async function compileOwnerProject({
   stdio = 'inherit',
   env = process.env,
   spawn = nodeSpawn,
+  compilePlan,
+  watch = false,
 } = {}) {
-  const plan = planOwnerCompile({ projectPath, aggregatePath })
+  const plan = compilePlan ?? planOwnerCompile({ projectPath, aggregatePath })
   const materialized = materializeOwnerCompile(plan, { scratchRoot, rootPropsPath, outputDir })
 
   // Check if success marker is valid for the computed fingerprint and output contains JS
@@ -637,6 +888,10 @@ export async function compileOwnerProject({
 
   if (hasAssets) {
     args.push('--noRestore')
+  }
+
+  if (watch) {
+    args.push('--watch')
   }
 
   const startTime = Date.now()

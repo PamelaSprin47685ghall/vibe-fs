@@ -12,8 +12,8 @@
 
 ### 2. 快照投影与身份因果解析
 
-- **SessionSnapshotPort**：提供一致的消息结构投影，维护工具调用与执行结果的状态对齐。
-- **严格定位证明**：`SessionSnapshotSurface.locateToolCall` 直接调用 `SessionSnapshotPort.locateToolCall`。`session-snapshot-locality.test.mjs` 同时固定唯一目标 + 非目标 decoy、目标缺失、目标多解三个世界；只允许唯一目标返回运行上下文，后两者分别返回 typed `Missing` / `Ambiguous`，禁止 first-match 猜测。
+- **SessionSnapshotPort**：把 SDK/HTTP wire 投影为 `SessionSnapshot` 契约词汇，不拥有定位规则。
+- **严格定位证明**：`SessionSnapshotSurface.locateToolCall` 直接调用纯 `SessionSnapshot.locateToolCall`。`session-snapshot-locality.test.mjs` 同时固定唯一目标 + 非目标 decoy、目标缺失、目标多解三个世界；只允许唯一目标返回运行上下文，后两者分别返回 typed `Missing` / `Ambiguous`，禁止 first-match 猜测。
 - **最大序列**：`SessionSnapshotPort` 只接受 finite Host `time.created`；latest assistant 按 `(time.created, id)` 排序，ID 仅作同时间的确定性 tie-break。任一 assistant 缺少合法 creation evidence 时绑定 fail closed。
 - **因果绑定**：公开 `message.updated.properties.info` 同时携带 exact `sessionID`、assistant `id`、exact user `parentID`、`role=assistant` 与 `time.created` 时，边界才发布 exact provider-start observation；任一字段缺失或不匹配即安全失败。
 - **Pre-run transform 边界**：公开顺序为 `chat.message → experimental.chat.messages.transform(user only) → chat.params(可重复) → provider`。Transform 只按 exact `(SessionId, PhysicalUserMessageId)` 冻结 pending attempt plan，绝不建立 `ProviderRunIdentity` 或写 `ProviderStarted`。首次 exact assistant observation 一次性绑定 plan 并先持久 `ProviderStarted`；同一事件若还携带 terminal evidence，只有 start 持久确认后才进入 terminal accounting。
@@ -39,6 +39,17 @@
 - contract adapter 只 import 受支持公开 Hook/SDK surface；architecture proof 拒绝 Host fork、private module、monkey patch 与 UI/DOM 依赖。
 - canary 启动声明支持的真实 Host build，通过公开入口执行 Hook ordering、snapshot identity、routing projection、terminal observation 与 fatal settlement 场景，并从公开输出断言结果。mock/fixture tests 仍可做低层 contract proof，但不能标记为 canary。
 - canary failure 或能力不可观察时环境 fail closed；不得以版本猜测、wall-clock wait 或 UI 文案推定支持。
+
+### 6. Contract/Runtime 编译架构分界与单向依赖
+
+- **六大 Locality 切分**：
+  - `Host.Session.Contract`（`host-session-contract`，kind: `contract`）：仅包含 `SessionContract` capability 与 `SessionSnapshot` 纯词汇、端口、定位 decision；
+  - `Host.Signal.Contract`（`host-signal-contract`，kind: `contract`）：包含 `HostSignal` 词汇表与无状态编解码器（`HostEventCodec`、`LoopEventCodec`、`HostMessageCodec`、`ToolHostCodec` 等）；
+  - `Host.Diagnostics.Runtime`（`host-diagnostics-runtime`，kind: `runtime`）：包含 `HookPolicy` 元数据表与 `ReliabilityDiagnostics` 因果记录收集；
+  - `Host.Signal.Adapter`（`host-signal-adapter`，kind: `adapter`）：包含 `HostSignalAdapter` 路由器、`HostSignalSubscribe` 订阅器与 `Events` 终端总线；
+  - `Host.Session.Runtime`（`host-session-runtime`，kind: `runtime`）：包含 `SessionSnapshotPort`/`SessionSnapshotSurface` wire 投影、`SessionQuiescenceGate`、`QuiescenceSurface`、`HostMessageProjection` 就地修改与 `HostSessionContext`；
+  - `Sphinx.Host.Adapter`（`sphinx-host-adapter`，kind: `adapter`）：包含 `SphinxMcpConfig` 启动配置与环境适配。
+- **单向依赖与闭包纯洁性**：应用与领域契约只能引用 Contract locality，严禁传递包含 Runtime 与 Adapter 实现；契约源码闭包与聚焦运行时分别受 $\le 100$ 和 $\le 185$ 源码上限约束。
 
 ## 验证与测试落点
 
@@ -69,3 +80,4 @@
 | HOST-BOUNDARY-023 | `requirements/host-boundary/tests/opencode-chat-admission-canary.test.mjs::WHAT[HOST-BOUNDARY-023] installed OpenCode chat admission public contract is observed and version-fenced` |
 | HOST-BOUNDARY-024 | `requirements/host-boundary/tests/hook-policy.test.mjs::WHAT[HOST-BOUNDARY-024] registered Hook keys and closed policy rows have exact one-to-one closure`；`requirements/host-boundary/tests/hook-policy.test.mjs::WHAT[HOST-BOUNDARY-024] registration is explicit static composition through the policy score`；`requirements/host-boundary/tests/hook-policy.test.mjs::WHAT[HOST-BOUNDARY-024] rejects degradable security or workflow hook`；`requirements/host-boundary/tests/hook-policy.test.mjs::WHAT[HOST-BOUNDARY-024] Hook authority cannot express identity mutation or admission bypass`；`requirements/host-boundary/tests/hook-policy.test.mjs::WHAT[HOST-BOUNDARY-024] optional Casebook failure preserves the critical result and emits the existing diagnostic`（静态门禁 `scripts/checks/hook-policy.mjs`） |
 | HOST-BOUNDARY-025 | `requirements/host-boundary/tests/diagnostics.test.mjs::WHAT[HOST-BOUNDARY-025] causal diagnostic schema preserves exact available correlation and explicit absence`；`requirements/host-boundary/tests/diagnostics.test.mjs::WHAT[HOST-BOUNDARY-025] causal diagnostics reject payload fields and redact credential/path material`；`requirements/host-boundary/tests/diagnostics.test.mjs::WHAT[HOST-BOUNDARY-025] missing observation counters are process-local monotonic immutable snapshots`；`requirements/host-boundary/tests/diagnostics.test.mjs::WHAT[HOST-BOUNDARY-025] diagnostic adapter failure is transparent to caller state`；`requirements/host-boundary/tests/known-failure-stderr.test.mjs::WHAT[HOST-BOUNDARY-025] known typed failure emits one redacted JSON line without stack` |
+| HOST-BOUNDARY-026 | `requirements/host-boundary/tests/host-session-contract-closure.test.mjs::WHAT[HOST-BOUNDARY-026] host session contract compiles independently without runtime or sphinx dependencies`；`requirements/host-boundary/tests/host-session-contract-closure.test.mjs::WHAT[HOST-BOUNDARY-026] host boundary projects declare explicit locality kinds and exact compile ownership` |

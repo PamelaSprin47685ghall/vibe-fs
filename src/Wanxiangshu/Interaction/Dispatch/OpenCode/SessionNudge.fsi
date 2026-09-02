@@ -84,7 +84,7 @@ module HostSessionNudge =
         | Failed of string
 
     val trySendIdleManagerEncouragement:
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         permit: QuiescencePermit ->
         sessionPort: ISessionHostPort ->
         sessionId: SessionId ->
@@ -111,7 +111,7 @@ module HostSessionNudge =
             Task<IdleContinuationOutcome>
 
     val trySendIdleGateContinuation:
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         permit: QuiescencePermit ->
         sessionPort: ISessionHostPort ->
         sessionId: SessionId ->
@@ -125,7 +125,7 @@ module HostSessionNudge =
             Task<IdleContinuationOutcome>
 
     val trySendIdleGateRepair:
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         permit: QuiescencePermit ->
         sessionPort: ISessionHostPort ->
         sessionId: SessionId ->
@@ -137,7 +137,7 @@ module HostSessionNudge =
             Task<IdleContinuationOutcome>
 
     val trySendIdleInteractionRepair:
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         permit: QuiescencePermit ->
         sessionPort: ISessionHostPort ->
         sessionId: SessionId ->

@@ -29,7 +29,7 @@ module MagicTodoLocality =
 
     [<RequireQualifiedAccess>]
     type LocalityRejection =
-        | Snapshot of SessionSnapshotPort.ToolCallLocationError
+        | Snapshot of SessionSnapshot.ToolCallLocationError
         | XTraceUnavailable
         | XTraceMissing of providerRun: ProviderRunIdentity * toolCallId: ToolCallId * hostToolPartId: HostToolPartId
         | XTraceAmbiguous of providerRun: ProviderRunIdentity * toolCallId: ToolCallId * hostToolPartId: HostToolPartId
@@ -37,7 +37,7 @@ module MagicTodoLocality =
     [<RequireQualifiedAccess>]
     type InputMaterializationRejection =
         | SnapshotUnavailable of reason: string
-        | Snapshot of SessionSnapshotPort.ToolCallLocationError
+        | Snapshot of SessionSnapshot.ToolCallLocationError
         | CarrierChanged
         | InputMismatch
 
@@ -111,7 +111,7 @@ module MagicTodoLocality =
     let private resolveCapturedToolCall
         trace
         messages
-        (located: SessionSnapshotPort.ToolCallLocation)
+        (located: SessionSnapshot.ToolCallLocation)
         (part: XTraceSemanticPartView)
         =
         let toolPartOrdinal =
@@ -144,11 +144,7 @@ module MagicTodoLocality =
                   Range = XTraceProjection.rangeOfPart part }
         | _ -> Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
 
-    let private resolvePendingInMessage
-        trace
-        (located: SessionSnapshotPort.ToolCallLocation)
-        (message: SessionMessage)
-        =
+    let private resolvePendingInMessage trace (located: SessionSnapshot.ToolCallLocation) (message: SessionMessage) =
         let partMatches =
             message.ToolParts
             |> Array.mapi (fun index part -> index, part)
@@ -176,7 +172,7 @@ module MagicTodoLocality =
                   Range = XTraceRange.create frontier (XTraceCursor.nextCursor frontier) }
         | _ -> Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
 
-    let private resolvePendingAssistantMessage trace messages (located: SessionSnapshotPort.ToolCallLocation) =
+    let private resolvePendingAssistantMessage trace messages (located: SessionSnapshot.ToolCallLocation) =
         let providerRunText = ProviderRunIdentity.value located.ProviderRun
 
         let messageMatches =
@@ -190,7 +186,7 @@ module MagicTodoLocality =
     let private resolvePendingToolCall
         trace
         (messages: SessionMessage list)
-        (located: SessionSnapshotPort.ToolCallLocation)
+        (located: SessionSnapshot.ToolCallLocation)
         =
         if located.State <> SnapshotToolPartState.Pending then
             Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
@@ -211,7 +207,7 @@ module MagicTodoLocality =
     let private resolveDuplicateCapturedTool
         trace
         messages
-        (located: SessionSnapshotPort.ToolCallLocation)
+        (located: SessionSnapshot.ToolCallLocation)
         (duplicates: XTraceSemanticPartView list)
         =
         match collapseIdenticalPhysicalReplays duplicates with
@@ -219,7 +215,7 @@ module MagicTodoLocality =
         | None ->
             Error(LocalityRejection.XTraceAmbiguous(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
 
-    let private resolveLocated trace messages (located: SessionSnapshotPort.ToolCallLocation) =
+    let private resolveLocated trace messages (located: SessionSnapshot.ToolCallLocation) =
         let matches =
             XTraceProjection.toolPartsForHostIdentity
                 located.ProviderRun
@@ -232,7 +228,7 @@ module MagicTodoLocality =
         | [] -> resolvePendingToolCall trace messages located
         | duplicates -> resolveDuplicateCapturedTool trace messages located duplicates
 
-    let private resolveWithTrace messages (located: SessionSnapshotPort.ToolCallLocation) xTrace =
+    let private resolveWithTrace messages (located: SessionSnapshot.ToolCallLocation) xTrace =
         match xTrace with
         | None -> Error LocalityRejection.XTraceUnavailable
         | Some trace -> resolveLocated trace messages located
@@ -243,7 +239,7 @@ module MagicTodoLocality =
         (projection: ProjectionSet)
         (toolCallId: ToolCallId)
         : Result<LocalizedToolCall, LocalityRejection> =
-        match SessionSnapshotPort.locateToolCall toolCallId messages with
+        match SessionSnapshot.locateToolCall toolCallId messages with
         | Error error -> Error(LocalityRejection.Snapshot error)
         | Ok located ->
             let xTrace =

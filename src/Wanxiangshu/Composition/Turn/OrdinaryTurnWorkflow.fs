@@ -75,7 +75,7 @@ module OrdinaryTurnWorkflow =
     /// Revisit a previously delivered turn only for work whose authority comes
     /// from a fresh idle observation. Terminal plumbing remains first-delivery only.
     let observeIdle
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -136,7 +136,7 @@ module OrdinaryTurnWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         =
         task {
@@ -170,7 +170,7 @@ module OrdinaryTurnWorkflow =
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (completeAgent: unit -> Task<XTraceTerminalCompletion>)
         =
@@ -240,7 +240,7 @@ module OrdinaryTurnWorkflow =
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
         (abortCause: AbortCause)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (completeAgent: unit -> Task<XTraceTerminalCompletion>)
         =
@@ -268,7 +268,7 @@ module OrdinaryTurnWorkflow =
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
         (abortCause: AbortCause)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         : Task =
         let turn = context.Turn

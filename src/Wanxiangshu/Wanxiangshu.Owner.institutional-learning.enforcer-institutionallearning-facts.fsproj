@@ -2,6 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>institutional-learning</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>enforcer-institutionallearning-facts</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-catalog.fsproj"/>

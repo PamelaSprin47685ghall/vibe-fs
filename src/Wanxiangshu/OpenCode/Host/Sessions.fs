@@ -9,43 +9,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Participant.Persona
 
-type SessionPromptOptions = OpenCodePromptOptions
-
-type ISessionHostPort =
-    abstract SubscribeTerminal: sessionId: SessionId * listener: TerminalCompletionListener -> IDisposable
-    abstract SubscribeFutureTerminal: sessionId: SessionId * listener: TerminalCompletionListener -> IDisposable
-
-    /// PROMPT-005/PROMPT-011: the outcome, not a `Result`.
-    ///
-    /// `Result<messageId, string>` had to invent a message id on every success and
-    /// had one failure shape for every failure. Both erasures matter: a transport
-    /// receipt is not a physical message, and `AcceptanceUnknown` is not
-    /// `Retryable` — resending the former can produce two logical effects.
-    abstract SendPrompt: sessionId: SessionId * text: string * opts: SessionPromptOptions -> Task<SendOutcome>
-
-    abstract AbortSession: sessionId: SessionId -> Task<Result<unit, string>>
-    /// Internal attempt stop: abort only this physical Host attempt.
-    /// Unlike AbortSession, this does not detach/cancel logical children and is
-    /// unavailable to user-facing/root sessions.
-    abstract InterruptAttempt: sessionId: SessionId -> Task<Result<unit, string>>
-    /// One authority predicate shared by every internal stop/termination path.
-    abstract IsManagedChild: sessionId: SessionId -> bool
-    abstract AbortChildren: parentId: SessionId -> Task
-
-    /// Fission-only physical sibling creation. `physicalParentId` is the old
-    /// caller's Host parent; no managed-child registry/linkage is created.
-    abstract CreateSiblingSession:
-        ownerSessionId: SessionId * physicalParentId: SessionId option * options: OpenCodeChildOptions ->
-            Task<Result<SessionId, string>>
-
-    abstract TryGetParentSession: sessionId: SessionId -> Task<Result<SessionId option, string>>
-    abstract CreateChildSession: parentId: SessionId * options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
-    abstract ListChildren: parentId: SessionId -> Task<Result<OpenCodeChildInfo list, string>>
-
-    /// HOST-015: the family root every managed child is physically parented to.
-    /// Ownership is proven by durable journal links, never by Host parentID.
-    abstract FamilyRootOf: sessionId: SessionId -> SessionId
-
 [<RequireQualifiedAccess>]
 module ManagedSessionTermination =
 

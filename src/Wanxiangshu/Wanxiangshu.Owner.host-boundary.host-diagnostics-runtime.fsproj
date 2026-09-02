@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>host-diagnostics-runtime</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
+    <Compile Include="OpenCode/Host/HookPolicy.fsi"/>
+    <Compile Include="OpenCode/Host/HookPolicy.fs"/>
+    <Compile Include="OpenCode/Host/ReliabilityDiagnostics.fsi"/>
+    <Compile Include="OpenCode/Host/ReliabilityDiagnostics.fs"/>
+    <Compile Include="OpenCode/Host/ReliabilityDiagnosticsSurface.fsi"/>
+    <Compile Include="OpenCode/Host/ReliabilityDiagnosticsSurface.fs"/>
+    <Compile Include="OpenCode/Host/Diagnostic.fsi"/>
+    <Compile Include="OpenCode/Host/Diagnostic.fs"/>
+    <Compile Include="OpenCode/Host/HookPolicySurface.fsi"/>
+    <Compile Include="OpenCode/Host/HookPolicySurface.fs"/>
+  </ItemGroup>
+</Project>

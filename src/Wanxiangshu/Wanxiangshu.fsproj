@@ -20,6 +20,10 @@
     <Compile Include="Host/Digest.fs"/>
     <Compile Include="Foundation/Identity.fsi"/>
     <Compile Include="Foundation/Identity.fs"/>
+    <Compile Include="OpenCode/Host/Message.fsi"/>
+    <Compile Include="OpenCode/Host/Message.fs"/>
+    <Compile Include="OpenCode/Host/SessionContract.fsi"/>
+    <Compile Include="OpenCode/Host/SessionContract.fs"/>
     <Compile Include="OpenCode/Host/SessionQuiescenceGate.fsi"/>
     <Compile Include="OpenCode/Host/SessionQuiescenceGate.fs"/>
     <Compile Include="Context/Trace/Cursor.fsi"/>
@@ -324,6 +328,8 @@
     <Compile Include="Participant/Provider/Attempt/PlannerSurface.fs"/>
     <Compile Include="Persistence/EventStore/Model.fsi"/>
     <Compile Include="Persistence/EventStore/Model.fs"/>
+    <Compile Include="Strength/EventVocabulary.fsi"/>
+    <Compile Include="Strength/EventVocabulary.fs"/>
     <Compile Include="Strength/Events.fsi"/>
     <Compile Include="Strength/Events.fs"/>
     <Compile Include="Strength/Projection/Model.fsi"/>
@@ -350,6 +356,10 @@
     <Compile Include="Repository/Knowledge/Casebook/Model.fs"/>
     <Compile Include="Persistence/EventStore/StoreTypes.fsi"/>
     <Compile Include="Persistence/EventStore/StoreTypes.fs"/>
+    <Compile Include="Persistence/EventStore/Port.fsi"/>
+    <Compile Include="Persistence/EventStore/Port.fs"/>
+    <Compile Include="Persistence/EventStore/GitTypes.fsi"/>
+    <Compile Include="Persistence/EventStore/GitTypes.fs"/>
     <Compile Include="Persistence/EventStore/CanonicalEventCodec.fsi"/>
     <Compile Include="Persistence/EventStore/CanonicalEventCodec.fs"/>
     <Compile Include="Persistence/EventStore/EventVocabulary.fsi"/>
@@ -770,6 +780,8 @@
     <Compile Include="OpenCode/Host/HookPolicySurface.fs"/>
     <Compile Include="Context/Companion/CompressionSurface.fsi"/>
     <Compile Include="Context/Companion/CompressionSurface.fs"/>
+    <Compile Include="OpenCode/Signals/EventContract.fsi"/>
+    <Compile Include="OpenCode/Signals/EventContract.fs"/>
     <Compile Include="OpenCode/Host/Events.fsi"/>
     <Compile Include="OpenCode/Host/Events.fs"/>
     <Compile Include="OpenCode/Host/SharedTerminalBus.fsi"/>
@@ -806,6 +818,8 @@
     <Compile Include="Strength/Lifecycle.fs"/>
     <Compile Include="Strength/Replica/TraceRecovery.fsi"/>
     <Compile Include="Strength/Replica/TraceRecovery.fs"/>
+    <Compile Include="OpenCode/Host/SessionSnapshot.fsi"/>
+    <Compile Include="OpenCode/Host/SessionSnapshot.fs"/>
     <Compile Include="OpenCode/Host/SessionSnapshotPort.fsi"/>
     <Compile Include="OpenCode/Host/SessionSnapshotPort.fs"/>
     <Compile Include="OpenCode/Host/ProviderRunBinding.fsi"/>
@@ -814,6 +828,8 @@
     <Compile Include="OpenCode/Host/SessionSnapshotSurface.fs"/>
     <Compile Include="OpenCode/Host/ProviderRunBindingSurface.fsi"/>
     <Compile Include="OpenCode/Host/ProviderRunBindingSurface.fs"/>
+    <Compile Include="OpenCode/Host/OpenCodeContract.fsi"/>
+    <Compile Include="OpenCode/Host/OpenCodeContract.fs"/>
     <Compile Include="OpenCode/Host/OpenCodePort.fsi"/>
     <Compile Include="OpenCode/Host/OpenCodePort.fs"/>
     <Compile Include="OpenCode/Host/SessionExecutionBinding.fsi"/>
@@ -824,6 +840,8 @@
     <Compile Include="OpenCode/Host/SessionBindingSurface.fs"/>
     <Compile Include="OpenCode/Host/ProviderLanguageBinding.fsi"/>
     <Compile Include="OpenCode/Host/ProviderLanguageBinding.fs"/>
+    <Compile Include="OpenCode/Host/SessionHostPort.fsi"/>
+    <Compile Include="OpenCode/Host/SessionHostPort.fs"/>
     <Compile Include="OpenCode/Host/Sessions.fsi"/>
     <Compile Include="OpenCode/Host/Sessions.fs"/>
     <Compile Include="OpenCode/Host/SessionsSurface.fsi"/>

@@ -8,26 +8,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
-type AttachedChildObservation =
-    | Missing
-    | Matching of SessionId
-    | Conflicting of SessionId list
-
-[<RequireQualifiedAccess>]
-type AttachedChildDecision =
-    | Create
-    | Adopt of SessionId
-    | RejectConflict of SessionId list
-
-[<RequireQualifiedAccess>]
-module AttachedChildObservation =
-    let decide =
-        function
-        | AttachedChildObservation.Missing -> AttachedChildDecision.Create
-        | AttachedChildObservation.Matching childId -> AttachedChildDecision.Adopt childId
-        | AttachedChildObservation.Conflicting children -> AttachedChildDecision.RejectConflict children
-
-[<RequireQualifiedAccess>]
 type private AttachedRuntimePlan =
     | Reuse of SessionId * string
     | Attach of AttachedChildDecision
@@ -230,3 +210,22 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
                 reconcile key scope role ownerSessionId agentName directory observeChild createChild bindChild onReady)
 
     member _.Clear() = lock gate (fun () -> bindings.Clear())
+
+    interface IAttachedSessionPort with
+        member this.TryFind(ownerSessionId, role) = this.TryFind(ownerSessionId, role)
+        member this.TryFindByScope(scope, role) = this.TryFindByScope(scope, role)
+
+        member this.TryFindOwner(delegateSessionId, role) =
+            this.TryFindOwner(delegateSessionId, role)
+
+        member this.Remove(ownerSessionId, role) = this.Remove(ownerSessionId, role)
+
+        member this.RemoveByDelegateSession(delegateSessionId) =
+            this.RemoveByDelegateSession(delegateSessionId)
+
+        member this.GetOrCreate
+            (ownerSessionId, role, agentName, directory, observeChild, createChild, bindChild, onReady)
+            =
+            this.GetOrCreate(ownerSessionId, role, agentName, directory, observeChild, createChild, bindChild, onReady)
+
+        member this.Clear() = this.Clear()

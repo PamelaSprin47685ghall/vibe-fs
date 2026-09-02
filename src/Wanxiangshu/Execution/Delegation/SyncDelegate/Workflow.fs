@@ -15,7 +15,7 @@ module internal SyncDelegateWorkflow =
     /// Everything SyncDelegateRuntime.Invoke needs from its host, so the workflow
     /// runs against the store + dependencies without touching runtime fields.
     type Dependencies =
-        { Attached: AttachedSessionRuntime
+        { Attached: IAttachedSessionPort
           ResolveOwnerTier: SessionId -> AgentTier option
           ObserveChild:
               SessionId -> ReuseScopeId -> SyncDelegateRole -> string -> Task<Result<AttachedChildObservation, string>>
@@ -34,6 +34,7 @@ module internal SyncDelegateWorkflow =
           ReplaceToolEstimate: SessionId -> int option -> Task<unit>
           SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<PreparedDelegationHandoff, string>>
           CheckpointCompletedHandoff: SessionId -> PreparedDelegationHandoff -> Task<Result<unit, string>>
+          TripFatal: string -> string -> unit
           ResolveBoundAgent: SessionId -> string option
           DescribeWait: SyncDelegateWait -> DiagnosticWait
           SubscribeFutureTerminal: SessionId -> TerminalCompletionListener -> System.IDisposable }
@@ -157,7 +158,7 @@ module internal SyncDelegateWorkflow =
             | Ok() -> return Ok()
             | Error error ->
                 let detail = sprintf "delegation completed-handoff append failed: %s" error
-                FatalProcess.trip "SyncDelegate.checkpointCompletedHandoff" detail
+                deps.TripFatal "SyncDelegate.checkpointCompletedHandoff" detail
                 return raise (System.InvalidOperationException detail)
         }
 

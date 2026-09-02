@@ -41,7 +41,7 @@ module HostBoundarySurface =
 
     let locateToolCall (toolCallId: string) (rawMessages: obj array) : obj =
         match
-            SessionSnapshotPort.locateToolCall
+            SessionSnapshot.locateToolCall
                 (ToolCallId.create toolCallId)
                 (SessionSnapshotPort.projectMessages rawMessages)
         with
@@ -55,7 +55,7 @@ module HostBoundarySurface =
                    toolName = location.ToolName
                    inputCanonical = location.InputCanonical
                    state = toolState location.State |}
-        | Error(SessionSnapshotPort.ToolCallLocationError.Missing _) ->
+        | Error(SessionSnapshot.ToolCallLocationError.Missing _) ->
             box
                 {| ok = false
                    error = "Missing"
@@ -65,7 +65,7 @@ module HostBoundarySurface =
                    toolName = null
                    inputCanonical = null
                    state = null |}
-        | Error(SessionSnapshotPort.ToolCallLocationError.Ambiguous _) ->
+        | Error(SessionSnapshot.ToolCallLocationError.Ambiguous _) ->
             box
                 {| ok = false
                    error = "Ambiguous"

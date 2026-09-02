@@ -1,16 +1,3 @@
-namespace Wanxiangshu.Foundation
-
-/// Process-local side-effect admission handle (HOST-004).
-///
-/// The handle exposes no authority facts. Its file-private runtime evidence is
-/// interpretable only by the issuing SessionQuiescenceGate. Callers may only
-/// obtain the handle and pass it back to a gate.
-///
-/// NEVER written to the journal (HOST-007): a restart has no matching gate
-/// registry or fresh attempt, so a crashed process cannot resume sending an
-/// idle-derived continuation.
-type QuiescencePermit = interface end
-
 namespace Wanxiangshu.OpenCode
 
 open System.Collections.Generic
@@ -40,15 +27,6 @@ type private Activity =
     /// and does not mint a fresh one until the next real BeginProviderAttempt.
     | Revoked of attemptSerial: int64
 
-/// Why a quiescence capability could not be consumed or released.
-[<RequireQualifiedAccess>]
-type QuiescencePermitFailure =
-    | WrongOwner
-    | NoFreshIdle
-    | AlreadyConsumed
-    | Superseded
-    | Revoked
-
 /// HOST-004：process-local side-effect admission gate。
 ///
 /// 只回答一个问题：一个以 idle 为前提的副作用，现在是否仍有资格发送？
@@ -65,7 +43,7 @@ type QuiescencePermitFailure =
 /// TryRelease(permit)              owned token scope is IdleConsumed(serial) → Idle → Ok；否则 typed Error
 /// DropSession(session)            清空该 session 状态，旧 permit 永久失效
 /// ```
-type SessionQuiescenceGate() =
+type SessionQuiescenceGate() as this =
     let gate = obj ()
     let owner = obj ()
     // At most one live opaque handle per session. Old handles retain private
@@ -235,3 +213,15 @@ type SessionQuiescenceGate() =
             serials <- Map.add key (nextSerial key) serials
             activities <- Map.remove key activities
             physicalMessages <- Map.remove key physicalMessages)
+
+    interface ISessionQuiescenceGate with
+        member _.BeginProviderAttempt(sessionId) = this.BeginProviderAttempt(sessionId)
+
+        member _.ObservePhysicalUserMessage(sessionId, physicalUserMessageId) =
+            this.ObservePhysicalUserMessage(sessionId, physicalUserMessageId)
+
+        member _.ObserveIdle(sessionId) = this.ObserveIdle(sessionId)
+        member _.TryConsume(permit) = this.TryConsume(permit)
+        member _.TryRelease(permit) = this.TryRelease(permit)
+        member _.RevokeCurrentAttempt(sessionId) = this.RevokeCurrentAttempt(sessionId)
+        member _.DropSession(sessionId) = this.DropSession(sessionId)

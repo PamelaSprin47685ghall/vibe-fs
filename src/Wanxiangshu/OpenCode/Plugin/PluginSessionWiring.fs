@@ -149,12 +149,19 @@ module PluginSessionWiring =
 
                 wired.BindActiveRun delegateId (roleForAgent agent) workspaceDirectory
 
+            let workRecordCapability: DelegationWorkRecordCapability =
+                { ParentWorkRecord =
+                    fun sessionId -> LifecycleWorkRecordProjection.lifecycleWorkRecord (Some durable) sessionId true
+                  ParentWorkRecordBounded =
+                    fun sessionId range ->
+                        LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some durable) sessionId range }
+
             let syncDelegate =
                 new SyncDelegateRuntime(
                     sessionPort,
                     dispatcher,
                     durable,
-                    attached,
+                    (attached :> IAttachedSessionPort),
                     SyncDelegateTier.fromDispatcher dispatcher,
                     registerDelegate,
                     scope.Sessions.Quiescence,
@@ -164,7 +171,7 @@ module PluginSessionWiring =
                             sessionId
                             range
                             providerRun),
-                    DelegationHandoffLedger.port durable,
+                    DelegationHandoffLedger.port workRecordCapability durable,
                     ?workspaceDirectory = workspaceDirectory,
                     ?onInspectorPrompt = Some CasebookLifecycle.notePrompt,
                     ?onInspectorAnswer = Some CasebookLifecycle.noteAnswer,

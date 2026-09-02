@@ -584,7 +584,7 @@ module MagicTodoHostHooks =
             let messages = requireMessages sessionText messagesResult
 
             let currentProviderRun =
-                match SessionSnapshotPort.locateToolCall callId messages with
+                match SessionSnapshot.locateToolCall callId messages with
                 | Ok located -> located.ProviderRun
                 | Error reason ->
                     fatalInfrastructure sessionText (sprintf "todowrite snapshot locality failed: %A" reason)

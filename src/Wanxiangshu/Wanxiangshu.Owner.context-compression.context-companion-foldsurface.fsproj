@@ -2,7 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>context-compression</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>context-companion-foldsurface</WanxiangshuOwnerLocality>
-    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-codec.fsproj"/>
@@ -15,7 +15,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.strength-persistence-durabilityport.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.obligation-ledger.mission-manager-life-openingfloor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.context-prefix-candidate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.mission-obligation-todo-prefixepoch.fsproj"/>

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>execution-model-routing</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>opencode-host-opencodeport-adapter</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.opencode-host-opencodeport.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
+    <Compile Include="OpenCode/Host/OpenCodePort.fsi"/>
+    <Compile Include="OpenCode/Host/OpenCodePort.fs"/>
+  </ItemGroup>
+</Project>

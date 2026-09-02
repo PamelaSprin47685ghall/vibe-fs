@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>durable-convergence</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>eventstore-integrator-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
+    <Compile Include="Persistence/EventStore/IntegrationKernel.fsi"/>
+    <Compile Include="Persistence/EventStore/IntegrationKernel.fs"/>
+  </ItemGroup>
+</Project>

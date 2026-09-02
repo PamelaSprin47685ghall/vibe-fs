@@ -83,3 +83,9 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 ## DURABLE-EVENTS-021: semantic failure 写入 durable cut-tail 且当前进程 fatal
 
 当注册的业务折叠规则对合法信封返回语义错误时，系统在持久化保留该错误事实的同时紧随写入 `ProjectionCutTail` 重置事件，以隔离故障作用域。产生坏事实的当前进程必须立即 fatal 退出以防内存状态被污染，由重启后的下一代进程从重置后的 `Current` 安全接续。
+
+## DURABLE-EVENTS-022: EventStore contract/runtime 编译闭包必须单向且有界
+
+`EventStore.Model.Contract` 只拥有 `EventEnvelope`、`EventStreamId`、`PayloadRef` 等稳定领域模型；`EventStore.Port.Contract` 只拥有 append/read 所需 request/result/error 与 `IEventStore` capability；`EventStore.EventVocabulary.Contract` 只拥有 canonical EventStore event type 集合，并仅依赖 `Strength.EventVocabulary.Contract` 等更基础词汇。`EventStore.Core.Runtime`、`EventStore.Git.Runtime`、Canonical Integrator、Journal、Host acquisition 与 test surface 必须依赖这些 contract，反向依赖禁止。业务 consumer 的 transitive compile input 不得包含 Git object/ref、process/file codec、Canonical Integrator、Strength predictor/replica/runtime 或 Host adapter。
+
+Git 同步所需 object/ref 类型与 `IGitRawStore` 只能位于独立 physical-port contract，由 Git/sync adapter 消费，不得经 `EventStore.Port.Contract` 暴露给业务消费者。Contract locality 的 transitive production `.fs` 不得超过 100；focused EventStore runtime locality 不得超过 185。所有 locality compile 必须由 ProjectReference closure 生成一个零 ProjectReference flat project，并由一次 Fable invocation 编译。

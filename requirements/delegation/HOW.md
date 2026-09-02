@@ -38,6 +38,12 @@ DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`com
 
 Join 机制从所有者的完成信箱中按稳定排序逐项 CAS 消费可用结果，单次消费上限受 `MaxJoinBatch` 约束。外部打断信号与超时仅产生 `Interrupted` 结果，确保子会话的执行与既有权能不受破坏。
 
+### Contract/Runtime 编译边界
+
+- `Delegation.Contract` 汇集稳定 command/result、fact、payload、route 与 completion evidence；`Delegation.Fold` 只消费 contract 计算投影；`Delegation.Ledger` 在显式 Composition locality 中连接 `AgentJournal`。
+- Sync/Fork/Recovery CE 分居三个 Runtime locality；Host 与 PTY 的物理调用分居两个 Adapter locality。Runtime/Adapter 只能依赖 contract/fold，普通 consumer 不能引用它们。
+- `scripts/checks/owner-projects.mjs` 固定 locality kind、方向与 closure budget；`scripts/compile-owner.mjs` 只编译目标 ProjectReference closure 的单一 flat projection。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
@@ -68,6 +74,7 @@ Join 机制从所有者的完成信箱中按稳定排序逐项 CAS 消费可用�
 | DELEG-025 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-025] SYNC_RUNTIME_late_failure_from_previous_authority_root_cannot_fail_reused_call`；`requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-025] reusable fork terminal failure is guarded by the accepted authority root`；`requirements/host-boundary/tests/events-port.test.mjs::WHAT[DELEG-025] EVT_run_scoped_failure_preserves_authority_root_across_host_event_port` |
 | DELEG-026 | `requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-026] reusable delegation has no durable program-counter/state-machine vocabulary`；`requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-026] fork admission bookkeeping that can fail happens before dispatch` |
 | DELEG-027 | `requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-027] active fork assignment never becomes BusyAgentNudge` |
+| DELEG-028 | `requirements/delegation/tests/delegation-compile-boundary.test.mjs::WHAT[DELEG-028] Delegation contract excludes workflow Host PTY and recovery sources`；`requirements/delegation/tests/delegation-compile-boundary.test.mjs::WHAT[DELEG-028] Delegation focused localities stay within compile budgets` |
 
 ## GAP
 

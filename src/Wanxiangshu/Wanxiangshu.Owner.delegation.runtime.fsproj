@@ -2,16 +2,21 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>delegation-runtime-surface</WanxiangshuOwnerLocality>
-    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-causalwait.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-fold.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-host-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-recovery-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-handle-surface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-ledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-canonicalintegrator.fsproj"/>
@@ -22,13 +27,15 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.strength-persistence-durabilityport.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.opencode-host-opencodeport.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.execution-session-recoveryclosureprojection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.session-attachment-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.session-attachment-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-horizon.execution-session-opencode-horizontool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-processrequest.fsproj"/>
@@ -37,9 +44,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.repository-investigation.opencode-tools-inspectortool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-capture.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionbindingsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.work-record.mission-workrecord-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecoverySurface.fsi"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecoverySurface.fs"/>
     <Compile Include="Execution/Delegation/Handle/Surface.fsi"/>

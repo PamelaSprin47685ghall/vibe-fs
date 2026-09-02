@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
-    <WanxiangshuOwnerLocality>execution-delegation-syncdelegate-model</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocality>delegation-sync-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>

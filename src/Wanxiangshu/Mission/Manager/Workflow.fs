@@ -48,7 +48,7 @@ module ManagerWorkflow =
         (journal: AgentJournal option)
         (nudgeSent: HashSet<string>)
         (hasLivePty: string -> bool)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         : Task =
         let turn = context.Turn
@@ -64,7 +64,7 @@ module ManagerWorkflow =
         (journal: AgentJournal option)
         (nudgeSent: HashSet<string>)
         (hasLivePty: string -> bool)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (turn: ReconciledTurn)
         (settled: ManagerBackground.BackgroundSettlement)
@@ -81,7 +81,7 @@ module ManagerWorkflow =
         (nudgeSent: HashSet<string>)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (turn: ReconciledTurn)
         : Task =
@@ -126,7 +126,7 @@ module ManagerWorkflow =
         (nudgeSent: HashSet<string>)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (observeOrdinary: ReconciledTurnContext -> Task)
         (context: ReconciledTurnContext)
         : Task =
@@ -164,7 +164,7 @@ module ManagerWorkflow =
         (nudgeSent: HashSet<string>)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (observeOrdinary: ReconciledTurnContext -> Task)
         (context: ReconciledTurnContext)
         : Task =

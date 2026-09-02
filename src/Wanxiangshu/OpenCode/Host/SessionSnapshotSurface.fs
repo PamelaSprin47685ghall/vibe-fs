@@ -53,7 +53,7 @@ module SessionSnapshotSurface =
 
     /// HOST-BOUNDARY-012: resolve one tool callback through the Host's
     /// persisted assistant message + ToolPart. Delegates to
-    /// `SessionSnapshotPort.locateToolCall` and translates the
+    /// `SessionSnapshot.locateToolCall` and translates the
     /// `Result<ToolCallLocation, ToolCallLocationError>` into a plain object.
     ///
     /// Returns `{ ok: true, providerRun, hostToolPartId, toolCallId, toolName,
@@ -63,7 +63,7 @@ module SessionSnapshotSurface =
     let locateToolCall (callId: string) (handle: ProjectedMessages) : obj =
         let typed = ToolCallId.create callId
 
-        match SessionSnapshotPort.locateToolCall typed handle.Messages with
+        match SessionSnapshot.locateToolCall typed handle.Messages with
         | Ok location ->
             box
                 {| ok = true
@@ -75,12 +75,12 @@ module SessionSnapshotSurface =
                    state = toolPartStateToJs location.State |}
         | Error error ->
             match error with
-            | SessionSnapshotPort.ToolCallLocationError.Missing id ->
+            | SessionSnapshot.ToolCallLocationError.Missing id ->
                 box
                     {| ok = false
                        error = "Missing"
                        toolCallId = ToolCallId.value id |}
-            | SessionSnapshotPort.ToolCallLocationError.Ambiguous id ->
+            | SessionSnapshot.ToolCallLocationError.Ambiguous id ->
                 box
                     {| ok = false
                        error = "Ambiguous"

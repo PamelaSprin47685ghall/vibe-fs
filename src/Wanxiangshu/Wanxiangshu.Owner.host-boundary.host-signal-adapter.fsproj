@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>host-signal-adapter</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <Compile Include="Foundation/FatalProcess.fsi"/>
+    <Compile Include="Foundation/FatalProcess.fs"/>
+    <Compile Include="OpenCode/Codec/CanonicalJson.fsi"/>
+    <Compile Include="OpenCode/Codec/CanonicalJson.fs"/>
+    <Compile Include="OpenCode/Codec/CanonicalJsonSurface.fsi"/>
+    <Compile Include="OpenCode/Codec/CanonicalJsonSurface.fs"/>
+    <Compile Include="OpenCode/Codec/HostEventCodec.fsi"/>
+    <Compile Include="OpenCode/Codec/HostEventCodec.fs"/>
+    <Compile Include="OpenCode/Codec/LoopEventCodec.fsi"/>
+    <Compile Include="OpenCode/Codec/LoopEventCodec.fs"/>
+    <Compile Include="OpenCode/Codec/HostMessageCodec.fsi"/>
+    <Compile Include="OpenCode/Codec/HostMessageCodec.fs"/>
+    <Compile Include="OpenCode/Codec/ToolHostCodec.fsi"/>
+    <Compile Include="OpenCode/Codec/ToolHostCodec.fs"/>
+    <Compile Include="OpenCode/Codec/ToolHostSurface.fsi"/>
+    <Compile Include="OpenCode/Codec/ToolHostSurface.fs"/>
+    <Compile Include="OpenCode/Signals/HostSignalAdapter.fsi"/>
+    <Compile Include="OpenCode/Signals/HostSignalAdapter.fs"/>
+    <Compile Include="OpenCode/Host/HostSignalSurface.fsi"/>
+    <Compile Include="OpenCode/Host/HostSignalSurface.fs"/>
+    <Compile Include="OpenCode/Signals/HostSignalSubscribe.fsi"/>
+    <Compile Include="OpenCode/Signals/HostSignalSubscribe.fs"/>
+    <Compile Include="OpenCode/Host/HostSignalSubscribeSurface.fsi"/>
+    <Compile Include="OpenCode/Host/HostSignalSubscribeSurface.fs"/>
+    <Compile Include="OpenCode/Host/Events.fsi"/>
+    <Compile Include="OpenCode/Host/Events.fs"/>
+    <Compile Include="OpenCode/Host/SharedTerminalBus.fsi"/>
+    <Compile Include="OpenCode/Host/SharedTerminalBus.fs"/>
+    <Compile Include="OpenCode/Host/EventsSurface.fsi"/>
+    <Compile Include="OpenCode/Host/EventsSurface.fs"/>
+  </ItemGroup>
+</Project>

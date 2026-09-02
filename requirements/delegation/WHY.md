@@ -15,6 +15,7 @@
 5. **单向载荷与信封隔离**：父向子传递背景必须作为只读数据字段，子向父交付结果必须作为 entry-local 证据，严禁逆向污染。
 6. **复用的是 participant，不是物理 session 或上一轮执行态**：同一 Byname / dedicated role 可以连续承接多个 work unit；每个新 charge 都拥有独立的输入窗口、执行身份与完成证据。
 7. **已发生的 effect 不得被后置 bookkeeping 否认**：一旦某个 work unit 已经 durable admission 并进入物理 dispatch，后续 projection/affinity/frontier 写入失败只能进入明确的失败或 reconciliation 语义，绝不能把调用结果降格成“没有放置”。
+8. **Contract 不携带执行拓扑**：业务 consumer 只编译 delegation command/result、typed payload 与 capability；fold、AgentJournal ledger、sync/fork workflow、Host callback、PTY、recovery 与 OpenCode adapter 分居单向依赖的 Runtime/Composition/Adapter locality。否则一个委托类型会把 Host、store、PTY 与恢复实现拖入所有 consumer 的 Fable 闭包。
 
 ## 破坏后果
 

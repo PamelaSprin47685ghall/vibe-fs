@@ -2,17 +2,17 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>action-affordance</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>tool-runtime-surface</WanxiangshuOwnerLocality>
-    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-executortoolsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-signal-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.opencode-tools-ptytool.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionbindingsurface.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <Compile Include="OpenCode/Tools/ExecutorToolSurface.fsi"/>
     <Compile Include="OpenCode/Tools/ExecutorToolSurface.fs"/>
     <Compile Include="OpenCode/Tools/ToolContext.fsi"/>

@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>delegation-recovery-runtime</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-causalwait.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-handle-surface.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <Compile Include="Execution/Delegation/Fork/ChildRecovery.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/ChildRecovery.fs"/>
+    <Compile Include="Execution/Delegation/Handle/Controller.fsi"/>
+    <Compile Include="Execution/Delegation/Handle/Controller.fs"/>
+    <Compile Include="Execution/Delegation/Handle/JoinInterruptRegistry.fsi"/>
+    <Compile Include="Execution/Delegation/Handle/JoinInterruptRegistry.fs"/>
+    <Compile Include="Execution/Delegation/Handle/CompletionCodec.fsi"/>
+    <Compile Include="Execution/Delegation/Handle/CompletionCodec.fs"/>
+    <Compile Include="Execution/Delegation/Handle/JoinDrain.fsi"/>
+    <Compile Include="Execution/Delegation/Handle/JoinDrain.fs"/>
+    <Compile Include="Execution/Delegation/ChildRecoveryWorkflow.fsi"/>
+    <Compile Include="Execution/Delegation/ChildRecoveryWorkflow.fs"/>
+  </ItemGroup>
+</Project>

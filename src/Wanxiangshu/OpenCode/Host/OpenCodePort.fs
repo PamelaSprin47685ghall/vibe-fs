@@ -10,55 +10,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Outcome
 
-[<RequireQualifiedAccess>]
-type SessionBindingIntent =
-    | Preserve
-    | ExplicitExecutionOverride
-
-/// DSL-state-combination: physical — optional host/provider request fields
-/// are one OpenCode boundary payload; BindingIntent is transport policy, not a
-/// business execution state.
-type OpenCodePromptOptions =
-    {
-        Model: OpencodeModel option
-        Agent: string option
-        Directory: string option
-        Metadata: obj option
-        /// PROMPT-012: complete request-local provider tool surface.
-        Tools: Map<string, bool> option
-        BindingIntent: SessionBindingIntent
-    }
-
-type IPromptPort =
-    abstract SendPrompt:
-        sessionId: SessionId -> promptText: string -> options: OpenCodePromptOptions -> Task<SendOutcome>
-
-type OpenCodeChildOptions =
-    { Title: string option
-      Agent: string option
-      Directory: string option }
-
-type OpenCodeChildInfo =
-    { SessionId: SessionId
-      ParentSessionId: SessionId option
-      Agent: string option
-      Title: string option }
-
-type IOpenCodePort =
-    inherit IPromptPort
-    abstract AbortSession: sessionId: SessionId -> Task<Result<unit, string>>
-
-    /// Create a physical Host session with an optional Host parent. Unlike
-    /// CreateChildSession this carries no Wanxiangshu managed-child semantics.
-    abstract CreateSession:
-        parentId: SessionId option -> options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
-
-    abstract GetSessionParent: sessionId: SessionId -> Task<Result<SessionId option, string>>
-    abstract CreateChildSession: parentId: SessionId -> options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
-    abstract ListChildren: parentId: SessionId -> Task<Result<OpenCodeChildInfo list, string>>
-    abstract CloseChildSession: childId: SessionId -> Task<Result<unit, string>>
-
-module OpenCodePort =
+module OpenCodePortAdapter =
 
     let private wireModel (model: OpencodeModel) =
         createObj [ "providerID", box model.providerID; "modelID", box model.modelID ]

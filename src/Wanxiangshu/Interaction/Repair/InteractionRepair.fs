@@ -37,7 +37,7 @@ module InteractionRepairWorkflow =
     /// `Superseded` (stale permit) is not a failure: nothing was claimed, nothing
     /// was sent — the system is doing something fresher.
     let private sendRepair
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -87,7 +87,7 @@ module InteractionRepairWorkflow =
 
     /// HOST-004: idle-derived repair sends funnel through one admission point.
     let private trySendIdleRepair
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -110,7 +110,7 @@ module InteractionRepairWorkflow =
         continuationKindOf journal turn = Some PromptAuthority.ContinuationKind.InteractionRepair
 
     let private repairDefect
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -249,14 +249,14 @@ module InteractionRepairWorkflow =
         :> Task
 
     let private admitPermit
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         : Result<QuiescencePermit, QuiescencePermitFailure> =
         quiescence.TryConsume permit |> Result.map (fun () -> permit)
 
     let private consumeThenSendBloggerAabb
         (host: IBloggerRuntimeHost)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -283,7 +283,7 @@ module InteractionRepairWorkflow =
 
     let private sendBloggerNudge
         (host: IBloggerRuntimeHost)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -344,7 +344,7 @@ module InteractionRepairWorkflow =
 
     let private repairOwnedBloggerProtocol
         (host: IBloggerRuntimeHost)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -405,7 +405,7 @@ module InteractionRepairWorkflow =
     /// BloggerRequest there is no protocol budget to spend.
     let repairBloggerProtocol
         (host: IBloggerRuntimeHost)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -472,7 +472,7 @@ module InteractionRepairWorkflow =
     /// continues own the recovery slot — suppress missing-final-report so the
     /// probe's own terminal can promote.
     let repairMissingFinalReport
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -496,7 +496,7 @@ module InteractionRepairWorkflow =
     /// Incomplete in-progress interaction: classify then idle-repair, unless a
     /// ProviderRetryAttempt continue owns the recovery slot.
     let repairIncompleteInteraction
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)

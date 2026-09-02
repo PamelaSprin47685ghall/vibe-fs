@@ -4,24 +4,10 @@ open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Foundation.Identity
 
-[<RequireQualifiedAccess>]
-type AttachedChildObservation =
-    | Missing
-    | Matching of SessionId
-    | Conflicting of SessionId list
-
-[<RequireQualifiedAccess>]
-type AttachedChildDecision =
-    | Create
-    | Adopt of SessionId
-    | RejectConflict of SessionId list
-
-[<RequireQualifiedAccess>]
-module AttachedChildObservation =
-    val decide: AttachedChildObservation -> AttachedChildDecision
-
 type AttachedSessionRuntime =
     new: ?registerParent: (SessionId -> SessionId -> unit) * ?isUsable: (SessionId -> bool) -> AttachedSessionRuntime
+
+    interface IAttachedSessionPort
 
     member TryFind: ownerSessionId: SessionId * role: SyncDelegateRole -> SessionId option
     member TryFindByScope: scope: ReuseScopeId * role: SyncDelegateRole -> SessionId option

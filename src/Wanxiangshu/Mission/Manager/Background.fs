@@ -88,7 +88,7 @@ module ManagerBackground =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         =
         task {
@@ -127,7 +127,7 @@ module ManagerBackground =
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         : Task<BackgroundSettlement> =
         task {

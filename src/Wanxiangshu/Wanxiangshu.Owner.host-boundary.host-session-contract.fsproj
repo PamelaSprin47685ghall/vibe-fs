@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>host-session-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.opencode-host-opencodeport.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <Compile Include="OpenCode/Host/SessionContract.fsi"/>
+    <Compile Include="OpenCode/Host/SessionContract.fs"/>
+    <Compile Include="OpenCode/Host/SessionSnapshot.fsi"/>
+    <Compile Include="OpenCode/Host/SessionSnapshot.fs"/>
+    <Compile Include="OpenCode/Host/SessionHostPort.fsi"/>
+    <Compile Include="OpenCode/Host/SessionHostPort.fs"/>
+  </ItemGroup>
+</Project>

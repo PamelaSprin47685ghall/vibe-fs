@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>managed-session-lifecycle</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>session-attachment-runtime</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.session-attachment-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj"/>
+    <Compile Include="Execution/Session/Attachment/AttachedRuntime.fsi"/>
+    <Compile Include="Execution/Session/Attachment/AttachedRuntime.fs"/>
+    <Compile Include="Execution/Session/Attachment/AttachmentSurface.fsi"/>
+    <Compile Include="Execution/Session/Attachment/AttachmentSurface.fs"/>
+    <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fsi"/>
+    <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fs"/>
+    <Compile Include="OpenCode/Host/SatelliteSurface.fsi"/>
+    <Compile Include="OpenCode/Host/SatelliteSurface.fs"/>
+    <Compile Include="Execution/Session/Recovery/Coordinator.fsi"/>
+    <Compile Include="Execution/Session/Recovery/Coordinator.fs"/>
+    <Compile Include="Execution/Session/Recovery/Surface.fsi"/>
+    <Compile Include="Execution/Session/Recovery/Surface.fs"/>
+  </ItemGroup>
+</Project>

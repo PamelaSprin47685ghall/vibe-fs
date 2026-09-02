@@ -4,7 +4,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
@@ -24,6 +23,7 @@ module DelegationHandoffLedger =
         |> XTraceProjection.headCursor
 
     let prepare
+        (workRecord: DelegationWorkRecordCapability)
         (journal: AgentJournal)
         (parent: SessionId)
         (route: DelegationHandoffRoute)
@@ -35,11 +35,11 @@ module DelegationHandoffLedger =
 
             let! parentRecord =
                 if handoff.IsInitial then
-                    LifecycleWorkRecordProjection.lifecycleWorkRecord (Some journal) parent true
+                    workRecord.ParentWorkRecord parent
                 elif XTraceRange.isEmpty handoff.Range then
                     Task.FromResult None
                 else
-                    LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) parent handoff.Range
+                    workRecord.ParentWorkRecordBounded parent handoff.Range
 
             return
                 { Route = route
@@ -67,6 +67,6 @@ module DelegationHandoffLedger =
             return appended |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
         }
 
-    let port (journal: AgentJournal) : ReusableHandoffPort =
-        { Prepare = fun parent route -> prepare journal parent route
+    let port (workRecord: DelegationWorkRecordCapability) (journal: AgentJournal) : ReusableHandoffPort =
+        { Prepare = fun parent route -> prepare workRecord journal parent route
           CheckpointCompleted = fun parent handoff -> checkpointCompleted journal parent handoff }

@@ -62,7 +62,7 @@ module PluginBoot =
             // This may create the missing user config atomically, but performs no Host call.
             do! ModelRouting.initialize ()
 
-            let portOpt = OpenCodePort.create input
+            let portOpt = OpenCodePortAdapter.create input
 
             let! journalResult = PluginHost.createJournal input
 

@@ -2,7 +2,6 @@ namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Wait
@@ -73,10 +72,10 @@ type SyncDelegateRuntime
         sessions: ISessionHostPort,
         dispatcher: PromptDispatcher.Runtime,
         journal: AgentJournal,
-        attached: AttachedSessionRuntime,
+        attached: IAttachedSessionPort,
         resolveOwnerTier: SessionId -> AgentTier option,
         onDelegateReady: SessionId -> string -> unit,
-        quiescence: SessionQuiescenceGate,
+        quiescence: ISessionQuiescenceGate,
         workRecordFor: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>,
         handoff: ReusableHandoffPort,
         ?workspaceDirectory: string,
@@ -290,6 +289,7 @@ type SyncDelegateRuntime
                 }
           SendPrompt = fun call request -> sendDelegatePrompt call request
           CheckpointCompletedHandoff = fun parent prepared -> handoff.CheckpointCompleted parent prepared
+          TripFatal = FatalProcess.trip
           ResolveBoundAgent =
             fun childId ->
                 let projections = (AgentJournal.snapshot journal).AgentProjections
@@ -430,7 +430,7 @@ type SyncDelegateRuntime
             | Error error -> return Error error
         }
 
-    member _.Attached = attached
+    member _.Attached: IAttachedSessionPort = attached
 
     member _.ObserveProviderToolCall
         (ownerSessionId: SessionId, providerRun: ProviderRunIdentity, role: SyncDelegateRole, callId: ToolCallId)

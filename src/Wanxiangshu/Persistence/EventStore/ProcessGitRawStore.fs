@@ -1,8 +1,5 @@
 namespace Wanxiangshu.Persistence.EventStore
 
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Repository.Programming.Js
-
 open System
 open System.Text
 open System.Threading.Tasks

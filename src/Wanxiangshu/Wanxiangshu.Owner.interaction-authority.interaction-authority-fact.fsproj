@@ -2,7 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>interaction-authority</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>interaction-authority-fact</WanxiangshuOwnerLocality>
-    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>

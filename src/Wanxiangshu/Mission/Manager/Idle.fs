@@ -137,7 +137,7 @@ module ManagerIdle =
         | _ -> false
 
     let private sendIdleEncouragement
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -186,7 +186,7 @@ module ManagerIdle =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (nudgeSent: HashSet<string>)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (turn: ReconciledTurn)
         (life: LifeProjection)
         (permit: QuiescencePermit)
@@ -218,7 +218,7 @@ module ManagerIdle =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (nudgeSent: HashSet<string>)
-        (quiescence: SessionQuiescenceGate)
+        (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (life: LifeProjection)
         : Task =

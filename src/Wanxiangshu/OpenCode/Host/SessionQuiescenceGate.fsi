@@ -1,22 +1,11 @@
-namespace Wanxiangshu.Foundation
-
-type QuiescencePermit = interface end
-
 namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-[<RequireQualifiedAccess>]
-type QuiescencePermitFailure =
-    | WrongOwner
-    | NoFreshIdle
-    | AlreadyConsumed
-    | Superseded
-    | Revoked
-
 type SessionQuiescenceGate =
     new: unit -> SessionQuiescenceGate
+    interface ISessionQuiescenceGate
     member BeginProviderAttempt: sessionId: SessionId -> unit
     member ObservePhysicalUserMessage: sessionId: SessionId * physicalUserMessageId: PhysicalUserMessageId -> unit
     member ObserveIdle: sessionId: SessionId -> QuiescencePermit

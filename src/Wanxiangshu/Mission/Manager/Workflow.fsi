@@ -16,7 +16,7 @@ module ManagerWorkflow =
         journal: AgentJournal option ->
         nudgeSent: HashSet<string> ->
         hasLivePty: (string -> bool) ->
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
             Task
 
@@ -30,7 +30,7 @@ module ManagerWorkflow =
         nudgeSent: HashSet<string> ->
         joinGuardNudges: HashSet<string> ->
         hasLivePty: (string -> bool) ->
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         observeOrdinary: (ReconciledTurnContext -> Task) ->
         context: ReconciledTurnContext ->
             Task

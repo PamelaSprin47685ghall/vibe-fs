@@ -2,11 +2,11 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>knowledge-reuse</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>repository-knowledge-casebook-lifecyclesurface</WanxiangshuOwnerLocality>
-    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-continuation.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-processeventlog.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-surface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.strength-persistence-durabilityport.fsproj"/>

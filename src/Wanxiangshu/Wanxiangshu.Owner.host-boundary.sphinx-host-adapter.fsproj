@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>sphinx-host-adapter</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-mcp.fsproj"/>
+    <Compile Include="OpenCode/Host/SphinxMcpConfig.fsi"/>
+    <Compile Include="OpenCode/Host/SphinxMcpConfig.fs"/>
+    <Compile Include="OpenCode/Host/SphinxMcpConfigSurface.fsi"/>
+    <Compile Include="OpenCode/Host/SphinxMcpConfigSurface.fs"/>
+  </ItemGroup>
+</Project>

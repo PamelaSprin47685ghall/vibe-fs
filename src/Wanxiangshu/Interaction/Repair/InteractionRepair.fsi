@@ -9,7 +9,7 @@ open Wanxiangshu.Persistence.Journal
 module InteractionRepairWorkflow =
     val repairBloggerProtocol:
         host: IBloggerRuntimeHost ->
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
         sessionPort: ISessionHostPort ->
         eventPort: IEventObservationPort ->
@@ -17,7 +17,7 @@ module InteractionRepairWorkflow =
             Task
 
     val repairMissingFinalReport:
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
         sessionPort: ISessionHostPort ->
         eventPort: IEventObservationPort ->
@@ -25,7 +25,7 @@ module InteractionRepairWorkflow =
             Task
 
     val repairIncompleteInteraction:
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
         sessionPort: ISessionHostPort ->
         eventPort: IEventObservationPort ->

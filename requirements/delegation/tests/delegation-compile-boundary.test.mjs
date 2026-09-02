@@ -1,0 +1,86 @@
+import assert from 'node:assert/strict'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import test from 'node:test'
+import { planOwnerCompile } from '../../../scripts/lib/owner-compile.mjs'
+
+const ROOT = resolve(import.meta.dirname, '../../..')
+const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
+const AGGREGATE = join(SOURCE_ROOT, 'Wanxiangshu.fsproj')
+
+const projects = readdirSync(SOURCE_ROOT)
+  .filter((name) => /^Wanxiangshu\.Owner\..+\.fsproj$/.test(name))
+  .map((name) => {
+    const path = join(SOURCE_ROOT, name)
+    const xml = readFileSync(path, 'utf8')
+    return {
+      path,
+      locality: xml.match(/<WanxiangshuOwnerLocality>([^<]+)<\/WanxiangshuOwnerLocality>/)?.[1],
+      kind: xml.match(/<WanxiangshuOwnerLocalityKind>([^<]+)<\/WanxiangshuOwnerLocalityKind>/)?.[1],
+    }
+  })
+
+const requireLocality = (locality) => {
+  const matches = projects.filter((project) => project.locality === locality)
+  assert.equal(matches.length, 1, `${locality} must resolve to exactly one owner project`)
+  return matches[0]
+}
+
+const inspectLocality = (locality) => {
+  const project = requireLocality(locality)
+  const plan = planOwnerCompile({ projectPath: project.path, aggregatePath: AGGREGATE })
+  const sources = plan.compileItems
+    .filter((path) => path.endsWith('.fs'))
+    .map((path) => path.slice(SOURCE_ROOT.length + 1).replaceAll('\\', '/'))
+  return { project, sources }
+}
+
+const EXPECTED_KINDS = new Map([
+  ['delegation-contract', 'contract'],
+  ['delegation-fold', 'runtime'],
+  ['delegation-ledger', 'composition'],
+  ['delegation-sync-runtime', 'runtime'],
+  ['delegation-fork-runtime', 'runtime'],
+  ['delegation-host-adapter', 'adapter'],
+  ['delegation-pty-adapter', 'adapter'],
+  ['delegation-recovery-runtime', 'runtime'],
+])
+
+test('WHAT[DELEG-028] Delegation contract excludes workflow Host PTY and recovery sources', () => {
+  const { project, sources } = inspectLocality('delegation-contract')
+  assert.equal(project.kind, 'contract')
+
+  const forbidden = [
+    /Execution\/Delegation\/SyncDelegate\/(?:Wait|Store|Prompt|Workflow|Runtime)\.fs$/,
+    /Execution\/Delegation\/Fork\/Host\//,
+    /Execution\/Delegation\/Handle\/(?:Controller|JoinInterruptRegistry|CompletionCodec|JoinDrain)\.fs$/,
+    /Execution\/Delegation\/ChildRecoveryWorkflow\.fs$/,
+    /Execution\/Delegation\/.*\/OpenCode\//,
+    /Execution\/Agent\/(?:Program|Errors)\.fs$/,
+    /Process\//,
+  ]
+
+  for (const pattern of forbidden) {
+    assert.ok(!sources.some((source) => pattern.test(source)), `delegation contract leaks ${pattern}`)
+  }
+})
+
+test('WHAT[DELEG-028] Delegation focused localities stay within compile budgets', () => {
+  for (const [locality, kind] of EXPECTED_KINDS) {
+    const inspected = inspectLocality(locality)
+    assert.equal(inspected.project.kind, kind, `${locality} must declare ${kind} kind`)
+    if (kind !== 'composition') {
+      assert.ok(inspected.sources.length <= (kind === 'contract' ? 100 : 185), `${locality} exceeds its production source budget`)
+    }
+  }
+
+  const foldSources = inspectLocality('delegation-fold').sources
+  assert.ok(foldSources.includes('Execution/Delegation/DelegationFactFold.fs'))
+  assert.ok(!foldSources.includes('Execution/Delegation/HandoffLedger.fs'))
+  assert.ok(inspectLocality('delegation-ledger').sources.includes('Execution/Delegation/HandoffLedger.fs'))
+  assert.ok(inspectLocality('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Runtime.fs'))
+  assert.ok(inspectLocality('delegation-fork-runtime').sources.includes('Execution/Delegation/Fork/Runtime.fs'))
+  assert.ok(inspectLocality('delegation-host-adapter').sources.includes('Execution/Delegation/Fork/Host/Runtime.fs'))
+  assert.ok(inspectLocality('delegation-pty-adapter').sources.includes('Execution/Delegation/Fork/Host/Pty.fs'))
+  assert.ok(inspectLocality('delegation-recovery-runtime').sources.includes('Execution/Delegation/ChildRecoveryWorkflow.fs'))
+})

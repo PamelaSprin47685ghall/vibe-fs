@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>durable-convergence</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>eventstore-merge-runtime</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
+    <Compile Include="Persistence/EventStore/EventKWayMerge.fsi"/>
+    <Compile Include="Persistence/EventStore/EventKWayMerge.fs"/>
+  </ItemGroup>
+</Project>

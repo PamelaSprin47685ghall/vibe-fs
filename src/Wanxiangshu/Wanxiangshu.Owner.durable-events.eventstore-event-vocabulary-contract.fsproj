@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>durable-events</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>eventstore-event-vocabulary-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-event-vocabulary-contract.fsproj"/>
+    <Compile Include="Persistence/EventStore/EventVocabulary.fsi"/>
+    <Compile Include="Persistence/EventStore/EventVocabulary.fs"/>
+  </ItemGroup>
+</Project>

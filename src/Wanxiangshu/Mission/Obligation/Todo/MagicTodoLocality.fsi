@@ -28,7 +28,7 @@ module MagicTodoLocality =
 
     [<RequireQualifiedAccess>]
     type LocalityRejection =
-        | Snapshot of SessionSnapshotPort.ToolCallLocationError
+        | Snapshot of SessionSnapshot.ToolCallLocationError
         | XTraceUnavailable
         | XTraceMissing of providerRun: ProviderRunIdentity * toolCallId: ToolCallId * hostToolPartId: HostToolPartId
         | XTraceAmbiguous of providerRun: ProviderRunIdentity * toolCallId: ToolCallId * hostToolPartId: HostToolPartId
@@ -36,7 +36,7 @@ module MagicTodoLocality =
     [<RequireQualifiedAccess>]
     type InputMaterializationRejection =
         | SnapshotUnavailable of reason: string
-        | Snapshot of SessionSnapshotPort.ToolCallLocationError
+        | Snapshot of SessionSnapshot.ToolCallLocationError
         | CarrierChanged
         | InputMismatch
 

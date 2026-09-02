@@ -2,6 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>work-record</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-workrecord-surface</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
@@ -11,6 +12,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-capture.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.work-record.mission-workrecord-model.fsproj"/>
     <Compile Include="Mission/WorkRecord/Surface.fsi"/>
     <Compile Include="Mission/WorkRecord/Surface.fs"/>

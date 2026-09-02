@@ -2,6 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>participant-identity</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>foundation-roles</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Foundation/Roles.fsi"/>

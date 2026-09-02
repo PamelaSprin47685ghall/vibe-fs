@@ -105,3 +105,9 @@ terminal 能完成或失败 work unit，当且仅当它属于该 work unit 实�
 ## DELEG-027: 新 assignment 不得伪装成 busy nudge
 
 同一 logical route 同时至多一个 active work unit。已有 work unit 未终结时到来的新 assignment 必须明确拒绝；`BusyAgentNudge` 只允许作为既有 LogicalRun 的内部 continuation，不得承载新的 fork/synchronous charge。前一 work unit 已完成后，同一 participant 必须立即可承接下一 work unit，无需依赖 join 消费或重新创建 participant。
+
+## DELEG-028: Delegation contract/runtime 编译闭包必须按 effect 边界分层
+
+`Delegation.Contract` 只拥有 command/result、fact、typed payload、logical route、completion evidence 与 injected capability；`Delegation.Fold` 只实现纯投影；`Delegation.Ledger` 仅在 composition 边界把 fold 连接到 canonical `AgentJournal`；`Delegation.Sync.Runtime`、`Delegation.Fork.Runtime` 与 `Delegation.Recovery.Runtime` 消费 contract/fold 并实现各自 CE。Host callback/dispatch 与 PTY 分别位于 `Delegation.Host.Adapter`、`Delegation.Pty.Adapter`，只能由 composition root 绑定。Contract 的 direct/transitive ProjectReference closure 不得包含 Host、OpenCode tool、PTY、process、EventStore runtime、sync/fork workflow 或 recovery runtime。
+
+`Delegation.Contract` 的 transitive production `.fs` 不得超过 100；每个 focused fold/runtime/adapter locality 不得超过 185。owner compile 必须把选定 locality 的 ProjectReference closure 合并为 aggregate-order、零 ProjectReference 的单一 flat project，并只启动一次 Fable。

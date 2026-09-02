@@ -4,16 +4,6 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// Typed semantic content decoded from one Host message part. Transport-only
-/// fields never cross this boundary.
-[<RequireQualifiedAccess>]
-type MessagePart =
-    | Text of text: string
-    | Reasoning of text: string
-    | ToolCall of callId: string * name: string * argsCanonical: string
-    | ToolResult of callId: string * resultCanonical: string
-    | Activity of kind: string
-
 /// Raw OpenCode part codec. This is the only message-part module allowed to
 /// inspect dynamic Host objects.
 module HostMessageCodec =

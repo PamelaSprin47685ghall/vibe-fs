@@ -115,6 +115,6 @@ test('WHAT[DURABLE-EVENTS-003] distinct_EventIds_are_both_retained', () => {
   assert.equal(merged.events.length, 2)
 })
 
-test('WHAT[DURABLE-EVENTS-016] StoreTypes_exposes_canonical_store_ref', () => {
+test('WHAT[DURABLE-EVENTS-016] Git_contract_exposes_canonical_store_ref', () => {
   assert.equal(eventStore.canonicalStoreRef, 'refs/wanxiang/store')
 })

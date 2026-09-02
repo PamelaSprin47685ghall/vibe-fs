@@ -99,3 +99,15 @@ Requirement、领域状态与恢复策略只能依赖受支持的公开 Hook/SDK
 ## HOST-BOUNDARY-025: 单一因果诊断与显式脱敏
 
 Host 只通过 `ReliabilityDiagnostics.CausalDiagnosticRecord` 发布结构化因果记录。可用事实携带 exact logical run、session、physical user message、provider run、agent、role、request kind、state transition、typed failure/retry/fallback、capacity、recovery 与 persistence commitment；不可用事实必须为 `None/null`，严禁猜测。schema 不接收 prompt、content、token、credential、cookie 或 path 字段；adapter 对允许的自由文本显式脱敏并压成单行。known typed failure 只输出一行 JSON 且无 stack。diagnostic emit/counter/query 失败不得改变 Hook result、admission、retry、recovery、capacity settlement 或 durable fact。
+
+## HOST-BOUNDARY-026: Host Contract/Runtime 编译分界与单向依赖
+
+Host 边界严格切分为 Contract、Runtime 与 Adapter 架构 locality：
+- `Host.Session.Contract`（`host-session-contract`）：仅包含会话静止 capability 与纯 `SessionSnapshot` 词汇、端口、定位 decision，不依赖 SDK/HTTP 投影、具体 Host 运行时、进程控制、诊断或 Sphinx MCP。
+- `Host.Signal.Contract`（`host-signal-contract`）：包含规范的宿主唤醒信号与编解码器词汇表，无状态且零副作用。
+- `Host.Diagnostics.Runtime`（`host-diagnostics-runtime`）：封闭 Hook 策略元数据与因果诊断单向消费 Contract，不得反向侵入应用契约闭包。
+- `Host.Signal.Adapter`（`host-signal-adapter`）：宿主信号路由、物理订阅与事件总线适配器，仅作为 Adapter 实现契约。
+- `Host.Session.Runtime`（`host-session-runtime`）：SDK/HTTP 快照投影、进程级静止门禁状态机（`SessionQuiescenceGate`、`QuiescenceSurface`）、消息就地变更与宿主上下文投影，禁止被普通业务契约直接引用。
+- `Sphinx.Host.Adapter`（`sphinx-host-adapter`）：外部 Sphinx MCP 启动配置与环境适配器，隔离于核心契约之外。
+
+普通业务契约仅允许引用 `Host.Session.Contract` 或 `Host.Signal.Contract`，严禁传递编译 Sphinx、诊断、消息就地修改或具体 Host 运行时。

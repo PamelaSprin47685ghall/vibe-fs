@@ -12,7 +12,7 @@ module OrdinaryTurnWorkflow =
     /// Revisit a previously delivered turn only for work whose authority comes
     /// from a fresh idle observation. Terminal plumbing remains first-delivery only.
     val observeIdle:
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         sessionPort: ISessionHostPort ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
@@ -27,6 +27,6 @@ module OrdinaryTurnWorkflow =
         joinGuardNudges: HashSet<string> ->
         hasLivePty: (string -> bool) ->
         abortCause: AbortCause ->
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
             Task

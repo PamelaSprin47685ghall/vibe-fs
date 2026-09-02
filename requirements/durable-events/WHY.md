@@ -11,6 +11,7 @@
 - **Event 是唯一真相**：动态业务状态完全由不可变事件流表达，状态投影仅是纯函数的衍生视图；
 - **Append-Only 与单进程单写者**：每个进程独占单个持续增长的本地 NDJSON 文件，写入成本与历史大小无关；
 - **单一 Integrator**：历史合并与当前状态折叠由唯一的 Canonical Integrator 统一裁决。
+- **领域契约与物理实现分离**：业务消费者只编译 `EventEnvelope`、append/read port 与稳定事件词汇；本地文件、Git object/ref、codec、replay 与 Host adapter 留在 Runtime/Adapter locality。否则 Fable 会把整条物理实现闭包合并进每个消费者，owner 工程只剩名义边界。
 
 ## 2. 核心不变量与破坏后果
 

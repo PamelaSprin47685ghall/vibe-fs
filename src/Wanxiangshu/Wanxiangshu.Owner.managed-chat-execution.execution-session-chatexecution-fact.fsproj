@@ -2,7 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>managed-chat-execution</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>execution-session-chatexecution-fact</WanxiangshuOwnerLocality>
-    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
@@ -15,8 +15,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <Compile Include="Execution/Session/ChatExecution/Fact.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Fact.fs"/>
-    <Compile Include="Execution/Session/ChatExecution/Projection.fsi"/>
-    <Compile Include="Execution/Session/ChatExecution/Projection.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Recovery.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Recovery.fs"/>
     <Compile Include="Execution/Session/ChatExecution/RecoveryRuntime.fsi"/>

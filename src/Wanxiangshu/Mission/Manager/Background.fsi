@@ -30,6 +30,6 @@ module ManagerBackground =
         journal: AgentJournal option ->
         joinGuardNudges: HashSet<string> ->
         hasLivePty: (string -> bool) ->
-        quiescence: SessionQuiescenceGate ->
+        quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
             Task<BackgroundSettlement>

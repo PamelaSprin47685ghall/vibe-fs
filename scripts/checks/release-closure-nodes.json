@@ -18,9 +18,13 @@
         "src/Wanxiangshu/Persistence/EventStore/EventStoreHandle.fs",
         "src/Wanxiangshu/Persistence/EventStore/EventVocabulary.fs",
         "src/Wanxiangshu/Persistence/EventStore/GitObjectDatabase.fs",
+        "src/Wanxiangshu/Persistence/EventStore/GitTypes.fs",
         "src/Wanxiangshu/Persistence/EventStore/MergeSurface.fs",
         "src/Wanxiangshu/Persistence/EventStore/Model.fs",
+        "src/Wanxiangshu/Persistence/EventStore/Port.fs",
+        "src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs",
         "src/Wanxiangshu/Persistence/EventStore/ProcessGitRawStore.fs",
+        "src/Wanxiangshu/Persistence/EventStore/Store.fs",
         "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs",
         "src/Wanxiangshu/Persistence/EventStore/StrengthSurface.fs",
         "src/Wanxiangshu/Persistence/EventStore/Surface.fs",
@@ -46,7 +50,8 @@
         "src/Wanxiangshu/Strength/Persistence/Store.fs"
       ],
       "proofs": [
-        "requirements/durable-events/tests/canonical-integrator.test.mjs"
+        "requirements/durable-events/tests/canonical-integrator.test.mjs",
+        "requirements/durable-events/tests/event-store-compile-boundary.test.mjs"
       ],
       "publishes": [
         "DurableEvents.Contract",
@@ -60,6 +65,7 @@
         "src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs",
         "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs",
         "src/Wanxiangshu/OpenCode/Host/ModelRoutingSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/OpenCodeContract.fs",
         "src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/PlannerSurface.fs",
         "src/Wanxiangshu/Strength/Policy.fs"
@@ -383,11 +389,13 @@
       "state": "DONE",
       "files": [
         "src/Wanxiangshu/Strength/Budget.fs",
+        "src/Wanxiangshu/Strength/EventVocabulary.fs",
         "src/Wanxiangshu/Strength/Events.fs",
         "src/Wanxiangshu/Strength/Prediction/Predictor.fs",
         "src/Wanxiangshu/Strength/Replica/Transform.fs"
       ],
       "proofs": [
+        "requirements/durable-events/tests/event-store-compile-boundary.test.mjs",
         "requirements/speculative-investigation/tests/replica-transform.test.mjs"
       ],
       "publishes": [
@@ -462,9 +470,7 @@
         "src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs",
         "src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs",
         "src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs",
-        "src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs",
         "src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs",
-        "src/Wanxiangshu/Persistence/EventStore/Store.fs",
         "src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs"
       ],
       "proofs": [
@@ -1580,6 +1586,7 @@
         "src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs",
         "src/Wanxiangshu/OpenCode/Host/GitTree.fs",
         "src/Wanxiangshu/OpenCode/Host/HostBoundarySurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/Message.fs",
         "src/Wanxiangshu/OpenCode/Host/HostMessageProjection.fs",
         "src/Wanxiangshu/OpenCode/Host/HostSessionContext.fs",
         "src/Wanxiangshu/OpenCode/Host/HostSessionContextSurface.fs",
@@ -1597,6 +1604,9 @@
         "src/Wanxiangshu/OpenCode/Host/QuiescenceSurface.fs",
         "src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnostics.fs",
         "src/Wanxiangshu/OpenCode/Host/ReliabilityDiagnosticsSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionContract.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionHostPort.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionSnapshot.fs",
         "src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs",
         "src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs",
         "src/Wanxiangshu/OpenCode/Host/SessionSnapshotSurface.fs",
@@ -1612,12 +1622,14 @@
         "src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs",
         "src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs",
         "src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs",
+        "src/Wanxiangshu/OpenCode/Signals/EventContract.fs",
         "src/Wanxiangshu/OpenCode/Signals/HostSignal.fs",
         "src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs",
         "src/Wanxiangshu/OpenCode/Signals/HostSignalSubscribe.fs"
       ],
       "proofs": [
-        "requirements/host-boundary/tests/chat-hook-settlement.test.mjs"
+        "requirements/host-boundary/tests/chat-hook-settlement.test.mjs",
+        "requirements/host-boundary/tests/host-session-contract-closure.test.mjs"
       ],
       "publishes": [
         "host-boundary.Contract"
@@ -1690,7 +1702,8 @@
         "src/Wanxiangshu/Execution/Session/AgentCompletion.fs"
       ],
       "proofs": [
-        "requirements/delegation/tests/delegated-tool-estimate-facts.test.mjs"
+        "requirements/delegation/tests/delegated-tool-estimate-facts.test.mjs",
+        "requirements/delegation/tests/delegation-compile-boundary.test.mjs"
       ],
       "publishes": [
         "delegation.Contract"

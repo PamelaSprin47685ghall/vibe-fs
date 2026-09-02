@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>delegation-host-adapter</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-causalwait.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptsurface.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-recovery-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fork-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-handle-surface.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-ledger.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-sync-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.opencode-host-opencodeport.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.execution-session-recoveryclosureprojection.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-processrequest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.review-assurance.mission-review-barrier-projection.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-capture.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <Compile Include="Execution/Delegation/SyncDelegate/Runtime.fsi"/>
+    <Compile Include="Execution/Delegation/SyncDelegate/Runtime.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Host/PendingRun.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/Host/PendingRun.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Host/BusyNudge.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/Host/BusyNudge.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Host/RunLifecycle.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/Host/RunLifecycle.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Host/ChildDispatch.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/Host/ChildDispatch.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Host/AgentOwner.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/Host/AgentOwner.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Host/Runtime.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/Host/Runtime.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Host/Join.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/Host/Join.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Host/Agent.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/Host/Agent.fs"/>
+  </ItemGroup>
+</Project>

@@ -1,1 +1,18 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><WanxiangshuSemanticOwner>durable-convergence</WanxiangshuSemanticOwner><WanxiangshuOwnerLocality>persistence-eventstore-processeventlog</WanxiangshuOwnerLocality></PropertyGroup><ItemGroup><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/><Compile Include="Persistence/EventStore/ProcessEventLog.fsi"/><Compile Include="Persistence/EventStore/ProcessEventLog.fs"/><Compile Include="Persistence/EventStore/EventKWayMerge.fsi"/><Compile Include="Persistence/EventStore/EventKWayMerge.fs"/><Compile Include="Persistence/EventStore/IntegrationKernel.fsi"/><Compile Include="Persistence/EventStore/IntegrationKernel.fs"/><Compile Include="Persistence/EventStore/Store.fsi"/><Compile Include="Persistence/EventStore/Store.fs"/><Compile Include="Persistence/EventStore/WriterStreamSync.fsi"/><Compile Include="Persistence/EventStore/WriterStreamSync.fs"/><Compile Include="Persistence/EventStore/RetentionSurface.fsi"/><Compile Include="Persistence/EventStore/RetentionSurface.fs"/></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>durable-events</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>eventstore-core-runtime</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.eventstore-integrator-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.eventstore-event-vocabulary-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
+    <Compile Include="Persistence/EventStore/CanonicalEventCodec.fsi"/>
+    <Compile Include="Persistence/EventStore/CanonicalEventCodec.fs"/>
+    <Compile Include="Persistence/EventStore/ProcessEventLog.fsi"/>
+    <Compile Include="Persistence/EventStore/ProcessEventLog.fs"/>
+    <Compile Include="Persistence/EventStore/Store.fsi"/>
+    <Compile Include="Persistence/EventStore/Store.fs"/>
+  </ItemGroup>
+</Project>

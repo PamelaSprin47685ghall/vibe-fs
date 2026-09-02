@@ -2,6 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>semantic-trace</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>context-trace-cursor</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Context/Trace/Cursor.fsi"/>

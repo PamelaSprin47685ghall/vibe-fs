@@ -11,6 +11,7 @@ const SHARED_PROPS = join(SOURCE_ROOT, 'Directory.Build.props')
 const OWNERS = join(ROOT, 'scripts/checks/semantic-owners.json')
 const CONTRACTS = join(ROOT, 'scripts/checks/published-contracts.json')
 const OWNER_PROJECT = /^Wanxiangshu\.Owner\..+\.fsproj$/
+const LOCALITY_KINDS = new Set(['contract', 'runtime', 'adapter', 'composition'])
 
 const norm = (value) => value.replace(/\\/g, '/')
 const repoPath = (value) => norm(relative(ROOT, value))
@@ -20,13 +21,14 @@ function parseProject(projectPath) {
   const text = readFileSync(projectPath, 'utf8')
   const owner = text.match(/<WanxiangshuSemanticOwner>([^<]+)<\/WanxiangshuSemanticOwner>/)?.[1]?.trim() ?? ''
   const locality = text.match(/<WanxiangshuOwnerLocality>([^<]+)<\/WanxiangshuOwnerLocality>/)?.[1]?.trim() ?? ''
+  const kind = text.match(/<WanxiangshuOwnerLocalityKind>([^<]+)<\/WanxiangshuOwnerLocalityKind>/)?.[1]?.trim() ?? ''
   const compile = [...text.matchAll(/<Compile\s+Include="([^"]+\.fs)"\s*\/?\s*>/g)]
     .map((match) => repoPath(resolve(dirname(projectPath), match[1])))
   const signatures = [...text.matchAll(/<Compile\s+Include="([^"]+\.fsi)"\s*\/?\s*>/g)]
     .map((match) => repoPath(resolve(dirname(projectPath), match[1])))
   const references = [...text.matchAll(/<ProjectReference\s+Include="([^"]+\.fsproj)"\s*\/?\s*>/g)]
     .map((match) => resolve(dirname(projectPath), match[1]))
-  return { projectPath, text, owner, locality, compile, signatures, references }
+  return { projectPath, text, owner, locality, kind, compile, signatures, references }
 }
 
 function cycleOf(projects) {
@@ -67,6 +69,64 @@ function projectClosure(projects, roots) {
     }
   }
   return closure
+}
+
+export function projectArchitectureViolations(projects, { contractSourceBudget = 100 } = {}) {
+  const violations = []
+
+  for (const project of projects.values()) {
+    const label = repoPath(project.projectPath)
+
+    if (!project.kind) {
+      violations.push(`locality-kind: ${label}: missing WanxiangshuOwnerLocalityKind`)
+      continue
+    }
+
+    if (!LOCALITY_KINDS.has(project.kind)) {
+      violations.push(`locality-kind: ${label}: unknown WanxiangshuOwnerLocalityKind '${project.kind}'`)
+    }
+  }
+
+  for (const project of projects.values()) {
+    if (project.kind === 'contract') {
+      const closure = projectClosure(projects, [project.projectPath])
+      const sources = new Set()
+
+      for (const projectPath of closure) {
+        const dependency = projects.get(projectPath)
+        for (const source of dependency?.compile ?? []) sources.add(source)
+
+        if (dependency && dependency.kind !== 'contract') {
+          violations.push(
+            `contract-runtime-direction: ${repoPath(project.projectPath)}: contract closure contains non-contract ${repoPath(projectPath)} (${dependency.kind || 'missing'})`,
+          )
+        }
+      }
+
+      if (sources.size > contractSourceBudget) {
+        violations.push(
+          `contract-closure-budget: ${repoPath(project.projectPath)}: contract closure has ${sources.size} production .fs; budget is ${contractSourceBudget}`,
+        )
+      }
+    }
+
+    for (const reference of project.references) {
+      const provider = projects.get(reference)
+      const foreignImplementation = provider
+        && provider.owner !== project.owner
+        && provider.kind === 'runtime'
+
+      if (!foreignImplementation) continue
+
+      if (project.kind !== 'composition') {
+        violations.push(
+          `foreign-runtime-reference/composition-only-runtime-binding: ${repoPath(project.projectPath)} -> ${repoPath(reference)}: only composition may reference foreign ${provider.kind}`,
+        )
+      }
+    }
+  }
+
+  return violations
 }
 
 function allowedForeignReferences(projects, projectOfSource, contracts) {
@@ -147,6 +207,9 @@ export function checkOwnerProjects() {
   const cycle = cycleOf(projects)
   if (cycle) fail(`owner project graph contains SCC/cycle: ${cycle.map(repoPath).join(' -> ')}`)
 
+  const allowed = allowedForeignReferences(projects, projectOfSource, contractManifest)
+  for (const violation of projectArchitectureViolations(projects)) fail(violation)
+
   const contractPaths = new Set((contractManifest.contracts ?? []).map((entry) => entry.path))
   const contractSupportPaths = new Set()
   for (const entry of contractManifest.compile_contract_support ?? []) {
@@ -224,7 +287,6 @@ export function checkOwnerProjects() {
     )
   }
 
-  const allowed = allowedForeignReferences(projects, projectOfSource, contractManifest)
   for (const project of projects.values()) {
     for (const reference of project.references) {
       const provider = projects.get(reference)
