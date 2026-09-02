@@ -29,7 +29,7 @@
 
 # Local delivery verification logs (not product)
 /.delivery-logs/
-/.fable-build/
+.fable-build/
 
 # Logs
 *.log

@@ -19,7 +19,7 @@ test('WHAT[OBLIGATION-LEDGER-020] quality assurance is consolidated to Finality 
 
 test('WHAT[OBLIGATION-LEDGER-025] deferred prepare synchronizes the Host snapshot before freezing ReviewFrontier', () => {
   const source = readFileSync(membraneSource, 'utf8')
-  const locate = source.indexOf('SessionSnapshotPort.locateToolCall callId messages')
+  const locate = source.indexOf('SessionSnapshot.locateToolCall callId messages')
   const prefix = source.indexOf('messages |> List.takeWhile (fun message -> message.Id <> currentRunId)')
   const capture = source.indexOf('XTraceCapture.captureSessionMessagesWithReceipt (Some durable) sessionId priorMessages')
   const resolve = source.indexOf('MagicTodoLocality.resolve sessionId messages (AgentJournal.snapshot durable) callId')

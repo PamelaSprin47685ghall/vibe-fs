@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import test from 'node:test'
 import {
+  compileIncremental,
   compileOwnerProject,
   materializeOwnerCompile,
   planImpactCompile,
@@ -88,14 +89,9 @@ test('WHAT[STRUCTURED-WORKFLOW-012] implementation changes exclude reverse consu
   }
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-012] impact watch launches one Fable process on the flat project', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-012] incremental compile executes focused flat compile and records cache', async () => {
   const fixture = createFixture()
   try {
-    const plan = planImpactCompile({
-      changedPaths: [join(fixture.root, 'Source/Runtime.fs')],
-      projectDirectory: fixture.root,
-      aggregatePath: fixture.aggregate,
-    })
     const calls = []
     const spawn = (command, args) => {
       calls.push({ command, args })
@@ -109,21 +105,27 @@ test('WHAT[STRUCTURED-WORKFLOW-012] impact watch launches one Fable process on t
       return child
     }
 
-    const result = await compileOwnerProject({
-      compilePlan: plan,
+    const outputDir = join(fixture.root, 'dist')
+    const manifestPath = join(fixture.root, '.fable-build/build-manifest.json')
+
+    const result = await compileIncremental({
+      changedPaths: [join(fixture.root, 'Source/Runtime.fs')],
+      aggregatePath: fixture.aggregate,
       rootPropsPath: join(fixture.root, 'Directory.Build.props'),
-      scratchRoot: join(fixture.root, '.scratch-watch'),
+      scratchRoot: join(fixture.root, '.scratch'),
+      outputDir,
+      manifestPath,
       spawn,
       stdio: 'pipe',
-      watch: true,
     })
 
     assert.equal(result.ok, true)
+    assert.equal(result.cached, false)
     assert.equal(calls.length, 1)
     assert.equal(calls[0].command, 'dotnet')
-    assert.equal(calls[0].args.filter((arg) => arg === '--watch').length, 1)
     assert.notEqual(calls[0].args[4], fixture.projects.runtime)
     assert.ok(!readFileSync(calls[0].args[4], 'utf8').includes('<ProjectReference'))
+    assert.ok(existsSync(manifestPath), 'manifest must be recorded on successful compilation')
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }

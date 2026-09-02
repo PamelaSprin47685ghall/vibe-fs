@@ -11,6 +11,7 @@ export const SCHEMA_VERSION = 'owner-compile-v3'
 export const DEFAULT_AGGREGATE_PATH = path.resolve(REPO_ROOT, 'src/Wanxiangshu/Wanxiangshu.fsproj')
 export const DEFAULT_SCRATCH_ROOT = path.resolve(REPO_ROOT, '.fable-build/owner-compile')
 export const DEFAULT_ROOT_PROPS_PATH = path.resolve(REPO_ROOT, 'Directory.Build.props')
+export const DEFAULT_BUILD_MANIFEST_PATH = path.resolve(REPO_ROOT, '.fable-build/build-manifest.json')
 
 function norm(filePath) {
   return path.resolve(filePath).replace(/\\/g, '/')
@@ -654,7 +655,7 @@ function generateFlatProjectXml(aggregateContent, aggregatePath, orderedCompileI
  * aggregate contents, root props, and exact ordered compile item bytes.
  */
 export function materializeOwnerCompile(plan, {
-  scratchRoot = DEFAULT_SCRATCH_ROOT,
+  scratchRoot,
   rootPropsPath = DEFAULT_ROOT_PROPS_PATH,
   outputDir,
 } = {}) {
@@ -662,7 +663,10 @@ export function materializeOwnerCompile(plan, {
     throw new Error('Valid plan object is required for materializeOwnerCompile')
   }
 
-  const resolvedScratchRoot = norm(scratchRoot)
+  const defaultScratch = outputDir
+    ? path.resolve(path.dirname(plan.aggregatePath), '.fable-build')
+    : DEFAULT_SCRATCH_ROOT
+  const resolvedScratchRoot = norm(scratchRoot ?? defaultScratch)
   const resolvedRootPropsPath = norm(rootPropsPath)
 
   if (!fs.existsSync(resolvedRootPropsPath)) {
@@ -843,14 +847,13 @@ export function removeOutputDirectory(outputDir) {
 export async function compileOwnerProject({
   projectPath,
   aggregatePath = DEFAULT_AGGREGATE_PATH,
-  scratchRoot = DEFAULT_SCRATCH_ROOT,
+  scratchRoot,
   rootPropsPath = DEFAULT_ROOT_PROPS_PATH,
   outputDir,
   stdio = 'inherit',
   env = process.env,
   spawn = nodeSpawn,
   compilePlan,
-  watch = false,
 } = {}) {
   const plan = compilePlan ?? planOwnerCompile({ projectPath, aggregatePath })
   const materialized = materializeOwnerCompile(plan, { scratchRoot, rootPropsPath, outputDir })
@@ -861,11 +864,14 @@ export async function compileOwnerProject({
     materialized.fingerprint,
     materialized.outputPath,
   )
+  const isScratchOutput = materialized.outputPath.startsWith(materialized.scratchDir)
 
   if (!isWarm) {
-    // Missing or invalid marker: delete output directory recursively while retaining isolated restore assets
+    // Missing or invalid marker: delete scratch output directory recursively while retaining isolated restore assets
     removeSuccessMarker(materialized.markerPath)
-    removeOutputDirectory(materialized.outputPath)
+    if (isScratchOutput) {
+      removeOutputDirectory(materialized.outputPath)
+    }
     fs.mkdirSync(materialized.outputPath, { recursive: true })
   } else {
     fs.mkdirSync(materialized.outputPath, { recursive: true })
@@ -884,14 +890,11 @@ export async function compileOwnerProject({
     '-o',
     materialized.outputPath,
     '--noGitignore',
+    '--noCache',
   ]
 
   if (hasAssets) {
     args.push('--noRestore')
-  }
-
-  if (watch) {
-    args.push('--watch')
   }
 
   const startTime = Date.now()
@@ -949,7 +952,9 @@ export async function compileOwnerProject({
     }
   } catch (err) {
     removeSuccessMarker(materialized.markerPath)
-    removeOutputDirectory(materialized.outputPath)
+    if (isScratchOutput) {
+      removeOutputDirectory(materialized.outputPath)
+    }
     throw err
   }
 
@@ -964,15 +969,19 @@ export async function compileOwnerProject({
       ok = false
       result.code = 1
       removeSuccessMarker(materialized.markerPath)
-      removeOutputDirectory(materialized.outputPath)
+      if (isScratchOutput) {
+        removeOutputDirectory(materialized.outputPath)
+      }
     } else {
       // Atomically write marker
       writeSuccessMarker(materialized.markerPath, materialized.fingerprint)
     }
   } else {
-    // Nonzero or signal: remove marker and partial output
+    // Nonzero or signal: remove marker and partial scratch output
     removeSuccessMarker(materialized.markerPath)
-    removeOutputDirectory(materialized.outputPath)
+    if (isScratchOutput) {
+      removeOutputDirectory(materialized.outputPath)
+    }
   }
 
   if (ok && stdio !== 'pipe') {
@@ -996,5 +1005,292 @@ export async function compileOwnerProject({
     fingerprint: materialized.fingerprint,
     elapsedMs,
     cached: false,
+  }
+}
+
+/**
+ * Computes SHA-256 hash for a given file path.
+ */
+export function computeFileHash(filePath) {
+  const content = fs.readFileSync(filePath)
+  return crypto.createHash('sha256').update(content).digest('hex')
+}
+
+/**
+ * Collects all tracked production and configuration inputs for incremental build tracking.
+ */
+export function collectTrackedInputs({
+  root = REPO_ROOT,
+  aggregatePath = DEFAULT_AGGREGATE_PATH,
+  projectDirectory,
+} = {}) {
+  const resolvedAggregate = norm(aggregatePath)
+  const resolvedProjectDirectory = norm(projectDirectory ?? path.dirname(resolvedAggregate))
+  const aggregate = parseAggregateProject(resolvedAggregate)
+  const projectPaths = discoverOwnerProjects(resolvedProjectDirectory, resolvedAggregate)
+
+  const tracked = new Set()
+  tracked.add(resolvedAggregate)
+
+  for (const item of aggregate.compileItems) {
+    tracked.add(item)
+  }
+
+  for (const proj of projectPaths) {
+    tracked.add(proj)
+  }
+
+  const configCandidates = [
+    path.resolve(root, 'Directory.Build.props'),
+    path.resolve(root, 'Directory.Build.targets'),
+    path.resolve(root, 'package.json'),
+    path.resolve(root, 'package-lock.json'),
+    path.resolve(root, '.config/dotnet-tools.json'),
+    path.resolve(resolvedProjectDirectory, 'Directory.Build.props'),
+  ]
+
+  for (const config of configCandidates) {
+    if (fs.existsSync(config)) {
+      tracked.add(norm(config))
+    }
+  }
+
+  return [...tracked].sort()
+}
+
+/**
+ * Detects modified, added, or removed inputs by comparing against the recorded build manifest.
+ */
+export function detectChangedFiles({
+  root = REPO_ROOT,
+  aggregatePath = DEFAULT_AGGREGATE_PATH,
+  manifestPath = DEFAULT_BUILD_MANIFEST_PATH,
+  outputDir,
+} = {}) {
+  const resolvedOutputDir = norm(outputDir ?? path.resolve(root, 'dist'))
+  const resolvedManifestPath = norm(manifestPath)
+  const trackedFiles = collectTrackedInputs({ root, aggregatePath })
+
+  const essentialOutputs = [
+    path.join(resolvedOutputDir, 'OpenCode/Plugin/Plugin.js'),
+    path.join(resolvedOutputDir, 'Sphinx/McpServer.js'),
+  ]
+
+  const hasOutputs = fs.existsSync(resolvedOutputDir)
+    && essentialOutputs.every((p) => fs.existsSync(p))
+    && hasEmittedJsFiles(resolvedOutputDir)
+
+  let manifest = null
+  if (fs.existsSync(resolvedManifestPath)) {
+    try {
+      manifest = JSON.parse(fs.readFileSync(resolvedManifestPath, 'utf8'))
+    } catch {
+      manifest = null
+    }
+  }
+
+  if (!manifest || manifest.schema !== SCHEMA_VERSION || !hasOutputs) {
+    const currentFiles = {}
+    for (const file of trackedFiles) {
+      if (fs.existsSync(file)) {
+        const stat = fs.statSync(file)
+        const hash = computeFileHash(file)
+        currentFiles[file] = { mtimeMs: stat.mtimeMs, size: stat.size, hash }
+      }
+    }
+    return {
+      changedPaths: trackedFiles,
+      isCleanBuild: true,
+      manifest: null,
+      currentFiles,
+    }
+  }
+
+  const oldFiles = manifest.files ?? {}
+  const currentFiles = {}
+  const changedPaths = []
+
+  for (const file of trackedFiles) {
+    if (!fs.existsSync(file)) {
+      changedPaths.push(file)
+      continue
+    }
+
+    const stat = fs.statSync(file)
+    const oldEntry = oldFiles[file]
+
+    let hash
+    if (oldEntry && oldEntry.mtimeMs === stat.mtimeMs && oldEntry.size === stat.size && oldEntry.hash) {
+      hash = oldEntry.hash
+    } else {
+      hash = computeFileHash(file)
+    }
+
+    currentFiles[file] = { mtimeMs: stat.mtimeMs, size: stat.size, hash }
+
+    if (!oldEntry || oldEntry.hash !== hash) {
+      changedPaths.push(file)
+    }
+  }
+
+  // Check for deleted files that were in manifest
+  for (const oldFile of Object.keys(oldFiles)) {
+    if (!currentFiles[oldFile] && !fs.existsSync(oldFile)) {
+      changedPaths.push(oldFile)
+    }
+  }
+
+  return {
+    changedPaths: [...new Set(changedPaths)].sort(),
+    isCleanBuild: false,
+    manifest,
+    currentFiles,
+  }
+}
+
+/**
+ * Executes automatic freshness-driven incremental compilation.
+ */
+export async function compileIncremental({
+  changedPaths,
+  root = REPO_ROOT,
+  aggregatePath = DEFAULT_AGGREGATE_PATH,
+  outputDir,
+  scratchRoot,
+  rootPropsPath = DEFAULT_ROOT_PROPS_PATH,
+  fullThreshold = 0.6,
+  stdio = 'inherit',
+  env = process.env,
+  spawn = nodeSpawn,
+  manifestPath = DEFAULT_BUILD_MANIFEST_PATH,
+} = {}) {
+  const resolvedOutputDir = outputDir ? norm(outputDir) : undefined
+  const targetOutputDir = resolvedOutputDir ?? norm(path.resolve(root, 'dist'))
+  const resolvedManifestPath = norm(manifestPath)
+  const resolvedAggregate = norm(aggregatePath)
+
+  let effectiveChangedPaths
+  let isClean = false
+  let currentFilesCache = null
+
+  if (Array.isArray(changedPaths)) {
+    effectiveChangedPaths = [...new Set(changedPaths.map((p) => norm(p)))].sort()
+  } else {
+    const detection = detectChangedFiles({
+      root,
+      aggregatePath: resolvedAggregate,
+      manifestPath: resolvedManifestPath,
+      outputDir: targetOutputDir,
+    })
+    effectiveChangedPaths = detection.changedPaths
+    isClean = detection.isCleanBuild
+    currentFilesCache = detection.currentFiles
+  }
+
+  // Fast no-op cache hit when no changed paths
+  if (effectiveChangedPaths.length === 0) {
+    const hasJs = hasEmittedJsFiles(targetOutputDir)
+    if (hasJs) {
+      return {
+        ok: true,
+        code: 0,
+        signal: null,
+        mode: 'cached',
+        reason: 'no-changes-detected',
+        changedPaths: [],
+        compileItems: [],
+        elapsedMs: 0,
+        cached: true,
+        outputPath: targetOutputDir,
+      }
+    }
+    // If output is missing despite no changed paths, trigger clean compile
+    isClean = true
+    effectiveChangedPaths = collectTrackedInputs({ root, aggregatePath: resolvedAggregate })
+  }
+
+  const plan = planImpactCompile({
+    changedPaths: effectiveChangedPaths,
+    aggregatePath: resolvedAggregate,
+    fullThreshold,
+    projectDirectory: path.dirname(resolvedAggregate),
+  })
+
+  if (plan.mode === 'none') {
+    return {
+      ok: true,
+      code: 0,
+      signal: null,
+      mode: 'none',
+      reason: plan.reason,
+      changedPaths: effectiveChangedPaths,
+      compileItems: [],
+      elapsedMs: 0,
+      cached: true,
+      outputPath: targetOutputDir,
+    }
+  }
+
+  // For clean build, wipe and recreate output directory so deleted files leave no stale JS
+  if (isClean) {
+    if (resolvedOutputDir && fs.existsSync(resolvedOutputDir)) {
+      fs.rmSync(resolvedOutputDir, { recursive: true, force: true })
+    }
+    if (resolvedOutputDir) {
+      fs.mkdirSync(resolvedOutputDir, { recursive: true })
+    }
+  } else if (resolvedOutputDir && !fs.existsSync(resolvedOutputDir)) {
+    fs.mkdirSync(resolvedOutputDir, { recursive: true })
+  }
+
+  const result = await compileOwnerProject({
+    compilePlan: plan,
+    scratchRoot,
+    rootPropsPath,
+    outputDir: resolvedOutputDir,
+    stdio,
+    env,
+    spawn,
+  })
+
+  if (result.ok) {
+    // Record successful build manifest
+    try {
+      const files = currentFilesCache ?? (() => {
+        const tracked = collectTrackedInputs({ root, aggregatePath: resolvedAggregate })
+        const map = {}
+        for (const f of tracked) {
+          if (fs.existsSync(f)) {
+            const stat = fs.statSync(f)
+            map[f] = { mtimeMs: stat.mtimeMs, size: stat.size, hash: computeFileHash(f) }
+          }
+        }
+        return map
+      })()
+
+      const manifestPayload = JSON.stringify({
+        schema: SCHEMA_VERSION,
+        timestamp: Date.now(),
+        aggregatePath: resolvedAggregate,
+        outputDir: result.outputPath,
+        mode: plan.mode,
+        files,
+      }, null, 2)
+
+      fs.mkdirSync(path.dirname(resolvedManifestPath), { recursive: true })
+      const tmpPath = `${resolvedManifestPath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`
+      fs.writeFileSync(tmpPath, manifestPayload, 'utf8')
+      fs.renameSync(tmpPath, resolvedManifestPath)
+    } catch {
+      // Manifest write non-fatal
+    }
+  }
+
+  return {
+    ...result,
+    mode: plan.mode,
+    reason: plan.reason,
+    changedPaths: effectiveChangedPaths,
+    compileItems: plan.compileItems,
   }
 }

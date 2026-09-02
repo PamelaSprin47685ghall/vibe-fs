@@ -22,10 +22,11 @@ test('WHAT[MANAGED-SESSION-017] fail-closed interrupt becomes Failed terminal so
   const lifecycle = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs')
   const runtime = read('src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs')
 
+  const hostPort = read('src/Wanxiangshu/OpenCode/Host/SessionHostPort.fs')
   const termination = sessions.match(/module ManagedSessionTermination =([\s\S]*?)type InjectedSessionPort/)
   assert.ok(termination, 'managed termination CE must be inspectable')
   assert.match(termination[1], /not \(sessionPort\.IsManagedChild sessionId\)/)
-  assert.match(sessions, /abstract IsManagedChild: sessionId: SessionId -> bool/)
+  assert.match(hostPort, /abstract IsManagedChild: sessionId: SessionId -> bool/)
   assert.match(sessions, /member _\.IsManagedChild\(sessionId\) = managedChild sessionId/)
   assert.match(
     termination[1],

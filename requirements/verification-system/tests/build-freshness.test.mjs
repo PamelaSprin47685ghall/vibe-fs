@@ -57,38 +57,35 @@ test('WHAT[VERIFICATION-SYSTEM-008] local repository export shards are excluded 
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-008] Fable build compiles once and never accepts watch-daemon freshness guesses', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] Fable build compiles incrementally and never accepts watch-daemon freshness guesses', () => {
   const build = readFileSync(new URL('../../../scripts/build.mjs', import.meta.url), 'utf8')
+  const ownerCompile = readFileSync(new URL('../../../scripts/lib/owner-compile.mjs', import.meta.url), 'utf8')
 
   assert.match(
     build,
-    /'tool',[\s\S]*'run',[\s\S]*'fable',[\s\S]*'src\/Wanxiangshu\/Wanxiangshu\.fsproj'/,
-    'build must invoke the real Fable compiler for the current source tree',
+    /compileIncremental/,
+    'build must invoke the unified incremental compiler',
   )
   assert.match(
-    build,
-    /['"]-c['"],[\s\S]*['"]Debug['"]/,
-    'one-shot compile must preserve the established watch-build Debug configuration',
+    ownerCompile,
+    /'tool',[\s\S]*'run',[\s\S]*'fable',[\s\S]*'-c',[\s\S]*'Debug'/,
+    'incremental compile must preserve the established Debug configuration',
   )
-  assert.match(build, /child\.once\('exit',[\s\S]*result\.code !== 0/)
-  assert.doesNotMatch(build, /FableBarrier|fable-daemon|fable-cycle-ack|['"]watch['"]/)
+  assert.doesNotMatch(build, /FableBarrier|fable-daemon|fable-cycle-ack|['"]--watch['"]/)
+  assert.doesNotMatch(ownerCompile, /FableBarrier|fable-daemon|fable-cycle-ack|['"]--watch['"]/)
 })
 
-test('WHAT[VERIFICATION-SYSTEM-008] one-shot build removes the previous artifact tree before compiling', () => {
-  const build = readFileSync(new URL('../../../scripts/build.mjs', import.meta.url), 'utf8')
-  const compileStart = build.indexOf('async function compileFable()')
-  const spawnAt = build.indexOf('const child = spawn(', compileStart)
-  const compilePrefix = build.slice(compileStart, spawnAt)
+test('WHAT[VERIFICATION-SYSTEM-008] incremental build manages clean artifact state and cleans invalid output', () => {
+  const ownerCompile = readFileSync(new URL('../../../scripts/lib/owner-compile.mjs', import.meta.url), 'utf8')
 
-  assert.ok(compileStart >= 0 && spawnAt > compileStart, 'compileFable must own the one-shot compiler boundary')
   assert.match(
-    compilePrefix,
-    /fs\.rmSync\(dist,\s*\{\s*recursive:\s*true,\s*force:\s*true\s*\}\)/,
-    'a removed F# source must not leave a stale JS module in the next package',
+    ownerCompile,
+    /removeSuccessMarker\(materialized\.markerPath\)/,
+    'invalid marker must be removed on dirty compile',
   )
-  assert.match(compilePrefix, /fs\.mkdirSync\(dist,\s*\{\s*recursive:\s*true\s*\}\)/)
-  assert.ok(
-    compilePrefix.indexOf('fs.rmSync(dist') < compilePrefix.indexOf('fs.mkdirSync(dist'),
-    'artifact cleanup must precede recreating the compiler output directory',
+  assert.match(
+    ownerCompile,
+    /removeOutputDirectory\(materialized\.outputPath\)/,
+    'a failed or dirty compile must clean output directory to avoid stale JS modules',
   )
 })

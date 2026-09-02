@@ -56,6 +56,7 @@ export function integrationNodeTestSteps(root) {
       label: 'owner-project-compiler-boundary.test.mjs (structured-workflow)',
       files: [
         path.join(root, 'requirements/structured-workflow/tests/integration/owner-project-compiler-boundary.test.mjs'),
+        path.join(root, 'requirements/structured-workflow/tests/integration/owner-impact-compile-cli.test.mjs'),
       ],
       perTestTimeoutMs: PROJECT_CHECK_TIMEOUT_MS,
     },

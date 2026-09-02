@@ -2,7 +2,9 @@
 
 import { dirname, resolve } from 'node:path'
 import {
+  compileIncremental,
   compileOwnerProject,
+  detectChangedFiles,
   materializeOwnerCompile,
   planImpactCompile,
   DEFAULT_AGGREGATE_PATH,
@@ -13,10 +15,10 @@ const DEFAULT_SCRATCH_ROOT = resolve('.fable-build/impact-compile')
 
 function printHelp() {
   console.log(`
-Usage: node scripts/compile-impact.mjs <changed-path>... [options]
+Usage: node scripts/compile-impact.mjs [changed-path]... [options]
 
 Arguments:
-  <changed-path>...       Changed source, signature, project, or toolchain paths
+  [changed-path]...       Changed source, signature, project, or toolchain paths (optional; auto-detected when omitted)
 
 Options:
   --aggregate <path>      Aggregate Wanxiangshu.fsproj
@@ -27,7 +29,6 @@ Options:
   --threshold <ratio>     Focused/full production-source cutoff (default: 0.6)
   --plan-only             Print the impact plan without materializing or compiling
   --materialize-only      Materialize the flat project without compiling
-  --watch                 Keep one Fable process watching the flat impact project
   --help, -h              Show this help message
 `)
 }
@@ -51,7 +52,6 @@ function parseArgs(args) {
   let fullThreshold = 0.6
   let planOnly = false
   let materializeOnly = false
-  let watch = false
   const changedPaths = []
 
   for (let index = 0; index < args.length; index += 1) {
@@ -66,10 +66,6 @@ function parseArgs(args) {
     }
     if (arg === '--materialize-only') {
       materializeOnly = true
-      continue
-    }
-    if (arg === '--watch') {
-      watch = true
       continue
     }
 
@@ -93,14 +89,8 @@ function parseArgs(args) {
     changedPaths.push(resolve(arg))
   }
 
-  if (changedPaths.length === 0) {
-    throw new Error('at least one changed path is required')
-  }
   if (planOnly && materializeOnly) {
     throw new Error('--plan-only and --materialize-only are mutually exclusive')
-  }
-  if (watch && (planOnly || materializeOnly)) {
-    throw new Error('--watch cannot be combined with --plan-only or --materialize-only')
   }
 
   return {
@@ -112,7 +102,6 @@ function parseArgs(args) {
     fullThreshold,
     planOnly,
     materializeOnly,
-    watch,
     changedPaths,
   }
 }
@@ -128,7 +117,36 @@ async function main() {
   }
 
   try {
-    const plan = planImpactCompile(options)
+    let effectivePaths = options.changedPaths
+    if (effectivePaths.length === 0) {
+      const detection = detectChangedFiles({
+        aggregatePath: options.aggregatePath,
+        outputDir: options.outputDir,
+      })
+      effectivePaths = detection.changedPaths
+    }
+
+    if (effectivePaths.length === 0 && (options.planOnly || options.materializeOnly)) {
+      if (options.planOnly) {
+        console.log(JSON.stringify({
+          mode: 'none',
+          reason: 'no-changes-detected',
+          changedPaths: [],
+          rootProjectPaths: [],
+          projectPaths: [],
+          compileItems: [],
+        }, null, 2))
+        return
+      }
+      console.log('[impact-compile] no production compile impact')
+      return
+    }
+
+    const plan = planImpactCompile({
+      ...options,
+      changedPaths: effectivePaths.length > 0 ? effectivePaths : [options.aggregatePath],
+    })
+
     if (options.planOnly) {
       console.log(JSON.stringify({
         mode: plan.mode,
@@ -155,12 +173,13 @@ async function main() {
       return
     }
 
-    const result = await compileOwnerProject({
-      compilePlan: plan,
+    const result = await compileIncremental({
+      changedPaths: options.changedPaths.length > 0 ? options.changedPaths : undefined,
+      aggregatePath: options.aggregatePath,
       scratchRoot: options.scratchRoot,
       rootPropsPath: options.rootPropsPath,
       outputDir: options.outputDir,
-      watch: options.watch,
+      fullThreshold: options.fullThreshold,
     })
     if (!result.ok) {
       process.exit(result.code || 1)

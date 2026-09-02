@@ -9,6 +9,9 @@ import { run as runModuleLinkage } from './checks/js-module-linkage.mjs'
 import {
   writeLoopDetectorEnvelopeArtifact,
 } from './lib/derive-loop-detector-envelope.mjs'
+import {
+  compileIncremental,
+} from './lib/owner-compile.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(root, 'dist')
@@ -112,36 +115,22 @@ class CrossProcessMutex {
 // ── Fable Compile ─────────────────────────────────────────────────────────────
 
 async function compileFable() {
-  fs.rmSync(dist, { recursive: true, force: true })
-  fs.mkdirSync(dist, { recursive: true })
-  logInfo('Compiling F# with Fable...')
-
-  const child = spawn(
-    'dotnet',
-    [
-      'tool',
-      'run',
-      'fable',
-      '--',
-      'src/Wanxiangshu/Wanxiangshu.fsproj',
-      '-c',
-      'Debug',
-      '-o',
-      'dist',
-      '--noGitignore',
-    ],
-    { cwd: root, stdio: 'inherit' },
-  )
-
-  const result = await new Promise((resolve, reject) => {
-    child.once('error', reject)
-    child.once('exit', (code, signal) => resolve({ code, signal }))
+  logInfo('Compiling F# with automatic incremental Fable...')
+  const result = await compileIncremental({
+    root,
+    outputDir: dist,
   })
 
-  if (result.code !== 0) {
+  if (!result.ok) {
     fail(
       `Fable compilation failed${result.signal ? ` by signal ${result.signal}` : ` with exit code ${result.code}`}`,
     )
+  }
+
+  if (result.cached) {
+    logInfo('up-to-date (cached)')
+  } else {
+    logInfo(`compiled ${result.mode} impact (${result.compileItems?.length ?? 0} items in ${result.elapsedMs}ms)`)
   }
 }
 

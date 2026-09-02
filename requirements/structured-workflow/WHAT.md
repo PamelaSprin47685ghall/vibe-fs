@@ -60,6 +60,6 @@ Protocol-boundary exemption（外部协议边界豁免条件）：若存在外�
 
 owner compile 的输入是目标 owner locality 加其 transitive ProjectReference closure；impact compile 的输入按 changed contract 决定。修改带 sibling `.fsi` 的实现 `.fs` 且 `.fsi` 未变时，只选择该实现 locality 与其 forward contract closure，普通 reverse consumer 禁止进入 impact set。修改 `.fsi`、新增/删除公开 source，或同批同时修改 sibling `.fsi` 时，必须选择 owning locality 的全部 transitive reverse consumers，再对所有选中 root 求 forward closure。多个改动合并为集合并集，不得逐工程重复编译。fsproj、`Directory.Build.*`、package lock、Fable/tool manifest 或 aggregate emitter 变化保守选择 full。
 
-所有选中 source 必须按 `Wanxiangshu.fsproj` 的 canonical order 生成一个零 ProjectReference flat fsproj，并由一次真实 Fable invocation 编译；input union 少一个、多一个、重复或乱序都失败。选中 production `.fs` 超过 aggregate 的 60% 时直接退化为 full flat build，不伪装 focused。watch 使用同一 materialized flat project，不把原生 owner ProjectReference 图交给 Fable。
+所有选中 source 必须按 `Wanxiangshu.fsproj` 的 canonical order 生成一个零 ProjectReference flat fsproj，并由一次真实 Fable invocation 编译；input union 少一个、多一个、重复或乱序都失败。选中 production `.fs` 超过 aggregate 的 60% 时直接退化为 full flat build，不伪装 focused。全自动增量编译根据代码与产物的新旧状态精确计算 impact 闭包并复用产物缓存，无文件变更时秒级返回，禁止依赖 watch 守护进程。
 
 full release build 始终以 aggregate emitter 的完整 source/config union 启动一次 Fable；多工程 topology 只负责 ownership 与 impact 计算，不得逐 owner 编译后再拼接。等价 clean 环境下，最终 full multi-project 路径的输入集合、Fable 配置、invocation 数与原始单工程路径相同；交付必须记录两者的实际 clean timing，禁止仅凭结构推断性能等价。
