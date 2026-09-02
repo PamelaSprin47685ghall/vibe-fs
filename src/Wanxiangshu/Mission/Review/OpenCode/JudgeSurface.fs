@@ -3,6 +3,7 @@ namespace Wanxiangshu.Mission.Review.OpenCode
 open System.Threading
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Mission.Review
@@ -37,30 +38,58 @@ module JudgeSurface =
                        {| name = "verdict"
                           values = [| "PERFECT"; "REVISE" |] |} |] |}
 
-    /// The public fail-closed precedence used by JudgeTool before any identity
-    /// or tree lookup. This is diagnostic text, not internal state.
-    let validateContext
+    let private optionalIdentity create (value: string) =
+        if String.IsNullOrWhiteSpace value then
+            None
+        else
+            Some(create value)
+
+    let private executionDecisionToJs (decision: JudgeTool.ExecutionDecision) : obj =
+        match decision with
+        | JudgeTool.ExecutionDecision.Refused rejection ->
+            box
+                {| decision = "Refused"
+                   rejection = JudgeTool.rejectionName rejection |}
+        | JudgeTool.ExecutionDecision.AlreadyJudged ->
+            box
+                {| decision = "AlreadyJudged"
+                   rejection = "" |}
+        | JudgeTool.ExecutionDecision.Proceed judgement ->
+            box
+                {| decision = "Proceed"
+                   rejection = ""
+                   sessionId = SessionId.value judgement.ReviewerSessionId
+                   physicalUserMessageId = PhysicalUserMessageId.value judgement.PhysicalUserMessageId
+                   providerRunId = ProviderRunIdentity.value judgement.ProviderRun
+                   toolCallId = ToolCallId.value judgement.ToolCallId
+                   verdict =
+                    match judgement.Verdict with
+                    | ReviewGuardVerdict.Perfect -> "Perfect"
+                    | ReviewGuardVerdict.Revise -> "Revise" |}
+
+    let decideExecution
         (role: string)
         (sessionId: string)
-        (hasOwner: bool)
-        (hasParent: bool)
-        (hasBarrier: bool)
-        (hasTree: bool)
+        (isSubmitted: bool)
+        (verdict: string)
+        (toolCallId: string)
+        (providerRunId: string)
+        (physicalUserMessageId: string)
         : obj =
-        if role <> "Reviewer" then
-            box
-                {| ok = false
-                   message = "This verdict did not come from a Reviewer session." |}
-        elif System.String.IsNullOrWhiteSpace sessionId then
-            box
-                {| ok = false
-                   message = "judgment authority is established before review context" |}
-        elif not hasOwner || not hasParent || not hasBarrier || not hasTree then
-            box
-                {| ok = false
-                   message = "review context is incomplete" |}
-        else
-            box {| ok = true; message = "" |}
+        let evidence: JudgeTool.ExecutionEvidence =
+            { Role = if isNull role then None else Roles.tryParseRole role
+              SessionId = sessionId
+              IsSubmitted = isSubmitted
+              Verdict = StaticTools.reviewerVerdictOfString verdict
+              ToolCallId = optionalIdentity ToolCallId.create toolCallId
+              ProviderRunId = optionalIdentity ProviderRunIdentity.create providerRunId
+              PhysicalUserMessageId =
+                if isNull physicalUserMessageId then
+                    None
+                else
+                    Some physicalUserMessageId }
+
+        evidence |> JudgeTool.decideExecution |> executionDecisionToJs
 
     let receipt (language: string) =
         ProviderResources.readText (ProviderLanguage.parse language) "tool/judge/received"

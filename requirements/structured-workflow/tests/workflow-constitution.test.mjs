@@ -299,5 +299,3 @@ test('WHAT[STRUCTURED-WORKFLOW-004] PluginTransforms_order_requires_executable_c
   const dormant = readFixture('dormant-plugin-transform-order.fs')
   assert.ok(scanPluginTransforms(dormant, 'dormant-plugin-transform-order.fs').some((hit) => hit.kind === 'ordering'))
 })
-
-

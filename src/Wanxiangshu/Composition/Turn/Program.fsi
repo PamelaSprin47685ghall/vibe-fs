@@ -57,7 +57,6 @@ module ReconcileProgram =
 
     [<RequireQualifiedAccess>]
     type ReconcileDecision =
-        | Reread of clearContinuationCandidate: bool * rereadsRemaining: int
         | Publish
         | StopPass
 
@@ -65,9 +64,8 @@ module ReconcileProgram =
     val isTerminalOutcome: outcome: TurnOutcome -> bool
     val tryFailureWitness: wake: ReconcileWake -> turn: PublishTurn -> (ExecutionFailure * string) option
     val tryFailureWitnessReason: wake: ReconcileWake -> turn: PublishTurn -> string option
-    val decideStep: wake: ReconcileWake -> rereadsRemaining: int -> evidence: ReconcileEvidence -> ReconcileDecision
+    val decideStep: wake: ReconcileWake -> evidence: ReconcileEvidence -> ReconcileDecision
     val decisionName: decision: ReconcileDecision -> string
-    val clearsContinuationCandidate: decision: ReconcileDecision -> bool
     val consumeKey: turn: PublishTurn -> string
 
     type PublishMaps =

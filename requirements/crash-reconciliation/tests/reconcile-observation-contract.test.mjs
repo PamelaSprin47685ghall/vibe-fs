@@ -5,36 +5,33 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as reconcile from '../../../dist/Composition/Turn/ReconcileSurface.js'
 
-const decisionName = (remaining, evidence, wake = reconcile.retryWake()) =>
-  reconcile.decisionName(reconcile.decideStep(wake, remaining, evidence))
+const decisionName = (evidence, wake = reconcile.retryWake()) =>
+  reconcile.decisionName(reconcile.decideStep(wake, evidence))
 
 test('WHAT[CRASH-003] unknown_effect_without_quiescence_is_not_replayed', () => {
   // HOST-BOUNDARY-005: no read is authorized by a counter. Non-actionable
   // evidence stops without replay. Unknown only publishes after a fresh
   // idle/quiescence observation.
-  assert.equal(decisionName(0, reconcile.evidenceSnapshotError('transient')), 'StopPass')
-  assert.equal(decisionName(0, reconcile.evidenceNoTurn()), 'StopPass')
+  assert.equal(decisionName(reconcile.evidenceSnapshotError('transient')), 'StopPass')
+  assert.equal(decisionName(reconcile.evidenceNoTurn()), 'StopPass')
 
-  assert.equal(decisionName(0, reconcile.evidenceUnknown(), reconcile.retryWake()), 'StopPass')
-  assert.equal(decisionName(0, reconcile.evidenceUnknown(), reconcile.failureWake()), 'StopPass')
-  assert.equal(decisionName(0, reconcile.evidenceUnknown(), reconcile.abortWake()), 'StopPass')
+  assert.equal(decisionName(reconcile.evidenceUnknown(), reconcile.retryWake()), 'StopPass')
+  assert.equal(decisionName(reconcile.evidenceUnknown(), reconcile.failureWake()), 'StopPass')
+  assert.equal(decisionName(reconcile.evidenceUnknown(), reconcile.abortWake()), 'StopPass')
 
   assert.equal(
-    decisionName(0, reconcile.evidenceUnknown(), reconcile.idleWake('ses-a', 1)),
+    decisionName(reconcile.evidenceUnknown(), reconcile.idleWake('ses-a', 1)),
     'Publish',
   )
-
-  // The counter is a pure compatibility surface — no Reread is produced.
-  assert.equal(decisionName(3, reconcile.evidenceUnknown(), reconcile.retryWake()), 'StopPass')
 })
 
 test('WHAT[CRASH-003] reconcile_decision_has_no_business_repair_vocabulary', () => {
   // The owner exposes only observation decisions. Exercise every decision shape
   // through the JS-native surface rather than reflecting a Fable union.
   const names = new Set([
-    decisionName(3, reconcile.evidenceUnknown(), reconcile.retryWake()),
-    decisionName(0, reconcile.evidenceUnknown(), reconcile.idleWake('ses-a', 1)),
-    decisionName(0, reconcile.evidenceNoTurn(), reconcile.retryWake()),
+    decisionName(reconcile.evidenceUnknown(), reconcile.retryWake()),
+    decisionName(reconcile.evidenceUnknown(), reconcile.idleWake('ses-a', 1)),
+    decisionName(reconcile.evidenceNoTurn(), reconcile.retryWake()),
   ])
   assert.deepEqual([...names].sort(), ['Publish', 'StopPass'])
   assert.equal([...names].some((name) => /Repair|Resend|Rollback|Abort|Replay|Reread/i.test(name)), false)

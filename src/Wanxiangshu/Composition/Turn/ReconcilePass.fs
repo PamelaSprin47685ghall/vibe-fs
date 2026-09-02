@@ -196,167 +196,36 @@ module ReconcilePass =
                         lastSnapshot
         }
 
-    let private publishableOf
-        (evidence: ReconcileProgram.ReconcileEvidence)
-        (candidate: ReconcileProgram.PublishTurn option)
-        : ReconcileProgram.PublishTurn option =
+    let private publishableOf (evidence: ReconcileProgram.ReconcileEvidence) : ReconcileProgram.PublishTurn option =
         match evidence with
         | ReconcileProgram.ReconcileEvidence.Terminal observed -> observed.PublishTurn
         | ReconcileProgram.ReconcileEvidence.Unknown(Some observed) -> observed.PublishTurn
         | ReconcileProgram.ReconcileEvidence.Provisional observed -> observed.PublishTurn
-        | _ -> candidate
+        | _ -> None
 
-    let private rereadCandidate
-        (clearCandidate: bool)
-        (evidence: ReconcileProgram.ReconcileEvidence)
-        (candidate: ReconcileProgram.PublishTurn option)
-        : ReconcileProgram.PublishTurn option =
-        match clearCandidate, evidence with
-        | true, _ -> None
-        | false, ReconcileProgram.ReconcileEvidence.Provisional observed -> observed.PublishTurn
-        | false, _ -> candidate
-
-    let private observedTurnsOf
-        (turn: ReconciledTurn option)
-        (turns: Map<string, ReconciledTurn>)
-        : Map<string, ReconciledTurn> =
+    let private observedTurnsOf (turn: ReconciledTurn option) : Map<string, ReconciledTurn> =
         match turn with
-        | Some value -> Map.add (ReconcileProgram.consumeKey (publishTurnOf value)) value turns
-        | None -> turns
+        | Some value -> Map.empty |> Map.add (ReconcileProgram.consumeKey (publishTurnOf value)) value
+        | None -> Map.empty
 
-    let private continueIfCurrent
+    let private handleSnapshotSuccess
         (isCurrent: SessionId -> int -> bool)
-        (sessionId: SessionId)
-        (generation: int)
-        (next: unit -> Task)
-        : Task =
-        task {
-            if isCurrent sessionId generation then
-                return! next ()
-            else
-                return ()
-        }
-
-    let rec private materializeActive
-        (snapshot: ISessionSnapshotPort)
-        (isCurrent: SessionId -> int -> bool)
-        (isCleared: SessionId -> bool)
         (recordMaps: SessionId -> ReconcileProgram.PublishMaps -> unit)
         (observeSnapshot: SessionId -> SessionMessage list -> Task)
         (onTurn: ReconciledTurnContext -> Task)
-        (maxErrors: int)
         (sessionId: SessionId)
         (generation: int)
         (wake: ReconcileProgram.ReconcileWake)
-        (rereadsRemaining: int)
-        (consecutiveErrors: int)
-        (candidate: ReconcileProgram.PublishTurn option)
         (maps: ReconcileProgram.PublishMaps)
         (activeBinding: ActiveRunBinding)
-        (turns: Map<string, ReconciledTurn>)
-        (lastSnapshot: SessionMessage list option)
-        : Task =
-        task {
-            if not (isCurrent sessionId generation) then
-                return ()
-            elif isCleared sessionId || not (isCurrent sessionId generation) then
-                return ()
-            else
-                let! result = snapshot.GetMessages sessionId
-
-                return!
-                    resumeAfterSnapshot
-                        snapshot
-                        isCurrent
-                        isCleared
-                        recordMaps
-                        observeSnapshot
-                        onTurn
-                        maxErrors
-                        sessionId
-                        generation
-                        wake
-                        rereadsRemaining
-                        consecutiveErrors
-                        candidate
-                        maps
-                        activeBinding
-                        turns
-                        lastSnapshot
-                        result
-        }
-
-    and private handleSnapshotError
-        (snapshot: ISessionSnapshotPort)
-        (isCurrent: SessionId -> int -> bool)
-        (isCleared: SessionId -> bool)
-        (recordMaps: SessionId -> ReconcileProgram.PublishMaps -> unit)
-        (observeSnapshot: SessionId -> SessionMessage list -> Task)
-        (onTurn: ReconciledTurnContext -> Task)
-        (maxErrors: int)
-        (sessionId: SessionId)
-        (generation: int)
-        (wake: ReconcileProgram.ReconcileWake)
-        (rereadsRemaining: int)
-        (consecutiveErrors: int)
-        (candidate: ReconcileProgram.PublishTurn option)
-        (maps: ReconcileProgram.PublishMaps)
-        (activeBinding: ActiveRunBinding)
-        (turns: Map<string, ReconciledTurn>)
-        (lastSnapshot: SessionMessage list option)
-        (error: string)
-        : Task =
-        let nextErrors = consecutiveErrors + 1
-        logError "RECONCILE-SNAPSHOT" (sprintf "snapshot failed: %s" (string error))
-
-        if nextErrors >= maxErrors then
-            // StopPass: keep Dirty for next host signal; errors do not consume causal budget.
-            observeIfPresent isCurrent observeSnapshot sessionId generation lastSnapshot
-        else
-            continueIfCurrent isCurrent sessionId generation (fun () ->
-                materializeActive
-                    snapshot
-                    isCurrent
-                    isCleared
-                    recordMaps
-                    observeSnapshot
-                    onTurn
-                    maxErrors
-                    sessionId
-                    generation
-                    wake
-                    rereadsRemaining
-                    nextErrors
-                    candidate
-                    maps
-                    activeBinding
-                    turns
-                    lastSnapshot)
-
-    and private handleSnapshotSuccess
-        (snapshot: ISessionSnapshotPort)
-        (isCurrent: SessionId -> int -> bool)
-        (isCleared: SessionId -> bool)
-        (recordMaps: SessionId -> ReconcileProgram.PublishMaps -> unit)
-        (observeSnapshot: SessionId -> SessionMessage list -> Task)
-        (onTurn: ReconciledTurnContext -> Task)
-        (maxErrors: int)
-        (sessionId: SessionId)
-        (generation: int)
-        (wake: ReconcileProgram.ReconcileWake)
-        (rereadsRemaining: int)
-        (candidate: ReconcileProgram.PublishTurn option)
-        (maps: ReconcileProgram.PublishMaps)
-        (activeBinding: ActiveRunBinding)
-        (turns: Map<string, ReconciledTurn>)
         (messages: SessionMessage list)
         : Task =
         let turn =
             TurnReconcile.reconcile messages activeBinding |> materializeFailureWitness wake
 
         let evidence = evidenceOf turn
-        let observedTurns = observedTurnsOf turn turns
-        let decision = ReconcileProgram.decideStep wake rereadsRemaining evidence
+        let observedTurns = observedTurnsOf turn
+        let decision = ReconcileProgram.decideStep wake evidence
 
         match decision with
         | ReconcileProgram.ReconcileDecision.Publish ->
@@ -373,95 +242,72 @@ module ReconcilePass =
                 generation
                 wake
                 maps
-                (publishableOf evidence candidate)
+                (publishableOf evidence)
                 observedTurns
                 (Some messages)
         | ReconcileProgram.ReconcileDecision.StopPass ->
             observeIfPresent isCurrent observeSnapshot sessionId generation (Some messages)
-        | ReconcileProgram.ReconcileDecision.Reread(clearCandidate, remaining) ->
-            continueIfCurrent isCurrent sessionId generation (fun () ->
-                materializeActive
-                    snapshot
-                    isCurrent
-                    isCleared
-                    recordMaps
-                    observeSnapshot
-                    onTurn
-                    maxErrors
-                    sessionId
-                    generation
-                    wake
-                    remaining
-                    0
-                    (rereadCandidate clearCandidate evidence candidate)
-                    maps
-                    activeBinding
-                    observedTurns
-                    (Some messages))
 
-    and private resumeAfterSnapshot
+    let private resumeFromSnapshot
+        (isCurrent: SessionId -> int -> bool)
+        (recordMaps: SessionId -> ReconcileProgram.PublishMaps -> unit)
+        (observeSnapshot: SessionId -> SessionMessage list -> Task)
+        (onTurn: ReconciledTurnContext -> Task)
+        (sessionId: SessionId)
+        (generation: int)
+        (wake: ReconcileProgram.ReconcileWake)
+        (maps: ReconcileProgram.PublishMaps)
+        (activeBinding: ActiveRunBinding)
+        (result: Result<SessionMessage list, string>)
+        : Task =
+        task {
+            match isCurrent sessionId generation, result with
+            | false, _ -> ()
+            | true, Error error -> logError "RECONCILE-SNAPSHOT" (sprintf "snapshot failed: %s" (string error))
+            | true, Ok messages ->
+                do!
+                    handleSnapshotSuccess
+                        isCurrent
+                        recordMaps
+                        observeSnapshot
+                        onTurn
+                        sessionId
+                        generation
+                        wake
+                        maps
+                        activeBinding
+                        messages
+        }
+
+    let private materializeActive
         (snapshot: ISessionSnapshotPort)
         (isCurrent: SessionId -> int -> bool)
         (isCleared: SessionId -> bool)
         (recordMaps: SessionId -> ReconcileProgram.PublishMaps -> unit)
         (observeSnapshot: SessionId -> SessionMessage list -> Task)
         (onTurn: ReconciledTurnContext -> Task)
-        (maxErrors: int)
         (sessionId: SessionId)
         (generation: int)
         (wake: ReconcileProgram.ReconcileWake)
-        (rereadsRemaining: int)
-        (consecutiveErrors: int)
-        (candidate: ReconcileProgram.PublishTurn option)
         (maps: ReconcileProgram.PublishMaps)
         (activeBinding: ActiveRunBinding)
-        (turns: Map<string, ReconciledTurn>)
-        (lastSnapshot: SessionMessage list option)
-        (result: Result<SessionMessage list, string>)
         : Task =
         task {
-            match isCurrent sessionId generation, result with
-            | false, _ -> return ()
-            | true, Error error ->
+            if isCurrent sessionId generation && not (isCleared sessionId) then
+                let! result = snapshot.GetMessages sessionId
+
                 return!
-                    handleSnapshotError
-                        snapshot
+                    resumeFromSnapshot
                         isCurrent
-                        isCleared
                         recordMaps
                         observeSnapshot
                         onTurn
-                        maxErrors
                         sessionId
                         generation
                         wake
-                        rereadsRemaining
-                        consecutiveErrors
-                        candidate
                         maps
                         activeBinding
-                        turns
-                        lastSnapshot
-                        error
-            | true, Ok messages ->
-                return!
-                    handleSnapshotSuccess
-                        snapshot
-                        isCurrent
-                        isCleared
-                        recordMaps
-                        observeSnapshot
-                        onTurn
-                        maxErrors
-                        sessionId
-                        generation
-                        wake
-                        rereadsRemaining
-                        candidate
-                        maps
-                        activeBinding
-                        turns
-                        messages
+                        result
         }
 
     let private observeIdleSnapshot
@@ -489,8 +335,6 @@ module ReconcilePass =
         (wake: ReconcileProgram.ReconcileWake)
         (observeSnapshot: SessionId -> SessionMessage list -> Task)
         (onTurn: ReconciledTurnContext -> Task)
-        (maxRereads: int)
-        (maxErrors: int)
         (activeBinding: ActiveRunBinding option)
         (sessionId: SessionId)
         (generation: int)
@@ -507,17 +351,11 @@ module ReconcilePass =
                 recordMaps
                 observeSnapshot
                 onTurn
-                maxErrors
                 sessionId
                 generation
                 wake
-                (maxRereads + 1)
-                0
-                None
                 (mapsFor sessionId)
                 bound
-                Map.empty
-                None
 
     /// Run one reconcile pass for a session generation.
     /// HOST-006: no active run still observes snapshot.
@@ -530,8 +368,6 @@ module ReconcilePass =
         (wake: ReconcileProgram.ReconcileWake)
         (observeSnapshot: SessionId -> SessionMessage list -> Task)
         (onTurn: ReconciledTurnContext -> Task)
-        (maxRereads: int)
-        (maxErrors: int)
         (activeBinding: ActiveRunBinding option)
         (sessionId: SessionId)
         (generation: int)
@@ -550,8 +386,6 @@ module ReconcilePass =
                         wake
                         observeSnapshot
                         onTurn
-                        maxRereads
-                        maxErrors
                         activeBinding
                         sessionId
                         generation

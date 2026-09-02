@@ -51,7 +51,7 @@ validity 证明共同落在同一个 closure 上。
 
 | 命题 | 落点测试 |
 |---|---|
-| CONTEXT-COMPRESSION-001 | `requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs::WHAT[CONTEXT-COMPRESSION-001] CTX_001_forbidden_capacity_synonyms_never_appear_in_production_source` |
+| CONTEXT-COMPRESSION-001 | `requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs::WHAT[CONTEXT-COMPRESSION-001] CTX_001_context_compression_owner_never_observes_forbidden_capacity_synonyms` |
 | CONTEXT-COMPRESSION-002 | `requirements/context-compression/tests/recovery-slot.test.mjs::WHAT[CONTEXT-COMPRESSION-002] FALLBACK_012_only_a_failure_advance_arms_the_next_slot` |
 | CONTEXT-COMPRESSION-003 | `requirements/context-compression/tests/blogger-delta.test.mjs::WHAT[CONTEXT-COMPRESSION-003] CTX_003_no_chunk_exceeds_the_limit` |
 | CONTEXT-COMPRESSION-004 | `requirements/context-compression/tests/terminal-validity.test.mjs::WHAT[CONTEXT-COMPRESSION-004] CTX_004_empty_terminal_is_not_a_result` |

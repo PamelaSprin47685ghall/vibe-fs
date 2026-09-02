@@ -14,8 +14,6 @@ module ReconcilePass =
         wake: ReconcileProgram.ReconcileWake ->
         observeSnapshot: (SessionId -> SessionMessage list -> Task) ->
         onTurn: (ReconciledTurnContext -> Task) ->
-        maxRereads: int ->
-        maxErrors: int ->
         activeBinding: ActiveRunBinding option ->
         sessionId: SessionId ->
         generation: int ->

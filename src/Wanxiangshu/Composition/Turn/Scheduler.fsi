@@ -22,9 +22,7 @@ module Reconciler =
             ?onDeleted: (SessionId -> unit) *
             ?projection: (SessionId -> AgentProjectionSet option) *
             ?onSnapshot: (SessionId -> SessionMessage list -> Task) *
-            ?durableUnavailable: (unit -> bool) *
-            ?maxCausalRereads: int *
-            ?maxConsecutiveErrors: int ->
+            ?durableUnavailable: (unit -> bool) ->
                 Scheduler
 
         member Kick: sessionId: SessionId * wake: ReconcileProgram.ReconcileWake -> unit

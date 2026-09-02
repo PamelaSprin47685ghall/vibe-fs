@@ -25,9 +25,6 @@ module ReconcileSurface =
     let private stringOf (value: obj) =
         if isNullish value then "" else string value
 
-    let private boolOf (value: obj) =
-        if isNullish value then false else unbox<bool> value
-
     let private mapsOf (value: obj) = (value :?> PublishMapsHandle).Maps
 
     let private outcomeOf (value: obj) : ReconcileProgram.TurnOutcome =
@@ -81,19 +78,8 @@ module ReconcileSurface =
         | "SessionCleared" -> ReconcileProgram.evidenceSessionCleared ()
         | other -> invalidArg "evidence" (sprintf "unknown reconcile evidence: %s" other)
 
-    let private decisionToJs (decision: ReconcileProgram.ReconcileDecision) (rereadsRemaining: int) : obj =
-        let name = ReconcileProgram.decisionName decision
-
-        let rereads =
-            match decision with
-            | ReconcileProgram.ReconcileDecision.Reread(_, remaining) -> remaining
-            | ReconcileProgram.ReconcileDecision.Publish
-            | ReconcileProgram.ReconcileDecision.StopPass -> rereadsRemaining
-
-        box
-            {| name = name
-               clearsContinuationCandidate = ReconcileProgram.clearsContinuationCandidate decision
-               rereadsRemaining = rereads |}
+    let private decisionToJs (decision: ReconcileProgram.ReconcileDecision) : obj =
+        box {| name = ReconcileProgram.decisionName decision |}
 
     let private turnOf (value: obj) : ReconcileProgram.PublishTurn =
         ReconcileProgram.turnFixture
@@ -251,14 +237,10 @@ module ReconcileSurface =
 
     let evidenceSessionCleared () : obj = box {| kind = "SessionCleared" |}
 
-    let decideStep (wake: obj) (rereadsRemaining: int) (evidence: obj) : obj =
-        ReconcileProgram.decideStep (wakeOf wake) rereadsRemaining (evidenceOf evidence)
-        |> fun decision -> decisionToJs decision rereadsRemaining
+    let decideStep (wake: obj) (evidence: obj) : obj =
+        ReconcileProgram.decideStep (wakeOf wake) (evidenceOf evidence) |> decisionToJs
 
     let decisionName (decision: obj) : string = stringOf (property decision "name")
-
-    let clearsContinuationCandidate (decision: obj) : bool =
-        boolOf (property decision "clearsContinuationCandidate")
 
     let consumeKey (turn: obj) : string =
         ReconcileProgram.consumeKey (turnOf turn)
@@ -327,6 +309,60 @@ module ReconcileSurface =
 
             do! scheduler.StopAndDrain()
             return box {| snapshotReads = snapshotReads |}
+        }
+
+    let idleProvisionalWithoutProjectionEdgeScenario () : Task<obj> =
+        task {
+            let sessionId = SessionId.create "single-edge-session"
+            let physical = PhysicalUserMessageId.create "single-edge-user"
+            let store = TurnBinding.Store()
+            store.BindUserMessage(sessionId, physical)
+
+            // DSL-MUTABLE: algorithm-scratch — controlled port observation.
+            let mutable snapshotReads = 0
+            // DSL-MUTABLE: algorithm-scratch — controlled callback capture.
+            let mutable observed: ReconciledTurnContext option = None
+
+            let snapshot =
+                { new ISessionSnapshotPort with
+                    member _.GetMessages _ =
+                        snapshotReads <- snapshotReads + 1
+
+                        Task.FromResult(
+                            Ok
+                                [ schedulerMessage "single-edge-user" "user" None None None false [||]
+                                  schedulerMessage
+                                      "single-edge-provider-run"
+                                      "assistant"
+                                      (Some "single-edge-user")
+                                      (Some "tool-calls")
+                                      None
+                                      false
+                                      [||] ]
+                        ) }
+
+            let onTurn (context: ReconciledTurnContext) : Task =
+                observed <- Some context
+                Task.FromResult(()) :> Task
+
+            let scheduler = Reconciler.Scheduler(snapshot, store, onTurn)
+            let quiescence = SessionQuiescenceGate()
+            quiescence.BeginProviderAttempt sessionId
+            scheduler.SignalIdle(sessionId, quiescence.ObserveIdle sessionId)
+            do! scheduler.StopAndDrain()
+
+            return
+                box
+                    {| snapshotReads = snapshotReads
+                       observed = Option.isSome observed
+                       outcome =
+                        match observed |> Option.map (fun context -> context.Turn.Outcome) with
+                        | Some ReconcileProgram.TurnInProgress -> "TurnInProgress"
+                        | Some(ReconcileProgram.TurnNeedsContinuation _) -> "TurnNeedsContinuation"
+                        | Some ReconcileProgram.TurnCompleted -> "TurnCompleted"
+                        | Some(ReconcileProgram.TurnAborted _) -> "TurnAborted"
+                        | Some(ReconcileProgram.TurnFailed _) -> "TurnFailed"
+                        | None -> "" |}
         }
 
     let private projectionEdgeScenario (failureWake: bool) : Task<obj> =

@@ -56,11 +56,9 @@ module ReconcileSurface =
 
     val evidenceSessionCleared: unit -> obj
 
-    val decideStep: wake: obj -> rereadsRemaining: int -> evidence: obj -> obj
+    val decideStep: wake: obj -> evidence: obj -> obj
 
     val decisionName: decision: obj -> string
-
-    val clearsContinuationCandidate: decision: obj -> bool
 
     val consumeKey: turn: obj -> string
 
@@ -73,6 +71,8 @@ module ReconcileSurface =
     val clearProvisional: maps: obj -> session: string -> obj
 
     val unboundFailureScenario: unit -> Task<obj>
+
+    val idleProvisionalWithoutProjectionEdgeScenario: unit -> Task<obj>
 
     val idleProjectionEdgeScenario: unit -> Task<obj>
 

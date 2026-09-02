@@ -14,15 +14,14 @@ module JudgeSurface =
 
     val contract: language: string -> obj
 
-    /// The public fail-closed precedence used by JudgeTool before any identity
-    /// or tree lookup. This is diagnostic text, not internal state.
-    val validateContext:
+    val decideExecution:
         role: string ->
         sessionId: string ->
-        hasOwner: bool ->
-        hasParent: bool ->
-        hasBarrier: bool ->
-        hasTree: bool ->
+        isSubmitted: bool ->
+        verdict: string ->
+        toolCallId: string ->
+        providerRunId: string ->
+        physicalUserMessageId: string ->
             obj
 
     val receipt: language: string -> string
