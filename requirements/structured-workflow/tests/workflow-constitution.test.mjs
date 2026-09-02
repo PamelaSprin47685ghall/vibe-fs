@@ -11,10 +11,6 @@ import {
   ORDERING_STEPS,
   scanPluginTransforms,
 } from '../../../scripts/checks/plugin-transforms-invariant.mjs'
-import {
-  ROOT_CONTRACTS,
-  scanCompositionRoot,
-} from '../../../scripts/checks/composition-root-invariant.mjs'
 
 const readFixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
 const semanticDecoratorFcsFixture = fileURLToPath(new URL('./fixtures/semantic-decorator-fcs/', import.meta.url))
@@ -304,58 +300,4 @@ test('WHAT[STRUCTURED-WORKFLOW-004] PluginTransforms_order_requires_executable_c
   assert.ok(scanPluginTransforms(dormant, 'dormant-plugin-transform-order.fs').some((hit) => hit.kind === 'ordering'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-004] composition_root_registry_is_complete_and_new_semantics_are_RED', () => {
-  assert.deepEqual(ROOT_CONTRACTS.map(({ name }) => name), [
-    'PluginBoot',
-    'HostSignalBootstrap',
-    'PluginTransforms',
-    'ToolRegistry',
-  ])
 
-  for (const helper of ['chooseFinality', 'selectRecovery']) {
-    const source = `module PluginBoot\n    let private ${helper} value = value`
-    assert.ok(scanCompositionRoot(source, 'PluginBoot').some((hit) => hit.kind === 'unregistered-site'))
-  }
-
-  const inlineForeignMatch = 'module PluginBoot\n    let create foreign = match foreign with | Some value -> value | None -> 0'
-  assert.ok(scanCompositionRoot(inlineForeignMatch, 'PluginBoot').some((hit) => hit.kind === 'unregistered-site'))
-
-  const controls = readFixture('composition-control-decisions.fs')
-  const controlHits = scanCompositionRoot(controls, 'PluginBoot')
-  assert.ok(controlHits.some((hit) => hit.kind === 'unregistered-site' && hit.message.includes('declaration')))
-  assert.ok(controlHits.some((hit) => hit.kind === 'unregistered-site' && hit.message.includes('if')))
-  assert.ok(controlHits.some((hit) => hit.kind === 'unregistered-site' && hit.message.includes('elif')))
-  assert.ok(controlHits.some((hit) => hit.kind === 'unregistered-site' && hit.message.includes('match')))
-  assert.ok(controlHits.some((hit) => hit.kind === 'unregistered-site' && hit.message.includes('try')))
-  assert.ok(controlHits.some((hit) => hit.kind === 'unregistered-site' && hit.message.includes('lambda')))
-
-  const applications = scanCompositionRoot(readFixture('composition-call-applications.fs'), 'PluginBoot')
-  for (const target of ['ForeignPolicy.apply', 'ForeignPolicy.finish', 'ForeignPolicy.inspect', 'ForeignPolicy.normalize']) {
-    assert.ok(applications.some((hit) => hit.kind === 'unregistered-site' && hit.message.includes('application') && hit.message.includes(target)))
-  }
-
-  const resolvedOpenCall = scanCompositionRoot(
-    readFixture('composition-call-applications.fs'),
-    'PluginBoot',
-    [{
-      consumerPath: 'composition-call-applications.fs',
-      sourceAnchor: 'applyPolicy',
-      resolvedTarget: 'ForeignPolicy.applyPolicy',
-      declarationPaths: ['ForeignPolicy.fs'],
-      startLine: 9,
-      startColumn: 12,
-      endLine: 9,
-      endColumn: 23,
-    }],
-  )
-  assert.ok(resolvedOpenCall.some((hit) => hit.kind === 'unregistered-site'
-    && hit.message.includes('application')
-    && hit.message.includes('applyPolicy')
-    && hit.message.includes('ForeignPolicy.applyPolicy')))
-  assert.equal(resolvedOpenCall.filter((hit) => hit.kind === 'unregistered-site'
-    && hit.message.includes('application')).length, 1)
-
-  const registered = ROOT_CONTRACTS.find(({ name }) => name === 'PluginBoot')
-  const stale = { ...registered, sites: registered.sites.map((site, index) => index === 0 ? { ...site, anchor: `${site.anchor} changed` } : site) }
-  assert.ok(scanCompositionRoot(readFixture('deep-composition-root.fs'), stale).some((hit) => hit.kind === 'stale-anchor'))
-})

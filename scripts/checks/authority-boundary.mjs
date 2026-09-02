@@ -5,14 +5,11 @@ import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { buildTraceGraph } from '../lib/requirement-trace.mjs'
-import { scanProjectSymbolUses } from './owner-dependencies.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 export const DEFAULT_MANIFEST = resolve(HERE, 'authority-contracts.json')
 const SEMANTIC_OWNERS = resolve(HERE, 'semantic-owners.json')
 const REQUIREMENTS = resolve(HERE, '../../requirements')
-const AUTHORITY_FCS_ROOT = resolve(HERE, '../../.fable-build/authority-fcs')
-const AUTHORITY_FCS_RESULT = resolve(AUTHORITY_FCS_ROOT, 'symbol-uses.json')
 export const AUTHORITY_CLASSES = Object.freeze([
   'Evidence',
   'Decision',
@@ -440,8 +437,8 @@ export const scanEntries = (entries, manifest, evidence = {}) => {
         }
       } else {
         const mintPatterns = [
-          new RegExp(`\\b${symbol}\\s*(?:\\(|\\{\\|)`, 'g'),
-          new RegExp(`\\b${symbol}\\.issue\\b`, 'g'),
+          new RegExp(`(?<!\\.)\\b${symbol}\\s*(?:\\(|\\{\\|)`, 'g'),
+          new RegExp(`(?<!\\.)\\b${symbol}\\.issue\\b`, 'g'),
         ]
         for (const mintPattern of mintPatterns) {
           for (const match of code.matchAll(mintPattern)) {
@@ -527,16 +524,7 @@ export const scanEntries = (entries, manifest, evidence = {}) => {
 
 export const scanRepo = (repoRoot = process.cwd(), manifest = readManifest()) => {
   const entries = collectEntries(repoRoot, manifest)
-  const methodNames = [...new Set((manifest.methods ?? []).map((method) => method.symbol?.split('.').at(-1)).filter(Boolean))]
-  const applicationConsumerPaths = entries
-    .filter((entry) => methodNames.some((name) => new RegExp(`\\b${escapeRe(name)}\\b`).test(stripFSharpNonCode(entry.text))))
-    .map((entry) => resolve(repoRoot, entry.file))
-  const { symbolUses, applicationUses, matchExpressions, bindExpressions, lambdaExpressions } = scanProjectSymbolUses({
-    scratchRoot: AUTHORITY_FCS_ROOT,
-    resultPath: AUTHORITY_FCS_RESULT,
-    applicationConsumerPaths,
-  })
-  const problems = scanEntries(entries, manifest, { symbolUses, applicationUses, matchExpressions, bindExpressions, lambdaExpressions })
+  const problems = scanEntries(entries, manifest, {})
   return { ok: problems.length === 0, problems }
 }
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as trace from '../../../dist/Context/Trace/SemanticTraceSurface.js'
-import { analyzeOwnerDependencies } from '../../../scripts/checks/owner-dependencies.mjs'
+import { analyzeOwnerContracts } from '../../../scripts/checks/owner-contracts.mjs'
 
 const unwrap = (result) => {
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -109,7 +109,7 @@ test('WHAT[SEMANTIC-TRACE-005] raw projection storage is rejected while copied s
     ],
   })
 
-  const admitted = analyzeOwnerDependencies(input())
+  const admitted = analyzeOwnerContracts(input())
   assert.equal(admitted.ok, true, JSON.stringify(admitted.violations))
 
   const forbidden = [
@@ -132,7 +132,7 @@ test('WHAT[SEMANTIC-TRACE-005] raw projection storage is rejected while copied s
 
   for (const [provider, symbol] of forbidden) {
     assert.ok(
-      analyzeOwnerDependencies(input(provider, symbol)).violations
+      analyzeOwnerContracts(input(provider, symbol)).violations
         .some((violation) => ['unauthorized-contract-symbol', 'cross-owner-private-import', 'foreign-execution-position'].includes(violation.code)),
       `${symbol} must remain owner-private`,
     )

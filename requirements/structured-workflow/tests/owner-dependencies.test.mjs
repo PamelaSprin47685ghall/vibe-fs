@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { analyzeOwnerDependencies } from '../../../scripts/checks/owner-dependencies.mjs'
+import { analyzeOwnerContracts } from '../../../scripts/checks/owner-contracts.mjs'
 
 const file = (path) => ({ path })
 
@@ -38,7 +38,7 @@ const symbolUse = (consumer, provider, symbol, overrides = {}) => ({
 })
 
 const analyze = ({ files, owners, contracts = registry(), uses = [], migrationState }) =>
-  analyzeOwnerDependencies({
+  analyzeOwnerContracts({
     compilePaths: files.map((entry) => entry.path),
     semanticOwners: ownership(...owners),
     publishedContracts: contracts,
@@ -113,7 +113,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] unowned production modules are rejected', ()
 
 test('WHAT[STRUCTURED-WORKFLOW-011] analysis fails closed without compiler evidence', () => {
   const owned = file('src/Wanxiangshu/Alpha/Model.fs')
-  const result = analyzeOwnerDependencies({
+  const result = analyzeOwnerContracts({
     compilePaths: [owned.path],
     semanticOwners: ownership({ path: owned.path, owner: 'alpha' }),
     publishedContracts: registry(),

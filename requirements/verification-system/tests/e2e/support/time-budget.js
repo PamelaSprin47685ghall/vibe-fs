@@ -203,7 +203,7 @@ export const UNIT_VERDICT_SILENCE_MS = budgetFromEnv('UNIT_VERDICT_SILENCE_MS', 
  * to a default production scan, and the expensive lanes are either fixture-project scans (not
  * reusable by construction) or the producer of the evidence itself.
  */
-export const FCS_PROJECT_CHECK_TIMEOUT_MS = budgetFromEnv('FCS_PROJECT_CHECK_TIMEOUT_MS', 180000);
+export const PROJECT_CHECK_TIMEOUT_MS = budgetFromEnv('PROJECT_CHECK_TIMEOUT_MS', 180000);
 
 /**
  * Fixed probe lattice for `tests/integration/harness/unit-runner-cases.mjs`.

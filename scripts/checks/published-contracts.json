@@ -18906,58 +18906,5 @@
       "justification": "host-boundary wires only the listed foreign symbols in this composition root; it owns no foreign decision law."
     }
   ],
-  "requirement_dependencies": [],
-  "owner_cycle_justifications": [
-    {
-      "owners": [
-        "action-affordance",
-        "attention-regulation",
-        "behavior-diagnosis",
-        "capability-enforcement",
-        "causal-wait",
-        "change-integration",
-        "cognitive-environment",
-        "concern-routing",
-        "context-compression",
-        "degeneration-guard",
-        "delegation",
-        "dispatch-protocol",
-        "distribution",
-        "durable-convergence",
-        "durable-events",
-        "epistemic-reasoning",
-        "execution-failure-policy",
-        "execution-model-routing",
-        "external-investigation",
-        "finality",
-        "guidance-delivery",
-        "host-boundary",
-        "institutional-learning",
-        "interaction-authority",
-        "intra-participant-parallelism",
-        "knowledge-reuse",
-        "managed-chat-execution",
-        "managed-session-lifecycle",
-        "obligation-ledger",
-        "output-distillation",
-        "participant-horizon",
-        "prefix-stability",
-        "process-execution",
-        "provider-attempt-recovery",
-        "provider-language",
-        "provider-projection",
-        "repository-investigation",
-        "repository-programming",
-        "requirement-grounding",
-        "review-assurance",
-        "review-judgement",
-        "semantic-trace",
-        "session-ontology",
-        "speculative-investigation",
-        "time-capability",
-        "work-record"
-      ],
-      "justification": "Final live owner dependency SCC after all ready-frontier KEEP cutovers; cross-owner surface contracts span this strongly connected component. Future architecture work must break cycles into DAGs."
-    }
-  ]
+  "requirement_dependencies": []
 }

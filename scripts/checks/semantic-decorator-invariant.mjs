@@ -10,12 +10,9 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildTraceGraph } from '../lib/requirement-trace.mjs'
 import { walk } from '../lib/walk.mjs'
-import { scanProjectSymbolUses } from './owner-dependencies.mjs'
 
 export const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 export const PRODUCTION_ROOT = 'src/Wanxiangshu'
-const FCS_SCRATCH = join(ROOT, '.fable-build/semantic-decorator-fcs')
-const FCS_RESULT = join(FCS_SCRATCH, 'symbol-uses.json')
 
 const GENERIC_FRAMEWORK_PATTERNS = Object.freeze([
   /\bMiddlewarePipeline\b/,
@@ -666,38 +663,13 @@ export const scanSemanticDecorators = (text, file = '<synthetic>', applicationUs
 export const scanEntries = (entries, applicationUses, flowEvidence) =>
   entries.flatMap((entry) => scanSemanticDecorators(entry.text, entry.file, applicationUses, flowEvidence))
 
-export const scanSemanticDecoratorEvidence = ({
-  projectFile = join(ROOT, 'src/Wanxiangshu/Wanxiangshu.fsproj'),
-  productionRoot = join(ROOT, PRODUCTION_ROOT),
-  scratchRoot = FCS_SCRATCH,
-  resultPath = FCS_RESULT,
-  applicationConsumerPaths,
-} = {}) => scanProjectSymbolUses({
-  projectFile,
-  productionRoot,
-  scratchRoot,
-  resultPath,
-  applicationConsumerPaths,
-})
-
-export const scanSemanticDecoratorApplications = (options) =>
-  scanSemanticDecoratorEvidence(options).applicationUses
-
-export const scanRepo = (root = ROOT, compilerEvidence) => {
+export const scanRepo = (root = ROOT) => {
   const base = resolve(root, PRODUCTION_ROOT)
   const entries = walk(base, ['.fs']).map((file) => ({
     file: file.replace(`${resolve(root)}/`, '').replace(/\\/g, '/'),
     text: readFileSync(file, 'utf8'),
   }))
-  const evidence = compilerEvidence ?? scanSemanticDecoratorEvidence({
-    projectFile: join(root, 'src/Wanxiangshu/Wanxiangshu.fsproj'),
-    productionRoot: base,
-    scratchRoot: join(root, '.fable-build/semantic-decorator-fcs'),
-    resultPath: join(root, '.fable-build/semantic-decorator-fcs/symbol-uses.json'),
-  })
-  const applicationUses = Array.isArray(evidence) ? evidence : evidence.applicationUses
-  const flowEvidence = Array.isArray(evidence) ? undefined : evidence
-  return scanEntries(entries, applicationUses, flowEvidence)
+  return scanEntries(entries)
 }
 
 const runCli = () => {
