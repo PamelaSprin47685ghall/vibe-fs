@@ -143,7 +143,7 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs",
-      "owner": "host-boundary",
+      "owner": "dispatch-protocol",
       "justification": "Signed JS-native facade over canonical JSON representation; normalization internals remain private and it grants no additional semantic authority."
     },
     {
@@ -1562,6 +1562,11 @@
       "path": "src/Wanxiangshu/Verification/TemporalSurface.fs",
       "owner": "verification-system",
       "justification": "Signed JS-native temporal verification surface for deterministic virtual timer and clock capabilities; event store internals remain signature-hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateProjection.fs",
+      "owner": "durable-events",
+      "justification": "Pure estimate projection state with pure observe/replace functions consumed by the durable projection spine; no runtime authority."
     }
   ],
   "compiler_boundary_localities": [
@@ -1724,6 +1729,11 @@
       "owner": "host-boundary",
       "locality": "host-signal-adapter",
       "justification": "Host signal adapter, signal router, listener subscription and terminal event bus form one adapter locality over host signal and diagnostics runtimes."
+    },
+    {
+      "owner": "host-boundary",
+      "locality": "host-fatal-effect",
+      "justification": "Narrow process-fuse physical effect contract (Foundation/FatalProcess); zero dependencies, sealed by FatalProcess.fsi, consumed by diagnostics runtime and the durable journal spine as the single fatal-exit vocabulary."
     },
     {
       "owner": "host-boundary",
@@ -2648,6 +2658,7 @@
         "host-boundary",
         "interaction-authority",
         "intra-participant-parallelism",
+        "knowledge-reuse",
         "managed-chat-execution",
         "provider-attempt-recovery",
         "review-judgement",
@@ -6287,6 +6298,7 @@
         "institutional-learning",
         "interaction-authority",
         "intra-participant-parallelism",
+        "knowledge-reuse",
         "managed-chat-execution",
         "managed-session-lifecycle",
         "obligation-ledger",
@@ -6472,12 +6484,11 @@
     },
     {
       "path": "src/Wanxiangshu/Persistence/Journal/RuntimePath.fs",
-      "owner": "durable-events",
+      "owner": "change-integration",
       "node": "canonical-spine",
       "contract": "DurableEvents.Contract",
       "kind": "published-contract",
       "consumers": [
-        "change-integration",
         "host-boundary",
         "knowledge-reuse"
       ],
@@ -7507,6 +7518,7 @@
       "kind": "published-contract",
       "consumers": [
         "behavior-diagnosis",
+        "capability-enforcement",
         "change-integration",
         "cognitive-environment",
         "context-compression",
@@ -7514,23 +7526,31 @@
         "dispatch-protocol",
         "durable-convergence",
         "durable-events",
+        "execution-model-routing",
+        "finality",
         "guidance-delivery",
         "institutional-learning",
+        "interaction-authority",
         "intra-participant-parallelism",
+        "knowledge-reuse",
+        "managed-chat-execution",
+        "managed-session-lifecycle",
         "obligation-ledger",
         "output-distillation",
         "participant-horizon",
         "prefix-stability",
         "provider-projection",
         "requirement-grounding",
+        "review-judgement",
         "semantic-trace",
+        "session-ontology",
         "speculative-investigation",
         "work-record"
       ],
       "symbols": [
         "Wanxiangshu.Host.HostDigest.sha256Hex"
       ],
-      "justification": "Host.HostDigest publishes exactly the compiler-observed symbols required by the listed production owners; every unlisted sibling remains private to host-boundary."
+      "justification": "Host.HostDigest sha256 is the single host hash vocabulary consumed repo-wide by contract and composition localities for durable identity digests."
     },
     {
       "path": "src/Wanxiangshu/Foundation/Temporal.fs",
@@ -15059,7 +15079,7 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
-      "owner": "host-boundary",
+      "owner": "dispatch-protocol",
       "node": "host-boundary-frontier-keep",
       "contract": "host-boundary.Contract",
       "kind": "published-contract",
@@ -15073,7 +15093,7 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
-      "owner": "host-boundary",
+      "owner": "dispatch-protocol",
       "node": "host-boundary-frontier-keep",
       "contract": "host-boundary.Contract",
       "kind": "published-contract",
@@ -15087,7 +15107,7 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
-      "owner": "host-boundary",
+      "owner": "dispatch-protocol",
       "node": "host-boundary-frontier-keep",
       "contract": "host-boundary.Contract",
       "kind": "published-contract",
@@ -15101,7 +15121,7 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
-      "owner": "host-boundary",
+      "owner": "dispatch-protocol",
       "node": "host-boundary-frontier-keep",
       "contract": "host-boundary.Contract",
       "kind": "published-contract",
@@ -15115,7 +15135,7 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
-      "owner": "host-boundary",
+      "owner": "dispatch-protocol",
       "node": "host-boundary-frontier-keep",
       "contract": "host-boundary.Contract",
       "kind": "published-contract",
@@ -17321,26 +17341,13 @@
       "justification": "delegation.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to delegation."
     },
     {
-      "path": "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateProjection.fs",
-      "owner": "delegation",
-      "node": "delegation-frontier-keep",
-      "contract": "delegation.Contract",
-      "kind": "published-contract",
-      "consumers": [
-        "durable-events"
-      ],
-      "symbols": [
-        "Wanxiangshu.Execution.Delegation.DelegatedToolEstimateProjectionState"
-      ],
-      "justification": "delegation.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to delegation."
-    },
-    {
       "path": "src/Wanxiangshu/Execution/Delegation/DelegationFactFold.fs",
       "owner": "delegation",
       "node": "delegation-frontier-keep",
       "contract": "delegation.Contract",
       "kind": "published-contract",
       "consumers": [
+        "change-integration",
         "durable-events"
       ],
       "symbols": [
@@ -17355,6 +17362,7 @@
       "contract": "delegation.Contract",
       "kind": "published-contract",
       "consumers": [
+        "change-integration",
         "durable-events"
       ],
       "symbols": [
@@ -17369,6 +17377,7 @@
       "contract": "delegation.Contract",
       "kind": "published-contract",
       "consumers": [
+        "change-integration",
         "durable-events"
       ],
       "symbols": [
@@ -17772,6 +17781,7 @@
       "contract": "delegation.Contract",
       "kind": "published-contract",
       "consumers": [
+        "durable-events",
         "participant-horizon"
       ],
       "symbols": [
@@ -18048,6 +18058,7 @@
       "contract": "delegation.Contract",
       "kind": "published-contract",
       "consumers": [
+        "durable-events",
         "host-boundary",
         "managed-session-lifecycle"
       ],
@@ -18086,7 +18097,7 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
-      "owner": "delegation",
+      "owner": "durable-events",
       "node": "delegation-frontier-keep",
       "contract": "delegation.Contract",
       "kind": "published-contract",
@@ -18105,24 +18116,7 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
-      "owner": "delegation",
-      "node": "delegation-frontier-keep",
-      "contract": "delegation.Contract",
-      "kind": "published-contract",
-      "consumers": [
-        "durable-events"
-      ],
-      "symbols": [
-        "Wanxiangshu.Execution.Delegation.AgentLinkageProjection",
-        "Wanxiangshu.Execution.Delegation.HandleProjection.empty",
-        "Wanxiangshu.Execution.Delegation.HandleProjection.recordSealsBlogger",
-        "Wanxiangshu.Execution.Delegation.HandleRecord"
-      ],
-      "justification": "delegation.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to delegation."
-    },
-    {
-      "path": "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
-      "owner": "delegation",
+      "owner": "durable-events",
       "node": "delegation-frontier-keep",
       "contract": "delegation.Contract",
       "kind": "published-contract",
@@ -18142,7 +18136,7 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
-      "owner": "delegation",
+      "owner": "durable-events",
       "node": "delegation-frontier-keep",
       "contract": "delegation.Contract",
       "kind": "published-contract",
@@ -18168,7 +18162,7 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
-      "owner": "delegation",
+      "owner": "durable-events",
       "node": "delegation-frontier-keep",
       "contract": "delegation.Contract",
       "kind": "published-contract",
@@ -18195,7 +18189,7 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
-      "owner": "delegation",
+      "owner": "durable-events",
       "node": "delegation-frontier-keep",
       "contract": "delegation.Contract",
       "kind": "published-contract",
@@ -18213,7 +18207,7 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
-      "owner": "delegation",
+      "owner": "durable-events",
       "node": "delegation-frontier-keep",
       "contract": "delegation.Contract",
       "kind": "published-contract",
@@ -18239,7 +18233,7 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
-      "owner": "delegation",
+      "owner": "durable-events",
       "node": "delegation-frontier-keep",
       "contract": "delegation.Contract",
       "kind": "published-contract",
@@ -18253,7 +18247,7 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
-      "owner": "delegation",
+      "owner": "durable-events",
       "node": "delegation-frontier-keep",
       "contract": "delegation.Contract",
       "kind": "published-contract",

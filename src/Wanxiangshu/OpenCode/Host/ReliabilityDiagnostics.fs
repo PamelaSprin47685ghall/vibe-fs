@@ -183,12 +183,6 @@ type ReliabilitySnapshot =
 [<RequireQualifiedAccess>]
 module ReliabilityDiagnostics =
 
-    let private diagnosticLifecycle =
-        function
-        | ChatExecutionLifecycle.Accepted -> DurableExecutionLifecycle.AcceptedBeforeProvider
-        | ChatExecutionLifecycle.ProviderStarted -> DurableExecutionLifecycle.ProviderStarted
-        | ChatExecutionLifecycle.Terminal _ -> DurableExecutionLifecycle.Terminal
-
     let querySources
         (counters: ReliabilityCounters)
         (executions: ExecutionReliabilitySource seq)
@@ -227,25 +221,6 @@ module ReliabilityDiagnostics =
               StaleFences = capacity.StaleFences
               ConflictingFences = capacity.ConflictingFences }
           Recovery = recovery }
-
-    let internal query
-        (counters: ReliabilityCounters)
-        (executions: ChatExecutionState seq)
-        (capacity: CapacityInvariantEvidence)
-        (recovery: RecoveryOwnershipDiagnosticSource)
-        : ReliabilitySnapshot =
-        querySources
-            counters
-            (executions
-             |> Seq.map (fun state ->
-                 { LogicalRunId = state.Evidence.LogicalRunId
-                   Lifecycle = diagnosticLifecycle state.Lifecycle }))
-            { QueueDepth = capacity.Waiters.Length
-              ActiveLeases = capacity.ActiveCount
-              DuplicateFences = capacity.Counters.Duplicate
-              StaleFences = capacity.Counters.Stale
-              ConflictingFences = capacity.Counters.Conflict }
-            recovery
 
     let validateOperation (operation: string) =
         not (String.IsNullOrWhiteSpace operation)

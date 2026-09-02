@@ -14,6 +14,10 @@
     <Compile Include="Interaction/Dispatch/Nudge.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/MetadataCodec.fsi"/>
     <Compile Include="Interaction/Dispatch/OpenCode/MetadataCodec.fs"/>
+    <Compile Include="OpenCode/Codec/CanonicalJson.fsi"/>
+    <Compile Include="OpenCode/Codec/CanonicalJson.fs"/>
+    <Compile Include="OpenCode/Codec/CanonicalJsonSurface.fsi"/>
+    <Compile Include="OpenCode/Codec/CanonicalJsonSurface.fs"/>
     <Compile Include="Foundation/OutcomeSurface.fsi"/>
     <Compile Include="Foundation/OutcomeSurface.fs"/>
   </ItemGroup>

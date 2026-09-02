@@ -13,10 +13,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <Compile Include="Execution/Delegation/Fact.fsi"/>
     <Compile Include="Execution/Delegation/Fact.fs"/>
-    <Compile Include="Execution/Delegation/LinkageProjection.fsi"/>
-    <Compile Include="Execution/Delegation/LinkageProjection.fs"/>
-    <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fsi"/>
-    <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fs"/>
     <Compile Include="Execution/Delegation/ExecutionFactFold.fsi"/>
     <Compile Include="Execution/Delegation/ExecutionFactFold.fs"/>
     <Compile Include="Execution/Delegation/DelegationFactFold.fsi"/>

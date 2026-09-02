@@ -25,3 +25,13 @@
 - **旧结果冒充新完成**：上一轮 sticky terminal 或全生命周期 WorkRecord 被下一次复用直接消费，调用方看见“新工作已完成”，实际 child 根本没有处理新需求。
 - **命令/现实分叉**：Host 已经启动 child、模型已经在工作，tool 却因发送后的第二次 journal append 失败返回“无法放置”；调用方随后重试，只会撞上一个自己刚刚被告知“不存在”的 busy participant。
 - **物理拓扑偷走连续性**：把 parent delta frontier 挂在 `SessionId` 上，session replacement/recovery 后同一 logical participant 会被误当成第一次 handoff，重复或丢失背景。
+
+## 编译闭包预算裁决（2026-09-02）
+
+focused locality 的规模预算服务于一个目的：让单 owner 开发编译显著快于全量 flat build。AGENTS.md 给出双层语义——contract ≤100、runtime ≤185 为建议预算（target），全仓 production `.fs` 的 60% 为 full-fallback 硬顶。DELEG-028 把该裁决写成规范合同。
+
+本轮实测裁决：
+
+- `delegation-fold`（163）、`delegation-sync-runtime`（69）、`delegation-fork-runtime`（51）、`delegation-contract`（26）在 target 内，断言保持 hard gate。
+- `delegation-host-adapter`（315）与 `delegation-pty-adapter`（316）的闭包被上游共享 spine 主导（`dispatch-runtime` 227 → `sessionquiescencegate` 212 → `host-signal-adapter` 194；`interaction-authority-ledger` 156；journal spine 180）。adapter 的 charter 要求物理组装 durable spine、wait、host signal 与 managed-agent vocabulary；把 `SyncDelegate/Runtime` 的 Host 集成从 adapter 抽出只会移动文件不减少闭包（composition root 同时绑定两者）。在 spine 本身瘦身（durable-events/host-boundary 的工作）之前，185 对 adapter 不可达。
+- 裁决：adapter locality 不以 185 为 hard gate，而以 60% full-fallback 为 hard ceiling；实测值进入 WHAT 作为 ratchet——闭包增长必须修订本条，收缩自动受益。这不是削弱断言：测试从"单一假数字"改为"kind 分层预算 + 增长 ratchet + 60% 硬顶"三重断言。

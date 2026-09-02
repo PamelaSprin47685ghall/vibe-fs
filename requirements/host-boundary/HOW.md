@@ -42,14 +42,15 @@
 
 ### 6. Contract/Runtime 编译架构分界与单向依赖
 
-- **六大 Locality 切分**：
+- **Locality 切分**：
   - `Host.Session.Contract`（`host-session-contract`，kind: `contract`）：仅包含 `SessionContract` capability 与 `SessionSnapshot` 纯词汇、端口、定位 decision；
-  - `Host.Signal.Contract`（`host-signal-contract`，kind: `contract`）：包含 `HostSignal` 词汇表与无状态编解码器（`HostEventCodec`、`LoopEventCodec`、`HostMessageCodec`、`ToolHostCodec` 等）；
+  - `Host.Signal.Contract`（`host-signal-contract`，kind: `contract`）：包含 `HostDigest` sha256 词汇、`McpLaunch` 物理启动描述与共享终端词汇（`EventContract`、`Message`/`MessagePart`、`OpencodeTypes`/`OpencodeModel`）；`HostSignal` 词汇表与无状态编解码器（`HostEventCodec`、`LoopEventCodec`、`HostMessageCodec`、`ToolHostCodec` 等）中，`CanonicalJson` 由 `dispatch-protocol.foundation-identity` 持有，`HostSignal` 与剩余 codec 由 `Host.Signal.Adapter` 持有；
+  - `Host.Fatal.Effect`（`host-fatal-effect`，kind: `contract`）：`Foundation/FatalProcess` 进程 fuse 的窄物理效果边界；
   - `Host.Diagnostics.Runtime`（`host-diagnostics-runtime`，kind: `runtime`）：包含 `HookPolicy` 元数据表与 `ReliabilityDiagnostics` 因果记录收集；
-  - `Host.Signal.Adapter`（`host-signal-adapter`，kind: `adapter`）：包含 `HostSignalAdapter` 路由器、`HostSignalSubscribe` 订阅器与 `Events` 终端总线；
+  - `Host.Signal.Adapter`（`host-signal-adapter`，kind: `adapter`）：包含 `HostSignal` 词汇、全部宿主编解码器（`HostEventCodec`/`LoopEventCodec`/`HostMessageCodec`/`ToolHostCodec`）、`HostSignalAdapter` 路由器、`HostSignalSubscribe` 订阅器与 `Events` 终端总线；共享终端词汇 `EventContract`/`Message`/`OpencodeTypes` 已在 `Host.Signal.Contract`；
   - `Host.Session.Runtime`（`host-session-runtime`，kind: `runtime`）：包含 `SessionSnapshotPort`/`SessionSnapshotSurface` wire 投影、`SessionQuiescenceGate`、`QuiescenceSurface`、`HostMessageProjection` 就地修改与 `HostSessionContext`；
   - `Sphinx.Host.Adapter`（`sphinx-host-adapter`，kind: `adapter`）：包含 `SphinxMcpConfig` 启动配置与环境适配。
-- **单向依赖与闭包纯洁性**：应用与领域契约只能引用 Contract locality，严禁传递包含 Runtime 与 Adapter 实现；契约源码闭包与聚焦运行时分别受 $\le 100$ 和 $\le 185$ 源码上限约束。
+- **单向依赖与闭包纯洁性**：应用与领域契约只能引用 Contract locality，严禁传递包含 Runtime 与 Adapter 实现；契约源码闭包受 $\le 100$ 上限约束，聚焦 runtime 以 185 为 target、adapter/宽闭包 locality 以全仓 60% 为 full-fallback 硬顶（见 delegation/host 预算裁决）。
 
 ## 验证与测试落点
 

@@ -195,9 +195,12 @@ test('WHAT[HOST-BOUNDARY-026] host boundary projects declare explicit locality k
     hostSignalBootstrap.references.some((r) => r.includes('execution-delegation-ledger')),
     'opencode-host-hostsignalbootstrap must reference the persistence-backed delegation ledger',
   )
+  // Physical truth: bootstrap consumes SyncDelegateHostObservation (hostturnobservedsurface) and the
+  // delegation ledger; SyncDelegateRuntime Host integration lives in delegation-host-adapter while
+  // Wait/Store/Prompt/Workflow stay in delegation-sync-runtime (see AGENTS delegation split).
   assert.ok(
-    hostSignalBootstrap.references.some((r) => r.includes('delegation-sync-runtime')),
-    'opencode-host-hostsignalbootstrap must reference delegation-sync-runtime',
+    hostSignalBootstrap.references.some((r) => r.includes('execution-delegation-hostturnobservedsurface')),
+    'opencode-host-hostsignalbootstrap must reference the delegation host-turn-observed surface',
   )
   assert.ok(
     !hostSignalBootstrap.references.some((r) => r.includes('delegation-host-adapter')),

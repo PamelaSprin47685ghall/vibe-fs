@@ -9,6 +9,9 @@
 
 /src/Wanxiangshu/**/*.fs
 /scripts/check.mjs
+/scripts/compile-impact.mjs
+/scripts/compile-owner.mjs
+/scripts/lib/owner-compile.mjs
 /scripts/checks/architecture.mjs
 /scripts/checks/dsl-ownership.mjs
 /scripts/checks/fsharp-control-pyramid.mjs

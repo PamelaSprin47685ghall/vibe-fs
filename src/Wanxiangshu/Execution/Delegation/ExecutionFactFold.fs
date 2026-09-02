@@ -26,9 +26,7 @@ open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Composition.Durable.ProjectionUpdate
 open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.ProjectionUpdate
 
 module ExecutionFactFold =
 

@@ -159,7 +159,7 @@
   ],
   "contracts": [
     {
-      "file": "src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs",
+      "file": "src/Wanxiangshu/OpenCode/Host/SessionContract.fs",
       "symbol": "QuiescencePermit",
       "anchor": "type QuiescencePermit = interface end",
       "classification": "Authority",
@@ -587,7 +587,7 @@
           "file": "src/Wanxiangshu/Persistence/EventStore/Store.fs",
           "symbol": "commitPrepared",
           "anchor": "{ Cuts = prepared.Cuts }",
-          "owner": "durable-convergence"
+          "owner": "durable-events"
         },
         {
           "file": "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs",

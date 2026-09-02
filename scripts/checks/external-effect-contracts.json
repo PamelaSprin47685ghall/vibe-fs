@@ -4,260 +4,920 @@
     {
       "id": "canonical-append",
       "owner": "durable-events",
-      "what_ids": ["DURABLE-EVENTS-001", "DURABLE-EVENTS-003"],
-      "intent": {"kind": "durable-intent", "path": "src/Wanxiangshu/Persistence/EventStore/Model.fs", "symbols": ["EventEnvelope"]},
-      "admission": {"kind": "process-local-admission", "path": "src/Wanxiangshu/Persistence/EventStore/Store.fs", "symbols": ["withStoreLock"]},
-      "physical_receipt": {"kind": "typed-result", "path": "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs", "symbols": ["AppendReceipt"]},
-      "durable_outcome": {"kind": "durable-outcome", "path": "src/Wanxiangshu/Persistence/EventStore/Store.fs", "symbols": ["commitPrepared"]},
+      "what_ids": [
+        "DURABLE-EVENTS-001",
+        "DURABLE-EVENTS-003"
+      ],
+      "intent": {
+        "kind": "durable-intent",
+        "path": "src/Wanxiangshu/Persistence/EventStore/Model.fs",
+        "symbols": [
+          "EventEnvelope"
+        ]
+      },
+      "admission": {
+        "kind": "process-local-admission",
+        "path": "src/Wanxiangshu/Persistence/EventStore/Store.fs",
+        "symbols": [
+          "withStoreLock"
+        ]
+      },
+      "physical_receipt": {
+        "kind": "typed-result",
+        "path": "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs",
+        "symbols": [
+          "AppendReceipt"
+        ]
+      },
+      "durable_outcome": {
+        "kind": "durable-outcome",
+        "path": "src/Wanxiangshu/Persistence/EventStore/Store.fs",
+        "symbols": [
+          "commitPrepared"
+        ]
+      },
       "effect_identity": "EventId plus canonical EventEnvelope bytes",
       "ambiguity": {
-        "mechanisms": ["idempotency", "query", "finite-fail-closed"],
-        "states": ["proven-not-applied", "same-canonical-event", "identity-collision"],
+        "mechanisms": [
+          "idempotency",
+          "query",
+          "finite-fail-closed"
+        ],
+        "states": [
+          "proven-not-applied",
+          "same-canonical-event",
+          "identity-collision"
+        ],
         "retry_when": "proven-not-applied",
-        "query_or_compensation": {"path": "src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs", "symbol": "checkIdentity"}
+        "query_or_compensation": {
+          "path": "src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs",
+          "symbol": "checkIdentity"
+        }
       },
-      "reentry": {"path": "src/Wanxiangshu/Persistence/EventStore/Store.fs", "symbol": "appendValidated", "ordinary_ce": true},
+      "reentry": {
+        "path": "src/Wanxiangshu/Persistence/EventStore/Store.fs",
+        "symbol": "appendValidated",
+        "ordinary_ce": true
+      },
       "proof_portfolio": [
-        {"what_id": "DURABLE-EVENTS-001", "path": "requirements/durable-events/tests/event-store-append.test.mjs", "title": "WHAT[DURABLE-EVENTS-001] append_commits_complete_canonical_line_then_updates_Current", "level": "adapter"},
-        {"what_id": "DURABLE-EVENTS-003", "path": "requirements/durable-events/tests/event-store-identity-collision.test.mjs", "title": "WHAT[DURABLE-EVENTS-003] same_EventId_different_canonical_bytes_fail_closed", "level": "pure"}
+        {
+          "what_id": "DURABLE-EVENTS-001",
+          "path": "requirements/durable-events/tests/event-store-append.test.mjs",
+          "title": "WHAT[DURABLE-EVENTS-001] append_commits_complete_canonical_line_then_updates_Current",
+          "level": "adapter"
+        },
+        {
+          "what_id": "DURABLE-EVENTS-003",
+          "path": "requirements/durable-events/tests/event-store-identity-collision.test.mjs",
+          "title": "WHAT[DURABLE-EVENTS-003] same_EventId_different_canonical_bytes_fail_closed",
+          "level": "pure"
+        }
       ]
     },
     {
       "id": "writer-sync",
       "owner": "durable-convergence",
-      "what_ids": ["DURABLE-CONVERGENCE-002", "DURABLE-CONVERGENCE-009"],
-      "intent": {"kind": "process-local-intent", "path": "src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs", "symbols": ["syncWriterStreams"]},
-      "admission": {"kind": "not-applicable", "reason": "The Git hook is the invocation boundary; synchronization keeps no durable admission."},
-      "physical_receipt": {"kind": "typed-result", "path": "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs", "symbols": ["StoreSnapshot"]},
-      "durable_outcome": {"kind": "not-applicable", "reason": "The returned snapshot is a Git candidate; ref publication is owned by the Git gateway."},
+      "what_ids": [
+        "DURABLE-CONVERGENCE-002",
+        "DURABLE-CONVERGENCE-009"
+      ],
+      "intent": {
+        "kind": "process-local-intent",
+        "path": "src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs",
+        "symbols": [
+          "syncWriterStreams"
+        ]
+      },
+      "admission": {
+        "kind": "not-applicable",
+        "reason": "The Git hook is the invocation boundary; synchronization keeps no durable admission."
+      },
+      "physical_receipt": {
+        "kind": "typed-result",
+        "path": "src/Wanxiangshu/Persistence/EventStore/GitTypes.fs",
+        "symbols": [
+          "StoreSnapshot"
+        ]
+      },
+      "durable_outcome": {
+        "kind": "not-applicable",
+        "reason": "The returned snapshot is a Git candidate; ref publication is owned by the Git gateway."
+      },
       "effect_identity": "RootOid of the complete writer/payload tree",
       "ambiguity": {
-        "mechanisms": ["idempotency", "query", "finite-fail-closed"],
-        "states": ["same-root", "remote-absent", "remote-present", "invalid-remote"],
+        "mechanisms": [
+          "idempotency",
+          "query",
+          "finite-fail-closed"
+        ],
+        "states": [
+          "same-root",
+          "remote-absent",
+          "remote-present",
+          "invalid-remote"
+        ],
         "retry_when": "never",
-        "query_or_compensation": {"path": "src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs", "symbol": "tryCachedLocalSnapshot"}
+        "query_or_compensation": {
+          "path": "src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs",
+          "symbol": "tryCachedLocalSnapshot"
+        }
       },
-      "reentry": {"path": "src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs", "symbol": "syncWriterStreamsAt", "ordinary_ce": true},
+      "reentry": {
+        "path": "src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs",
+        "symbol": "syncWriterStreamsAt",
+        "ordinary_ce": true
+      },
       "proof_portfolio": [
-        {"what_id": "DURABLE-CONVERGENCE-002", "path": "requirements/durable-convergence/tests/writer-stream-sync.test.mjs", "title": "WHAT[DURABLE-CONVERGENCE-002] one k-way primitive is shared by integrator and sync", "level": "static"},
-        {"what_id": "DURABLE-CONVERGENCE-002", "path": "requirements/durable-convergence/tests/event-store-merge.test.mjs", "title": "WHAT[DURABLE-CONVERGENCE-002] duplicate stream input is idempotent by EventId", "level": "pure"},
-        {"what_id": "DURABLE-CONVERGENCE-009", "path": "requirements/durable-convergence/tests/writer-sync-adapter.test.mjs", "title": "WHAT[DURABLE-CONVERGENCE-009] Adapter: writer sync preserves exact identities and fails closed at the Git gateway", "level": "adapter"}
+        {
+          "what_id": "DURABLE-CONVERGENCE-002",
+          "path": "requirements/durable-convergence/tests/writer-stream-sync.test.mjs",
+          "title": "WHAT[DURABLE-CONVERGENCE-002] one k-way primitive is shared by integrator and sync",
+          "level": "static"
+        },
+        {
+          "what_id": "DURABLE-CONVERGENCE-002",
+          "path": "requirements/durable-convergence/tests/event-store-merge.test.mjs",
+          "title": "WHAT[DURABLE-CONVERGENCE-002] duplicate stream input is idempotent by EventId",
+          "level": "pure"
+        },
+        {
+          "what_id": "DURABLE-CONVERGENCE-009",
+          "path": "requirements/durable-convergence/tests/writer-sync-adapter.test.mjs",
+          "title": "WHAT[DURABLE-CONVERGENCE-009] Adapter: writer sync preserves exact identities and fails closed at the Git gateway",
+          "level": "adapter"
+        }
       ]
     },
     {
       "id": "worktree-create",
       "owner": "change-integration",
-      "what_ids": ["CHGINT-005", "CHGINT-006"],
-      "intent": {"kind": "durable-intent", "path": "src/Wanxiangshu/Change/Facts.fs", "symbols": ["WorktreeCreateRequested"]},
-      "admission": {"kind": "not-applicable", "reason": "The durable request and resolved physical query directly decide adoption or creation; there is no separate process-local admission capability."},
-      "physical_receipt": {"kind": "physical-identity", "path": "src/Wanxiangshu/Change/Runtime.fs", "symbols": ["WorktreeResource.Create", "WorktreeResource.Adopt"]},
-      "durable_outcome": {"kind": "durable-outcome", "path": "src/Wanxiangshu/Change/Facts.fs", "symbols": ["WorktreeCreated"]},
+      "what_ids": [
+        "CHGINT-005",
+        "CHGINT-006"
+      ],
+      "intent": {
+        "kind": "durable-intent",
+        "path": "src/Wanxiangshu/Change/Facts.fs",
+        "symbols": [
+          "WorktreeCreateRequested"
+        ]
+      },
+      "admission": {
+        "kind": "not-applicable",
+        "reason": "The durable request and resolved physical query directly decide adoption or creation; there is no separate process-local admission capability."
+      },
+      "physical_receipt": {
+        "kind": "physical-identity",
+        "path": "src/Wanxiangshu/Change/Runtime.fs",
+        "symbols": [
+          "WorktreeResource.Create",
+          "WorktreeResource.Adopt"
+        ]
+      },
+      "durable_outcome": {
+        "kind": "durable-outcome",
+        "path": "src/Wanxiangshu/Change/Facts.fs",
+        "symbols": [
+          "WorktreeCreated"
+        ]
+      },
       "effect_identity": "WorktreeIdentity manager/<ManagerJobId> plus observed path",
       "ambiguity": {
-        "mechanisms": ["query", "compensation", "finite-fail-closed"],
-        "states": ["no-durable-effect", "proven-not-applied", "requested-exact-physical", "requested-physical-conflict", "requested-owner-conflict", "query-failed", "created-receipt"],
+        "mechanisms": [
+          "query",
+          "compensation",
+          "finite-fail-closed"
+        ],
+        "states": [
+          "no-durable-effect",
+          "proven-not-applied",
+          "requested-exact-physical",
+          "requested-physical-conflict",
+          "requested-owner-conflict",
+          "query-failed",
+          "created-receipt"
+        ],
         "retry_when": "proven-not-applied",
-        "query_or_compensation": {"path": "src/Wanxiangshu/Change/Runtime.fs", "symbol": "ListWorktrees"}
+        "query_or_compensation": {
+          "path": "src/Wanxiangshu/Change/Runtime.fs",
+          "symbol": "ListWorktrees"
+        }
       },
-      "reentry": {"path": "src/Wanxiangshu/Change/Runtime.fs", "symbol": "forkManagerCore", "ordinary_ce": true},
+      "reentry": {
+        "path": "src/Wanxiangshu/Change/Runtime.fs",
+        "symbol": "forkManagerCore",
+        "ordinary_ce": true
+      },
       "proof_portfolio": [
-        {"what_id": "CHGINT-006", "path": "requirements/crash-reconciliation/tests/worktree-effect-reconciliation.test.mjs", "title": "WHAT[CHGINT-006] PERSIST_009_worktree_requested_created_reentry_is_finite_and_fail_closed", "level": "pure"},
-        {"what_id": "CHGINT-005", "path": "requirements/change-integration/tests/integration/worktree-create.test.mjs", "title": "WHAT[CHGINT-005] CHGINT_worktree_create_argv_is_accepted_by_real_git", "level": "adapter"}
+        {
+          "what_id": "CHGINT-006",
+          "path": "requirements/crash-reconciliation/tests/worktree-effect-reconciliation.test.mjs",
+          "title": "WHAT[CHGINT-006] PERSIST_009_worktree_requested_created_reentry_is_finite_and_fail_closed",
+          "level": "pure"
+        },
+        {
+          "what_id": "CHGINT-005",
+          "path": "requirements/change-integration/tests/integration/worktree-create.test.mjs",
+          "title": "WHAT[CHGINT-005] CHGINT_worktree_create_argv_is_accepted_by_real_git",
+          "level": "adapter"
+        }
       ]
     },
     {
       "id": "branch-fast-forward",
       "owner": "change-integration",
-      "what_ids": ["CHGINT-002", "CHGINT-007"],
-      "intent": {"kind": "durable-intent", "path": "src/Wanxiangshu/Change/Facts.fs", "symbols": ["PublishClaimed"]},
-      "admission": {"kind": "process-local-admission", "path": "src/Wanxiangshu/Change/Program.fs", "symbols": ["publishUnderGate", "AcquirePublishGate"]},
-      "physical_receipt": {"kind": "typed-result", "path": "src/Wanxiangshu/Git/Operations.fs", "symbols": ["ffMerge"]},
-      "durable_outcome": {"kind": "durable-outcome", "path": "src/Wanxiangshu/Change/Facts.fs", "symbols": ["Published"]},
+      "what_ids": [
+        "CHGINT-002",
+        "CHGINT-007"
+      ],
+      "intent": {
+        "kind": "durable-intent",
+        "path": "src/Wanxiangshu/Change/Facts.fs",
+        "symbols": [
+          "PublishClaimed"
+        ]
+      },
+      "admission": {
+        "kind": "process-local-admission",
+        "path": "src/Wanxiangshu/Change/Program.fs",
+        "symbols": [
+          "publishUnderGate",
+          "AcquirePublishGate"
+        ]
+      },
+      "physical_receipt": {
+        "kind": "typed-result",
+        "path": "src/Wanxiangshu/Git/Operations.fs",
+        "symbols": [
+          "ffMerge"
+        ]
+      },
+      "durable_outcome": {
+        "kind": "durable-outcome",
+        "path": "src/Wanxiangshu/Change/Facts.fs",
+        "symbols": [
+          "Published"
+        ]
+      },
       "effect_identity": "TargetRef expected head and rebased candidate commit",
       "ambiguity": {
-        "mechanisms": ["query", "finite-fail-closed"],
-        "states": ["already-fast-forwarded", "proven-not-applied", "claim-expired", "head-unreadable"],
+        "mechanisms": [
+          "query",
+          "finite-fail-closed"
+        ],
+        "states": [
+          "already-fast-forwarded",
+          "proven-not-applied",
+          "claim-expired",
+          "head-unreadable"
+        ],
         "retry_when": "proven-not-applied",
-        "query_or_compensation": {"path": "src/Wanxiangshu/Change/Projection.fs", "symbol": "classifyPublishClaim"}
+        "query_or_compensation": {
+          "path": "src/Wanxiangshu/Change/Projection.fs",
+          "symbol": "classifyPublishClaim"
+        }
       },
-      "reentry": {"path": "src/Wanxiangshu/Change/Program.fs", "symbol": "reenterPublishClaim", "ordinary_ce": true},
+      "reentry": {
+        "path": "src/Wanxiangshu/Change/Program.fs",
+        "symbol": "reenterPublishClaim",
+        "ordinary_ce": true
+      },
       "proof_portfolio": [
-        {"what_id": "CHGINT-007", "path": "requirements/change-integration/tests/job.test.mjs", "title": "WHAT[CHGINT-007] ORCH_007_the_three_publish_claim_branches_are_evaluated_in_the_clause_order", "level": "pure"},
-        {"what_id": "CHGINT-002", "path": "requirements/change-integration/tests/integration/branch-fast-forward-adapter.test.mjs", "title": "WHAT[CHGINT-002] Adapter_ffMerge_dirty_target_fails_closed_without_advancing_head", "level": "adapter"}
+        {
+          "what_id": "CHGINT-007",
+          "path": "requirements/change-integration/tests/job.test.mjs",
+          "title": "WHAT[CHGINT-007] ORCH_007_the_three_publish_claim_branches_are_evaluated_in_the_clause_order",
+          "level": "pure"
+        },
+        {
+          "what_id": "CHGINT-002",
+          "path": "requirements/change-integration/tests/integration/branch-fast-forward-adapter.test.mjs",
+          "title": "WHAT[CHGINT-002] Adapter_ffMerge_dirty_target_fails_closed_without_advancing_head",
+          "level": "adapter"
+        }
       ]
     },
     {
       "id": "prompt-dispatch",
       "owner": "dispatch-protocol",
-      "what_ids": ["DISPATCH-PROTOCOL-002", "DISPATCH-PROTOCOL-004", "DISPATCH-PROTOCOL-008", "DISPATCH-PROTOCOL-010"],
-      "intent": {"kind": "durable-intent", "path": "src/Wanxiangshu/Interaction/Dispatch/Send.fs", "symbols": ["PluginPromptClaimed"]},
-      "admission": {"kind": "process-local-admission", "path": "src/Wanxiangshu/Interaction/Dispatch/Send.fs", "symbols": ["physicalAdmission", "physicalSendAdmission"]},
-      "physical_receipt": {"kind": "transport-receipt", "path": "src/Wanxiangshu/Interaction/Dispatch/Send.fs", "symbols": ["PluginPromptSubmitted", "SendOutcome"]},
-      "durable_outcome": {"kind": "durable-outcome", "path": "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs", "symbols": ["PluginPromptPhysicalAccepted"]},
+      "what_ids": [
+        "DISPATCH-PROTOCOL-002",
+        "DISPATCH-PROTOCOL-004",
+        "DISPATCH-PROTOCOL-008",
+        "DISPATCH-PROTOCOL-010"
+      ],
+      "intent": {
+        "kind": "durable-intent",
+        "path": "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
+        "symbols": [
+          "PluginPromptClaimed"
+        ]
+      },
+      "admission": {
+        "kind": "process-local-admission",
+        "path": "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
+        "symbols": [
+          "physicalAdmission",
+          "physicalSendAdmission"
+        ]
+      },
+      "physical_receipt": {
+        "kind": "transport-receipt",
+        "path": "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
+        "symbols": [
+          "PluginPromptSubmitted",
+          "SendOutcome"
+        ]
+      },
+      "durable_outcome": {
+        "kind": "durable-outcome",
+        "path": "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
+        "symbols": [
+          "PluginPromptPhysicalAccepted"
+        ]
+      },
       "effect_identity": "PromptKey plus PhysicalUserMessageId",
       "ambiguity": {
-        "mechanisms": ["query", "finite-fail-closed"],
-        "states": ["submitted-only", "physically-accepted", "abandoned", "snapshot-unreadable"],
+        "mechanisms": [
+          "query",
+          "finite-fail-closed"
+        ],
+        "states": [
+          "submitted-only",
+          "physically-accepted",
+          "abandoned",
+          "snapshot-unreadable"
+        ],
         "retry_when": "never",
-        "query_or_compensation": {"path": "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs", "symbol": "reconcile"}
+        "query_or_compensation": {
+          "path": "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs",
+          "symbol": "reconcile"
+        }
       },
-      "reentry": {"path": "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs", "symbol": "reconcile", "ordinary_ce": true},
+      "reentry": {
+        "path": "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs",
+        "symbol": "reconcile",
+        "ordinary_ce": true
+      },
       "proof_portfolio": [
-        {"what_id": "DISPATCH-PROTOCOL-002", "path": "requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs", "title": "WHAT[DISPATCH-PROTOCOL-002] DP_002_submit_records_the_receipt_without_resolving_the_claim", "level": "pure"},
-        {"what_id": "DISPATCH-PROTOCOL-010", "path": "requirements/dispatch-protocol/tests/send-format.test.mjs", "title": "WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_agent_and_no_model", "level": "adapter"}
+        {
+          "what_id": "DISPATCH-PROTOCOL-002",
+          "path": "requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs",
+          "title": "WHAT[DISPATCH-PROTOCOL-002] DP_002_submit_records_the_receipt_without_resolving_the_claim",
+          "level": "pure"
+        },
+        {
+          "what_id": "DISPATCH-PROTOCOL-010",
+          "path": "requirements/dispatch-protocol/tests/send-format.test.mjs",
+          "title": "WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_agent_and_no_model",
+          "level": "adapter"
+        }
       ]
     },
     {
       "id": "blogger-request",
       "owner": "effect-accounting",
-      "what_ids": ["EFFECT-ACCOUNTING-004", "EFFECT-ACCOUNTING-008"],
-      "intent": {"kind": "durable-intent", "path": "src/Wanxiangshu/Context/Companion/Facts.fs", "symbols": ["BloggerRequestMaterialized"]},
-      "admission": {"kind": "process-local-admission", "path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs", "symbols": ["withMaterialization"]},
-      "physical_receipt": {"kind": "transport-receipt", "path": "src/Wanxiangshu/Interaction/Dispatch/Send.fs", "symbols": ["TransportReceipt", "PluginPromptSubmitted", "PhysicalUserMessageId", "acceptPhysical"]},
-      "durable_outcome": {"kind": "durable-outcome", "path": "src/Wanxiangshu/Context/Companion/Facts.fs", "symbols": ["BlogObservationCommitted"]},
+      "what_ids": [
+        "EFFECT-ACCOUNTING-004",
+        "EFFECT-ACCOUNTING-008"
+      ],
+      "intent": {
+        "kind": "durable-intent",
+        "path": "src/Wanxiangshu/Context/Companion/Facts.fs",
+        "symbols": [
+          "BloggerRequestMaterialized"
+        ]
+      },
+      "admission": {
+        "kind": "process-local-admission",
+        "path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs",
+        "symbols": [
+          "withMaterialization"
+        ]
+      },
+      "physical_receipt": {
+        "kind": "transport-receipt",
+        "path": "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
+        "symbols": [
+          "TransportReceipt",
+          "PluginPromptSubmitted",
+          "PhysicalUserMessageId",
+          "acceptPhysical"
+        ]
+      },
+      "durable_outcome": {
+        "kind": "durable-outcome",
+        "path": "src/Wanxiangshu/Context/Companion/Facts.fs",
+        "symbols": [
+          "BlogObservationCommitted"
+        ]
+      },
       "effect_identity": "BloggerRequestId plus context digest, Blogger SessionId, TransportReceipt, accepted PhysicalUserMessageId, and ProviderRunIdentity",
       "ambiguity": {
-        "mechanisms": ["idempotency", "query", "finite-fail-closed"],
-        "states": ["materialized-unsent", "transport-submitted", "physical-message-accepted", "observation-committed", "snapshot-unreadable"],
+        "mechanisms": [
+          "idempotency",
+          "query",
+          "finite-fail-closed"
+        ],
+        "states": [
+          "materialized-unsent",
+          "transport-submitted",
+          "physical-message-accepted",
+          "observation-committed",
+          "snapshot-unreadable"
+        ],
         "retry_when": "never",
-        "query_or_compensation": {"path": "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs", "symbol": "reconcile"}
+        "query_or_compensation": {
+          "path": "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs",
+          "symbol": "reconcile"
+        }
       },
-      "reentry": {"path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs", "symbol": "startWithJournal", "ordinary_ce": true},
+      "reentry": {
+        "path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs",
+        "symbol": "startWithJournal",
+        "ordinary_ce": true
+      },
       "proof_portfolio": [
-        {"what_id": "EFFECT-ACCOUNTING-004", "path": "requirements/effect-accounting/tests/blogger-request-materialized.test.mjs", "title": "WHAT[EFFECT-ACCOUNTING-004] C5_same_request_materialize_is_idempotent", "level": "pure"},
-        {"what_id": "EFFECT-ACCOUNTING-008", "path": "requirements/effect-accounting/tests/blogger-request-materialized.test.mjs", "title": "WHAT[EFFECT-ACCOUNTING-008] C5_materialize_prompt_key_fill_in_after_send", "level": "pure"},
-        {"what_id": "EFFECT-ACCOUNTING-008", "path": "requirements/effect-accounting/tests/blogger-request-materialized.test.mjs", "title": "WHAT[EFFECT-ACCOUNTING-008] C5_entry_commit_records_receipt_and_clears_open_request", "level": "pure"},
-        {"what_id": "EFFECT-ACCOUNTING-008", "path": "requirements/effect-accounting/tests/external-adapter-boundary.test.mjs", "title": "WHAT[EFFECT-ACCOUNTING-008] Adapter Blogger Coordinator submits one receipt and recovers exact physical acceptance without resend", "level": "adapter"}
+        {
+          "what_id": "EFFECT-ACCOUNTING-004",
+          "path": "requirements/effect-accounting/tests/blogger-request-materialized.test.mjs",
+          "title": "WHAT[EFFECT-ACCOUNTING-004] C5_same_request_materialize_is_idempotent",
+          "level": "pure"
+        },
+        {
+          "what_id": "EFFECT-ACCOUNTING-008",
+          "path": "requirements/effect-accounting/tests/blogger-request-materialized.test.mjs",
+          "title": "WHAT[EFFECT-ACCOUNTING-008] C5_materialize_prompt_key_fill_in_after_send",
+          "level": "pure"
+        },
+        {
+          "what_id": "EFFECT-ACCOUNTING-008",
+          "path": "requirements/effect-accounting/tests/blogger-request-materialized.test.mjs",
+          "title": "WHAT[EFFECT-ACCOUNTING-008] C5_entry_commit_records_receipt_and_clears_open_request",
+          "level": "pure"
+        },
+        {
+          "what_id": "EFFECT-ACCOUNTING-008",
+          "path": "requirements/effect-accounting/tests/external-adapter-boundary.test.mjs",
+          "title": "WHAT[EFFECT-ACCOUNTING-008] Adapter Blogger Coordinator submits one receipt and recovers exact physical acceptance without resend",
+          "level": "adapter"
+        }
       ]
     },
     {
       "id": "todo-write",
       "owner": "effect-accounting",
-      "what_ids": ["EFFECT-ACCOUNTING-005", "EFFECT-ACCOUNTING-011"],
-      "intent": {"kind": "durable-intent", "path": "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs", "symbols": ["TodoWritePrepared"]},
-      "admission": {"kind": "process-local-admission", "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs", "symbols": ["runBeforeTodo", "PreparedBridge"]},
-      "physical_receipt": {"kind": "physical-observation", "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs", "symbols": ["runAfterTodo", "PhysicalSuccessEvidence.LiveAfterSuccess"]},
-      "durable_outcome": {"kind": "durable-outcome", "path": "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs", "symbols": ["TodoWriteAccepted"]},
+      "what_ids": [
+        "EFFECT-ACCOUNTING-005",
+        "EFFECT-ACCOUNTING-011"
+      ],
+      "intent": {
+        "kind": "durable-intent",
+        "path": "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
+        "symbols": [
+          "TodoWritePrepared"
+        ]
+      },
+      "admission": {
+        "kind": "process-local-admission",
+        "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs",
+        "symbols": [
+          "runBeforeTodo",
+          "PreparedBridge"
+        ]
+      },
+      "physical_receipt": {
+        "kind": "physical-observation",
+        "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs",
+        "symbols": [
+          "runAfterTodo",
+          "PhysicalSuccessEvidence.LiveAfterSuccess"
+        ]
+      },
+      "durable_outcome": {
+        "kind": "durable-outcome",
+        "path": "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
+        "symbols": [
+          "TodoWriteAccepted"
+        ]
+      },
       "effect_identity": "TodoWriteId plus exact Prepared EventId and input/output digests",
       "ambiguity": {
-        "mechanisms": ["idempotency", "query", "finite-fail-closed"],
-        "states": ["prepared-only", "accepted-exact", "accepted-mismatched", "physical-evidence-missing"],
+        "mechanisms": [
+          "idempotency",
+          "query",
+          "finite-fail-closed"
+        ],
+        "states": [
+          "prepared-only",
+          "accepted-exact",
+          "accepted-mismatched",
+          "physical-evidence-missing"
+        ],
         "retry_when": "never",
-        "query_or_compensation": {"path": "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs", "symbol": "acceptedEvidence"}
+        "query_or_compensation": {
+          "path": "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs",
+          "symbol": "acceptedEvidence"
+        }
       },
-      "reentry": {"path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs", "symbol": "prepare", "ordinary_ce": true},
+      "reentry": {
+        "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs",
+        "symbol": "prepare",
+        "ordinary_ce": true
+      },
       "proof_portfolio": [
-        {"what_id": "EFFECT-ACCOUNTING-005", "path": "requirements/effect-accounting/tests/reconcile-before-retry.test.mjs", "title": "WHAT[EFFECT-ACCOUNTING-005] requested_only_without_physical_evidence_stays_pending_not_blind_retry", "level": "pure"},
-        {"what_id": "EFFECT-ACCOUNTING-011", "path": "requirements/effect-accounting/tests/todo-accepted-precise-ref.test.mjs", "title": "WHAT[EFFECT-ACCOUNTING-011] accepted_naming_exact_prepared_switches_current_immediately", "level": "pure"},
-        {"what_id": "EFFECT-ACCOUNTING-011", "path": "requirements/effect-accounting/tests/external-adapter-boundary.test.mjs", "title": "WHAT[EFFECT-ACCOUNTING-011] Adapter Todo Host Before executor After commits exact checkpoint and recovery does not repeat mutation", "level": "adapter"}
+        {
+          "what_id": "EFFECT-ACCOUNTING-005",
+          "path": "requirements/effect-accounting/tests/reconcile-before-retry.test.mjs",
+          "title": "WHAT[EFFECT-ACCOUNTING-005] requested_only_without_physical_evidence_stays_pending_not_blind_retry",
+          "level": "pure"
+        },
+        {
+          "what_id": "EFFECT-ACCOUNTING-011",
+          "path": "requirements/effect-accounting/tests/todo-accepted-precise-ref.test.mjs",
+          "title": "WHAT[EFFECT-ACCOUNTING-011] accepted_naming_exact_prepared_switches_current_immediately",
+          "level": "pure"
+        },
+        {
+          "what_id": "EFFECT-ACCOUNTING-011",
+          "path": "requirements/effect-accounting/tests/external-adapter-boundary.test.mjs",
+          "title": "WHAT[EFFECT-ACCOUNTING-011] Adapter Todo Host Before executor After commits exact checkpoint and recovery does not repeat mutation",
+          "level": "adapter"
+        }
       ]
     },
     {
       "id": "js-transaction",
       "owner": "repository-programming",
-      "what_ids": ["REPOSITORY-PROGRAMMING-014", "REPOSITORY-PROGRAMMING-015"],
-      "intent": {"kind": "durable-intent", "path": "src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs", "symbols": ["JsTransactionPrepared"]},
-      "admission": {"kind": "not-applicable", "reason": "The Prepared fact is the sole pre-mutation intent; no recoverable process capability is persisted."},
-      "physical_receipt": {"kind": "typed-result", "path": "src/Wanxiangshu/Repository/Programming/Js/MutationFs.fs", "symbols": ["commitPlan"]},
-      "durable_outcome": {"kind": "durable-outcome", "path": "src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs", "symbols": ["JsTransactionCommitted"]},
+      "what_ids": [
+        "REPOSITORY-PROGRAMMING-014",
+        "REPOSITORY-PROGRAMMING-015"
+      ],
+      "intent": {
+        "kind": "durable-intent",
+        "path": "src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs",
+        "symbols": [
+          "JsTransactionPrepared"
+        ]
+      },
+      "admission": {
+        "kind": "not-applicable",
+        "reason": "The Prepared fact is the sole pre-mutation intent; no recoverable process capability is persisted."
+      },
+      "physical_receipt": {
+        "kind": "typed-result",
+        "path": "src/Wanxiangshu/Repository/Programming/Js/MutationFs.fs",
+        "symbols": [
+          "commitPlan"
+        ]
+      },
+      "durable_outcome": {
+        "kind": "durable-outcome",
+        "path": "src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs",
+        "symbols": [
+          "JsTransactionCommitted"
+        ]
+      },
       "effect_identity": "JsTransactionId plus workspace root and exact mutation originals/new texts",
       "ambiguity": {
-        "mechanisms": ["query", "finite-fail-closed"],
-        "states": ["prepared-only", "committed", "filesystem-changed", "filesystem-unreadable"],
+        "mechanisms": [
+          "query",
+          "finite-fail-closed"
+        ],
+        "states": [
+          "prepared-only",
+          "committed",
+          "filesystem-changed",
+          "filesystem-unreadable"
+        ],
         "retry_when": "never",
-        "query_or_compensation": {"path": "src/Wanxiangshu/Repository/Programming/Js/Transaction.fs", "symbol": "validateFreshness"}
+        "query_or_compensation": {
+          "path": "src/Wanxiangshu/Repository/Programming/Js/Transaction.fs",
+          "symbol": "validateFreshness"
+        }
       },
-      "reentry": {"path": "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs", "symbol": "commitDurable", "ordinary_ce": true},
+      "reentry": {
+        "path": "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs",
+        "symbol": "commitDurable",
+        "ordinary_ce": true
+      },
       "proof_portfolio": [
-        {"what_id": "REPOSITORY-PROGRAMMING-014", "path": "requirements/repository-programming/tests/js-transaction.test.mjs", "title": "WHAT[REPOSITORY-PROGRAMMING-014] JS014_stale_rewrite_is_a_conflict_with_no_retry", "level": "pure"},
-        {"what_id": "REPOSITORY-PROGRAMMING-015", "path": "requirements/repository-programming/tests/js-transaction-adapter.test.mjs", "title": "WHAT[REPOSITORY-PROGRAMMING-015] Adapter JS015_MutationFs_commits_atomically_and_reopen_never_blind_retries_an_ambiguous_partial_commit", "level": "adapter"}
+        {
+          "what_id": "REPOSITORY-PROGRAMMING-014",
+          "path": "requirements/repository-programming/tests/js-transaction.test.mjs",
+          "title": "WHAT[REPOSITORY-PROGRAMMING-014] JS014_stale_rewrite_is_a_conflict_with_no_retry",
+          "level": "pure"
+        },
+        {
+          "what_id": "REPOSITORY-PROGRAMMING-015",
+          "path": "requirements/repository-programming/tests/js-transaction-adapter.test.mjs",
+          "title": "WHAT[REPOSITORY-PROGRAMMING-015] Adapter JS015_MutationFs_commits_atomically_and_reopen_never_blind_retries_an_ambiguous_partial_commit",
+          "level": "adapter"
+        }
       ]
     },
     {
       "id": "provider-execution",
       "owner": "execution-model-routing",
-      "what_ids": ["EMR-006", "EMR-009"],
-      "intent": {"kind": "process-local-intent", "path": "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs", "symbols": ["acceptPromptExecution"]},
-      "admission": {"kind": "process-local-admission", "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs", "symbols": ["bindIntent"]},
-      "physical_receipt": {"kind": "physical-identity", "path": "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs", "symbols": ["PhysicalUserMessageId"]},
-      "durable_outcome": {"kind": "not-applicable", "reason": "Provider execution binding is attempt-local; business owners persist their own terminal facts."},
+      "what_ids": [
+        "EMR-006",
+        "EMR-009"
+      ],
+      "intent": {
+        "kind": "process-local-intent",
+        "path": "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs",
+        "symbols": [
+          "acceptPromptExecution"
+        ]
+      },
+      "admission": {
+        "kind": "process-local-admission",
+        "path": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
+        "symbols": [
+          "bindIntent"
+        ]
+      },
+      "physical_receipt": {
+        "kind": "physical-identity",
+        "path": "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs",
+        "symbols": [
+          "PhysicalUserMessageId"
+        ]
+      },
+      "durable_outcome": {
+        "kind": "not-applicable",
+        "reason": "Provider execution binding is attempt-local; business owners persist their own terminal facts."
+      },
       "effect_identity": "SessionId, PhysicalUserMessageId, effective agent, and exact provider model/variant",
       "ambiguity": {
-        "mechanisms": ["idempotency", "query", "finite-fail-closed"],
-        "states": ["unbound", "exact-attempt", "physical-mismatch", "superseded"],
+        "mechanisms": [
+          "idempotency",
+          "query",
+          "finite-fail-closed"
+        ],
+        "states": [
+          "unbound",
+          "exact-attempt",
+          "physical-mismatch",
+          "superseded"
+        ],
         "retry_when": "never",
-        "query_or_compensation": {"path": "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs", "symbol": "currentProviderModel"}
+        "query_or_compensation": {
+          "path": "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs",
+          "symbol": "currentProviderModel"
+        }
       },
-      "reentry": {"path": "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs", "symbol": "beginPhysicalProviderAttemptForTransform", "ordinary_ce": true},
+      "reentry": {
+        "path": "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs",
+        "symbol": "beginPhysicalProviderAttemptForTransform",
+        "ordinary_ce": true
+      },
       "proof_portfolio": [
-        {"what_id": "EMR-006", "path": "requirements/execution-model-routing/tests/model-routing-runtime.test.mjs", "title": "WHAT[EMR-006] EMR_006_same_physical_message_retry_reuses_target_without_scheduler_rerun", "level": "pure"},
-        {"what_id": "EMR-009", "path": "requirements/execution-model-routing/tests/open-code-port-routing.test.mjs", "title": "WHAT[EMR-009] EMR_009_sdk_prompt_projects_model_without_nested_variant_and_reasoning_as_top_level_variant", "level": "adapter"}
+        {
+          "what_id": "EMR-006",
+          "path": "requirements/execution-model-routing/tests/model-routing-runtime.test.mjs",
+          "title": "WHAT[EMR-006] EMR_006_same_physical_message_retry_reuses_target_without_scheduler_rerun",
+          "level": "pure"
+        },
+        {
+          "what_id": "EMR-009",
+          "path": "requirements/execution-model-routing/tests/open-code-port-routing.test.mjs",
+          "title": "WHAT[EMR-009] EMR_009_sdk_prompt_projects_model_without_nested_variant_and_reasoning_as_top_level_variant",
+          "level": "adapter"
+        }
       ]
     },
     {
       "id": "managed-child",
       "owner": "managed-session-lifecycle",
-      "what_ids": ["MANAGED-SESSION-001", "MANAGED-SESSION-002"],
-      "intent": {"kind": "process-local-intent", "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs", "symbols": ["acquireAndRun"]},
-      "admission": {"kind": "process-local-admission", "path": "src/Wanxiangshu/Execution/Session/Attachment/AttachedRuntime.fs", "symbols": ["GetOrCreate", "AttachedChildObservation"]},
-      "physical_receipt": {"kind": "physical-identity", "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs", "symbols": ["createChild", "SessionId"]},
-      "durable_outcome": {"kind": "not-applicable", "reason": "Managed child creation returns a physical SessionId; each business handle owner persists its typed linkage fact."},
+      "what_ids": [
+        "MANAGED-SESSION-001",
+        "MANAGED-SESSION-002"
+      ],
+      "intent": {
+        "kind": "process-local-intent",
+        "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs",
+        "symbols": [
+          "acquireAndRun"
+        ]
+      },
+      "admission": {
+        "kind": "process-local-admission",
+        "path": "src/Wanxiangshu/Execution/Session/Attachment/AttachedRuntime.fs",
+        "symbols": [
+          "GetOrCreate",
+          "AttachedChildObservation"
+        ]
+      },
+      "physical_receipt": {
+        "kind": "physical-identity",
+        "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs",
+        "symbols": [
+          "createChild",
+          "SessionId"
+        ]
+      },
+      "durable_outcome": {
+        "kind": "not-applicable",
+        "reason": "Managed child creation returns a physical SessionId; each business handle owner persists its typed linkage fact."
+      },
       "effect_identity": "Family root, exact escaped OwnerReuseScopeId plus role plus managed agent title, matching Agent field, and physical child SessionId",
       "ambiguity": {
-        "mechanisms": ["query", "finite-fail-closed"],
-        "states": ["proven-not-applied", "one-exact-scope-role-agent-child", "multiple-exact-or-identity-conflict", "query-failed"],
+        "mechanisms": [
+          "query",
+          "finite-fail-closed"
+        ],
+        "states": [
+          "proven-not-applied",
+          "one-exact-scope-role-agent-child",
+          "multiple-exact-or-identity-conflict",
+          "query-failed"
+        ],
         "retry_when": "proven-not-applied",
-        "query_or_compensation": {"path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs", "symbol": "observeChild"}
+        "query_or_compensation": {
+          "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs",
+          "symbol": "observeChild"
+        }
       },
-      "reentry": {"path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs", "symbol": "acquireAndRun", "ordinary_ce": true},
+      "reentry": {
+        "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs",
+        "symbol": "acquireAndRun",
+        "ordinary_ce": true
+      },
       "proof_portfolio": [
-        {"what_id": "MANAGED-SESSION-001", "path": "requirements/crash-reconciliation/tests/managed-child-effect-reconciliation.test.mjs", "title": "WHAT[MANAGED-SESSION-001] managed_child_effect_reconciliation_classifies_missing_matching_and_conflicting_evidence", "level": "pure"},
-        {"what_id": "MANAGED-SESSION-002", "path": "requirements/managed-session-lifecycle/tests/satellite-runtime.test.mjs", "title": "WHAT[MANAGED-SESSION-002] HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child", "level": "pure"},
-        {"what_id": "MANAGED-SESSION-001", "path": "requirements/crash-reconciliation/tests/managed-child-effect-reconciliation.test.mjs", "title": "WHAT[MANAGED-SESSION-001] SyncDelegate adapter reconciles managed child effects through the Host boundary", "level": "adapter"}
+        {
+          "what_id": "MANAGED-SESSION-001",
+          "path": "requirements/crash-reconciliation/tests/managed-child-effect-reconciliation.test.mjs",
+          "title": "WHAT[MANAGED-SESSION-001] managed_child_effect_reconciliation_classifies_missing_matching_and_conflicting_evidence",
+          "level": "pure"
+        },
+        {
+          "what_id": "MANAGED-SESSION-002",
+          "path": "requirements/managed-session-lifecycle/tests/satellite-runtime.test.mjs",
+          "title": "WHAT[MANAGED-SESSION-002] HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child",
+          "level": "pure"
+        },
+        {
+          "what_id": "MANAGED-SESSION-001",
+          "path": "requirements/crash-reconciliation/tests/managed-child-effect-reconciliation.test.mjs",
+          "title": "WHAT[MANAGED-SESSION-001] SyncDelegate adapter reconciles managed child effects through the Host boundary",
+          "level": "adapter"
+        }
       ]
     },
     {
       "id": "managed-attempt-interrupt",
       "owner": "managed-session-lifecycle",
-      "what_ids": ["MANAGED-SESSION-016", "MANAGED-SESSION-017"],
-      "intent": {"kind": "process-local-intent", "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs", "symbols": ["InterruptAttempt"]},
-      "admission": {"kind": "process-local-admission", "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs", "symbols": ["managedChild"]},
-      "physical_receipt": {"kind": "typed-result", "path": "src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs", "symbols": ["AbortSession"]},
-      "durable_outcome": {"kind": "not-applicable", "reason": "Attempt interruption is typed control-plane observation and is never a business terminal fact."},
+      "what_ids": [
+        "MANAGED-SESSION-016",
+        "MANAGED-SESSION-017"
+      ],
+      "intent": {
+        "kind": "process-local-intent",
+        "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+        "symbols": [
+          "InterruptAttempt"
+        ]
+      },
+      "admission": {
+        "kind": "process-local-admission",
+        "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+        "symbols": [
+          "managedChild"
+        ]
+      },
+      "physical_receipt": {
+        "kind": "typed-result",
+        "path": "src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs",
+        "symbols": [
+          "AbortSession"
+        ]
+      },
+      "durable_outcome": {
+        "kind": "not-applicable",
+        "reason": "Attempt interruption is typed control-plane observation and is never a business terminal fact."
+      },
       "effect_identity": "Exact managed child SessionId and its current physical provider attempt",
       "ambiguity": {
-        "mechanisms": ["query", "finite-fail-closed"],
-        "states": ["managed-child", "user-facing-root", "already-terminal", "host-rejected"],
+        "mechanisms": [
+          "query",
+          "finite-fail-closed"
+        ],
+        "states": [
+          "managed-child",
+          "user-facing-root",
+          "already-terminal",
+          "host-rejected"
+        ],
         "retry_when": "never",
-        "query_or_compensation": {"path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs", "symbol": "IsManagedChild"}
+        "query_or_compensation": {
+          "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+          "symbol": "IsManagedChild"
+        }
       },
-      "reentry": {"path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs", "symbol": "InterruptAttempt", "ordinary_ce": true},
+      "reentry": {
+        "path": "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+        "symbol": "InterruptAttempt",
+        "ordinary_ce": true
+      },
       "proof_portfolio": [
-        {"what_id": "MANAGED-SESSION-017", "path": "requirements/managed-session-lifecycle/tests/interrupt-successor.test.mjs", "title": "WHAT[MANAGED-SESSION-017] raw InterruptAttempt callers are restricted to workflows with an explicit successor owner", "level": "static"},
-        {"what_id": "MANAGED-SESSION-016", "path": "requirements/managed-session-lifecycle/tests/interrupt-boundary.test.mjs", "title": "WHAT[MANAGED-SESSION-016] automatic sensors cannot interrupt user-facing root and use attempt-only port", "level": "static"},
-        {"what_id": "MANAGED-SESSION-016", "path": "requirements/managed-session-lifecycle/tests/interrupt-boundary.test.mjs", "title": "WHAT[MANAGED-SESSION-016] Sessions adapter rejects root attempt interrupt and physically aborts a managed child exactly once", "level": "adapter"},
-        {"what_id": "MANAGED-SESSION-016", "path": "requirements/managed-session-lifecycle/tests/interrupt-boundary.test.mjs", "title": "WHAT[MANAGED-SESSION-016] managed interrupt Host rejection is terminal after exactly one AbortSession attempt", "level": "temporal"}
+        {
+          "what_id": "MANAGED-SESSION-017",
+          "path": "requirements/managed-session-lifecycle/tests/interrupt-successor.test.mjs",
+          "title": "WHAT[MANAGED-SESSION-017] raw InterruptAttempt callers are restricted to workflows with an explicit successor owner",
+          "level": "static"
+        },
+        {
+          "what_id": "MANAGED-SESSION-016",
+          "path": "requirements/managed-session-lifecycle/tests/interrupt-boundary.test.mjs",
+          "title": "WHAT[MANAGED-SESSION-016] automatic sensors cannot interrupt user-facing root and use attempt-only port",
+          "level": "static"
+        },
+        {
+          "what_id": "MANAGED-SESSION-016",
+          "path": "requirements/managed-session-lifecycle/tests/interrupt-boundary.test.mjs",
+          "title": "WHAT[MANAGED-SESSION-016] Sessions adapter rejects root attempt interrupt and physically aborts a managed child exactly once",
+          "level": "adapter"
+        },
+        {
+          "what_id": "MANAGED-SESSION-016",
+          "path": "requirements/managed-session-lifecycle/tests/interrupt-boundary.test.mjs",
+          "title": "WHAT[MANAGED-SESSION-016] managed interrupt Host rejection is terminal after exactly one AbortSession attempt",
+          "level": "temporal"
+        }
       ]
     },
     {
       "id": "bounded-process",
       "owner": "process-execution",
-      "what_ids": ["PROC-004", "PROC-010"],
-      "intent": {"kind": "process-local-intent", "path": "src/Wanxiangshu/Process/ProcessRequest.fs", "symbols": ["Command", "ProcessEstimate"]},
-      "admission": {"kind": "process-local-admission", "path": "src/Wanxiangshu/Process/ProcessRunner.fs", "symbols": ["maybeAcquireGate"]},
-      "physical_receipt": {"kind": "typed-result", "path": "src/Wanxiangshu/Process/ProcessRequest.fs", "symbols": ["ProcessOutcome", "ProcessError"]},
-      "durable_outcome": {"kind": "not-applicable", "reason": "ProcessRunner returns a typed bounded outcome; callers own any durable business fact."},
+      "what_ids": [
+        "PROC-004",
+        "PROC-010"
+      ],
+      "intent": {
+        "kind": "process-local-intent",
+        "path": "src/Wanxiangshu/Process/ProcessRequest.fs",
+        "symbols": [
+          "Command",
+          "ProcessEstimate"
+        ]
+      },
+      "admission": {
+        "kind": "process-local-admission",
+        "path": "src/Wanxiangshu/Process/ProcessRunner.fs",
+        "symbols": [
+          "maybeAcquireGate"
+        ]
+      },
+      "physical_receipt": {
+        "kind": "typed-result",
+        "path": "src/Wanxiangshu/Process/ProcessRequest.fs",
+        "symbols": [
+          "ProcessOutcome",
+          "ProcessError"
+        ]
+      },
+      "durable_outcome": {
+        "kind": "not-applicable",
+        "reason": "ProcessRunner returns a typed bounded outcome; callers own any durable business fact."
+      },
       "effect_identity": "One ChildProcess handle under one Command, ProcessEstimate, deadline, and cancellation token",
       "ambiguity": {
-        "mechanisms": ["query", "finite-fail-closed"],
-        "states": ["spawn-failed", "running", "completed", "timed-out", "cancelled"],
+        "mechanisms": [
+          "query",
+          "finite-fail-closed"
+        ],
+        "states": [
+          "spawn-failed",
+          "running",
+          "completed",
+          "timed-out",
+          "cancelled"
+        ],
         "retry_when": "never",
-        "query_or_compensation": {"path": "src/Wanxiangshu/Process/NodeProcessWait.fs", "symbol": "waitForExit"}
+        "query_or_compensation": {
+          "path": "src/Wanxiangshu/Process/NodeProcessWait.fs",
+          "symbol": "waitForExit"
+        }
       },
-      "reentry": {"path": "src/Wanxiangshu/Process/ProcessRunner.fs", "symbol": "runProgram", "ordinary_ce": true},
+      "reentry": {
+        "path": "src/Wanxiangshu/Process/ProcessRunner.fs",
+        "symbol": "runProgram",
+        "ordinary_ce": true
+      },
       "proof_portfolio": [
-        {"what_id": "PROC-004", "path": "requirements/process-execution/tests/process-runner.test.mjs", "title": "WHAT[PROC-004] EXEC_011_slow_process_is_killed_and_reports_timeout", "level": "pure"},
-        {"what_id": "PROC-010", "path": "requirements/process-execution/tests/executor-tool.test.mjs", "title": "WHAT[PROC-010] RUN_completed_command_reports_exit_code_and_streams", "level": "adapter"}
+        {
+          "what_id": "PROC-004",
+          "path": "requirements/process-execution/tests/process-runner.test.mjs",
+          "title": "WHAT[PROC-004] EXEC_011_slow_process_is_killed_and_reports_timeout",
+          "level": "pure"
+        },
+        {
+          "what_id": "PROC-010",
+          "path": "requirements/process-execution/tests/executor-tool.test.mjs",
+          "title": "WHAT[PROC-010] RUN_completed_command_reports_exit_code_and_streams",
+          "level": "adapter"
+        }
       ]
     }
   ]

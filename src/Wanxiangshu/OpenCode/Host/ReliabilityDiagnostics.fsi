@@ -135,11 +135,4 @@ module ReliabilityDiagnostics =
         recovery: RecoveryOwnershipDiagnosticSource ->
             ReliabilitySnapshot
 
-    val internal query:
-        counters: ReliabilityCounters ->
-        executions: ChatExecutionState seq ->
-        capacity: CapacityInvariantEvidence ->
-        recovery: RecoveryOwnershipDiagnosticSource ->
-            ReliabilitySnapshot
-
     val validateOperation: operation: string -> bool

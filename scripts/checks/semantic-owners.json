@@ -530,7 +530,7 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateProjection.fs",
-      "owner": "delegation"
+      "owner": "durable-events"
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateSurface.fs",
@@ -738,7 +738,7 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
-      "owner": "delegation"
+      "owner": "durable-events"
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/OpenCode/DelegatedToolEstimate.fs",
@@ -1538,11 +1538,11 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
-      "owner": "host-boundary"
+      "owner": "dispatch-protocol"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs",
-      "owner": "host-boundary"
+      "owner": "dispatch-protocol"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs",
@@ -2366,7 +2366,7 @@
     },
     {
       "path": "src/Wanxiangshu/Persistence/Journal/RuntimePath.fs",
-      "owner": "durable-events"
+      "owner": "change-integration"
     },
     {
       "path": "src/Wanxiangshu/Persistence/Journal/SharedAgentJournal.fs",

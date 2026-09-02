@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { EventEmitter } from 'node:events'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import test from 'node:test'
 import {
@@ -9,6 +10,10 @@ import {
   materializeOwnerCompile,
   planImpactCompile,
 } from '../../../scripts/lib/owner-compile.mjs'
+
+const ROOT = resolve(import.meta.dirname, '../../..')
+const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
+const AGGREGATE = join(SOURCE_ROOT, 'Wanxiangshu.fsproj')
 
 const writeProject = (root, name, locality, kind, refs, source) => {
   const path = join(root, `${name}.fsproj`)
@@ -196,4 +201,122 @@ test('WHAT[STRUCTURED-WORKFLOW-012] materialized impact project has exact canoni
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-012] multi-change union compiles each closure once', () => {
+  const fixture = createFixture()
+  try {
+    const plan = planImpactCompile({
+      changedPaths: [
+        join(fixture.root, 'Source/Runtime.fs'),
+        join(fixture.root, 'Source/Unrelated.fs'),
+      ],
+      projectDirectory: fixture.root,
+      aggregatePath: fixture.aggregate,
+      fullThreshold: 1,
+    })
+
+    assert.equal(plan.mode, 'focused')
+    assert.deepEqual(sourceNames(plan), [
+      'Base.fsi', 'Base.fs',
+      'Contract.fsi', 'Contract.fs',
+      'Runtime.fsi', 'Runtime.fs',
+      'Unrelated.fsi', 'Unrelated.fs',
+    ])
+    assert.ok(!plan.projectPaths.includes(fixture.projects.consumer))
+    assert.ok(!plan.projectPaths.includes(fixture.projects.composition))
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-012] project file changes select one full flat build', () => {
+  const fixture = createFixture()
+  try {
+    const plan = planImpactCompile({
+      changedPaths: [fixture.projects.runtime],
+      projectDirectory: fixture.root,
+      aggregatePath: fixture.aggregate,
+    })
+    assert.equal(plan.mode, 'full')
+    assert.equal(plan.reason, 'toolchain-or-project-change')
+    assert.equal(plan.compileItems.length, 12)
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-012] production impact-set ladder classifies fs fsi project and toolchain', () => {
+  const impl = planImpactCompile({
+    changedPaths: [join(SOURCE_ROOT, 'Foundation/FatalProcess.fs')],
+    projectDirectory: SOURCE_ROOT,
+    aggregatePath: AGGREGATE,
+  })
+  assert.equal(impl.mode, 'focused')
+  assert.equal(impl.reason, 'focused-impact')
+  assert.deepEqual(
+    impl.compileItems.map((path) => path.split('/').at(-1)),
+    ['FatalProcess.fsi', 'FatalProcess.fs'],
+  )
+
+  const signature = planImpactCompile({
+    changedPaths: [join(SOURCE_ROOT, 'Foundation/FatalProcess.fsi')],
+    projectDirectory: SOURCE_ROOT,
+    aggregatePath: AGGREGATE,
+  })
+  assert.equal(signature.mode, 'full')
+  assert.equal(signature.reason, 'impact-exceeds-full-threshold')
+  assert.ok(signature.compileItems.length > impl.compileItems.length)
+
+  const project = planImpactCompile({
+    changedPaths: [join(SOURCE_ROOT, 'Wanxiangshu.Owner.host-boundary.host-fatal-effect.fsproj')],
+    projectDirectory: SOURCE_ROOT,
+    aggregatePath: AGGREGATE,
+  })
+  assert.equal(project.mode, 'full')
+  assert.equal(project.reason, 'toolchain-or-project-change')
+
+  const toolchain = planImpactCompile({
+    changedPaths: [join(ROOT, 'package.json')],
+    projectDirectory: SOURCE_ROOT,
+    aggregatePath: AGGREGATE,
+  })
+  assert.equal(toolchain.mode, 'full')
+  assert.equal(toolchain.reason, 'toolchain-or-project-change')
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI plan-only smoke matches the planner', () => {
+  const changed = join(SOURCE_ROOT, 'Foundation/FatalProcess.fs')
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/compile-impact.mjs', changed, '--plan-only'],
+    { cwd: ROOT, encoding: 'utf8' },
+  )
+  assert.equal(result.status, 0, result.stderr || result.stdout)
+  const cli = JSON.parse(result.stdout)
+  const plan = planImpactCompile({
+    changedPaths: [changed],
+    projectDirectory: SOURCE_ROOT,
+    aggregatePath: AGGREGATE,
+  })
+  assert.equal(cli.mode, plan.mode)
+  assert.equal(cli.reason, plan.reason)
+  assert.deepEqual(cli.compileItems, plan.compileItems)
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-012] obsolete recursive-graph compile probes stay deleted', () => {
+  assert.equal(existsSync(join(ROOT, 'scripts/analyze-closures.mjs')), false)
+  assert.equal(existsSync(join(SOURCE_ROOT, 'FableBarrier.fs')), false)
+
+  const ownerCli = readFileSync(join(ROOT, 'scripts/compile-owner.mjs'), 'utf8')
+  const impactCli = readFileSync(join(ROOT, 'scripts/compile-impact.mjs'), 'utf8')
+  const lib = readFileSync(join(ROOT, 'scripts/lib/owner-compile.mjs'), 'utf8')
+
+  assert.match(lib, /generateFlatProjectXml/)
+  assert.match(lib, /zero ProjectReference|Wanxiangshu\.Impact\.fsproj/)
+  assert.doesNotMatch(ownerCli, /tool',\s*'run',\s*'fable'/)
+  assert.doesNotMatch(impactCli, /tool',\s*'run',\s*'fable'/)
+  assert.match(ownerCli, /compileOwnerProject/)
+  assert.match(impactCli, /compileOwnerProject/)
+  assert.match(impactCli, /planImpactCompile/)
 })

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>host-fatal-effect</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Foundation/FatalProcess.fsi"/>
+    <Compile Include="Foundation/FatalProcess.fs"/>
+  </ItemGroup>
+</Project>

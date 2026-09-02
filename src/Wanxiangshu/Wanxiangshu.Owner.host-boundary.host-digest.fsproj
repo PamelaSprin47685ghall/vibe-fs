@@ -13,15 +13,13 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
     <Compile Include="Host/Digest.fsi"/>
     <Compile Include="Host/Digest.fs"/>
-    <Compile Include="Foundation/McpLaunch.fsi"/>
-    <Compile Include="Foundation/McpLaunch.fs"/>
     <Compile Include="OpenCode/Codec/OpencodeTypes.fsi"/>
     <Compile Include="OpenCode/Codec/OpencodeTypes.fs"/>
-    <Compile Include="OpenCode/Signals/EventContract.fsi"/>
-    <Compile Include="OpenCode/Signals/EventContract.fs"/>
-    <Compile Include="OpenCode/Signals/HostSignal.fsi"/>
-    <Compile Include="OpenCode/Signals/HostSignal.fs"/>
     <Compile Include="OpenCode/Host/Message.fsi"/>
     <Compile Include="OpenCode/Host/Message.fs"/>
+    <Compile Include="OpenCode/Signals/EventContract.fsi"/>
+    <Compile Include="OpenCode/Signals/EventContract.fs"/>
+    <Compile Include="Foundation/McpLaunch.fsi"/>
+    <Compile Include="Foundation/McpLaunch.fs"/>
   </ItemGroup>
 </Project>
