@@ -1,21 +1,6 @@
 namespace Wanxiangshu.Change
 
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Barrier
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Persistence
-open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Foundation
-
-open System
 
 module OrchestratorPrompts =
 

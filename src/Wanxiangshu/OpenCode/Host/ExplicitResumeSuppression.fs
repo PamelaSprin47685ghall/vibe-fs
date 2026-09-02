@@ -161,7 +161,7 @@ module ExplicitResumeSuppression =
     /// The exact physical material registry decides whether reconciliation must
     /// bind this user material. Both a marked resume and the first ordinary
     /// replacement change the binding boundary.
-    let requiresPhysicalBinding sessionId physicalId output =
+    let requiresPhysicalBinding (sessionId: SessionId) (physicalId: PhysicalUserMessageId) (output: obj) : bool =
         match observePhysicalMaterial sessionId physicalId output with
         | PhysicalMaterialObservation.ExplicitResume
         | PhysicalMaterialObservation.ReplacedExplicitResume -> true
@@ -199,4 +199,4 @@ module ExplicitResumeSuppression =
     })()""")>]
     let private isCurrentMaterialPhysical (_output: obj) : bool = jsNative
 
-    let isCurrentMaterial output = isCurrentMaterialPhysical output
+    let isCurrentMaterial (output: obj) : bool = isCurrentMaterialPhysical output

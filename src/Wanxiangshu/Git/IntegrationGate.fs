@@ -1,21 +1,12 @@
 namespace Wanxiangshu.Git
 
-open Wanxiangshu.Change
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Resources
-open Wanxiangshu.Strength.Persistence
-
 open System
 open System.IO
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
+open Wanxiangshu.Persistence.EventStore
 
 module private IntegrationGateDisposal =
 #if FABLE_COMPILER

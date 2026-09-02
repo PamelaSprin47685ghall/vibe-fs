@@ -17,18 +17,18 @@ module RequirementGroundingTransform =
     let toolName = "read"
     let cursorSeparator = PairProgrammingThoughtTransform.cursorGuidanceSeparator
 
-    let private tryString value =
+    let private tryString (value: obj) : string option =
         if isNull value then None else Some(string value)
 
-    let private sourceOf raw =
+    let private sourceOf (raw: obj) : string option =
         if isNull raw || isNull raw?info || isNull raw?info?source then
             None
         else
             tryString raw?info?source
 
-    let isGroundingRead raw = sourceOf raw = Some source
+    let isGroundingRead (raw: obj) : bool = sourceOf raw = Some source
 
-    let private callIdOf raw =
+    let private callIdOf (raw: obj) : string option =
         let resolveParts () =
             let parts = unbox<obj array> raw?parts
 
@@ -41,13 +41,20 @@ module RequirementGroundingTransform =
         else
             resolveParts ()
 
-    let stableCallId sessionId workspace packageName digest ordinal index =
+    let stableCallId
+        (sessionId: string)
+        (workspace: string)
+        (packageName: string)
+        (digest: string)
+        (ordinal: int64)
+        (index: int)
+        : string =
         let input =
             String.concat "\u0000" [ sessionId; workspace; packageName; digest; string ordinal; string index ]
 
         "requirement-grounding-read-" + (HostDigest.sha256Hex input).Substring(0, 24)
 
-    let cursorResult path resultBytes =
+    let cursorResult (path: string) (resultBytes: string) : string =
         LlmFacing.instructions [ resultBytes ]
         |> LlmFacing.withData [ LlmFacing.Data.stringField "requirement_source_path" path ]
         |> LlmFacing.render

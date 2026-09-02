@@ -21,7 +21,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionbindingsurface.fsproj"/>
+    <Compile Include="Repository/Knowledge/Casebook/Bookkeeper.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Bookkeeper.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Lifecycle.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Lifecycle.fs"/>
   </ItemGroup>
 </Project>

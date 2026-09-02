@@ -9,6 +9,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-hostsignalbootstrap.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
+    <Compile Include="Participant/Provider/LanguageSurface.fsi"/>
     <Compile Include="Participant/Provider/LanguageSurface.fs"/>
   </ItemGroup>
 </Project>

@@ -1,46 +1,24 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Composition.Durable
-
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Process
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Interaction.Repair
+open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Review.Judgement
+open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
+open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Process
 
 /// Owns every per-session tool runtime.
 ///

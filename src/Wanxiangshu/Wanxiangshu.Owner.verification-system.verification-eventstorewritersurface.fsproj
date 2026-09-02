@@ -28,7 +28,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <Compile Include="Verification/EventStoreWriterSurface.fsi"/>
     <Compile Include="Verification/EventStoreWriterSurface.fs"/>
+    <Compile Include="Verification/TemporalSurface.fsi"/>
     <Compile Include="Verification/TemporalSurface.fs"/>
   </ItemGroup>
 </Project>

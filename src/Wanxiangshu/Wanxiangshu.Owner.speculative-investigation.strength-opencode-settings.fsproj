@@ -36,8 +36,11 @@
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-budget.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-prediction-predictor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-turnevidence.fsproj"/>
+    <Compile Include="Strength/OpenCode/Settings.fsi"/>
     <Compile Include="Strength/OpenCode/Settings.fs"/>
+    <Compile Include="Strength/OpenCode/Speculate.fsi"/>
     <Compile Include="Strength/OpenCode/Speculate.fs"/>
+    <Compile Include="Strength/Surface.fsi"/>
     <Compile Include="Strength/Surface.fs"/>
   </ItemGroup>
 </Project>

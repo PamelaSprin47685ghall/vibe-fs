@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { EventEmitter } from 'node:events'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { checkOwnerProjects } from '../../../scripts/checks/owner-projects.mjs'
-import { planOwnerCompile, materializeOwnerCompile } from '../../../scripts/lib/owner-compile.mjs'
+import { planOwnerCompile, materializeOwnerCompile, compileOwnerProject } from '../../../scripts/lib/owner-compile.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../..')
 const SRC = join(ROOT, 'src/Wanxiangshu')
@@ -428,6 +429,225 @@ test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection materialization escape
       () => planOwnerCompile({ projectPath: unknownEntityPath, aggregatePath }),
       /(?:Unknown|Malformed|Invalid) XML (?:entity|character) reference/i,
       'must reject unknown XML entity reference fail-closed before compiler invocation',
+    )
+  } finally {
+    rmSync(scratchRoot, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] failure lifecycle prevents false-green warm cache and enforces success marker contract', async () => {
+  const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-sw011-failure-proof-'))
+  try {
+    const aggregatePath = join(FIXTURE, 'Emitter.fsproj')
+    const projectPath = join(FIXTURE, 'LeakyConsumer.fsproj')
+    const rootPropsPath = join(ROOT, 'Directory.Build.props')
+
+    let spawnInvocations = 0
+    let run4SawPreservedOutput = false
+    let run5SawPreservedOutput = false
+
+    const fakeSpawn = (command, args, options) => {
+      spawnInvocations++
+      const child = new EventEmitter()
+      child.stdout = new EventEmitter()
+      child.stderr = new EventEmitter()
+
+      const outIndex = args.indexOf('-o')
+      const targetOutputDir = outIndex !== -1 ? args[outIndex + 1] : null
+
+      setImmediate(() => {
+        if (spawnInvocations === 1) {
+          // First run: writes partial JS output then exits nonzero
+          if (targetOutputDir) {
+            writeFileSync(join(targetOutputDir, 'Partial.fs.js'), '// partial output from crashed run 1\n', 'utf8')
+          }
+          child.emit('close', 1, null)
+        } else if (spawnInvocations === 2) {
+          // Second run: would falsely return zero ONLY if partial output from run 1 survived
+          if (targetOutputDir && existsSync(join(targetOutputDir, 'Partial.fs.js'))) {
+            child.emit('close', 0, null)
+          } else {
+            // Correct behavior: partial output from run 1 was cleaned up; this run also writes partial output and fails
+            if (targetOutputDir) {
+              writeFileSync(join(targetOutputDir, 'Partial2.fs.js'), '// partial output from crashed run 2\n', 'utf8')
+            }
+            child.emit('close', 2, null)
+          }
+        } else if (spawnInvocations === 3) {
+          // Third run: simulated successful emit writing verified JS files and exiting 0
+          if (targetOutputDir) {
+            writeFileSync(join(targetOutputDir, 'Runtime.fs.js'), 'export const runtime = true;\n', 'utf8')
+            writeFileSync(join(targetOutputDir, 'LeakyConsumer.fs.js'), 'export const consumer = true;\n', 'utf8')
+          }
+          child.emit('close', 0, null)
+        } else if (spawnInvocations === 4) {
+          // Fourth run (warm compile): must invoke injected spawn again, preserve output before invocation
+          if (
+            targetOutputDir &&
+            existsSync(join(targetOutputDir, 'Runtime.fs.js')) &&
+            existsSync(join(targetOutputDir, 'LeakyConsumer.fs.js'))
+          ) {
+            run4SawPreservedOutput = true
+            writeFileSync(join(targetOutputDir, 'Runtime.fs.js'), 'export const runtime = true; // refreshed\n', 'utf8')
+            writeFileSync(join(targetOutputDir, 'LeakyConsumer.fs.js'), 'export const consumer = true; // refreshed\n', 'utf8')
+            child.emit('close', 0, null)
+          } else {
+            child.emit('close', 40, null)
+          }
+        } else if (spawnInvocations === 5) {
+          // Fifth run (warm compile with failure): output preserved before spawn, but compiler fails
+          if (
+            targetOutputDir &&
+            existsSync(join(targetOutputDir, 'Runtime.fs.js')) &&
+            existsSync(join(targetOutputDir, 'LeakyConsumer.fs.js'))
+          ) {
+            run5SawPreservedOutput = true
+            child.emit('close', 5, null)
+          } else {
+            child.emit('close', 50, null)
+          }
+        } else {
+          // Unexpected spawn call
+          child.emit('close', 99, null)
+        }
+      })
+
+      return child
+    }
+
+    // Call 1: First compilation fails after partial emit
+    const result1 = await compileOwnerProject({
+      projectPath,
+      aggregatePath,
+      scratchRoot,
+      rootPropsPath,
+      spawn: fakeSpawn,
+      stdio: 'pipe',
+    })
+
+    assert.equal(result1.ok, false, 'first compilation must fail on nonzero child exit')
+    assert.equal(result1.code, 1, 'first compilation must propagate exit code 1')
+    assert.equal(spawnInvocations, 1, 'first compilation must invoke spawn exactly once')
+    assert.equal(
+      existsSync(join(result1.outputPath, 'Partial.fs.js')),
+      false,
+      'partial JS output must be cleaned up after first compilation failure',
+    )
+    assert.equal(
+      existsSync(join(result1.scratchDir, '.success')),
+      false,
+      'success marker must not exist after first compilation failure',
+    )
+
+    // Call 2: Second compilation with same inputs must fail (not falsely return zero due to stale partial output)
+    const result2 = await compileOwnerProject({
+      projectPath,
+      aggregatePath,
+      scratchRoot,
+      rootPropsPath,
+      spawn: fakeSpawn,
+      stdio: 'pipe',
+    })
+
+    assert.equal(result2.ok, false, 'second compilation must fail without valid success marker')
+    assert.equal(result2.code, 2, 'second compilation must fail with clean-state failure code')
+    assert.equal(spawnInvocations, 2, 'second compilation must invoke spawn because cache is unvalidated')
+    assert.equal(
+      existsSync(join(result2.outputPath, 'Partial.fs.js')),
+      false,
+      'stale partial output from run 1 must not exist after second compilation',
+    )
+    assert.equal(
+      existsSync(join(result2.outputPath, 'Partial2.fs.js')),
+      false,
+      'partial output from run 2 must be cleaned up after failure',
+    )
+    assert.equal(
+      existsSync(join(result2.scratchDir, '.success')),
+      false,
+      'success marker must not exist after second compilation failure',
+    )
+
+    // Call 3: Simulated successful compilation emit creates success marker and preserves JS outputs
+    const result3 = await compileOwnerProject({
+      projectPath,
+      aggregatePath,
+      scratchRoot,
+      rootPropsPath,
+      spawn: fakeSpawn,
+      stdio: 'pipe',
+    })
+
+    assert.equal(result3.ok, true, 'third compilation with valid emit must succeed')
+    assert.equal(result3.code, 0, 'third compilation must return exit code 0')
+    assert.equal(spawnInvocations, 3, 'third compilation must invoke spawn')
+    assert.equal(
+      existsSync(join(result3.outputPath, 'Runtime.fs.js')),
+      true,
+      'emitted Runtime.fs.js must exist on successful compilation',
+    )
+    assert.equal(
+      existsSync(join(result3.outputPath, 'LeakyConsumer.fs.js')),
+      true,
+      'emitted LeakyConsumer.fs.js must exist on successful compilation',
+    )
+    const markerFile = join(result3.scratchDir, '.success')
+    assert.equal(existsSync(markerFile), true, 'success marker must be created on successful zero-exit compilation')
+
+    // Call 4: Next warm call must invoke injected spawn again, preserve output before invocation, and require a new successful compiler result
+    const result4 = await compileOwnerProject({
+      projectPath,
+      aggregatePath,
+      scratchRoot,
+      rootPropsPath,
+      spawn: fakeSpawn,
+      stdio: 'pipe',
+    })
+
+    assert.equal(result4.ok, true, 'fourth compilation must succeed with new compiler result')
+    assert.equal(result4.code, 0, 'fourth compilation must return exit code 0')
+    assert.equal(spawnInvocations, 4, 'fourth compilation must invoke injected spawn again (no marker-only cache bypass)')
+    assert.equal(run4SawPreservedOutput, true, 'fourth compilation must preserve existing output before spawn invocation')
+    assert.equal(
+      existsSync(join(result4.outputPath, 'Runtime.fs.js')),
+      true,
+      'emitted Runtime.fs.js must exist on successful warm compilation',
+    )
+    assert.equal(
+      existsSync(join(result4.outputPath, 'LeakyConsumer.fs.js')),
+      true,
+      'emitted LeakyConsumer.fs.js must exist on successful warm compilation',
+    )
+    assert.equal(existsSync(markerFile), true, 'success marker must remain intact after successful warm compilation')
+
+    // Call 5: Warm compilation failure must remove marker and output
+    const result5 = await compileOwnerProject({
+      projectPath,
+      aggregatePath,
+      scratchRoot,
+      rootPropsPath,
+      spawn: fakeSpawn,
+      stdio: 'pipe',
+    })
+
+    assert.equal(result5.ok, false, 'fifth compilation must fail when injected spawn returns nonzero')
+    assert.equal(result5.code, 5, 'fifth compilation must propagate exit code 5')
+    assert.equal(spawnInvocations, 5, 'fifth compilation must invoke injected spawn')
+    assert.equal(run5SawPreservedOutput, true, 'fifth compilation must preserve existing output before spawn invocation')
+    assert.equal(
+      existsSync(join(result5.outputPath, 'Runtime.fs.js')),
+      false,
+      'injected warm failure must remove output directory / JS outputs',
+    )
+    assert.equal(
+      existsSync(join(result5.outputPath, 'LeakyConsumer.fs.js')),
+      false,
+      'injected warm failure must remove output directory / JS outputs',
+    )
+    assert.equal(
+      existsSync(markerFile),
+      false,
+      'injected warm failure must remove success marker',
     )
   } finally {
     rmSync(scratchRoot, { recursive: true, force: true })

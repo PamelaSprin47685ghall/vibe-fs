@@ -2,12 +2,12 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { spawn } from 'node:child_process'
+import { spawn as nodeSpawn } from 'node:child_process'
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(MODULE_DIR, '../..')
 
-export const SCHEMA_VERSION = 'owner-compile-v2'
+export const SCHEMA_VERSION = 'owner-compile-v3'
 export const DEFAULT_AGGREGATE_PATH = path.resolve(REPO_ROOT, 'src/Wanxiangshu/Wanxiangshu.fsproj')
 export const DEFAULT_SCRATCH_ROOT = path.resolve(REPO_ROOT, '.fable-build/owner-compile')
 export const DEFAULT_ROOT_PROPS_PATH = path.resolve(REPO_ROOT, 'Directory.Build.props')
@@ -455,6 +455,7 @@ export function materializeOwnerCompile(plan, {
   const projectName = path.basename(plan.candidateBasename, path.extname(plan.candidateBasename))
   const assetsPath = norm(path.join(fingerprintDir, 'artifacts', 'obj', projectName, 'project.assets.json'))
   const finalOutputDir = outputDir ? norm(outputDir) : norm(path.join(fingerprintDir, 'out'))
+  const markerPath = norm(path.join(fingerprintDir, '.success'))
 
   // Generate flat fsproj XML
   const flatXml = generateFlatProjectXml(plan.aggregateContent, plan.aggregatePath, plan.compileItems)
@@ -476,9 +477,110 @@ export function materializeOwnerCompile(plan, {
     projectPath: generatedProjectPath,
     outputPath: finalOutputDir,
     assetsPath,
+    markerPath,
+    successMarkerPath: markerPath,
     fingerprint,
     scratchDir: fingerprintDir,
     candidateBasename: plan.candidateBasename,
+  }
+}
+
+/**
+ * Recursively checks if a directory contains at least one emitted JavaScript file.
+ */
+export function hasEmittedJsFiles(dir) {
+  if (!dir || !fs.existsSync(dir)) {
+    return false
+  }
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true })
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name)
+      if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase()
+        if (ext === '.js' || ext === '.mjs' || ext === '.cjs') {
+          return true
+        }
+      } else if (entry.isDirectory()) {
+        if (hasEmittedJsFiles(fullPath)) {
+          return true
+        }
+      }
+    }
+  } catch {
+    return false
+  }
+  return false
+}
+
+/**
+ * Validates whether the fingerprint-bound success marker exists and matches.
+ */
+export function isSuccessMarkerValid(markerPath, expectedFingerprint, outputDir) {
+  if (!markerPath || !fs.existsSync(markerPath)) {
+    return false
+  }
+  try {
+    const raw = fs.readFileSync(markerPath, 'utf8').trim()
+    let parsed
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      parsed = { fingerprint: raw }
+    }
+    if (parsed.fingerprint !== expectedFingerprint) {
+      return false
+    }
+    if (parsed.schema && parsed.schema !== SCHEMA_VERSION) {
+      return false
+    }
+  } catch {
+    return false
+  }
+  return hasEmittedJsFiles(outputDir)
+}
+
+/**
+ * Atomically writes the success marker for the given fingerprint.
+ */
+export function writeSuccessMarker(markerPath, fingerprint) {
+  const content = JSON.stringify(
+    {
+      schema: SCHEMA_VERSION,
+      fingerprint,
+    },
+    null,
+    2,
+  )
+  fs.mkdirSync(path.dirname(markerPath), { recursive: true })
+  const tmpPath = `${markerPath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`
+  fs.writeFileSync(tmpPath, content, 'utf8')
+  fs.renameSync(tmpPath, markerPath)
+}
+
+/**
+ * Removes the success marker file if it exists.
+ */
+export function removeSuccessMarker(markerPath) {
+  if (markerPath && fs.existsSync(markerPath)) {
+    try {
+      fs.rmSync(markerPath, { force: true })
+    } catch {
+      // ignore
+    }
+  }
+}
+
+/**
+ * Removes output directory recursively while retaining isolated restore assets.
+ */
+export function removeOutputDirectory(outputDir) {
+  if (outputDir && fs.existsSync(outputDir)) {
+    try {
+      fs.rmSync(outputDir, { recursive: true, force: true })
+    } catch {
+      // ignore
+    }
   }
 }
 
@@ -497,11 +599,26 @@ export async function compileOwnerProject({
   outputDir,
   stdio = 'inherit',
   env = process.env,
+  spawn = nodeSpawn,
 } = {}) {
   const plan = planOwnerCompile({ projectPath, aggregatePath })
   const materialized = materializeOwnerCompile(plan, { scratchRoot, rootPropsPath, outputDir })
 
-  fs.mkdirSync(materialized.outputPath, { recursive: true })
+  // Check if success marker is valid for the computed fingerprint and output contains JS
+  const isWarm = isSuccessMarkerValid(
+    materialized.markerPath,
+    materialized.fingerprint,
+    materialized.outputPath,
+  )
+
+  if (!isWarm) {
+    // Missing or invalid marker: delete output directory recursively while retaining isolated restore assets
+    removeSuccessMarker(materialized.markerPath)
+    removeOutputDirectory(materialized.outputPath)
+    fs.mkdirSync(materialized.outputPath, { recursive: true })
+  } else {
+    fs.mkdirSync(materialized.outputPath, { recursive: true })
+  }
 
   const hasAssets = fs.existsSync(materialized.assetsPath)
 
@@ -527,34 +644,81 @@ export async function compileOwnerProject({
   let stdout = ''
   let stderr = ''
 
-  const result = await new Promise((resolve, reject) => {
+  let result
+  try {
     const child = spawn('dotnet', args, {
       cwd: REPO_ROOT,
       stdio,
       env,
     })
 
-    if (child.stdout) {
-      child.stdout.setEncoding('utf8')
-      child.stdout.on('data', (chunk) => {
-        stdout += chunk
-      })
-    }
-    if (child.stderr) {
-      child.stderr.setEncoding('utf8')
-      child.stderr.on('data', (chunk) => {
-        stderr += chunk
-      })
-    }
+    if (child && typeof child.then === 'function') {
+      const awaited = await child
+      result = {
+        code: typeof awaited?.code === 'number' ? awaited.code : (awaited?.status ?? 0),
+        signal: awaited?.signal ?? null,
+      }
+      if (typeof awaited?.stdout === 'string') stdout = awaited.stdout
+      if (typeof awaited?.stderr === 'string') stderr = awaited.stderr
+    } else {
+      result = await new Promise((resolve, reject) => {
+        if (!child) {
+          resolve({ code: 1, signal: null })
+          return
+        }
 
-    child.on('error', reject)
-    child.on('close', (code, signal) => {
-      resolve({ code: code ?? (signal ? 1 : 0), signal })
-    })
-  })
+        if (child.stdout && typeof child.stdout.on === 'function') {
+          child.stdout.setEncoding?.('utf8')
+          child.stdout.on('data', (chunk) => {
+            stdout += chunk
+          })
+        }
+        if (child.stderr && typeof child.stderr.on === 'function') {
+          child.stderr.setEncoding?.('utf8')
+          child.stderr.on('data', (chunk) => {
+            stderr += chunk
+          })
+        }
+
+        if (typeof child.on === 'function') {
+          child.on('error', reject)
+          child.on('close', (code, signal) => {
+            resolve({ code: code ?? (signal ? 1 : 0), signal: signal ?? null })
+          })
+        } else if (typeof child.status === 'number' || typeof child.code === 'number') {
+          resolve({ code: child.code ?? child.status ?? 0, signal: child.signal ?? null })
+        } else {
+          resolve({ code: 0, signal: null })
+        }
+      })
+    }
+  } catch (err) {
+    removeSuccessMarker(materialized.markerPath)
+    removeOutputDirectory(materialized.outputPath)
+    throw err
+  }
 
   const elapsedMs = Date.now() - startTime
-  const ok = result.code === 0
+
+  let ok = result.code === 0 && !result.signal
+
+  if (ok) {
+    // Code 0: require at least one emitted .js recursively
+    const hasJs = hasEmittedJsFiles(materialized.outputPath)
+    if (!hasJs) {
+      ok = false
+      result.code = 1
+      removeSuccessMarker(materialized.markerPath)
+      removeOutputDirectory(materialized.outputPath)
+    } else {
+      // Atomically write marker
+      writeSuccessMarker(materialized.markerPath, materialized.fingerprint)
+    }
+  } else {
+    // Nonzero or signal: remove marker and partial output
+    removeSuccessMarker(materialized.markerPath)
+    removeOutputDirectory(materialized.outputPath)
+  }
 
   if (ok && stdio !== 'pipe') {
     const shortFp = materialized.fingerprint.slice(0, 12)
@@ -564,14 +728,18 @@ export async function compileOwnerProject({
 
   return {
     ok,
-    code: result.code,
-    signal: result.signal,
+    code: result.code ?? (ok ? 0 : 1),
+    signal: result.signal ?? null,
     stdout,
     stderr,
     projectPath: materialized.projectPath,
     outputPath: materialized.outputPath,
     assetsPath: materialized.assetsPath,
+    scratchDir: materialized.scratchDir,
+    markerPath: materialized.markerPath,
+    successMarkerPath: materialized.successMarkerPath,
     fingerprint: materialized.fingerprint,
     elapsedMs,
+    cached: false,
   }
 }

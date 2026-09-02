@@ -14,13 +14,13 @@ module RequirementGroundingSurface =
     type private JournalHandleBox(handle: JournalHandle) =
         member _.Value = handle
 
-    let private journalHandleOf value = (unbox<JournalHandleBox> value).Value
-    let private agentJournalOf value = (journalHandleOf value).Journal
+    let private journalHandleOf (value: obj) = (unbox<JournalHandleBox> value).Value
+    let private agentJournalOf (value: obj) = (journalHandleOf value).Journal
 
     let private isNullish value =
         isNull value || Fable.Core.JsInterop.emitJsExpr value "$0 === undefined"
 
-    let createJournal directory : Task<obj> =
+    let createJournal (directory: string) : Task<obj> =
         task {
             let! result =
                 JournalSurface.boot directory "requirement-grounding-surface" 0 (DateTimeOffset.UtcNow.ToString("O"))
@@ -36,10 +36,10 @@ module RequirementGroundingSurface =
                            journal = (JournalHandleBox handle :> obj) |}
         }
 
-    let disposeJournal journal =
+    let disposeJournal (journal: obj) : unit =
         JournalSurface.dispose (journalHandleOf journal)
 
-    let requestPaths journal workspace sessionId (paths: string array) : Task<obj> =
+    let requestPaths (journal: obj) (workspace: string) (sessionId: string) (paths: string array) : Task<obj> =
         task {
             let! result =
                 RequirementGroundingRuntime.requestPaths
@@ -59,7 +59,7 @@ module RequirementGroundingSurface =
                 | Error error -> box {| ok = false; error = error |}
         }
 
-    let mutationDecision journal workspace sessionId paths : Task<obj> =
+    let mutationDecision (journal: obj) (workspace: string) (sessionId: string) (paths: string array) : Task<obj> =
         task {
             let! result =
                 RequirementGroundingGate.decideMutation
@@ -80,7 +80,7 @@ module RequirementGroundingSurface =
                 | Error error -> box {| ok = false; error = error |}
         }
 
-    let weakMutationObservation journal workspace sessionId path : Task<bool> =
+    let weakMutationObservation (journal: obj) (workspace: string) (sessionId: string) (path: string) : Task<bool> =
         task {
             do!
                 RequirementGroundingGate.before
@@ -94,7 +94,14 @@ module RequirementGroundingSurface =
             return true
         }
 
-    let observationDecision journal workspace sessionId (toolName: string) (args: obj) _output : Task<obj> =
+    let observationDecision
+        (journal: obj)
+        (workspace: string)
+        (sessionId: string)
+        (toolName: string)
+        (args: obj)
+        (output: obj)
+        : Task<obj> =
         task {
             let paths =
                 if toolName.ToLowerInvariant() <> "read" || isNull args then
@@ -119,7 +126,7 @@ module RequirementGroundingSurface =
                 | Error error -> box {| ok = false; error = error |}
         }
 
-    let projectWithJournal journal sessionId (rawMessages: obj array) : Task<obj> =
+    let projectWithJournal (journal: obj) (sessionId: string) (rawMessages: obj array) : Task<obj> =
         task {
             let! result =
                 RequirementGroundingTransform.tryProject
@@ -136,16 +143,22 @@ module RequirementGroundingSurface =
                 | Error error -> box {| ok = false; error = error |}
         }
 
-    let groundedIdentities journal sessionId : string array =
+    let groundedIdentities (journal: obj) (sessionId: string) : string array =
         RequirementGroundingRuntime.groundedKeys (agentJournalOf journal) (SessionId.create sessionId)
         |> List.toArray
 
-    let pendingPackages journal sessionId : string array =
+    let pendingPackages (journal: obj) (sessionId: string) : string array =
         RequirementGroundingRuntime.pending (agentJournalOf journal) (SessionId.create sessionId)
         |> List.map _.PackageName
         |> List.toArray
 
-    let appendContextReanchored journal sessionId (previousEpoch: int64) (nextEpoch: int64) observedRun : Task<obj> =
+    let appendContextReanchored
+        (journal: obj)
+        (sessionId: string)
+        (previousEpoch: int64)
+        (nextEpoch: int64)
+        (observedRun: string)
+        : Task<obj> =
         task {
             let session = SessionId.create sessionId
 
@@ -170,5 +183,5 @@ module RequirementGroundingSurface =
     let source = RequirementGroundingTransform.source
     let cursorSeparator = RequirementGroundingTransform.cursorSeparator
 
-    let isGroundingRead raw =
+    let isGroundingRead (raw: obj) : bool =
         RequirementGroundingTransform.isGroundingRead raw

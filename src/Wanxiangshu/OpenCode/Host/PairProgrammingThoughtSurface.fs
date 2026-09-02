@@ -295,20 +295,23 @@ module PairProgrammingThoughtSurface =
                 {| calls = calls
                    error = error.Message |}
 
-    let stableCallId (sessionId: obj) (ordinal: int64) =
+    let stableCallId (sessionId: obj) (ordinal: int64) : string =
         PairProgrammingThoughtTransform.stableCallId (if isNull sessionId then None else Some(string sessionId)) ordinal
 
-    let isPairProgrammingThought raw =
+    let isPairProgrammingThought (raw: obj) : bool =
         PairProgrammingThoughtTransform.isPairProgrammingThought raw
 
-    let providerIdOfMessage raw =
-        PairProgrammingThoughtTransform.providerIdOfMessage raw |> Option.toObj
+    let providerIdOfMessage (raw: obj) : obj =
+        PairProgrammingThoughtTransform.providerIdOfMessage raw |> Option.toObj |> box
 
-    let providerIdFromMessages (raw: obj array) =
-        PairProgrammingThoughtTransform.providerIdFromMessages (Array.toList raw)
+    let providerIdFromMessages (raw: obj array) : obj =
+        let messages = if isNull raw then [] else Array.toList raw
+
+        PairProgrammingThoughtTransform.providerIdFromMessages messages
         |> Option.toObj
+        |> box
 
-    let skipAutoInjectedRequested (providerId: obj) =
+    let skipAutoInjectedRequested (providerId: obj) : bool =
         PairProgrammingThoughtTransform.skipAutoInjectedRequested (
             if isNull providerId then None else Some(string providerId)
         )
