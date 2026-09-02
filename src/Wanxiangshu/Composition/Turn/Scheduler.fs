@@ -41,9 +41,7 @@ module Reconciler =
             ?onDeleted: SessionId -> unit,
             ?projection: (SessionId -> AgentProjectionSet option),
             ?onSnapshot: SessionId -> SessionMessage list -> Task,
-            ?durableUnavailable: unit -> bool,
-            ?maxCausalRereads: int,
-            ?maxConsecutiveErrors: int
+            ?durableUnavailable: unit -> bool
         ) as this =
 
         let gate = obj ()
@@ -114,15 +112,6 @@ module Reconciler =
 
         let observeSnapshot =
             defaultArg onSnapshot (fun _ _ -> AsyncSupport.completedTask ())
-
-        // The public constructor keeps these optional arguments for source
-        // compatibility, but production reconciliation is event-driven: one
-        // causal edge owns one snapshot read. Another read requires another
-        // coarse Host signal or exact projection-change edge, never time/budget.
-        let _ = maxCausalRereads
-        let _ = maxConsecutiveErrors
-        let maxRereads = 0
-        let maxErrors = 1
 
         let isCleared (sessionId: SessionId) =
             lock gate (fun () -> cleared.Contains(SessionId.value sessionId))
@@ -404,8 +393,6 @@ module Reconciler =
                             wake
                             observeProjectionSnapshot
                             onTurn
-                            maxRereads
-                            maxErrors
                             activeBinding
                             sessionId
                             generation

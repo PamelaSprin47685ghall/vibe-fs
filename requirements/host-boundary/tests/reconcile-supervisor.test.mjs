@@ -13,11 +13,8 @@ const failed = (error) => ({ kind: 'Failed', error })
 // ── HOST-BOUNDARY-005: reconcile decision surface ────────────────────────
 //
 // The production owner is ReconcileSurface.decideStep. The support
-// hostPolicy.reconcile was a hand-model that reimplemented counter-driven
-// reread with a different shape. Production no longer authorizes reads from
-// that counter; the real logic uses
-// decideStep(wake, rereadsRemaining, evidence) → { name, rereadsRemaining,
-// clearsContinuationCandidate }.
+// hostPolicy.reconcile hand-model is gone; the real logic uses
+// decideStep(wake, evidence) → { name }.
 //
 // Mapping from the old test's snapshot-list model:
 //   - snapshots with finish=true → evidenceTerminal
@@ -29,48 +26,41 @@ const failed = (error) => ({ kind: 'Failed', error })
 const idleWake = ReconcileSurface.idleWake('s1', 1n)
 
 test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_error_never_self_polls', () => {
-  for (const remaining of [8, 4, 2, 1]) {
-    const decision = ReconcileSurface.decideStep(
-      idleWake,
-      remaining,
-      ReconcileSurface.evidenceSnapshotError('provider unavailable'),
-    )
-    assert.equal(ReconcileSurface.decisionName(decision), 'StopPass')
-  }
+  const decision = ReconcileSurface.decideStep(
+    idleWake,
+    ReconcileSurface.evidenceSnapshotError('provider unavailable'),
+  )
+  assert.equal(ReconcileSurface.decisionName(decision), 'StopPass')
 })
 
 test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_idle_is_the_only_nonterminal_publish_authority', () => {
-  const idle = ReconcileSurface.decideStep(idleWake, 4, ReconcileSurface.evidenceProvisional('TurnInProgress'))
+  const idle = ReconcileSurface.decideStep(idleWake, ReconcileSurface.evidenceProvisional('TurnInProgress'))
   assert.equal(ReconcileSurface.decisionName(idle), 'Publish')
 
   const failure = ReconcileSurface.decideStep(
     ReconcileSurface.failureWake(),
-    4,
     ReconcileSurface.evidenceProvisional('TurnInProgress'),
   )
   assert.equal(ReconcileSurface.decisionName(failure), 'StopPass')
 })
 
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_incomplete_rereads_exhausted_stops', () => {
-  // Provisional exhausted under IdleWake → Publish (not StopPass).
-  // This is the production invariant: Provisional under IdleWake publishes
-  // when exhausted, it does not silently StopPass.
-  const decision = ReconcileSurface.decideStep(idleWake, 1, ReconcileSurface.evidenceProvisional('TurnInProgress'))
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_idle_provisional_publishes', () => {
+  const decision = ReconcileSurface.decideStep(idleWake, ReconcileSurface.evidenceProvisional('TurnInProgress'))
   assert.equal(ReconcileSurface.decisionName(decision), 'Publish')
 })
 
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_unknown_exhausted_under_idle_wake_publishes', () => {
-  // Unknown (finish=None) exhausted under IdleWake → Publish.
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_unknown_under_idle_wake_publishes', () => {
+  // Unknown (finish=None) under IdleWake → Publish.
   // Under Retry/Failure/Abort wake → StopPass.
-  const idleDecision = ReconcileSurface.decideStep(idleWake, 1, ReconcileSurface.evidenceUnknown())
+  const idleDecision = ReconcileSurface.decideStep(idleWake, ReconcileSurface.evidenceUnknown())
   assert.equal(ReconcileSurface.decisionName(idleDecision), 'Publish')
 
-  const retryDecision = ReconcileSurface.decideStep(ReconcileSurface.retryWake(), 1, ReconcileSurface.evidenceUnknown())
+  const retryDecision = ReconcileSurface.decideStep(ReconcileSurface.retryWake(), ReconcileSurface.evidenceUnknown())
   assert.equal(ReconcileSurface.decisionName(retryDecision), 'StopPass')
 })
 
 test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_session_cleared_stops', () => {
-  const decision = ReconcileSurface.decideStep(idleWake, 4, ReconcileSurface.evidenceSessionCleared())
+  const decision = ReconcileSurface.decideStep(idleWake, ReconcileSurface.evidenceSessionCleared())
   assert.equal(ReconcileSurface.decisionName(decision), 'StopPass')
 })
 
@@ -122,9 +112,9 @@ test('WHAT[HOST-BOUNDARY-003] HOST_signal_subscribe_client_events_listen_support
 
 // ── Mutation sensitivity ─────────────────────────────────────────────────
 
-test('WHAT[HOST-BOUNDARY-005] mutation_canary_snapshot_error_exhausted_must_stop_pass', () => {
+test('WHAT[HOST-BOUNDARY-005] mutation_canary_snapshot_error_must_stop_pass', () => {
   // SnapshotError must never Publish or self-authorize another read.
-  const decision = ReconcileSurface.decideStep(idleWake, 1, ReconcileSurface.evidenceSnapshotError('e'))
+  const decision = ReconcileSurface.decideStep(idleWake, ReconcileSurface.evidenceSnapshotError('e'))
   assert.equal(ReconcileSurface.decisionName(decision), 'StopPass',
     'mutation guard: SnapshotError must StopPass, not Publish or Reread')
 })

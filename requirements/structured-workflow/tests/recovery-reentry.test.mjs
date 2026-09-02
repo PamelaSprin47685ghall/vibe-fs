@@ -117,13 +117,12 @@ test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_provider_recovery_rules_are_productio
 
 test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_reconcile_domain_is_observation_stabilization_not_a_program', () => {
   // The registered ReconcileSurface is the owner contract: callers observe
-  // bounded reread + publish decisions, never emitted union metadata.
+  // one causal observation decision, never emitted union metadata.
   for (const n of [
     'decideStep',
     'decisionName',
     'publishDecision',
     'isTerminalOutcome',
-    'clearsContinuationCandidate',
     'consumeKey',
     'clearProvisional',
   ]) {

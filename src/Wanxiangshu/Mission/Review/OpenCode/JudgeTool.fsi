@@ -2,6 +2,9 @@ namespace Wanxiangshu.Mission.Review.OpenCode
 
 open System.Threading
 open System.Threading.Tasks
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Review
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 
@@ -40,6 +43,32 @@ module JudgeTool =
 
         [<Literal>]
         val JudgmentCouldNotBeRecorded: string = "tool/judge/judgment-could-not-be-recorded"
+
+    [<RequireQualifiedAccess>]
+    type ExecutionRejection =
+        | NotFromReviewer
+        | NoActiveIdentity
+        | VerdictMustBePerfectOrRevise
+        | CouldNotBind
+
+    [<RequireQualifiedAccess>]
+    type ExecutionDecision =
+        | Refused of ExecutionRejection
+        | AlreadyJudged
+        | Proceed of ReviewJudgement
+
+    type ExecutionEvidence =
+        { Role: Role option
+          SessionId: string
+          IsSubmitted: bool
+          Verdict: Result<ReviewGuardVerdict, string>
+          ToolCallId: ToolCallId option
+          ProviderRunId: ProviderRunIdentity option
+          PhysicalUserMessageId: string option }
+
+    val decideExecution: evidence: ExecutionEvidence -> ExecutionDecision
+
+    val rejectionName: rejection: ExecutionRejection -> string
 
     val interruptAfterSubmittedJudgement:
         journal: AgentJournal option ->

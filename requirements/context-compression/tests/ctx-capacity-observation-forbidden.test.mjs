@@ -14,20 +14,12 @@ import test from 'node:test'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const NEXT_DIR = path.join(ROOT, 'src', 'Wanxiangshu')
+const ownerManifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts', 'checks', 'semantic-owners.json'), 'utf8'))
+const files = ownerManifest.ownership
+  .filter(({ owner }) => owner === 'context-compression')
+  .map(({ path: sourcePath }) => path.join(ROOT, sourcePath))
 
-function sourceFiles(dir) {
-  const out = []
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) out.push(...sourceFiles(full))
-    else if (entry.name.endsWith('.fs')) out.push(full)
-  }
-  return out
-}
-
-const files = sourceFiles(NEXT_DIR)
-
-test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_forbidden_capacity_synonyms_never_appear_in_production_source', () => {
+test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_context_compression_owner_never_observes_forbidden_capacity_synonyms', () => {
   // CTX-001's exact forbidden vocabulary, with one allowed exception: the
   // BloggerDeltaLimitBytes input contract (CTX-003) is a byte LIMIT on one
   // delta, not a window estimate — it is tested elsewhere and must stay.
@@ -43,6 +35,7 @@ test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_forbidden_capacity_synonyms_never_ap
     'TokenToByte',
   ]
 
+  assert.ok(files.length > 0, 'context-compression must own production files')
   for (const file of files) {
     const source = fs.readFileSync(file, 'utf8')
     for (const name of forbidden) {
