@@ -2093,7 +2093,12 @@
     {
       "owner": "provider-attempt-recovery",
       "locality": "participant-provider-attempt-requestkind",
-      "justification": "Provider request-kind and fallback durable-fact vocabularies form a signed two-file contract locality whose only compile dependency is graduated foundation identity."
+      "justification": "Provider request-kind is a source-pure signed contract consumed by behavior owners; fallback durable-fact vocabulary is absent."
+    },
+    {
+      "owner": "provider-attempt-recovery",
+      "locality": "participant-provider-attempt-fallback-facts",
+      "justification": "Fallback durable-fact vocabulary is a source-pure signed contract consumed only by durable-events and verification-system; request-kind vocabulary is absent."
     },
     {
       "owner": "attention-regulation",
@@ -5808,7 +5813,7 @@
         "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackFactCases.FallbackCursorAdvanced",
         "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackFactCases.FallbackExhausted"
       ],
-      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Facts symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+      "justification": "Provider.AttemptRecovery publishes the source-pure fallback fact vocabulary exactly to durable-events and verification-system; the RequestKind locality no longer grants this sibling vocabulary."
     },
     {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",

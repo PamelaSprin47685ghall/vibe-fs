@@ -69,6 +69,8 @@ exact contract 的编译承载单位是 consumer cohort 单一的 owner locality
 
 物理 Host API 采用同一规则，但必须同时固定 provider port 与 consumer adapter。`NodeFs` 是唯一 Node `fs` import owner：独立 adapter locality 的 `.fsi` 只公开 `FileTools` 与 `FileMutationTools` 实际调用的八个同步操作；foreign `repository-programming` 只能通过六个 mutation 所需 symbol 的 physical-port contract 与 `FileMutationTools` exact adapter target 取得能力。`ManagedAgent`、`StaticTools`、`NodeFs` 三个 source 分居三个 locality；tool policy signature 不再夹带文件能力，`FileMutationTools` 不再复制第二套 import。`owner-project-boundaries.test.mjs` 固定 exact compile set、consumer cohort、physical target、hidden sibling 与关键 direct reference。
 
+`ProviderRequestKind` 与 `FallbackFactCases` 虽同属 provider-attempt-recovery 的纯 vocabulary，但 direct consumer cohort 不同：前者供 11 个行为 owner 消费，后者只供 durable-events 与 verification-system 消费。因此二者分居 `participant-provider-attempt-requestkind` 与 `participant-provider-attempt-fallback-facts` 两个单 source contract locality；只需 RequestKind 的 consumer 不得直接引用 Facts locality，durable routing/codec 与 verification 只直接引用 Facts，owner 内 fallback composition 确实消费两者才显式引用两条边。更宽 consumer 的传递闭包仍可能因其他已授权 contract 含 Facts；本批只消除 RequestKind locality 自身的 sibling 授权，不冒充全图 capability firewall。
+
 ### 6. Owner/impact flat compile
 
 `scripts/lib/owner-compile.mjs` 同时生成 owner closure 与 changed-source impact plan。实现 `.fs` 使用 owning locality 的 forward closure；公开 `.fsi` 使用 owning locality 的 transitive reverse consumers，再求所有 root 的 forward union。工程、aggregate、lockfile 与 Fable tool manifest 变化直接选择 full；选中 production `.fs` 超过 aggregate 60% 也选择 full。所有模式共用 aggregate-order、zero-ProjectReference materializer 与单一 Fable launcher。
@@ -97,3 +99,5 @@ exact contract 的编译承载单位是 consumer cohort 单一的 owner locality
 STRUCTURED-WORKFLOW-011 的首个 exact consumer counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] GitGateway exact contract has an isolated compiler boundary`。
 
 STRUCTURED-WORKFLOW-011 的首个 physical capability counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] NodeFs physical port and tool contracts have isolated compiler boundaries`。
+
+STRUCTURED-WORKFLOW-011 的纯 vocabulary cohort counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] request kind and fallback facts have disjoint compiler boundaries`。

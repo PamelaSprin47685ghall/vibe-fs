@@ -201,6 +201,81 @@ test('WHAT[STRUCTURED-WORKFLOW-011] NodeFs physical port and tool contracts have
   assert.ok(joinToolRefs.includes('Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj'))
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-011] request kind and fallback facts have disjoint compiler boundaries', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const contractAt = (path) => manifest.contracts.find((entry) => entry.path === path)
+  const compileItems = (projectName) =>
+    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+  const references = (projectName) =>
+    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+
+  const requestProject = 'Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj'
+  const factsProject = 'Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-facts.fsproj'
+
+  assert.deepEqual(compileItems(requestProject), [
+    'Participant/Provider/Attempt/RequestKind.fsi',
+    'Participant/Provider/Attempt/RequestKind.fs',
+  ])
+  assert.deepEqual(compileItems(factsProject), [
+    'Participant/Provider/Attempt/Fallback/Facts.fsi',
+    'Participant/Provider/Attempt/Fallback/Facts.fs',
+  ])
+
+  assert.deepEqual(contractAt('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs')?.consumers, [
+    'durable-events',
+    'verification-system',
+  ])
+  assert.deepEqual(contractAt('src/Wanxiangshu/Participant/Provider/Attempt/RequestKind.fs')?.consumers, [
+    'capability-enforcement',
+    'cognitive-environment',
+    'context-compression',
+    'delegation',
+    'execution-failure-policy',
+    'execution-model-routing',
+    'host-boundary',
+    'interaction-authority',
+    'managed-chat-execution',
+    'prefix-stability',
+    'speculative-investigation',
+  ])
+
+  const capabilityRefs = references(
+    'Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj',
+  )
+  assert.ok(capabilityRefs.includes(requestProject))
+  assert.ok(!capabilityRefs.includes(factsProject))
+
+  const durableFactRefs = references('Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj')
+  assert.ok(durableFactRefs.includes(factsProject))
+  assert.ok(!durableFactRefs.includes(requestProject))
+
+  const durableCodecRefs = references('Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj')
+  assert.ok(durableCodecRefs.includes(factsProject))
+  assert.ok(!durableCodecRefs.includes(requestProject))
+
+  const verificationRefs = references(
+    'Wanxiangshu.Owner.verification-system.verification-eventstorewritersurface.fsproj',
+  )
+  assert.ok(verificationRefs.includes(factsProject))
+  assert.ok(!verificationRefs.includes(requestProject))
+
+  const ownerFallbackRefs = references(
+    'Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj',
+  )
+  assert.ok(ownerFallbackRefs.includes(requestProject))
+  assert.ok(ownerFallbackRefs.includes(factsProject))
+
+  const localities = manifest.compiler_boundary_localities
+    .filter((entry) => entry.owner === 'provider-attempt-recovery')
+    .map((entry) => entry.locality)
+  assert.ok(localities.includes('participant-provider-attempt-requestkind'))
+  assert.ok(localities.includes('participant-provider-attempt-fallback-facts'))
+})
+
 test('WHAT[STRUCTURED-WORKFLOW-011] locality kinds enforce contract purity, direction, and closure budget', () => {
   const contract = resolve('/architecture/Contract.fsproj')
   const nestedContract = resolve('/architecture/NestedContract.fsproj')

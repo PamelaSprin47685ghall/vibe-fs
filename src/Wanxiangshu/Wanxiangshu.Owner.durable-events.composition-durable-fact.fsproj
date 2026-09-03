@@ -17,7 +17,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-model.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.requirement-grounding-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-facts.fsproj"/>
     <Compile Include="Composition/Durable/Fact.fsi"/>
