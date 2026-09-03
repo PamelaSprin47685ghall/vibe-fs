@@ -1,2 +1,0 @@
-# Dated local evidence only. This is not the authoritative supported-workspace inventory.
-../..

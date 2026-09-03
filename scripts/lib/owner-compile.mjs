@@ -664,7 +664,7 @@ export function materializeOwnerCompile(plan, {
   }
 
   const defaultScratch = outputDir
-    ? path.resolve(path.dirname(plan.aggregatePath), '.fable-build')
+    ? path.resolve(REPO_ROOT, '.fable-build/output-compile')
     : DEFAULT_SCRATCH_ROOT
   const resolvedScratchRoot = norm(scratchRoot ?? defaultScratch)
   const resolvedRootPropsPath = norm(rootPropsPath)

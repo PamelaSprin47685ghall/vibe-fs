@@ -153,7 +153,7 @@ resources/     随包运行时资源
 requirements/  48 包 normative 语义树：每包 WHY/WHAT/HOW/PROOF + 包自有测试
 proposals/     deferred 未来材料（用户管理）
 scripts/       构建与少量仓库检查
-cleanup/       退役追踪与 migration 报告
+docs/          项目文档与在线阅览（docs/index.html）
 dist/          最终编译输出，不提交
 artifacts/     中间产物与本地发布产物，不提交
 ```

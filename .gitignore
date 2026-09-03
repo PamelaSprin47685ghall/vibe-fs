@@ -1,61 +1,70 @@
 # Dependencies
 /node_modules/
 
-# Generated output
+# .NET and F# compiler outputs & caches
+bin/
+obj/
 /artifacts/
+*.user
+*.userosscache
+*.sln.docstates
+.ionide/
+
+# Fable & JavaScript build output
 /dist/
 /coverage/
-
-# Package output
+.fable-build/
+/.wireit/
 /*.tgz
 
-# Local environment
+# Local environment & credentials
 /.env
 /.env.*
 !/.env.example
 *.pem
 *.key
 
-# Local agent runtime (Reasonix / host tooling)
+# Local tool runtimes & caches
 /.reasonix/
-
-# wireit incremental cache
-/.wireit/
 /reasonix.toml
-
-# Local NuGet / .NET CLI caches (writable sandbox when home is read-only)
 /.nuget/
 /.dotnet-cli/
-
-# Local delivery verification logs (not product)
 /.delivery-logs/
-.fable-build/
+/.codebuff-index
+.codegraph/
+.slim/
+.omo/
+.wanxiangshu/
+*.ndjson
 
 # Logs
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Editors and OS
+# Editors, OS & temporary files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+*~
+*.swp
+*.swo
+*.bak
+*.orig
+*.rej
 /.idea/
 /.vscode/
-.DS_Store
-Thumbs.db
 
-# Local repository exports
+# Local exports & scan artifacts
 /repomix-output*.xml
 /repomix-output*.md
 /changes/
 /docs/repomix-output-fresh.xml
 /docs/repomix-output.xml
 /vibe-fs.xml
-
-# Runtime state
-/.codebuff-index
-
-# Local deepwork state
-.slim/deepwork/
-.omo/
-
-# Local scan artifacts
 /local/
 /local:/
