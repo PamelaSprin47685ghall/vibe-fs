@@ -121,6 +121,17 @@ test('WHAT[STRUCTURED-WORKFLOW-011] review opening prompt has a source-pure comp
   assert.ok(changeRefs.includes(promptProject))
   assert.ok(!changeRefs.includes(mixedProject))
   assert.ok(finalityRefs.includes(promptProject))
+
+  const referencers = readdirSync(SRC)
+    .filter((name) => /^Wanxiangshu\.Owner\..+\.fsproj$/.test(name) && name !== promptProject)
+    .filter((name) =>
+      readFileSync(join(SRC, name), 'utf8').includes(`ProjectReference Include="${promptProject}"`),
+    )
+    .sort()
+  assert.deepEqual(referencers, [
+    'Wanxiangshu.Owner.change-integration.git-integrationgate.fsproj',
+    'Wanxiangshu.Owner.finality.mission-finality-prompt.fsproj',
+  ])
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] review request identity and challenge have source-pure compiler boundaries', () => {
@@ -225,6 +236,21 @@ test('WHAT[STRUCTURED-WORKFLOW-011] review request identity and challenge have s
     assert.ok(!references(unrelated).includes(challengeProject))
   }
 
+  const directReferencers = (providerProject) =>
+    readdirSync(SRC)
+      .filter((name) => /^Wanxiangshu\.Owner\..+\.fsproj$/.test(name) && name !== providerProject)
+      .filter((name) => projectSource(name).includes(`ProjectReference Include="${providerProject}"`))
+      .sort()
+  assert.deepEqual(directReferencers(requestProject), [
+    'Wanxiangshu.Owner.host-boundary.opencode-host-sharedstatesurface.fsproj',
+    'Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj',
+    'Wanxiangshu.Owner.review-judgement.mission-review-opencode-judgetool.fsproj',
+  ])
+  assert.deepEqual(directReferencers(challengeProject), [
+    'Wanxiangshu.Owner.review-assurance.mission-review-barrier-workflow.fsproj',
+    'Wanxiangshu.Owner.review-judgement.mission-review-opencode-judgetool.fsproj',
+  ])
+
   const localities = manifest.compiler_boundary_localities
     .filter((entry) => entry.owner === 'review-judgement')
     .map((entry) => entry.locality)
@@ -311,6 +337,18 @@ test('WHAT[STRUCTURED-WORKFLOW-011] review witness has a source-pure compiler bo
   assert.ok(projectionRefs.includes(witnessProject) && !projectionRefs.includes(mixedProject))
   assert.ok(workflowRefs.includes(witnessProject) && workflowRefs.includes(mixedProject))
   assert.ok(foldRefs.includes(witnessProject) && foldRefs.includes(mixedProject))
+
+  const referencers = readdirSync(SRC)
+    .filter((name) => /^Wanxiangshu\.Owner\..+\.fsproj$/.test(name) && name !== witnessProject)
+    .filter((name) => projectSource(name).includes(`ProjectReference Include="${witnessProject}"`))
+    .sort()
+  assert.deepEqual(referencers, [
+    'Wanxiangshu.Owner.durable-events.runtime.fsproj',
+    'Wanxiangshu.Owner.finality.mission-finality-prompt.fsproj',
+    'Wanxiangshu.Owner.review-assurance.mission-review-barrier-projection.fsproj',
+    'Wanxiangshu.Owner.review-assurance.mission-review-barrier-workflow.fsproj',
+    'Wanxiangshu.Owner.review-judgement.mission-review-reviewfactfold.fsproj',
+  ])
 
   const signature = readFileSync(join(SRC, 'Mission/Review/Judgement/Witness.fsi'), 'utf8')
   assert.doesNotMatch(signature, /\bval (?:isQualifiedConfirmationFor|witnesses):/)
