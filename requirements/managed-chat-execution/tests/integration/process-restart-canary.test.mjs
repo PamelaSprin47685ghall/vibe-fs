@@ -17,7 +17,7 @@ const runChild = (mode, workspace, marker) =>
 
 const readMarker = (path) => JSON.parse(readFileSync(path, 'utf8'))
 
-test('WHAT[CHATEXEC-009] OS crash retains Accepted and discards exact process-local admission artifacts', () => {
+test('WHAT[CHATEXEC-009] abrupt process exit retains Accepted and discards established local admission artifacts', () => {
   const workspace = mkdtempSync(join(tmpdir(), 'wxs-chat-crash-'))
   const beforeMarker = join(workspace, 'before-crash.json')
   const afterMarker = join(workspace, 'after-reopen.json')
@@ -29,7 +29,7 @@ test('WHAT[CHATEXEC-009] OS crash retains Accepted and discards exact process-lo
     assert.deepEqual(readMarker(beforeMarker), {
       status: { accepted: true, providerStarted: false, terminal: false },
       bindingCount: 1,
-      exactCapacityOwned: true,
+      exactCapacity: { token: true, custody: true, execution: true, waiter: false, owner: true },
     })
 
     const reopened = runChild('reopen-after-crash', workspace, afterMarker)
@@ -37,7 +37,7 @@ test('WHAT[CHATEXEC-009] OS crash retains Accepted and discards exact process-lo
     assert.deepEqual(readMarker(afterMarker), {
       status: { accepted: true, providerStarted: false, terminal: false },
       bindingCount: 0,
-      exactCapacityOwned: false,
+      exactCapacity: { token: false, custody: false, execution: false, waiter: false, owner: false },
     })
   } finally {
     rmSync(workspace, { recursive: true, force: true })

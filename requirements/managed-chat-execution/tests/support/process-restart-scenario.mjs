@@ -23,13 +23,13 @@ const observe = async (withRuntime) => {
     statusSurface.query(journal, sessionId, physicalUserMessageId),
   )
   const capacity = routingSurface.sharedCapacitySnapshot()
-  const exactCapacityOwned = [
-    ...capacity.tokens.map((token) => token.owner),
-    ...capacity.custodies.map((custody) => custody.owner),
-    ...capacity.executions,
-    ...capacity.waiters,
-    ...capacity.owners,
-  ].some(exactOwner)
+  const exactCapacity = {
+    token: capacity.tokens.some((token) => exactOwner(token.owner)),
+    custody: capacity.custodies.some((custody) => exactOwner(custody.owner)),
+    execution: capacity.executions.some(exactOwner),
+    waiter: capacity.waiters.some(exactOwner),
+    owner: capacity.owners.some(exactOwner),
+  }
 
   return {
     status: {
@@ -38,7 +38,7 @@ const observe = async (withRuntime) => {
       terminal: status.terminal,
     },
     bindingCount: bindingSurface.exactExecutionBindingCount(sessionId, physicalUserMessageId),
-    exactCapacityOwned,
+    exactCapacity,
   }
 }
 
