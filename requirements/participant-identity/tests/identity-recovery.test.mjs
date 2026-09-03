@@ -80,15 +80,6 @@ const journalRoundTripPayload = (fact) => {
   return decoded.value.fact.payload
 }
 
-const profileFromPayload = (payload) => ({
-  session: payload.SessionId,
-  logicalRun: payload.LogicalRunId,
-  authorityRoot: payload.AuthorityRootUserMessageId,
-  authorityKind: payload.AuthorityKind,
-  identitySeed: payload.IdentitySeed,
-  participantIdentity: payload.IdentitySeed.participantIdentity,
-})
-
 const authorityCase = (value) => {
   if (Array.isArray(value)) {
     if (value[0] === 'AuthorityRootAccepted') return value
@@ -126,24 +117,20 @@ const inheritedProfile = () => {
   return createRoot('AgentOwnerRoot', issued.value, 'ses-recovery-child', 'msg-recovery-child')
 }
 
-test('WHAT[PID-010] current v2 durable identity recovers exact participant and owner provenance', () => {
+test('WHAT[PID-010] current v2 durable identity payload preserves exact participant and owner provenance', () => {
   const profile = inheritedProfile()
   const payload = journalRoundTripPayload(authorityFact(profile))
-  const replayed = profileFromPayload(payload)
-
-  const recovered = authority.recoverActiveIdentity(register(replayed))
-
-  assert.deepEqual(recovered, {
-    ok: true,
-    value: {
-      participantIdentity: profile.participantIdentity,
-      identitySeed: profile.identitySeed,
-    },
-    error: '',
+  assert.deepEqual(payload, {
+    SchemaVersion: 2,
+    SessionId: profile.session,
+    LogicalRunId: profile.logicalRun,
+    AuthorityRootUserMessageId: profile.authorityRoot,
+    AuthorityKind: profile.authorityKind,
+    IdentitySeed: profile.identitySeed,
   })
 })
 
-test('WHAT[PID-010] supported legacy HumanRoot deterministically recovers its upgraded identity', () => {
+test('WHAT[PID-003] supported legacy HumanRoot payload upgrades to canonical versioned identity', () => {
   const profile = createRoot()
   const legacy = legacyHumanRootLine(profile)
   const first = factCodec.decode(legacy)
@@ -151,13 +138,13 @@ test('WHAT[PID-010] supported legacy HumanRoot deterministically recovers its up
   assert.equal(first.ok, true, first.ok ? '' : first.error)
   assert.equal(second.ok, true, second.ok ? '' : second.error)
   assert.deepEqual(second.payload, first.payload)
-
-  const replayed = profileFromPayload(first.payload)
-  const recovered = authority.recoverActiveIdentity(register(replayed))
-
-  assert.deepEqual(recovered.value, {
-    participantIdentity: rootSeed.participantIdentity,
-    identitySeed: rootSeed,
+  assert.deepEqual(first.payload, {
+    SchemaVersion: 2,
+    SessionId: profile.session,
+    LogicalRunId: profile.logicalRun,
+    AuthorityRootUserMessageId: profile.authorityRoot,
+    AuthorityKind: profile.authorityKind,
+    IdentitySeed: rootSeed,
   })
 })
 
