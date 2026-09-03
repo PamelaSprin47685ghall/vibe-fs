@@ -1877,8 +1877,13 @@
     },
     {
       "owner": "review-judgement",
+      "locality": "mission-review-prompt",
+      "justification": "The canonical Reviewer opening semantic path is a source-pure signed contract consumed only by change-integration and finality; unrelated review facts, witnesses, challenges and request identities are absent."
+    },
+    {
+      "owner": "review-judgement",
       "locality": "mission-review-fact",
-      "justification": "Review fact routing, canonical review prompt path, witnessed dual-PERFECT confirmation, challenge rendering and judgement request identity are fully signed review contracts over graduated identity, durable routing and provider representation boundaries."
+      "justification": "Review fact routing, witnessed dual-PERFECT confirmation, challenge rendering and judgement request identity remain a signed composition locality over graduated identity, durable routing and provider representation boundaries pending the remaining GAP-031 cohort cuts."
     },
     {
       "owner": "finality",

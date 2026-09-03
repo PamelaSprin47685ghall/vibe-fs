@@ -92,6 +92,37 @@ test('WHAT[STRUCTURED-WORKFLOW-011] GitGateway exact contract has an isolated co
   assert.doesNotMatch(signature, /SyncActiveEnv|discoverRemote/)
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-011] review opening prompt has a source-pure compiler boundary', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const contract = manifest.contracts.find(
+    (entry) => entry.path === 'src/Wanxiangshu/Mission/Review/Prompt.fs',
+  )
+  assert.ok(contract)
+  assert.deepEqual(contract.consumers, ['change-integration', 'finality'])
+  assert.deepEqual(contract.symbols, ['Wanxiangshu.Mission.Review.HostReviewPrompt.Opening'])
+
+  const promptProject = 'Wanxiangshu.Owner.review-judgement.mission-review-prompt.fsproj'
+  const mixedProject = 'Wanxiangshu.Owner.review-judgement.mission-review-fact.fsproj'
+  const provider = readFileSync(join(SRC, promptProject), 'utf8')
+  const compileItems = [...provider.matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(([, path]) => path)
+  assert.match(provider, /<WanxiangshuOwnerLocality>mission-review-prompt<\/WanxiangshuOwnerLocality>/)
+  assert.match(provider, /<WanxiangshuOwnerLocalityKind>contract<\/WanxiangshuOwnerLocalityKind>/)
+  assert.deepEqual(compileItems, ['Mission/Review/Prompt.fsi', 'Mission/Review/Prompt.fs'])
+
+  const mixed = readFileSync(join(SRC, mixedProject), 'utf8')
+  assert.doesNotMatch(mixed, /<Compile Include="Mission\/Review\/Prompt\.(?:fsi|fs)"\s*\/>/)
+
+  const references = (projectName) =>
+    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+  const changeRefs = references('Wanxiangshu.Owner.change-integration.git-integrationgate.fsproj')
+  const finalityRefs = references('Wanxiangshu.Owner.finality.mission-finality-prompt.fsproj')
+  assert.ok(changeRefs.includes(promptProject))
+  assert.ok(!changeRefs.includes(mixedProject))
+  assert.ok(finalityRefs.includes(promptProject))
+})
+
 test('WHAT[STRUCTURED-WORKFLOW-011] NodeFs physical port and tool contracts have isolated compiler boundaries', () => {
   const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
   const contractAt = (path) => manifest.contracts.find((entry) => entry.path === path)

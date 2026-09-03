@@ -71,6 +71,8 @@ exact contract 的编译承载单位是 consumer cohort 单一的 owner locality
 
 `ProviderRequestKind` 与 `FallbackFactCases` 虽同属 provider-attempt-recovery 的纯 vocabulary，但 direct consumer cohort 不同：前者供 11 个行为 owner 消费，后者只供 durable-events 与 verification-system 消费。因此二者分居 `participant-provider-attempt-requestkind` 与 `participant-provider-attempt-fallback-facts` 两个单 source contract locality；只需 RequestKind 的 consumer 不得直接引用 Facts locality，durable routing/codec 与 verification 只直接引用 Facts，owner 内 fallback composition 确实消费两者才显式引用两条边。更宽 consumer 的传递闭包仍可能因其他已授权 contract 含 Facts；本批只消除 RequestKind locality 自身的 sibling 授权，不冒充全图 capability firewall。
 
+Review opening prompt 已从历史 `mission-review-fact` 混合 composition 抽离为无依赖、单 source 的 `mission-review-prompt` contract locality。`change-integration` 与 `finality` 显式引用该 edge；前者不再因一个 opening path 获得 Fact/Witness/Challenge/RequestIdentity，后者在 Witness cohort 切分前仍因真实 Witness 消费暂留旧 mixed edge。永久 counterexample 固定 Prompt 的唯一 symbol、exact two-owner cohort、source-pure compile set 与 Change 的 sibling 隔离，不提前宣称 GAP-031 Review 五类已全部毕业。
+
 ### 6. Owner/impact flat compile
 
 `scripts/lib/owner-compile.mjs` 同时生成 owner closure 与 changed-source impact plan。实现 `.fs` 使用 owning locality 的 forward closure；公开 `.fsi` 使用 owning locality 的 transitive reverse consumers，再求所有 root 的 forward union。工程、aggregate、lockfile 与 Fable tool manifest 变化直接选择 full；选中 production `.fs` 超过 aggregate 60% 也选择 full。所有模式共用 aggregate-order、zero-ProjectReference materializer 与单一 Fable launcher。
@@ -101,3 +103,5 @@ STRUCTURED-WORKFLOW-011 的首个 exact consumer counterexample：`requirements/
 STRUCTURED-WORKFLOW-011 的首个 physical capability counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] NodeFs physical port and tool contracts have isolated compiler boundaries`。
 
 STRUCTURED-WORKFLOW-011 的纯 vocabulary cohort counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] request kind and fallback facts have disjoint compiler boundaries`。
+
+STRUCTURED-WORKFLOW-011 的 Review Prompt cohort counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] review opening prompt has a source-pure compiler boundary`。
