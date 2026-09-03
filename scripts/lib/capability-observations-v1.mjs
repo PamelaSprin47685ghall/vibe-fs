@@ -172,17 +172,135 @@ const identityIsOrExtends = (identity, owner, separators = '.') => identity === 
     && identity.slice(0, owner.length) === owner
     && separators.includes(identity[owner.length]))
 
-const CLOSED_PURE_IDENTITY_FAMILIES = [
-  'fstoolkit.errorhandling',
-  'microsoft.fsharp.core.languageprimitives',
-  'microsoft.fsharp.core.optionmodule',
-  'microsoft.fsharp.core.resultmodule',
-  'microsoft.fsharp.core.valueoption',
-  'thoth.json',
-]
 const CLOSED_PURE_IDENTITIES = new Set([
+  'date.parse',
+  'new date(epoch)',
+])
+const FSHARP_CORE_PURE_TYPES = new Set([
+  'microsoft.fsharp.collections.fsharplist`1',
+  'microsoft.fsharp.collections.fsharpmap`2',
+  'microsoft.fsharp.collections.fsharpset`1',
+  'microsoft.fsharp.collections.list<_>',
+  'microsoft.fsharp.collections.map<_,_>',
+  'microsoft.fsharp.collections.set<_>',
+  'microsoft.fsharp.core.choice<_,_>',
+  'microsoft.fsharp.core.choice<_,_,_>',
+  'microsoft.fsharp.core.fsharpchoice`2',
+  'microsoft.fsharp.core.fsharpchoice`3',
+  'microsoft.fsharp.core.fsharpoption`1',
+  'microsoft.fsharp.core.fsharpresult`2',
+  'microsoft.fsharp.core.fsharpvalueoption`1',
+  'microsoft.fsharp.core.option<_>',
+  'microsoft.fsharp.core.result<_,_>',
+  'microsoft.fsharp.core.unit',
+])
+const FSHARP_CORE_PURE_MEMBERS = new Set([
   'microsoft.fsharp.collections.list.map',
   'microsoft.fsharp.collections.listmodule',
+  'microsoft.fsharp.collections.listmodule.append',
+  'microsoft.fsharp.collections.listmodule.choose',
+  'microsoft.fsharp.collections.listmodule.collect',
+  'microsoft.fsharp.collections.listmodule.concat',
+  'microsoft.fsharp.collections.listmodule.contains',
+  'microsoft.fsharp.collections.listmodule.empty',
+  'microsoft.fsharp.collections.listmodule.exists',
+  'microsoft.fsharp.collections.listmodule.filter',
+  'microsoft.fsharp.collections.listmodule.fold',
+  'microsoft.fsharp.collections.listmodule.foldback',
+  'microsoft.fsharp.collections.listmodule.forall',
+  'microsoft.fsharp.collections.listmodule.head',
+  'microsoft.fsharp.collections.listmodule.indexed',
+  'microsoft.fsharp.collections.listmodule.isempty',
+  'microsoft.fsharp.collections.listmodule.item',
+  'microsoft.fsharp.collections.listmodule.length',
+  'microsoft.fsharp.collections.listmodule.map',
+  'microsoft.fsharp.collections.listmodule.mapi',
+  'microsoft.fsharp.collections.listmodule.map2',
+  'microsoft.fsharp.collections.listmodule.map3',
+  'microsoft.fsharp.collections.listmodule.partition',
+  'microsoft.fsharp.collections.listmodule.rev',
+  'microsoft.fsharp.collections.listmodule.singleton',
+  'microsoft.fsharp.collections.listmodule.tail',
+  'microsoft.fsharp.collections.listmodule.tryfind',
+  'microsoft.fsharp.collections.listmodule.tryhead',
+  'microsoft.fsharp.collections.listmodule.tryitem',
+  'microsoft.fsharp.collections.listmodule.trylast',
+  'microsoft.fsharp.collections.listmodule.unzip',
+  'microsoft.fsharp.collections.listmodule.zip',
+  'microsoft.fsharp.collections.mapmodule',
+  'microsoft.fsharp.collections.mapmodule.add',
+  'microsoft.fsharp.collections.mapmodule.change',
+  'microsoft.fsharp.collections.mapmodule.containskey',
+  'microsoft.fsharp.collections.mapmodule.count',
+  'microsoft.fsharp.collections.mapmodule.empty',
+  'microsoft.fsharp.collections.mapmodule.exists',
+  'microsoft.fsharp.collections.mapmodule.filter',
+  'microsoft.fsharp.collections.mapmodule.find',
+  'microsoft.fsharp.collections.mapmodule.fold',
+  'microsoft.fsharp.collections.mapmodule.foldback',
+  'microsoft.fsharp.collections.mapmodule.forall',
+  'microsoft.fsharp.collections.mapmodule.isempty',
+  'microsoft.fsharp.collections.mapmodule.map',
+  'microsoft.fsharp.collections.mapmodule.ofarray',
+  'microsoft.fsharp.collections.mapmodule.oflist',
+  'microsoft.fsharp.collections.mapmodule.remove',
+  'microsoft.fsharp.collections.mapmodule.tolist',
+  'microsoft.fsharp.collections.mapmodule.tryfind',
+  'microsoft.fsharp.collections.setmodule',
+  'microsoft.fsharp.collections.setmodule.add',
+  'microsoft.fsharp.collections.setmodule.contains',
+  'microsoft.fsharp.collections.setmodule.count',
+  'microsoft.fsharp.collections.setmodule.difference',
+  'microsoft.fsharp.collections.setmodule.empty',
+  'microsoft.fsharp.collections.setmodule.exists',
+  'microsoft.fsharp.collections.setmodule.filter',
+  'microsoft.fsharp.collections.setmodule.fold',
+  'microsoft.fsharp.collections.setmodule.foldback',
+  'microsoft.fsharp.collections.setmodule.forall',
+  'microsoft.fsharp.collections.setmodule.intersect',
+  'microsoft.fsharp.collections.setmodule.isempty',
+  'microsoft.fsharp.collections.setmodule.map',
+  'microsoft.fsharp.collections.setmodule.ofarray',
+  'microsoft.fsharp.collections.setmodule.oflist',
+  'microsoft.fsharp.collections.setmodule.remove',
+  'microsoft.fsharp.collections.setmodule.tolist',
+  'microsoft.fsharp.collections.setmodule.union',
+  'microsoft.fsharp.core.languageprimitives.genericequality',
+  'microsoft.fsharp.core.operators.fst',
+  'microsoft.fsharp.core.operators.id',
+  'microsoft.fsharp.core.operators.ignore',
+  'microsoft.fsharp.core.operators.snd',
+  'microsoft.fsharp.core.optionmodule',
+  'microsoft.fsharp.core.optionmodule.bind',
+  'microsoft.fsharp.core.optionmodule.defaultvalue',
+  'microsoft.fsharp.core.optionmodule.defaultwith',
+  'microsoft.fsharp.core.optionmodule.exists',
+  'microsoft.fsharp.core.optionmodule.filter',
+  'microsoft.fsharp.core.optionmodule.flatten',
+  'microsoft.fsharp.core.optionmodule.fold',
+  'microsoft.fsharp.core.optionmodule.forall',
+  'microsoft.fsharp.core.optionmodule.isnone',
+  'microsoft.fsharp.core.optionmodule.issome',
+  'microsoft.fsharp.core.optionmodule.map',
+  'microsoft.fsharp.core.optionmodule.map2',
+  'microsoft.fsharp.core.optionmodule.map3',
+  'microsoft.fsharp.core.optionmodule.tolist',
+  'microsoft.fsharp.core.resultmodule',
+  'microsoft.fsharp.core.resultmodule.bind',
+  'microsoft.fsharp.core.resultmodule.defaultvalue',
+  'microsoft.fsharp.core.resultmodule.defaultwith',
+  'microsoft.fsharp.core.resultmodule.exists',
+  'microsoft.fsharp.core.resultmodule.fold',
+  'microsoft.fsharp.core.resultmodule.forall',
+  'microsoft.fsharp.core.resultmodule.iserror',
+  'microsoft.fsharp.core.resultmodule.isok',
+  'microsoft.fsharp.core.resultmodule.map',
+  'microsoft.fsharp.core.resultmodule.maperror',
+  'microsoft.fsharp.core.resultmodule.tooption',
+])
+const CLOSED_PACKAGE_PURE_MEMBERS = new Map([
+  ['fstoolkit.errorhandling', new Set(['fstoolkit.errorhandling.resultce.bind'])],
+  ['thoth.json', new Set(['thoth.json.decode.string'])],
 ])
 const identityIsOneOf = (identity, values) => values.includes(identity)
 const identityBelongsToOneOf = (identity, owners, separators = '.') =>
@@ -190,7 +308,7 @@ const identityBelongsToOneOf = (identity, owners, separators = '.') =>
 
 const labelsForIdentity = (identity, runtime = 'fsharp') => {
   const lower = identity.toLowerCase()
-  if (identityIsOneOf(lower, ['date.parse', 'new date(epoch)'])) {
+  if (CLOSED_PURE_IDENTITIES.has(lower)) {
     return classified({ runtimes: [runtime], semanticClasses: ['pure-representation'] })
   }
   if (identityIsOrExtends(lower, 'gpt-tokenizer/encoding/o200k_base')) {
@@ -201,10 +319,6 @@ const labelsForIdentity = (identity, runtime = 'fsharp') => {
   }
   if (identityIsOrExtends(lower, 'node:path', './')) {
     return classified({ runtimes: ['node'], authorities: ['environment'], semanticClasses: ['capability-value'] })
-  }
-  if (CLOSED_PURE_IDENTITIES.has(lower)
-    || CLOSED_PURE_IDENTITY_FAMILIES.some((owner) => identityIsOrExtends(lower, owner))) {
-    return classified({ runtimes: [runtime], semanticClasses: ['pure-representation'] })
   }
   if (identityIsOrExtends(lower, 'node:fs', './')
     || identityIsOrExtends(lower, 'fs')
@@ -275,6 +389,35 @@ const labelsForIdentity = (identity, runtime = 'fsharp') => {
   return null
 }
 
+const labelsForExternalFcsSymbol = (assembly, identity) => {
+  const normalizedAssembly = assembly.toLowerCase()
+  const normalizedIdentity = identity.toLowerCase()
+  if (normalizedAssembly === 'fsharp.core'
+    && (FSHARP_CORE_PURE_TYPES.has(normalizedIdentity) || FSHARP_CORE_PURE_MEMBERS.has(normalizedIdentity))) {
+    return classified({ runtimes: ['external-package'], semanticClasses: ['pure-representation'] })
+  }
+  if (['system.runtime', 'netstandard'].includes(normalizedAssembly)
+    && normalizedIdentity === 'system.string') {
+    return classified({ runtimes: ['external-package'], semanticClasses: ['pure-representation'] })
+  }
+  if (CLOSED_PACKAGE_PURE_MEMBERS.get(normalizedAssembly)?.has(normalizedIdentity)) {
+    return classified({ runtimes: ['external-package'], semanticClasses: ['pure-representation'] })
+  }
+  if (normalizedAssembly === 'node') return labelsForIdentity(identity, 'node')
+  if (['system.runtime', 'netstandard'].includes(normalizedAssembly)
+    && identityIsOrExtends(normalizedIdentity, 'system')) {
+    return labelsForIdentity(identity, 'external-package')
+  }
+  if (normalizedAssembly === 'fsharp.core'
+    && normalizedIdentity === 'microsoft.fsharp.control.fsharpasync.sleep') {
+    return labelsForIdentity(identity, 'external-package')
+  }
+  if (normalizedAssembly === 'host.runtime' && identityIsOrExtends(normalizedIdentity, 'host')) {
+    return labelsForIdentity(identity, 'external-package')
+  }
+  return null
+}
+
 export const classifyCapabilityObservationV1 = (observation) => {
   if (!validateRawCapabilityObservationV1(observation)) {
     let rawIdentity
@@ -287,7 +430,7 @@ export const classifyCapabilityObservationV1 = (observation) => {
   }
   const payload = observation.payload
   if (observation.case === 'fcs-external-symbol-use') {
-    return labelsForIdentity(payload.fully_qualified_symbol, payload.assembly === 'node' ? 'node' : 'external-package')
+    return labelsForExternalFcsSymbol(payload.assembly, payload.fully_qualified_symbol)
       ?? unknown('unclassified-external-symbol', observation.case, `${payload.assembly}:${payload.fully_qualified_symbol}`)
   }
   if (observation.case === 'fable-import') {
@@ -311,12 +454,16 @@ export const classifyCapabilityObservationV1 = (observation) => {
     if (payload.node_kind === 'module-mutable-value-read' || payload.node_kind === 'module-mutable-value-set') {
       return classified({ runtimes: ['fsharp'], mutableResources: ['top-level-mutable'], semanticClasses: ['capability-value'] })
     }
-    if (payload.node_kind === 'capability-immutable-value') {
+    if (payload.node_kind === 'capability-immutable-value'
+      || payload.node_kind === 'capability-immutable-field-get') {
       return classified({ runtimes: ['fsharp'], semanticClasses: ['capability-value'] })
     }
     if (payload.node_kind === 'captured-mutable-value-read'
       || payload.node_kind === 'captured-mutable-value-set'
+      || payload.node_kind === 'capability-mutable-container-value'
+      || payload.node_kind === 'capability-mutable-container-field-get'
       || payload.node_kind === 'mutable-container-value'
+      || payload.node_kind === 'mutable-container-field-get'
       || payload.node_kind === 'mutable-field-get'
       || payload.node_kind === 'mutable-field-set') {
       return classified({ runtimes: ['fsharp'], mutableResources: ['runtime-cell'], semanticClasses: ['capability-value'] })

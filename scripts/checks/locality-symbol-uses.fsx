@@ -458,48 +458,335 @@ let entityHasCapabilityShape entity =
     let functionField =
         try propertyValue entity "FSharpFields" |> asObjects |> Seq.exists (fun field -> boolPropertyOrFalse (propertyValue field "FieldType") "IsFunctionType")
         with _ -> false
-    boolPropertyOrFalse entity "IsInterface" || abstractMember || functionField
+    boolPropertyOrFalse entity "IsInterface" || boolPropertyOrFalse entity "IsAbstractClass" || abstractMember || functionField
 
-let entityHasMutableField entity =
-    try propertyValue entity "FSharpFields" |> asObjects |> Seq.exists (fun field -> boolPropertyOrFalse field "IsMutable")
-    with _ -> false
+let typeDefinitionIdentity assembly namespaceName compiledName =
+    $"{assembly}\u0000{namespaceName}\u0000{compiledName}"
 
-let pureRepresentationTypes =
+let entityDefinitionIdentity entity =
+    try
+        let assembly = propertyValue (propertyValue entity "Assembly") "SimpleName" :?> string
+        let namespaceName =
+            match propertyValue entity "Namespace" |> optionValue with
+            | Some (:? string as value) -> value
+            | _ -> ""
+        let compiledName = propertyValue entity "CompiledName" :?> string
+        typeDefinitionIdentity assembly namespaceName compiledName
+    with _ -> ""
+
+let systemPureRepresentationNames =
+    [ "Boolean"
+      "Byte"
+      "Char"
+      "DateTime"
+      "DateTimeOffset"
+      "Decimal"
+      "Double"
+      "Guid"
+      "Int16"
+      "Int32"
+      "Int64"
+      "SByte"
+      "Single"
+      "String"
+      "TimeSpan"
+      "UInt16"
+      "UInt32"
+      "UInt64" ]
+
+let pureRepresentationDefinitions =
+    seq {
+        yield typeDefinitionIdentity "FSharp.Core" "Microsoft.FSharp.Core" "Unit"
+        for assembly in [ "System.Runtime"; "netstandard" ] do
+            for compiledName in systemPureRepresentationNames do
+                yield typeDefinitionIdentity assembly "System" compiledName
+    }
+    |> fun definitions -> HashSet<string>(definitions, StringComparer.Ordinal)
+
+let immutableGenericContainerDefinitions =
     HashSet<string>(
-        [ "Microsoft.FSharp.Core.Unit"
-          "System.Boolean"
-          "System.Byte"
-          "System.Char"
-          "System.DateTime"
-          "System.DateTimeOffset"
-          "System.Decimal"
-          "System.Double"
-          "System.Guid"
-          "System.Int16"
-          "System.Int32"
-          "System.Int64"
-          "System.SByte"
-          "System.Single"
-          "System.String"
-          "System.TimeSpan"
-          "System.UInt16"
-          "System.UInt32"
-          "System.UInt64" ],
+        [ typeDefinitionIdentity "FSharp.Core" "Microsoft.FSharp.Collections" "FSharpList`1"
+          typeDefinitionIdentity "FSharp.Core" "Microsoft.FSharp.Collections" "FSharpMap`2"
+          typeDefinitionIdentity "FSharp.Core" "Microsoft.FSharp.Collections" "FSharpSet`1"
+          typeDefinitionIdentity "FSharp.Core" "Microsoft.FSharp.Core" "FSharpChoice`2"
+          typeDefinitionIdentity "FSharp.Core" "Microsoft.FSharp.Core" "FSharpChoice`3"
+          typeDefinitionIdentity "FSharp.Core" "Microsoft.FSharp.Core" "FSharpOption`1"
+          typeDefinitionIdentity "FSharp.Core" "Microsoft.FSharp.Core" "FSharpResult`2"
+          typeDefinitionIdentity "FSharp.Core" "Microsoft.FSharp.Core" "FSharpValueOption`1" ],
         StringComparer.Ordinal)
+
+let mutableArrayDefinitions =
+    HashSet<string>(
+        [ typeDefinitionIdentity "FSharp.Core" "Microsoft.FSharp.Core" "array`1" ],
+        StringComparer.Ordinal)
+
+type ClosedImmutableDefinition =
+    | PrimitiveRepresentation
+    | ImmutableGenericContainer
+    | MutableArrayContainer
+    | UnclassifiedDefinition
+
+let closedImmutableDefinition identity =
+    if pureRepresentationDefinitions.Contains identity then PrimitiveRepresentation
+    elif immutableGenericContainerDefinitions.Contains identity then ImmutableGenericContainer
+    elif mutableArrayDefinitions.Contains identity then MutableArrayContainer
+    else UnclassifiedDefinition
+
+if closedImmutableDefinition (typeDefinitionIdentity "System.Runtime" "System" "String") <> PrimitiveRepresentation
+   || closedImmutableDefinition (typeDefinitionIdentity "netstandard" "System" "String") <> PrimitiveRepresentation
+   || closedImmutableDefinition (typeDefinitionIdentity "fixture" "System" "String") <> UnclassifiedDefinition
+   || closedImmutableDefinition (typeDefinitionIdentity "FSharp.Core" "Microsoft.FSharp.Core" "FSharpOption`1") <> ImmutableGenericContainer
+   || closedImmutableDefinition (typeDefinitionIdentity "fixture" "Microsoft.FSharp.Core" "FSharpOption`1") <> UnclassifiedDefinition
+   || closedImmutableDefinition (typeDefinitionIdentity "FSharp.Core" "Microsoft.FSharp.Core" "array`1") <> MutableArrayContainer
+   || closedImmutableDefinition (typeDefinitionIdentity "fixture" "Microsoft.FSharp.Core" "array`1") <> UnclassifiedDefinition
+   || closedImmutableDefinition (typeDefinitionIdentity "" "System" "String") <> UnclassifiedDefinition then
+    failwith "closed immutable definition classifier is not assembly-qualified"
+
+type ImmutableTypeEvidence =
+    | ProvenPure
+    | ProvenCapability
+    | ProvenMutable
+    | ProvenMutableCapability
+    | Unproven
+
+let mergeTypeEvidence left right =
+    match left, right with
+    | Unproven, _
+    | _, Unproven -> Unproven
+    | ProvenPure, evidence
+    | evidence, ProvenPure -> evidence
+    | ProvenCapability, ProvenCapability -> ProvenCapability
+    | ProvenMutable, ProvenMutable -> ProvenMutable
+    | ProvenMutableCapability, _
+    | _, ProvenMutableCapability
+    | ProvenCapability, ProvenMutable
+    | ProvenMutable, ProvenCapability -> ProvenMutableCapability
+
+let typeArguments fullType =
+    try propertyValue fullType "GenericArguments" |> asObjects |> Seq.toArray
+    with _ -> [||]
+
+let entityFields entity =
+    let directFields =
+        try propertyValue entity "FSharpFields" |> asObjects |> Seq.toArray
+        with _ -> [||]
+    let unionFields =
+        try
+            propertyValue entity "UnionCases"
+            |> asObjects
+            |> Seq.collect (fun unionCase -> propertyValue unionCase "Fields" |> asObjects)
+            |> Seq.toArray
+        with _ -> [||]
+    Array.append directFields unionFields |> Array.distinct
+
+let entityGenericParameters entity =
+    try propertyValue entity "GenericParameters" |> asObjects |> Seq.toArray
+    with _ -> [||]
+
+let qualifiedTypeIdentity (assembly: string) (fullName: string) =
+    let assemblyIdentity = if String.IsNullOrWhiteSpace assembly then "?" else assembly
+    $"{assemblyIdentity.Length}:{assemblyIdentity}\u0000{fullName.Length}:{fullName}"
+
+let typeConstructorIdentity entity =
+    let assembly =
+        try propertyValue (propertyValue entity "Assembly") "SimpleName" :?> string
+        with _ -> ""
+    qualifiedTypeIdentity assembly (symbolName entity)
+
+let constructorIdentityCanary = qualifiedTypeIdentity "fixture-a" "Shared.Type"
+let unknownAssemblyIdentityCanary = qualifiedTypeIdentity "" "Shared.Type"
+
+if constructorIdentityCanary <> qualifiedTypeIdentity "fixture-a" "Shared.Type"
+   || constructorIdentityCanary = qualifiedTypeIdentity "fixture-b" "Shared.Type"
+   || constructorIdentityCanary = unknownAssemblyIdentityCanary
+   || not (unknownAssemblyIdentityCanary.Contains("?", StringComparison.Ordinal)) then
+    failwith "closed type identity is not deterministic and assembly-qualified"
+
+let rec typeShapeIdentity (substitutions: Dictionary<obj, obj>) (resolving: HashSet<obj>) fullType =
+    if boolPropertyOrFalse fullType "IsGenericParameter" then
+        let parameter = propertyValue fullType "GenericParameter"
+        match substitutions.TryGetValue parameter with
+        | true, replacement when resolving.Add parameter ->
+            let identity = typeShapeIdentity substitutions resolving replacement
+            resolving.Remove parameter |> ignore
+            identity
+        | _ -> "generic:?"
+    elif boolPropertyOrFalse fullType "IsFunctionType" then
+        typeArguments fullType
+        |> Array.map (typeShapeIdentity substitutions resolving)
+        |> String.concat ","
+        |> sprintf "function<%s>"
+    elif boolPropertyOrFalse fullType "IsTupleType" then
+        typeArguments fullType
+        |> Array.map (typeShapeIdentity substitutions resolving)
+        |> String.concat ","
+        |> sprintf "tuple<%s>"
+    elif boolPropertyOrFalse fullType "HasTypeDefinition" then
+        let entity = propertyValue fullType "TypeDefinition"
+        typeArguments fullType
+        |> Array.map (typeShapeIdentity substitutions resolving)
+        |> String.concat ","
+        |> fun arguments -> $"{typeConstructorIdentity entity}<{arguments}>"
+    else "type:?"
+
+let genericParameterOf fullType =
+    if boolPropertyOrFalse fullType "IsGenericParameter" then Some(propertyValue fullType "GenericParameter")
+    else None
+
+let rec typeContainsGenericParameter parameter fullType =
+    match genericParameterOf fullType with
+    | Some candidate -> candidate.Equals parameter
+    | None -> typeArguments fullType |> Array.exists (typeContainsGenericParameter parameter)
+
+let withEntityTypeArguments
+    (entity: obj)
+    (arguments: obj array)
+    (substitutions: Dictionary<obj, obj>)
+    (classify: unit -> ImmutableTypeEvidence)
+    =
+    let parameters = entityGenericParameters entity
+    if parameters.Length <> arguments.Length then Unproven
+    elif
+        Array.zip parameters arguments
+        |> Array.exists (fun (parameter, argument) ->
+            typeContainsGenericParameter parameter argument
+            && genericParameterOf argument <> Some parameter)
+    then
+        Unproven
+    else
+        let previous = ResizeArray<obj * obj option>()
+        for index in 0 .. parameters.Length - 1 do
+            let parameter = parameters.[index]
+            let argument = arguments.[index]
+            if genericParameterOf argument <> Some parameter then
+                let prior =
+                    match substitutions.TryGetValue parameter with
+                    | true, value -> Some value
+                    | _ -> None
+                previous.Add(parameter, prior)
+                substitutions.[parameter] <- argument
+        let evidence = classify ()
+        for parameter, prior in previous do
+            match prior with
+            | Some value -> substitutions.[parameter] <- value
+            | None -> substitutions.Remove parameter |> ignore
+        evidence
+
+let rec immutableTypeEvidence
+    (visiting: HashSet<string>)
+    (substitutions: Dictionary<obj, obj>)
+    (resolving: HashSet<obj>)
+    fullType
+    =
+    if boolPropertyOrFalse fullType "IsFunctionType" then ProvenCapability
+    elif boolPropertyOrFalse fullType "IsArrayType" then
+        typeArguments fullType
+        |> Array.map (immutableTypeEvidence visiting substitutions resolving)
+        |> Array.fold mergeTypeEvidence ProvenMutable
+    elif boolPropertyOrFalse fullType "IsGenericParameter" then
+        let parameter = propertyValue fullType "GenericParameter"
+        match substitutions.TryGetValue parameter with
+        | true, replacement when resolving.Add parameter ->
+            let evidence = immutableTypeEvidence visiting substitutions resolving replacement
+            resolving.Remove parameter |> ignore
+            evidence
+        | _ -> Unproven
+    elif boolPropertyOrFalse fullType "IsTupleType" then
+        match typeArguments fullType with
+        | [||] -> Unproven
+        | arguments ->
+            arguments
+            |> Array.map (immutableTypeEvidence visiting substitutions resolving)
+            |> Array.fold mergeTypeEvidence ProvenPure
+    elif not (boolPropertyOrFalse fullType "HasTypeDefinition") then Unproven
+    else
+        let entity = propertyValue fullType "TypeDefinition"
+        let constructorIdentity = typeConstructorIdentity entity
+        let arguments = typeArguments fullType
+        let definition = closedImmutableDefinition (entityDefinitionIdentity entity)
+        if constructorIdentity.Contains("?", StringComparison.Ordinal) then
+            Unproven
+        elif definition = MutableArrayContainer then
+            arguments
+            |> Array.map (immutableTypeEvidence visiting substitutions resolving)
+            |> Array.fold mergeTypeEvidence ProvenMutable
+        elif boolPropertyOrFalse entity "IsFSharpAbbreviation" then
+            withEntityTypeArguments entity arguments substitutions (fun () ->
+                immutableTypeEvidence visiting substitutions resolving (propertyValue entity "AbbreviatedType"))
+        elif definition = PrimitiveRepresentation && arguments.Length = 0 then ProvenPure
+        elif definition = ImmutableGenericContainer then
+            if arguments.Length = 0 then Unproven
+            else
+                arguments
+                |> Array.map (immutableTypeEvidence visiting substitutions resolving)
+                |> Array.fold mergeTypeEvidence ProvenPure
+        elif boolPropertyOrFalse entity "IsInterface" || boolPropertyOrFalse entity "IsAbstractClass" then ProvenCapability
+        elif boolPropertyOrFalse entity "IsFSharpRecord" || boolPropertyOrFalse entity "IsFSharpUnion" then
+            let cycleIdentity =
+                typeShapeIdentity substitutions (HashSet<obj>()) fullType
+            if visiting.Contains cycleIdentity then ProvenPure
+            else
+                visiting.Add cycleIdentity |> ignore
+                let evidence = withEntityTypeArguments entity arguments substitutions (fun () ->
+                    entityFields entity
+                    |> Array.map (fun field ->
+                        let fieldEvidence =
+                            immutableTypeEvidence visiting substitutions resolving (propertyValue field "FieldType")
+                        if boolPropertyOrFalse field "IsMutable" then mergeTypeEvidence ProvenMutable fieldEvidence
+                        else fieldEvidence)
+                    |> Array.fold mergeTypeEvidence ProvenPure)
+                visiting.Remove cycleIdentity |> ignore
+                evidence
+        else Unproven
+
+let immutableTypeEvidenceCache = Dictionary<string, ImmutableTypeEvidence>(StringComparer.Ordinal)
+
+let immutableTypeNodeKind pureKind capabilityKind mutableKind combinedKind fallbackKind fullType =
+    try
+        let substitutions = Dictionary<obj, obj>()
+        let typeIdentity = typeShapeIdentity substitutions (HashSet<obj>()) fullType
+        let evidence =
+            match immutableTypeEvidenceCache.TryGetValue typeIdentity with
+            | true, cached -> cached
+            | _ ->
+                let extracted =
+                    immutableTypeEvidence
+                        (HashSet<string>(StringComparer.Ordinal))
+                        substitutions
+                        (HashSet<obj>())
+                        fullType
+                if not (typeIdentity.Contains("?", StringComparison.Ordinal)) then
+                    immutableTypeEvidenceCache.[typeIdentity] <- extracted
+                extracted
+        match evidence with
+        | ProvenPure -> pureKind
+        | ProvenCapability -> capabilityKind
+        | ProvenMutable -> mutableKind
+        | ProvenMutableCapability -> combinedKind
+        | Unproven -> fallbackKind
+    with _ -> fallbackKind
 
 let immutableValueNodeKind symbol =
     try
-        let fullType = propertyValue symbol "FullType"
-        if boolPropertyOrFalse fullType "IsFunctionType" then "capability-immutable-value"
-        elif boolPropertyOrFalse fullType "IsArrayType" then "mutable-container-value"
-        elif boolPropertyOrFalse fullType "HasTypeDefinition" then
-            let entity = propertyValue fullType "TypeDefinition"
-            if entityHasMutableField entity then "mutable-container-value"
-            elif entityHasCapabilityShape entity then "capability-immutable-value"
-            elif pureRepresentationTypes.Contains(symbolName entity) then "pure-immutable-value"
-            else "immutable-value"
-        else "immutable-value"
+        immutableTypeNodeKind
+            "pure-immutable-value"
+            "capability-immutable-value"
+            "mutable-container-value"
+            "capability-mutable-container-value"
+            "immutable-value"
+            (propertyValue symbol "FullType")
     with _ -> "immutable-value"
+
+let immutableFieldNodeKind field =
+    try
+        immutableTypeNodeKind
+            "immutable-field-get"
+            "capability-immutable-field-get"
+            "mutable-container-field-get"
+            "capability-mutable-container-field-get"
+            "f-sharp-field-get"
+            (propertyValue field "FieldType")
+    with _ -> "f-sharp-field-get"
 
 let resolvedFSharpNodeKind patternName payload =
     let fallback = kebabCase patternName
@@ -528,7 +815,7 @@ let resolvedFSharpNodeKind patternName payload =
         | _ -> fallback
     | "FSharpFieldGet", Some field ->
         match tryBooleanProperty field "IsMutable" with
-        | Some false -> "immutable-field-get"
+        | Some false -> immutableFieldNodeKind field
         | Some true -> "mutable-field-get"
         | None -> fallback
     | "FSharpFieldSet", Some field ->
@@ -605,9 +892,16 @@ let rec visitExpression sourcePath anchor expression =
     | Some(patternName, payload) ->
         let nodeKind = resolvedFSharpNodeKind patternName payload
         let identity =
-            tryPayloadSymbol payload
-            |> Option.map symbolName
-            |> Option.defaultValue $"fsharp:{nodeKind}"
+            match patternName with
+            | "Value"
+            | "CallWithWitnesses"
+            | "ValueSet"
+            | "FSharpFieldGet"
+            | "FSharpFieldSet" ->
+                tryPayloadSymbol payload
+                |> Option.map symbolName
+                |> Option.defaultValue $"fsharp:{nodeKind}"
+            | _ -> $"fsharp:{nodeKind}"
         fsharpNodesOut.Add
             { NodeKind = nodeKind
               SemanticIdentity = identity

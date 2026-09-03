@@ -321,6 +321,34 @@ test('WHAT[STRUCTURED-WORKFLOW-014] FCS-accounted F# structure closes explicitly
       semantic_classes: ['capability-value'],
     },
   })
+  for (const [ordinal, nodeKind] of [
+    'capability-mutable-container-value',
+    'capability-mutable-container-field-get',
+    'mutable-container-field-get',
+  ].entries()) {
+    assert.deepEqual(classifyCapabilityObservationV1(fsharpNode(nodeKind, `Fixture.${nodeKind}`, ordinal + 101)), {
+      case: 'classified',
+      payload: {
+        runtimes: ['fsharp'],
+        authorities: [],
+        mutable_resources: ['runtime-cell'],
+        semantic_classes: ['capability-value'],
+      },
+    })
+  }
+  assert.deepEqual(classifyCapabilityObservationV1(fsharpNode(
+    'capability-immutable-field-get',
+    'Fixture.CapabilityEnvelope.Port',
+    104,
+  )), {
+    case: 'classified',
+    payload: {
+      runtimes: ['fsharp'],
+      authorities: [],
+      mutable_resources: [],
+      semantic_classes: ['capability-value'],
+    },
+  })
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-014] external FCS symbols use closed semantic families rather than assembly defaults or substring guesses', () => {
@@ -387,6 +415,11 @@ test('WHAT[STRUCTURED-WORKFLOW-014] external FCS symbols use closed semantic fam
       classifyCapabilityObservationV1(externalFsharp(assembly, symbol, ordinal + 120)).payload.authorities,
       [authority],
     )
+    assert.equal(
+      classifyCapabilityObservationV1(externalFsharp('Example', symbol, ordinal + 130)).case,
+      'unknown',
+      `${symbol} from the wrong assembly must not gain ${authority} authority`,
+    )
   }
 
   for (const [ordinal, symbol] of [
@@ -406,6 +439,60 @@ test('WHAT[STRUCTURED-WORKFLOW-014] external FCS symbols use closed semantic fam
       `${symbol} must not inherit authority from a substring`,
     )
   }
+
+  const exactPureCoreSymbols = [
+    ['System.Runtime', 'System.String'],
+    ['FSharp.Core', 'Microsoft.FSharp.Core.OptionModule.Map'],
+    ['FSharp.Core', 'Microsoft.FSharp.Core.ResultModule.Map'],
+    ['FSharp.Core', 'Microsoft.FSharp.Collections.ListModule.Choose'],
+    ['FSharp.Core', 'Microsoft.FSharp.Collections.MapModule.TryFind'],
+    ['FSharp.Core', 'Microsoft.FSharp.Collections.SetModule.Contains'],
+    ['FSharp.Core', 'Microsoft.FSharp.Core.Operators.id'],
+    ['FSharp.Core', 'Microsoft.FSharp.Core.Operators.ignore'],
+    ['FSharp.Core', 'Microsoft.FSharp.Core.Operators.fst'],
+    ['FSharp.Core', 'Microsoft.FSharp.Core.Operators.snd'],
+  ]
+  for (const [ordinal, [assembly, symbol]] of exactPureCoreSymbols.entries()) {
+    assert.deepEqual(classifyCapabilityObservationV1(externalFsharp(assembly, symbol, ordinal + 160)), {
+      case: 'classified',
+      payload: {
+        runtimes: ['external-package'],
+        authorities: [],
+        mutable_resources: [],
+        semantic_classes: ['pure-representation'],
+      },
+    })
+  }
+
+  for (const [ordinal, symbol] of [
+    'Microsoft.FSharp.Core.OptionModule.Mapish',
+    'Microsoft.FSharp.Core.Operators.idle',
+    'Microsoft.FSharp.Collections.FSharpListish`1',
+    'Microsoft.FSharp.Collections.ArrayModule.Set',
+    'Microsoft.FSharp.Core.OptionModule.ToArray',
+    'Microsoft.FSharp.Collections.ListModule.ToArray',
+    'Microsoft.FSharp.Collections.MapModule.ToArray',
+    'Microsoft.FSharp.Collections.SetModule.ToArray',
+    'Microsoft.FSharp.Collections.MapModule.ToSeq',
+    'Microsoft.FSharp.Collections.SetModule.ToSeq',
+    'Microsoft.FSharp.Core.array',
+    'System.Collections.Generic.ResizeArray`1',
+    'System.Collections.Generic.Dictionary`2',
+    'System.Threading.Tasks.TaskCompletionSource`1',
+    'System.Threading.CancellationTokenSource',
+  ].entries()) {
+    const disposition = classifyCapabilityObservationV1(externalFsharp('FSharp.Core', symbol, ordinal + 180))
+    assert.notDeepEqual(
+      disposition.case === 'classified' ? disposition.payload.semantic_classes : [],
+      ['pure-representation'],
+      `${symbol} must not inherit immutable-core purity`,
+    )
+  }
+  assert.equal(classifyCapabilityObservationV1(externalFsharp(
+    'Example',
+    'System.String',
+    200,
+  )).case, 'unknown', 'an exact FQN from the wrong assembly must not inherit core purity')
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-014] JavaScript visitor closes dynamic computed CommonJS and parameterless Date capabilities', () => {

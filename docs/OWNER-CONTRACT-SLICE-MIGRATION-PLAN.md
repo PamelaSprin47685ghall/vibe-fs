@@ -1597,3 +1597,10 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - classifier只把显式穷举、其能力已由child/compiler symbol/dependency observation承接的结构node判irrelevant。FCS `FullType`、mutability、module/local scope、declaring entity与field facts区分primitive pure value、local scratch、top-level mutable、runtime cell与capability carrier；array、object/IL/address/trait/`this`及未证明immutable carrier继续Unknown。
 - external classification只采用exact FQN family/member/component。删除ArrayModule整族pure与substring authority命中；FileSystem、ProcessControl、Environment、Console、Clock、Randomness、Timer、Network、Host均有positive与near-miss反例。assembly名不能使symbol自动变pure。
 - 基于独立B3 commit `b166c0c77`的fresh run耗时约266.3s：181 localities、712 sources、1,864 refs、4,406 edges、861,657 facts、460 traversals；Unknown从857,589降为315,949，其中F# node 234,212、external 81,290、JS/Fable 447。唯一extraction diagnostic仍是`SharedState.RootWorkspace` signature export；唯一closure finding仍是既定EventStore blocker。该节点只增强report-only extractor，不启用v2 authority、不伪称B7 adjudication完成。
+
+### 2026-09-04 — M6.3b B7-B closed immutable algebra
+
+- scanner以FCS `FullType`执行invocation-local、cycle-safe recursive algebra；展开abbreviation与closed generic substitution，tuple、record与union递归检查全部字段。cache key包含assembly-qualified closed constructor shape；无法建立exact key的类型不缓存。
+- primitive、immutable container与array通过同一exact assembly+namespace+compiled-name classifier；production canary固定wrong/blank assembly不命中。external pure/authority同样要求exact assembly+FQN/component；8个authority family均有wrong-assembly exact counterexample。
+- recursive/mutual recursion、changing generic cycle、nested capability/array/function、mutable field、wrong-assembly与ordinal stability均由production-bound fixture固定；test中的Fable类型字面改为真实compiler-resolved `FSharpEntity` observation，JS boundary保持零债。
+- final fresh report：186 localities、713 sources、1,888 refs、4,408 edges、861,926 facts、457 traversals、172,735 Unknown、1 diagnostic，digest `sha256:d278fb53142f30691dad36b17932f5683123b1f090c360469be8dadbbeb0ef7a`。中间156,553 Unknown结果因assembly-agnostic false green废弃。`RootWorkspace` diagnostic与EventStore blocker明确保留给B7后续/M6.3c前关闭；旧gate仍是唯一authority。targeted 12/12、JS boundary与`node scripts/check.mjs`全绿。

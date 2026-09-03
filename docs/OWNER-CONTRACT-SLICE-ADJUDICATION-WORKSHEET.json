@@ -597,6 +597,15 @@
       "draft_proofs": []
     },
     {
+      "locality_id": "execution-session-sessionstartedatprojection",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
       "locality_id": "execution-session-wait-causalwait",
       "status": "undecided",
       "draft_reason": null,
@@ -643,6 +652,15 @@
     },
     {
       "locality_id": "foundation-temporal",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "foundation-temporal-contract",
       "status": "undecided",
       "draft_reason": null,
       "draft_target_classification": null,
@@ -1407,6 +1425,15 @@
       "draft_proofs": []
     },
     {
+      "locality_id": "process-deadline-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
       "locality_id": "process-largegatesurface",
       "status": "undecided",
       "draft_reason": null,
@@ -1416,7 +1443,25 @@
       "draft_proofs": []
     },
     {
+      "locality_id": "process-node-timing-adapter",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
       "locality_id": "process-processrequest",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "process-virtual-timing",
       "status": "undecided",
       "draft_reason": null,
       "draft_target_classification": null,

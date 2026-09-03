@@ -191,6 +191,89 @@ test('WHAT[STRUCTURED-WORKFLOW-011] compiler-resolved analyzer rejects an aggreg
         },
       },
     }).case === 'unknown'), 'without a closed escape proof even a lexical local must stay Unknown')
+    const immutableAlgebraNodes = result.compilerObservations.fsharpNodes.filter(({ site }) =>
+      site.semanticDeclarationAnchor.endsWith('.classifyImmutableAlgebra'))
+    const immutableAlgebraKind = (identity) => {
+      const candidates = immutableAlgebraNodes.filter(({ semanticIdentity }) => semanticIdentity === identity)
+      assert.ok(candidates.length > 0, `the immutable algebra fixture must observe ${identity}`)
+      return [...new Set(candidates.map(({ nodeKind }) => nodeKind))]
+    }
+    for (const identity of [
+      'purePrimitiveRecord',
+      'pureLeaf',
+      'pureTree',
+      'pureTuple',
+      'pureOption',
+      'pureList',
+      'pureMap',
+      'pureSet',
+      'pureResult',
+      'pureGeneric',
+    ]) {
+      assert.deepEqual(
+        immutableAlgebraKind(identity),
+        ['pure-immutable-value'],
+        `${identity} must be proven by the recursive immutable algebra`,
+      )
+    }
+    const immutableAlgebraCoreSymbols = new Set(result.compilerObservations.externalSymbolUses
+      .filter(({ assembly, fullyQualifiedSymbol, symbolKind }) =>
+        assembly === 'FSharp.Core'
+        && symbolKind === 'FSharpEntity'
+        && (fullyQualifiedSymbol.includes('`')
+          || (fullyQualifiedSymbol.includes('<') && fullyQualifiedSymbol.includes('>'))))
+      .filter(({ assembly, fullyQualifiedSymbol, site }) => {
+        const disposition = classifyCapabilityObservationV1({
+          case: 'fcs-external-symbol-use',
+          payload: {
+            assembly,
+            fully_qualified_symbol: fullyQualifiedSymbol,
+            site: {
+              locality_id: 'fixture-provider',
+              source_path: site.sourcePath,
+              semantic_declaration_anchor: site.semanticDeclarationAnchor,
+              same_anchor_occurrence_ordinal: site.sameAnchorOccurrenceOrdinal,
+            },
+          },
+        })
+        return disposition.case === 'classified'
+          && disposition.payload.semantic_classes.includes('pure-representation')
+      })
+      .map(({ fullyQualifiedSymbol }) => fullyQualifiedSymbol))
+    assert.equal(
+      immutableAlgebraCoreSymbols.size,
+      3,
+      'the pinned compiler closed generic container types must pass the production exact-assembly classifier',
+    )
+    for (const identity of [
+      'recursiveCapability',
+      'mutualCapability',
+      'changingCycle',
+      'capabilityGeneric',
+      'nestedCapability',
+      'nestedFunction',
+    ]) {
+      assert.deepEqual(
+        immutableAlgebraKind(identity),
+        ['capability-immutable-value'],
+        `${identity} must retain its nested capability`,
+      )
+    }
+    assert.deepEqual(immutableAlgebraKind('recursiveMutable'), ['mutable-container-value'])
+    assert.deepEqual(immutableAlgebraKind('arrayGeneric'), ['mutable-container-value'])
+    assert.deepEqual(immutableAlgebraKind('nestedArray'), ['mutable-container-value'])
+    assert.deepEqual(immutableAlgebraKind('nestedMutableCapability'), ['capability-mutable-container-value'])
+    assert.deepEqual(immutableAlgebraKind('plainClass'), ['immutable-value'])
+    assert.deepEqual(immutableAlgebraKind('genericValue'), ['immutable-value'])
+    const immutableFieldKinds = new Map(result.compilerObservations.fsharpNodes
+      .filter(({ site }) => site.semanticDeclarationAnchor.endsWith('.inspectImmutableAlgebra'))
+      .filter(({ semanticIdentity }) => semanticIdentity.includes('.'))
+      .map(({ semanticIdentity, nodeKind }) => [semanticIdentity.split('.').at(-1), nodeKind]))
+    assert.equal(immutableFieldKinds.get('Count'), 'immutable-field-get')
+    assert.equal(immutableFieldKinds.get('Port'), 'capability-immutable-field-get')
+    assert.equal(immutableFieldKinds.get('Values'), 'mutable-container-field-get')
+    assert.equal(immutableFieldKinds.get('Callback'), 'capability-immutable-field-get')
+    assert.equal(immutableFieldKinds.get('Ports'), 'capability-mutable-container-field-get')
     assert.deepEqual(
       [...new Set(result.compilerObservations.fableInterop.map(({ kind }) => kind))].sort(),
       ['emit-js-expr', 'fable-emit', 'fable-import'],
