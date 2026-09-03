@@ -32,8 +32,22 @@ const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 const fsPermissionsOf = (role) =>
   rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Grep'].includes(n))
 
-const MEMBER_BY_PERMISSION = { Read: 'file', Glob: 'glob', Grep: 'grep', Edit: 'rewrite', Write: 'write' }
-const BINDING_BY_MEMBER = { file: 'js.read', glob: 'js.glob', grep: 'js.grep', rewrite: 'js.edit', write: 'js.write' }
+const MEMBERS_BY_PERMISSION = {
+  Read: ['file'],
+  Glob: ['glob'],
+  Grep: ['grep'],
+  Edit: ['edit', 'rewrite'],
+  Write: ['write'],
+}
+const BINDING_BY_MEMBER = {
+  file: 'js.read',
+  glob: 'js.glob',
+  grep: 'js.grep',
+  edit: 'js.edit',
+  rewrite: 'js.edit',
+  write: 'js.write',
+}
+const MEMBER_ORDER = ['file', 'glob', 'grep', 'edit', 'rewrite', 'write']
 
 // Capability exactness is structural: member, generated API description,
 // runtime binding, base class. GrandRewrite §6.10 intentionally decouples the
@@ -69,7 +83,9 @@ test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_role_projection_is_exactly_roles_pe
       assert.equal(isNone(result), true, `${role} has no fs capability`)
     } else {
       assert.equal(isSome(result), true, `${role} must get a js-* surface`)
-      const expected = fsPerms.map((name) => MEMBER_BY_PERMISSION[name]).sort()
+      const expected = fsPerms
+        .flatMap((name) => MEMBERS_BY_PERMISSION[name])
+        .sort((left, right) => MEMBER_ORDER.indexOf(left) - MEMBER_ORDER.indexOf(right))
       assert.deepEqual(memberNames(result), expected, `${role} member set`)
     }
   }
@@ -91,7 +107,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_capability_exactness_plus_one_ultra
   const result = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   assert.equal(isSome(result), true)
   const layers = layersOf(result)
-  assert.deepEqual(Object.keys(layers).sort(), ['file', 'glob', 'grep', 'rewrite', 'write'])
+  assert.deepEqual(Object.keys(layers).sort(), ['edit', 'file', 'glob', 'grep', 'rewrite', 'write'])
   for (const [member, layer] of Object.entries(layers)) {
     assert.equal(layer.inBaseClass, true, `${member} in base class`)
     assert.equal(layer.inDescription, true, `${member} in description`)
@@ -101,6 +117,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_capability_exactness_plus_one_ultra
   assert.match(result.description, /name\+N \/ name-N/)
   assert.match(result.description, /not a line number/)
   assert.match(result.description, /text\(from = "\^", to = "\$"\)/)
+  assert.match(result.description, /edit\(path, changes\)/)
   assert.equal(result.description.includes('_api'), false)
   assert.equal(result.description.includes('__jsFailure'), false)
   assert.equal(result.examples.length, 1, 'one responsibility-shaped Ultra Example')
@@ -111,11 +128,38 @@ test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_absent_capability_is_absent_in_all_
   const result = surface('Inspector', ['Read', 'Glob', 'Grep']) // no Edit / Write
   assert.equal(isSome(result), true)
   assert.deepEqual(memberNames(result), ['file', 'glob', 'grep'])
+  assert.equal(result.description.includes('edit(path'), false)
   assert.equal(result.description.includes('rewrite(path'), false)
   assert.equal(result.description.includes('write(path'), false)
   assert.equal(result.baseClassSource.includes('js.edit'), false)
   assert.equal(result.baseClassSource.includes('js.write'), false)
   assert.equal(result.examples.some((example) => example.includes('this.rewrite')), false)
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_edit_guidance_never_names_missing_read_or_write_members', () => {
+  const editOnly = surface('Coder', ['Edit'])
+  assert.deepEqual(memberNames(editOnly), ['edit', 'rewrite'])
+  for (const unavailable of [
+    'file(matches)',
+    'file() + JavaScript',
+    'file(path',
+    'FileView.text',
+  ]) {
+    assert.equal(editOnly.description.includes(unavailable), false, `Edit-only surface leaked ${unavailable}`)
+  }
+  assert.doesNotMatch(editOnly.description, /(^|[^A-Za-z0-9_])write\(path/m)
+
+  const readEdit = surface('Coder', ['Read', 'Edit'])
+  assert.deepEqual(memberNames(readEdit), ['file', 'edit', 'rewrite'])
+  assert.equal(readEdit.description.includes('file(matches) + text() + rewrite()'), true)
+  assert.doesNotMatch(readEdit.description, /(^|[^A-Za-z0-9_])write\(path/m)
+
+  const editWrite = surface('Coder', ['Edit', 'Write'])
+  assert.deepEqual(memberNames(editWrite), ['edit', 'rewrite', 'write'])
+  assert.equal(editWrite.description.includes('file(matches)'), false)
+  assert.equal(editWrite.description.includes('file(path'), false)
+  assert.equal(editWrite.description.includes('FileView.text'), false)
+  assert.match(editWrite.description, /(^|[^A-Za-z0-9_])write\(path/m)
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-004] JS001_generated_name_gate_rejects_forged_names', () => {
@@ -132,6 +176,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_member_gate_binds_present_members_o
   assert.equal(memberBinding('Inspector', perms, 'file'), 'js.read')
   assert.equal(memberBinding('Inspector', perms, 'glob'), 'js.glob')
   assert.equal(memberBinding('Inspector', perms, 'grep'), 'js.grep')
+  assert.equal(memberBinding('Inspector', perms, 'edit'), undefined)
   assert.equal(memberBinding('Inspector', perms, 'rewrite'), undefined)
   assert.equal(memberBinding('Inspector', perms, 'write'), undefined)
   assert.equal(memberBinding('Inquiry', caps(ToolPermission.Inspect), 'file'), undefined)
@@ -175,6 +220,8 @@ test('WHAT[REPOSITORY-PROGRAMMING-005] JS002_description_embeds_spec_base_class_
     'ordered',
     'begin',
     'end',
+    'edit(path, changes)',
+    '{ find, put, all? }',
     'complete resulting file',
     'Anchors locate',
     'Define exactly one class named Js',
@@ -190,6 +237,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-005] JS002_description_embeds_spec_base_class_
   assert.equal(inspector.description.includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
   assert.equal(inspector.description.includes('RetryPolicy'), true)
   assert.equal(inspector.description.includes('this.rewrite'), false)
+  assert.equal(inspector.description.includes('this.edit'), false)
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-003] JS010_each_filesystem_role_gets_exactly_one_distinct_ultra_example', () => {
@@ -247,15 +295,26 @@ test('WHAT[REPOSITORY-PROGRAMMING-005] JS_description_retains_no_unsubstituted_p
   assert.equal(result.description.includes('{{'), false)
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-022] JS_description_teaches_tool_choice_through_paid_failure_memory', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-022] JS_description_is_action_first_then_teaches_paid_failure_memory', () => {
   const coder = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   const lessonText = coder.description.replace(/\s+/g, ' ')
 
   assert.equal(
-    lessonText.startsWith('WARNING: You may be about to turn a bounded filesystem task into a self-inflicted repair job.'),
+    lessonText.startsWith('For ordinary edits, start with edit(path, changes).'),
     true,
-    'the first screen must interrupt autopilot before the API manual begins',
+    'the first screen must provide the default action before the cautionary manual',
   )
+
+  for (const affordance of [
+    'Decision ladder',
+    'one exact replacement, insertion, deletion, or repeated replacement',
+    'one edit call per path',
+    '{ find, put, all? }',
+    'use file(matches) + text() + rewrite() for structural recomposition',
+    'Near matches are diagnostics, never write authority',
+  ]) {
+    assert.equal(lessonText.includes(affordance), true, `action-first affordance missing: ${affordance}`)
+  }
 
   for (const lesson of [
     'The Host already owns this boundary',
@@ -294,10 +353,21 @@ test('WHAT[REPOSITORY-PROGRAMMING-022] JS_description_teaches_tool_choice_throug
   ).description.replace(/\s+/g, ' ')
 
   assert.equal(
-    zh.startsWith('警告：你正准备把一个本来有边界保护的文件任务，亲手变成一场返工事故。'),
+    zh.startsWith('普通编辑默认从 edit(path, changes) 开始。'),
     true,
-    '中文第一屏必须先惊醒，再解释',
+    '中文第一屏必须先给动作，再给风险记忆',
   )
+
+  for (const affordance of [
+    '选择阶梯',
+    '一次精确替换、插入、删除或重复替换',
+    '每个路径只调用一次 edit',
+    '{ find, put, all? }',
+    '结构重组才使用 file(matches) + text() + rewrite()',
+    '近似匹配只产生诊断，绝不获得写权限',
+  ]) {
+    assert.equal(zh.includes(affordance), true, `中文 action-first affordance 缺失: ${affordance}`)
+  }
 
   for (const lesson of [
     'Host 已经拥有这层边界',

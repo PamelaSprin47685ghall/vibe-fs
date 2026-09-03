@@ -11,10 +11,19 @@ module JsCanonicalDescription =
         val Header: string = "tool/js-program/header"
 
         [<Literal>]
+        val EditPrelude: string = "tool/js-program/edit-prelude"
+
+        [<Literal>]
+        val EditStructuralGuidance: string = "tool/js-program/edit-structural-guidance"
+
+        [<Literal>]
         val Footer: string = "tool/js-program/footer"
 
         [<Literal>]
         val Contract: string = "tool/js-program/contract"
+
+        [<Literal>]
+        val ContractEditRecommendation: string = "tool/js-program/contract-edit-recommendation"
 
         [<Literal>]
         val ContractParallelEdits: string = "tool/js-program/contract-parallel-edits"
@@ -60,6 +69,9 @@ module JsCanonicalDescription =
 
         [<Literal>]
         val UltraUnavailable: string = "tool/js-program/ultra-unavailable"
+
+        [<Literal>]
+        val UltraCoder: string = "tool/js-program/ultra-coder"
 
         [<Literal>]
         val MechanicalSemantic: string = "tool/js-program/mechanical-semantic"
@@ -110,6 +122,42 @@ module JsCanonicalDescription =
         val ReasonRunUnimplemented: string = "tool/js-program/reason-run-unimplemented"
 
         [<Literal>]
+        val ReasonEditInvalid: string = "tool/js-program/reason-edit-invalid"
+
+        [<Literal>]
+        val ReasonEditNotFound: string = "tool/js-program/reason-edit-not-found"
+
+        [<Literal>]
+        val ReasonEditAmbiguous: string = "tool/js-program/reason-edit-ambiguous"
+
+        [<Literal>]
+        val ReasonEditOverlap: string = "tool/js-program/reason-edit-overlap"
+
+        [<Literal>]
+        val ReasonEditAtomicity: string = "tool/js-program/reason-edit-atomicity"
+
+        [<Literal>]
+        val ReasonEditPreview: string = "tool/js-program/reason-edit-preview"
+
+        [<Literal>]
+        val ReasonEditCopyReady: string = "tool/js-program/reason-edit-copy-ready"
+
+        [<Literal>]
+        val ReasonEditAttempted: string = "tool/js-program/reason-edit-attempted"
+
+        [<Literal>]
+        val ReasonEditUnknownFields: string = "tool/js-program/reason-edit-unknown-fields"
+
+        [<Literal>]
+        val ReasonEditCandidate: string = "tool/js-program/reason-edit-candidate"
+
+        [<Literal>]
+        val ReasonEditLine: string = "tool/js-program/reason-edit-line"
+
+        [<Literal>]
+        val ReasonEditOverlaps: string = "tool/js-program/reason-edit-overlaps"
+
+        [<Literal>]
         val ArgProgram: string = "tool/js-program/arg-program"
 
         [<Literal>]
@@ -120,8 +168,11 @@ module JsCanonicalDescription =
 
     type Prose =
         { Header: string
+          EditPrelude: string
+          EditStructuralGuidance: string
           Footer: string
           Contract: string
+          ContractEditRecommendation: string
           ContractParallelEdits: string
           ContractParallelReads: string
           VerbRead: string
@@ -137,6 +188,7 @@ module JsCanonicalDescription =
           MutationRules: string
           UltraFraming: string
           UltraUnavailable: string
+          UltraCoder: string
           MechanicalSemantic: string
           CommentAnchorOwnSearch: string
           CommentIgnoreGy: string
@@ -152,7 +204,19 @@ module JsCanonicalDescription =
           ReasonUnknownAnchor: string
           ReasonInvalidSlice: string
           ReasonFileReadFailed: string
-          ReasonRunUnimplemented: string }
+          ReasonRunUnimplemented: string
+          ReasonEditInvalid: string
+          ReasonEditNotFound: string
+          ReasonEditAmbiguous: string
+          ReasonEditOverlap: string
+          ReasonEditAtomicity: string
+          ReasonEditPreview: string
+          ReasonEditCopyReady: string
+          ReasonEditAttempted: string
+          ReasonEditUnknownFields: string
+          ReasonEditCandidate: string
+          ReasonEditLine: string
+          ReasonEditOverlaps: string }
 
     val fileAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string
     val has: capabilities: Set<JsCapability> -> capability: JsCapability -> bool
@@ -160,5 +224,5 @@ module JsCanonicalDescription =
     val runtimeBaseClass: prose: Prose -> capabilities: Set<JsCapability> -> string
     val contract: prose: Prose -> toolName: string -> capabilities: Set<JsCapability> -> string
     val rules: prose: Prose -> capabilities: Set<JsCapability> -> string
-    val ultraExample: roleName: string -> capabilities: Set<JsCapability> -> JsExample option
+    val ultraExample: prose: Prose -> roleName: string -> capabilities: Set<JsCapability> -> JsExample option
     val render: prose: Prose -> roleName: string -> toolName: string -> capabilities: Set<JsCapability> -> string

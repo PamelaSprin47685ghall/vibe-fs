@@ -1,6 +1,7 @@
-A program may mutate each canonical path exactly once. A second rewrite/write
-on the same path is DUPLICATE_MUTATION_TARGET. Multi-phase edits belong in
-JavaScript variables, then one rewrite/write.
+A program may mutate each canonical path exactly once. A second edit/rewrite/write
+on the same path is DUPLICATE_MUTATION_TARGET. Put independent local changes in
+one edit array; computed multi-phase edits belong in JavaScript variables, then
+one rewrite/write.
 
 I have also made the worse version of that mistake: build too much, delete pieces
 with replace, leave blank separators and dangling fragments, then write second
@@ -32,7 +33,7 @@ forward into cleanup.
 
 The generated class has no commit, rollback, snapshot, or transaction methods.
 run() returning normally → Host preflight → prepare → commit. run() throwing or
-any file()/glob()/grep() failure discards every staged mutation.
+any generated filesystem method failure discards every staged mutation.
 
 run() must return a JSON-compatible value: null, boolean, finite number, string,
 array, or plain object (recursive). undefined, BigInt, NaN, Infinity, function,

@@ -1,5 +1,5 @@
-一个 program 对每个 canonical path 只能 mutation 恰好一次。对同一路径的第二次 rewrite/write
-是 DUPLICATE_MUTATION_TARGET。多阶段编辑应放在
+一个 program 对每个 canonical path 只能 mutation 恰好一次。对同一路径的第二次 edit/rewrite/write
+是 DUPLICATE_MUTATION_TARGET。独立局部修改放进一个 edit 数组；需要计算的多阶段编辑应放在
 JavaScript 变量里，然后一次 rewrite/write。
 
 我也犯过更难看的版本：先拼太多，再用 replace 删局部，留下空行、悬空
@@ -25,7 +25,7 @@ program 就已经失去 commit 的资格。让它失败。不要拿一个可疑�
 
 生成的 class 没有 commit、rollback、snapshot 或 transaction 方法。
 run() 正常返回 → Host preflight → prepare → commit。run() 抛出或
-任何 file()/glob()/grep() 失败都会丢弃全部已暂存 mutation。
+任何已生成的文件系统方法失败都会丢弃全部已暂存 mutation。
 
 run() 必须返回 JSON 兼容值：null、boolean、有限 number、string、
 array 或 plain object（递归）。undefined、BigInt、NaN、Infinity、function、

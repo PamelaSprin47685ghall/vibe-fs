@@ -15,9 +15,8 @@ snapshot, and transaction guarantees this tool already gives you. One careless p
 more work than the original task; the expensive part is rarely the first mistake, but the second and
 third programs written to repair it.
 
-If you are about to calculate structural boundaries by hand, first ask whether file(matches) +
-ordered anchors + text() already owns that boundary. If yes, use it. If a result later violates an
-obvious invariant, treat that as a stop signal, not an invitation to keep guessing.
+If a result violates an obvious invariant, treat that as a stop signal, not an invitation to keep
+guessing with a lower-level technique.
 
 This is the programmable filesystem tool for the current agent.
 

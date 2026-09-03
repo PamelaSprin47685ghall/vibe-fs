@@ -21,7 +21,7 @@ module JsToolGenerator =
         prose: JsCanonicalDescription.Prose -> roleName: string -> capabilities: Set<JsCapability> -> string
 
     val renderExamples:
-        _prose: JsCanonicalDescription.Prose -> roleName: string -> capabilities: Set<JsCapability> -> string list
+        prose: JsCanonicalDescription.Prose -> roleName: string -> capabilities: Set<JsCapability> -> string list
 
     val generate:
         roleName: string -> capabilities: Set<ToolPermission> -> prose: JsCanonicalDescription.Prose -> JsSurface option

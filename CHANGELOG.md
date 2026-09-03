@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-- （空）
+- JS capability-projected 编辑面升级为渐进式双层协议：
+  - 新增默认 `edit(path, changes)`，用 `{ find, put, all? }` 覆盖精确替换、插入、删除、全匹配与同文件批量修改；所有 change 基于同一不可变快照规划并至多暂存一个 Rewrite，既有 `rewrite(path, newText)` 继续作为完整文件计算与结构重组的无上限逃生舱。
+  - 新增 `INVALID_EDIT`、`EDIT_NOT_FOUND`、`EDIT_AMBIGUOUS`、`EDIT_OVERLAP` 稳定失败码；近似文本只生成有界、双语、copy-ready 诊断，绝不自动获得写权限。
+  - 工具说明改为 action-first 决策阶梯与 replace / insert / delete / all 规范示例；说明、成员、示例与 runtime binding 均按实际 capability 裁剪，较弱模型不再被推荐调用不存在的方法。
+  - 保持事务、ReadSet 冲突检测、CRLF、同路径单意图、跨文件全有或全无与 no-op 零写盘语义。
 
 ## 0.8.4
 
