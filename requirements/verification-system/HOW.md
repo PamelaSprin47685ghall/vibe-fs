@@ -48,6 +48,10 @@
 
 静态 ownership/absence、真实 Host/网络/进程与语义仍有争议的命题不使用 property testing。不得建立全仓 mutation framework，不得把随机次数解释为 exhaustive/comprehensive，也不得依赖传递依赖取得 property runner。
 
+当前 fast-check 组合只覆盖状态空间确实是风险源的性质：durable convergence merge、writer tail truncation、managed session join/reuse、prefix append-only 与 structured-workflow owner-impact compile。`surface-charter.test.mjs` 只验证 runner provenance，不是产品性质。identity/capacity 的有限域穷举、managed chat closed table/crash cut、clean build freshness、canonical UTF-8/JSON 固定字节与真实 Host/process/network canary 保持 deterministic；把这些机械包装成随机输入不会增加证明力。
+
+文件名 `*.property.test.mjs` 不授予 property proof 权威。未调用 fast-check 的测试不得宣称随机 comprehensive。测试内 `violations()` 一类镜像公式及其 self-mutation 必须删除，或改为对 production Surface 的固定 counterexample；只有 production output 能使断言变红。
+
 ---
 
 ## 验证与测试落点

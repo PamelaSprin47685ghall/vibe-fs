@@ -50,6 +50,8 @@ logical cancel 与 session delete 必须枚举 durable projection 中该作用�
 
 `Accepted` 且 exact provider absent 才可恢复 pre-provider admission；observed provider 必须先 reconcile durable started/terminal facts。`ProviderStarted` 且 provider alive 只观察，exact terminal 才 finalize，exact absent 只消费 failure policy authorization；typed supersession 因而只能使用 policy 发布的 exact cancelled terminal。durable terminal 若 physical resource 仍 held 则请求 exact reconciliation，否则幂等忽略。missing/ambiguous receipt、unknown persistence/resource、无 policy authorization 均 fail closed 为 manual intervention；stale external evidence 不得改写当前 execution。禁止 Role、error text、terminal prose、idle、timer、process age、cursor、registry presence 或 process-local capacity state参与判断。同一 Evidence 必须永远产生同一 Decision。
 
+排列、重复事件与 crash cut proof 必须调用已注册 production Surface。测试内重建 decision、terminal、release 或 dispatch 公式并 mutation 该副本，不构成本命题的 executable proof。
+
 ## CHATEXEC-013: Execution reliability query 只投影 canonical lifecycle
 
 `Accepted without Terminal`、`ProviderStarted without Terminal` 与每个 `LogicalRunId` 的 physical attempt 数只能从 canonical `ChatExecutionProjection` 只读导出。查询返回不可变 process-local snapshot，不写 durable fact，不 terminalize execution，不授权 retry/fallback，不读取 diagnostic counter 作为恢复 evidence。Recovery pending/manual intervention 只投影 `PluginRecoveryScope.PendingChatRecoveryOwnership()` 的 typed ownership，不复制或清理其状态。

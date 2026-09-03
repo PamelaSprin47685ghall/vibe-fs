@@ -51,17 +51,7 @@ const evidence = {
 
 const action = (kind, extra = {}) => ({ kind, evidence, appendOutcome: 'Committed', ...extra })
 
-const violations = (scenario) => {
-  const found = []
-  if (scenario.requiresTerminal && !scenario.facts.includes('Terminal')) found.push('MissingTerminalAppend')
-  if (scenario.requiresRelease && scenario.binding !== 0) found.push('MissingUnbind')
-  if (scenario.requiresRelease && scenario.capacity !== 0) found.push('MissingExactRelease')
-  if (scenario.fatal && (!scenario.facts.includes('Terminal') || scenario.binding !== 0 || scenario.capacity !== 0)) found.push('EarlyFatal')
-  if (scenario.providerEffects > 1) found.push('DuplicateProviderDispatch')
-  return found
-}
-
-test('WHAT[CHATEXEC-012] generated duplicate causal events, restart permutations, and mutations equal canonical replay or fail closed', async () => {
+test('WHAT[CHATEXEC-012] duplicate causal events and restart permutations equal canonical production replay or fail closed', async () => {
   const baseline = canonical((await recovery.admissionCrashPointScenarios(CUTS, 'PluginReload', 'NotCommitted', 'Applied')).scenarios)
 
   for (const restart of ['PluginReload', 'ProcessRestart']) {
@@ -118,26 +108,4 @@ test('WHAT[CHATEXEC-012] generated duplicate causal events, restart permutations
   assert.equal(staleFence.releaseCount, 1)
   assert.equal(staleFence.providerCount, 0)
 
-  const settled = {
-    facts: ['Accepted', 'ProviderStarted', 'Terminal'],
-    binding: 0,
-    capacity: 0,
-    providerEffects: 1,
-    requiresTerminal: true,
-    requiresRelease: true,
-    fatal: false,
-  }
-  assert.deepEqual(violations(settled), [])
-
-  const mutations = [
-    ['MissingTerminalAppend', { facts: ['Accepted', 'ProviderStarted'] }],
-    ['MissingUnbind', { binding: 1 }],
-    ['MissingExactRelease', { capacity: 1 }],
-    ['EarlyFatal', { facts: ['Accepted', 'ProviderStarted'], binding: 1, capacity: 1, fatal: true }],
-    ['DuplicateProviderDispatch', { providerEffects: 2 }],
-  ]
-
-  for (const [name, mutation] of mutations) {
-    assert.ok(violations({ ...settled, ...mutation }).includes(name), name)
-  }
 })

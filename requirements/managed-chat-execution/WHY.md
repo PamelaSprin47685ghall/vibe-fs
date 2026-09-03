@@ -21,6 +21,7 @@
 - provider 已启动但 durable 历史仍停在无法区分“从未启动”的状态。
 - cancel/delete 通过 SessionId 粗放释放另一个执行的容量。
 - 重启通过超时补写终态、重试 provider，或恢复已失效的进程内 waiter。
+- 测试复制 terminal、release 或 dispatch 公式，再 mutation 该副本；production 破坏后伪 oracle 仍保持全绿。
 
 ## DEPENDS ON
 
