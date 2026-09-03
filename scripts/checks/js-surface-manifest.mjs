@@ -182,10 +182,21 @@ const analyzeSurface = (source, module, syntax) => {
   const bindingByIdentifier = new WeakMap()
   const ancestorsByNode = new WeakMap()
   const declarators = []
+  const functions = []
   const imports = []
   const addBinding = (identifier, scope, declarationEnd, surface = false) => {
     if (!identifier || !scope || bindingByIdentifier.has(identifier)) return bindingByIdentifier.get(identifier)
-    const binding = { name: identifier.name, scope: scope.node, depth: scope.depth, declarationEnd, surface }
+    const binding = {
+      name: identifier.name,
+      scope: scope.node,
+      depth: scope.depth,
+      declarationEnd,
+      position: identifier.start,
+      surface,
+      callable: null,
+      fastCheck: false,
+      propertyInitializer: null,
+    }
     bindings.push(binding)
     bindingIdentifiers.add(identifier)
     bindingByIdentifier.set(identifier, binding)
@@ -200,7 +211,11 @@ const analyzeSurface = (source, module, syntax) => {
       const surface = moduleSpecifierMatches(node.source.value, module)
       if (surface) imports.push(node)
       const scope = { node: program, depth: 0 }
-      for (const specifier of node.specifiers) addBinding(specifier.local, scope, node.end, surface)
+      for (const specifier of node.specifiers) {
+        const binding = addBinding(specifier.local, scope, node.end, surface)
+        binding.fastCheck = node.source.value === 'fast-check'
+          && (specifier.type === 'ImportDefaultSpecifier' || specifier.type === 'ImportNamespaceSpecifier')
+      }
       return
     }
     if (node.type === 'ImportExpression' && moduleSpecifierMatches(node.source?.value, module)) imports.push(node)
@@ -212,15 +227,21 @@ const analyzeSurface = (source, module, syntax) => {
       return
     }
     if (node.type === 'FunctionDeclaration') {
-      addBinding(node.id, outerBlock(ancestors), node.end)
+      const binding = addBinding(node.id, outerBlock(ancestors), node.end)
+      if (binding) binding.callable = node
       const scope = { node, depth: ancestors.length }
       for (const identifier of node.params.flatMap(patternIdentifiers)) addBinding(identifier, scope, node.end)
+      functions.push(node)
       return
     }
     if (node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
       const scope = { node, depth: ancestors.length }
-      if (node.type === 'FunctionExpression') addBinding(node.id, scope, node.end)
+      if (node.type === 'FunctionExpression') {
+        const binding = addBinding(node.id, scope, node.end)
+        if (binding) binding.callable = node
+      }
       for (const identifier of node.params.flatMap(patternIdentifiers)) addBinding(identifier, scope, node.end)
+      functions.push(node)
       return
     }
     if (node.type === 'ClassDeclaration') addBinding(node.id, outerBlock(ancestors), node.end)
@@ -243,6 +264,13 @@ const analyzeSurface = (source, module, syntax) => {
     if (identifiers === null) return null
     const targets = identifiers.map((identifier) => bindingByIdentifier.get(identifier)).filter(Boolean)
     return targets.length === identifiers.length ? targets : null
+  }
+
+  for (const { node } of declarators) {
+    const targets = targetsOf(node.id) ?? []
+    if (isFunction(node.init)) {
+      for (const target of targets) target.callable = node.init
+    }
   }
 
   for (const { node, declaration } of declarators) {
@@ -281,12 +309,143 @@ const analyzeSurface = (source, module, syntax) => {
     const binding = resolveBinding(node)
     if (!binding?.surface || assignmentTarget(node, ancestors) || inNonterminalInitializer(node, ancestors) || voidRead(node, ancestors)) return
     if (staticallyUnreachable(node, ancestors)) return
-    uses.push({ position: node.start, functions: ancestors.filter(isFunction) })
+    const enclosingFunctions = ancestors.filter(isFunction)
+    uses.push({
+      position: node.start,
+      functions: enclosingFunctions,
+      owner: enclosingFunctions.at(-1) ?? null,
+    })
   })
+
+  const callsByFunction = new Map(functions.map((fn) => [fn, []]))
+  walkSyntax(program, (node, _parent, _key, ancestors) => {
+    if (node.type !== 'CallExpression' || staticallyUnreachable(node, ancestors)) return
+    const owner = ancestors.filter(isFunction).at(-1)
+    if (owner) callsByFunction.get(owner)?.push({ node, ancestors })
+  })
+  for (const calls of callsByFunction.values()) calls.sort((left, right) => left.node.start - right.node.start)
+
+  const functionParameters = new Map(functions.map((fn) => [
+    fn,
+    fn.params.map((parameter) =>
+      patternIdentifiers(parameter).map((identifier) => bindingByIdentifier.get(identifier)).filter(Boolean)),
+  ]))
+  const functionByBodyStart = new Map(functions.map((fn) => [fn.body.start, fn]))
+  const unwrapChain = (node) => node?.type === 'ChainExpression' ? node.expression : node
+  const fastCheckMember = (call, names) => {
+    const callee = unwrapChain(call?.callee)
+    if (callee?.type !== 'MemberExpression' || callee.computed || callee.object.type !== 'Identifier') return null
+    if (callee.property.type !== 'Identifier' || !names.has(callee.property.name)) return null
+    return resolveBinding(callee.object)?.fastCheck ? callee.property.name : null
+  }
+  const propertyConstructors = new Set(['property', 'asyncProperty'])
+  const propertyRunners = new Set(['assert', 'check'])
+  for (const { node, declaration } of declarators) {
+    if (declaration.kind !== 'const' || !fastCheckMember(node.init, propertyConstructors)) continue
+    for (const target of targetsOf(node.id) ?? []) target.propertyInitializer = node.init
+  }
+  const returnedOrAwaited = (call, ancestors, owner) => {
+    if (owner?.body?.type !== 'BlockStatement' && contains(owner?.body, call)) return true
+    return ancestors.some((ancestor) =>
+      (ancestor.type === 'AwaitExpression' && contains(ancestor.argument, call))
+      || (ancestor.type === 'ReturnStatement' && contains(ancestor.argument, call)))
+  }
+  const emptyValue = () => ({ callables: [], properties: [] })
+  const mergeValue = (left, right) => ({
+    callables: [...left.callables, ...right.callables],
+    properties: [...left.properties, ...right.properties],
+  })
+  const valueOf = (expression, environment, resolving = new Set()) => {
+    const node = unwrapChain(expression)
+    if (!node) return emptyValue()
+    if (isFunction(node)) return { callables: [{ fn: node, environment: new Map(environment) }], properties: [] }
+    if (node.type === 'Identifier') {
+      const binding = resolveBinding(node)
+      if (!binding) return emptyValue()
+      if (environment.has(binding)) return environment.get(binding)
+      if (binding.callable) {
+        return { callables: [{ fn: binding.callable, environment: new Map(environment) }], properties: [] }
+      }
+      if (binding.propertyInitializer && binding.declarationEnd <= node.start && !resolving.has(binding)) {
+        const next = new Set(resolving)
+        next.add(binding)
+        return valueOf(binding.propertyInitializer, environment, next)
+      }
+      return emptyValue()
+    }
+    if (node.type === 'ConditionalExpression') {
+      const condition = literalBoolean(node.test)
+      if (condition === true) return valueOf(node.consequent, environment, resolving)
+      if (condition === false) return valueOf(node.alternate, environment, resolving)
+      return mergeValue(
+        valueOf(node.consequent, environment, resolving),
+        valueOf(node.alternate, environment, resolving),
+      )
+    }
+    if (node.type !== 'CallExpression') return emptyValue()
+    const propertyKind = fastCheckMember(node, propertyConstructors)
+    if (!propertyKind) return emptyValue()
+    const callback = valueOf(node.arguments.at(-1), environment, resolving).callables
+    return {
+      callables: [],
+      properties: callback.length === 0 ? [] : [{ async: propertyKind === 'asyncProperty', callback }],
+    }
+  }
+  const environmentKey = (environment) => [...environment.entries()]
+    .sort(([left], [right]) => left.position - right.position)
+    .map(([binding, value]) => {
+      const callables = value.callables.map(({ fn }) => fn.start).sort((left, right) => left - right).join(',')
+      const properties = value.properties
+        .flatMap(({ async, callback }) => callback.map(({ fn }) => `${async ? 'a' : 's'}${fn.start}`))
+        .sort()
+        .join(',')
+      return `${binding.position}:${callables}:${properties}`
+    })
+    .join('|')
+  const bindCall = (target, arguments_, callerEnvironment) => {
+    const environment = new Map(target.environment)
+    const parameters = functionParameters.get(target.fn) ?? []
+    for (let index = 0; index < parameters.length; index++) {
+      const argument = valueOf(arguments_[index], callerEnvironment)
+      for (const binding of parameters[index]) environment.set(binding, argument)
+    }
+    return { fn: target.fn, environment }
+  }
+  const closureHasUse = (declaration) => {
+    const root = functionByBodyStart.get(declaration.bodyStart)
+    if (!root) return false
+    const queue = [{ fn: root, environment: new Map() }]
+    const visited = new Set()
+    const functionsWithUses = new Set(uses.map(({ owner }) => owner).filter(Boolean))
+
+    for (let index = 0; index < queue.length; index++) {
+      const state = queue[index]
+      const key = `${state.fn.start}|${environmentKey(state.environment)}`
+      if (visited.has(key)) continue
+      visited.add(key)
+      if (functionsWithUses.has(state.fn)) return true
+
+      for (const call of callsByFunction.get(state.fn) ?? []) {
+        const runner = fastCheckMember(call.node, propertyRunners)
+        if (runner) {
+          for (const property of valueOf(call.node.arguments[0], state.environment).properties) {
+            if (property.async && !returnedOrAwaited(call.node, call.ancestors, state.fn)) continue
+            queue.push(...property.callback)
+          }
+          continue
+        }
+        for (const target of valueOf(call.node.callee, state.environment).callables) {
+          queue.push(bindCall(target, call.node.arguments, state.environment))
+        }
+      }
+    }
+    return false
+  }
 
   const analysis = {
     imports: [...new Map(imports.map((node) => [node.start, node])).values()],
     uses: [...new Map(uses.map((use) => [use.position, use])).values()].sort((left, right) => left.position - right.position),
+    closureHasUse,
   }
   byModule.set(module, analysis)
   return analysis
@@ -391,22 +550,17 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
       typeof entry.module === 'string' && Array.isArray(SURFACE_CONSUMERS[entry.module]) ? SURFACE_CONSUMERS[entry.module] : [],
     )
 
-    const directUses = []
+    const attributedUses = []
     if (typeof entry.module === 'string') {
       for (const testSource of importedBy) {
-        for (const use of analyzeSurface(testSource.source, entry.module, testSource.syntax).uses) {
-          const declaration = testSource.declarations
-            .filter(({ bodyStart, bodyEnd }) => Number.isInteger(bodyStart) && bodyStart <= use.position && use.position < bodyEnd)
-            .sort((left, right) => (left.bodyEnd - left.bodyStart) - (right.bodyEnd - right.bodyStart))[0]
-          const nestedClosure = declaration && use.functions.some(
-            (fn) => declaration.bodyStart <= fn.start && fn.end <= declaration.bodyEnd,
-          )
-          if (declaration && !nestedClosure) directUses.push({ file: testSource.file, declaration })
+        const analysis = analyzeSurface(testSource.source, entry.module, testSource.syntax)
+        for (const declaration of testSource.declarations) {
+          if (analysis.closureHasUse(declaration)) attributedUses.push({ file: testSource.file, declaration })
         }
       }
     }
-    const uniqueDirectUses = [...new Map(directUses.map((use) => [`${use.file}:${use.declaration.start}`, use])).values()]
-    const activeUses = uniqueDirectUses.filter(({ declaration }) => declaration.state === 'active')
+    const uniqueAttributedUses = [...new Map(attributedUses.map((use) => [`${use.file}:${use.declaration.start}`, use])).values()]
+    const activeUses = uniqueAttributedUses.filter(({ declaration }) => declaration.state === 'active')
     const isLawProof = ({ file, declaration }) => {
       if (declaration.whatIds.length !== 1) return false
       const law = declaration.whatIds[0]

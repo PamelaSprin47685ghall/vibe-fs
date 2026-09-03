@@ -30,6 +30,40 @@ const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 const relativePath = (path) => relative(process.cwd(), path).replace(/\\/g, '/')
 const distImport = (prefix, module) => `${prefix}dist/${module}`
 
+const validateSurfaceFixture = (body) => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-surface-execution-closure-'))
+  const paths = {
+    what: join(temporaryRoot, 'requirements', 'owner', 'WHAT.md'),
+    source: join(temporaryRoot, 'src', 'Wanxiangshu', 'Owner', 'Surface.fs'),
+    project: join(temporaryRoot, 'src', 'Wanxiangshu', 'Wanxiangshu.fsproj'),
+    output: join(temporaryRoot, 'dist', 'Owner', 'Surface.js'),
+    test: join(temporaryRoot, 'requirements', 'owner', 'tests', 'owner.test.mjs'),
+  }
+  for (const path of Object.values(paths)) mkdirSync(dirname(path), { recursive: true })
+
+  try {
+    writeFileSync(paths.what, '# WHAT\n\n## OWNER-001: owner law\n\n## OWNER-002: decoy law\n')
+    writeFileSync(paths.source, 'module Owner.Surface\n')
+    writeFileSync(paths.project, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
+    writeFileSync(paths.output, 'export const value = () => 1\n')
+    writeFileSync(paths.test, [
+      "import test from 'node:test'",
+      `import { value } from '${distImport('../../../', 'Owner/Surface.js')}'`,
+      body,
+    ].join('\n'))
+    return validateSurfaceManifest([{
+      module: 'Owner/Surface.js',
+      owner: 'owner',
+      laws: ['OWNER-001'],
+      source: 'src/Wanxiangshu/Owner/Surface.fs',
+      representation: 'json',
+      kind: 'pure',
+    }], temporaryRoot)
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true })
+  }
+}
+
 // ── 001: all semantic tests are JavaScript ──────────────────────────────────
 
 test('WHAT[JS-SEMANTIC-SURFACE-001] JS_SURFACE_001_all_semantic_tests_are_mjs', () => {
@@ -431,6 +465,144 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003f_only_the_primary_owner_law_c
     )
   } finally {
     rmSync(temporaryRoot, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003g_execution_closure_attributes_only_reachable_production_calls', () => {
+  const cases = [
+    {
+      name: 'direct test callback',
+      green: true,
+      body: "test('WHAT[OWNER-001] direct', () => { value() })",
+    },
+    {
+      name: 'exact fast-check property and awaited asyncProperty callbacks',
+      green: true,
+      body: [
+        "import fc from 'fast-check'",
+        "test('WHAT[OWNER-001] fast-check callbacks', async () => {",
+        '  fc.assert(fc.property(fc.constant(null), () => value()))',
+        '  await fc.assert(fc.asyncProperty(fc.constant(null), async () => value()))',
+        '})',
+      ].join('\n'),
+    },
+    {
+      name: 'returned exact asyncProperty callback',
+      green: true,
+      body: [
+        "import fc from 'fast-check'",
+        "test('WHAT[OWNER-001] returned async property', async () =>",
+        '  fc.assert(fc.asyncProperty(fc.constant(null), async () => value())))',
+      ].join('\n'),
+    },
+    {
+      name: 'stored exact property consumed by check',
+      green: true,
+      body: [
+        "import fc from 'fast-check'",
+        "test('WHAT[OWNER-001] stored property', () => {",
+        '  const property = fc.property(fc.constant(null), () => value())',
+        '  fc.check(property)',
+        '})',
+      ].join('\n'),
+    },
+    {
+      name: 'unawaited asyncProperty has no authority',
+      green: false,
+      body: [
+        "import fc from 'fast-check'",
+        "test('WHAT[OWNER-001] unawaited async property', async () => {",
+        '  fc.assert(fc.asyncProperty(fc.constant(null), async () => value()))',
+        '})',
+      ].join('\n'),
+    },
+    {
+      name: 'local helper called by the owner WHAT',
+      green: true,
+      body: [
+        'const helper = () => value()',
+        "test('WHAT[OWNER-001] called helper', () => { helper() })",
+      ].join('\n'),
+    },
+    {
+      name: 'defined but dead helper',
+      green: false,
+      body: [
+        'const helper = () => value()',
+        "test('WHAT[OWNER-001] dead helper', () => {})",
+      ].join('\n'),
+    },
+    {
+      name: 'helper called only by another WHAT',
+      green: false,
+      body: [
+        'const helper = () => value()',
+        "test('WHAT[OWNER-001] target', () => {})",
+        "test('WHAT[OWNER-002] decoy', () => { helper() })",
+      ].join('\n'),
+    },
+    {
+      name: 'import without use',
+      green: false,
+      body: "test('WHAT[OWNER-001] import only', () => {})",
+    },
+    {
+      name: 'comment and string forgery',
+      green: false,
+      body: [
+        "test('WHAT[OWNER-001] forged use', () => {",
+        "  const text = 'value()'",
+        '  /* value() */',
+        '  void text',
+        '})',
+      ].join('\n'),
+    },
+    {
+      name: 'recursive helper cycle terminates deterministically',
+      green: true,
+      stable: true,
+      body: [
+        'const first = () => { value(); second() }',
+        'const second = () => first()',
+        "test('WHAT[OWNER-001] recursive closure', () => { first() })",
+      ].join('\n'),
+    },
+    {
+      name: 'eager wrapper invokes the owner callback',
+      green: true,
+      body: [
+        'const invoke = (callback) => callback()',
+        'const production = () => value()',
+        "test('WHAT[OWNER-001] eager wrapper', () => { invoke(production) })",
+      ].join('\n'),
+    },
+    {
+      name: 'eager wrapper keeps callback arguments test-local',
+      green: false,
+      body: [
+        'const invoke = (callback) => callback()',
+        'const production = () => value()',
+        'const noop = () => null',
+        "test('WHAT[OWNER-001] target wrapper', () => { invoke(noop) })",
+        "test('WHAT[OWNER-002] decoy wrapper', () => { invoke(production) })",
+      ].join('\n'),
+    },
+    {
+      name: 'lookalike fast-check object has no callback authority',
+      green: false,
+      body: [
+        'const fc = { property: (...args) => args.at(-1), assert: () => undefined }',
+        "test('WHAT[OWNER-001] fake property runner', () => {",
+        '  fc.assert(fc.property(null, () => value()))',
+        '})',
+      ].join('\n'),
+    },
+  ]
+
+  for (const fixture of cases) {
+    const failures = validateSurfaceFixture(fixture.body)
+    assert.equal(failures.length === 0, fixture.green, `${fixture.name}: ${failures.join('\n')}`)
+    if (fixture.stable) assert.deepEqual(validateSurfaceFixture(fixture.body), failures)
   }
 })
 
