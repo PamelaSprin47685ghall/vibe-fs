@@ -63,24 +63,19 @@ module FinalitySurface =
             else
                 Roles.tryParseRole (str (value?canonicalRole)) |> Option.map Some
 
-        let tier = Roles.tryParseTier (str (value?selectedTier))
-
         let origin =
             match str (value?origin) with
             | "ResolvedAtRoot" -> Some PersonaOrigin.ResolvedAtRoot
             | "InheritedFromOwner" -> Some PersonaOrigin.InheritedFromOwner
             | _ -> None
 
-        match role, tier, origin with
-        | None, _, _ -> Error(sprintf "unknown role: %s" (str (value?canonicalRole)))
-        | _, None, _ -> Error(sprintf "unknown tier: %s" (str (value?selectedTier)))
-        | _, _, None -> Error(sprintf "unknown participant identity origin: %s" (str (value?origin)))
-        | Some role, Some tier, Some origin ->
+        match role, origin with
+        | None, _ -> Error(sprintf "unknown role: %s" (str (value?canonicalRole)))
+        | _, None -> Error(sprintf "unknown participant identity origin: %s" (str (value?origin)))
+        | Some role, Some origin ->
             Ok
                 { SelectedAgent = str (value?selectedAgent)
-                  PeerAgent = str (value?peerAgent)
                   Role = role
-                  InitialTier = tier
                   Persona = str (value?persona)
                   PersonaCatalogVersion = unbox<int> value?personaCatalogVersion
                   Origin = origin }
@@ -741,11 +736,6 @@ module FinalitySurface =
         | "agent-owner-root" -> Ok PromptAuthority.RootAuthorityKind.AgentOwnerRoot
         | unknown -> Error(sprintf "unknown authority kind: %s" unknown)
 
-    let private tierResult (value: string) : Result<AgentTier, string> =
-        match Roles.tryParseTier value with
-        | Some tier -> Ok tier
-        | None -> Error(sprintf "unknown tier: %s" value)
-
     let private inheritedIdentitySeedResult (value: obj) : Result<PromptAuthority.IdentitySeed, string> =
         if isNull value then
             Error "AgentOwnerRoot requires an inherited owner identity seed"
@@ -759,22 +749,15 @@ module FinalitySurface =
         (authorityKind: string)
         (rootMessageId: string)
         (selectedAgent: string)
-        (peerAgent: string)
-        (tier: string)
         (identitySeedValue: obj)
         : Result<PromptAuthority.AuthorityExecutionProfile, string> =
-        match authorityKindResult authorityKind, tierResult tier with
-        | Ok PromptAuthority.RootAuthorityKind.HumanRoot, Ok tier ->
+        match authorityKindResult authorityKind with
+        | Ok PromptAuthority.RootAuthorityKind.HumanRoot ->
             ParticipantIdentity.resolveAtRoot selectedAgent
             |> Result.bind (fun identity ->
                 let input = ParticipantIdentity.toInput identity
 
-                ParticipantIdentity.rehydrate
-                    None
-                    { input with
-                        PeerAgent = peerAgent
-                        Role = Some Role.Manager
-                        InitialTier = tier })
+                ParticipantIdentity.rehydrate None { input with Role = Some Role.Manager })
             |> Result.mapError (fun error -> sprintf "invalid participant identity: %A" error)
             |> Result.bind (fun participantIdentity ->
                 PromptAuthority.createAuthorityExecutionProfile
@@ -783,7 +766,7 @@ module FinalitySurface =
                     (AuthorityRootUserMessageId.create rootMessageId)
                     PromptAuthority.RootAuthorityKind.HumanRoot
                     participantIdentity)
-        | Ok PromptAuthority.RootAuthorityKind.AgentOwnerRoot, Ok tier ->
+        | Ok PromptAuthority.RootAuthorityKind.AgentOwnerRoot ->
             inheritedIdentitySeedResult identitySeedValue
             |> Result.bind (fun identitySeed ->
                 let activeOwner =
@@ -797,8 +780,6 @@ module FinalitySurface =
                 |> Result.mapError (fun error -> sprintf "invalid identity seed: %A" error)
                 |> Result.bind (fun identity ->
                     let actualRole = ParticipantIdentity.role identity
-                    let actualTier = ParticipantIdentity.initialTier identity
-                    let actualPeer = ParticipantIdentity.peerAgent identity
                     let actualAgent = ParticipantIdentity.selectedAgent identity
 
                     if actualAgent <> selectedAgent then
@@ -814,18 +795,6 @@ module FinalitySurface =
                                 "invalid participant identity: %A"
                                 (ParticipantIdentityError.RoleMismatch(Some Role.Manager, actualRole))
                         )
-                    elif actualTier <> tier then
-                        Error(
-                            sprintf
-                                "invalid participant identity: %A"
-                                (ParticipantIdentityError.TierMismatch(tier, actualTier))
-                        )
-                    elif actualPeer <> peerAgent then
-                        Error(
-                            sprintf
-                                "invalid participant identity: %A"
-                                (ParticipantIdentityError.PeerMismatch(peerAgent, actualPeer))
-                        )
                     else
                         PromptAuthority.createAuthorityExecutionProfileFromSeed
                             (SessionId.create "ses-authority")
@@ -833,8 +802,7 @@ module FinalitySurface =
                             (AuthorityRootUserMessageId.create rootMessageId)
                             PromptAuthority.RootAuthorityKind.AgentOwnerRoot
                             identitySeed))
-        | Error error, _
-        | _, Error error -> Error error
+        | Error error -> Error error
 
     let private lifecycleOf (world: obj) : ManagerLifeProjection =
         let world = asWorld world
@@ -856,20 +824,15 @@ module FinalitySurface =
         (tier: string)
         (opening: obj)
         : obj =
+        ignore peerAgent
+        ignore tier
         let world = asWorld world
         let lifecycle = lifecycleOf world
 
         let identitySeed = if isNull opening then null else opening?identitySeed
 
         match
-            authorityProfileOf
-                world.Projection.AgentProjections
-                authorityKind
-                rootMessageId
-                selectedAgent
-                peerAgent
-                tier
-                identitySeed
+            authorityProfileOf world.Projection.AgentProjections authorityKind rootMessageId selectedAgent identitySeed
         with
         | Error error -> box {| ok = false; error = error |}
         | Ok profile ->
@@ -893,16 +856,7 @@ module FinalitySurface =
         let world = asWorld world
         let lifecycle = lifecycleOf world
 
-        match
-            authorityProfileOf
-                world.Projection.AgentProjections
-                authorityKind
-                rootMessageId
-                "fast-manager"
-                "deep-manager"
-                "fast"
-                null
-        with
+        match authorityProfileOf world.Projection.AgentProjections authorityKind rootMessageId "manager" null with
         | Error _ -> false
         | Ok profile ->
             let opening =

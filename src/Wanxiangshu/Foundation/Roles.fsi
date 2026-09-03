@@ -1,11 +1,6 @@
 namespace Wanxiangshu.Foundation
 
 [<RequireQualifiedAccess>]
-type AgentTier =
-    | Fast
-    | Deep
-
-[<RequireQualifiedAccess>]
 type Role =
     | Manager
     | Orchestrator
@@ -22,6 +17,4 @@ module Roles =
     val all: Role list
     val roleLabel: Role -> string
     val tryParseRole: string -> Role option
-    val wireTierLabel: AgentTier -> string
-    val tryParseTier: string -> AgentTier option
     val isInternal: Role -> bool

@@ -6,10 +6,10 @@ import * as binding from '../../../dist/OpenCode/Host/SessionBindingSurface.js'
 import * as chatParams from '../../../dist/OpenCode/Host/ChatParamsSurface.js'
 
 test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_parented_session_requires_provider_model_binding', () => {
-  binding.bindChild('ses_chat_params_root', 'ses_chat_params_child', 'deep-coder')
+  binding.bindChild('ses_chat_params_root', 'ses_chat_params_child', 'coder')
   const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
   const rejected = chatParams.apply(
-    { sessionID: 'ses_chat_params_child', agent: 'deep-coder', model: { providerID: 'anthropic', modelID: 'fast-haiku' } },
+    { sessionID: 'ses_chat_params_child', agent: 'coder', model: { providerID: 'anthropic', modelID: 'fast-haiku' } },
     output,
   )
   assert.equal(rejected.ok, false)
@@ -21,7 +21,7 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_unbound_Host_auxiliary_child_d
   binding.observeHostAuxiliaryChild('ses_chat_params_title')
   const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
   const observed = chatParams.apply(
-    { sessionID: 'ses_chat_params_title', agent: 'fast-coder', model: { providerID: 'anthropic', modelID: 'fast-haiku' } },
+    { sessionID: 'ses_chat_params_title', agent: 'coder', model: { providerID: 'anthropic', modelID: 'fast-haiku' } },
     output,
   )
 
@@ -31,17 +31,17 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_unbound_Host_auxiliary_child_d
 })
 
 test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_acceptance_establishes_binding_without_rewriting_host_model', () => {
-  binding.bindChild('ses_chat_params_root_2', 'ses_chat_params_child_2', 'deep-coder')
+  binding.bindChild('ses_chat_params_root_2', 'ses_chat_params_child_2', 'coder')
   binding.acceptPromptExecution(
     'ses_chat_params_child_2',
     'pk-chat-params',
     'physical-chat-params',
-    'deep-coder',
+    'coder',
     { providerID: 'anthropic', modelID: 'deep-opus' },
   )
   const output = { model: { providerID: 'anthropic', modelID: 'deep-opus' } }
   const observed = chatParams.apply(
-    { sessionID: 'ses_chat_params_child_2', agent: 'deep-coder', model: { providerID: 'anthropic', modelID: 'deep-opus' } },
+    { sessionID: 'ses_chat_params_child_2', agent: 'coder', model: { providerID: 'anthropic', modelID: 'deep-opus' } },
     output,
   )
   assert.equal(observed.ok, true, observed.error)
@@ -51,12 +51,12 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_acceptance_establishes_binding
 })
 
 test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_uses_the_resolved_provider_model_id_not_the_mutated_user_message_model', () => {
-  binding.bindChild('ses_chat_params_root_3', 'ses_chat_params_child_3', 'deep-coder')
+  binding.bindChild('ses_chat_params_root_3', 'ses_chat_params_child_3', 'coder')
   binding.acceptPromptExecution(
     'ses_chat_params_child_3',
     'pk-chat-params-actual-model',
     'physical-chat-params-actual-model',
-    'deep-coder',
+    'coder',
     { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
   )
 
@@ -64,7 +64,7 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_uses_the_resolved_provider_mod
   const observed = chatParams.apply(
     {
       sessionID: 'ses_chat_params_child_3',
-      agent: 'deep-coder',
+      agent: 'coder',
       model: { id: 'fast-haiku', providerID: 'anthropic' },
       message: {
         model: { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
@@ -78,12 +78,12 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_uses_the_resolved_provider_mod
 })
 
 test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_accepts_the_real_provider_model_shape_with_message_variant', () => {
-  binding.bindChild('ses_chat_params_root_4', 'ses_chat_params_child_4', 'deep-coder')
+  binding.bindChild('ses_chat_params_root_4', 'ses_chat_params_child_4', 'coder')
   binding.acceptPromptExecution(
     'ses_chat_params_child_4',
     'pk-chat-params-real-shape',
     'physical-chat-params-real-shape',
-    'deep-coder',
+    'coder',
     { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
   )
 
@@ -99,7 +99,7 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_accepts_the_real_provider_mode
   const observed = chatParams.apply(
     {
       sessionID: 'ses_chat_params_child_4',
-      agent: 'deep-coder',
+      agent: 'coder',
       model: inputModel,
       message: {
         model: { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
@@ -119,12 +119,12 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_accepts_the_real_provider_mode
 })
 
 test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_leaves_temperature_untouched_when_model_capability_disables_it', () => {
-  binding.bindChild('ses_chat_params_root_5', 'ses_chat_params_child_5', 'deep-coder')
+  binding.bindChild('ses_chat_params_root_5', 'ses_chat_params_child_5', 'coder')
   binding.acceptPromptExecution(
     'ses_chat_params_child_5',
     'pk-chat-params-reasoning-shape',
     'physical-chat-params-reasoning-shape',
-    'deep-coder',
+    'coder',
     { providerID: 'openai', modelID: 'o3-mini', variant: 'high' },
   )
 
@@ -138,7 +138,7 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_leaves_temperature_untouched_w
   const observed = chatParams.apply(
     {
       sessionID: 'ses_chat_params_child_5',
-      agent: 'deep-coder',
+      agent: 'coder',
       model: inputModel,
       message: {
         model: { providerID: 'openai', modelID: 'o3-mini', variant: 'high' },

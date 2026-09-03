@@ -63,8 +63,8 @@ test('WHAT[OBLIGATION-LEDGER-006] rejects blank and duplicate obligation names a
   )
 })
 
-test('WHAT[OBLIGATION-LEDGER-007] rejects different todowrite calls in one assistant message as syntax/protocol error', () => {
-  assert.equal(todo.admitTodowriteBatch([firstCall, secondCall]).error.code, 'MultipleTodowriteInMessage')
+test('WHAT[OBLIGATION-LEDGER-007] admits multiple todowrite calls in one assistant message with sequential execution semantics', () => {
+  assert.equal(ok(todo.admitTodowriteBatch([firstCall, secondCall])), null)
   assert.equal(ok(todo.admitTodowriteBatch([firstCall, firstCall])), null)
 })
 

@@ -9,7 +9,7 @@ open Wanxiangshu.Participant.Persona
 
 /// JS-native proof surface for PROMPT-008 / ENF-001 / ENF-003 / ENF-004.
 ///
-/// The caller supplies only the role, tier and physical request kind. The
+/// The caller supplies only the role and physical request kind. The
 /// AttemptPlanner remains the sole constructor of the profile; this boundary
 /// translates its derived fields to plain strings and arrays.
 module AttemptPlannerSurface =
@@ -72,8 +72,8 @@ module AttemptPlannerSurface =
 
         ProviderRequestKind.label requestKind
 
-    let private profileOf (role: Role) (tier: AgentTier) (requestKind: ProviderRequestKind) =
-        ParticipantIdentity.resolveAtRoot (ManagedAgentCatalog.nameOf tier role)
+    let private profileOf (role: Role) (requestKind: ProviderRequestKind) =
+        ParticipantIdentity.resolveAtRoot (ManagedAgentCatalog.nameOf role)
         |> Result.mapError (fun error -> sprintf "invalid participant identity: %A" error)
         |> Result.bind (fun participantIdentity ->
             PromptAuthority.createAuthorityExecutionProfile
@@ -94,11 +94,13 @@ module AttemptPlannerSurface =
                 (fun () -> Error NoCandidateReason.NoCoverage))
 
     let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
+        let selected = ParticipantIdentity.selectedAgent identity
+
         box
-            {| selectedAgent = ParticipantIdentity.selectedAgent identity
-               peerAgent = ParticipantIdentity.peerAgent identity
+            {| selectedAgent = selected
+               peerAgent = selected
                canonicalRole = ParticipantIdentity.roleLabel identity
-               selectedTier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+               selectedTier = "deep"
                persona = ParticipantIdentity.persona identity
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
                origin =
@@ -107,15 +109,14 @@ module AttemptPlannerSurface =
                 | PersonaOrigin.InheritedFromOwner -> "InheritedFromOwner" |}
 
     /// Build one derived profile from JSON-shaped input.
-    /// `{ role, tier, kind }` are labels; unknown labels fail closed.
+    /// `{ role, kind }` are labels; tier label is ignored for compatibility; unknown labels fail closed.
     let plan (input: obj) : obj =
         let roleLabel = stringOf input?role
-        let tierLabel = stringOf input?tier
         let kindLabel = stringOf input?kind
 
-        match Roles.tryParseRole roleLabel, Roles.tryParseTier tierLabel, requestKindOf kindLabel with
-        | Some role, Some tier, Some requestKind ->
-            match profileOf role tier requestKind with
+        match Roles.tryParseRole roleLabel, requestKindOf kindLabel with
+        | Some role, Some requestKind ->
+            match profileOf role requestKind with
             | Error error -> box {| ok = false; error = error |}
             | Ok planned ->
                 let profile = planned.Profile
@@ -132,9 +133,8 @@ module AttemptPlannerSurface =
                         |> List.sort
                         |> List.toArray
                        requestKind = ProviderRequestKind.label profile.RequestKind |}
-        | None, _, _ -> box {| ok = false; error = "unknown role" |}
-        | _, None, _ -> box {| ok = false; error = "unknown tier" |}
-        | _, _, None ->
+        | None, _ -> box {| ok = false; error = "unknown role" |}
+        | _, None ->
             box
                 {| ok = false
                    error = "unknown request kind" |}

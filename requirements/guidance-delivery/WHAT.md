@@ -38,7 +38,7 @@ Full 与 IdentityOnly 的呈现判定唯一依赖于 `TipDeliveryProjection`（�
 
 ## GD-009: Guidance 交付仅作为提示，不创建新的 Interaction Authority
 
-向 Main 交付 tip guidance 仅通过 `TipGuidanceDelivered` 投影及合成的 `skill({ name: "" })` 工具调用/结果对（形式为 `<skill_content name="">…</skill_content>`）注入 provider horizon。严禁向 Main 注入伪造的用户角色消息（fake-user message），严禁派发新的 Interaction Authority Root，交付过程保持权限与主体中立。
+向 Main 交付 tip guidance 仅通过 `TipGuidanceDelivered` 投影，并随结对指引统一以 cursor 模式附加于终端真实工具结果尾部（NUL+BOM 分隔），不合成任何伪装成模型调用的工具消息。严禁向 Main 注入伪造的用户角色消息（fake-user message），严禁派发新的 Interaction Authority Root，交付过程保持权限与主体中立。
 
 ## GD-010: 规则语料可区分性由人类 Review 保证
 

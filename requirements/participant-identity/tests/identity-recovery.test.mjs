@@ -13,10 +13,10 @@ const rootSeed = {
   ownerLogicalRun: null,
   ownerAuthorityRoot: null,
   participantIdentity: {
-    selectedAgent: 'fast-coder',
-    peerAgent: 'deep-coder',
+    selectedAgent: 'coder',
+    peerAgent: 'coder',
     canonicalRole: 'coder',
-    selectedTier: 'fast',
+    selectedTier: 'deep',
     persona: 'Coder',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
@@ -80,6 +80,15 @@ const journalRoundTripPayload = (fact) => {
   return decoded.value.fact.payload
 }
 
+const profileFromPayload = (payload) => ({
+  session: payload.SessionId,
+  logicalRun: payload.LogicalRunId,
+  authorityRoot: payload.AuthorityRootUserMessageId,
+  authorityKind: payload.AuthorityKind,
+  identitySeed: payload.IdentitySeed,
+  participantIdentity: payload.IdentitySeed.participantIdentity,
+})
+
 const authorityCase = (value) => {
   if (Array.isArray(value)) {
     if (value[0] === 'AuthorityRootAccepted') return value
@@ -103,21 +112,21 @@ const legacyHumanRootLine = (profile) => {
   const payload = tagged[1]
   delete payload.SchemaVersion
   delete payload.IdentitySeed
-  payload.SelectedAgent = 'fast-coder'
-  payload.PeerAgent = 'deep-coder'
+  payload.SelectedAgent = 'coder'
+  payload.PeerAgent = 'coder'
   payload.CanonicalRole = 'coder'
-  payload.SelectedTier = 'fast'
+  payload.SelectedTier = 'deep'
   return JSON.stringify(current)
 }
 
 const inheritedProfile = () => {
   const owner = createRoot()
-  const issued = authority.issueInheritedIdentitySeed('deep-reviewer', owner)
+  const issued = authority.issueInheritedIdentitySeed('reviewer', owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
   return createRoot('AgentOwnerRoot', issued.value, 'ses-recovery-child', 'msg-recovery-child')
 }
 
-test('WHAT[PID-010] current v2 durable identity payload preserves exact participant and owner provenance', () => {
+test('WHAT[PID-008] current v2 durable identity recovers exact participant and owner provenance', () => {
   const profile = inheritedProfile()
   const payload = journalRoundTripPayload(authorityFact(profile))
   assert.deepEqual(payload, {
@@ -128,9 +137,18 @@ test('WHAT[PID-010] current v2 durable identity payload preserves exact particip
     AuthorityKind: profile.authorityKind,
     IdentitySeed: profile.identitySeed,
   })
+
+  assert.deepEqual(authority.recoverActiveIdentity(register(profileFromPayload(payload))), {
+    ok: true,
+    value: {
+      participantIdentity: profile.participantIdentity,
+      identitySeed: profile.identitySeed,
+    },
+    error: '',
+  })
 })
 
-test('WHAT[PID-003] supported legacy HumanRoot payload upgrades to canonical versioned identity', () => {
+test('WHAT[PID-008] supported legacy HumanRoot deterministically recovers its upgraded identity', () => {
   const profile = createRoot()
   const legacy = legacyHumanRootLine(profile)
   const first = factCodec.decode(legacy)
@@ -146,9 +164,18 @@ test('WHAT[PID-003] supported legacy HumanRoot payload upgrades to canonical ver
     AuthorityKind: profile.authorityKind,
     IdentitySeed: rootSeed,
   })
+
+  assert.deepEqual(authority.recoverActiveIdentity(register(profileFromPayload(first.payload))), {
+    ok: true,
+    value: {
+      participantIdentity: rootSeed.participantIdentity,
+      identitySeed: rootSeed,
+    },
+    error: '',
+  })
 })
 
-test('WHAT[PID-010] missing active authority rejects even when LastAuthorityProfile is present', () => {
+test('WHAT[PID-008] missing active authority rejects even when LastAuthorityProfile is present', () => {
   const projection = register(createRoot())
   const historicalOnly = { ...projection, activeLogicalRun: null }
 
@@ -159,7 +186,7 @@ test('WHAT[PID-010] missing active authority rejects even when LastAuthorityProf
   })
 })
 
-test('WHAT[PID-010] rejects corrupt identity provenance', () => {
+test('WHAT[PID-008] rejects corrupt identity provenance', () => {
   const rootProjection = register(createRoot())
   const inheritedProjection = register(inheritedProfile())
   const corruptions = [
@@ -181,7 +208,7 @@ test('WHAT[PID-010] rejects corrupt identity provenance', () => {
   }
 })
 
-test('WHAT[PID-010] closed exact run cannot be recovered as current', () => {
+test('WHAT[PID-008] closed exact run cannot be recovered as current', () => {
   const profile = createRoot()
   const closed = authority.closeAuthority(
     profile.logicalRun,

@@ -13,7 +13,7 @@ const WT_PATH = '/tmp/wt_ea'
 const baseJob = {
   jobId: JOB,
   managerSessionId: 'ses_ea',
-  managerAgent: 'fast-manager',
+  managerAgent: 'manager',
   byname: 'Road',
   worktreeIdentity: WT,
   worktreePath: WT_PATH,

@@ -39,9 +39,9 @@ Runtime 仅负责加载 scheduler、校验 ABI、维护进程共享的 token led
 租约释放必须依赖确切的物理执行终结证据（无 error、completed assistant、`finish` 明确属于 `stop | length | content-filter`，且其 parentID 匹配 PhysicalUserMessageId）。
 `finish="tool-calls"` 仅终结单步并归还 step token，不解除 physical execution binding；assistant error，以及 Host 将流错误归一化后的 `finish="unknown" | "error"`，都只作为单步终结证据，不直接删除 execution binding，以便 Host 继续同 material retry。业务层的 handle 完成、join 或 finality 不直接操作租约。
 
-## EMR-008: `opencode.json` model 不再具有 authority；不校验 fast/deep model 互异
+## EMR-008: `opencode.json` model 不再具有 authority；不校验不同角色 model 互异
 
-Host 的 `opencode.json` 不作为 managed model 的真相源。系统不要求 fast 档与 deep 档使用互异的物理模型字符串；两者解析至相同 target 属于合法状态。
+Host 的 `opencode.json` 不作为 managed model 的真相源。系统不要求不同 canonical 角色使用互异的物理模型字符串；两者解析至相同 target 属于合法状态 (历史 `fast-`/`deep-` 档亦然)。
 
 ## EMR-009: `chat.message` 是唯一 managed model admission；dispatch message 保持 model-free
 

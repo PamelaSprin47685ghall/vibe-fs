@@ -10,7 +10,7 @@ test('WHAT[CHGINT-012] ORCH_007_NeedsReview_preserves_the_active_worktree', () =
   let projection = change.createJob(change.empty(), {
     jobId: 'job-1',
     managerSessionId: 'ses-manager-1',
-    managerAgent: 'fast-manager',
+    managerAgent: 'manager',
     byname: 'Road',
     worktreeIdentity: 'manager/job-1',
     worktreePath: '/tmp/wt-job-1',

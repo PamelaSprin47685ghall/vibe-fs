@@ -52,7 +52,7 @@ const decide = (previous, next, boundary = null) =>
   sealDecision({ previousWire: previous === null ? null : wireOf(previous), body: next, boundary });
 
 /** A SOURCE boundary, as an author writes it and `validateBoundary` checks it. */
-const at = (kind) => ({ kind, lane: 'fast-coder', turn: 'Round 2', step: 0 });
+const at = (kind) => ({ kind, lane: 'coder', turn: 'Round 2', step: 0 });
 
 /**
  * A COMPILED boundary, as `boundaryFor` consumes it: it names the entry it governs.
@@ -61,9 +61,9 @@ const at = (kind) => ({ kind, lane: 'fast-coder', turn: 'Round 2', step: 0 });
  * let the lookup cases assert against author-shaped input the runtime never sees — and hid
  * that the lookup compared DECLARED text to REQUEST text, so every real boundary was inert.
  */
-const compiledAt = (kind, entryId = 'round2') => ({ kind, lane: 'fast-coder', entryId });
+const compiledAt = (kind, entryId = 'round2') => ({ kind, lane: 'coder', entryId });
 
-const entry = (id) => ({ id, lane: 'fast-coder' });
+const entry = (id) => ({ id, lane: 'coder' });
 
 export const coldBoundaryCases = [
   // ── the ordinary case ─────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ export const coldBoundaryCases = [
     fn: () => {
       // The tightening this file's measurement produced. `modelSideCold` allowed the
       // system prompt to change whenever the model id did — but AGENT-001 gives
-      // `fast-ROLE` and `deep-ROLE` ONE byte-identical system prompt (verified for
+      // each canonical role carries ONE byte-identical system prompt (verified for
       // coder/manager/reviewer/devops/inspector), so a real side switch moves the
       // model field and nothing else.
       //

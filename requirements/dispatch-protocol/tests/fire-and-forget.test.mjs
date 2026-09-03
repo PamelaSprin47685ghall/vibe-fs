@@ -25,13 +25,12 @@ const capturingPort = (captured, outcome = () => dispatch.admittedWithReceipt('a
 })
 
 const personas = {
-  'fast-coder': 'Coder',
-  'fast-manager': 'Coordinator',
-  'deep-devops': 'DevOps',
+  coder: 'Coder',
+  manager: 'Lead',
+  devops: 'Operator',
 }
 const rootSelection = (agent) => {
-  const [selectedTier, canonicalRole] = agent.split('-')
-  const peerTier = selectedTier === 'fast' ? 'deep' : 'fast'
+  const canonicalRole = agent === 'predictor' ? 'inspector' : agent
   return {
     kind: 'RootSelection',
     ownerSession: null,
@@ -39,9 +38,9 @@ const rootSelection = (agent) => {
     ownerAuthorityRoot: null,
     participantIdentity: {
       selectedAgent: agent,
-      peerAgent: `${peerTier}-${canonicalRole}`,
+      peerAgent: agent,
       canonicalRole,
-      selectedTier,
+      selectedTier: 'deep',
       persona: personas[agent] ?? 'Unknown',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
@@ -56,10 +55,10 @@ const profileFor = (session, runtime = 'rt-007c') => {
     `${session}_owner`,
     'HumanRoot',
     `msg-${session}-owner`,
-    rootSelection('fast-manager'),
+    rootSelection('manager'),
   )
   assert.equal(owner.ok, true, owner.error)
-  const seed = authority.issueInheritedIdentitySeed('fast-coder', owner.value)
+  const seed = authority.issueInheritedIdentitySeed('coder', owner.value)
   assert.equal(seed.ok, true, seed.error)
   const built = authority.createAuthorityRoot(hash, runtime, session, 'AgentOwnerRoot', `msg-root-${session}`, seed.value)
   assert.equal(built.ok, true, built.ok ? '' : JSON.stringify(built.error))
@@ -71,7 +70,7 @@ const acceptOwner = async (handle, session = 'ses_owner') => {
     handle,
     session,
     `msg-${session}`,
-    rootSelection('fast-manager'),
+    rootSelection('manager'),
   )
   assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
   return accepted.profile
@@ -84,7 +83,7 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_claims_and_persists_withou
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_007_owner')
-      const seed = authority.issueInheritedIdentitySeed('fast-coder', owner).value
+      const seed = authority.issueInheritedIdentitySeed('coder', owner).value
       const captured = []
       const sent = await dispatch.sendAgentOwnerRoot(
         capturingPort(captured),
@@ -112,7 +111,7 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_sdk_physical_id_does_not_r
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_007_physical_owner')
-      const seed = authority.issueInheritedIdentitySeed('fast-coder', owner).value
+      const seed = authority.issueInheritedIdentitySeed('coder', owner).value
       const port = capturingPort([], () => dispatch.admittedWithPhysicalMessage('msg-sdk-early-007'))
       const sent = await dispatch.sendAgentOwnerRoot(
         port,
@@ -144,7 +143,7 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_returns_even_when_session_
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_007_never_owner')
-      const seed = authority.issueInheritedIdentitySeed('deep-devops', owner).value
+      const seed = authority.issueInheritedIdentitySeed('devops', owner).value
       let invoked = 0
       const never = new Promise((resolve) => { release = resolve })
       const port = {
@@ -187,7 +186,7 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_continuation_same_claim_pa
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_007c_owner')
-      const seed = authority.issueInheritedIdentitySeed('fast-coder', owner).value
+      const seed = authority.issueInheritedIdentitySeed('coder', owner).value
       const captured = []
       const port = capturingPort(captured)
       const root = await dispatch.sendAgentOwnerRoot(
@@ -206,7 +205,7 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_continuation_same_claim_pa
         'busy nudge text',
         'BusyAgentNudge',
         profileFor('ses_007c'),
-        'fast-coder',
+        'coder',
         'Detached',
       )
       assert.equal(cont.ok, true, cont.ok ? '' : cont.error)

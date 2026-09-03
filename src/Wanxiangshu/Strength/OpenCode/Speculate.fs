@@ -48,10 +48,15 @@ module StrengthSpeculate =
         |> HostDigest.sha256Hex
         |> StrengthDecisionId.create
 
-    let private rootWork (sessionId: SessionId) (associations: Map<SessionId, SessionAssociation>) =
-        match SessionOwnershipClassification.tryClassify sessionId associations with
-        | Some(SessionExecutionClass.Work, Some SessionOwnership.Root) -> true
-        | _ -> false
+    let private isRootWorkEntry (entry: SessionAssociation) : bool =
+        entry.ParentSessionId.IsNone
+        && match SessionOwnershipClassification.classifyLegacy entry with
+           | SessionExecutionClass.Work, Some SessionOwnership.Root -> true
+           | _ -> false
+
+    let private rootWork (sessionId: SessionId) (associations: Map<SessionId, SessionAssociation>) : bool =
+        SessionAssociationProjection.tryFind sessionId associations
+        |> Option.exists isRootWorkEntry
 
     let private failClosed (scope: PluginRuntimeScope) (reason: string) : 'a =
         scope.Strength.TripStrengthFuse reason
@@ -171,17 +176,17 @@ module StrengthSpeculate =
           Prediction: StrengthPrediction
           Estimate: StrengthValueEstimate
           Control: bool
-          FastAgent: string option }
+          ReplicaAgent: string option }
 
     [<RequireQualifiedAccess>]
     type private DryRunAdmission =
         | Skip of reason: string
         | Start of agent: string
 
-    let private dryRunAdmission (eligibility: StrengthEligibility) (fastAgent: string option) : DryRunAdmission =
-        match eligibility, fastAgent with
+    let private dryRunAdmission (eligibility: StrengthEligibility) (replicaAgent: string option) : DryRunAdmission =
+        match eligibility, replicaAgent with
         | StrengthEligibility.Ineligible reason, _ -> DryRunAdmission.Skip reason
-        | StrengthEligibility.Eligible, None -> DryRunAdmission.Skip "fast-peer-unavailable"
+        | StrengthEligibility.Eligible, None -> DryRunAdmission.Skip "predictor-unavailable"
         | StrengthEligibility.Eligible, Some agent -> DryRunAdmission.Start agent
 
     [<RequireQualifiedAccess>]
@@ -337,7 +342,7 @@ module StrengthSpeculate =
                     CostModelAvailable = true
                     HostCanaryHealthy = true }
 
-            match dryRunAdmission (StrengthPolicy.eligibility canaryOpportunity) surface.FastAgent with
+            match dryRunAdmission (StrengthPolicy.eligibility canaryOpportunity) surface.ReplicaAgent with
             | DryRunAdmission.Skip reason ->
                 Diagnostic.emit
                     "strength-dry-run-skip"
@@ -433,7 +438,7 @@ module StrengthSpeculate =
                     surface.Estimate
                     surface.Settings.Policy
 
-            match decision, surface.FastAgent with
+            match decision, surface.ReplicaAgent with
             | StrengthDecision.Skip _, _ -> return ()
             | StrengthDecision.ControlHoldout, _ ->
                 surface.Scope.Strength.ArmStrengthCounterfactual(surface.Owner, surface.Target, surface.Feature)
@@ -474,9 +479,14 @@ module StrengthSpeculate =
         (requestKind: ProviderRequestKind)
         (effectiveAgent: string)
         (hasPrefixProbe: bool)
-        (fastAgent: string option)
+        (predictorAvailable: bool)
         : StrengthOpportunity =
         let costsAvailable = settings.Costs.IsSome
+
+        let attachedDelegate =
+            scope.SyncDelegateRuntime
+            |> Option.bind (fun sd -> sd.TryFindDelegateOwner owner)
+            |> Option.isSome
 
         let stableCaptureEligible =
             rawMessages
@@ -486,16 +496,20 @@ module StrengthSpeculate =
                 | XTraceStableCaptureEligibility.Eligible _ -> true
                 | _ -> false
 
-        { IsRootWork = rootWork owner projections.AgentProjections.Associations
+        let isRootWork =
+            authority.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
+            && rootWork owner projections.AgentProjections.Associations
+            && not attachedDelegate
+
+        { IsRootWork = isRootWork
           RequestKind = requestKind
           CanonicalRole = authority.CanonicalRole
-          SelectedTier = authority.SelectedTier
           SelectedAgent = authority.SelectedAgent
           EffectiveAgent = effectiveAgent
           IsFallbackRetry = not (String.Equals(authority.SelectedAgent, effectiveAgent, StringComparison.Ordinal))
           HasPrefixProbe = hasPrefixProbe
           IsReviewerOrFinality = authority.CanonicalRole = Role.Reviewer
-          IsAttachedOrInternalLeaf = not (rootWork owner projections.AgentProjections.Associations)
+          IsAttachedOrInternalLeaf = not isRootWork
           OwnerCancelled = false
           TargetProviderRunBound = true
           EventStoreHealthy = true
@@ -503,7 +517,7 @@ module StrengthSpeculate =
             StrengthSettings.hostCanaryHealthy ()
             && stableCaptureEligible
             && scope.Strength.StrengthFuseReason.IsNone
-          FastPeerAvailable = fastAgent.IsSome
+          PredictorAvailable = predictorAvailable
           CostModelAvailable = costsAvailable }
 
     let private buildSurface
@@ -520,7 +534,7 @@ module StrengthSpeculate =
         let requestKind, effectiveAgent, hasPrefixProbe =
             planEvidence scope owner target projections authority
 
-        let fastAgent = Some(ManagedAgent.nameOf AgentTier.Fast authority.CanonicalRole)
+        let replicaAgent = Some(Roles.roleLabel authority.CanonicalRole)
 
         let opportunity =
             buildOpportunity
@@ -534,7 +548,7 @@ module StrengthSpeculate =
                 requestKind
                 effectiveAgent
                 hasPrefixProbe
-                fastAgent
+                replicaAgent.IsSome
 
         let wire = ProviderWireCapture.decodeMessageView rawMessages
         let semantic = ProviderProjection.toSemantic wire
@@ -576,7 +590,7 @@ module StrengthSpeculate =
           Prediction = prediction
           Estimate = estimate
           Control = control
-          FastAgent = fastAgent }
+          ReplicaAgent = replicaAgent }
 
     let private applyAfterRecovery
         (scope: PluginRuntimeScope)

@@ -17,7 +17,7 @@
 4. 重置 Interaction Repair 预算；
 5. 成为后续 execution binding 的延续基准。
 
-`AuthorityRootAccepted { SessionId; LogicalRunId; AuthorityRootId; RootKind; ParticipantIdentityEvidence; initial execution selection }` 是 root acceptance 与 identity installation 的唯一 durable fact payload，必须以一次原子 append 接受或拒绝。Authority 不得先持久化 identity 再接受 root，也不得从 agent 名称推导或拥有 canonical SelectedAgent/PeerAgent、Role、initial Tier、Persona 或 provenance/version；它只校验 evidence 的 exact key/owner witness 并保管 payload。append 成功后的同一 fold 原子建立新 active root、绑定 exact evidence、清空已关闭 prior run 的 claims/continuation 映射/序列号并重置 Fallback 游标；append 未提交则两者均不存在。
+`AuthorityRootAccepted { SessionId; LogicalRunId; AuthorityRootId; RootKind; ParticipantIdentityEvidence; initial execution selection }` 是 root acceptance 与 identity installation 的唯一 durable fact payload，必须以一次原子 append 接受或拒绝。Authority 不得先持久化 identity 再接受 root，也不得从 agent 名称推导或拥有 canonical SelectedAgent、Role、Persona 或 provenance/version；它只校验 evidence 的 exact key/owner witness 并保管 payload。append 成功后的同一 fold 原子建立新 active root、绑定 exact evidence、清空已关闭 prior run 的 claims/continuation 映射/序列号并重置 Fallback 游标；append 未提交则两者均不存在。
 
 ## INTERACTION-AUTHORITY-004: Continuation 禁区
 
@@ -29,7 +29,7 @@
 
 ## INTERACTION-AUTHORITY-006: HumanRoot 必须显式命名 managed agent
 
-`HumanRoot` 必须显式指定合法的 managed agent 名称。该名称只是交给 participant-identity owner 的 root identity 请求，不是 Authority 自行推导 Persona/Role 的依据。省略名称、使用废弃裸名、格式错误或缺少 owner 返回的版本化 identity evidence 必须 fail-closed，禁止静默猜测或从 Session cache 补全。
+`HumanRoot` 必须显式指定合法的 managed agent 本名。该名称只是交给 participant-identity owner 的 root identity 请求，不是 Authority 自行推导 Persona/Role 的依据。省略名称、使用 legacy 名称、连字符/大小写变形、格式错误或缺少 owner 返回的版本化 identity evidence 必须 fail-closed，禁止静默猜测或从 Session cache 补全。
 
 ## INTERACTION-AUTHORITY-007: UnknownOrigin fail-closed
 
@@ -49,7 +49,7 @@
 
 ## INTERACTION-AUTHORITY-011: authority 是原子 profile 内的稳定子记录
 
-每次执行的 `AttemptExecutionProfile` 必须原子携带 exact SessionId、LogicalRunId、AuthorityRootId、当前 `ExecutionBinding` selection，以及 `AuthorityRootAccepted` 中 participant-identity owner 准备的完整版本化 `ParticipantIdentityEvidence`。Authority fold 向 Host/execution 消费者逐字段精确暴露 stable SelectedAgent/PeerAgent、Role、initial Tier、稳定 Persona 与 provenance/version，但不拥有、重新解析或修改这些字段；当前 EffectiveAgent/provider/model/lease 只来自 execution binding。禁止从 Session cache、物理 parent、agent 名称或分散消息拼装 profile。
+每次执行的 `AttemptExecutionProfile` 必须原子携带 exact SessionId、LogicalRunId、AuthorityRootId、当前 `ExecutionBinding` selection，以及 `AuthorityRootAccepted` 中 participant-identity owner 准备的完整版本化 `ParticipantIdentityEvidence`。Authority fold 向 Host/execution 消费者逐字段精确暴露 stable SelectedAgent、Role、稳定 Persona 与 provenance/version，但不拥有、重新解析或修改这些字段；当前 EffectiveAgent/provider/model/lease 只来自 execution binding。禁止从 Session cache、物理 parent、agent 名称或分散消息拼装 profile。
 
 ## INTERACTION-AUTHORITY-012: degeneration-guard 是 continuation 而非 fallback 失败
 

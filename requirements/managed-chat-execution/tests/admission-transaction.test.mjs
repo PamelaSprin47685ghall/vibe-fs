@@ -15,10 +15,10 @@ const evidence = {
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: 'fast-coder',
-      peerAgent: 'deep-coder',
+      selectedAgent: 'coder',
+      peerAgent: 'coder',
       canonicalRole: 'coder',
-      selectedTier: 'fast',
+      selectedTier: 'deep',
       persona: 'Coder',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
@@ -26,7 +26,7 @@ const evidence = {
   },
   providerRun: 'provider-transaction',
   origin: 'HumanRoot',
-  effectiveAgent: 'fast-coder',
+  effectiveAgent: 'coder',
   requestKind: 'work-main',
   projectionChoice: { kind: 'UseCommittedEpoch' },
 }

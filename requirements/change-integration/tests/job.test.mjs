@@ -10,7 +10,7 @@ const MANAGER = 'ses_m'
 const payload = (overrides = {}) => ({
   jobId: JOB,
   managerSessionId: MANAGER,
-  managerAgent: 'fast-manager',
+  managerAgent: 'manager',
   byname: 'Road',
   worktreeIdentity: 'wt_1',
   worktreePath: '/tmp/wt1',
@@ -58,7 +58,7 @@ test('WHAT[CHGINT-001] ORCH_003_a_created_job_persists_the_manager_agent_and_the
   assert.deepEqual(job, {
     jobId: 'job_1',
     managerSessionId: 'ses_m',
-    managerAgent: 'fast-manager',
+    managerAgent: 'manager',
     byname: 'Road',
     worktreeIdentity: 'wt_1',
     worktreePath: '/tmp/wt1',
@@ -229,10 +229,10 @@ test('WHAT[CHGINT-006] ORCH_006_a_replayed_create_does_not_reset_a_job_that_alre
 })
 
 test('WHAT[CHGINT-009] ORCH_003_a_second_create_for_one_job_id_cannot_change_its_manager_or_worktree', () => {
-  const again = change.createJob(created(), payload({ managerAgent: 'deep-manager', worktreeIdentity: 'wt_other' }))
+  const again = change.createJob(created(), payload({ managerAgent: 'coder', worktreeIdentity: 'wt_other', worktreePath: '/tmp/wt_other' }))
   assert.deepEqual(
     { agent: change.find(again, JOB).managerAgent, worktree: change.find(again, JOB).worktreeIdentity },
-    { agent: 'fast-manager', worktree: 'wt_1' },
+    { agent: 'manager', worktree: 'wt_1' },
   )
 })
 

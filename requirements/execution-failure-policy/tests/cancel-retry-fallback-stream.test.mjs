@@ -53,7 +53,7 @@ const transactionEvidence = (suffix) => ({
   logicalRunId: `logical-policy-${suffix}`,
   authorityRootUserMessageId: `root-policy-${suffix}`,
   providerRun: `provider-policy-${suffix}`,
-  identitySeed: { participantIdentity: { selectedAgent: 'fast-coder' } },
+  identitySeed: { participantIdentity: { selectedAgent: 'coder' } },
 })
 
 const assertNoRecovery = (decision) => {

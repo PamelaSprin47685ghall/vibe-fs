@@ -600,7 +600,11 @@ module XWire =
                 // decision (requiredBlob / forChoice).
                 let snapshot = { CurrentProjection = current }
 
-                let opportunity = RecoverySlot.opportunity arming fallback.Cursor.Offset
+                let opportunity =
+                    if fallback.Cursor.ConsecutiveFailureCount > 0 then
+                        RecoveryOpportunity.RecoveryAttempt
+                    else
+                        RecoverySlot.opportunity arming fallback.Cursor.Offset
 
                 let! candidateResult =
                     match opportunity with

@@ -19,15 +19,15 @@ test('WHAT[BD-006] CHRONICLE_no_live_cycle_aborts_then_host_adapter_exposes_sdk_
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const parentID = 'ses-manager'
     const sessionID = 'blogger-no-live-cycle'
-    bindManagedChild(parentID, sessionID, 'fast-blogger')
+    bindManagedChild(parentID, sessionID, 'blogger')
     await hooks['chat.message'](
-      { sessionID, agent: 'fast-blogger' },
+      { sessionID, agent: 'blogger' },
       {
         message: {
           id: `root-${sessionID}`,
           role: 'user',
           sessionID,
-          agent: 'fast-blogger',
+          agent: 'blogger',
           model: { providerID: 'host', modelID: 'placeholder' },
         },
         parts: [],
@@ -39,7 +39,7 @@ test('WHAT[BD-006] CHRONICLE_no_live_cycle_aborts_then_host_adapter_exposes_sdk_
         { entry: 'work', tip: 'primitive-obsession' },
         {
           sessionID,
-          agent: 'fast-blogger',
+          agent: 'blogger',
           // HOST-011: a real OpenCode ToolContext always names the assistant
           // message/provider run that emitted this tool call. Keep the fixture
           // physical rather than bypassing the provider→tool capacity boundary.

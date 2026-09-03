@@ -6,8 +6,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// EXEC-026 / HOST-008: SyncDelegate vocabulary — dedicated Inspector/Coder
-/// ownership keys, AttachmentKind mapping, and owner→delegate tier (fast→fast,
-/// deep→deep). Runtime/tools are wired later; this module is types + helpers only.
+/// ownership keys and AttachmentKind mapping. Runtime/tools are wired later; this module is types + helpers only.
 
 [<RequireQualifiedAccess>]
 type SyncDelegateRole =
@@ -60,22 +59,11 @@ module SyncDelegate =
         | SyncDelegateRole.Inspector -> "inspector"
         | SyncDelegateRole.Coder -> "coder"
 
-    /// EXEC-026: canonical wire tier label (`fast` / `deep`).
-    let tierLabel (tier: AgentTier) : string =
-        match tier with
-        | AgentTier.Fast -> "fast"
-        | AgentTier.Deep -> "deep"
-
     /// HOST-008: SyncDelegateRole → AttachmentKind for Work+Attached registration.
     let delegateRoleToAttachment (role: SyncDelegateRole) : AttachmentKind =
         match role with
         | SyncDelegateRole.Inspector -> AttachmentKind.SyncInspector
         | SyncDelegateRole.Coder -> AttachmentKind.SyncCoder
 
-    /// EXEC-026 nail: owner effective tier maps identically onto the dedicated
-    /// delegate (`fast→fast`, `deep→deep`). Call sites must not override tier.
-    let tierForOwner (ownerTier: AgentTier) : AgentTier = ownerTier
-
-    /// Wire agent name for a dedicated SyncDelegate (`fast-inspector`, …).
-    let agentNameFor (role: SyncDelegateRole) (tier: AgentTier) : string =
-        sprintf "%s-%s" (tierLabel tier) (roleLabel role)
+    /// Canonical wire agent name for a dedicated SyncDelegate (`inspector`, `coder`).
+    let agentNameFor (role: SyncDelegateRole) : string = roleLabel role

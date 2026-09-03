@@ -24,12 +24,11 @@ Grounding 仅从当前工作区根目录下的 `requirements/` 目录发现 pack
 
 Grounding 去重必须以当前 provider horizon 内执行者已经实际看见的规范材料为事实来源，而不是只记录“自动注入过哪些 package”。原生 `read` 与 `repository-programming` 的 `js-*` 文件读取只要返回了文件内容，都必须登记对应工作区路径与 content digest。若主动读取命中某 package 的根目录 grounding Markdown，该材料视为已经 grounding，当前轮与后续轮自动接入不得再次注入同一内容版本；未读材料仍可按需补齐。材料内容变更导致 digest 改变时允许读取新版本。发生上下文重锚 (`ContextReanchored`) 时，当前 horizon 的可见材料记录被清空，后续再次触碰需重新接入。
 
-## REQUIREMENT-GROUNDING-007: 自动 Grounding 为普通 Read 的弱投影与 Cursor 补充
+## REQUIREMENT-GROUNDING-007: 自动 Grounding 为终端结果的 result-only 字节补充
 
-当直接 `read` 操作将代码暴露给执行者时，未 grounding package 的材料以完全等同于执行者主动调用 `read` 的普通 tool call/result 形式进入当前视界（同一能力权限、路径与范围规则、输出格式）。禁止引入私有的 bundle 格式或特殊 system 文本。
+当直接 `read` 操作将代码暴露给执行者时，未 grounding package 的材料以 result-only 字节形式进入当前视界：不产生任何 synthetic read 调用/结果对，所有 provider 统一以 `NUL+BOM` 分隔符追加于终端真实工具结果之后，每份材料携带 `requirement_source_path = "requirements/<package>/<file>"` 作为来源证明，正文内容保持原始读取字节不变。禁止引入私有的 bundle 格式或特殊 system 文本。
 `repository-programming` 中任何 `js-*` 操作只要实际读取并返回文件内容，与原生 `read` 具有完全相同的 grounding 触发语义；工具名、宿主实现或是否通过 JavaScript 编程面不得造成旁路。
-在同一轮次中若同时存在 pair-programming 伪技能与规范读取，固定顺序为：伪技能 → requirement reads。`grep`、`glob`、`list` 等候选发现工具不触发 `APPLIES-TO` 规范注入。
-在 Cursor 环境下，规范读取结果以 `NUL+BOM` 分隔符追加于终端工具结果之后，并在外层携带工作区相对路径属性作为来源证明，正文内容保持原始读取字节不变。
+在同一轮次中若同时存在 pair-programming guidance 与规范读取，固定顺序为：guidance → requirement reads。`grep`、`glob`、`list` 等候选发现工具不触发 `APPLIES-TO` 规范注入。
 
 ## REQUIREMENT-GROUNDING-008: Mutation 不受 Grounding 阻断
 

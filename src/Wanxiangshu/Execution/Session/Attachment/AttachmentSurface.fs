@@ -123,7 +123,7 @@ module AttachmentSurface =
     let reconciliationScenario (observation: string) : Task<obj> =
         task {
             let owner = SessionId.create "owner"
-            let agent = "deep-inspector"
+            let agent = "inspector"
             let existing = SessionId.create "host-child-existing"
             let createdCount = ref 0
             let observedCount = ref 0

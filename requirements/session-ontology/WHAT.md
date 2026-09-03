@@ -22,7 +22,7 @@ Companion、Bookkeeper 与 StrengthReplica 属于 `InternalLeaf + Attached`；In
 
 ## SESSION-ONTOLOGY-006: 物理 Host Parent 恒为 Family Root 且逻辑归属由 Journal 承载
 
-所有 managed child 在 Host 物理层均挂在 family root 下（物理树深度恒为 2）；层级归属完全由持久化 journal association 承载。物理 parentID 既不得推断 logical ownership，也不得作为 child/attached/InternalLeaf 的 Role、Persona、Peer、identity provenance 或 owner-derived identity evidence。
+所有 managed child 在 Host 物理层均挂在 family root 下（物理树深度恒为 2）；层级归属完全由持久化 journal association 承载。物理 parentID 既不得推断 logical ownership，也不得作为 child/attached/InternalLeaf 的 Role、Persona、identity provenance 或 owner-derived identity evidence。
 
 ## SESSION-ONTOLOGY-007: Durable 关联事实与正交分类派生视图解耦
 
@@ -38,7 +38,7 @@ Companion、Bookkeeper 与 StrengthReplica 属于 `InternalLeaf + Attached`；In
 
 ## SESSION-ONTOLOGY-010: Runtime 拓扑不决定业务分类与角色
 
-Session 的物理本体分类严格仅由 `ExecutionClass × Ownership` 决定，不得受 Role、Tier、Persona、工具暴露面或 Logical Run 影响；Companion 资格不设角色白名单。反向亦然：classification、association、Session cache 与 Host parent 均不得生成或修改 `ParticipantIdentity`。
+Session 的物理本体分类严格仅由 `ExecutionClass × Ownership` 决定，不得受 Role、Persona、工具暴露面或 Logical Run 影响；Companion 资格不设角色白名单。反向亦然：classification、association、Session cache 与 Host parent 均不得生成或修改 `ParticipantIdentity`。
 
 ## SESSION-ONTOLOGY-011: StrengthReplica 为 Universal 内部叶子且不跨决策复用
 

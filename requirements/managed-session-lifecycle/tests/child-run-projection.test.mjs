@@ -65,7 +65,7 @@ test('WHAT[MANAGED-SESSION-012] VERIFY_009_projection_status_idle_for_other_fail
 test('WHAT[MANAGED-SESSION-012] VERIFY_009_projection_to_record_running_state', () => {
   const record = childRunSnapshot()
   assert.equal(record.agentId, 'agent-1')
-  assert.equal(record.agent, 'fast-coder')
+  assert.equal(record.agent, 'coder')
   assert.equal(record.role, 'Manager')
   assert.equal(record.status, 'Busy')
   assert.equal(record.currentRunId, 'run-1')

@@ -23,11 +23,11 @@ const ownerRootSelection = {
   ownerLogicalRun: null,
   ownerAuthorityRoot: null,
   participantIdentity: {
-    selectedAgent: 'fast-manager',
-    peerAgent: 'deep-manager',
+    selectedAgent: 'manager',
+    peerAgent: 'manager',
     canonicalRole: 'manager',
-    selectedTier: 'fast',
-    persona: 'Coordinator',
+    selectedTier: 'deep',
+    persona: 'Lead',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
   },
@@ -86,7 +86,7 @@ test('WHAT[EFFECT-ACCOUNTING-008] Adapter Blogger Coordinator submits one receip
       },
       ListChildren: async () => {
         childListCalls += 1
-        return dispatch.acceptedChild(bloggerSession, 'fast-blogger', 'fast-blogger')
+        return dispatch.acceptedChild(bloggerSession, 'blogger', 'blogger')
       },
       FamilyRootOf: () => mainSession,
     }

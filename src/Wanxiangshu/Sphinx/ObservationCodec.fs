@@ -32,7 +32,7 @@ module ObservationCodec =
             let! dependencyKey = optional "dependencyKey" asString "" raw
             let! rootGain = optional "expectedRootGain" asFloat 0.0 raw
             let! gatewayGain = optional "gatewayGain" asFloat 0.0 raw
-            let! cost = optional "cost" asFloat 1.0 raw
+            let! cost = optional "cost" asFloat 0.0 raw
             let! provenance = optional "provenance" stringList [] raw
 
             return

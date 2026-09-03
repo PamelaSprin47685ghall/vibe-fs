@@ -12,15 +12,12 @@ import * as semble from '../../../dist/Repository/Investigation/SembleSurface.js
 const here = dirname(fileURLToPath(import.meta.url))
 const fixturePath = join(here, '../../verification-system/tests/support/semble-mcp-fixture.js')
 const ROLES = ['Manager', 'Orchestrator', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'Reviewer', 'DevOps', 'Distiller', 'Blogger', 'Bookkeeper']
-const TIERS = ['fast', 'deep']
-const agentName = (tier, role) => `${tier}-${role.toLowerCase()}`
+const agentName = (role) => `${role.toLowerCase()}`
 const uvxFrom = (ref) => ['uvx', '--from', `semble[mcp] @ git+https://github.com/MinishLab/semble.git@${ref}`, 'semble']
 
 const buildConfig = () => {
   const agent = {}
-  for (const tier of TIERS) {
-    for (const role of ROLES) agent[agentName(tier, role)] = { model: `${tier}-${role.toLowerCase()}-model` }
-  }
+  for (const role of ROLES) agent[agentName(role)] = { model: `${agentName(role)}-model` }
   return { agent }
 }
 
@@ -110,12 +107,10 @@ test('WHAT[REPOSITORY-INVESTIGATION-001] AGENT_027_configure_does_not_inject_hos
   assert.equal(managedAgentConfig.configure(config).ok, true)
   assert.equal(config.mcp?.[semble.serverName], undefined)
   assert.equal(config.mcp?.['stealth-browser-mcp']?.type, 'local')
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      const permission = config.agent[agentName(tier, role)].permission
-      assert.equal(permission.semble, undefined, `${agentName(tier, role)} semble`)
-      assert.equal(permission['semble_*'], undefined, `${agentName(tier, role)} semble_*`)
-      assert.equal(permission['semble_search'], undefined, `${agentName(tier, role)} semble_search`)
-    }
+  for (const role of ROLES) {
+    const permission = config.agent[agentName(role)].permission
+    assert.equal(permission.semble, undefined, `${agentName(role)} semble`)
+    assert.equal(permission['semble_*'], undefined, `${agentName(role)} semble_*`)
+    assert.equal(permission['semble_search'], undefined, `${agentName(role)} semble_search`)
   }
 })

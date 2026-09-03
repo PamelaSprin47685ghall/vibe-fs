@@ -3,17 +3,18 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 
-test('WHAT[DELEG-010] EXEC_026_tierForOwner_preserves_each_supported_tier', () => {
+test('WHAT[DELEG-010] EXEC_026_tier_is_an_ignored_compat_param', () => {
   for (const tier of ['Fast', 'Deep']) {
     const value = sync.vocabulary('Inspector', tier, 'owner-reuse-scope')
-    assert.equal(value.tier, tier.toLowerCase())
+    assert.equal(value.agent, 'inspector')
+    assert.equal(value.role, 'inspector')
   }
 })
-test('WHAT[DELEG-010] EXEC_026_agentNameFor_covers_fast_deep_times_inspector_coder', () => {
-  assert.equal(sync.vocabulary('Inspector', 'Fast', 's').agent, 'fast-inspector')
-  assert.equal(sync.vocabulary('Inspector', 'Deep', 's').agent, 'deep-inspector')
-  assert.equal(sync.vocabulary('Coder', 'Fast', 's').agent, 'fast-coder')
-  assert.equal(sync.vocabulary('Coder', 'Deep', 's').agent, 'deep-coder')
+test('WHAT[DELEG-010] EXEC_026_agentNameFor_returns_bare_inspector_coder', () => {
+  assert.equal(sync.vocabulary('Inspector', 'Fast', 's').agent, 'inspector')
+  assert.equal(sync.vocabulary('Inspector', 'Deep', 's').agent, 'inspector')
+  assert.equal(sync.vocabulary('Coder', 'Fast', 's').agent, 'coder')
+  assert.equal(sync.vocabulary('Coder', 'Deep', 's').agent, 'coder')
 })
 test('WHAT[DELEG-010] EXEC_026_ReuseScopeId_create_value_and_equals', () => {
   assert.equal(sync.vocabulary('Inspector', 'Fast', 'owner-reuse-scope').scope, 'owner-reuse-scope')

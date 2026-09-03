@@ -104,8 +104,8 @@ export const projectionCases = [
 
   differs(
     'VERIFY-007 different tool arguments differ',
-    body([SYSTEM, assistantCall({ args: '{"agent":"fast-coder"}' })]),
-    body([SYSTEM, assistantCall({ args: '{"agent":"deep-coder"}' })]),
+    body([SYSTEM, assistantCall({ args: '{"agent":"coder"}' })]),
+    body([SYSTEM, assistantCall({ args: '{"agent":"reviewer"}' })]),
   ),
 
   differs(

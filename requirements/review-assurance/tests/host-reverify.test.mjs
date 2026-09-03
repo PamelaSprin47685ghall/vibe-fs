@@ -25,11 +25,11 @@ const ownerSelection = {
   ownerLogicalRun: null,
   ownerAuthorityRoot: null,
   participantIdentity: {
-    selectedAgent: 'fast-manager',
-    peerAgent: 'deep-manager',
+    selectedAgent: 'manager',
+    peerAgent: 'manager',
     canonicalRole: 'manager',
-    selectedTier: 'fast',
-    persona: 'Coordinator',
+    selectedTier: 'deep',
+    persona: 'Lead',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
   },
@@ -45,7 +45,7 @@ const liveReviewerOwner = async (ownerSession, options) => {
   )
   assert.equal(seedOwner.ok, true, seedOwner.ok ? '' : seedOwner.error)
 
-  const inherited = authority.issueInheritedIdentitySeed('fast-manager', seedOwner.profile)
+  const inherited = authority.issueInheritedIdentitySeed('manager', seedOwner.profile)
   assert.equal(inherited.ok, true, inherited.ok ? '' : inherited.error)
   const appended = await dispatch.appendAuthorityRoot(live.journal, ownerSession, inherited.value)
   assert.equal(appended.ok, true, appended.ok ? '' : JSON.stringify(appended.error))

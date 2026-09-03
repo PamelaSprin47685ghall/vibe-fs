@@ -72,7 +72,6 @@ type SyncDelegateRuntime
         dispatcher: PromptDispatcher.Runtime,
         journal: AgentJournal,
         attached: IAttachedSessionPort,
-        resolveOwnerTier: SessionId -> AgentTier option,
         onDelegateReady: SessionId -> string -> unit,
         quiescence: ISessionQuiescenceGate,
         workRecordFor: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>,
@@ -271,7 +270,6 @@ type SyncDelegateRuntime
 
     let deps: SyncDelegateWorkflow.Dependencies =
         { Attached = attached
-          ResolveOwnerTier = resolveOwnerTier
           ObserveChild = observeChild
           CreateChild = createChild
           BindChild = bindChild
@@ -442,6 +440,12 @@ type SyncDelegateRuntime
 
     member _.TryFind(ownerSessionId: SessionId, role: SyncDelegateRole) = attached.TryFind(ownerSessionId, role)
 
+    /// Inverse lookup for Strength eligibility: a dedicated SyncDelegate session
+    /// is Work+Attached, never speculation material, regardless of its role.
+    member _.TryFindDelegateOwner(delegateSessionId: SessionId) : SessionId option =
+        attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Inspector)
+        |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Coder))
+
     member _.TryFindForScopeClose(ownerSessionId: SessionId, role: SyncDelegateRole) =
         match attached.TryFind(ownerSessionId, role) with
         | Some sessionId -> Some sessionId
@@ -586,11 +590,3 @@ type SyncDelegateRuntime
 
     interface IDisposable with
         member runtime.Dispose() = runtime.Dispose()
-
-/// Helpers for constructing `resolveOwnerTier` from the active logical run.
-module SyncDelegateTier =
-
-    /// Resolve SelectedTier only while the session has an active logical run.
-    let fromDispatcher (dispatcher: PromptDispatcher.Runtime) (sessionId: SessionId) : AgentTier option =
-        dispatcher.ActiveProfile sessionId
-        |> Option.map (fun profile -> profile.SelectedTier)

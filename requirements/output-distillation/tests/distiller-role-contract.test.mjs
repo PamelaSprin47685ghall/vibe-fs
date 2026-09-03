@@ -36,11 +36,11 @@ test('WHAT[DISTILL-009] distiller_is_private_leaf_runtime_without_public_target_
 
   assert.equal(roleLabel, 'distiller')
   assert.equal(canBeForkedOrHorizonTarget, false)
-  assert.equal(managedAgentName, 'fast-distiller')
+  assert.equal(managedAgentName, 'distiller')
   assert.equal(isInternalRuntime, true)
   assert.equal(contract.internalRuntime, true)
   assert.equal(contract.publicTarget, false)
-  assert.equal(contract.managedAgent, 'fast-distiller')
+  assert.equal(contract.managedAgent, 'distiller')
   assert.equal(hasBloggerCompanion, false)
   assert.equal(contract.bloggerCompanion, false)
 })

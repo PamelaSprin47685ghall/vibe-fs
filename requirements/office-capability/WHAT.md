@@ -7,15 +7,15 @@ Office capability 由该职位有权产生的后果（Entitled Consequence）定
 ## OFF-002: canonical 五分法：五类可 fork office 各有唯一 entitled consequence 与 non-consequence
 
 Manager 可 fork 的五类 Office 构成 canonical 五分法，各自具备明确的权能与边界：
-- **Coder / Engineer**：有权变更仓库源代码（实现、修复、重构、tests-as-source、受托配置）；不做项目运行、测试构建执行、运行证据认证以及未受托的产品决策。
-- **Inspector / Investigator**：有权建立本地已存在事实的证据；不做代码修改、修复实现、测试运行或创造新行为证据。
-- **DevOps / Operator**：有权对运行中的环境行动并产生行为证据；不做产品含义发明或直接的代码编写修改。
-- **Browser / Researcher**：有权建立带有溯源凭据（provenance）的外部事实；不做仓库内部修改，亦不将外部可能性自动转化为仓库义务。
-- **Inquiry / Analyst**：有权对未决问题进行语义理解与假设推演；不做代码变更、环境执行或将思想冒充为证据。
+- **Coder**：有权变更仓库源代码（实现、修复、重构、tests-as-source、受托配置）；不做项目运行、测试构建执行、运行证据认证以及未受托的产品决策。
+- **Inspector**：有权建立本地已存在事实的证据；不做代码修改、修复实现、测试运行或创造新行为证据。
+- **DevOps**：有权对运行中的环境行动并产生行为证据；不做产品含义发明或直接的代码编写修改。
+- **Browser**：有权建立带有溯源凭据（provenance）的外部事实；不做仓库内部修改，亦不将外部可能性自动转化为仓库义务。
+- **Inquiry**：有权对未决问题进行语义理解与假设推演；不做代码变更、环境执行或将思想冒充为证据。
 
-## OFF-003: 同一 office 跨 Persona/ExecutionBinding 时 authority 不变
+## OFF-003: 同一 office 的 authority 不变
 
-同一 Office 的不同档位（fast/deep）与 Persona 仅在表达风格与推理深度上存在差异，其 Office 权能与权限集合保持完全一致。
+同一 Office 的权能与权限集合保持完全一致。每个 Role 恰对应一个 Persona，不存在 fast/deep 档位或组合名解析语义。
 
 ## OFF-004: capability 是 consequence model，不是 tool whitelist 的口语转写
 
@@ -31,7 +31,7 @@ Office 能力是纯粹的后果模型，权限矩阵仅是其在执行层的投�
 
 ## OFF-007: Manager 无普通工具：不读文件、不跑终端、不改仓库、不 inspect
 
-Manager 的核心权能是统筹、委托与集成，不亲自建立仓库具体事实。Manager 面向模型的工具仅限于 fork、join、horizon、todowrite、fission 等编排接口，不具备文件读写、终端运行或直接 inspect 的能力。
+Manager 的核心权能是统筹、委托与集成，不亲自建立仓库具体事实。Manager 面向模型的工具仅限于 fork、join、horizon、fission 等编排接口，不具备文件读写、终端运行或直接 inspect 的能力。
 
 ## OFF-008: Coder consequence = repository source mutation；non-consequence = 运行项目/认证证据/未被托付的决定
 
@@ -60,3 +60,7 @@ Browser 负责采集与求证外部网络事实，并附带可验证的溯源信
 ## OFF-014: Inquiry consequence = 对未决问题的语义理解；non-consequence = 改变 source/执行世界/把思想变成证据
 
 Inquiry 专注于复杂概念辨析、假设生成与未决问题分析。Inquiry 不改变仓库、不触发外部执行，亦不得将推理假设视同已证实证据。
+
+## OFF-015: Predictor 是内部机制专用角色，不参与普通调度与工具门禁
+
+Predictor 仅为 Strength 降级指定廉价 provider/model，不进入 Manager 公开 fork 候选、不参与普通 participant 调度、不拥有工具门禁规则、不暴露给用户可见接口。Predictor 只在内部强度机制中使用。

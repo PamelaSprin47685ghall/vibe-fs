@@ -37,7 +37,7 @@ prompt = { text = "Ship the parser fix." }
 
 [[turn]]
 id = "mgr"
-lane = "fast-manager"
+lane = "manager"
 user = "Ship the parser fix."
 
   [[turn.step]]
@@ -51,7 +51,7 @@ const runtimeOf = (source) => {
   const result = compileScenario(source, { name: 'p.toml' });
   assertTrue(result.ok, `fixture must compile: ${result.ok ? '' : result.problems.join(' | ')}`);
   const runtime = new ScenarioRuntime(result.scenario);
-  runtime.bindAlias('fast-manager', SESSION);
+  runtime.bindAlias('manager', SESSION);
   return runtime;
 };
 
@@ -191,7 +191,7 @@ export const forestLibCases = [
       const undeclared = request([user('Nobody declared this.')]);
 
       const refusal = rejectsSelect(runtime, undeclared, 'unmatched');
-      assertEq(refusal.unmatched.key.lane, 'fast-manager', 'the refusal itself is returned for further assertions');
+      assertEq(refusal.unmatched.key.lane, 'manager', 'the refusal itself is returned for further assertions');
 
       assertEq(
         thrownMessage(() => rejectsSelect(runtime, undeclared, 'ambiguous')),

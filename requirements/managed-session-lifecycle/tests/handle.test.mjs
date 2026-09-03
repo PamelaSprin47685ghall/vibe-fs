@@ -55,7 +55,7 @@ const HANDLE = handleId.agent('h1')
 
 // ── Projection command helpers (call production HandleSurface) ───────────────
 
-const linkOn = (state, { handle = HANDLE, child = CHILD, agent = 'fast-coder', role = 'Coder' } = {}) => {
+const linkOn = (state, { handle = HANDLE, child = CHILD, agent = 'coder', role = 'Coder' } = {}) => {
   const applied = HandleSurface.apply(state, { op: 'link', handle, child, agent, role })
   assert.equal(applied.ok, true, applied.ok ? '' : `link refused: ${JSON.stringify(applied.error)}`)
   return applied.state
@@ -100,13 +100,13 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_agent_pty_and_manager_job_handles_are_s
   state = linkOn(state, {
     handle: handleId.pty('x'),
     child: sessionId('ses_b'),
-    agent: 'fast-devops',
+    agent: 'devops',
     role: 'DevOps',
   })
   state = linkOn(state, {
     handle: handleId.managerJob('x'),
     child: sessionId('ses_j'),
-    agent: 'fast-manager',
+    agent: 'manager',
     role: 'Manager',
   })
 
@@ -143,7 +143,7 @@ test('WHAT[MANAGED-SESSION-015] EXEC_009_a_linked_handle_records_the_child_sessi
   assert.deepEqual(stateOf(state), {
     handle: 'agent:h1',
     child: 'ses_c',
-    targetAgent: 'fast-coder',
+    targetAgent: 'coder',
     role: 'Coder',
     lifecycle: 'Active',
     creationOrder: 0,
@@ -288,7 +288,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_handle_answers_retired_foreve
     op: 'link',
     handle: HANDLE,
     child: CHILD,
-    agent: 'fast-coder',
+    agent: 'coder',
     role: 'Coder',
   })
   assert.equal(reopened.ok, true, `same binding must accept a new work unit: ${JSON.stringify(reopened)}`)
@@ -341,7 +341,7 @@ test('WHAT[MANAGED-SESSION-015] EXEC_009_one_durable_handle_cannot_be_rebound_to
       op: 'link',
       handle: HANDLE,
       child: sessionId('ses_other'),
-      agent: 'fast-coder',
+      agent: 'coder',
       role: 'Coder',
     }),
     { ok: false, error: { kind: 'TransitionRejected', reason: 'HandleIdentityConflict' } },
@@ -374,7 +374,7 @@ const handleFact = {
     ParentSessionId: PARENT,
     ChildSessionId: CHILD,
     Handle: HANDLE,
-    TargetAgent: 'fast-coder',
+    TargetAgent: 'coder',
     CanonicalRole: roles.of('Coder'),
     Ownership: handleOwnership.durableParentHandle(),
   }),
@@ -418,7 +418,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_the_three_facts_replay_into_the_termina
   assert.deepEqual(foldStateOf(folded), {
     handle: 'agent:h1',
     child: 'ses_c',
-    targetAgent: 'fast-coder',
+    targetAgent: 'coder',
     role: 'Coder',
     lifecycle: 'Retired',
     creationOrder: 0,
@@ -478,7 +478,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_001_fork_creates_a_child_run', () => {
   assert.deepEqual(stateOf(active), {
     handle: 'agent:h1',
     child: 'ses_c',
-    targetAgent: 'fast-coder',
+    targetAgent: 'coder',
     role: 'Coder',
     lifecycle: 'Active',
     creationOrder: 0,
@@ -500,7 +500,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_001_fork_creates_a_child_run', () => {
 
 test('WHAT[MANAGED-SESSION-006] EXEC_007_nudge_is_fire_and_forget', () => {
   const active = linkOn(HandleSurface.empty())
-  const nudged = linkOn(active, { child: CHILD, agent: 'fast-coder', role: 'Coder' })
+  const nudged = linkOn(active, { child: CHILD, agent: 'coder', role: 'Coder' })
 
   // A nudge re-uses the same handle; it does not add a new child, listener,
   // or completion cell.
@@ -521,7 +521,7 @@ test('WHAT[MANAGED-SESSION-007] EXEC_009_completed_awaiting_join_carries_blob_re
   assert.deepEqual(stateOf(completed), {
     handle: 'agent:h1',
     child: 'ses_c',
-    targetAgent: 'fast-coder',
+    targetAgent: 'coder',
     role: 'Coder',
     lifecycle: 'CompletedAwaitingJoin',
     creationOrder: 0,
@@ -557,7 +557,7 @@ test('WHAT[MANAGED-SESSION-007] EXEC_009_fold_replays_completion_blob_refs', () 
   assert.deepEqual(foldStateOf(folded), {
     handle: 'agent:h1',
     child: 'ses_c',
-    targetAgent: 'fast-coder',
+    targetAgent: 'coder',
     role: 'Coder',
     lifecycle: 'CompletedAwaitingJoin',
     creationOrder: 0,
@@ -614,7 +614,7 @@ test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_role', () => {
     op: 'link',
     handle: HANDLE,
     child: CHILD,
-    agent: 'fast-coder',
+    agent: 'coder',
     role: 'Plumber',
   })
   assert.equal(result.ok, false)
@@ -643,7 +643,7 @@ test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_ownership', () => {
     op: 'link',
     handle: HANDLE,
     child: CHILD,
-    agent: 'fast-coder',
+    agent: 'coder',
     role: 'Coder',
     ownership: 'AlienOwned',
   })

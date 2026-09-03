@@ -26,9 +26,8 @@ module DistillationSurface =
     /// The internal role label used by the Host-owned runtime.
     let roleLabel: string = Roles.roleLabel distillerRole
 
-    /// The fixed fast-tier managed identity used for bounded-tail distillation.
-    let managedAgentName: string =
-        ManagedAgentCatalog.nameOf AgentTier.Fast distillerRole
+    /// The fixed managed identity used for bounded-tail distillation.
+    let managedAgentName: string = ManagedAgentCatalog.nameOf distillerRole
 
     /// Distiller is an internal Host-owned runtime.
     let isInternalRuntime: bool = Roles.isInternal distillerRole

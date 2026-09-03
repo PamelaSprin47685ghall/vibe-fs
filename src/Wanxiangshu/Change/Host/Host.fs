@@ -74,8 +74,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let managerAgentId (jobId: ManagerJobId) = ManagerJobId.value jobId
 
     /// The durable job record. ORCH-003: the Manager's managed agent name lives here
-    /// and nowhere else, so a resumed `deep-manager` job never degrades to
-    /// `fast-manager` (PROMPT-008 forbids rebuilding it from the role).
+    /// and nowhere else (PROMPT-008 forbids rebuilding it from the role).
     let jobRecord (jobId: ManagerJobId) =
         deps.Journal
         |> Option.bind (fun journal ->

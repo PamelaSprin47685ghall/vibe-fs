@@ -12,7 +12,7 @@ const [mode, workspace, marker] = process.argv.slice(2)
 const sessionId = 'ses-process-restart-canary'
 const physicalUserMessageId = 'msg-process-restart-canary'
 const decoyPhysicalUserMessageId = 'msg-process-restart-decoy'
-const agent = 'fast-coder'
+const agent = 'coder'
 
 if (!mode || !workspace || !marker) throw new Error('mode, workspace, and marker are required')
 

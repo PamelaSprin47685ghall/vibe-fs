@@ -26,10 +26,10 @@ const currentPayload = {
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: 'fast-coder',
-      peerAgent: 'deep-coder',
+      selectedAgent: 'coder',
+      peerAgent: 'coder',
       canonicalRole: 'coder',
-      selectedTier: 'fast',
+      selectedTier: 'deep',
       persona: 'Coder',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
@@ -49,10 +49,10 @@ const inheritedPayload = {
     ownerLogicalRun: 'run-authority-owner',
     ownerAuthorityRoot: 'root-authority-owner',
     participantIdentity: {
-      selectedAgent: 'fast-coder',
-      peerAgent: 'deep-coder',
+      selectedAgent: 'coder',
+      peerAgent: 'coder',
       canonicalRole: 'coder',
-      selectedTier: 'fast',
+      selectedTier: 'deep',
       persona: 'Lead',
       personaCatalogVersion: 1,
       origin: 'InheritedFromOwner',
@@ -202,14 +202,16 @@ test('WHAT[INTERACTION-AUTHORITY-003] malformed legacy identity fails closed at 
   assertDecodeErrorAcrossReplayRoutes(malformed, /SelectedAgent/)
 })
 
-test('WHAT[INTERACTION-AUTHORITY-003] mismatched legacy identity fails closed precisely', () => {
-  const mismatch = replacePayload(legacyHumanRoot, (payload) => {
-    payload.PeerAgent = 'deep-reviewer'
+test('WHAT[INTERACTION-AUTHORITY-003] stale legacy peer fields normalize to canonical identity', () => {
+  const stale = replacePayload(legacyHumanRoot, (payload) => {
+    payload.PeerAgent = 'reviewer'
+    payload.SelectedTier = 'fast'
   })
-  assertDecodeErrorAcrossReplayRoutes(
-    mismatch,
-    /participant identity PeerAgent mismatch: expected deep-coder, got deep-reviewer/,
-  )
+  const decoded = factCodec.decode(stale)
+  assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
+  assert.equal(decoded.payload.IdentitySeed.participantIdentity.selectedAgent, 'coder')
+  assert.equal(decoded.payload.IdentitySeed.participantIdentity.peerAgent, 'coder')
+  assert.equal(decoded.payload.IdentitySeed.participantIdentity.selectedTier, 'deep')
 })
 
 test('WHAT[INTERACTION-AUTHORITY-003] malformed schema-v2 identity fails closed at the missing field', () => {
@@ -267,10 +269,10 @@ test('WHAT[INTERACTION-AUTHORITY-003] ReviewJournalSurface constructs and projec
       authorityRoot: 'root-ses-review-authority-v2',
       authorityKind: 'HumanRoot',
       identitySeed: currentPayload.IdentitySeed,
-      selectedAgent: 'fast-coder',
-      peerAgent: 'deep-coder',
+      selectedAgent: 'coder',
+      peerAgent: 'coder',
       role: 'coder',
-      initialTier: 'fast',
+      initialTier: 'deep',
     })
   } finally {
     journal.JournalSurface_dispose(opened.journal)

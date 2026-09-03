@@ -33,15 +33,15 @@ const {
 const SESSION = 'ses_a'
 const RUN = 'run_L'
 const ROOT = 'msg_u1'
-const PAIR = { selectedAgent: 'fast-coder', peerAgent: 'deep-coder' }
+const PAIR = { selectedAgent: 'coder', peerAgent: 'coder' }
 
 const ROOT_SELECTION_IDENTITY_SEED = {
   kind: 'RootSelection',
   participantIdentity: {
-    selectedAgent: 'fast-coder',
-    peerAgent: 'deep-coder',
+    selectedAgent: 'coder',
+    peerAgent: 'coder',
     canonicalRole: 'coder',
-    selectedTier: 'fast',
+    selectedTier: 'deep',
     persona: 'Coder',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
@@ -125,11 +125,12 @@ test('WHAT[PAR-002] FALLBACK_002_offset_is_modulo_four_and_never_stops_advancing
 test('WHAT[PAR-002] FALLBACK_002_each_offset_maps_to_a_fixed_side_and_a_fixed_agent', () => {
   assert.deepEqual([0, 1, 2, 3].map(cursor.side), ['SideA', 'SideA', 'SideB', 'SideB'])
 
-  // A/A/B/B: the agent is a function of the offset alone, which is what makes
-  // "which model is this attempt on" answerable without any history.
+  // Modulo-4 offsets are unchanged, but the single-version identity is preserved:
+  // SelectedAgent == PeerAgent, so EffectiveAgent always equals SelectedAgent and
+  // provider rotation happens at the model level, not via a peer flip.
   assert.deepEqual(
     [0, 1, 2, 3].map((offset) => cursor.effectiveAgent(PAIR, cursor.atOffset(offset))),
-    ['fast-coder', 'fast-coder', 'deep-coder', 'deep-coder'],
+    ['coder', 'coder', 'coder', 'coder'],
   )
 })
 

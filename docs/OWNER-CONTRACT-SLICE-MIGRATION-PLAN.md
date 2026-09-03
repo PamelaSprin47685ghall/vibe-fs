@@ -2,7 +2,7 @@
 
 日期：2026-09-03
 
-状态：M6.0–M6.2已完成；M6.3全局规则及EventStore/Host/Delegation点名边界已裁决；第四轮protocol review后可立即启动M6.3a。`C(W)`/`J(W)`、generated artifact row、Node runtime判定与semantic staged-input closure必须先进入正式WHAT/proof并全绿，之后才可启动M6.3b production extractor。全部live locality的terminal classification/adjudication、完整capability census与全量slice manifest尚未完成；不得进入M6.3c/M6.4。`deriveAdjudicationCandidates`的key universe固定为fresh owner-project graph的全部locality；当前92个composition provider只是带`CompositionProvider` reason的pre-cutover子集，不是永久gate数量。
+状态：M6.0–M6.2已完成；M6.3全局规则及EventStore/Host/Delegation点名边界已裁决；M6.3a执行前preflight与upstream `edc97d45b`语义合并已完成，下一节点从正式WHY→WHAT→HOW→GAP开始。`C(W)`/`J(W)`、generated artifact row、Node runtime判定与semantic staged-input closure必须先进入正式WHAT/proof并全绿，之后才可启动M6.3b production extractor。全部live locality的terminal classification/adjudication、完整capability census与全量slice manifest尚未完成；不得进入M6.3c/M6.4。`deriveAdjudicationCandidates`的key universe固定为fresh owner-project graph的全部locality；当前92个composition provider只是带`CompositionProvider` reason的pre-cutover子集，不是永久gate数量。
 
 适用背景：Fable owner-project 编译边界、published contract 授权与 semantic owner 重整
 
@@ -18,7 +18,7 @@
 
 授权绑定稳定的 locality，不绑定 owner 名称。每条跨 locality 依赖都必须经过 slice grant；owner 是否相同不参与授权判定。Fable 的真实有效 audience 按 ProjectReference 反向可达闭包计算；轻量 compiler-resolved analyzer 证明实际源码依赖没有逃出该闭包。高风险 effect implementation 只能由 composition 到达，普通 consumer 只依赖 port/capability。
 
-当前 fresh census 为 49 个 owner、178 个 locality、711 个 production source、1,853 条 ProjectReference、784 份旧 contract record、4,420 条 actual cross-locality source edge；尚有 1 条 missing closure edge。数字随施工变化，只作计划快照。190–210 个 project、39–44 个 owner、增量影响下降 25%只作规划导向，不构成正确性定义。模拟显示，优先增加约 30 个高价值 slice，能消除理想化 project-level 模型中约 50.8% 的额外暴露；继续增加至 50 个的收益仅升至约 55.4%，边际收益明显下降。
+当前 fresh census 为 49 个 owner、178 个 locality、711 个 production source、1,853 条 ProjectReference、784 份旧 contract record、4,421 条 actual cross-locality source edge；尚有 1 条 missing closure edge。数字随施工变化，只作计划快照。190–210 个 project、39–44 个 owner、增量影响下降 25%只作规划导向，不构成正确性定义。模拟显示，优先增加约 30 个高价值 slice，能消除理想化 project-level 模型中约 50.8% 的额外暴露；继续增加至 50 个的收益仅升至约 55.4%，边际收益明显下降。
 
 这不是试点方案。迁移可以分批提交，但全部批次使用同一终态 schema；禁止长期并存新旧授权模型、兼容 facade 或临时 baseline。
 
@@ -123,7 +123,7 @@ owner identity 不参与授权判断。`private` locality 禁止任何其他 loc
 | ProjectReference | 1,853 |
 | 跨 owner ProjectReference | 1,614 |
 | same-owner ProjectReference | 239 |
-| actual cross-locality source edge | 4,420 |
+| actual cross-locality source edge | 4,421 |
 | missing closure edge | 1 |
 | 指向 contract kind 的 direct reference | 921 |
 | 指向 composition kind 的 direct reference | 797 |
@@ -1471,3 +1471,15 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - 计划复验：`git diff --check`零错误、Markdown code fence为64个且闭合；`node --test requirements/structured-workflow/tests/*.test.mjs`为244/244；`node scripts/check.mjs`全绿，包含291条spec、711个production source、178个locality、784个contract与780 WHAT/3977 tests requirement trace。
 - 执行边界：M6.3a可立即开始；本节schema、规则、RED code与proof必须先进入正式`structured-workflow` WHY/WHAT/HOW/GAP并全绿，随后才可启动M6.3b production extractor。无需重开EventStore、Host、FatalProcess、Delegation、PTY或老板裁决。
 - 本轮只修改计划，不启动M6.3a production、不启用v2 gate，GAP-031保持PARTIAL。
+
+### 2026-09-03 — M6.3a执行前preflight与upstream同步
+
+- 起点为reviewer批准的干净HEAD `bfbee8f2abf4ed788cc3b6383b096e88604ed385`。执行第10节preflight时发现upstream前移到`edc97d45bc2ad4898117abc2aceec654040b1572`（`canonical single-version roles, universal cursor mode, and failover summary retry`），先完成语义合并再建立基线；Git object format由`git rev-parse --show-object-format`确认为`sha1`。
+- 三处文本冲突均按细粒度语义解开：① admission decision proof保留本地固定production-bound counterworld，拒绝恢复Cartesian `expectedFor`镜像，同时采用upstream唯一`coder`身份；② participant identity HOW采用upstream PID-001..009与single-version role语义，把本地recovery proofs重映射到PID-008；③ identity recovery proof同时保留本地exact durable payload/typed rejection因果断言与upstream实际`recoverActiveIdentity`断言。两套断言调用同一production surface，无平行oracle。
+- 合并后主动修复一处upstream原内容：`src/Wanxiangshu/Interaction/Authority/Child.fs`在`edc97d45b`中把二参数application的第二参数缩进到错误列，`format:check`必红；Fantomas只恢复规范缩进，不改变表达式、类型或控制流。最终完整sink的format/build/unit/integration/E2E证明该修正。
+- 三次失败基线均保留因果分类。首次非特权sink为3928/3930 unit：Host canary因沙箱禁止`127.0.0.1`监听而失败，沙箱外重放2/2绿；proof-ladder真实发现M6.1 `locality-dependencies.mjs`既非pre-build gate也未登记为alternate entrypoint。修复后将它明确登记为M6.4前的report-only integration analyzer，proof-ladder 12/12绿，未赋予第二release authority。第二次sink在integration发现analyzer错误从隔离后的`HOME`寻找Fable程序集；改为`NUGET_PACKAGES → DOTNET_CLI_HOME → OS home`解析，复现runner隔离环境的compiler fixture 1/1绿。第三次sink发现本地process-restart scenario仍以已退役`fast-coder`建立正向身份；该文件不在upstream，属于本地proof对upstream语义的漏迁。改为`coder`后真实进程重启canary 1/1绿；其余legacy agent字符串均为拒绝负例，保留。
+- 最终`npm run format-build-test`从头退出0，wall约111s：format绿色；fast gate为290条spec、49 owners、178 localities、711 production sources、1,853 refs、784 contracts、779 WHAT/3,978 tests；Fable 5.13.0单次clean full invocation解析1,460 sources、编译1,422 impact items用31.624s，build总计36.2s，165 surfaces/780 emitted modules闭合；unit 3,930/3,930；全部integration绿色，其中owner compiler/analyzer组5/5、verification harness 273 cases；Long Stroke单独复验60 steps/6.6s flow、进程15.0s；`npm pack --dry-run`产出2.2MB tarball、2,059 files。
+- fresh production analyzer用19.716s得到178 localities、711 sources、4,421 actual cross-locality source edges与唯一`eventstore-merge-runtime/EventKWayMerge.fs → eventstore-core-runtime/CanonicalEventCodec.fs` missing closure。它仍是M6.3c/M6.4既定原子blocker，不是新增M6.2遗漏；19.716s远低于185s project-check预算，M6.4仍只允许release integration lane fresh执行一次。
+- 全部163个direct provider的无owner过滤反向闭包排名见`docs/OWNER-CONTRACT-SLICE-PREFLIGHT-CENSUS.md`；完整row digest为`7fb847f52189438e13746c8d57ee84f46272add4b44a440a047a8941f1e0dbb0`。最高三项为`foundation-roles` 166 projects/672 sources、`foundation-identity` 163/663、`participant-provider-projection-model` 134/584；`git-gateway`仍为4 projects/22 sources，证明统计口径与历史canary一致。
+- 本次upstream变更没有产生需要新老板/owner裁决的owner merge候选；数量相近或引用密集不能自动推出语义合并。现有49 owner与历史M6.5候选保持待测，不在M6.3a扩大范围。project规划仍以190–210作容量导向：当前178不构成不足，后续只因effect隔离、授权边界或可测closure收益增加locality。
+- test运行产生的fixture-local NuGet migration marker加入精确`.gitignore`路径；不扩大通配范围，不把production、manifest或cutover input隐藏。M6.3a下一节点严格从structured-workflow与全局GAP的WHY→WHAT→HOW→GAP开始；production-owned oracle及全部RED fixture全绿前不得进入M6.3b。

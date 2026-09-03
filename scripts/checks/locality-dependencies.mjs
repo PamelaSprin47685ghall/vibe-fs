@@ -24,7 +24,8 @@ function fableToolDirectory() {
   const manifest = JSON.parse(readFileSync(join(ROOT, '.config/dotnet-tools.json'), 'utf8'))
   const version = manifest?.tools?.fable?.version
   if (typeof version !== 'string' || version.length === 0) throw new Error('dotnet tool manifest has no pinned Fable version')
-  const directory = join(homedir(), '.nuget/packages/fable', version, 'tools', 'net10.0', 'any')
+  const packageRoot = process.env.NUGET_PACKAGES ?? join(process.env.DOTNET_CLI_HOME ?? homedir(), '.nuget/packages')
+  const directory = join(packageRoot, 'fable', version, 'tools', 'net10.0', 'any')
   for (const assembly of ['Fable.Compiler.dll', 'Fable.AST.dll', 'FSharp.Compiler.Service.dll'])
     if (!existsSync(join(directory, assembly))) throw new Error(`missing Fable ${version} compiler assembly: ${assembly}`)
   return directory

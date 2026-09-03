@@ -190,9 +190,9 @@ type private ForkRuntimeBackendState
         (agentId: string, role: Role, agent: string, ?prompt: string, ?runWork: unit -> Task<AgentCompletionOutcome>)
         : ForkResult =
         // PROMPT-008: the managed agent name is required, never defaulted.
-        // Defaulting to `fast-ROLE` invented a tier nobody selected, and the
-        // invented name then flowed into the completion record and the Host send
-        // boundary as if it had been chosen.
+        // Rebuilding or inventing a name from a role is forbidden; the selected
+        // name flows into the completion record and the Host send boundary as
+        // chosen by the caller.
         let agentName = agent.Trim()
 
         lock lockObj (fun () ->

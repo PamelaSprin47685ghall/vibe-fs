@@ -206,19 +206,11 @@ module CompressionSurface =
             | Some role -> Ok role
             | None -> Error(sprintf "unknown role: %s" (text value))
 
-    let private tierResult value : Result<AgentTier, string> =
-        if isNullish value then
-            Ok AgentTier.Fast
-        else
-            match Roles.tryParseTier (text value) with
-            | Some tier -> Ok tier
-            | None -> Error(sprintf "unknown tier: %s" (text value))
-
     let private attemptProbeOf (value: obj) : PrefixProbe = probeOfJs value
 
     let private attemptPlanCore (value: obj) : Result<AttemptPlan, string> =
-        match roleResult value?role, tierResult value?tier, requestKindResult value?kind with
-        | Ok role, Ok tier, Ok requestKind ->
+        match roleResult value?role, requestKindResult value?kind with
+        | Ok role, Ok requestKind ->
 
             let selectProbe () =
                 if not (isNullish value?probe) then
@@ -226,7 +218,7 @@ module CompressionSurface =
                 else
                     Error(reasonOf value?noCandidateReason)
 
-            ParticipantIdentity.resolveAtRoot (ManagedAgentCatalog.nameOf tier role)
+            ParticipantIdentity.resolveAtRoot (ManagedAgentCatalog.nameOf role)
             |> Result.mapError (fun error -> sprintf "invalid participant identity: %A" error)
             |> Result.bind (fun participantIdentity ->
                 PromptAuthority.createAuthorityExecutionProfile
@@ -248,9 +240,8 @@ module CompressionSurface =
                      else
                          RecoveryOpportunity.OrdinaryAttempt)
                     selectProbe)
-        | Error error, _, _
-        | _, Error error, _
-        | _, _, Error error -> Error error
+        | Error error, _
+        | _, Error error -> Error error
 
     let private permissionLabel (permission: ToolPermission) : string =
         match permission with
@@ -283,7 +274,7 @@ module CompressionSurface =
             {| selectedAgent = ParticipantIdentity.selectedAgent identity
                peerAgent = ParticipantIdentity.peerAgent identity
                canonicalRole = ParticipantIdentity.roleLabel identity
-               selectedTier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+               selectedTier = "deep"
                persona = ParticipantIdentity.persona identity
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
                origin =

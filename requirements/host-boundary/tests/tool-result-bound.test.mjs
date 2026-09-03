@@ -14,7 +14,7 @@ test('WHAT[HOST-BOUNDARY-015] TOOL_RESULT_BOUND_constants_match_host_defaults_ex
 })
 
 test('WHAT[HOST-BOUNDARY-015] TOOL_RESULT_BOUND_under_limit_is_identity', () => {
-  const text = 'status = "completed"\nagent = "fast-coder"\n'
+  const text = 'status = "completed"\nagent = "coder"\n'
   assert.equal(toolResultBound.bound(text), text)
 })
 

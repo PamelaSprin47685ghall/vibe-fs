@@ -56,7 +56,7 @@ type PtyRecord =
 type AgentRecord =
     {
         AgentId: string
-        /// Managed agent name (fast-ROLE / deep-ROLE). Required; empty is refused at reuse.
+        /// Managed agent name. Required; empty is refused at reuse.
         Agent: string
         Role: Role
         Status: AgentStatus

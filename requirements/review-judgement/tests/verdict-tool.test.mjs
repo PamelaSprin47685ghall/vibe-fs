@@ -5,7 +5,7 @@ import * as judge from '../../../dist/Mission/Review/OpenCode/JudgeSurface.js'
 
 const hostContext = ({ sessionId = 'ses-reviewer', toolCallId, providerRunId } = {}) => ({
   sessionID: sessionId,
-  agent: 'fast-reviewer',
+  agent: 'reviewer',
   ...(toolCallId === undefined ? {} : { callID: toolCallId }),
   ...(providerRunId === undefined ? {} : { messageID: providerRunId }),
 })
@@ -16,12 +16,12 @@ const admitReviewerMaterial = async (hooks, messageId) => {
       id: messageId,
       role: 'user',
       sessionID: 'ses-reviewer',
-      agent: 'fast-reviewer',
+      agent: 'reviewer',
       model: { providerID: 'host', modelID: 'placeholder' },
     },
     parts: [],
   }
-  await hooks['chat.message']({ sessionID: 'ses-reviewer', agent: 'fast-reviewer' }, output)
+  await hooks['chat.message']({ sessionID: 'ses-reviewer', agent: 'reviewer' }, output)
 }
 
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_spec_exposes_the_verdict_input_and_public_tool_identity', () => {
@@ -34,7 +34,7 @@ test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_spec_exposes_the_verdict_input_and_public
 
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_invalid_input_is_rejected_as_a_natural_consequence', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
+    await acceptAuthorityRoot(runtime, 'ses-reviewer', 'reviewer')
     const result = await hooks.tool.judge.execute({ verdict: 'APPROVE' }, hostContext())
     assert.match(result, /(?:judgment was not received|你的判断未被收下)/i)
     assert.match(result, /(?:PERFECT or REVISE|PERFECT 或 REVISE)/i)
@@ -44,7 +44,7 @@ test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_invalid_input_is_rejected_as_a_natural_co
 
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_missing_input_is_rejected_as_a_natural_consequence', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
+    await acceptAuthorityRoot(runtime, 'ses-reviewer', 'reviewer')
     const result = await hooks.tool.judge.execute({}, hostContext())
     assert.match(result, /(?:judgment was not received|你的判断未被收下)/i)
     assert.match(result, /(?:PERFECT or REVISE|PERFECT 或 REVISE)/i)
@@ -62,7 +62,7 @@ test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_is_unavailable_to_non_reviewer_sessions',
 
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_empty_session_is_rejected_before_role_resolution', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
+    await acceptAuthorityRoot(runtime, 'ses-reviewer', 'reviewer')
     const result = await hooks.tool.judge.execute({ verdict: 'REVISE' }, hostContext({ sessionId: '' }))
     assert.match(result, /(?:authority is established|no active identity|没有有效身份|调用方权威确立之前)/i)
     assert.doesNotMatch(result, /\berror\s*=/)
@@ -71,7 +71,7 @@ test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_empty_session_is_rejected_before_role_res
 
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_reviewer_requires_a_tool_call_id_before_review_submission', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
+    await acceptAuthorityRoot(runtime, 'ses-reviewer', 'reviewer')
     const result = await hooks.tool.judge.execute({ verdict: 'REVISE' }, hostContext({ providerRunId: 'run-1' }))
     assert.match(result, /(?:could not be bound to the current review turn|无法绑定到当前审查轮次)/i)
     assert.doesNotMatch(result, /\berror\s*=/)

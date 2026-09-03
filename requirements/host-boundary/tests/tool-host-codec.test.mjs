@@ -13,8 +13,8 @@ const decode = (input) => {
 }
 
 test('WHAT[HOST-BOUNDARY-009] HOST_011_call_id_and_message_id_present_decode_to_some', () => {
-  assert.deepEqual(decode({ sessionID: 'ses_tool_1', agent: 'fast-reviewer', callID: 'call_abc', messageID: 'msg_asst_run' }), {
-    sessionId: 'ses_tool_1', agent: 'fast-reviewer', toolCallId: 'call_abc', providerRunId: 'msg_asst_run',
+  assert.deepEqual(decode({ sessionID: 'ses_tool_1', agent: 'reviewer', callID: 'call_abc', messageID: 'msg_asst_run' }), {
+    sessionId: 'ses_tool_1', agent: 'reviewer', toolCallId: 'call_abc', providerRunId: 'msg_asst_run',
   })
 })
 

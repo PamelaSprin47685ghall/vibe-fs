@@ -23,18 +23,18 @@ const acceptedWire = (physicalUserMessageId, overrides = {}) => {
     IdentitySeed: [
       'RootSelection',
       {
-        InitialTier: 'Fast',
+        InitialTier: 'deep',
         Origin: 'ResolvedAtRoot',
-        PeerAgent: 'deep-coder',
+        PeerAgent: 'coder',
         Persona: 'Coder',
         PersonaCatalogVersion: 1,
         Role: 'coder',
-        SelectedAgent: 'fast-coder',
+        SelectedAgent: 'coder',
       },
     ],
     PhysicalUserMessageId: tagged('PhysicalUserMessageId', physicalUserMessageId),
     Origin: ['AuthorityRoot', 'HumanRoot'],
-    EffectiveAgent: 'fast-coder',
+    EffectiveAgent: 'coder',
     ...overrides.Evidence,
   }
 
@@ -129,7 +129,7 @@ test('WHAT[CHATEXEC-004] identical Accepted replay is idempotent and conflicting
     mustFold([accepted, startedWire('msg-replay')]),
   )
 
-  const conflict = acceptedWire('msg-replay', { Evidence: { EffectiveAgent: 'deep-coder' } })
+  const conflict = acceptedWire('msg-replay', { Evidence: { EffectiveAgent: 'reviewer' } })
   const rejected = fold([accepted, conflict])
   assert.equal(rejected.ok, false)
   assert.notEqual(rejected.error, '')
@@ -208,7 +208,7 @@ test('WHAT[CHATEXEC-010] cancel and delete settle every exact projected executio
     assert.equal(signals.has(signal), true)
     const sessionId = `ses-${lifecycle}-drain`
     const messageIds = [`msg-${lifecycle}-a`, `msg-${lifecycle}-b`]
-    const effectiveAgents = ['fast-coder', 'deep-coder']
+    const effectiveAgents = ['coder', 'reviewer']
     const runtimes = new Map()
     const facts = []
 

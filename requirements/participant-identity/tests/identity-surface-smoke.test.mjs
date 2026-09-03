@@ -10,12 +10,15 @@ import * as factCodec from '../../../dist/Persistence/Journal/FactCodecSurface.j
 import * as reviewJournal from '../../../dist/Persistence/Journal/ReviewJournalSurface.js'
 
 test('WHAT[PID-001] registered identity surfaces load and expose their narrow contracts', async () => {
-  assert.equal(identity.peerName('fast-coder'), 'deep-coder')
+  const coder = identity.resolveParticipantIdentityAtRoot('coder')
+  assert.equal(coder.ok, true)
+  assert.equal(coder.identity.peer, 'coder')
   assert.equal(authority.promotePhysical('msg_identity_surface_smoke'), 'msg_identity_surface_smoke')
   assert.equal(journalCodec.deserialize('{}').ok, false)
   assert.equal(factCodec.containsLegacyFallbackFields('{}'), false)
   assert.deepEqual(fission.ringMergeOrder(1), [])
-  assert.equal(identity.nameOf('fast', 'coder'), 'fast-coder')
+  assert.equal(identity.nameOf('fast', 'coder'), 'coder')
+  assert.equal(identity.nameOf('deep', 'coder'), 'coder')
   assert.deepEqual(roles.allInternalRoleLabels, ['blogger', 'distiller'])
 
   const rejectedAppend = await reviewJournal.appendAgent(null, '', null, '', '', null)

@@ -555,7 +555,7 @@ module TransactionSurface =
             let attemptedEvidence =
                 if acceptanceConflict then
                     { acceptedEvidence with
-                        EffectiveAgent = ParticipantIdentity.peerAgent profile.Authority.ParticipantIdentity }
+                        LogicalRunId = LogicalRunId.create "run-conflict" }
                 else
                     acceptedEvidence
 

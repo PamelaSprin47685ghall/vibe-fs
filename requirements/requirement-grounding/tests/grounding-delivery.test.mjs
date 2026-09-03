@@ -40,21 +40,14 @@ test('WHAT[REQUIREMENT-GROUNDING-005] APPLIES-TO external grounding injects only
     const projected = await host.projectWithJournal(opened.journal, 's-material', terminalRead(source))
     assert.equal(projected.ok, true)
 
-    const injectedPaths = projected.value
-      .filter((message) => message.info?.source === host.source)
-      .map((message) => message.parts[0].state.input.filePath)
-      .map((path) => path.replaceAll('\\', '/'))
-      .map((path) => path.slice(path.indexOf('/requirements/') + 1))
-
-    assert.deepEqual(injectedPaths, [
-      'requirements/alpha/HOW.md',
-      'requirements/alpha/PROOF.md',
-      'requirements/alpha/WHAT.md',
-      'requirements/alpha/WHY.md',
-    ])
-    assert.ok(injectedPaths.every((path) => path.endsWith('.md')))
-    assert.equal(injectedPaths.some((path) => path.includes('/tests/')), false)
-    assert.equal(injectedPaths.some((path) => path.endsWith('/APPLIES-TO')), false)
+    const terminalOutput = projected.value.at(-1).parts[0].state.output
+    for (const file of ['HOW.md', 'PROOF.md', 'WHAT.md', 'WHY.md']) {
+      assert.ok(terminalOutput.includes(`requirement_source_path = "requirements/alpha/${file}"`), `must contain ${file}`)
+    }
+    assert.equal(terminalOutput.includes('notes.txt'), false)
+    assert.equal(terminalOutput.includes('/tests/'), false)
+    assert.equal(terminalOutput.includes('/APPLIES-TO'), false)
+    assert.equal(projected.value.some((m) => m.info?.source === host.source), false)
     host.disposeJournal(opened.journal)
   } finally { cleanup() }
 })
@@ -87,18 +80,12 @@ test('WHAT[REQUIREMENT-GROUNDING-006] direct Markdown read counts as visible gro
     const projected = await host.projectWithJournal(opened.journal, 's-self-material', terminalRead(selfPath))
     assert.equal(projected.ok, true)
 
-    const injectedPaths = projected.value
-      .filter((message) => message.info?.source === host.source)
-      .map((message) => message.parts[0].state.input.filePath)
-      .map((path) => path.replaceAll('\\', '/'))
-      .map((path) => path.slice(path.indexOf('/requirements/') + 1))
-
-    assert.deepEqual(injectedPaths, [
-      'requirements/alpha/HOW.md',
-      'requirements/alpha/WHY.md',
-    ])
-    assert.equal(injectedPaths.some((path) => path.includes('/tests/')), false)
-    assert.equal(injectedPaths.some((path) => path.endsWith('/APPLIES-TO')), false)
+    const terminalOutput = projected.value.at(-1).parts[0].state.output
+    assert.ok(terminalOutput.includes('requirement_source_path = "requirements/alpha/HOW.md"'))
+    assert.ok(terminalOutput.includes('requirement_source_path = "requirements/alpha/WHY.md"'))
+    assert.equal(terminalOutput.includes('requirement_source_path = "requirements/alpha/WHAT.md"'), false)
+    assert.equal(terminalOutput.includes('/tests/'), false)
+    assert.equal(terminalOutput.includes('/APPLIES-TO'), false)
 
     const later = await host.requestPaths(opened.journal, dir, 's-self-material', [join(dir, 'src', 'main.fs')])
     assert.equal(later.needsGrounding, false, 'manual + automatic reads share one horizon dedupe fact')
@@ -127,12 +114,8 @@ test('WHAT[REQUIREMENT-GROUNDING-006] deduplicates material content versions and
     assert.equal(changed.needsGrounding, true)
     assert.equal(changed.requested, 1)
     const changedProjection = await host.projectWithJournal(journal, 's-dedupe', terminalRead(source))
-    const changedReads = changedProjection.value
-      .filter((message) => message.info?.source === host.source)
-      .slice(-1)
-      .map((message) => message.parts[0].state.input.filePath.replaceAll('\\', '/'))
-    assert.equal(changedReads.length, 1)
-    assert.ok(changedReads[0].endsWith('requirements/alpha/WHAT.md'))
+    const changedOutput = changedProjection.value.at(-1).parts[0].state.output
+    assert.ok(changedOutput.includes('requirement_source_path = "requirements/alpha/WHAT.md"'))
     host.disposeJournal(journal)
   } finally { cleanup() }
 })
@@ -164,10 +147,9 @@ test('WHAT[REQUIREMENT-GROUNDING-011] ordinary read observations add knowledge w
     await host.requestPaths(opened.journal, dir, 's-authority', [source])
     const projected = await host.projectWithJournal(opened.journal, 's-authority', terminalRead(source))
     assert.equal(projected.ok, true)
-    const injected = projected.value.filter((m) => m.info?.source === host.source)
-    assert.ok(injected.length > 0)
-    assert.ok(injected.every((m) => m.info.role === 'assistant' && m.info.synthetic === true))
-    assert.ok(injected.every((m) => m.parts[0].tool === 'read'))
+    const terminalOutput = projected.value.at(-1).parts[0].state.output
+    assert.ok(terminalOutput.includes('requirement_source_path = "requirements/alpha/WHAT.md"'))
+    assert.equal(projected.value.some((m) => m.info?.source === host.source), false)
     host.disposeJournal(opened.journal)
   } finally { cleanup() }
 })

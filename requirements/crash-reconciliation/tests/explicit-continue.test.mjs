@@ -50,7 +50,7 @@ test('WHAT[CRASH-018] CRASH_018_real_command_material_materializes_briefing_and_
 
     // Durable history survives restart, while the new process intentionally has
     // no SessionExecutionBinding user-facing agent observation yet.
-    await acceptAuthorityRoot(runtime, sessionID, 'fast-coder')
+    await acceptAuthorityRoot(runtime, sessionID, 'coder')
 
     const commandOutput = { parts: [] }
     await hooks['command.execute.before'](
@@ -141,7 +141,7 @@ test('WHAT[CRASH-018] CRASH_018_transform_uses_exact_physical_binding_when_host_
     const sessionID = 'ses_continue_exact_binding'
     const continueID = 'msg-continue-exact-binding'
 
-    await acceptAuthorityRoot(runtime, sessionID, 'deep-coder')
+    await acceptAuthorityRoot(runtime, sessionID, 'coder')
 
     const commandOutput = { parts: [] }
     await hooks['command.execute.before'](
@@ -201,7 +201,7 @@ test('WHAT[CRASH-018] CRASH_018_chat_params_respects_exact_disclosure_classifica
     const sessionID = 'ses_continue_chat_params'
     const continueID = 'msg-continue-chat-params'
 
-    await acceptAuthorityRoot(runtime, sessionID, 'fast-manager')
+    await acceptAuthorityRoot(runtime, sessionID, 'manager')
 
     const commandOutput = { parts: [] }
     await hooks['command.execute.before'](
@@ -225,7 +225,7 @@ test('WHAT[CRASH-018] CRASH_018_chat_params_respects_exact_disclosure_classifica
     await hooks['chat.params'](
       {
         sessionID,
-        agent: 'fast-manager',
+        agent: 'manager',
         model: {
           id: 'host-default-model',
           providerID: 'fixture',
@@ -287,7 +287,7 @@ test('WHAT[CRASH-018] CRASH_018_resumed_session_user_message_without_explicit_ag
     const sessionID = 'ses_resumed_user_continue'
     const userMessageID = 'msg-user-continue-1'
 
-    await acceptAuthorityRoot(runtime, sessionID, 'fast-manager')
+    await acceptAuthorityRoot(runtime, sessionID, 'manager')
 
     const userOutput = {
       message: { id: userMessageID, sessionID, role: 'user' },
@@ -328,7 +328,7 @@ test('WHAT[CRASH-018] CRASH_018_chat_params_with_toplevel_messageID_recognizes_d
     const sessionID = 'ses_continue_toplevel_messageid'
     const continueID = 'msg-continue-toplevel-id'
 
-    await acceptAuthorityRoot(runtime, sessionID, 'fast-manager')
+    await acceptAuthorityRoot(runtime, sessionID, 'manager')
 
     const commandOutput = { parts: [] }
     await hooks['command.execute.before'](
@@ -354,7 +354,7 @@ test('WHAT[CRASH-018] CRASH_018_chat_params_with_toplevel_messageID_recognizes_d
       {
         sessionID,
         messageID: continueID,
-        agent: 'fast-manager',
+        agent: 'manager',
         model: {
           id: 'host-default-model',
           providerID: 'fixture',

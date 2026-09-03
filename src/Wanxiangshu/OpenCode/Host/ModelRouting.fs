@@ -14,6 +14,7 @@ open Wanxiangshu.Execution.Session.ChatExecution
 type private ExecutionLease =
     { PhysicalUserMessageId: string option
       Agent: string
+      RoutingAgent: string
       Target: ModelRoutingTarget }
 
 module ModelRouting =
@@ -173,6 +174,10 @@ module ModelRouting =
             if not (isFunction scheduler) then
                 invalidOp "execution-model-routing: scheduler default export must be a function"
 
+            if not (isNull moduleObj) then
+                scheduler?markProviderFailed <- moduleObj?markProviderFailed
+                scheduler?hasTheoreticalCapacity <- moduleObj?hasTheoreticalCapacity
+
             return scheduler
         }
 
@@ -267,6 +272,24 @@ module ModelRouting =
         // DSL-MUTABLE: resource — process-local scheduler poison
         let mutable fatalError: exn option = None
 
+        let markFailedFn: obj =
+            if isNull scheduler then
+                null
+            else
+                scheduler?markProviderFailed
+
+        let hasCapFn: obj =
+            if isNull scheduler then
+                null
+            else
+                scheduler?hasTheoreticalCapacity
+
+        let hasTheoreticalCapacityLocked (agent: string) : bool =
+            if not (isNull hasCapFn) && isFunction hasCapFn then
+                unbox<bool> (callScheduler hasCapFn agent [||] null)
+            else
+                true
+
         let running () = capacity.Snapshot()
 
         let previousTarget sessionId =
@@ -311,6 +334,7 @@ module ModelRouting =
             activeBySession.[demand.SessionId] <-
                 { PhysicalUserMessageId = Some demand.PhysicalUserMessageId
                   Agent = demand.EffectiveAgent
+                  RoutingAgent = demand.EffectiveAgent
                   Target = target }
 
             lastPhysicalTargetBySession.[demand.SessionId] <- target
@@ -383,7 +407,10 @@ module ModelRouting =
                 drainDemands ()
 
         let requireSameAgent sessionId physicalUserMessageId expected observed =
-            if expected <> observed then
+            // Predictor is a routing-only label for cheap Strength models, never an
+            // identity: a predictor reservation is adopted by the replica's own
+            // canonical agent at first physical execution.
+            if expected <> observed && expected <> "predictor" then
                 invalidOp (
                     sprintf
                         "execution-model-routing: physical execution %s/%s changed agent (%s -> %s)"
@@ -404,6 +431,11 @@ module ModelRouting =
             |> fun credit -> admissionOwner.Issue(identity, credit)
             |> ExecutionAdmissionAcquisition.Admitted
 
+        // Predictor reservations carry a routing-only label: adoption transfers
+        // the cheap-model target to the replica's own canonical agent.
+        let adoptedAgent (lease: ExecutionLease) (agent: string) : string =
+            if lease.Agent = "predictor" then agent else lease.Agent
+
         let reuseOrAdoptActiveExecution sessionId physicalUserMessageId agent (lease: ExecutionLease) =
             match lease.PhysicalUserMessageId with
             | Some current when current = physicalUserMessageId ->
@@ -416,7 +448,8 @@ module ModelRouting =
 
                 activeBySession.[sessionId] <-
                     { lease with
-                        PhysicalUserMessageId = Some physicalUserMessageId }
+                        PhysicalUserMessageId = Some physicalUserMessageId
+                        Agent = adoptedAgent lease agent }
 
                 lastPhysicalTargetBySession.[sessionId] <- lease.Target
 
@@ -453,6 +486,7 @@ module ModelRouting =
                 activeBySession.[sessionId] <-
                     { PhysicalUserMessageId = Some physicalUserMessageId
                       Agent = agent
+                      RoutingAgent = agent
                       Target = target }
 
                 lastPhysicalTargetBySession.[sessionId] <- target
@@ -461,17 +495,23 @@ module ModelRouting =
                 issueAdmission sessionId physicalUserMessageId agent target
             | None -> admissionQueue.Enqueue(sessionId, physicalUserMessageId, agent, previous)
 
+        let acquireFreshOrAdopt sessionId physicalUserMessageId agent =
+            match currentExecutionOutcome sessionId physicalUserMessageId agent with
+            | Some current -> current
+            | None ->
+                let oldPhysicalUserMessageId = currentPhysicalUserMessageId sessionId
+                activeBySession.Remove sessionId |> ignore
+                supersedeCurrentDemand sessionId
+                acquireFreshDemand sessionId oldPhysicalUserMessageId physicalUserMessageId agent
+
         let acquireManagedTask sessionId physicalUserMessageId agent =
             lock gate (fun () ->
                 ensureHealthy ()
 
-                match currentExecutionOutcome sessionId physicalUserMessageId agent with
-                | Some current -> current
-                | None ->
-                    let oldPhysicalUserMessageId = currentPhysicalUserMessageId sessionId
-                    activeBySession.Remove sessionId |> ignore
-                    supersedeCurrentDemand sessionId
-                    acquireFreshDemand sessionId oldPhysicalUserMessageId physicalUserMessageId agent)
+                if not (hasTheoreticalCapacityLocked agent) then
+                    ExecutionAdmissionAcquisition.QueueFull
+                else
+                    acquireFreshOrAdopt sessionId physicalUserMessageId agent)
 
         let acquireManagedSafe sessionId physicalUserMessageId agent =
             try
@@ -486,6 +526,7 @@ module ModelRouting =
                 activeBySession.[sessionId] <-
                     { PhysicalUserMessageId = None
                       Agent = agent
+                      RoutingAgent = agent
                       Target = target }
 
                 drainDemands ()
@@ -521,7 +562,7 @@ module ModelRouting =
                     physicalUserMessageId,
                     lease.Target,
                     fence,
-                    fun running -> exactTargetAvailable lease.Agent lease.Target running
+                    fun running -> exactTargetAvailable lease.RoutingAgent lease.Target running
                 )
             | _ ->
                 failedTask<unit> (
@@ -765,6 +806,16 @@ module ModelRouting =
         member _.PendingBound = ModelCapacityQueue.MaximumPendingDemands
         member _.PendingContractVersion = ModelCapacityQueue.ContractVersion
 
+        member _.LastPhysicalTarget(sessionId: string) : ModelRoutingTarget option =
+            lock gate (fun () -> previousTarget sessionId)
+
+        member _.MarkProviderFailed(provider: string) =
+            if not (isNull markFailedFn) && isFunction markFailedFn then
+                callScheduler markFailedFn provider [||] null |> ignore
+
+        member _.HasTheoreticalCapacity(role: string) : bool =
+            lock gate (fun () -> hasTheoreticalCapacityLocked role)
+
     let private sharedGate = obj ()
     // DSL-MUTABLE: resource — process-shared scheduler runtime singleton
     let mutable private sharedRuntime: ModelRoutingRuntime option = None
@@ -799,6 +850,13 @@ module ModelRouting =
         match lock sharedGate (fun () -> sharedRuntime) with
         | Some runtime -> runtime
         | None -> invalidOp "execution-model-routing: scheduler runtime was not initialized during plugin load"
+
+    let internal lastPhysicalTarget (sessionId: string) : ModelRoutingTarget option =
+        current().LastPhysicalTarget sessionId
+
+    let internal markProviderFailed (provider: string) : unit = current().MarkProviderFailed provider
+
+    let internal hasTheoreticalCapacity (role: string) : bool = current().HasTheoreticalCapacity role
 
     let internal acquireExecutionAdmission
         (sessionId: SessionId)

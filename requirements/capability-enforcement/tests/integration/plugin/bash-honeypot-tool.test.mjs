@@ -10,28 +10,28 @@ import { withExecutablePlugin, acceptAuthorityRoot } from '../../../../verificat
 
 test('WHAT[ENF-010] AGENT_023_coder_receives_hard_denial_and_no_shell', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'coder-bash-honey', 'fast-coder')
+    await acceptAuthorityRoot(runtime, 'coder-bash-honey', 'coder')
     assert.ok(hooks.tool['bash-honeypot'], 'bash-honeypot must be registered')
 
     const result = await hooks.tool['bash-honeypot'].execute(
       {},
-      { sessionID: 'coder-bash-honey', agent: 'fast-coder' },
+      { sessionID: 'coder-bash-honey', agent: 'coder' },
     )
 
     assert.match(result, /DENIED/)
-    assert.match(result, /unauthorized privilege-escalation/i)
-    assert.match(result, /No command ran/i)
+    assert.match(result, /unauthorized privilege-escalation|提权/)
+    assert.match(result, /No command ran|没有运行任何命令/)
   })
 })
 
 test('WHAT[ENF-010] AGENT_023_bash_honeypot_is_denied_for_non_coder_roles', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'manager-bash-honey', 'fast-manager')
+    await acceptAuthorityRoot(runtime, 'manager-bash-honey', 'manager')
     const result = await hooks.tool['bash-honeypot'].execute(
       {},
-      { sessionID: 'manager-bash-honey', agent: 'fast-manager' },
+      { sessionID: 'manager-bash-honey', agent: 'manager' },
     )
-    assert.match(result, /not available to Manager/)
+    assert.match(result, /not available to Manager|对 Manager 不可用/)
   })
 })
 
@@ -39,8 +39,8 @@ test('WHAT[ENF-010] AGENT_023_bash_honeypot_is_denied_when_the_role_is_unresolve
   await withExecutablePlugin(async (hooks) => {
     const result = await hooks.tool['bash-honeypot'].execute(
       {},
-      { sessionID: 'unresolved-bash-honey', agent: 'fast-coder' },
+      { sessionID: 'unresolved-bash-honey', agent: 'coder' },
     )
-    assert.match(result, /authority is established/)
+    assert.match(result, /authority is established|权威确立/)
   })
 })

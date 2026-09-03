@@ -30,7 +30,7 @@ const input = {
   diagnostics: [{
     operation: 'AcceptedPersisted', logicalRunId: 'run-chat-fixture', sessionId: 'ses-chat-fixture',
     authorityRootUserMessageId: 'msg-chat-root', physicalUserMessageId: 'msg-chat-fixture', promptKey: null,
-    providerRunIdentity: null, effectiveAgent: 'fast-coder', role: 'coder', providerRequestKind: 'work-main',
+    providerRunIdentity: null, effectiveAgent: 'coder', role: 'coder', providerRequestKind: 'work-main',
     transition: { from: null, to: 'Accepted' }, failureClass: null, retryDecision: null,
     fallbackDecision: null, capacityState: 'Released', capacityFence: null, hook: 'chat.message',
     policyClass: 'Workflow', recoveryDecision: 'ResumeAdmission', persistenceCommitment: 'Committed',

@@ -20,7 +20,7 @@ module PromptAuthority =
 
     /// What an Authority Root fixes for the whole Logical Run (PROMPT-002).
     ///
-    /// FALLBACK-004: SelectedAgent, PeerAgent, CanonicalRole and SelectedTier
+    /// FALLBACK-004: SelectedAgent, PeerAgent, and CanonicalRole
     /// never change here. Fallback moves EffectiveAgent, which lives on the
     /// per-attempt profile instead — that separation is the clause.
     ///
@@ -53,7 +53,6 @@ module PromptAuthority =
             | Some role -> role
             | None -> invalidOp "public authority participant identity cannot be Bookkeeper"
 
-        member this.SelectedTier = ParticipantIdentity.initialTier this.ParticipantIdentity
         member this.Persona = ParticipantIdentity.persona this.ParticipantIdentity
 
         member this.PersonaCatalogVersion =
@@ -171,7 +170,7 @@ module PromptAuthority =
             /// FALLBACK-002: the side the cursor currently selects. The only field
             /// fallback may move (FALLBACK-004).
             EffectiveAgent: string
-            /// AGENT-001: fast-ROLE and deep-ROLE share one system prompt, so this
+            /// AGENT-001: Canonical role shares one system prompt, so this
             /// is derived from CanonicalRole alone.
             SystemPromptId: SystemPromptId
             /// AGENT-007 both layers read this same set: the Host-visible schema
@@ -203,7 +202,6 @@ module PromptAuthority =
         member this.SelectedAgent = this.Authority.SelectedAgent
         member this.PeerAgent = this.Authority.PeerAgent
         member this.CanonicalRole = this.Authority.CanonicalRole
-        member this.SelectedTier = this.Authority.SelectedTier
 
     /// A dispatched prompt before the Host has confirmed anything (PROMPT-005
     /// `Claimed`).
@@ -350,60 +348,37 @@ module PromptAuthority =
         | UnknownManagedAgent of string
         | Malformed of string
 
-    /// A parsed `fast-ROLE` / `deep-ROLE` name with its A/B peer (AGENT-002/003).
-    type ParsedAgentName =
-        { Name: string
-          Role: Role
-          Tier: AgentTier
-          PeerName: string }
+    /// A parsed canonical managed agent name.
+    type ParsedAgentName = { Name: string; Role: Role }
 
-    /// Parse the tier/role segments with fail-closed handling for unknown values.
-    let private parseTierAndRole (trimmed: string) (parts: string array) : Result<ParsedAgentName, AgentNameRejection> =
-        match Roles.tryParseTier parts.[0], Roles.tryParseRole parts.[1] with
-        | None, _
-        | _, None -> Error(AgentNameRejection.UnknownManagedAgent trimmed)
-        | Some tier, Some role ->
-            Ok
-                { Name = trimmed
-                  Role = role
-                  Tier = tier
-                  PeerName = ManagedAgentCatalog.peerNameOf tier role }
-
-    /// Parse a non-legacy candidate after the required non-empty check.
     let private parseStructuredAgentName (trimmed: string) : Result<ParsedAgentName, AgentNameRejection> =
-        let parts = trimmed.Split([| '-' |], 2)
+        match Roles.tryParseRole (trimmed.ToLowerInvariant()) with
+        | Some role when trimmed = Roles.roleLabel role -> Ok { Name = trimmed; Role = role }
+        | Some _ -> Error(AgentNameRejection.Malformed trimmed)
+        | None -> Error(AgentNameRejection.UnknownManagedAgent trimmed)
 
-        if parts.Length <> 2 then
-            Error(AgentNameRejection.Malformed trimmed)
-        else
-            parseTierAndRole trimmed parts
-
-    /// Parse a non-empty name while rejecting all legacy aliases.
     let private parseNonBlankAgentName (trimmed: string) : Result<ParsedAgentName, AgentNameRejection> =
         if ManagedAgentCatalog.isLegacyAgentName (trimmed.ToLowerInvariant()) then
             Error(AgentNameRejection.LegacyAgentName trimmed)
+        elif trimmed.Contains("-") then
+            Error(AgentNameRejection.Malformed trimmed)
         else
             parseStructuredAgentName trimmed
 
-    /// AGENT-002 and AGENT-003: parse `fast-ROLE` / `deep-ROLE` and derive the peer.
-    ///
-    /// The ONE parser for this format. Labels, legacy set, and peer derivation all
-    /// come from `ManagedAgentCatalog`; `ManagedAgent.parse` only adds visibility.
     let parseAgentNameTyped (value: string) : Result<ParsedAgentName, AgentNameRejection> =
         if String.IsNullOrWhiteSpace value then
             Error(AgentNameRejection.Malformed value)
         else
             parseNonBlankAgentName (value.Trim())
 
-    /// String-error form, for the fact-fold and claim paths that only report.
-    let parseAgentName (value: string) : Result<string * Role * AgentTier * string, string> =
+    let parseAgentName (value: string) : Result<string * Role, string> =
         parseAgentNameTyped value
-        |> Result.map (fun parsed -> parsed.Name, parsed.Role, parsed.Tier, parsed.PeerName)
+        |> Result.map (fun parsed -> parsed.Name, parsed.Role)
         |> Result.mapError (fun rejection ->
             match rejection with
             | AgentNameRejection.LegacyAgentName name -> ManagedAgentCatalog.formatLegacyNameNotSupported name
-            | AgentNameRejection.UnknownManagedAgent _ -> "Unknown tier or role. Use fast-* or deep-*."
-            | AgentNameRejection.Malformed _ -> "Expected fast-ROLE or deep-ROLE.")
+            | AgentNameRejection.UnknownManagedAgent name -> sprintf "Unknown managed agent '%s'." name
+            | AgentNameRejection.Malformed name -> sprintf "Malformed managed agent name '%s'." name)
 
     /// Deterministic Logical Run id. PROMPT-011 requires stability across
     /// restarts, so it is derived from durable identities and never generated.
@@ -508,7 +483,8 @@ module PromptAuthority =
 
     /// FALLBACK-001: the profile's agent pair for a given cursor.
     let effectiveAgentFor (profile: AuthorityExecutionProfile) (cursor: AgentPairCursor.FallbackCursor) : string =
-        AgentPairCursor.effectiveAgent (agentPair profile) cursor
+        ignore cursor
+        profile.SelectedAgent
 
     /// Blogger-request + terminal-scoped repair identity used by the exact-one
     /// chronicle nudge→AABB state machine. Both axes matter: terminal identity
@@ -651,10 +627,8 @@ module PromptAuthority =
             (idlePayloadDigest lifeId conditionKey terminalProviderRun)
             projection
 
-    /// AGENT-001: fast-ROLE and deep-ROLE share one system prompt, so the prompt
-    /// identity is a function of CanonicalRole alone. Tier deliberately does not
-    /// participate — if it did, `permissions(fast-coder) = permissions(deep-coder)`
-    /// (AGENT-010) would stop being structurally guaranteed.
+    /// AGENT-001: Canonical role shares one system prompt, so the prompt
+    /// identity is a function of CanonicalRole alone.
     let systemPromptIdFor (role: Role) : SystemPromptId =
         SystemPromptId.create (Roles.roleLabel role)
 
@@ -704,7 +678,7 @@ module PromptAuthority =
     /// FALLBACK-014 / AGENT-029: `EffectiveAgent` may move to PeerAgent on B-side;
     /// `SystemPromptId` and ParticipantIdentity stay fixed by the Authority Root
     /// IdentitySeed, while SessionProviderLanguage stays session bind-once. None
-    /// follows EffectiveAgent tier/name.
+    /// follows EffectiveAgent name.
     ///
     /// That is the whole clause. The previous code assembled these fields from a
     /// mutable session cache, the last user message, a Role map and the fallback

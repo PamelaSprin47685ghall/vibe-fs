@@ -71,16 +71,12 @@ module CursorSurface =
             requiredText "identitySeed.participantIdentity.canonicalRole" (field value "canonicalRole")
 
         let role =
-            Roles.tryParseRole roleLabel
-            |> Option.defaultWith (fun () -> invalidArg "participantIdentity" $"unknown role '{roleLabel}'")
-            |> Some
-
-        let tierLabel =
-            requiredText "identitySeed.participantIdentity.selectedTier" (field value "selectedTier")
-
-        let initialTier =
-            Roles.tryParseTier tierLabel
-            |> Option.defaultWith (fun () -> invalidArg "participantIdentity" $"unknown tier '{tierLabel}'")
+            if roleLabel = "bookkeeper" then
+                None
+            else
+                Roles.tryParseRole roleLabel
+                |> Option.defaultWith (fun () -> invalidArg "participantIdentity" $"unknown role '{roleLabel}'")
+                |> Some
 
         let originLabel =
             requiredText "identitySeed.participantIdentity.origin" (field value "origin")
@@ -92,9 +88,7 @@ module CursorSurface =
             | _ -> invalidArg "participantIdentity" $"unknown persona origin '{originLabel}'"
 
         { SelectedAgent = requiredText "identitySeed.participantIdentity.selectedAgent" (field value "selectedAgent")
-          PeerAgent = requiredText "identitySeed.participantIdentity.peerAgent" (field value "peerAgent")
           Role = role
-          InitialTier = initialTier
           Persona = requiredText "identitySeed.participantIdentity.persona" (field value "persona")
           PersonaCatalogVersion = intValue (field value "personaCatalogVersion")
           Origin = origin }
@@ -142,7 +136,7 @@ module CursorSurface =
             {| selectedAgent = ParticipantIdentity.selectedAgent identity
                peerAgent = ParticipantIdentity.peerAgent identity
                canonicalRole = ParticipantIdentity.roleLabel identity
-               selectedTier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+               selectedTier = "deep"
                persona = ParticipantIdentity.persona identity
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
                origin =

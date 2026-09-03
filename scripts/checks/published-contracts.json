@@ -7209,9 +7209,6 @@
         "verification-system"
       ],
       "symbols": [
-        "Wanxiangshu.Foundation.AgentTier",
-        "Wanxiangshu.Foundation.AgentTier.Deep",
-        "Wanxiangshu.Foundation.AgentTier.Fast",
         "Wanxiangshu.Foundation.Role",
         "Wanxiangshu.Foundation.Role.Blogger",
         "Wanxiangshu.Foundation.Role.Browser",
@@ -7226,11 +7223,9 @@
         "Wanxiangshu.Foundation.Roles.all",
         "Wanxiangshu.Foundation.Roles.isInternal",
         "Wanxiangshu.Foundation.Roles.roleLabel",
-        "Wanxiangshu.Foundation.Roles.tryParseRole",
-        "Wanxiangshu.Foundation.Roles.tryParseTier",
-        "Wanxiangshu.Foundation.Roles.wireTierLabel"
+        "Wanxiangshu.Foundation.Roles.tryParseRole"
       ],
-      "justification": "Role and AgentTier are the participant-identity published vocabulary. These are the exact compiler-observed foreign consumers and symbols; capability consequences remain outside this contract."
+      "justification": "Role is the participant-identity published vocabulary. These are the exact compiler-observed foreign consumers and symbols; capability consequences remain outside this contract."
     },
     {
       "path": "src/Wanxiangshu/Foundation/OfficeCapability.fs",
@@ -7296,7 +7291,7 @@
       "symbols": [
         "Wanxiangshu.Participant.Persona.PersonaCatalog.persona"
       ],
-      "justification": "Delegation consumes only the canonical Role × AgentTier to Persona decision; Persona rendering and parsing remain identity-owner boundary mechanics."
+      "justification": "Delegation consumes only the canonical Role to Persona decision; Persona rendering and parsing remain identity-owner boundary mechanics."
     },
     {
       "path": "src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs",
@@ -7321,8 +7316,8 @@
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.allInternalRoles",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.allPublicRoles",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.allRoles",
-        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.bookkeeperNameOf",
-        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.bookkeeperPeerName",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.bookkeeperName",
+        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.bookkeeperNames",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.coderToolNames",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.formatLegacyNameInConfig",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.formatLegacyNameNotSupported",
@@ -7334,13 +7329,11 @@
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.managerForkableRoles",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.nameOf",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.orchestratorForkableNames",
-        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.peerNameOf",
-        "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.peerTier",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.personaCallingName",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.requiredNames",
         "Wanxiangshu.Participant.Persona.ManagedAgentCatalog.tryParsePersonaCallingName"
       ],
-      "justification": "ManagedCatalog publishes the exact machine-name, peer, role-set and Host calling-name boundary consumed across owners; every role/tier decision delegates to the canonical identity vocabulary."
+      "justification": "ManagedCatalog publishes the exact machine-name, peer, role-set and Host calling-name boundary consumed across owners; every role decision delegates to the canonical identity vocabulary."
     },
     {
       "path": "src/Wanxiangshu/Participant/Persona/Identity.fs",

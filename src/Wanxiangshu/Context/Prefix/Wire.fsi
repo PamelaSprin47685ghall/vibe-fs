@@ -2,6 +2,7 @@ namespace Wanxiangshu.Context.Prefix
 
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal

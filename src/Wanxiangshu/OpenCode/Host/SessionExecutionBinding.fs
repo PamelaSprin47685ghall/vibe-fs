@@ -141,25 +141,15 @@ module SessionExecutionBinding =
             )
         | _ -> agents.[sessionKey] <- proposed
 
-    let private tierAndRoleTokens (trimmed: string) : (string * string) option =
-        match trimmed.IndexOf '-' with
-        | index when index > 0 && index < trimmed.Length - 1 ->
-            Some(trimmed.Substring(0, index), trimmed.Substring(index + 1))
-        | _ -> None
-
-    let private peerFromTokens (tierText, roleText) : string option =
-        match Roles.tryParseTier tierText, Roles.tryParseRole roleText with
-        | Some tier, Some role -> Some(ManagedAgentCatalog.peerNameOf tier role)
-        | _ -> None
-
-    let private peerFromTieredName (trimmed: string) : string option =
-        trimmed |> tierAndRoleTokens |> Option.bind peerFromTokens
-
     let private tryPeerName (agentName: string) : string option =
-        if ManagedAgentCatalog.isBookkeeperName agentName then
-            ManagedAgentCatalog.bookkeeperPeerName agentName
+        let trimmed = agentName.Trim()
+
+        if String.IsNullOrWhiteSpace trimmed then
+            None
+        elif ManagedAgentCatalog.isBookkeeperName trimmed then
+            Some trimmed
         else
-            agentName.Trim() |> peerFromTieredName
+            Some trimmed
 
     let private sameModel (left: OpencodeModel) (right: OpencodeModel) =
         left.providerID = right.providerID

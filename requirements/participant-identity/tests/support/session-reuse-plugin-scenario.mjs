@@ -23,18 +23,18 @@ await withRestartablePlugin(async (start, _directory, { stop, withRuntime }) => 
 
   let operatorProfile
   await withRuntime(async (runtime) => {
-    const leadProfile = await acceptAuthorityRoot(runtime, sessionId, 'deep-manager', leadMessageId)
+    const leadProfile = await acceptAuthorityRoot(runtime, sessionId, 'manager', leadMessageId)
     const originalLeadProfile = structuredClone(leadProfile)
     assert.equal(leadProfile.participantIdentity.persona, 'Lead')
 
-    const duplicateLead = await decideAuthorityRoot(runtime, sessionId, 'deep-manager', leadMessageId)
+    const duplicateLead = await decideAuthorityRoot(runtime, sessionId, 'manager', leadMessageId)
     assert.equal(duplicateLead.ok, true, JSON.stringify(duplicateLead.error))
     assert.deepEqual(duplicateLead.profile, leadProfile)
 
     const drift = await decideAuthorityRoot(
       runtime,
       sessionId,
-      'deep-devops',
+      'devops',
       'msg-production-illegal-operator-root',
     )
     assert.equal(drift.ok, false)
@@ -49,7 +49,7 @@ await withRestartablePlugin(async (start, _directory, { stop, withRuntime }) => 
     await completeManagerLife(runtime, sessionId)
     assert.equal(observeAuthority(runtime, sessionId).activeLogicalRun, null)
 
-    operatorProfile = await acceptAuthorityRoot(runtime, sessionId, 'deep-devops', operatorMessageId)
+    operatorProfile = await acceptAuthorityRoot(runtime, sessionId, 'devops', operatorMessageId)
     assert.equal(operatorProfile.participantIdentity.persona, 'Operator')
     assert.notEqual(operatorProfile.logicalRun, leadProfile.logicalRun)
     assert.notEqual(operatorProfile.authorityRoot, leadProfile.authorityRoot)
@@ -73,7 +73,7 @@ await withRestartablePlugin(async (start, _directory, { stop, withRuntime }) => 
     const recovered = observeAuthority(runtime, sessionId).activeLogicalRun
     assert.deepEqual(recovered, operatorProfile)
 
-    const duplicateOperator = await decideAuthorityRoot(runtime, sessionId, 'deep-devops', operatorMessageId)
+    const duplicateOperator = await decideAuthorityRoot(runtime, sessionId, 'devops', operatorMessageId)
     assert.equal(duplicateOperator.ok, true, JSON.stringify(duplicateOperator.error))
     assert.deepEqual(duplicateOperator.profile, operatorProfile)
 

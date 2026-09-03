@@ -24,8 +24,8 @@ const compile = (source) => {
   return result.scenario;
 };
 
-/** A runtime with `fast-manager` already bound, which is what the driver does on session create. */
-const runtimeOf = (source, alias = 'fast-manager') => {
+/** A runtime with `manager` already bound, which is what the driver does on session create. */
+const runtimeOf = (source, alias = 'manager') => {
   const runtime = new ScenarioRuntime(compile(source));
   runtime.bindAlias(alias, SESSION);
   return runtime;
@@ -56,7 +56,7 @@ prompt = { text = "Ship the parser fix." }
 
 [[turn]]
 id = "mgr"
-lane = "fast-manager"
+lane = "manager"
 user = "Ship the parser fix."
 
   [[turn.step]]
@@ -130,7 +130,7 @@ export const scenarioRuntimeCases = [
       const selection = runtime.select(body, contextOf(body.sessionID));
 
       assertTrue(selection.unmatched !== undefined, 'must fail closed');
-      assertEq(selection.unmatched.key.lane, 'fast-manager', 'the diagnostic names the lane');
+      assertEq(selection.unmatched.key.lane, 'manager', 'the diagnostic names the lane');
       assertEq(selection.unmatched.key.step, 0);
     },
   },
@@ -365,7 +365,7 @@ reason = "prefix-probe"
       const runtime = runtimeOf(`${TWO_STEPS}
 [[turn]]
 id = "title"
-lane = "fast-manager"
+lane = "manager"
 kind = "title"
 user = "Ship the parser fix."
 
@@ -401,7 +401,7 @@ prompt = { text = "Ship the parser fix." }
 
 [[turn]]
 id = "mgr"
-lane = "fast-manager"
+lane = "manager"
 user = "Ship the parser fix."
 
   [[turn.step]]
@@ -433,7 +433,7 @@ prompt = { text = "Ship the parser fix." }
 
 [[turn]]
 id = "mgr"
-lane = "fast-manager"
+lane = "manager"
 user = "Ship the parser fix."
 
   [[turn.step]]
@@ -474,14 +474,14 @@ user = "# Review is required before completion."
       // carries the same shape the old smallest converted scenario used: one chat turn with
       // two provider steps plus a title on a shared session. Do not recreate a second TOML
       // on disk — One World keeps long-stroke.toml as the sole product scenario.
-      // `session = { bind = ["inspector-title", "fast-inspector"] }` — both aliases point at
+      // `session = { bind = ["inspector-title", "inspector"] }` — both aliases point at
       // the one session the Host mints, which is why `lanesOf` returns a set.
       const INLINE_RUNTIME = `scenario = "inline-runtime"
 prompt = { text = "Run the command and report if it timed out." }
 
 [[turn]]
 id = "inspector"
-lane = "fast-inspector"
+lane = "inspector"
 user = "Run the command and report if it timed out."
 tools = ["executor"]
 
@@ -500,7 +500,7 @@ user = "Run the command and report if it timed out."
   [[turn.step]]
   respond = { type = "title", text = "E2E Test Session" }
 `;
-      const runtime = runtimeOf(INLINE_RUNTIME, 'fast-inspector');
+      const runtime = runtimeOf(INLINE_RUNTIME, 'inspector');
       runtime.bindAlias('inspector-title', SESSION);
       const prompt = 'Run the command and report if it timed out.';
 

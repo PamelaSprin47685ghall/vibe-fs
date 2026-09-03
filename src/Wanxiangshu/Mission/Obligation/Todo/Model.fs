@@ -185,15 +185,11 @@ module MagicTodo =
                 { input with
                     WorkingOn = normalizeWorkingOn input.WorkingOn items }
 
-    /// More than one distinct todowrite call in one assistant message is a call
-    /// protocol error. Same ToolCallId replay remains one physical attempt.
+    /// Multiple todowrite calls in one assistant message are supported and execute
+    /// with sequential execution semantics. Same ToolCallId replay remains one physical attempt.
     let admitTodowriteBatch (toolCallIdsInMessage: ToolCallId list) : Result<unit, MagicTodoReject> =
-        let distinct = toolCallIdsInMessage |> List.map ToolCallId.value |> List.distinct
-
-        if List.length distinct > 1 then
-            Error(MagicTodoReject.MultipleTodowriteInMessage distinct)
-        else
-            Ok()
+        ignore toolCallIdsInMessage
+        Ok()
 
     type PreparedIdentity =
         { ManagerLifeId: ManagerLifeId

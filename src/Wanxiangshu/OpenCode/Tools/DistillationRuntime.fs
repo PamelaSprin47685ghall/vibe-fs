@@ -46,7 +46,7 @@ module DistillationRuntime =
     /// AGENT-008: the Distiller is internal, so its managed name is fixed here
     /// rather than chosen by a caller. This is the one legitimate place a name is
     /// derived from a role — the role is a constant, not an inference.
-    let private distillerAgent = ManagedAgent.nameOf AgentTier.Fast Role.Distiller
+    let private distillerAgent = ManagedAgent.nameOf Role.Distiller
 
     let private awaitWithTimeout runtime permit agentId timeoutMs : Task<Result<RunCompletion, ForkError>> =
         match timeoutMs with

@@ -42,7 +42,7 @@ const handleLinked = (overrides = {}) => ({
     ParentSessionId: 'ses_hl',
     ChildSessionId: 'ses_hl_child',
     Handle: 'h-hl',
-    TargetAgent: 'fast-reviewer',
+    TargetAgent: 'reviewer',
     Byname: 'Rhea',
     CanonicalRole: 'Reviewer',
     Ownership: 'DurableParentHandle',

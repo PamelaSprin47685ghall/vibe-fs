@@ -42,14 +42,22 @@ test('WHAT[PREFIX-STABILITY-007] PROMPT_019_each_canonical_role_has_one_stable_p
   assert.equal(ids.size, roles.length, 'canonical roles must not alias prompt identities')
 })
 
-test('WHAT[PREFIX-STABILITY-007] PROMPT_019_effective_agent_changes_by_tier_not_prompt_identity', () => {
+test('WHAT[PREFIX-STABILITY-007] PROMPT_019_effective_agent_preserved_across_tiers_not_prompt_identity', () => {
   const inspectorFast = delegation.vocabulary('Inspector', 'Fast', OWNER)
   const inspectorDeep = delegation.vocabulary('Inspector', 'Deep', OWNER)
   const coderFast = delegation.vocabulary('Coder', 'Fast', OWNER)
   const coderDeep = delegation.vocabulary('Coder', 'Deep', OWNER)
 
-  assert.notEqual(inspectorFast.agent, inspectorDeep.agent)
-  assert.notEqual(coderFast.agent, coderDeep.agent)
+  // Single-version world: the effective agent is the selected agent on every
+  // tier — identity is preserved, provider rotation happens at model level.
+  assert.equal(inspectorFast.agent, 'inspector')
+  assert.equal(inspectorDeep.agent, 'inspector')
+  assert.equal(coderFast.agent, 'coder')
+  assert.equal(coderDeep.agent, 'coder')
+  for (const attempt of [profile('Inspector', 'Fast'), profile('Inspector', 'Deep'), profile('Coder', 'Fast'), profile('Coder', 'Deep')]) {
+    assert.equal(attempt.participantIdentity.selectedAgent, attempt.participantIdentity.peerAgent)
+    assert.equal(attempt.participantIdentity.selectedTier, 'deep')
+  }
   assert.equal(profile('Manager', 'Fast').systemPromptId, profile('Manager', 'Deep').systemPromptId)
   assert.equal(profile('Reviewer', 'Fast').systemPromptId, profile('Reviewer', 'Deep').systemPromptId)
 })

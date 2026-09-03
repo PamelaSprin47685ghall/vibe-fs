@@ -18,6 +18,7 @@
 - **五分法正交性**：Manager 可 fork 的五类 Office（Coder、Inspector、DevOps、Browser、Inquiry）构成完备正交的权能模型。
 - **单一语义所有权、多处投影**：同一后果事实在 Manager Role Law、fork 描述、各 Office 自我模型中保持严格一致，不得漂移。
 - **不可互换性**：各 Office 之间严禁作为通用代理相互替代。
+- **Role 是本名**：Manager/Orchestrator/Coder/Inspector/Browser/Inquiry/Reviewer/DevOps/Distiller/Blogger 是十个本名 Role，每个 Role 恰对应一个 Persona 且权能完全相同，不存在 fast/deep 档位差异或组合名解析。Predictor 是内部机制专用角色，仅为 Strength 降级指定廉价 provider/model，不参与普通调度与工具门禁。
 
 ## 破裂后果
 

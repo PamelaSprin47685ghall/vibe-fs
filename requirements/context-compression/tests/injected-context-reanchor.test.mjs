@@ -41,15 +41,14 @@ test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_reanchor_retires_old_pair_wire_but_k
   assert.equal(opened.ok, true)
   try {
     const session = 'ctx-019-pair'
-    const raw = [
-      { info: { id: 'u0', role: 'user', providerID: 'anthropic' }, parts: [{ type: 'text', text: 'hello' }] },
-      { info: { id: 'a0', role: 'assistant', providerID: 'anthropic' }, parts: [{ type: 'text', text: 'welcome' }] },
-      { info: { id: 'u1', role: 'user', providerID: 'anthropic' }, parts: [{ type: 'text', text: 'task' }] },
-    ]
+    const raw = [{
+      info: { id: 'r1', role: 'assistant', providerID: 'anthropic' },
+      parts: [{ type: 'tool', tool: 'read', callID: 'source', state: { status: 'completed', input: {}, output: 'source\n', time: { start: 0, end: 0 } } }],
+    }]
     const first = await pair.tryInjectWithJournal(opened.journal, session, pair.text, raw)
     assert.equal(first.ok, true)
-    const firstIds = pairCallIds(first.value)
-    assert.equal(firstIds.length, 1)
+    assert.equal(pairCallIds(first.value).length, 0, 'universal cursor mode emits zero synthetic pair rows')
+    assert.equal(suffixCount(first.value[0].parts[0].state.output), 1)
     assert.equal(pair.pairCount(opened.journal, session), 1)
 
     const reanchored = await pair.appendContextReanchored(opened.journal, session, 0n, 1n, 'compaction-1')
@@ -57,9 +56,12 @@ test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_reanchor_retires_old_pair_wire_but_k
 
     const next = await pair.tryInjectWithJournal(opened.journal, session, pair.text, first.value)
     assert.equal(next.ok, true, next.error)
-    const nextIds = pairCallIds(next.value)
-    assert.equal(nextIds.length, 1, 'new Y horizon must contain only its fresh pair')
-    assert.notEqual(nextIds[0], firstIds[0], 'fresh horizon pair needs a fresh call identity')
+    assert.equal(pairCallIds(next.value).length, 0, 'new Y horizon carries no synthetic pair rows either')
+    assert.equal(
+      suffixCount(next.value[0].parts[0].state.output),
+      1,
+      'old pair suffix must be stripped before the fresh horizon suffix is appended',
+    )
     assert.equal(pair.pairCount(opened.journal, session), 2, 'durable audit history keeps both occurrences')
   } finally {
     pair.disposeJournal(opened.journal)
@@ -73,20 +75,22 @@ test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_prefix_rebase_is_the_same_auxiliary_
   assert.equal(opened.ok, true)
   try {
     const session = 'ctx-019-prefix-rebase-pair'
-    const raw = [{ info: { id: 'todo-anchor', role: 'assistant', providerID: 'anthropic' }, parts: [{ type: 'text', text: 'retained raw anchor' }] }]
+    const raw = [{
+      info: { id: 'r1', role: 'assistant', providerID: 'anthropic' },
+      parts: [{ type: 'tool', tool: 'read', callID: 'source', state: { status: 'completed', input: {}, output: 'source\n', time: { start: 0, end: 0 } } }],
+    }]
     const first = await pair.tryInjectWithJournal(opened.journal, session, pair.text, raw)
     assert.equal(first.ok, true)
-    const firstIds = pairCallIds(first.value)
-    assert.equal(firstIds.length, 1)
+    assert.equal(pairCallIds(first.value).length, 0)
+    assert.equal(suffixCount(first.value[0].parts[0].state.output), 1)
 
     const rebased = await pair.appendPrefixRebaseCommitted(opened.journal, session, 0n, 1n, 1)
     assert.equal(rebased.ok, true, rebased.error)
 
     const next = await pair.tryInjectWithJournal(opened.journal, session, pair.text, first.value)
     assert.equal(next.ok, true, next.error)
-    const nextIds = pairCallIds(next.value)
-    assert.equal(nextIds.length, 1, 'a retained raw Host anchor must not tunnel the old pair across a Y prefix rebase')
-    assert.notEqual(nextIds[0], firstIds[0], 'the new Y horizon must mint a fresh pair identity')
+    assert.equal(pairCallIds(next.value).length, 0, 'no synthetic pair rows tunnel across a Y prefix rebase')
+    assert.equal(suffixCount(next.value[0].parts[0].state.output), 1, 'the new Y horizon carries exactly one fresh pair suffix')
     assert.equal(pair.pairCount(opened.journal, session), 2, 'durable pair history remains audit-visible after retirement')
   } finally {
     pair.disposeJournal(opened.journal)
@@ -104,9 +108,9 @@ test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_reanchor_retires_old_requirement_rea
     assert.equal(requested.needsGrounding, true)
     const first = await grounding.projectWithJournal(opened.journal, session, terminalRead(source))
     assert.equal(first.ok, true)
-    const firstReads = groundingMessages(first.value)
-    assert.ok(firstReads.length > 0)
-    const firstCallIds = firstReads.map((message) => message.parts[0].callID)
+    const firstOutput = first.value.at(-1).parts[0].state.output
+    assert.ok(firstOutput.includes('requirement_source_path = "requirements/alpha/WHAT.md"'))
+    assert.equal(groundingMessages(first.value).length, 0, 'universal cursor mode emits zero synthetic read rows')
 
     const reanchored = await grounding.appendContextReanchored(opened.journal, session, 0n, 1n, 'compaction-1')
     assert.equal(reanchored.ok, true, reanchored.error)
@@ -114,19 +118,15 @@ test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_reanchor_retires_old_requirement_rea
 
     const afterReplacement = await grounding.projectWithJournal(opened.journal, session, first.value)
     assert.equal(afterReplacement.ok, true)
-    assert.equal(groundingMessages(afterReplacement.value).length, 0, 'old grounding reads must not survive Y')
+    assert.equal(afterReplacement.value.at(-1).parts[0].state.output, 'source\n', 'old requirement suffixes must not survive Y')
 
     const rerun = await grounding.requestPaths(opened.journal, dir, session, [source])
     assert.equal(rerun.needsGrounding, true)
     assert.equal(rerun.requested, 1)
     const second = await grounding.projectWithJournal(opened.journal, session, afterReplacement.value)
-    const secondReads = groundingMessages(second.value)
-    assert.ok(secondReads.length > 0)
-    assert.notDeepEqual(
-      secondReads.map((message) => message.parts[0].callID),
-      firstCallIds,
-      'same digest in a new horizon must use fresh read call identities',
-    )
+    const secondOutput = second.value.at(-1).parts[0].state.output
+    assert.ok(secondOutput.includes('requirement_source_path = "requirements/alpha/WHAT.md"'), 'same digest regrounds in the new horizon')
+    assert.equal(suffixCount(secondOutput), suffixCount(firstOutput), 'regrounding restores the identical suffix shape')
   } finally {
     grounding.disposeJournal(opened.journal)
     cleanup()

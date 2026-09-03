@@ -4,7 +4,7 @@ import test from 'node:test'
 import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 
 const target = { model: 'provider/shared', reasoning: 'none' }
-const identity = (sessionId, physicalUserMessageId, effectiveAgent = 'fast-coder') => ({
+const identity = (sessionId, physicalUserMessageId, effectiveAgent = 'coder') => ({
   sessionId,
   physicalUserMessageId,
   effectiveAgent,
@@ -30,7 +30,7 @@ test('WHAT[EMR-014] valid immutable snapshot is a reconciliation no-op with trac
   const holderLease = await acquire(runtime, holder)
   assert.deepEqual(routing.commitExecutionAdmission(runtime, holderLease, holder), { kind: 'Applied' })
   routing.bindCapacityChild(runtime, 'holder', 'lineage-child')
-  const queued = await routing.beginExecutionAdmission(runtime, 'waiting', 'physical-waiting', 'deep-coder')
+  const queued = await routing.beginExecutionAdmission(runtime, 'waiting', 'physical-waiting', 'coder')
   assert.equal(queued.kind, 'Queued')
 
   const snapshot = routing.capacitySnapshot(runtime)

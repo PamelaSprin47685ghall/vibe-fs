@@ -602,6 +602,14 @@ module ProviderRecoveryWorkflow =
         recoveryDecision turn failure current requestKind
         |> executeFallbackDecision sessionPort eventPort durable scope turn continuationPrompt error
 
+    let private providerOfTarget (target: Wanxiangshu.OpenCode.ModelRoutingTarget) : string =
+        let slash = target.Model.IndexOf '/'
+
+        if slash > 0 then
+            target.Model.Substring(0, slash)
+        else
+            target.Model
+
     let private continueDurableFailure
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -613,25 +621,42 @@ module ProviderRecoveryWorkflow =
         (error: string)
         : Task =
         task {
-            match
-                FallbackEvidence.tryCurrentState turn.SessionId (AgentJournal.snapshot durable),
-                requestKindFor durable scope turn.SessionId
-            with
-            | None, _
-            | _, None -> notifyFailure eventPort turn error
-            | Some current, Some requestKind ->
-                return!
-                    executeAuthorizedRecovery
-                        sessionPort
-                        eventPort
-                        durable
-                        scope
-                        turn
-                        failure
-                        continuationPrompt
-                        error
-                        current
-                        requestKind
+            match ModelRouting.lastPhysicalTarget (SessionId.value turn.SessionId) with
+            | Some target -> ModelRouting.markProviderFailed (providerOfTarget target)
+            | None -> ()
+
+            let projections = AgentJournal.snapshot durable
+
+            let activeProfileOpt =
+                PromptAuthorityLedger.activeProfile turn.SessionId projections.AgentProjections
+
+            let roleName =
+                activeProfileOpt
+                |> Option.map (fun profile -> Roles.roleLabel profile.CanonicalRole)
+                |> Option.defaultValue ""
+
+            if roleName <> "" && not (ModelRouting.hasTheoreticalCapacity roleName) then
+                notifyFailure eventPort turn "All candidate providers exhausted (zero capacity)"
+            else
+                match
+                    FallbackEvidence.tryCurrentState turn.SessionId projections,
+                    requestKindFor durable scope turn.SessionId
+                with
+                | None, _
+                | _, None -> notifyFailure eventPort turn error
+                | Some current, Some requestKind ->
+                    return!
+                        executeAuthorizedRecovery
+                            sessionPort
+                            eventPort
+                            durable
+                            scope
+                            turn
+                            failure
+                            continuationPrompt
+                            error
+                            current
+                            requestKind
         }
 
     /// FALLBACK-003 + FALLBACK-004: a settled failed turn.

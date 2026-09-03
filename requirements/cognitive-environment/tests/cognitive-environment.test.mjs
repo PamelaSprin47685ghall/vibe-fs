@@ -209,12 +209,11 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_points_non_linear_work_to_ass
   }
 })
 
-test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_reserves_empty_skill_name_without_disabling_real_skills', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_rides_cursor_suffix_without_pseudo_skill_wire', () => {
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
-    assert.match(text, /skill\(\{ name: "" \}\)|skill\(""\)/)
-    assert.match(text, /injection-only|只能由系统注入|空 skill name|empty skill name/i)
-    assert.match(text, /non-empty|非空 name/i)
+    assert.match(text, /附加于工具输出尾部|appended to tool output/i)
+    assert.doesNotMatch(text, /skill\(\{ name: "" \}\)|skill\(""\)/)
     assert.doesNotMatch(text, /This prompt is injected automatically|本提示由系统自动注入/)
   }
 })

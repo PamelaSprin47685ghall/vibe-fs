@@ -2,7 +2,7 @@
 //
 // OrderedTransformProof: verifies the 17-step static semantic score of
 // PluginTransforms.normalTransform alongside the StrengthReplica and
-// ExplicitResumeSuppression branch isolation paths without illegal deep-dist imports.
+// ExplicitResumeSuppression branch isolation paths without illegal deep dist imports.
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'

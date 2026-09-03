@@ -74,11 +74,11 @@ module PairProgrammingThoughtTransform =
         | "1" -> true
         | _ -> false
 
+    /// Unconditionally true: Cursor mode (NUL+BOM tool result suffix injection without synthetic tool messages)
+    /// is unified across all providers.
     let isCursorProvider (providerId: string option) =
-        providerId
-        |> Option.exists (fun value -> value.Equals("cursor", StringComparison.OrdinalIgnoreCase))
-        || providerId
-           |> Option.exists (fun value -> value.Equals("google", StringComparison.OrdinalIgnoreCase))
+        ignore providerId
+        true
 
     /// The marker's source identity (HOST-013). Filtering must use this, never
     /// the text: a real user may quote the sentence.
@@ -885,14 +885,8 @@ module PairProgrammingThoughtTransform =
                     let memory = readMemoryHistory key
                     memory, memory, (fun pair -> Task.FromResult(appendMemory key pair))
 
-            let rawProviderId = providerIdFromMessages rawMessages
-
-            let rawMessages =
-                if isCursorProvider rawProviderId then
-                    let suffixes = history |> List.map _.MarkerText
-                    rawMessages |> List.map (stripCursorSuffixes suffixes)
-                else
-                    rawMessages
+            let suffixes = history |> List.map (fun pair -> pair.MarkerText)
+            let rawMessages = rawMessages |> List.map (stripCursorSuffixes suffixes)
 
             let strippedCallIds =
                 rawMessages

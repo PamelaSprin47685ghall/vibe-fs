@@ -46,7 +46,7 @@ Roles.permissions (Kernel 层单一真相源)
 | ENF-001 | `requirements/capability-enforcement/tests/attempt-plan-authority.test.mjs::WHAT[ENF-001] PROMPT_008_the_profile_derives_role_prompt_and_tools_from_the_authority` |
 | ENF-002 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs::WHAT[ENF-002] AGENT_006_role_tool_matrix_reaches_the_host_schema`；`requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs::WHAT[ENF-002] TOOLSPEC_delegation_tools_have_owner_defined_admission` |
 | ENF-003 | `requirements/capability-enforcement/tests/attempt-plan-authority.test.mjs::WHAT[ENF-003] PROMPT_008_the_request_kind_is_carried_not_inferred` |
-| ENF-004 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs::WHAT[ENF-004] AGENT_010_fast_and_deep_agents_carry_the_same_allow_set` |
+| ENF-004 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs::WHAT[ENF-004] AGENT_010_canonical_agents_carry_stable_allow_sets` |
 | ENF-005 | `requirements/capability-enforcement/tests/strength-replica-tool-map.test.mjs::WHAT[ENF-005] STRENGTH_004_replica_host_tool_map_denies_everything_then_allows_exact_readonly` |
 | ENF-006 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs::WHAT[ENF-006] HOST_skill_remains_allowed_for_every_managed_role`；`requirements/capability-enforcement/tests/internal-leaf-tool-authority.test.mjs::WHAT[ENF-006] internal_leaf_tool_declares_attachment_authority_not_a_public_office` |
 | ENF-007 | `requirements/capability-enforcement/tests/stealth-browser-mcp-wildcard.test.mjs::WHAT[ENF-007] AGENT_026_wildcard_matrix_mechanism` |

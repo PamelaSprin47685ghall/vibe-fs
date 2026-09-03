@@ -70,9 +70,9 @@ const rootSeed = (agent) => {
     ownerAuthorityRoot: null,
     participantIdentity: {
       selectedAgent: resolved.identity.name,
-      peerAgent: resolved.identity.peer,
+      peerAgent: resolved.identity.name,
       canonicalRole: resolved.identity.role,
-      selectedTier: resolved.identity.initialTier.toLowerCase(),
+      selectedTier: 'deep',
       persona: resolved.identity.persona,
       personaCatalogVersion: resolved.identity.catalogVersion,
       origin: resolved.identity.origin,
@@ -175,8 +175,8 @@ const assertOwner = (owner, evidence) => {
 
 export const defaultFamily = Object.freeze({
   name: 'manager-coder-single',
-  parentAgent: 'fast-manager',
-  childAgent: 'deep-coder',
+  parentAgent: 'manager',
+  childAgent: 'coder',
   capacity: 2,
   replay: false,
   duplicateDelivery: false,

@@ -30,7 +30,7 @@ MJS 表达策略        ──► (role, running, previous) -> { model, reasonin
 
 ## 边界与关系
 
-- `participant-identity`：提供 CanonicalRole、EffectiveAgent 与 Peer 关系定义。
+- `participant-identity`：提供 CanonicalRole、`EffectiveAgent (= SelectedAgent)` 与 `Peer (= SelectedAgent)` 身份保持关系定义。
 - `managed-session-lifecycle`：提供 managed session 生命周期边界与销毁信号。
 - `host-boundary`：提供 plugin 启动、物理 message/hook 拦截与 Host 消息改写边界。
 

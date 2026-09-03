@@ -34,9 +34,9 @@ effectivePlanComplete(k) = OR(planComplete of Accepted T1..Tk)
 
 同一 proposed account 内出现重复 `name` 或空白 `name` 均触发调用语法拒绝，作为当前 tool 红字返回。禁止通过 `work` 文本相似度猜测 obligation identity；Host 内部若需稳定标识，不得穿透至 provider 视野。
 
-## OBLIGATION-LEDGER-007: 同 message 多已 materialize todowrite 全拒与单 inflight
+## OBLIGATION-LEDGER-007: 同 message 多已 materialize todowrite 顺序执行与单 inflight
 
-同一 assistant message 出现多于一个不同 `ToolCallId` 且已 materialize/可执行的 `todowrite` 时，全部作为调用协议错误拒绝，不存在 ordinal winner 或基于时间的仲裁。流式构造期间无输入的 pending stub 不计为第二调用。同一 Manager Life 同时最多存在一个新 checkpoint admission；不同 `ToolCallId` 产生新 checkpoint。
+同一 assistant message 出现多个 `ToolCallId` 的 `todowrite` 时，支持同回合多次调用并按顺序执行语义串行生效：第 $k$ 次调用 accepted 的账目作为第 $k+1$ 次调用的 base，后一次调用自然更新前一次调用；流式构造期间无输入的 pending stub 不计为第二调用。T1 commitment 仅在首个 accepted `planComplete=true` 时揭示一次。同一 Manager Life 同时最多存在一个进行中的 checkpoint admission 事务。
 
 ## OBLIGATION-LEDGER-008: 同 ToolCallId replay 幂等
 

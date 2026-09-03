@@ -357,3 +357,74 @@ test('WHAT[EPI-013] kernel_rejected_error_content_is_human_readable', async () =
   assert.match(result.content[0].text, /KERNEL_REJECTED/)
   assert.match(result.content[0].text, /Next action/)
 })
+
+test('WHAT[EPI-013] full_next_tool_chain_with_bare_candidate_proposals', async () => {
+  const tools = mcpServer(createStore())._registeredTools
+
+  const started = await tools.start.handler({ question: '如何写程序才能写好程序？' })
+  const handle = started.structuredContent.handle
+  assert.equal(started.structuredContent.status, 'yield')
+  assert.equal(started.structuredContent.nextTool, 'assess')
+
+  const assessed = await tools.assess.handler({
+    handle,
+    forms: { How: 0.8, What: 0.1, Why: 0.1 },
+    targets: ['写程序', '好程序'],
+    intents: ['方法', '实践', '原则'],
+  })
+  assert.equal(assessed.structuredContent.status, 'yield')
+  assert.equal(assessed.structuredContent.nextTool, 'propose')
+
+  const proposed = await tools.propose.handler({
+    handle,
+    items: [
+      {
+        method: 'CausalMechanism',
+        question: '决定程序好坏的因果机制是什么？',
+        semanticKey: 'causal-mechanism',
+      },
+    ],
+  })
+  assert.equal(proposed.structuredContent.status, 'yield')
+  assert.equal(proposed.structuredContent.nextTool, 'investigate')
+  const actionId = proposed.structuredContent.request.action.id
+  assert.ok(actionId.length > 0)
+
+  const investigated = await tools.investigate.handler({
+    handle,
+    actionKey: actionId,
+    findings: [
+      {
+        semanticKey: 'finding:modularity',
+        text: '模块化与低耦合是程序长期可维护性的因果基础。',
+        evidenceKeys: ['evidence:software-engineering-study'],
+      },
+    ],
+    evidence: [
+      {
+        semanticKey: 'evidence:software-engineering-study',
+        proposition: '实证研究表明低耦合架构的缺陷率显著更低。',
+        source: { id: 'se-empirical-study', kind: 'document' },
+        dependencyKey: 'study-1',
+      },
+    ],
+  })
+  assert.equal(investigated.structuredContent.status, 'yield')
+  assert.equal(investigated.structuredContent.nextTool, 'propose')
+
+  const regenerated = await tools.propose.handler({ handle, items: [] })
+  assert.equal(regenerated.structuredContent.status, 'yield')
+  assert.equal(regenerated.structuredContent.nextTool, 'synthesize')
+
+  const answered = await tools.synthesize.handler({
+    handle,
+    text: '写好程序需要遵循低耦合高内聚原则，通过持续重构和测试保证质量。',
+    findingKeys: ['finding:modularity'],
+    uncertainties: [],
+  })
+  assert.equal(answered.isError, undefined)
+  assert.equal(answered.structuredContent.status, 'answered')
+  assert.equal(answered.structuredContent.answer.stopReason, 'stop-dominates')
+  assert.equal(answered.structuredContent.answer.epistemicBasis.findings.length, 1)
+  assert.equal(answered.structuredContent.answer.epistemicBasis.evidence.length, 1)
+})

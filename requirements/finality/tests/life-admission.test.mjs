@@ -26,11 +26,11 @@ const ownerLogicalRun = 'run-finality-owner'
 const ownerAuthorityRoot = 'msg-finality-owner-root'
 
 const participantIdentity = (origin) => ({
-  selectedAgent: 'fast-manager',
-  peerAgent: 'deep-manager',
+  selectedAgent: 'manager',
+  peerAgent: 'manager',
   canonicalRole: 'manager',
-  selectedTier: 'fast',
-  persona: 'Coordinator',
+  selectedTier: 'deep',
+  persona: 'Lead',
   personaCatalogVersion: 1,
   origin,
 })
@@ -58,19 +58,20 @@ const inheritedOwnerIdentitySeed = {
 const ownerWorld = project([ownerAuthorityAccepted])
 
 const agentOwnerEnding = (opening) =>
-  finality.endingAdmission(ownerWorld, 'agent-owner-root', 'root-1', 'fast-manager', 'deep-manager', 'fast', {
+  finality.endingAdmission(ownerWorld, 'agent-owner-root', 'root-1', 'manager', 'manager', 'fast', {
     ...opening,
     identitySeed: inheritedOwnerIdentitySeed,
   })
 
-test('WHAT[FINALITY-022] unknown authority kind and tier fail closed', () => {
-  const unknownKind = finality.endingAdmission(emptyWorld, 'forged-root', 'root-1', 'fast-manager', 'deep-manager', 'fast', { assignmentText: 'work' })
+test('WHAT[FINALITY-022] unknown authority kind fails closed, tier is compat passthrough', () => {
+  const unknownKind = finality.endingAdmission(emptyWorld, 'forged-root', 'root-1', 'manager', 'manager', 'fast', { assignmentText: 'work' })
   assert.equal(unknownKind.ok, false)
   assert.match(unknownKind.error, /unknown authority kind/)
 
-  const unknownTier = finality.endingAdmission(emptyWorld, 'agent-owner-root', 'root-1', 'fast-manager', 'deep-manager', 'forged', { assignmentText: 'work' })
-  assert.equal(unknownTier.ok, false)
-  assert.match(unknownTier.error, /unknown tier/)
+  // FinalitySurface.endingAdmission ignores peerAgent+tier (compat params):
+  // a forged tier still admits the same migration as the passthrough tier.
+  const forgedTier = finality.endingAdmission(ownerWorld, 'agent-owner-root', 'root-1', 'manager', 'manager', 'forged', { assignmentText: 'work', identitySeed: inheritedOwnerIdentitySeed })
+  assert.deepEqual(forgedTier, { kind: 'initial-agent-owner-migration' })
   assert.equal(finality.tryHumanRootOpening(emptyWorld, 'forged-root', 'root-1', 'root-1'), false)
 })
 
@@ -139,8 +140,8 @@ test('WHAT[FINALITY-022] AgentOwner migration is admitted only before any Life h
     closed,
     'agent-owner-root',
     'root-1',
-    'fast-manager',
-    'deep-manager',
+    'manager',
+    'manager',
     'fast',
     { ...opening, identitySeed: inheritedOwnerIdentitySeed },
   )

@@ -34,7 +34,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_host_reusable_inspector_one_finalize_then_c
   mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
   writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
   const owner = 'ses_meditator_g6'
-  const runtime = await syncDelegate.create(dir, [{ sessionId: owner, agent: 'fast-manager' }])
+  const runtime = await syncDelegate.create(dir, [{ sessionId: owner, agent: 'manager' }])
   const bookkeeperPort = scriptedBookkeeperPort()
   try {
     lifecycle.enable(dir)

@@ -17,13 +17,13 @@ test('WHAT[MANAGED-SESSION-006] TPOL_outstanding_without_durable_work_is_role_cl
 
 test('WHAT[MANAGED-SESSION-015] TPOL_linked_child_keeps_exact_handle_and_target', () => {
   const linked = HandleSurface.apply(HandleSurface.empty(), {
-    op: 'link', handle: 'agent:h1', child: 'ses_child', agent: 'fast-coder', role: 'Coder',
+    op: 'link', handle: 'agent:h1', child: 'ses_child', agent: 'coder', role: 'Coder',
   })
   assert.equal(linked.ok, true)
   assert.deepEqual(HandleSurface.tryFindByChildSession(linked.state, 'ses_child'), {
     handle: 'agent:h1',
     child: 'ses_child',
-    targetAgent: 'fast-coder',
+    targetAgent: 'coder',
     role: 'Coder',
     lifecycle: 'Active',
     creationOrder: 0,

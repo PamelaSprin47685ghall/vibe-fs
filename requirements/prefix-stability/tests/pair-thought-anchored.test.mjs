@@ -87,8 +87,13 @@ const assertWireEqual = (a, b, label) => {
 }
 
 const toolNames = (messages) => messages.map((m) => m.parts[0]?.tool)
-const skillContent = (markerText) => markerText
-const callIdOf = (messages, index) => messages[index].parts[0].callID
+// Universal cursor mode: guidance is a NUL+BOM suffix on a real tool result,
+// so history rows carry no synthetic tool names and pairMessages stays empty.
+const guidanceSuffixCount = (messages) =>
+  messages
+    .map((m) => m.parts[0]?.state?.output ?? m.parts[0]?.state?.error ?? '')
+    .filter((value) => typeof value === 'string')
+    .map((value) => (value.match(/\0/g) ?? []).length)
 
 /** Fresh durable journal in a temp dir. */
 const openJournal = async (dir) => {
@@ -110,16 +115,18 @@ test('WHAT[PREFIX-STABILITY-001] H13_01_canonical_multi_tool_sequence_is_an_appe
     toolResult('r2', 'read', 't2'),
   ]
 
-  // round 1: Req1 Req2 Resp1 Resp2 → FakePair1 (one completed Host row)
+  // round 1: Req1 Req2 Resp1 Resp2 — universal cursor mode carries guidance
+  // only as a NUL+BOM suffix on the terminal real tool result (Resp2).
   const round1Wire = await inject(undefined, session, round1Real)
-  assert.deepEqual(toolNames(round1Wire), ['bash', 'read', 'bash', 'read', 'skill'])
-  const call1 = stableCallId(session, 1n)
-  assert.equal(round1Wire[4].parts[0].state.status, 'completed')
-  assert.notEqual(round1Wire[4].parts[0].state.status, 'pending')
-  assert.equal(callIdOf(round1Wire, 4), call1)
+  assert.deepEqual(toolNames(round1Wire), ['bash', 'read', 'bash', 'read'])
+  assert.equal(pairMessages(round1Wire).length, 0)
+  assert.equal(round1Wire[3].parts[0].state.status, 'completed')
+  assert.notEqual(round1Wire[3].parts[0].state.status, 'pending')
+  assert.equal(round1Wire[3].parts[0].state.output, `ok\0\uFEFF${text}`)
+  assert.equal(round1Wire[2].parts[0].state.output, 'ok')
 
-  // round 2 input carries the previous wire's synthetic messages (Host persists
-  // them): Req1 Req2 Resp1 Resp2 FakePair1 Req3 Resp3
+  // round 2 input carries the previous wire's suffixed bytes (Host persists
+  // them): Req1 Req2 Resp1 Resp2+suffix Req3 Resp3+suffix
   const round2Real = [
     ...round1Wire,
     toolCall('c3', 'write', 't3'),
@@ -127,12 +134,12 @@ test('WHAT[PREFIX-STABILITY-001] H13_01_canonical_multi_tool_sequence_is_an_appe
   ]
   const round2Wire = await inject(undefined, session, round2Real)
   assert.deepEqual(toolNames(round2Wire), [
-    'bash', 'read', 'bash', 'read', 'skill',
-    'write', 'write', 'skill',
+    'bash', 'read', 'bash', 'read',
+    'write', 'write',
   ])
-  const call2 = stableCallId(session, 2n)
-  assert.equal(callIdOf(round2Wire, 7), call2)
-  assert.notEqual(call1, call2)
+  assert.equal(pairMessages(round2Wire).length, 0)
+  assert.equal(round2Wire[3].parts[0].state.output, `ok\0\uFEFF${text}`, 'historical guidance bytes never change')
+  assert.equal(round2Wire[5].parts[0].state.output, `ok\0\uFEFF${text}`)
 
   assertPrefixLaw(round1Wire, round2Wire, 'H13-01 canonical sequence')
 })
@@ -144,17 +151,23 @@ test('WHAT[PREFIX-STABILITY-010] H13_02_historical_pair_never_relocates_to_curre
 
   const round1 = [toolCall('c1', 'bash', 't1'), toolResult('r1', 'bash', 't1')]
   const wire1 = await inject(undefined, session, round1)
-  // Req1 Resp1 FakePair1
-  assert.deepEqual(toolNames(wire1), ['bash', 'bash', 'skill'])
+  // Req1 Resp1+suffix — no synthetic row follows the batch.
+  assert.deepEqual(toolNames(wire1), ['bash', 'bash'])
+  assert.equal(pairMessages(wire1).length, 0)
+  assert.equal(wire1[1].parts[0].state.output, `ok\0\uFEFF${text}`)
 
   const round2 = [...wire1, toolCall('c2', 'read', 't2'), toolResult('r2', 'read', 't2')]
   const wire2 = await inject(undefined, session, round2)
-  // Req1 Resp1 FakePair1 Req2 Resp2 FakePair2
-  // A historyBlock implementation would move pair1 next to the current batch.
+  // Req1 Resp1+suffix Req2 Resp2+suffix
+  // A historyBlock implementation would rewrite pair1's bytes next to the
+  // current batch; instead the historical suffix is frozen in place.
   assert.deepEqual(toolNames(wire2), [
-    'bash', 'bash', 'skill',
-    'read', 'read', 'skill',
+    'bash', 'bash',
+    'read', 'read',
   ])
+  assert.equal(pairMessages(wire2).length, 0)
+  assert.equal(wire2[1].parts[0].state.output, `ok\0\uFEFF${text}`)
+  assert.equal(wire2[3].parts[0].state.output, `ok\0\uFEFF${text}`)
   assertPrefixLaw(wire1, wire2, 'H13-02 no historical relocation')
 })
 
@@ -173,11 +186,21 @@ test('WHAT[PREFIX-STABILITY-010] H13_02b_durable_history_replays_the_current_ski
     })
     assert.equal(appended.ok, true, JSON.stringify(appended))
 
+    // Universal cursor mode: the durable fact persists journal-side, but with
+    // no terminal real tool result there is no guidance carrier to render —
+    // zero synthetic rows, even with history present.
     const wire = await inject(opened.journal, session, [])
-    assert.equal(wire.length, 1)
-    assert.equal(wire[0].parts[0].tool, 'skill')
-    assert.deepEqual(wire[0].parts[0].state.input, { name: '' })
-    assert.equal(wire[0].parts[0].state.output, pair.text)
+    assert.deepEqual(wire, [])
+    assert.equal(pairMessages(wire).length, 0)
+    assert.equal(durablePairCount(opened.journal, session), 1)
+
+    // The same durable history guides the next real terminal result instead.
+    const guided = await inject(opened.journal, session, [
+      toolCall('c1', 'bash', 't1'),
+      toolResult('r1', 'bash', 't1', 'out1'),
+    ])
+    assert.deepEqual(toolNames(guided), ['bash', 'bash'])
+    assert.equal(guided[1].parts[0].state.output, `out1\0\uFEFF${pair.text}`)
   } finally {
     pair.disposeJournal(opened.journal)
     rmSync(dir, { recursive: true, force: true })
@@ -194,12 +217,14 @@ test('WHAT[PREFIX-STABILITY-010] H13_03_same_placement_reentry_appends_no_pair',
     const raw = [userMsg('u1'), assistantText('a1'), userMsg('msg_1')]
 
     const once = await inject(opened.journal, session, raw)
-    assert.equal(once.length, 4)
+    assert.equal(once.length, 3)
+    assert.deepEqual(once, raw, 'no terminal tool result means no guidance carrier')
+    assert.equal(pairMessages(once).length, 0)
     assert.equal(durablePairCount(opened.journal, session), 1)
 
     const twice = await inject(opened.journal, session, [...once])
-    assert.equal(twice.length, 4, 'same placement must replay, not append')
-    assert.equal(pairMessages(twice).length, 1)
+    assert.equal(twice.length, 3, 'same placement must replay, not append')
+    assert.equal(pairMessages(twice).length, 0)
     assert.deepEqual(twice, once)
     assert.equal(durablePairCount(opened.journal, session), 1, 'journal must hold exactly one anchored fact')
   } finally {
@@ -317,8 +342,11 @@ test('WHAT[PREFIX-STABILITY-010] H13_05b_xwire_drop_leading_continue_still_commi
 
     const wire1 = await inject(opened.journal, session, [user0, asst0, user1])
     assert.equal(durablePairCount(opened.journal, session), 1)
+    assert.equal(pairMessages(wire1).length, 0)
 
-    // DropLeading removes u1 (pair1's Before(u1) anchors).
+    // DropLeading removes u1 (pair1's Before(u1) anchors). Neither view has a
+    // terminal real tool result, so neither renders guidance — but both must
+    // still commit (not Abort).
     const result = await tryInjectWithJournal(opened.journal, session, text, [synthPrefix, failAsst, cont])
     assert.equal(result.ok, true, `XWire continue must not fail closed: ${result.error ?? ''}`)
     const wire2 = result.value
@@ -328,12 +356,14 @@ test('WHAT[PREFIX-STABILITY-010] H13_05b_xwire_drop_leading_continue_still_commi
       false,
       'pair1 anchors dropped with covered prefix — must not reappear',
     )
-    // Full transcript (no drop) still replays pair1; pure u1 re-entry is byte-identical.
+    assert.equal(pairMessages(wire2).length, 0)
+    const countAfterContinue = durablePairCount(opened.journal, session)
+    // Full transcript (no drop) replays the same durable occurrence without
+    // appending a new fact; pure u1 re-entry is byte-identical.
     const restored = await inject(opened.journal, session, [user0, asst0, user1, failAsst, cont])
-    assert.ok(
-      restored.some((m) => m.parts?.[0]?.callID === call1),
-      'full transcript must re-place pair1 at its durable anchor',
-    )
+    assert.equal(pairMessages(restored).length, 0)
+    assert.deepEqual(restored, [user0, asst0, user1, failAsst, cont])
+    assert.equal(durablePairCount(opened.journal, session), countAfterContinue, 're-entry must not append a second fact')
     assertWireEqual(wire1, await inject(opened.journal, session, [user0, asst0, user1]), 'H13-05b same placement on u1 is pure replay')
   } finally {
     pair.disposeJournal(opened.journal)
@@ -346,22 +376,24 @@ test('WHAT[PREFIX-STABILITY-010] H13_05b_xwire_drop_leading_continue_still_commi
 test('WHAT[PREFIX-STABILITY-010] H13_06_prior_tip_only_affects_the_new_pair', async () => {
   const session = 'h13-06'
 
-  const wire1 = await inject(undefined, session, [userMsg('u0'), assistantText('a0'), userMsg('u1')], 'guideline')
-  const call1 = stableCallId(session, 1n)
-  assert.equal(wire1[2].parts[0].callID, call1)
-  assert.equal(wire1[2].parts[0].state.output, skillContent('guideline'))
+  const wire1 = await inject(
+    undefined,
+    session,
+    [toolCall('c1', 'bash', 't1'), toolResult('r1', 'bash', 't1', 'out1')],
+    'guideline',
+  )
+  assert.equal(pairMessages(wire1).length, 0)
+  assert.equal(wire1[1].parts[0].state.output, `out1\0\uFEFFguideline`)
 
   const wire2 = await inject(
     undefined,
     session,
-    [userMsg('u0'), assistantText('a0'), userMsg('u1'), assistantText('a1'), userMsg('u2')],
+    [...wire1, toolCall('c2', 'bash', 't2'), toolResult('r2', 'bash', 't2', 'out2')],
     'tip2\n\nguideline',
   )
-  const call2 = stableCallId(session, 2n)
-  assert.equal(wire2[2].parts[0].state.output, skillContent('guideline'), 'pair1 marker bytes must never change')
-  assert.equal(wire2[5].parts[0].state.output, skillContent('tip2\n\nguideline'))
-  assert.equal(wire2[5].parts[0].callID, call2)
-  assert.notEqual(call1, call2)
+  assert.equal(pairMessages(wire2).length, 0)
+  assert.equal(wire2[1].parts[0].state.output, `out1\0\uFEFFguideline`, 'historical marker bytes must never change')
+  assert.equal(wire2[3].parts[0].state.output, `out2\0\uFEFFtip2\n\nguideline`)
 
   assertPrefixLaw(wire1, wire2, 'H13-06 prior tip isolation')
 })
@@ -384,8 +416,8 @@ test('WHAT[PREFIX-STABILITY-001] H13_08_n_round_property_prefix_law_holds', asyn
   const session = 'h13-08'
   const rounds = 8
 
-  // history grows exactly as the Host transcript does: previous wire (synthetic
-  // messages included) + the new real content of this round.
+  // history grows exactly as the Host transcript does: previous wire (result
+  // guidance bytes included) + the new real content of this round.
   let history = []
   let previousWire
   let previousPairCount = 0
@@ -404,11 +436,15 @@ test('WHAT[PREFIX-STABILITY-001] H13_08_n_round_property_prefix_law_holds', asyn
 
     const wire = await inject(undefined, session, [...history, ...fresh])
 
-    // One round can create at most one new pair; a round whose terminal shape
-    // repeats an existing placement (HOST-013 §8 dedupe) creates none.
+    // Universal cursor mode emits zero synthetic rows; guidance replays strip
+    // the suffix for placement and re-apply it exactly once — no row ever
+    // accumulates a doubled NUL+BOM suffix.
     const pairCount = pairMessages(wire).length
     assert.ok(pairCount >= previousPairCount, `round ${n}: pair count must never shrink`)
     assert.ok(pairCount <= previousPairCount + 1, `round ${n}: at most one new pair per round`)
+    for (const suffixes of guidanceSuffixCount(wire)) {
+      assert.ok(suffixes <= 1, `round ${n}: at most one guidance suffix per result`)
+    }
 
     if (previousWire !== undefined) {
       assertPrefixLaw(previousWire, wire, `H13-08 round ${n}`)

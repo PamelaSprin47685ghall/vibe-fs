@@ -12,8 +12,7 @@
 //      build → unit → integration orchestrator → L4 e2e/entry（恰一个）→
 //      L5 npm pack --dry-run），以及每个 Wireit step 解析到的真实仓库命令；
 //   2. check.mjs 的 wired gate 清单：每个 wired 路径存在；
-//      scripts/checks/*.mjs == wired ∪ {spec-rules.mjs(lib)、
-//      semantic-anchors.mjs(catalog)}；
+//      scripts/checks/*.mjs == wired ∪ explicit non-prebuild entrypoints；
 //   3. check.mjs fail-closed：`process.exit(result.status ?? 1)` 传播非零。
 //
 // 「可红」由现有 per-gate red fixture（tests/unit/verify/*.test.mjs 与
@@ -174,6 +173,7 @@ const WIRED_ALLOWLIST = new Set([
   'js-surface-manifest.mjs', // post-build gate：由 build.mjs 在 fable precompile 后调用（依赖 dist 产物，不能 pre-build）
   'js-module-linkage.mjs', // post-build linkage gate: invoked by build.mjs after Fable emit, cannot run pre-build
   'legacy-horizon-census.mjs', // census tool：由 OBL-007 历史 detector 退出验证调用
+  'locality-dependencies.mjs', // report-only integration analyzer：M6.4 原子切换前不得成为 pre-build release gate
 ])
 
 /** 解析 check.mjs 的 checks 数组，返回 wired basename 清单（保持声明顺序）。 */
@@ -230,7 +230,7 @@ test('WHAT[VERIFICATION-SYSTEM-004] checks directory is wired plus allowlist onl
   assert.deepEqual(
     actual,
     [...new Set([...wired, ...WIRED_ALLOWLIST])].sort(),
-    'scripts/checks/*.mjs must equal wired gates ∪ {spec-rules(lib), semantic-anchors(catalog)}',
+    'scripts/checks/*.mjs must equal wired gates ∪ explicit non-prebuild entrypoints',
   )
 })
 

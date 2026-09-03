@@ -8,11 +8,10 @@ import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.j
 
 const hash = (value) => `H(${value})`
 const personas = {
-  'fast-manager': 'Coordinator',
+  manager: 'Lead',
 }
 const rootSelection = (agent) => {
-  const [selectedTier, canonicalRole] = agent.split('-')
-  const peerTier = selectedTier === 'fast' ? 'deep' : 'fast'
+  const canonicalRole = agent === 'predictor' ? 'inspector' : agent
   return {
     kind: 'RootSelection',
     ownerSession: null,
@@ -20,10 +19,10 @@ const rootSelection = (agent) => {
     ownerAuthorityRoot: null,
     participantIdentity: {
       selectedAgent: agent,
-      peerAgent: `${peerTier}-${canonicalRole}`,
+      peerAgent: agent,
       canonicalRole,
-      selectedTier,
-      persona: personas[agent] ?? 'Coordinator',
+      selectedTier: 'deep',
+      persona: personas[agent] ?? 'Lead',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
     },
@@ -36,7 +35,7 @@ const inheritedSeed = (agent, physical) => {
     'ses-owner',
     'HumanRoot',
     `owner-${physical}`,
-    rootSelection('fast-manager'),
+    rootSelection('manager'),
   )
   assert.equal(owner.ok, true, owner.error)
   const inherited = authority.issueInheritedIdentitySeed(agent, owner.value)
@@ -44,7 +43,7 @@ const inheritedSeed = (agent, physical) => {
   return inherited.value
 }
 const profile = (run, root, kind = 'HumanRoot') => {
-  const seed = kind === 'AgentOwnerRoot' ? inheritedSeed('fast-manager', root) : rootSelection('fast-manager')
+  const seed = kind === 'AgentOwnerRoot' ? inheritedSeed('manager', root) : rootSelection('manager')
   const result = authority.createAuthorityRoot(hash, 'rt-close', 'ses-close', kind, root, seed)
   assert.equal(result.ok, true, result.error)
   return { ...result.value, logicalRun: run, authorityRoot: root }

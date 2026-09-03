@@ -28,7 +28,7 @@ const toolModule = {
 }
 
 const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime, count)
-const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'fast-manager' }]
+const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
 
 test('WHAT[DELEG-019] FORK_TOOL_payload_has_assignment_and_requirements', () => {
   const wire = fork.render('en', {
@@ -65,11 +65,11 @@ test('WHAT[DELEG-003] FORK_road_with_calling_is_independent_and_omitted_calling_
 })
 
 test('WHAT[DELEG-006] FORK_continuation_reuses_bound_managed_agent_and_does_not_rebind_tier', () => {
-  const result = fork.reuseBinding('Ada', 'deep-inspector', 'fast-inspector', 'deep', 'continue the charge')
+  const result = fork.reuseBinding('Ada', 'inspector', 'coder', 'deep', 'continue the charge')
   assert.equal(result.ok, true)
   assert.equal(result.byname, 'Ada')
-  assert.equal(result.managedAgent, 'deep-inspector')
-  assert.equal(result.requestedAgent, 'fast-inspector')
+  assert.equal(result.managedAgent, 'inspector')
+  assert.equal(result.requestedAgent, 'coder')
   assert.equal(result.tier, 'deep')
   assert.equal(result.authorityTransferred, false)
   assert.equal(Object.hasOwn(result, 'agentId'), false)

@@ -278,10 +278,10 @@ export const ROOT_SELECTION_IDENTITY_SEED = {
   OwnerLogicalRunId: null,
   OwnerAuthorityRootUserMessageId: null,
   ParticipantIdentity: {
-    SelectedAgent: 'fast-coder',
-    PeerAgent: 'deep-coder',
+    SelectedAgent: 'coder',
+    PeerAgent: 'coder',
     Role: 'coder',
-    InitialTier: 'Fast',
+    InitialTier: 'Deep',
     Persona: 'Coder',
     PersonaCatalogVersion: 1,
     Origin: 'ResolvedAtRoot',

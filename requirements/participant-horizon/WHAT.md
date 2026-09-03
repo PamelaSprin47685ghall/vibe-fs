@@ -45,8 +45,8 @@ Blogger、Distiller、Bookkeeper 等内部辅助角色严禁出现在模型可�
 
 ## PARTICIPANT-HORIZON-010: fork/commission 可见集合
 
-- Manager `fork` 仅可见：fast/deep 的 coder、inspector、devops、browser、inquiry。
-- Orchestrator `commission` 仅可见：fast-manager、deep-manager。
+- Manager `fork` 仅可见：coder、inspector、devops、browser、inquiry（各一个本名版本）。
+- Orchestrator `commission` 仅可见：manager。
 - `horizon()` 仅返回在场名册的 Byname 或 TerminalName，不暴露底层 id。
 - Reviewer、Blogger、Distiller、Bookkeeper 严禁出现在可 fork 集合中。
 

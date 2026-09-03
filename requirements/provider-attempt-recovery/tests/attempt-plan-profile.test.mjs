@@ -54,9 +54,12 @@ test('WHAT[PAR-013] FALLBACK_002_the_cursor_changes_only_the_effective_agent', (
     planner.plan({ cursor: cursor.atOffset(offset), kind: requestKind.workMain }),
   )
 
+  // Single-version world: SelectedAgent == PeerAgent, so EffectiveAgent always
+  // equals SelectedAgent across all modulo-4 offsets; provider rotation happens
+  // at the model level. The cursor no longer flips to a peer agent.
   assert.deepEqual(
     attempts.map(({ effectiveAgent }) => effectiveAgent),
-    ['fast-coder', 'fast-coder', 'deep-coder', 'deep-coder'],
+    ['coder', 'coder', 'coder', 'coder'],
   )
 
   const { participantIdentity: identity, systemPromptId, toolCapabilities } = attempts[0]
@@ -66,10 +69,10 @@ test('WHAT[PAR-013] FALLBACK_002_the_cursor_changes_only_the_effective_agent', (
     assert.deepEqual(attempt.toolCapabilities, toolCapabilities)
   }
   assert.deepEqual(identity, {
-    selectedAgent: 'fast-coder',
-    peerAgent: 'deep-coder',
+    selectedAgent: 'coder',
+    peerAgent: 'coder',
     canonicalRole: 'coder',
-    selectedTier: 'fast',
+    selectedTier: 'deep',
     persona: 'Coder',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',

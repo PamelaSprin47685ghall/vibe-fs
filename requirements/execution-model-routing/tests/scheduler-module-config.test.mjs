@@ -9,9 +9,9 @@ import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 const { bootstrapAndLoadAt, invokeScheduler } = routing
 
 const template = `export default function route(role, running) {
-  if (role !== 'fast-coder') return null
+  if (role !== 'coder') return null
   return running.length === 0
-    ? { model: 'provider/fast-model', reasoning: 'none' }
+    ? { model: 'provider/coder-model', reasoning: 'none' }
     : null
 }\n`
 
@@ -28,8 +28,8 @@ test('WHAT[EMR-001] EMR_001_missing_scheduler_is_created_once_then_loaded_from_d
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(path, template)
     assert.equal(await readFile(path, 'utf8'), template)
-    const selected = invokeScheduler(scheduler, 'fast-coder', [])
-    assert.equal(selected.model, 'provider/fast-model')
+    const selected = invokeScheduler(scheduler, 'coder', [])
+    assert.equal(selected.model, 'provider/coder-model')
     assert.equal(selected.reasoning, 'none')
   })
 })
@@ -42,7 +42,7 @@ test('WHAT[EMR-001] EMR_001_existing_scheduler_is_never_overwritten', async () =
 
     const scheduler = await bootstrapAndLoadAt(path, template)
     assert.equal(await readFile(path, 'utf8'), existing)
-    assert.equal(invokeScheduler(scheduler, 'deep-coder', []).model, 'provider/user-choice')
+    assert.equal(invokeScheduler(scheduler, 'coder', []).model, 'provider/user-choice')
   })
 })
 
@@ -54,8 +54,8 @@ test('WHAT[EMR-001] EMR_001_concurrent_bootstrap_keeps_one_atomic_winner_without
     ])
 
     assert.equal(await readFile(path, 'utf8'), template)
-    assert.equal(invokeScheduler(left, 'fast-coder', []).model, 'provider/fast-model')
-    assert.equal(invokeScheduler(right, 'fast-coder', []).model, 'provider/fast-model')
+    assert.equal(invokeScheduler(left, 'coder', []).model, 'provider/coder-model')
+    assert.equal(invokeScheduler(right, 'coder', []).model, 'provider/coder-model')
   })
 })
 
@@ -91,16 +91,16 @@ test('WHAT[EMR-002] EMR_002_scheduler_program_errors_fail_closed', async () => {
 
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(path, `export default async () => ({ model: 'provider/x', reasoning: 'none' })\n`)
-    assert.throws(() => invokeScheduler(scheduler, 'fast-coder', []), /Promise|synchronous/i)
+    assert.throws(() => invokeScheduler(scheduler, 'coder', []), /Promise|synchronous/i)
   })
 
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(path, `export default () => ({ model: 'bare-model', reasoning: 'none' })\n`)
-    assert.throws(() => invokeScheduler(scheduler, 'fast-coder', []), /provider\/model/i)
+    assert.throws(() => invokeScheduler(scheduler, 'coder', []), /provider\/model/i)
   })
 
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(path, `export default () => ({ model: 'provider/model', reasoning: '' })\n`)
-    assert.throws(() => invokeScheduler(scheduler, 'fast-coder', []), /reasoning/i)
+    assert.throws(() => invokeScheduler(scheduler, 'coder', []), /reasoning/i)
   })
 })

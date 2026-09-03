@@ -4,8 +4,7 @@ open System
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Persona
 
-/// Managed Agent identity: fast-ROLE / deep-ROLE.
-/// Canonical Role stays unprefixed; Host Agent identity is always tier-prefixed.
+/// Managed Agent identity: canonical Role.
 /// Identity tables live in `ManagedAgentCatalog` (AGENT-001…004).
 [<RequireQualifiedAccess>]
 type AgentVisibility =
@@ -15,7 +14,6 @@ type AgentVisibility =
 type ManagedAgent =
     { Name: string
       Role: Role
-      Tier: AgentTier
       Visibility: AgentVisibility }
 
 [<RequireQualifiedAccess>]
@@ -27,7 +25,6 @@ type ManagedAgentParseError =
 module ManagedAgent =
 
     let roleName = Roles.roleLabel
-    let tierName = Roles.wireTierLabel
     let nameOf = ManagedAgentCatalog.nameOf
 
     let visibilityOf (role: Role) : AgentVisibility =
@@ -36,10 +33,9 @@ module ManagedAgent =
         else
             AgentVisibility.Public
 
-    let make (tier: AgentTier) (role: Role) : ManagedAgent =
-        { Name = nameOf tier role
+    let make (role: Role) : ManagedAgent =
+        { Name = nameOf role
           Role = role
-          Tier = tier
           Visibility = visibilityOf role }
 
     let allPublicRoles = ManagedAgentCatalog.allPublicRoles
@@ -59,8 +55,6 @@ module ManagedAgent =
         | ParticipantIdentityError.MalformedParticipantName name -> ManagedAgentParseError.Malformed name
         | ParticipantIdentityError.UnsupportedPersonaCatalogVersion _
         | ParticipantIdentityError.RoleMismatch _
-        | ParticipantIdentityError.TierMismatch _
-        | ParticipantIdentityError.PeerMismatch _
         | ParticipantIdentityError.BlankPersona
         | ParticipantIdentityError.PersonaMismatch _
         | ParticipantIdentityError.OriginMismatch _
@@ -68,7 +62,6 @@ module ManagedAgent =
         | ParticipantIdentityError.OwnerPersonaMismatch _
         | ParticipantIdentityError.OwnerCatalogVersionMismatch _
         | ParticipantIdentityError.LegacyRoleMismatch _
-        | ParticipantIdentityError.LegacyTierMismatch _
         | ParticipantIdentityError.UnsupportedLegacyAuthorityKind _
         | ParticipantIdentityError.UnprovableLegacyAuthorityIdentity _ -> ManagedAgentParseError.Malformed value
 
@@ -83,7 +76,6 @@ module ManagedAgent =
         |> Result.map (fun role ->
             { Name = ParticipantIdentity.selectedAgent identity
               Role = role
-              Tier = ParticipantIdentity.initialTier identity
               Visibility = visibilityOf role })
 
     let parse (value: string) : Result<ManagedAgent, ManagedAgentParseError> =
@@ -93,28 +85,26 @@ module ManagedAgent =
 
     let tryParse (value: string) : ManagedAgent option = parse value |> Result.toOption
 
-    let peer (agent: ManagedAgent) : ManagedAgent =
-        make (ManagedAgentCatalog.peerTier agent.Tier) agent.Role
+    let peer (agent: ManagedAgent) : ManagedAgent = agent
 
     let isInternal (agent: ManagedAgent) =
         agent.Visibility = AgentVisibility.Internal
 
     let private unknownAgentSuggestion (name: string) =
         if name.IndexOf("inspect", StringComparison.OrdinalIgnoreCase) >= 0 then
-            " Use 'fast-inspector' or 'deep-inspector'."
+            " Use 'inspector'."
         elif name.IndexOf("review", StringComparison.OrdinalIgnoreCase) >= 0 then
-            " Use 'fast-reviewer' or 'deep-reviewer'."
+            " Use 'reviewer'."
         elif name.IndexOf("manager", StringComparison.OrdinalIgnoreCase) >= 0 then
-            " Use 'fast-manager' or 'deep-manager'."
+            " Use 'manager'."
         elif name.IndexOf("coder", StringComparison.OrdinalIgnoreCase) >= 0 then
-            " Use 'fast-coder' or 'deep-coder'."
+            " Use 'coder'."
         else
-            " Use an explicit fast-* or deep-* managed agent name."
+            " Use a valid canonical managed agent name."
 
     let formatParseError (err: ManagedAgentParseError) : string =
         match err with
         | ManagedAgentParseError.LegacyAgentName name -> ManagedAgentCatalog.formatLegacyNameNotSupported name
         | ManagedAgentParseError.UnknownManagedAgent name ->
             sprintf "Unknown managed agent '%s'.%s" name (unknownAgentSuggestion name)
-        | ManagedAgentParseError.Malformed name ->
-            sprintf "Malformed managed agent name '%s'. Expected fast-ROLE or deep-ROLE." name
+        | ManagedAgentParseError.Malformed name -> sprintf "Malformed managed agent name '%s'." name

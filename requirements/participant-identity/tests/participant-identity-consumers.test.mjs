@@ -83,7 +83,7 @@ test('WHAT[PID-005] provider planning selects the system prompt and tool set fro
 
 test('WHAT[PID-002] ProviderAttempt carries its ParticipantIdentity as one nested value', () => {
   const attempt = attemptPlan('inspector', 'deep')
-  const resolved = Persona.resolveParticipantIdentityAtRoot('deep-inspector')
+  const resolved = Persona.resolveParticipantIdentityAtRoot('inspector')
 
   assert.equal(resolved.ok, true, resolved.ok ? '' : resolved.error)
   assert.deepEqual(attempt.participantIdentity, {
@@ -98,21 +98,25 @@ test('WHAT[PID-002] ProviderAttempt carries its ParticipantIdentity as one neste
 })
 
 test('WHAT[PID-006] fallback preserves ParticipantIdentity', () => {
-  const selected = attemptPlan('coder', 'fast', 0)
-  const fallback = attemptPlan('coder', 'fast', 2)
+  const selected = attemptPlan('coder', 'deep', 0)
   const pair = {
     selectedAgent: selected.participantIdentity.selectedAgent,
     peerAgent: selected.participantIdentity.peerAgent,
   }
 
-  assert.equal(Fallback.cursor.effectiveAgent(pair, { offset: 0, failures: 0 }), selected.effectiveAgent)
-  assert.equal(Fallback.cursor.effectiveAgent(pair, { offset: 2, failures: 2 }), fallback.effectiveAgent)
-  assert.notEqual(fallback.effectiveAgent, selected.effectiveAgent)
-  assert.deepEqual(fallback.participantIdentity, selected.participantIdentity)
+  for (const offset of [0, 1, 2, 3]) {
+    const attempt = attemptPlan('coder', 'deep', offset)
+    assert.equal(attempt.effectiveAgent, selected.participantIdentity.selectedAgent)
+    assert.equal(
+      Fallback.cursor.effectiveAgent(pair, { offset, failures: offset }),
+      attempt.effectiveAgent,
+    )
+    assert.deepEqual(attempt.participantIdentity, selected.participantIdentity)
+  }
 })
 
 test('WHAT[PID-004] terminal dispatch preserves the exact IdentitySeed', () => {
-  const profile = rootProfile('deep-devops')
+  const profile = rootProfile('devops')
   const promptKey = 'pk_identity_terminal_dispatch'
   const claim = Runtime.claimContinuation(
     promptKey,
@@ -132,11 +136,13 @@ test('WHAT[PID-004] terminal dispatch preserves the exact IdentitySeed', () => {
   assert.deepEqual(projection.acceptedDispatches[0].identitySeed, profile.identitySeed)
 })
 
-test('WHAT[PID-010] child identity inherits the parent Persona and version across role and tier', () => {
-  const parent = rootProfile('fast-coder', 'ses_identity_parent')
-  const child = inheritedSeed('deep-reviewer', parent)
+test('WHAT[PID-008] child identity inherits the parent Persona and version across role and tier', () => {
+  const parent = rootProfile('coder', 'ses_identity_parent')
+  const child = inheritedSeed('reviewer', parent)
 
+  assert.equal(child.participantIdentity.selectedAgent, 'reviewer')
   assert.equal(child.participantIdentity.selectedTier, 'deep')
+  assert.equal(child.participantIdentity.selectedTier, parent.participantIdentity.selectedTier)
   assert.equal(child.participantIdentity.canonicalRole, 'reviewer')
   assert.deepEqual(personaVersion(child.participantIdentity), personaVersion(parent.participantIdentity))
   assert.equal(child.ownerSession, parent.session)
@@ -144,11 +150,15 @@ test('WHAT[PID-010] child identity inherits the parent Persona and version acros
   assert.equal(child.ownerAuthorityRoot, parent.authorityRoot)
 })
 
-test('WHAT[PID-004] Strength replica inherits owner Persona and version with a different EffectiveAgent', () => {
-  const owner = rootProfile('fast-coder', 'ses_identity_strength_owner')
-  const replica = inheritedSeed('deep-coder', owner)
+test('WHAT[PID-004] Strength replica inherits owner Persona and version with the same EffectiveAgent', () => {
+  const owner = rootProfile('coder', 'ses_identity_strength_owner')
+  const replica = inheritedSeed('coder', owner)
 
-  assert.notEqual(replica.participantIdentity.selectedAgent, owner.participantIdentity.selectedAgent)
+  assert.equal(replica.participantIdentity.selectedAgent, owner.participantIdentity.selectedAgent)
+  assert.equal(
+    attemptPlan('coder', 'deep', 0).effectiveAgent,
+    replica.participantIdentity.selectedAgent,
+  )
   assert.deepEqual(personaVersion(replica.participantIdentity), personaVersion(owner.participantIdentity))
   assert.equal(Strength.systemPromptIdForRole(replica.participantIdentity.canonicalRole), 'coder')
   assert.deepEqual(
@@ -158,11 +168,12 @@ test('WHAT[PID-004] Strength replica inherits owner Persona and version with a d
 })
 
 test('WHAT[PID-004] Fission lane inherits owner Persona and version without physical-parent inference', () => {
-  const owner = rootProfile('deep-inspector', 'ses_identity_fission_owner')
-  const laneIdentity = inheritedSeed('fast-inspector', owner)
+  const owner = rootProfile('inspector', 'ses_identity_fission_owner')
+  const laneIdentity = inheritedSeed('inspector', owner)
   const lane = Fission.startedLane(2, 'ses_unrelated_physical_parent', 'inspect lane')
 
-  assert.notEqual(laneIdentity.participantIdentity.selectedTier, owner.participantIdentity.selectedTier)
+  assert.equal(laneIdentity.participantIdentity.selectedAgent, 'inspector')
+  assert.equal(laneIdentity.participantIdentity.selectedTier, owner.participantIdentity.selectedTier)
   assert.deepEqual(personaVersion(laneIdentity.participantIdentity), personaVersion(owner.participantIdentity))
   assert.equal(laneIdentity.ownerLogicalRun, owner.logicalRun)
   assert.deepEqual(lane, {
@@ -174,12 +185,12 @@ test('WHAT[PID-004] Fission lane inherits owner Persona and version without phys
   })
 })
 
-test('WHAT[PID-009] Bookkeeper has private identity and no public Role', () => {
-  const bookkeeper = Persona.resolveParticipantIdentityAtRoot('fast-bookkeeper')
+test('WHAT[PID-007] Bookkeeper has private identity and no public Role', () => {
+  const bookkeeper = Persona.resolveParticipantIdentityAtRoot('bookkeeper')
 
   assert.equal(bookkeeper.ok, true, bookkeeper.ok ? '' : bookkeeper.error)
-  assert.equal(bookkeeper.identity.name, 'fast-bookkeeper')
-  assert.equal(bookkeeper.identity.peer, 'deep-bookkeeper')
+  assert.equal(bookkeeper.identity.name, 'bookkeeper')
+  assert.equal(bookkeeper.identity.peer, 'bookkeeper')
   assert.notEqual(bookkeeper.identity.persona, '')
   assert.equal(Number.isInteger(bookkeeper.identity.catalogVersion), true)
   assert.equal(Persona.allPublicRoleLabels.includes(bookkeeper.identity.role), false)

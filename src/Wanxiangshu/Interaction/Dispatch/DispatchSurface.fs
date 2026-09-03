@@ -125,23 +125,18 @@ module DispatchSurface =
             else
                 Roles.tryParseRole (text value?canonicalRole) |> Option.map Some
 
-        let tier = Roles.tryParseTier (text value?selectedTier)
-
         let origin =
             match text value?origin with
             | "ResolvedAtRoot" -> Ok PersonaOrigin.ResolvedAtRoot
             | "InheritedFromOwner" -> Ok PersonaOrigin.InheritedFromOwner
             | unknown -> Error(sprintf "Unknown participant identity origin: %s" unknown)
 
-        match role, tier, origin with
-        | None, _, _ -> Error(sprintf "Unknown role: %s" (text value?canonicalRole))
-        | _, None, _ -> Error(sprintf "Unknown tier: %s" (text value?selectedTier))
-        | _, _, Error error -> Error error
-        | Some role, Some tier, Ok origin ->
+        match role, origin with
+        | None, _ -> Error(sprintf "Unknown role: %s" (text value?canonicalRole))
+        | _, Error error -> Error error
+        | Some role, Ok origin ->
             { SelectedAgent = text value?selectedAgent
-              PeerAgent = text value?peerAgent
               Role = role
-              InitialTier = tier
               Persona = text value?persona
               PersonaCatalogVersion = unbox<int> value?personaCatalogVersion
               Origin = origin }
@@ -438,7 +433,7 @@ module DispatchSurface =
             {| selectedAgent = ParticipantIdentity.selectedAgent identity
                peerAgent = ParticipantIdentity.peerAgent identity
                canonicalRole = ParticipantIdentity.roleLabel identity
-               selectedTier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+               selectedTier = "deep"
                persona = ParticipantIdentity.persona identity
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
                origin =

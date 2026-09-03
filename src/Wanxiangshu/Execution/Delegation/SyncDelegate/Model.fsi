@@ -36,7 +36,5 @@ module DedicatedDelegateKey =
 module SyncDelegate =
     val tryRoleOfToolName: name: string -> SyncDelegateRole option
     val roleLabel: role: SyncDelegateRole -> string
-    val tierLabel: tier: AgentTier -> string
     val delegateRoleToAttachment: role: SyncDelegateRole -> AttachmentKind
-    val tierForOwner: ownerTier: AgentTier -> AgentTier
-    val agentNameFor: role: SyncDelegateRole -> tier: AgentTier -> string
+    val agentNameFor: role: SyncDelegateRole -> string

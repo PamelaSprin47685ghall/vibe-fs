@@ -27,17 +27,17 @@ const plainEvidence = (key = durableKey) => ({
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: 'fast-coder',
-      peerAgent: 'deep-coder',
+      selectedAgent: 'coder',
+      peerAgent: 'coder',
       canonicalRole: 'coder',
-      selectedTier: 'fast',
+      selectedTier: 'deep',
       persona: 'Coder',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
     },
   },
   origin: 'HumanRoot',
-  effectiveAgent: 'fast-coder',
+  effectiveAgent: 'coder',
 })
 
 const evidenceWire = (evidence) => ({
@@ -51,7 +51,7 @@ const evidenceWire = (evidence) => ({
   IdentitySeed: [
     'RootSelection',
     {
-      InitialTier: 'Fast',
+      InitialTier: 'deep',
       Origin: 'ResolvedAtRoot',
       PeerAgent: evidence.identitySeed.participantIdentity.peerAgent,
       Persona: evidence.identitySeed.participantIdentity.persona,

@@ -4,28 +4,18 @@ open Wanxiangshu.Foundation
 
 [<RequireQualifiedAccess>]
 type Persona =
-    | Integrator
     | Director
-    | Coordinator
     | Lead
     | Coder
-    | Engineer
-    | Scout
     | Investigator
-    | Technician
     | Operator
-    | Navigator
     | Researcher
     | Analyst
-    | Inquirer
-    | Examiner
     | Auditor
-    | Scribe
     | Chronicler
-    | Condenser
     | Distiller
-    | Clerk
     | Curator
+    | Predictor
 
 [<RequireQualifiedAccess>]
 module Persona =
@@ -34,8 +24,8 @@ module Persona =
 
 [<RequireQualifiedAccess>]
 module PersonaCatalog =
-    val persona: Role -> AgentTier -> Persona
-    val bookkeeperPersona: AgentTier -> Persona
-    val personaV1: Role -> AgentTier -> string
-    val bookkeeperPersonaV1: AgentTier -> string
+    val persona: Role -> Persona
+    val bookkeeperPersona: unit -> Persona
+    val personaV1: Role -> string
+    val bookkeeperPersonaV1: unit -> string
     val inheritFrom: string -> string

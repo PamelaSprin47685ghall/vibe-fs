@@ -72,19 +72,19 @@ test('WHAT[PROC-001] PTY_TYPES_pty_id_roundtrips_its_value', () => {
 
 test('WHAT[PROC-001] PTY_TYPES_pty_handle_view_exposes_identity_and_command', () => {
   const port = createPtyPort({})
-  const id = portFork(port, 'sleep 1', 'fast-distiller', ptyId('pty-1'), undefined)
+  const id = portFork(port, 'sleep 1', 'distiller', ptyId('pty-1'), undefined)
   const listed = portList(port).ptys
   assert.equal(listed.length, 1)
   assert.equal(listed[0].id, 'pty-1')
   assert.equal(listed[0].command, 'sleep 1')
-  assert.equal(listed[0].agent, 'fast-distiller')
+  assert.equal(listed[0].agent, 'distiller')
   assert.ok(typeof listed[0].startedAt === 'string')
   assert.equal(ptyIdView(id), 'pty-1')
 })
 
 test('WHAT[PROC-001] PTY_TYPES_pty_read_view_reports_output_and_closed', async () => {
   const port = createPtyPort({})
-  const id = portFork(port, 'echo hi', 'fast-distiller', ptyId('pty-read'), undefined)
+  const id = portFork(port, 'echo hi', 'distiller', ptyId('pty-read'), undefined)
   const pending = portRead(port, id)
   portReadResult(port, id, 'partial output', true)
   assert.deepEqual(await pending, { ok: true, value: { output: 'partial output', closed: true } })
@@ -96,7 +96,7 @@ test('WHAT[PROC-001] PTY_TYPES_read_plans_cover_unknown_in_progress_closed_and_p
   const unknown = await portRead(port, ptyId('pty-unknown'))
   assert.deepEqual(unknown, { ok: false, error: 'Unknown PTY id: pty-unknown' })
 
-  const id = portFork(port, 'echo hi', 'fast-distiller', ptyId('pty-plan'), undefined)
+  const id = portFork(port, 'echo hi', 'distiller', ptyId('pty-plan'), undefined)
   const parked = portRead(port, id)
   assert.deepEqual(await portRead(port, id), { ok: false, error: 'PTY read already in progress' })
   portReadResult(port, id, '', false)

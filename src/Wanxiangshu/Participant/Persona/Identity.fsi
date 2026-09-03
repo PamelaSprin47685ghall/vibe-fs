@@ -15,8 +15,6 @@ type ParticipantIdentityError =
     | UnknownParticipantName of string
     | UnsupportedPersonaCatalogVersion of int
     | RoleMismatch of Expected: Role option * Actual: Role option
-    | TierMismatch of Expected: AgentTier * Actual: AgentTier
-    | PeerMismatch of Expected: string * Actual: string
     | BlankPersona
     | PersonaMismatch of Expected: string * Actual: string
     | OriginMismatch of Expected: PersonaOrigin * Actual: PersonaOrigin
@@ -24,15 +22,12 @@ type ParticipantIdentityError =
     | OwnerPersonaMismatch of Expected: string * Actual: string
     | OwnerCatalogVersionMismatch of Expected: int * Actual: int
     | LegacyRoleMismatch of Expected: string * Actual: string
-    | LegacyTierMismatch of Expected: string * Actual: string
     | UnsupportedLegacyAuthorityKind of string
     | UnprovableLegacyAuthorityIdentity of string
 
 type ParticipantIdentityInput =
     { SelectedAgent: string
-      PeerAgent: string
       Role: Role option
-      InitialTier: AgentTier
       Persona: string
       PersonaCatalogVersion: int
       Origin: PersonaOrigin }
@@ -40,9 +35,7 @@ type ParticipantIdentityInput =
 type LegacyAuthorityRootIdentityV1Input =
     { AuthorityKind: string
       SelectedAgent: string
-      PeerAgent: string
-      CanonicalRole: string
-      SelectedTier: string }
+      CanonicalRole: string }
 
 type ParticipantIdentity
 type ParticipantIdentityEvidence
@@ -52,7 +45,6 @@ module ParticipantIdentity =
     val selectedAgent: ParticipantIdentityEvidence -> string
     val role: ParticipantIdentityEvidence -> Role option
     val roleLabel: ParticipantIdentityEvidence -> string
-    val initialTier: ParticipantIdentityEvidence -> AgentTier
     val peerAgent: ParticipantIdentityEvidence -> string
     val persona: ParticipantIdentityEvidence -> string
     val personaCatalogVersion: ParticipantIdentityEvidence -> int

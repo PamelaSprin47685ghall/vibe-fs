@@ -12,7 +12,7 @@ module RecoverySurface =
 
     let private accepted (suffix: string) : AcceptedChatExecutionEvidence =
         let identity =
-            ParticipantIdentity.resolveAtRoot "fast-coder"
+            ParticipantIdentity.resolveAtRoot "coder"
             |> Result.defaultWith (fun error -> invalidOp $"cannot construct proof identity: {error}")
 
         { SessionId = SessionId.create $"session-{suffix}"
@@ -22,7 +22,7 @@ module RecoverySurface =
           IdentitySeed = RootSelection identity
           PhysicalUserMessageId = PhysicalUserMessageId.create $"message-{suffix}"
           Origin = PromptOrigin.AuthorityRoot PromptRootAuthorityKind.HumanRoot
-          EffectiveAgent = "fast-coder" }
+          EffectiveAgent = "coder" }
 
     let private keyOf (accepted: AcceptedChatExecutionEvidence) : ChatExecutionKey =
         { SessionId = accepted.SessionId

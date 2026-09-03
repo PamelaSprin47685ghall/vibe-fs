@@ -7,7 +7,7 @@
 1. **单轴分类无法表达执行能力边界**。长期持有上下文与知识的工作会话（如 Dedicated Sync*）需要完整的 Companion 与 context 能力；而短命的叶子节点（如 Bookkeeper、StrengthReplica）则是即用即弃的内部执行单元。单轴分类必然把两者揉成一团，模糊两者的执行能力边界。
 2. **所有权事实必须具有单一来源**。若每个特性各自维护 parent/child 映射与生命周期，级联取消与崩溃恢复逻辑必然出现分歧。
 3. **物理拓扑不得冒充逻辑归属**。Host 的物理展示层级保持扁平（深度为 2），所有逻辑归属关系完全由持久化 journal 事实承载。若依据物理 parentID 推断逻辑归属，系统恢复时将错误收养其他会话的子节点。
-4. **Runtime 拓扑不决定角色与权威**。Session 的本体属性由 ExecutionClass 与 Ownership 正交决定，Role、Tier、Persona、工具集与 Authority 绝不参与底层分类。否则物理容器与执行绑定会被误解为业务身份。
+4. **Runtime 拓扑不决定角色与权威**。Session 的本体属性由 ExecutionClass 与 Ownership 正交决定，Role、Persona、工具集与 Authority 绝不参与底层分类。否则物理容器与执行绑定会被误解为业务身份。
 5. **Identity 生命周期必须独立于容器生命周期**。同一 SessionId 只有在 `interaction-authority` 持久化 exact `AuthorityLogicalRunClosed` 并释放 active identity binding 后才可承载 fresh root；association removal、detach/attach、idle/timeout 或 Host 观察都不是 closure。Session ontology 只发布容器分类与 durable association，`participant-identity` 才拥有 identity 解析，root acceptance 与 identity installation 则共享一个 durable `AuthorityRootAccepted` payload。
 
 ## 核心不变量

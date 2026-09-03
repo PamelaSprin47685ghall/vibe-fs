@@ -80,12 +80,6 @@ module ReviewJournalSurface =
             |> Option.map Some
             |> Option.defaultWith (fun () -> failwith $"ReviewJournalSurface: unknown participant role '{label}'")
 
-    let private participantTierOf value =
-        let label = text value
-
-        Roles.tryParseTier label
-        |> Option.defaultWith (fun () -> failwith $"ReviewJournalSurface: unknown participant tier '{label}'")
-
     let private participantOriginOf value =
         match text value with
         | "ResolvedAtRoot" -> PersonaOrigin.ResolvedAtRoot
@@ -94,9 +88,7 @@ module ReviewJournalSurface =
 
     let private participantIdentityInputOf (value: obj) =
         { SelectedAgent = strField value "selectedAgent"
-          PeerAgent = strField value "peerAgent"
           Role = participantRoleOf (field value "canonicalRole")
-          InitialTier = participantTierOf (field value "selectedTier")
           Persona = strField value "persona"
           PersonaCatalogVersion = unbox<int> (field value "personaCatalogVersion")
           Origin = participantOriginOf (field value "origin") }
@@ -143,7 +135,7 @@ module ReviewJournalSurface =
                 {| selectedAgent = ParticipantIdentity.selectedAgent identity
                    peerAgent = ParticipantIdentity.peerAgent identity
                    canonicalRole = ParticipantIdentity.roleLabel identity
-                   selectedTier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+                   selectedTier = "deep"
                    persona = ParticipantIdentity.persona identity
                    personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
                    origin =
@@ -317,9 +309,9 @@ module ReviewJournalSurface =
         task {
             let selectedAgent =
                 if String.IsNullOrWhiteSpace agent then
-                    "fast-reviewer"
+                    "reviewer"
                 else
-                    $"fast-{agent}"
+                    agent
 
             match ParticipantIdentity.resolveAtRoot selectedAgent with
             | Error error ->
@@ -406,7 +398,7 @@ module ReviewJournalSurface =
                            selectedAgent = authority.SelectedAgent
                            peerAgent = authority.PeerAgent
                            role = Roles.roleLabel authority.CanonicalRole
-                           initialTier = Roles.wireTierLabel authority.SelectedTier |})
+                           initialTier = "deep" |})
                 |> Option.toObj
 
             box

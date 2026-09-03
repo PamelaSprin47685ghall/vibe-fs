@@ -39,14 +39,14 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] real root chat message carries a r
           id: 'msg-fission-root-provider-surface',
           role: 'user',
           sessionID,
-          agent: 'fast-manager',
+          agent: 'manager',
           model: { providerID: 'host', modelID: 'placeholder' },
           tools: { fork: true, join: true, horizon: true, suicide: true },
         },
         parts: [{ type: 'text', text: 'root work' }],
       }
 
-      await hooks['chat.message']({ sessionID, agent: 'fast-manager' }, output)
+      await hooks['chat.message']({ sessionID, agent: 'manager' }, output)
 
       assert.equal(output.message.tools?.fission, false)
       assert.equal(output.message.tools?.fork, true)
@@ -60,13 +60,13 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] real root chat message carries a r
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] forced root fission rejects origin before parsing prompts', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'fission-root-origin'
-    await acceptAuthorityRoot(runtime, sessionID, 'fast-manager')
+    await acceptAuthorityRoot(runtime, sessionID, 'manager')
 
     const result = await hooks.tool.fission.execute(
       { prompts: 'only one lane' },
       {
         sessionID,
-        agent: 'fast-manager',
+        agent: 'manager',
         callID: 'call-root-fission',
         messageID: 'run-root-fission',
       },

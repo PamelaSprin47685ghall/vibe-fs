@@ -23,12 +23,11 @@ const capturingPort = () => ({
 })
 
 const personas = {
-  'fast-coder': 'Coder',
-  'fast-manager': 'Coordinator',
+  coder: 'Coder',
+  manager: 'Lead',
 }
 const rootSelection = (agent) => {
-  const [selectedTier, canonicalRole] = agent.split('-')
-  const peerTier = selectedTier === 'fast' ? 'deep' : 'fast'
+  const canonicalRole = agent === 'predictor' ? 'inspector' : agent
   return {
     kind: 'RootSelection',
     ownerSession: null,
@@ -36,9 +35,9 @@ const rootSelection = (agent) => {
     ownerAuthorityRoot: null,
     participantIdentity: {
       selectedAgent: agent,
-      peerAgent: `${peerTier}-${canonicalRole}`,
+      peerAgent: agent,
       canonicalRole,
-      selectedTier,
+      selectedTier: 'deep',
       persona: personas[agent] ?? 'Unknown',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
@@ -46,7 +45,7 @@ const rootSelection = (agent) => {
   }
 }
 
-const profileFor = (runtime = 'rt-send', session = 'ses_006', physical = 'msg_u1', agent = 'fast-coder') => {
+const profileFor = (runtime = 'rt-send', session = 'ses_006', physical = 'msg_u1', agent = 'coder') => {
   const built = authority.createAuthorityRoot(hash, runtime, session, 'HumanRoot', physical, rootSelection(agent))
   assert.equal(built.ok, true, built.ok ? '' : built.error)
   return built.value
@@ -57,7 +56,7 @@ const acceptOwner = async (handle, session = 'ses_owner') => {
     handle,
     session,
     `msg-${session}`,
-    rootSelection('fast-manager'),
+    rootSelection('manager'),
   )
   assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
   return accepted.profile
@@ -82,7 +81,7 @@ test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_unknown_authority_kind_fails_closed
         'reject malformed profile',
         'ProviderRetryAttempt',
         { ...profileFor(), authorityKind: 'UnknownRoot' },
-        'deep-coder',
+        'coder',
         'Await',
       )
       assert.equal(result.ok, false)
@@ -102,7 +101,7 @@ test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_agent_and_no_m
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_006_owner')
-      const seed = authority.issueInheritedIdentitySeed('fast-coder', owner).value
+      const seed = authority.issueInheritedIdentitySeed('coder', owner).value
       const ownerRoot = await dispatch.sendAgentOwnerRoot(
         capturingPort(),
         opened.journal,
@@ -117,7 +116,7 @@ test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_agent_and_no_m
         'retry on the other side',
         'ProviderRetryAttempt',
         profileFor(),
-        'deep-coder',
+        'coder',
         'Await',
       )
       const captured = [observation(ownerRoot), observation(continuation)]
@@ -132,12 +131,12 @@ test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_agent_and_no_m
 
       assert.deepEqual(
         { agent: captured[0].agent, model: captured[0].model },
-        { agent: 'fast-coder', model: null },
+        { agent: 'coder', model: null },
         'SendAgentOwnerRoot must carry Agent = Some agent and Model = None',
       )
       assert.deepEqual(
         { agent: captured[1].agent, model: captured[1].model },
-        { agent: 'deep-coder', model: null },
+        { agent: 'coder', model: null },
         'SendContinuation must carry Agent = Some effectiveAgent and Model = None',
       )
 
@@ -157,7 +156,7 @@ test('WHAT[DISPATCH-PROTOCOL-011] PROMPT_006_send_payload_carries_prompt_key_met
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_006m_owner')
-      const seed = authority.issueInheritedIdentitySeed('fast-coder', owner).value
+      const seed = authority.issueInheritedIdentitySeed('coder', owner).value
       const ownerRoot = await dispatch.sendAgentOwnerRoot(
         capturingPort(),
         opened.journal,
@@ -171,8 +170,8 @@ test('WHAT[DISPATCH-PROTOCOL-011] PROMPT_006_send_payload_carries_prompt_key_met
         'ses_006m',
         'retry on the other side',
         'ProviderRetryAttempt',
-        profileFor('rt-send-meta', 'ses_006m', 'msg_u1', 'fast-coder'),
-        'deep-coder',
+        profileFor('rt-send-meta', 'ses_006m', 'msg_u1', 'coder'),
+        'coder',
         'Await',
       )
 
@@ -199,7 +198,7 @@ test('WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_i
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_dispatch_handoff_owner')
-      const inherited = authority.issueInheritedIdentitySeed('fast-coder', owner)
+      const inherited = authority.issueInheritedIdentitySeed('coder', owner)
       assert.equal(inherited.ok, true, inherited.ok ? '' : inherited.error)
 
       const sent = await dispatch.sendAgentOwnerRoot(
@@ -216,11 +215,11 @@ test('WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_i
       assert.equal(claimed[0].promptKey, sent.key)
       assert.deepEqual(claimed[0].identitySeed, inherited.value)
       assert.deepEqual(claimed[0].identitySeed.participantIdentity, {
-        selectedAgent: 'fast-coder',
-        peerAgent: 'deep-coder',
+        selectedAgent: 'coder',
+        peerAgent: 'coder',
         canonicalRole: 'coder',
-        selectedTier: 'fast',
-        persona: 'Coordinator',
+        selectedTier: 'deep',
+        persona: 'Lead',
         personaCatalogVersion: 1,
         origin: 'InheritedFromOwner',
       })
@@ -230,7 +229,7 @@ test('WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_i
         'ses_dispatch_handoff',
         'msg_dispatch_handoff',
         `${sent.key}-wrong`,
-        'fast-coder',
+        'coder',
       )
       assert.equal(wrongClaim.ok, false, 'managed acceptance must reject a non-exact PromptKey')
       assert.equal(dispatch.pendingClaimCount(opened.journal, 'ses_dispatch_handoff'), 1)
@@ -240,7 +239,7 @@ test('WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_i
         'ses_dispatch_handoff',
         'msg_dispatch_handoff',
         sent.key,
-        'fast-coder',
+        'coder',
       )
       assert.deepEqual(
         accepted,
@@ -250,7 +249,7 @@ test('WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_i
           sessionId: 'ses_dispatch_handoff',
           physicalUserMessageId: 'msg_dispatch_handoff',
           origin: 'AgentOwnerRoot',
-          effectiveAgent: 'fast-coder',
+          effectiveAgent: 'coder',
         },
         'the durable managed-execution witness must carry the exact physical identity and accepted profile',
       )
@@ -270,7 +269,7 @@ test('WHAT[DISPATCH-PROTOCOL-002] HOST_004_stale_idle_repair_is_abandoned_at_the
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const session = 'ses_idle_race'
-      const accepted = await dispatch.acceptHumanRoot(opened.journal, session, 'msg-root', 'fast-blogger')
+      const accepted = await dispatch.acceptHumanRoot(opened.journal, session, 'msg-root', 'blogger')
       assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
 
       let sends = 0
@@ -289,7 +288,7 @@ test('WHAT[DISPATCH-PROTOCOL-002] HOST_004_stale_idle_repair_is_abandoned_at_the
         'repair stale terminal',
         'InteractionRepair',
         accepted.profile,
-        'fast-blogger',
+        'blogger',
         'Superseded',
       )
 

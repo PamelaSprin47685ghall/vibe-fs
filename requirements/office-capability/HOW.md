@@ -41,3 +41,4 @@ Office Consequence Model (语义唯一事实源)
 | OFF-012 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs::WHAT[OFF-012] orchestrator_commissions_manager_roads_not_phases` |
 | OFF-013 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs::WHAT[OFF-013] browser_consequence_is_external_facts_with_provenance_not_local_repo` |
 | OFF-014 | `requirements/office-capability/tests/office-capability-role-law-contract.test.mjs::WHAT[OFF-014] inquiry_consequence_is_semantic_understanding_not_evidence_minting` |
+| OFF-015 | `requirements/office-capability/tests/office-capability-integrity.test.mjs::WHAT[OFF-015] predictor_is_internal_mechanism_role_not_forkable_or_scheduled` |

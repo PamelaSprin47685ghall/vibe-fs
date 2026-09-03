@@ -21,9 +21,7 @@ open Wanxiangshu.Persistence.Journal
 /// "Reviewer requested revision" error, keeping ORCH-009 publication semantics).
 module OrchestratorHostReview =
 
-    /// ORCH-009: post-rebase review is always deep-reviewer. Explicit tier, never
-    /// inferred.
-    let DeepReviewerAgent = ManagedAgent.nameOf AgentTier.Deep Role.Reviewer
+    let DeepReviewerAgent = ManagedAgent.nameOf Role.Reviewer
 
     let private openingPrompt (managerSessionId: SessionId) =
         ProviderProse.render (ProviderProse.languageOf managerSessionId) HostReviewPrompt.Opening Map.empty

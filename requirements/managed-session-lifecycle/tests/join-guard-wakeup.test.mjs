@@ -5,7 +5,7 @@ import * as HandleSurface from '../../../dist/Execution/Delegation/Handle/Surfac
 
 const makeActive = () => {
   const result = HandleSurface.apply(HandleSurface.empty(), {
-    op: 'link', handle: 'agent:c1', child: 'ses_child', agent: 'fast-coder', role: 'Coder',
+    op: 'link', handle: 'agent:c1', child: 'ses_child', agent: 'coder', role: 'Coder',
   })
   assert.equal(result.ok, true)
   return result.state
@@ -27,7 +27,7 @@ test('WHAT[MANAGED-SESSION-007] THEOREM_handle_completed_causally_awakens_joinab
 
 test('WHAT[MANAGED-SESSION-007] THEOREM_join_wake_path_trace_WorkActivated_then_HandleCompleted', () => {
   const folded = HandleFoldSurface.foldApply(HandleFoldSurface.foldEmpty(), [
-    { fact: { case: 'HandleLinked', payload: { ParentSessionId: 'ses_parent', ChildSessionId: 'ses_child', Handle: 'agent:c1', TargetAgent: 'fast-coder', CanonicalRole: 'Coder', Ownership: 'DurableParentHandle' } } },
+    { fact: { case: 'HandleLinked', payload: { ParentSessionId: 'ses_parent', ChildSessionId: 'ses_child', Handle: 'agent:c1', TargetAgent: 'coder', CanonicalRole: 'Coder', Ownership: 'DurableParentHandle' } } },
     { fact: { case: 'HandleCompleted', payload: { ParentSessionId: 'ses_parent', Handle: 'agent:c1', Kind: 'Terminal' } } },
   ])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))

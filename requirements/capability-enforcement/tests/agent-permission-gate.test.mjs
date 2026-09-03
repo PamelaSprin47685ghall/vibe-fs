@@ -3,10 +3,9 @@
 //
 // Regression: the plugin's `config` hook (ManagedAgentConfig.configureFromHostConfig)
 // writes Wanxiangshu-owned mode/permission/prompt onto the Host's live config
-// object. A validation failure elsewhere in the config (e.g. a duplicated
-// fast/deep model pair) used to short-circuit BEFORE any write, so every managed
-// agent fell back to Host defaults — whose `"*": "allow"` baseline opened bash
-// for Coder/Inspector/Manager alike.
+// object. A validation failure elsewhere in the config used to short-circuit
+// BEFORE any write, so every managed agent fell back to Host defaults — whose
+// `"*": "allow"` baseline opened bash for Coder/Inspector/Manager alike.
 //
 // These tests drive the real dist entry and assert the writes the Host's
 // Agent.state consumes: the `permission` object with a concrete `"*": "deny"`
@@ -35,23 +34,18 @@ const ROLES = [
   'Distiller',
   'Blogger',
 ]
-const TIERS = ['fast', 'deep']
 
-const agentName = (tier, role) => `${tier}-${role.toLowerCase()}`
+const agentName = (role) => `${role.toLowerCase()}`
 
-const buildConfig = ({ duplicateBrowserModel = false } = {}) => {
+const buildConfig = () => {
   const agent = {}
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      agent[agentName(tier, role)] = {
-        model:
-          duplicateBrowserModel && role === 'Browser'
-            ? 'shared-browser-model'
-            : `${tier}-${role.toLowerCase()}-model`,
-      }
+  for (const role of ROLES) {
+    agent[agentName(role)] = {
+      model: `${role.toLowerCase()}-model`,
     }
-    agent[`${tier}-bookkeeper`] = { model: `${tier}-bookkeeper-model` }
   }
+  agent.bookkeeper = { model: 'bookkeeper-model' }
+  agent.predictor = { model: 'predictor-model' }
   return { agent }
 }
 
@@ -177,27 +171,25 @@ test('WHAT[ENF-010] AGENT_002_gate_accepts_distinct_models_and_writes_owned_fiel
   const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, true, `gate must accept distinct models: ${outcome.error}`)
 
-  // Every managed agent got the owned mode + permission + prompt.
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      const entry = config.agent[agentName(tier, role)]
-      assert.equal(entry.mode, 'primary', `${agentName(tier, role)} must be primary`)
-      assert.ok(entry.permission && entry.permission['*'] === 'deny', `${agentName(tier, role)} must deny by default`)
-      assert.ok(typeof entry.prompt === 'string' && entry.prompt.length > 0, `${agentName(tier, role)} must carry a prompt`)
-    }
+  // Every canonical managed agent got the owned mode + permission + prompt.
+  for (const role of ROLES) {
+    const entry = config.agent[agentName(role)]
+    assert.equal(entry.mode, 'primary', `${agentName(role)} must be primary`)
+    assert.ok(entry.permission && entry.permission['*'] === 'deny', `${agentName(role)} must deny by default`)
+    assert.ok(typeof entry.prompt === 'string' && entry.prompt.length > 0, `${agentName(role)} must carry a prompt`)
   }
 })
 
-test('WHAT[ENF-004] AGENT_010_fast_and_deep_agents_carry_the_same_allow_set', () => {
-  const config = buildConfig()
-  const outcome = configureManagedAgents(config)
-  assert.equal(outcome.ok, true, outcome.error)
+test('WHAT[ENF-004] AGENT_010_canonical_agents_carry_stable_allow_sets', () => {
+  const first = buildConfig()
+  const second = buildConfig()
+  assert.equal(configureManagedAgents(first).ok, true)
+  assert.equal(configureManagedAgents(second).ok, true)
 
-  // AGENT-010: fast and deep carry the same permission set.
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      assert.deepEqual(allowList(config, agentName(tier, role)), allowList(config, agentName(tier === 'fast' ? 'deep' : 'fast', role)))
-    }
+  // Single-version world: no fast-/deep- tiers. Each canonical agent's allow
+  // set is stable across independent configurations.
+  for (const role of ROLES) {
+    assert.deepEqual(allowList(first, agentName(role)), allowList(second, agentName(role)))
   }
 })
 
@@ -207,58 +199,54 @@ test('WHAT[ENF-002] AGENT_006_role_tool_matrix_reaches_the_host_schema', () => {
   assert.equal(outcome.ok, true, outcome.error)
 
   for (const role of ROLES) {
-    for (const tier of TIERS) {
-      const name = agentName(tier, role)
-      const allowed = allowList(config, name).sort()
-      assert.deepEqual(
-        allowed,
-        [...ROLE_ALLOW[role], ...HOST_UTILITY_ALLOW, ...cognitiveUtilityAllowFor(role)].sort(),
-        `${name} allow set must equal AGENT-006 matrix + non-authority utilities`,
-      )
-    }
+    const name = agentName(role)
+    const allowed = allowList(config, name).sort()
+    assert.deepEqual(
+      allowed,
+      [...ROLE_ALLOW[role], ...HOST_UTILITY_ALLOW, ...cognitiveUtilityAllowFor(role)].sort(),
+      `${name} allow set must equal AGENT-006 matrix + non-authority utilities`,
+    )
   }
 })
 
 test('WHAT[ENF-010] AGENT_007_bash_stays_denied_even_when_the_gate_fails', () => {
   // The live-config regression: a catalog validation failure used to
-  // short-circuit BEFORE any write. EMR-008 made duplicate fast/deep models
-  // legal, so the error path is a leftover legacy agent name.
+  // short-circuit BEFORE any write. The error path is a legacy agent name
+  // (build/plan/student/teacher/meditator/executor or underscore shape).
   const config = buildConfig()
-  config.agent.coder = { model: 'some-model' }
+  config.agent.build = { model: 'some-model' }
   const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, false, 'legacy agent name must fail the gate')
-  assert.match(outcome.error, /Legacy agent name 'coder'/)
+  assert.match(outcome.error, /Legacy agent name 'build'/)
 
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      const name = agentName(tier, role)
-      const entry = config.agent[name]
-      assert.equal(entry.mode, 'primary', `${name} mode must survive a gate error`)
-      assert.ok(entry.permission && entry.permission['*'] === 'deny', `${name} must keep "*": deny after a gate error`)
-      assert.deepEqual(
-        allowList(config, name).sort(),
-        [...ROLE_ALLOW[role], ...HOST_UTILITY_ALLOW, ...cognitiveUtilityAllowFor(role)].sort(),
-        `${name} tool set must survive a gate error`,
-      )
-      assert.ok(!allowList(config, name).includes('bash'), `${name} must never allow bash`)
-    }
+  for (const role of ROLES) {
+    const name = agentName(role)
+    const entry = config.agent[name]
+    assert.equal(entry.mode, 'primary', `${name} mode must survive a gate error`)
+    assert.ok(entry.permission && entry.permission['*'] === 'deny', `${name} must keep "*": deny after a gate error`)
+    assert.deepEqual(
+      allowList(config, name).sort(),
+      [...ROLE_ALLOW[role], ...HOST_UTILITY_ALLOW, ...cognitiveUtilityAllowFor(role)].sort(),
+      `${name} tool set must survive a gate error`,
+    )
+    assert.ok(!allowList(config, name).includes('bash'), `${name} must never allow bash`)
   }
 })
 
 test('WHAT[ENF-010] AGENT_007_validation_error_is_still_reported', () => {
   const config = buildConfig()
-  config.agent.coder = { model: 'some-model' }
+  config.agent.build = { model: 'some-model' }
   const outcome = validateManagedAgents(config)
   assert.equal(outcome.ok, false)
-  assert.match(outcome.error, /Legacy agent name 'coder'/)
+  assert.match(outcome.error, /Legacy agent name 'build'/)
 })
 
 test('WHAT[ENF-011] AGENT_002_missing_agent_is_projected_on_configure', () => {
   const config = buildConfig()
-  delete config.agent['deep-coder']
+  delete config.agent.coder
   const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, true, outcome.error)
-  const entry = config.agent['deep-coder']
+  const entry = config.agent.coder
   assert.equal(entry.mode, 'primary')
   assert.equal(entry.permission['*'], 'deny')
   assert.ok(typeof entry.prompt === 'string' && entry.prompt.length > 0)
@@ -267,10 +255,10 @@ test('WHAT[ENF-011] AGENT_002_missing_agent_is_projected_on_configure', () => {
 
 test('WHAT[ENF-010] AGENT_004_legacy_agent_name_fails_validation', () => {
   const config = buildConfig()
-  config.agent.coder = { model: 'some-model' }
+  config.agent.build = { model: 'some-model' }
   const outcome = validateManagedAgents(config)
   assert.equal(outcome.ok, false)
-  assert.match(outcome.error, /Legacy agent name 'coder'/)
+  assert.match(outcome.error, /Legacy agent name 'build'/)
 })
 
 test('WHAT[ENF-011] AGENT_002_owned_writes_never_touch_the_model_binding', () => {
@@ -324,7 +312,7 @@ test('WHAT[ENF-002] office_capability_permissions_agree_with_the_host_schema_mat
     const config = buildConfig()
     configureManagedAgents(config)
     const nonDomainUtilities = [...HOST_UTILITY_ALLOW, ...COGNITIVE_UTILITY_ALLOW]
-    const fromSchema = [...new Set(allowList(config, agentName('fast', role)).filter((tool) => !nonDomainUtilities.includes(tool)).map(permissionOf))].sort()
+    const fromSchema = [...new Set(allowList(config, agentName(role)).filter((tool) => !nonDomainUtilities.includes(tool)).map(permissionOf))].sort()
     assert.deepEqual(fromSchema, fromRoles, `${role}: domain permissions must equal the Host schema allow list`)
   }
 })
@@ -332,25 +320,21 @@ test('WHAT[ENF-002] office_capability_permissions_agree_with_the_host_schema_mat
 test('WHAT[ENF-006] HOST_skill_remains_allowed_for_every_managed_role', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      assert.equal(evaluate(mergedRules(config, agentName(tier, role)), 'skill', '*').action, 'allow')
-    }
+  for (const role of ROLES) {
+    assert.equal(evaluate(mergedRules(config, agentName(role)), 'skill', '*').action, 'allow')
   }
 })
 
 test('WHAT[ENF-006] ASSUME_is_a_non_authority_utility_for_interactive_roles_only', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      const expected = role === 'Blogger' || role === 'Distiller' ? 'deny' : 'allow'
-      assert.equal(
-        evaluate(mergedRules(config, agentName(tier, role)), 'assume', '*').action,
-        expected,
-        `${agentName(tier, role)} assume permission`,
-      )
-    }
+  for (const role of ROLES) {
+    const expected = role === 'Blogger' || role === 'Distiller' ? 'deny' : 'allow'
+    assert.equal(
+      evaluate(mergedRules(config, agentName(role)), 'assume', '*').action,
+      expected,
+      `${agentName(role)} assume permission`,
+    )
   }
 })
 
@@ -360,17 +344,15 @@ test('WHAT[ENF-011] AGENT_019_external_directory_overrides_host_default_ask', ()
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
 
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      const name = agentName(tier, role)
-      const rules = mergedRules(config, name)
-      const action = evaluate(rules, 'external_directory', '/tmp/outside/*').action
-      assert.equal(action, 'allow', `${name} must allow external_directory (got ${action})`)
-      assert.equal(
-        config.agent[name].permission.external_directory,
-        'allow',
-        `${name} permission object must set external_directory allow`,
-      )
-    }
+  for (const role of ROLES) {
+    const name = agentName(role)
+    const rules = mergedRules(config, name)
+    const action = evaluate(rules, 'external_directory', '/tmp/outside/*').action
+    assert.equal(action, 'allow', `${name} must allow external_directory (got ${action})`)
+    assert.equal(
+      config.agent[name].permission.external_directory,
+      'allow',
+      `${name} permission object must set external_directory allow`,
+    )
   }
 })

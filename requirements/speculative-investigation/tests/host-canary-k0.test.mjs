@@ -8,10 +8,9 @@ installDefaultResources()
 const eligibleOpportunity = {
   isRootWork: true,
   requestKind: 'work-main',
-  canonicalRole: 'Coder',
-  selectedTier: 'Deep',
-  selectedAgent: 'deep-coder',
-  effectiveAgent: 'deep-coder',
+  canonicalRole: 'coder',
+  selectedAgent: 'coder',
+  effectiveAgent: 'coder',
   isFallbackRetry: false,
   hasPrefixProbe: false,
   isReviewerOrFinality: false,
@@ -20,7 +19,7 @@ const eligibleOpportunity = {
   targetProviderRunBound: true,
   eventStoreHealthy: true,
   hostCanaryHealthy: true,
-  fastPeerAvailable: true,
+  predictorAvailable: true,
   costModelAvailable: true,
 }
 const prediction = { P1: 0.9, P2: 0.8, evidenceCount: 100 }
@@ -36,6 +35,9 @@ test('WHAT[SPEC-INV-001] STRENGTH_002_011_policy_k0_default_when_host_canary_or_
   const unhealthy = decide({ ...eligibleOpportunity, hostCanaryHealthy: false })
   assert.equal(skipReason(unhealthy), 'host-canary-unhealthy')
   assert.equal(unhealthy.budget, 'K0')
+  const noPredictor = decide({ ...eligibleOpportunity, predictorAvailable: false })
+  assert.equal(skipReason(noPredictor), 'predictor-unavailable')
+  assert.equal(noPredictor.budget, 'K0')
   const noCost = decide({ ...eligibleOpportunity, costModelAvailable: false })
   assert.equal(skipReason(noCost), 'cost-model-unavailable')
   assert.equal(noCost.budget, 'K0')
@@ -45,7 +47,7 @@ test('WHAT[SPEC-INV-001] STRENGTH_002_011_policy_k0_default_when_host_canary_or_
 })
 
 test('WHAT[SPEC-INV-002] STRENGTH_002_013_review_finality_and_attached_internal_leaf_are_always_k0', () => {
-  assert.equal(skipReason(decide({ ...eligibleOpportunity, canonicalRole: 'Reviewer', selectedAgent: 'deep-reviewer', effectiveAgent: 'deep-reviewer' })), 'role-ineligible')
+  assert.equal(skipReason(decide({ ...eligibleOpportunity, canonicalRole: 'reviewer', selectedAgent: 'reviewer', effectiveAgent: 'reviewer' })), 'role-ineligible')
   assert.equal(decide({ ...eligibleOpportunity, isReviewerOrFinality: true }).budget, 'K0')
   assert.equal(decide({ ...eligibleOpportunity, isAttachedOrInternalLeaf: true }).budget, 'K0')
   const notRoot = decide({ ...eligibleOpportunity, isRootWork: false, isAttachedOrInternalLeaf: true })

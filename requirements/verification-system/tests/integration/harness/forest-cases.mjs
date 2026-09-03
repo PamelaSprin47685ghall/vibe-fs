@@ -201,7 +201,7 @@ export const forestCases = [
     name: 'VERIFY-003 a second session on the same lane does not change what content is selected',
     fn: () => {
       // Not in K10's charter; added because `lanesOf` binds an alias to a SET of sessions
-      // (measured in K9: `fast-reviewer` legitimately holds two forks), which makes "does the
+      // (measured in K9: `reviewer` legitimately holds two forks), which makes "does the
       // session leak into content selection" a real question rather than a rhetorical one.
       //
       // The property: binding a SECOND session id to every alias must not change any answer.

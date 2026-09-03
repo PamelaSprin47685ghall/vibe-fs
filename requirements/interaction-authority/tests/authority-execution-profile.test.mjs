@@ -13,10 +13,10 @@ const rootSelection = (participantIdentity) => ({
 })
 
 const coderIdentity = {
-  selectedAgent: 'fast-coder',
-  peerAgent: 'deep-coder',
+  selectedAgent: 'coder',
+  peerAgent: 'coder',
   canonicalRole: 'coder',
-  selectedTier: 'fast',
+  selectedTier: 'deep',
   persona: 'Coder',
   personaCatalogVersion: 1,
   origin: 'ResolvedAtRoot',
@@ -64,11 +64,9 @@ test('WHAT[INTERACTION-AUTHORITY-003] valid authority profiles carry one atomic 
 test('WHAT[INTERACTION-AUTHORITY-003] rejects hand-built mismatched profile', () => {
   const valid = createRoot()
   const mismatches = {
-    selectedAgent: 'deep-coder',
-    peerAgent: 'fast-coder',
+    selectedAgent: 'reviewer',
     canonicalRole: 'reviewer',
-    selectedTier: 'deep',
-    persona: 'Engineer',
+    persona: 'Auditor',
   }
 
   for (const [field, value] of Object.entries(mismatches)) {
@@ -94,11 +92,11 @@ test('WHAT[INTERACTION-AUTHORITY-003] Bookkeeper cannot enter a public authority
     'HumanRoot',
     'msg-profile',
     rootSelection({
-      selectedAgent: 'fast-bookkeeper',
-      peerAgent: 'deep-bookkeeper',
+      selectedAgent: 'bookkeeper',
+      peerAgent: 'bookkeeper',
       canonicalRole: 'bookkeeper',
-      selectedTier: 'fast',
-      persona: 'Clerk',
+      selectedTier: 'deep',
+      persona: 'Curator',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
     }),

@@ -67,11 +67,6 @@ module StrengthSurface =
         | Some role -> Ok role
         | None -> Error(sprintf "unknown role: %s" (textOf value))
 
-    let private tierResult (value: obj) : Result<AgentTier, string> =
-        match Roles.tryParseTier (textOf value) with
-        | Some tier -> Ok tier
-        | None -> Error(sprintf "unknown tier: %s" (textOf value))
-
     let private budgetResult (value: obj) : Result<StrengthBudget, string> =
         match StrengthBudget.parse (textOf value) with
         | Some budget -> Ok budget
@@ -405,13 +400,12 @@ module StrengthSurface =
                V2 = estimate.V2 |}
 
     let private opportunityOf (value: obj) : Result<StrengthOpportunity, string> =
-        match requestKindResult value?requestKind, roleResult value?canonicalRole, tierResult value?selectedTier with
-        | Ok requestKind, Ok canonicalRole, Ok selectedTier ->
+        match requestKindResult value?requestKind, roleResult value?canonicalRole with
+        | Ok requestKind, Ok canonicalRole ->
             Ok
                 { IsRootWork = unbox<bool> value?isRootWork
                   RequestKind = requestKind
                   CanonicalRole = canonicalRole
-                  SelectedTier = selectedTier
                   SelectedAgent = textOf value?selectedAgent
                   EffectiveAgent = textOf value?effectiveAgent
                   IsFallbackRetry = unbox<bool> value?isFallbackRetry
@@ -422,11 +416,10 @@ module StrengthSurface =
                   TargetProviderRunBound = unbox<bool> value?targetProviderRunBound
                   EventStoreHealthy = unbox<bool> value?eventStoreHealthy
                   HostCanaryHealthy = unbox<bool> value?hostCanaryHealthy
-                  FastPeerAvailable = unbox<bool> value?fastPeerAvailable
+                  PredictorAvailable = unbox<bool> value?predictorAvailable
                   CostModelAvailable = unbox<bool> value?costModelAvailable }
-        | Error error, _, _
-        | _, Error error, _
-        | _, _, Error error -> Error error
+        | Error error, _
+        | _, Error error -> Error error
 
     let private predictionOf (value: obj) =
         { P1 = float value?P1

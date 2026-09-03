@@ -21,7 +21,7 @@ const toolModule = () => {
   tool.schema = { string: () => ({ kind: 'string-schema' }) }
   return { tool }
 }
-const context = (sessionID) => ({ sessionID, agent: 'fast-coder' })
+const context = (sessionID) => ({ sessionID, agent: 'coder' })
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-filemut-'))

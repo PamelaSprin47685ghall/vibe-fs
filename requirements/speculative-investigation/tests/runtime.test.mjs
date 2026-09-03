@@ -25,7 +25,7 @@ const rootSelection = (agent) => {
     },
   }
 }
-const ownerProfile = (agent = 'fast-coder') => {
+const ownerProfile = (agent = 'coder') => {
   const result = authority.createAuthorityRoot(
     H,
     'runtime-special-lineage',
@@ -70,9 +70,9 @@ test('WHAT[SPEC-INV-004] STRENGTH_004_runtime_rejects_K0_and_ineligible_replica_
   assert.equal(Strength.runtimeRegister(runtime, binding('o2', 'r2', 'd2', 'Manager', 'K1')).error, 'RoleIneligible')
 })
 
-test('WHAT[PID-010] Strength replica inherits the owner Persona and exact authority lineage', () => {
-  const owner = ownerProfile('fast-coder')
-  const issued = authority.issueInheritedIdentitySeed('deep-coder', owner)
+test('WHAT[PID-008] Strength replica inherits the owner Persona and exact authority lineage', () => {
+  const owner = ownerProfile('coder')
+  const issued = authority.issueInheritedIdentitySeed('coder', owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
 
   assert.deepEqual(
@@ -93,9 +93,9 @@ test('WHAT[PID-010] Strength replica inherits the owner Persona and exact author
   )
 })
 
-test('WHAT[PID-010] Fission lane carries owner-issued identity lineage', () => {
-  const owner = ownerProfile('deep-coder')
-  const issued = authority.issueInheritedIdentitySeed('deep-coder', owner)
+test('WHAT[PID-008] Fission lane carries owner-issued identity lineage', () => {
+  const owner = ownerProfile('coder')
+  const issued = authority.issueInheritedIdentitySeed('coder', owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
 
   assert.deepEqual(authority.validateInheritedIdentitySeed(owner, issued.value), {
@@ -105,7 +105,7 @@ test('WHAT[PID-010] Fission lane carries owner-issued identity lineage', () => {
   })
 })
 
-test('WHAT[PID-010] Fission lane identity never infers lineage from a physical parent', () => {
+test('WHAT[PID-008] Fission lane identity never infers lineage from a physical parent', () => {
   const lane = Fission.startedLane(1, 'ses_physical_parent', 'investigate independently')
   assert.deepEqual(lane, {
     index: 1,

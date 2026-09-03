@@ -7,8 +7,6 @@ module PersonaSurface =
     val requiredNames: string array
     val legacyNames: string array
     val nameOf: string -> string -> string
-    val peerTierLabel: string -> string
-    val peerName: string -> string
     val isManagedName: string -> bool
     val isLegacyName: string -> bool
     val roleName: string -> string

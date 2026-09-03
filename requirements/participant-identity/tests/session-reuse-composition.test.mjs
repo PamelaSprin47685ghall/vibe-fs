@@ -7,7 +7,7 @@ const scenario = fileURLToPath(
   new URL('./support/session-reuse-plugin-scenario.mjs', import.meta.url),
 )
 
-test('WHAT[PID-011] production plugin replaces identity only after exact durable Manager closure', () => {
+test('WHAT[PID-009] production plugin replaces identity only after exact durable Manager closure', () => {
   const child = spawnSync(process.execPath, [scenario], {
     cwd: process.cwd(),
     encoding: 'utf8',

@@ -32,7 +32,6 @@ module PromptAuthority =
         member SelectedAgent: string
         member PeerAgent: string
         member CanonicalRole: Role
-        member SelectedTier: AgentTier
         member Persona: string
         member PersonaCatalogVersion: int
         member PersonaOrigin: PersonaOrigin
@@ -86,7 +85,6 @@ module PromptAuthority =
         member SelectedAgent: string
         member PeerAgent: string
         member CanonicalRole: Role
-        member SelectedTier: AgentTier
 
     type PromptClaim =
         { PromptKey: PromptKey
@@ -127,14 +125,10 @@ module PromptAuthority =
         | UnknownManagedAgent of string
         | Malformed of string
 
-    type ParsedAgentName =
-        { Name: string
-          Role: Role
-          Tier: AgentTier
-          PeerName: string }
+    type ParsedAgentName = { Name: string; Role: Role }
 
     val parseAgentNameTyped: value: string -> Result<ParsedAgentName, AgentNameRejection>
-    val parseAgentName: value: string -> Result<string * Role * AgentTier * string, string>
+    val parseAgentName: value: string -> Result<string * Role, string>
 
     val stableLogicalRunId:
         sha256: (string -> string) ->

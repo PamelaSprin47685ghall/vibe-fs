@@ -52,10 +52,6 @@ module FactCodecSurface =
         | "DurableParentHandle" -> HandleOwnership.DurableParentHandle
         | other -> failwith $"FactCodecSurface: unknown ownership '{other}'"
 
-    let private tierOf (value: obj) =
-        Roles.tryParseTier (text value)
-        |> Option.defaultWith (fun () -> failwith $"FactCodecSurface: unknown tier '{text value}'")
-
     let private originOf (value: obj) =
         match text value with
         | "ResolvedAtRoot" -> PersonaOrigin.ResolvedAtRoot
@@ -64,13 +60,11 @@ module FactCodecSurface =
 
     let private identityInputOfJs (value: obj) =
         { SelectedAgent = text (value?selectedAgent)
-          PeerAgent = text (value?peerAgent)
           Role =
             if text (value?canonicalRole) = "bookkeeper" then
                 None
             else
                 Some(roleOf (value?canonicalRole))
-          InitialTier = tierOf (value?selectedTier)
           Persona = text (value?persona)
           PersonaCatalogVersion = unbox<int> (value?personaCatalogVersion)
           Origin = originOf (value?origin) }
@@ -95,7 +89,7 @@ module FactCodecSurface =
             {| selectedAgent = ParticipantIdentity.selectedAgent evidence
                peerAgent = ParticipantIdentity.peerAgent evidence
                canonicalRole = ParticipantIdentity.roleLabel evidence
-               selectedTier = ParticipantIdentity.initialTier evidence |> Roles.wireTierLabel
+               selectedTier = "deep"
                persona = ParticipantIdentity.persona evidence
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion evidence
                origin =

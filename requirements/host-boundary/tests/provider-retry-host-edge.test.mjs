@@ -28,7 +28,7 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_failed_provider_step_keeps_same_physical_
   const runtime = routing.createRuntime(() => target)
   const sessionId = 'session-retry'
   const physicalUserMessageId = 'msg-retry'
-  const agent = 'fast-coder'
+  const agent = 'coder'
 
   await admit(runtime, sessionId, physicalUserMessageId, agent)
   await routing.enterProviderStep(runtime, sessionId, physicalUserMessageId, [])
@@ -71,7 +71,7 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_ambiguous_finish_keeps_same_physical_exec
     const sessionId = `session-retry-${finish}`
     const physicalUserMessageId = `msg-retry-${finish}`
     const providerRun = `run-${finish}`
-    const agent = 'fast-coder'
+    const agent = 'coder'
 
     await admit(runtime, sessionId, physicalUserMessageId, agent)
     await routing.enterProviderStep(runtime, sessionId, physicalUserMessageId, [])

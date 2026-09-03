@@ -12,7 +12,7 @@ const evidence = (suffix, overrides = {}) => ({
   providerRun: `provider-pre-provider-${suffix}`,
   identitySeed: {
     participantIdentity: {
-      selectedAgent: 'fast-coder',
+      selectedAgent: 'coder',
     },
   },
   ...overrides,

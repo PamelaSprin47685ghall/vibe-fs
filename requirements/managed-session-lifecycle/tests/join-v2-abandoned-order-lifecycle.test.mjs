@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as HandleSurface from '../../../dist/Execution/Delegation/Handle/Surface.js'
 
-const link = (projection, agentId, child, targetAgent = 'fast-coder') => {
+const link = (projection, agentId, child, targetAgent = 'coder') => {
   const result = HandleSurface.apply(projection, {
     op: 'link', handle: `agent:${agentId}`, child, agent: targetAgent, role: 'Coder',
   })
