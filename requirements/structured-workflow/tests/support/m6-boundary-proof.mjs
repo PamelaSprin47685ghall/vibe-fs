@@ -21,8 +21,8 @@ const facts = (...observations) => {
 }
 
 const pureFact = (localityId) => ({
-  case: 'fsharp-node',
-  payload: { node_kind: 'record', semantic_identity: `${localityId}.Vocabulary`, site: site(localityId) },
+  case: 'public-signature-export',
+  payload: { export_kind: 'pure-type', declaration_identity: `${localityId}.Vocabulary`, site: site(localityId) },
 })
 
 const capabilityTypeFact = (localityId) => ({
