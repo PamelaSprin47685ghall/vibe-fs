@@ -162,11 +162,32 @@ export const degradationCases = [
         typeof pipeline === 'string' && !pipeline.includes('--repeat'),
         'format-build-test must not reintroduce a --repeat release-gate pool',
       );
-      const warmupAt = typeof pipeline === 'string' ? pipeline.indexOf('warmup-opencode.mjs') : -1;
+      const integrationAt = typeof pipeline === 'string' ? pipeline.indexOf('tests/integration/run.mjs') : -1;
       const e2eAt = typeof pipeline === 'string' ? pipeline.indexOf('tests/e2e/entry.test.mjs') : -1;
       assertTrue(
-        warmupAt >= 0 && e2eAt >= 0 && warmupAt < e2eAt,
-        'format-build-test must warm opencode before Long Stroke e2e',
+        integrationAt >= 0 && e2eAt >= 0 && integrationAt < e2eAt,
+        'format-build-test must run the integration owner before Long Stroke e2e',
+      );
+      assertTrue(!pipeline.includes('warmup-opencode.mjs'), 'format-build-test must not duplicate integration warmup');
+      assertTrue(
+        !pipeline.includes('distribution/tests/integration/package/run.mjs'),
+        'format-build-test must not duplicate the integration-owned package child',
+      );
+
+      const integration = readSource('requirements/verification-system/tests/integration/run.mjs');
+      assertEq(
+        integration.split('scripts/warmup-opencode.mjs').length - 1,
+        1,
+        'integration orchestrator must own exactly one opencode warmup',
+      );
+      assertEq(
+        integration.split('requirements/distribution/tests/integration/package/run.mjs').length - 1,
+        1,
+        'integration orchestrator must own exactly one distribution package child',
+      );
+      assertTrue(
+        integration.indexOf('scripts/warmup-opencode.mjs') < integration.indexOf('for (const step of nodeTestSteps)'),
+        'integration orchestrator must warm opencode before any integration child',
       );
 
       const entry = readSource(SOLE_ENTRY);
