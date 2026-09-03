@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -57,10 +59,11 @@ function investigateArgs(handle, actionKey) {
  * newline-delimited JSON-RPC 2.0 over stdio.  Every non-empty stdout line is
  * captured in `lines` for purity assertions.
  */
-function spawnSphinx() {
+function spawnSphinx(env = {}) {
   const proc = spawn('node', [serverEntry], {
     cwd: repoRoot,
     stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, ...env },
   })
 
   let nextId = 1
@@ -217,24 +220,35 @@ test('WHAT[EPI-014] initialize_returns_server_identity_and_instructions', { time
   }
 })
 
-test('WHAT[EPI-013] tools_list_returns_eight_tools_with_schemas', { timeout: 30000 }, async () => {
+test('WHAT[EPI-013] tools_list_returns_legacy_eight_plus_generic_five_with_schemas', { timeout: 30000 }, async () => {
   const s = spawnSphinx()
   try {
+    // Default blackbox client negotiates 2024-11-05: the legacy eight keep
+    // working there and the generic five are listed alongside them.
     await s.initialize()
     const res = await s.call('tools/list', {})
     const names = res.result.tools.map((t) => t.name)
-    assert.deepEqual(names, [
-      'start',
+    assert.deepEqual([...names].sort(), [
       'assess',
-      'propose',
-      'investigate',
-      'synthesize',
-      'status',
       'cancel',
+      'investigate',
+      'propose',
       'resume',
+      'sphinx_inquiry_cancel',
+      'sphinx_inquiry_export',
+      'sphinx_inquiry_start',
+      'sphinx_inquiry_status',
+      'sphinx_work_submit',
+      'start',
+      'status',
+      'synthesize',
     ])
     for (const t of res.result.tools) {
       assert.ok(t.inputSchema, `${t.name} must have an inputSchema`)
+      assert.ok(
+        typeof t.description === 'string' && t.description.length > 0,
+        `${t.name} must have a description`,
+      )
     }
     const resume = res.result.tools.find((t) => t.name === 'resume')
     assert.match(resume.description, /^Legacy compatibility tool/)
@@ -243,6 +257,69 @@ test('WHAT[EPI-013] tools_list_returns_eight_tools_with_schemas', { timeout: 300
       investigate.inputSchema.required?.includes('actionKey'),
       'investigate schema must require actionKey',
     )
+    const genericStart = res.result.tools.find((t) => t.name === 'sphinx_inquiry_start')
+    assert.ok(
+      genericStart.inputSchema.required?.includes('question'),
+      'generic start schema must require question',
+    )
+    for (const field of ['profile', 'plugins', 'executionMode', 'budget']) {
+      assert.ok(
+        genericStart.inputSchema.properties && field in genericStart.inputSchema.properties,
+        `generic start schema must accept ${field}`,
+      )
+    }
+    const submit = res.result.tools.find((t) => t.name === 'sphinx_work_submit')
+    for (const field of ['inquiryId', 'expectedRevision', 'results']) {
+      assert.ok(
+        submit.inputSchema.required?.includes(field),
+        `generic submit schema must require ${field}`,
+      )
+    }
+  } finally {
+    s.close()
+  }
+})
+
+test('WHAT[EPI-014] newer_negotiated_capability_discovers_generic_tools_without_tasks_or_sampling', { timeout: 30000 }, async () => {
+  const s = spawnSphinx()
+  try {
+    const res = await s.call('initialize', {
+      protocolVersion: '2025-11-25',
+      capabilities: {},
+      clientInfo: { name: 'blackbox-test', version: '0.0.0' },
+    })
+    s.notify('notifications/initialized', {})
+    assert.equal(res.result.serverInfo.name, 'sphinx')
+    assert.equal(res.result.serverInfo.version, pkgVersion)
+    // This client negotiates no Tasks capability, so the server must not
+    // advertise one: the direct-provider path stands alone.
+    assert.equal(res.result.capabilities?.tasks, undefined)
+
+    const listed = await s.call('tools/list', {})
+    const names = listed.result.tools.map((t) => t.name)
+    for (const name of [
+      'sphinx_inquiry_start',
+      'sphinx_work_submit',
+      'sphinx_inquiry_status',
+      'sphinx_inquiry_export',
+      'sphinx_inquiry_cancel',
+    ]) {
+      assert.ok(names.includes(name), `negotiated client must discover generic tool ${name}`)
+    }
+
+    // Legacy structuredContent tools keep working under the newer protocol.
+    const handle = await driveToAnswered(s)
+    assert.ok(typeof handle === 'string' && handle.length > 0)
+
+    // No server-initiated Sampling or Tasks traffic anywhere on the wire: the
+    // direct provider never depends on deprecated Sampling or on Tasks.
+    for (const line of s.lines) {
+      assert.ok(!line.includes('sampling/'), `wire must not carry Sampling traffic: ${line.slice(0, 160)}`)
+      assert.ok(
+        !/"method":"tasks\//.test(line),
+        `wire must not carry Tasks traffic: ${line.slice(0, 160)}`,
+      )
+    }
   } finally {
     s.close()
   }
@@ -463,27 +540,38 @@ test('WHAT[EPI-013] stdout_lines_are_pure_jsonrpc', { timeout: 30000 }, async ()
   }
 })
 
-test('WHAT[EPI-013] restart_invalidates_handles', { timeout: 30000 }, async () => {
-  // server 1: start → handle
-  const s1 = spawnSphinx()
-  let handle
+test('WHAT[EPI-030] restart_recovers_same_durable_inquiry', { timeout: 30000 }, async () => {
+  // Both servers share one durable commonDir via SPHINX_COMMON_DIR. Killing
+  // the first process must not invalidate the handle: the second server
+  // recovers the same durable inquiry at the same revision.
+  const commonDir = await mkdtemp(join(tmpdir(), 'sphinx-mcp-'))
   try {
-    await s1.initialize()
-    const startRes = await s1.tool('start', { question: '花儿为什么这样红？' })
-    handle = startRes.result.structuredContent.handle
-  } finally {
-    s1.close()
-  }
+    const env = { SPHINX_COMMON_DIR: commonDir }
+    const s1 = spawnSphinx(env)
+    let handle
+    try {
+      await s1.initialize()
+      const startRes = await s1.tool('start', { question: '花儿为什么这样红？' })
+      handle = startRes.result.structuredContent.handle
+      const assessed = await s1.tool('assess', assessArgs(handle))
+      assert.equal(assessed.result.structuredContent.revision, 1)
+    } finally {
+      s1.close()
+    }
 
-  // server 2: handle from server 1 is unknown (process-local, no persistence)
-  const s2 = spawnSphinx()
-  try {
-    await s2.initialize()
-    const res = await s2.tool('status', { handle })
-    assert.equal(res.result.isError, true)
-    assert.equal(res.result.structuredContent, undefined)
-    assert.equal(res.result._meta.error.code, 'UNKNOWN_HANDLE')
+    const s2 = spawnSphinx(env)
+    try {
+      await s2.initialize()
+      const res = await s2.tool('status', { handle })
+      assert.equal(res.result.isError, undefined)
+      assert.equal(res.result.structuredContent.handle, handle)
+      assert.equal(res.result.structuredContent.status, 'active')
+      assert.equal(res.result.structuredContent.revision, 1)
+      assert.equal(res.result.structuredContent.nextTool, 'propose')
+    } finally {
+      s2.close()
+    }
   } finally {
-    s2.close()
+    await rm(commonDir, { recursive: true, force: true })
   }
 })

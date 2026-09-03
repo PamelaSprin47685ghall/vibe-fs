@@ -428,3 +428,67 @@ test('WHAT[EPI-013] full_next_tool_chain_with_bare_candidate_proposals', async (
   assert.equal(answered.structuredContent.answer.epistemicBasis.findings.length, 1)
   assert.equal(answered.structuredContent.answer.epistemicBasis.evidence.length, 1)
 })
+
+test('WHAT[EPI-013] generic_tools_registered_alongside_legacy_eight', () => {
+  const tools = mcpServer(createStore())._registeredTools
+
+  for (const name of ['start', 'assess', 'propose', 'investigate', 'synthesize', 'status', 'cancel', 'resume']) {
+    assert.ok(name in tools, `legacy tool ${name} must stay registered`)
+  }
+  for (const name of [
+    'sphinx_inquiry_start',
+    'sphinx_work_submit',
+    'sphinx_inquiry_status',
+    'sphinx_inquiry_export',
+    'sphinx_inquiry_cancel',
+  ]) {
+    assert.ok(name in tools, `generic tool ${name} must be registered`)
+    assert.equal(typeof tools[name].handler, 'function')
+  }
+})
+
+test('WHAT[EPI-013] generic_start_status_cancel_envelope_with_iq_ids_and_stale_submit_conflict', async () => {
+  const tools = mcpServer(createStore())._registeredTools
+
+  const started = await tools.sphinx_inquiry_start.handler({
+    question: ROOT_QUESTION,
+    profile: 'default-legacy',
+    plugins: [],
+    executionMode: 'mcp',
+    budget: {},
+  })
+  assert.equal(started.isError, undefined)
+  assert.match(started.structuredContent.inquiryId, /^iq_/)
+  assert.equal(started.structuredContent.revision, 0)
+
+  const status = await tools.sphinx_inquiry_status.handler({
+    inquiryId: started.structuredContent.inquiryId,
+  })
+  assert.equal(status.isError, undefined)
+  assert.equal(status.structuredContent.inquiryId, started.structuredContent.inquiryId)
+
+  // Stale expectedRevision conflicts before any write, mirroring the
+  // EventStore rule: the failed submit advances nothing.
+  const stale = await tools.sphinx_work_submit.handler({
+    inquiryId: started.structuredContent.inquiryId,
+    expectedRevision: 999,
+    results: [],
+  })
+  assert.equal(stale.isError, true)
+  assert.match(stale._meta.error.code, /REVISION_CONFLICT/)
+  const after = await tools.sphinx_inquiry_status.handler({
+    inquiryId: started.structuredContent.inquiryId,
+  })
+  assert.equal(after.structuredContent.revision, status.structuredContent.revision)
+
+  const cancelled = await tools.sphinx_inquiry_cancel.handler({
+    inquiryId: started.structuredContent.inquiryId,
+  })
+  assert.equal(cancelled.isError, undefined)
+  assert.equal(cancelled.structuredContent.status, 'cancelled')
+
+  const gone = await tools.sphinx_inquiry_status.handler({
+    inquiryId: started.structuredContent.inquiryId,
+  })
+  assert.equal(gone.isError, true)
+})

@@ -448,6 +448,21 @@
       "justification": "Signed owner-local epistemic vocabulary for questions, evidence, findings, hypotheses, candidate actions and synthesis; it publishes no foreign authority."
     },
     {
+      "path": "src/Wanxiangshu/Sphinx/Core/Hash.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed canonical-JSON and sha256 hashing support for opaque Sphinx envelopes and event trails; no epistemic interpretation."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Core/Model.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed opaque Sphinx-GEC vocabulary: kind-specific IDs, canonical envelopes, typed hypergraph, certificate slots, fenced work facts, budget, events and errors; epistemology-free mechanics only."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Core/Reducer.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure inquiry reducer: revision and parent guards, fenced work transitions, budget conservation, idempotent terminals and semantic views; observation idempotence keyed by work and attempt."
+    },
+    {
       "path": "src/Wanxiangshu/Sphinx/RuntimeTypes.fs",
       "owner": "epistemic-reasoning",
       "justification": "Signed owner-local kernel request, observation, budget, solver-state and canonical-answer algebra used only inside the Sphinx runtime locality."
@@ -508,9 +523,89 @@
       "justification": "Signed JS wire decode primitives with explicit obj input and typed Result output; raw property helpers stay private."
     },
     {
+      "path": "src/Wanxiangshu/Sphinx/GecDecode.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed JS-event decoders translating the generic work and replay envelope into canonical Core events; wall-clock fields rejected, protocol bindings completeness-checked."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecSurface.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed JS-native GEC surface aggregating replay, schedule, refinement, elicitation and host methods over the Sphinx Core and Runtime; opaque handles only."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecRefine.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed JS composition over exact, bound, sample and ordinal certificate slots plus Bayes, AStar and MCTS refiners and Borda and BTL inference; guarantee correspondence enforced."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecElicit.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed JS composition over split-ballot randomization, sealed self-prediction scoring and framing-scoped stop certificates; raw scores never substitute answers."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecHost.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed JS composition for host-equivalence folds and OpenCode blind-dispatch planning; host-private fields excluded from semantic hashes, no private lease pool."
+    },
+    {
       "path": "src/Wanxiangshu/Sphinx/ObservationCodec.fs",
       "owner": "epistemic-reasoning",
       "justification": "Signed observation decoder from free JS values into the closed Sphinx observation algebra; per-record decoder helpers remain hidden."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/AStar/Refiner.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure AStar bound refiner with global open-frontier lower bound, incumbent upper bound and better-g reopening; admissibility recorded as assumption."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/Bayes/Exact.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure Bayes exact sum-product refiner in log space with full factor qualification gates; failures are typed faults, never uniform coverups."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/Mcts/Refiner.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure seeded MCTS sample refiner with return-width-scaled UCT and declared coverage scope; estimates never pose as deterministic truth."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/Ordinal/Inference.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure Borda baseline with declared extensions and zero-sum-gauge Bradley-Terry with connectivity and separation guards."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/Questionnaire/Protocol.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure split-ballot allocation and signed difference-in-means contrasts with permutation nulls; blind envelopes carry no sibling data."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/Stop/Certificate.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure framing-scoped stop certificates with sequential error control, conservative VOC gate and minority-mode preservation."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/Truthful/SelfPrediction.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure sealed self-prediction scoring with epsilon-floor log score and simplex-validated Brier; calibration updates gated on held-out targets."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Runtime/Agenda.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure refinement scheduler: dependency, conflict and budget compatible batches with Pareto frontier and canonical-order composition; declared fixed-point domains with conjecture downgrade."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Runtime/Certificate.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed slot-to-guarantee certificate constructor separating deterministic inclusion from probabilistic coverage; witness-only growth allowed."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Runtime/Plugin.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed plugin manifest shape with lock-entry projection; identity and binding validation helpers."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Runtime/PluginRegistry.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed plugin manifest binding: dependency, release, ABI and schema-hash checks with topological order and lock compatibility."
     },
     {
       "path": "src/Wanxiangshu/Sphinx/WireEncode.fs",

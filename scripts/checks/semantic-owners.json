@@ -2713,7 +2713,39 @@
       "owner": "epistemic-reasoning"
     },
     {
+      "path": "src/Wanxiangshu/Sphinx/Core/Hash.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Core/Model.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Core/Reducer.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
       "path": "src/Wanxiangshu/Sphinx/DecodePrimitives.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecDecode.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecElicit.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecHost.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecRefine.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecSurface.fs",
       "owner": "epistemic-reasoning"
     },
     {
@@ -2741,11 +2773,55 @@
       "owner": "epistemic-reasoning"
     },
     {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/AStar/Refiner.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/Bayes/Exact.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/Mcts/Refiner.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/Ordinal/Inference.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/Questionnaire/Protocol.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/Stop/Certificate.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Plugins/Truthful/SelfPrediction.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
       "path": "src/Wanxiangshu/Sphinx/Policy.fs",
       "owner": "epistemic-reasoning"
     },
     {
       "path": "src/Wanxiangshu/Sphinx/Representation.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Runtime/Agenda.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Runtime/Certificate.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Runtime/Plugin.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/Runtime/PluginRegistry.fs",
       "owner": "epistemic-reasoning"
     },
     {

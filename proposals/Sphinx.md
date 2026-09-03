@@ -40,6 +40,8 @@ Bellman 是这个母体在“决策节点”上的表现形式，而不是三个
 
 ## Sphinx 广义认识演算
 
+> 实施校正（2026-09-03）：本文件的工程目标已进入 `requirements/epistemic-reasoning/WHAT.md`。实现采用 canonical EventStore 而非 SQLite；work lease 由显式 durable/Host 事件推进而非时间到期；数学上区分确定性 concretization inclusion 与采样 coverage，并修正 A* 全局下界、Borda 退化、批 delta 可加和问法效应可识别性等过强表述。若下文早期路线与 EPI-015—EPI-030 冲突，以 requirements 与 ADR 为准。
+
 ---
 
 # 二、最终架构：一套核心、两个宿主、全部认识论插件化
@@ -377,57 +379,17 @@ CertificatePatched
 
 ## 5.4 事件存储
 
-V1 第一版可以用 SQLite：
+本仓已有 canonical EventStore；Sphinx 必须在该 spine 上增加一个 additive event vocabulary、codec 与 pure Integrator rule，不得创建 SQLite、feature-private NDJSON、第二 history fold 或 durable snapshot backend。
 
-```sql
-inquiries(
-  id TEXT PRIMARY KEY,
-  revision INTEGER NOT NULL,
-  status TEXT NOT NULL,
-  head_event_id TEXT,
-  created_at TEXT NOT NULL
-);
-
-events(
-  sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-  event_id TEXT UNIQUE NOT NULL,
-  inquiry_id TEXT NOT NULL,
-  revision INTEGER NOT NULL,
-  event_type TEXT NOT NULL,
-  plugin_id TEXT,
-  payload_json TEXT NOT NULL,
-  previous_hash TEXT,
-  event_hash TEXT NOT NULL,
-  created_at TEXT NOT NULL
-);
-
-work_items(
-  work_id TEXT PRIMARY KEY,
-  inquiry_id TEXT NOT NULL,
-  branch_id TEXT NOT NULL,
-  status TEXT NOT NULL,
-  lease_owner TEXT,
-  lease_expires_at TEXT,
-  attempt INTEGER NOT NULL,
-  payload_json TEXT NOT NULL
-);
-
-snapshots(
-  inquiry_id TEXT NOT NULL,
-  revision INTEGER NOT NULL,
-  projection_json TEXT NOT NULL,
-  event_hash TEXT NOT NULL,
-  PRIMARY KEY(inquiry_id, revision)
-);
-```
+每个 inquiry 使用独立 `StreamId`。`EventEnvelope.Parents` 表达 causal head，payload 保存 canonical CoreEvent，identity 由现有 codec 校验。`Current` 持有物化 Inquiry projection；进程内 hot cache 可以丢弃，恢复直接读取 Integrator Current 或由 canonical events 重新积分。
 
 关键要求：
 
-* 事件先落盘，响应后返回；
-* `expectedRevision` 实现乐观并发；
-* 重复提交相同 `workId + attempt` 必须幂等；
-* snapshot 只是加速缓存；
-* 删除 snapshot 后仍能从事件重放。
+* event append 成功后才替换内存 projection 和返回成功；
+* `expectedRevision` 在 append 前比较，竞态形成 typed branch conflict，不能静默覆盖；
+* 同一 canonical `workId + attempt` observation 幂等，冲突 payload 拒绝；
+* snapshot/cache 仅加速且不是业务事实，删除后重放结果不变；
+* recovery、lease 释放与 retry 由 durable transition 或 typed Host terminal 驱动，不由 wall clock 推断。
 
 ---
 
@@ -1095,60 +1057,21 @@ OpenCode 还区分 primary agent 与 subagent；General subagent 的官方用途
 
 ---
 
-# 十三、V2 OpenCode 包结构
+# 十三、V2 OpenCode 物理结构
+
+本仓已经是单一 Fable package，且拥有受管 session、delegation/fission、capacity、failure policy 与 canonical EventStore。再造 TypeScript package、worker pool、lease manager 和 SQLite 会产生第二套状态机。实施结构收敛为：
 
 ```text
-packages/sphinx-opencode/
-  package.json
-  src/
-    index.ts
-    config.ts
-    runtime.ts
-
-    host/
-      opencode-client.ts
-      session-fork.ts
-      event-router.ts
-      output-parser.ts
-
-    scheduling/
-      scheduler.ts
-      agenda.ts
-      conflict-graph.ts
-      worker-pool.ts
-      lease-manager.ts
-      retry-policy.ts
-      budget-manager.ts
-
-    persistence/
-      sqlite-store.ts
-      migrations.ts
-
-    tools/
-      start.ts
-      status.ts
-      cancel.ts
-      explain.ts
-      export.ts
-
-    rendering/
-      parent-session.ts
-      diagnostics.ts
+src/Wanxiangshu/Sphinx/
+  Core/                 # opaque mechanics + reducer
+  Runtime/              # plugin registry, agenda, scheduler
+  Plugins/              # Legacy / Bayes / AStar / Mcts / Research
+  Hosts/Mcp/            # generic + Legacy protocol adapters
+  Hosts/OpenCode/       # only WorkEnvelope ↔ existing managed Host ports
+  Persistence/          # codec + canonical Integrator rule only
 ```
 
-F# Core 通过 Fable 编译为共享 JS 包：
-
-```text
-packages/sphinx-core-js/
-```
-
-MCP Host 和 OpenCode Host 都依赖同一个版本：
-
-```json
-{
-  "@wanxiangshu/sphinx-core": "2.x"
-}
-```
+MCP 与 OpenCode Host 在同一发布包中依赖同一 F# Core/Runtime。OpenCode adapter 复用 `IOpenCodePort`、`HostForkRuntime`、delegation/fission、capacity 与 failure-policy owner；只有 composition root 同时绑定 Sphinx contract 和具体 Host/EventStore runtime。
 
 ---
 
@@ -1405,16 +1328,17 @@ Running
   └──→ Superseded
 ```
 
-每个 lease 包括：
+每个 lease case 只携带合法世界需要的证据：
 
 ```text
 leaseOwner
-leaseExpiresAt
-heartbeatAt
 attempt
 childSessionId
 promptMessageId
+capacityFence
 ```
+
+没有 `leaseExpiresAt` 或 `heartbeatAt`。释放、失效与重试由 exact durable transition、typed Host terminal 或 owner cancel/delete 触发；wall clock 只可用于物理观测，不能裁决业务状态。
 
 ## 17.3 精确上下文分叉
 
@@ -1528,13 +1452,13 @@ Core 不决定其认识论含义。
 
 插件重启：
 
-1. 打开 SQLite；
-2. 重放到最新 revision；
-3. 查询 OpenCode child session 状态；
-4. 已完成但未吸收的结果重新摄取；
-5. 已失效 lease 回到 Ready；
-6. 正在运行的 session 重新绑定；
-7. 保证 `workId + attempt` 幂等。
+1. 打开 workspace canonical EventStore；
+2. 从 Integrator Current 恢复 inquiry，必要时重放 canonical events；
+3. 查询 OpenCode child session 的 typed physical status；
+4. 已完成但未吸收的 exact result 重新摄取；
+5. durable failure/terminal 已证明失效的 lease 进入 Ready(new attempt)；
+6. 仍在运行的 exact child identity 重新绑定；
+7. 保证 `workId + attempt` observation 幂等，冲突 payload fail closed。
 
 ---
 
@@ -1713,8 +1637,7 @@ $$
 \otimes,
 \mathfrak M,
 K,
-\psi,
-\mathcal N
+\psi
 \right)
 $$
 
@@ -1726,40 +1649,46 @@ $$
 * \(\otimes\)：局部值与未来值的组合；
 * \(\mathfrak M\)：结果变量的消元／聚合；
 * \(K\)：转移或观测核；
-* \(\psi\)：局部势函数；
-* \(\mathcal N\)：必要的规范化算子。
+* \(\psi\)：局部势函数；规范化若必需，必须成为类型化 \(T_e\) 的显式步骤。
 
-定义广义固定点算子：
+每种节点 \(v\) 有自己的值域 \(\mathcal X_v\)，超边算子必须声明完整类型：
 
 $$
-(\mathfrak F_\Phi X)(v)
+T_e:
+\prod_{u\in\operatorname{tail}(e)}\mathcal X_u
+\longrightarrow
+\mathcal X_{\operatorname{head}(e)}
+$$
+
+因此全局状态空间是异质积空间 \(\mathcal X=\prod_{v\in V}\mathcal X_v\)，不是把概率、代价、Pareto 集和 posterior 强塞进同一个标量半环。对类型相容的插件族，定义：
+
+$$
+(\mathfrak F_\Phi X)_v
 =
-\bigoplus_{e\in\operatorname{Out}(v)}^{\Phi}
-\left[
-\psi_e
-\otimes_\Phi
-\mathfrak M_{\omega\sim K_e}^{\Phi}
-X\!\left(\tau(v,e,\omega)\right)
-\right]
+\bigoplus_{e\in\operatorname{In}(v)}^\Phi
+T_e\!\left(X|_{\operatorname{tail}(e)}\right)
 \tag{1}
 $$
 
-最终对象是：
+只有满足以下任一证明域时，才写：
 
 $$
 X^*=\operatorname{Fix}(\mathfrak F_\Phi)
 \tag{2}
 $$
 
-在动作选择节点上，式（1）表现为 Bellman 方程。
+```text
+有限 DAG：按拓扑序求值，并声明无入边节点的 identity；
+complete lattice：逐点序下 F 单调可由 Knaster–Tarski 保证 fixed point 存在；
+DCPO/Kleene 迭代：逐点序下 F 必须 Scott-continuous；
+complete metric：每个值类型声明严格 q<1 的 contraction modulus。
+```
 
-在概率因子节点上，式（1）表现为 sum-product 消息传播。
+否则运行时只能给出第 \(k\) 次迭代 \(X_k\) 和 residual，不能宣称 fixed point 存在、唯一或已收敛。
 
-在最短路节点上，表现为 min-plus 递推。
+在动作选择节点上，式（1）可表现为 Bellman 方程；在概率因子节点上可表现为 sum-product 消息；在确定最短路节点上可表现为 min-plus 递推。只能采样的随机节点估计的是相关期望算子，并不因此获得与 exact refiner 相同的确定性保证。
 
-在只能采样的随机节点上，\(\mathfrak M\) 由经验估计逼近。
-
-广义分配律正是把 sum-product、min-sum 等多类算法放入共同消息传递框架的重要理论基础。([authors.library.caltech.edu][10])
+广义分配律能统一 sum-product、min-sum 等消息传递算法，但只有当对应载体与运算满足所需封闭性、结合律、单位元和分配律时才适用。Sphinx-GEC 统一的是 typed refinement protocol 与证书组合边界，不声称任意插件共享一个无条件半环。([authors.library.caltech.edu][10])
 
 ---
 
@@ -1819,12 +1748,17 @@ $$
 因此严格退化条件是：
 
 ```text
-无动作选择
-完整概率因子
-sum-product 值代数
-精确消元
-正的归一化常数
+无动作选择；
+有限离散 H 且 |H|≥2；
+先验非负、可归一，允许零质量且零先验保持零；
+likelihood 在给定 h 后条件独立，并由 DependencyKey 编码；
+每个 factor 完整覆盖 H、有限且位于 [0,1]；
+每个依赖组只取一个 canonical factor；
+partition function Z 严格正且有限；
+log-space 累加并以 log-sum-exp 精确归一。
 ```
+
+任一条件失败时 exact 槽为空并返回 typed qualitative uncertainty；不能用均匀 posterior 掩盖无定义归一化。
 
 Bayes 插件应输出一个 singleton certificate：
 
@@ -1892,18 +1826,21 @@ min-plus 值代数
 发现更优 g 时重开
 ```
 
-A* 的证书是：
+单节点的 \(f(n)=g(n)+h(n)\) 只是该前缀的 bound，不是根最优代价的完整证书。A* 的全局证书应为：
 
 $$
-C_n=
+C_k=
 \left(
-L_n=g_n+h_n,\;
-U_n,\;
-\text{parent}_n,\;
-\text{closed}_n
+L_k=\min_{n\in\operatorname{OPEN}_k}[g(n)+h(n)],\;
+U_k=g(\widehat g_k),\;
+\operatorname{OPEN}_k,\;
+\operatorname{CLOSED}_k,\;
+\operatorname{parent}_k
 \right)
 \tag{9}
 $$
+
+其中 \(U_k=+\infty\) 表示尚无可行 incumbent。对 tree-search，admissible heuristic 足以保证终止时最优；对 graph-search，若 heuristic 不一致，必须允许更优 \(g\) 重开节点。证书只有在固定目标、有限可达图、非负有限成本与上述日程条件下才成立。
 
 ---
 
@@ -1947,7 +1884,7 @@ $$
 
 逼近期望。
 
-UCT 的典型采样日程为：
+UCT 先展开所有 \(N_n(b,a)=0\) 的动作；只对已访问动作使用：
 
 $$
 a_n
@@ -1961,9 +1898,12 @@ c
 \frac{\log N_n(b)}
 {N_n(b,a)}
 }
-\right]
+\right],
+\qquad N_n(b,a)>0
 \tag{13}
 $$
+
+\(c\) 必须按声明的 bounded reward range 缩放；裸常数跨任务没有可比意义。
 
 UCT 论文在有限时域或折扣 MDP 条件下给出了相合性和有限样本分析。([施普林格自然链接][11])
 
@@ -1972,11 +1912,16 @@ UCT 论文在有限时域或折扣 MDP 条件下给出了相合性和有限样�
 严格退化条件：
 
 ```text
-随机 Bellman 语义
-只能访问生成式转移核
-经验均值近似期望
-UCT/PUCT 分配采样
-visit/value 统计参与证书，不充当外部真值
+随机 Bellman 语义，γ∈[0,1) 或 finite horizon；
+reward 位于声明的有限 [r_min,r_max] 且期望存在；
+只能访问生成式转移核；
+经验均值近似期望；
+N(b,a)=0 先展开，之后用按 reward range 缩放的 UCT/PUCT；
+每个相关动作在定理条件下被无限访问；
+coverage 声明 fixed-time / simultaneous / anytime-valid 与 δ；
+POMCP 声明 particle count 与有限粒子 bias；
+只有 DAG-correct reweighting 时才跨路径共享 semantic-node 统计；
+visit/value 统计参与证书，不充当外部真值或 deterministic singleton。
 ```
 
 ---
@@ -2031,26 +1976,29 @@ $$
 * \(\Theta\)：潜变量后验；
 * \(W\)：所有观测和推导 witness。
 
-设 \(\gamma(C)\) 是该证书允许的精确值集合。
-
-一个精化 \(\rho\) 是 sound 的，当：
+对 exact/bound/ordinal 插件，设 \(\gamma_I(C)\) 是证书允许的精确语义集合。其确定性 sound refinement 满足：
 
 $$
-\gamma(\rho(C))
+\gamma_I(\rho(C))
 \subseteq
-\gamma(C)
-\tag{15}
+\gamma_I(C)
+\tag{15a}
 $$
 
-于是：
+对 sample 插件，确定性包含通常不成立。它必须给出事件 \(E_\delta(C)\) 与显式假设，使：
 
-* Bayes 精确消元可把 \(\gamma(C)\) 收缩为单点；
-* A* 展开收紧上下界；
-* MCTS 样本收紧经验后验；
-* Borda／BTL 增加序数约束；
-* split-ballot 更新 framing 参数。
+$$
+\Pr_{\theta\sim P_\theta}
+\left[
+\theta\in\Gamma_\delta(C)
+\right]
+\geq 1-\delta
+\tag{15b}
+$$
 
-同一节点允许这些操作交错进行。
+并声明该区间是 fixed-time、simultaneous 还是 anytime-valid；重复检查不得偷换 coverage。Bayes exact 消元在模型成立且数值合格时可把 \(\gamma_I(C)\) 收缩为单点；A* 收紧全局上下界；Borda/BTL 增加声明模型下的序数约束；split-ballot 更新 framing 参数；MCTS 只更新 sample summary 与概率保证。
+
+信息精化因此是带 plugin guarantee 的 preorder。两个证书即使语义约束相同，也可携带不同 witness provenance；反对称性只对 provenance quotient 后的语义证书成立。同一节点允许这些槽交错更新，但不自动保证所有更新交换。
 
 ---
 
@@ -2087,7 +2035,7 @@ $$
 * \(c(\rho)\)：token、调用次数、延迟等资源；
 * \(\lambda\)：不是 Kernel 常量，而是当前资源／偏好插件的一部分。
 
-并行批次：
+并行批次只有在各 refinement 共享同一个 decision-loss currency 时才定义联合 VOC。设 \(\kappa_B\) 是 canonical event order，\(\circ\) 表示函数复合：
 
 $$
 B^*
@@ -2103,12 +2051,13 @@ c(B)\leq B_t
 -
 \mathcal D
 \left(
-C\oplus
-\sum_{\rho\in B}\Delta_\rho
+(\rho_{\kappa_B(|B|)}\circ\cdots\circ\rho_{\kappa_B(1)})(C)
 \right)
 \right]
 \tag{17}
 $$
+
+这里不是 \(\sum_{\rho\in B}\Delta_\rho\)：归一化、posterior、incumbent 与 framing 更新通常不可加，且未声明独立时不可交换。若插件收益没有共同尺度，scheduler 只维护 Pareto frontier，再按显式资源/偏好插件选相容批次。
 
 精确求解太贵时，可由 scheduler 插件提供：
 
@@ -2251,9 +2200,9 @@ $$
 * \(\alpha_{f,i}\)：措辞对候选 \(i\) 的影响；
 * \(\beta_o\)：左右／顺序效应；
 * \(\gamma_\pi\)：协议效应；
-* \(u_r\)：branch 随机效应。
+* \(u_r\sim\mathcal N(0,\sigma^2)\)：有足够 branch 重复时才估计的随机效应。
 
-Bradley–Terry 模型本来就是为不完全区组中的成对比较设计的。([JSTOR][13])
+可–Terry 只对差值可识别，必须固定 \(\sum_i\theta_i=0\) 或一个 reference candidate；framing、order 与 protocol effect 也各需 reference level。comparison graph 必须连通，扩展 design matrix 必须满秩，否则返回 typed unidentifiable error。完全/准分离用显式 L2 或 Firth regularization；sigmoid、log-likelihood 和 Hessian 使用数值稳定形式，并返回 finite estimate、uncertainty 与 fit diagnostics。随机效应必须经 Laplace/quadrature 等边际化，不能把 \(u_r\) 当作每个单观测都可自由拟合的参数。([ booking–Terry 模型本来就是为不完全区组中的成对比较设计的。([JSTOR][13])
 
 ## 28.3 鲁棒污染模型
 
@@ -2298,16 +2247,7 @@ $$
 
 及各自后验质量。
 
-普通 Borda 是式（23）—（25）在以下条件下的低阶退化：
-
-```text
-所有 branch 等权
-无措辞效应
-无顺序效应
-无协议效应
-无多模态
-无相关结构
-```
+普通 Borda 不是式（23）—（25）的严格退化。它是 complete、equal-exposure ballot 上的描述性胜场基线；BTL 是带似然与识别条件的潜变量模型。两者即使在无措辞、顺序、协议和多模态效应时也不保证给出相同参数或排序。实现只验证 Borda 对 ballot 顺序不变、对 candidate relabeling 等变；不声称 clone independence、IIA 或统计一致性。tie、abstention、top-\(k\) 与不等 exposure 必须声明 fractional/appearance-normalized 扩展。
 
 ---
 
@@ -2325,16 +2265,19 @@ $$
 
 实际反思后结果为 \(x_r^{\mathrm{future}}\)。
 
-对数分数：
+预测必须在展示 reflection stimulus 前密封，且 \(q_i\) 位于概率单纯形。对数分数采用声明的 \(\varepsilon>0\) 防止数值发散：
 
 $$
-S_{\log}
+S_{\log,\varepsilon}
 =
 \log
+\max\left\{
 q_r^{\mathrm{future}}
 \left(
 x_r^{\mathrm{future}}
-\right)
+\right),
+\varepsilon
+\right\}
 \tag{26}
 $$
 
@@ -2346,6 +2289,8 @@ S_{\mathrm{Brier}}
 2q_y-\sum_i q_i^2
 \tag{27}
 $$
+
+截断后的 log score 是数值安全的操作性评分；properness 陈述必须明确截断和有限报告精度改变了严格理论条件。calibration、sharpness 与最终答案分开报告。
 
 可以分别计算：
 
@@ -2372,46 +2317,46 @@ $$
 q_A,\quad q_B
 $$
 
-即时问法效应：
+先声明一个有方向、对两组都定义的 outcome \(g(Y)\)。即时问法效应的 finite-population estimand 与 difference-in-means estimator 分别为：
 
 $$
-\Delta_{\mathrm{surface}}
+\tau_{\mathrm{surface}}
 =
-d
-\left(
-Y(q_A),
-Y(q_B)
-\right)
+\mathbb E[g(Y(A))-g(Y(B))],
+\qquad
+\widehat\tau_{\mathrm{surface}}
+=
+\overline{g(Y)}_A-\overline{g(Y)}_B
 \tag{28}
 $$
 
-所有 branch 随后回答共同锚题 \(q_0\)。
-
-持续携带效应：
+所有 branch 随后回答共同锚题 \(q_0\)。持续携带效应为：
 
 $$
-\Delta_{\mathrm{carry}}
+\tau_{\mathrm{carry}}
 =
-d
-\left(
-Y(q_0\mid q_A),
-Y(q_0\mid q_B)
-\right)
+\mathbb E
+\left[
+g(Y(q_0;A))-g(Y(q_0;B))
+\right]
 \tag{29}
 $$
 
-反思效应：
+对同一 branch 的反思迁移可作 paired estimand：
 
 $$
-\Delta_{\mathrm{reflect}}
+\tau_{\mathrm{reflect}}
 =
-d
-\left(
-Y_{\mathrm{before}},
-Y_{\mathrm{after\ reasons}}
-\right)
+\mathbb E
+\left[
+g(Y_{\mathrm{after\ reasons}})
+-
+g(Y_{\mathrm{before}})
+\right]
 \tag{30}
 $$
+
+原先的非负距离 \(d(Y_A,Y_B)\) 只能报告 effect magnitude 或 distributional discrepancy，不能作为有方向 ATE 的无偏估计。因果解释还要求随机分配、同一 root prefix、positivity、SUTVA/no interference、无 differential attrition 与预先声明的 outcome/estimand；否则只报告描述性 framing contrast 与 permutation null。
 
 随机化 manifest 必须包含：
 
@@ -2490,7 +2435,7 @@ Core 不认识这些名称。
 
 ## 定理目标 1：Bayes 退化一致性
 
-在固定假设、正先验、完整有限似然和正归一化常数下，GEC 的 sum-product 插件输出式（4）的唯一 posterior。
+在固定有限 \(H\)、\(|H|\geq2\)、非负可归一先验（允许零）、给定 \(h\) 后条件独立且 DependencyKey 去重的完整有限 `[0,1]` likelihood、严格正有限 \(Z\) 下，GEC exact plugin 的 log-sum-exp 结果唯一等于式（4）；条件失败则返回 typed uncertainty。
 
 ## 定理目标 2：A* 退化一致性
 
@@ -2498,21 +2443,22 @@ Core 不认识这些名称。
 
 ## 定理目标 3：MCTS 退化一致性
 
-在有限动作、有限时域或折扣回报、生成式转移核和公平 UCT 采样条件下，sample certificate 的动作价值估计依概率或几乎处处收敛。
+在有限动作、bounded reward、finite horizon 或 \(\gamma<1\)、可重复调用的 generative kernel，以及按声明 \(c\) 使每个相关动作无限访问的日程下，sample estimate 按相应 UCT 定理收敛。certificate 必须另行声明 fixed-time、simultaneous 或 anytime-valid coverage 与 \(\delta\)；收敛本身不产生有限样本确定性保证。
 
 ## 定理目标 4：异步混合精化
 
-若：
+式（15a）不足以推出 mixed refinement 的共同决策收敛；sample refiner 甚至只满足式（15b）。候选定理至少还需：
 
-1. 每个 refiner 都满足式（15）；
-2. 所有必要依赖最终都会被调度；
-3. 样本估计强相合；
-4. 独立 GraphDelta 可交换；
-5. stop certificate 对 \(\gamma(C)\) 中所有可行精确值都稳健；
+1. 有限 decision set；
+2. 决策最优项存在严格正 gap；
+3. exact/bound concretization 非空并嵌套；
+4. sample uncertainty vanishes 且模型 correctly specified；
+5. ordinal likelihood 可识别；
+6. conflict-aware canonical composition；
+7. 每个永久可用 refinement 被公平调度；
+8. stop rule 是 anytime-valid 或支付完整 sequential error budget。
 
-则异步 Exact、Bound、Sample、Ordinal 精化收敛到同一个决策等价类。
-
-这条目前应标为**待完成证明**，不要在文档里先宣布已证。
+在这些条件下仍需证明 eventual decision-equivalence；当前实现只把它标为 conjecture，并测试每个 refiner 的局部保证、canonical order 与 bounded residual，不宣布异步联合收敛。
 
 ## 定理目标 5：宿主等价
 
@@ -2529,7 +2475,7 @@ CoreEvent 序列
 
 ## 定理目标 6：问法效应可识别
 
-在共同根快照、随机处理分配、无 branch 泄漏和共同锚题条件下，式（28）和式（29）可以作为对应协议中的平均处理效应估计。
+式（28）—（30）的因果解释需要共同根快照、随机处理分配、positivity、SUTVA/no interference、无 branch 泄漏、无 differential attrition、共同且不受处理重新定义的 outcome 与预先声明的 estimand。共同锚题本身可能成为新的干预；其答案只能识别指定 protocol path 下的 carryover。条件缺失时只可报告随机化分布下的 contrast，不能称为普适 ATE。
 
 ---
 
@@ -2589,7 +2535,7 @@ independent delta commutativity
 certificate refinement monotonicity
 plugin version lock
 budget conservation
-lease expiry recovery
+durable terminal-driven lease recovery
 ```
 
 ## 插件测试
@@ -2709,13 +2655,13 @@ fold deterministic
 
 ## Commit 5
 
-实现 SQLite EventStore 和 snapshots。
+接入 canonical EventStore vocabulary、codec、Integrator Current 与可丢弃 projection cache。
 
 验证：
 
 ```text
 重启恢复
-删除 snapshot 后重放
+删除 process-local cache 后从 canonical events/Current 恢复
 ```
 
 ## Commit 6
@@ -2876,13 +2822,7 @@ Exact、Bound、Sample、Ordinal 同时在一个 inquiry 中工作
 
 ## Sphinx V1 / MCP
 
-应发布为：
-
-```text
-@wanxiangshu/sphinx-core
-@wanxiangshu/sphinx-mcp
-@wanxiangshu/sphinx-plugins-default
-```
+当前仓库发布单一 `wanxiangshu-next` Fable package；Core、MCP Host 与 default plugins 是其物理 owner localities，不再建立三个 npm deployment graph。
 
 具备：
 
@@ -2896,13 +2836,7 @@ Exact、Bound、Sample、Ordinal 同时在一个 inquiry 中工作
 
 ## Sphinx V2 / OpenCode
 
-应发布为：
-
-```text
-@wanxiangshu/sphinx-opencode
-```
-
-它只增加：
+OpenCode Host 是同一 package 的 adapter locality，不是第二 npm package。它只增加：
 
 * OpenCode custom tools；
 * child session 创建与 fork；
@@ -2915,7 +2849,7 @@ Exact、Bound、Sample、Ordinal 同时在一个 inquiry 中工作
 它不复制：
 
 * 图；
-  -证书；
+* 证书；
 * 插件；
 * Bayes；
 * A*；

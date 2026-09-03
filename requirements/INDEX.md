@@ -195,7 +195,7 @@ knowledge-reuse          → repository-investigation, durable-events, durable-c
 repository-programming   → office-capability, capability-enforcement, effect-accounting, durable-events, participant-horizon
 requirement-grounding    → requirement-system, host-boundary, participant-horizon, provider-projection, interaction-authority, semantic-trace, prefix-stability, repository-programming
 speculative-investigation→ repository-investigation, participant-identity, execution-model-routing, participant-horizon, provider-projection, semantic-trace
-epistemic-reasoning      → participant-horizon
+epistemic-reasoning      → participant-horizon, durable-events, delegation, execution-model-routing
 distribution             → 特殊：所有声明 runtime resource 的 semantic packages（不获其语义 ownership）
 ```
 
@@ -208,4 +208,4 @@ guidance-delivery    → provider-projection 删（渲染是下游机制）
 finality             → participant-horizon 保留（隐藏机制=信息准入边界，与 delegation 同型）
 ```
 
-当前 146 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。旧正文曾写“110 edges”，但旧邻接表实际已含 112；前轮以邻接表本身为准纠正计数漂移，上一轮随两个 execution owner 落地后按当前邻接表重新机器计数。本轮补上 `provider-attempt-recovery → context-compression, prefix-stability`：PAR-011/PAR-017/PAR-018 的定义直接需要 Blogger squash 材料、durable open request 生命周期与严格更新的 prefix coverage 这三个 guarantee，此前只在包 HOW/WHY 以已归档 cutover 文档名义出现，未进入骨架。
+当前 149 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。`epistemic-reasoning` 的 durable inquiry、受管 blind branch 与 capacity-safe OpenCode dispatch 分别直接依赖 `durable-events`、`delegation` 与 `execution-model-routing` 的 guarantee；这些不是存储、Host 或 proof 的偶然耦合。
