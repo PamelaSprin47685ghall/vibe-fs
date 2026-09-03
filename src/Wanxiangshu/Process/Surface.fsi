@@ -15,11 +15,15 @@ module ProcessSurface =
     val timerNowMs: timer: obj -> int
     val timerDispose: timer: obj -> unit
 
+    val createNodeTimer: unit -> obj
+    val nodeTimerDispose: timer: obj -> unit
+
     val createVirtualClock: unit -> obj
     val clockNowIso: clock: obj -> string
     val clockNowMs: clock: obj -> int64
     val clockAdvanceMs: clock: obj -> milliseconds: int -> unit
     val clockSet: clock: obj -> iso: string -> unit
+    val createNodeClock: unit -> obj
 
     val effectiveDeadlineSeconds: runtimeSeconds: float -> hardLimitSeconds: float -> float
     val outputThreshold: bytes: float -> float

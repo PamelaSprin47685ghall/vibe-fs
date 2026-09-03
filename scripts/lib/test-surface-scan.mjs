@@ -1399,7 +1399,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Process/Surface.js',
     owner: 'time-capability',
-    laws: ['TIME-001', 'TIME-002', 'TIME-003', 'TIME-005', 'TIME-006', 'TIME-007'],
+    laws: ['TIME-001', 'TIME-002', 'TIME-003', 'TIME-005', 'TIME-006', 'TIME-007', 'TIME-008'],
     source: 'src/Wanxiangshu/Process/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1472,7 +1472,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Host/HostSignalSurface.js',
     owner: 'host-boundary',
-    laws: ['HOST-BOUNDARY-001', 'HOST-BOUNDARY-002', 'HOST-BOUNDARY-003'],
+    laws: ['HOST-BOUNDARY-001', 'HOST-BOUNDARY-002', 'HOST-BOUNDARY-003', 'HOST-BOUNDARY-027'],
     source: 'src/Wanxiangshu/OpenCode/Host/HostSignalSurface.fs',
     representation: 'json',
     kind: 'pure',

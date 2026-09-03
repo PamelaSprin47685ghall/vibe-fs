@@ -4,7 +4,7 @@
 
 `time-capability` 通过抽象接口定义、强类型封装、物理与虚拟端口实现及静态门禁共同保证时间能力的可注入性与确定性：
 
-### 1. 纯接口契约（`Kernel/Temporal.fs`）
+### 1. 纯接口契约（`Foundation/Temporal.fs`）
 
 定义无外部依赖的纯时间接口：
 - `IClockPort`：抽象时刻获取能力，提供 `UtcNow()` 接口。
@@ -31,6 +31,10 @@
 
 通过 `SessionStartedAtLedger` 与 `SessionStartedAtProjection` 机制，在会话首次生成 prompt 时同步采样注入时钟并追加持久化事件，后续重启通过内存投影 O(1) 获取固定原点，确保会话经过时长（elapsed）的确定性与不可变性。
 
+### 6. Temporal边界的production行为proof
+
+`Process/Surface.js`直接投影production `IClockPort`、`ITimerPort`、`Deadline`、Node adapter与virtual implementation。TIME-008的行为proof固定三个可区分错误世界：两个capability实例不得共享推进状态；`Deadline`只随显式clock input变化且不积累隐藏状态；构造Node capability不得改变virtual clock/timer。Node物理时钟与timer的外界正确性属于adapter canary，不用墙钟容差或真实timer等待伪装成确定性unit proof。locality分类、source集合、authority closure与mandatory injection属于结构命题，由正式production inventory/v2 validator验证；行为Surface不复制源码扫描或第二套分层公式。
+
 ---
 
 ## 验证与测试落点
@@ -44,4 +48,4 @@
 | TIME-005 | `requirements/time-capability/tests/deadline-typed.test.mjs::WHAT[TIME-005] TIME_005_verdict_follows_injected_clock_not_value` |
 | TIME-006 | `requirements/time-capability/tests/until-signal-or-deadline.test.mjs::WHAT[TIME-006] THEOREM_untilSignalOrDeadline_deadline_without_material_is_WaitTimedOut` |
 | TIME-007 | `requirements/time-capability/tests/pair-session-elapsed.test.mjs::WHAT[TIME-007] TIME_007_session_started_at_is_bind_once_to_first_prompt_sample`；`requirements/time-capability/tests/session-started-at-bind-surface.test.mjs::WHAT[TIME-007] SessionStartedAtLedger owns bindSessionStartedAt entry point for transform boundary` |
-| TIME-008 | `requirements/time-capability/tests/m6-slice-boundary.test.mjs::WHAT[TIME-008] temporal contracts exclude Node adapters mutable timers and SessionStartedAt projection` |
+| TIME-008 | `requirements/time-capability/tests/m6-slice-boundary.test.mjs::WHAT[TIME-008] clock and timer capabilities are opaque instance-bound values`；`requirements/time-capability/tests/m6-slice-boundary.test.mjs::WHAT[TIME-008] Deadline is immutable and decided only by explicit clock input`；`requirements/time-capability/tests/m6-slice-boundary.test.mjs::WHAT[TIME-008] Node capability construction cannot mutate virtual time`；locality/source/closure/injection结构命题由M6.3b production inventory/v2 validator承接 |

@@ -1529,7 +1529,7 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 2. `B1 M6.3b extractor`（DONE）：B1-A=`5830fa473`实现report-only fresh F#/FCS/JS/generated extractor、唯一canonical world/summary/full report与178-record closed worksheet；B1-A2=`4c831aca0`固化baseline定义与clean exact-commit writer；A3=`e6268f35a`删除synthetic FCS node alias。B1-B在A3 exact clean checkout完成fixed impact corpus，production gate仍未接入。
 3. `B2 EventStore slice`（PROOF DONE；PRODUCTION DEFERRED TO C/D）：production-bound codec proof已锁定六项公开协议；在M6.3c同一未提交cutover state抽`eventstore-canonical-codec` bounded contract并迁fresh direct consumers，再随M6.4原子提交。它不能形成旧gate下独立节点：旧ACL正借codec与`ProcessEventLog`同project偶然授权，过渡节点若维持绿色只能扩张错误的owner-wide权限。provider/direct/reverse-impact编译仍须在原子提交前全绿。
 4. `B3 Host slices`（PENDING）：抽HostMessage/HostEventEnvelope/LoopEvent contracts，完成typed subscription、diagnostic injection与fatal port/adapter分离。
-5. `B4 foundational capabilities`（PENDING）：依序拆Temporal、CausalWait、Process/PTY纯词汇与窄capability，先立contract再迁consumer，最后删旧路径。
+5. `B4 foundational capabilities`（T0 PROOF DONE；SPLITS PENDING）：Temporal synthetic blueprint已替换为production-bound行为proof；后续依序拆Temporal、CausalWait、Process/PTY纯词汇与窄capability，先立contract再迁consumer，最后删旧路径。
 6. `B5 Delegation ownership`（PENDING）：迁owner fact/append/query/wait/clock ports与pure projections/folds，durable composition只保留outer routing/combine。
 7. `B6 Delegation Host/PTY wiring`（PENDING）：拆host runtime/窄adapter，删除PTY对HostForkRuntime与Process implementation反向依赖，由现有composition roots注入。
 8. `B7 full adjudication`（PENDING）：fresh生成全locality worksheet，逐条写入非current-reference-derived裁决，零undecided、零extractor blocker；每组绿色Git节点。
@@ -1563,3 +1563,9 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - fresh source census确认`CanonicalEventCodec`六项公开协议的direct consumer恰为五个已裁决locality；旧v1 ACL只列四项且把codec与`ProcessEventLog/Store`混装，故project切分仍保留给M6.3c/M6.4原子提交。
 - DURABLE-EVENTS-023不再由synthetic contract blueprint冒充production proof。正式`Persistence/EventStore/CodecSurface.js`直接调用同一个production codec，固定canonical roundtrip、valid-but-noncanonical拒绝、非法UTF-8在text/envelope两条入口同类拒绝、same-ID same-bytes、same-ID different-bytes collision、different-ID decoy与dedupe/distinct/collision merge。唯一新增Surface成员`decodeUtf8Text`直接投影`tryDecodeUtf8Text`，不复制parser、identity或merge公式。
 - executable RED先在旧Surface稳定得到`eventCodec.decodeUtf8Text is not a function`，再补最窄production投影。clean Fable build、durable-events 165/165、Surface manifest/gate、test-boundary、requirement-trace、spec与旧owner gates全绿；未改fsproj、live manifest或release authority。
+
+### 2026-09-04 — M6.3b B4-T0 Temporal production-bound proof
+
+- TIME-008删除synthetic contract blueprint；三个正式测试直接穿越registered `Process/Surface.js`与`Process/DeadlineSurface.js`，分别固定virtual clock/timer实例隔离、Deadline只由显式clock input决定、构造Node capability不改变virtual state。
+- proof不读取墙钟、不等待真实timer、不扫描源码。Node clock/timer只验证最窄opaque capability construction；物理时间正确性仍属于adapter canary，locality/source/closure/injection仍由后续production inventory/v2 validator承接。
+- executable RED由旧Surface缺少`createNodeClock`/`createNodeTimer`稳定触发；实现只增加production `PtyTiming` Node capability的直接opaque投影及timer disposal，不复制时间算法或第二状态机。time-capability、Surface/trace meta、clean Fable build与旧release gates全绿；本节点未切fsproj、未启用v2 authority。

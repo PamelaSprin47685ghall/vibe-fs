@@ -184,6 +184,11 @@ module ProcessSurface =
     let timerDispose (timer: obj) : unit =
         (timer :?> TimerPortHandle).Port.Port.Dispose()
 
+    let createNodeTimer () : obj = box (PtyTiming.nodeTimerPort ())
+
+    let nodeTimerDispose (timer: obj) : unit =
+        (unbox<ITimerPort> timer).Dispose()
+
     let createVirtualClock () : obj =
         ClockPortHandle(PtyTiming.createVirtualClockPort ()) :> obj
 
@@ -198,6 +203,8 @@ module ProcessSurface =
 
     let clockSet (clock: obj) (iso: string) : unit =
         (clock :?> ClockPortHandle).Port.Set(DateTimeOffset.Parse iso)
+
+    let createNodeClock () : obj = box (PtyTiming.nodeClockPort ())
 
     let effectiveDeadlineSeconds (runtimeSeconds: float) (hardLimitSeconds: float) : float =
         if
