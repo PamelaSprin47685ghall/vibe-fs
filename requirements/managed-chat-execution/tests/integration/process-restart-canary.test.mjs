@@ -17,7 +17,7 @@ const runChild = (mode, workspace, marker) =>
 
 const readMarker = (path) => JSON.parse(readFileSync(path, 'utf8'))
 
-test('WHAT[CHATEXEC-009] abrupt process exit retains Accepted and discards established local admission artifacts', () => {
+test('WHAT[CHATEXEC-009] abrupt process exit retains exact Accepted and empties local admission capacity', () => {
   const workspace = mkdtempSync(join(tmpdir(), 'wxs-chat-crash-'))
   const beforeMarker = join(workspace, 'before-crash.json')
   const afterMarker = join(workspace, 'after-reopen.json')
@@ -29,7 +29,21 @@ test('WHAT[CHATEXEC-009] abrupt process exit retains Accepted and discards estab
     assert.deepEqual(readMarker(beforeMarker), {
       status: { accepted: true, providerStarted: false, terminal: false },
       bindingCount: 1,
+      decoy: {
+        status: { accepted: false, providerStarted: false, terminal: false },
+        bindingCount: 0,
+      },
       exactCapacity: { token: true, custody: true, execution: true, waiter: false, owner: true },
+      capacityCounts: {
+        ledgerEntries: 1,
+        tokens: 1,
+        custodies: 1,
+        executions: 1,
+        waiters: 0,
+        owners: 1,
+        lineage: 0,
+        active: 0,
+      },
     })
 
     const reopened = runChild('reopen-after-crash', workspace, afterMarker)
@@ -37,7 +51,21 @@ test('WHAT[CHATEXEC-009] abrupt process exit retains Accepted and discards estab
     assert.deepEqual(readMarker(afterMarker), {
       status: { accepted: true, providerStarted: false, terminal: false },
       bindingCount: 0,
+      decoy: {
+        status: { accepted: false, providerStarted: false, terminal: false },
+        bindingCount: 0,
+      },
       exactCapacity: { token: false, custody: false, execution: false, waiter: false, owner: false },
+      capacityCounts: {
+        ledgerEntries: 0,
+        tokens: 0,
+        custodies: 0,
+        executions: 0,
+        waiters: 0,
+        owners: 0,
+        lineage: 0,
+        active: 0,
+      },
     })
   } finally {
     rmSync(workspace, { recursive: true, force: true })

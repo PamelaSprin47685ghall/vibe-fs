@@ -11,6 +11,7 @@ import {
 const [mode, workspace, marker] = process.argv.slice(2)
 const sessionId = 'ses-process-restart-canary'
 const physicalUserMessageId = 'msg-process-restart-canary'
+const decoyPhysicalUserMessageId = 'msg-process-restart-decoy'
 const agent = 'fast-coder'
 
 if (!mode || !workspace || !marker) throw new Error('mode, workspace, and marker are required')
@@ -21,6 +22,9 @@ const exactOwner = (value) =>
 const observe = async (withRuntime) => {
   const status = await withRuntime(({ journal }) =>
     statusSurface.query(journal, sessionId, physicalUserMessageId),
+  )
+  const decoyStatus = await withRuntime(({ journal }) =>
+    statusSurface.query(journal, sessionId, decoyPhysicalUserMessageId),
   )
   const capacity = routingSurface.sharedCapacitySnapshot()
   const exactCapacity = {
@@ -38,7 +42,25 @@ const observe = async (withRuntime) => {
       terminal: status.terminal,
     },
     bindingCount: bindingSurface.exactExecutionBindingCount(sessionId, physicalUserMessageId),
+    decoy: {
+      status: {
+        accepted: decoyStatus.accepted,
+        providerStarted: decoyStatus.providerStarted,
+        terminal: decoyStatus.terminal,
+      },
+      bindingCount: bindingSurface.exactExecutionBindingCount(sessionId, decoyPhysicalUserMessageId),
+    },
     exactCapacity,
+    capacityCounts: {
+      ledgerEntries: capacity.ledgerEntries.length,
+      tokens: capacity.tokens.length,
+      custodies: capacity.custodies.length,
+      executions: capacity.executions.length,
+      waiters: capacity.waiters.length,
+      owners: capacity.owners.length,
+      lineage: capacity.lineage.length,
+      active: capacity.activeCount,
+    },
   }
 }
 
