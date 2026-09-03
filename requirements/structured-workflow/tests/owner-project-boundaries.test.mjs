@@ -36,6 +36,31 @@ test('WHAT[STRUCTURED-WORKFLOW-011] owner-locality project graph is complete, au
   assert.equal(result.contractLeakSourceCount, 0, 'published contract compile closure must contain no runtime/private source')
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-011] GitGateway exact contract has an isolated compiler boundary', () => {
+  const contracts = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const contract = contracts.contracts.find((entry) => entry.path === 'src/Wanxiangshu/Git/Gateway.fs')
+  assert.ok(contract)
+  assert.deepEqual(contract.consumers, ['durable-convergence'])
+  assert.deepEqual(contract.symbols, [
+    'Wanxiangshu.Git.GitGateway.converge',
+    'Wanxiangshu.Git.GitGateway.createDefaultRunner',
+    'Wanxiangshu.Git.GitGatewayRunner',
+  ])
+
+  const providerName = 'Wanxiangshu.Owner.change-integration.git-gateway.fsproj'
+  const provider = readFileSync(join(SRC, providerName), 'utf8')
+  assert.match(provider, /<WanxiangshuOwnerLocality>git-gateway<\/WanxiangshuOwnerLocality>/)
+  assert.match(provider, /<Compile Include="Git\/Gateway\.fsi"\s*\/>\s*<Compile Include="Git\/Gateway\.fs"\s*\/>/)
+  assert.equal([...provider.matchAll(/<Compile Include="[^"]+\.fs"\s*\/>/g)].length, 1)
+
+  const consumer = readFileSync(join(SRC, 'Wanxiangshu.Owner.durable-convergence.git-hook-sync.fsproj'), 'utf8')
+  assert.match(consumer, /<ProjectReference Include="Wanxiangshu\.Owner\.change-integration\.git-gateway\.fsproj"\s*\/>/)
+  assert.doesNotMatch(consumer, /ProjectReference Include="Wanxiangshu\.Owner\.change-integration\.git-integrationgate\.fsproj"/)
+
+  const signature = readFileSync(join(SRC, 'Git/Gateway.fsi'), 'utf8')
+  assert.doesNotMatch(signature, /SyncActiveEnv|discoverRemote/)
+})
+
 test('WHAT[STRUCTURED-WORKFLOW-011] locality kinds enforce contract purity, direction, and closure budget', () => {
   const contract = resolve('/architecture/Contract.fsproj')
   const nestedContract = resolve('/architecture/NestedContract.fsproj')
