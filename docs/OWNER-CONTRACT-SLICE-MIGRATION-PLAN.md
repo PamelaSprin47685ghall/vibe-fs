@@ -1527,7 +1527,7 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 
 1. `R0 M6.3a repair`（DONE）：关闭canonical fact、J→C、generated relation、world/traversal/input closure与Host raw membrane反例；定向proof、fast gate、clean build、受影响测试与真实Host Long Stroke全绿后建立Git节点。
 2. `B1 M6.3b extractor`（DONE）：B1-A=`5830fa473`实现report-only fresh F#/FCS/JS/generated extractor、唯一canonical world/summary/full report与178-record closed worksheet；B1-A2=`4c831aca0`固化baseline定义与clean exact-commit writer；A3=`e6268f35a`删除synthetic FCS node alias。B1-B在A3 exact clean checkout完成fixed impact corpus，production gate仍未接入。
-3. `B2 EventStore slice`（PENDING）：抽`eventstore-canonical-codec` bounded contract，迁fresh direct consumers；旧gate下provider/direct/reverse-impact编译全绿。
+3. `B2 EventStore slice`（DEFERRED TO C/D）：先在M6.3c同一未提交cutover state抽`eventstore-canonical-codec` bounded contract并迁fresh direct consumers，再随M6.4原子提交。它不能形成旧gate下独立节点：旧ACL正借codec与`ProcessEventLog`同project偶然授权，过渡节点若维持绿色只能扩张错误的owner-wide权限。provider/direct/reverse-impact编译仍须在原子提交前全绿。
 4. `B3 Host slices`（PENDING）：抽HostMessage/HostEventEnvelope/LoopEvent contracts，完成typed subscription、diagnostic injection与fatal port/adapter分离。
 5. `B4 foundational capabilities`（PENDING）：依序拆Temporal、CausalWait、Process/PTY纯词汇与窄capability，先立contract再迁consumer，最后删旧路径。
 6. `B5 Delegation ownership`（PENDING）：迁owner fact/append/query/wait/clock ports与pure projections/folds，durable composition只保留outer routing/combine。
