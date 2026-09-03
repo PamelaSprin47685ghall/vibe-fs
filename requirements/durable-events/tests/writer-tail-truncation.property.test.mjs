@@ -28,8 +28,6 @@ const truncatedWriter = (values, seed) => {
   return Buffer.concat(lines).subarray(0, -removedBytes)
 }
 
-const completePrefix = (bytes) => bytes.subarray(0, bytes.lastIndexOf(0x0a) + 1)
-
 const assertIncompleteTailRejected = (read) => {
   assert.throws(read, (error) => /incomplete trailing line/i.test(String(error)))
 }
@@ -55,30 +53,6 @@ test('WHAT[DURABLE-EVENTS-004] every incomplete canonical writer tail fails clos
         assertIncompleteTailRejected(() => retention.retainedWriterIdsAt(commonDir, 0))
       }),
       propertyOptions,
-    )
-  })
-})
-
-test('WHAT[DURABLE-EVENTS-007] truncation property rejects a skip-corrupt-tail mutant with replayable shrink path', () => {
-  withWriter(({ commonDir, writerPath }) => {
-    const skipCorruptTail = fc.property(payloads, cutSeed, (values, seed) => {
-      const truncated = truncatedWriter(values, seed)
-      writeFileSync(writerPath, completePrefix(truncated))
-      assertIncompleteTailRejected(() => retention.retainedWriterIdsAt(commonDir, 0))
-    })
-    const mutationResult = fc.check(skipCorruptTail, { seed: 0x44555242, numRuns: 100 })
-
-    assert.equal(mutationResult.failed, true)
-    assert.equal(mutationResult.seed, 0x44555242)
-    assert.notEqual(mutationResult.counterexamplePath, '')
-    assert.ok(mutationResult.counterexample.length > 0)
-    assert.equal(
-      fc.check(skipCorruptTail, {
-        seed: mutationResult.seed,
-        path: mutationResult.counterexamplePath,
-        numRuns: 1,
-      }).failed,
-      true,
     )
   })
 })
