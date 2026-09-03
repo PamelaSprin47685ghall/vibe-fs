@@ -845,6 +845,12 @@ export function removeOutputDirectory(outputDir) {
   }
 }
 
+export function resetOutputDirectory(outputDir) {
+  if (!outputDir) throw new Error('outputDir is required')
+  fs.rmSync(outputDir, { recursive: true, force: true })
+  fs.mkdirSync(outputDir, { recursive: true })
+}
+
 /**
  * Compiles an owner project using the flattened projection.
  *

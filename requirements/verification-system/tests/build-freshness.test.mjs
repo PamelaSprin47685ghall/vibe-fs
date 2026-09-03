@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
 import { loopDetectorRepositoryInputFiles } from '../../../scripts/lib/loop-detector-repository-corpus.mjs'
+import { resetOutputDirectory } from '../../../scripts/lib/owner-compile.mjs'
 import { checkBuildFreshness } from './support/build-freshness.mjs'
 
 test('WHAT[VERIFICATION-SYSTEM-008] build freshness includes repository-derived artifact inputs beyond F# sources', () => {
@@ -57,14 +58,14 @@ test('WHAT[VERIFICATION-SYSTEM-008] local repository export shards are excluded 
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-008] Fable build compiles incrementally and never accepts watch-daemon freshness guesses', () => {
+test('WHAT[VERIFICATION-SYSTEM-008] release build performs one clean full compile and never accepts watch-daemon freshness guesses', () => {
   const build = readFileSync(new URL('../../../scripts/build.mjs', import.meta.url), 'utf8')
   const ownerCompile = readFileSync(new URL('../../../scripts/lib/owner-compile.mjs', import.meta.url), 'utf8')
 
   assert.match(
     build,
-    /compileIncremental/,
-    'build must invoke the unified incremental compiler',
+    /resetOutputDirectory\(dist\)[\s\S]*compileIncremental/,
+    'release build must reset dist before invoking the unified compiler',
   )
   assert.match(
     ownerCompile,
@@ -73,6 +74,23 @@ test('WHAT[VERIFICATION-SYSTEM-008] Fable build compiles incrementally and never
   )
   assert.doesNotMatch(build, /FableBarrier|fable-daemon|fable-cycle-ack|['"]--watch['"]/)
   assert.doesNotMatch(ownerCompile, /FableBarrier|fable-daemon|fable-cycle-ack|['"]--watch['"]/)
+})
+
+test('WHAT[VERIFICATION-SYSTEM-008] release output reset physically removes stale artifacts', () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-release-output-'))
+  const output = join(root, 'dist')
+  const stale = join(output, 'src', 'Wanxiangshu', 'Stale.js')
+  try {
+    mkdirSync(join(output, 'src', 'Wanxiangshu'), { recursive: true })
+    writeFileSync(stale, 'export const stale = true\n', 'utf8')
+
+    resetOutputDirectory(output)
+
+    assert.equal(existsSync(stale), false)
+    assert.equal(existsSync(output), true)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[VERIFICATION-SYSTEM-008] incremental build manages clean artifact state and cleans invalid output', () => {
