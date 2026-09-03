@@ -2,7 +2,7 @@
 
 日期：2026-09-03
 
-状态：M6.0–M6.2 已完成；M6.3 preflight 等待 owner 裁决
+状态：M6.0–M6.2 已完成；M6.3 owner 裁决已完成，待按裁决准备 cutover
 
 适用背景：Fable owner-project 编译边界、published contract 授权与 semantic owner 重整
 
@@ -750,11 +750,73 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - M6.2c：`opencode-host-messagevisibility` 已补上其 `HostEventCodec.unwrap/eventTypeOf/tryMessageSessionId` 依赖对应的 `host-signal-adapter` ProjectReference。旧 manifest 已有 `host-boundary.Contract → participant-horizon` exact grant；本次只修复 compiler closure。
 - M6.2 verification：旧权威 `owner-contracts.mjs` 与 `owner-projects.mjs` 绿色；178 localities、711 sources、1,853 refs、DAG。两个可独立提交的缺边已关闭，相关 consumer focused Fable compile 绿色。fresh analyzer 现只报告 `eventstore-merge-runtime → eventstore-core-runtime/CanonicalEventCodec` 一条原子 cutover blocker；它将在 M6.3 工作树准备并随 M6.4 单提交切换，不会制造旧 ACL 例外。
 
-### 2026-09-03 — M6.3 classification preflight：等待 owner 裁决
+### 2026-09-03 — M6.3 classification preflight：历史裁决停点
 
 - 当前 direct ProjectReference 按 provider kind：contract 921、composition 797、adapter 54、runtime 81；其中 foreign 1,614、same-owner 239。新模型不豁免后者。
 - 92 个标为 composition 的 locality 正在充当 provider，共 797 条 direct edge：768 条来自 composition consumer、19 条来自 adapter、10 条来自 runtime。现有 10 份旧 composition-root relation 不能证明这 797 条边全是 terminal wiring；自动把它们全部改写成 wiring 会把错误分类固化。
 - effect matrix 有 10 条直接违规：`execution-session-loopdetector → host-signal-adapter`、`host-session-runtime → host-signal-adapter`、`host-signal-adapter → host-diagnostics-runtime`；`delegation-host-adapter → delegation-{recovery,fork,fold,sync}-runtime`、`delegation-pty-adapter → delegation-host-adapter/delegation-fork-runtime`、`delegation-recovery-runtime → delegation-fold`。反向闭包共影响 12 个 effect provider。
 - 这些事实要求逐 owner 判断：①旧 composition kind 是错标，可改为 shared/bounded contract；②locality 混合 public capability 与 terminal wiring，必须拆 source/project；③确属 terminal composition，只能增加 exact composition-wiring relation；④effect consumer 本身应成为 composition，或抽 port 并改为 capability injection。引用图无法替 owner 做此选择。
 - 推荐裁决：保持 M6.0 kind × exposure 矩阵不变；授权按上述四分法逐 locality 审核，先处理 29 条 non-composition → composition direct edge与 10 条 direct effect violation，再审核 768 条 composition → composition edge。禁止把当前 ProjectReference 集合自动抄成 grant。
-- 在裁决前停止 M6.3；未生成新 manifest，未启用新 gate，旧 gate 仍是唯一 release authority，工作树保持可回溯绿色停点。
+- 当时在裁决前停止 M6.3；未生成新 manifest，未启用新 gate，旧 gate 仍是唯一 release authority，工作树保持可回溯绿色停点。下节裁决现已解除该停点。
+
+### 2026-09-03 — M6.3 owner 裁决：经源码、签名与 live graph 复核后生效
+
+本节记录 owner 已批准的迁移边界。它授权后续施工，不替代产品规范；每组 production 修改仍必须先把本裁决按 WHY → WHAT → HOW → GAP 写入对应 `requirements/<package>/`，建立 executable RED，再实现。若施工发现本节未覆盖的新业务语义冲突，停止并请求新裁决；ProjectReference 数量变化、文件移动或实现细节不构成重新裁决理由。
+
+复核事实：工作树干净；旧权威 `owner-projects.mjs` 为 178 localities、711 sources、1,853 refs、DAG，`owner-contracts.mjs` 为 784 contracts；fresh compiler-resolved scan 为 4,420 条 actual source edges，仅剩 `eventstore-merge-runtime/EventKWayMerge.fs → eventstore-core-runtime/CanonicalEventCodec.fs` 一条 missing closure。此前 10 条 direct effect-kind 违规成立，但该 census 只按现有 kind 计算，漏掉了被错标为 contract、实际执行 `console.error/process.kill` 的 `host-fatal-effect`；后续 effect purity census 必须同时检查源码能力，不能只信 kind metadata。
+
+#### 全局裁决
+
+1. M6.0 的 kind × exposure 矩阵保持不变：contract 只承载纯数据、纯函数、opaque identity 与 capability type，不得承载 capability value/factory；runtime/adapter 承载 effect；effect implementation 只能由 composition 构造并注入；composition 只做 terminal wiring。
+2. contract 默认 `bounded`。只有无 authority、扩张 audience 不增加任何决策或操作能力、且确属跨域基础词汇的 locality 才可 `shared`。不得以减少 manifest 行数为由选择 shared。
+3. 当前 ProjectReference、旧 owner ACL 或现有 composition 标签都不是授权证据。禁止把现有 graph 自动抄成 grant、wiring、allowlist、baseline 或 suppression。
+4. 同一 `.fsi` 的全部公开符号共同授权。consumer cohort 或 authority 不同就拆 source/project；禁止在 JSON 中恢复编译器不能兑现的 per-symbol 权限。
+5. 确定性、仓库派生、无 IO/ambient state 的 generated module 可通过 exact `compile-contract-support` relation 被消费，不因使用 Fable `Import` 自动归为物理 effect。该 relation 必须绑定精确 import specifier、生成 owner、consumer locality 与可执行 determinism proof；Node/Host/process/network import 不适用此条。
+6. M6.4 仍为唯一权威切换点：新 manifest、compiler-resolved analyzer、schema/gate、所有原子 blocker 与旧 schema/gate 删除必须同一 commit 全绿。此前不得形成第二 release authority。
+
+#### EventStore 裁决
+
+1. `CanonicalEventCodec.{fsi,fs}` 从 `eventstore-core-runtime` 拆为独立 `eventstore-canonical-codec` bounded contract。六个公开函数 `encode/checkIdentity/mergeByIdentity/tryDecode/tryDecodeUtf8Text/tryDecodeUtf8` 同属一个 canonical identity protocol，批准共同授权；禁止只复制或另写 `checkIdentity` 公式。
+2. 初始 direct consumers 必须由 cutover 工作树 fresh 推导，并至少包含五个已证实 locality：`eventstore-core-runtime`、`eventstore-merge-runtime`、`eventstore-sync-runtime`、`persistence-eventstore-canonicalintegrator`、`durable-runtime-surface`。same-owner consumer 不豁免；bounded effective audience 只写允许上界，不把本次约 49 个反向可达 locality 的临时数值当事实源。
+3. 禁止新增 `eventstore-merge-runtime → eventstore-core-runtime`。该边会把 `ProcessEventLog`、Store factory、文件/锁 authority 带入 merge runtime，旧 gate 与新矩阵都应 RED。
+4. 接受 M6.4 时剩余 `ProcessEventLog + Store` 暂为一个 effect slice：它们共同拥有本地 EventStore 创建、读取、append、锁与恢复生命周期，且当前九个 direct consumers 均为 composition。该裁决只承认编译器已经存在的完整 `.fsi` 可见性，不恢复旧 manifest 声称的伪 symbol 隔离；M6.5 必须按 consumer cohort 与 authority 使用量复测，若完整 surface 共同授权不可接受，再拆 ProcessEventLog、store factory 与 lock adapter。
+5. codec 拆分、五个 consumer references、新 bounded grant、旧 codec symbol ACL 删除必须随 M6.4 原子落地。原因是旧 owner-wide expansion 正借 codec 与 ProcessEventLog 共处一 project 偶然放行三条 core-runtime 引用；不得为过渡新增 ProcessEventLog owner ACL。
+
+#### Host codec、signal 与 diagnostics 裁决
+
+1. `HostMessageCodec` 建立独立 bounded contract。已证实 direct production consumers 为 `host-session-runtime`、`interaction-repair-interactionrepair`、`opencode-codec-providerprojectionsurface`；cutover 时 fresh exact census 后登记。它不得与 Loop codec 合并：两者 vocabulary、consumer cohort 与变更原因不同，合并只会扩大双方 audience。
+2. 抽取无状态 `HostEventEnvelope` bounded contract，只拥有 raw Host envelope 的 unwrap、event type 与 session/message-session identity 读取。实现不得修改输入对象；当前 `HostEventCodec.attachDirectoryIfMissing` 的原地写入不能进入 contract。`HostEventCodec` 与 `LoopEventCodec` 必须共同消费该唯一 envelope 公式，禁止各复制一套 dynamic field parser。
+3. `LoopEventCodec` 建立独立 bounded contract，仅发布 `TextDelta` 与 loop-delta decode/query。其 direct consumers 当前为 `execution-session-loopdetector` 与 `host-signal-adapter`；它只依赖 `HostEventEnvelope` contract，不获得完整 provider failure/terminal codec。
+4. M6.4 前不把完整 `HostEventCodec`、`HostSignalAdapter`、subscription、event bus 或 `ToolHostCodec` 改成 contract。完整 HostEvent decode 仍拥有 HostSignal/failure/terminal 适配语义；其同 project 还含 physical listener/disposer、随机 tool handle、mutable listener/sticky registry 与 process-shared bus。M6.5 再按 audience 决定是否把纯 HostSignal vocabulary/full decoder另拆 bounded slice。
+5. 删除 `HostSignalSubscribe → Diagnostic.fatal`。subscription adapter 只返回现有 typed `Error`；`HostSignalBootstrap` 已在 composition 边界解释同一失败并执行 fatal，故它是唯一 fatal owner。不得让 adapter 与 composition 对同一错误各 fatal 一次。若未来要求 adapter 独立报告，只可注入 `signalSubscriptionFailed: string -> unit` 这一事件能力，不能注入整个 Diagnostic 模块。
+6. `LoopSensor` 继续与 `LoopDetector` 同属 `execution-session-loopdetector` runtime；本次不为文件数量而强拆。向其构造器注入最窄 `emitDiagnostic: string -> (string * string) list -> unit`，由 `HostSignalBootstrap` composition 传入 `Diagnostic.emit`。diagnostic 抛错不得改变 arm、interrupt、consume 或 continuation 结果。
+7. `#wanxiangshu-loop-detector-envelope` 是仓库内容派生的确定性 tokenizer/envelope artifact，裁决为 exact `compile-contract-support`，不是 Host/IO effect。必须保留 repository-SSOT、生成 determinism 与 import linkage proof；`LoopDetector` 因 process-local Dictionary scratch 继续是 runtime，不伪装成纯 contract。
+8. `host-diagnostics-runtime` 保持 runtime；`Diagnostic` 读取 process env、写 console，`ReliabilityCounters` 持有可变状态。完成第 5、6 条后，非 composition consumer 不再直接引用该实现。
+9. `host-fatal-effect` 当前 kind=`contract` 与源码冲突：`FatalProcess` 写 console 并调用 `process.kill/process.exit`。不为它设特例。建立只发布 capability type、不含 value/factory 的 bounded `FatalProcessPort` contract；物理实现改为 effect adapter/runtime，由 composition 注入 diagnostics、journal 与其他非 composition consumer。迁移必须保持“先取得 committed/unknown settlement evidence，后 fatal”的既有时序，并为漏注入、重复 fatal、先 fatal 后 settlement 建立 RED。
+10. Host 规范与 proof 必须先改：现有 HOST-BOUNDARY-026/WHAT/HOW 和 closure tests 明文把全部 codec 固定在 `Host.Signal.Adapter`。实施时先重写这些事实，再建立三个 closure RED：`host-session-runtime` 不含 signal adapter、loop runtime 不含 signal/diagnostic implementation、signal adapter 不含 diagnostics runtime。
+
+#### Delegation 裁决
+
+1. 拒绝把整个 `delegation-host-adapter` 只改标签为 composition。该动作虽能在 PTY 解耦后消除四条 runtime matrix 违规，却会把完整可变 `HostForkRuntime`、pending-run registry、join/child-dispatch lifecycle 冒充 terminal wiring。将现 locality 拆为 `delegation-host-runtime` 与必要的窄 Host adapter：runtime 只消费 delegation-owned contract ports，继续由现有 14 个 composition consumers 构造；直接 OpenCode/Host 表示转换若存在则留在 adapter。共享构造若无法在 14 个 composition roots 无重复表达，才建立最窄 `delegation-host-composition`，不得把 runtime 源整体迁入。同步修改 DELEG-028、WHY/HOW 与 compile-boundary proof，删除误导的旧 `delegation-host-adapter` locality/name，不保留兼容 facade。
+2. `delegation-pty-adapter` 保持 adapter，禁止仅改成 composition 掩盖依赖。它不得直接读取 `HostForkRuntime.Gate/PtyRuns/TerminalByName/Runtime/PtyPort`。建立 source-pure capability contract，分别表达：Host-owned PTY registry/name binding、Fork snapshot register/unregister、Process PTY fork/send/read。composition 从三个 owner 的实现构造最窄 capability 后注入 PTY adapter；同一原子变更先删 `pty → host/fork/process` 再接 `composition → pty`，禁止形成 SCC。
+3. Delegation 领域 constructor 只返回 `ExecutionFactCases`、`DelegationFactCases` 或等价 typed intent，不得返回 durable composition 的 `AgentFact`。`AgentFact` 继续由 `durable-events` composition 拥有；`delegation-ledger` composition 是把领域 case 包进 `AgentFact.Execution/Delegation` 并 append 的唯一位置。禁止把 `AgentFact` 下沉成全域 shared contract，也禁止复制 outer-union wrapper。
+4. `delegation-fold` 先拆出上述 Fact bridge；剩余 fold 因直接协调中央 `AgentProjectionSet`、child index 与 PromptAuthority，M6.4 归为 composition，而不是伪装成 owner-pure contract。`delegation-recovery-runtime` 改依赖 delegation-owned fact/ledger capability，不再通过 fold locality获得 `AgentFact` constructor。若 M6.5 要把 fold 变为 contract，必须先抽出真正 delegation-owned projection，再由 durable composition 协调多个 projection。
+5. `HandleController`、`ChildRecoveryWorkflow` 等 runtime 不再接收完整 `AgentJournal`、central projection 或 composition clock。定义 delegation-owned append/query/wait/clock capability types，composition 注入实现；runtime 只产生 typed request/intent 与消费 typed result。
+6. `foundation-temporal` 必须拆为纯 `IClockPort`/timer capability contract 与 Node/virtual implementation；`execution-session-wait-causalwait` 必须拆为 wait vocabulary/capability contract 与 process-local hub/runtime；`process-processrequest` 必须拆 Process/PTY vocabulary/port 与 Node physical implementation。Delegation runtime/PTY 只能依赖 contract 或注入值，不能继续把这些 composition locality 当公共 provider。
+7. 迁移顺序固定为：Temporal/CausalWait/Process capability → Delegation fact/ledger port → Host runtime 的 recovery/fork/fold/sync 注入 ports → PTY 去反向依赖 → 既有 composition roots 构造 Host/PTY capabilities → fold composition 化 → 删除旧 references/names。共享 type/port 先立，consumer 后迁，旧 owner 最后删；中途不得提交双实现或 compatibility facade。
+
+#### 92 个 composition provider 的裁决方法
+
+1. 先处理全部 non-composition → composition edge；这些边不得登记 composition-wiring。纯 vocabulary/decision/codec 拆为 bounded/shared contract，effect 通过 capability injection，真正 consumer orchestration 改到 composition。
+2. 再处理 composition → composition edge。只有“下游 composition 是上游 terminal wiring 的组成层”且两端 module、capability、WHAT law 与 semantic evidence 均明确时，才登记 exact composition-wiring；公共 query、fact、projection、codec、registry 或 helper 不因 consumer 也是 composition 就自动合法。
+3. `Composition.Durable.Fact/Projection` 保持 durable composition，不改成公共 shared contract。非 composition runtime 必须改为返回 owner-owned case/intent、消费 owner-owned query/append capability；由 durable composition统一 outer routing与跨 projection协调。
+4. 每个候选 locality 输出同一 adjudication record：当前 owner/kind、`.fsi` 全 export、实际 direct/effective consumers、effect/physical import、唯一 decision owner、裁决后的 kind/exposure、拆分或 injection 路径、对应 WHAT/proof。记录是 review 输入，不是允许集合；实际集合仍由 analyzer 同次推导。
+
+#### 裁决后的施工批次与停止条件
+
+1. M6.3a：更新 durable-events、host-boundary、delegation、time-capability、causal-wait、process-execution 的 WHY/WHAT/HOW/GAP；每条变更建立旧世界会绿、新规则必须红的 architecture/closure fixture。
+2. M6.3b：先实施能在旧权威下独立保持绿色的纯 contract/port 切分；每组一个 Git 节点，运行 provider、direct consumer 与 reverse impact compile。
+3. M6.3c：在同一未提交 cutover 工作树准备 Canonical、FatalProcess、Delegation Host runtime/port cut 等不能被旧 ACL 正确表达的原子迁移，以及全量 slice manifest。
+4. M6.4：单 commit 启用新 analyzer/schema/gate并删除旧 owner-wide/per-symbol权威；执行 fixed RED、fast-check graph properties、fresh compiler scan 与完整 release sink。
+5. M6.5：再按 audience/closure 收益拆 `ProcessEventLog + Store`、完整 HostEvent/HostSignal codec、Delegation owner-pure projection等非 cutover blocker；没有可测量 authority 或 closure 收益就不拆。
+6. 任一阶段若需要放宽矩阵、把 current refs 自动变 grant、让 adapter/runtime直接消费 effect implementation、把 central composition下沉为公共 contract，或新增本节未定义的业务 owner 转移，必须停止并请求新裁决。
