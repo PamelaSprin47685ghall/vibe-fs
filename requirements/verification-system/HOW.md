@@ -11,7 +11,7 @@
 - `format-build-test` 以 Fantomas `--check` 只读验证提交字节；`format` 仅供开发者主动改写。`check/build` 允许经 Wireit 缓存调度，但 proof 同时锁定顶层 `npm run` 顺序与每个 Wireit step 的 exact command；间接调度不得隐藏、替换或跳过 Fantomas、text gate、owner contract gate 与 clean Fable build。FCS 白盒扫描已在 57.15 终局整体删除。
 - build fingerprint 覆盖整个 workspace，仅排除自身 `dist/` 与 `.fable-build/` 输出；因为 `LoopDetectorEnvelope` 从 Git 跟踪的全部源码/文档语料派生，按固定目录枚举输入会让新增目录或文档修改错误复用旧 artifact。
 - 确保 `scripts/check.mjs` 中注册的所有门禁脚本路径在磁盘上真实存在，且任何门禁失败时其非零退出码均能正确向上传播（fail-closed）。
-- `scripts/checks/proof-levels.json` 独立保存精确 `(path, title, what_id) → level` 分类；共享 resolver 对缺失或重复键返回无权威结果，registry validator 阻断形状、层序与键歧义，外部登记行只能匹配该分类而不能自我改标。
+- `scripts/checks/proof-levels.json` 独立保存精确 `(path, title, what_id) → level` 分类；共享 resolver 对缺失或重复键返回无权威结果，registry validator 阻断形状、层序与键歧义，外部登记行只能匹配该分类而不能自我改标。该 registry 不扫描 WHAT/HOW，也不授予 proof existence；分类输入必须已由 `requirement-trace` 建立精确 active edge。
 - `scripts/build.mjs` 每次调用都持有跨进程 build lock，先删除上一轮 `dist/` artifact tree，再以显式 `Debug` configuration 执行一次真实 Fable compile；compiler 成功退出后才验证 `dist` 与 Surface Manifest。源码删除因此不会留下可被 package 收走的陈旧 JS。configuration 不依赖 Fable 的 watch/one-shot 默认值。不存在 watch-daemon、source-touch barrier、ack、artifact-exists fast path 或 wall-clock freshness 猜测，因此旧 `dist` 不能冒充当前源码的编译结果。
 
 ### 2. 因果看门狗与静默监督（`e2e-watchdog-feed`）

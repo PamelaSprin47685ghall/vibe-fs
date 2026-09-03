@@ -279,30 +279,6 @@ export function analyzeOwnerContracts({
         })
         return null
       }
-      const proofs = node.proofs
-      const invalidProofs = Array.isArray(proofs)
-        ? proofs.filter((proof) => {
-            if (typeof proof !== 'string' || proof.length === 0 || proof !== norm(proof) || isAbsolute(proof)) return true
-            if (!/^requirements\/[^/]+\/tests\/.+\.test\.mjs$/.test(proof)) return true
-            const resolved = resolve(ROOT, proof)
-            const repositoryRelative = norm(relative(ROOT, resolved))
-            return (
-              repositoryRelative === '..' ||
-              repositoryRelative.startsWith('../') ||
-              repositoryRelative !== proof ||
-              !existsSync(resolved) ||
-              !statSync(resolved).isFile()
-            )
-          })
-        : []
-      if (!Array.isArray(proofs) || proofs.length === 0 || invalidProofs.length > 0) {
-        fail(
-          'contract-without-proof',
-          `${path}: migration node '${nodeId}' must have existing executable proofs under requirements/<package>/tests/*.test.mjs`,
-          { path, invalidProofs },
-        )
-        return null
-      }
       if (publication && (!entry.contract || !node.publishes?.includes(entry.contract))) {
         fail('contract-vocabulary-mismatch', `${path}: '${entry.contract ?? ''}' is not published by migration node '${nodeId}'`, {
           path,

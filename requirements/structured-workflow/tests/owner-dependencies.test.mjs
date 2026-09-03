@@ -445,7 +445,7 @@ const migrationContractFixture = ({
   closed = true,
   entryNode = 'provider-cutover',
   nodeState = 'DONE',
-  proofs = ['requirements/structured-workflow/tests/owner-dependencies.test.mjs'],
+  proofs,
   publishes = ['Provider.Contract'],
 } = {}) => {
   const provider = file('src/Wanxiangshu/Provider/Contract.fs')
@@ -454,8 +454,8 @@ const migrationContractFixture = ({
   const node = {
     id: 'provider-cutover',
     state: nodeState,
-    proofs,
     publishes,
+    ...(proofs === undefined ? {} : { proofs }),
   }
   return analyze({
     files: [provider, consumer],
@@ -487,7 +487,7 @@ const migrationContractFixture = ({
   })
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-011] a published contract binds its exact DONE node, proof, and vocabulary', () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] a published contract binds its exact DONE node and vocabulary', () => {
   const result = migrationContractFixture()
 
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
@@ -514,29 +514,19 @@ test('WHAT[STRUCTURED-WORKFLOW-011] pending providers stay visible and cannot pu
   assert.ok(codes(migrationContractFixture({ closed: false })).includes('contract-before-cutover'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] stale migration node, proof, and vocabulary bindings fail closed', () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] stale migration node and vocabulary bindings fail closed', () => {
   assert.ok(codes(migrationContractFixture({ entryNode: 'other-cutover' })).includes('contract-node-mismatch'))
   assert.ok(codes(migrationContractFixture({ nodeState: 'RUNNING' })).includes('contract-node-mismatch'))
-  assert.ok(codes(migrationContractFixture({ proofs: [] })).includes('contract-without-proof'))
   assert.ok(codes(migrationContractFixture({ publishes: [] })).includes('contract-vocabulary-mismatch'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] migration proofs must be existing repository test files for their package', () => {
-  const invalidProofs = [
-    ['null proof collection', null],
-    ['prose instead of an array', 'verified manually by the migration owner'],
-    ['null entry', [null]],
-    ['prose entry', ['verified manually by the migration owner']],
-    ['absolute path', ['/tmp/provider-contract.test.mjs']],
-    ['path outside requirement tests', ['scripts/check.mjs']],
-    ['stale path', ['requirements/structured-workflow/tests/missing-contract.test.mjs']],
-    ['directory', ['requirements/structured-workflow/tests']],
-    ['non-test file', ['requirements/structured-workflow/tests/fixtures/owner-dependencies/Provider.fs']],
-  ]
+test('WHAT[STRUCTURED-WORKFLOW-011] migration proof inventory cannot grant or deny contract authority', () => {
+  const absent = migrationContractFixture()
+  const unrelated = migrationContractFixture({ proofs: ['requirements/structured-workflow/tests/missing-contract.test.mjs'] })
 
-  for (const [name, proofs] of invalidProofs) {
-    assert.ok(codes(migrationContractFixture({ proofs })).includes('contract-without-proof'), name)
-  }
+  assert.equal(absent.ok, true, JSON.stringify(absent.violations, null, 2))
+  assert.equal(unrelated.ok, true, JSON.stringify(unrelated.violations, null, 2))
+  assert.equal(codes(unrelated).includes('contract-without-proof'), false)
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] wildcard authorizations and stale consumer grants fail closed', () => {
