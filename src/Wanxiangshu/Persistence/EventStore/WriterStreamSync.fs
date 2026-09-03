@@ -488,12 +488,16 @@ module WriterStreamSync =
         (entry: TreeEntry option)
         : Task<Result<Map<string, WriterManifestEntry> option, ConvergeError>> =
         let parseManifestBytes (bytes: byte[]) =
-            let text = Encoding.UTF8.GetString bytes
+            result {
+                let! text =
+                    CanonicalEventCodec.tryDecodeUtf8Text bytes
+                    |> Result.mapError ConvergeError.StorageInvalid
 
-            if text = "v1" || text.StartsWith("v1\n", StringComparison.Ordinal) then
-                Ok None
-            else
-                text |> writerManifestFromText |> Result.map Some |> Result.mapError asStorage
+                if text = "v1" || text.StartsWith("v1\n", StringComparison.Ordinal) then
+                    return None
+                else
+                    return! text |> writerManifestFromText |> Result.map Some |> Result.mapError asStorage
+            }
 
         let readManifestEntry manifest =
             taskResult {
@@ -601,21 +605,28 @@ module WriterStreamSync =
         (manifest: Map<string, WriterManifestEntry>)
         (entryByName: Map<string, TreeEntry>)
         (name: string, bytes: byte[])
-        =
-        if not (name.EndsWith(".ndjson", StringComparison.Ordinal)) then
-            raise (InvalidOperationException(sprintf "invalid writer filename: %s" name))
+        : Result<RemoteWriter, ConvergeError> =
+        result {
+            if not (name.EndsWith(".ndjson", StringComparison.Ordinal)) then
+                return! Error(asStorage (sprintf "invalid writer filename: %s" name))
 
-        let writerId = name.Substring(0, name.Length - ".ndjson".Length)
+            let writerId = name.Substring(0, name.Length - ".ndjson".Length)
 
-        let activity =
-            entryByName
-            |> Map.tryFind name
-            |> Option.bind (manifestForEntry manifest)
-            |> Option.map (fun info -> info.LastActivityMs)
+            let activity =
+                entryByName
+                |> Map.tryFind name
+                |> Option.bind (manifestForEntry manifest)
+                |> Option.map (fun info -> info.LastActivityMs)
 
-        { WriterId = writerId
-          Text = Encoding.UTF8.GetString bytes
-          LastActivityMs = activity }
+            let! text =
+                CanonicalEventCodec.tryDecodeUtf8Text bytes
+                |> Result.mapError ConvergeError.StorageInvalid
+
+            return
+                { WriterId = writerId
+                  Text = text
+                  LastActivityMs = activity }
+        }
 
     let private readRemoteTrees
         (raw: IGitRawStore)
@@ -660,7 +671,7 @@ module WriterStreamSync =
             let entryByName =
                 retainedEntries |> List.map (fun entry -> entry.Name, entry) |> Map.ofList
 
-            let remoteWriters = writerBlobs |> List.map (writerFromBlob manifest entryByName)
+            let! remoteWriters = writerBlobs |> List.traverseResultM (writerFromBlob manifest entryByName)
 
             let! payloadEntries = readRequiredTree raw payloadTree.Oid "payloads"
             let payloadStats = ProcessEventLog.payloadPhysicalStats commonDir |> Map.ofList

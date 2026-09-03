@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Persistence.EventStore
 
-open System.Text
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
@@ -124,5 +123,23 @@ module CanonicalEventCodec =
         else
             tryDecodeCanonical text
 
+    [<Emit("new TextDecoder('utf-8', { fatal: true }).decode($0)")>]
+    let private decodeUtf8Fatal (bytes: byte[]) : string = jsNative
+
+    [<Emit("$0.length >= 3 && $0[0] === 0xef && $0[1] === 0xbb && $0[2] === 0xbf")>]
+    let private hasUtf8Bom (bytes: byte[]) : bool = jsNative
+
+    let private decodeUtf8WithoutBom bytes =
+        try
+            Ok(decodeUtf8Fatal bytes)
+        with _ ->
+            Error(StorageInvalid.NonCanonical "event bytes are not valid UTF-8")
+
+    let tryDecodeUtf8Text (bytes: byte[]) : Result<string, StorageInvalid> =
+        if hasUtf8Bom bytes then
+            Error(StorageInvalid.NonCanonical "event bytes must not contain a BOM")
+        else
+            decodeUtf8WithoutBom bytes
+
     let tryDecodeUtf8 (bytes: byte[]) : Result<EventEnvelope, StorageInvalid> =
-        tryDecode (Encoding.UTF8.GetString bytes)
+        tryDecodeUtf8Text bytes |> Result.bind tryDecode

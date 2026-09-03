@@ -11,6 +11,9 @@ module EventCodecSurface =
     /// Decode canonical bytes without exposing EventEnvelope or Fable values.
     val decode: bytes: string -> obj
 
+    /// Decode raw UTF-8 bytes before parsing; malformed byte sequences fail closed.
+    val decodeUtf8: bytes: byte[] -> obj
+
     /// Compare identity bytes for two JS-native events.
     val checkIdentity: left: obj -> right: obj -> obj
 

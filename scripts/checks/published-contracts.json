@@ -5935,7 +5935,8 @@
       "symbols": [
         "Wanxiangshu.Persistence.EventStore.CanonicalEventCodec.checkIdentity",
         "Wanxiangshu.Persistence.EventStore.CanonicalEventCodec.encode",
-        "Wanxiangshu.Persistence.EventStore.CanonicalEventCodec.tryDecode"
+        "Wanxiangshu.Persistence.EventStore.CanonicalEventCodec.tryDecode",
+        "Wanxiangshu.Persistence.EventStore.CanonicalEventCodec.tryDecodeUtf8Text"
       ],
       "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
     },

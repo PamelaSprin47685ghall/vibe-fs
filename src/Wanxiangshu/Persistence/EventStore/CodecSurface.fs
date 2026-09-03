@@ -95,6 +95,15 @@ module EventCodecSurface =
                 {| ok = false
                    error = invalidToJs error |}
 
+    /// Decode raw UTF-8 bytes before parsing; malformed byte sequences fail closed.
+    let decodeUtf8 (bytes: byte[]) : obj =
+        match CanonicalEventCodec.tryDecodeUtf8 bytes with
+        | Ok event -> box {| ok = true; event = eventToJs event |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = invalidToJs error |}
+
     /// Compare identity bytes for two JS-native events.
     let checkIdentity (left: obj) (right: obj) : obj =
         match CanonicalEventCodec.checkIdentity (eventOfJs left) (eventOfJs right) with
