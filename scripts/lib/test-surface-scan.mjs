@@ -926,7 +926,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Persistence/EventStore/CodecSurface.js',
     owner: 'durable-events',
-    laws: ['DURABLE-EVENTS-003', 'DURABLE-EVENTS-005'],
+    laws: ['DURABLE-EVENTS-003', 'DURABLE-EVENTS-005', 'DURABLE-EVENTS-023'],
     source: 'src/Wanxiangshu/Persistence/EventStore/CodecSurface.fs',
     representation: 'json',
     kind: 'pure',

@@ -11,6 +11,9 @@ module EventCodecSurface =
     /// Decode canonical bytes without exposing EventEnvelope or Fable values.
     val decode: bytes: string -> obj
 
+    /// Decode raw UTF-8 bytes to text without parsing an EventEnvelope.
+    val decodeUtf8Text: bytes: byte[] -> obj
+
     /// Decode raw UTF-8 bytes before parsing; malformed byte sequences fail closed.
     val decodeUtf8: bytes: byte[] -> obj
 
