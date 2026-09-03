@@ -548,6 +548,26 @@
       "justification": "Signed JS composition for host-equivalence folds and OpenCode blind-dispatch planning; host-private fields excluded from semantic hashes, no private lease pool."
     },
     {
+      "path": "src/Wanxiangshu/Sphinx/GecInquiry.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed in-memory generic-inquiry registry backing the schema-only sphinx_inquiry tools; revision and conflict mechanics only, no refiner, stop or answer verdicts and no durable effect."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecLegacy.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed Legacy adapter replaying frozen MCP transcripts through the live Session kernel with identical request, nextTool, revision and answer shapes; frozen handles never leak."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/LegacyDurability.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed codec from accepted legacy observations to canonical sphinx-legacy envelopes plus a runner-side replay helper; appends only after kernel acceptance and never reads history."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecStore.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed pure Sphinx store codec, pre-write conflict checks, canonical fold and research-export bundle builder over canonical EventStore envelopes; no IO and no private substrate."
+    },
+    {
       "path": "src/Wanxiangshu/Sphinx/ObservationCodec.fs",
       "owner": "epistemic-reasoning",
       "justification": "Signed observation decoder from free JS values into the closed Sphinx observation algebra; per-record decoder helpers remain hidden."
@@ -1844,6 +1864,11 @@
       "owner": "epistemic-reasoning",
       "locality": "sphinx-runtime",
       "justification": "The Sphinx epistemic kernel, algorithms, codecs, process-local session capability, MCP adapter and JS semantic surface are fully signed and depend only on the assembly metadata plus the already-graduated sphinx-mcp contract; mutable registries, SDK interop and representation helpers remain signature-hidden."
+    },
+    {
+      "owner": "epistemic-reasoning",
+      "locality": "sphinx-event-vocabulary-contract",
+      "justification": "Sphinx inquiry envelope type constants form one fully signed contract over no other locality; the canonical EventStore vocabulary references it additively for sphinx streams."
     },
     {
       "owner": "execution-model-routing",
@@ -14964,6 +14989,92 @@
       "justification": "epistemic-reasoning.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to epistemic-reasoning."
     },
     {
+      "path": "src/Wanxiangshu/Sphinx/EventVocabulary.fs",
+      "owner": "epistemic-reasoning",
+      "node": "epistemic-reasoning-sphinx-gec",
+      "contract": "epistemic-reasoning.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-convergence",
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Sphinx.SphinxEventTypes.PluginSetBound",
+        "Wanxiangshu.Sphinx.SphinxEventTypes.ObservationAccepted",
+        "Wanxiangshu.Sphinx.SphinxEventTypes.AnswerCommitted",
+        "Wanxiangshu.Sphinx.SphinxEventTypes.LegacyObservation",
+        "Wanxiangshu.Sphinx.SphinxEventTypes.all",
+        "Wanxiangshu.Sphinx.SphinxEventTypes.isSphinxEvent"
+      ],
+      "justification": "epistemic-reasoning.Contract publishes exactly these Sphinx envelope type constants to 'durable-events'; the closed sphinx vocabulary is additive to the canonical spine."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/LegacyIntegrator.fs",
+      "owner": "epistemic-reasoning",
+      "node": "epistemic-reasoning-sphinx-gec",
+      "contract": "epistemic-reasoning.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-convergence"
+      ],
+      "symbols": [
+        "Wanxiangshu.Sphinx.LegacyIntegrator.LegacyInquiryCursor",
+        "Wanxiangshu.Sphinx.LegacyIntegrator.SphinxLegacyCurrent",
+        "Wanxiangshu.Sphinx.LegacyIntegrator.LegacyObservationFields",
+        "Wanxiangshu.Sphinx.LegacyIntegrator.LegacyEnvelopeInput",
+        "Wanxiangshu.Sphinx.LegacyIntegrator.empty",
+        "Wanxiangshu.Sphinx.LegacyIntegrator.applyOne"
+      ],
+      "justification": "epistemic-reasoning.Contract publishes exactly this pure single-envelope fold to 'durable-convergence'; the canonical Sphinx business rule consumes nothing else."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/Port.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "physical-port",
+      "consumers": [
+        "epistemic-reasoning"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.IEventStore",
+        "Wanxiangshu.Persistence.EventStore.IEventStore.Append",
+        "Wanxiangshu.Persistence.EventStore.IEventStore.TryCurrent"
+      ],
+      "justification": "epistemic-reasoning uses only append and current reads on the acquired handle for MCP inquiry restart; event readers and convergence stay private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/Model.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "physical-port",
+      "consumers": [
+        "epistemic-reasoning"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.EventEnvelope",
+        "Wanxiangshu.Persistence.EventStore.EventEnvelope.normalize",
+        "Wanxiangshu.Persistence.EventStore.EventStreamId",
+        "Wanxiangshu.Persistence.EventStore.EventStreamId.create"
+      ],
+      "justification": "epistemic-reasoning constructs only sphinx-legacy envelopes with deterministic ids for MCP inquiry restart; envelope validation and identity policy remain private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "physical-port",
+      "consumers": [
+        "epistemic-reasoning"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.AppendError"
+      ],
+      "justification": "epistemic-reasoning matches only append outcome cases to report durable failures over MCP; storage and cut semantics remain private to durable-events."
+    },
+    {
       "path": "src/Wanxiangshu/Sphinx/Mcp.fs",
       "owner": "epistemic-reasoning",
       "node": "epistemic-reasoning-frontier-keep",
@@ -18831,6 +18942,34 @@
     }
   ],
   "physical_adapters": [
+    {
+      "path": "src/Wanxiangshu/Sphinx/McpServer.fs",
+      "owner": "epistemic-reasoning",
+      "node": "epistemic-reasoning-frontier-keep",
+      "ports": [
+        {
+          "path": "src/Wanxiangshu/Persistence/EventStore/Port.fs",
+          "symbols": [
+            "Wanxiangshu.Persistence.EventStore.IEventStore",
+            "Wanxiangshu.Persistence.EventStore.IEventStore.Append",
+            "Wanxiangshu.Persistence.EventStore.IEventStore.TryCurrent"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Persistence/EventStore/Model.fs",
+          "symbols": [
+            "Wanxiangshu.Persistence.EventStore.EventEnvelope"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs",
+          "symbols": [
+            "Wanxiangshu.Persistence.EventStore.AppendError"
+          ]
+        }
+      ],
+      "justification": "epistemic-reasoning adapts only the listed store acquire/append/current symbols and envelope/error types at the MCP restart boundary; it owns no store, journal or convergence policy."
+    },
     {
       "path": "src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs",
       "owner": "action-affordance",

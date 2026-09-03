@@ -8,7 +8,8 @@ open Wanxiangshu.Sphinx.Runtime
 
 module GecSurface =
 
-    let private fail code message : Result<'value, CoreError> = Error { Code = code; Message = message }
+    let private fail code message : Result<'value, CoreError> =
+        Error { Code = code; Message = message }
 
     let private isNullish (value: obj) : bool = emitJsExpr value "$0 == null"
 
@@ -23,7 +24,9 @@ module GecSurface =
     let private isFiniteNumber (value: obj) : bool = emitJsExpr value "Number.isFinite($0)"
 
     let private errorObject (code: string) (message: string) : obj =
-        box {| ok = false; error = box {| code = code; message = message |} |}
+        box
+            {| ok = false
+               error = box {| code = code; message = message |} |}
 
     let private coreErrorObject (fault: CoreError) : obj = errorObject fault.Code fault.Message
 
@@ -56,7 +59,11 @@ module GecSurface =
 
                 let check (result: Result<'id, string>) : obj =
                     match result with
-                    | Ok _ -> box {| ok = true; kind = kind; value = value |}
+                    | Ok _ ->
+                        box
+                            {| ok = true
+                               kind = kind
+                               value = value |}
                     | Error message -> errorObject "invalid-id" message
 
                 match kind with
@@ -74,7 +81,10 @@ module GecSurface =
                     elif value |> Seq.exists Char.IsWhiteSpace then
                         errorObject "invalid-id" "AttemptId must not contain whitespace"
                     else
-                        box {| ok = true; kind = kind; value = value |}
+                        box
+                            {| ok = true
+                               kind = kind
+                               value = value |}
                 | "BlindToken" -> check (BlindToken.tryCreate value |> Result.map box)
                 | _ -> errorObject "unknown-kind" ("unknown id kind " + kind)
 
@@ -100,13 +110,23 @@ module GecSurface =
 
     let private placeholderNode (target: NodeId) (revision: int64) : GraphNode =
         let payload =
-            match JsonEnvelope.create { Id = "sphinx.graph/empty@1"; Hash = "sphinx-graph-empty-v1" } (box {| |}) with
+            match
+                JsonEnvelope.create
+                    { Id = "sphinx.graph/empty@1"
+                      Hash = "sphinx-graph-empty-v1" }
+                    (box {| |})
+            with
             | Ok envelope -> envelope
             | Error _ ->
-                { Schema = { Id = "sphinx.graph/empty@1"; Hash = "sphinx-graph-empty-v1" }
+                { Schema =
+                    { Id = "sphinx.graph/empty@1"
+                      Hash = "sphinx-graph-empty-v1" }
                   CanonicalPayload = "{}" }
 
-        { Id = target; Kind = "Unknown"; Payload = payload; Revision = revision }
+        { Id = target
+          Kind = "Unknown"
+          Payload = payload
+          Revision = revision }
 
     let private applyWithRetry (state: InquiryState option) (event: InquiryEvent) : Result<InquiryState, CoreError> =
         match Reducer.apply state event with
@@ -116,7 +136,11 @@ module GecSurface =
             | Some current, CertificatePatched patch ->
                 let grown =
                     { current with
-                        Graph = Map.add patch.Certificate.NodeId (placeholderNode patch.Certificate.NodeId event.Revision) current.Graph }
+                        Graph =
+                            Map.add
+                                patch.Certificate.NodeId
+                                (placeholderNode patch.Certificate.NodeId event.Revision)
+                                current.Graph }
 
                 Reducer.apply (Some grown) event
             | _ -> Error fault
@@ -135,7 +159,8 @@ module GecSurface =
                     | ObservationAccepted binding ->
                         match state with
                         | Some current ->
-                            checkObservationLock current binding |> Result.bind (fun _ -> applyWithRetry state event)
+                            checkObservationLock current binding
+                            |> Result.bind (fun _ -> applyWithRetry state event)
                         | None -> applyWithRetry state event
                     | _ -> applyWithRetry state event)
                 |> Result.bind (fun next -> loop (Some next) (index + 1))
@@ -193,12 +218,9 @@ module GecSurface =
     let private boolField (raw: obj) (name: string) : bool =
         let found = getField raw name
 
-        if isNullish found then
-            false
-        elif jsType found = "boolean" then
-            unbox<bool> found
-        else
-            false
+        if isNullish found then false
+        elif jsType found = "boolean" then unbox<bool> found
+        else false
 
     let private floatField (raw: obj) (name: string) (fallback: float) : float =
         let found = getField raw name
@@ -259,7 +281,13 @@ module GecSurface =
                     let start = intField raw "start" 0
                     Some(FiniteMap(start, decodeIntList (getField raw "table")))
                 | "affine" ->
-                    Some(AffineMap(floatField raw "factor" Double.NaN, floatField raw "offset" Double.NaN, floatField raw "start" Double.NaN))
+                    Some(
+                        AffineMap(
+                            floatField raw "factor" Double.NaN,
+                            floatField raw "offset" Double.NaN,
+                            floatField raw "start" Double.NaN
+                        )
+                    )
                 | "none" -> Some NoOperator
                 | _ -> Some NoOperator
 
@@ -282,7 +310,6 @@ module GecSurface =
             |> Map.toList
             |> List.map (fun (key, value) -> string key, box value)
             |> createObj
-            :> obj
         | ScalarPoint scalar -> box scalar
         | NoPoint -> Option.toObj (None: obj option)
 
@@ -305,11 +332,14 @@ module GecSurface =
                     let closureRaw = getField input "closure"
 
                     if isNullish closureRaw then
-                        box {| ok = true; state = view; stateHash = stateHash |}
+                        box
+                            {| ok = true
+                               state = view
+                               stateHash = stateHash |}
                     else
                         let maxIterations = intField closureRaw "maxIterations" 0
 
-                        let request : ClosureRequest =
+                        let request: ClosureRequest =
                             { Domain = decodeClosureDomain (getField closureRaw "domain")
                               Operator = decodeClosureOperator (getField closureRaw "operator")
                               MaxIterations = maxIterations
@@ -370,13 +400,18 @@ module GecSurface =
                     let existingRaw = getField input "existingLock"
 
                     if isNullish existingRaw then
-                        box {| ok = true; lock = bound |> List.map lockView |> List.toArray |}
+                        box
+                            {| ok = true
+                               lock = bound |> List.map lockView |> List.toArray |}
                     else
                         match GecDecode.decodeLockEntries existingRaw with
                         | Error fault -> coreErrorObject fault
                         | Ok existing ->
                             match PluginRegistry.compatible existing bound with
-                            | Ok _ -> box {| ok = true; lock = bound |> List.map lockView |> List.toArray |}
+                            | Ok _ ->
+                                box
+                                    {| ok = true
+                                       lock = bound |> List.map lockView |> List.toArray |}
                             | Error fault -> errorObject fault.Code fault.Message
 
     let private decodeBudgetMap (value: obj) : Result<Map<string, float>, CoreError> =
@@ -452,7 +487,8 @@ module GecSurface =
                                                     |> Result.bind (fun collected ->
                                                         match asStringValue rawKey with
                                                         | Ok text -> Ok(Set.add text collected)
-                                                        | Error _ -> fail "invalid-target" "conflict key must be a string"))
+                                                        | Error _ ->
+                                                            fail "invalid-target" "conflict key must be a string"))
                                                 (Ok Set.empty)
 
                                     conflicts
@@ -470,7 +506,8 @@ module GecSurface =
 
                                                     let currency =
                                                         match asStringValue currencyRaw with
-                                                        | Ok text when not (String.IsNullOrWhiteSpace text) -> Some text
+                                                        | Ok text when not (String.IsNullOrWhiteSpace text) ->
+                                                            Some text
                                                         | _ -> None
 
                                                     let loss =
@@ -489,7 +526,8 @@ module GecSurface =
                                                     None
                                                 else
                                                     match asStringValue commonRaw with
-                                                    | Ok text when not (String.IsNullOrWhiteSpace text) -> Some text
+                                                    | Ok text when not (String.IsNullOrWhiteSpace text) ->
+                                                        Some text
                                                     | _ -> None
 
                                             Ok(
@@ -502,7 +540,7 @@ module GecSurface =
                                                       LossValue = lossValue
                                                       CommonCurrency = common
                                                       EffectSlot = None } ]
-                                            ))))))))
+                                            )))))))
                 (Ok [])
 
     let private decodeCompleted (raw: obj) : Result<Set<string>, CoreError> =
@@ -535,8 +573,10 @@ module GecSurface =
                     match decodeCompleted (getField input "completed") with
                     | Error fault -> coreErrorObject fault
                     | Ok completed ->
-                        let request : ScheduleRequest =
-                            { Targets = targets; Budget = budget; Completed = completed }
+                        let request: ScheduleRequest =
+                            { Targets = targets
+                              Budget = budget
+                              Completed = completed }
 
                         match Agenda.schedule request with
                         | Error fault -> errorObject fault.Code fault.Message
@@ -547,14 +587,21 @@ module GecSurface =
                                    pareto = result.Pareto |> List.toArray
                                    order = result.Order |> List.toArray |}
 
-    let private ownMethods : (string * obj) list =
+    let private ownMethods: (string * obj) list =
         [ "validateId", box validateId
           "semanticHash", box semanticHash
           "replay", box replay
           "bindPlugins", box bindPlugins
           "schedule", box schedule ]
 
-    let methods : (string * obj) list = ownMethods
+    let methods: (string * obj) list = ownMethods
 
-    let gecSurface : obj =
-        createObj (ownMethods @ GecRefine.methods @ GecElicit.methods @ GecHost.methods)
+    let gecSurface: obj =
+        createObj (
+            ownMethods
+            @ GecRefine.methods
+            @ GecElicit.methods
+            @ GecHost.methods
+            @ GecLegacy.methods
+            @ GecStore.methods
+        )

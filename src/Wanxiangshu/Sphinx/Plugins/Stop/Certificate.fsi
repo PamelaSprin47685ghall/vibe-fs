@@ -2,8 +2,7 @@ namespace Wanxiangshu.Sphinx.Plugins.Stop
 
 module Certificate =
     type DecisionMass =
-        { Decision: string
-          Probability: float }
+        { Decision: string; Probability: float }
 
     type VocBand =
         { Point: float
@@ -49,9 +48,7 @@ module Certificate =
         | SingleWinner of string
         | DecisionDistribution of DecisionMass list
 
-    type CheckOutcome =
-        { Check: string
-          Passed: bool }
+    type CheckOutcome = { Check: string; Passed: bool }
 
     type VocOutcome =
         { Point: float

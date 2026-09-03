@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadGecSurface } from './gec-support.mjs';
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js';
 
 const nodeId = 'n01h455vb4pex5vsknk084sn02b';
 
@@ -32,7 +32,7 @@ function patchesInCanonicalOrder() {
 }
 
 test('WHAT[EPI-016] single_certificate_holds_exact_bound_sample_ordinal_latent_together_or_solver_mode_splits_state', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   let certificate = baseCertificate();
   for (const patch of patchesInCanonicalOrder()) {
     const result = await surface.refineCertificate({ certificate, patch });
@@ -65,7 +65,7 @@ test('WHAT[EPI-016] single_certificate_holds_exact_bound_sample_ordinal_latent_t
 });
 
 test('WHAT[EPI-016] sample_slot_requires_coverage_assumptions_or_point_estimate_masquerades_as_bound', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const invalidPatches = [
     {
       name: 'lower above upper',
@@ -116,7 +116,7 @@ test('WHAT[EPI-016] sample_slot_requires_coverage_assumptions_or_point_estimate_
 });
 
 test('WHAT[EPI-016] exact_bound_declare_inclusion_while_sample_declares_coverage_or_value_preorder_collapses', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const start = baseCertificate();
   const withExact = await surface.refineCertificate({
     certificate: start,

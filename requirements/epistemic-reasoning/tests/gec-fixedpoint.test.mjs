@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadGecSurface } from './gec-support.mjs';
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js';
 
 function events() {
   return [
@@ -28,7 +28,7 @@ const contractionCase = {
 };
 
 test('WHAT[EPI-026] declared_finite_dag_lattice_or_contraction_converges_or_closure_claims_without_domain', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const dag = await surface.replay({ events: events(), closure: { domain: dagCase.domain, operator: dagCase.operator, maxIterations: 50 } });
   assert.equal(dag.ok, true);
   assert.equal(dag.converged, true, 'an acyclic recurrence must reach its least fixed point');
@@ -48,7 +48,7 @@ test('WHAT[EPI-026] declared_finite_dag_lattice_or_contraction_converges_or_clos
 });
 
 test('WHAT[EPI-026] undeclared_domain_reports_bounded_residual_without_uniqueness_or_naive_fixed_point_overclaims', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const missing = [
     { name: 'absent domain', closure: { operator: latticeCase.operator, maxIterations: 8 } },
     { name: 'empty domain', closure: { domain: { kind: 'none' }, operator: latticeCase.operator, maxIterations: 8 } },
@@ -69,7 +69,7 @@ test('WHAT[EPI-026] undeclared_domain_reports_bounded_residual_without_uniquenes
 });
 
 test('WHAT[EPI-026] async_convergence_stays_conjecture_without_gap_fairness_and_order_or_partial_evidence_claims_limit', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const partial = await surface.replay({
     events: events(),
     closure: {

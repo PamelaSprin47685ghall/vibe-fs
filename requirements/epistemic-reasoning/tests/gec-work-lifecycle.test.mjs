@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadGecSurface } from './gec-support.mjs';
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js';
 
 const inquiry = 'iq_01h455vb4pex5vsknk084sn02x';
 const branch = 'branch_01h455vb4pex5vsknk084sn02z';
@@ -35,7 +35,7 @@ function workRef(workId, attempt = 1, extra = {}) {
 }
 
 test('WHAT[EPI-021] ready_requires_satisfied_dependencies_or_dangling_work_runs_early', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const blocked = [
     created(),
     planned(1, 'ev0', 'work_aaaa', []),
@@ -50,14 +50,14 @@ test('WHAT[EPI-021] ready_requires_satisfied_dependencies_or_dangling_work_runs_
     ...prefix('work_aaaa', []),
     transition(2, 'ev1', workRef('work_aaaa', 1, { dependencies: [] }), 'Planned', 'Ready', {}),
     transition(3, 'ev2', workRef('work_aaaa', 1, { fence: 'fence-1' }), 'Ready', 'Leased', {}),
-    transition(4, 'ev3', workRef('work_aaaa', 1, { fence: 'fence-1', session: 'sess-1' }), 'Leased', 'Running', {}),
+    transition(4, 'ev3', workRef('work_aaaa', 1, { fence: 'fence-1', session: 'sess-1' }), 'Leased', 'Executing', {}),
   ];
   const accepted = await surface.replay({ events: legal });
-  assert.equal(accepted.ok, true, 'dependency-free work must traverse Planned Ready Leased Running');
+  assert.equal(accepted.ok, true, 'dependency-free work must traverse Planned Ready Leased Executing');
 
   const skipped = [
     ...prefix('work_aaaa', []),
-    transition(2, 'ev1', workRef('work_aaaa', 1, { fence: 'fence-1', session: 'sess-1' }), 'Planned', 'Running', {}),
+    transition(2, 'ev1', workRef('work_aaaa', 1, { fence: 'fence-1', session: 'sess-1' }), 'Planned', 'Executing', {}),
   ];
   const rejected = await surface.replay({ events: skipped });
   assert.equal(rejected.ok, false, 'skipping Ready and Leased must be rejected');
@@ -73,19 +73,19 @@ test('WHAT[EPI-021] ready_requires_satisfied_dependencies_or_dangling_work_runs_
   assert.equal(noFence.error.code, 'missing-fence');
 });
 
-test('WHAT[EPI-021] terminal_states_never_return_to_running_and_attempt_accepts_single_observation_or_retry_forks_state', async () => {
-  const surface = await loadGecSurface();
+test('WHAT[EPI-021] terminal_states_never_return_to_executing_and_attempt_accepts_single_observation_or_retry_forks_state', async () => {
+  const surface = gecSurface;
   const runToSuccess = (workId) => [
     ...prefix(workId, []),
     transition(2, 'ev1', workRef(workId, 1), 'Planned', 'Ready', {}),
     transition(3, 'ev2', workRef(workId, 1, { fence: 'fence-1' }), 'Ready', 'Leased', {}),
-    transition(4, 'ev3', workRef(workId, 1, { fence: 'fence-1', session: 'sess-1' }), 'Leased', 'Running', {}),
-    transition(5, 'ev4', workRef(workId, 1, { fence: 'fence-1', session: 'sess-1' }), 'Running', 'Succeeded', { observation: 'obs-1' }),
+    transition(4, 'ev3', workRef(workId, 1, { fence: 'fence-1', session: 'sess-1' }), 'Leased', 'Executing', {}),
+    transition(5, 'ev4', workRef(workId, 1, { fence: 'fence-1', session: 'sess-1' }), 'Executing', 'Succeeded', { observation: 'obs-1' }),
   ];
   const done = await surface.replay({ events: runToSuccess('work_cccc') });
   assert.equal(done.ok, true);
 
-  const illegalResumes = ['Running', 'Ready', 'Leased', 'InputRequired'];
+  const illegalResumes = ['Executing', 'Ready', 'Leased', 'InputRequired'];
   for (const to of illegalResumes) {
     const events = [
       ...runToSuccess('work_dddd'),
@@ -98,7 +98,7 @@ test('WHAT[EPI-021] terminal_states_never_return_to_running_and_attempt_accepts_
 
   const duplicateObservation = [
     ...runToSuccess('work_eeee').slice(0, 5),
-    transition(5, 'ev4', workRef('work_eeee', 1, { fence: 'fence-1', session: 'sess-1' }), 'Running', 'Succeeded', { observation: 'obs-1' }),
+    transition(5, 'ev4', workRef('work_eeee', 1, { fence: 'fence-1', session: 'sess-1' }), 'Executing', 'Succeeded', { observation: 'obs-1' }),
     transition(6, 'ev5', workRef('work_eeee', 1, { fence: 'fence-1', session: 'sess-1' }), 'Succeeded', 'Succeeded', { observation: 'obs-2' }),
   ];
   const dup = await surface.replay({ events: duplicateObservation });
@@ -109,16 +109,16 @@ test('WHAT[EPI-021] terminal_states_never_return_to_running_and_attempt_accepts_
     ...prefix('work_ffff', []),
     transition(2, 'ev1', workRef('work_ffff', 1, { fence: 'fence-1', session: 'sess-1' }), 'Planned', 'Ready', {}),
     transition(3, 'ev2', workRef('work_ffff', 1, { fence: 'fence-1', session: 'sess-1' }), 'Ready', 'Leased', {}),
-    transition(4, 'ev3', workRef('work_ffff', 1, { fence: 'fence-1', session: 'sess-1' }), 'Leased', 'Running', {}),
-    transition(5, 'ev4', workRef('work_ffff', 1, { fence: 'fence-1', session: 'sess-1' }), 'Running', 'Failed', { error: 'boom' }),
+    transition(4, 'ev3', workRef('work_ffff', 1, { fence: 'fence-1', session: 'sess-1' }), 'Leased', 'Executing', {}),
+    transition(5, 'ev4', workRef('work_ffff', 1, { fence: 'fence-1', session: 'sess-1' }), 'Executing', 'Failed', { error: 'boom' }),
     transition(6, 'ev5', workRef('work_ffff', 2), 'Failed', 'Ready', {}),
   ];
   const retried = await surface.replay({ events: retry });
-  assert.equal(retried.ok, true, 'retry must re-enter Ready with a fresh attempt rather than resuming Running');
+  assert.equal(retried.ok, true, 'retry must re-enter Ready with a fresh attempt rather than resuming Executing');
 });
 
 test('WHAT[EPI-021] wall_clock_fields_are_rejected_or_timer_drives_lifecycle', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const timed = [
     'leaseExpiresAt',
     'heartbeatTimeout',

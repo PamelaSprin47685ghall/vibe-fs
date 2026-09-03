@@ -2,9 +2,7 @@ namespace Wanxiangshu.Sphinx.Runtime
 
 open Wanxiangshu.Sphinx.Core
 
-type CertificateError =
-    { Code: string
-      Message: string }
+type CertificateError = { Code: string; Message: string }
 
 type CertificatePatchRequest =
     { Slot: string
@@ -25,7 +23,6 @@ type CertificatePatchRequest =
 
 module Certificate =
     val empty: nodeId: NodeId -> ValueCertificate
+
     val apply:
-        certificate: ValueCertificate ->
-        patch: CertificatePatchRequest ->
-            Result<ValueCertificate, CertificateError>
+        certificate: ValueCertificate -> patch: CertificatePatchRequest -> Result<ValueCertificate, CertificateError>

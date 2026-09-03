@@ -1,6 +1,13 @@
 namespace Wanxiangshu.Sphinx
 
+open System
+open System.Threading.Tasks
+open Thoth.Json
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Resources
+open Wanxiangshu.Sphinx.Core
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -46,6 +53,9 @@ module McpServer =
     let private zRecordArray (description: string) : obj =
         emitJsExpr (zod, description) "$0.array($0.record($0.string(), $0.any())).describe($1)"
 
+    let private zAnyArray (description: string) : obj =
+        emitJsExpr (zod, description) "$0.array($0.any()).describe($1)"
+
     let private zObjectArray (shape: obj) (description: string) : obj =
         emitJsExpr (zod, shape, description) "$0.array($0.object($1)).describe($2)"
 
@@ -62,6 +72,13 @@ module McpServer =
 
     [<Emit("(args) => $0(args)")>]
     let private unaryHandler (handler: obj -> obj) : obj = jsNative
+
+    // WHAT[EPI-030]: the MCP SDK awaits whatever a tool callback returns, so a
+    // Fable Task (a native promise) lets durable tools append after the session
+    // accepted, without fire-and-forget. Rejections never escape: every durable
+    // handler catches its failures into a typed isError result.
+    [<Emit("(args) => $0(args)")>]
+    let private asyncUnaryHandler (handler: obj -> Task<obj>) : obj = jsNative
 
     [<Emit("$0.connect($1)")>]
     let private connect (server: obj) (transport: obj) : JS.Promise<unit> = jsNative
@@ -188,10 +205,8 @@ module McpServer =
             logError tool view startedMs
             errorResult tool view
 
-    let private startHandler (store: SessionStore) (args: obj) : obj =
-        let startedMs = nowMs ()
-
-        match store.StartTyped(unbox<string> args?question) with
+    let private startOutcomeResult (startedMs: float) (outcome: StartOutcome) : obj =
+        match outcome with
         | StartOutcome.Started(handle, state, result) ->
             let success: SessionSuccess =
                 { Handle = handle
@@ -205,6 +220,9 @@ module McpServer =
             let view = McpContract.questionRequiredView message
             logError McpContract.toolStart view startedMs
             errorResult McpContract.toolStart view
+
+    let private startHandler (store: SessionStore) (args: obj) : obj =
+        startOutcomeResult (nowMs ()) (store.StartTyped(unbox<string> args?question))
 
     let private observationHandler
         (tool: string)
@@ -266,6 +284,343 @@ module McpServer =
 
             successResult (McpContract.summarizeCancel ()) (McpContract.cancelPayload handle))
 
+    let private textField (args: obj) (name: string) : string =
+        let raw: obj = emitJsExpr (args, name) "$0[$1]"
+        if isNullish raw then "" else string raw
+
+    let private optField (args: obj) (name: string) : obj = emitJsExpr (args, name) "$0[$1]"
+
+    let private nullIfMissing (value: obj) : obj = if isNullish value then null else value
+
+    let private inquiryFaultView (fault: GecInquiry.InquiryFault) : McpContract.ErrorView =
+        match fault with
+        | GecInquiry.InquiryFault.RevisionConflict(inquiryId, current) ->
+            { Code = GecInquiry.faultCode fault
+              Message = GecInquiry.faultMessage fault
+              Recoverable = true
+              Retryable = false
+              NextAction = "Call sphinx_inquiry_status and resubmit at the current revision."
+              Handle = Some inquiryId
+              Revision = Some current
+              ExpectedTool = None }
+        | GecInquiry.InquiryFault.UnknownInquiry inquiryId
+        | GecInquiry.InquiryFault.InquiryCancelled inquiryId ->
+            { Code = GecInquiry.faultCode fault
+              Message = GecInquiry.faultMessage fault
+              Recoverable = false
+              Retryable = false
+              NextAction = "Start a new generic inquiry with sphinx_inquiry_start."
+              Handle = Some inquiryId
+              Revision = None
+              ExpectedTool = None }
+
+    let private inquiryStartHandler (registry: GecInquiry.Registry) (args: obj) : obj =
+        let startedMs = nowMs ()
+        let question = textField args "question"
+
+        if System.String.IsNullOrWhiteSpace question then
+            let view = McpContract.questionRequiredView "question is required"
+            logError GecInquiry.toolGenericStart view startedMs
+            errorResult GecInquiry.toolGenericStart view
+        else
+            let entry: GecInquiry.GecInquiryEntry =
+                registry.Start(
+                    question,
+                    textField args "profile",
+                    nullIfMissing (optField args "plugins"),
+                    textField args "executionMode",
+                    nullIfMissing (optField args "budget")
+                )
+
+            logSuccess GecInquiry.toolGenericStart entry.InquiryId "active" entry.InquiryRevision startedMs
+            successResult "Sphinx generic inquiry started." (GecInquiry.entryView entry)
+
+    let private inquirySubmitHandler (registry: GecInquiry.Registry) (args: obj) : obj =
+        let startedMs = nowMs ()
+        let inquiryId = textField args "inquiryId"
+        let expectedRaw: obj = optField args "expectedRevision"
+
+        let expected: int = if isNullish expectedRaw then -1 else unbox<int> expectedRaw
+
+        let resultsRaw: obj = optField args "results"
+
+        let results: obj list =
+            if isNullish resultsRaw then
+                []
+            else
+                unbox<obj array> resultsRaw |> Array.toList
+
+        match registry.Submit(inquiryId, expected, results) with
+        | Ok(entry: GecInquiry.GecInquiryEntry) ->
+            logSuccess GecInquiry.toolGenericSubmit entry.InquiryId "active" entry.InquiryRevision startedMs
+            successResult "Sphinx generic work submitted." (GecInquiry.submitView entry results.Length)
+        | Error(fault: GecInquiry.InquiryFault) ->
+            let view: McpContract.ErrorView = inquiryFaultView fault
+            logError GecInquiry.toolGenericSubmit view startedMs
+            errorResult GecInquiry.toolGenericSubmit view
+
+    let private inquiryLookupError (tool: string) (startedMs: float) (fault: GecInquiry.InquiryFault) : obj =
+        let view: McpContract.ErrorView = inquiryFaultView fault
+        logError tool view startedMs
+        errorResult tool view
+
+    let private cancelledOrActiveResult
+        (tool: string)
+        (activeText: string)
+        (view: GecInquiry.GecInquiryEntry -> obj)
+        (entry: GecInquiry.GecInquiryEntry)
+        (startedMs: float)
+        : obj =
+        if entry.InquiryCancelled then
+            inquiryLookupError tool startedMs (GecInquiry.InquiryFault.InquiryCancelled entry.InquiryId)
+        else
+            logSuccess tool entry.InquiryId "active" entry.InquiryRevision startedMs
+            successResult activeText (view entry)
+
+    let private inquiryStatusHandler (registry: GecInquiry.Registry) (args: obj) : obj =
+        let startedMs = nowMs ()
+        let inquiryId = textField args "inquiryId"
+
+        match registry.TryFind inquiryId with
+        | Some(entry: GecInquiry.GecInquiryEntry) ->
+            cancelledOrActiveResult
+                GecInquiry.toolGenericStatus
+                "Sphinx generic inquiry active."
+                GecInquiry.entryView
+                entry
+                startedMs
+        | None ->
+            inquiryLookupError GecInquiry.toolGenericStatus startedMs (GecInquiry.InquiryFault.UnknownInquiry inquiryId)
+
+    let private inquiryExportHandler (registry: GecInquiry.Registry) (args: obj) : obj =
+        let startedMs = nowMs ()
+        let inquiryId = textField args "inquiryId"
+
+        match registry.TryFind inquiryId with
+        | Some(entry: GecInquiry.GecInquiryEntry) ->
+            cancelledOrActiveResult
+                GecInquiry.toolGenericExport
+                "Sphinx generic inquiry exported."
+                GecInquiry.exportView
+                entry
+                startedMs
+        | None ->
+            inquiryLookupError GecInquiry.toolGenericExport startedMs (GecInquiry.InquiryFault.UnknownInquiry inquiryId)
+
+    let private inquiryCancelHandler (registry: GecInquiry.Registry) (args: obj) : obj =
+        let startedMs = nowMs ()
+        let inquiryId = textField args "inquiryId"
+
+        match registry.Cancel inquiryId with
+        | Ok(entry: GecInquiry.GecInquiryEntry) ->
+            logSuccess GecInquiry.toolGenericCancel entry.InquiryId "cancelled" entry.InquiryRevision startedMs
+            successResult "Sphinx generic inquiry cancelled." (GecInquiry.cancelView entry)
+        | Error(fault: GecInquiry.InquiryFault) ->
+            let view: McpContract.ErrorView = inquiryFaultView fault
+            logError GecInquiry.toolGenericCancel view startedMs
+            errorResult GecInquiry.toolGenericCancel view
+
+    // WHAT[EPI-030]: SPHINX_COMMON_DIR selects the durable workspace. Missing
+    // or blank keeps the legacy in-memory server with no store contact.
+    let private sphinxCommonDirEnv = "SPHINX_COMMON_DIR"
+
+    // WHAT[EPI-030]: sanctioned Current slot written by the Sphinx rule.
+    let private sphinxCurrentKey = "Sphinx"
+
+    let private readCommonDir () : string option =
+        match Environment.GetEnvironmentVariable sphinxCommonDirEnv with
+        | null
+        | "" -> None
+        | value when String.IsNullOrWhiteSpace value -> None
+        | value -> Some value
+
+    // WHAT[EPI-030]: durable identity mirrors LegacyDurability: one stream per
+    // handle, deterministic handle:revision ids chained by causal parents, and
+    // the accepted args inlined as canonical JSON for replay.
+    let private legacyEnvelopeOf
+        (handle: string)
+        (tool: string)
+        (argsJson: string)
+        (revision: int)
+        (question: string)
+        : EventEnvelope =
+        EventEnvelope.normalize
+            { EventId = Wanxiangshu.Foundation.Identity.EventId.create (LegacyDurability.envelopeId handle revision)
+              StreamId = EventStreamId.create (LegacyDurability.streamFor handle)
+              EventType = LegacyDurability.observationType
+              Parents =
+                if revision <= 0 then
+                    []
+                else
+                    [ Wanxiangshu.Foundation.Identity.EventId.create (LegacyDurability.envelopeId handle (revision - 1)) ]
+              Payload =
+                Encode.object
+                    [ "handle", Encode.string handle
+                      "tool", Encode.string tool
+                      "args_json", Encode.string argsJson
+                      "revision", Encode.int revision
+                      "question", Encode.string question ]
+              PayloadRefs = [] }
+
+    // WHAT[EPI-030]: durable-append failures are typed MCP errors, never
+    // silent. The session already advanced in memory, so the revision can never
+    // be appended again; only in-memory work continues.
+    let private durableAppendFailedView (handle: string) (revision: int) (reason: string) : McpContract.ErrorView =
+        { Code = "durable-append-failed"
+          Message = reason
+          Recoverable = true
+          Retryable = false
+          NextAction =
+            "The inquiry advanced in memory but was not made durable, so it will not survive restart. Continue in memory, or start a new inquiry for restart-safe work."
+          Handle = Some handle
+          Revision = Some revision
+          ExpectedTool = None }
+
+    let private appendOutcomeReason (appendError: AppendError) : string =
+        match appendError with
+        | AppendError.StorageInvalid invalid -> sprintf "durable storage rejected the observation: %A" invalid
+        | AppendError.SemanticCut cut -> sprintf "durable semantic cut by rule %s: %s" cut.Rule cut.Reason
+        | AppendError.AppendFailed reason -> reason
+
+    let private appendLegacyObservation
+        (events: IEventStore)
+        (tool: string)
+        (handle: string)
+        (args: obj)
+        (revision: int)
+        (startedMs: float)
+        : Task<Result<unit, McpContract.ErrorView>> =
+        task {
+            let question =
+                if tool = McpContract.toolStart then
+                    textField args "question"
+                else
+                    ""
+
+            let envelope =
+                legacyEnvelopeOf handle tool (CoreHash.canonical args) revision question
+
+            match! events.Append [ envelope ] with
+            | Ok _ -> return Ok()
+            | Error appendError ->
+                let view = durableAppendFailedView handle revision (appendOutcomeReason appendError)
+                logError tool view startedMs
+                return Error view
+        }
+
+    let private decodeDurableObservation
+        (tool: string)
+        (decode: obj -> Result<Observation, string>)
+        (args: obj)
+        (startedMs: float)
+        : Result<Observation, McpContract.ErrorView> =
+        decode args
+        |> Result.mapError (fun message ->
+            let view = McpContract.invalidObservationView (optionalHandle args?handle) message
+            logError tool view startedMs
+            view)
+
+    let private resumeDurableObservation
+        (tool: string)
+        (sessions: SessionStore)
+        (handle: string)
+        (observation: Observation)
+        (startedMs: float)
+        : Result<SessionSuccess, McpContract.ErrorView> =
+        match sessions.ResumeObservation(handle, observation) with
+        | SessionOutcome.Success success -> Ok success
+        | SessionOutcome.Failure failure ->
+            let view = McpContract.failureView failure
+            logError tool view startedMs
+            Error view
+
+    let private renderDurableOutcome (tool: string) (outcome: Result<obj, McpContract.ErrorView>) : obj =
+        match outcome with
+        | Ok rendered -> rendered
+        | Error view -> errorResult tool view
+
+    let private startDurableHandler (sessions: SessionStore) (events: IEventStore) (args: obj) : Task<obj> =
+        task {
+            let startedMs = nowMs ()
+
+            match sessions.StartTyped(unbox<string> args?question) with
+            | StartOutcome.Rejected _ as rejected -> return startOutcomeResult startedMs rejected
+            | StartOutcome.Started(handle, state, _) as started ->
+                let! outcome =
+                    taskResult {
+                        do! appendLegacyObservation events McpContract.toolStart handle args state.Revision startedMs
+                        return startOutcomeResult startedMs started
+                    }
+
+                return renderDurableOutcome McpContract.toolStart outcome
+        }
+
+    let private observationDurableHandler
+        (tool: string)
+        (decode: obj -> Result<Observation, string>)
+        (sessions: SessionStore)
+        (events: IEventStore)
+        (args: obj)
+        : Task<obj> =
+        task {
+            let startedMs = nowMs ()
+            let handle = unbox<string> args?handle
+
+            let! outcome =
+                taskResult {
+                    let! observation = decodeDurableObservation tool decode args startedMs
+                    let! success = resumeDurableObservation tool sessions handle observation startedMs
+                    do! appendLegacyObservation events tool handle args success.State.Revision startedMs
+                    return resumeResultOf tool startedMs (SessionOutcome.Success success)
+                }
+
+            return renderDurableOutcome tool outcome
+        }
+
+    let private replayToolOfObservation (observation: Observation) : string =
+        match observation with
+        | SemanticAssessmentObservation _ -> McpContract.toolAssess
+        | CandidatesObservation _ -> McpContract.toolPropose
+        | InvestigationObservation _ -> McpContract.toolInvestigate
+        | SynthesisObservation _ -> McpContract.toolSynthesize
+
+    let private decodeLegacyDurableObservation
+        (args: obj)
+        (startedMs: float)
+        : Result<Observation, McpContract.ErrorView> =
+        ObservationCodec.decode args?observation
+        |> Result.mapError (fun message ->
+            let view = McpContract.invalidObservationView (optionalHandle args?handle) message
+            logError McpContract.toolResumeLegacy view startedMs
+            view)
+
+    let private resumeLegacyDurableHandler (sessions: SessionStore) (events: IEventStore) (args: obj) : Task<obj> =
+        task {
+            let startedMs = nowMs ()
+            let handle = unbox<string> args?handle
+
+            let! outcome =
+                taskResult {
+                    let! observation = decodeLegacyDurableObservation args startedMs
+
+                    let! success =
+                        resumeDurableObservation McpContract.toolResumeLegacy sessions handle observation startedMs
+
+                    do!
+                        appendLegacyObservation
+                            events
+                            (replayToolOfObservation observation)
+                            handle
+                            args?observation
+                            success.State.Revision
+                            startedMs
+
+                    return resumeResultOf McpContract.toolResumeLegacy startedMs (SessionOutcome.Success success)
+                }
+
+            return renderDurableOutcome McpContract.toolResumeLegacy outcome
+        }
+
     let private candidateSchema =
         createObj
             [ "method" ==> zBareString ()
@@ -295,23 +650,57 @@ module McpServer =
             (unaryHandler handler)
         |> ignore
 
-    let create (store: SessionStore) =
+    let private registerAsync
+        (server: obj)
+        (name: string)
+        (title: string)
+        (description: string)
+        (inputSchema: obj)
+        (handler: obj -> Task<obj>)
+        =
+        registerTool
+            server
+            name
+            (createObj
+                [ "title" ==> title
+                  "description" ==> description
+                  "inputSchema" ==> inputSchema ])
+            (asyncUnaryHandler handler)
+        |> ignore
+
+    // WHAT[EPI-030]: one registration source for both servers. None keeps the
+    // legacy sync handlers; Some store swaps the six mutating tools to
+    // append-after-accept handlers with identical titles and schemas.
+    let private buildServer (sessions: SessionStore) (durable: IEventStore option) : obj =
         let server =
             construct
                 mcpServerConstructor
                 (createObj [ "name" ==> SphinxMcp.serverName; "version" ==> PackageMetadata.version () ])
                 (createObj [ "instructions" ==> serverInstructions ])
 
-        register
-            server
+        let inquiries = GecInquiry.Registry()
+
+        let registerDurable
+            (tool: string)
+            (title: string)
+            (description: string)
+            (inputSchema: obj)
+            (sync: obj -> obj)
+            (async: IEventStore -> obj -> Task<obj>)
+            =
+            match durable with
+            | None -> register server tool title description inputSchema sync
+            | Some events -> registerAsync server tool title description inputSchema (async events)
+
+        registerDurable
             McpContract.toolStart
             "Start Sphinx inquiry"
             "Start one kernel-controlled Sphinx inquiry. If the result yields, follow nextTool; do not choose another phase yourself."
             (createObj [ "question" ==> zString "Root question" ])
-            (startHandler store)
+            (startHandler sessions)
+            (startDurableHandler sessions)
 
-        register
-            server
+        registerDurable
             McpContract.toolAssess
             "Assess question semantics"
             "Answer the pending SemanticAssessmentRequest. forms maps QuestionForm (Why/How/What/Who/Where/When/Which/Polar/Other) to belief mass; facets, targets and intents are optional."
@@ -321,10 +710,10 @@ module McpServer =
                   "facets" ==> zOptional (zNumberRecord "Facet → applicability")
                   "targets" ==> zOptional (zStringArray "Target terms")
                   "intents" ==> zOptional (zStringArray "Intent terms") ])
-            (observationHandler McpContract.toolAssess ObservationCodec.decodeSemanticAssessment store)
+            (observationHandler McpContract.toolAssess ObservationCodec.decodeSemanticAssessment sessions)
+            (observationDurableHandler McpContract.toolAssess ObservationCodec.decodeSemanticAssessment sessions)
 
-        register
-            server
+        registerDurable
             McpContract.toolPropose
             "Propose investigation candidates"
             "Answer the pending GenerateCandidatesRequest with candidate investigation proposals. Proposals are not evidence; the kernel decides which action is investigated."
@@ -334,13 +723,13 @@ module McpServer =
                   ==> zObjectArray
                           candidateSchema
                           "Candidate proposals: method, question, semanticKey; optional dependencyKey, expectedRootGain, gatewayGain, cost, provenance" ])
-            (observationHandler McpContract.toolPropose ObservationCodec.decodeCandidates store)
+            (observationHandler McpContract.toolPropose ObservationCodec.decodeCandidates sessions)
+            (observationDurableHandler McpContract.toolPropose ObservationCodec.decodeCandidates sessions)
 
-        register
-            server
+        registerDurable
             McpContract.toolInvestigate
             "Investigate the selected action"
-            "Answer the pending InvestigateRequest. actionKey must be copied exactly from the current InvestigateRequest.action.id. Findings, evidence, hypotheses, candidates and semanticAssessment are optional collections; evidence must be explicit and sourced."
+            "Answer the pending InvestigateRequest. actionKey must be copied exactly from the current InvestigateRequest.action.id. Findings, evidence, hypotheses, candidates and semanticAssessment are optional collections; each evidence entry is an object with semanticKey, proposition, source object carrying id, and dependencyKey. A bare-string source is rejected as INVALID_OBSERVATION without advancing the revision."
             (createObj
                 [ "handle" ==> zString "Opaque inquiry handle returned by start"
                   "actionKey" ==> zString "Copy exactly from InvestigateRequest.action.id"
@@ -352,10 +741,10 @@ module McpServer =
                   "hypotheses"
                   ==> zOptional (zRecordArray "Hypotheses with semanticKey and label")
                   "candidates" ==> zOptional (zRecordArray "Follow-up candidate proposals") ])
-            (observationHandler McpContract.toolInvestigate ObservationCodec.decodeInvestigation store)
+            (observationHandler McpContract.toolInvestigate ObservationCodec.decodeInvestigation sessions)
+            (observationDurableHandler McpContract.toolInvestigate ObservationCodec.decodeInvestigation sessions)
 
-        register
-            server
+        registerDurable
             McpContract.toolSynthesize
             "Synthesize findings"
             "Answer the pending SynthesizeRequest. Synthesis organizes existing findings; it does not create evidence. findingKeys must reference known findings."
@@ -365,7 +754,8 @@ module McpServer =
                   "findingKeys"
                   ==> zOptional (zStringArray "Known finding keys organized by this synthesis")
                   "uncertainties" ==> zOptional (zStringArray "Explicit uncertainties") ])
-            (observationHandler McpContract.toolSynthesize ObservationCodec.decodeSynthesis store)
+            (observationHandler McpContract.toolSynthesize ObservationCodec.decodeSynthesis sessions)
+            (observationDurableHandler McpContract.toolSynthesize ObservationCodec.decodeSynthesis sessions)
 
         register
             server
@@ -373,7 +763,7 @@ module McpServer =
             "Inquiry status"
             "Read the current status of one inquiry: active with nextTool and pending request, or answered with the canonical answer."
             (createObj [ "handle" ==> zString "Opaque inquiry handle returned by start" ])
-            (statusHandler store)
+            (statusHandler sessions)
 
         register
             server
@@ -381,26 +771,202 @@ module McpServer =
             "Cancel inquiry"
             "Cancel one inquiry and release its handle. The handle becomes unknown immediately."
             (createObj [ "handle" ==> zString "Opaque inquiry handle returned by start" ])
-            (cancelHandler store)
+            (cancelHandler sessions)
 
-        register
-            server
+        registerDurable
             McpContract.toolResumeLegacy
             "Resume Sphinx inquiry (legacy)"
             "Legacy compatibility tool. Prefer the phase-specific tool named by nextTool. Continues the same inquiry with a raw observation object carrying an explicit type field."
             (createObj
                 [ "handle" ==> zString "Opaque inquiry handle returned by start"
                   "observation" ==> zRecord "Raw observation with explicit type field" ])
-            (resumeLegacyHandler store)
+            (resumeLegacyHandler sessions)
+            (resumeLegacyDurableHandler sessions)
+
+        register
+            server
+            GecInquiry.toolGenericStart
+            "Start generic inquiry"
+            "Start one schema-only generic inquiry and return its iq_ handle at revision 0. The host records revisions only; it never returns refiner, stop or answer verdicts."
+            (createObj
+                [ "question" ==> zString "Root question"
+                  "profile" ==> zOptional (zString "Profile name")
+                  "plugins" ==> zOptional (zAnyArray "Plugin descriptors")
+                  "executionMode" ==> zOptional (zString "Execution mode")
+                  "budget" ==> zOptional (zRecord "Budget by currency") ])
+            (inquiryStartHandler inquiries)
+
+        register
+            server
+            GecInquiry.toolGenericSubmit
+            "Submit generic work results"
+            "Submit worker results at an expected revision. A stale expectedRevision fails with REVISION_CONFLICT and advances nothing."
+            (createObj
+                [ "inquiryId" ==> zString "Generic inquiry id returned by sphinx_inquiry_start"
+                  "expectedRevision" ==> zNumber ()
+                  "results" ==> zAnyArray "Work results applied at the next revision" ])
+            (inquirySubmitHandler inquiries)
+
+        register
+            server
+            GecInquiry.toolGenericStatus
+            "Generic inquiry status"
+            "Read one generic inquiry revision and liveness without judging it."
+            (createObj [ "inquiryId" ==> zString "Generic inquiry id returned by sphinx_inquiry_start" ])
+            (inquiryStatusHandler inquiries)
+
+        register
+            server
+            GecInquiry.toolGenericExport
+            "Export generic inquiry"
+            "Export the registry view of one generic inquiry: question, revision, status, budget and submitted results."
+            (createObj [ "inquiryId" ==> zString "Generic inquiry id returned by sphinx_inquiry_start" ])
+            (inquiryExportHandler inquiries)
+
+        register
+            server
+            GecInquiry.toolGenericCancel
+            "Cancel generic inquiry"
+            "Cancel one generic inquiry. Later status calls for the same id fail."
+            (createObj [ "inquiryId" ==> zString "Generic inquiry id returned by sphinx_inquiry_start" ])
+            (inquiryCancelHandler inquiries)
 
         server
+
+    let create (store: SessionStore) = buildServer store None
+
+    let createDurable (sessions: SessionStore) (events: IEventStore) = buildServer sessions (Some events)
 
     let serveStdio (store: SessionStore) =
         let server = create store
         let transport = constructEmpty stdioTransportConstructor
         connect server transport
 
-    let serveDefault () = serveStdio Session.defaultStore
+    let serveDurable (sessions: SessionStore) (events: IEventStore) =
+        let server = createDurable sessions events
+        let transport = constructEmpty stdioTransportConstructor
+        connect server transport
+
+    [<Emit("JSON.parse($0)")>]
+    let private parseJson (text: string) : obj = jsNative
+
+    let private storedRawObject (raw: obj) (handle: string) (tool: string) (argsJson: string) : Result<obj, string> =
+        if String.IsNullOrWhiteSpace handle then
+            Error "stored legacy raw needs a non-blank handle"
+        elif String.IsNullOrWhiteSpace tool then
+            Error(sprintf "stored legacy raw for %s needs a tool" handle)
+        elif String.IsNullOrWhiteSpace argsJson then
+            Error(sprintf "stored legacy raw for %s needs canonical args" handle)
+        else
+            Ok(
+                createObj
+                    [ "handle" ==> handle
+                      "tool" ==> tool
+                      "args" ==> parseJson argsJson
+                      "revision" ==> optField raw "revision" ]
+            )
+
+    let private parseStoredRaw (raw: obj) : Result<obj, string> =
+        try
+            storedRawObject raw (textField raw "handle") (textField raw "tool") (textField raw "argsJson")
+        with ex ->
+            Error(sprintf "stored legacy raw is not replayable: %s" ex.Message)
+
+    let private replayErrorText (result: obj) : string =
+        let message = textField (optField result "error") "message"
+
+        if String.IsNullOrWhiteSpace message then
+            "unknown replay failure"
+        else
+            message
+
+    [<Emit("$0 && $0.ok === true")>]
+    let private replaySucceeded (result: obj) : bool = jsNative
+
+    let rec private parseStoredRaws (remaining: obj list) (parsed: obj list) : Result<obj array, string> =
+        match remaining with
+        | [] -> Ok(List.rev parsed |> List.toArray)
+        | raw :: tail ->
+            parseStoredRaw raw
+            |> Result.bind (fun value -> parseStoredRaws tail (value :: parsed))
+
+    let private replayDecodedRaws (serving: SessionStore) (handle: string) (raws: obj array) : Result<unit, string> =
+        let outcome = LegacyDurability.replayObservations serving raws
+
+        if replaySucceeded outcome then
+            Ok()
+        else
+            Error(sprintf "replay of %s failed: %s" handle (replayErrorText outcome))
+
+    let private replayCursor
+        (serving: SessionStore)
+        (handle: string)
+        (cursor: LegacyIntegrator.LegacyInquiryCursor)
+        : Result<unit, string> =
+        try
+            parseStoredRaws cursor.Raws [] |> Result.bind (replayDecodedRaws serving handle)
+        with ex ->
+            Error(sprintf "replay of %s threw: %s" handle ex.Message)
+
+    let rec private replayCursors
+        (serving: SessionStore)
+        (remaining: (string * LegacyIntegrator.LegacyInquiryCursor) list)
+        : Result<SessionStore, string> =
+        match remaining with
+        | [] -> Ok serving
+        | (handle, cursor) :: tail ->
+            replayCursor serving handle cursor
+            |> Result.bind (fun () -> replayCursors serving tail)
+
+    // WHAT[EPI-030]: cross-process recovery. Every durable cursor rebuilds into
+    // the serving store oldest-first before the transport connects, so server2
+    // answers at the same revision server1 left behind. Any failure refuses to
+    // serve rather than answering from an unrecovered store.
+    let private bootFromCurrent (current: obj) : Result<SessionStore, string> =
+        try
+            let folded = unbox<LegacyIntegrator.SphinxLegacyCurrent> current
+            let serving = SessionStore()
+
+            let cursors =
+                folded |> Map.toList |> List.sortBy (fun (_, cursor) -> cursor.Revision)
+
+            replayCursors serving cursors
+        with ex ->
+            Error(sprintf "Sphinx durable current has an unexpected shape: %s" ex.Message)
+
+    let private bootFromCurrentOption (current: obj option) : Result<SessionStore, string> =
+        match current with
+        | None -> Ok(SessionStore())
+        | Some found -> bootFromCurrent found
+
+    let private bootDurableSessions (events: IEventStore) : Result<SessionStore, string> =
+        try
+            bootFromCurrentOption (events.TryCurrent sphinxCurrentKey)
+        with ex ->
+            Error(sprintf "Sphinx durable boot failed: %s" ex.Message)
+
+    let private serveBootOutcome (events: IEventStore) (booted: Result<SessionStore, string>) =
+        match booted with
+        | Ok serving -> serveDurable serving events
+        | Error message -> failwith message
+
+    let private serveDurableDir (commonDir: string) =
+        try
+            let integrator = CanonicalIntegrator.create ()
+
+            let events =
+                EventStore.createLocal commonDir (Guid.NewGuid().ToString("N")) integrator
+
+            serveBootOutcome events (bootDurableSessions events)
+        with ex ->
+            consoleError (sprintf "[sphinx-mcp] durable boot failed: %s" ex.Message)
+            exitFailure ()
+            reraise ()
+
+    let serveDefault () =
+        match readCommonDir () with
+        | None -> serveStdio Session.defaultStore
+        | Some commonDir -> serveDurableDir commonDir
 
     let private runIfEntryPoint () =
         let argument = entryArgument ()

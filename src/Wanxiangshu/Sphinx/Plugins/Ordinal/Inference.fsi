@@ -1,8 +1,7 @@
 namespace Wanxiangshu.Sphinx.Plugins.Ordinal
 
 module Inference =
-    type Ballot =
-        { Ranks: string list list }
+    type Ballot = { Ranks: string list list }
 
     type BordaInput =
         { Candidates: string list
@@ -51,8 +50,7 @@ module Inference =
           Regularization: float
           RequestedMaxIterations: int }
 
-    type BtlUncertainty =
-        { StandardErrors: Map<string, float> }
+    type BtlUncertainty = { StandardErrors: Map<string, float> }
 
     type BtlOutcome =
         { Strengths: Map<string, float>

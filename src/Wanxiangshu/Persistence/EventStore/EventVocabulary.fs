@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Persistence.EventStore
 
+open Wanxiangshu.Sphinx
 open Wanxiangshu.Strength
 
 /// Additive authoritative event vocabulary. Unknown durable facts fail closed
@@ -31,6 +32,10 @@ module AuthoritativeEventTypes =
               StrengthEventTypes.CandidatePrepared
               StrengthEventTypes.CandidatePromoted
               StrengthEventTypes.FramesTraced
-              StrengthEventTypes.CandidateAbandoned ]
+              StrengthEventTypes.CandidateAbandoned
+              SphinxEventTypes.PluginSetBound
+              SphinxEventTypes.ObservationAccepted
+              SphinxEventTypes.AnswerCommitted
+              SphinxEventTypes.LegacyObservation ]
 
     let isKnown eventType = Set.contains eventType builtins

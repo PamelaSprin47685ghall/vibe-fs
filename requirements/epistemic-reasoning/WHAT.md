@@ -65,7 +65,7 @@ Evidence 的内部标识至少由规范化的 semantic key 与 dependency key �
 
 MCP Host 必须暴露 `sphinx_inquiry_start`、`sphinx_work_submit`、`sphinx_inquiry_status`、`sphinx_inquiry_export`、`sphinx_inquiry_cancel`；`submit` 一次接受一个或多个结果并直接返回下一批 ready work。旧 `start`、`assess`、`propose`、`investigate`、`synthesize`、`status`、`cancel`、`resume` 全部保留为 Legacy Adapter，其中四种 PendingRequest 仍各有唯一阶段工具与 `nextTool`。Host 只做 schema/表示转换，不裁决 observation 合法性、refiner、停止或答案。
 
-Protocol-boundary exemption（遵循 STRUCTURED-WORKFLOW-017）：`nextTool` 与 generic work envelope 都是外部协议语义；Runtime 独占事件提交与 continuation，caller 只提交 typed observation。
+Protocol-boundary exemption（遵循 STRUCTURED-WORKFLOW-017）：`nextTool` 与 generic work envelope 都是外部协议语义；默认 Legacy profile 下，Legacy Kernel 唯一拥有 continuation、closure 与停止判定，external caller 只提供 typed observation，不决定下一步执行语义；旧四阶段的 yield/observe 循环是协议语义而非领域程序计数器；通用 WorkEnvelope 路径由 Runtime 独占事件提交与 continuation，caller 只提交 typed observation。
 
 ## EPI-014: MCP Server 身份、版本与能力协商
 
@@ -97,7 +97,7 @@ InquiryCreated 时锁定每个 plugin 的 ID、release、ABI hash、capability�
 
 ## EPI-021: 通用 WorkItem 拒绝非法生命周期
 
-WorkItem 用封闭状态表达 Planned、Ready、Leased、Running、InputRequired、Succeeded、Failed、Cancelled 与 Superseded；需要 fence/session/attempt 的状态在对应 case 内携带证据，不以 bool+option 拼装。依赖满足前不得 Ready；同一 attempt 至多接受一个 observation；terminal 不可回到 running。lease 释放、重试、取消与 crash recovery 只由 durable transition 或 typed Host terminal 驱动，禁止 `leaseExpiresAt`、heartbeat timeout 或 wall clock 推断。
+WorkItem 用封闭状态表达 Planned、Ready、Leased、Executing、InputRequired、Succeeded、Failed、Cancelled 与 Superseded；需要 fence/session/attempt 的状态在对应 case 内携带证据，不以 bool+option 拼装。依赖满足前不得 Ready；同一 attempt 至多接受一个 observation；terminal 不可回到 executing。lease 释放、重试、取消与 crash recovery 只由 durable transition 或 typed Host terminal 驱动，禁止 `leaseExpiresAt`、heartbeat timeout 或 wall clock 推断。
 
 ## EPI-022: Scheduler 选择相容计算而非统一认识论总分
 

@@ -3,6 +3,7 @@
 namespace Wanxiangshu.Sphinx.Plugins.AStar
 
 open System
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Sphinx.Core
 
 module Refiner =
@@ -57,11 +58,12 @@ module Refiner =
 
     let message (fault: GraphFault) : string =
         match fault with
-        | GraphFault.NegativeCost (fromNode, toNode) ->
+        | GraphFault.NegativeCost(fromNode, toNode) ->
             sprintf "edge %s -> %s carries a negative cost; costs must be nonnegative" fromNode toNode
-        | GraphFault.NonFiniteCost (fromNode, toNode) ->
+        | GraphFault.NonFiniteCost(fromNode, toNode) ->
             sprintf "edge %s -> %s carries a non-finite cost; costs must be finite" fromNode toNode
-        | GraphFault.NegativeHeuristic node -> sprintf "heuristic for node %s is negative; estimates must be nonnegative" node
+        | GraphFault.NegativeHeuristic node ->
+            sprintf "heuristic for node %s is negative; estimates must be nonnegative" node
         | GraphFault.NonFiniteHeuristic node ->
             sprintf "heuristic for node %s is non-finite; estimates must be finite" node
 
@@ -72,100 +74,146 @@ module Refiner =
     let private isFiniteNumber (value: float) : bool =
         not (Double.IsNaN value || Double.IsInfinity value)
 
-    let private validate (problem: Problem) : Result<unit, GraphFault> =
+    let private checkNonFiniteCost (problem: Problem) : Result<unit, GraphFault> =
         match problem.Edges |> List.tryFind (fun edge -> not (isFiniteNumber edge.Cost)) with
         | Some edge -> Error(GraphFault.NonFiniteCost(edge.FromNode, edge.ToNode))
-        | None ->
-            match problem.Edges |> List.tryFind (fun edge -> edge.Cost < 0.0) with
-            | Some edge -> Error(GraphFault.NegativeCost(edge.FromNode, edge.ToNode))
-            | None ->
-                let ordered = problem.Heuristic |> Map.toList
+        | None -> Ok()
 
-                match ordered |> List.tryFind (fun (_, estimate) -> not (isFiniteNumber estimate)) with
-                | Some (node, _) -> Error(GraphFault.NonFiniteHeuristic node)
-                | None ->
-                    match ordered |> List.tryFind (fun (_, estimate) -> estimate < 0.0) with
-                    | Some (node, _) -> Error(GraphFault.NegativeHeuristic node)
-                    | None -> Ok()
+    let private checkNegativeCost (problem: Problem) : Result<unit, GraphFault> =
+        match problem.Edges |> List.tryFind (fun edge -> edge.Cost < 0.0) with
+        | Some edge -> Error(GraphFault.NegativeCost(edge.FromNode, edge.ToNode))
+        | None -> Ok()
+
+    let private checkNonFiniteHeuristic (problem: Problem) : Result<unit, GraphFault> =
+        match
+            problem.Heuristic
+            |> Map.toList
+            |> List.tryFind (fun (_, estimate) -> not (isFiniteNumber estimate))
+        with
+        | Some(node, _) -> Error(GraphFault.NonFiniteHeuristic node)
+        | None -> Ok()
+
+    let private checkNegativeHeuristic (problem: Problem) : Result<unit, GraphFault> =
+        match
+            problem.Heuristic
+            |> Map.toList
+            |> List.tryFind (fun (_, estimate) -> estimate < 0.0)
+        with
+        | Some(node, _) -> Error(GraphFault.NegativeHeuristic node)
+        | None -> Ok()
+
+    let private validate (problem: Problem) : Result<unit, GraphFault> =
+        result {
+            do! checkNonFiniteCost problem
+            do! checkNegativeCost problem
+            do! checkNonFiniteHeuristic problem
+            do! checkNegativeHeuristic problem
+        }
 
     type private FrontierEntry = { Node: string; G: float; F: float }
 
+    let private estimateOf (problem: Problem) (node: string) : float =
+        problem.Heuristic |> Map.tryFind node |> Option.defaultValue 0.0
+
+    let private adjacencyOf (problem: Problem) : Map<string, Edge list> =
+        problem.Edges |> List.groupBy (fun edge -> edge.FromNode) |> Map.ofList
+
+    let rec private rebuild (parents: Map<string, string>) (node: string) (path: string list) : string list =
+        match Map.tryFind node parents with
+        | None -> node :: path
+        | Some parent -> rebuild parents parent (node :: path)
+
+    let private isStaleEntry (bestG: Map<string, float>) (closed: Set<string>) (entry: FrontierEntry) : bool =
+        let recorded =
+            bestG |> Map.tryFind entry.Node |> Option.defaultValue Double.PositiveInfinity
+
+        entry.G > recorded || Set.contains entry.Node closed
+
+    let private relaxEdge
+        (estimate: string -> float)
+        (entryG: float)
+        (entryNode: string)
+        (queue: FrontierEntry list, costs: Map<string, float>, lineage: Map<string, string>, sealedNodes: Set<string>)
+        (edge: Edge)
+        : FrontierEntry list * Map<string, float> * Map<string, string> * Set<string> =
+        let tentative = entryG + edge.Cost
+
+        let previous =
+            costs |> Map.tryFind edge.ToNode |> Option.defaultValue Double.PositiveInfinity
+
+        if tentative < previous then
+            (({ Node = edge.ToNode
+                G = tentative
+                F = tentative + estimate edge.ToNode }
+             : FrontierEntry)
+             :: queue,
+             Map.add edge.ToNode tentative costs,
+             Map.add edge.ToNode entryNode lineage,
+             Set.remove edge.ToNode sealedNodes)
+        else
+            queue, costs, lineage, sealedNodes
+
+    let private goalProof (parents: Map<string, string>) (entry: FrontierEntry) (expandedRev: string list) : PathProof =
+        { Path = rebuild parents entry.Node []
+          Cost = entry.G
+          Expanded = List.rev (entry.Node :: expandedRev)
+          Expansions = List.length expandedRev + 1
+          LowerBound = entry.F
+          UpperBound = entry.G
+          Assumptions =
+            Set.ofList
+                [ "admissible-heuristic-assumed-unverified"
+                  "global-bound-at-goal-pop"
+                  "open-closed-parent-witnessed" ] }
+
+    let rec private searchLoop
+        (problem: Problem)
+        (estimate: string -> float)
+        (adjacency: Map<string, Edge list>)
+        (openSet: FrontierEntry list)
+        (bestG: Map<string, float>)
+        (parents: Map<string, string>)
+        (closed: Set<string>)
+        (expandedRev: string list)
+        : Outcome =
+        match openSet |> List.sortBy (fun entry -> entry.F, entry.G, entry.Node) with
+        | [] ->
+            Outcome.Unreachable
+                { Expanded = List.rev expandedRev
+                  Expansions = List.length expandedRev
+                  LowerBound = Double.PositiveInfinity
+                  UpperBound = Double.PositiveInfinity }
+        | entry :: rest when isStaleEntry bestG closed entry ->
+            searchLoop problem estimate adjacency rest bestG parents closed expandedRev
+        | entry :: rest when entry.Node = problem.Goal -> Outcome.Optimal(goalProof parents entry expandedRev)
+        | entry :: rest ->
+            let closedNow = Set.add entry.Node closed
+
+            let nextOpen, nextBest, nextParents, nextClosed =
+                adjacency
+                |> Map.tryFind entry.Node
+                |> Option.defaultValue []
+                |> List.fold (relaxEdge estimate entry.G entry.Node) (rest, bestG, parents, closedNow)
+
+            searchLoop problem estimate adjacency nextOpen nextBest nextParents nextClosed (entry.Node :: expandedRev)
+
     let solve (problem: Problem) : Result<Outcome, GraphFault> =
-        match validate problem with
-        | Error fault -> Error fault
-        | Ok () ->
-            let estimate node =
-                problem.Heuristic |> Map.tryFind node |> Option.defaultValue 0.0
+        result {
+            do! validate problem
+            let estimate = estimateOf problem
+            let adjacency = adjacencyOf problem
 
-            let adjacency = problem.Edges |> List.groupBy (fun edge -> edge.FromNode) |> Map.ofList
-
-            let neighbors node =
-                adjacency |> Map.tryFind node |> Option.defaultValue []
-
-            let rec rebuild parents node path =
-                match Map.tryFind node parents with
-                | None -> node :: path
-                | Some parent -> rebuild parents parent (node :: path)
-
-            let rec loop openSet bestG parents closed expandedRev =
-                match openSet |> List.sortBy (fun entry -> entry.F, entry.G, entry.Node) with
-                | [] ->
-                    Outcome.Unreachable
-                        { Expanded = List.rev expandedRev
-                          Expansions = List.length expandedRev
-                          LowerBound = Double.PositiveInfinity
-                          UpperBound = Double.PositiveInfinity }
-                | entry :: rest ->
-                    let recorded =
-                        bestG |> Map.tryFind entry.Node |> Option.defaultValue Double.PositiveInfinity
-
-                    if entry.G > recorded || Set.contains entry.Node closed then
-                        loop rest bestG parents closed expandedRev
-                    elif entry.Node = problem.Goal then
-                        Outcome.Optimal
-                            { Path = rebuild parents entry.Node []
-                              Cost = entry.G
-                              Expanded = List.rev (entry.Node :: expandedRev)
-                              Expansions = List.length expandedRev + 1
-                              LowerBound = entry.F
-                              UpperBound = entry.G
-                              Assumptions =
-                                Set.ofList
-                                    [ "admissible-heuristic-assumed-unverified"
-                                      "global-bound-at-goal-pop"
-                                      "open-closed-parent-witnessed" ] }
-                    else
-                        let closedNow = Set.add entry.Node closed
-
-                        let nextOpen, nextBest, nextParents, nextClosed =
-                            neighbors entry.Node
-                            |> List.fold
-                                (fun (queue, costs, lineage, sealedNodes) edge ->
-                                    let tentative = entry.G + edge.Cost
-
-                                    let previous =
-                                        costs |> Map.tryFind edge.ToNode |> Option.defaultValue Double.PositiveInfinity
-
-                                    if tentative < previous then
-                                        ({ Node = edge.ToNode
-                                           G = tentative
-                                           F = tentative + estimate edge.ToNode } :: queue,
-                                         Map.add edge.ToNode tentative costs,
-                                         Map.add edge.ToNode entry.Node lineage,
-                                         Set.remove edge.ToNode sealedNodes)
-                                    else
-                                        queue, costs, lineage, sealedNodes)
-                                (rest, bestG, parents, closedNow)
-
-                        loop nextOpen nextBest nextParents nextClosed (entry.Node :: expandedRev)
-
-            Ok(
-                loop
-                    [ { Node = problem.Start
-                        G = 0.0
-                        F = estimate problem.Start } ]
+            return
+                searchLoop
+                    problem
+                    estimate
+                    adjacency
+                    [ ({ Node = problem.Start
+                         G = 0.0
+                         F = estimate problem.Start }
+                      : FrontierEntry) ]
                     (Map.ofList [ problem.Start, 0.0 ])
                     Map.empty
                     Set.empty
                     []
-            )
+        }

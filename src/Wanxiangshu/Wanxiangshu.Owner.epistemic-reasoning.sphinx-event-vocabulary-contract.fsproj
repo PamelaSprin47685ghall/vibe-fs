@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>epistemic-reasoning</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>sphinx-event-vocabulary-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Sphinx/EventVocabulary.fsi"/>
+    <Compile Include="Sphinx/EventVocabulary.fs"/>
+  </ItemGroup>
+</Project>

@@ -11,15 +11,14 @@ type PluginManifest =
       Dependencies: Set<string>
       Schemas: Map<string, SchemaRef> }
 
-type PluginError =
-    { Code: string
-      Message: string }
+type PluginError = { Code: string; Message: string }
 
 type BoundPlugin = BoundPlugin of PluginManifest
 
 module Plugin =
 
-    let private error code message = Error { Code = code; Message = message }
+    let private error code message =
+        Error { Code = code; Message = message }
 
     let validate manifest =
         if String.IsNullOrWhiteSpace manifest.Id then
@@ -42,7 +41,8 @@ module Plugin =
           Dependencies = manifest.Dependencies
           Schemas = manifest.Schemas }
 
-    let bind manifest = validate manifest |> Result.map BoundPlugin
+    let bind manifest =
+        validate manifest |> Result.map BoundPlugin
 
     let manifestOf (BoundPlugin manifest) = manifest
 

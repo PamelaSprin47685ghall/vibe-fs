@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadGecSurface } from './gec-support.mjs';
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js';
 
 function target(overrides = {}) {
   return {
@@ -17,7 +17,7 @@ function shuffledCopies(list) {
 }
 
 test('WHAT[EPI-022] batch_respects_dependencies_conflicts_and_budget_or_naive_scheduler_overcommits', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const targets = [
     target({ id: 't-root', cost: { compute: 1, budget: 1 } }),
     target({ id: 't-child', dependencies: ['t-root'], cost: { compute: 1, budget: 1 } }),
@@ -50,7 +50,7 @@ test('WHAT[EPI-022] batch_respects_dependencies_conflicts_and_budget_or_naive_sc
 });
 
 test('WHAT[EPI-022] incomparable_losses_keep_pareto_frontier_or_scalar_sum_hides_tradeoff', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const targets = [
     target({ id: 't-alpha', loss: { currency: 'alpha-loss', value: 0.1 } }),
     target({ id: 't-beta', loss: { currency: 'beta-loss', value: 0.1 } }),
@@ -72,7 +72,7 @@ test('WHAT[EPI-022] incomparable_losses_keep_pareto_frontier_or_scalar_sum_hides
 });
 
 test('WHAT[EPI-022] batch_composes_by_canonical_order_not_input_sum_or_delta_addition_reorders_semantics', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const targets = [
     target({ id: 't-zeta', loss: { currency: 'shared', value: 0.3 }, commonCurrency: 'shared' }),
     target({ id: 't-mid', loss: { currency: 'shared', value: 0.2 }, commonCurrency: 'shared' }),

@@ -10,9 +10,7 @@ type PluginManifest =
       Dependencies: Set<string>
       Schemas: Map<string, SchemaRef> }
 
-type PluginError =
-    { Code: string
-      Message: string }
+type PluginError = { Code: string; Message: string }
 
 type BoundPlugin = private BoundPlugin of PluginManifest
 
