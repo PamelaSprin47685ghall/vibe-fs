@@ -84,3 +84,7 @@ Authority 的 durable terminal interpreter 校验 source witness 与 accepted ro
 ## INTERACTION-AUTHORITY-019: gate nudge admission、飞行态与 fresh-terminal re-arm 必须分型
 
 `InteractionRepair` 的 claim/Submitted/PhysicalAccepted 只建立一次 gate-nudge attempt 的 admission/物理落地证据，不建立 gate completion，更不建立“提醒预算耗尽”。当前 nudge attempt 仍为 `finish=None`、`tool-calls` 或其它明确 in-progress 观测时，重复 idle/reconcile 必须保持等待，禁止并发发送第二次 nudge。若该 attempt 自身到达新的稳定但仍不满足 gate 的 terminal（例如空/XML-only `stop` 或 `length`），该 fresh `ProviderRunIdentity` 必须重新获得一次 nudge 资格；同一 terminal 的重复观测仍严格幂等。普通旧 turn 在后续 nudge 已 admitted 后再次被观察，只能幂等吸收，不能替 fresh terminal 消耗提醒资格。普通 gate nudge 不发布 `INTERACTION_REPAIR_EXHAUSTED`。
+
+## INTERACTION-AUTHORITY-020: repair fatal绑定exact claim settlement与注入fuse
+
+只有typed repair invariant incident可以请求fatal；当前PromptKey claim、Submitted/PhysicalAccepted与fresh terminal判定必须先形成exact settlement evidence。InteractionRepair不得直接引用fatal physical adapter、optional/default/global fallback；composition注入mandatory capability。同一incident只允许一次report与kill，普通exhaustion或可恢复send failure不得升级为fatal。

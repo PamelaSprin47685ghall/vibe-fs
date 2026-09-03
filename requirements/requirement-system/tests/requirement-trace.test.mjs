@@ -237,6 +237,46 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects 
   }
 })
 
+test('WHAT[REQUIREMENT-SYSTEM-018] unrelated external proof inventory cannot close a WHAT', () => {
+  const root = mkdtempSync(join(tmpdir(), 'requirement-trace-external-inventory-'))
+  const requirements = join(root, 'requirements')
+  const packageRoot = join(requirements, 'fixture-package')
+  const tests = join(packageRoot, 'tests')
+  const unrelatedProof = join(tests, 'unrelated.test.mjs')
+  mkdirSync(tests, { recursive: true })
+  try {
+    writeFileSync(
+      join(packageRoot, 'WHAT.md'),
+      '# WHAT\n\n## FIXTURE-PACKAGE-001: must remain open\n\n## FIXTURE-PACKAGE-002: unrelated law\n',
+    )
+    writeFileSync(
+      unrelatedProof,
+      "import test from 'node:test'\ntest('WHAT[FIXTURE-PACKAGE-002] unrelated active proof', () => {})\n",
+    )
+    writeFileSync(
+      join(packageRoot, 'HOW.md'),
+      '| 命题 | 落点 |\n|---|---|\n| FIXTURE-PACKAGE-002 | `tests/unrelated.test.mjs::WHAT[FIXTURE-PACKAGE-002] unrelated active proof` |\n',
+    )
+    const externalInventory = {
+      nodes: [
+        {
+          id: 'decoy',
+          state: 'DONE',
+          proofs: ['requirements/fixture-package/tests/unrelated.test.mjs'],
+        },
+      ],
+    }
+    writeFileSync(join(root, 'release-closure-nodes.json'), `${JSON.stringify(externalInventory, null, 2)}\n`)
+
+    const graph = buildTraceGraph(requirements)
+    assert.deepEqual(graph.unproved.map(({ id }) => id), ['FIXTURE-PACKAGE-001'])
+    assert.deepEqual(graph.proofMissing.map(({ id }) => id), ['FIXTURE-PACKAGE-001'])
+    assert.deepEqual(graph.proofEdges.map(({ whatId }) => whatId), ['FIXTURE-PACKAGE-002'])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[REQUIREMENT-SYSTEM-018] exact proof-title resolution is reusable and never guesses', () => {
   const tests = scanTestSource(
     '<virtual>',

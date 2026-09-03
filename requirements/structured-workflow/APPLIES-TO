@@ -21,5 +21,7 @@
 /scripts/checks/semantic-decorator-invariant.mjs
 /scripts/checks/plugin-transforms-invariant.mjs
 /scripts/checks/owner-contracts.mjs
+/scripts/checks/owner-projects.mjs
 /scripts/checks/published-contracts.json
+/scripts/lib/semantic-evidence.mjs
 /scripts/lib/walk.mjs

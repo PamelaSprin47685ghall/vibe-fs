@@ -32,3 +32,7 @@
 ## DEPENDS ON
 
 `knowledge-reuse → repository-investigation, durable-events, durable-convergence`
+
+## Physical fatal boundary
+
+Casebook semantic conflict与cut-tail属于knowledge-reuse durable truth；process termination不属于store。直接fatal可在补偿事实未settle时结束进程，使重启无法判断本次Case更新是否已隔离。

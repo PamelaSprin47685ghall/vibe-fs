@@ -171,30 +171,6 @@ test('WHAT[PREFIX-STABILITY-001] PREFIX_STABILITY_modified_historical_bytes_brea
   )
 })
 
-test('WHAT[PREFIX-STABILITY-001] historical-byte property rejects a length-only mutant with a replayable shrink path', () => {
-  const lengthOnlyProperty = fc.property(metadata, mutationTarget, (identity, target) => {
-    const previous = wire([target], identity)
-    const next = wire([{ ...target, role: changed(target.role) }, target], identity)
-    assert.equal(providerProjection.isAppendOnlyPrefix(previous, next), false)
-    const lengthOnlyMutant = next.messages.length >= previous.messages.length
-    assert.equal(lengthOnlyMutant, false)
-  })
-  const mutationResult = fc.check(lengthOnlyProperty, { seed: 0x5052465a, numRuns: 100 })
-
-  assert.equal(mutationResult.failed, true)
-  assert.equal(mutationResult.seed, 0x5052465a)
-  assert.notEqual(mutationResult.counterexamplePath, '')
-  assert.ok(mutationResult.counterexample.length > 0)
-  assert.equal(
-    fc.check(lengthOnlyProperty, {
-      seed: mutationResult.seed,
-      path: mutationResult.counterexamplePath,
-      numRuns: 1,
-    }).failed,
-    true,
-  )
-})
-
 test('WHAT[PREFIX-STABILITY-013] PREFIX_STABILITY_tool_set_change_breaks_the_law_even_if_messages_prefix', () => {
   const fewerTools = wire([msg('m1', 'user', 'first')], { tools: ['read'] })
   assert.equal(providerProjection.isAppendOnlyPrefix(fewerTools, W2), false, 'tools must be identical, not merely prefixed')

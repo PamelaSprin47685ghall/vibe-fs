@@ -43,3 +43,7 @@
 ## PROC-011: Run 为 DevOps 有界执行且非 Distiller Office
 
 `run` 工具代表单次有界执行的物理能力，严格校验参数并在前置拦截非法输入，其职责仅限于物理命令执行，绝不承担内容摘要或结果蒸馏职责。
+
+## PROC-012: process与PTY contract只发布纯词汇和窄capability type
+
+process request/outcome/error、one-shot capability type及owner-pure PTY request/result vocabulary必须与Node child-process/PTY adapter、spool/output runtime分居。contract不得携带`ManagedAgent`、`TaskCompletionSource`、mutable handle、capability value/factory或Node import。Node process与Node PTY各由唯一adapter实现；delegation与其它runtime只消费composition注入的窄capability，PTY adapter不得反向引用delegation Host/Fork runtime。

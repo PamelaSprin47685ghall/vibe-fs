@@ -62,3 +62,4 @@ Roles.permissions (Kernel 层单一真相源)
 | ENF-017 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-017] every authority contract declares its multiplicity` |
 | ENF-018 | `requirements/capability-enforcement/tests/process-capability-lifecycle.test.mjs::WHAT[ENF-018] process capability consumes once and reports duplicate consumption without effect` |
 | ENF-019 | `requirements/capability-enforcement/tests/process-capability-lifecycle.test.mjs::WHAT[ENF-019] provider-attempt composition requires fresh current-process admission without codec or event recovery` |
+| ENF-020 | `requirements/capability-enforcement/tests/m6-fatal-boundary.test.mjs::WHAT[ENF-020] invalid configuration reaches one injected fatal adapter only through composition` |

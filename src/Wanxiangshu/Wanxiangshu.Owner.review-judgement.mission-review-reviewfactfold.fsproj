@@ -19,6 +19,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.review-assurance.mission-review-barrier-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-judgement-witness.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-capture.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>

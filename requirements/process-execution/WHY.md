@@ -23,3 +23,4 @@
 - 发送终止信号后立刻返回，导致孤儿进程在后台继续产生不可控的副作用。
 - 缺乏明确的硬性时限，导致任务在僵死命令上永久挂起。
 - 进程输出无限制缓冲导致内存耗尽崩溃。
+- request/outcome/error vocabulary若与one-shot runner、Node child process、PTY backend、TCS read plan或spool runtime同居，普通consumer会传递获得process control与mutable physical handle，且PTY adapter可反向侵入delegation runtime。

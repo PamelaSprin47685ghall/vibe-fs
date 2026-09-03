@@ -75,3 +75,7 @@ Witness、Capability 与 Receipt 的合同必须声明 subject、版本/序列�
 ## ENF-019: process capability/permit/PhysicalHandle 非耐久；重启后由当前事实 fresh admission
 
 进程 capability、permit 与 `PhysicalHandle` 禁止进入 Fact/Event、journal codec、JSON 或任何跨进程恢复载荷。崩溃后可恢复 durable Evidence/Receipt，再经普通 owner admission 发行当前进程的新能力；不得持久化 capability、读取 feature history 推断能力、或设置隐藏 recovery PC。Quiescence 恢复必须重新经历当前 physical attempt 的 `ObserveIdle`，不得消费崩溃前 permit。
+
+## ENF-020: 配置不变量fatal使用mandatory injected fuse
+
+invalid managed-agent configuration必须先收敛为capability-enforcement拥有的typed incident；解释该incident的composition必须显式注入fatal capability。validator/runtime不得直接引用fatal physical adapter，不得持有optional/default/global fallback；同一incident只允许一次report与一次kill。此边界不把普通可预期admission rejection升级为fatal。

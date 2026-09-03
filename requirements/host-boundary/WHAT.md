@@ -112,3 +112,15 @@ Host 边界严格切分为 Contract、Runtime 与 Adapter 架构 locality：
 - `Sphinx.Host.Adapter`（`sphinx-host-adapter`）：外部 Sphinx MCP 启动配置与环境适配器，隔离于核心契约之外。
 
 普通业务契约仅允许引用 `Host.Session.Contract` 或 `Host.Signal.Contract`，严禁传递编译 Sphinx、诊断、消息就地修改或具体 Host 运行时。
+
+## HOST-BOUNDARY-027: Host codec 按语义与consumer cohort切片
+
+无状态`HostEventEnvelope`是raw Host envelope unwrap、event type与session/message-session identity读取的唯一公式；`HostEventCodec`与`LoopEventCodec`都必须消费该contract，禁止复制dynamic field parser。`HostMessageCodec`与`LoopEventCodec`分别形成独立bounded contract；前者只服务message consumer，后者只发布loop text-delta语义。`Host.Session.Runtime`不得为message codec引用完整signal adapter；loop runtime不得获得完整Host failure/terminal codec或diagnostics implementation；signal adapter不得反向引用diagnostics runtime。
+
+## HOST-BOUNDARY-028: signal subscription 与optional diagnostic 必须分型
+
+Host signal subscription必须返回closed typed error与`LocalEventHook | EventsListen of Subscription` mode，不得以`option + string`表达非法组合。adapter只报告typed failure；composition是该失败的唯一fatal解释者。Loop diagnostic经必填窄`emitDiagnostic` capability注入；其失败只能产生非权威诊断outcome，不得改变arm、interrupt、consume或continuation结果。
+
+## HOST-BOUNDARY-029: fatal process 是唯一注入的physical adapter
+
+`FatalProcessPort` contract只含immutable incident vocabulary与capability type，不得含value、factory或Node import。唯一fatal adapter拥有该路径的`console.error`、`process.kill`与`process.exit`；所有caller由composition获得mandatory capability，普通contract/runtime/adapter不得直接引用physical implementation。fatal前置settlement由caller owner提供typed evidence；同一incident只允许一次report与一次kill。

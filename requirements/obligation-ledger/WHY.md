@@ -37,3 +37,7 @@ Manager 作为长期 mission 的执行者，系统必须随时回答核心问题
 ```text
 DEPENDS ON: durable-events, effect-accounting, semantic-trace
 ```
+
+## Physical fatal boundary
+
+MagicTodo input/materialization conflict与accepted checkpoint settlement由obligation-ledger拥有；process termination是Host effect。direct fatal会让codec/membrane跨过durable evidence边界，并可能把普通provider-visible rejection误作进程事故。

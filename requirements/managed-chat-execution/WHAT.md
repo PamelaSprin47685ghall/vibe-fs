@@ -14,7 +14,7 @@
 
 ## CHATEXEC-004: Accepted 单次建立且 replay 幂等
 
-同一 key 的等值 pre-provider `Accepted` evidence 重放是幂等 no-op；与既有 identity 或 acceptance 内容冲突必须 fail closed。新物理消息即使复用同一 `SessionId` 也必须建立新 key，不得继承前一 execution 的事实。ProviderStarted 只能在 accepted evidence 完全相等后增加 Host-observed run evidence。
+同一 key 的等值 pre-provider `Accepted` evidence 重放是幂等 no-op；与既有 identity 或 acceptance 内容冲突必须 fail closed。supplied state 的 key 不匹配时必须先拒绝，不能借其 terminal 绕过 exact key；exact terminal 重放则不得因新提交的 malformed attempt payload 改写既有结论。新物理消息即使复用同一 `SessionId` 也必须建立新 key，不得继承前一 execution 的事实。ProviderStarted 只能在 accepted evidence 完全相等后增加 Host-observed run evidence。
 
 ## CHATEXEC-005: ProviderStarted 是 provider effect 的 durable 前置
 
@@ -36,6 +36,8 @@
 
 capacity lease handle、waiter、callback、queue node、cancellation token 与 subscription 均属 process-local artifact，不得写入 execution facts、快照或恢复 token。恢复只能从 durable semantic facts 重建新的本地 artifact；旧 artifact 的缺失不能被解释为 terminal disposition。
 
+OS process crash/restart 不等于 graceful teardown/reconstruction：同一 durable workspace 重启后，已落盘的 `Accepted` 必须保留；旧进程的 exact binding、capacity ownership、token、custody、execution 与 waiter 必须全部消失，除非新进程从 durable facts 经正常业务路径重新建立。process-local artifact 不得跨进程身份继承。
+
 ## CHATEXEC-010: Cancel/Delete 精确终结并排空
 
 logical cancel 与 session delete 必须枚举 durable projection 中该作用域内尚未 terminal 的 exact execution key，逐个请求 typed settlement，并等待每个已准入 execution 完成 durable terminal 与 exact capacity 归还后再宣告生命周期排空。禁止 session-wide blind release、timer grace period 或 polling 判断完成。
@@ -49,6 +51,10 @@ logical cancel 与 session delete 必须枚举 durable projection 中该作用�
 `managed-chat-execution` 独占纯 `Evidence → Decision` 公式。Evidence 只包含 canonical `ChatExecutionState`、exact public provider receipt observation（missing、ambiguous、absent、alive、terminal）、exact physical resource observation、typed persistence commitment，以及 `execution-failure-policy` 已发布的 retry/fallback/terminal decision。Decision 是 closed DU：`Ignore | ReconcilePhysical | ResumePreProvider | RequeueEligible | Finalize | MarkManualIntervention`；每个 effectful case 携带 Task29 所需的 exact execution evidence 或 typed provider recovery authorization，但本公式不执行 effect。
 
 `Accepted` 且 exact provider absent 才可恢复 pre-provider admission；observed provider 必须先 reconcile durable started/terminal facts。`ProviderStarted` 且 provider alive 只观察，exact terminal 才 finalize，exact absent 只消费 failure policy authorization；typed supersession 因而只能使用 policy 发布的 exact cancelled terminal。durable terminal 若 physical resource 仍 held 则请求 exact reconciliation，否则幂等忽略。missing/ambiguous receipt、unknown persistence/resource、无 policy authorization 均 fail closed 为 manual intervention；stale external evidence 不得改写当前 execution。禁止 Role、error text、terminal prose、idle、timer、process age、cursor、registry presence 或 process-local capacity state参与判断。同一 Evidence 必须永远产生同一 Decision。
+
+排列、重复事件与 crash cut proof 必须调用已注册 production Surface。测试内重建 decision、terminal、release 或 dispatch 公式并 mutation 该副本，不构成本命题的 executable proof。
+
+Recovery Surface 的 port observation 必须逐次追加每个真实 invocation，不得在 observer 内去重。process restart 两侧必须创建独立 observer；跨重启幂等只能由 durable owner 实现，测试观察器不得代替 owner 吞掉重复请求。
 
 ## CHATEXEC-013: Execution reliability query 只投影 canonical lifecycle
 

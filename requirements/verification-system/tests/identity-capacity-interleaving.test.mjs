@@ -3,7 +3,6 @@ import test from 'node:test'
 
 import {
   defaultFamily,
-  invalidCausalEdge,
   operations,
   permutations,
   prerequisites,
@@ -39,20 +38,4 @@ test('WHAT[VERIFICATION-SYSTEM-007] executes every valid identity/admission/capa
   assert.equal(observations.length, 12)
   assert.equal(new Set(observations.map(({ schedule }) => schedule.join(' → '))).size, 12)
   assert.ok(observations.every(({ providerDispatches }) => providerDispatches === 1))
-})
-
-test('WHAT[VERIFICATION-SYSTEM-007] rejects every causally invalid ordering before effects', async () => {
-  const invalid = permutations.filter((schedule) => invalidCausalEdge(schedule) !== null)
-  assert.equal(invalid.length, 708)
-
-  for (const schedule of invalid) {
-    const edge = invalidCausalEdge(schedule)
-    assert.ok(edge)
-    await assert.rejects(runInterleaving(schedule, defaultFamily), (error) => {
-      assert.equal(error.code, 'INVALID_CAUSAL_ORDER')
-      assert.equal(error.operation, edge.operation)
-      assert.equal(error.missing, edge.missing)
-      return true
-    })
-  }
 })

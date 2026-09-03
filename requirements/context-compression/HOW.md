@@ -75,6 +75,7 @@ validity 证明共同落在同一个 closure 上。
 | CONTEXT-COMPRESSION-022 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs::WHAT[CONTEXT-COMPRESSION-022] CTX_022_all_production_main_rebuilds_share_BloggerMainContext` |
 | CONTEXT-COMPRESSION-023 | `requirements/context-compression/tests/parked-transform.test.mjs::WHAT[CONTEXT-COMPRESSION-023] CTX_023_park_has_no_clock_or_timeout_dependency`；`requirements/context-compression/tests/companion-recovery-slot.test.mjs::WHAT[CONTEXT-COMPRESSION-023] recovery_wait_has_no_clock_or_process_local_correctness_state` |
 | CONTEXT-COMPRESSION-024 | `requirements/context-compression/tests/parked-transform.test.mjs::WHAT[CONTEXT-COMPRESSION-024] CTX_024_materialization_admission_is_cross_instance_single_flight`；`requirements/context-compression/tests/companion-recovery-slot.test.mjs::WHAT[CONTEXT-COMPRESSION-024] CTX_024_all_materialization_owners_share_admission_and_nonoverwrite_flight`；`requirements/context-compression/tests/enforcer-cycle-convergence.test.mjs::WHAT[CONTEXT-COMPRESSION-024] stale_terminal_cannot_reclaim_a_new_Blogger_request` |
+| CONTEXT-COMPRESSION-025 | `requirements/context-compression/tests/m6-fatal-boundary.test.mjs::WHAT[CONTEXT-COMPRESSION-025] Blogger fatal binds exact request settlement and one injected fuse` |
 
 ## GAP
 

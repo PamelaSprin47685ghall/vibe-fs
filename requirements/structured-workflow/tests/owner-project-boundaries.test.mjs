@@ -4,7 +4,12 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
-import { checkOwnerProjects, projectArchitectureViolations } from '../../../scripts/checks/owner-projects.mjs'
+import {
+  checkOwnerProjects,
+  projectArchitectureViolations,
+  validateProjectContractEvidence,
+} from '../../../scripts/checks/owner-projects.mjs'
+import { buildTraceGraph } from '../../../scripts/lib/requirement-trace.mjs'
 import { planOwnerCompile, materializeOwnerCompile, compileOwnerProject } from '../../../scripts/lib/owner-compile.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../..')
@@ -34,6 +39,558 @@ test('WHAT[STRUCTURED-WORKFLOW-011] owner-locality project graph is complete, au
   assert.equal(result.ok, true, result.violations.join('\n'))
   assert.ok(result.sourceCount > 0, 'owner-locality graph must cover production sources')
   assert.equal(result.contractLeakSourceCount, 0, 'published contract compile closure must contain no runtime/private source')
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] owner-project authorization rejects a comment-only semantic proof independently', () => {
+  const result = validateProjectContractEvidence(
+    {
+      contracts: [
+        {
+          path: 'src/Wanxiangshu/ExternalInvestigation/Cursor.fs',
+          owner: 'external-investigation',
+          kind: 'semantic-evidence',
+          consumers: ['consumer'],
+          symbols: ['Wanxiangshu.ExternalInvestigation.Cursor.current'],
+          law: 'WHAT[EXTERNAL-INVESTIGATION-010]',
+          proof: {
+            path: 'requirements/external-investigation/tests/browser-provenance-canary.test.mjs',
+            title: 'WHAT[EXTERNAL-INVESTIGATION-010] browser_is_the_only_network_office',
+            what_id: 'EXTERNAL-INVESTIGATION-010',
+          },
+        },
+      ],
+    },
+    buildTraceGraph(join(ROOT, 'requirements')),
+  )
+
+  assert.equal(result.contractManifest.contracts.length, 0)
+  assert.match(result.violations.join('\n'), /invalid-semantic-evidence-metadata/)
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] GitGateway exact contract has an isolated compiler boundary', () => {
+  const contracts = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const contract = contracts.contracts.find((entry) => entry.path === 'src/Wanxiangshu/Git/Gateway.fs')
+  assert.ok(contract)
+  assert.deepEqual(contract.consumers, ['durable-convergence'])
+  assert.deepEqual(contract.symbols, [
+    'Wanxiangshu.Git.GitGateway.converge',
+    'Wanxiangshu.Git.GitGateway.createDefaultRunner',
+    'Wanxiangshu.Git.GitGatewayRunner',
+  ])
+
+  const providerName = 'Wanxiangshu.Owner.change-integration.git-gateway.fsproj'
+  const provider = readFileSync(join(SRC, providerName), 'utf8')
+  assert.match(provider, /<WanxiangshuOwnerLocality>git-gateway<\/WanxiangshuOwnerLocality>/)
+  assert.match(provider, /<Compile Include="Git\/Gateway\.fsi"\s*\/>\s*<Compile Include="Git\/Gateway\.fs"\s*\/>/)
+  assert.equal([...provider.matchAll(/<Compile Include="[^"]+\.fs"\s*\/>/g)].length, 1)
+
+  const consumer = readFileSync(join(SRC, 'Wanxiangshu.Owner.durable-convergence.git-hook-sync.fsproj'), 'utf8')
+  assert.match(consumer, /<ProjectReference Include="Wanxiangshu\.Owner\.change-integration\.git-gateway\.fsproj"\s*\/>/)
+  assert.doesNotMatch(consumer, /ProjectReference Include="Wanxiangshu\.Owner\.change-integration\.git-integrationgate\.fsproj"/)
+
+  const signature = readFileSync(join(SRC, 'Git/Gateway.fsi'), 'utf8')
+  assert.doesNotMatch(signature, /SyncActiveEnv|discoverRemote/)
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] review opening prompt has a source-pure compiler boundary', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const contract = manifest.contracts.find(
+    (entry) => entry.path === 'src/Wanxiangshu/Mission/Review/Prompt.fs',
+  )
+  assert.ok(contract)
+  assert.deepEqual(contract.consumers, ['change-integration', 'finality'])
+  assert.deepEqual(contract.symbols, ['Wanxiangshu.Mission.Review.HostReviewPrompt.Opening'])
+
+  const promptProject = 'Wanxiangshu.Owner.review-judgement.mission-review-prompt.fsproj'
+  const mixedProject = 'Wanxiangshu.Owner.review-judgement.mission-review-fact.fsproj'
+  const provider = readFileSync(join(SRC, promptProject), 'utf8')
+  const compileItems = [...provider.matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(([, path]) => path)
+  assert.match(provider, /<WanxiangshuOwnerLocality>mission-review-prompt<\/WanxiangshuOwnerLocality>/)
+  assert.match(provider, /<WanxiangshuOwnerLocalityKind>contract<\/WanxiangshuOwnerLocalityKind>/)
+  assert.deepEqual(compileItems, ['Mission/Review/Prompt.fsi', 'Mission/Review/Prompt.fs'])
+
+  const mixed = readFileSync(join(SRC, mixedProject), 'utf8')
+  assert.doesNotMatch(mixed, /<Compile Include="Mission\/Review\/Prompt\.(?:fsi|fs)"\s*\/>/)
+
+  const references = (projectName) =>
+    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+  const changeRefs = references('Wanxiangshu.Owner.change-integration.git-integrationgate.fsproj')
+  const finalityRefs = references('Wanxiangshu.Owner.finality.mission-finality-prompt.fsproj')
+  assert.ok(changeRefs.includes(promptProject))
+  assert.ok(!changeRefs.includes(mixedProject))
+  assert.ok(finalityRefs.includes(promptProject))
+
+  const referencers = readdirSync(SRC)
+    .filter((name) => /^Wanxiangshu\.Owner\..+\.fsproj$/.test(name) && name !== promptProject)
+    .filter((name) =>
+      readFileSync(join(SRC, name), 'utf8').includes(`ProjectReference Include="${promptProject}"`),
+    )
+    .sort()
+  assert.deepEqual(referencers, [
+    'Wanxiangshu.Owner.change-integration.git-integrationgate.fsproj',
+    'Wanxiangshu.Owner.finality.mission-finality-prompt.fsproj',
+  ])
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] review request identity and challenge have source-pure compiler boundaries', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const contractAt = (path) => manifest.contracts.find((entry) => entry.path === path)
+  const projectSource = (projectName) => readFileSync(join(SRC, projectName), 'utf8')
+  const compileItems = (projectName) =>
+    [...projectSource(projectName).matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(([, path]) => path)
+  const references = (projectName) =>
+    [...projectSource(projectName).matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+
+  const mixedProject = 'Wanxiangshu.Owner.review-judgement.mission-review-fact.fsproj'
+  const requestProject =
+    'Wanxiangshu.Owner.review-judgement.mission-review-judgement-requestidentity.fsproj'
+  const challengeProject = 'Wanxiangshu.Owner.review-judgement.mission-review-judgement-challenge.fsproj'
+  const mixedSource = projectSource(mixedProject)
+
+  assert.doesNotMatch(
+    mixedSource,
+    /<Compile Include="Mission\/Review\/Judgement\/(?:RequestIdentity|Challenge)\.(?:fsi|fs)"\s*\/>/,
+  )
+  assert.doesNotMatch(
+    mixedSource,
+    /ProjectReference Include="Wanxiangshu\.Owner\.provider-projection\.participant-provider-projection-model\.fsproj"/,
+  )
+  assert.deepEqual(compileItems(requestProject), [
+    'Mission/Review/Judgement/RequestIdentity.fsi',
+    'Mission/Review/Judgement/RequestIdentity.fs',
+  ])
+  assert.deepEqual(compileItems(challengeProject), [
+    'Mission/Review/Judgement/Challenge.fsi',
+    'Mission/Review/Judgement/Challenge.fs',
+  ])
+  assert.deepEqual(references(requestProject), [
+    'Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj',
+  ])
+  assert.deepEqual(references(challengeProject), [
+    'Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj',
+  ])
+
+  assert.deepEqual(
+    contractAt('src/Wanxiangshu/Mission/Review/Judgement/RequestIdentity.fs')?.consumers,
+    ['host-boundary', 'managed-session-lifecycle'],
+  )
+  assert.deepEqual(
+    contractAt('src/Wanxiangshu/Mission/Review/Judgement/RequestIdentity.fs')?.symbols,
+    [
+      'Wanxiangshu.Mission.Review.Judgement.JudgementRequestIdentity.belongsTo',
+      'Wanxiangshu.Mission.Review.Judgement.JudgementRequestIdentity.key',
+    ],
+  )
+  assert.deepEqual(contractAt('src/Wanxiangshu/Mission/Review/Judgement/Challenge.fs')?.consumers, [
+    'review-assurance',
+  ])
+  assert.deepEqual(contractAt('src/Wanxiangshu/Mission/Review/Judgement/Challenge.fs')?.symbols, [
+    'Wanxiangshu.Mission.Review.Judgement.ReviewChallenge.Path',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewChallenge.promptOf',
+  ])
+
+  const requestSignature = readFileSync(join(SRC, 'Mission/Review/Judgement/RequestIdentity.fsi'), 'utf8')
+  assert.deepEqual(
+    [...requestSignature.matchAll(/^\s*val ([A-Za-z0-9_]+):/gm)].map(([, name]) => name),
+    ['key', 'belongsTo'],
+  )
+  const challengeSignature = readFileSync(join(SRC, 'Mission/Review/Judgement/Challenge.fsi'), 'utf8')
+  assert.deepEqual(
+    [...challengeSignature.matchAll(/^\s*val ([A-Za-z0-9_]+):/gm)].map(([, name]) => name),
+    ['Path', 'promptOf'],
+  )
+
+  const hostRefs = references('Wanxiangshu.Owner.host-boundary.opencode-host-sharedstatesurface.fsproj')
+  assert.ok(hostRefs.includes(requestProject))
+  assert.ok(!hostRefs.includes(mixedProject))
+  assert.ok(!hostRefs.includes(challengeProject))
+  assert.ok(!hostRefs.includes('Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj'))
+
+  const managedRefs = references(
+    'Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj',
+  )
+  assert.ok(managedRefs.includes(requestProject))
+  assert.ok(!managedRefs.includes(mixedProject))
+  assert.ok(!managedRefs.includes(challengeProject))
+
+  const assuranceRefs = references('Wanxiangshu.Owner.review-assurance.mission-review-barrier-workflow.fsproj')
+  assert.ok(assuranceRefs.includes(challengeProject))
+  assert.ok(assuranceRefs.includes(mixedProject))
+  assert.ok(!assuranceRefs.includes(requestProject))
+
+  const judgeRefs = references('Wanxiangshu.Owner.review-judgement.mission-review-opencode-judgetool.fsproj')
+  assert.ok(judgeRefs.includes(requestProject))
+  assert.ok(judgeRefs.includes(challengeProject))
+  assert.ok(!judgeRefs.includes(mixedProject))
+
+  for (const unrelated of [
+    'Wanxiangshu.Owner.durable-events.runtime.fsproj',
+    'Wanxiangshu.Owner.finality.mission-finality-prompt.fsproj',
+    'Wanxiangshu.Owner.change-integration.git-integrationgate.fsproj',
+  ]) {
+    assert.ok(!references(unrelated).includes(requestProject))
+    assert.ok(!references(unrelated).includes(challengeProject))
+  }
+
+  const directReferencers = (providerProject) =>
+    readdirSync(SRC)
+      .filter((name) => /^Wanxiangshu\.Owner\..+\.fsproj$/.test(name) && name !== providerProject)
+      .filter((name) => projectSource(name).includes(`ProjectReference Include="${providerProject}"`))
+      .sort()
+  assert.deepEqual(directReferencers(requestProject), [
+    'Wanxiangshu.Owner.host-boundary.opencode-host-sharedstatesurface.fsproj',
+    'Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj',
+    'Wanxiangshu.Owner.review-judgement.mission-review-opencode-judgetool.fsproj',
+  ])
+  assert.deepEqual(directReferencers(challengeProject), [
+    'Wanxiangshu.Owner.review-assurance.mission-review-barrier-workflow.fsproj',
+    'Wanxiangshu.Owner.review-judgement.mission-review-opencode-judgetool.fsproj',
+  ])
+
+  const localities = manifest.compiler_boundary_localities
+    .filter((entry) => entry.owner === 'review-judgement')
+    .map((entry) => entry.locality)
+  assert.ok(localities.includes('mission-review-judgement-requestidentity'))
+  assert.ok(localities.includes('mission-review-judgement-challenge'))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] review witness has a source-pure compiler boundary', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const contract = manifest.contracts.find(
+    (entry) => entry.path === 'src/Wanxiangshu/Mission/Review/Judgement/Witness.fs',
+  )
+  assert.ok(contract)
+  assert.deepEqual(contract.consumers, ['durable-events', 'finality', 'review-assurance'])
+  assert.deepEqual(contract.symbols, [
+    'BarrierId',
+    'First',
+    'FirstPhysicalUserMessageId',
+    'GitTreeHash',
+    'Report',
+    'Second',
+    'SecondPhysicalUserMessageId',
+    'Wanxiangshu.Mission.Review.Judgement.CandidateVerificationFailure',
+    'Wanxiangshu.Mission.Review.Judgement.CandidateVerificationFailure.IncompleteCohort',
+    'Wanxiangshu.Mission.Review.Judgement.CandidateVerificationFailure.StaleWitness',
+    'Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitness',
+    'Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitnessModule.create',
+    'Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitnessModule.gitTreeHash',
+    'Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitnessModule.lifeId',
+    'Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitnessModule.requestId',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewCandidate.isWitnessValidForTree',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewCandidate.verifyCandidate',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitness',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitness.Confirmed',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitness.NoReview',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitness.RevisionWitness',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.attemptIdentity',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.confirm',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.confirmedReviewer',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.gitTreeHash',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.isConfirmed',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.isDistinctAttempt',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.isRevision',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.isValidForTree',
+    'Wanxiangshu.Mission.Review.Judgement.VerdictWitness',
+    'Wanxiangshu.Mission.Review.Judgement.VerdictWitness.GitTreeHash',
+    'Wanxiangshu.Mission.Review.Judgement.VerdictWitness.ProviderRun',
+    'Wanxiangshu.Mission.Review.Judgement.VerdictWitness.ReviewerSessionId',
+    'Wanxiangshu.Mission.Review.Judgement.VerdictWitness.ToolCallId',
+  ])
+
+  const witnessProject = 'Wanxiangshu.Owner.review-judgement.mission-review-judgement-witness.fsproj'
+  const mixedProject = 'Wanxiangshu.Owner.review-judgement.mission-review-fact.fsproj'
+  const projectSource = (projectName) => readFileSync(join(SRC, projectName), 'utf8')
+  const compileItems = (projectName) =>
+    [...projectSource(projectName).matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(([, path]) => path)
+  const references = (projectName) =>
+    [...projectSource(projectName).matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+
+  const provider = projectSource(witnessProject)
+  assert.match(provider, /<WanxiangshuOwnerLocality>mission-review-judgement-witness<\/WanxiangshuOwnerLocality>/)
+  assert.match(provider, /<WanxiangshuOwnerLocalityKind>contract<\/WanxiangshuOwnerLocalityKind>/)
+  assert.deepEqual(compileItems(witnessProject), [
+    'Mission/Review/Judgement/Witness.fsi',
+    'Mission/Review/Judgement/Witness.fs',
+  ])
+  assert.deepEqual(references(witnessProject), [
+    'Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj',
+  ])
+  assert.doesNotMatch(
+    projectSource(mixedProject),
+    /<Compile Include="Mission\/Review\/Judgement\/Witness\.(?:fsi|fs)"\s*\/>/,
+  )
+
+  const durableRefs = references('Wanxiangshu.Owner.durable-events.runtime.fsproj')
+  const finalityRefs = references('Wanxiangshu.Owner.finality.mission-finality-prompt.fsproj')
+  const projectionRefs = references('Wanxiangshu.Owner.review-assurance.mission-review-barrier-projection.fsproj')
+  const workflowRefs = references('Wanxiangshu.Owner.review-assurance.mission-review-barrier-workflow.fsproj')
+  const foldRefs = references('Wanxiangshu.Owner.review-judgement.mission-review-reviewfactfold.fsproj')
+  assert.ok(durableRefs.includes(witnessProject) && durableRefs.includes(mixedProject))
+  assert.ok(finalityRefs.includes(witnessProject) && !finalityRefs.includes(mixedProject))
+  assert.ok(projectionRefs.includes(witnessProject) && !projectionRefs.includes(mixedProject))
+  assert.ok(workflowRefs.includes(witnessProject) && workflowRefs.includes(mixedProject))
+  assert.ok(foldRefs.includes(witnessProject) && foldRefs.includes(mixedProject))
+
+  const referencers = readdirSync(SRC)
+    .filter((name) => /^Wanxiangshu\.Owner\..+\.fsproj$/.test(name) && name !== witnessProject)
+    .filter((name) => projectSource(name).includes(`ProjectReference Include="${witnessProject}"`))
+    .sort()
+  assert.deepEqual(referencers, [
+    'Wanxiangshu.Owner.durable-events.runtime.fsproj',
+    'Wanxiangshu.Owner.finality.mission-finality-prompt.fsproj',
+    'Wanxiangshu.Owner.review-assurance.mission-review-barrier-projection.fsproj',
+    'Wanxiangshu.Owner.review-assurance.mission-review-barrier-workflow.fsproj',
+    'Wanxiangshu.Owner.review-judgement.mission-review-reviewfactfold.fsproj',
+  ])
+
+  const signature = readFileSync(join(SRC, 'Mission/Review/Judgement/Witness.fsi'), 'utf8')
+  assert.doesNotMatch(signature, /\bval (?:isQualifiedConfirmationFor|witnesses):/)
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] review fact routing has exact per-consumer authorization', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const factPath = 'src/Wanxiangshu/Mission/Review/Fact.fs'
+  const contracts = manifest.contracts.filter((entry) => entry.path === factPath)
+  const allFactSymbols = [
+    'Wanxiangshu.Mission.Review.ReviewFact.ConfirmedReviewWitness',
+    'Wanxiangshu.Mission.Review.ReviewFact.ReviewAttemptClosed',
+    'Wanxiangshu.Mission.Review.ReviewFact.ReviewBarrierStarted',
+    'Wanxiangshu.Mission.Review.ReviewFact.ReviewVerdictRecorded',
+  ]
+  assert.deepEqual(
+    contracts.map(({ consumers, symbols }) => ({ consumers, symbols })),
+    [
+      { consumers: ['durable-events'], symbols: allFactSymbols },
+      {
+        consumers: ['review-assurance'],
+        symbols: ['Wanxiangshu.Mission.Review.ReviewFact.ReviewBarrierStarted'],
+      },
+    ],
+  )
+
+  const factProject = 'Wanxiangshu.Owner.review-judgement.mission-review-fact.fsproj'
+  const projectSource = (projectName) => readFileSync(join(SRC, projectName), 'utf8')
+  const provider = projectSource(factProject)
+  assert.match(provider, /<WanxiangshuOwnerLocalityKind>composition<\/WanxiangshuOwnerLocalityKind>/)
+  assert.deepEqual(
+    [...provider.matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(([, path]) => path),
+    ['Mission/Review/Fact.fsi', 'Mission/Review/Fact.fs'],
+  )
+  assert.deepEqual(
+    [...provider.matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(([, path]) => path),
+    [
+      'Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj',
+      'Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj',
+      'Wanxiangshu.Owner.review-judgement.mission-review-facts.fsproj',
+    ],
+  )
+
+  const referencers = readdirSync(SRC)
+    .filter((name) => /^Wanxiangshu\.Owner\..+\.fsproj$/.test(name) && name !== factProject)
+    .filter((name) => projectSource(name).includes(`ProjectReference Include="${factProject}"`))
+    .sort()
+  assert.deepEqual(referencers, [
+    'Wanxiangshu.Owner.durable-events.runtime.fsproj',
+    'Wanxiangshu.Owner.review-assurance.mission-review-barrier-workflow.fsproj',
+    'Wanxiangshu.Owner.review-judgement.mission-review-reviewfactfold.fsproj',
+  ])
+
+  const locality = manifest.compiler_boundary_localities.find(
+    (entry) => entry.owner === 'review-judgement' && entry.locality === 'mission-review-fact',
+  )
+  assert.match(locality?.justification ?? '', /ReviewFactCases to AgentFact routing/)
+  assert.doesNotMatch(locality?.justification ?? '', /Prompt|Witness|Challenge|RequestIdentity/)
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] NodeFs physical port and tool contracts have isolated compiler boundaries', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const contractAt = (path) => manifest.contracts.find((entry) => entry.path === path)
+  const compileItems = (projectName) =>
+    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+  const references = (projectName) =>
+    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+
+  assert.deepEqual(contractAt('src/Wanxiangshu/OpenCode/Tools/ManagedAgent.fs')?.consumers, [
+    'capability-enforcement',
+    'change-integration',
+    'context-compression',
+    'delegation',
+    'execution-model-routing',
+    'finality',
+    'host-boundary',
+    'interaction-authority',
+    'managed-session-lifecycle',
+    'output-distillation',
+    'participant-horizon',
+    'process-execution',
+    'speculative-investigation',
+    'time-capability',
+  ])
+  assert.deepEqual(contractAt('src/Wanxiangshu/OpenCode/Tools/StaticTools.fs')?.consumers, [
+    'capability-enforcement',
+    'delegation',
+    'host-boundary',
+    'review-assurance',
+    'review-judgement',
+  ])
+
+  const nodeFsPath = 'src/Wanxiangshu/OpenCode/Tools/NodeFs.fs'
+  const nodeFsContract = contractAt(nodeFsPath)
+  assert.equal(nodeFsContract?.kind, 'physical-port')
+  assert.deepEqual(nodeFsContract?.consumers, ['repository-programming'])
+  assert.deepEqual(nodeFsContract?.symbols, [
+    'Wanxiangshu.OpenCode.NodeFs.cpSync',
+    'Wanxiangshu.OpenCode.NodeFs.existsSync',
+    'Wanxiangshu.OpenCode.NodeFs.readdirSync',
+    'Wanxiangshu.OpenCode.NodeFs.renameSync',
+    'Wanxiangshu.OpenCode.NodeFs.rmSync',
+    'Wanxiangshu.OpenCode.NodeFs.statSync',
+  ])
+
+  const fileMutationAdapter = manifest.physical_adapters.find(
+    (entry) => entry.path === 'src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs',
+  )
+  assert.ok(fileMutationAdapter)
+  assert.equal(fileMutationAdapter.owner, 'repository-programming')
+  assert.deepEqual(fileMutationAdapter.ports, [
+    {
+      path: nodeFsPath,
+      symbols: nodeFsContract.symbols,
+    },
+  ])
+
+  const managedProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj'
+  const staticProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-statictools.fsproj'
+  const nodeFsProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-nodefs.fsproj'
+  assert.deepEqual(compileItems(managedProject), ['OpenCode/Tools/ManagedAgent.fsi', 'OpenCode/Tools/ManagedAgent.fs'])
+  assert.deepEqual(compileItems(staticProject), ['OpenCode/Tools/StaticTools.fsi', 'OpenCode/Tools/StaticTools.fs'])
+  assert.deepEqual(compileItems(nodeFsProject), ['OpenCode/Tools/NodeFs.fsi', 'OpenCode/Tools/NodeFs.fs'])
+
+  const staticSignature = readFileSync(join(SRC, 'OpenCode/Tools/StaticTools.fsi'), 'utf8')
+  const staticImplementation = readFileSync(join(SRC, 'OpenCode/Tools/StaticTools.fs'), 'utf8')
+  const fileMutationImplementation = readFileSync(join(SRC, 'OpenCode/Tools/FileMutationTools.fs'), 'utf8')
+  assert.doesNotMatch(staticSignature, /\bmodule NodeFs\b/)
+  assert.doesNotMatch(staticImplementation, /\bmodule NodeFs\b|\[<Import\([^\n]+, "fs"\)>\]/)
+  assert.doesNotMatch(fileMutationImplementation, /\bmodule private NodeFs\b|\[<Import\([^\n]+, "fs"\)>\]/)
+
+  const nodeFsSignature = readFileSync(join(SRC, 'OpenCode/Tools/NodeFs.fsi'), 'utf8')
+  assert.deepEqual(
+    [...nodeFsSignature.matchAll(/^\s*val ([A-Za-z0-9_]+):/gm)].map(([, name]) => name),
+    ['readFileSync', 'writeFileSync', 'existsSync', 'statSync', 'readdirSync', 'renameSync', 'rmSync', 'cpSync'],
+  )
+
+  const capabilityRefs = references('Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj')
+  assert.ok(capabilityRefs.includes(managedProject))
+  assert.ok(capabilityRefs.includes(staticProject))
+  assert.ok(capabilityRefs.includes('Wanxiangshu.Owner.host-boundary.sphinx-host-adapter.fsproj'))
+
+  const reviewRefs = references('Wanxiangshu.Owner.review-judgement.mission-review-opencode-judgetool.fsproj')
+  assert.ok(reviewRefs.includes(staticProject))
+  assert.ok(!reviewRefs.includes(managedProject))
+
+  const routingRefs = references('Wanxiangshu.Owner.execution-model-routing.opencode-host-modelroutingsurface.fsproj')
+  assert.ok(routingRefs.includes(managedProject))
+  assert.ok(!routingRefs.includes(staticProject))
+
+  const actionRuntimeRefs = references('Wanxiangshu.Owner.action-affordance.runtime.fsproj')
+  assert.ok(actionRuntimeRefs.includes(staticProject))
+  assert.ok(actionRuntimeRefs.includes(nodeFsProject))
+  assert.ok(!actionRuntimeRefs.includes(managedProject))
+
+  const repositoryRefs = references('Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj')
+  assert.ok(repositoryRefs.includes(nodeFsProject))
+
+  const ptyToolRefs = references('Wanxiangshu.Owner.process-execution.opencode-tools-ptytool.fsproj')
+  assert.ok(ptyToolRefs.includes('Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj'))
+
+  const joinToolRefs = references('Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj')
+  assert.ok(joinToolRefs.includes('Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj'))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] request kind and fallback facts have disjoint compiler boundaries', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const contractAt = (path) => manifest.contracts.find((entry) => entry.path === path)
+  const compileItems = (projectName) =>
+    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+  const references = (projectName) =>
+    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+
+  const requestProject = 'Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj'
+  const factsProject = 'Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-facts.fsproj'
+
+  assert.deepEqual(compileItems(requestProject), [
+    'Participant/Provider/Attempt/RequestKind.fsi',
+    'Participant/Provider/Attempt/RequestKind.fs',
+  ])
+  assert.deepEqual(compileItems(factsProject), [
+    'Participant/Provider/Attempt/Fallback/Facts.fsi',
+    'Participant/Provider/Attempt/Fallback/Facts.fs',
+  ])
+
+  assert.deepEqual(contractAt('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs')?.consumers, [
+    'durable-events',
+    'verification-system',
+  ])
+  assert.deepEqual(contractAt('src/Wanxiangshu/Participant/Provider/Attempt/RequestKind.fs')?.consumers, [
+    'capability-enforcement',
+    'cognitive-environment',
+    'context-compression',
+    'delegation',
+    'execution-failure-policy',
+    'execution-model-routing',
+    'host-boundary',
+    'interaction-authority',
+    'managed-chat-execution',
+    'prefix-stability',
+    'speculative-investigation',
+  ])
+
+  const capabilityRefs = references(
+    'Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj',
+  )
+  assert.ok(capabilityRefs.includes(requestProject))
+  assert.ok(!capabilityRefs.includes(factsProject))
+
+  const durableFactRefs = references('Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj')
+  assert.ok(durableFactRefs.includes(factsProject))
+  assert.ok(!durableFactRefs.includes(requestProject))
+
+  const durableCodecRefs = references('Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj')
+  assert.ok(durableCodecRefs.includes(factsProject))
+  assert.ok(!durableCodecRefs.includes(requestProject))
+
+  const verificationRefs = references(
+    'Wanxiangshu.Owner.verification-system.verification-eventstorewritersurface.fsproj',
+  )
+  assert.ok(verificationRefs.includes(factsProject))
+  assert.ok(!verificationRefs.includes(requestProject))
+
+  const ownerFallbackRefs = references(
+    'Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj',
+  )
+  assert.ok(ownerFallbackRefs.includes(requestProject))
+  assert.ok(ownerFallbackRefs.includes(factsProject))
+
+  const localities = manifest.compiler_boundary_localities
+    .filter((entry) => entry.owner === 'provider-attempt-recovery')
+    .map((entry) => entry.locality)
+  assert.ok(localities.includes('participant-provider-attempt-requestkind'))
+  assert.ok(localities.includes('participant-provider-attempt-fallback-facts'))
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] locality kinds enforce contract purity, direction, and closure budget', () => {

@@ -43,3 +43,4 @@
 | DISPATCH-PROTOCOL-011 | `requirements/dispatch-protocol/tests/send-format.test.mjs::WHAT[DISPATCH-PROTOCOL-011] PROMPT_006_send_payload_carries_prompt_key_metadata` |
 | DISPATCH-PROTOCOL-012 | `requirements/dispatch-protocol/tests/send-format.test.mjs::WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_identity_to_managed_execution` |
 | DISPATCH-PROTOCOL-013 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs::WHAT[DISPATCH-PROTOCOL-013] DP_013_construction_waits_for_durability_activation_before_explicit_recovery` |
+| DISPATCH-PROTOCOL-014 | `requirements/dispatch-protocol/tests/m6-fatal-boundary.test.mjs::WHAT[DISPATCH-PROTOCOL-014] dispatch fatal preserves exact claim truth and one injected fuse` |

@@ -2089,6 +2089,10 @@
       "owner": "action-affordance"
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Tools/NodeFs.fs",
+      "owner": "action-affordance"
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Tools/PtyTool.fs",
       "owner": "process-execution"
     },

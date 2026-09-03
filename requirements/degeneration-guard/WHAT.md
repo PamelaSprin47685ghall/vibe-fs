@@ -20,7 +20,7 @@ LoopSensor 仅从 Host 流式事件提取 assistant `text` 与 reasoning/thinkin
 
 ## DG-004: 固定时间尺度 + Repository SSOT 即用即派生
 
-Detector 的时间尺度固定为 `256` 个 `o200k_base` token；half-life 不由源码换行、formatter 或文件布局推导。Repository 本身是正常包络的唯一 SSOT。每次 build 只读取 Git tracked、strict UTF-8、正常人工可读的 source/document text；corpus 采用正向 source/document 类型 allowlist，机器生成物、vendor/dependency、fixture/golden 与 JSON/JSONL/CSV 等结构化数据不得因可 UTF-8 decode 而进入语料。入选文本按 repository path 顺序连接成一条连续文本流。多线程编码在安全换行边界（`\n` 后紧跟可打印非 `/` ASCII 字符）分块，分块结果与单流全量编码完全位等价。以 $D_0=X$ 做一次仿射 replay，令 normal prior 为 $X = mean(D_t(X))$ 的唯一自洽解，再以前向投影序列 $D_t(X)=\lambda^t X + b_t$ 的经验分位数（$p=0.025$ 与 $p=1.0$）计算 `minimum` 与 `maximum`；不得用任意 seed 预热后再二次 replay。生成 JS 仅是编译后 runtime import 所需的临时 artifact，不是配置源，也不得把 `normal/min/max` 数值复制回 tracked 源码。min/max 不设数值快照测试。禁止 Beta 拟合、连续分布拟合、运行期动态分位数及其它概率外推。
+Detector 的时间尺度固定为 `256` 个 `o200k_base` token；half-life 不由源码换行、formatter 或文件布局推导。Repository 本身是正常包络的唯一 SSOT。每次 build 的 selector 只返回 Git-tracked filesystem paths；generator boundary拒绝root外路径并将root内路径规范为canonical repository-relative identity。generator、build invocation、selector及每个selector output都必须绑定同一 staged input，且每个输入raw bytes只能经同一tracking reader取得。strict UTF-8与generated marker判定发生在tracked read之后，禁止selector内部或generator下游直接`readFileSync`。corpus采用正向source/document类型allowlist，机器生成物、vendor/dependency、fixture/golden与JSON/JSONL/CSV等结构化数据不得因可UTF-8 decode而进入语料。入选文本按repository path顺序连接成一条连续文本流。多线程编码在安全换行边界（`\n`后紧跟可打印非`/` ASCII字符）分块，分块结果与单流全量编码完全位等价。以 $D_0=X$ 做一次仿射 replay，令 normal prior 为 $X = mean(D_t(X))$ 的唯一自洽解，再以前向投影序列 $D_t(X)=\lambda^t X + b_t$ 的经验分位数（$p=0.025$ 与 $p=1.0$）计算 `minimum` 与 `maximum`；不得用任意seed预热后再二次replay。生成JS仅是编译后runtime import所需的临时artifact，不是配置源，也不得把`normal/min/max`数值复制回tracked源码。它必须由唯一generated artifact row绑定stable identity、output digest、selected-input digest、generator/build/selector lineage、package import target及完整JavaScript traversal；determinism不能消除artifact实际携带的authority。min/max不设数值快照测试。禁止Beta拟合、连续分布拟合、运行期动态分位数及其它概率外推。
 
 ## DG-005: O(1) 更新与有界内存
 
@@ -58,3 +58,7 @@ Provider language resource 可翻译措辞，但两类语义必须保持上述�
 ## DG-012: degeneration-guard 是闭合 owner
 
 本包唯一职责闭环为 `observe → classify → interrupt → reconcile-own-cause → continue`。它不修改 fallback Offset/失败预算，不发送普通 interaction repair，不借用 AABB retry prompt；其它模块也不得为 `DegenerationGuard` 再实现第二条 recovery。
+
+## DG-013: diagnostic capability 非权威且失败不干扰guard
+
+LoopSensor只接受构造时必填的窄`emitDiagnostic: string -> (string * string) list -> unit` capability，不得引用Host diagnostics implementation。diagnostic调用抛错时，arm、exact-once interrupt、cause consume与continuation结果必须与成功诊断完全相同；诊断不得获得fallback、journal、process-fatal或attempt-control authority。

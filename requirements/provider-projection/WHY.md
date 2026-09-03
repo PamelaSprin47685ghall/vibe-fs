@@ -19,6 +19,7 @@
 - **把来源误当成分面依据**：看到“record/evidence/result”就机械放入字段，忽略它对当前 Agent 实际承担的是责任交接或行动约束；child → parent LWR 因而被错误降格成“参考数据”。
 - **多 renderer 漂移**：feature owner 各自拼 `#`、Markdown/XML envelope、TOML table 或空行，单处看似可读，组合后却出现第二 instruction block、字段被 table 吸收、或同一概念在不同路径使用不同形状。
 - **render 后再组合**：多个各自合法的 document 在字符串层拼接，导致整体不再满足 instruction-first/data-second 的唯一语法与认知结构。
+- **Host ingress 形状漂移**：宿主把 opaque SessionId 从直接字符串扩展为对象后，decoder 用值前缀猜类型，导致原有合法会话无法进入同一投影边界。
 
 ## 独立变化能力
 
