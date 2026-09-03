@@ -57,6 +57,7 @@ export function integrationNodeTestSteps(root) {
       files: [
         path.join(root, 'requirements/structured-workflow/tests/integration/owner-project-compiler-boundary.test.mjs'),
         path.join(root, 'requirements/structured-workflow/tests/integration/owner-impact-compile-cli.test.mjs'),
+        path.join(root, 'requirements/structured-workflow/tests/integration/locality-dependency-analyzer.test.mjs'),
       ],
       perTestTimeoutMs: PROJECT_CHECK_TIMEOUT_MS,
     },

@@ -20,7 +20,7 @@ const norm = (value) => value.replace(/\\/g, '/')
 const repoPath = (value) => norm(relative(ROOT, value))
 const sorted = (values) => [...values].sort()
 
-function parseProject(projectPath) {
+export function parseProject(projectPath) {
   const text = readFileSync(projectPath, 'utf8')
   const owner = text.match(/<WanxiangshuSemanticOwner>([^<]+)<\/WanxiangshuSemanticOwner>/)?.[1]?.trim() ?? ''
   const locality = text.match(/<WanxiangshuOwnerLocality>([^<]+)<\/WanxiangshuOwnerLocality>/)?.[1]?.trim() ?? ''
@@ -60,7 +60,7 @@ function cycleOf(projects) {
   return cycle
 }
 
-function projectClosure(projects, roots) {
+export function projectClosure(projects, roots) {
   const closure = new Set()
   const pending = [...roots]
   while (pending.length > 0) {

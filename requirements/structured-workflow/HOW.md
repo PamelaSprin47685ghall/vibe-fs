@@ -89,6 +89,8 @@ Review Witness 已收敛到 `mission-review-judgement-witness`：唯一依赖是
 
 ## 验证与测试落点
 
+STRUCTURED-WORKFLOW-011 的 compiler-resolved locality closure proof：`requirements/structured-workflow/tests/locality-dependencies.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] compiler-resolved locality edges must stay inside declared closure`；`requirements/structured-workflow/tests/locality-dependencies.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] locality analysis is owner-independent and fail-closed`；`requirements/structured-workflow/tests/integration/locality-dependency-analyzer.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] compiler-resolved analyzer rejects an aggregate-green missing locality edge`。
+
 | 命题 | 落点测试 |
 |---|---|
 | STRUCTURED-WORKFLOW-001 | `requirements/structured-workflow/tests/direct-ce-contract.test.mjs::WHAT[STRUCTURED-WORKFLOW-001] FLOW_001_direct_task_workflow_is_allowed` |

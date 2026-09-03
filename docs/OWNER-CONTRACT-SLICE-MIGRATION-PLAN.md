@@ -2,7 +2,7 @@
 
 日期：2026-09-03
 
-状态：老板裁决已成立；M6.0 已完成，M6.1 待执行
+状态：老板裁决已成立；M6.0–M6.1 已完成，M6.2 待执行
 
 适用背景：Fable owner-project 编译边界、published contract 授权与 semantic owner 重整
 
@@ -739,3 +739,8 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - 仓库没有可执行的 compiler-resolved locality dependency analyzer；`owner-contracts.mjs` production path 仍传入 `symbolUses: []`。因此本条只叫 pre-cutover structural census，不冒充 actual source-edge census。第一份正式 source-edge census 必须由 M6.1 新 analyzer fresh 生成。
 - M6.0 将老板既有裁决写入 tracked WHY/WHAT/HOW/GAP：授权主键改为 locality→slice，same-owner 不豁免，`.fsi` 成为唯一 export inventory，GAP-031 保持 PARTIAL。
 - M6.0 验证：`spec.mjs`、`requirement-trace.mjs`、旧权威 `owner-contracts.mjs`、`owner-projects.mjs` 全绿。该绿色只证明规范文档闭合且旧 gate 未被提前切换，不宣称 M6 新 gate 已实现。
+- M6.1 RED：`locality-dependencies.test.mjs` 首次执行因 production analyzer module 不存在而失败；该测试先固定 missing closure、合法 direct/transitive、same-owner 不豁免、open/type/pattern 与 external symbol 边界，再实现纯 analyzer。
+- M6.1 analyzer：`locality-symbol-uses.fsx` 从 fresh fingerprint flat project 读取 FCS declaration use；`locality-dependencies.mjs` 将 use 映射为稳定去重的 cross-locality source edge，再验证 ProjectReference transitive closure。扫描产物只存在于本次临时目录；无 snapshot、delta、mtime、跨 run cache 或 symbol ACL。
+- M6.1 永久反例：fixture 的 consumer 与 provider 同属 `fixture` owner、consumer 无 provider ProjectReference；真实 flattened Fable aggregate 编译绿色，而 analyzer 必须输出唯一 `fixture-consumer → fixture-provider` missing-closure-edge。fixture 同时覆盖 open、alias/generic type、union-case pattern、value use 与 external package 排除。
+- M6.1 fresh live census：178 localities、711 production sources、4,420 条 actual cross-locality source edges、3 条 missing closure edges；FCS 35.6s。三处 blocker 是 `InstitutionalLearningTools.fs → ToolHostCodec.fs`、`EventKWayMerge.fs → CanonicalEventCodec.fs`、`MessageVisibility.fs → HostEventCodec.fs`。这些事实进入 M6.2 修复，不写入 manifest/baseline。
+- M6.1 仍不改变 release 权威：新 analyzer 只提供报告与自证反例；旧 `owner-contracts.mjs` 继续单独决定 release，直至 M6.4 原子切换。
