@@ -30,6 +30,8 @@ module ToolHostSurface =
     val contextDecode: raw: obj -> obj
     val contextView: context: obj -> obj
     val contextAttachAbort: context: obj -> callback: (unit -> unit) -> (unit -> unit)
+    val sessionObservation: raw: obj -> obj
+    val sessionAgent: raw: obj -> obj
     val tomlObject: fields: obj array -> string
     val tomlObjectWithInstructions: instructions: string array -> fields: obj array -> string
     val tomlTable: name: string -> entries: obj array array -> string

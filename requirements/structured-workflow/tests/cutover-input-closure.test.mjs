@@ -49,21 +49,14 @@ const legalIndexEntries = () => [
 const bytesByPath = (entries) => new Map(entries.map(({ path }) => [path, Buffer.from(`bytes:${path}`)]))
 
 const legalState = () => {
-  const closure = resolveCutoverInputClosureV1(legalClosureInput())
-  assert.deepEqual(closure.violations, [])
   const indexEntries = legalIndexEntries()
   const indexBlobBytes = bytesByPath(indexEntries)
   return {
-    closure,
+    closure_input: legalClosureInput(),
     index_entries: indexEntries,
     object_format: 'sha1',
     index_blob_bytes_by_path: indexBlobBytes,
     working_tree_bytes_by_path: new Map(indexBlobBytes),
-    excluded_paths: [
-      'docs/OWNER-CONTRACT-SLICE-ADJUDICATION-WORKSHEET.json',
-      'docs/OWNER-CONTRACT-SLICE-ADJUDICATIONS.json',
-    ],
-    build_output_paths: ['dist/Generated.js'],
   }
 }
 
@@ -72,7 +65,34 @@ test('WHAT[STRUCTURED-WORKFLOW-016] cutover closure and stage index reject every
   const validated = validateCutoverInputStateV1(state)
   assert.deepEqual(validated.violations, [])
   assert.match(canonicalInputIndexDigestV1(validated.index_rows), /^sha256:[0-9a-f]{64}$/)
-  assert.ok(!validated.index_rows.some(({ path }) => state.excluded_paths.includes(path)))
+  assert.ok(!validated.index_rows.some(({ path }) => [
+    'docs/OWNER-CONTRACT-SLICE-ADJUDICATION-WORKSHEET.json',
+    'docs/OWNER-CONTRACT-SLICE-ADJUDICATIONS.json',
+  ].includes(path)))
+
+  const forgedClosure = legalState()
+  forgedClosure.closure = { paths: [], build_output_paths: [], violations: [] }
+  assert.deepEqual(validateCutoverInputStateV1(forgedClosure).violations, [{
+    code: 'cutover-input-closure-incomplete',
+    path: '$',
+    reason: 'invalid-cutover-state-schema',
+  }])
+
+  const secondBuildOutputAuthority = legalState()
+  secondBuildOutputAuthority.build_output_paths = []
+  assert.deepEqual(validateCutoverInputStateV1(secondBuildOutputAuthority).violations, [{
+    code: 'cutover-input-closure-incomplete',
+    path: '$',
+    reason: 'invalid-cutover-state-schema',
+  }])
+
+  const arbitraryExclusion = legalState()
+  arbitraryExclusion.excluded_paths = ['src/A.fs']
+  assert.deepEqual(validateCutoverInputStateV1(arbitraryExclusion).violations, [{
+    code: 'cutover-input-closure-incomplete',
+    path: '$',
+    reason: 'invalid-cutover-state-schema',
+  }])
 
   const unread = legalClosureInput()
   unread.tracked_read_paths.push('secrets/ambient.txt')
@@ -90,13 +110,105 @@ test('WHAT[STRUCTURED-WORKFLOW-016] cutover closure and stage index reject every
     reason: 'dynamic-local-import',
   }])
 
+  const missingScan = legalClosureInput()
+  missingScan.imports_by_path.delete('scripts/generate.mjs')
+  assert.deepEqual(resolveCutoverInputClosureV1(missingScan).violations, [{
+    code: 'cutover-input-closure-incomplete',
+    path: 'scripts/generate.mjs',
+    reason: 'missing-import-scan-row',
+  }])
+
+  const invalidScan = legalClosureInput()
+  invalidScan.imports_by_path.set('scripts/generate.mjs', 'scripts/ambient.mjs')
+  assert.deepEqual(resolveCutoverInputClosureV1(invalidScan).violations, [{
+    code: 'cutover-input-closure-incomplete',
+    path: 'scripts/generate.mjs',
+    reason: 'invalid-import-scan-row',
+  }])
+
+  const unusedInvalidScan = legalClosureInput()
+  unusedInvalidScan.imports_by_path.set('scripts/unused.mjs', [{ path: 'src/A.fs', kind: 'static-local', extra: true }])
+  assert.deepEqual(resolveCutoverInputClosureV1(unusedInvalidScan).violations, [{
+    code: 'cutover-input-closure-incomplete',
+    path: 'scripts/unused.mjs',
+    reason: 'invalid-import-scan-row',
+  }])
+
+  const invalidSelectorOutput = legalClosureInput()
+  invalidSelectorOutput.selector_outputs_by_entry.set('scripts/select.mjs#inputs', 'src/A.fs')
+  assert.deepEqual(resolveCutoverInputClosureV1(invalidSelectorOutput).violations, [{
+    code: 'cutover-input-closure-incomplete',
+    path: 'scripts/select.mjs#inputs',
+    reason: 'invalid-selector-output',
+  }])
+
+  const invalidSelectorEntry = legalClosureInput()
+  invalidSelectorEntry.selector_outputs_by_entry = new Map([['scripts/select.mjs', ['src/A.fs']]])
+  assert.deepEqual(resolveCutoverInputClosureV1(invalidSelectorEntry).violations, [{
+    code: 'cutover-input-closure-incomplete',
+    path: 'scripts/select.mjs',
+    reason: 'invalid-selector-entry',
+  }])
+
+  const selectedBuildOutput = legalClosureInput()
+  selectedBuildOutput.selector_outputs_by_entry.set('scripts/select.mjs#inputs', ['src/A.fs', 'dist/Generated.js'])
+  assert.deepEqual(resolveCutoverInputClosureV1(selectedBuildOutput).violations, [{
+    code: 'cutover-input-closure-incomplete',
+    path: 'dist/Generated.js',
+    reason: 'selected-input-build-output-overlap',
+  }])
+
+  for (const [field, value, path, reason] of [
+    ['entry_paths', null, '$.entry_paths', 'invalid-entry-paths'],
+    ['imports_by_path', {}, '$.imports_by_path', 'invalid-import-scan-map'],
+    ['selector_outputs_by_entry', [], '$.selector_outputs_by_entry', 'invalid-selector-output-map'],
+    ['tracked_read_paths', 'src/A.fs', '$.tracked_read_paths', 'invalid-tracked-read-paths'],
+    ['build_output_paths', {}, '$.build_output_paths', 'invalid-build-output-paths'],
+  ]) {
+    const malformed = legalClosureInput()
+    malformed[field] = value
+    assert.deepEqual(resolveCutoverInputClosureV1(malformed).violations, [{
+      code: 'cutover-input-closure-incomplete',
+      path,
+      reason,
+    }])
+  }
+
   const missingStage = legalState()
   missingStage.index_entries = missingStage.index_entries.filter(({ path }) => path !== 'src/A.fs')
+  missingStage.index_blob_bytes_by_path.delete('src/A.fs')
+  missingStage.working_tree_bytes_by_path.delete('src/A.fs')
   assert.deepEqual(validateCutoverInputStateV1(missingStage).violations, [{ code: 'cutover-input-closure-incomplete', path: 'src/A.fs', reason: 'missing-stage-zero-entry' }])
 
   const unmerged = legalState()
   unmerged.index_entries.find(({ path }) => path === 'src/A.fs').stage = 2
-  assert.deepEqual(validateCutoverInputStateV1(unmerged).violations, [{ code: 'cutover-input-closure-incomplete', path: 'src/A.fs', reason: 'missing-stage-zero-entry' }])
+  assert.deepEqual(validateCutoverInputStateV1(unmerged).violations, [{ code: 'cutover-input-closure-incomplete', path: 'src/A.fs', reason: 'unmerged-index-entry' }])
+
+  const unrelatedUnmerged = legalState()
+  unrelatedUnmerged.index_entries.push({ path: 'scratch.txt', mode: '100644', stage: 3, blob_oid: oid('9'), object_type: 'blob' })
+  assert.deepEqual(validateCutoverInputStateV1(unrelatedUnmerged).violations, [{ code: 'cutover-input-closure-incomplete', path: 'scratch.txt', reason: 'unmerged-index-entry' }])
+
+  const malformedIndexCollection = legalState()
+  malformedIndexCollection.index_entries = null
+  assert.deepEqual(validateCutoverInputStateV1(malformedIndexCollection).violations, [{ code: 'cutover-input-closure-incomplete', path: '$.index_entries', reason: 'invalid-index-entries' }])
+
+  const openIndexRow = legalState()
+  openIndexRow.index_entries[0].extra = true
+  assert.deepEqual(validateCutoverInputStateV1(openIndexRow).violations, [{ code: 'cutover-input-closure-incomplete', path: '$.index_entries[0]', reason: 'invalid-index-entry-schema' }])
+
+  const invalidObjectFormat = legalState()
+  invalidObjectFormat.object_format = 'sha512'
+  invalidObjectFormat.index_entries[0].blob_oid = 'not-an-oid'
+  assert.deepEqual(validateCutoverInputStateV1(invalidObjectFormat).violations, [{ code: 'cutover-input-closure-incomplete', path: '$object-format', reason: 'unsupported-object-format' }])
+
+  const arbitraryByteRow = legalState()
+  arbitraryByteRow.index_blob_bytes_by_path.set('src/not-indexed.fs', Buffer.from('ambient'))
+  assert.deepEqual(validateCutoverInputStateV1(arbitraryByteRow).violations, [{ code: 'cutover-input-closure-incomplete', path: 'src/not-indexed.fs', reason: 'unexpected-index-blob-bytes' }])
+
+  const symlink = legalState()
+  symlink.index_entries.find(({ path }) => path === 'docs/OWNER-CONTRACT-SLICE-ADJUDICATIONS.json').mode = '120000'
+  assert.deepEqual(validateCutoverInputStateV1(symlink).violations, [{ code: 'cutover-input-closure-incomplete', path: 'docs/OWNER-CONTRACT-SLICE-ADJUDICATIONS.json', reason: 'invalid-stage-zero-entry' }])
+  assert.throws(() => canonicalInputIndexDigestV1([{ path: 'link', mode: '120000', blob_oid: oid('a') }]), TypeError)
 
   const unstaged = legalState()
   unstaged.working_tree_bytes_by_path.set('src/A.fs', Buffer.from('different'))

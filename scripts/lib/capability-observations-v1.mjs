@@ -12,10 +12,17 @@ const RAW_CASE_KEYS = Object.freeze({
   'fable-emit': ['expression', 'javascript_traversal_id', 'site'],
   'emit-js-expr': ['expression', 'javascript_traversal_id', 'site'],
   'public-signature-export': ['export_kind', 'declaration_identity', 'site'],
-  'generated-javascript': ['generated_artifact_id', 'javascript_observation', 'site'],
+  'javascript-capability': ['source_kind', 'source_id', 'generated_artifact_id', 'javascript_observation', 'site'],
 })
 
 const JS_KINDS = new Set(['static-import', 'dynamic-import', 'free-global', 'member-read', 'member-write', 'call', 'construct', 'mutable-binding', 'update'])
+const JAVASCRIPT_BINDING_PROVENANCES = new Set(['local', 'imported', 'free', 'unresolved'])
+const PUBLIC_SIGNATURE_EXPORT_KINDS = new Set([
+  'pure-type',
+  'pure-value',
+  'pure-function',
+  'capability-type',
+])
 const LABEL_KEYS = ['runtimes', 'authorities', 'mutable_resources', 'semantic_classes']
 const LABEL_VALUES = Object.freeze({
   runtimes: new Set(['fsharp', 'node', 'bun', 'browser', 'generated-javascript', 'external-package']),
@@ -70,11 +77,14 @@ const siteValid = (site) => {
 
 const nonEmptyText = (value) => typeof value === 'string' && value.length > 0
 
-const javascriptObservationValid = (value) => exactKeys(value, ['kind', 'root', 'member_path'])
+const JAVASCRIPT_SOURCE_KINDS = new Set(['fable-emit', 'emit-js-expr', 'generated-artifact'])
+
+const javascriptObservationValid = (value) => exactKeys(value, ['kind', 'root', 'member_path', 'binding_provenance'])
   && JS_KINDS.has(value.kind)
-  && typeof value.root === 'string'
+  && nonEmptyText(value.root)
   && Array.isArray(value.member_path)
-  && value.member_path.every((member) => typeof member === 'string')
+  && value.member_path.every(nonEmptyText)
+  && JAVASCRIPT_BINDING_PROVENANCES.has(value.binding_provenance)
 
 export const validateRawCapabilityObservationV1 = (observation) => {
   if (!exactKeys(observation, ['case', 'payload'])) return false
@@ -85,18 +95,22 @@ export const validateRawCapabilityObservationV1 = (observation) => {
   if (observation.case === 'fcs-external-symbol-use' && ![payload.assembly, payload.fully_qualified_symbol].every(nonEmptyText)) return false
   if (observation.case === 'fable-import' && ![payload.module_specifier, payload.selector].every(nonEmptyText)) return false
   if (['fable-emit', 'emit-js-expr'].includes(observation.case) && !nonEmptyText(payload.expression)) return false
-  if (observation.case === 'public-signature-export' && ![payload.export_kind, payload.declaration_identity].every(nonEmptyText)) return false
-  if (observation.case === 'generated-javascript' && !javascriptObservationValid(observation.payload.javascript_observation)) return false
-  if (observation.case === 'generated-javascript' && !nonEmptyText(payload.generated_artifact_id)) return false
+  if (observation.case === 'public-signature-export'
+    && (!PUBLIC_SIGNATURE_EXPORT_KINDS.has(payload.export_kind) || !nonEmptyText(payload.declaration_identity))) return false
+  if (observation.case === 'javascript-capability') {
+    if (!JAVASCRIPT_SOURCE_KINDS.has(payload.source_kind)
+      || !nonEmptyText(payload.source_id)
+      || !javascriptObservationValid(payload.javascript_observation)) return false
+    if (payload.source_kind === 'generated-artifact') {
+      if (payload.generated_artifact_id !== payload.source_id) return false
+    } else if (payload.generated_artifact_id !== null) return false
+  }
   if (observation.case === 'fable-import' && !(payload.generated_artifact_id === null || nonEmptyText(payload.generated_artifact_id))) return false
   if (['fable-emit', 'emit-js-expr'].includes(observation.case) && !(payload.javascript_traversal_id === null || nonEmptyText(payload.javascript_traversal_id))) return false
   return true
 }
 
-export const capabilityObservationIdV1 = (observation, site) => canonicalDigestV1('capability-observation/v1\0',
-  observation?.case === undefined
-    ? { case: 'generated-javascript', payload: { generated_artifact_id: 'fixture', javascript_observation: observation, site } }
-    : observation)
+export const capabilityObservationIdV1 = (observation) => canonicalDigestV1('capability-observation/v1\0', observation)
 
 export const capabilityFactIdV1 = (observationId, disposition) => canonicalDigestV1('capability-fact/v1\0', {
   observation_id: observationId,
@@ -194,9 +208,7 @@ export const classifyCapabilityObservationV1 = (observation) => {
       ?? unknown('dynamic-target', observation.case, `${payload.module_specifier}:${payload.selector}`)
   }
   if (observation.case === 'public-signature-export') {
-    const semanticClasses = payload.export_kind === 'capability-type'
-      ? ['capability-type-only']
-      : ['pure-representation']
+    const semanticClasses = [payload.export_kind === 'capability-type' ? 'capability-type-only' : 'pure-representation']
     return classified({ runtimes: ['fsharp'], semanticClasses })
   }
   if (observation.case === 'fsharp-node') {
@@ -207,9 +219,23 @@ export const classifyCapabilityObservationV1 = (observation) => {
     }
     return unknown('unsupported-ast', payload.node_kind, payload.semantic_identity)
   }
-  if (observation.case === 'generated-javascript') {
+  if (observation.case === 'javascript-capability') {
     const { javascript_observation: javascriptObservation } = payload
     const identity = [javascriptObservation.root, ...javascriptObservation.member_path].join('.')
+    if (['mutable-binding', 'update', 'member-write'].includes(javascriptObservation.kind)) {
+      return classified({ runtimes: ['generated-javascript'], mutableResources: ['top-level-mutable'], semanticClasses: ['capability-value'] })
+    }
+    if (javascriptObservation.binding_provenance === 'unresolved') {
+      return unknown('dynamic-target', javascriptObservation.kind, identity)
+    }
+    if (javascriptObservation.binding_provenance === 'local') {
+      return { case: 'irrelevant', payload: { closed_rule_id: 'javascript-local-binding' } }
+    }
+    if (javascriptObservation.binding_provenance === 'free'
+      && ['call', 'construct'].includes(javascriptObservation.kind)
+      && identity === 'Date') {
+      return classified({ runtimes: ['generated-javascript'], authorities: ['clock'], semanticClasses: ['capability-value'] })
+    }
     const known = labelsForIdentity(identity, 'generated-javascript')
     if (known) {
       return classified({
@@ -218,9 +244,6 @@ export const classifyCapabilityObservationV1 = (observation) => {
         mutableResources: javascriptObservation.kind === 'mutable-binding' ? ['top-level-mutable'] : known.payload.mutable_resources,
         semanticClasses: known.payload.semantic_classes,
       })
-    }
-    if (javascriptObservation.kind === 'mutable-binding' || javascriptObservation.kind === 'update' || javascriptObservation.kind === 'member-write') {
-      return classified({ runtimes: ['generated-javascript'], mutableResources: ['top-level-mutable'], semanticClasses: ['capability-value'] })
     }
     return unknown('unclassified-capability', javascriptObservation.kind, identity)
   }
@@ -255,10 +278,19 @@ const sortedViolations = (violations) => violations.sort((left, right) => {
   return byCode || compareCanonicalTextV1(encodeCanonicalJsonV1(left), encodeCanonicalJsonV1(right))
 })
 
-export const validateCapabilityPartitionV1 = ({ observations, dispositions, facts, extraction_diagnostics: diagnostics = [] }) => {
+export const validateCapabilityPartitionV1 = (input = {}) => {
+  const observations = input?.observations
+  const dispositions = input?.dispositions
+  const facts = input?.facts
+  const diagnostics = input?.extraction_diagnostics ?? []
   const violations = []
   const explicitFacts = facts !== undefined
-  if (!Array.isArray(observations) || !Array.isArray(diagnostics)) return { facts: [], coverage: null, violations: [violation('capability-extraction-incomplete')] }
+  if (!Array.isArray(observations)
+    || !Array.isArray(diagnostics)
+    || (dispositions !== undefined && !Array.isArray(dispositions))
+    || (facts !== undefined && !Array.isArray(facts))) {
+    return { facts: [], coverage: null, violations: [violation('capability-extraction-incomplete')] }
+  }
   const validObservations = observations.filter(validateRawCapabilityObservationV1)
   if (diagnostics.length > 0 || validObservations.length !== observations.length) violations.push(violation('capability-extraction-incomplete'))
   const observationRows = validObservations.map((observation) => ({ observation, observation_id: capabilityObservationIdV1(observation) }))
@@ -320,6 +352,9 @@ export const validateCapabilityPartitionV1 = ({ observations, dispositions, fact
     if (fact.fact_id !== capabilityFactIdV1(fact.observation_id, fact.disposition) && !collidingFactIds.has(fact.fact_id)) {
       violations.push(violation('capability-extraction-incomplete'))
     }
+    if (encodeCanonicalJsonV1(fact.disposition) !== encodeCanonicalJsonV1(classifyCapabilityObservationV1(fact.observation))) {
+      violations.push(violation('capability-extraction-incomplete', { observation_id: fact.observation_id }))
+    }
   }
 
   const uniqueFacts = [...new Map(structurallyValidFacts.map((fact) => [encodeCanonicalJsonV1(fact), fact])).values()]
@@ -356,6 +391,9 @@ export const validateCapabilityPartitionV1 = ({ observations, dispositions, fact
 }
 
 export const extractObservedCapabilityFactsV1 = (observations, extractionDiagnostics = []) => {
+  if (!Array.isArray(observations) || !Array.isArray(extractionDiagnostics)) {
+    return { facts: [], coverage: null, violations: [violation('capability-extraction-incomplete')] }
+  }
   const dispositions = observations.map((observation) => ({
     observation_id: capabilityObservationIdV1(observation),
     disposition: classifyCapabilityObservationV1(observation),
@@ -372,12 +410,20 @@ const childNodes = (node) => Object.keys(node)
     return value?.type ? [{ node: value, segment: key }] : []
   })
 
-export const enumerateJavaScriptAstNodesV1 = (ast, sourceId) => {
+const closedBindingProvenance = (value) => JAVASCRIPT_BINDING_PROVENANCES.has(value) ? value : 'unresolved'
+
+export const enumerateJavaScriptAstNodesV1 = (ast, sourceId, bindingProvenanceForNode) => {
   if (typeof sourceId !== 'string' || sourceId.length === 0 || !ast?.type) return []
   const rows = []
   const visit = (node, path) => {
     const nodeId = `${sourceId}#${path}`
-    rows.push({ node_id: nodeId, node_type: node.type, node: structuredClone(node) })
+    const row = { node_id: nodeId, node_type: node.type, node: structuredClone(node) }
+    rows.push({
+      ...row,
+      binding_provenance: closedBindingProvenance(typeof bindingProvenanceForNode === 'function'
+        ? bindingProvenanceForNode(row)
+        : 'unresolved'),
+    })
     for (const child of childNodes(node)) visit(child.node, `${path}/${child.segment}`)
   }
   visit(ast, 'root')
@@ -387,101 +433,280 @@ export const enumerateJavaScriptAstNodesV1 = (ast, sourceId) => {
 export const javascriptTraversalIdV1 = (sourceKind, sourceId) =>
   canonicalDigestV1('javascript-traversal/v1\0', { source_kind: sourceKind, source_id: sourceId })
 
+export const javascriptSourceIdV1 = (expression, site) =>
+  canonicalDigestV1('javascript-source/v1\0', { expression, site })
+
 const memberIdentity = (node) => {
   if (node?.type === 'Identifier') return { root: node.name, member_path: [] }
-  if (node?.type !== 'MemberExpression' || node.computed) return null
+  if (node?.type !== 'MemberExpression') return null
   const parent = memberIdentity(node.object)
-  const member = node.property?.type === 'Identifier' ? node.property.name : null
+  const member = node.computed
+    ? node.property?.type === 'Literal' && typeof node.property.value === 'string' && node.property.value.length > 0
+      ? node.property.value
+      : '<computed>'
+    : node.property?.type === 'Identifier' ? node.property.name : null
   return parent && member ? { root: parent.root, member_path: [...parent.member_path, member] } : null
 }
-
-const jsObservationId = (row, observation) => canonicalDigestV1('javascript-capability-observation/v1\0', {
-  node_id: row.node_id,
-  observation,
-})
 
 const emittedResult = (row, observations) => ({
   node_id: row.node_id,
   result: {
     case: 'emitted-capability-observations',
-    payload: { observation_ids: observations.map((observation) => jsObservationId(row, observation)).sort(compareCanonicalTextV1) },
+    payload: {
+      observations: [...observations].sort((left, right) => compareCanonicalTextV1(encodeCanonicalJsonV1(left), encodeCanonicalJsonV1(right))),
+    },
   },
 })
 
+const noCapabilityResult = (row) => ({ node_id: row.node_id, result: { case: 'no-capability-observation', payload: {} } })
+
+const dynamicIdentity = { root: '<dynamic>', member_path: [] }
+const identifierOwnedByParent = (nodeId) => /\/(callee|id|key|local|object|param|params\[\d+\]|property)$/.test(nodeId)
+
 export const visitJavaScriptNodeV1 = (row) => {
   const node = row.node
+  const bindingProvenance = closedBindingProvenance(row.binding_provenance)
+  const observed = (kind, identity, provenance = bindingProvenance) => ({
+    kind,
+    ...identity,
+    binding_provenance: provenance,
+  })
   if (!KNOWN_NODE_TYPES.has(node.type)) return { node_id: row.node_id, result: { case: 'unknown-node-type', payload: { node_type: node.type } } }
   if (node.type === 'ImportDeclaration') {
-    return emittedResult(row, [{ kind: 'static-import', root: String(node.source?.value ?? ''), member_path: [] }])
+    const root = typeof node.source?.value === 'string' && node.source.value.length > 0 ? node.source.value : '<dynamic>'
+    return emittedResult(row, [observed('static-import', { root, member_path: [] }, root === '<dynamic>' ? 'unresolved' : 'imported')])
   }
   if (node.type === 'ImportExpression') {
-    return emittedResult(row, [{ kind: 'dynamic-import', root: String(node.source?.value ?? ''), member_path: [] }])
+    const root = typeof node.source?.value === 'string' && node.source.value.length > 0 ? node.source.value : '<dynamic>'
+    return emittedResult(row, [observed('dynamic-import', { root, member_path: [] }, root === '<dynamic>' ? 'unresolved' : 'imported')])
+  }
+  if (node.type === 'Identifier' && !identifierOwnedByParent(row.node_id) && bindingProvenance !== 'local') {
+    return emittedResult(row, [observed(bindingProvenance === 'free' ? 'free-global' : 'member-read', { root: node.name, member_path: [] })])
   }
   if (node.type === 'VariableDeclaration' && node.kind !== 'const') {
-    return emittedResult(row, (node.declarations ?? []).map((declaration) => ({
-      kind: 'mutable-binding',
-      root: declaration.id?.name ?? '',
-      member_path: [],
-    })))
+    const observations = (node.declarations ?? []).map((declaration) =>
+      observed('mutable-binding', { root: declaration.id?.name ?? '<dynamic>', member_path: [] }, 'local'))
+    return observations.length > 0 ? emittedResult(row, observations) : noCapabilityResult(row)
   }
   if (node.type === 'UpdateExpression') {
-    const identity = memberIdentity(node.argument) ?? { root: '', member_path: [] }
-    return emittedResult(row, [{ kind: 'update', ...identity }])
+    const identity = memberIdentity(node.argument) ?? dynamicIdentity
+    return emittedResult(row, [observed('update', identity)])
   }
   if (node.type === 'AssignmentExpression') {
-    const identity = memberIdentity(node.left)
-    if (identity) return emittedResult(row, [{ kind: 'member-write', ...identity }])
+    return emittedResult(row, [observed('member-write', memberIdentity(node.left) ?? dynamicIdentity)])
   }
   if (node.type === 'MemberExpression') {
     const identity = memberIdentity(node)
-    if (identity && labelsForIdentity([identity.root, ...identity.member_path].join('.'), 'generated-javascript')) {
-      return emittedResult(row, [{ kind: 'member-read', ...identity }])
-    }
+    return bindingProvenance === 'local'
+      ? noCapabilityResult(row)
+      : emittedResult(row, [observed('member-read', identity ?? dynamicIdentity)])
   }
   if (node.type === 'CallExpression' || node.type === 'NewExpression') {
     const identity = memberIdentity(node.callee)
-    if (identity && labelsForIdentity([identity.root, ...identity.member_path].join('.'), 'generated-javascript')) {
-      return emittedResult(row, [{ kind: node.type === 'CallExpression' ? 'call' : 'construct', ...identity }])
+    if (bindingProvenance === 'local') return noCapabilityResult(row)
+    if (node.type === 'CallExpression'
+      && bindingProvenance === 'free'
+      && identity?.root === 'require'
+      && identity.member_path.length === 0) {
+      const specifier = node.arguments?.length === 1 && node.arguments[0]?.type === 'Literal' && typeof node.arguments[0].value === 'string'
+        ? node.arguments[0].value
+        : '<dynamic>'
+      return emittedResult(row, [observed(
+        specifier === '<dynamic>' ? 'dynamic-import' : 'static-import',
+        { root: specifier, member_path: [] },
+        specifier === '<dynamic>' ? 'unresolved' : 'imported',
+      )])
     }
+    if (node.type === 'NewExpression'
+      && bindingProvenance === 'free'
+      && identity?.root === 'Date'
+      && identity.member_path.length === 0
+      && (node.arguments?.length ?? 0) > 0) {
+      return emittedResult(row, [observed('construct', { root: 'new Date(epoch)', member_path: [] })])
+    }
+    return emittedResult(row, [observed(node.type === 'CallExpression' ? 'call' : 'construct', identity ?? dynamicIdentity)])
   }
-  return { node_id: row.node_id, result: { case: 'no-capability-observation', payload: {} } }
+  return noCapabilityResult(row)
 }
 
-export const validateJavaScriptTraversalV1 = ({ source_kind: sourceKind, source_id: sourceId, nodes, visits, capability_observation_ids: capabilityObservationIds }) => {
+const visitResultValid = (result) => {
+  if (!exactKeys(result, ['case', 'payload'])) return false
+  if (result.case === 'no-capability-observation') return exactKeys(result.payload, [])
+  if (result.case === 'unknown-node-type') return exactKeys(result.payload, ['node_type']) && nonEmptyText(result.payload.node_type)
+  return result.case === 'emitted-capability-observations'
+    && exactKeys(result.payload, ['observations'])
+    && Array.isArray(result.payload.observations)
+    && result.payload.observations.length > 0
+    && result.payload.observations.every(javascriptObservationValid)
+    && result.payload.observations.every((observation, index) => index === 0
+      || compareCanonicalTextV1(encodeCanonicalJsonV1(result.payload.observations[index - 1]), encodeCanonicalJsonV1(observation)) < 0)
+}
+
+const compareAstNodeIdV1 = (left, right) => {
+  const leftSegments = left.slice(left.indexOf('#') + 1).split('/')
+  const rightSegments = right.slice(right.indexOf('#') + 1).split('/')
+  for (let index = 0; index < Math.min(leftSegments.length, rightSegments.length); index += 1) {
+    const leftMatch = /^(.*)\[(\d+)\]$/.exec(leftSegments[index])
+    const rightMatch = /^(.*)\[(\d+)\]$/.exec(rightSegments[index])
+    const byKey = compareCanonicalTextV1(leftMatch?.[1] ?? leftSegments[index], rightMatch?.[1] ?? rightSegments[index])
+    if (byKey !== 0) return byKey
+    if (leftMatch && rightMatch && Number(leftMatch[2]) !== Number(rightMatch[2])) return Number(leftMatch[2]) - Number(rightMatch[2])
+    if (Boolean(leftMatch) !== Boolean(rightMatch)) return leftMatch ? 1 : -1
+  }
+  return leftSegments.length - rightSegments.length
+}
+
+const canonicalJavaScriptObservationsV1 = (sourceKind, sourceId, observationSite, visits) => {
+  const occurrences = new Map()
+  return [...visits]
+    .sort((left, right) => compareAstNodeIdV1(left.node_id, right.node_id))
+    .flatMap(({ result }) => result.case === 'emitted-capability-observations' ? result.payload.observations : [])
+    .map((javascriptObservation) => {
+      const identity = encodeCanonicalJsonV1(javascriptObservation)
+      const ordinal = occurrences.get(identity) ?? 0
+      occurrences.set(identity, ordinal + 1)
+      return {
+        case: 'javascript-capability',
+        payload: {
+          source_kind: sourceKind,
+          source_id: sourceId,
+          generated_artifact_id: sourceKind === 'generated-artifact' ? sourceId : null,
+          javascript_observation: javascriptObservation,
+          site: { ...observationSite, same_anchor_occurrence_ordinal: observationSite.same_anchor_occurrence_ordinal + ordinal },
+        },
+      }
+    })
+}
+
+export const projectJavaScriptCapabilityObservationsV1 = ({ source_kind: sourceKind, source_id: sourceId, observation_site: observationSite, visits }) => {
+  if (!JAVASCRIPT_SOURCE_KINDS.has(sourceKind)
+    || !nonEmptyText(sourceId)
+    || !siteValid(observationSite)
+    || !Array.isArray(visits)
+    || !visits.every((row) => exactKeys(row, ['node_id', 'result']) && nonEmptyText(row.node_id) && visitResultValid(row.result))) {
+    return { observations: [], violations: [violation('capability-extraction-incomplete', { source_id: sourceId })] }
+  }
+  return { observations: canonicalJavaScriptObservationsV1(sourceKind, sourceId, observationSite, visits), violations: [] }
+}
+
+export const validateJavaScriptTraversalV1 = (input = {}) => {
+  const sourceKind = input?.source_kind
+  const sourceId = input?.source_id
+  const observationSite = input?.observation_site
+  const ast = input?.ast
+  const bindingProvenanceForNode = input?.binding_provenance_for_node
+  const visits = input?.visits
+  const capabilityFacts = input?.capability_facts
+  const inputShapeValid = exactKeys(input, [
+    'source_kind',
+    'source_id',
+    'observation_site',
+    'ast',
+    'binding_provenance_for_node',
+    'visits',
+    'capability_facts',
+  ])
+  const inputBoundaryValid = inputShapeValid
+    && JAVASCRIPT_SOURCE_KINDS.has(sourceKind)
+    && nonEmptyText(sourceId)
+    && siteValid(observationSite)
+    && ast !== null
+    && typeof ast === 'object'
+    && !Array.isArray(ast)
+    && nonEmptyText(ast.type)
+    && typeof bindingProvenanceForNode === 'function'
+    && Array.isArray(visits)
+    && Array.isArray(capabilityFacts)
+  if (!inputBoundaryValid) {
+    return { coverage: null, emitted_observation_ids: [], violations: [violation('capability-extraction-incomplete', { source_id: sourceId })] }
+  }
+  let nodes
+  try {
+    nodes = enumerateJavaScriptAstNodesV1(ast, sourceId, bindingProvenanceForNode)
+  } catch {
+    return { coverage: null, emitted_observation_ids: [], violations: [violation('capability-extraction-incomplete', { source_id: sourceId })] }
+  }
   const violations = []
+  let incomplete = false
+  const visitRows = visits
+  const factRows = capabilityFacts
   const nodeCounts = new Map()
-  for (const row of nodes ?? []) nodeCounts.set(row.node_id, (nodeCounts.get(row.node_id) ?? 0) + 1)
+  for (const row of nodes) {
+    const valid = exactKeys(row, ['node_id', 'node_type', 'node', 'binding_provenance'])
+      && nonEmptyText(row.node_id)
+      && nonEmptyText(row.node_type)
+      && row.node !== null
+      && typeof row.node === 'object'
+      && !Array.isArray(row.node)
+      && row.node.type === row.node_type
+      && JAVASCRIPT_BINDING_PROVENANCES.has(row.binding_provenance)
+      && row.node_id.startsWith(`${sourceId}#`)
+    if (!valid) incomplete = true
+    if (nonEmptyText(row?.node_id)) nodeCounts.set(row.node_id, (nodeCounts.get(row.node_id) ?? 0) + 1)
+  }
   const visitCounts = new Map()
-  for (const row of visits ?? []) visitCounts.set(row.node_id, (visitCounts.get(row.node_id) ?? 0) + 1)
+  for (const row of visitRows) {
+    const valid = exactKeys(row, ['node_id', 'result']) && nonEmptyText(row.node_id) && visitResultValid(row.result)
+    if (!valid) incomplete = true
+    if (nonEmptyText(row?.node_id)) visitCounts.set(row.node_id, (visitCounts.get(row.node_id) ?? 0) + 1)
+  }
+  if (nodeCounts.size === 0) incomplete = true
   for (const [nodeId, count] of nodeCounts) if (count > 1) violations.push(violation('javascript-ast-node-duplicate-visit', { node_id: nodeId }))
   for (const [nodeId, count] of visitCounts) if (count > 1) violations.push(violation('javascript-ast-node-duplicate-visit', { node_id: nodeId }))
   for (const nodeId of nodeCounts.keys()) if (!visitCounts.has(nodeId)) violations.push(violation('javascript-ast-node-unvisited', { node_id: nodeId }))
   for (const nodeId of visitCounts.keys()) if (!nodeCounts.has(nodeId)) violations.push(violation('javascript-traversal-stale', { node_id: nodeId }))
 
-  const uniqueVisits = [...new Map((visits ?? []).map((row) => [row.node_id, row])).values()]
-  for (const row of uniqueVisits) if (row.result?.case === 'unknown-node-type') violations.push(violation('javascript-ast-node-unknown', { node_id: row.node_id, node_type: row.result.payload?.node_type }))
-  const emitted = uniqueVisits.flatMap((row) => row.result?.case === 'emitted-capability-observations' ? row.result.payload.observation_ids : []).sort(compareCanonicalTextV1)
-  const expected = [...(capabilityObservationIds ?? [])].sort(compareCanonicalTextV1)
-  if (encodeCanonicalJsonV1(emitted) !== encodeCanonicalJsonV1(expected)) violations.push(violation('javascript-traversal-source-mismatch', { source_id: sourceId }))
+  const uniqueVisits = [...new Map(visitRows.filter((row) => nonEmptyText(row?.node_id)).map((row) => [row.node_id, row])).values()]
+  const validVisits = uniqueVisits.filter((row) => visitResultValid(row.result))
+  for (const row of validVisits) if (row.result.case === 'unknown-node-type') violations.push(violation('javascript-ast-node-unknown', { node_id: row.node_id, node_type: row.result.payload.node_type }))
+
+  let sourceMismatch = false
+  const nodesById = new Map(nodes.filter((row) => nonEmptyText(row?.node_id)).map((row) => [row.node_id, row]))
+  for (const row of validVisits) {
+    const node = nodesById.get(row.node_id)
+    if (node && encodeCanonicalJsonV1(row) !== encodeCanonicalJsonV1(visitJavaScriptNodeV1(node))) sourceMismatch = true
+  }
+  const validFacts = factRows.filter(validateCanonicalCapabilityFactV1)
+  if (validFacts.length !== factRows.length) incomplete = true
+  let emittedObservationIds = []
+  if (!incomplete) {
+    emittedObservationIds = projectJavaScriptCapabilityObservationsV1({
+      source_kind: sourceKind,
+      source_id: sourceId,
+      observation_site: observationSite,
+      visits: validVisits,
+    }).observations
+      .map(capabilityObservationIdV1)
+      .sort(compareCanonicalTextV1)
+    const expected = validFacts
+      .filter(({ observation }) => observation.case === 'javascript-capability'
+        && observation.payload.source_kind === sourceKind
+        && observation.payload.source_id === sourceId)
+      .map(({ observation_id: observationId }) => observationId)
+      .sort(compareCanonicalTextV1)
+    if (encodeCanonicalJsonV1(emittedObservationIds) !== encodeCanonicalJsonV1(expected)) sourceMismatch = true
+  }
+  if (sourceMismatch && !incomplete) violations.push(violation('javascript-traversal-source-mismatch', { source_id: sourceId }))
+  if (incomplete) violations.push(violation('capability-extraction-incomplete', { source_id: sourceId }))
 
   const counts = {
-    noCapability: uniqueVisits.filter((row) => row.result?.case === 'no-capability-observation').length,
-    capability: uniqueVisits.filter((row) => row.result?.case === 'emitted-capability-observations').length,
-    unknown: uniqueVisits.filter((row) => row.result?.case === 'unknown-node-type').length,
+    noCapability: validVisits.filter((row) => row.result.case === 'no-capability-observation').length,
+    capability: validVisits.filter((row) => row.result.case === 'emitted-capability-observations').length,
+    unknown: validVisits.filter((row) => row.result.case === 'unknown-node-type').length,
   }
   const coverage = {
     id: javascriptTraversalIdV1(sourceKind, sourceId),
     source_kind: sourceKind,
     source_id: sourceId,
     ast_node_count: nodeCounts.size,
-    visited_node_count: uniqueVisits.length,
+    visited_node_count: validVisits.length,
     no_capability_node_count: counts.noCapability,
     capability_emitting_node_count: counts.capability,
     unknown_node_count: counts.unknown,
     ast_node_set_digest: canonicalDigestV1('javascript-ast-nodes/v1\0', [...nodeCounts.keys()].sort(compareCanonicalTextV1)),
-    visit_partition_digest: canonicalDigestV1('javascript-visit-partition/v1\0', uniqueVisits.sort((left, right) => compareCanonicalTextV1(left.node_id, right.node_id)).map(({ node_id: nodeId, result }) => ({ node_id: nodeId, result }))),
+    visit_partition_digest: canonicalDigestV1('javascript-visit-partition/v1\0', [...validVisits].sort((left, right) => compareCanonicalTextV1(left.node_id, right.node_id)).map(({ node_id: nodeId, result }) => ({ node_id: nodeId, result }))),
   }
-  return { coverage, violations: sortedViolations(violations) }
+  return { coverage, emitted_observation_ids: emittedObservationIds, violations: sortedViolations(violations) }
 }
 
 export const capabilityDispositionViolatesContractV1 = (disposition) => disposition.case === 'unknown'
@@ -496,3 +721,4 @@ export const validateCanonicalCapabilityFactV1 = (fact) => exactKeys(fact, ['obs
   && validateCapabilityDispositionV1(fact.disposition)
   && fact.observation_id === capabilityObservationIdV1(fact.observation)
   && fact.fact_id === capabilityFactIdV1(fact.observation_id, fact.disposition)
+  && encodeCanonicalJsonV1(fact.disposition) === encodeCanonicalJsonV1(classifyCapabilityObservationV1(fact.observation))

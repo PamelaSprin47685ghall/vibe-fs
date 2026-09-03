@@ -1224,8 +1224,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Codec/ToolHostSurface.js',
     owner: 'provider-projection',
-    laws: ['PROVIDER-PROJECTION-003', 'PROVIDER-PROJECTION-005', 'PROVIDER-PROJECTION-008', 'PROVIDER-PROJECTION-009', 'HOST-BOUNDARY-009'],
-    lawOwners: { 'HOST-BOUNDARY-009': 'host-boundary' },
+    laws: ['PROVIDER-PROJECTION-003', 'PROVIDER-PROJECTION-005', 'PROVIDER-PROJECTION-008', 'PROVIDER-PROJECTION-009', 'HOST-BOUNDARY-009', 'HOST-BOUNDARY-030'],
+    lawOwners: { 'HOST-BOUNDARY-009': 'host-boundary', 'HOST-BOUNDARY-030': 'host-boundary' },
     source: 'src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1634,7 +1634,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Interaction/Dispatch/DispatchSurface.js',
     owner: 'dispatch-protocol',
-    laws: ['DISPATCH-PROTOCOL-002', 'DISPATCH-PROTOCOL-004', 'DISPATCH-PROTOCOL-005', 'DISPATCH-PROTOCOL-007', 'DISPATCH-PROTOCOL-009', 'EFFECT-ACCOUNTING-008'],
+    laws: ['DISPATCH-PROTOCOL-002', 'DISPATCH-PROTOCOL-004', 'DISPATCH-PROTOCOL-005', 'DISPATCH-PROTOCOL-007', 'DISPATCH-PROTOCOL-009', 'DISPATCH-PROTOCOL-015', 'EFFECT-ACCOUNTING-008'],
     lawOwners: { 'EFFECT-ACCOUNTING-008': 'effect-accounting' },
     source: 'src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs',
     representation: 'opaque-capability',

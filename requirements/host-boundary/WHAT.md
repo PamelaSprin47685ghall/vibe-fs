@@ -124,3 +124,7 @@ Host signal subscription必须返回closed typed error与`LocalEventHook | Event
 ## HOST-BOUNDARY-029: fatal process 是唯一注入的physical adapter
 
 `FatalProcessPort` contract只含immutable incident vocabulary与capability type，不得含value、factory或Node import。唯一fatal adapter拥有该路径的`console.error`、`process.kill`与`process.exit`；所有caller由composition获得mandatory capability，普通contract/runtime/adapter不得直接引用physical implementation。fatal前置settlement由caller owner提供typed evidence；同一incident只允许一次report与一次kill。
+
+## HOST-BOUNDARY-030: raw Host membrane 只接受精确 JavaScript 类型
+
+布尔marker只接受primitive `true | false`；字符串、数字、对象、boxed value均不得借truthiness成为compaction、synthetic或abort。parts只接受真实Array，其他值安全投影为空且hook不得抛异常。session event与`session.get`响应中的SessionId、parentID、agent只接受原始非空白primitive string，禁止`string value`制造领域值。所有dynamic reader必须在Fable边界执行显式JavaScript type predicate；正确性不得依赖`unbox`、异常捕获或下游字符串函数偶然拒绝。

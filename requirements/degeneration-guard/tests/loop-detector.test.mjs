@@ -7,6 +7,7 @@ import * as loopDetector from '../../../dist/Execution/Session/LoopDetectorSurfa
 import {
   deriveLoopDetectorEnvelope,
   loadLoopDetectorRepositoryCorpusV1,
+  writeLoopDetectorEnvelopeArtifact,
 } from '../../../scripts/lib/derive-loop-detector-envelope.mjs'
 import {
   loopDetectorRepositoryInputFiles,
@@ -78,8 +79,12 @@ test('WHAT[DG-003] LOOP_003_fresh_detector_uses_repository_normal_prior', () => 
 })
 
 test('WHAT[DG-004] LOOP_004_runtime_envelope_is_freshly_derived_from_the_current_repository_without_numeric_snapshots', async () => {
-  const derived = await deriveLoopDetectorEnvelope()
+  let generatedBytes = null
+  const derived = await writeLoopDetectorEnvelopeArtifact(undefined, {
+    writeArtifact: (_target, bytes) => { generatedBytes = bytes },
+  })
 
+  assert.ok(Buffer.isBuffer(generatedBytes) && generatedBytes.length > 0)
   assert.equal(derived.halfLife, 256)
   close(derived.centralProbability, 0.975)
   close(derived.lowerQuantileProbability, 0.025)

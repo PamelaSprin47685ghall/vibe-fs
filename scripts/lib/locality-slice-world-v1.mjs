@@ -6,6 +6,7 @@ import {
 } from './canonical-json-v1.mjs'
 import {
   capabilityDispositionViolatesContractV1,
+  javascriptSourceIdV1,
   javascriptTraversalIdV1,
   validateCanonicalCapabilityFactV1,
   validateCapabilityPartitionV1,
@@ -182,6 +183,9 @@ const javascriptTraversal = (value, path) => {
   if (result.id !== javascriptTraversalIdV1(result.source_kind, result.source_id)) {
     fail('canonical-world-schema', `${path}.id`, 'JavaScript traversal identity does not match its source')
   }
+  if (result.ast_node_count === 0) {
+    fail('canonical-world-schema', `${path}.ast_node_count`, 'JavaScript traversal must cover a non-empty AST')
+  }
   if (result.visited_node_count !== result.ast_node_count
     || result.visited_node_count !== result.no_capability_node_count + result.capability_emitting_node_count + result.unknown_node_count) {
     fail('canonical-world-schema', path, 'JavaScript traversal counts do not form one complete partition')
@@ -327,6 +331,8 @@ const opaqueCapabilityFact = (value, path) => {
 
 const validateReferences = (world) => {
   const localities = new Map(world.observed.localities.map((row) => [row.id, row]))
+  const artifacts = new Map(world.observed.generated_artifacts.map((row) => [row.id, row]))
+  const traversals = new Map(world.observed.javascript_traversals.map((row) => [row.id, row]))
   const sourceOwner = new Map()
   for (const row of localities.values()) {
     for (const source of row.sources) {
@@ -370,10 +376,62 @@ const validateReferences = (world) => {
       fail('canonical-world-schema', '$.normative.generated_module_relations', 'generated relation consumer or owner does not resolve')
     }
   }
+  for (const artifact of artifacts.values()) {
+    const traversal = traversals.get(artifact.javascript_traversal_id)
+    if (!traversal || traversal.source_kind !== 'generated-artifact' || traversal.source_id !== artifact.id) {
+      fail('canonical-world-schema', '$.observed.generated_artifacts', 'generated artifact traversal does not resolve')
+    }
+  }
+  for (const traversal of traversals.values()) {
+    if (traversal.source_kind === 'generated-artifact') {
+      if (!artifacts.has(traversal.source_id)) fail('canonical-world-schema', '$.observed.javascript_traversals', 'generated traversal source does not resolve')
+      continue
+    }
+    const sourceFact = world.observed.capability_facts.find(({ observation }) => observation.case === traversal.source_kind
+      && observation.payload.javascript_traversal_id === traversal.id
+      && javascriptSourceIdV1(observation.payload.expression, observation.payload.site) === traversal.source_id)
+    if (!sourceFact) fail('canonical-world-schema', '$.observed.javascript_traversals', 'Fable interop traversal source does not resolve')
+  }
   for (const fact of world.observed.capability_facts) {
     const site = fact.observation.payload.site
     if (!localities.has(site.locality_id) || sourceOwner.get(site.source_path) !== site.locality_id) {
       fail('canonical-world-schema', '$.observed.capability_facts', 'capability fact site does not match source ownership')
+    }
+    const { observation } = fact
+    if (observation.case === 'fable-import' && observation.payload.generated_artifact_id !== null
+      && !artifacts.has(observation.payload.generated_artifact_id)) {
+      fail('canonical-world-schema', '$.observed.capability_facts', 'Fable import artifact does not resolve')
+    }
+    if (['fable-emit', 'emit-js-expr'].includes(observation.case) && observation.payload.javascript_traversal_id !== null) {
+      const sourceId = javascriptSourceIdV1(observation.payload.expression, observation.payload.site)
+      const traversal = traversals.get(observation.payload.javascript_traversal_id)
+      if (observation.payload.javascript_traversal_id !== javascriptTraversalIdV1(observation.case, sourceId)
+        || !traversal
+        || traversal.source_kind !== observation.case
+        || traversal.source_id !== sourceId) {
+        fail('canonical-world-schema', '$.observed.capability_facts', 'Fable interop traversal does not resolve')
+      }
+    }
+    if (observation.case === 'javascript-capability') {
+      const traversalId = javascriptTraversalIdV1(observation.payload.source_kind, observation.payload.source_id)
+      if (!traversals.has(traversalId)
+        || (observation.payload.source_kind === 'generated-artifact' && !artifacts.has(observation.payload.generated_artifact_id))) {
+        fail('canonical-world-schema', '$.observed.capability_facts', 'JavaScript capability source does not resolve')
+      }
+      if (observation.payload.source_kind !== 'generated-artifact') {
+        const sourceObservation = world.observed.capability_facts
+          .map(({ observation: candidate }) => candidate)
+          .find((candidate) => candidate.case === observation.payload.source_kind
+            && javascriptSourceIdV1(candidate.payload.expression, candidate.payload.site) === observation.payload.source_id)
+        const sourceSite = sourceObservation?.payload.site
+        if (!sourceSite
+          || sourceSite.locality_id !== site.locality_id
+          || sourceSite.source_path !== site.source_path
+          || sourceSite.semantic_declaration_anchor !== site.semantic_declaration_anchor
+          || site.same_anchor_occurrence_ordinal < sourceSite.same_anchor_occurrence_ordinal) {
+          fail('canonical-world-schema', '$.observed.capability_facts', 'JavaScript capability site does not match its Fable interop source')
+        }
+      }
     }
   }
 }
@@ -555,7 +613,7 @@ export const queryCanonicalLocalityV1 = (worldInput, localityId) => {
   relationEndpoints.sort((left, right) => compareCanonicalTextV1(`${left.relation_kind}\0${left.role}\0${left.relation_id}`, `${right.relation_kind}\0${right.role}\0${right.relation_id}`))
   const localFacts = world.observed.capability_facts.filter((fact) => factLocality(fact) === localityId)
   const artifactIds = new Set(localFacts.flatMap(({ observation }) => {
-    if (observation.case === 'generated-javascript') return [observation.payload.generated_artifact_id]
+    if (observation.case === 'javascript-capability' && observation.payload.generated_artifact_id !== null) return [observation.payload.generated_artifact_id]
     if (observation.case === 'fable-import' && observation.payload.generated_artifact_id !== null) return [observation.payload.generated_artifact_id]
     return []
   }))

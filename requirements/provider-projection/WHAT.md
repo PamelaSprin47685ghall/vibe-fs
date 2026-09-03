@@ -12,8 +12,6 @@ Provider 消息投影必须通过类型化组合子与直接执行的计算管�
 
 投影输出依次遵循 `SemanticEventTree → ProviderSemanticProjection → ProviderWireProjection`。`ProviderSemanticProjection`（语义视图，去除易失 ID，供跨会话等价性比对与规范摘要）与 `ProviderWireProjection`（Wire 视图，包含物理 ID 与本地时间线序号）属于不同类型，严禁隐式混用。
 
-Host ingress 的 SessionId 是 opaque 非空字符串。`sessionID`、`sessionId`、字符串 `session`，以及对象 `session.id/sessionID/sessionId` 必须投影为同一 SessionId；不得用 `ses_` 等值前缀猜测 wire 类型。未知对象、非字符串标量与空白值必须 fail-closed。
-
 ## PROVIDER-PROJECTION-004: 严格划分 Coordinator、Planner 与 Renderer 三层
 
 系统结构严格划分为三层：

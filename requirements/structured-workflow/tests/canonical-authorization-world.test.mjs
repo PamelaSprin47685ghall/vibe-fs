@@ -13,7 +13,11 @@ import {
   queryCanonicalLocalityV1,
   serializeCanonicalWorldV1,
 } from '../../../scripts/lib/locality-slice-world-v1.mjs'
-import { extractObservedCapabilityFactsV1 } from '../../../scripts/lib/capability-observations-v1.mjs'
+import {
+  extractObservedCapabilityFactsV1,
+  javascriptSourceIdV1,
+  javascriptTraversalIdV1,
+} from '../../../scripts/lib/capability-observations-v1.mjs'
 
 const digest = (digit) => `sha256:${digit.repeat(64)}`
 
@@ -145,4 +149,116 @@ test('WHAT[STRUCTURED-WORKFLOW-013] canonical world has one closed byte identity
   const duplicateIdentity = minimalWorld()
   duplicateIdentity.observed.localities.push({ ...duplicateIdentity.observed.localities[0] })
   assert.throws(() => buildCanonicalWorldV1(duplicateIdentity), { code: 'canonical-world-duplicate-identity' })
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-014] canonical world closes capability artifact and traversal references', () => {
+  const observationSite = {
+    locality_id: 'provider',
+    source_path: 'src/Provider.fs',
+    semantic_declaration_anchor: 'Provider.emit',
+    same_anchor_occurrence_ordinal: 0,
+  }
+  const expression = 'console.error($0)'
+  const sourceId = javascriptSourceIdV1(expression, observationSite)
+  const traversalId = javascriptTraversalIdV1('fable-emit', sourceId)
+  const emitObservation = {
+    case: 'fable-emit',
+    payload: { expression, javascript_traversal_id: traversalId, site: observationSite },
+  }
+  const emitWorld = minimalWorld()
+  const emitFacts = extractObservedCapabilityFactsV1([emitObservation])
+  emitWorld.observed.capability_facts = emitFacts.facts
+  emitWorld.observed.capability_extraction = emitFacts.coverage
+  emitWorld.observed.javascript_traversals = [{
+    id: traversalId,
+    source_kind: 'fable-emit',
+    source_id: sourceId,
+    ast_node_count: 1,
+    visited_node_count: 1,
+    no_capability_node_count: 1,
+    capability_emitting_node_count: 0,
+    unknown_node_count: 0,
+    ast_node_set_digest: digest('5'),
+    visit_partition_digest: digest('6'),
+  }]
+  assert.doesNotThrow(() => buildCanonicalWorldV1(emitWorld))
+
+  const zeroNodeTraversal = structuredClone(emitWorld)
+  zeroNodeTraversal.observed.javascript_traversals[0].ast_node_count = 0
+  zeroNodeTraversal.observed.javascript_traversals[0].visited_node_count = 0
+  zeroNodeTraversal.observed.javascript_traversals[0].no_capability_node_count = 0
+  assert.throws(() => buildCanonicalWorldV1(zeroNodeTraversal), {
+    code: 'canonical-world-schema',
+    path: '$.observed.javascript_traversals[0].ast_node_count',
+  })
+
+  const javascriptObservation = {
+    case: 'javascript-capability',
+    payload: {
+      source_kind: 'fable-emit',
+      source_id: sourceId,
+      generated_artifact_id: null,
+      javascript_observation: { kind: 'call', root: 'console', member_path: ['error'], binding_provenance: 'free' },
+      site: observationSite,
+    },
+  }
+  const sourceWorld = structuredClone(emitWorld)
+  const sourceFacts = extractObservedCapabilityFactsV1([emitObservation, javascriptObservation])
+  sourceWorld.observed.capability_facts = sourceFacts.facts
+  sourceWorld.observed.capability_extraction = sourceFacts.coverage
+  sourceWorld.observed.javascript_traversals[0].no_capability_node_count = 0
+  sourceWorld.observed.javascript_traversals[0].capability_emitting_node_count = 1
+  assert.doesNotThrow(() => buildCanonicalWorldV1(sourceWorld))
+
+  const wrongCapabilitySite = minimalWorld()
+  const foreignJavaScriptObservation = structuredClone(javascriptObservation)
+  foreignJavaScriptObservation.payload.site = {
+    locality_id: 'consumer',
+    source_path: 'src/Consumer.fs',
+    semantic_declaration_anchor: 'Consumer.decoy',
+    same_anchor_occurrence_ordinal: 0,
+  }
+  const foreignFacts = extractObservedCapabilityFactsV1([emitObservation, foreignJavaScriptObservation])
+  wrongCapabilitySite.observed.capability_facts = foreignFacts.facts
+  wrongCapabilitySite.observed.capability_extraction = foreignFacts.coverage
+  wrongCapabilitySite.observed.javascript_traversals = structuredClone(sourceWorld.observed.javascript_traversals)
+  assert.throws(() => buildCanonicalWorldV1(wrongCapabilitySite), { code: 'canonical-world-schema' })
+
+  const missingTraversal = structuredClone(emitWorld)
+  missingTraversal.observed.javascript_traversals = []
+  assert.throws(() => buildCanonicalWorldV1(missingTraversal), { code: 'canonical-world-schema' })
+
+  const wrongTraversalSource = structuredClone(emitWorld)
+  wrongTraversalSource.observed.javascript_traversals[0].source_id = 'sha256:wrong'
+  wrongTraversalSource.observed.javascript_traversals[0].id = javascriptTraversalIdV1('fable-emit', 'sha256:wrong')
+  assert.throws(() => buildCanonicalWorldV1(wrongTraversalSource), { code: 'canonical-world-schema' })
+
+  const danglingArtifact = minimalWorld()
+  const artifactFacts = extractObservedCapabilityFactsV1([{
+    case: 'javascript-capability',
+    payload: {
+      source_kind: 'generated-artifact',
+      source_id: 'generated-artifact/v1:missing',
+      generated_artifact_id: 'generated-artifact/v1:missing',
+      javascript_observation: { kind: 'call', root: 'console', member_path: ['error'], binding_provenance: 'free' },
+      site: observationSite,
+    },
+  }])
+  danglingArtifact.observed.capability_facts = artifactFacts.facts
+  danglingArtifact.observed.capability_extraction = artifactFacts.coverage
+  assert.throws(() => buildCanonicalWorldV1(danglingArtifact), { code: 'canonical-world-schema' })
+
+  const danglingImport = minimalWorld()
+  const importFacts = extractObservedCapabilityFactsV1([{
+    case: 'fable-import',
+    payload: {
+      module_specifier: '#generated',
+      selector: 'value',
+      generated_artifact_id: 'generated-artifact/v1:missing',
+      site: observationSite,
+    },
+  }])
+  danglingImport.observed.capability_facts = importFacts.facts
+  danglingImport.observed.capability_extraction = importFacts.coverage
+  assert.throws(() => buildCanonicalWorldV1(danglingImport), { code: 'canonical-world-schema' })
 })

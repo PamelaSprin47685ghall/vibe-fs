@@ -4,6 +4,15 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
+type HostSessionObservation =
+    { SessionId: SessionId
+      HasParent: bool
+      Agent: string option }
+
+module HostIngressCodec =
+    val sessionObservation: raw: obj -> HostSessionObservation option
+    val sessionAgent: raw: obj -> string option
+
 type HostToolArguments =
     internal new: raw: obj -> HostToolArguments
     member Text: name: string -> string

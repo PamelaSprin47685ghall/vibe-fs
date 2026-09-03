@@ -22,3 +22,14 @@ test('WHAT[HOST-BOUNDARY-009] HOST_abort_callback_fires_once_immediately_or_from
   unsubscribe()
   assert.deepEqual(removed, [{ name: 'abort', listener: registration.listener }])
 })
+
+test('WHAT[HOST-BOUNDARY-030] abort marker accepts primitive boolean true only', () => {
+  for (const aborted of [1, 'true', {}, [], new Boolean(true)]) {
+    let calls = 0
+    contextAttachAbort(contextDecode({
+      sessionID: 'strict-abort',
+      abort: { aborted, addEventListener() {}, removeEventListener() {} },
+    }), () => { calls += 1 })
+    assert.equal(calls, 0)
+  }
+})

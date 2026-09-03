@@ -27,6 +27,7 @@ module DispatchSurface =
     val fatal: reason: string -> Outcome.SendOutcome
 
     val decodePhysicalUserMessageId: input: obj -> output: obj -> obj
+    val decodeIngress: input: obj -> output: obj -> obj
 
     /// Seed the durable AgentOwnerRoot needed by a continuation owner. This is
     /// the same PromptFact writer used by production ingress; the returned value

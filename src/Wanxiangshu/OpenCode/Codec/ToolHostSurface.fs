@@ -143,6 +143,19 @@ module ToolHostSurface =
     let contextAttachAbort (context: obj) (callback: unit -> unit) : (unit -> unit) =
         (contextOf context).AttachAbort callback
 
+    let sessionObservation (raw: obj) : obj =
+        raw
+        |> HostIngressCodec.sessionObservation
+        |> Option.map (fun observation ->
+            box
+                {| sessionId = SessionId.value observation.SessionId
+                   hasParent = observation.HasParent
+                   agent = observation.Agent |> Option.toObj |})
+        |> Option.toObj
+
+    let sessionAgent (raw: obj) : obj =
+        HostIngressCodec.sessionAgent raw |> Option.map box |> Option.toObj
+
     let rec private tomlValue (value: obj) : ToolHostCodec.TomlValue =
         if isNull value then
             ToolHostCodec.TomlValue.TString ""

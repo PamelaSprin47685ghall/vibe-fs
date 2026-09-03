@@ -10,6 +10,147 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Foundation.Identity
 
+type HostSessionObservation =
+    { SessionId: SessionId
+      HasParent: bool
+      Agent: string option }
+
+module HostIngressCodec =
+
+    [<Emit("typeof $0 === 'string'")>]
+    let private isString (value: obj) : bool = jsNative
+
+    [<Emit("typeof $0 === 'boolean'")>]
+    let private isBoolean (value: obj) : bool = jsNative
+
+    [<Emit("Array.isArray($0)")>]
+    let private isArray (value: obj) : bool = jsNative
+
+    [<Emit("(() => { try { if ($0 === null || typeof $0 !== 'object' || Array.isArray($0)) return false; const p = Object.getPrototypeOf($0); return p === Object.prototype || p === null; } catch { return false; } })()")>]
+    let private isPlainRecord (value: obj) : bool = jsNative
+
+    [<Emit("(() => { try { return Object.getOwnPropertyDescriptor($0, $1) ?? null; } catch { return null; } })()")>]
+    let private propertyDescriptor (source: obj) (name: string) : obj = jsNative
+
+    [<Emit("$0 != null && Object.prototype.hasOwnProperty.call($0, 'value')")>]
+    let private isDataDescriptor (descriptor: obj) : bool = jsNative
+
+    [<Emit("$0.value")>]
+    let private descriptorValue (descriptor: obj) : obj = jsNative
+
+    type private TextCarrier =
+        | Missing
+        | Malformed
+        | Text of string
+
+    let private dataProperty (source: obj) (name: string) =
+        let descriptor = propertyDescriptor source name
+
+        if isNull descriptor || not (isDataDescriptor descriptor) then
+            None
+        else
+            Some(descriptorValue descriptor)
+
+    let private valueProperty (source: obj) (name: string) =
+        if isNull source || not (isPlainRecord source) then
+            None
+        else
+            dataProperty source name
+
+    let primitiveNonBlankString (value: obj) =
+        if isNull value || not (isString value) then
+            None
+        else
+            let text = unbox<string> value
+            if String.IsNullOrWhiteSpace text then None else Some text
+
+    let stringProperty (source: obj) (name: string) =
+        valueProperty source name |> Option.bind primitiveNonBlankString
+
+    let private textValue value =
+        primitiveNonBlankString value
+        |> Option.map Text
+        |> Option.defaultValue Malformed
+
+    let private textProperty (source: obj) (name: string) =
+        valueProperty source name |> Option.map textValue |> Option.defaultValue Missing
+
+    let private consolidate carriers =
+        if carriers |> List.exists ((=) Malformed) then
+            Malformed
+        else
+            carriers
+            |> List.choose (function
+                | Text value -> Some value
+                | _ -> None)
+            |> List.distinct
+            |> function
+                | [] -> Missing
+                | [ value ] -> Text value
+                | _ -> Malformed
+
+    let private recordProperty source name =
+        valueProperty source name |> Option.filter isPlainRecord
+
+    let private eventPayload raw =
+        let dataEvent =
+            recordProperty raw "data"
+            |> Option.filter (fun data -> stringProperty data "type" |> Option.isSome)
+
+        [ recordProperty raw "event"; recordProperty raw "payload"; dataEvent ]
+        |> List.tryPick id
+        |> Option.defaultValue raw
+
+    let sessionObservation (raw: obj) =
+        let event = eventPayload raw
+
+        match stringProperty event "type" with
+        | Some "session.created"
+        | Some "session.updated" ->
+            let properties = recordProperty event "properties"
+            let info = properties |> Option.bind (fun value -> recordProperty value "info")
+
+            let agent =
+                [ properties
+                  |> Option.map (fun value -> textProperty value "agent")
+                  |> Option.defaultValue Missing
+                  info
+                  |> Option.map (fun value -> textProperty value "agent")
+                  |> Option.defaultValue Missing ]
+                |> consolidate
+                |> function
+                    | Text value -> Some value
+                    | _ -> None
+
+            properties
+            |> Option.bind (fun value -> stringProperty value "sessionID")
+            |> Option.map (fun sessionId ->
+                { SessionId = SessionId.create sessionId
+                  HasParent =
+                    info
+                    |> Option.bind (fun value -> stringProperty value "parentID")
+                    |> Option.isSome
+                  Agent = agent })
+        | _ -> None
+
+    let sessionAgent (raw: obj) =
+        recordProperty raw "data"
+        |> Option.defaultValue raw
+        |> fun body -> stringProperty body "agent"
+
+    let primitiveBoolean (value: obj) =
+        if isBoolean value then Some(unbox<bool> value) else None
+
+    let arrayProperty (source: obj) (name: string) =
+        valueProperty source name
+        |> Option.filter isArray
+        |> Option.map unbox<obj array>
+
+    let objectProperty (source: obj) (name: string) = valueProperty source name
+
+    let optionalObjectProperty (source: obj) (name: string) =
+        valueProperty source name |> Option.filter (isNull >> not)
+
 module private HostArgDecode =
     let nonEmptyString (value: string) =
         if String.IsNullOrWhiteSpace value then None else Some value
@@ -66,11 +207,7 @@ module private HostArgDecode =
         else
             Error()
 
-    let boolFromValue (value: obj) =
-        if emitJsExpr value "typeof $0 === 'boolean'" then
-            Some(unbox<bool> value)
-        else
-            None
+    let boolFromValue (value: obj) = HostIngressCodec.primitiveBoolean value
 
     let tryBoolFromValue (value: obj) =
         try
@@ -81,10 +218,13 @@ module private HostArgDecode =
 /// Opaque Host arguments. Dynamic property access is confined to this codec.
 type HostToolArguments internal (raw: obj) =
     member _.Text(name: string) =
-        if isNull raw || isNull raw?(name) then
-            ""
-        else
-            unbox<string> raw?(name)
+        HostIngressCodec.objectProperty raw name
+        |> Option.bind (fun value ->
+            if emitJsExpr value "typeof $0 === 'string'" then
+                Some(unbox<string> value)
+            else
+                None)
+        |> Option.defaultValue ""
 
     member this.OptionalText(name: string) =
         this.Text name
@@ -92,34 +232,26 @@ type HostToolArguments internal (raw: obj) =
         |> Option.filter (String.IsNullOrWhiteSpace >> not)
 
     member _.OptionalTexts(name: string) =
-        if isNull raw || isNull raw?(name) then
-            None
-        else
-            HostArgDecode.tryTextsFromArrayValue (raw?(name))
+        HostIngressCodec.optionalObjectProperty raw name
+        |> Option.bind HostArgDecode.tryTextsFromArrayValue
 
     member _.Texts(name: string) =
-        if isNull raw || isNull raw?(name) then
-            []
-        else
-            HostArgDecode.tryStringsFromArrayValue (raw?(name)) |> Option.defaultValue []
+        HostIngressCodec.objectProperty raw name
+        |> Option.bind HostArgDecode.tryStringsFromArrayValue
+        |> Option.defaultValue []
 
     member _.OptionalNumber(name: string) =
-        if isNull raw || isNull raw?(name) then
-            None
-        else
-            HostArgDecode.tryNumberFromValue (raw?(name))
+        HostIngressCodec.optionalObjectProperty raw name
+        |> Option.bind HostArgDecode.tryNumberFromValue
 
     member _.OptionalNonNegativeInteger(name: string) : Result<int option, unit> =
-        if isNull raw || isNull raw?(name) then
-            Ok None
-        else
-            HostArgDecode.nonNegativeIntegerFromValue (raw?(name))
+        match HostIngressCodec.optionalObjectProperty raw name with
+        | None -> Ok None
+        | Some value -> HostArgDecode.nonNegativeIntegerFromValue value
 
     member _.OptionalBool(name: string) =
-        if isNull raw || isNull raw?(name) then
-            None
-        else
-            HostArgDecode.tryBoolFromValue (raw?(name))
+        HostIngressCodec.optionalObjectProperty raw name
+        |> Option.bind HostArgDecode.tryBoolFromValue
 
 /// Typed subset of the OpenCode tool invocation context used by domain tools.
 ///
@@ -225,27 +357,13 @@ module ToolHostCodec =
 
     let newHandleId () : string = newHandleIdPhysical ()
 
-    let private tryUnboxString (raw: obj) (name: string) =
-        try
-            Some(unbox<string> raw?(name))
-        with _ ->
-            None
-
     let private contextString (raw: obj) (name: string) =
-        if isNull raw || isNull raw?(name) then
-            None
-        else
-            tryUnboxString raw name |> Option.bind HostArgDecode.nonEmptyString
+        HostIngressCodec.stringProperty raw name
 
     let private abortSignalFromRaw (raw: obj) =
-        let abort = raw?("abort")
-
-        if not (isNull abort) then
-            abort
-        elif not (isNull (raw?("abortSignal"))) then
-            raw?("abortSignal")
-        else
-            raw?("signal")
+        [ "abort"; "abortSignal"; "signal" ]
+        |> List.tryPick (HostIngressCodec.objectProperty raw)
+        |> Option.toObj
 
     let private abortSignalOf (raw: obj) =
         if isNull raw then null else abortSignalFromRaw raw
@@ -253,7 +371,7 @@ module ToolHostCodec =
     let private listenAbort (signal: obj) (callback: unit -> unit) =
         let aborted = signal?("aborted")
 
-        if not (isNull aborted) && unbox<bool> aborted then
+        if HostIngressCodec.primitiveBoolean aborted = Some true then
             callback ()
             fun () -> ()
         else
@@ -270,27 +388,16 @@ module ToolHostCodec =
             listenAbort signal callback
 
     let private partText (part: obj) =
-        if isNull part || isNull part?text then
-            None
-        else
-            Some(unbox<string> part?text)
+        HostIngressCodec.stringProperty part "text"
 
     let private tryPartsPrompt (raw: obj) =
-        try
-            unbox<obj array> raw?message?parts
-            |> Array.choose partText
-            |> String.concat ""
-            |> Option.ofObj
-            |> Option.filter (String.IsNullOrWhiteSpace >> not)
-        with _ ->
-            None
+        HostIngressCodec.objectProperty raw "message"
+        |> Option.bind (fun message -> HostIngressCodec.arrayProperty message "parts")
+        |> Option.map (Array.choose partText >> String.concat "")
+        |> Option.bind HostArgDecode.nonEmptyString
 
     let private promptText (raw: obj) =
-        let fromParts =
-            if isNull raw || isNull raw?message || isNull raw?message?parts then
-                None
-            else
-                tryPartsPrompt raw
+        let fromParts = tryPartsPrompt raw
 
         fromParts
         |> Option.orElse (contextString raw "prompt")

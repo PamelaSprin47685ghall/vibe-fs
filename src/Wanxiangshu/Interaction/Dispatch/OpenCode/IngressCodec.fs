@@ -12,6 +12,37 @@ module PromptIngressCodec =
     [<Emit("typeof $0 === 'string'")>]
     let private isString (value: obj) : bool = jsNative
 
+    [<Emit("typeof $0 === 'boolean'")>]
+    let private isBoolean (value: obj) : bool = jsNative
+
+    [<Emit("Array.isArray($0)")>]
+    let private isArray (value: obj) : bool = jsNative
+
+    [<Emit("(() => { try { if ($0 === null || typeof $0 !== 'object' || Array.isArray($0)) return false; const p = Object.getPrototypeOf($0); return p === Object.prototype || p === null; } catch { return false; } })()")>]
+    let private isPlainRecord (value: obj) : bool = jsNative
+
+    [<Emit("(() => { try { return $0 != null && $1 in Object($0); } catch { return false; } })()")>]
+    let private hasProperty (source: obj) (name: string) : bool = jsNative
+
+    [<Emit("(() => { try { return Object.getOwnPropertyDescriptor($0, $1) ?? null; } catch { return null; } })()")>]
+    let private propertyDescriptor (source: obj) (name: string) : obj = jsNative
+
+    [<Emit("$0 != null && Object.prototype.hasOwnProperty.call($0, 'value')")>]
+    let private isDataDescriptor (descriptor: obj) : bool = jsNative
+
+    [<Emit("$0.value")>]
+    let private descriptorValue (descriptor: obj) : obj = jsNative
+
+    type private RawCarrier =
+        | MissingRaw
+        | MalformedRaw
+        | Raw of obj
+
+    type private TextCarrier =
+        | MissingText
+        | MalformedText
+        | Text of string
+
     type DecodedMessage = ChatAdmissionIntent.DecodedMessage
 
     let private nonBlankString (value: obj) : string option =
@@ -21,106 +52,189 @@ module PromptIngressCodec =
             let text = unbox<string> value
             if String.IsNullOrWhiteSpace text then None else Some text
 
-    let private readString (source: obj) (name: string) : string option =
-        if isNull source then
-            None
+    let private rawDataProperty (source: obj) (name: string) : RawCarrier =
+        let descriptor = propertyDescriptor source name
+
+        if isNull descriptor || not (isDataDescriptor descriptor) then
+            MalformedRaw
         else
-            nonBlankString (source?(name))
+            Raw(descriptorValue descriptor)
+
+    let private rawProperty (source: obj) (name: string) : RawCarrier =
+        if isNull source || not (hasProperty source name) then
+            MissingRaw
+        elif not (isPlainRecord source) then
+            MalformedRaw
+        else
+            rawDataProperty source name
+
+    let private textValue (value: obj) : TextCarrier =
+        match nonBlankString value with
+        | Some text -> Text text
+        | None -> MalformedText
+
+    let private textProperty (source: obj) (name: string) : TextCarrier =
+        match rawProperty source name with
+        | MissingRaw -> MissingText
+        | MalformedRaw -> MalformedText
+        | Raw value -> textValue value
+
+    let private consolidateText (carriers: TextCarrier list) : TextCarrier =
+        if carriers |> List.exists ((=) MalformedText) then
+            MalformedText
+        else
+            carriers
+            |> List.choose (function
+                | Text value -> Some value
+                | _ -> None)
+            |> List.distinct
+            |> function
+                | [] -> MissingText
+                | [ value ] -> Text value
+                | _ -> MalformedText
+
+    let private textOption =
+        function
+        | Text value -> Some value
+        | _ -> None
+
+    let private readString (source: obj) (name: string) : string option = textProperty source name |> textOption
 
     let private childObject (source: obj) (name: string) : obj =
-        if isNull source then null else source?(name)
+        match rawProperty source name with
+        | Raw value -> value
+        | _ -> null
+
+    let private recordValue (allowString: bool) (value: obj) =
+        if isPlainRecord value then Raw value
+        elif allowString && isString value then MissingRaw
+        else MalformedRaw
+
+    let private recordSource (value: obj) =
+        if isNull value then MissingRaw else recordValue false value
+
+    let private recordContainer (allowString: bool) (source: obj) (name: string) =
+        match rawProperty source name with
+        | Raw value -> recordValue allowString value
+        | carrier -> carrier
+
+    let private carrierObject =
+        function
+        | Raw value -> value
+        | _ -> null
+
+    let private containerValidity =
+        function
+        | MalformedRaw -> MalformedText
+        | _ -> MissingText
+
+    let private agentCarriers (source: obj) : TextCarrier list =
+        let root = recordSource source
+        let info = recordContainer false source "info"
+        let message = recordContainer false source "message"
+        let properties = recordContainer false source "properties"
+        let session = recordContainer true source "session"
+        let body = recordContainer false source "body"
+        let options = recordContainer false source "options"
+
+        let containers =
+            [ root
+              info
+              message
+              recordContainer false (carrierObject message) "info"
+              properties
+              recordContainer false (carrierObject properties) "info"
+              session
+              recordContainer false (carrierObject session) "info"
+              body
+              recordContainer false (carrierObject body) "info"
+              options
+              recordContainer false (carrierObject options) "info" ]
+
+        [ yield! containers |> List.map containerValidity
+          yield!
+              containers
+              |> List.map (fun candidate -> textProperty (carrierObject candidate) "agent") ]
 
     let private agentOf (source: obj) : string option =
-        let message = childObject source "message"
-        let properties = childObject source "properties"
-        let session = childObject source "session"
-        let body = childObject source "body"
-        let options = childObject source "options"
+        agentCarriers source |> consolidateText |> textOption
 
-        [ source
-          childObject source "info"
-          message
-          childObject message "info"
-          properties
-          childObject properties "info"
-          session
-          childObject session "info"
-          body
-          childObject body "info"
-          options
-          childObject options "info" ]
-        |> List.tryPick (fun candidate -> readString candidate "agent")
-
-    let private metadataOf (source: obj) (key: string) : string option =
-        if isNull source || isNull source?metadata then
-            None
-        else
-            let value = source?metadata?(key)
-            if isNull value then None else Some(unbox<string> value)
+    let private metadataCarrier (source: obj) (key: string) : TextCarrier =
+        match rawProperty source "metadata" with
+        | MissingRaw -> MissingText
+        | MalformedRaw -> MalformedText
+        | Raw metadata when isPlainRecord metadata -> textProperty metadata key
+        | Raw _ -> MalformedText
 
     let private parts (source: obj) : obj array =
-        if isNull source || isNull source?parts then
-            [||]
-        else
-            unbox<obj array> source?parts
+        match rawProperty source "parts" with
+        | Raw value when isArray value -> unbox<obj array> value
+        | _ -> [||]
 
-    let private tryBoolean (value: obj) =
-        try
-            Some(unbox<bool> value)
-        with _ ->
-            None
+    let private isTrue (value: obj) = isBoolean value && unbox<bool> value
 
-    let private isTrue (value: obj) =
-        match tryBoolean value with
-        | Some true -> true
+    let private isTrueProperty (source: obj) (name: string) =
+        match rawProperty source name with
+        | Raw value -> isTrue value
         | _ -> false
 
     let private isHostCompaction (output: obj) =
         let outputParts = parts output
-        let message = if isNull output then null else output?message
+        let message = childObject output "message"
 
         outputParts
         |> Array.exists (fun part ->
             readString part "type"
             |> Option.exists (fun kind -> kind.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
-        || isTrue (if isNull message then null else message?summary)
+        || isTrueProperty message "summary"
         || (agentOf output
             |> Option.exists (fun agent -> agent.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
         || (readString message "mode"
             |> Option.exists (fun mode -> mode.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
 
     let private isHostSynthetic (output: obj) =
-        parts output
-        |> Array.exists (fun part -> isTrue (if isNull part then null else part?synthetic))
+        parts output |> Array.exists (fun part -> isTrueProperty part "synthetic")
 
-    let private sessionIdOfPart (sess: obj) : string option =
+    let private sessionIdCarrierOfPart (sess: obj) : TextCarrier =
         if isNull sess then
-            None
+            MalformedText
         elif isString sess then
-            nonBlankString sess
+            textValue sess
         else
-            [ readString sess "id"
-              readString sess "sessionID"
-              readString sess "sessionId" ]
-            |> List.tryPick id
+            [ textProperty sess "id"
+              textProperty sess "sessionID"
+              textProperty sess "sessionId" ]
+            |> consolidateText
+            |> function
+                | MissingText -> MalformedText
+                | carrier -> carrier
 
     let private sessionIdOf (input: obj) (output: obj) =
-        let fromSource (source: obj) =
-            [ readString source "sessionID"
-              readString source "sessionId"
-              sessionIdOfPart (childObject source "session") ]
-            |> List.tryPick id
+        let fromSource (sourceCarrier: RawCarrier) =
+            let source = carrierObject sourceCarrier
 
-        let message = if isNull output then null else output?message
-        let info = if isNull output then null else output?info
+            let nested =
+                match rawProperty source "session" with
+                | MissingRaw -> MissingText
+                | MalformedRaw -> MalformedText
+                | Raw session -> sessionIdCarrierOfPart session
 
-        [ fromSource input; fromSource output; fromSource message; fromSource info ]
-        |> List.tryPick id
-        |> Option.filter (String.IsNullOrWhiteSpace >> not)
-        |> Option.map (fun value -> SessionId.create (value.Trim()))
+            [ containerValidity sourceCarrier
+              textProperty source "sessionID"
+              textProperty source "sessionId"
+              nested ]
+
+        let message = recordContainer false output "message"
+        let info = recordContainer false output "info"
+
+        [ recordSource input; recordSource output; message; info ]
+        |> List.collect fromSource
+        |> consolidateText
+        |> textOption
+        |> Option.map SessionId.create
 
     let private messageIdOf (input: obj) (output: obj) =
-        let message = if isNull output then null else output?message
+        let message = childObject output "message"
 
         [ readString input "messageID"; readString message "id" ]
         |> List.choose id
@@ -136,18 +250,19 @@ module PromptIngressCodec =
     /// recovery: the write side moves, the read side keeps matching nothing, and
     /// every plugin prompt starts looking like UnknownOrigin.
     let private promptKeyOf (input: obj) (output: obj) =
-        match metadataOf input PromptMetadataCodec.PromptKeyField with
-        | Some key when not (String.IsNullOrWhiteSpace key) -> Some(PromptKey.create key)
-        | _ ->
-            parts output
-            |> Array.tryPick (fun part -> metadataOf part PromptMetadataCodec.PromptKeyField)
-            |> Option.filter (String.IsNullOrWhiteSpace >> not)
-            |> Option.map PromptKey.create
+        [ metadataCarrier input PromptMetadataCodec.PromptKeyField
+          yield!
+              parts output
+              |> Array.map (fun part -> metadataCarrier part PromptMetadataCodec.PromptKeyField)
+              |> Array.toList ]
+        |> consolidateText
+        |> textOption
+        |> Option.map PromptKey.create
 
     /// Classify one physical message part; synthetic and non-text parts are not
     /// opening content.
     let private textOfPart (part: obj) : string option =
-        match isTrue (if isNull part then null else part?synthetic), readString part "type" with
+        match isTrueProperty part "synthetic", readString part "type" with
         | true, _ -> None
         | false, Some kind when kind.Equals("text", StringComparison.OrdinalIgnoreCase) -> readString part "text"
         | _ -> None
@@ -165,22 +280,24 @@ module PromptIngressCodec =
             | texts -> Some(String.concat "\n" texts)
 
     let decode (input: obj) (output: obj) : DecodedMessage =
-        let message = if isNull output then null else output?message
-        let info = if isNull output then null else output?info
-        let properties = if isNull output then null else output?properties
+        let message = childObject output "message"
+        let info = childObject output "info"
+        let properties = childObject output "properties"
+
+        let sessionId = sessionIdOf input output
 
         let explicitAgent =
-            [ agentOf input
-              agentOf output
-              agentOf message
-              agentOf info
-              agentOf properties ]
-            |> List.tryPick id
-            |> Option.filter (String.IsNullOrWhiteSpace >> not)
-            |> Option.map (fun v -> v.Trim())
-            |> Option.orElseWith (fun () -> sessionIdOf input output |> Option.bind SessionExecutionBinding.tryAgent)
+            [ input; output; message; info; properties ]
+            |> List.collect agentCarriers
+            |> consolidateText
 
-        { SessionId = sessionIdOf input output
+        let explicitAgent =
+            match explicitAgent with
+            | Text agent -> Some agent
+            | MissingText -> sessionId |> Option.bind SessionExecutionBinding.tryAgent
+            | MalformedText -> None
+
+        { SessionId = sessionId
           PhysicalUserMessageId = messageIdOf input output
           ExplicitAgent = explicitAgent
           PromptKey = promptKeyOf input output

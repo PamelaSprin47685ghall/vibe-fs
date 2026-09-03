@@ -32,6 +32,7 @@
 - **观测先于声明**：locality kind、exposure、grant、relation 与 annotation 都是待验证 claim，不能决定源码里存在什么能力。每个 production observation 必须进入唯一 canonical world；capability observation `C(W)` 与 JavaScript AST traversal `J(W)` 分开闭合，避免把“遍历了所有节点”偷换成“只记录了已认识的危险节点”。
 - **生成物必须绑定来源**：deterministic 只证明相同输入产生相同 bytes，不证明 bytes 无 authority。repository-generated module 必须同时绑定 output digest、selector 实际读取的 input digest、generator/build/selector lineage、package import linkage 与完整 AST traversal；fact 只引用唯一 artifact identity，禁止复制 linkage 形成第二事实源。
 - **裁决必须绑定同一世界**：migration worksheet 只帮助施工，不能授权；formal adjudication 只冻结 M6.4 cutover 的同一 staged input。canonical encoder、world/query/index digest 与 tracking reader共同防止“扫描一棵树、提交另一棵树”，但冻结快照不得在 cutover 后继续充当 live authority。
+- **Oracle不得同源自证**：classifier输出不能由caller任意替换后仅重算ID，visitor输出不能回填成自身expected，测试不得以production不会产生的镜像row证明正式schema。每个安全结论必须由另一条canonical事实链或定向mutation约束；否则“完整闭集”只是相同遗漏的两次复述。
 - **局部编译只改变输入集合，不改变编译器模型**：owner/impact compile 先计算 ProjectReference closure 或 reverse-consumer impact，再按 aggregate source order 合并成一个零 ProjectReference flat fsproj，仅启动一次 Fable。实现 `.fs` 且 sibling `.fsi` 未变时不重编普通 consumer；`.fsi` 改动必须纳入全部 reverse consumers；工程/工具链输入变化保守走 full flat build。全量 release 继续编译与原始单工程完全相同的 source/config union，绝不逐 owner 启动 Fable，因此多工程边界不能给全量构建叠加工程图税。
 
 ## 核心不变量与违约状态（RED）

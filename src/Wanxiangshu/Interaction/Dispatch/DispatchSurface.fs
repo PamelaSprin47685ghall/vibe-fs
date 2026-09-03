@@ -107,6 +107,21 @@ module DispatchSurface =
         |> Option.map box
         |> Option.toObj
 
+    let decodeIngress (input: obj) (output: obj) : obj =
+        let decoded = PromptIngressCodec.decode input output
+
+        box
+            {| sessionId = decoded.SessionId |> Option.map SessionId.value |> Option.toObj
+               physicalUserMessageId =
+                decoded.PhysicalUserMessageId
+                |> Option.map PhysicalUserMessageId.value
+                |> Option.toObj
+               explicitAgent = decoded.ExplicitAgent |> Option.toObj
+               promptKey = decoded.PromptKey |> Option.map PromptKey.value |> Option.toObj
+               isHostCompaction = decoded.IsHostCompaction
+               isHostSynthetic = decoded.IsHostSynthetic
+               text = decoded.Text |> Option.toObj |}
+
     let private appendResult result =
         match result with
         | Ok _ -> box {| ok = true; error = null |}

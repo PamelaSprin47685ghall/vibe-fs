@@ -55,3 +55,7 @@ Dispatch 在建立 `PhysicalAccepted` 后只向 `managed-chat-execution` 交接 
 ## DISPATCH-PROTOCOL-014: dispatch fatal先保留claim truth再经注入fuse执行
 
 只有typed dispatch invariant incident可以请求fatal。已发生或outcome unknown的send必须先保留durable Pending/PhysicalAccepted truth与exact PromptKey settlement；fatal不得把它重写为未发送。dispatch runtime只接受composition注入的mandatory fatal capability，不得直接引用physical adapter、optional/default/global fallback；同一incident只允许一次report与kill。
+
+## DISPATCH-PROTOCOL-015: chat.message 身份 carrier 是封闭且无歧义的 wire 代数
+
+`PromptIngressCodec`只接受JSON record中的正式carrier。每个字符串carrier必须是原始字节保持不变的非空白字符串；`SessionId`支持`sessionID`、`sessionId`、字符串`session`及plain own-property record `session.id/sessionID/sessionId`，并在`input`、`output`、`output.message`、`output.info`四个正式source中统一收集。任一显式carrier类型非法、对象不是plain record、继承字段冒充own field、或两个合法carrier原始字节不同，整个SessionId投影必须fail-closed；缺失与非法不得合并为同一状态。多个同值carrier只产生一个opaque `SessionId`，禁止trim、字符串化、truthiness或值前缀猜测。agent与PromptKey的多carrier投影遵循同一typed、同值唯一规则。
