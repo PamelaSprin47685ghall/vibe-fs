@@ -36,6 +36,8 @@
 
 capacity lease handle、waiter、callback、queue node、cancellation token 与 subscription 均属 process-local artifact，不得写入 execution facts、快照或恢复 token。恢复只能从 durable semantic facts 重建新的本地 artifact；旧 artifact 的缺失不能被解释为 terminal disposition。
 
+OS process crash/restart 不等于 graceful teardown/reconstruction：同一 durable workspace 重启后，已落盘的 `Accepted` 必须保留；旧进程的 exact binding、capacity ownership、token、custody、execution 与 waiter 必须全部消失，除非新进程从 durable facts 经正常业务路径重新建立。process-local artifact 不得跨进程身份继承。
+
 ## CHATEXEC-010: Cancel/Delete 精确终结并排空
 
 logical cancel 与 session delete 必须枚举 durable projection 中该作用域内尚未 terminal 的 exact execution key，逐个请求 typed settlement，并等待每个已准入 execution 完成 durable terminal 与 exact capacity 归还后再宣告生命周期排空。禁止 session-wide blind release、timer grace period 或 polling 判断完成。

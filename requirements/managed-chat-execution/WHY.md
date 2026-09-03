@@ -24,6 +24,7 @@
 - 测试复制 terminal、release 或 dispatch 公式，再 mutation 该副本；production 破坏后伪 oracle 仍保持全绿。
 - admission proof 用与 production 相同的条件优先级计算 expected；两份公式同步出错时仍会互相证明。
 - recovery proof observer 用 set 去重 owner-port invocation，重复调用 production runtime 时仍伪装成单次 effect；跨重启复用该 observer 又把本应丢失的 process-local 状态伪装成 durable 幂等。
+- 同进程内调用 `dispose` 再构造 plugin 会执行正常清理且保留 module-global registry，不能证明 OS crash 后 durable acceptance 留存而旧 binding/capacity artifact 消失。
 
 ## DEPENDS ON
 

@@ -25,6 +25,25 @@ const dispatchSurface = await import('../../../../dist/Interaction/Dispatch/Disp
 const obligationJournalSurface = await import('../../../../dist/Persistence/Journal/ObligationJournalSurface.js')
 const sessionBindingSurface = await import('../../../../dist/OpenCode/Host/SessionBindingSurface.js')
 
+const withJournalRuntime = async (directory, action) => {
+  const journalResult = await journalSurface.JournalSurface_acquireSharedForWorkspace(
+    directory,
+    process.pid,
+    new Date().toISOString(),
+  )
+  if (!journalResult?.ok) {
+    throw new Error(`journal acquire rejected: ${journalResult?.error ?? 'unknown error'}`)
+  }
+  try {
+    return await action({
+      journal: journalResult.journal,
+      runtimeId: journalSurface.JournalSurface_runtimeId(journalResult.journal),
+    })
+  } finally {
+    journalSurface.JournalSurface_dispose(journalResult.journal)
+  }
+}
+
 const setupRoutingHome = (directory) => {
   const routingHome = join(directory, 'routing-home')
   const routingDir = join(routingHome, '.config', 'opencode')
@@ -272,24 +291,7 @@ export const withRestartablePlugin = async (body) => {
       await hooks.dispose()
     }
 
-    const withRuntime = async (action) => {
-      const journalResult = await journalSurface.JournalSurface_acquireSharedForWorkspace(
-        directory,
-        process.pid,
-        new Date().toISOString(),
-      )
-      if (!journalResult?.ok) {
-        throw new Error(`journal acquire rejected: ${journalResult?.error ?? 'unknown error'}`)
-      }
-      try {
-        return await action({
-          journal: journalResult.journal,
-          runtimeId: journalSurface.JournalSurface_runtimeId(journalResult.journal),
-        })
-      } finally {
-        journalSurface.JournalSurface_dispose(journalResult.journal)
-      }
-    }
+    const withRuntime = (action) => withJournalRuntime(directory, action)
 
     await body(start, directory, {
       stop,
@@ -307,6 +309,32 @@ export const withRestartablePlugin = async (body) => {
     if (previousUserProfile === undefined) delete process.env.USERPROFILE
     else process.env.USERPROFILE = previousUserProfile
     rmSync(directory, { recursive: true, force: true })
+  }
+}
+
+/**
+ * One caller-owned plugin incarnation over an existing workspace. No teardown
+ * is registered: OS-crash tests must be able to terminate without dispose.
+ */
+export const startPluginIncarnation = async (directory) => {
+  const routingHome = setupRoutingHome(directory)
+  process.env.HOME = routingHome
+  process.env.USERPROFILE = routingHome
+  const createdIds = []
+  const abortedIds = []
+  const prompts = []
+  const messages = []
+  const client = stubClient(createdIds, prompts, messages, abortedIds)
+  const hooks = await initSpikePlugin({
+    client,
+    directory,
+    events: { listen: () => () => {} },
+  })
+  await configureManagedPlugin(hooks)
+
+  return {
+    hooks,
+    withRuntime: (action) => withJournalRuntime(directory, action),
   }
 }
 
