@@ -1,7 +1,13 @@
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { isAbsolute, relative, resolve } from 'node:path'
+
+import { analyzeSurface } from '../checks/js-surface-manifest.mjs'
+import { parseModule } from './js-syntax.mjs'
+import { scanTestSource } from './requirement-trace.mjs'
+import { SURFACE_MANIFEST } from './test-surface-scan.mjs'
 
 const norm = (value) => String(value).replace(/\\/g, '/')
-const exactProofKeys = 'path,title,what_id'
+const exactProofKeys = 'path,surface_module,title,what_id'
 
 const finding = (entry, reason) => ({
   code: 'invalid-semantic-evidence-metadata',
@@ -19,9 +25,10 @@ export function validateSemanticEvidenceProof(entry, traceGraph, repositoryRoot)
     || Array.isArray(proof)
     || Object.keys(proof).sort().join(',') !== exactProofKeys
     || typeof proof.path !== 'string'
+    || typeof proof.surface_module !== 'string'
     || typeof proof.title !== 'string'
     || typeof proof.what_id !== 'string'
-  ) return finding(entry, 'needs exact proof {path,title,what_id}')
+  ) return finding(entry, 'needs exact proof {path,title,what_id,surface_module}')
 
   const segments = norm(proof.path).split('/')
   const expectedPrefix = `requirements/${entry.owner}/tests/`
@@ -60,9 +67,35 @@ export function validateSemanticEvidenceProof(entry, traceGraph, repositoryRoot)
     && edge.title === proof.title
     && graphPath(edge.proofFile) === expectedHow)
 
-  return matches.length === 1
-    ? null
-    : finding(entry, 'proof must resolve to one active, unrejected requirement-trace edge')
+  if (matches.length !== 1) {
+    return finding(entry, 'proof must resolve to one active, unrejected requirement-trace edge')
+  }
+
+  const surfaces = SURFACE_MANIFEST.filter((surface) => surface.module === proof.surface_module)
+  if (
+    surfaces.length !== 1
+    || surfaces[0].owner !== entry.owner
+    || !surfaces[0].laws.includes(proof.what_id)
+  ) return finding(entry, 'surface must be one registered owner Surface governed by the same WHAT')
+
+  if (!existsSync(absolutePath)) return finding(entry, 'proof test does not exist')
+  try {
+    const source = readFileSync(absolutePath, 'utf8')
+    const syntax = parseModule(source, absolutePath)
+    const declarations = scanTestSource(absolutePath, source, syntax).filter((declaration) =>
+      declaration.state === 'active'
+      && declaration.title === proof.title
+      && declaration.whatIds.length === 1
+      && declaration.whatIds[0] === proof.what_id)
+    if (
+      declarations.length !== 1
+      || !analyzeSurface(source, proof.surface_module, syntax).closureHasUse(declarations[0])
+    ) return finding(entry, 'exact proof callback must reach one executable use of its registered Surface')
+  } catch {
+    return finding(entry, 'proof test must be statically analyzable')
+  }
+
+  return null
 }
 
 export function validatedSemanticEvidenceContracts(contracts, traceGraph, repositoryRoot) {

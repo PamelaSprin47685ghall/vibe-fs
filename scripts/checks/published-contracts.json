@@ -3751,7 +3751,8 @@
       "proof": {
         "path": "requirements/semantic-trace/tests/x-trace.test.mjs",
         "title": "WHAT[SEMANTIC-TRACE-003] cursor vocabulary is monotonic and opaque",
-        "what_id": "SEMANTIC-TRACE-003"
+        "what_id": "SEMANTIC-TRACE-003",
+        "surface_module": "Context/Trace/SemanticTraceSurface.js"
       },
       "consumers": [
         "behavior-diagnosis",
@@ -5720,7 +5721,8 @@
       "proof": {
         "path": "requirements/provider-attempt-recovery/tests/cursor.test.mjs",
         "title": "WHAT[PAR-020] fallback_cursor_replay_exposes_domain_evidence_without_resume_authority",
-        "what_id": "PAR-020"
+        "what_id": "PAR-020",
+        "surface_module": "Participant/Provider/Attempt/Fallback/CursorSurface.js"
       },
       "consumers": [
         "context-compression",

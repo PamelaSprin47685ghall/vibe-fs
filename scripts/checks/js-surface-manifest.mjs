@@ -167,7 +167,7 @@ const staticallyUnreachable = (node, ancestors) => ancestors.some((ancestor) => 
 
 const analysisCache = new WeakMap()
 
-const analyzeSurface = (source, module, syntax) => {
+export const analyzeSurface = (source, module, syntax) => {
   if (!source.includes(`dist/${module}`)) return { imports: [], uses: [] }
   const program = syntax ?? parseModule(source)
   let byModule = analysisCache.get(program)

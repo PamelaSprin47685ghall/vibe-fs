@@ -358,6 +358,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] durable semantic cursor evidence crosses the
             path: 'requirements/semantic-trace/tests/x-trace.test.mjs',
             title: 'WHAT[SEMANTIC-TRACE-003] cursor vocabulary is monotonic and opaque',
             what_id: 'SEMANTIC-TRACE-003',
+            surface_module: 'Context/Trace/SemanticTraceSurface.js',
           },
           justification: 'The durable semantic cursor records replay evidence and never selects executable workflow control.',
         },
@@ -367,6 +368,69 @@ test('WHAT[STRUCTURED-WORKFLOW-011] durable semantic cursor evidence crosses the
   })
 
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence without an exact production surface is rejected', () => {
+  const cursor = file('src/Wanxiangshu/Context/Trace/Cursor.fs')
+  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
+  const symbol = 'Wanxiangshu.Context.Trace.XTraceCursor.sequence'
+  const result = analyze({
+    files: [cursor, consumer],
+    owners: [
+      { path: cursor.path, owner: 'semantic-trace' },
+      { path: consumer.path, owner: 'consumer' },
+    ],
+    contracts: registry({ contracts: [{
+      path: cursor.path,
+      owner: 'semantic-trace',
+      kind: 'semantic-evidence',
+      consumers: ['consumer'],
+      symbols: [symbol],
+      law: 'WHAT[SEMANTIC-TRACE-003]',
+      proof: {
+        path: 'requirements/semantic-trace/tests/x-trace.test.mjs',
+        title: 'WHAT[SEMANTIC-TRACE-003] cursor vocabulary is monotonic and opaque',
+        what_id: 'SEMANTIC-TRACE-003',
+      },
+      justification: 'A trace edge without its production surface does not prove production behavior.',
+    }] }),
+    uses: [symbolUse(consumer, cursor, symbol)],
+  })
+
+  assert.ok(codes(result).includes('invalid-semantic-evidence-metadata'))
+  assert.ok(codes(result).includes('foreign-execution-position'))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] an active same-owner proof without callback surface use is rejected', () => {
+  const cursor = file('src/Wanxiangshu/Context/Trace/Cursor.fs')
+  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
+  const symbol = 'Wanxiangshu.Context.Trace.XTraceCursor.sequence'
+  const result = analyze({
+    files: [cursor, consumer],
+    owners: [
+      { path: cursor.path, owner: 'semantic-trace' },
+      { path: consumer.path, owner: 'consumer' },
+    ],
+    contracts: registry({ contracts: [{
+      path: cursor.path,
+      owner: 'semantic-trace',
+      kind: 'semantic-evidence',
+      consumers: ['consumer'],
+      symbols: [symbol],
+      law: 'WHAT[SEMANTIC-TRACE-005]',
+      proof: {
+        path: 'requirements/semantic-trace/tests/x-trace-capture-boundary.test.mjs',
+        title: 'WHAT[SEMANTIC-TRACE-005] raw projection storage is rejected while copied semantic query is admitted',
+        what_id: 'SEMANTIC-TRACE-005',
+        surface_module: 'Context/Trace/SemanticTraceSurface.js',
+      },
+      justification: 'An active owner-law proof that does not call this surface cannot authorize the edge.',
+    }] }),
+    uses: [symbolUse(consumer, cursor, symbol)],
+  })
+
+  assert.ok(codes(result).includes('invalid-semantic-evidence-metadata'))
+  assert.ok(codes(result).includes('foreign-execution-position'))
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] a comment-only WHAT mention cannot authorize semantic evidence', () => {
@@ -392,6 +456,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] a comment-only WHAT mention cannot authorize
             path: 'requirements/external-investigation/tests/browser-provenance-canary.test.mjs',
             title: 'WHAT[EXTERNAL-INVESTIGATION-010] browser_is_the_only_network_office',
             what_id: 'EXTERNAL-INVESTIGATION-010',
+            surface_module: 'Context/Trace/SemanticTraceSurface.js',
           },
           justification: 'A comment that names another proof must never grant an execution-position exception.',
         },
@@ -412,6 +477,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence rejects bare paths wrong i
     path: 'requirements/semantic-trace/tests/x-trace.test.mjs',
     title: 'WHAT[SEMANTIC-TRACE-003] cursor vocabulary is monotonic and opaque',
     what_id: 'SEMANTIC-TRACE-003',
+    surface_module: 'Context/Trace/SemanticTraceSurface.js',
   }
   const malformed = [
     exact.path,
@@ -451,6 +517,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence rejects bare paths wrong i
     path: 'requirements/semantic-trace/tests/skipped.test.mjs',
     title: 'WHAT[SEMANTIC-TRACE-003] skipped cursor claim',
     what_id: 'SEMANTIC-TRACE-003',
+    surface_module: 'Context/Trace/SemanticTraceSurface.js',
   }
   for (const state of ['skip', 'todo']) {
     const inactiveTrace = {
@@ -485,6 +552,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence rejects bare paths wrong i
         path: 'requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs',
         title: 'WHAT[EXTERNAL-INVESTIGATION-010] browser_is_the_only_network_office',
         what_id: 'EXTERNAL-INVESTIGATION-010',
+        surface_module: 'Context/Trace/SemanticTraceSurface.js',
       },
       justification: 'A foreign owner law must never grant this provider an execution-position exception.',
     }] }),
