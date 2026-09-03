@@ -23,7 +23,7 @@ const link = (state, handle, child) => {
     op: 'link',
     handle,
     child,
-    agent: 'fast-coder',
+    agent: 'coder',
     role: 'Coder',
   })
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))

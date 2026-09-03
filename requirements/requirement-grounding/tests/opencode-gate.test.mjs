@@ -34,8 +34,9 @@ test('WHAT[REQUIREMENT-GROUNDING-007] ordinary providers replay anchored read ca
     const paired = await pair.tryInject('ordinary', pair.text, toolBatch('anthropic', sourcePath))
     assert.equal(paired.ok, true)
     const ordinary = await grounding.projectWithJournal(ordinaryJournal.journal, 'ordinary', paired.value)
-    const names = ordinary.value.map((m) => m.parts?.[0]?.tool).filter(Boolean)
-    assert.ok(names.lastIndexOf('skill') < names.lastIndexOf('read'))
+    const ordinaryTerminal = ordinary.value.at(-1).parts[0].state.output
+    assert.ok(ordinaryTerminal.includes(`${grounding.cursorSeparator}# ground truth`))
+    assert.equal(ordinary.value.some((m) => m.info?.source === grounding.source), false, 'Universal cursor mode has result-only grounding')
     grounding.disposeJournal(ordinaryJournal.journal)
 
     const cursorJournal = await grounding.createJournal(dir)

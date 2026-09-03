@@ -482,16 +482,14 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_P idempotent replay accept uses Journal sta
   })
 })
 
-// ── Canary R: multi-todowrite rejection ──────────────────────────────────
+// ── Canary R: multi-todowrite sequential admission ───────────────────────
 
-test('WHAT[HOST-BOUNDARY-019] CANARY_R admitTodowriteBatch rejects multiple todowrite calls in one message', () => {
+test('WHAT[HOST-BOUNDARY-019] CANARY_R admitTodowriteBatch admits multiple todowrite calls in one message', () => {
   const firstCall = 'call-r-first'
   const secondCall = 'call-r-second'
-  // R: two different callIDs in one assistant message → all rejected, no winner
-  const rejected = todo.admitTodowriteBatch([firstCall, secondCall])
-  assert.equal(rejected.ok, false)
-  assert.equal(rejected.error.code, 'MultipleTodowriteInMessage')
-  assert.deepEqual(rejected.error.callIds, [firstCall, secondCall])
+  // R: two different callIDs in one assistant message → admitted for sequential execution
+  const admitted = todo.admitTodowriteBatch([firstCall, secondCall])
+  assert.equal(admitted.ok, true)
 })
 
 test('WHAT[HOST-BOUNDARY-019] CANARY_R single todowrite call is admitted', () => {
@@ -537,14 +535,15 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_O no plugin todowrite tool overrides builti
 
 // ── Canary Q: description face — static proof ────────────────────────────
 
-test('WHAT[HOST-BOUNDARY-019] CANARY_Q todowrite description contains tagged/lag/multi-reject, not reviewer/session/barrier/witness/2N', () => {
+test('WHAT[HOST-BOUNDARY-019] CANARY_Q todowrite description contains tagged/lag/multi-sequential, not reviewer/session/barrier/witness/2N', () => {
   const description = read('resources/provider/lifecycle/magic-todo/todowrite-description/en.md')
   // Q: must contain planComplete tagging
   assert.match(description, /planComplete/i)
   // Q: must contain lag-1 / review-wait semantics
   assert.match(description, /accepted|account/i)
-  // Q: must contain multi-todowrite rejection
-  assert.match(description, /multiple todowrite|rejected/i)
+  // Q: must describe sequential multi-todowrite execution, never rejection
+  assert.match(description, /multiple todowrite calls.*sequentially/i)
+  assert.doesNotMatch(description, /rejected entirely/i)
   // Q: must NOT contain reviewer identity / session / barrier / witness / 2N mechanics
   assert.doesNotMatch(description, /reviewer session|barrier|witness|2N/i)
 })

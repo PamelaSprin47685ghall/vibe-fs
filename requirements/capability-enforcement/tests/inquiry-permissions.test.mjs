@@ -65,32 +65,30 @@ test('WHAT[ENF-010] Inquiry_rolePredicate_inspector_allow_and_host_native_read_g
 test('WHAT[ENF-002] Inquiry_host_schema_allow_list_is_inspect_sphinx_and_fission', () => {
   const config = {
     agent: {
-      'fast-inquiry': { model: 'fast-inquiry-model' },
-      'deep-inquiry': { model: 'deep-inquiry-model' },
+      inquiry: { model: 'inquiry-model' },
     },
   }
-  for (const tier of ['fast', 'deep']) {
-    for (const role of [
-      'manager',
-      'orchestrator',
-      'coder',
-      'inspector',
-      'browser',
-      'reviewer',
-      'devops',
-      'distiller',
-      'blogger',
-      'bookkeeper',
-    ]) {
-      const name = `${tier}-${role}`
-      if (!config.agent[name]) config.agent[name] = { model: `${name}-model` }
-    }
+  for (const role of [
+    'manager',
+    'orchestrator',
+    'coder',
+    'inspector',
+    'browser',
+    'reviewer',
+    'devops',
+    'distiller',
+    'blogger',
+    'bookkeeper',
+    'predictor',
+  ]) {
+    const name = role
+    if (!config.agent[name]) config.agent[name] = { model: `${name}-model` }
   }
 
   const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, true, outcome.error)
 
-  for (const name of ['fast-inquiry', 'deep-inquiry']) {
+  for (const name of ['inquiry']) {
     const permission = config.agent[name].permission
     assert.equal(permission['*'], 'deny')
     assert.equal(permission.inspect, 'allow')

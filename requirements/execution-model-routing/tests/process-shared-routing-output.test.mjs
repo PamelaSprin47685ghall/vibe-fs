@@ -19,7 +19,7 @@ test('WHAT[EMR-009] EMR_009_chat_message_routes_when_session_id_is_carried_on_ou
         id: 'msg-output-only',
         role: 'user',
         sessionID: 'ses-output-only',
-        agent: 'fast-coder',
+        agent: 'coder',
         model: { providerID: 'host', modelID: 'placeholder' },
       },
       parts: [],

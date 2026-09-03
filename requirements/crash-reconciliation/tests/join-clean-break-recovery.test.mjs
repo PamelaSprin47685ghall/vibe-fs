@@ -11,7 +11,7 @@ test('WHAT[CRASH-009] P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_jo
   assert.equal(handles.crashScenario('active').retired, false)
   const terminal = child.resolve('active', 'terminal', [], 'real work done')
   assert.equal(terminal.result, 'RecoveredTerminal')
-  const wire = join.renderBatch('english', [{ kind: 'completed', agentId: 'h1', agentName: 'fast-coder', role: 'Coder', runId: 'run-h1', workRecord: 'real work done' }])
+  const wire = join.renderBatch('english', [{ kind: 'completed', agentId: 'h1', agentName: 'coder', role: 'Coder', runId: 'run-h1', workRecord: 'real work done' }])
   assert.ok(!wire.includes('status = "aborted"'))
 })
 

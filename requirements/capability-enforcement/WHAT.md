@@ -12,9 +12,9 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 必须双�
 
 能力投影允许根据特定 `RequestKind`（如投机副本或窄通道）对角色固有权限进行收窄，但任何投影出的能力集合必须是 `Roles.permissions(role)` 的严格子集，严禁发生权能扩大。
 
-## ENF-004: execution tier 不改变同 office 的 authority：permissions(fast-ROLE) = permissions(deep-ROLE)
+## ENF-004: execution tier 不改变同 office 的 authority：同一 CanonicalRole 的权限集与 tier 无关
 
-同一 Office 的 fast 档与 deep 档工具权限集完全相等：`permissions(fast-ROLE) = permissions(deep-ROLE)`。执行档位仅代表底层机器与推理深度，不影响权限矩阵。
+同一 Office 的工具权限集完全由 `CanonicalRole` 决定，与执行档位无关。执行档位仅代表底层机器与推理深度，不影响权限矩阵。托管 agent 使用 canonical bare 名称 (`manager`/`coder`/…/`predictor`)，不再有 `fast-`/`deep-` 前缀。
 
 ## ENF-005: request-specific replica/leaf 可进一步收窄：StrengthReplica 只 {Read; Glob; Grep}
 

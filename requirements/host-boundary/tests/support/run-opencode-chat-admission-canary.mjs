@@ -77,7 +77,7 @@ const request = async (baseUrl, method, pathname, body, expectedStatus) => {
 const sessionIdOf = ({ data }) => data?.data?.data?.id ?? data?.data?.id ?? data?.id
 const prompt = (messageID, text) => ({
   messageID,
-  agent: 'fast-coder',
+  agent: 'coder',
   model: { providerID: 'test', modelID: 'test-model' },
   parts: [{ type: 'text', text }],
 })
@@ -98,7 +98,7 @@ try {
   })
 
   sessionID = sessionIdOf(await request(host.baseUrl, 'POST', '/api/session', {
-    agent: 'fast-coder',
+    agent: 'coder',
     model: { providerID: 'test', id: 'test-model' },
   }, 200))
   assert.ok(sessionID, 'public session create response omitted its id')

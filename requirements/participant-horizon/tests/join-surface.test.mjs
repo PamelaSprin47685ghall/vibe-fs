@@ -7,8 +7,8 @@ const LEGACY_DTO = /\b(status|count|ordinal|kind|agent|code|message)\s*=|\[\[res
 const assertClean = (wire, label) => assert.ok(!LEGACY_DTO.test(wire), `${label}: ${wire}`)
 
 test('WHAT[PARTICIPANT-HORIZON-004] JOIN_SURFACE_completed_batch_is_natural_language_plus_work_record', () => {
-  const wire = join.renderBatch('english', [{ kind: 'completed', agentId: 'a1', agentName: 'fast-coder', role: 'Coder', runId: 'run-a1', workRecord: 'Chronicle\nRecent work' }])
-  assert.match(wire, /# fast-coder has returned\./)
+  const wire = join.renderBatch('english', [{ kind: 'completed', agentId: 'a1', agentName: 'coder', role: 'Coder', runId: 'run-a1', workRecord: 'Chronicle\nRecent work' }])
+  assert.match(wire, /# coder has returned\./)
   assert.match(wire, /Chronicle/)
   assertClean(wire, 'completed')
 })

@@ -73,7 +73,7 @@ module ChatAdmissionIntentSurface =
                         (LogicalRunId.create "run-surface-owner")
                         (AuthorityRootUserMessageId.create "root-surface-owner")
                         PromptAuthority.RootAuthorityKind.HumanRoot
-                        (PromptAuthority.IdentitySeed.RootSelection(rootIdentity "fast-manager"))
+                        (PromptAuthority.IdentitySeed.RootSelection(rootIdentity "manager"))
                     |> Result.defaultWith invalidOp
 
                 let inherited =

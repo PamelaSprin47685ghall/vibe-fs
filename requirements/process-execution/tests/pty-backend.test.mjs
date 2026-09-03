@@ -38,7 +38,7 @@ test('WHAT[PROC-001] BACKEND_createPort_returns_a_working_port', () => {
 test('WHAT[PROC-003] BACKEND_fork_without_bun_pty_fails_spawn_and_publishes_failed', async () => {
   const port = backendCreatePort()
   const completion = takeCompletions(port)
-  const pid = portFork(port, 'echo hi', 'fast-distiller', ptyId('pty-sf'), undefined)
+  const pid = portFork(port, 'echo hi', 'distiller', ptyId('pty-sf'), undefined)
   const [item] = await completion
 
   assert.equal(ptyIdView(pid), 'pty-sf')
@@ -52,7 +52,7 @@ test('WHAT[PROC-003] BACKEND_fork_without_bun_pty_fails_spawn_and_publishes_fail
 test('WHAT[PROC-001] BACKEND_failed_fork_leaves_unknown_active_but_known_closed', async () => {
   const port = backendCreatePort()
   const completion = takeCompletions(port)
-  const pid = portFork(port, 'echo hi', 'fast-distiller', ptyId('pty-fa'), undefined)
+  const pid = portFork(port, 'echo hi', 'distiller', ptyId('pty-fa'), undefined)
   await completion
   assert.equal(portExists(port, pid), false)
   assert.equal(portKnown(port, pid), true)
@@ -61,7 +61,7 @@ test('WHAT[PROC-001] BACKEND_failed_fork_leaves_unknown_active_but_known_closed'
 test('WHAT[PROC-001] BACKEND_generated_id_also_fails_cleanly', async () => {
   const port = backendCreatePort()
   const completion = takeCompletions(port)
-  const pid = portFork(port, 'echo hi', 'fast-distiller', undefined, undefined)
+  const pid = portFork(port, 'echo hi', 'distiller', undefined, undefined)
   const [item] = await completion
   assert.match(ptyIdView(pid), /^pty-[0-9a-f]{8}$/)
   assert.equal(item.ptyId, ptyIdView(pid))
@@ -70,7 +70,7 @@ test('WHAT[PROC-001] BACKEND_generated_id_also_fails_cleanly', async () => {
 test('WHAT[PROC-001] BACKEND_send_after_failed_fork_reports_closed', async () => {
   const port = backendCreatePort()
   const completion = takeCompletions(port)
-  const pid = portFork(port, 'echo hi', 'fast-distiller', ptyId('pty-wc'), undefined)
+  const pid = portFork(port, 'echo hi', 'distiller', ptyId('pty-wc'), undefined)
   await completion
   assert.deepEqual(await portSend(port, pid, write), failure('PTY closed'))
 })
@@ -83,7 +83,7 @@ test('WHAT[PROC-001] BACKEND_send_on_never_forked_id_is_unknown', async () => {
 test('WHAT[PROC-001] BACKEND_read_after_failed_fork_returns_empty_closed', async () => {
   const port = backendCreatePort()
   const completion = takeCompletions(port)
-  const pid = portFork(port, 'echo hi', 'fast-distiller', ptyId('pty-rf'), undefined)
+  const pid = portFork(port, 'echo hi', 'distiller', ptyId('pty-rf'), undefined)
   await completion
   assert.deepEqual(await portRead(port, pid), { ok: true, value: { output: '', closed: true } })
 })
@@ -101,7 +101,7 @@ test('WHAT[PROC-001] BACKEND_ports_are_isolated_from_each_other', async () => {
   const a = backendCreatePort()
   const b = backendCreatePort()
   const completion = takeCompletions(a)
-  const pid = portFork(a, 'echo hi', 'fast-distiller', ptyId('pty-iso'), undefined)
+  const pid = portFork(a, 'echo hi', 'distiller', ptyId('pty-iso'), undefined)
   await completion
   assert.equal(portKnown(a, pid), true)
   assert.equal(portKnown(b, pid), false)
@@ -111,8 +111,8 @@ test('WHAT[PROC-001] BACKEND_ports_are_isolated_from_each_other', async () => {
 test('WHAT[PROC-003] BACKEND_concurrent_failed_forks_each_publish_one_completion', async () => {
   const port = backendCreatePort()
   const completion = takeCompletions(port, 2)
-  portFork(port, 'cmd one', 'fast-distiller', ptyId('pty-f1'), undefined)
-  portFork(port, 'cmd two', 'fast-distiller', ptyId('pty-f2'), undefined)
+  portFork(port, 'cmd one', 'distiller', ptyId('pty-f1'), undefined)
+  portFork(port, 'cmd two', 'distiller', ptyId('pty-f2'), undefined)
   const items = await completion
   assert.deepEqual(items.map((item) => item.ptyId).sort(), ['pty-f1', 'pty-f2'])
 })
@@ -120,7 +120,7 @@ test('WHAT[PROC-003] BACKEND_concurrent_failed_forks_each_publish_one_completion
 test('WHAT[PROC-001] BACKEND_signal_on_failed_id_is_rejected_as_closed', async () => {
   const port = backendCreatePort()
   const completion = takeCompletions(port)
-  const pid = portFork(port, 'echo hi', 'fast-distiller', ptyId('pty-sg'), undefined)
+  const pid = portFork(port, 'echo hi', 'distiller', ptyId('pty-sg'), undefined)
   await completion
   assert.deepEqual(await portSend(port, pid, signal), failure('PTY closed'))
 })

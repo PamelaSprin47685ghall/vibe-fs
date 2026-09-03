@@ -53,11 +53,7 @@ module FinalityHostPort =
                 ownership = HandleOwnership.HostOwnedHidden
             )
 
-        let reviewerAgentName =
-            scope.ActiveProfileFor managerSessionId
-            |> Option.map (fun profile -> profile.SelectedTier)
-            |> Option.defaultValue AgentTier.Deep
-            |> fun tier -> ManagedAgent.nameOf tier Role.Reviewer
+        let reviewerAgentName = ManagedAgent.nameOf Role.Reviewer
 
         let openingAssignment () =
             ProviderProse.render (ProviderProse.languageOf managerSessionId) HostReviewPrompt.Opening Map.empty

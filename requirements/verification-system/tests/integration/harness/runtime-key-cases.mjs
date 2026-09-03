@@ -27,7 +27,7 @@ import {
 
 const SESSION = 'ses_real_1';
 const BINDINGS = new Map([
-  ['fast-manager', SESSION],
+  ['manager', SESSION],
   ['coder-after', 'ses_real_2'],
 ]);
 
@@ -42,7 +42,7 @@ const toolCall = (name, args = '{}') => ({
 
 const request = (messages) => ({ messages });
 
-const entry = ({ id, turn, step = 0, lane = 'fast-manager' }) => ({ id, lane, turn, step });
+const entry = ({ id, turn, step = 0, lane = 'manager' }) => ({ id, lane, turn, step });
 
 /**
  * The anchor a forked-child declaration uses, taken from production rather than copied.
@@ -154,8 +154,8 @@ export const runtimeKeyCases = [
     name: 'VERIFY-003 kind partitions declarations, and defaults to chat',
     fn: () => {
       const entries = [
-        { id: 'chat', lane: 'fast-manager', turn: 'Ship it.', step: 0 },
-        { id: 'title', lane: 'fast-manager', kind: 'title', turn: 'Ship it.', step: 0 },
+        { id: 'chat', lane: 'manager', turn: 'Ship it.', step: 0 },
+        { id: 'title', lane: 'manager', kind: 'title', turn: 'Ship it.', step: 0 },
       ];
 
       assertEq(resolveEntry(request([user('Ship it.')]), entries, BINDINGS, { sessionId: SESSION }).matched?.id, 'chat');
@@ -421,8 +421,8 @@ export const runtimeKeyCases = [
       // Driven through production's own renderer rather than a hand-built string: a local template
       // would keep passing after the real one changed shape.
       const entries = [
-        entry({ id: 'revise', lane: 'fast-manager', turn: ['# Review current worktree', ANCHOR] }),
-        entry({ id: 'perfect', lane: 'fast-manager', turn: ['# Re-review the fixed tree', ANCHOR] }),
+        entry({ id: 'revise', lane: 'manager', turn: ['# Review current worktree', ANCHOR] }),
+        entry({ id: 'perfect', lane: 'manager', turn: ['# Re-review the fixed tree', ANCHOR] }),
       ];
 
       const revise = forkPrompt('Review current worktree', ['Ship it.']);
@@ -439,7 +439,7 @@ export const runtimeKeyCases = [
       // The property N3 bought, and the one the four-shape envelope made impossible. A scenario
       // author knows a child was forked and what the assignment said; they do not know whether the
       // parent had produced a work record yet, and must not have to.
-      const entries = [entry({ id: 'child', lane: 'fast-manager', turn: ['# Write proof.txt', ANCHOR] })];
+      const entries = [entry({ id: 'child', lane: 'manager', turn: ['# Write proof.txt', ANCHOR] })];
 
       const shapes = [
         forkRelay('Write proof.txt', undefined, []),
@@ -536,7 +536,7 @@ export const runtimeKeyCases = [
   {
     name: 'HOST-008 lane resolves through the session binding',
     fn: () => {
-      assertEq([...lanesOf(request([user('go')]), BINDINGS, { sessionId: SESSION })].join(), 'fast-manager');
+      assertEq([...lanesOf(request([user('go')]), BINDINGS, { sessionId: SESSION })].join(), 'manager');
       assertEq([...lanesOf(request([user('go')]), BINDINGS, { sessionId: 'ses_real_2' })].join(), 'coder-after');
     },
   },
@@ -550,19 +550,19 @@ export const runtimeKeyCases = [
       // only ever see the fixture shape.
       const reviewerSessions = new Set(['ses_rev_1', 'ses_rev_2']);
       const bindings = new Map([
-        ['fast-reviewer', reviewerSessions],
-        ['fast-manager', new Set([SESSION])],
+        ['reviewer', reviewerSessions],
+        ['manager', new Set([SESSION])],
       ]);
 
-      assertEq([...lanesOf(request([user('go')]), bindings, { sessionId: 'ses_rev_1' })].join(), 'fast-reviewer');
-      assertEq([...lanesOf(request([user('go')]), bindings, { sessionId: 'ses_rev_2' })].join(), 'fast-reviewer');
+      assertEq([...lanesOf(request([user('go')]), bindings, { sessionId: 'ses_rev_1' })].join(), 'reviewer');
+      assertEq([...lanesOf(request([user('go')]), bindings, { sessionId: 'ses_rev_2' })].join(), 'reviewer');
       assertEq(lanesOf(request([user('go')]), bindings, { sessionId: 'ses_other' }).size, 0);
-      assertEq([...lanesOf(request([user('go')]), bindings, { sessionId: SESSION })].join(), 'fast-manager');
+      assertEq([...lanesOf(request([user('go')]), bindings, { sessionId: SESSION })].join(), 'manager');
 
       const entries = [
-        entry({ id: 'rev-a', lane: 'fast-reviewer', turn: 'Review A' }),
-        entry({ id: 'rev-b', lane: 'fast-reviewer', turn: 'Review B' }),
-        entry({ id: 'mgr', lane: 'fast-manager', turn: 'Review A' }),
+        entry({ id: 'rev-a', lane: 'reviewer', turn: 'Review A' }),
+        entry({ id: 'rev-b', lane: 'reviewer', turn: 'Review B' }),
+        entry({ id: 'mgr', lane: 'manager', turn: 'Review A' }),
       ];
       assertEq(
         resolveEntry(request([user('Review A')]), entries, bindings, { sessionId: 'ses_rev_2' }).matched?.id,
@@ -600,18 +600,18 @@ export const runtimeKeyCases = [
       // Measured in K9, and it was an impurity hiding inside the function that names the
       // key. Every converted scenario binds two aliases to its primary session — the Host
       // titles a session on the same id it chats on, so
-      // `bind = ["inspector-title", "fast-inspector"]` is the norm rather than an edge case.
+      // `bind = ["inspector-title", "inspector"]` is the norm rather than an edge case.
       //
       // A reverse lookup returning the FIRST match made the answer depend on Map insertion
       // order: same request, same bindings, different lane depending on which alias the
       // driver happened to register first. `process-stress` failed to resolve its title
       // request for exactly this reason.
       const shared = 'ses_shared';
-      const titleFirst = new Map([['inspector-title', shared], ['fast-inspector', shared]]);
-      const chatFirst = new Map([['fast-inspector', shared], ['inspector-title', shared]]);
+      const titleFirst = new Map([['inspector-title', shared], ['inspector', shared]]);
+      const chatFirst = new Map([['inspector', shared], ['inspector-title', shared]]);
       const body = request([user('go')]);
 
-      assertEq([...lanesOf(body, titleFirst, { sessionId: shared })].sort().join('|'), 'fast-inspector|inspector-title');
+      assertEq([...lanesOf(body, titleFirst, { sessionId: shared })].sort().join('|'), 'inspector|inspector-title');
       assertEq(
         [...lanesOf(body, chatFirst, { sessionId: shared })].sort().join('|'),
         [...lanesOf(body, titleFirst, { sessionId: shared })].sort().join('|'),
@@ -717,7 +717,7 @@ export const runtimeKeyCases = [
 
       // And the same turn in another lane is another conversation.
       const laned = [
-        entry({ id: 'mgr', turn: 'Do it', lane: 'fast-manager' }),
+        entry({ id: 'mgr', turn: 'Do it', lane: 'manager' }),
         entry({ id: 'coder', turn: 'Do it', lane: 'coder-after' }),
       ];
       assertEq(resolveEntry(request([user('Do it')]), laned, BINDINGS, { sessionId: SESSION }).matched?.id, 'mgr');
@@ -734,7 +734,7 @@ export const runtimeKeyCases = [
       assertTrue(resolved.matched === undefined, 'no match must not produce a match');
       assertEq(resolved.unmatched?.key.turn, 'Something else');
       assertEq(resolved.unmatched?.key.step, 0);
-      assertEq(resolved.unmatched?.key.lane, 'fast-manager');
+      assertEq(resolved.unmatched?.key.lane, 'manager');
     },
   },
 
@@ -745,7 +745,7 @@ export const runtimeKeyCases = [
       // is not a match for that entry — it fails closed like an undeclared turn.
       const entries = [{
         id: 'needs-fork',
-        lane: 'fast-manager',
+        lane: 'manager',
         turn: 'Do it',
         step: 0,
         tools: ['fork'],
@@ -777,7 +777,7 @@ export const runtimeKeyCases = [
       // name is filtered out of candidates and fails closed.
       const entries = [{
         id: 'no-fork',
-        lane: 'fast-manager',
+        lane: 'manager',
         turn: 'Do it',
         step: 0,
         forbiddenTools: ['fork'],

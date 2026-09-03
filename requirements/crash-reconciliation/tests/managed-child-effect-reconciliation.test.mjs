@@ -47,9 +47,9 @@ test('WHAT[MANAGED-SESSION-001] SyncDelegate adapter reconciles managed child ef
   assert.equal(created.createCount, 1)
   assert.equal(
     created.createTitle,
-    `wanxiangshu:sync-delegate:v1:scope=${encodeURIComponent(created.ownerScope)}:role=inspector:agent=fast-inspector`,
+    `wanxiangshu:sync-delegate:v1:scope=${encodeURIComponent(created.ownerScope)}:role=inspector:agent=inspector`,
   )
-  assert.equal(created.createAgent, 'fast-inspector')
+  assert.equal(created.createAgent, 'inspector')
   assert.equal(created.child, 'host-child-created')
   assert.equal(created.error, '')
 
@@ -79,7 +79,7 @@ test('WHAT[MANAGED-SESSION-001] same-family delegates are adopted only for the e
   assert.equal(result.createCount, 1)
   assert.equal(
     result.createTitle,
-    `wanxiangshu:sync-delegate:v1:scope=${encodeURIComponent(result.ownerScope)}:role=inspector:agent=fast-inspector`,
+    `wanxiangshu:sync-delegate:v1:scope=${encodeURIComponent(result.ownerScope)}:role=inspector:agent=inspector`,
   )
   assert.equal(result.child, 'host-child-created-exact-scope')
   assert.equal(result.error, '')

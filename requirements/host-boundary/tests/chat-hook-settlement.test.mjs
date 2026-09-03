@@ -11,7 +11,7 @@ const evidence = (suffix) => ({
   logicalRunId: `run-chat-hook-${suffix}`,
   authorityRootUserMessageId: `root-chat-hook-${suffix}`,
   providerRun: `provider-chat-hook-${suffix}`,
-  identitySeed: { participantIdentity: { selectedAgent: 'fast-coder' } },
+  identitySeed: { participantIdentity: { selectedAgent: 'coder' } },
 })
 
 test('WHAT[HOST-BOUNDARY-022] fatal diagnostic follows exact settlement', async () => {

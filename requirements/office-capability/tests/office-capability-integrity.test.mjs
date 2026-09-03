@@ -174,3 +174,10 @@ test('WHAT[OFF-001] OFF_001_office_capability_is_consequence_not_tool_whitelist'
   assert.match(managerEn, /not by the instruments hidden[\s\S]{0,20}inside it/i)
   assert.match(managerEn, /Do not prescribe the hidden instruments of another office/i)
 })
+
+test('WHAT[OFF-015] predictor_is_internal_mechanism_role_not_forkable_or_scheduled', () => {
+  const forkEn = read('tool/fork/description/en.md')
+  const forkZh = read('tool/fork/description/zh-CN.md')
+  assert.doesNotMatch(forkEn, /\bpredictor\b/i)
+  assert.doesNotMatch(forkZh, /predictor/)
+})

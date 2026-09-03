@@ -12,12 +12,9 @@ const ownerPhysical = 'msg-manager-root'
 const propertyOptions = { seed: 0x53554241, numRuns: 200 }
 
 const subagentAgents = [
-  'fast-inspector',
-  'deep-inspector',
-  'fast-coder',
-  'deep-coder',
-  'fast-blogger',
-  'deep-blogger',
+  'inspector',
+  'coder',
+  'blogger',
 ]
 
 const arbitrarySubagentAgent = fc.constantFrom(...subagentAgents)
@@ -32,11 +29,11 @@ const managerSeed = {
   ownerLogicalRun: null,
   ownerAuthorityRoot: null,
   participantIdentity: {
-    selectedAgent: 'fast-manager',
-    peerAgent: 'deep-manager',
+    selectedAgent: 'manager',
+    peerAgent: 'manager',
     canonicalRole: 'manager',
-    selectedTier: 'fast',
-    persona: 'Coordinator',
+    selectedTier: 'deep',
+    persona: 'Lead',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
   },
@@ -162,7 +159,7 @@ test('WHAT[MANAGED-SESSION-020] subagent authority closure cleans claims, contin
 })
 
 test('WHAT[MANAGED-SESSION-020] Manager AgentOwnerRoot remains active for owner-directed post-life recovery', () => {
-  const profile = createSubagentRoot('msg-manager-child-work', 'fast-manager')
+  const profile = createSubagentRoot('msg-manager-child-work', 'manager')
   const active = authority.registerAuthority(profile, authority.empty)
   assert.notEqual(active.ok, false)
 

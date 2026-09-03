@@ -5,7 +5,7 @@
 # facts + public results only — no internal program-counter choreography (§7).
 # Wall clock must stay short (§16).
 #
-# Outer shell = fast-orchestrator (commission → join). Inner Manager walks the
+# Outer shell = orchestrator (commission → join). Inner Manager walks the
 # adversity spine; publish conflict resumes the SAME Manager (ORCH-007).
 #
 # ── natural story (compressed from orch-unhappy + manager-unhappy + fallback) ─
@@ -74,8 +74,8 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 #                      future legitimate topology change must re-measure the complete stroke first.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
 setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-replica-continue", "strength-canary-owner", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g2-inspector-batch", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 700, maxSseEvents = 3450, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
-session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
-prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
+session = { agent = "orchestrator", bind = ["title", "orchestrator"] }
+prompt = { agent = "orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
 must = [
   "g2-inspector-owner.0",
@@ -140,7 +140,7 @@ flow = [
   # Orchestrator Birth → ManagerJob
   { wait = "orch.0" },
   { waitFact = { name = "ManagerJobCreated", eq = 1 } },
-  { bindChild = { agent = "fast-manager", bind = ["fast-manager"] } },
+  { bindChild = { agent = "manager", bind = ["manager"] } },
 
   # Manager: fork → join; join stays in flight while child held.
   # Host evidence (StaticTools.knownToolNames + Manager permission matrix) does not
@@ -159,7 +159,7 @@ flow = [
   # proves the model returned a join call; wait for the real Host ToolPart running
   # event before injecting the external user message, or the wake is correctly dropped.
   { custom = "awaitManagerJoinRunning" },
-  { prompt = { agent = "fast-manager", text = "Interrupt the active join.", resumeAfterIdleText = "Continue after the interrupted join." }, session = "child", timeoutMs = 60000 },
+  { prompt = { agent = "manager", text = "Interrupt the active join.", resumeAfterIdleText = "Continue after the interrupted join." }, session = "child", timeoutMs = 60000 },
   { wait = "coder.3", timeoutMs = 60000 },
   { awaitIdle = { after = "coder.3" }, timeoutMs = 60000 },
   { waitFact = { name = "HandleCompleted", gte = 1 }, timeoutMs = 60000 },
@@ -326,6 +326,16 @@ user = ["# G2B1: establish the first repository fact.", "# G2B2: establish the s
   respond = { type = "text", text = "G2B: all three repository facts were established together." }
 
 [[turn]]
+id = "g2-inspector-replica"
+internal = true
+user = "G2_INSPECTOR_PREFIX_CANARY: reuse one inspector for Q1, Q2, then Q3."
+tools = ["glob", "grep", "read"]
+forbiddenTools = ["edit", "write", "inspect"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "G2 replica shadow completed." }
+
+[[turn]]
 id = "g6-bookkeeper-title"
 internal = true
 kind = "title"
@@ -358,12 +368,12 @@ user = "Ship publish_proof.txt to the target branch through the long stroke."
 
 [[turn]]
 id = "orch"
-lane = "fast-orchestrator"
+lane = "orchestrator"
 user = "Ship publish_proof.txt to the target branch through the long stroke."
 tools = ["commission", "join"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "commission", args = { calling = "coordinator", name = "Long Stroke Road", charge = "Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile." } }
+  respond = { type = "tool-call", tool = "commission", args = { calling = "lead", name = "Long Stroke Road", charge = "Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
@@ -419,7 +429,7 @@ tools = ["judge"]
 
 [[turn]]
 id = "manager"
-lane = "fast-manager"
+lane = "manager"
 user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile."
 tools = ["fork", "join", "horizon", "suicide"]
 
@@ -442,7 +452,7 @@ user = "# The previous physical attempt did not complete.\n#\n# Continue the sam
 
 [[turn]]
 id = "manager-interrupt"
-lane = "fast-manager"
+lane = "manager"
 user = "Interrupt the active join."
 tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
 optional = true
@@ -455,7 +465,7 @@ optional = true
 
 [[turn]]
 id = "manager-resume"
-lane = "fast-manager"
+lane = "manager"
 user = "Continue after the interrupted join."
 tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
 
@@ -494,7 +504,7 @@ tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
 
 [[turn]]
 id = "coder"
-lane = "fast-coder"
+lane = "coder"
 user = "# Write publish_proof.txt."
 tools = ["js-coder", "read"]
 
@@ -517,7 +527,7 @@ tools = ["js-coder", "read"]
 
 [[turn]]
 id = "coder-fix"
-lane = "fast-coder"
+lane = "coder"
 user = "# Ensure publish_proof.txt contains exactly: Published by long-stroke canary"
 tools = ["js-coder"]
 
@@ -529,7 +539,7 @@ tools = ["js-coder"]
 
 [[turn]]
 id = "coder-reuse"
-lane = "fast-coder"
+lane = "coder"
 user = "# Verify the reused subagent received this second charge and publish_proof.txt is exact."
 tools = ["read"]
 
@@ -557,7 +567,7 @@ tools = ["fork", "join", "horizon", "suicide"]
 
 [[turn]]
 id = "coder-resolve"
-lane = "fast-coder"
+lane = "coder"
 user = "# Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary"
 tools = ["write"]
 

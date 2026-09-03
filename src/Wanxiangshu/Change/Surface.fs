@@ -639,7 +639,7 @@ module ChangeSurface =
     let private observableJob git jobId =
         { JobId = jobId
           ManagerSessionId = SessionId.create "manager-session"
-          ManagerAgent = "fast-manager"
+          ManagerAgent = "manager"
           TargetRef = TargetRef.create "refs/heads/main"
           Worktree =
             WorktreeResource.Adopt(

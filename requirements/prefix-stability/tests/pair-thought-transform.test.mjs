@@ -1,8 +1,10 @@
 // Split from tests/unit/host/pair-thought-transform.test.mjs (cutover Wave 2a);
 // owner: prefix-stability. PPT: PairProgrammingThoughtTransform — HOST-013
-// permanent pair injection: anchor/replay 机制（placement、replay、call-id
-// 稳定性、skip-auto-injected 环境门、同 occurrence 恢复）。
-// Cursor wire 渲染断言（NUL+BOM guidance）归 provider-projection；
+// universal cursor mode: zero synthetic skill messages on every provider.
+// Guidance travels only as a NUL+BOM suffix on the terminal real tool result;
+// the durable occurrence (ordinal/call-id 稳定性、skip-auto-injected 环境门、
+// 同 occurrence 恢复、replay 去重) is journal-level, never a wire message.
+// NUL+BOM error-result 断言归 provider-projection；
 // PAIR_HINT marker 正文 craft 归 cognitive-environment。
 
 import assert from 'node:assert/strict'
@@ -56,22 +58,11 @@ const toolResult = (id, tool, callID, output = 'ok') => ({
 })
 
 const pairMessages = (messages) => messages.filter((m) => isPairProgrammingThought(m))
-const skillContent = (markerText) => markerText
-
-const assertPairShape = (msg, callId, markerText) => {
-  assert.equal(msg.info.role, 'assistant')
-  assert.equal(msg.info.source, source)
-  assert.equal(msg.info.synthetic, true)
-  assert.equal(msg.parts.length, 1)
-  assert.equal(msg.parts[0].type, 'tool')
-  assert.equal(msg.parts[0].tool, 'skill')
-  assert.equal(msg.parts[0].callID, callId)
-  assert.equal(msg.parts[0].state.status, 'completed')
-  assert.notEqual(msg.parts[0].state.status, 'pending')
-  assert.notEqual(msg.parts[0].state.status, 'running')
-  assert.deepEqual(msg.parts[0].state.input, { name: '' })
-  assert.equal(msg.parts[0].state.output, skillContent(markerText))
-}
+// Universal cursor mode: the only guidance carrier is a NUL+BOM suffix on the
+// terminal real tool result. There are no synthetic skill messages, so every
+// shape assertion below counts pairMessages === 0 and checks suffix bytes.
+const guidanceSuffix = (markerText) => `\0\uFEFF${markerText}`
+const terminalOutputOf = (messages, id) => messages.find((m) => m.info.id === id).parts[0].state.output
 
 test('WHAT[PREFIX-STABILITY-014] PPT_source_is_the_frozen_side_channel_identity', () => {
   assert.equal(source, 'pair-programming-auto-injected')
@@ -100,12 +91,12 @@ test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_places_pair_before_trailing_user_
   const raw = [userMsg('u1'), assistantText('a1'), userMsg('u2', 'steer')]
   const out = await inject('ses_assistant', raw)
   assert.ok(out)
-  assert.equal(out.length, 4)
-  assert.deepEqual(out[0], raw[0])
-  assert.deepEqual(out[1], raw[1])
-  const callId = stableCallId('ses_assistant', 1n)
-  assertPairShape(out[2], callId, text)
-  assert.deepEqual(out[3], raw[2], 'steer user remains after pair')
+  // Universal cursor mode: no terminal real tool result exists, so no guidance
+  // carrier exists either — the transcript passes through byte-identical with
+  // zero synthetic messages. The durable occurrence lives in the journal.
+  assert.equal(out.length, 3)
+  assert.deepEqual(out, raw)
+  assert.equal(pairMessages(out).length, 0)
 })
 
 test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_merges_into_tool_batches_before_user', async () => {
@@ -118,38 +109,41 @@ test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_merges_into_tool_batches_before_u
   ]
   const out = await inject('ses_tools', raw)
   assert.ok(out)
-  assert.equal(out.length, 6)
-  const callId = stableCallId('ses_tools', 1n)
+  // Universal cursor mode: the batch keeps its four real rows plus the steer
+  // user; guidance lands on the terminal real tool result only.
+  assert.equal(out.length, 5)
+  assert.equal(pairMessages(out).length, 0)
 
   assert.equal(out[0].parts[0].tool, 'bash')
   assert.equal(out[1].parts[0].tool, 'read')
   assert.equal(out[2].parts[0].tool, 'bash')
   assert.equal(out[2].parts[0].state.status, 'completed')
+  assert.equal(out[2].parts[0].state.output, 'out1')
   assert.equal(out[3].parts[0].tool, 'read')
   assert.equal(out[3].parts[0].state.status, 'completed')
-  assert.equal(out[4].parts[0].tool, 'skill')
-  assert.equal(out[4].parts[0].state.status, 'completed')
-  assert.equal(out[4].parts[0].callID, callId)
-  assert.deepEqual(out[4].parts[0].state.input, { name: '' })
-  assert.equal(out[4].parts[0].state.output, skillContent(text))
-  assert.deepEqual(out[5], raw[4])
+  assert.equal(out[3].parts[0].state.output, `out2${guidanceSuffix(text)}`)
+  assert.deepEqual(out[4], raw[4], 'steer user remains the terminal row')
+
+  // Re-feeding the wire strips the suffix for placement, then re-applies it:
+  // replay is byte-identical, never a doubled suffix.
+  const replay = await inject('ses_tools', out)
+  assert.deepEqual(replay, out)
+  assert.equal(terminalOutputOf(replay, 'r2'), `out2${guidanceSuffix(text)}`)
 })
 
 test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_second_pass_of_same_placement_replays_existing_pair', async () => {
   const initial = [userMsg('u1'), assistantText('a1'), userMsg('u2')]
   const once = await inject('ses_append', initial)
   assert.ok(once)
-  assert.equal(once.length, 4)
+  assert.equal(once.length, 3)
+  assert.equal(pairMessages(once).length, 0)
 
-  // Same real transcript again (production raw carries the previous wire's
-  // synthetic messages): same placement → replay only, no new pair.
+  // Same real transcript again: same placement → replay only, no new guidance
+  // carrier. The durable occurrence is journal-level, never a wire message.
   const twice = await inject('ses_append', once)
   assert.ok(twice)
-  assert.equal(twice.length, 4, 'same placement must not append a second pair')
-  assert.equal(pairMessages(twice).length, 1)
-
-  const firstCall = stableCallId('ses_append', 1n)
-  assertPairShape(twice[2], firstCall, text)
+  assert.equal(twice.length, 3, 'same placement must not append a second carrier')
+  assert.equal(pairMessages(twice).length, 0)
   assert.deepEqual(twice, once, 'replay must be byte-identical')
 })
 
@@ -160,20 +154,23 @@ test('WHAT[PREFIX-STABILITY-015] PPT_tryInject_call_id_is_stable_per_session_and
 })
 
 test('WHAT[PREFIX-STABILITY-015] PPT_tryInject_without_session_id_still_appends_stable_pair', async () => {
-  const raw = [userMsg('u1'), assistantText('a1'), userMsg('u2')]
+  // Without a session id the guidance still lands deterministically on the
+  // terminal real tool result; a session-less trailing-user turn passes through.
+  const raw = [toolCall('c1', 'bash', 't1'), toolResult('r1', 'bash', 't1', 'out1')]
   const out = await inject(undefined, raw)
   assert.ok(out)
-  assert.equal(out.length, 4)
-  const callId = stableCallId(undefined, 1n)
-  assertPairShape(out[2], callId, text)
+  assert.equal(out.length, 2)
+  assert.equal(pairMessages(out).length, 0)
+  assert.equal(terminalOutputOf(out, 'r1'), `out1${guidanceSuffix(text)}`)
+  assert.deepEqual(await inject(undefined, out), out, 'session-less replay stays byte-identical')
 })
 
 test('WHAT[PREFIX-STABILITY-014] PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker', async () => {
   const raw = [userMsg('u1'), assistantText('a1'), userMsg('msg_1', text)]
   const out = await inject('ses_quote', raw)
-  assert.equal(isPairProgrammingThought(out[3]), false, 'matching text alone must not classify as marker')
-  assert.equal(out.length, 4)
-  assert.equal(out[3].info.role, 'user')
+  assert.equal(isPairProgrammingThought(out[2]), false, 'matching text alone must not classify as marker')
+  assert.equal(out.length, 3)
+  assert.equal(out[2].info.role, 'user')
 })
 
 test('WHAT[PREFIX-STABILITY-010] PPT_skip_auto_injected_env_blocks_new_pair_but_replays_history', async () => {
@@ -183,23 +180,33 @@ test('WHAT[PREFIX-STABILITY-010] PPT_skip_auto_injected_env_blocks_new_pair_but_
     assert.equal(skipAutoInjectedRequested(undefined), false)
 
     const session = 'ses_skip_env'
-    const seeded = await inject(session, [userMsg('u1'), assistantText('a1'), userMsg('msg_u1')])
-    assert.equal(pairMessages(seeded).length, 1)
+    const seeded = await inject(session, [
+      toolCall('msg_c0', 'bash', 'call_0'),
+      toolResult('msg_r0', 'bash', 'call_0', 'out0'),
+      userMsg('msg_u1'),
+    ])
+    assert.equal(pairMessages(seeded).length, 0)
+    assert.equal(terminalOutputOf(seeded, 'msg_r0'), `out0${guidanceSuffix(text)}`)
 
     process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = '1'
     assert.equal(skipAutoInjectedRequested(undefined), true)
 
+    // Historical guidance bytes replay untouched; the new terminal result gets
+    // no fresh suffix while the env gate is set.
+    const replay = await inject(session, [...seeded])
+    assert.deepEqual(replay, seeded, 'history replays byte-identical under the skip gate')
+
     const raw = [
       ...seeded,
       toolCall('msg_c1', 'bash', 'call_1'),
-      toolResult('msg_r1', 'bash', 'call_1'),
+      toolResult('msg_r1', 'bash', 'call_1', 'out1'),
       userMsg('msg_u2'),
     ]
     const out = await inject(session, raw)
-    // Historical pair for placement Before(msg_u1) still replays; no new pair for Before(msg_u2).
-    assert.equal(pairMessages(out).length, 1)
-    assert.equal(out.length, 7)
-    assert.equal(isPairProgrammingThought(out[2]), true)
+    assert.equal(pairMessages(out).length, 0)
+    assert.equal(out.length, 6)
+    assert.equal(terminalOutputOf(out, 'msg_r0'), `out0${guidanceSuffix(text)}`)
+    assert.equal(terminalOutputOf(out, 'msg_r1'), 'out1')
   } finally {
     if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
     else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
@@ -223,8 +230,11 @@ test('WHAT[PREFIX-STABILITY-010] C_PH_ordinary_cursor_ordinary_suppresses_then_r
   const session = 'ses_cursor_transition'
   const initial = [userMsg('u1'), assistantText('a1'), userMsg('u2')]
   const ordinary = await inject(session, initial)
-  const ordinaryCallId = stableCallId(session, 1n)
-  assert.equal(pairMessages(ordinary).length, 1)
+  // Universal cursor mode: neither ordinary nor cursor turns emit synthetic
+  // messages; the durable occurrence is journal-level and the wire passes
+  // through. Returning to the ordinary turn restores the identical wire.
+  assert.equal(pairMessages(ordinary).length, 0)
+  assert.deepEqual(ordinary, initial)
 
   const cursorReal = [{
     info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'composer' } },
@@ -235,15 +245,15 @@ test('WHAT[PREFIX-STABILITY-010] C_PH_ordinary_cursor_ordinary_suppresses_then_r
   assert.deepEqual(cursor, cursorReal)
 
   const back = await inject(session, initial)
-  assert.equal(pairMessages(back).length, 1)
-  assertPairShape(back[2], ordinaryCallId, text)
+  assert.equal(pairMessages(back).length, 0)
+  assert.deepEqual(back, ordinary, 'same occurrence restores the identical wire')
 })
 
 test('WHAT[PREFIX-STABILITY-010] PPT_distiller_and_blogger_never_inject_pair_hint', async () => {
   const bloggerMsg = [
     userMsg('u1'),
     assistantText('a1'),
-    { info: { id: 'u2', role: 'user', agent: 'fast-blogger' }, parts: [{ type: 'text', text: 'blog task' }] },
+    { info: { id: 'u2', role: 'user', agent: 'blogger' }, parts: [{ type: 'text', text: 'blog task' }] },
   ]
   const bloggerOut = await inject('ses_blogger', bloggerMsg)
   assert.equal(pairMessages(bloggerOut).length, 0)
@@ -252,9 +262,20 @@ test('WHAT[PREFIX-STABILITY-010] PPT_distiller_and_blogger_never_inject_pair_hin
   const distillerMsg = [
     userMsg('u3'),
     assistantText('a2'),
-    { info: { id: 'u4', role: 'user', agent: 'fast-distiller' }, parts: [{ type: 'text', text: 'distill task' }] },
+    { info: { id: 'u4', role: 'user', agent: 'distiller' }, parts: [{ type: 'text', text: 'distill task' }] },
   ]
   const distillerOut = await inject('ses_distiller', distillerMsg)
   assert.equal(pairMessages(distillerOut).length, 0)
   assert.deepEqual(distillerOut, distillerMsg)
+
+  // Suppression holds even with a terminal real tool result: no guidance
+  // suffix is appended for the canonical blogger/distiller turns.
+  const bloggerTools = [
+    toolCall('c1', 'bash', 't1'),
+    toolResult('r1', 'bash', 't1', 'out1'),
+    { info: { id: 'u2', role: 'user', agent: 'blogger' }, parts: [{ type: 'text', text: 'blog task' }] },
+  ]
+  const bloggerToolsOut = await inject('ses_blogger_tools', bloggerTools)
+  assert.equal(pairMessages(bloggerToolsOut).length, 0)
+  assert.deepEqual(bloggerToolsOut, bloggerTools)
 })

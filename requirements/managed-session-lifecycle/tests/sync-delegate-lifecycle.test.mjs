@@ -9,7 +9,7 @@ const owner = 'managed-session-owner'
 
 const create = async () => SyncDelegateSurface.create(
   await mkdtemp(join(tmpdir(), 'wxs-managed-sync-')),
-  [{ sessionId: owner, agent: 'fast-manager' }],
+  [{ sessionId: owner, agent: 'manager' }],
 )
 
 const admit = async (runtime, count) => {

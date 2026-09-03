@@ -15,10 +15,10 @@ const evidence = (overrides = {}) => ({
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: 'fast-coder',
-      peerAgent: 'deep-coder',
+      selectedAgent: 'coder',
+      peerAgent: 'coder',
       canonicalRole: 'coder',
-      selectedTier: 'fast',
+      selectedTier: 'deep',
       persona: 'Coder',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
@@ -26,7 +26,7 @@ const evidence = (overrides = {}) => ({
   },
   providerRun: 'provider-provider-lifecycle',
   origin: 'HumanRoot',
-  effectiveAgent: 'fast-coder',
+  effectiveAgent: 'coder',
   requestKind: 'work-main',
   projectionChoice: { kind: 'UseCommittedEpoch' },
   ...overrides,
@@ -124,7 +124,7 @@ test('WHAT[CHATEXEC-011] exact physical provider run and evidence are frozen', a
   for (const [attempt, expected] of [
     [evidence({ physicalUserMessageId: 'msg-wrong' }), 'AttemptKeyMismatch'],
     [evidence({ providerRun: 'provider-wrong' }), 'ProviderRunConflict'],
-    [evidence({ effectiveAgent: 'deep-coder' }), 'EstablishedEvidenceConflict'],
+    [evidence({ logicalRunId: 'run-other' }), 'EstablishedEvidenceConflict'],
   ]) {
     const startResult = await run(accept(), start(), start(attempt))
     assert.equal(startResult.ok, false)

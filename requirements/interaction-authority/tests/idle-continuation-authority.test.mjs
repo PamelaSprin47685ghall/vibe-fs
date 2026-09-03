@@ -7,11 +7,10 @@ import * as finality from '../../../dist/Mission/Manager/FinalitySurface.js'
 
 const hash = (value) => `H(${value})`
 const personas = {
-  'fast-manager': 'Coordinator',
+  manager: 'Lead',
 }
 const rootSelection = (agent) => {
-  const [selectedTier, canonicalRole] = agent.split('-')
-  const peerTier = selectedTier === 'fast' ? 'deep' : 'fast'
+  const canonicalRole = agent === 'predictor' ? 'inspector' : agent
   return {
     kind: 'RootSelection',
     ownerSession: null,
@@ -19,16 +18,16 @@ const rootSelection = (agent) => {
     ownerAuthorityRoot: null,
     participantIdentity: {
       selectedAgent: agent,
-      peerAgent: `${peerTier}-${canonicalRole}`,
+      peerAgent: agent,
       canonicalRole,
-      selectedTier,
-      persona: personas[agent] ?? 'Coordinator',
+      selectedTier: 'deep',
+      persona: personas[agent] ?? 'Lead',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
     },
   }
 }
-const createdRoot = authority.createAuthorityRoot(hash, 'rt_idle', 'ses_idle', 'HumanRoot', 'root', rootSelection('fast-manager'))
+const createdRoot = authority.createAuthorityRoot(hash, 'rt_idle', 'ses_idle', 'HumanRoot', 'root', rootSelection('manager'))
 assert.equal(createdRoot.ok, true, createdRoot.error)
 const root = createdRoot.value
 const register = () => authority.registerAuthority(root, authority.empty)
@@ -38,7 +37,7 @@ test('WHAT[INTERACTION-AUTHORITY-012] HOST_004_manager_idle_admission_is_exactly
   assert.equal(authority.idleAlreadyAdmitted('ses_idle', root.logicalRun, 'life-idle', 'pre-t1', 'run-1', state), false)
 
   const idleDigest = (life, condition, run) => [life, condition, run].join('\x1f')
-  const first = authority.claimContinuation('pk-idle-1', 'ses_idle', 'ManagerIdleEncouragement', root, 'fast-manager', idleDigest('life-idle', 'pre-t1', 'run-1'))
+  const first = authority.claimContinuation('pk-idle-1', 'ses_idle', 'ManagerIdleEncouragement', root, 'manager', idleDigest('life-idle', 'pre-t1', 'run-1'))
   state = authority.registerClaim(first, state)
   assert.equal(authority.idleAlreadyAdmitted('ses_idle', root.logicalRun, 'life-idle', 'pre-t1', 'run-1', state), true)
   assert.equal(authority.idleAlreadyAdmitted('ses_idle', root.logicalRun, 'life-idle', 'pre-t1', 'run-2', state), false)
@@ -50,7 +49,7 @@ test('WHAT[INTERACTION-AUTHORITY-012] HOST_004_manager_idle_admission_is_exactly
     'definite pre-send failure must re-open the exact Manager idle occasion',
   )
 
-  const second = authority.claimContinuation('pk-idle-2', 'ses_idle', 'ManagerIdleEncouragement', root, 'fast-manager', idleDigest('life-idle', 'pre-t1', 'run-2'))
+  const second = authority.claimContinuation('pk-idle-2', 'ses_idle', 'ManagerIdleEncouragement', root, 'manager', idleDigest('life-idle', 'pre-t1', 'run-2'))
   state = authority.registerClaim(second, state)
   assert.equal(authority.idleAlreadyAdmitted('ses_idle', root.logicalRun, 'life-idle', 'pre-t1', 'run-2', state), true)
   assert.equal(authority.idleAlreadyAdmitted('ses_idle', root.logicalRun, 'life-idle', 'post-t1', 'run-3', state), false)

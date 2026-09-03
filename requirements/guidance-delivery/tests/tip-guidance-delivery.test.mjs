@@ -32,7 +32,7 @@ const seedOwnerWithTip = async (journal, { tip = 'primitive-obsession', runSuffi
   const linked = await guidance.appendCompanionLink(journal, {
     session: main,
     bloggerSession: blogger,
-    bloggerAgent: 'fast-blogger',
+    bloggerAgent: 'blogger',
   })
   assert.equal(linked.ok, true, linked.error)
 
@@ -148,7 +148,7 @@ test('WHAT[GD-006] ENFORCER_TIP_DELIVERY_005_missing_tip_returns_none', async ()
     const linked = await guidance.appendCompanionLink(journal, {
       session: main,
       bloggerSession: blogger,
-      bloggerAgent: 'fast-blogger',
+      bloggerAgent: 'blogger',
     })
     assert.equal(linked.ok, true, linked.error)
     assert.equal(await resolveTipGuidance(journal, main), null)

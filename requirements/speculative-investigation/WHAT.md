@@ -6,7 +6,7 @@
 
 ## SPEC-INV-002: Eligible Opportunity 判定
 
-实际投机仅在同时满足以下条件时被允许：根会话为 `SessionExecutionClass.Work`；请求类型为 `ProviderRequestKind.WorkMain`；角色属于 `{Coder, Inspector, DevOps, Inquiry}`；Authority 选择 Deep 且 `EffectiveAgent = SelectedAgent`；非 Fallback 分支、非交互修复、非前缀探测、非 Reviewer/Finality、非 Attached/InternalLeaf；Owner 未取消；可唯一绑定即将消费输入的 `TargetProviderRun`；存在同角色的 fast peer 且显式成本模型判定收益为正；EventStore 与宿主 Canary 均健康。任一条件未知或不满足立即判定为 K0。
+实际投机仅在同时满足以下条件时被允许：根会话为 `SessionExecutionClass.Work`；请求类型为 `ProviderRequestKind.WorkMain`；角色属于 `{coder, inspector, devops, inquiry}`；Authority 为 canonical single-version (`selectedTier` 为 `deep` 且 `EffectiveAgent = SelectedAgent`)；非 Fallback 分支、非交互修复、非前缀探测、非 Reviewer/Finality、非 Attached/InternalLeaf；Owner 未取消；可唯一绑定即将消费输入的 `TargetProviderRun`；predictor 便宜模型可用 (`PredictorAvailable`) 且显式成本模型判定收益为正；EventStore 与宿主 Canary 均健康。任一条件未知或不满足立即判定为 K0。
 
 ## SPEC-INV-003: 预算单位 K
 
@@ -14,7 +14,7 @@
 
 ## SPEC-INV-004: Replica Authority 结构约束
 
-Replica 构造为 `InternalLeaf × Attached(owner, StrengthReplica)`，使用 `fast-<owner-role>`；通过 owner-derived `ParticipantIdentity` evidence 继承 Owner logical run 的 Persona 与 provenance/version，并继承 Owner 的 SessionProviderLanguage，仅切换执行绑定至 fast EffectiveAgent，其物理执行目标由调度器解析。Replica 拥有短生命周期，完成即释放，不跨决策复用；无 Companion、无嵌套投机、无深度 Fallback 或权限交互。其可见工具 Schema 与底层执行门禁严格同源且仅允许 `read/glob/grep`，任何其他工具调用直接 fail closed。
+Replica 构造为 `InternalLeaf × Attached(owner, StrengthReplica)`，通过 owner-derived `ParticipantIdentity` evidence 继承 Owner logical run 的 Persona 与 provenance/version，并继承 Owner 的 SessionProviderLanguage，仅将执行绑定切换至 predictor 便宜模型角色 (`predictor`，`PredictorAvailable`)，其物理执行目标由调度器解析。Replica 拥有短生命周期，完成即释放，不跨决策复用；无 Companion、无嵌套投机、无深度 Fallback 或权限交互。其可见工具 Schema 与底层执行门禁严格同源且仅允许 `read/glob/grep`，任何其他工具调用直接 fail closed。
 
 ## SPEC-INV-005: Candidate Frame 确定性规范化
 

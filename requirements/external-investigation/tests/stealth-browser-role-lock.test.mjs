@@ -26,15 +26,12 @@ const ROLES = [
   'Blogger',
   'Bookkeeper',
 ]
-const TIERS = ['fast', 'deep']
-const agentName = (tier, role) => `${tier}-${role.toLowerCase()}`
+const agentName = (role) => `${role.toLowerCase()}`
 
 const buildConfig = () => {
   const agent = {}
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      agent[agentName(tier, role)] = { model: `${tier}-${role.toLowerCase()}-model` }
-    }
+  for (const role of ROLES) {
+    agent[agentName(role)] = { model: `${agentName(role)}-model` }
   }
   return { agent }
 }
@@ -67,19 +64,17 @@ test('WHAT[EXTERNAL-INVESTIGATION-010] browser_is_the_only_network_office', () =
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
 
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      const name = agentName(tier, role)
-      const permission = config.agent[name].permission
+  for (const role of ROLES) {
+    const name = agentName(role)
+    const permission = config.agent[name].permission
 
-      // role-lock 事实：只有 Browser 能到达外部网络，其它 role 一律 deny。
-      assert.equal(
-        permission[permissionKey],
-        role === 'Browser' ? 'allow' : 'deny',
-        `${name} ${permissionKey}`,
-      )
-      const concrete = evaluate(permission, CONCRETE_TOOL).action
-      assert.equal(concrete, role === 'Browser' ? 'allow' : 'deny', `${name} concrete MCP tool`)
-    }
+    // role-lock 事实：只有 Browser 能到达外部网络，其它 role 一律 deny。
+    assert.equal(
+      permission[permissionKey],
+      role === 'Browser' ? 'allow' : 'deny',
+      `${name} ${permissionKey}`,
+    )
+    const concrete = evaluate(permission, CONCRETE_TOOL).action
+    assert.equal(concrete, role === 'Browser' ? 'allow' : 'deny', `${name} concrete MCP tool`)
   }
 })

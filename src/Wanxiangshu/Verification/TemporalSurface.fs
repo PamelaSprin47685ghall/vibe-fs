@@ -92,12 +92,6 @@ module TemporalSurface =
                     failwith $"TemporalSurface: unknown participant role '{text (value?Role)}'")
                 |> Some
 
-        let tierLabel = text (value?InitialTier)
-
-        let initialTier =
-            Roles.tryParseTier tierLabel
-            |> Option.defaultWith (fun () -> failwith $"TemporalSurface: unknown participant tier '{tierLabel}'")
-
         let originLabel = text (value?Origin)
 
         let origin =
@@ -107,9 +101,7 @@ module TemporalSurface =
             | _ -> failwith $"TemporalSurface: unknown participant origin '{originLabel}'"
 
         { SelectedAgent = text (value?SelectedAgent)
-          PeerAgent = text (value?PeerAgent)
           Role = role
-          InitialTier = initialTier
           Persona = text (value?Persona)
           PersonaCatalogVersion = intValue (value?PersonaCatalogVersion)
           Origin = origin }
@@ -121,9 +113,9 @@ module TemporalSurface =
 
         box
             {| SelectedAgent = identity.SelectedAgent
-               PeerAgent = identity.PeerAgent
+               PeerAgent = ParticipantIdentity.peerAgent evidence
                Role = identity.Role |> Option.map Roles.roleLabel |> Option.toObj
-               InitialTier = Roles.wireTierLabel identity.InitialTier
+               InitialTier = "deep"
                Persona = identity.Persona
                PersonaCatalogVersion = identity.PersonaCatalogVersion
                Origin =

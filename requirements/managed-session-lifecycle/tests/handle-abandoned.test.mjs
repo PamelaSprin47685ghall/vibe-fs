@@ -18,7 +18,7 @@ const CHILD = 'ses_c'
 const HANDLE = 'agent:h1'
 const fact = (caseName, payload) => ({ case: caseName, payload })
 
-const linkOn = (projection, { handle = HANDLE, child = CHILD, agent = 'fast-coder', role = 'Coder' } = {}) => {
+const linkOn = (projection, { handle = HANDLE, child = CHILD, agent = 'coder', role = 'Coder' } = {}) => {
   const applied = HandleSurface.apply(projection, { op: 'link', handle, child, agent, role })
   assert.equal(applied.ok, true, applied.ok ? '' : `link refused: ${JSON.stringify(applied.error)}`)
   return applied.state
@@ -61,7 +61,7 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_Active_to_Abandoned_fold_and_projection
   assert.deepEqual(stateOf(abandoned), {
     handle: 'agent:h1',
     child: 'ses_c',
-    targetAgent: 'fast-coder',
+    targetAgent: 'coder',
     role: 'Coder',
     lifecycle: 'Abandoned',
     creationOrder: 0,
@@ -97,12 +97,12 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_Abandoned_is_not_joinable_and_cannot_co
   assert.equal(stateOf(retired.state).lifecycle, 'Retired')
   assert.equal(HandleSurface.reportableAbandonedCount(retired.state), 0)
   assert.deepEqual(
-    HandleSurface.apply(abandoned, { op: 'link', handle: HANDLE, child: CHILD, agent: 'fast-coder', role: 'Coder' }).error,
+    HandleSurface.apply(abandoned, { op: 'link', handle: HANDLE, child: CHILD, agent: 'coder', role: 'Coder' }).error,
     { kind: 'TransitionRejected', reason: 'AlreadyAbandoned' },
   )
   // EXEC-009: Retired handles reopen on link for agent reuse. The tombstone is
   // the prior LastCompletion, not a permanent ban on further Labor.
-  const reopened = HandleSurface.apply(retired.state, { op: 'link', handle: HANDLE, child: CHILD, agent: 'fast-coder', role: 'Coder' })
+  const reopened = HandleSurface.apply(retired.state, { op: 'link', handle: HANDLE, child: CHILD, agent: 'coder', role: 'Coder' })
   assert.equal(reopened.ok, true, `Retired handle must be reopenable, got ${JSON.stringify(reopened)}`)
   assert.equal(stateOf(reopened.state).lifecycle, 'Active')
 })
@@ -118,7 +118,7 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_recordAbandon_CAS_first_wins', async (c
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
   context.after(() => HandleJournalSurface.JournalSurface_dispose(created.journal))
   const j = created.journal
-    const linked = await HandleJournalSurface.JournalSurface_link(j, PARENT, 'h1', CHILD, 'fast-coder', 'Coder')
+    const linked = await HandleJournalSurface.JournalSurface_link(j, PARENT, 'h1', CHILD, 'coder', 'Coder')
     assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
 
     const first = await HandleJournalSurface.JournalSurface_recordAbandon(
@@ -151,7 +151,7 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_fold_replays_HandleAbandoned_idempotent
     ParentSessionId: PARENT,
     ChildSessionId: CHILD,
     Handle: HANDLE,
-    TargetAgent: 'fast-coder',
+    TargetAgent: 'coder',
     CanonicalRole: 'Coder',
     Ownership: 'DurableParentHandle',
   })

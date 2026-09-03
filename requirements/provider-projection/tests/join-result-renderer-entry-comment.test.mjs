@@ -10,8 +10,8 @@ test('WHAT[PROVIDER-PROJECTION-009] MISC_join_render_batch_empty_work_record_no_
 })
 
 test('WHAT[PROVIDER-PROJECTION-009] MISC_join_render_batch_child_to_parent_lwr_stays_entry_local_comment', () => {
-  const wire = join.renderAgentCompletion('english', 'fast-coder', 'Chronicle\ndid the thing\n\nRecent work\nok')
-  assert.match(wire, /# fast-coder has returned\./)
+  const wire = join.renderAgentCompletion('english', 'coder', 'Chronicle\ndid the thing\n\nRecent work\nok')
+  assert.match(wire, /# coder has returned\./)
   assert.match(wire, /^# Chronicle$/m)
   assert.match(wire, /^# did the thing$/m)
   assert.equal(wire.includes('work_record ='), false)

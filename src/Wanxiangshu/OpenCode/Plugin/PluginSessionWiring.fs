@@ -162,7 +162,6 @@ module PluginSessionWiring =
                     dispatcher,
                     durable,
                     (attached :> IAttachedSessionPort),
-                    SyncDelegateTier.fromDispatcher dispatcher,
                     registerDelegate,
                     scope.Sessions.Quiescence,
                     (fun sessionId range providerRun ->

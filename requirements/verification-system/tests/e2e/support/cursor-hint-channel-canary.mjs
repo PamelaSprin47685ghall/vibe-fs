@@ -106,14 +106,14 @@ const host = await startHost();
 let sessionId;
 try {
   const created = await request(host.baseUrl, 'POST', '/api/session', {
-    agent: 'deep-coder',
+    agent: 'coder',
     model: { providerID: 'cursor', id: 'default' },
   });
   sessionId = sessionIdOf(created);
   assert.ok(sessionId, `missing session id: ${JSON.stringify(created)}`);
 
   await request(host.baseUrl, 'POST', `/session/${sessionId}/prompt_async`, {
-    agent: 'deep-coder',
+    agent: 'coder',
     model: { providerID: 'cursor', modelID: 'default' },
     parts: [{
       type: 'text',

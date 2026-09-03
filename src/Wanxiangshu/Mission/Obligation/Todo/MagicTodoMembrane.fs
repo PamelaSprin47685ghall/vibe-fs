@@ -670,9 +670,18 @@ module MagicTodoHostHooks =
             acceptResolvedCheckpoint sessionText outcome output
         }
 
+    let private resolveCompletionToken (completionTokens: Dictionary<string, TaskCompletionSource<unit>>) key =
+        match completionTokens.TryGetValue key with
+        | true, tcs ->
+            AsyncSupport.trySetResult tcs () |> ignore
+            completionTokens.Remove key |> ignore
+        | false, _ -> ()
+
     let private runAfterTodo
         (journal: AgentJournal option)
         (bridges: Dictionary<string, Task<Result<MagicTodoMembrane.PreparedBridge, string>>>)
+        (completionTokens: Dictionary<string, TaskCompletionSource<unit>>)
+        (tailGate: obj)
         (input: obj)
         (output: obj)
         =
@@ -691,12 +700,24 @@ module MagicTodoHostHooks =
                 do! acceptAfterPrepare durable sessionText preparedTask output
             finally
                 bridges.Remove key |> ignore
+                lock tailGate (fun () -> resolveCompletionToken completionTokens key)
+        }
+
+    let private awaitPriorTask (prior: Task) : Task =
+        task {
+            try
+                do! prior
+            with _ ->
+                ()
         }
 
     let private runBeforeTodo
         (journal: AgentJournal option)
         (snapshot: ISessionSnapshotPort option)
         (bridges: Dictionary<string, Task<Result<MagicTodoMembrane.PreparedBridge, string>>>)
+        (sessionTails: Dictionary<string, Task>)
+        (completionTokens: Dictionary<string, TaskCompletionSource<unit>>)
+        (tailGate: obj)
         (input: obj)
         (output: obj)
         =
@@ -708,6 +729,25 @@ module MagicTodoHostHooks =
 
             let sessionText = requiredText input "sessionID"
             let callText = requiredText input "callID"
+            let key = bridgeKey sessionText callText
+
+            let priorTask =
+                lock tailGate (fun () ->
+                    match sessionTails.TryGetValue sessionText with
+                    | true, task -> Some task
+                    | false, _ -> None)
+
+            match priorTask with
+            | Some prior -> do! awaitPriorTask prior
+            | None -> ()
+
+            let tcs =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            lock tailGate (fun () ->
+                sessionTails[sessionText] <- tcs.Task
+                completionTokens[key] <- tcs)
+
             let sessionId = SessionId.create sessionText
             let callId = ToolCallId.create callText
             let args: obj = output?args
@@ -719,7 +759,7 @@ module MagicTodoHostHooks =
                 output
                 (obligationsToCompatibilityRows submittedInput.WorkingOn obligations)
 
-            bridges[bridgeKey sessionText callText] <-
+            bridges[key] <-
                 prepareDeferredBridge
                     durable
                     snapshots
@@ -735,6 +775,10 @@ module MagicTodoHostHooks =
         let bridges =
             Dictionary<string, Task<Result<MagicTodoMembrane.PreparedBridge, string>>>()
 
+        let sessionTails = Dictionary<string, Task>()
+        let completionTokens = Dictionary<string, TaskCompletionSource<unit>>()
+        let tailGate = obj ()
+
         let definition (input: obj) (output: obj) =
             if isTodoTool input "toolID" then
                 let sessionText = sessionTextOf input
@@ -744,13 +788,13 @@ module MagicTodoHostHooks =
         let before (input: obj) (output: obj) : Task<unit> =
             task {
                 if isTodoTool input "tool" then
-                    do! runBeforeTodo journal snapshot bridges input output
+                    do! runBeforeTodo journal snapshot bridges sessionTails completionTokens tailGate input output
             }
 
         let after (input: obj) (output: obj) : Task<unit> =
             task {
                 if isTodoTool input "tool" then
-                    do! runAfterTodo journal bridges input output
+                    do! runAfterTodo journal bridges completionTokens tailGate input output
             }
 
         { Definition = definition

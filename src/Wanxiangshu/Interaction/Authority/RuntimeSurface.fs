@@ -42,11 +42,6 @@ module RuntimeSurface =
         | Some role -> Ok role
         | None -> Error(sprintf "unknown role: %s" (text value))
 
-    let private tierResult (value: obj) : Result<AgentTier, string> =
-        match Roles.tryParseTier (text value) with
-        | Some tier -> Ok tier
-        | None -> Error(sprintf "unknown tier: %s" (text value))
-
     let private originResult (value: obj) : Result<PersonaOrigin, string> =
         match text value with
         | "ResolvedAtRoot" -> Ok PersonaOrigin.ResolvedAtRoot
@@ -60,20 +55,17 @@ module RuntimeSurface =
             roleResult value |> Result.map Some
 
     let private participantIdentityResult (value: obj) : Result<ParticipantIdentityEvidence, string> =
-        match identityRoleResult value?canonicalRole, tierResult value?selectedTier, originResult value?origin with
-        | Ok role, Ok tier, Ok origin ->
+        match identityRoleResult value?canonicalRole, originResult value?origin with
+        | Ok role, Ok origin ->
             { SelectedAgent = text value?selectedAgent
-              PeerAgent = text value?peerAgent
               Role = role
-              InitialTier = tier
               Persona = text value?persona
               PersonaCatalogVersion = unbox<int> value?personaCatalogVersion
               Origin = origin }
             |> ParticipantIdentity.fromInput
             |> Result.mapError (fun error -> sprintf "invalid participant identity: %A" error)
-        | Error error, _, _
-        | _, Error error, _
-        | _, _, Error error -> Error error
+        | Error error, _
+        | _, Error error -> Error error
 
     let private identitySeedResult (value: obj) : Result<PromptAuthority.IdentitySeed, string> =
         participantIdentityResult value?participantIdentity
@@ -139,7 +131,7 @@ module RuntimeSurface =
             {| selectedAgent = ParticipantIdentity.selectedAgent identity
                peerAgent = ParticipantIdentity.peerAgent identity
                canonicalRole = ParticipantIdentity.roleLabel identity
-               selectedTier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+               selectedTier = "deep"
                persona = ParticipantIdentity.persona identity
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
                origin =
@@ -569,8 +561,8 @@ module RuntimeSurface =
                         box
                             {| name = ParticipantIdentity.selectedAgent identity
                                role = Roles.roleLabel role
-                               tier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
-                               peer = ParticipantIdentity.peerAgent identity |}
+                               tier = "deep"
+                               peer = ParticipantIdentity.selectedAgent identity |}
                        error = null |}
             | None ->
                 box
@@ -579,15 +571,17 @@ module RuntimeSurface =
                        error =
                         box
                             {| kind = "UnknownManagedAgent"
-                               message = "Unknown tier or role. Use fast-* or deep-* ." |} |}
+                               message = sprintf "Unknown managed agent '%s'." agent |} |}
         | Error rejection ->
             let kind, message =
                 match rejection with
                 | ParticipantIdentityError.LegacyParticipantName name ->
                     "LegacyAgentName", ManagedAgentCatalog.formatLegacyNameNotSupported name
-                | ParticipantIdentityError.UnknownParticipantName _ ->
-                    "UnknownManagedAgent", "Unknown tier or role. Use fast-* or deep-* ."
-                | _ -> "Malformed", "Expected fast-ROLE or deep-ROLE."
+                | ParticipantIdentityError.UnknownParticipantName name ->
+                    "UnknownManagedAgent", sprintf "Unknown managed agent '%s'." name
+                | ParticipantIdentityError.MalformedParticipantName name ->
+                    "Malformed", sprintf "Malformed managed agent name '%s'." name
+                | _ -> "Malformed", sprintf "Malformed managed agent name '%s'." agent
 
             box
                 {| ok = false

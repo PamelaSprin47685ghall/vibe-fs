@@ -69,6 +69,10 @@ module ModelRouting =
 
     val initialize: unit -> Task
 
+    val internal lastPhysicalTarget: sessionId: string -> ModelRoutingTarget option
+    val internal markProviderFailed: provider: string -> unit
+    val internal hasTheoreticalCapacity: role: string -> bool
+
     val internal acquireExecutionAdmission:
         sessionId: SessionId ->
         physicalUserMessageId: PhysicalUserMessageId ->

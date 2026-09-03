@@ -54,7 +54,7 @@ type StrengthReplicaRuntime =
         decisionId: StrengthDecisionId *
         targetProviderRun: ProviderRunIdentity *
         budget: StrengthBudget *
-        fastAgent: string *
+        replicaAgent: string *
         localizedMirror: WireMessage list *
         mirrorSemanticDigest: string ->
             Task<Result<StrengthDryRunStart, string>>
@@ -64,7 +64,7 @@ type StrengthReplicaRuntime =
         decisionId: StrengthDecisionId *
         targetProviderRun: ProviderRunIdentity *
         budget: StrengthBudget *
-        fastAgent: string *
+        replicaAgent: string *
         localizedMirror: WireMessage list *
         mirrorSemanticDigest: string ->
             Task<Result<StrengthReplicaOutcome, string>>

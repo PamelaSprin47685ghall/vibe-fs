@@ -9,7 +9,7 @@ test('WHAT[CHGINT-006] EXEC_016_active_manager_jobs_are_outstanding_for_orchestr
   let jobs = change.createJob(change.empty(), {
     jobId: 'job_1',
     managerSessionId: 'ses_mgr',
-    managerAgent: 'fast-manager',
+    managerAgent: 'manager',
     byname: 'Road',
     worktreeIdentity: 'manager/job_1',
     worktreePath: '/tmp/wt',

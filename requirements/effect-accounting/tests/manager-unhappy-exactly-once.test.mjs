@@ -45,7 +45,7 @@ const linkedHandle = () => {
     op: 'link',
     handle: 'agent:h1',
     child: 'ses_child',
-    agent: 'fast-coder',
+    agent: 'coder',
     role: 'Coder',
   })
   assert.equal(linked.ok, true, linked.ok ? '' : JSON.stringify(linked.error))

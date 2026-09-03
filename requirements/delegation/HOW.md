@@ -57,7 +57,7 @@ Join 机制从所有者的完成信箱中按稳定排序逐项 CAS 消费可用�
 | DELEG-007 | `requirements/delegation/tests/delegation-structure-contract.test.mjs::WHAT[DELEG-007] sync_delegate_edges_are_the_allowed_dag_only` |
 | DELEG-008 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-008] SYNC_RUNTIME_provider_tool_call_collection_preserves_role_order` |
 | DELEG-009 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-009] SYNC_RUNTIME_same_reuse_scope_serializes_distinct_provider_runs_but_distinct_scopes_are_independent` |
-| DELEG-010 | `requirements/delegation/tests/sync-delegate.test.mjs::WHAT[DELEG-010] EXEC_026_agentNameFor_covers_fast_deep_times_inspector_coder` |
+| DELEG-010 | `requirements/delegation/tests/sync-delegate.test.mjs::WHAT[DELEG-010] EXEC_026_agentNameFor_returns_bare_inspector_coder` |
 | DELEG-011 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-011] SYNC_RUNTIME_ordinary_completion_settles_batch_without_return_channel` |
 | DELEG-012 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-012] SYNC_RUNTIME_first_provider_call_receives_canonical_record_and_sibling_receives_reference` |
 | DELEG-013 | `requirements/delegation/tests/join-completion.test.mjs::WHAT[DELEG-013] JOIN_COMPLETION_completed_is_rendered_as_entry_local_work_record` |

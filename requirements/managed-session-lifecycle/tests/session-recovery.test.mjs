@@ -10,7 +10,7 @@ test('WHAT[MANAGED-SESSION-003] session_recovery_contract_restart_reuses_matchin
   const observed = await SatelliteSurface.SatelliteSurface_scenario(true, true, false, false)
   assert.equal(observed.ok, true)
   assert.equal(observed.origin, 'Reused')
-  assert.deepEqual(observed.linked, [['work', 'blogger-1', 'fast-blogger']])
+  assert.deepEqual(observed.linked, [['work', 'blogger-1', 'blogger']])
 })
 
 test('WHAT[MANAGED-SESSION-003] session_recovery_contract_conflict_fails_closed_without_guessing', async () => {
@@ -28,7 +28,7 @@ test('WHAT[MANAGED-SESSION-013] session_recovery_contract_reenlist_filters_hidde
   const parent = 'ses_parent'
   
   // Link durable public child
-  const r1 = HandleSurface.apply(state, { op: 'link', handle: 'agent:coder', child: 'ses_child_1', agent: 'fast-coder', role: 'Coder', ownership: 'DurableParentHandle' })
+  const r1 = HandleSurface.apply(state, { op: 'link', handle: 'agent:coder', child: 'ses_child_1', agent: 'coder', role: 'Coder', ownership: 'DurableParentHandle' })
   state = r1.state
 
   // Link host-owned hidden child (e.g. distiller / reviewer)
@@ -76,9 +76,9 @@ test('WHAT[MANAGED-SESSION-013] session_recovery_contract_authorizes_family_with
 })
 
 test('WHAT[MANAGED-SESSION-001] session_recovery_contract_attached_runtime_single_owner_pure_evidence', async () => {
-  const result = await AttachmentSurface.scenario('owner_1', 'Inspector', 'deep-inspector', 'fast-inspector', true)
+  const result = await AttachmentSurface.scenario('owner_1', 'Inspector', 'inspector', 'inspector', true)
   assert.equal(result.created, 1)
   assert.equal(result.firstChild, 'child-1')
   assert.equal(result.secondChild, 'child-1')
-  assert.equal(result.firstAgent, 'deep-inspector')
+  assert.equal(result.firstAgent, 'inspector')
 })

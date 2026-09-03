@@ -10,7 +10,6 @@ type AgentVisibility =
 type ManagedAgent =
     { Name: string
       Role: Role
-      Tier: AgentTier
       Visibility: AgentVisibility }
 
 [<RequireQualifiedAccess>]
@@ -21,10 +20,9 @@ type ManagedAgentParseError =
 
 module ManagedAgent =
     val roleName: (Role -> string)
-    val tierName: (AgentTier -> string)
-    val nameOf: (AgentTier -> Role -> string)
+    val nameOf: (Role -> string)
     val visibilityOf: role: Role -> AgentVisibility
-    val make: tier: AgentTier -> role: Role -> ManagedAgent
+    val make: role: Role -> ManagedAgent
     val allPublicRoles: Role list
     val allInternalRoles: Role list
     val allRoles: Role list

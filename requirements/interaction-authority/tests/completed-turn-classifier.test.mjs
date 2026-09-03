@@ -110,7 +110,7 @@ test('WHAT[INTERACTION-AUTHORITY-004] RECON_repair_role_table_respects_host_tool
 
 test('WHAT[INTERACTION-AUTHORITY-004] RECON_roleOfAgent_prefers_managed_agent_then_fallback', () => {
   assert.equal(turns.roleOfAgent(undefined, 'coder'), 'coder')
-  assert.equal(turns.roleOfAgent('deep-coder', 'reviewer'), 'coder')
+  assert.equal(turns.roleOfAgent('coder', 'reviewer'), 'coder')
   assert.equal(turns.roleOfAgent('not-a-managed-agent', 'reviewer'), 'reviewer')
   assert.equal(turns.roleOfAgent('not-a-managed-agent', undefined), '')
 })
@@ -123,7 +123,7 @@ test('WHAT[INTERACTION-AUTHORITY-004] RECON_buildTurn_returns_plain_identity_and
     {
       id: 'asst-9',
       role: 'assistant',
-      agent: 'fast-reviewer',
+      agent: 'reviewer',
       finish: 'stop',
       completed: true,
       parts: [text('LGTM'), reasoning('checked twice')],

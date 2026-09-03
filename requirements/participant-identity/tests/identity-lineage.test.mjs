@@ -27,7 +27,7 @@ const rootSelection = (agent) => {
 const rootProfile = (
   session = 'ses_owner',
   physical = 'msg_owner_root',
-  agent = 'fast-manager',
+  agent = 'manager',
 ) => {
   const result = authority.createAuthorityRoot(
     H,
@@ -47,9 +47,9 @@ const inheritedSeed = (child, owner) => {
   return result.value
 }
 
-test('WHAT[PID-010] inherited identity records the exact durable owner witness', () => {
+test('WHAT[PID-008] inherited identity records the exact durable owner witness', () => {
   const owner = rootProfile()
-  const seed = inheritedSeed('deep-coder', owner)
+  const seed = inheritedSeed('coder', owner)
 
   assert.deepEqual(
     {
@@ -75,7 +75,7 @@ test('WHAT[PID-010] inherited identity records the exact durable owner witness',
       origin: seed.participantIdentity.origin,
     },
     {
-      selectedAgent: 'deep-coder',
+      selectedAgent: 'coder',
       canonicalRole: 'coder',
       selectedTier: 'deep',
       persona: owner.participantIdentity.persona,
@@ -85,8 +85,8 @@ test('WHAT[PID-010] inherited identity records the exact durable owner witness',
   )
 })
 
-test('WHAT[PID-010] rejects stale owner identity evidence', () => {
-  const seed = inheritedSeed('fast-inspector', rootProfile())
+test('WHAT[PID-008] rejects stale owner identity evidence', () => {
+  const seed = inheritedSeed('inspector', rootProfile())
   const currentOwnerRun = rootProfile('ses_owner', 'msg_fresh_owner_root')
 
   const validation = authority.validateInheritedIdentitySeed(currentOwnerRun, seed)
@@ -99,9 +99,9 @@ test('WHAT[PID-010] rejects stale owner identity evidence', () => {
   })
 })
 
-test('WHAT[PID-010] closed owner run rejects its inherited identity evidence', () => {
+test('WHAT[PID-008] closed owner run rejects its inherited identity evidence', () => {
   const owner = rootProfile()
-  const seed = inheritedSeed('fast-inspector', owner)
+  const seed = inheritedSeed('inspector', owner)
 
   const validation = authority.validateInheritedIdentitySeedAgainstActiveOwner(null, seed)
 
@@ -113,7 +113,7 @@ test('WHAT[PID-010] closed owner run rejects its inherited identity evidence', (
   })
 })
 
-test('WHAT[PID-010] derived identity rejects root-selection evidence', () => {
+test('WHAT[PID-008] derived identity rejects root-selection evidence', () => {
   const owner = rootProfile()
 
   const validation = authority.validateInheritedIdentitySeed(owner, owner.identitySeed)
@@ -126,9 +126,9 @@ test('WHAT[PID-010] derived identity rejects root-selection evidence', () => {
   })
 })
 
-test('WHAT[PID-010] inherited identity rejects a different owner session', () => {
+test('WHAT[PID-008] inherited identity rejects a different owner session', () => {
   const owner = rootProfile()
-  const seed = inheritedSeed('fast-inspector', owner)
+  const seed = inheritedSeed('inspector', owner)
   const wrongOwner = { ...owner, session: 'ses_different_owner' }
 
   const validation = authority.validateInheritedIdentitySeed(wrongOwner, seed)
@@ -141,9 +141,9 @@ test('WHAT[PID-010] inherited identity rejects a different owner session', () =>
   })
 })
 
-test('WHAT[PID-010] inherited identity rejects a different authority root', () => {
+test('WHAT[PID-008] inherited identity rejects a different authority root', () => {
   const owner = rootProfile()
-  const seed = inheritedSeed('fast-inspector', owner)
+  const seed = inheritedSeed('inspector', owner)
   const wrongRoot = { ...owner, authorityRoot: 'msg_different_root' }
 
   const validation = authority.validateInheritedIdentitySeed(wrongRoot, seed)
@@ -156,9 +156,9 @@ test('WHAT[PID-010] inherited identity rejects a different authority root', () =
   })
 })
 
-test('WHAT[PID-010] durable inherited seed round-trips without re-resolution', () => {
+test('WHAT[PID-008] durable inherited seed round-trips without re-resolution', () => {
   const owner = rootProfile()
-  const seed = inheritedSeed('deep-reviewer', owner)
+  const seed = inheritedSeed('reviewer', owner)
   const claimed = authority.claimAgentOwnerRoot('pk_child', 'ses_child', 'digest-child', seed)
   assert.equal(claimed.ok, true, claimed.ok ? '' : claimed.error)
 

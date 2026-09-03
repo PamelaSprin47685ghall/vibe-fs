@@ -14,8 +14,8 @@ test('WHAT[HOST-BOUNDARY-017] HOST_CTX_roleOf_rejects_absent_and_blank_agents', 
 })
 
 test('WHAT[HOST-BOUNDARY-017] HOST_CTX_roleOf_resolves_managed_identity_and_rejects_aliases', () => {
-  assert.equal(labelOf(roleOf('fast-coder')), 'coder')
-  assert.equal(labelOf(roleOf('deep-reviewer')), 'reviewer')
+  assert.equal(labelOf(roleOf('coder')), 'coder')
+  assert.equal(labelOf(roleOf('reviewer')), 'reviewer')
   assert.equal(roleOf('build'), undefined)
   assert.equal(roleOf('plan'), undefined)
 })
@@ -37,6 +37,6 @@ test('WHAT[HOST-BOUNDARY-017] HOST_CTX_read_accepts_a_bare_message_without_event
 })
 
 test('WHAT[HOST-BOUNDARY-017] HOST_CTX_read_extracts_the_agent_only_from_properties_info', () => {
-  assert.deepEqual(read({ event: { properties: { sessionID: 'ses_a', info: { agent: 'fast-manager' } } } }), ['ses_a', 'fast-manager'])
-  assert.deepEqual(read({ event: { sessionID: 'ses_a', agent: 'fast-manager' } }), ['ses_a', undefined])
+  assert.deepEqual(read({ event: { properties: { sessionID: 'ses_a', info: { agent: 'manager' } } } }), ['ses_a', 'manager'])
+  assert.deepEqual(read({ event: { sessionID: 'ses_a', agent: 'manager' } }), ['ses_a', undefined])
 })

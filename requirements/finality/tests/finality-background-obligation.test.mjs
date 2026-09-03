@@ -14,7 +14,7 @@ const handleLinked = (ownership = 'durable-parent-handle') => ({
   sessionId: MANAGER,
   childSessionId: 'ses_child',
   handleId: 'h1',
-  targetAgent: 'fast-coder',
+  targetAgent: 'coder',
   byname: 'finality-background-child',
   role: 'coder',
   ownership,

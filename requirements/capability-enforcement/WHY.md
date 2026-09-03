@@ -14,7 +14,7 @@ Gate 有、Schema 无   ──► 产生安全隐患：模型虽不可见但可�
 `capability-enforcement` 的核心不变量：
 - **同源派生**：Schema 呈现与 Runtime Gate 必须从唯一的 `Roles.permissions` 权威推导，严禁维护第二份映射矩阵。
 - **投影只收窄不扩大**：基于请求类型（RequestKind）的投影可以根据上下文收窄能力，但绝不得突破 Office 的固有权能上限。
-- **档位等权**：同一 Office 的 fast 档与 deep 档拥有完全相同的工具权限。
+- **档位等权**：同一 `CanonicalRole` 的工具权限与执行档位无关 (single-version，无 `fast-`/`deep-` 前缀)。
 - **内部工具隔离**：运行时合成的内部角色工具（如 Blogger 的 `chronicle`、Bookkeeper 的 `js-bookkeeper`）绝不进入未受托角色的工具面。
 - **四层同构**：面向编程的 `js-*` 工具在类型方法、描述文案、示例代码与运行时门禁四层保持严格同构。
 - **双层 Fail-Closed**：角色未决时拒绝一切执行；Host 配置异常时优先落地 deny 默认并安全终止进程。

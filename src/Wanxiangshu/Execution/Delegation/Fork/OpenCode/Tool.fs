@@ -181,17 +181,14 @@ module ForkTool =
     let private successInstruction (text: string) =
         ToolHostCodec.tomlObjectWithInstructions [ text ] []
 
-    let private personaBinding (role: Role) (tier: AgentTier) =
-        PersonaCatalog.persona role tier, ManagedAgent.make tier role
+    let private personaBinding (role: Role) =
+        PersonaCatalog.persona role, ManagedAgent.make role
 
     let private managerCallingBindings =
         [ for role in ManagedAgentCatalog.managerForkableRoles do
-              yield personaBinding role AgentTier.Fast
-              yield personaBinding role AgentTier.Deep ]
+              yield personaBinding role ]
 
-    let private orchestratorCallingBindings =
-        [ personaBinding Role.Manager AgentTier.Fast
-          personaBinding Role.Manager AgentTier.Deep ]
+    let private orchestratorCallingBindings = [ personaBinding Role.Manager ]
 
     let private callingNames bindings =
         bindings |> List.map (fst >> ManagedAgentCatalog.personaCallingName)

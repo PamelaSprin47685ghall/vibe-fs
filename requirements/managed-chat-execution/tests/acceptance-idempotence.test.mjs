@@ -26,17 +26,17 @@ const evidence = (overrides = {}) => ({
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: 'fast-coder',
-      peerAgent: 'deep-coder',
+      selectedAgent: 'coder',
+      peerAgent: 'coder',
       canonicalRole: 'coder',
-      selectedTier: 'fast',
+      selectedTier: 'deep',
       persona: 'Coder',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
     },
   },
   origin: 'HumanRoot',
-  effectiveAgent: 'fast-coder',
+  effectiveAgent: 'coder',
   ...overrides,
 })
 
@@ -68,11 +68,11 @@ const rootIdentity = {
   ownerLogicalRun: null,
   ownerAuthorityRoot: null,
   participantIdentity: {
-    selectedAgent: 'fast-manager',
-    peerAgent: 'deep-manager',
+    selectedAgent: 'manager',
+    peerAgent: 'manager',
     canonicalRole: 'manager',
-    selectedTier: 'fast',
-    persona: 'Coordinator',
+    selectedTier: 'deep',
+    persona: 'Lead',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
   },
@@ -89,7 +89,7 @@ test('WHAT[CHATEXEC-011] external and plugin roots share AcceptManagedChatIntent
       handle,
       'ses-external',
       'msg-external',
-      'fast-manager',
+      'manager',
     )
     assert.equal(external.ok, true, external.error)
     assert.equal(external.origin, 'HumanRoot')
@@ -102,7 +102,7 @@ test('WHAT[CHATEXEC-011] external and plugin roots share AcceptManagedChatIntent
     )
     assert.equal(owner.ok, true, owner.error)
 
-    const inherited = authority.issueInheritedIdentitySeed('fast-coder', owner.profile)
+    const inherited = authority.issueInheritedIdentitySeed('coder', owner.profile)
     assert.equal(inherited.ok, true, inherited.error)
 
     const sent = await dispatch.sendAgentOwnerRoot(
@@ -119,7 +119,7 @@ test('WHAT[CHATEXEC-011] external and plugin roots share AcceptManagedChatIntent
       'ses-plugin',
       'msg-plugin',
       sent.key,
-      'fast-coder',
+      'coder',
     )
     assert.equal(plugin.ok, true, plugin.error)
     assert.equal(plugin.origin, 'AgentOwnerRoot')
@@ -150,7 +150,7 @@ test('WHAT[CHATEXEC-004] exact duplicate reconstructs an equivalent witness with
 test('WHAT[CHATEXEC-004] established evidence conflict is typed and appends nothing', async () => {
   const result = await chatExecution.acceptanceConflictScenario(
     evidence(),
-    evidence({ effectiveAgent: 'deep-coder' }),
+    evidence({ logicalRunId: 'run-other' }),
   )
 
   assert.equal(result.ok, false)

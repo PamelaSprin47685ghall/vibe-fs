@@ -12,7 +12,7 @@
 [K0 / Shadow / 熔断]: 不启动投机，直接执行主请求
 [DryRun]: 异步启动真实 Replica 子会话，记录审计日志，主路径立即无等待继续
 [Treatment (K1/K2)]:
-  启动短生命周期 Replica (fast peer + 只读工具约束)
+  启动短生命周期 Replica (predictor 便宜模型 + 只读工具约束)
   ↓
   批量收割只读 call/result → 校验完整配对与字节上限
   ↓

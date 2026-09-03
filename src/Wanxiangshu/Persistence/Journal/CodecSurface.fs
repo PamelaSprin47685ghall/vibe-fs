@@ -35,10 +35,6 @@ module JournalCodecSurface =
         Roles.tryParseRole (text value)
         |> Option.defaultWith (fun () -> failwith $"JournalCodecSurface: unknown role '{text value}'")
 
-    let private tierOf (value: obj) =
-        Roles.tryParseTier (text value)
-        |> Option.defaultWith (fun () -> failwith $"JournalCodecSurface: unknown tier '{text value}'")
-
     let private originOf (value: obj) =
         match text value with
         | "ResolvedAtRoot" -> PersonaOrigin.ResolvedAtRoot
@@ -47,13 +43,11 @@ module JournalCodecSurface =
 
     let private identityInputOfJs (value: obj) =
         { SelectedAgent = text (value?selectedAgent)
-          PeerAgent = text (value?peerAgent)
           Role =
             if text (value?canonicalRole) = "bookkeeper" then
                 None
             else
                 Some(roleOf (value?canonicalRole))
-          InitialTier = tierOf (value?selectedTier)
           Persona = text (value?persona)
           PersonaCatalogVersion = unbox<int> (value?personaCatalogVersion)
           Origin = originOf (value?origin) }
@@ -78,7 +72,7 @@ module JournalCodecSurface =
             {| selectedAgent = ParticipantIdentity.selectedAgent evidence
                peerAgent = ParticipantIdentity.peerAgent evidence
                canonicalRole = ParticipantIdentity.roleLabel evidence
-               selectedTier = ParticipantIdentity.initialTier evidence |> Roles.wireTierLabel
+               selectedTier = "deep"
                persona = ParticipantIdentity.persona evidence
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion evidence
                origin =

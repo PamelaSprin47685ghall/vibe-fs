@@ -54,7 +54,7 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.OpenCode
 
 /// Existing-child send must use the session's bound managed agent.
-/// Never invent `fast-ROLE` from CanonicalRole; never let the caller overwrite Deep with Fast.
+/// Never invent a managed name from CanonicalRole; never let the caller overwrite the bound agent.
 module HostForkBinding =
     let private tryName (value: string) =
         if String.IsNullOrWhiteSpace value then
@@ -713,8 +713,8 @@ module HostForkAgent =
             HostForkBinding.managedAgent this.Journal childId
 
         /// PROMPT-008: `agent` is the managed agent name the caller selected, and
-        /// it is required. Defaulting it to `fast-ROLE` invented a tier, and the
-        /// invented name then travelled to the Host send boundary as if chosen.
+        /// it is required. It is never defaulted, and the selected name travels to the
+        /// Host send boundary as chosen.
         ///
         /// `renderedPrompt` (PENDING 7): the caller already rendered the first-prompt
         /// ARCH-010 payload and wants it sent verbatim instead of the Host's own relay

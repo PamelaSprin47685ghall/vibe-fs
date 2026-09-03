@@ -17,8 +17,8 @@ test('WHAT[ENF-010] BASHHONEY_spec_is_parameterless_and_named_bash_honeypot', ()
 
 test('WHAT[ENF-010] BASHHONEY_execute_returns_hard_denial_and_runs_nothing', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'ses-honey', 'fast-coder')
-    const result = await hooks.tool['bash-honeypot'].execute({}, { sessionID: 'ses-honey', agent: 'fast-coder' })
+    await acceptAuthorityRoot(runtime, 'ses-honey', 'coder')
+    const result = await hooks.tool['bash-honeypot'].execute({}, { sessionID: 'ses-honey', agent: 'coder' })
     assert.doesNotMatch(result, /\berror\s*=/)
     assert.match(result, /DENIED/)
     assert.match(result, /unauthorized privilege-escalation|未经授权的提权/i)

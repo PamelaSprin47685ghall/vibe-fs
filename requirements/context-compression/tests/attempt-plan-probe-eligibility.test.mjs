@@ -69,12 +69,17 @@ test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_an_armed_work_main_carries_the_probe
   assert.equal(plan.noProbeReason, null)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_invalid_role_tier_and_kind_fail_closed', () => {
-  for (const input of [{ role: 'unknown' }, { tier: 'unknown' }, { kind: 'unknown' }]) {
+test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_invalid_role_and_kind_fail_closed', () => {
+  // CompressionSurface.attemptPlanCore validates only role+kind; tier was dropped
+  // from the surface (participantIdentityToJs pins selectedTier:"deep"), so a
+  // stray tier field is ignored rather than rejected.
+  for (const input of [{ role: 'unknown' }, { kind: 'unknown' }]) {
     const result = planner.attemptPlan(input)
     assert.equal(result.ok, false)
-    assert.match(result.error, /unknown (role|tier|request kind)/)
+    assert.match(result.error, /unknown (role|request kind)/)
   }
+  const tierIgnored = planner.attemptPlan({ tier: 'unknown' })
+  assert.equal(tierIgnored.choice, 'UseCommittedEpoch')
 })
 
 test('WHAT[CONTEXT-COMPRESSION-009] CTX_011_a_refused_candidate_falls_back_to_the_committed_epoch_with_a_reason', () => {

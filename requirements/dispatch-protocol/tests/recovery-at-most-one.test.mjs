@@ -39,11 +39,11 @@ const inheritedIdentity = {
   ownerLogicalRun: null,
   ownerAuthorityRoot: null,
   participantIdentity: {
-    selectedAgent: 'fast-manager',
-    peerAgent: 'deep-manager',
+    selectedAgent: 'manager',
+    peerAgent: 'manager',
     canonicalRole: 'manager',
-    selectedTier: 'fast',
-    persona: 'Coordinator',
+    selectedTier: 'deep',
+    persona: 'Lead',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
   },
@@ -58,7 +58,7 @@ const sendAgentOwnerRoot = async (port, handle, session, text) => {
     inheritedIdentity,
   )
   assert.equal(owner.ok, true, owner.ok ? '' : owner.error)
-  const seed = authority.issueInheritedIdentitySeed('fast-coder', owner.profile)
+  const seed = authority.issueInheritedIdentitySeed('coder', owner.profile)
   assert.equal(seed.ok, true, seed.ok ? '' : seed.error)
   return dispatch.sendAgentOwnerRoot(port, handle, session, text, seed.value)
 }

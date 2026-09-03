@@ -60,7 +60,7 @@ const compiled = (source) => {
 };
 
 /** A runtime over a source that must load, with `lane` bound. */
-const runtimeOf = (source, lane = 'fast-coder') => {
+const runtimeOf = (source, lane = 'coder') => {
   const runtime = new ScenarioRuntime(compiled(source));
   runtime.bindAlias(lane, SESSION);
   return runtime;
@@ -89,7 +89,7 @@ prompt = { text = "Ship the parser fix." }
 
 [[turn]]
 id = "mgr"
-lane = "fast-coder"
+lane = "coder"
 user = "Ship the parser fix."
 
   [[turn.step]]
@@ -195,7 +195,7 @@ prompt = { text = "Ship the parser fix." }
 
 [[turn]]
 id = "left"
-lane = "fast-coder"
+lane = "coder"
 user = "Ship the parser fix."
 
   [[turn.step]]
@@ -203,7 +203,7 @@ user = "Ship the parser fix."
 
 [[turn]]
 id = "right"
-lane = "fast-coder"
+lane = "coder"
 user = "Ship the parser fix."
 
   [[turn.step]]
@@ -243,7 +243,7 @@ flow = [ { prompt = { text = "yz" } } ]
 
 [[turn]]
 id = "left"
-lane = "fast-coder"
+lane = "coder"
 user = ["HEAD", "xy"]
 
   [[turn.step]]
@@ -251,7 +251,7 @@ user = ["HEAD", "xy"]
 
 [[turn]]
 id = "right"
-lane = "fast-coder"
+lane = "coder"
 user = ["HEAD", "yz"]
 
   [[turn.step]]

@@ -9,7 +9,7 @@ const change = await import('../../../dist/Change/Surface.js')
 const job = (id, path = `/tmp/${id}`) => ({
   jobId: id,
   managerSessionId: `ses-${id}`,
-  managerAgent: 'fast-manager',
+  managerAgent: 'manager',
   byname: id,
   worktreeIdentity: `manager/${id}`,
   worktreePath: path,

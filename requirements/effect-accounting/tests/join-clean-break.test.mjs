@@ -8,9 +8,9 @@ import * as handles from '../../../dist/Execution/Delegation/Handle/Surface.js'
 const legacy = () => clean.legacyBody('run-legacy-abort')
 
 test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_agent_join_wire_never_renders_aborted', () => {
-  const wire = clean.joinWire('fast-coder', 'host abort was observation, not finality')
+  const wire = clean.joinWire('coder', 'host abort was observation, not finality')
   assert.ok(!wire.includes('status = "aborted"'))
-  assert.match(wire, /# fast-coder could not complete the charge\./)
+  assert.match(wire, /# coder could not complete the charge\./)
   assert.match(wire, /host abort was observation, not finality/)
   assert.ok(!/\bstatus\s*=/.test(wire))
 })
@@ -49,7 +49,7 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_retired_legacy_abort_refuses_wi
 })
 
 test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_retired_legacy_abort_never_surfaces_aborted', () => {
-  const wire = join.renderBatch('english', [{ kind: 'abandoned', agentId: 'a1', agentName: 'fast-coder', reason: 'legacy abort' }])
+  const wire = join.renderBatch('english', [{ kind: 'abandoned', agentId: 'a1', agentName: 'coder', reason: 'legacy abort' }])
   assert.ok(!wire.includes('aborted'))
   assert.ok(!wire.includes('status ='))
 })

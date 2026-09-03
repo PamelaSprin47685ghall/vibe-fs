@@ -14,4 +14,4 @@
 
 义务仍欠时保留它；只有工作已真正解除，或一个 coverage-preserving refinement 已经用更精确的 obligations 完整承接它仍剩下的全部后果时，才移除旧 obligation。“continue later”“next session”、整洁 checkpoint、经过时间或良好 handoff 都不是 discharge。非空 account 中，`workingOn` 精确命名当前实际正在推进的 obligation；优先把 active focus 细化为可直接闭环的 `near`，但 `mid` 或 `far` 焦点或暂时没有 `near` 的 account 仍可正常记账，process review 再评价其规划分辨率。实际焦点切换时立即更新 `workingOn`。空 account 使用 `workingOn=""`。每一次 accepted call 都立即成为当前 account 的投影。后续记账可以记录新的后果，但不能把已经 accepted 的 account 回滚掉，也不能 supersede 原始 authority。
 
-同一 assistant message 中不得发出多个 todowrite；这种 batch 会整体被拒绝。
+同一 assistant message 中的多个 todowrite 按顺序依次执行：每次 accepted 的账目 supersede 当前账目，后一次调用在其之上继续更新。

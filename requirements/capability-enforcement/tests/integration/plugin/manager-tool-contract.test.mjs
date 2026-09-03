@@ -14,7 +14,6 @@ import {
   acceptAuthorityRoot,
   withExecutablePlugin,
   withPlugin,
-  withPluginClient,
 } from '../../../../verification-system/tests/support/plugin-fixture.mjs'
 
 const TOOL_NAMES = [
@@ -64,27 +63,9 @@ const withSession = (messages, sessionID = 'ses-capability-manager') =>
     },
   }))
 
-const admitManagedRoot = async (
-  hooks,
-  sessionID = 'ses-capability-manager',
-  physicalMessageID = `root-${sessionID}`,
-) => {
-  const output = {
-    message: {
-      id: physicalMessageID,
-      role: 'user',
-      sessionID,
-      agent: 'fast-manager',
-      model: { providerID: 'host', modelID: 'placeholder' },
-    },
-    parts: [],
-  }
-  await hooks['chat.message']({ sessionID, agent: 'fast-manager' }, output)
-}
-
 const fullConfig = () => ({
   agent: Object.fromEntries(
-    ROLE_NAMES.flatMap((role) => [`fast-${role}`, `deep-${role}`]).map((name) => [name, {}]),
+    ROLE_NAMES.map((role) => [role, {}]),
   ),
 })
 
@@ -129,48 +110,48 @@ test('WHAT[ENF-010] MANAGER_host_schemas_are_present_for_every_declared_argument
 
 test('WHAT[ENF-010] ASSUME_updates_then_queries_one_persistent_jq_canvas_in_one_call', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'manager-assume', 'fast-manager')
+    await acceptAuthorityRoot(runtime, 'manager-assume', 'manager')
 
     const first = await hooks.tool.assume.execute(
       {
         update: '{ideas:["compressed memory","random access"]}',
         query: '.ideas | map(select(test("memory")))',
       },
-      { sessionID: 'manager-assume', agent: 'fast-manager' },
+      { sessionID: 'manager-assume', agent: 'manager' },
     )
     const second = await hooks.tool.assume.execute(
       { update: '.', query: '.ideas[1]' },
-      { sessionID: 'manager-assume', agent: 'fast-manager' },
+      { sessionID: 'manager-assume', agent: 'manager' },
     )
     const scalar = await hooks.tool.assume.execute(
       { update: '"hello"', query: '.' },
-      { sessionID: 'manager-assume', agent: 'fast-manager' },
+      { sessionID: 'manager-assume', agent: 'manager' },
     )
     const scalarRead = await hooks.tool.assume.execute(
       { update: '.', query: '.' },
-      { sessionID: 'manager-assume', agent: 'fast-manager' },
+      { sessionID: 'manager-assume', agent: 'manager' },
     )
     await assert.rejects(
       hooks.tool.assume.execute(
         { update: '{committed:true}', query: 'error("query failed")' },
-        { sessionID: 'manager-assume', agent: 'fast-manager' },
+        { sessionID: 'manager-assume', agent: 'manager' },
       ),
       /assume query failed after update committed/,
     )
     const afterQueryFailure = await hooks.tool.assume.execute(
       { update: '.', query: '.committed' },
-      { sessionID: 'manager-assume', agent: 'fast-manager' },
+      { sessionID: 'manager-assume', agent: 'manager' },
     )
     await assert.rejects(
       hooks.tool.assume.execute(
         { update: 'empty', query: '.' },
-        { sessionID: 'manager-assume', agent: 'fast-manager' },
+        { sessionID: 'manager-assume', agent: 'manager' },
       ),
       /assume update must produce exactly one JSON value/,
     )
     const afterRejectedUpdate = await hooks.tool.assume.execute(
       { update: '.', query: '.committed' },
-      { sessionID: 'manager-assume', agent: 'fast-manager' },
+      { sessionID: 'manager-assume', agent: 'manager' },
     )
 
     assert.match(first, /compressed memory/)
@@ -187,14 +168,19 @@ test('WHAT[ENF-010] ASSUME_updates_then_queries_one_persistent_jq_canvas_in_one_
 test('WHAT[ENF-010] MANAGER_calling_enum_uses_personas_while_name_remains_a_free_byname', async () => {
   await withPlugin(async (hooks) => {
     const managerPersonas = [
-      'coder', 'engineer', 'scout', 'investigator', 'technician',
-      'operator', 'navigator', 'researcher', 'analyst', 'inquirer',
+      'coder', 'investigator', 'operator', 'researcher', 'analyst',
     ]
     for (const calling of managerPersonas) {
       assert.equal(hooks.tool.fork.args.calling.safeParse(calling).success, true, `fork.calling=${calling}`)
     }
-    for (const calling of ['coordinator', 'lead']) {
+    for (const calling of ['navigator', 'engineer', 'coordinator', 'lead', 'director']) {
+      assert.equal(hooks.tool.fork.args.calling.safeParse(calling).success, false, `fork rejects ${calling}`)
+    }
+    for (const calling of ['lead']) {
       assert.equal(hooks.tool.commission.args.calling.safeParse(calling).success, true, `commission.calling=${calling}`)
+    }
+    for (const calling of ['coordinator', 'director', 'coder', 'navigator']) {
+      assert.equal(hooks.tool.commission.args.calling.safeParse(calling).success, false, `commission rejects ${calling}`)
     }
     for (const managedName of ['fast-coder', 'deep-coder', 'fast-manager', 'deep-manager']) {
       assert.equal(hooks.tool.fork.args.calling.safeParse(managedName).success, false, `fork rejects ${managedName}`)
@@ -211,14 +197,14 @@ test('WHAT[ENF-011] MANAGER_config_projects_owned_permissions_with_default_deny'
     hooks.config(config)
     assert.equal(config.compaction.auto, false)
     for (const role of ROLE_NAMES) {
-      const permission = config.agent[`fast-${role}`].permission
+      const permission = config.agent[role].permission
       for (const toolName of TOOL_NAMES) {
         const expected = ALLOWED[role].includes(toolName) ? 'allow' : 'deny'
         const key = toolName === 'stealth-browser-mcp' ? 'stealth-browser-mcp_*' : toolName === 'sphinx' ? 'sphinx_*' : toolName
         assert.equal(permission[key], expected, `${role}.${key}`)
       }
       assert.equal(permission.external_directory, 'allow', `${role}.external_directory`)
-      assert.equal(config.agent[`fast-${role}`].model, undefined)
+      assert.equal(config.agent[role].model, undefined)
     }
   })
 })
@@ -232,65 +218,48 @@ test('WHAT[ENF-001] MANAGER_role_permission_matrix_is_owned_by_RolesSurface', ()
   }
 })
 
-test('WHAT[ENF-006] MANAGER_pair_marker_borrows_host_skill_with_empty_name_and_keeps_canonical_text', async () => {
+test('WHAT[ENF-006] MANAGER_pair_guidance_rides_cursor_suffix_without_synthetic_skill_row', async () => {
   assert.equal(markerToolName, 'skill')
   assert.equal(typeof markerSource, 'string')
-  const client = {
-    session: {
-      abort: async () => ({ data: {} }),
-      children: async () => ({ data: [] }),
-      create: async () => ({ data: { id: 'host-child-capability-contract' } }),
-      delete: async () => ({ data: {} }),
-      get: async (args) => ({ data: { id: args?.path?.id, parentID: null } }),
-      messages: async () => ({ data: [] }),
-      promptAsync: async () => ({ data: {} }),
-    },
-  }
-  await withPluginClient(client, async (hooks) => {
-    await admitManagedRoot(hooks, 'ses-capability-manager', 'steer-ses-capability-manager')
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    await acceptAuthorityRoot(runtime, 'ses-capability-manager', 'manager')
     assert.equal(hooks.tool.skill, undefined, 'skill remains Host-owned')
+    assert.equal(hooks.tool['auto-injected'], undefined, 'legacy auto-injected must not be plugin-registered')
     const transformed = {
       messages: withSession([
         { role: 'user', info: { id: 'root-ses-capability-manager' }, parts: [{ type: 'text', text: 'start' }] },
-        { role: 'assistant', info: { id: 'assistant-ses-capability-manager' }, parts: [{ type: 'text', text: 'ready' }] },
-        { role: 'user', info: { id: 'steer-ses-capability-manager' }, parts: [{ type: 'text', text: 'continue' }] },
+        { role: 'assistant', info: { id: 'c1' }, parts: [{ type: 'tool', tool: 'read', callID: 't1', state: { status: 'pending', input: {}, time: { start: 0 } } }] },
+        { role: 'assistant', info: { id: 'r1' }, parts: [{ type: 'tool', tool: 'read', callID: 't1', state: { status: 'completed', input: {}, output: 'ok1', time: { start: 0, end: 0 } } }] },
       ]),
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)
-    const marker = transformed.messages.find((message) => message.info?.source === markerSource)
-    assert.ok(marker, 'transform injects the internal pair marker')
-    assert.equal(marker.info?.synthetic, true)
-    assert.equal(marker.parts?.length, 1)
-    assert.equal(marker.parts?.[0]?.type, 'tool')
-    assert.equal(marker.parts?.[0]?.tool, markerToolName)
-    assert.deepEqual(marker.parts?.[0]?.state?.input, { name: '' })
-    assert.equal(marker.parts?.[0]?.state?.status, 'completed')
-    const markerOutput = marker.parts?.[0]?.state?.output ?? ''
-    assert.match(markerOutput, /^# /)
-    assert.doesNotMatch(markerOutput, /<skill_content|<\/skill_content>/)
-    assert.equal(markerOutput.split('\n').filter(Boolean).every((line) => line.startsWith('#')), true)
-    assert.match(markerOutput, /todowrite/i)
-    assert.match(markerOutput, /ready frontier/i)
-    assert.equal(hooks.tool[markerToolName], undefined, 'wire marker borrows the Host-owned skill name without plugin registration')
+    const synthetic = transformed.messages.find((message) => message.info?.source === markerSource)
+    assert.equal(synthetic, undefined, 'zero-synthetic mode must not inject a synthetic skill row')
+    const terminal = transformed.messages.find((message) => message.info?.id === 'r1')
+    assert.ok(terminal, 'terminal real tool result survives the transform')
+    const output = terminal.parts?.[0]?.state?.output ?? ''
+    assert.ok(output.startsWith('ok1\0\uFEFF'), 'guidance travels as NUL+BOM suffix on the terminal real tool result')
+    assert.match(output, /#/, 'suffix carries guidance bytes')
+    assert.equal(hooks.tool[markerToolName], undefined, 'cursor suffix borrows no plugin-registered skill name')
   })
 })
 
 test('WHAT[ENF-010] MANAGER_legacy_agent_configuration_is_rejected_after_owned_projection', async () => {
   await withPlugin(async (hooks) => {
     const config = fullConfig()
-    config.agent.coder = {}
-    assert.throws(() => hooks.config(config), /Legacy agent name 'coder'/)
+    config.agent.build = {}
+    assert.throws(() => hooks.config(config), /Legacy agent name 'build'/)
     assert.equal(config.compaction.auto, false)
-    assert.equal(config.agent['fast-manager'].permission['*'], 'deny')
+    assert.equal(config.agent['manager'].permission['*'], 'deny')
   })
 })
 
 test('WHAT[ENF-009] MANAGER_non_repository_fork_keywords_are_rejected_before_child_creation', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'ses-manager-contract', 'fast-manager')
+    await acceptAuthorityRoot(runtime, 'ses-manager-contract', 'manager')
     const result = await hooks.tool.fork.execute(
-      { calling: 'navigator', name: 'Web Road', charge: 'browse', keywords: 'repository clue' },
-      { sessionID: 'ses-manager-contract', agent: 'fast-manager' },
+      { calling: 'researcher', name: 'Web Road', charge: 'browse', keywords: 'repository clue' },
+      { sessionID: 'ses-manager-contract', agent: 'manager' },
     )
     assert.match(result, /fork targets Coder, Inspector, or DevOps|fork 目标为 Coder、Inspector 或 DevOps/i)
     assert.equal(createdIds.length, 0)

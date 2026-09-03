@@ -14,7 +14,7 @@ module RecoveryRuntimeSurface =
 
     let private accepted (suffix: string) : AcceptedChatExecutionEvidence =
         let identity =
-            ParticipantIdentity.resolveAtRoot "fast-coder"
+            ParticipantIdentity.resolveAtRoot "coder"
             |> Result.defaultWith (fun error -> invalidOp (sprintf "%A" error))
 
         { SessionId = SessionId.create $"session-{suffix}"
@@ -24,7 +24,7 @@ module RecoveryRuntimeSurface =
           IdentitySeed = RootSelection identity
           PhysicalUserMessageId = PhysicalUserMessageId.create $"message-{suffix}"
           Origin = PromptOrigin.AuthorityRoot PromptRootAuthorityKind.HumanRoot
-          EffectiveAgent = "fast-coder" }
+          EffectiveAgent = "coder" }
 
     let private keyOf (accepted: AcceptedChatExecutionEvidence) : ChatExecutionKey =
         { SessionId = accepted.SessionId

@@ -18,15 +18,15 @@ test('WHAT[PARTICIPANT-HORIZON-004] EXEC_005_horizon_description_says_work_recor
 })
 
 test('WHAT[PARTICIPANT-HORIZON-004] HORIZON_SURFACE_has_no_legacy_roster_dto', () => {
-  const text = horizon.render([agent('fast-coder')], [])
-  assert.match(text, /# fast-coder is still away\./)
+  const text = horizon.render([agent('coder')], [])
+  assert.match(text, /# coder is still away\./)
   assert.ok(!FORBIDDEN.test(text), text)
 })
 
 test('WHAT[PARTICIPANT-HORIZON-011] EXEC_005_horizon_shows_only_each_visible_subagent_latest_work_record', () => {
   const text = horizon.render([
-    agent('fast-coder', 'active', 'latest', 'Patched the parser and the focused regression is green.'),
-    agent('deep-inquiry', 'active', 'latest', 'Mapped the release boundary and found no remaining blocker.'),
+    agent('coder', 'active', 'latest', 'Patched the parser and the focused regression is green.'),
+    agent('inquiry', 'active', 'latest', 'Mapped the release boundary and found no remaining blocker.'),
   ], [])
   assert.match(text, /latest work record/i)
   assert.match(text, /Patched the parser and the focused regression is green\./)
@@ -35,11 +35,11 @@ test('WHAT[PARTICIPANT-HORIZON-011] EXEC_005_horizon_shows_only_each_visible_sub
 })
 
 test('WHAT[PARTICIPANT-HORIZON-011] EXEC_005_horizon_says_when_visible_subagent_has_no_work_record', () => {
-  assert.match(horizon.render([agent('fast-coder')], []), /fast-coder has no work record yet\./i)
+  assert.match(horizon.render([agent('coder')], []), /coder has no work record yet\./i)
 })
 
 test('WHAT[PARTICIPANT-HORIZON-011] EXEC_005_horizon_does_not_fall_back_when_latest_work_record_is_unreadable', () => {
-  const text = horizon.render([agent('fast-coder', 'active', 'unavailable', '')], [])
+  const text = horizon.render([agent('coder', 'active', 'unavailable', '')], [])
   assert.match(text, /latest work record cannot be read right now/i)
   assert.doesNotMatch(text, /Old record that must not masquerade as current progress\./)
 })

@@ -56,22 +56,38 @@ module Value =
         | None -> 1.0
         | Some dependency -> discountForDependency state dependency
 
+    let private hasOpenInvestigateActions (state: EpistemicState) =
+        state.Actions
+        |> Map.toSeq
+        |> Seq.exists (fun (_, a) -> a.Kind = ActionKind.Investigate && a.Status = ActionStatus.Open)
+
     let private synthesisDelta (state: EpistemicState) (action: CognitiveAction) =
         if state.Synthesis.IsSome || Map.isEmpty state.Findings then
             System.Double.NegativeInfinity
+        elif State.remainingYieldBudget state <= 2 then
+            10.0
+        elif hasOpenInvestigateActions state then
+            let coverage = min 1.0 (0.01 * float state.Findings.Count)
+            0.10 * coverage
         else
-            let coverage = min 1.0 (0.22 * float state.Findings.Count)
-            0.28 + coverage - max 0.0 action.Cost
+            let coverage = min 1.0 (0.01 * float state.Findings.Count)
+            0.36 + coverage - max 0.0 action.Cost
+
+    let private findingDiscount (findingCount: int) =
+        1.0 / (1.0 + 0.005 * float findingCount)
+
+    let private investigateDelta (state: EpistemicState) (action: CognitiveAction) =
+        let rootGain = max 0.0 action.ExpectedRootGain
+        let gateway = max 0.0 action.GatewayGain
+        let discount = findingDiscount state.Findings.Count
+
+        dependencyDiscount state action * (discount * rootGain + 0.65 * gateway)
+        - max 0.0 action.Cost
 
     let private deltaForKind (state: EpistemicState) (action: CognitiveAction) =
         match action.Kind with
         | ActionKind.Synthesize -> synthesisDelta state action
-        | ActionKind.Investigate ->
-            let rootGain = max 0.0 action.ExpectedRootGain
-            let gateway = max 0.0 action.GatewayGain
-
-            dependencyDiscount state action * (rootGain + 0.65 * gateway)
-            - max 0.0 action.Cost
+        | ActionKind.Investigate -> investigateDelta state action
 
     let actionDelta (state: EpistemicState) (action: CognitiveAction) =
         if action.Status = ActionStatus.Resolved then
@@ -79,10 +95,10 @@ module Value =
         else
             deltaForKind state action
 
-    let actionUtility state action =
+    let actionUtility (state: EpistemicState) action =
         stopUtility state + actionDelta state action
 
-    let revalueActions state =
+    let revalueActions (state: EpistemicState) =
         { state with
             Actions =
                 state.Actions
@@ -90,7 +106,7 @@ module Value =
                     { action with
                         Value = actionDelta state action }) }
 
-    let bestOpenAction state =
+    let bestOpenAction (state: EpistemicState) =
         state.Actions
         |> Map.toSeq
         |> Seq.map snd
@@ -98,7 +114,11 @@ module Value =
         |> Seq.sortBy (fun action -> -actionUtility state action, action.Cost, action.Id)
         |> Seq.tryHead
 
-    let stopDominates state =
-        match bestOpenAction state with
-        | None -> true
-        | Some action -> stopUtility state >= actionUtility state action
+    let private actionStopDominates (state: EpistemicState) action =
+        stopUtility state >= actionUtility state action
+
+    let stopDominates (state: EpistemicState) =
+        match state.Synthesis, bestOpenAction state with
+        | Some _, _ -> true
+        | None, None -> true
+        | None, Some action -> actionStopDominates state action

@@ -7,7 +7,7 @@ const target = (model = 'provider/shared', reasoning = 'none') => ({ model, reas
 const identity = (overrides = {}) => ({
   sessionId: 'session-a',
   physicalUserMessageId: 'message-a',
-  effectiveAgent: 'fast-coder',
+  effectiveAgent: 'coder',
   target: target(),
   ...overrides,
 })
@@ -62,7 +62,7 @@ test('WHAT[EMR-012] rejects release from another physical message and every wron
   for (const change of [
     { sessionId: 'other-session' },
     { physicalUserMessageId: 'other-message' },
-    { effectiveAgent: 'deep-coder' },
+    { effectiveAgent: 'inspector' },
     { target: { model: 'provider/other', reasoning: 'none' } },
   ]) {
     conflict(routing.releaseExecutionAdmissionBeforeProvider(runtime, lease, identity(change)))

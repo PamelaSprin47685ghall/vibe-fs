@@ -17,8 +17,6 @@ module PromptFactCodec =
         | Some value -> Roles.roleLabel value
         | None -> "None"
 
-    let private tierLabel = Roles.wireTierLabel
-
     let private originLabel origin =
         match origin with
         | PersonaOrigin.ResolvedAtRoot -> "ResolvedAtRoot"
@@ -37,13 +35,6 @@ module PromptFactCodec =
             sprintf "participant identity PersonaCatalogVersion is unsupported: %d" version
         | ParticipantIdentityError.RoleMismatch(expected, actual) ->
             sprintf "participant identity Role mismatch: expected %s, got %s" (roleLabel expected) (roleLabel actual)
-        | ParticipantIdentityError.TierMismatch(expected, actual) ->
-            sprintf
-                "participant identity InitialTier mismatch: expected %s, got %s"
-                (tierLabel expected)
-                (tierLabel actual)
-        | ParticipantIdentityError.PeerMismatch(expected, actual) ->
-            sprintf "participant identity PeerAgent mismatch: expected %s, got %s" expected actual
         | ParticipantIdentityError.BlankPersona -> "participant identity Persona is blank"
         | ParticipantIdentityError.PersonaMismatch(expected, actual) ->
             sprintf "participant identity Persona mismatch: expected %s, got %s" expected actual
@@ -59,8 +50,6 @@ module PromptFactCodec =
             sprintf "participant identity owner PersonaCatalogVersion mismatch: expected %d, got %d" expected actual
         | ParticipantIdentityError.LegacyRoleMismatch(expected, actual) ->
             sprintf "legacy AuthorityRootAccepted v1 CanonicalRole mismatch: expected %s, got %s" expected actual
-        | ParticipantIdentityError.LegacyTierMismatch(expected, actual) ->
-            sprintf "legacy AuthorityRootAccepted v1 SelectedTier mismatch: expected %s, got %s" expected actual
         | ParticipantIdentityError.UnsupportedLegacyAuthorityKind authorityKind ->
             sprintf "legacy AuthorityRootAccepted v1 AuthorityKind is unsupported: %s" authorityKind
         | ParticipantIdentityError.UnprovableLegacyAuthorityIdentity reason -> reason
@@ -85,9 +74,9 @@ module PromptFactCodec =
         let input = ParticipantIdentity.toInput evidence
 
         Encode.object
-            [ "InitialTier", Encode.string (tierLabel input.InitialTier)
+            [ "InitialTier", Encode.string "deep"
               "Origin", Encode.string (originLabel input.Origin)
-              "PeerAgent", Encode.string input.PeerAgent
+              "PeerAgent", Encode.string (ParticipantIdentity.peerAgent evidence)
               "Persona", Encode.string input.Persona
               "PersonaCatalogVersion", Encode.int input.PersonaCatalogVersion
               "Role", roleEncoder input.Role
@@ -147,13 +136,6 @@ module PromptFactCodec =
                 | Some role -> Decode.succeed (Some role)
                 | None -> Decode.fail (sprintf "participant identity Role is unknown: %s" label))
 
-    let private tierDecoder =
-        Decode.string
-        |> Decode.andThen (fun label ->
-            match Roles.tryParseTier label with
-            | Some tier -> Decode.succeed tier
-            | None -> Decode.fail (sprintf "participant identity InitialTier is unknown: %s" label))
-
     let private originDecoder =
         Decode.string
         |> Decode.andThen (function
@@ -164,9 +146,7 @@ module PromptFactCodec =
     let private identityInputDecoder =
         Decode.object (fun get ->
             { SelectedAgent = get.Required.Field "SelectedAgent" Decode.string
-              PeerAgent = get.Required.Field "PeerAgent" Decode.string
               Role = get.Required.Field "Role" roleDecoder
-              InitialTier = get.Required.Field "InitialTier" tierDecoder
               Persona = get.Required.Field "Persona" Decode.string
               PersonaCatalogVersion = get.Required.Field "PersonaCatalogVersion" Decode.int
               Origin = get.Required.Field "Origin" originDecoder })
@@ -231,9 +211,7 @@ module PromptFactCodec =
             let identity =
                 { AuthorityKind = get.Required.Field "AuthorityKind" Decode.string
                   SelectedAgent = get.Required.Field "SelectedAgent" Decode.string
-                  PeerAgent = get.Required.Field "PeerAgent" Decode.string
-                  CanonicalRole = get.Required.Field "CanonicalRole" Decode.string
-                  SelectedTier = get.Required.Field "SelectedTier" Decode.string }
+                  CanonicalRole = get.Required.Field "CanonicalRole" Decode.string }
 
             sessionId, logicalRunId, authorityRootUserMessageId, identity)
 

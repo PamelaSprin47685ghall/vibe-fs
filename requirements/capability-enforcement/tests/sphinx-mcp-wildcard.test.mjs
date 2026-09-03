@@ -25,15 +25,12 @@ const ROLES = [
   'Blogger',
   'Bookkeeper',
 ]
-const TIERS = ['fast', 'deep']
-const agentName = (tier, role) => `${tier}-${role.toLowerCase()}`
+const agentName = (role) => `${role.toLowerCase()}`
 
 const buildConfig = () => {
   const agent = {}
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      agent[agentName(tier, role)] = { model: `${tier}-${role.toLowerCase()}-model` }
-    }
+  for (const role of ROLES) {
+    agent[agentName(role)] = { model: `${role.toLowerCase()}-model` };
   }
   return { agent }
 }
@@ -64,17 +61,15 @@ test('WHAT[ENF-007] AGENT_030_inquiry_only_wildcard_permission', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
 
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      const name = agentName(tier, role)
-      const permission = config.agent[name].permission
-      assert.equal(
-        permission[permissionKey],
-        role === 'Inquiry' ? 'allow' : 'deny',
-        `${name} sphinx_*`,
-      )
-      const concrete = evaluate(permission, 'sphinx_start').action
-      assert.equal(concrete, role === 'Inquiry' ? 'allow' : 'deny', `${name} concrete MCP tool`)
-    }
+  for (const role of ROLES) {
+    const name = agentName(role);
+    const permission = config.agent[name].permission
+    assert.equal(
+      permission[permissionKey],
+      role === 'Inquiry' ? 'allow' : 'deny',
+      `${name} sphinx_*`,
+    )
+    const concrete = evaluate(permission, 'sphinx_start').action
+    assert.equal(concrete, role === 'Inquiry' ? 'allow' : 'deny', `${name} concrete MCP tool`)
   }
 })

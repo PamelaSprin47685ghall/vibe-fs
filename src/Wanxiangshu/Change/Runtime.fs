@@ -114,8 +114,7 @@ type Orchestrator
     ///
     /// `managerAgent` is required and never defaulted. ORCH-003 keeps one Manager per
     /// job for its whole life, and PROMPT-008 forbids rebuilding a managed name from
-    /// a role — a `deep-manager` job resumed as `fast-manager` would carry the wrong
-    /// FALLBACK-002 A/B pair for the rest of the run.
+    /// a role — the managed agent name lives here and nowhere else.
     let forkManagerCore
         (jobId: ManagerJobId)
         (managerAgent: string)

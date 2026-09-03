@@ -8,7 +8,7 @@ import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.j
 
 const live = async (owner) => sync.create(
   await mkdtemp(join(tmpdir(), 'wxs-sync-delegate-')),
-  [{ sessionId: owner, agent: 'fast-manager' }],
+  [{ sessionId: owner, agent: 'manager' }],
 )
 const waitForChild = async (h, owner, role) => {
   await sync.awaitPromptCount(h, owner, role, 1)

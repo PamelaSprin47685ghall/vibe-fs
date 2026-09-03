@@ -13,7 +13,7 @@ const createEvent = (jobId, managerSessionId, worktreeIdentity = `wt_${jobId.sli
   payload: {
     jobId,
     managerSessionId,
-    managerAgent: 'fast-manager',
+    managerAgent: 'manager',
     byname: 'Road',
     worktreeIdentity,
     worktreePath: `/tmp/${worktreeIdentity}`,

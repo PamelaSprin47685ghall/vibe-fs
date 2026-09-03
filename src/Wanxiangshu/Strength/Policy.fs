@@ -11,7 +11,6 @@ type StrengthOpportunity =
     { IsRootWork: bool
       RequestKind: ProviderRequestKind
       CanonicalRole: Role
-      SelectedTier: AgentTier
       SelectedAgent: string
       EffectiveAgent: string
       IsFallbackRetry: bool
@@ -22,7 +21,7 @@ type StrengthOpportunity =
       TargetProviderRunBound: bool
       EventStoreHealthy: bool
       HostCanaryHealthy: bool
-      FastPeerAvailable: bool
+      PredictorAvailable: bool
       CostModelAvailable: bool }
 
 type StrengthPrediction =
@@ -57,8 +56,6 @@ module StrengthPolicy =
             StrengthEligibility.Ineligible "not-work-main"
         elif not (Set.contains opportunity.CanonicalRole eligibleRoles) then
             StrengthEligibility.Ineligible "role-ineligible"
-        elif opportunity.SelectedTier <> AgentTier.Deep then
-            StrengthEligibility.Ineligible "selected-tier-not-deep"
         elif not (String.Equals(opportunity.SelectedAgent, opportunity.EffectiveAgent, StringComparison.Ordinal)) then
             StrengthEligibility.Ineligible "effective-agent-not-selected"
         elif opportunity.IsFallbackRetry then
@@ -77,8 +74,8 @@ module StrengthPolicy =
             StrengthEligibility.Ineligible "event-store-unhealthy"
         elif not opportunity.HostCanaryHealthy then
             StrengthEligibility.Ineligible "host-canary-unhealthy"
-        elif not opportunity.FastPeerAvailable then
-            StrengthEligibility.Ineligible "fast-peer-unavailable"
+        elif not opportunity.PredictorAvailable then
+            StrengthEligibility.Ineligible "predictor-unavailable"
         elif not opportunity.CostModelAvailable then
             StrengthEligibility.Ineligible "cost-model-unavailable"
         else

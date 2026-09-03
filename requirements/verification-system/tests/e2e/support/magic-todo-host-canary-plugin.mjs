@@ -362,7 +362,7 @@ export const collectManagerProviderToolEvidence = (scenario, opts = {}) => {
       ? opts.childSessionId
       : null;
   const boundManager =
-    typeof provider?.sessionFor === 'function' ? provider.sessionFor('fast-manager') : null;
+    typeof provider?.sessionFor === 'function' ? provider.sessionFor('manager') : null;
 
   const managerSessions = new Set(
     [childSessionId, boundManager].filter((id) => typeof id === 'string' && id.length > 0),

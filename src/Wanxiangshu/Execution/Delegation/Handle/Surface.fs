@@ -46,7 +46,7 @@ module HandleSurface =
             HandleProjection.link
                 handle
                 (SessionId.create "ses_child")
-                "fast-coder"
+                "coder"
                 Role.Coder
                 HandleOwnership.DurableParentHandle
                 HandleProjection.empty
@@ -88,7 +88,7 @@ module HandleSurface =
             HandleProjection.link
                 handle
                 (SessionId.create "ses_child")
-                "fast-coder"
+                "coder"
                 Role.Coder
                 HandleOwnership.DurableParentHandle
                 HandleProjection.empty

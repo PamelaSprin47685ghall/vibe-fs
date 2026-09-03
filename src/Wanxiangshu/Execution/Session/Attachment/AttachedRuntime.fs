@@ -188,7 +188,7 @@ type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?is
     /// Work child with `Agent = Some agentName` (not a SatelliteKind leaf).
     ///
     /// On reuse the returned agent is the one stored at create time. A later
-    /// owner-tier lookup must not overwrite a Deep child with Fast.
+    /// lookup must not overwrite the existing child agent.
     member _.GetOrCreate
         (
             ownerSessionId: SessionId,

@@ -62,16 +62,13 @@ module Surface =
         let roleLabel =
             requiredText "identitySeed.participantIdentity.canonicalRole" value?canonicalRole
 
-        let tierLabel =
-            requiredText "identitySeed.participantIdentity.selectedTier" value?selectedTier
-
         let role =
-            Roles.tryParseRole roleLabel
-            |> Option.defaultWith (fun () -> invalidArg "canonicalRole" $"unknown role '{roleLabel}'")
-
-        let tier =
-            Roles.tryParseTier tierLabel
-            |> Option.defaultWith (fun () -> invalidArg "selectedTier" $"unknown tier '{tierLabel}'")
+            if roleLabel = "bookkeeper" then
+                None
+            else
+                Roles.tryParseRole roleLabel
+                |> Option.defaultWith (fun () -> invalidArg "canonicalRole" $"unknown role '{roleLabel}'")
+                |> Some
 
         let origin =
             match requiredText "identitySeed.participantIdentity.origin" value?origin with
@@ -80,9 +77,7 @@ module Surface =
             | label -> invalidArg "identitySeed.participantIdentity.origin" $"unknown persona origin '{label}'"
 
         { SelectedAgent = requiredText "identitySeed.participantIdentity.selectedAgent" value?selectedAgent
-          PeerAgent = requiredText "identitySeed.participantIdentity.peerAgent" value?peerAgent
-          Role = Some role
-          InitialTier = tier
+          Role = role
           Persona = requiredText "identitySeed.participantIdentity.persona" value?persona
           PersonaCatalogVersion = unbox<int> value?personaCatalogVersion
           Origin = origin }
@@ -166,7 +161,7 @@ module Surface =
             {| selectedAgent = ParticipantIdentity.selectedAgent identity
                peerAgent = ParticipantIdentity.peerAgent identity
                canonicalRole = ParticipantIdentity.roleLabel identity
-               selectedTier = ParticipantIdentity.initialTier identity |> Roles.wireTierLabel
+               selectedTier = "deep"
                persona = ParticipantIdentity.persona identity
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
                origin =

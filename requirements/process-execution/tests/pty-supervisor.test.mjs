@@ -76,7 +76,7 @@ const fakeTerm = (pid) => {
 }
 const portWith = (value) => {
   const p = port()
-  portFork(p, 'echo hi', 'fast-distiller', id(value), undefined)
+  portFork(p, 'echo hi', 'distiller', id(value), undefined)
   return p
 }
 

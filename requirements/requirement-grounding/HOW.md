@@ -17,7 +17,7 @@ Visible-Material Fold (登记执行者实际读到的 material path + content di
   ↓
 Missing-Material Filter (同 horizon 已看见的材料逐文件跳过)
   ↓
-自动补读剩余材料 (ordinary: 普通 read；Cursor: NUL+BOM path-attributed suffix)
+自动补读剩余材料 (全 provider 统一: 终端真实工具结果上的 NUL+BOM result-only 后缀, 携带 requirement_source_path)
 
 原 mutation / js transaction 始终按自身语义继续；grounding 失败不得转换成 tool failure。
 ```
@@ -41,7 +41,7 @@ Missing-Material Filter (同 horizon 已看见的材料逐文件跳过)
 ### 3. 持久化与前缀保护 (Durable Projection & Prefix Stability)
 
 - 规范读取产生带类型的持久化 occurrence，固定记录调用参数与原始结果字节。
-- 自动规范读取产生带类型的持久化 occurrence；执行者主动读取 grounding material 产生独立的 visible-material 事实。两者共同驱动去重，但只有自动 occurrence 参与 synthetic replay，避免把已经存在于真实 transcript 的主动 read 再伪造一遍。
+- 自动规范读取产生带类型的持久化 occurrence；执行者主动读取 grounding material 产生独立的 visible-material 事实。两者共同驱动去重，但只有自动 occurrence 的 result-only 字节参与 replay，避免把已经存在于真实 transcript 的主动 read 再伪造一遍；任何 provider 都不产生 synthetic read 调用/结果对。
 - 同一 horizon 内的后续轮次直接重放已冻结的自动 occurrence，严禁重新扫描历史 occurrence 对应文件，以确保 provider KV 缓存前缀字节严格不变。
 - 发生上下文重锚 (`ContextReanchored`) 时仅重置内存中的已接入集合，保留历史 occurrence，在后续触碰时作为新事件追加在 wire 尾部。
 

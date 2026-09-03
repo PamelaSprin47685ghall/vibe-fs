@@ -7,14 +7,13 @@ import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.j
 
 const hash = (value) => `H(${value})`
 const personas = {
-  'fast-coder': 'Coder',
-  'deep-coder': 'Engineer',
-  'deep-reviewer': 'Auditor',
-  'fast-manager': 'Coordinator',
+  coder: 'Coder',
+  manager: 'Lead',
+  reviewer: 'Auditor',
+  inspector: 'Investigator',
 }
 const rootSelection = (agent) => {
-  const [selectedTier, canonicalRole] = agent.split('-')
-  const peerTier = selectedTier === 'fast' ? 'deep' : 'fast'
+  const canonicalRole = agent === 'predictor' ? 'inspector' : agent
   return {
     kind: 'RootSelection',
     ownerSession: null,
@@ -22,9 +21,9 @@ const rootSelection = (agent) => {
     ownerAuthorityRoot: null,
     participantIdentity: {
       selectedAgent: agent,
-      peerAgent: `${peerTier}-${canonicalRole}`,
+      peerAgent: agent,
       canonicalRole,
-      selectedTier,
+      selectedTier: 'deep',
       persona: personas[agent] ?? 'Unknown',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
@@ -38,14 +37,14 @@ const inheritedSelection = (agent, physical) => {
     'ses_owner',
     'HumanRoot',
     `owner_${physical}`,
-    rootSelection('fast-manager'),
+    rootSelection('manager'),
   )
   assert.equal(owner.ok, true, owner.error)
   const inherited = authority.issueInheritedIdentitySeed(agent, owner.value)
   assert.equal(inherited.ok, true, inherited.error)
   return inherited.value
 }
-const rootFor = (agent = 'fast-coder', physical = 'msg_u1', kind = 'HumanRoot') => {
+const rootFor = (agent = 'coder', physical = 'msg_u1', kind = 'HumanRoot') => {
   const seed = kind === 'AgentOwnerRoot' ? inheritedSelection(agent, physical) : rootSelection(agent)
   const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', kind, physical, seed)
   assert.equal(result.ok, true, result.error)
@@ -65,7 +64,7 @@ const register = (root) => authority.registerAuthority(root, authority.empty)
 test('WHAT[INTERACTION-AUTHORITY-004] IA_004_continuation_inherits_run_and_root', () => {
   const root = rootFor()
   const before = register(root)
-  const claim = authority.claimContinuation('pk_c', 'ses_a', 'ProviderRetryAttempt', root, 'deep-coder', 'pd-retry')
+  const claim = authority.claimContinuation('pk_c', 'ses_a', 'ProviderRetryAttempt', root, 'coder', 'pd-retry')
 
   assert.deepEqual(
     {
@@ -78,7 +77,7 @@ test('WHAT[INTERACTION-AUTHORITY-004] IA_004_continuation_inherits_run_and_root'
       origin: 'Continuation',
       logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
       authorityRoot: 'msg_u1',
-      effectiveAgent: 'deep-coder',
+      effectiveAgent: 'coder',
     },
   )
 
@@ -110,12 +109,12 @@ test('WHAT[INTERACTION-AUTHORITY-005] IA_005_every_continuation_kind_is_parseabl
 
 // INTERACTION-AUTHORITY-008/009: accepted > claimed > compaction > owner root > unknown.
 test('WHAT[INTERACTION-AUTHORITY-008] IA_008_resolution_order_is_accepted_then_claimed_then_compaction_then_root', () => {
-  const root = rootFor('fast-coder', 'msg_u1', 'AgentOwnerRoot')
+  const root = rootFor('coder', 'msg_u1', 'AgentOwnerRoot')
   let state = register(root)
 
-  const claimed = authority.claimContinuation('pk_claimed', 'ses_a', 'ReviewerGuard', root, 'fast-coder', 'pd-c')
+  const claimed = authority.claimContinuation('pk_claimed', 'ses_a', 'ReviewerGuard', root, 'coder', 'pd-c')
   state = authority.registerClaim(claimed, state)
-  const accepted = authority.claimContinuation('pk_accepted', 'ses_a', 'BusyAgentNudge', root, 'fast-coder', 'pd-a')
+  const accepted = authority.claimContinuation('pk_accepted', 'ses_a', 'BusyAgentNudge', root, 'coder', 'pd-a')
   state = authority.registerClaim(accepted, state)
   state = authority.acceptClaim('pk_accepted', 'msg_accepted', state)
 
@@ -141,7 +140,7 @@ test('WHAT[INTERACTION-AUTHORITY-008] IA_008_accepted_continuation_outranks_comp
   const root = rootFor()
   let state = register(root)
   state = authority.registerClaim(
-    authority.claimContinuation('pk_both', 'ses_a', 'ManagerGuard', root, 'fast-coder', 'pd-b'),
+    authority.claimContinuation('pk_both', 'ses_a', 'ManagerGuard', root, 'coder', 'pd-b'),
     state,
   )
   state = authority.acceptClaim('pk_both', 'msg_both', state)
@@ -149,7 +148,7 @@ test('WHAT[INTERACTION-AUTHORITY-008] IA_008_accepted_continuation_outranks_comp
 })
 
 test('WHAT[INTERACTION-AUTHORITY-009] IA_009_pure_resolution_never_infers_human_root', () => {
-  const root = rootFor('fast-coder', 'msg_u1', 'HumanRoot')
+  const root = rootFor('coder', 'msg_u1', 'HumanRoot')
   const state = register(root)
   assert.equal(state.activeLogicalRun.authorityKind, 'HumanRoot')
   assert.equal(authority.resolveKnownOrigin('msg_new', 'pk_any', false, state), 'UnknownOrigin')
@@ -160,7 +159,7 @@ test('WHAT[INTERACTION-AUTHORITY-016] IA_016_accepted_root_claim_stays_out_of_co
     'pk_owner',
     'ses_a',
     'pd-owner',
-    inheritedSelection('fast-manager', 'msg_owner'),
+    inheritedSelection('manager', 'msg_owner'),
   )
   assert.equal(claim.ok, true, claim.error)
   let state = authority.registerClaim(claim.value, authority.empty)
@@ -175,7 +174,7 @@ test('WHAT[INTERACTION-AUTHORITY-007] IA_007_unknown_origin_changes_no_projectio
   const state = register(root)
   const before = JSON.stringify(state)
   assert.equal(authority.resolveKnownOrigin('msg_never_proven', 'pk_never_proven', false, state), 'UnknownOrigin')
-  assert.deepEqual(intent.resolve({ sessionId: 'ses_a', physicalUserMessageId: 'msg_never_proven', explicitAgent: null, promptKey: null, hostCompaction: false, hostSynthetic: false }, { available: true, activeAgent: 'fast-coder', activeKind: 'HumanRoot', claims: [], acceptedContinuations: [] }), { case: 'Reject', reason: 'UnknownOriginWhileActive' })
+  assert.deepEqual(intent.resolve({ sessionId: 'ses_a', physicalUserMessageId: 'msg_never_proven', explicitAgent: null, promptKey: null, hostCompaction: false, hostSynthetic: false }, { available: true, activeAgent: 'coder', activeKind: 'HumanRoot', claims: [], acceptedContinuations: [] }), { case: 'Reject', reason: 'UnknownOriginWhileActive' })
   assert.equal(JSON.stringify(state), before)
 })
 

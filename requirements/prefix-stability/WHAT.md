@@ -40,9 +40,9 @@ FrozenRecordPrefix 以明确标记的 low-trust context block 注入上下文，
 
 Cutoff 游标只能位于 current-generation canonical XTrace 的完整 semantic turn 边界。`CoveredPrefixDigest` 的生产与 probe step-5 重算必须对同一个 `XTraceMaterialization.currentProjection` 做截断；请求级 provider presentation 的合法变化不得制造假 `CutoffProofFailed`。写回 Host 时必须把 semantic-turn cutoff 映射为 stable XTrace Host message identity，严禁把 cutoff 当作本次 provider message 数组下标。`ProviderRetryAttempt` 不具有 X semantic part，因此当前 retry 的 request-start cutoff 可以从与 XTrace capture 相同的 decodable Host message universe 取得 semantic-turn 坐标；这只用于定位 live request，不得把 retry 文本重新引入 canonical X。retry transport row 的退休同样受 prefix horizon 约束：`Current` presentation 必须保留已经进入当前 provider prefix 的所有 retry rows；只有新的 `TentativeCold` presentation 才可按 stable Host id 精确退休此前 horizon 的 retry rows，同时保留触发本次 cold presentation 的 current physical retry。由此 retry 控制文本可以不进入 X/Y/digest，而同一 horizon 的 provider wire 仍保持 append-only。真实 canonical X 历史发生变化时 digest 仍必须失配并 fail-closed 拒绝执行。
 
-## PREFIX-STABILITY-010: 同一 horizon 的 historical synthetic pair 原位 replay；reanchor 退休旧 replay set
+## PREFIX-STABILITY-010: 同一 horizon 的 guidance occurrence 原位 replay；reanchor 退休旧 replay set
 
-在同一未重锚 horizon 内，历史 synthetic pair 必须按其持久化的 gap anchor 保持原位置、原字节回放，禁止删除、过滤、去重或重新定位。`ContextReanchored` 将旧 pair 的可见性退休，新 pair 采用新的序号与 call ID 追加。
+全 provider 统一 cursor 模式：永不产生 synthetic skill 消息。Pair-programming guidance 仅以 `NUL+BOM` 后缀形式附着于终端真实工具结果（completed/error 均可）；无终端工具结果的轮次不产生任何 guidance 载体。在同一未重锚 horizon 内，历史 guidance 字节必须按其持久化的 occurrence 保持原位置、原字节回放，禁止删除、过滤、去重、重新定位或叠加第二后缀；重放先剥离后缀做 placement 判定再精确重附。`ContextReanchored` 将旧 occurrence 的可见性退休，新 occurrence 采用新的序号追加。
 
 ## PREFIX-STABILITY-011: 冷边界由事实驱动
 
@@ -56,9 +56,9 @@ Cutoff 游标只能位于 current-generation canonical XTrace 的完整 semantic
 
 参与前缀一致性比较的范围包括 provider、model、variant、tools、system prompt 与消息序列。任何一项发生变更均构成冷边界，不可当作追加前缀处理。
 
-## PREFIX-STABILITY-014: HOST-013 synthetic 正文不进 trace 系
+## PREFIX-STABILITY-014: HOST-013 guidance 后缀正文不进 trace 系
 
-Synthetic pair 正文仅用于影响 provider prompt 字节以维持前缀缓存，严禁进入 XTrace、Companion decode、Blogger delta、WorkRecord 或 compaction 输入。
+Pair-programming guidance 后缀正文仅用于影响 provider prompt 字节以维持前缀缓存，严禁进入 XTrace、Companion decode、Blogger delta、WorkRecord 或 compaction 输入；仅 guidance 的 durable occurrence 投影事实（PairProgrammingGuidelineAnchored → Guidelines）参与 HOST-013 恢复。
 
 ## PREFIX-STABILITY-015: synthetic id 确定性派生
 

@@ -105,7 +105,7 @@ test('WHAT[PROVIDER-PROJECTION-005] CODEC_schema_dsl_builds_each_shape', () => {
   assert.deepEqual(schemaEnum(toolModule, ['x']), { schema: 'enum', values: ['x'] })
   assert.deepEqual(schemaOptionalEnum(toolModule, ['y']), { schema: 'enum-optional', values: ['y'] })
   assert.deepEqual(schemaOptionalEnumDescribed(toolModule, ['z'], 'maybe'), { schema: 'enum-described-optional', values: ['z'], description: 'maybe' })
-  assert.equal(schemaManagedOrHandle(toolModule, ['fast-coder']).schema, 'union')
+  assert.equal(schemaManagedOrHandle(toolModule, ['coder']).schema, 'union')
   assert.deepEqual(schemaOptionalString(toolModule), { schema: 'string-optional' })
   assert.deepEqual(schemaOptionalStringDescribed(toolModule, 'hints'), { schema: 'string-described-optional', description: 'hints' })
   assert.deepEqual(schemaOptionalNumber(toolModule), { schema: 'number-optional' })

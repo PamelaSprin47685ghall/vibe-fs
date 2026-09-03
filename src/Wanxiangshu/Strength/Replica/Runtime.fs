@@ -100,15 +100,6 @@ module private StrengthReplicaRuntimeLogic =
         else
             Ok()
 
-    let parseEligibleFastAgent (fastAgent: string) =
-        match ManagedAgent.tryParse fastAgent with
-        | None -> Error(sprintf "StrengthReplica fast agent is unmanaged: %s" fastAgent)
-        | Some managed when not (Set.contains managed.Role StrengthPolicy.eligibleRoles) ->
-            Error(sprintf "StrengthReplica role is ineligible: %A" managed.Role)
-        | Some managed when managed.Tier <> AgentTier.Fast ->
-            Error(sprintf "StrengthReplica agent is not fast tier: %s" fastAgent)
-        | Some managed -> Ok managed
-
     let requireOwnerIdle (liveRegistry: StrengthRuntime) (owner: SessionId) =
         match liveRegistry.TryFindByOwner owner with
         | Some _ -> Error "StrengthReplica owner already has an active decision"
@@ -130,9 +121,9 @@ module private StrengthReplicaRuntimeLogic =
             | Ok() -> return Ok()
         }
 
-    let private safeAcquire (acquire: SessionId -> string -> OpencodeModel option) replica fastAgent =
+    let private safeAcquire (acquire: SessionId -> string -> OpencodeModel option) replica modelRole =
         try
-            Ok(acquire replica fastAgent)
+            Ok(acquire replica modelRole)
         with ex ->
             Error ex
 
@@ -140,10 +131,10 @@ module private StrengthReplicaRuntimeLogic =
         (sessions: ISessionHostPort)
         (acquire: SessionId -> string -> OpencodeModel option)
         (replica: SessionId)
-        (fastAgent: string)
+        (modelRole: string)
         : Task<Result<OpencodeModel option, string>> =
         task {
-            match safeAcquire acquire replica fastAgent with
+            match safeAcquire acquire replica modelRole with
             | Ok(Some model) -> return Ok(Some model)
             | Ok None ->
                 let! _ = sessions.AbortSession replica
@@ -157,11 +148,11 @@ module private StrengthReplicaRuntimeLogic =
         (sessions: ISessionHostPort)
         (tryAcquireModel: (SessionId -> string -> OpencodeModel option) option)
         (replica: SessionId)
-        (fastAgent: string)
+        (modelRole: string)
         : Task<Result<OpencodeModel option, string>> =
         match tryAcquireModel with
         | None -> Task.FromResult(Ok None)
-        | Some acquire -> executeAcquireModel sessions acquire replica fastAgent
+        | Some acquire -> executeAcquireModel sessions acquire replica modelRole
 
     let tryClaimCollector
         (gate: obj)
@@ -187,12 +178,12 @@ module private StrengthReplicaRuntimeLogic =
         (registerReplica: SessionId -> SessionId -> string -> unit)
         (owner: SessionId)
         (replica: SessionId)
-        (fastAgent: string)
+        (agent: string)
         (state: StrengthReplicaDecisionState)
         : Task<Result<unit, string>> =
         task {
             if tryClaimCollector gate byReplica sessionKey replica state then
-                registerReplica owner replica fastAgent
+                registerReplica owner replica agent
                 return Ok()
             else
                 liveRegistry.Retire replica |> ignore
@@ -563,7 +554,7 @@ type StrengthReplicaRuntime
             decisionId: StrengthDecisionId,
             targetProviderRun: ProviderRunIdentity,
             budget: StrengthBudget,
-            fastAgent: string,
+            replicaAgent: string,
             localizedMirror: WireMessage list,
             mirrorSemanticDigest: string
         ) : Task<Result<StrengthDryRunStart, string>> =
@@ -574,7 +565,7 @@ type StrengthReplicaRuntime
                     decisionId,
                     targetProviderRun,
                     budget,
-                    fastAgent,
+                    replicaAgent,
                     localizedMirror,
                     mirrorSemanticDigest,
                     StrengthReplicaPurpose.DryRun
@@ -596,14 +587,13 @@ type StrengthReplicaRuntime
             decisionId: StrengthDecisionId,
             targetProviderRun: ProviderRunIdentity,
             budget: StrengthBudget,
-            fastAgent: string,
+            replicaAgent: string,
             localizedMirror: WireMessage list,
             mirrorSemanticDigest: string,
             purpose: StrengthReplicaPurpose
         ) : Task<Result<StrengthReplicaDecisionState, string>> =
         taskResult {
             do! StrengthReplicaRuntimeLogic.requireNonEmptyBudget budget
-            let! managed = StrengthReplicaRuntimeLogic.parseEligibleFastAgent fastAgent
             do! StrengthReplicaRuntimeLogic.requireOwnerIdle liveRegistry owner
 
             let! ownerProfile =
@@ -611,30 +601,41 @@ type StrengthReplicaRuntime
                 | Some profile -> Ok profile
                 | None -> Error "StrengthReplica owner has no active authority profile"
 
+            do!
+                if replicaAgent = Roles.roleLabel ownerProfile.CanonicalRole then
+                    Ok()
+                else
+                    Error(sprintf "StrengthReplica agent '%s' disagrees with owner role" replicaAgent)
+
+            if not (Set.contains ownerProfile.CanonicalRole StrengthPolicy.eligibleRoles) then
+                return! Error(sprintf "StrengthReplica role is ineligible: %A" ownerProfile.CanonicalRole)
+
+            // The replica simulates the owner role read-only (validated above);
+            // only model routing uses the dedicated predictor label for a cheap model.
             let! identitySeed =
-                PromptAuthority.issueInheritedIdentitySeed fastAgent ownerProfile
+                PromptAuthority.issueInheritedIdentitySeed replicaAgent ownerProfile
                 |> Result.mapError (sprintf "StrengthReplica identity seed is invalid: %A")
 
             let! replica =
                 sessions.CreateChildSession(
                     owner,
-                    { Title = Some fastAgent
-                      Agent = Some fastAgent
+                    { Title = Some replicaAgent
+                      Agent = Some replicaAgent
                       Directory = directory }
                 )
 
             let! promptModel =
-                StrengthReplicaRuntimeLogic.acquireOptionalModelOrAbort sessions tryAcquireModel replica fastAgent
+                StrengthReplicaRuntimeLogic.acquireOptionalModelOrAbort sessions tryAcquireModel replica "predictor"
 
             let capabilities =
-                PromptAuthority.toolCapabilitiesFor managed.Role ProviderRequestKind.StrengthReplica
+                PromptAuthority.toolCapabilitiesFor ownerProfile.CanonicalRole ProviderRequestKind.StrengthReplica
 
             let binding: StrengthReplicaBinding =
                 { OwnerSessionId = owner
                   ReplicaSessionId = replica
                   DecisionId = decisionId
                   TargetProviderRun = targetProviderRun
-                  CanonicalRole = managed.Role
+                  CanonicalRole = ownerProfile.CanonicalRole
                   Budget = budget
                   MaxFrameBytes = frameByteLimit
                   SemanticDigest = mirrorSemanticDigest
@@ -664,7 +665,7 @@ type StrengthReplicaRuntime
                     registerReplica
                     owner
                     replica
-                    fastAgent
+                    replicaAgent
                     state
 
             do!
@@ -689,7 +690,7 @@ type StrengthReplicaRuntime
             decisionId: StrengthDecisionId,
             targetProviderRun: ProviderRunIdentity,
             budget: StrengthBudget,
-            fastAgent: string,
+            replicaAgent: string,
             localizedMirror: WireMessage list,
             mirrorSemanticDigest: string
         ) : Task<Result<StrengthReplicaOutcome, string>> =
@@ -700,7 +701,7 @@ type StrengthReplicaRuntime
                     decisionId,
                     targetProviderRun,
                     budget,
-                    fastAgent,
+                    replicaAgent,
                     localizedMirror,
                     mirrorSemanticDigest,
                     StrengthReplicaPurpose.Treatment

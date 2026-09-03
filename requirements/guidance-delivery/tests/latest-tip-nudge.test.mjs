@@ -45,7 +45,7 @@ const seed = async ({ withAssociation = true, withTip = true } = {}) => {
     const linked = await guidance.appendCompanionLink(journal, {
       session: main,
       bloggerSession: blogger,
-      bloggerAgent: 'fast-blogger',
+      bloggerAgent: 'blogger',
     })
     assert.equal(linked.ok, true, linked.error)
   }
@@ -113,20 +113,25 @@ test('WHAT[GD-006] ENFORCER_TIP_NUDGE_003_missing_owner_returns_none', async () 
 })
 
 const guideline = '# Pair programming auto-injected'
+// Universal cursor-mode separator (NUL+BOM): guidance rides the terminal real
+// tool result, never a synthetic skill row.
+const SEP = '\0\uFEFF'
 const anchor = [
-  { info: { id: 'u0', role: 'user' }, parts: [{ type: 'text', text: 'initial' }] },
-  { info: { id: 'a0', role: 'assistant' }, parts: [{ type: 'text', text: 'reply' }] },
-  { info: { id: 'user-1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] },
+  { info: { id: 'c1', role: 'assistant' }, parts: [{ type: 'tool', tool: 'read', callID: 'source', state: { status: 'pending', input: {}, time: { start: 0 } } }] },
+  { info: { id: 'r1', role: 'assistant' }, parts: [{ type: 'tool', tool: 'read', callID: 'source', state: { status: 'completed', input: {}, output: 'source\n', time: { start: 0, end: 0 } } }] },
 ]
 const markerOutput = (messages) => {
-  // pair sits before trailing user: completed synthetic skill, user
-  const result = messages.find((m) => m?.parts?.[0]?.tool === 'skill' && m?.parts?.[0]?.state?.status === 'completed')
-  return result?.parts?.[0]?.state?.output
+  // universal cursor mode: terminal real tool result carries output + SEP + marker
+  const result = messages.at(-1)
+  const output = result?.parts?.[0]?.state?.output
+  if (typeof output !== 'string') return undefined
+  const idx = output.indexOf(SEP)
+  return idx >= 0 ? output.slice(idx + SEP.length) : undefined
 }
 
 test('WHAT[GD-009] CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', async () => {
   const marker = pair.text
-  const result = await tryInject(undefined, marker, anchor)
+  const result = await tryInject('ses-gd-001', marker, anchor)
   assert.equal(result.ok, true, result.error)
   assert.equal(markerOutput(result.value), marker)
   assert.match(marker, /^# /)
@@ -135,11 +140,7 @@ test('WHAT[GD-009] CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text'
 test('WHAT[GD-009] CTX_002_GUIDELINE_002_marker_with_nudge_is_one_instruction_plane', async () => {
   const nudge = 'A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.'
   const marker = `# ${nudge}\n${pair.text}`
-  const result = await tryInject(undefined, marker, [
-    { info: { id: 'u0', role: 'user' }, parts: [{ type: 'text', text: 'initial' }] },
-    { info: { id: 'a0', role: 'assistant' }, parts: [{ type: 'text', text: 'reply' }] },
-    { info: { id: 'user-2', role: 'user' }, parts: [{ type: 'text', text: 'task' }] },
-  ])
+  const result = await tryInject('ses-gd-002', marker, anchor)
   assert.equal(result.ok, true, result.error)
   assert.equal(markerOutput(result.value), marker)
   assert.ok(marker.indexOf('# A domain concept') < marker.indexOf(pair.text.trim()))

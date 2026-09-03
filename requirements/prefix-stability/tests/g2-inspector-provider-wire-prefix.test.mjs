@@ -15,7 +15,7 @@ import * as providerCodec from '../../../dist/OpenCode/Codec/ProviderProjectionS
 import * as providerProjection from '../../../dist/Participant/Provider/Projection/Surface.js'
 import * as delegation from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 
-const INSPECTOR_AGENT = 'fast-inspector'
+const INSPECTOR_AGENT = 'inspector'
 const INSPECTOR_PROVIDER = 'g2-test-provider'
 const INSPECTOR_MODEL_ID = 'g2-inspector-model'
 const OWNER = 'ses_owner_g2_wire'
@@ -86,7 +86,7 @@ const mutatedWire = (wire, mutation) => mutation({
 
 test('WHAT[PREFIX-STABILITY-001] G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-g2-inspector-wire-'))
-  const harness = await delegation.create(directory, [{ sessionId: OWNER, agent: 'fast-manager' }])
+  const harness = await delegation.create(directory, [{ sessionId: OWNER, agent: 'manager' }])
   try {
     const transcript = []
     const wires = []

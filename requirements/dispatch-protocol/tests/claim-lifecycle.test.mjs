@@ -18,12 +18,11 @@ const findClaim = (projection, key) => projection.pendingClaims.find((claim) => 
 const promptOrigin = (kind) => authority.originForContinuation(kind)
 
 const personas = {
-  'fast-coder': 'Coder',
-  'fast-manager': 'Coordinator',
+  coder: 'Coder',
+  manager: 'Lead',
 }
 const rootSelection = (agent) => {
-  const [selectedTier, canonicalRole] = agent.split('-')
-  const peerTier = selectedTier === 'fast' ? 'deep' : 'fast'
+  const canonicalRole = agent === 'predictor' ? 'inspector' : agent
   return {
     kind: 'RootSelection',
     ownerSession: null,
@@ -31,9 +30,9 @@ const rootSelection = (agent) => {
     ownerAuthorityRoot: null,
     participantIdentity: {
       selectedAgent: agent,
-      peerAgent: `${peerTier}-${canonicalRole}`,
+      peerAgent: agent,
       canonicalRole,
-      selectedTier,
+      selectedTier: 'deep',
       persona: personas[agent] ?? 'Unknown',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
@@ -47,7 +46,7 @@ const inheritedSeed = (agent, physical) => {
     SESSION,
     'HumanRoot',
     physical,
-    rootSelection('fast-manager'),
+    rootSelection('manager'),
   )
   assert.equal(owner.ok, true, owner.error)
   const inherited = authority.issueInheritedIdentitySeed(agent, owner.value)
@@ -62,7 +61,7 @@ const profileOf = () => {
     SESSION,
     'HumanRoot',
     'msg_u1',
-    rootSelection('fast-coder'),
+    rootSelection('coder'),
   )
   assert.equal(built.ok, true, built.ok ? '' : built.error)
   return built.value
@@ -73,7 +72,7 @@ const profileOf = () => {
 test('WHAT[DISPATCH-PROTOCOL-002] DP_002_submit_records_the_receipt_without_resolving_the_claim', () => {
   const root = profileOf()
   const key = 'pk_s'
-  const claim = authority.claimContinuation(key, SESSION, 'ManagerGuard', root, 'fast-coder', 'pd-1')
+  const claim = authority.claimContinuation(key, SESSION, 'ManagerGuard', root, 'coder', 'pd-1')
 
   let projection = authority.registerAuthority(root, authority.empty)
   projection = authority.registerClaim(claim, projection)
@@ -99,7 +98,7 @@ test('WHAT[DISPATCH-PROTOCOL-002] DP_002_abandon_removes_the_claim_and_leaves_th
   const key = 'pk_x'
   let projection = authority.registerAuthority(root, authority.empty)
   projection = authority.registerClaim(
-    authority.claimContinuation(key, SESSION, 'BusyAgentNudge', root, 'fast-coder', 'pd-n'),
+    authority.claimContinuation(key, SESSION, 'BusyAgentNudge', root, 'coder', 'pd-n'),
     projection,
   )
 
@@ -116,7 +115,7 @@ test('WHAT[DISPATCH-PROTOCOL-006] DP_006_abandon_keeps_the_claim_sequence_consum
   const key = 'pk_x'
   let projection = authority.registerAuthority(root, authority.empty)
   projection = authority.registerClaim(
-    authority.claimContinuation(key, SESSION, 'BusyAgentNudge', root, 'fast-coder', 'pd-n'),
+    authority.claimContinuation(key, SESSION, 'BusyAgentNudge', root, 'coder', 'pd-n'),
     projection,
   )
 
@@ -145,7 +144,7 @@ test('WHAT[DISPATCH-PROTOCOL-005] DP_005_prompt_key_is_deterministic_and_moves_w
     run: root.logicalRun,
     authorityRootId: root.authorityRoot,
     origin: promptOrigin('ManagerGuard'),
-    agent: 'fast-coder',
+    agent: 'coder',
     payload: 'pd-1',
     sequence: 1,
   }
@@ -164,14 +163,14 @@ test('WHAT[DISPATCH-PROTOCOL-005] DP_005_prompt_key_is_deterministic_and_moves_w
 
   assert.equal(
     derive(base),
-    `H(${['ses_a', 'H(rt_1\nses_a\nmsg_u1)', 'msg_u1', 'ManagerGuard', 'fast-coder', 'pd-1', '1'].join('\u001f')})`,
+    `H(${['ses_a', 'H(rt_1\nses_a\nmsg_u1)', 'msg_u1', 'ManagerGuard', 'coder', 'pd-1', '1'].join('\u001f')})`,
   )
   assert.equal(derive(base), derive(base), 'same logical dispatch is deterministic')
 
   const variants = {
     session: { ...base, session: 'ses_b' },
     origin: { ...base, origin: promptOrigin('ReviewerGuard') },
-    agent: { ...base, agent: 'deep-coder' },
+    agent: { ...base, agent: 'reviewer' },
     payload: { ...base, payload: 'pd-2' },
     sequence: { ...base, sequence: 2 },
   }
@@ -211,7 +210,7 @@ test('WHAT[DISPATCH-PROTOCOL-006] DP_006_claim_sequence_advances_on_registration
   assert.equal(authority.nextClaimSequence(scope, projection), 1)
 
   const claimAt = (n) =>
-    authority.claimContinuation(`pk_${n}`, SESSION, 'ReviewerGuard', root, 'fast-coder', 'pd-same')
+    authority.claimContinuation(`pk_${n}`, SESSION, 'ReviewerGuard', root, 'coder', 'pd-same')
 
   projection = authority.registerClaim(claimAt(1), projection)
   assert.equal(authority.nextClaimSequence(scope, projection), 2)
@@ -229,7 +228,7 @@ test('WHAT[DISPATCH-PROTOCOL-007] DP_007_runtime_start_stamp_is_audit_only_not_r
   const root = profileOf()
   const key = 'pk_r'
   const projection = authority.registerClaim(
-    authority.claimContinuation(key, SESSION, 'ManagerGuard', root, 'fast-coder', 'pd-r'),
+    authority.claimContinuation(key, SESSION, 'ManagerGuard', root, 'coder', 'pd-r'),
     authority.registerAuthority(root, authority.empty),
   )
   const claim = findClaim(projection, key)
@@ -267,7 +266,7 @@ test('WHAT[DISPATCH-PROTOCOL-002] DP_002_claim_records_payload_digest_and_effect
     'pk_o',
     SESSION,
     'pd-owner',
-    inheritedSeed('fast-manager', 'msg-claim-owner'),
+    inheritedSeed('manager', 'msg-claim-owner'),
   )
   assert.equal(claim.ok, true, claim.ok ? '' : claim.error)
   assert.deepEqual(
@@ -277,7 +276,7 @@ test('WHAT[DISPATCH-PROTOCOL-002] DP_002_claim_records_payload_digest_and_effect
       effectiveAgent: claim.value.effectiveAgent,
       receipt: claim.value.receipt,
     },
-    { origin: 'AuthorityRoot', payloadDigest: 'pd-owner', effectiveAgent: 'fast-manager', receipt: null },
+    { origin: 'AuthorityRoot', payloadDigest: 'pd-owner', effectiveAgent: 'manager', receipt: null },
   )
 })
 

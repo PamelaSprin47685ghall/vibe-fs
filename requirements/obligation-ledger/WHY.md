@@ -29,7 +29,7 @@ Manager 作为长期 mission 的执行者，系统必须随时回答核心问题
 - 当前 mission debt 失去单一真相源（Host 表、reviewer 或内存状态可充当 current）。
 - `planComplete=false` 时 planning work 被迫伪装为 mission debt，或 commitment 后仍将 planning placeholder 记为 mission debt。
 - 崩溃恢复不重放 Accepted 链，而是依赖 Stage、布尔标志或时间推算。
-- 同一 message 中多个已 materialize 的 todowrite 存在 winner 仲裁，或基础设施故障被降格为工具红字。
+- 同一 message 中多个已 materialize 的 todowrite 破坏顺序执行语义，或基础设施故障被降格为工具红字。
 - 当前执行前沿缺少可闭环的细粒度义务，或遥远债务被迫以细粒度提前展开；`near/mid/far` 被误作生命周期状态机。
 
 ## 4. 依赖边界

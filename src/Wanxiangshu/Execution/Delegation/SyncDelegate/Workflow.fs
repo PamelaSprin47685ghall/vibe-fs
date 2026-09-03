@@ -16,7 +16,6 @@ module internal SyncDelegateWorkflow =
     /// runs against the store + dependencies without touching runtime fields.
     type Dependencies =
         { Attached: IAttachedSessionPort
-          ResolveOwnerTier: SessionId -> AgentTier option
           ObserveChild:
               SessionId -> ReuseScopeId -> SyncDelegateRole -> string -> Task<Result<AttachedChildObservation, string>>
           CreateChild:
@@ -319,17 +318,15 @@ module internal SyncDelegateWorkflow =
             | Ok pair -> do! runAttachedPair store deps ownerScope role batchOwner invocations pair
         }
 
-    let private runReadyWithTier
+    let private runReadyWithRole
         (store: SyncDelegateCallStore)
         (deps: Dependencies)
         (ownerScope: ReuseScopeId)
         (role: SyncDelegateRole)
         (batchOwner: SessionId)
         (invocations: SyncDelegateInvocation list)
-        (ownerTier: AgentTier)
         : Task<unit> =
-        let tier = SyncDelegate.tierForOwner ownerTier
-        let agentName = SyncDelegate.agentNameFor role tier
+        let agentName = SyncDelegate.agentNameFor role
 
         task {
             try
@@ -349,11 +346,7 @@ module internal SyncDelegateWorkflow =
         let batchOwner = first.Owner
         maybeCleanupInspector store deps ownerScope role
 
-        match deps.ResolveOwnerTier batchOwner with
-        | None ->
-            failAdmission store ownerScope role invocations "sync delegate rejected: owner tier unknown"
-            Task.FromResult(())
-        | Some ownerTier -> runReadyWithTier store deps ownerScope role batchOwner invocations ownerTier
+        runReadyWithRole store deps ownerScope role batchOwner invocations
 
     /// EXEC-026 / EXEC-031: reusable SyncDelegate CE. A semantic batch is fixed by
     /// ProviderRun tool-call membership before dispatch; scheduler timing never

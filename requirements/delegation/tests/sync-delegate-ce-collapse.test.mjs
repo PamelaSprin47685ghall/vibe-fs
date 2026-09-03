@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 
 const OWNER = 'owner-ce'
-const descriptor = [{ sessionId: OWNER, agent: 'fast-manager' }]
+const descriptor = [{ sessionId: OWNER, agent: 'manager' }]
 
 test('WHAT[DELEG-009] SYNC_SERIALIZATION_second_active_call_is_rejected', async () => {
   const h = await sync.create(await mkdtemp(join(tmpdir(), 'wxs-sync-ce-')), descriptor)

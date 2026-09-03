@@ -321,6 +321,7 @@ test('WHAT[OBLIGATION-LEDGER-026] enriched result for normal checkpoints contain
     const t2Accepted = await accept(handle, t2Prepared.bridge, t2.digest, sha256Hex('t2-physical-output'))
     assert.equal(t2Accepted.ok, true)
     assert.match(t2Accepted.value.enrichedResult, /Keep working/)
+    assert.doesNotMatch(t2Accepted.value.enrichedResult, /Manager who will carry it is you|The road is yours/i, 'T1 entrustment revelation happens exactly once')
   })
 })
 

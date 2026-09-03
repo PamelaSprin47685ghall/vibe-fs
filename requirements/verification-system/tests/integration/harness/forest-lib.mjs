@@ -28,7 +28,7 @@
  * measured reasons to use one session per turn instead of one per lane:
  *
  *   a turn declares `tools`, and tools are part of the wire identity, so two turns of one
- *   lane with different tool sets cannot share a seal chain — `fast-manager`'s
+ *   lane with different tool sets cannot share a seal chain — `manager`'s
  *   `manager-guard` (fork/join/list) and `blogger` (no tools) would break ARCH-004 on the
  *   second request and the sequence would be testing the seal instead of the lookup
  *

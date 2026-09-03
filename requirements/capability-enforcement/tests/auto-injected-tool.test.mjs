@@ -29,12 +29,12 @@ const admitManagedRoot = async (hooks, sessionID = 'ses-auto-injected') => {
       id: `root-${sessionID}`,
       role: 'user',
       sessionID,
-      agent: 'fast-coder',
+      agent: 'coder',
       model: { providerID: 'host', modelID: 'placeholder' },
     },
     parts: [],
   }
-  await hooks['chat.message']({ sessionID, agent: 'fast-coder' }, output)
+  await hooks['chat.message']({ sessionID, agent: 'coder' }, output)
 }
 
 test('WHAT[ENF-006] AUTOINJ_skill_wire_stays_host_owned_and_is_not_plugin_registered', async () => {
@@ -97,7 +97,7 @@ test('WHAT[ENF-006] AUTOINJ_active_empty_skill_call_is_denied_without_touching_r
   })
 })
 
-test('WHAT[ENF-006] AUTOINJ_tryInject_rewrites_active_call_while_preserving_synthetic_injection', async () => {
+test('WHAT[ENF-006] AUTOINJ_tryInject_rewrites_active_call_without_synthetic_injection', async () => {
   await withExecutablePlugin(async (hooks) => {
     await admitManagedRoot(hooks)
     const transformed = {
@@ -128,15 +128,12 @@ test('WHAT[ENF-006] AUTOINJ_tryInject_rewrites_active_call_while_preserving_synt
     assert.equal(rewrittenActive.parts[0].state.status, 'completed')
     assert.match(rewrittenActive.parts[0].state.output, /DENIED/)
 
+    // Canonical cursor mode: zero synthetic skill messages. Guidance travels
+    // only as NUL+BOM suffix on terminal real tool results, so a synthetic-free
+    // input produces no synthetic injection row.
     const synthetic = transformed.messages.find(
       (message) => message.info?.source === markerSource,
     )
-    assert.ok(synthetic)
-    assert.equal(synthetic.parts[0].tool, 'skill')
-    assert.deepEqual(synthetic.parts[0].state.input, { name: '' })
-    assert.equal(synthetic.parts[0].state.status, 'completed')
-    assert.equal(typeof synthetic.parts[0].state.output, 'string')
-    assert.match(synthetic.parts[0].state.output, /^# /)
-    assert.doesNotMatch(synthetic.parts[0].state.output, /<skill_content|<\/skill_content>/)
+    assert.equal(synthetic, undefined, 'zero-synthetic mode must not inject a synthetic skill row')
   })
 })

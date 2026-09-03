@@ -195,7 +195,7 @@ test('WHAT[PAR-014] PAR_014_a_continuation_has_a_unique_accounted_and_budgeted_o
 })
 
 async function acceptHumanRoot(journal, userMessageId) {
-  const accepted = await fallbackAcceptHumanRoot(journal, SESSION, userMessageId, 'fast-coder')
+  const accepted = await fallbackAcceptHumanRoot(journal, SESSION, userMessageId, 'coder')
   assert.equal(accepted.ok, true, `AcceptHumanRoot failed: ${accepted.error}`)
 }
 

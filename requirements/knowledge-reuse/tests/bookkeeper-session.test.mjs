@@ -64,7 +64,7 @@ export const installBookkeeperRuntime = (port, ownerSessionIds) => {
       sessionId,
       logicalRunId: `bookkeeper-run-${sessionId}`,
       authorityRootUserMessageId: `bookkeeper-root-${sessionId}`,
-      agent: 'fast-inspector',
+      agent: 'inspector',
     })),
   )
   assert.equal(installed.ok, true, installed.error)

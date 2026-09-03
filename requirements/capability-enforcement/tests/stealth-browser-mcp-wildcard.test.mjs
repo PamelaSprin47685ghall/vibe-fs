@@ -27,15 +27,12 @@ const ROLES = [
   'Blogger',
   'Bookkeeper',
 ]
-const TIERS = ['fast', 'deep']
-const agentName = (tier, role) => `${tier}-${role.toLowerCase()}`
+const agentName = (role) => `${role.toLowerCase()}`
 
 const buildConfig = () => {
   const agent = {}
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      agent[agentName(tier, role)] = { model: `${tier}-${role.toLowerCase()}-model` }
-    }
+  for (const role of ROLES) {
+    agent[agentName(role)] = { model: `${role.toLowerCase()}-model` };
   }
   return { agent }
 }
@@ -66,21 +63,19 @@ test('WHAT[ENF-007] AGENT_026_wildcard_matrix_mechanism', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
 
-  for (const tier of TIERS) {
-    for (const role of ROLES) {
-      const name = agentName(tier, role)
-      const permission = config.agent[name].permission
+  for (const role of ROLES) {
+    const name = agentName(role);
+    const permission = config.agent[name].permission
 
-      // 矩阵机制：wildcard 键必须钉在每个 role 的 schema（allow 或 deny），
-      // 绝不缺席——缺席会让该 role 对具体 MCP 工具落到 'ask'/默认路径。
-      assert.equal(typeof permission[permissionKey], 'string', `${name} must pin ${permissionKey}`)
+    // 矩阵机制：wildcard 键必须钉在每个 role 的 schema（allow 或 deny），
+    // 绝不缺席——缺席会让该 role 对具体 MCP 工具落到 'ask'/默认路径。
+    assert.equal(typeof permission[permissionKey], 'string', `${name} must pin ${permissionKey}`)
 
-      // 不发射虚构的 network 键（域能力 token 只经 Roles.permissions 进入 schema）。
-      assert.equal(permission.network, undefined, `${name} must not emit fictional network`)
+    // 不发射虚构的 network 键（域能力 token 只经 Roles.permissions 进入 schema）。
+    assert.equal(permission.network, undefined, `${name} must not emit fictional network`)
 
-      // 具体 MCP 工具经 wildcard 求值 = 键值（wildcard 是驱动具体工具的 schema 键）。
-      const concrete = evaluate(permission, 'stealth-browser-mcp_get_debug_view').action
-      assert.equal(concrete, permission[permissionKey], `${name} concrete MCP tool must follow the wildcard key`)
-    }
+    // 具体 MCP 工具经 wildcard 求值 = 键值（wildcard 是驱动具体工具的 schema 键）。
+    const concrete = evaluate(permission, 'stealth-browser-mcp_get_debug_view').action
+    assert.equal(concrete, permission[permissionKey], `${name} concrete MCP tool must follow the wildcard key`)
   }
 })

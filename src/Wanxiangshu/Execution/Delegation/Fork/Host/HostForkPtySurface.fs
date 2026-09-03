@@ -96,7 +96,7 @@ module HostForkPtySurface =
                     ptyPort = port
                 )
 
-            let agent = ManagedAgent.make AgentTier.Fast Role.DevOps
+            let agent = ManagedAgent.make Role.DevOps
 
             match action with
             | "lookup-unknown" ->

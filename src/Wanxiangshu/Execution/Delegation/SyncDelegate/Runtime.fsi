@@ -21,7 +21,6 @@ type SyncDelegateRuntime =
         dispatcher: PromptDispatcher.Runtime *
         journal: AgentJournal *
         attached: IAttachedSessionPort *
-        resolveOwnerTier: (SessionId -> AgentTier option) *
         onDelegateReady: (SessionId -> string -> unit) *
         quiescence: ISessionQuiescenceGate *
         workRecordFor: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
@@ -43,6 +42,7 @@ type SyncDelegateRuntime =
             SyncDelegateBatch option
 
     member TryFind: ownerSessionId: SessionId * role: SyncDelegateRole -> SessionId option
+    member TryFindDelegateOwner: delegateSessionId: SessionId -> SessionId option
     member TryFindForScopeClose: ownerSessionId: SessionId * role: SyncDelegateRole -> SessionId option
     member StageDeletedInspector: ownerSessionId: SessionId * inspectorSessionId: SessionId -> bool
     member StageDeletedInspectorBySession: inspectorSessionId: SessionId -> SessionId option
@@ -74,6 +74,3 @@ type SyncDelegateRuntime =
     member CancelSession: sessionId: SessionId -> unit
     member Dispose: unit -> unit
     interface IDisposable
-
-module SyncDelegateTier =
-    val fromDispatcher: dispatcher: PromptDispatcher.Runtime -> sessionId: SessionId -> AgentTier option

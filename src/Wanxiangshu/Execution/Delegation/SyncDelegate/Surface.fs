@@ -349,17 +349,17 @@ module SyncDelegateSurface =
                     let children =
                         match mode with
                         | "matching" ->
-                            [ descriptor "host-child-wrong-agent" exactTitle "fast-coder"
-                              descriptor "host-child-existing" exactTitle "fast-inspector" ]
+                            [ descriptor "host-child-wrong-agent" exactTitle "coder"
+                              descriptor "host-child-existing" exactTitle "inspector" ]
                         | "conflicting" ->
-                            [ descriptor "host-child-existing-a" exactTitle "fast-inspector"
-                              descriptor "host-child-existing-b" exactTitle "fast-inspector" ]
+                            [ descriptor "host-child-existing-a" exactTitle "inspector"
+                              descriptor "host-child-existing-b" exactTitle "inspector" ]
                         | "other-scope" ->
                             [ descriptor
                                   "host-child-other-scope"
-                                  "wanxiangshu:sync-delegate:v1:scope=another-owner:role=inspector:agent=fast-inspector"
-                                  "fast-inspector" ]
-                        | _ -> [ descriptor "host-child-wrong-agent" exactTitle "fast-coder" ]
+                                  "wanxiangshu:sync-delegate:v1:scope=another-owner:role=inspector:agent=inspector"
+                                  "inspector" ]
+                        | _ -> [ descriptor "host-child-wrong-agent" exactTitle "coder" ]
 
                     Task.FromResult(Ok children)
                 | None ->
@@ -371,11 +371,11 @@ module SyncDelegateSurface =
                         [ { SessionId = child
                             ParentSessionId = Some parent
                             Title = Some "managed delegate"
-                            Agent = Some "fast-inspector" }
+                            Agent = Some "inspector" }
                           { SessionId = child
                             ParentSessionId = Some parent
                             Title = Some "managed delegate"
-                            Agent = Some "fast-coder" } ])
+                            Agent = Some "coder" } ])
                     |> Seq.toList
                     |> Ok
                     |> Task.FromResult
@@ -569,7 +569,6 @@ module SyncDelegateSurface =
                     dispatcher,
                     journal,
                     (attached :> IAttachedSessionPort),
-                    (fun _ -> Some AgentTier.Fast),
                     (fun _ _ -> ()),
                     gate,
                     workRecordFor,
@@ -605,7 +604,7 @@ module SyncDelegateSurface =
         | Error error -> raise (ArgumentException error)
 
     let private createForObservation (directory: string) (observationMode: string option) : Task<obj> =
-        match ownerAdmissionFor "managed-child-reconciliation" "fast-manager" with
+        match ownerAdmissionFor "managed-child-reconciliation" "manager" with
         | Ok admission -> createWithAdmissions directory observationMode [ admission ]
         | Error error -> raise (InvalidOperationException error)
 
@@ -619,7 +618,7 @@ module SyncDelegateSurface =
             let ownerScope = ReuseScope.ofSession owner
 
             harness.Sessions.SetExpectedTitle(
-                SyncDelegatePhysicalIdentity.title ownerScope SyncDelegateRole.Inspector "fast-inspector"
+                SyncDelegatePhysicalIdentity.title ownerScope SyncDelegateRole.Inspector "inspector"
             )
 
             let invocation =
@@ -693,7 +692,7 @@ module SyncDelegateSurface =
                 attached.GetOrCreate(
                     owner,
                     SyncDelegateRole.Inspector,
-                    "fast-inspector",
+                    "inspector",
                     None,
                     observe,
                     create,
@@ -968,23 +967,15 @@ module SyncDelegateSurface =
         harness.Runtime.CancelSession(harness.OwnerSession session)
 
     let vocabulary (roleName: string) (tierName: string) (scope: string) : obj =
+        ignore tierName
+
         match roleOf roleName with
         | Error error -> box {| ok = false; error = error |}
         | Ok role ->
-            let tier =
-                if
-                    not (isNull tierName)
-                    && tierName.Equals("Deep", StringComparison.OrdinalIgnoreCase)
-                then
-                    AgentTier.Deep
-                else
-                    AgentTier.Fast
-
             let key = DedicatedDelegateKey.create (ReuseScopeId.create scope) role
 
             box
-                {| tier = SyncDelegate.tierLabel (SyncDelegate.tierForOwner tier)
-                   agent = SyncDelegate.agentNameFor role tier
+                {| agent = SyncDelegate.agentNameFor role
                    scope = ReuseScopeId.value key.Scope
                    role = SyncDelegate.roleLabel key.Role |}
 

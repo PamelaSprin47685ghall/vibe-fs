@@ -200,7 +200,7 @@ module BookkeeperRuntime =
         )
         |> LlmFacing.render
 
-    let private canonicalAgent = ManagedAgentCatalog.bookkeeperNameOf AgentTier.Fast
+    let private canonicalAgent = ManagedAgentCatalog.bookkeeperName
 
     let private childOptions (txId: string) : OpenCodeChildOptions =
         { Title = Some("bookkeeper:" + txId)

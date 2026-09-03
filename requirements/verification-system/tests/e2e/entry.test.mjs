@@ -116,7 +116,7 @@ const waitCaptured = async (scenario) => {
 };
 
 const preFlowCanaries = async (scenario) => {
-  await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'deep-coder');
+  await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'coder');
 
   assert.equal(
     scenario.provider.matchCount('strength-canary-replica.0'),
@@ -152,7 +152,7 @@ const preFlowCanaries = async (scenario) => {
     body: {
       messageID: 'msg-g2-inspector-owner',
       parts: [{ type: 'text', text: G2_INSPECTOR_CANARY_PROMPT }],
-      agent: 'fast-coder',
+      agent: 'coder',
     },
   });
   assert.ok(inspectorPrompt.ok, `g2 inspector prompt failed: ${JSON.stringify(inspectorPrompt.data)}`);

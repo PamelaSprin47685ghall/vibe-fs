@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Sphinx
 
+open System
+
 module Absorb =
 
     let private normalizeKey (text: string) = text.Trim().ToLowerInvariant()
@@ -8,7 +10,55 @@ module Absorb =
         let dependency = proposal.DependencyKey |> Option.defaultValue "independent"
         normalizeKey (proposal.SemanticKey + "|" + dependency)
 
-    let private actionFromProposal (proposal: CandidateProposal) =
+    let private gainFromMethod state (methodDef: Methodology.MethodDefinition option) =
+        match methodDef with
+        | Some def ->
+            let u = Methodology.utility state def
+            max 0.35 (min 0.95 u)
+        | None -> 0.60
+
+    let private rootGainForProposal
+        state
+        (proposal: CandidateProposal)
+        (methodDef: Methodology.MethodDefinition option)
+        =
+        if proposal.ExpectedRootGain > 0.0 then
+            proposal.ExpectedRootGain
+        else
+            gainFromMethod state methodDef
+
+    let private costFromMethod (methodDef: Methodology.MethodDefinition option) =
+        match methodDef with
+        | Some def -> max 0.10 (min 0.50 (0.15 * def.BaseCost))
+        | None -> 0.15
+
+    let private costForProposal (proposal: CandidateProposal) (methodDef: Methodology.MethodDefinition option) =
+        if proposal.Cost > 0.0 then
+            proposal.Cost
+        else
+            costFromMethod methodDef
+
+    let private dependentCount (semanticKey: string) (actions: Map<string, CognitiveAction>) =
+        actions
+        |> Map.toSeq
+        |> Seq.filter (fun (_, a) -> a.DependencyKey = Some semanticKey)
+        |> Seq.length
+
+    let private gatewayFromCount (count: int) =
+        if count > 0 then min 1.0 (0.25 * float count) else 0.0
+
+    let private gatewayForProposal (state: EpistemicState) (proposal: CandidateProposal) =
+        if proposal.GatewayGain > 0.0 then
+            proposal.GatewayGain
+        else
+            let normKey = normalizeKey proposal.SemanticKey
+            dependentCount normKey state.Actions |> gatewayFromCount
+
+    let private actionFromProposal (state: EpistemicState) (proposal: CandidateProposal) =
+        let methodDef =
+            Methodology.library
+            |> List.tryFind (fun m -> String.Equals(m.Name, proposal.Method, StringComparison.OrdinalIgnoreCase))
+
         { Id = actionId proposal
           Kind = ActionKind.Investigate
           Method = proposal.Method
@@ -16,9 +66,9 @@ module Absorb =
           SemanticKey = normalizeKey proposal.SemanticKey
           EquivalenceKey = None
           DependencyKey = proposal.DependencyKey |> Option.map normalizeKey
-          ExpectedRootGain = max 0.0 proposal.ExpectedRootGain
-          GatewayGain = max 0.0 proposal.GatewayGain
-          Cost = max 0.0 proposal.Cost
+          ExpectedRootGain = rootGainForProposal state proposal methodDef
+          GatewayGain = gatewayForProposal state proposal
+          Cost = costForProposal proposal methodDef
           Value = 0.0
           Status = ActionStatus.Open
           Provenance = proposal.Provenance |> List.distinct }
@@ -32,7 +82,7 @@ module Absorb =
             Provenance = List.distinct (left.Provenance @ right.Provenance) }
 
     let private addCandidate proposal (state: EpistemicState) =
-        let action = actionFromProposal proposal
+        let action = actionFromProposal state proposal
 
         let actions =
             match Map.tryFind action.Id state.Actions with

@@ -13,7 +13,6 @@ open Wanxiangshu.OpenCode
 module internal SyncDelegateWorkflow =
     type Dependencies =
         { Attached: IAttachedSessionPort
-          ResolveOwnerTier: SessionId -> AgentTier option
           ObserveChild:
               SessionId -> ReuseScopeId -> SyncDelegateRole -> string -> Task<Result<AttachedChildObservation, string>>
           CreateChild:

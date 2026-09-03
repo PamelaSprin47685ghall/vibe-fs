@@ -61,18 +61,18 @@ test('WHAT[SESSION-ONTOLOGY-012] HOST_008_bookkeeper_carries_transaction_id', ()
   assert.deepEqual(assoc.bookkeeperAttachment('tx-42'), { name: 'Bookkeeper', transactionId: 'tx-42' })
 })
 
-test('WHAT[PID-010] SyncDelegate identity inherits its exact owner Persona and version', () => {
+test('WHAT[PID-008] SyncDelegate identity inherits its exact owner Persona and version', () => {
   const created = authority.createAuthorityRoot(
     H,
     'runtime-sync-lineage',
     'ses_sync_owner',
     'HumanRoot',
     'msg_sync_owner',
-    rootSelection('fast-manager'),
+    rootSelection('manager'),
   )
   assert.equal(created.ok, true, created.ok ? '' : created.error)
   const owner = created.value
-  const issued = authority.issueInheritedIdentitySeed('deep-inspector', owner)
+  const issued = authority.issueInheritedIdentitySeed('inspector', owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
 
   assert.deepEqual(
@@ -87,7 +87,7 @@ test('WHAT[PID-010] SyncDelegate identity inherits its exact owner Persona and v
       ownerAuthorityRoot: issued.value.ownerAuthorityRoot,
     },
     {
-      selectedAgent: 'deep-inspector',
+      selectedAgent: 'inspector',
       canonicalRole: 'inspector',
       selectedTier: 'deep',
       persona: owner.participantIdentity.persona,
@@ -100,9 +100,9 @@ test('WHAT[PID-010] SyncDelegate identity inherits its exact owner Persona and v
 })
 
 test('WHAT[SESSION-ONTOLOGY-012] Bookkeeper is private identity, not a Foundation role', () => {
-  assert.equal(persona.isManagedName('fast-bookkeeper'), true)
+  assert.equal(persona.isManagedName('bookkeeper'), true)
   assert.equal(roles.allRoleLabels.includes('bookkeeper'), false)
-  assert.equal(persona.nameOf('fast', 'bookkeeper'), '')
+  assert.equal(persona.nameOf('deep', 'bookkeeper'), '')
 })
 
 assert.deepEqual(syncDelegateRoles, ['Inspector', 'Coder'])

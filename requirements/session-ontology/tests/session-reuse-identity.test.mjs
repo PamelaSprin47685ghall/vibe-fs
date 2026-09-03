@@ -66,8 +66,8 @@ const acceptedFact = (profile) => ({
 
 test('WHAT[SESSION-ONTOLOGY-015] physical SessionId reuse requires durable logical-run closure', () => {
   const session = 'ses-reusable-container'
-  const first = root(session, 'msg-container-a', 'fast-manager')
-  const second = root(session, 'msg-container-b', 'deep-reviewer')
+  const first = root(session, 'msg-container-a', 'manager')
+  const second = root(session, 'msg-container-b', 'reviewer')
   const scenario = temporal.sessionReuseIdentityScenario(
     acceptedFact(first),
     acceptedFact(second),

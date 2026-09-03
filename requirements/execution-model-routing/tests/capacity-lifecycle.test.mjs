@@ -7,7 +7,7 @@ const target = { model: 'provider/shared', reasoning: 'none' }
 const identity = (overrides = {}) => ({
   sessionId: 'session-a',
   physicalUserMessageId: 'message-a',
-  effectiveAgent: 'fast-coder',
+  effectiveAgent: 'coder',
   target,
   ...overrides,
 })

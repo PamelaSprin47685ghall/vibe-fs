@@ -8,7 +8,7 @@ test('WHAT[MANAGED-SESSION-003] HOST_015_companion_reuses_exact_journal_linked_p
   assert.equal(observed.origin, 'Reused')
   assert.equal(observed.child, 'blogger-1')
   assert.deepEqual(observed.created, [])
-  assert.deepEqual(observed.linked, [['work', 'blogger-1', 'fast-blogger']])
+  assert.deepEqual(observed.linked, [['work', 'blogger-1', 'blogger']])
 })
 
 test('WHAT[MANAGED-SESSION-011] HOST_015_missing_restored_child_closes_then_links_replacement', async () => {
@@ -17,7 +17,7 @@ test('WHAT[MANAGED-SESSION-011] HOST_015_missing_restored_child_closes_then_link
   assert.equal(observed.origin, 'Replacement')
   assert.deepEqual(observed.created, ['created-1'])
   assert.deepEqual(observed.closed, ['work'])
-  assert.deepEqual(observed.linked, [['work', 'created-1', 'fast-blogger']])
+  assert.deepEqual(observed.linked, [['work', 'created-1', 'blogger']])
 })
 
 test('WHAT[MANAGED-SESSION-003] HOST_015_conflicting_restored_child_fails_closed', async () => {

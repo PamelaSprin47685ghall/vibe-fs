@@ -23,7 +23,7 @@ test('WHAT[ENF-009] FORK_disposed_or_unbound_execution_surfaces_natural_executio
   await withExecutablePlugin(async (hooks) => {
     const result = await hooks.tool.fork.execute(
       { calling: 'coder', name: 'Ada', charge: 'do work' },
-      { sessionID: '', agent: 'fast-coder' },
+      { sessionID: '', agent: 'coder' },
     )
     assert.match(result, /cannot be placed from this execution context|caller's authority is established|调用方权威确立之前/i)
     assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
@@ -34,7 +34,7 @@ test('WHAT[ENF-010] FORK_orchestrator_missing_authority_is_refused_without_sessi
   await withExecutablePlugin(async (hooks) => {
     const result = await hooks.tool.commission.execute(
       { calling: 'coordinator', name: 'North Road', charge: 'x' },
-      { sessionID: '', agent: 'fast-orchestrator' },
+      { sessionID: '', agent: 'orchestrator' },
     )
     assert.match(result, /caller's authority is established|调用方权威确立之前/i)
     assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
@@ -43,10 +43,10 @@ test('WHAT[ENF-010] FORK_orchestrator_missing_authority_is_refused_without_sessi
 
 test('WHAT[ENF-009] FORK_non_repository_target_rejects_nonempty_warm_start_keywords_before_creation', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'ses-fork', 'fast-manager')
+    await acceptAuthorityRoot(runtime, 'ses-fork', 'manager')
     const result = await hooks.tool.fork.execute(
-      { calling: 'navigator', name: 'Web Road', charge: 'browse', keywords: 'repository clue' },
-      { sessionID: 'ses-fork', agent: 'fast-manager' },
+      { calling: 'researcher', name: 'Web Road', charge: 'browse', keywords: 'repository clue' },
+      { sessionID: 'ses-fork', agent: 'manager' },
     )
     assert.match(result, /only available when fork targets Coder, Inspector, or DevOps|仅当 fork 目标为 Coder、Inspector 或 DevOps/i)
     assert.doesNotMatch(result, /\berror\s*=/i)

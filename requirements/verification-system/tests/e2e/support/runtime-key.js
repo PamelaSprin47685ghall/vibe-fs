@@ -47,14 +47,14 @@ import {
  * Which lanes this request could belong to — a SET, not one name.
  *
  * A lane is addressed by the session the Host issued, and aliases exist because a
- * scenario names sessions before they exist (`fast-manager`, `coder-after`). The
+ * scenario names sessions before they exist (`manager`, `coder-after`). The
  * binding is established when the Host mints the real id; HOST-008 makes the
  * association durable and the mock is told it rather than inferring it.
  *
  * ── why a set ───────────────────────────────────────────────────────────────
  *
  * Measured: every converted scenario binds TWO aliases to its primary session, e.g.
- * `bind = ["inspector-title", "fast-inspector"]`, because the Host titles a session
+ * `bind = ["inspector-title", "inspector"]`, because the Host titles a session
  * on the same id it chats on. A reverse lookup returning the first match is then
  * decided by Map insertion order, not by the request — the exact impurity this
  * module exists to remove, hidden inside the function that names the key.

@@ -6,7 +6,7 @@ import test from 'node:test'
 import * as childRecovery from '../../../dist/Execution/Delegation/Fork/ChildRecoverySurface.js'
 
 const CHILD = 'ses_trace_child'
-const AGENT = 'fast-coder'
+const AGENT = 'coder'
 const event = (kind, payload = {}) => ({ kind, ...payload })
 
 const legal = [

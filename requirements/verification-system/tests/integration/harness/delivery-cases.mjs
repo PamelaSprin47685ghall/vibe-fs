@@ -25,7 +25,7 @@ import {
 import { resolveEntry } from '../../e2e/support/runtime-key.js';
 
 const SESSION = 'ses_real_1';
-const BINDINGS = new Map([['fast-coder', SESSION]]);
+const BINDINGS = new Map([['coder', SESSION]]);
 
 const user = (text) => ({ role: 'user', content: text });
 const request = (text) => ({ messages: [user(text)] });
@@ -37,10 +37,10 @@ const OTHER_TURN = 'Round 2 fallback attempt.';
 // is what the "no spreading" cases below need: under text keying a fault on the shorter
 // declaration silently covered the longer one.
 const ENTRIES = [
-  { id: 'round1', lane: 'fast-coder', turn: TURN, step: 0, respond: { text: 'done' } },
-  { id: 'round1x', lane: 'fast-coder', turn: `${TURN} Extended.`, step: 0, respond: { text: 'extended' } },
-  { id: 'round2', lane: 'fast-coder', turn: OTHER_TURN, step: 0, respond: { text: 'done 2' } },
-  { id: 'round1step1', lane: 'fast-coder', turn: TURN, step: 1, respond: { text: 'after' } },
+  { id: 'round1', lane: 'coder', turn: TURN, step: 0, respond: { text: 'done' } },
+  { id: 'round1x', lane: 'coder', turn: `${TURN} Extended.`, step: 0, respond: { text: 'extended' } },
+  { id: 'round2', lane: 'coder', turn: OTHER_TURN, step: 0, respond: { text: 'done 2' } },
+  { id: 'round1step1', lane: 'coder', turn: TURN, step: 1, respond: { text: 'after' } },
 ];
 
 const entryOf = (id) => ENTRIES.find((entry) => entry.id === id);
@@ -55,7 +55,7 @@ const entryOf = (id) => ENTRIES.find((entry) => entry.id === id);
  */
 const fault = (overrides = {}) => ({
   entryId: 'round1',
-  lane: 'fast-coder',
+  lane: 'coder',
   attempts: [1, 2],
   kind: 'provider-error',
   status: 500,
@@ -275,7 +275,7 @@ export const deliveryCases = [
     fn: () => {
       const faults = [{ turn: TURN, step: 0, attempts: [1], kind: 'provider-error' }];
 
-      assertTrue(faultFor(faults, { lane: 'fast-coder', turn: TURN, step: 0 }) !== null);
+      assertTrue(faultFor(faults, { lane: 'coder', turn: TURN, step: 0 }) !== null);
       assertTrue(faultFor(faults, { lane: 'anything', turn: TURN, step: 0 }) !== null);
     },
   },

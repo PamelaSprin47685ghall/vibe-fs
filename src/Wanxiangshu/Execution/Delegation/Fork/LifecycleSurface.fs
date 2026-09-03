@@ -11,7 +11,7 @@ module ForkLifecycleSurface =
     let private epoch = DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero)
 
     let snapshot (action: string) (runtimeCancelled: bool) (message: string) : obj =
-        let run = ChildRun.create "agent-1" "run-1" "fast-coder" Role.Manager "prompt" epoch
+        let run = ChildRun.create "agent-1" "run-1" "coder" Role.Manager "prompt" epoch
 
         if runtimeCancelled || action = "cancel" then
             ChildRun.cancel run

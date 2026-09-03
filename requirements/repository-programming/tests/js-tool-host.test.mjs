@@ -78,14 +78,14 @@ test('WHAT[REPOSITORY-PROGRAMMING-016] JS073_spec_executes_program_and_renders_r
     return { before: view.text() };
   }
 }`
-    const result = await execute(registered, { program }, { sessionID: 'ses-test', agent: 'fast-coder' })
+    const result = await execute(registered, { program }, { sessionID: 'ses-test', agent: 'coder' })
     assert.equal(result.startsWith('# ok\n'), true)
     assert.equal(result.includes('[data]'), true)
     assert.equal(result.includes('before'), true)
     assert.equal(result.includes('[fs]'), true)
     assert.equal(result.includes('status ='), false)
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'goodbye world', 'committed via workflow')
-    const missing = await execute(registered, {}, { sessionID: 'ses-test', agent: 'fast-coder' })
+    const missing = await execute(registered, {}, { sessionID: 'ses-test', agent: 'coder' })
     assert.equal(missing.includes('error'), true)
     assert.equal(missing.includes("missing 'program' argument"), true)
   } finally {

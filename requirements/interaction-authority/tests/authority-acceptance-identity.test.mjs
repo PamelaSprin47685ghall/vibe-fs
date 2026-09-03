@@ -10,11 +10,11 @@ import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as obligationJournal from '../../../dist/Persistence/Journal/ObligationJournalSurface.js'
 
 const participantIdentity = {
-  selectedAgent: 'fast-manager',
-  peerAgent: 'deep-manager',
+  selectedAgent: 'manager',
+  peerAgent: 'manager',
   canonicalRole: 'manager',
-  selectedTier: 'fast',
-  persona: 'Coordinator',
+  selectedTier: 'deep',
+  persona: 'Lead',
   personaCatalogVersion: 1,
   origin: 'ResolvedAtRoot',
 }
@@ -62,7 +62,7 @@ const acceptOwner = async (handle, session = 'ses-owner') => {
   return accepted.profile
 }
 
-const inheritedSeed = (owner, child = 'fast-coder') => {
+const inheritedSeed = (owner, child = 'coder') => {
   const issued = authority.issueInheritedIdentitySeed(child, owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
   return issued.value
@@ -120,13 +120,13 @@ test('WHAT[INTERACTION-AUTHORITY-015] matching external user ingress continues w
       handle,
       'ses-external-while-active',
       'msg-external-while-active',
-      'fast-manager',
+      'manager',
     )
     const after = dispatch.projectionObservation(handle, 'ses-external-while-active')
 
     assert.equal(ingress.ok, true)
     assert.equal(ingress.origin, 'HumanMessage')
-    assert.equal(ingress.effectiveAgent, 'fast-manager')
+    assert.equal(ingress.effectiveAgent, 'manager')
     assert.deepEqual(after.activeLogicalRun, active)
     assert.equal(after.activeLogicalRun.logicalRun, before.activeLogicalRun.logicalRun)
     assert.equal(after.runtimeStartCount, before.runtimeStartCount)
@@ -255,7 +255,7 @@ test('WHAT[INTERACTION-AUTHORITY-005] owner superseded after claim rejects physi
 test('WHAT[INTERACTION-AUTHORITY-003] physical receipt installs exact AgentOwnerRoot authority after its claim', async () => {
   await withJournal('physical-acceptance', async (handle) => {
     const owner = await acceptOwner(handle)
-    const seed = inheritedSeed(owner, 'deep-coder')
+    const seed = inheritedSeed(owner, 'coder')
     const order = []
 
     const result = await dispatch.sendAgentOwnerRootAwait(
@@ -294,8 +294,8 @@ test('WHAT[INTERACTION-AUTHORITY-003] physical receipt installs exact AgentOwner
 test('WHAT[INTERACTION-AUTHORITY-003] rejected or unknown physical send outcome leaves no authority', async () => {
   await withJournal('unaccepted-send', async (handle) => {
     const owner = await acceptOwner(handle)
-    const rejectedSeed = inheritedSeed(owner, 'fast-coder')
-    const unknownSeed = inheritedSeed(owner, 'deep-coder')
+    const rejectedSeed = inheritedSeed(owner, 'coder')
+    const unknownSeed = inheritedSeed(owner, 'inspector')
 
     const rejected = await dispatch.sendAgentOwnerRootAwait(
       hostPort(async () => dispatch.fatal('provider rejected')),

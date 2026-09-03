@@ -8,11 +8,11 @@
 合法 root input / typed owner-derived evidence
                        │
                        ▼
-resolve(Role, initial Tier, persona provenance/version, canonical catalog)
+resolve(Role, persona provenance/version, canonical catalog)
                        │
                        ▼
 prepared ParticipantIdentityEvidence {
-  SelectedAgent; PeerAgent; Role; InitialTier; Persona; PersonaEvidence
+  SelectedAgent; PeerAgent; Role; Persona; PersonaEvidence
 }
                        │
                        ▼
@@ -32,7 +32,7 @@ exact execution request ───► ExecutionBinding { EffectiveAgent; provider
 4. **Execution separation**：canonical SelectedAgent/PeerAgent 是 immutable identity evidence；fallback、Strength、Peer 路由与 provider lease 只生成含当前 EffectiveAgent/provider/model/lease 的新 `ExecutionBinding`。system prompt、authority profile 与 capability projection 消费同一 durable identity evidence，不反向解析或改写身份。内部 Role 使用私有 catalog 分支，不进入 public `Role`。
 
 5. **typed evidence 与所有权切割**：
-   - `ParticipantIdentityEvidence` 是私有构造的完整值；root resolve、owner-derived inheritance 与 durable rehydration 都必须校验 canonical agent/peer、Role、initial Tier、Persona、catalog version 与 provenance，不能逐字段补写。
+   - `ParticipantIdentityEvidence` 是私有构造的完整值；root resolve、owner-derived inheritance 与 durable rehydration 都必须校验 canonical agent/peer、Role、Persona、catalog version 与 provenance，不能逐字段补写。
    - `SessionPersona`、`SessionSurface`、Host `PersonaBinding` 与 `RoleIdentity` 均不存在；身份不能落入 `SessionId` keyed process cache，也不能由显示字符串授权。
    - `Roles.fs` 不含 `ToolPermission`、权限矩阵或 capability 判断；这些事实只在 `Foundation/OfficeCapability.fs`。
 
@@ -41,13 +41,11 @@ exact execution request ───► ExecutionBinding { EffectiveAgent; provider
 | 命题 | 落点测试 |
 |---|---|
 | PID-001 | `requirements/participant-identity/tests/participant-identity.test.mjs::WHAT[PID-001] resolves every canonical participant identity and persona`；`requirements/participant-identity/tests/identity-boundary-gate.test.mjs::WHAT[PID-001] rejects SessionId keyed identity cache` |
-| PID-002 | `requirements/participant-identity/tests/catalog.test.mjs::WHAT[PID-002] persona_catalog_is_the_exact_closed_twenty_two_label_matrix`；`requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-002] ProviderAttempt carries its ParticipantIdentity as one nested value` |
+| PID-002 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-002] ProviderAttempt carries its ParticipantIdentity as one nested value` |
 | PID-003 | `requirements/participant-identity/tests/participant-identity.test.mjs::WHAT[PID-003] rejects blank Persona and unsupported catalog version` |
-| PID-004 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-004] terminal dispatch preserves the exact IdentitySeed`；`requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-004] Strength replica inherits owner Persona and version with a different EffectiveAgent` |
+| PID-004 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-004] terminal dispatch preserves the exact IdentitySeed`；`requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-004] Strength replica inherits owner Persona and version with the same EffectiveAgent` |
 | PID-005 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-005] provider planning selects the system prompt and tool set from profile Role` |
 | PID-006 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-006] fallback preserves ParticipantIdentity` |
-| PID-007 | `requirements/participant-identity/tests/catalog.test.mjs::WHAT[PID-007] peer_is_same_role_opposite_tier_and_symmetric` |
-| PID-008 | `requirements/participant-identity/tests/session-execution-binding.test.mjs::WHAT[PID-008] root_requires_external_agent_proof_then_model_is_scheduler_owned`；`requirements/participant-identity/tests/session-execution-binding.test.mjs::WHAT[PID-008] parented_session_uses_stable_agent_lease_and_authorized_peer_only`；`requirements/participant-identity/tests/session-execution-binding.test.mjs::WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease` |
-| PID-009 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-009] Bookkeeper has private identity and no public Role` |
-| PID-010 | `requirements/participant-identity/tests/identity-lineage.test.mjs::WHAT[PID-010] inherited identity records the exact durable owner witness`；`requirements/participant-identity/tests/identity-lineage.test.mjs::WHAT[PID-010] rejects stale owner identity evidence` |
-| PID-011 | `requirements/participant-identity/tests/session-reuse-identity.test.mjs::WHAT[PID-011] reuses SessionId with a fresh closed-run identity`；`requirements/participant-identity/tests/session-reuse-composition.test.mjs::WHAT[PID-011] production plugin replaces identity only after exact durable Manager closure` |
+| PID-007 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-007] Bookkeeper has private identity and no public Role` |
+| PID-008 | `requirements/participant-identity/tests/identity-lineage.test.mjs::WHAT[PID-008] inherited identity records the exact durable owner witness`；`requirements/participant-identity/tests/identity-lineage.test.mjs::WHAT[PID-008] rejects stale owner identity evidence` |
+| PID-009 | `requirements/participant-identity/tests/session-reuse-identity.test.mjs::WHAT[PID-009] reuses SessionId with a fresh closed-run identity`；`requirements/participant-identity/tests/session-reuse-composition.test.mjs::WHAT[PID-009] production plugin replaces identity only after exact durable Manager closure` |

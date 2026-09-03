@@ -864,7 +864,7 @@
       "classification": "Authority",
       "class": "Witness",
       "owner": "interaction-authority",
-      "what": "INTERACTION-AUTHORITY-011, PID-010, ENF-013, ENF-015",
+      "what": "INTERACTION-AUTHORITY-011, PID-008, ENF-013, ENF-015",
       "scope": "the owner's exact SessionId + LogicalRunId + AuthorityRootUserMessageId and the versioned ParticipantIdentityEvidence installed at that Authority Root",
       "freshness": "the derived root re-validates every owner field and the InheritedFromOwner origin; a mismatch is a typed PromptIdentitySeedValidationError",
       "multiplicity": "replayable evidence: any number of derived roots may cite the same owner authority root",
@@ -881,7 +881,7 @@
       ],
       "whatOwners": {
         "INTERACTION-AUTHORITY-011": "interaction-authority",
-        "PID-010": "participant-identity",
+        "PID-008": "participant-identity",
         "ENF-013": "capability-enforcement",
         "ENF-015": "capability-enforcement"
       }

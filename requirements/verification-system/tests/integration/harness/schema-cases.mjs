@@ -36,18 +36,18 @@ description = "ORCH-005 short CAS publish"
 must = ["mgr.0"]
 
 flow = [
-  { prompt = { agent = "fast-manager", text = "Ship the parser fix." } },
+  { prompt = { agent = "manager", text = "Ship the parser fix." } },
   { wait = "mgr.0" },
 ]
 
 [[turn]]
 id = "mgr"
-lane = "fast-manager"
+lane = "manager"
 user = "Ship the parser fix."
 tools = ["fork", "join"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Fix it." } }
+  respond = { type = "tool-call", tool = "fork", args = { agent = "coder", prompt = "Fix it." } }
 
   [[turn.step]]
   respond = { type = "text", text = "Done." }
@@ -153,7 +153,7 @@ user = "go"
       // cannot disagree with it, and the copied triple did (measured: every real fault inert).
       assertEq(scenario.faults[0].entryId, 'mgr.0');
       assertEq(scenario.faults[0].kind, 'provider-error');
-      assertEq(scenario.faults[0].lane, 'fast-manager');
+      assertEq(scenario.faults[0].lane, 'manager');
     },
   },
 
@@ -815,14 +815,14 @@ attempts = [2]
       const claiming = (claim) => `scenario = "probe"
 
 flow = [
-  { prompt = { agent = "fast-manager", text = "Ship the parser fix." } },
+  { prompt = { agent = "manager", text = "Ship the parser fix." } },
   { wait = "mgr.0" },
   { assertModelTrajectory = ${claim} },
 ]
 
 [[turn]]
 id = "mgr"
-lane = "fast-manager"
+lane = "manager"
 user = "Ship the parser fix."
 
   [[turn.step]]
@@ -831,8 +831,8 @@ user = "Ship the parser fix."
 
       rejects(claiming('false'), 'assertModelTrajectory must be a table');
       rejects(claiming('{ lane = "nonexistent", models = ["test-model"] }'), "references lane 'nonexistent'");
-      rejects(claiming('{ lane = "fast-manager", models = [] }'), 'needs the exact expected model sequence');
-      accepts(claiming('{ lane = "fast-manager", models = ["test-model", "test-model-b"] }'));
+      rejects(claiming('{ lane = "manager", models = [] }'), 'needs the exact expected model sequence');
+      accepts(claiming('{ lane = "manager", models = ["test-model", "test-model-b"] }'));
     },
   },
 
@@ -855,10 +855,10 @@ user = "go"
 
       rejects(binding('{ bind = ["coder"] }'), 'bindChild requires an exact agent');
       rejects(
-        binding('{ agent = "fast-coder", bind = ["coder"], parent = "manager" }'),
+        binding('{ agent = "coder", bind = ["coder"], parent = "manager" }'),
         "bindChild field 'parent' is unsupported",
       );
-      accepts(binding('{ agent = "fast-coder", bind = ["coder"] }'));
+      accepts(binding('{ agent = "coder", bind = ["coder"] }'));
     },
   },
 

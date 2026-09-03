@@ -4,7 +4,7 @@ import * as HandleSurface from '../../../dist/Execution/Delegation/Handle/Surfac
 
 const linkedProjection = () => {
   const linked = HandleSurface.apply(HandleSurface.empty(), {
-    op: 'link', handle: 'agent:child-1', child: 'ses_child', agent: 'fast-coder', role: 'Coder',
+    op: 'link', handle: 'agent:child-1', child: 'ses_child', agent: 'coder', role: 'Coder',
   })
   assert.equal(linked.ok, true)
   return linked.state

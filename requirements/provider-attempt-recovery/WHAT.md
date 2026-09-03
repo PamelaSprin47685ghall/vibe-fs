@@ -12,17 +12,17 @@ FallbackOffset 仅存在 `Fork0 | Fork1 | Fork2 | Fork3` 四个合法取值。�
 
 FallbackLedger 是唯一允许提交 `FallbackCursorAdvanced` 与 `FallbackExhausted` 的写入口。同一已确认失败（基于 SessionId、LogicalRunId、AuthorityRootUserMessageId 与 ProviderRun 唯一去重）最多推进 cursor 一次；重复观察直接幂等吸收，不写新事实、不推进游标。
 
-## PAR-004: 推进不变量
+## PAR-004: 推进不变量与首次失败永久摘要上下文替换
 
-任意一次已确认失败将 Offset 沿模 4 环前进一格且使连续失败计数加 1。主请求成功写入 `FallbackSucceeded` 事实并将连续失败计数归零，同时关闭当前 recovery 子槽：`Fork1(A′) → Fork0(A)`、`Fork3(B′) → Fork2(B)`，偶数普通槽保持不变。成功只结束同一侧的 primed recovery phase，不改变 EffectiveAgent 所在侧。这样一次 A′/B′ 成功后，下一次真实失败会从该侧普通槽直接推进到同侧 primed 槽并立即获得 recovery opportunity，不会先白白消耗另一侧普通请求。
+不再使用 AA'BB' 重试法。任意一次已确认失败将使连续失败计数加 1，并永久标记当前 provider 为失败（在进程生命周期内所有 `wanxiangshu.mjs` 指定的该 provider 容量均视为 0）。首次失败立即永久替换为 blogger 摘要上下文重试（开启新 prefix epoch，同一 epoch 内保持前缀不可变）。成功写入 `FallbackSucceeded` 事实并将连续失败计数归零。
 
-## PAR-005: 有限自动恢复预算
+## PAR-005: 理论容量耗尽判定与有限自动恢复预算
 
-A/A/B/B 侧循环在结构上无界，但自动恢复预算严格有界（默认为 12 次连续失败）。连续失败达到预算时写入 `FallbackExhausted` 并停止自动发出物理请求，后续恢复必须依赖新 Authority Root 或用户显式动作。
+重试在候选池中切换至其它具备非零容量的 provider（使用已替换的摘要上下文）。当该角色在 `wanxiangshu.mjs` 中的所有 candidate provider 理论容量全部腾出后仍均为 0 时，或者连续失败达到自动恢复预算上限时，判定为容量耗尽并写入 `FallbackExhausted`，停止自动发出物理请求。
 
-## PAR-006: 侧序列与预算的维度分离
+## PAR-006: 失败轮换与容量归零维度分离
 
-Offset 每次失败前进一格（映射至 A/A′/B/B′ 循环）。第 12 次连续失败落在 Offset=3 并前进至 0，此时立即判定为 final 耗尽，严禁自动发起第 13 次请求。
+失败轮换不依赖模 4 侧序号，而是依据 `wanxiangshu.mjs` 中的可用 provider 候选列表。每当一个 provider 发生物理失败，其容量在当前进程生命周期内归零，由调度器自动转向下一可用 provider。
 
 ## PAR-007: Fold 拒绝条件
 
@@ -48,9 +48,9 @@ Host 传输层的重试序号是宿主内部状态，不得写入领域连续失
 
 Host 因 abort 清理将工具调用标记为 interrupted 的残留记录，严禁被当作已确认的 provider attempt 失败，不得推进 cursor 或消耗预算。
 
-## PAR-013: 换 Peer = 换执行者，不换身份
+## PAR-013: 换 Provider = 换执行者，不换身份
 
-Fallback 推进仅改变下一次执行的 `EffectiveAgent` 与物理模型目标。同一 durable logical participant run 的 immutable `ParticipantIdentity`（包括 Persona 与 provenance/version）、SessionProviderLanguage、system prompt、CanonicalRole 与 Authority identity 在所有 retry/fallback attempt 中保持严格不变；Persona 与 provenance/version 必须从该 run 的 durable identity evidence 继承。只有该 run 已 exact terminal closure 后建立的新 run 才能取得新 identity，且机器代数严禁泄漏进 provider horizon。
+Fallback 轮换仅改变下一次执行的物理 provider/model 目标。同一 durable logical participant run 的 immutable `ParticipantIdentity`（包括本名 Role、稳定 Persona 与 provenance/version）、SessionProviderLanguage、system prompt、CanonicalRole 与 Authority identity 在所有 retry/fallback attempt 中保持严格不变；Persona 与 provenance/version 必须从该 run 的 durable identity evidence 继承。只有该 run 已 exact terminal closure 后建立的新 run 才能取得新 identity，且机器代数严禁泄漏进 provider horizon。
 
 ## PAR-014: continuation 只在失败记账后、预算允许时
 

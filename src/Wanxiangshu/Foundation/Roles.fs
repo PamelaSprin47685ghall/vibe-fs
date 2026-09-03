@@ -1,10 +1,5 @@
 namespace Wanxiangshu.Foundation
 
-[<RequireQualifiedAccess>]
-type AgentTier =
-    | Fast
-    | Deep
-
 /// DSL-class: Vocabulary — the fixed set of managed agent roles (one
 /// vocabulary, no control-flow reading).
 [<RequireQualifiedAccess>]
@@ -60,18 +55,6 @@ module Roles =
         | "reviewer" -> Some Role.Reviewer
         | "distiller" -> Some Role.Distiller
         | "blogger" -> Some Role.Blogger
-        | _ -> None
-
-    /// Wire spelling used in Host agent names (fast / deep).
-    let wireTierLabel (tier: AgentTier) : string =
-        match tier with
-        | AgentTier.Fast -> "fast"
-        | AgentTier.Deep -> "deep"
-
-    let tryParseTier (value: string) : AgentTier option =
-        match value.ToLowerInvariant() with
-        | "fast" -> Some AgentTier.Fast
-        | "deep" -> Some AgentTier.Deep
         | _ -> None
 
     /// AGENT-008 / ENF-006: Distiller and Blogger are private runtimes, not

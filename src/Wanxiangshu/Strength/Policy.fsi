@@ -8,7 +8,6 @@ type StrengthOpportunity =
     { IsRootWork: bool
       RequestKind: ProviderRequestKind
       CanonicalRole: Role
-      SelectedTier: AgentTier
       SelectedAgent: string
       EffectiveAgent: string
       IsFallbackRetry: bool
@@ -19,7 +18,7 @@ type StrengthOpportunity =
       TargetProviderRunBound: bool
       EventStoreHealthy: bool
       HostCanaryHealthy: bool
-      FastPeerAvailable: bool
+      PredictorAvailable: bool
       CostModelAvailable: bool }
 
 type StrengthPrediction =

@@ -13,8 +13,7 @@ open Wanxiangshu.Persistence.Journal
 /// "Reviewer requested revision" error, keeping ORCH-009 publication semantics).
 module OrchestratorHostReview =
 
-    /// ORCH-009: post-rebase review is always deep-reviewer. Explicit tier, never
-    /// inferred.
+    /// ORCH-009: post-rebase review uses reviewer.
     val DeepReviewerAgent: string
 
     val reverify:

@@ -50,10 +50,10 @@ test('WHAT[PROC-011] RUN_surface_names_the_provider_execution_verb', () => {
 })
 
 test('WHAT[PROC-011] RUN_host_context_codec_exposes_plain_snapshot', () => {
-  const decoded = contextDecode({ sessionID: 'ses-exec', agent: 'fast-devops' })
+  const decoded = contextDecode({ sessionID: 'ses-exec', agent: 'devops' })
   assert.deepEqual(contextView(decoded), {
     sessionId: 'ses-exec',
-    agent: 'fast-devops',
+    agent: 'devops',
     toolCallId: null,
     providerRunId: null,
     promptText: null,

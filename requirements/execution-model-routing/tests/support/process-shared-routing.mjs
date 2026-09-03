@@ -11,7 +11,7 @@ export const createEnvironment = (initPlugin) => {
   writeFileSync(
     join(routingDir, 'wanxiangshu.mjs'),
     `export default function route(role, running) {
-  if (role === 'fast-coder') {
+  if (role === 'coder') {
     const occupied = running.filter((item) => item.model === 'provider/model-a' && item.reasoning === 'none').length
     return occupied === 0
       ? { model: 'provider/model-a', reasoning: 'none' }
@@ -40,9 +40,8 @@ export const createEnvironment = (initPlugin) => {
 
 export const managedConfig = () => {
   const agent = {}
-  for (const role of ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'reviewer', 'blogger', 'distiller', 'bookkeeper']) {
-    agent[`fast-${role}`] = {}
-    agent[`deep-${role}`] = {}
+  for (const role of ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'reviewer', 'blogger', 'distiller', 'bookkeeper', 'predictor']) {
+    agent[role] = {}
   }
   return { agent }
 }
@@ -58,7 +57,7 @@ export const messageOutput = (sessionID, agent, messageID = `msg_${sessionID}`) 
   parts: [],
 })
 
-export const routeMessage = async (hooks, sessionID, agent = 'fast-coder', messageID = `msg_${sessionID}`) => {
+export const routeMessage = async (hooks, sessionID, agent = 'coder', messageID = `msg_${sessionID}`) => {
   const output = messageOutput(sessionID, agent, messageID)
   await hooks['chat.message']({ sessionID, agent }, output)
   return output.message.model

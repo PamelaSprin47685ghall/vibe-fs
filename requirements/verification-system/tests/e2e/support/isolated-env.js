@@ -53,29 +53,21 @@ function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
     id: 'test-model-b',
     name: 'Test Model B',
   };
+  // Canonical single-version agents: provider rotation happens at model level
+  // via the routing function below, not via fast-/deep- agent doubles.
   const managedAgents = {
-    'fast-orchestrator': { model: 'test/test-model' },
-    'deep-orchestrator': { model: 'test/test-model-b' },
-    'fast-manager': { model: 'test/test-model' },
-    'deep-manager': { model: 'test/test-model-b' },
-    'fast-coder': { model: 'test/test-model' },
-    'deep-coder': { model: 'test/test-model-b' },
-    'fast-inspector': { model: 'test/test-model' },
-    'deep-inspector': { model: 'test/test-model-b' },
-    'fast-devops': { model: 'test/test-model' },
-    'deep-devops': { model: 'test/test-model-b' },
-    'fast-browser': { model: 'test/test-model' },
-    'deep-browser': { model: 'test/test-model-b' },
-    'fast-inquiry': { model: 'test/test-model' },
-    'deep-inquiry': { model: 'test/test-model-b' },
-    'fast-reviewer': { model: 'test/test-model' },
-    'deep-reviewer': { model: 'test/test-model-b' },
-    'fast-blogger': { model: 'test/test-model' },
-    'deep-blogger': { model: 'test/test-model-b' },
-    'fast-distiller': { model: 'test/test-model' },
-    'deep-distiller': { model: 'test/test-model-b' },
-    'fast-bookkeeper': { model: 'test/test-model' },
-    'deep-bookkeeper': { model: 'test/test-model-b' },
+    orchestrator: { model: 'test/test-model' },
+    manager: { model: 'test/test-model' },
+    coder: { model: 'test/test-model' },
+    inspector: { model: 'test/test-model' },
+    devops: { model: 'test/test-model' },
+    browser: { model: 'test/test-model' },
+    inquiry: { model: 'test/test-model' },
+    reviewer: { model: 'test/test-model' },
+    blogger: { model: 'test/test-model' },
+    distiller: { model: 'test/test-model' },
+    bookkeeper: { model: 'test/test-model' },
+    predictor: { model: 'test/test-model' },
   };
   return {
     formatter: false,
@@ -164,8 +156,7 @@ export function createIsolatedEnv(opts) {
   const routingDir = path.join(home, '.config', 'opencode');
   fs.mkdirSync(routingDir, { recursive: true });
   const routingSource = opts.routingSource || `export default function route(role) {
-  if (role.startsWith('fast-')) return { model: 'test/test-model', reasoning: 'none' }
-  if (role.startsWith('deep-')) return { model: 'test/test-model-b', reasoning: 'none' }
+  if (new Set(['manager', 'orchestrator', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) return { model: 'test/test-model', reasoning: 'none' }
   throw new Error('unexpected managed role: ' + role)
 }\n`;
   fs.writeFileSync(path.join(routingDir, 'wanxiangshu.mjs'), routingSource, 'utf8');

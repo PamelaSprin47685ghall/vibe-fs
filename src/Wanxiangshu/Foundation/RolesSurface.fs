@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Foundation
 
-/// JS-native semantic surface for participant identity. Role and AgentTier
-/// cross the boundary as their canonical wire labels; JS callers never touch
+/// JS-native semantic surface for participant identity. Role
+/// crosses the boundary as canonical wire labels; JS callers never touch
 /// Fable representation (JS-SEMANTIC-SURFACE-003/005).
 module RolesSurface =
 

@@ -303,7 +303,7 @@ type CompanionHost
     let gate = obj ()
     let bloggerCreated = defaultArg onBloggerCreated (fun _ -> ())
 
-    let bloggerEffectiveAgent = ManagedAgent.nameOf AgentTier.Fast Role.Blogger
+    let bloggerEffectiveAgent = ManagedAgent.nameOf Role.Blogger
 
     // DSL-MUTABLE: single-flight — memoized blogger create task
     let mutable bloggerCreateTask: Task<SessionId> option = None
