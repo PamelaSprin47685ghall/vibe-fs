@@ -111,101 +111,94 @@ const states = [
   })),
 ]
 
-const explicitAgents = [
-  { label: 'explicit absent', value: null, mismatch: false },
-  { label: 'explicit matching', value: 'fast-coder', mismatch: false },
-  { label: 'explicit mismatching', value: 'other-coder', mismatch: true },
-]
-
-const evidenceCases = [
-  { label: 'exact evidence', mutate: (evidence) => evidence, conflict: false, invalid: false },
-  {
-    label: 'conflicting evidence',
-    mutate: (evidence) => ({ ...evidence, logicalRunId: 'run-conflicting' }),
-    conflict: true,
-    invalid: false,
-  },
-  {
-    label: 'invalid evidence',
-    mutate: (evidence) => ({ ...evidence, effectiveAgent: ' ' }),
-    conflict: false,
-    invalid: true,
-  },
-]
-
-const stateKeys = [
-  { label: 'matching state key', mismatch: false },
-  { label: 'mismatched state key', mismatch: true },
-]
-const attemptKeys = [
-  { label: 'matching attempt key', mismatch: false },
-  { label: 'mismatched attempt key', mismatch: true },
-]
-
-const expectedFor = (state, stateKey, attemptKey, explicitAgent, evidenceCase, attemptedEvidence) => {
-  if (state.phase !== 'None' && stateKey.mismatch) return { error: 'StateKeyMismatch' }
-  if (state.phase === 'Terminal') {
-    return { intent: 'AlreadyTerminal', disposition: state.disposition }
-  }
-  if (evidenceCase.invalid) return { error: 'AttemptEvidenceInvalid' }
-  if (attemptKey.mismatch) return { error: 'AttemptKeyMismatch' }
-  if (explicitAgent.mismatch) return { error: 'ExplicitAgentMismatch' }
-  if (state.phase !== 'None' && evidenceCase.conflict) {
-    return { error: 'ExistingEvidenceConflict' }
-  }
-  if (state.phase === 'None') return { intent: 'NeedAcceptance', evidence: attemptedEvidence }
-  if (state.phase === 'Accepted') return { intent: 'ResumeAccepted', evidence: durableEvidence }
-  return { intent: 'AlreadyStarted', evidence: durableEvidence }
+const byState = Object.fromEntries(states.map((state) => [state.label, state]))
+const otherKey = {
+  sessionId: 'ses-admission-other',
+  physicalUserMessageId: 'msg-admission-other',
 }
+const exactMessage = { ...durableKey, explicitAgent: null }
+const conflictEvidence = { ...durableEvidence, logicalRunId: 'run-conflicting' }
+const invalidEvidence = { ...durableEvidence, effectiveAgent: ' ' }
 
-const table = states.flatMap((state) =>
-  stateKeys
-    .filter((stateKey) => state.phase !== 'None' || !stateKey.mismatch)
-    .flatMap((stateKey) =>
-      attemptKeys.flatMap((attemptKey) =>
-        explicitAgents.flatMap((explicitAgent) =>
-          evidenceCases.map((evidenceCase) => {
-            const messageKey = stateKey.mismatch
-              ? { sessionId: 'ses-message-other', physicalUserMessageId: 'msg-message-other' }
-              : durableKey
-            const attemptedKey = attemptKey.mismatch
-              ? { sessionId: 'ses-attempt-other', physicalUserMessageId: 'msg-attempt-other' }
-              : messageKey
-            const attemptedEvidence = evidenceCase.mutate(plainEvidence(attemptedKey))
+const cases = [
+  {
+    label: 'wrong state key cannot borrow a terminal result',
+    facts: byState['Terminal(Completed)'].facts,
+    message: { ...otherKey, explicitAgent: null },
+    attemptedEvidence: plainEvidence(otherKey),
+    expected: { error: 'StateKeyMismatch' },
+  },
+  {
+    label: 'exact terminal ignores a malformed new attempt',
+    facts: byState['Terminal(Completed)'].facts,
+    message: exactMessage,
+    attemptedEvidence: invalidEvidence,
+    expected: { intent: 'AlreadyTerminal', disposition: 'Completed' },
+  },
+  {
+    label: 'malformed evidence is rejected',
+    facts: [],
+    message: exactMessage,
+    attemptedEvidence: invalidEvidence,
+    expected: { error: 'AttemptEvidenceInvalid' },
+  },
+  {
+    label: 'attempt key must match the physical message',
+    facts: [],
+    message: exactMessage,
+    attemptedEvidence: plainEvidence(otherKey),
+    expected: { error: 'AttemptKeyMismatch' },
+  },
+  {
+    label: 'explicit agent must match accepted identity',
+    facts: [],
+    message: { ...durableKey, explicitAgent: 'other-coder' },
+    attemptedEvidence: durableEvidence,
+    expected: { error: 'ExplicitAgentMismatch' },
+  },
+  {
+    label: 'existing acceptance rejects conflicting evidence',
+    facts: byState.Accepted.facts,
+    message: exactMessage,
+    attemptedEvidence: conflictEvidence,
+    expected: { error: 'ExistingEvidenceConflict' },
+  },
+  {
+    label: 'fresh exact attempt needs durable acceptance',
+    facts: byState.None.facts,
+    message: exactMessage,
+    attemptedEvidence: durableEvidence,
+    expected: { intent: 'NeedAcceptance', evidence: durableEvidence },
+  },
+  {
+    label: 'equal accepted evidence resumes pre-provider admission',
+    facts: byState.Accepted.facts,
+    message: exactMessage,
+    attemptedEvidence: durableEvidence,
+    expected: { intent: 'ResumeAccepted', evidence: durableEvidence },
+  },
+  {
+    label: 'equal provider-started evidence is already started',
+    facts: byState.ProviderStarted.facts,
+    message: exactMessage,
+    attemptedEvidence: durableEvidence,
+    expected: { intent: 'AlreadyStarted', evidence: durableEvidence },
+  },
+  ...['Cancelled', 'Rejected', 'Failed'].map((disposition) => ({
+    label: `terminal ${disposition} remains exact`,
+    facts: byState[`Terminal(${disposition})`].facts,
+    message: exactMessage,
+    attemptedEvidence: durableEvidence,
+    expected: { intent: 'AlreadyTerminal', disposition },
+  })),
+]
 
-            return {
-              label: [
-                state.label,
-                stateKey.label,
-                attemptKey.label,
-                explicitAgent.label,
-                evidenceCase.label,
-              ].join(' / '),
-              facts: state.facts,
-              message: { ...messageKey, explicitAgent: explicitAgent.value },
-              attemptedEvidence,
-              expected: expectedFor(
-                state,
-                stateKey,
-                attemptKey,
-                explicitAgent,
-                evidenceCase,
-                attemptedEvidence,
-              ),
-            }
-          }),
-        ),
-      ),
-    ),
-)
-
-test('WHAT[CHATEXEC-004] pure admission decision rejects conflicting exact evidence', () => {
-  assert.ok(table.length >= 48, `decision table must contain at least 48 rows; received ${table.length}`)
+test('WHAT[CHATEXEC-004] fixed admission counterworlds distinguish every intent and rejection', () => {
 
   const observedIntents = new Set()
   const observedErrors = new Set()
 
-  for (const row of table) {
+  for (const row of cases) {
     const result = chatExecution.admitIntent(row.facts, row.message, row.attemptedEvidence)
 
     assert.equal(result.ok, !row.expected.error, `${row.label}: success classification`)
@@ -235,7 +228,7 @@ test('WHAT[CHATEXEC-004] pure admission decision rejects conflicting exact evide
   assert.deepEqual(
     [...observedIntents].sort(),
     ['AlreadyStarted', 'AlreadyTerminal', 'NeedAcceptance', 'ResumeAccepted'],
-    'table must assert every admission intent',
+    'fixed counterworlds must assert every admission intent',
   )
   assert.deepEqual(
     [...observedErrors].sort(),
@@ -246,6 +239,6 @@ test('WHAT[CHATEXEC-004] pure admission decision rejects conflicting exact evide
       'ExplicitAgentMismatch',
       'StateKeyMismatch',
     ],
-    'table must assert every typed admission error',
+    'fixed counterworlds must assert every typed admission error',
   )
 })

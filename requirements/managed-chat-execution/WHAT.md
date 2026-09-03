@@ -14,7 +14,7 @@
 
 ## CHATEXEC-004: Accepted 单次建立且 replay 幂等
 
-同一 key 的等值 pre-provider `Accepted` evidence 重放是幂等 no-op；与既有 identity 或 acceptance 内容冲突必须 fail closed。新物理消息即使复用同一 `SessionId` 也必须建立新 key，不得继承前一 execution 的事实。ProviderStarted 只能在 accepted evidence 完全相等后增加 Host-observed run evidence。
+同一 key 的等值 pre-provider `Accepted` evidence 重放是幂等 no-op；与既有 identity 或 acceptance 内容冲突必须 fail closed。supplied state 的 key 不匹配时必须先拒绝，不能借其 terminal 绕过 exact key；exact terminal 重放则不得因新提交的 malformed attempt payload 改写既有结论。新物理消息即使复用同一 `SessionId` 也必须建立新 key，不得继承前一 execution 的事实。ProviderStarted 只能在 accepted evidence 完全相等后增加 Host-observed run evidence。
 
 ## CHATEXEC-005: ProviderStarted 是 provider effect 的 durable 前置
 
