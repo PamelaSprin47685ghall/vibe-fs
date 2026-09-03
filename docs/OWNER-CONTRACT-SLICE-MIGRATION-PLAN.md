@@ -2,7 +2,7 @@
 
 日期：2026-09-03
 
-状态：M6.0–M6.2 已完成；M6.3 全局规则及 EventStore/Host/Delegation 点名边界已裁决；全部 live locality 的 terminal classification/adjudication、完整 capability census 与全量 slice manifest 尚未完成；不得进入 M6.3c/M6.4。`deriveAdjudicationCandidates` 的 key universe 固定为 fresh owner-project graph 的全部 locality；当前 92 个 composition provider 只是带 `CompositionProvider` reason 的 pre-cutover 子集，不是永久 gate 数量。
+状态：M6.0–M6.2已完成；M6.3全局规则及EventStore/Host/Delegation点名边界已裁决；第四轮protocol review后可立即启动M6.3a。`C(W)`/`J(W)`、generated artifact row、Node runtime判定与semantic staged-input closure必须先进入正式WHAT/proof并全绿，之后才可启动M6.3b production extractor。全部live locality的terminal classification/adjudication、完整capability census与全量slice manifest尚未完成；不得进入M6.3c/M6.4。`deriveAdjudicationCandidates`的key universe固定为fresh owner-project graph的全部locality；当前92个composition provider只是带`CompositionProvider` reason的pre-cutover子集，不是永久gate数量。
 
 适用背景：Fable owner-project 编译边界、published contract 授权与 semantic owner 重整
 
@@ -266,7 +266,7 @@ P ∈ projectReferenceClosure(C)
 
 源码能力必须形成唯一、规范化、零遗漏的 production fact set。提取边界读取完整 production compile set 的 F# source、全部 sibling `.fsi`、FCS symbol use、Fable interop 与 exact generated runtime artifact；owner、locality kind、目标 exposure、grant、relation、旧 allowlist 与 authority annotation 全部只是待验证的 normative claim，不能增加、删除或降格 observation。
 
-实现固定为四个 production pure boundary：`enumerateCapabilityUniverseV1` 枚举 observation universe，`classifyCapabilityObservationV1` 对一条 observation 作总函数分类，`extractObservedCapabilityFactsV1` 验证完整 partition，`validateCapabilityPolicyV1` 才把 canonical facts 与 normative claims 合取。现有 scanner 只能贡献 observation primitive；任何按文件 allowlist 跳过扫描、只输出 diagnostics 或把 annotation 当 exemption 的路径都不能成为该 fact owner。
+实现固定为两条production pure pipeline。capability pipeline由`enumerateCapabilityObservationsV1`枚举`C(W)`、`classifyCapabilityObservationV1`对单条observation作总函数分类、`extractObservedCapabilityFactsV1`验证完整partition、`validateCapabilityPolicyV1`把canonical facts与normative claims合取；JavaScript coverage pipeline由`enumerateJavaScriptAstNodesV1`与`visitJavaScriptNodeV1`证明`J(W)`全遍历。现有scanner只能贡献parsed primitive；任何按文件allowlist跳过扫描、只输出diagnostics或把annotation当exemption的路径都不能成为fact/coverage owner。
 
 observation schema 固定为 version 1 的封闭代数：
 
@@ -279,14 +279,15 @@ ObservationSiteV1 = {
 RawCapabilityObservationV1 =
   | FSharpNode of node_kind * semantic_identity * ObservationSiteV1
   | FcsExternalSymbolUse of assembly * fully_qualified_symbol * ObservationSiteV1
-  | FableImport of module_specifier * selector * GeneratedLinkageV1 option * ObservationSiteV1
-  | FableEmit of expression * ObservationSiteV1
-  | EmitJsExpr of expression * ObservationSiteV1
+  | FableImport of module_specifier * selector * generated_artifact_id option * ObservationSiteV1
+  | FableEmit of expression * javascript_traversal_id option * ObservationSiteV1
+  | EmitJsExpr of expression * javascript_traversal_id option * ObservationSiteV1
   | PublicSignatureExport of export_kind * declaration_identity * ObservationSiteV1
-  | GeneratedJavaScript of artifact_path * JsObservationV1 * GeneratedLinkageV1 * ObservationSiteV1
+  | GeneratedJavaScript of generated_artifact_id * JsCapabilityObservationV1 * ObservationSiteV1
 
-JsObservationV1 = {
-  kind: StaticImport | DynamicImport | FreeGlobal | MemberRead | MemberWrite | Call | Construct,
+JsCapabilityObservationV1 = {
+  kind: StaticImport | DynamicImport | FreeGlobal | MemberRead | MemberWrite |
+        Call | Construct | MutableBinding | Update,
   root, member_path
 }
 
@@ -295,6 +296,19 @@ GeneratedLinkageV1 = {
   generator_path, generator_entry,
   input_selector_path, input_selector_entry,
   build_path, build_entry
+}
+
+JavaScriptTraversalCoverageV1 = {
+  id,
+  source_kind: "fable-emit" | "emit-js-expr" | "generated-artifact",
+  source_id,
+  ast_node_count,
+  visited_node_count,
+  no_capability_node_count,
+  capability_emitting_node_count,
+  unknown_node_count,
+  ast_node_set_digest,
+  visit_partition_digest
 }
 ```
 
@@ -329,32 +343,39 @@ CanonicalCapabilityFactV1 = {
 
 DU 的 canonical JSON encoding 统一为 exact `{case, payload}`；`case` 使用上述 kebab-case 名称，`payload` 只允许该 case 声明的字段，unit payload 是 `{}`，option 只编码为 object 或 `null`。set 在 projection 阶段变为按 4.5 canonical text comparator 排序的 unique array。未知 case/key、空 `Classified`、重复 label 或非法 option 一律 RED。
 
-完整 observation universe 为：
+capability observation universe与JavaScript AST traversal universe必须分开：
 
 ```text
-U(W) =
+C(W) =
   全部 owner-project production .fs 的每个可执行 F# AST node
   ∪ 全部 compiler-resolved external FCS symbol-use occurrence
   ∪ 全部 Fable Import/Emit attribute 与 emitJsExpr occurrence
   ∪ 全部 sibling .fsi public export
-  ∪ 每个 production package import 可达 generated runtime artifact 的
-    全部 JavaScript AST node、static/dynamic import、free global 与 effect occurrence
+  ∪ full JavaScript visitor从Emit/emitJsExpr/generated artifact
+    产出的全部 JsCapabilityObservationV1
+
+J(W) =
+  每个 Fable Emit/emitJsExpr parse unit的全部JavaScript AST node
+  ∪ 每个 production package import可达generated runtime artifact的
+    全部JavaScript AST node
 ```
 
-`FableImport` 若由 source/package/build 事实独立解析到 repository-generated artifact，只在同一 observation 的 `GeneratedLinkageV1` 填值；不得再产生竞争的 `GeneratedModuleImport` fact。Node只是runtime维度，不自动等于physical authority：例如`node:path/posix`的closed纯调用可以是`Node + PureRepresentation`，platform-default `node:path`另按ambient-platform规则判定；`node:fs`必须同时标记`Node + FileSystem`，`node:child_process`必须同时标记`Node + ProcessControl`。一个 multiline Emit 可同时标记 `Environment + ProcessControl`；多标签必须全部保留。generated linkage 只增加 provenance，绝不删除 artifact 的 runtime/authority/mutable/class labels。
+`C(W)`的每条observation恰有一个capability disposition；普通JavaScript declaration、literal、纯operator等不伪造capability fact，只进入`J(W)` traversal coverage。`FableImport`若独立解析到repository-generated artifact，只引用该artifact的stable ID；linkage与digest只存在于4.5 `GeneratedArtifactRowV1`，不得再复制进fact或产生竞争的`GeneratedModuleImport`。Node只是runtime维度，不自动等于physical authority：例如`node:path/posix`的closed纯调用可以是`Node + PureRepresentation`，platform-default`node:path`另按ambient-platform规则判定；`node:fs`必须同时标记`Node + FileSystem`，`node:child_process`必须同时标记`Node + ProcessControl`。一个multiline Emit可同时标记`Environment + ProcessControl`；多标签必须全部保留。generated provenance绝不删除artifact的runtime/authority/mutable/class labels。
 
 partition 铁律：
 
 ```text
-universeKeys = keys(U(W))
-irrelevantKeys ∪ classifiedKeys ∪ unknownKeys = universeKeys
+observationKeys = keys(C(W))
+irrelevantKeys ∪ classifiedKeys ∪ unknownKeys = observationKeys
 irrelevantKeys、classifiedKeys、unknownKeys 两两不交
-∀ observationKey，恰有一个 disposition
+∀ observationKey ∈ C(W)，恰有一个 disposition
 ```
 
-AST/FCS/JS parser diagnostic、未支持 node、动态 target、无法解析 alias/FQN、缺 generated artifact/linkage 均产生 `Unknown` 或顶层 `capability-extraction-incomplete`，禁止静默跳过。F# visitor 必须穷举 AST union，不得 wildcard 忽略；JS visitor 对未知 `node.type` 产生 Unknown。integration fixture 固定完整 universe/partition 计数与 observation IDs，mutation 删除一个 observation 必须精确得到 `capability-observation-missing`；一条 observation 产生零或多 disposition 分别得到 `capability-observation-missing`/`capability-observation-duplicate`。fact ID collision 且 canonical payload 不同得到 `capability-fact-id-collision`。
+Emit/emitJsExpr的`source_id`哈希`{raw expression,ObservationSiteV1}`，generated artifact直接使用`artifact.id`；`JavaScriptTraversalCoverageV1.id`哈希`{source_kind,source_id}`，不含coverage结果。`enumerateJavaScriptAstNodesV1`以generic AST child traversal产生`J(W)`的stable`node_id = source_id + AST child-index path`；`visitJavaScriptNodeV1`是独立closed semantic visitor，每个node精确产生`NoCapabilityObservation | EmittedCapabilityObservations(nonempty observation IDs) | UnknownNodeType(node_type)`之一。ephemeral node rows按`node_id`排序后生成`ast_node_set_digest`与`visit_partition_digest`；canonical world只保存`JavaScriptTraversalCoverageV1`，不复制普通node。每行必须满足`visited_node_count = ast_node_count = no_capability_node_count + capability_emitting_node_count + unknown_node_count`，node key与visit key集合精确相等且各自unique；全部`EmittedCapabilityObservations` ID的union还必须精确等于同source unit进入`C(W)`的`JsCapabilityObservationV1` ID集合，禁止orphan/missing/跨unit fact。missing、duplicate、unknown分别得到`javascript-ast-node-unvisited`、`javascript-ast-node-duplicate-visit`、`javascript-ast-node-unknown`；`unknown_node_count`必须为0才可cutover。
 
-F#调用按FCS-resolved fully-qualified symbol分类，source alias与open不另走字符串猜测。`FableEmit/EmitJsExpr`先把参数hole替换为不可执行sentinel，再用仓库既有Acorn解析expression/module fragment并遍历同一`JsObservationV1`规则；无法唯一解析的template进入`UnparsedInterop`，禁止regex命中一部分后当作完整分类。fixed fixture必须让同一physical call以FQN、alias、open、单行Emit、多行Emit五种表示得到相同authority labels。
+AST/FCS/JS parser diagnostic、未支持F# node、动态target、无法解析alias/FQN、缺generated artifact/linkage均产生`Unknown`或顶层`capability-extraction-incomplete`，禁止静默跳过。F# visitor必须穷举AST union，不得wildcard忽略；JS的未知node type由上述traversal coverage fail-closed，不要求`JsCapabilityObservationV1`伪装声明/字面量/运算符。integration fixture固定完整capability partition与AST traversal计数/digest；mutation删除一个capability disposition必须精确得到`capability-observation-missing`，复制一个得到`capability-observation-duplicate`，fact ID同而canonical payload不同得到`capability-fact-id-collision`；另独立mutation node visit partition的missing/duplicate/unknown，禁止用一种RED代替另一种。
+
+F#调用按FCS-resolved fully-qualified symbol分类，source alias与open不另走字符串猜测。`FableEmit/EmitJsExpr`先把参数hole替换为不可执行sentinel，再用仓库既有Acorn解析expression/module fragment并执行上述structural enumerator+semantic visitor；无法唯一解析的template进入`UnparsedInterop`，禁止regex命中一部分后当作完整分类。fixed fixture必须让同一physical call以FQN、alias、open、单行Emit、多行Emit五种表示得到相同authority labels。
 
 分类表至少固定以下 exact 规则；相邻纯反例必须同测：
 
@@ -371,7 +392,7 @@ F#调用按FCS-resolved fully-qualified symbol分类，source alias与open不另
 
 `observation_id` 哈希去掉 line/column/diagnostic 后的完整 raw observation；`fact_id` 哈希 `{observation_id, disposition}`。两者都使用 4.5 的唯一 canonical encoder与 domain prefix。`same_anchor_occurrence_ordinal` 按同一 `(source_path,semantic_declaration_anchor,raw case,完整 raw payload)` 的 compiler traversal 顺序编号；两处相同 occurrence 保持不同 ID，重复提取同一 occurrence才去重。fixture必须覆盖不同 payload不碰撞、同payload双 occurrence、alias/FQN、`.fs`/`.fsi`、Import/Emit/emitJsExpr和generated JS。
 
-generated artifact 必须解析实际输出 JavaScript 的 static/dynamic import、free global、member read/write、call与construct。生成过程 deterministic 只证明 bytes可复现；artifact 含 `Date.now()`、`fetch()`、mutable global或未知动态调用仍分别产生 physical/mutable/Unknown fact并使 contract/generated policy RED。
+generated artifact必须先建立4.5唯一`GeneratedArtifactRowV1`，再解析实际输出JavaScript；static/dynamic import、free global、member read/write、call、construct、mutable binding与update只产生引用`generated_artifact_id`的capability facts，普通AST node只进入traversal coverage。生成过程deterministic只证明bytes可复现；artifact含`Date.now()`、`fetch()`、mutable global、未知动态调用或未知AST node仍分别产生authority/mutable/Unknown fact或coverage violation，并使contract/generated policy RED。
 
 actual capability facts 不得复制进 manifest、baseline 或 adjudication record。slice validator、effect purity census、generated-module validator、physical-port/adapter/composition checks 与 fast-check 只消费同一 `CanonicalCapabilityFactV1` set；不得重扫源码、解析其他 gate 的诊断字符串，或以 locality kind metadata代替源码事实。
 
@@ -387,6 +408,8 @@ CanonicalWorldV1 = {
     localities: LocalityRowV1[],
     project_references: ProjectReferenceRowV1[],
     actual_source_edges: SourceEdgeRowV1[],
+    generated_artifacts: GeneratedArtifactRowV1[],
+    javascript_traversals: JavaScriptTraversalCoverageV1[],
     capability_extraction: ExtractionCoverageV1,
     capability_facts: CanonicalCapabilityFactV1[]
   },
@@ -416,9 +439,20 @@ SourceEdgeRowV1 = {
   provider_locality, provider_source
 }
 
+GeneratedArtifactRowV1 = {
+  id,
+  artifact_path,
+  artifact_digest,
+  selected_inputs_digest,
+  linkage: GeneratedLinkageV1,
+  javascript_traversal_id
+}
+
 ExtractionCoverageV1 = {
-  universe_count, irrelevant_count, classified_count, unknown_count,
-  universe_digest, disposition_digest
+  capability_observation_count,
+  irrelevant_count, classified_count, unknown_count,
+  capability_observation_digest,
+  disposition_digest
 }
 
 SemanticEvidenceProjectionV2 = {
@@ -474,15 +508,18 @@ GeneratedModuleRelationProjectionV2 = {
 }
 ```
 
-所有 object 都是 exact keys。`implementation_digest/signature_digest/universe_digest/disposition_digest` 采用 `sha256:<64 lowercase hex>`；source digest覆盖原始文件bytes。每个 implementation 必须有同 locality sibling signature；source/path/locality/owner 均为非空 canonical string。`ExtractionCoverageV1` 必须满足三类 count之和等于 `universe_count == capability_facts.length`；`universe_digest` 覆盖排序后的全部 raw observation，`disposition_digest` 覆盖排序后的全部 canonical fact。Unknown count非零即阻断。
+所有object都是exact keys。所有`*_digest`采用`sha256:<64 lowercase hex>`；source/artifact digest覆盖原始文件bytes。每个implementation必须有同locality sibling signature；source/path/locality/owner均为非空canonical string。`ExtractionCoverageV1`必须满足三类count之和等于`capability_observation_count == capability_facts.length`；`capability_observation_digest`覆盖排序后的全部raw observation，`disposition_digest`覆盖排序后的全部canonical fact。Unknown count非零即阻断。
 
-normative projection 直接来自已经通过 schema v2 shape validator 的 manifest：slice、capability relation、generated relation 分别使用第5节exact row去掉 `justification` 后的全部字段；classification、grant、law与evidence保留在所属row。不得另建 semantic-owner、law/evidence或generated-linkage副本：locality owner/kind在`LocalityRowV1`，observed generated linkage只在capability fact，normative generated claim只在generated relation。slice/relation中的owner必须与对应locality row交叉验证。
+`GeneratedArtifactRowV1.id := "generated-artifact/v1:" + SHA256(encodeCanonicalJsonV1({artifact_path,linkage}))`，内容变化不换identity，由两个digest显式反映。exact output bytes只作为`artifact_digest`的哈希输入，不复制进canonical world。input selector必须先返回canonical path；repository reader为每个path提供exact bytes并投影`{path,blob_digest}`，其中`blob_digest`是raw bytes的SHA-256；rows按path排序、unique后的canonical encoding产生`selected_inputs_digest`。M6.3c reader必须把这些path绑定stage-0 blob；post-cutover integration reader使用本次fresh working-tree/HEAD输入，不读取formal snapshot。linkage只在该row保存一次；`FableImport`与`GeneratedJavaScript`fact只保存artifact ID。每个artifact精确引用一个`source_kind = "generated-artifact"`的traversal row，且该row的`source_id = artifact.id`；traversal row missing/stale/duplicate/source mismatch分别得到`javascript-traversal-missing`、`javascript-traversal-stale`、`javascript-traversal-duplicate`、`javascript-traversal-source-mismatch`。Fable Emit/emitJsExpr解析成功时引用对应traversal ID；解析失败时为`null`且该observation只能得到`Unknown(UnparsedInterop,...)`。
+
+normative projection直接来自已经通过schema v2 shape validator的manifest：slice、capability relation、generated relation分别使用第5节exact row去掉`justification`后的全部字段；classification、grant、law与evidence保留在所属row。不得另建semantic-owner、law/evidence或generated-linkage副本：locality owner/kind在`LocalityRowV1`，observed generated linkage与artifact/input digests只在`GeneratedArtifactRowV1`，capability facts只引用其ID，normative generated claim只在generated relation。slice/relation中的owner必须与对应locality row交叉验证。
 
 collection identity与排序固定：
 
 - localities：`id`；同 locality sources：`implementation_path`。
 - ProjectReference：`(consumer_locality,provider_locality)`。
 - source edge：`(consumer_locality,consumer_source,provider_locality,provider_source)`。
+- generated artifact：`id`；JavaScript traversal：`id`。
 - capability fact：`(observation_id,fact_id)`。
 - slice、capability relation、generated relation：各自`id`。
 - law：WHAT ID；evidence：`(what_id,path,title,surface_module)`；record proof另按其三元组。
@@ -582,11 +619,13 @@ audience/v1:<locality> = {
 
 capability/v1:<locality> = {
   facts: CanonicalCapabilityFactV1[],
+  generated_artifacts: GeneratedArtifactRowV1[],
+  javascript_traversals: JavaScriptTraversalCoverageV1[],
   declared_kind_mismatch: boolean
 }
 ```
 
-surface export 从同一 canonical `PublicSignatureExport` facts按 signature path 投影；signature、export、consumer、relation endpoint、source edge与fact分别按4.5对应identity排序且unique，重复不同payload RED。`relation_endpoints` 中 slice row只产生 provider endpoint；capability relation产生consumer+provider endpoint；generated relation只产生consumer endpoint。三个 result object与nested row均拒绝未知字段。
+surface export从同一canonical `PublicSignatureExport` facts按signature path投影；capability query的artifact集合等于该locality facts引用的全部artifact，traversal集合等于其Emit facts与artifact rows引用的全部traversal，零漏项、零stale row。signature、export、consumer、relation endpoint、source edge、artifact、traversal与fact分别按4.5对应identity排序且unique，重复不同payload RED。`relation_endpoints`中slice row只产生provider endpoint；capability relation产生consumer+provider endpoint；generated relation只产生consumer endpoint。三个result object与nested row均拒绝未知字段。
 
 query digest只调用同一encoder：
 
@@ -664,10 +703,11 @@ record validator使用closed codes：`adjudication-record-missing`、`adjudicati
 
 M6.3c先完成production/source/`.fsi`/fsproj/target manifest/relation修改，再建立最终staged input。cutover index协议固定：
 
-1. stage全部计划进入M6.4提交的tracked文件；worksheet deletion也必须staged。拒绝unmerged index entry、unstaged tracked change，以及未跟踪的`.fs/.fsi/.fsproj/.props/.targets/.json/.mjs/.cjs/.js/.md`canonical-input候选。
-2. `CanonicalInputIndexRowV1 = {path,mode,blob_oid}`。读取`git ls-files --stage -z`的全部stage-0 tracked entry，排除正式snapshot与worksheet后，按path canonical排序；mode只允许`100644/100755/120000`，拒绝gitlink、duplicate/path非法值，`blob_oid`必须符合仓库`extensions.objectFormat`的lowercase hex长度且对象类型为blob。`cutover_input_index_digest := "sha256:" + SHA256(UTF8("cutover-input-index/v1\u0000") ++ encodeCanonicalJsonV1(rows))`。不把包含snapshot自身的完整tree OID写入snapshot，避免内容依赖自身OID的循环。
-3. scan前后都执行`assertWorkingTreeMatchesCutoverIndexV1`：逐个tracked row比较working-tree bytes与index blob，重跑相关untracked检查；任一变化立即RED。generated runtime artifact若tracked则同样比较；若build-only，则其实际bytes/digest进入canonical facts/world，generator/build/input-selector及其全部tracked repository input已由全index digest绑定。
-4. fresh full scan只读上述已核对working tree，产生canonical world、candidate、query digest与正式snapshot；写入并stage snapshot，删除并stage worksheet，再次计算排除两文件的index digest并要求不变。正式snapshot的working-tree bytes必须等于其stage-0 blob，validator直接解析这组bytes；worksheet在index与working tree都必须不存在。之后不得再改任何staged input。
+1. `resolveCutoverInputClosureV1`只按真实语义入口建集合，不按扩展名猜测：owner/aggregate project与其compile/signature/reference/props输入；semantic-owner与v2 manifest；WHAT/HOW/Surface/proof输入；analyzer/build/generator/input-selector entry module及其全部repository-local transitive import；每个input selector实际返回的全部path；package/tool manifest与lock。canonical world构建期间所有repository file read必须经过同一tracking reader；任何实际读取但不在closure的path、dynamic local import或无法解析的selector output立即`cutover-input-closure-incomplete`。
+2. stage全部计划进入M6.4提交的tracked文件；worksheet deletion也必须staged。closure中的每个path必须是canonical repository-relative path并精确命中一个stage-0 tracked entry；尤其每条generated relation的generator、build invocation、input selector及selector返回的每个input都不得untracked、ignored、unmerged或只存在working tree，且必须是`100644/100755`regular blob，禁止symlink在读取时越出已绑定bytes。唯一例外是relation明确声明的build output artifact；它必须由`GeneratedArtifactRowV1.artifact_path/artifact_digest`承接，不能反向成为selected input。拒绝任何unstaged tracked change；不使用文件扩展名allowlist判断相关性。
+3. `CanonicalInputIndexRowV1 = {path,mode,blob_oid}`。读取`git ls-files --stage -z`的全部stage-0 tracked entry，排除正式snapshot与worksheet后，按path canonical排序；mode只允许`100644/100755/120000`，拒绝gitlink、duplicate/path非法值。object format只由`git rev-parse --show-object-format`取得；`blob_oid`必须符合该format的lowercase hex长度且对象类型为blob。`cutover_input_index_digest := "sha256:" + SHA256(UTF8("cutover-input-index/v1\u0000") ++ encodeCanonicalJsonV1(rows))`。不把包含snapshot自身的完整tree OID写入snapshot，避免内容依赖自身OID的循环。
+4. scan前后都执行`assertWorkingTreeMatchesCutoverIndexV1`：逐个tracked row比较working-tree bytes与index blob，再重建input closure并要求路径、selector outputs与stage-0 binding完全相同；任一变化立即RED。generated artifact若tracked则同样比较；若是唯一允许的build-only output，则重建后exact bytes必须匹配`GeneratedArtifactRowV1.artifact_digest`，其selector输出rows必须匹配`selected_inputs_digest`。
+5. fresh full scan只读上述已核对working tree，产生canonical world、candidate、query digest与正式snapshot；写入并stage snapshot，删除并stage worksheet，再次计算排除两文件的index digest并要求不变。正式snapshot的working-tree bytes必须等于其stage-0 blob，validator直接解析这组bytes；worksheet在index与working tree都必须不存在。之后不得再改任何staged input。
 
 M6.4在同一staged state一次性验证：record locality集合精确等于candidate集合；world/query/index digest零失配；target classifier、manifest claim、WHAT/proof全部零失配。通过后随cutover commit冻结snapshot。M6.5/M6.6/M6.7与所有post-cutover release gate都不得再用snapshot对比live world、更新snapshot或从snapshot读取授权；后续split/owner merge按常规WHY→WHAT→HOW→GAP与live executable proof施工。Git中的M6.4文件只作不可变审计史，实际授权永远只来自live manifest+analyzer。
 
@@ -704,7 +744,7 @@ grant 授权该并集的完整 public surface；manifest 不得复制 symbol 清
 
 composition 是 locality kind，不是第四种 exposure。它位于依赖图末端，不得重新成为领域 project 的公共 provider。
 
-纯度不由手写 `"exposure": "shared"` 自证。gate 必须消费 4.4 的 canonical capability facts。`Import`/`Emit` 是待分类的源码事实，不是 effect 的同义词：Node/Host/process/network/fs/Git/provider authority 与 mutable/capability value/factory 必须 RED；纯表示 `Emit` 与 exact deterministic generated-module relation 不得误杀。
+纯度不由手写`"exposure": "shared"`自证。gate必须消费4.4的canonical capability facts。`Import`/`Emit`与`RuntimeV1.Node/Bun/Browser/ExternalPackage`都只是mechanism/runtime事实，本身不决定RED。拒绝谓词只看：`authorities`非空、`mutable_resources`非空、semantic class含`CapabilityValue/CapabilityFactory/EffectConstructor`，或disposition为`Unknown`。因此`Node + PureRepresentation`可GREEN；带`Host/ProcessControl/Network/FileSystem/Git/Provider`等authority的同一Node import必须RED；纯表示`Emit`与exact deterministic generated-module relation不得误杀。
 
 ### 4.8 Port + capability injection
 
@@ -829,7 +869,7 @@ deterministic repository-generated module 使用独立 exact relation，不得�
   },
   "input_selector": {
     "path": "scripts/lib/loop-detector-repository-corpus.mjs",
-    "entry": "loopDetectorRepositoryTexts"
+    "entry": "loopDetectorRepositoryInputFiles"
   },
   "runtime_surface_module": "Execution/Session/LoopDetectorSurface.js",
   "laws": ["DG-004"],
@@ -842,9 +882,9 @@ deterministic repository-generated module 使用独立 exact relation，不得�
 }
 ```
 
-`generated_module_relations[]` element 的 exact keys 为 `id/kind/consumer_locality/import_specifier/generated_owner/package_import_target/generator/build_invocation/input_selector/runtime_surface_module/laws/determinism_proof/justification`；`kind` 只能是 `"compile-contract-support"`。`generator`、`build_invocation`、`input_selector` 只允许 `path/entry`，`determinism_proof` 只允许 `path/title/what_id`。`laws` 必须是 singleton 且精确等于 `[determinism_proof.what_id]`；不允许 orphan law 或一个 proof 暗中替多个 law 作证。新增第二条独立 law 需要提升 schema 并显式改为双向全覆盖的 proof collection，不能在 v2 自行扩张。未知 key RED；relation ID、law 与 proof identity 唯一且稳定排序。
+`generated_module_relations[]` element 的 exact keys 为 `id/kind/consumer_locality/import_specifier/generated_owner/package_import_target/generator/build_invocation/input_selector/runtime_surface_module/laws/determinism_proof/justification`；`kind` 只能是 `"compile-contract-support"`。`generator`、`build_invocation`、`input_selector` 只允许 `path/entry`，其中input selector entry的closed contract是只返回filesystem path array；selector boundary将其规范为canonical repository-relative paths，拒绝root外路径、duplicate与无来源text/bytes。`determinism_proof`只允许`path/title/what_id`。`laws` 必须是 singleton 且精确等于 `[determinism_proof.what_id]`；不允许 orphan law 或一个 proof 暗中替多个 law 作证。新增第二条独立 law 需要提升 schema 并显式改为双向全覆盖的 proof collection，不能在 v2 自行扩张。未知 key RED；relation ID、law 与 proof identity 唯一且稳定排序。现有loop-detector generator在M6.3a改为调用`loopDetectorRepositoryInputFiles`并经注入reader读取bytes；`loopDetectorRepositoryTexts`不能继续充当normative selector，因为其返回值无法绑定stage-0 path identity。
 
-M6.3a 先按 WHY → WHAT → HOW → GAP 把该 relation 写入 `structured-workflow`，再实现 schema。actual imported member、package import target、generated output 与 repository input digest 仍由同次 analyzer/build 推导，不复制进 manifest。relation-specific validator 必须证明 build invocation 触达 exact generator、input selector，且 exact test callback 同时触达 generator lineage 与 registered runtime Surface；普通 semantic-evidence validator 不能代替 generator lineage proof。`laws[]` 与 determinism proof 的 owner 必须等于 `generated_owner`，该 relation 仍与 consumer locality kind/capability policy 叠加。gate 必须拒绝 missing、stale、duplicate、actual import/relation mismatch、specifier/target/build invocation漂移、缺 determinism proof、非 repository-content-determined output，以及 Node/Host/process/network/fs/Git/provider import 冒充 compile support。
+M6.3a先按WHY→WHAT→HOW→GAP把该relation与`GeneratedArtifactRowV1`写入`structured-workflow`，再实现schema。actual imported member、package target、artifact/output digest与selected-input digest由同次analyzer/build产生，只进入canonical observed artifact row，不复制进manifest。relation-specific validator必须证明build invocation触达exact generator、input selector，actual artifact linkage与normative relation一致，且exact test callback同时触达generator lineage与registered runtime Surface；普通semantic-evidence validator不能代替generator lineage proof。`laws[]`与determinism proof的owner必须等于`generated_owner`，该relation仍与consumer locality kind/capability policy叠加。gate必须拒绝missing/stale/duplicate artifact或relation、actual import/relation/linkage mismatch、specifier/target/build invocation漂移、artifact/input digest mismatch、缺determinism proof、非repository-content-determined output，以及任何`authorities`非空、`mutable_resources`非空或`Unknown`的artifact冒充compile support；`RuntimeV1.Node`单独存在不得触发拒绝。
 
 当前 `published-contracts.json.compile_contract_support` 的 `{path,owner,justification}` 记录是旧 owner gate 的 source-path 豁免，不是上述 relation。M6.4 必须把这些 F# source 纳入普通 locality slice 的完整 `.fsi` 语义后删除旧字段与 parser；禁止兼容读取两种 shape。`#wanxiangshu-loop-detector-envelope` 是当前唯一已裁决实例，仍须由 package import linkage、generated member 存在与 executable determinism proof 共同验收。
 
@@ -971,7 +1011,7 @@ refactor(owner): remove <cutover-blocker> locality leak
 4. exact `semantic_evidence`。
 5. physical-port、adapter、composition-wiring capability relations。
 6. exact `generated_module_relations`；旧 `compile_contract_support` 裸路径记录的迁移与删除。
-7. canonical locality capability facts。
+7. canonical locality capability facts、generated artifact rows与JavaScript traversal coverage；facts只引用artifact/traversal ID。
 8. production pure `buildCanonicalWorldV1`、`deriveAdjudicationCandidates` 与三个 canonical query。
 
 新 manifest 可在 cutover 工作树中准备和验证，但不得先以独立绿色提交落地并与旧 manifest 同时成为权威。实际集合一律由 analyzer 临时生成，不写入 manifest。
@@ -980,7 +1020,7 @@ refactor(owner): remove <cutover-blocker> locality leak
 
 裁决工件生命周期只有三态：
 
-1. M6.3b `OWNER-CONTRACT-SLICE-ADJUDICATION-WORKSHEET.json`：迁移工作纸，可在绿色节点提交但无固定schema、无授权力、不得被release读取。
+1. M6.3b `OWNER-CONTRACT-SLICE-ADJUDICATION-WORKSHEET.json`：迁移工作纸，只有4.5定义的migration-only closed schema，不含digest、无授权力、不得被release读取；可在绿色节点反复更新。
 2. M6.3c `OWNER-CONTRACT-SLICE-ADJUDICATIONS.json`：仅在最终staged cutover input上生成的formal snapshot；生成后只允许修复validator指出的mismatch并整体重生，不能手改digest。
 3. M6.4：对同一staged state一次验真并与cutover一同commit；同时删除worksheet。此后formal snapshot冻结，M6.5/M6.6/M6.7与永久gate均不得拿它比较live world或重写它。
 
@@ -992,8 +1032,9 @@ M6.3 完成条件：
 4. live report 可展示actual direct/effective/source/capability集合；生成dump在cutover前删除。worksheet随M6.4删除；formal snapshot只保存cutover审计，不是manifest、allowlist或release fact source。
 5. 对应 WHY → WHAT → HOW → GAP 与 executable negative oracle 已落盘；“RED”指旧世界被 oracle 识别为违规，提交后的 test suite 必须全绿。
 6. 旧 gate 下可独立绿色的 contract/port split 已完成；新 pure validator/property 可提交，但 live 新模型只能 report-only，不能阻断 release。
-7. M6.3c严格执行4.5 cutover index协议；最终staged input已fresh重建canonical world、candidate与query digests。record locality/world/query/index、classifier、manifest claim、WHAT/proof任一失配均已重新裁决，最终mismatch为零。
-8. 进入 M6.3c 前，1–6 必须全部成立且 fresh report 不再有未裁决 blocker。M6.3c 只准备旧 ACL 无法表达的最小 production cut、全量终态 manifest 与 exact relations；第 7 项成立才算 M6.3 完成，随后进入 M6.4。仅完成点名 owner 裁决不等于 M6.3 完成。
+7. `C(W)` disposition与`J(W)` traversal coverage分别完整；generated artifact output/input digests、linkage与fact ID reference零mismatch，`RuntimeV1.Node`不被当作authority。
+8. M6.3c严格执行4.5 cutover index协议；最终staged input已fresh重建canonical world、candidate与query digests。record locality/world/query/index、classifier、manifest claim、WHAT/proof任一失配均已重新裁决，最终mismatch为零。
+9. 进入M6.3c前，1–7必须全部成立且fresh report不再有未裁决blocker。M6.3c只准备旧ACL无法表达的最小production cut、全量终态manifest与exact relations；第8项成立才算M6.3完成，随后进入M6.4。仅完成点名owner裁决不等于M6.3完成。
 
 ### M6.4：单个原子提交切换权威
 
@@ -1008,7 +1049,7 @@ M6.3 完成条件：
 7. shared 通过 authority/physical-import 机械矩阵。
 8. effect 只被 composition 反向到达。
 9. composition 只被 composition consumer 通过 exact composition-wiring relation 到达；private locality 无外部引用。
-10. canonical capability facts、exact generated-module、semantic-evidence、physical adapter、composition wiring 通过同一 pure policy validator。
+10. canonical capability facts、generated artifact rows、JavaScript traversal coverage、exact generated-module、semantic-evidence、physical adapter、composition wiring通过同一pure policy validator。
 11. 对M6.3c同一staged state一次性验证formal snapshot：全部locality已落实终态slice/relation；record locality/world/query/index、terminal classifier、manifest claims与WHAT/proof零mismatch；无stale/duplicate grant、reference、relation或缺law/evidence。
 12. 删除 owner-wide authorization expansion、per-symbol consumer ACL、旧 schema/parser 与旧 `compile_contract_support` 裸路径豁免。
 13. 删除dead production `symbolUses: []`、旧FCS snapshot/delta/cache、临时actual fact/query dump、M6.3b worksheet、compat facade、过渡adapter、旧空路径与pre-cutover report-only release bypass；formal snapshot随commit冻结且永久gate不再读取，`owner-projects`继续唯一拥有source→locality、ProjectReference DAG与closure。
@@ -1064,9 +1105,10 @@ fast-check shrink 的值必须始终是 `{ legal_base_world, single_target_mutat
 10. ProjectReference cycle → exact `locality-reference-cycle`。
 11. owner rename/merge 后 normalized authorization projection 不变。
 12. legal split 不扩大 capability audience：生成 `old locality → new locality partition`、source/export/capability 映射及 consumer/grant/reference 重映射；证明每个 source 恰映射一次、旧边均有映射、新边不跨 capability 偷渡，并按 capability 比较 normalized external direct/effective audience。owner 名不得作为映射键。
-13. generated-module relation 分别断言：missing → `missing-generated-module-relation`；stale → `stale-generated-module-relation`；duplicate → `duplicate-generated-module-relation`；specifier mismatch → `generated-module-specifier-mismatch`；target mismatch → `generated-module-target-mismatch`；nondeterministic → `generated-module-nondeterministic`；physical import → `generated-module-physical-authority`。每个 mutation 独立，不得用一个泛化 RED 覆盖多种失败。
+13. generated-module relation分别断言：missing → `missing-generated-module-relation`；stale → `stale-generated-module-relation`；duplicate → `duplicate-generated-module-relation`；specifier mismatch → `generated-module-specifier-mismatch`；target mismatch → `generated-module-target-mismatch`；nondeterministic → `generated-module-nondeterministic`；authority/mutable/Unknown artifact → `generated-module-physical-authority`。artifact row另分别断言：missing → `generated-artifact-missing`；stale → `generated-artifact-stale`；duplicate → `generated-artifact-duplicate`；fact引用missing ID → `generated-artifact-reference-missing`；linkage mismatch → `generated-artifact-linkage-mismatch`；output digest mismatch → `generated-artifact-digest-mismatch`；selected-input digest mismatch → `generated-artifact-inputs-digest-mismatch`。每个mutation独立，不得用一个泛化RED覆盖多种失败；`RuntimeV1.Node`单标签mutation保持GREEN。
 14. 任一`CapabilityDispositionV1.Unknown` → exact `unknown-capability-classification`；mutation只把一个已知GREEN observation的disposition改为一个closed `UnknownClassV1` case，禁止同时改变locality kind、grant或relation。
-15. observation universe与disposition partition必须全等：删除一条disposition → exact `capability-observation-missing`；复制一条 → exact `capability-observation-duplicate`；同fact ID换payload → exact `capability-fact-id-collision`。每次mutation只改一个partition坐标。
+15. capability observation universe `C(W)`与disposition partition必须全等：删除一条disposition → exact `capability-observation-missing`；复制一条 → exact `capability-observation-duplicate`；同fact ID换payload → exact `capability-fact-id-collision`。每次mutation只改一个partition坐标。
+16. JavaScript traversal `J(W)`独立证明node全覆盖：traversal row missing/stale/duplicate/source mismatch分别精确得到`javascript-traversal-missing`、`javascript-traversal-stale`、`javascript-traversal-duplicate`、`javascript-traversal-source-mismatch`；删除visit、复制visit、改成unknown node type分别精确得到`javascript-ast-node-unvisited`、`javascript-ast-node-duplicate-visit`、`javascript-ast-node-unknown`；普通declaration/literal/operator只改变coverage，不凭空增加capability fact。
 
 条目数量不是验收目标；每条性质必须消灭独立错误世界。固定 seed，失败输出最小 counterexample graph。`.fsi` export extraction、compiler declaration extraction、compile-set drift、Import/Emit 分类与 package-import linkage 由固定 fixture/真实 compiler gate证明，不伪装成随机图性质。pure `Emit` 与已批准 deterministic compile support 是 GREEN；canonical effect-capability 才是 RED。
 
@@ -1330,7 +1372,7 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 2. contract 默认 `bounded`。只有无 authority、扩张 audience 不增加任何决策或操作能力、且确属跨域基础词汇的 locality 才可 `shared`。不得以减少 manifest 行数为由选择 shared。
 3. 当前 ProjectReference、旧 owner ACL 或现有 composition 标签都不是授权证据。禁止把现有 graph 自动抄成 grant、wiring、allowlist、baseline 或 suppression。
 4. 同一 provider locality 全部 sibling `.fsi` 的公开符号并集共同授权。consumer cohort 或 authority 不同就拆 source/project；禁止在 JSON 中恢复编译器不能兑现的 per-symbol 权限。
-5. 确定性、仓库派生、无 IO/ambient state 的 generated module 可通过 exact `compile-contract-support` relation 被消费，不因使用 Fable `Import` 自动归为物理 effect。该 relation 必须绑定精确 import specifier、生成 owner、consumer locality 与可执行 determinism proof；Node/Host/process/network import 不适用此条。
+5. 确定性、仓库派生、无IO/ambient state的generated module可通过exact `compile-contract-support` relation被消费，不因Fable `Import`或`RuntimeV1.Node`自动归为物理effect。该relation必须绑定精确import specifier、生成owner、consumer locality与可执行determinism proof；任一Host/ProcessControl/Network/FileSystem/Git/Provider等authority、mutable resource或Unknown不适用此条。
 6. M6.4 仍为唯一权威切换点：新 manifest、compiler-resolved analyzer、schema/gate、所有原子 blocker 与旧 schema/gate 删除必须同一 commit 全绿。此前不得形成第二 release authority。
 
 #### EventStore 裁决
@@ -1376,8 +1418,8 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 
 #### 裁决后的施工批次与停止条件
 
-1. M6.3a：先更新 `requirements/structured-workflow/{WHY,WHAT,HOW}.md` 与全局 `requirements/GAP.md`，固定 v2 schema、canonical facts/world/candidates、generated-module relation 与 violation code；再更新 durable-events、host-boundary、degeneration-guard、delegation、time-capability、causal-wait、process-execution及 fresh census 找到的所有 FatalProcess caller owner WHY/WHAT/HOW/GAP。建立行为 oracle与 architecture/closure illegal fixture；先观察旧世界被新 oracle判为违规，再提交全绿 fixture，禁止提交红色 suite。
-2. M6.3b：提交report-only pure validator/property、fresh全集worksheet，以及旧gate下可独立绿色的contract/port split。worksheet可随绿色节点更新但无schema/authority；pure property进入unit sink，live新模型不得阻断release。每组一个绿色Git节点，运行provider、direct consumer与reverse impact compile。
+1. M6.3a：先更新`requirements/structured-workflow/{WHY,WHAT,HOW}.md`与全局`requirements/GAP.md`，固定v2 schema、`C(W)`/`J(W)`分离、generated artifact canonical row、Node runtime非authority、semantic staged-input closure及全部violation code；再更新durable-events、host-boundary、degeneration-guard、delegation、time-capability、causal-wait、process-execution及fresh census找到的所有FatalProcess caller owner WHY/WHAT/HOW/GAP。建立行为oracle与architecture/closure illegal fixture；先观察旧世界被新oracle判为违规，再提交全绿fixture，禁止提交红色suite。该步骤可立即开始；这些规则进入正式WHAT并全绿之前不得启动M6.3b production extractor。
+2. M6.3b：提交report-only pure validator/property、fresh全集worksheet，以及旧gate下可独立绿色的contract/port split。worksheet可随绿色节点更新，但只有migration-only closed schema、无digest/authority；pure property进入unit sink，live新模型不得阻断release。每组一个绿色Git节点，运行provider、direct consumer与reverse impact compile。
 3. M6.3c：只在同一未提交cutover工作树准备旧gate确实无法表达的最小production切换与最终manifest；不夹带M6.5优化，不形成独立commit。按4.5协议stage全部input并核对index/working tree，fresh重建world/candidates/query，生成formal snapshot；locality/world/query/index/classifier/claim/proof任一mismatch都要重裁，零mismatch后才可进入M6.4。
 4. M6.4：对同一staged state一次复验，单个绿色commit启用pure validator/schema/new authority，接入恰一次production fresh scan，激活最终manifest，并删除旧owner-wide/per-symbol/compile-support权威、worksheet、临时actual dump及所有迁移路径；formal snapshot随commit冻结，post-cutover gate不再读取。执行fixed negative oracle、fast-check、fresh production scan与完整release sink。
 5. report-only parser/analyzer/fixture存在不等于第二权威；只有 live old/new gate同时能够阻断 `format-build-test` 才是双 release authority。M6.4 后不得保留可供 release 降级的 report-only bypass。
@@ -1410,10 +1452,22 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 ### 2026-09-03 — reviewer 第三轮执行协议裁决
 
 - P1-1接受：adjudication工件拆成M6.3b worksheet与M6.3c formal snapshot；M6.4只对同一staged state验真一次。snapshot随cutover冻结，M6.5–M6.7及永久release gate不得与live world比较、更新或读取授权。
-- P1-2接受：补齐`CanonicalWorldV1`、normative projections、query rows、closed DU JSON、closure/self约定、identity/sort/dedupe/illegal-value规则与唯一`encodeCanonicalJsonV1`/`serializeCanonicalWorldV1`。generated linkage只在observed fact表达provenance，generated relation只表达normative claim，不再有第三份竞争字段。
+- P1-2接受：补齐`CanonicalWorldV1`、normative projections、query rows、closed DU JSON、closure/self约定、identity/sort/dedupe/illegal-value规则与唯一`encodeCanonicalJsonV1`/`serializeCanonicalWorldV1`。当轮先把generated linkage收进observed fact；下一轮进一步规范为唯一`GeneratedArtifactRowV1`，fact只引用ID，见下节。
 - P1-3接受：record改为sorted array，terminal classification必须等于production `classifyTerminalV1`；`manifest_claim_ids`必须等于同world的slice/consumer-relation投影；WHAT/proof shape、existence、HOW、Surface与owner校验及closed RED codes全部固定。
-- P1-4接受：capability extractor固定完整observation universe、exact partition与多轴标签；Date/time/random/timer/console/env/process/fs/network及alias/FQN有closed rule，unsupported输入fail-closed。generated runtime artifact另扫实际import/global/effect；determinism不再被当作purity。
+- P1-4接受：capability extractor固定完整observation partition与多轴标签；Date/time/random/timer/console/env/process/fs/network及alias/FQN有closed rule，unsupported输入fail-closed。下一轮将JavaScript普通AST node从capability universe拆到独立traversal coverage，保留同等零遗漏约束，见下节。
 - P1-5接受：physical-port完整surface允许`PureRepresentation + CapabilityTypeOnly`且必须至少一个capability type；value/factory/effect/authority/mutable/Unknown全部拒绝。consumer仍由自身actual fact/kind policy验证，不恢复symbol ACL。
 - 两个收口项接受：fast tier只跑schema/canonical/pure validator与fast-check；唯一production full scan进入独立integration step并由release sink恰执行一次。cutover使用排除formal snapshot/worksheet后的全tracked staged-entry digest，并在scan前后核对working tree；不存包含snapshot自身的tree OID，避免OID↔内容自指。成本census更新为161 unique foreign providers、1,614 foreign refs、239 same-owner refs、797 composition-provider refs。
 - 无顶层建议被拒绝。仅拒绝两个可能的字面实现：①post-cutover持续比较snapshot与live world，会使合法split/owner merge永远RED；②把包含snapshot自身的完整tree OID写进snapshot，无法构造固定点。两者分别由one-shot lifecycle与filtered staged-entry digest实现同一目标。
 - 本轮仍只修改计划，不启用v2 schema/gate、不改变production，GAP-031保持PARTIAL。
+
+### 2026-09-03 — reviewer 第四轮 extractor 前协议闭合
+
+- P1-1接受：`C(W)`只含可由closed schema表示的capability observations并执行exact disposition partition；`J(W)`独立枚举每个Emit/generated-JS AST node。structural enumerator与semantic visitor的key集合必须相等，ordinary node只记coverage，missing/duplicate/unknown node各有exact RED。
+- P1-2接受：新增唯一canonical `GeneratedArtifactRowV1`，承载artifact path/output digest、selector-input digest、linkage与traversal ID。Fable import/generated-JS facts只引用artifact ID；query从ID投影原row，manifest仍只保存normative relation，不制造第二事实源。
+- P1-3接受：统一所有purity/compile-support表述。`RuntimeV1.Node/Bun/Browser/ExternalPackage`本身不决定RED；只有authority/mutable/forbidden semantic class/Unknown决定拒绝。新增`RuntimeV1.Node`单标签GREEN property。
+- P2-1接受：worksheet始终只有4.5 migration-only closed schema；“无固定schema”全部改为“不含digest、无授权力”。
+- P2-2接受：cutover input closure改为tracking reader的actual reads、repository-local import closure与selector outputs，不按扩展名猜测。generator/build/selector及每个selected input必须命中stage-0 tracked entry；唯一build-output exception由artifact row承接。Git object format只取`git rev-parse --show-object-format`。
+- 无建议被拒绝。源码复核确认当前loop-detector generator仍调用返回text的`loopDetectorRepositoryTexts`，而同模块已有path-producing `loopDetectorRepositoryInputFiles`；M6.3a必须先迁generator到后者并经reader取bytes。当前仓库object format为`sha1`，三条linkage entry均为stage-0 tracked blob。
+- 计划复验：`git diff --check`零错误、Markdown code fence为64个且闭合；`node --test requirements/structured-workflow/tests/*.test.mjs`为244/244；`node scripts/check.mjs`全绿，包含291条spec、711个production source、178个locality、784个contract与780 WHAT/3977 tests requirement trace。
+- 执行边界：M6.3a可立即开始；本节schema、规则、RED code与proof必须先进入正式`structured-workflow` WHY/WHAT/HOW/GAP并全绿，随后才可启动M6.3b production extractor。无需重开EventStore、Host、FatalProcess、Delegation、PTY或老板裁决。
+- 本轮只修改计划，不启动M6.3a production、不启用v2 gate，GAP-031保持PARTIAL。
