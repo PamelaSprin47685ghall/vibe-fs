@@ -2268,7 +2268,12 @@
     {
       "owner": "change-integration",
       "locality": "git-integrationgate",
-      "justification": "Integration gate, worktree resource, job model, prompts, orchestrator program, runtime, Git operations/gateway, change surfaces, Git adapter, worktree cleanup, session directories, recovery and review runner form one fully signed change-integration locality over graduated identity, Git, journal, process and review contracts; process execution and lock details remain signature-hidden."
+      "justification": "Integration gate, worktree resource, job model, prompts, orchestrator program, runtime, Git operations, change surfaces, Git adapter, worktree cleanup, session directories, recovery and review runner form one fully signed change-integration locality over graduated identity, Git, journal, process and review contracts; process execution and lock details remain signature-hidden."
+    },
+    {
+      "owner": "change-integration",
+      "locality": "git-gateway",
+      "justification": "The Git convergence gateway is isolated behind one signed public module for durable-convergence; its private remote discovery and transport helpers cannot enter the consumer compile surface."
     },
     {
       "owner": "context-compression",
@@ -4128,7 +4133,8 @@
       ],
       "symbols": [
         "Wanxiangshu.Git.GitGateway.converge",
-        "Wanxiangshu.Git.GitGateway.createDefaultRunner"
+        "Wanxiangshu.Git.GitGateway.createDefaultRunner",
+        "Wanxiangshu.Git.GitGatewayRunner"
       ],
       "justification": "Git.Gateway publishes exactly these symbols to the listed owners; every unlisted sibling remains private to change-integration."
     },

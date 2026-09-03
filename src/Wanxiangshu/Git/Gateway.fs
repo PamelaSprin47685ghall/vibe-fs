@@ -13,10 +13,6 @@ type GitGatewayRunner = string list -> Task<int * string * string>
 
 [<RequireQualifiedAccess>]
 module GitGateway =
-
-    [<Literal>]
-    let SyncActiveEnv = "WANXIANG_GIT_SYNC_ACTIVE"
-
     let private trackingRef remote = StoreRef.remoteTracking remote
 
     let private transportError stdout stderr =
@@ -77,7 +73,7 @@ module GitGateway =
 
     /// Discover the current remote store root and ensure its object graph exists
     /// locally. Absence is a valid empty remote.
-    let discoverRemote
+    let private discoverRemote
         (run: GitGatewayRunner)
         (remote: string)
         : Task<Result<StoreSnapshot option * GitObjectId option, ConvergeError>> =
