@@ -22,7 +22,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.review-assurance.opencode-host-providerrunbinding.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-judgement-requestidentity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-reviewfactfold.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj"/>
     <Compile Include="OpenCode/Host/SharedStateSurface.fsi"/>
     <Compile Include="OpenCode/Host/SharedStateSurface.fs"/>
     <Compile Include="OpenCode/Host/PluginSessionScope.fsi"/>

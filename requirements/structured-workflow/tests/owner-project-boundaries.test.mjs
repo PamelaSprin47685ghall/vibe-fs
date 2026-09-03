@@ -197,7 +197,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] review request identity and challenge have s
   assert.ok(hostRefs.includes(requestProject))
   assert.ok(!hostRefs.includes(mixedProject))
   assert.ok(!hostRefs.includes(challengeProject))
-  assert.ok(hostRefs.includes('Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj'))
+  assert.ok(!hostRefs.includes('Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj'))
 
   const managedRefs = references(
     'Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj',
