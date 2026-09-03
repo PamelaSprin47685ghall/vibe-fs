@@ -11,6 +11,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.git-integrationgate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-host-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-recovery-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-handle-surface.fsproj"/>

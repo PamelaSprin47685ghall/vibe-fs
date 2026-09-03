@@ -92,6 +92,115 @@ test('WHAT[STRUCTURED-WORKFLOW-011] GitGateway exact contract has an isolated co
   assert.doesNotMatch(signature, /SyncActiveEnv|discoverRemote/)
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-011] NodeFs physical port and tool contracts have isolated compiler boundaries', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const contractAt = (path) => manifest.contracts.find((entry) => entry.path === path)
+  const compileItems = (projectName) =>
+    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+  const references = (projectName) =>
+    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+
+  assert.deepEqual(contractAt('src/Wanxiangshu/OpenCode/Tools/ManagedAgent.fs')?.consumers, [
+    'capability-enforcement',
+    'change-integration',
+    'context-compression',
+    'delegation',
+    'execution-model-routing',
+    'finality',
+    'host-boundary',
+    'interaction-authority',
+    'managed-session-lifecycle',
+    'output-distillation',
+    'participant-horizon',
+    'process-execution',
+    'speculative-investigation',
+    'time-capability',
+  ])
+  assert.deepEqual(contractAt('src/Wanxiangshu/OpenCode/Tools/StaticTools.fs')?.consumers, [
+    'capability-enforcement',
+    'delegation',
+    'host-boundary',
+    'review-assurance',
+    'review-judgement',
+  ])
+
+  const nodeFsPath = 'src/Wanxiangshu/OpenCode/Tools/NodeFs.fs'
+  const nodeFsContract = contractAt(nodeFsPath)
+  assert.equal(nodeFsContract?.kind, 'physical-port')
+  assert.deepEqual(nodeFsContract?.consumers, ['repository-programming'])
+  assert.deepEqual(nodeFsContract?.symbols, [
+    'Wanxiangshu.OpenCode.NodeFs.cpSync',
+    'Wanxiangshu.OpenCode.NodeFs.existsSync',
+    'Wanxiangshu.OpenCode.NodeFs.readdirSync',
+    'Wanxiangshu.OpenCode.NodeFs.renameSync',
+    'Wanxiangshu.OpenCode.NodeFs.rmSync',
+    'Wanxiangshu.OpenCode.NodeFs.statSync',
+  ])
+
+  const fileMutationAdapter = manifest.physical_adapters.find(
+    (entry) => entry.path === 'src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs',
+  )
+  assert.ok(fileMutationAdapter)
+  assert.equal(fileMutationAdapter.owner, 'repository-programming')
+  assert.deepEqual(fileMutationAdapter.ports, [
+    {
+      path: nodeFsPath,
+      symbols: nodeFsContract.symbols,
+    },
+  ])
+
+  const managedProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj'
+  const staticProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-statictools.fsproj'
+  const nodeFsProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-nodefs.fsproj'
+  assert.deepEqual(compileItems(managedProject), ['OpenCode/Tools/ManagedAgent.fsi', 'OpenCode/Tools/ManagedAgent.fs'])
+  assert.deepEqual(compileItems(staticProject), ['OpenCode/Tools/StaticTools.fsi', 'OpenCode/Tools/StaticTools.fs'])
+  assert.deepEqual(compileItems(nodeFsProject), ['OpenCode/Tools/NodeFs.fsi', 'OpenCode/Tools/NodeFs.fs'])
+
+  const staticSignature = readFileSync(join(SRC, 'OpenCode/Tools/StaticTools.fsi'), 'utf8')
+  const staticImplementation = readFileSync(join(SRC, 'OpenCode/Tools/StaticTools.fs'), 'utf8')
+  const fileMutationImplementation = readFileSync(join(SRC, 'OpenCode/Tools/FileMutationTools.fs'), 'utf8')
+  assert.doesNotMatch(staticSignature, /\bmodule NodeFs\b/)
+  assert.doesNotMatch(staticImplementation, /\bmodule NodeFs\b|\[<Import\([^\n]+, "fs"\)>\]/)
+  assert.doesNotMatch(fileMutationImplementation, /\bmodule private NodeFs\b|\[<Import\([^\n]+, "fs"\)>\]/)
+
+  const nodeFsSignature = readFileSync(join(SRC, 'OpenCode/Tools/NodeFs.fsi'), 'utf8')
+  assert.deepEqual(
+    [...nodeFsSignature.matchAll(/^\s*val ([A-Za-z0-9_]+):/gm)].map(([, name]) => name),
+    ['readFileSync', 'writeFileSync', 'existsSync', 'statSync', 'readdirSync', 'renameSync', 'rmSync', 'cpSync'],
+  )
+
+  const capabilityRefs = references('Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj')
+  assert.ok(capabilityRefs.includes(managedProject))
+  assert.ok(capabilityRefs.includes(staticProject))
+  assert.ok(capabilityRefs.includes('Wanxiangshu.Owner.host-boundary.sphinx-host-adapter.fsproj'))
+
+  const reviewRefs = references('Wanxiangshu.Owner.review-judgement.mission-review-opencode-judgetool.fsproj')
+  assert.ok(reviewRefs.includes(staticProject))
+  assert.ok(!reviewRefs.includes(managedProject))
+
+  const routingRefs = references('Wanxiangshu.Owner.execution-model-routing.opencode-host-modelroutingsurface.fsproj')
+  assert.ok(routingRefs.includes(managedProject))
+  assert.ok(!routingRefs.includes(staticProject))
+
+  const actionRuntimeRefs = references('Wanxiangshu.Owner.action-affordance.runtime.fsproj')
+  assert.ok(actionRuntimeRefs.includes(staticProject))
+  assert.ok(actionRuntimeRefs.includes(nodeFsProject))
+  assert.ok(!actionRuntimeRefs.includes(managedProject))
+
+  const repositoryRefs = references('Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj')
+  assert.ok(repositoryRefs.includes(nodeFsProject))
+
+  const ptyToolRefs = references('Wanxiangshu.Owner.process-execution.opencode-tools-ptytool.fsproj')
+  assert.ok(ptyToolRefs.includes('Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj'))
+
+  const joinToolRefs = references('Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj')
+  assert.ok(joinToolRefs.includes('Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj'))
+})
+
 test('WHAT[STRUCTURED-WORKFLOW-011] locality kinds enforce contract purity, direction, and closure budget', () => {
   const contract = resolve('/architecture/Contract.fsproj')
   const nestedContract = resolve('/architecture/NestedContract.fsproj')

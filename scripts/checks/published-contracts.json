@@ -1938,7 +1938,17 @@
     {
       "owner": "action-affordance",
       "locality": "opencode-tools-managedagent",
-      "justification": "Managed-agent identity and static tool/permission projection are fully signed action-affordance contracts; their compile closure is limited to graduated role/persona, office, review, Sphinx and stealth-browser vocabularies."
+      "justification": "Managed-agent identity is a single-source signed contract over the graduated participant role/persona vocabulary; static tool policy and physical filesystem access are absent."
+    },
+    {
+      "owner": "action-affordance",
+      "locality": "opencode-tools-nodefs",
+      "justification": "The unique signed Node filesystem physical adapter exposes only operations used by FileTools and FileMutationTools; it contains no tool policy or repository-programming decision."
+    },
+    {
+      "owner": "action-affordance",
+      "locality": "opencode-tools-statictools",
+      "justification": "Static tool names, permission projection, reviewer verdict parsing and agent config construction form one signed policy contract; managed-agent parsing and physical filesystem access are absent."
     },
     {
       "owner": "provider-projection",
@@ -5417,6 +5427,7 @@
       "consumers": [
         "capability-enforcement",
         "delegation",
+        "host-boundary",
         "review-assurance",
         "review-judgement"
       ],
@@ -5438,6 +5449,25 @@
         "Wanxiangshu.OpenCode.StaticTools.toolNames"
       ],
       "justification": "ToolOwner.ToolSpec publishes exactly these symbols to the listed owners; every unlisted sibling remains private to action-affordance."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/NodeFs.fs",
+      "owner": "action-affordance",
+      "node": "opencode-nodefs-port-contract",
+      "contract": "ToolOwner.NodeFsPort",
+      "kind": "physical-port",
+      "consumers": [
+        "repository-programming"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.NodeFs.cpSync",
+        "Wanxiangshu.OpenCode.NodeFs.existsSync",
+        "Wanxiangshu.OpenCode.NodeFs.readdirSync",
+        "Wanxiangshu.OpenCode.NodeFs.renameSync",
+        "Wanxiangshu.OpenCode.NodeFs.rmSync",
+        "Wanxiangshu.OpenCode.NodeFs.statSync"
+      ],
+      "justification": "Repository programming adapts only the six filesystem operations used by FileMutationTools; action-affordance read/write operations remain same-owner and grant no foreign capability."
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs",
@@ -18717,6 +18747,25 @@
         }
       ],
       "justification": "action-affordance adapts only the listed foreign symbols at the tool/physical boundary; it owns no provider policy."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs",
+      "owner": "repository-programming",
+      "node": "repository-programming-frontier-keep",
+      "ports": [
+        {
+          "path": "src/Wanxiangshu/OpenCode/Tools/NodeFs.fs",
+          "symbols": [
+            "Wanxiangshu.OpenCode.NodeFs.cpSync",
+            "Wanxiangshu.OpenCode.NodeFs.existsSync",
+            "Wanxiangshu.OpenCode.NodeFs.readdirSync",
+            "Wanxiangshu.OpenCode.NodeFs.renameSync",
+            "Wanxiangshu.OpenCode.NodeFs.rmSync",
+            "Wanxiangshu.OpenCode.NodeFs.statSync"
+          ]
+        }
+      ],
+      "justification": "FileMutationTools is the exact repository-programming adapter for Node filesystem mutation; it receives no read/write text capability and owns all mv/rm policy."
     }
   ],
   "composition_roots": [
