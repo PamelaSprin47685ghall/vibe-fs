@@ -111,3 +111,11 @@ terminal 能完成或失败 work unit，当且仅当它属于该 work unit 实�
 `Delegation.Contract` 只拥有 command/result、fact、typed payload、logical route、completion evidence 与 injected capability；`Delegation.Fold` 只实现纯投影；`Delegation.Ledger` 仅在 composition 边界把 fold 连接到 canonical `AgentJournal`；`Delegation.Sync.Runtime`、`Delegation.Fork.Runtime` 与 `Delegation.Recovery.Runtime` 消费 contract/fold 并实现各自 CE。Host callback/dispatch 与 PTY 分别位于 `Delegation.Host.Adapter`、`Delegation.Pty.Adapter`，只能由 composition root 绑定。Contract 的 direct/transitive ProjectReference closure 不得包含 Host、OpenCode tool、PTY、process、EventStore runtime、sync/fork workflow 或 recovery runtime。
 
 `Delegation.Contract` 的 transitive production `.fs` 不得超过 100。fold/runtime/sync/fork localities 的 transitive production `.fs` 以 185 为 target；adapter locality（`Delegation.Host.Adapter`、`Delegation.Pty.Adapter`）按其 charter 必须组装 durable spine、wait、host signal 与 managed-agent 物理 vocabularies，closure 由此被上游共享 spine 主导，其闭包以全仓 production `.fs` 的 60% 为 hard ceiling（超过即 full fallback，不伪装为 focused compile），实测规模（2026-09-02：host 315、pty 316、recovery 193）作为回归 ratchet——任何增长必须伴随本条修订；recovery 的闭包余量由 session-contract 快照 vocabulary 与 durable spine 的真实消费构成，185 为其持续收缩目标。composition locality 豁免规模预算。owner compile 必须把选定 locality 的 ProjectReference closure 合并为 aggregate-order、零 ProjectReference 的单一 flat project，并只启动一次 Fable。
+
+## DELEG-029: Delegation runtime、PTY 与 durable outer routing 必须单向注入
+
+Delegation领域constructor只产生`DelegationFactCases`、`ExecutionFactCases`或等价typed intent；linkage、estimate、handoff frontier、child handle index与closed rejection由delegation-owned pure fold/decision拥有。durable composition是把这些case包入`AgentFact`并组合projection的唯一位置。Host runtime、recovery、fork、fold与sync只消费delegation-owned append/query/wait/clock/PTY capability types；PTY adapter不得读取`HostForkRuntime`、Fork runtime、Process implementation、Gate、Dictionary、registry或TCS。Temporal、CausalWait及Process physical implementations只由composition构造最窄capability并注入。
+
+## DELEG-030: delegation fatal escalation 只消费mandatory injected fuse
+
+handoff checkpoint或sync invariant失败由delegation owner构造typed incident；caller必须先保留已发生effect与durable settlement，再调用构造时必填的fatal capability。fork/sync runtime不得直接引用fatal physical adapter，不得用optional/default/global fallback；同一incident只允许一次report与一次kill。

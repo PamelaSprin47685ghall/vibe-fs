@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { compareCanonicalTextV1 } from './canonical-json-v1.mjs'
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -49,29 +50,27 @@ const isGeneratedText = (text) => {
   return generatedMarkers.some((marker) => prefix.includes(marker))
 }
 
-const repositoryTextEntries = (root = defaultRoot) => {
-  const decoder = new TextDecoder('utf-8', { fatal: true })
-  const paths = execFileSync('git', ['-C', root, 'ls-files', '--cached', '-z'])
+export const loopDetectorRepositoryInputFiles = (root = defaultRoot) => {
+  const repositoryRoot = path.resolve(root)
+  return execFileSync('git', ['-C', repositoryRoot, 'ls-files', '--cached', '-z'])
     .toString('utf8')
     .split('\0')
     .filter(Boolean)
     .filter(isSourceDocumentPath)
+    .sort(compareCanonicalTextV1)
+    .map((repositoryPath) => path.join(repositoryRoot, repositoryPath))
+}
 
+export const loopDetectorRepositoryCorpusTexts = (trackedInputs) => {
+  const decoder = new TextDecoder('utf-8', { fatal: true })
   const readable = []
-  for (const relPath of paths) {
-    const file = path.join(root, relPath)
+  for (const { bytes } of trackedInputs) {
     try {
-      const text = decoder.decode(readFileSync(file))
-      if (!isGeneratedText(text)) readable.push({ file, text })
+      const text = decoder.decode(bytes)
+      if (!isGeneratedText(text)) readable.push(text)
     } catch {
-      // Strict UTF-8 is required for source/document corpus membership.
+      continue
     }
   }
   return readable
 }
-
-export const loopDetectorRepositoryInputFiles = (root = defaultRoot) =>
-  repositoryTextEntries(root).map(({ file }) => file)
-
-export const loopDetectorRepositoryTexts = (root = defaultRoot) =>
-  repositoryTextEntries(root).map(({ text }) => text)

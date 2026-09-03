@@ -9,7 +9,7 @@
 `tests/meta-verifier.test.mjs` 是全树结构契约的机器执行入口，执行五项封闭性断言：
 - **三文档与测试齐备**：索引中的每个包必须包含 `WHY.md`、`WHAT.md`、`HOW.md` 及 `tests/` 目录。
 - **命题落点封闭**：每个 `WHAT.md` 标题中声明的 `<PACKAGE>-NNN` 命题，必须在 `HOW.md` 的落点表格中有对应的证明行。
-- **测试文件物理存在**：落点表格中引用的测试文件必须在文件系统中真实存在。
+- **测试文件物理存在**：落点表格中引用的测试文件必须在文件系统中真实存在；存在性只提供候选，不授予证明权威。
 - **目录无外部越界**：`requirements/` 目录下不存在 `INDEX.md` 之外的任何未授权目录。
 - **依赖声明子集约束**：每个包文档中声明的 `DEPENDS ON` 集合必须是 `INDEX.md` 依赖骨架中定义边的子集。
 
@@ -29,6 +29,7 @@
 - 为每个命题 ID 保留全部定义位置；仅为恰有一个定义的 ID 建立权威映射，同包重复与跨包多 owner 均以全部位置 fail-closed。
 - 识别并阻断未关联命题的孤儿测试、多 primary 标签的歧义测试以及无有效测试覆盖的休眠命题。
 - 由共享的精确标题解析器解析 `HOW.md` 的 `(path, title)` 锚点；裸路径、零匹配或多匹配均产生缺失/悬空证明诊断且不取得 HOW 权威，同一命题可以保留多个独立证明边。
+- `requirement-trace` 是 WHAT↔HOW↔active test 拓扑的唯一 owner。release/migration ledger、合同册与 proof-level registry 不重复解析或关闭 WHAT；后者只能消费已由本图精确解析的测试身份。
 
 ### 4. 变更生命周期约束（`change-lifecycle`）
 
@@ -57,4 +58,4 @@
 | REQUIREMENT-SYSTEM-015 | `requirements/requirement-system/tests/change-lifecycle.test.mjs::WHAT[REQUIREMENT-SYSTEM-015] AGENTS.md keeps the small-fix exemption` |
 | REQUIREMENT-SYSTEM-016 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-016] declared DEPENDS ON stays within the INDEX skeleton` |
 | REQUIREMENT-SYSTEM-017 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-017] meta-verifier executes as the machine proof` |
-| REQUIREMENT-SYSTEM-018 | `requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] only executable node:test bindings with callbacks create active trace declarations`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] exact proof-title resolution is reusable and never guesses`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] graph preserves proof portfolios and rejects orphan or multi-primary tests`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects stale anchors` |
+| REQUIREMENT-SYSTEM-018 | `requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] only executable node:test bindings with callbacks create active trace declarations`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] exact proof-title resolution is reusable and never guesses`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] graph preserves proof portfolios and rejects orphan or multi-primary tests`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects stale anchors`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] unrelated external proof inventory cannot close a WHAT` |

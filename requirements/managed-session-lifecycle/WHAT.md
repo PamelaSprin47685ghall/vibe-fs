@@ -79,3 +79,7 @@ logical session cancel 或 delete 获得终止授权后，lifecycle owner 必须
 ## MANAGED-SESSION-020: Fresh identity 等待 durable exact prior-run closure
 
 同一 `SessionId` 被复用于 fresh logical participant run 前，lifecycle 必须先完成 exact execution settlement 与受权 child drain，再由 `interaction-authority` 持久化 exact prior-run closure 并取得 closure witness，最后才把容器开放给 `participant-identity` 安装新 evidence。association removal、detach、idle、timeout、Host observation 或 process restart 均不能代替该 witness；缺失或 run 不匹配必须 fail closed。
+
+## MANAGED-SESSION-021: lifecycle fatal晚于exact drain且只经注入fuse执行
+
+session delete、turn observation或strength semantic-cut incident必须先完成其要求的exact execution settlement、child drain与durable closure evidence；process/plugin detach无权fatal。lifecycle/Host runtime只接受composition注入的mandatory fatal capability，不得直接引用physical adapter、optional/default/global fallback。同一incident只允许一次report与kill，fatal不得伪造session terminal或child abandon。

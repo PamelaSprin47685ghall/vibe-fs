@@ -30,7 +30,7 @@ Reviewer 依据 Examiner's Ledger 的判断方向建立审查视角，仅在存�
 
 ## REVIEW-JUDGEMENT-008: 终审与发布评审中的单次 durable judge 与中断收束
 
-Reviewer 针对当前 barrier 或请求做出判断时，单次持久化 `judge` 即为 terminal。防重机制绑定于当前物理请求，同一物理请求内的重复调用予以收束。当 Host 准备把该 terminal tool result 送入同一物理请求的下一次 LLM continuation 时，provider transform 必须先确认该 judgement 对应的 exact `tool_result` 已进入 durable XTrace，并以该 part 的 `cursor+1` 持久化 `ReviewAttemptClosed`。随后 transform 把物理 interrupt 交给 runtime-owned background executor 并立即正常返回。Finality 与 Change 的 pre/post-rebase review 共享同一个 Host future-terminal 解释器；clean-abort authority 由强类型 `(ReviewerSessionId, ReviewBarrierId)` occasion 携带。Finality 首次 PERFECT 触发 skeptical challenge 并要求再次评估；只有 terminal judgement 被标记后才适用 transform interrupt。
+Reviewer 针对当前 barrier 或请求做出判断时，单次持久化 `judge` 即为 terminal。防重机制绑定于当前物理请求，同一物理请求内的重复调用予以收束。当 Host 准备把该 terminal tool result 送入同一物理请求的下一次 LLM continuation 时，provider transform 必须先确认该 judgement 对应的 exact `(ProviderRunIdentity, ToolCallId)` `tool_result` 已进入 durable XTrace；wrong-run 与 wrong-call part 均不得授权 closure，并以 exact part 的 `cursor+1` 持久化 `ReviewAttemptClosed`。随后 transform 把物理 interrupt 交给 runtime-owned background executor 并立即正常返回，不等待 physical interrupt settle。closure append 失败时不得 schedule interrupt。Finality 与 Change 的 pre/post-rebase review 共享同一个 Host future-terminal 解释器；clean-abort authority 由强类型 `(ReviewerSessionId, ReviewBarrierId)` occasion 携带。Finality 首次 PERFECT 触发 skeptical challenge 并要求再次评估；只有 terminal judgement 被标记后才适用 transform interrupt。注册给测试的 `JudgeSurface` 必须调用同一个 `JudgeTool.interruptAfterSubmittedJudgement` production entry；禁止复制 closure 或 interrupt 状态机。
 
 ## REVIEW-JUDGEMENT-009: 拒绝必须把伤口说清且不发明 obligation
 

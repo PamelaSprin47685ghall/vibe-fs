@@ -51,3 +51,7 @@ Dispatch 在建立 `PhysicalAccepted` 后只向 `managed-chat-execution` 交接 
 ## DISPATCH-PROTOCOL-013: Construction 纯 wiring，recovery 晚于 durability activation
 
 插件构造阶段只装配 dispatcher 与 handoff ports，不读 journal、不调和 pending claim、不恢复 execution、不启动 timer 或 polling。durable substrate 激活成功后，dispatch recovery 才可依据 durable claim 与 Host physical evidence 运行；execution recovery 委托 `managed-chat-execution`，且两者都不得以 wall clock 推进事实。
+
+## DISPATCH-PROTOCOL-014: dispatch fatal先保留claim truth再经注入fuse执行
+
+只有typed dispatch invariant incident可以请求fatal。已发生或outcome unknown的send必须先保留durable Pending/PhysicalAccepted truth与exact PromptKey settlement；fatal不得把它重写为未发送。dispatch runtime只接受composition注入的mandatory fatal capability，不得直接引用physical adapter、optional/default/global fallback；同一incident只允许一次report与kill。

@@ -75,6 +75,8 @@ Join 机制从所有者的完成信箱中按稳定排序逐项 CAS 消费可用�
 | DELEG-026 | `requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-026] reusable delegation has no durable program-counter/state-machine vocabulary`；`requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-026] fork admission bookkeeping that can fail happens before dispatch` |
 | DELEG-027 | `requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-027] active fork assignment never becomes BusyAgentNudge` |
 | DELEG-028 | `requirements/delegation/tests/delegation-compile-boundary.test.mjs::WHAT[DELEG-028] Delegation contract excludes workflow Host PTY and recovery sources`；`requirements/delegation/tests/delegation-compile-boundary.test.mjs::WHAT[DELEG-028] Delegation focused localities stay within compile budgets` |
+| DELEG-029 | `requirements/delegation/tests/m6-slice-boundary.test.mjs::WHAT[DELEG-029] delegation ports reject Host runtime PTY process and AgentFact reverse ownership` |
+| DELEG-030 | `requirements/delegation/tests/m6-slice-boundary.test.mjs::WHAT[DELEG-030] delegation invariant fatal preserves settlement and one injected fuse` |
 
 ## GAP
 

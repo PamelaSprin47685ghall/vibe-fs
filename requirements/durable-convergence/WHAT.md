@@ -6,7 +6,7 @@
 
 ## DURABLE-CONVERGENCE-002: k-way merge 是统一 primitive
 
-多流合并原语 `KWayMerge(writerStreams[])` 必须满足结合律、交换律、幂等性与确定性。同一组有序写者流无论以何种枚举顺序输入、由哪个进程或在哪台机器上执行，都必须产生完全相同的规范事件序列。
+多流合并原语 `KWayMerge(writerStreams[])` 必须满足结合律、交换律、幂等性与确定性。同一组有序写者流无论以何种枚举顺序输入、由哪个进程或在哪台机器上执行，都必须产生完全相同的规范事件序列。`EventId` 字典序不得替代因果序：即使 parent `EventId` 字典序大于 child，规范序列仍必须先输出 parent。
 
 ## DURABLE-CONVERGENCE-003: 生产 writer-stream k-way merge 等价于 retained-union oracle
 
@@ -26,7 +26,7 @@
 
 ## DURABLE-CONVERGENCE-007: 相同 retained merged history 导出同一个 Integrator Current
 
-收敛公式严格定义为 `Current(now) = CanonicalIntegrator(KWayMerge(Retain(now, writerStreams)))`，严禁在投影层直接进行状态对象的模糊合并。相同截止时刻与相同 writer 集合输入，经由唯一规范 retention 与 Integrator 后必须得到完全相同的 `Current`。
+收敛公式严格定义为 `Current(now) = CanonicalIntegrator(KWayMerge(Retain(now, writerStreams)))`，严禁在投影层直接进行状态对象的模糊合并。相同截止时刻与相同 writer 集合输入，经由唯一规范 retention 与 Integrator 后，Structural frontier 与每个已注册业务 oracle 的 production Current 观察必须完全相同；只比较事件集合、源码调用关系或空 projection 不足以证明收敛。
 
 ## DURABLE-CONVERGENCE-008: durability activation ensure hooks 且用户 Git 进程独立触发双向 sync
 

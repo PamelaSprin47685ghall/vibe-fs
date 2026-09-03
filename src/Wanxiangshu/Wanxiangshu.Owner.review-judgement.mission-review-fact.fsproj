@@ -3,8 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-facts.fsproj"/>
-    <Compile Include="Mission/Review/Fact.fsi"/><Compile Include="Mission/Review/Fact.fs"/><Compile Include="Mission/Review/Prompt.fsi"/><Compile Include="Mission/Review/Prompt.fs"/><Compile Include="Mission/Review/Judgement/Witness.fsi"/><Compile Include="Mission/Review/Judgement/Witness.fs"/><Compile Include="Mission/Review/Judgement/Challenge.fsi"/><Compile Include="Mission/Review/Judgement/Challenge.fs"/><Compile Include="Mission/Review/Judgement/RequestIdentity.fsi"/><Compile Include="Mission/Review/Judgement/RequestIdentity.fs"/>
+    <Compile Include="Mission/Review/Fact.fsi"/><Compile Include="Mission/Review/Fact.fs"/>
   </ItemGroup>
 </Project>

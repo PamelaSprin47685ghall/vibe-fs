@@ -48,3 +48,7 @@ offset、拼接整文件、处理重复片段并自行发明失败恢复协议�
 ## DEPENDS ON
 
 `office-capability`, `capability-enforcement`, `effect-accounting`, `durable-events`, `participant-horizon`
+
+## Physical fatal boundary
+
+JS transaction semantic cut属于repository-programming durable transaction truth；process termination属于Host adapter。direct fatal可在rollback/cut-tail未settle时终止，并把第三方并发修改与本owner incident混成不可恢复状态。

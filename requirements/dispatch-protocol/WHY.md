@@ -27,3 +27,7 @@
 - `host-boundary`
 - `durable-events`
 - `managed-chat-execution`
+
+## Physical fatal boundary
+
+Dispatch owns claim、physical acceptance与unknown-outcome语义；process termination是foreign effect。fatal若绕开typed claim settlement，可能同时向caller声称“未放置”并杀死一个实际已接受的execution。

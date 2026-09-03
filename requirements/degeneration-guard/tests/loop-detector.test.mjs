@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict'
+import path from 'node:path'
 import test from 'node:test'
 import { encode } from 'gpt-tokenizer/encoding/o200k_base'
 
 import * as loopDetector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
-import { deriveLoopDetectorEnvelope } from '../../../scripts/lib/derive-loop-detector-envelope.mjs'
+import {
+  deriveLoopDetectorEnvelope,
+  loadLoopDetectorRepositoryCorpusV1,
+} from '../../../scripts/lib/derive-loop-detector-envelope.mjs'
 import {
   loopDetectorRepositoryInputFiles,
-  loopDetectorRepositoryTexts,
 } from '../../../scripts/lib/loop-detector-repository-corpus.mjs'
 
 const close = (actual, expected, tolerance = 1e-9) =>
@@ -90,7 +93,7 @@ test('WHAT[DG-004] LOOP_004_runtime_envelope_is_freshly_derived_from_the_current
   close(loopDetector.minimumWeightedDistinctCount, derived.minimum)
   close(loopDetector.maximumWeightedDistinctCount, derived.maximum)
 
-  const tokens = encode(loopDetectorRepositoryTexts().join('\n'))
+  const tokens = encode(loadLoopDetectorRepositoryCorpusV1().texts.join('\n'))
   const reference = referenceEnvelope(tokens, derived.lambda, derived.normalPrior)
   close(reference.mean, derived.normalPrior)
   close(reference.minimum, derived.minimum)
@@ -100,11 +103,37 @@ test('WHAT[DG-004] LOOP_004_runtime_envelope_is_freshly_derived_from_the_current
 test('WHAT[DG-004] LOOP_004_repository_corpus_contains_normal_source_documents_only', () => {
   const files = loopDetectorRepositoryInputFiles().map((file) => file.replaceAll('\\', '/'))
 
+  assert.ok(files.every(path.isAbsolute), 'selector must return filesystem paths')
   assert.ok(files.some((file) => file.endsWith('/src/Wanxiangshu/Execution/Session/LoopDetector.fs')))
   assert.ok(files.some((file) => file.endsWith('/requirements/degeneration-guard/WHAT.md')))
   assert.ok(!files.some((file) => file.endsWith('/package-lock.json')))
   assert.ok(!files.some((file) => file.endsWith('/scripts/checks/semantic-owners.json')))
   assert.ok(!files.some((file) => file.endsWith('/docs/index.html')))
+})
+
+test('WHAT[DG-004] LOOP_004_runtime_envelope_reads_every_selected_repository_input_through_the_tracking_reader', async () => {
+  const reads = []
+  const bytes = new Map([
+    ['a.md', Buffer.from('first source\n')],
+    ['b.fs', Buffer.from('module Second\nlet value = 2\n')],
+  ])
+  const derived = await deriveLoopDetectorEnvelope('/fixture-root', {
+    selectInputFiles: () => [...bytes.keys()].reverse().map((repositoryPath) => `/fixture-root/${repositoryPath}`),
+    readFile: (file) => {
+      const repositoryPath = file.replace('/fixture-root/', '')
+      reads.push(repositoryPath)
+      return bytes.get(repositoryPath)
+    },
+  })
+
+  assert.deepEqual(reads, ['a.md', 'b.fs'])
+  assert.deepEqual(derived.selectedInputs.map(({ path }) => path), ['a.md', 'b.fs'])
+  assert.ok(derived.selectedInputs.every(({ blob_digest: blobDigest }) => /^sha256:[0-9a-f]{64}$/.test(blobDigest)))
+
+  assert.throws(() => loadLoopDetectorRepositoryCorpusV1('/fixture-root', {
+    selectInputFiles: () => ['/outside-root/secret.md'],
+    readFile: () => Buffer.from('must not be read'),
+  }), { code: 'generated-selected-input-outside-root' })
 })
 
 test('WHAT[DG-003] LOOP_003_push_text_is_o200k_token_based', () => {

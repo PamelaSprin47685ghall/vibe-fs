@@ -62,3 +62,4 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
 | EMR-013 | `requirements/execution-model-routing/tests/admission-queue.test.mjs::WHAT[EMR-013] queue bound is enforced without drops` |
 | EMR-014 | `requirements/execution-model-routing/tests/capacity-reconciliation.test.mjs::WHAT[EMR-014] valid immutable snapshot is a reconciliation no-op with traceable tokens, waiters, and lineage`；`requirements/execution-model-routing/tests/capacity-soak.test.mjs::WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact reconciliation after every operation` |
 | EMR-015 | `requirements/execution-model-routing/tests/diagnostics.test.mjs::WHAT[EMR-015] diagnostic query reuses capacity snapshot queue and fence counters without duplicate formula` |
+| EMR-016 | `requirements/execution-model-routing/tests/m6-fatal-boundary.test.mjs::WHAT[EMR-016] routing fatal requires exact fence settlement and one injected fuse` |

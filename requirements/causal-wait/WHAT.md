@@ -35,3 +35,7 @@
 ## CAUSAL-008: 观测是 process-local 的，重启后安全消失
 
 因果等待注册表是严格的进程内单例，不记录持久化介质，不参与崩溃恢复。进程重启后旧的等待观测自然清空并安全消失，系统恢复仅从持久化事实重新进入普通业务流程。
+
+## CAUSAL-009: wait vocabulary、runtime、diagnostic与mailbox必须分层
+
+wait identity、frontier、reader/writer capability type形成pure contract；registry/await runtime只拥有process-local waiter；Node diagnostic adapter只实现窄observation port；CompletionMailbox runtime独立拥有其physical wake resource；proof Surface不得成为production provider。consumer只能取得composition注入的最窄capability，禁止contract closure包含registry、TaskCompletionSource、Node import、diagnostic implementation或mailbox implementation。

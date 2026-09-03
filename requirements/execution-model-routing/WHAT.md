@@ -72,3 +72,7 @@ Capacity owner 必须发布不可变 snapshot：ledger entry、token state、exa
 ## EMR-015: Reliability query 复用 capacity owner snapshot
 
 Reliability query 的 queue depth、active lease 与 duplicate/stale/conflict fence 数必须逐字段投影 EMR-014 immutable snapshot；diagnostic 模块严禁维护第二份 capacity/release counter、重算不同公式、reset/repair owner state 或把 query result 反馈给 routing。`CapacityQueueFull` observation 是缺失的 process-local monotonic diagnostic counter，只用于观测，不授权 retry/fallback。
+
+## EMR-016: routing fatal绑定exact fence settlement并经注入fuse执行
+
+fatal incident必须携带exact execution key、capacity fence及`Committed | Unknown` settlement evidence；未settle、stale fence与coarse session identity无权fatal。routing/Host port只接受composition注入的mandatory fatal capability，不得直接引用physical adapter或optional/default/global fallback。同一incident只允许一次report与kill，fatal不得修复、清零或释放capacity state。

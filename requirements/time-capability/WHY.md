@@ -25,3 +25,4 @@
 3. 截止时间未通过强类型 `Deadline` 封装，散落为裸 `DateTimeOffset` 或整数毫秒的手工比较。
 4. 测试用例因缺少虚拟时间支持，被迫使用真实等待（sleep）进行时序验证。
 5. Session 起始时间原点在重试或回放中发生漂移，未能严格执行单次绑定。
+6. pure clock/timer capability type与Node clock/timer implementation处于同一slice，使普通consumer传递获得ambient time、timer或mutable runtime authority。

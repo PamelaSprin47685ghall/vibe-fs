@@ -49,3 +49,7 @@ Casebook 维护容量有界的 LRU 缓存：条目淘汰通过追加 `InspectorC
 ## KNOWLEDGE-REUSE-012: 公开索引仅暴露低信任 Shelfmark 与规范问题
 
 面向外部模型的 `CasebookIndexSnapshot` 属于低信任数据：模型仅可见 `{ shelfmark, canonical question }` 元组。Shelfmark 作为稳定的公开寻址标识，在内部解析为持久化 Case 身份，严禁将内部会话状态、新鲜度标记或机器私有字段泄漏至索引。
+
+## KNOWLEDGE-REUSE-013: Casebook fatal先settle补偿事实再经注入fuse执行
+
+Casebook semantic conflict必须先写入对应durable failure/cut-tail并取得committed或unknown settlement evidence，再构造typed incident。Store/runtime只接受composition注入的mandatory fatal capability；不得直接引用physical adapter、optional/default/global fallback。同一incident只允许一次report与kill，fatal不得修改Case projection、epoch或freshness。

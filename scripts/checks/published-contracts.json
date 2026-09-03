@@ -1631,7 +1631,7 @@
     {
       "path": "src/Wanxiangshu/Mission/Review/OpenCode/JudgeSurface.fs",
       "owner": "review-judgement",
-      "justification": "Signed JS-native judge tool surface exposing verdict schemas and parsers; ToolRuntimeScope and HostToolCodec remain signature-hidden."
+      "justification": "Signed JS-native judge tool surface exposing verdict schemas, parsers and a production-bound physical interrupt probe; ToolRuntimeScope and HostToolCodec remain signature-hidden."
     },
     {
       "path": "src/Wanxiangshu/Mission/Review/ReviewTodoSurface.fs",
@@ -1972,8 +1972,28 @@
     },
     {
       "owner": "review-judgement",
+      "locality": "mission-review-prompt",
+      "justification": "The canonical Reviewer opening semantic path is a source-pure signed contract consumed only by change-integration and finality; unrelated review facts, witnesses, challenges and request identities are absent."
+    },
+    {
+      "owner": "review-judgement",
+      "locality": "mission-review-judgement-challenge",
+      "justification": "The provider-visible review challenge path and renderer form a source-pure signed contract consumed only by review-assurance; request identity and durable review facts are absent."
+    },
+    {
+      "owner": "review-judgement",
+      "locality": "mission-review-judgement-requestidentity",
+      "justification": "The canonical judgement request key and ownership predicate form a source-pure signed contract consumed only by host-boundary and managed-session-lifecycle; challenge and durable review facts are absent."
+    },
+    {
+      "owner": "review-judgement",
+      "locality": "mission-review-judgement-witness",
+      "justification": "The witnessed dual-PERFECT confirmation and candidate verification algebra form a source-pure signed contract over graduated identity; durable fact routing, prompts, challenges and request identity are absent."
+    },
+    {
+      "owner": "review-judgement",
       "locality": "mission-review-fact",
-      "justification": "Review fact routing, canonical review prompt path, witnessed dual-PERFECT confirmation, challenge rendering and judgement request identity are fully signed review contracts over graduated identity, durable routing and provider representation boundaries."
+      "justification": "ReviewFactCases to AgentFact routing is a source-pure signed composition locality over graduated identity and durable routing."
     },
     {
       "owner": "finality",
@@ -2033,7 +2053,17 @@
     {
       "owner": "action-affordance",
       "locality": "opencode-tools-managedagent",
-      "justification": "Managed-agent identity and static tool/permission projection are fully signed action-affordance contracts; their compile closure is limited to graduated role/persona, office, review, Sphinx and stealth-browser vocabularies."
+      "justification": "Managed-agent identity is a single-source signed contract over the graduated participant role/persona vocabulary; static tool policy and physical filesystem access are absent."
+    },
+    {
+      "owner": "action-affordance",
+      "locality": "opencode-tools-nodefs",
+      "justification": "The unique signed Node filesystem physical adapter exposes only operations used by FileTools and FileMutationTools; it contains no tool policy or repository-programming decision."
+    },
+    {
+      "owner": "action-affordance",
+      "locality": "opencode-tools-statictools",
+      "justification": "Static tool names, permission projection, reviewer verdict parsing and agent config construction form one signed policy contract; managed-agent parsing and physical filesystem access are absent."
     },
     {
       "owner": "provider-projection",
@@ -2178,7 +2208,12 @@
     {
       "owner": "provider-attempt-recovery",
       "locality": "participant-provider-attempt-requestkind",
-      "justification": "Provider request-kind and fallback durable-fact vocabularies form a signed two-file contract locality whose only compile dependency is graduated foundation identity."
+      "justification": "Provider request-kind is a source-pure signed contract consumed by behavior owners; fallback durable-fact vocabulary is absent."
+    },
+    {
+      "owner": "provider-attempt-recovery",
+      "locality": "participant-provider-attempt-fallback-facts",
+      "justification": "Fallback durable-fact vocabulary is a source-pure signed contract consumed only by durable-events and verification-system; request-kind vocabulary is absent."
     },
     {
       "owner": "attention-regulation",
@@ -2363,7 +2398,12 @@
     {
       "owner": "change-integration",
       "locality": "git-integrationgate",
-      "justification": "Integration gate, worktree resource, job model, prompts, orchestrator program, runtime, Git operations/gateway, change surfaces, Git adapter, worktree cleanup, session directories, recovery and review runner form one fully signed change-integration locality over graduated identity, Git, journal, process and review contracts; process execution and lock details remain signature-hidden."
+      "justification": "Integration gate, worktree resource, job model, prompts, orchestrator program, runtime, Git operations, change surfaces, Git adapter, worktree cleanup, session directories, recovery and review runner form one fully signed change-integration locality over graduated identity, Git, journal, process and review contracts; process execution and lock details remain signature-hidden."
+    },
+    {
+      "owner": "change-integration",
+      "locality": "git-gateway",
+      "justification": "The Git convergence gateway is isolated behind one signed public module for durable-convergence; its private remote discovery and transport helpers cannot enter the consumer compile surface."
     },
     {
       "owner": "context-compression",
@@ -3828,7 +3868,12 @@
       "contract": "SemanticTrace.Contract",
       "kind": "semantic-evidence",
       "law": "WHAT[SEMANTIC-TRACE-003]",
-      "proof": "requirements/semantic-trace/tests/x-trace.test.mjs",
+      "proof": {
+        "path": "requirements/semantic-trace/tests/x-trace.test.mjs",
+        "title": "WHAT[SEMANTIC-TRACE-003] cursor vocabulary is monotonic and opaque",
+        "what_id": "SEMANTIC-TRACE-003",
+        "surface_module": "Context/Trace/SemanticTraceSurface.js"
+      },
       "consumers": [
         "behavior-diagnosis",
         "context-compression",
@@ -4223,7 +4268,8 @@
       ],
       "symbols": [
         "Wanxiangshu.Git.GitGateway.converge",
-        "Wanxiangshu.Git.GitGateway.createDefaultRunner"
+        "Wanxiangshu.Git.GitGateway.createDefaultRunner",
+        "Wanxiangshu.Git.GitGatewayRunner"
       ],
       "justification": "Git.Gateway publishes exactly these symbols to the listed owners; every unlisted sibling remains private to change-integration."
     },
@@ -4795,8 +4841,7 @@
       "contract": "Review.Judgement.Workflow",
       "kind": "published-contract",
       "consumers": [
-        "durable-events",
-        "review-assurance"
+        "durable-events"
       ],
       "symbols": [
         "Wanxiangshu.Mission.Review.ReviewFact.ConfirmedReviewWitness",
@@ -4804,7 +4849,21 @@
         "Wanxiangshu.Mission.Review.ReviewFact.ReviewBarrierStarted",
         "Wanxiangshu.Mission.Review.ReviewFact.ReviewVerdictRecorded"
       ],
-      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+      "justification": "Durable event codecs consume all four Review fact constructors; unrelated owners receive no constructor through this exact contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Fact.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.Judgement.Workflow",
+      "kind": "published-contract",
+      "consumers": [
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.ReviewFact.ReviewBarrierStarted"
+      ],
+      "justification": "Review assurance may start a barrier through the exact ReviewBarrierStarted constructor; verdict, attempt-close and confirmed-witness routing remain unauthorized."
     },
     {
       "path": "src/Wanxiangshu/Mission/Review/Facts.fs",
@@ -4857,7 +4916,7 @@
         "Wanxiangshu.Mission.Review.Judgement.ReviewChallenge.Path",
         "Wanxiangshu.Mission.Review.Judgement.ReviewChallenge.promptOf"
       ],
-      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+      "justification": "The source-pure Review challenge contract publishes exactly its path and renderer to review-assurance; request identity and durable review facts are absent."
     },
     {
       "path": "src/Wanxiangshu/Mission/Review/Judgement/RequestIdentity.fs",
@@ -4873,7 +4932,7 @@
         "Wanxiangshu.Mission.Review.Judgement.JudgementRequestIdentity.belongsTo",
         "Wanxiangshu.Mission.Review.Judgement.JudgementRequestIdentity.key"
       ],
-      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+      "justification": "The source-pure judgement request identity contract publishes exactly its canonical key and ownership predicate to host-boundary and managed-session-lifecycle."
     },
     {
       "path": "src/Wanxiangshu/Mission/Review/Judgement/Verdict.fs",
@@ -5502,6 +5561,7 @@
       "consumers": [
         "capability-enforcement",
         "delegation",
+        "host-boundary",
         "review-assurance",
         "review-judgement"
       ],
@@ -5523,6 +5583,25 @@
         "Wanxiangshu.OpenCode.StaticTools.toolNames"
       ],
       "justification": "ToolOwner.ToolSpec publishes exactly these symbols to the listed owners; every unlisted sibling remains private to action-affordance."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/NodeFs.fs",
+      "owner": "action-affordance",
+      "node": "opencode-nodefs-port-contract",
+      "contract": "ToolOwner.NodeFsPort",
+      "kind": "physical-port",
+      "consumers": [
+        "repository-programming"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.NodeFs.cpSync",
+        "Wanxiangshu.OpenCode.NodeFs.existsSync",
+        "Wanxiangshu.OpenCode.NodeFs.readdirSync",
+        "Wanxiangshu.OpenCode.NodeFs.renameSync",
+        "Wanxiangshu.OpenCode.NodeFs.rmSync",
+        "Wanxiangshu.OpenCode.NodeFs.statSync"
+      ],
+      "justification": "Repository programming adapts only the six filesystem operations used by FileMutationTools; action-affordance read/write operations remain same-owner and grant no foreign capability."
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs",
@@ -5771,8 +5850,13 @@
       "node": "provider-attempt-recovery-cutover",
       "contract": "Provider.AttemptRecovery",
       "kind": "semantic-evidence",
-      "law": "WHAT[PAR-016]",
-      "proof": "requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs",
+      "law": "WHAT[PAR-020]",
+      "proof": {
+        "path": "requirements/provider-attempt-recovery/tests/cursor.test.mjs",
+        "title": "WHAT[PAR-020] fallback_cursor_replay_exposes_domain_evidence_without_resume_authority",
+        "what_id": "PAR-020",
+        "surface_module": "Participant/Provider/Attempt/Fallback/CursorSurface.js"
+      },
       "consumers": [
         "context-compression",
         "execution-model-routing",
@@ -5857,7 +5941,7 @@
         "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackFactCases.FallbackCursorAdvanced",
         "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackFactCases.FallbackExhausted"
       ],
-      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Facts symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+      "justification": "Provider.AttemptRecovery publishes the source-pure fallback fact vocabulary exactly to durable-events and verification-system; the RequestKind locality no longer grants this sibling vocabulary."
     },
     {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
@@ -18791,6 +18875,25 @@
         }
       ],
       "justification": "action-affordance adapts only the listed foreign symbols at the tool/physical boundary; it owns no provider policy."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs",
+      "owner": "repository-programming",
+      "node": "repository-programming-frontier-keep",
+      "ports": [
+        {
+          "path": "src/Wanxiangshu/OpenCode/Tools/NodeFs.fs",
+          "symbols": [
+            "Wanxiangshu.OpenCode.NodeFs.cpSync",
+            "Wanxiangshu.OpenCode.NodeFs.existsSync",
+            "Wanxiangshu.OpenCode.NodeFs.readdirSync",
+            "Wanxiangshu.OpenCode.NodeFs.renameSync",
+            "Wanxiangshu.OpenCode.NodeFs.rmSync",
+            "Wanxiangshu.OpenCode.NodeFs.statSync"
+          ]
+        }
+      ],
+      "justification": "FileMutationTools is the exact repository-programming adapter for Node filesystem mutation; it receives no read/write text capability and owns all mv/rm policy."
     }
   ],
   "composition_roots": [

@@ -5,7 +5,7 @@
     <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-statictools.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-causalwait.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-recovery-runtime.fsproj"/>

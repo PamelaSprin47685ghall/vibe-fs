@@ -46,3 +46,4 @@
 | PROC-009 | `requirements/process-execution/tests/process-output.test.mjs::WHAT[PROC-009] EXEC_011_collector_spools_when_byte_count_crosses_threshold`；`requirements/process-execution/tests/process-output.test.mjs::WHAT[PROC-009] EXEC_011_collector_spooled_buffers_are_cleared` |
 | PROC-010 | `requirements/process-execution/tests/join-v2-wire-pty.test.mjs::WHAT[PROC-010] EXEC_004_pty_completion_is_natural_language_plus_exit_code` |
 | PROC-011 | `requirements/process-execution/tests/executor-tool.test.mjs::WHAT[PROC-011] RUN_surface_names_the_provider_execution_verb`；`requirements/process-execution/tests/executor-tool.test.mjs::WHAT[PROC-011] RUN_deadline_overrun_returns_the_fixed_timeout_consequence` |
+| PROC-012 | `requirements/process-execution/tests/m6-slice-boundary.test.mjs::WHAT[PROC-012] process and PTY contracts exclude Node adapters mutable handles and delegation runtime` |

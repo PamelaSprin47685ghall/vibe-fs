@@ -10,6 +10,8 @@
 
 `js-semantic-surface` 的核心存在理由是：**在实现世界与测试世界之间建立不可逾越的机器化隔离边界。** 生产代码（F#）拥有实现自由，测试代码（JavaScript）通过稳定、原生（JS-native）、显式声明的 Semantic Surface 访问系统并验证语义不变量。
 
+测试中的生产调用不必都写在 `test` callback 的第一层：共享的局部 helper 与 property callback 会在同一 proof 的实际执行链上。只承认第一层会逼使作者添加无语义的装饰性直接调用；只搜索文件中是否出现调用，又会让 dead helper 或其他 WHAT 借出虚假证据。因此门禁必须在每个 active primary WHAT 的独立执行闭包内归因 Surface use。
+
 ## 核心张力与元规则定位
 
 业务产品包（如 `managed-session-lifecycle`、`delegation`）拥有各自领域的具体产品语义，并有责任对外暴露对应的 Semantic Surface。`js-semantic-surface` 不拥有具体业务契约，它拥有的是**测试边界与数据表示的元规则**：
@@ -33,3 +35,4 @@
 4. 为了满足测试的访问便利，而在生产代码中随意将内部实现导出为 public。
 5. 新增 Surface 但未在 Manifest 中完成注册，或缺少对应的契约测试对其公开接口进行完整锁定。
 6. Fable 类型检查与发射成功，但生成的 ESM consumer named-import 一个 provider 实际未导出的符号，或生成相对 import 逃出 npm package 的 `dist/` 闭包；这种产物直到真实 Node 加载才爆炸，说明“编译成功”不能替代模块链接证明。
+7. 门禁拒绝 WHAT 真实调用的可达 helper/property callback，或让 dead helper、其他 WHAT 的调用、未执行 callback 为当前 WHAT 制造 Surface proof authority。

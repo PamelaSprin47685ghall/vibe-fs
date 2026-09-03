@@ -14,7 +14,7 @@
 4. **Long Stroke**：恰好一个真实完整的端到端（E2E）物理验收环境。
 5. **Release**：一次确定性的全量构建、打包与交付物验证。
 
-证据层序由 `package.json` 中的构建流程与 `scripts/check.mjs` 注册清单固定，层序颠倒或错置直接判为违约。每项可被外部登记表引用的证明，其层级只能由 verification-system 所有的 `scripts/checks/proof-levels.json` 以精确 `(path, title, what_id)` 键独立分类；消费方自报层级、缺失键或重复键均不得取得证明权威。
+证据层序由 `package.json` 中的构建流程与 `scripts/check.mjs` 注册清单固定，层序颠倒或错置直接判为违约。顶层 `format-build-test` 只调度 read-only format、static check、clean build、unit、唯一 integration orchestrator、Long Stroke 与 pack；distribution package child 与一次 physical warmup 只由 integration orchestrator 调度。每个 leaf step 必须恰有一个父级 owner，禁止顶层与子 orchestrator 重复执行。每项可被外部登记表引用的证明，其层级只能由 verification-system 所有的 `scripts/checks/proof-levels.json` 以精确 `(path, title, what_id)` 键独立分类；消费方自报层级、缺失键或重复键均不得取得证明权威。proof-level registry 只分类已经由 requirement-system 建立的精确 WHAT↔HOW↔active test 边，不得以自身条目创建或补足该拓扑。
 
 ## VERIFICATION-SYSTEM-002: One World——恰一个 Long Stroke
 
@@ -60,6 +60,8 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 ## VERIFICATION-SYSTEM-007: 时间确定性
 
 语义与逻辑证明严禁依赖物理环境墙钟的随机性。Temporal 层测试必须基于虚拟时钟与可注入的时间端口进行，所有时间推进必须是离散且可确切枚举的。严禁使用真实等待（sleep）断言语义成立，严禁依赖物理调度器的执行顺序碰巧证明并发竞态。
+
+测试调度器可以用 prerequisite graph 筛选合法排列，但该筛选器对非法排列的拒绝只定义测试输入域，不证明 production 拒绝任何行为。非法世界必须交给拥有该边界的 production decision 或 typed port 判定；未到达 production Surface 的 helper rejection 不得列入 executable proof。
 
 ## VERIFICATION-SYSTEM-008: 契约面语言边界
 

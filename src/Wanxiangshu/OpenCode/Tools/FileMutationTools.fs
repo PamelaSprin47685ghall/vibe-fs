@@ -2,7 +2,6 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Threading.Tasks
-open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
@@ -48,25 +47,6 @@ module FileMutationTools =
 
         [<Literal>]
         let RmRequired = "tool/rm/required"
-
-    module private NodeFs =
-        [<Import("statSync", "fs")>]
-        let statSync (path: string) : obj = jsNative
-
-        [<Import("readdirSync", "fs")>]
-        let readdirSync (path: string) : obj = jsNative
-
-        [<Import("renameSync", "fs")>]
-        let renameSync (source: string, destination: string) : unit = jsNative
-
-        [<Import("rmSync", "fs")>]
-        let rmSync (path: string, options: obj) : unit = jsNative
-
-        [<Import("cpSync", "fs")>]
-        let cpSync (source: string, destination: string, options: obj) : unit = jsNative
-
-        [<Import("existsSync", "fs")>]
-        let existsSync (path: string) : bool = jsNative
 
     let private languageOf (ctx: HostToolContext) =
         ProviderLanguageBinding.forSessionText ctx.SessionId

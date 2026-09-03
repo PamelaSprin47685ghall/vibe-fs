@@ -20,7 +20,7 @@ All imports below are compiled, registered `dist` surfaces. Use exact `(sessionI
 | Failure policy | `Execution/Failure/Surface.js`: `decide(typedFailureInput)` | typed retry, fallback, breaker, capacity settlement, message disposition and fatality decision |
 | Causal record | `OpenCode/Host/ReliabilityDiagnosticsSurface.js`: `projectRecord(record)` | immutable redacted record; unknown schema fields fail |
 | Reliability summary | `ReliabilityDiagnosticsSurface.queryReliability(counters, canonicalExecutions, capacitySnapshot, recoveryOwnershipSnapshot)` | canonical lifecycle, queue/fence and typed recovery ownership counts; read-only |
-| Recovery representation | `Execution/Session/ChatExecution/RecoveryRuntimeSurface.js`: `recoverScenarios([scenario])` | typed decisions and deduplicated owner effect-request names; proof representation only |
+| Recovery representation | `Execution/Session/ChatExecution/RecoveryRuntimeSurface.js`: `recoverScenarios([scenario])` | typed decisions and append-only owner-port invocation trace; proof representation only |
 | Supported Host contract | `requirements/host-boundary/fixtures/opencode-chat-admission-1.18.18.json` | exact OpenCode/plugin `1.18.18`, public hooks/order and terminal evidence |
 
 Re-observe the installed public Host contract:

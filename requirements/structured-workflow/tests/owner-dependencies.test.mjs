@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
+import { join, resolve } from 'node:path'
 import test from 'node:test'
 
 import { analyzeOwnerContracts } from '../../../scripts/checks/owner-contracts.mjs'
+import { buildTraceGraph } from '../../../scripts/lib/requirement-trace.mjs'
+
+const ROOT = resolve(import.meta.dirname, '../../..')
+const REQUIREMENT_TRACE = buildTraceGraph(join(ROOT, 'requirements'))
 
 const file = (path) => ({ path })
 
@@ -37,13 +42,15 @@ const symbolUse = (consumer, provider, symbol, overrides = {}) => ({
   ...overrides,
 })
 
-const analyze = ({ files, owners, contracts = registry(), uses = [], migrationState }) =>
+const analyze = ({ files, owners, contracts = registry(), uses = [], migrationState, requirementTrace = REQUIREMENT_TRACE }) =>
   analyzeOwnerContracts({
     compilePaths: files.map((entry) => entry.path),
     semanticOwners: ownership(...owners),
     publishedContracts: contracts,
     symbolUses: uses,
     migrationState,
+    requirementTrace,
+    repositoryRoot: ROOT,
   })
 
 const codes = (result) => result.violations.map((violation) => violation.code)
@@ -347,7 +354,12 @@ test('WHAT[STRUCTURED-WORKFLOW-011] durable semantic cursor evidence crosses the
           consumers: ['consumer'],
           symbols: [symbol],
           law: 'WHAT[SEMANTIC-TRACE-003]',
-          proof: 'requirements/semantic-trace/tests/x-trace.test.mjs',
+          proof: {
+            path: 'requirements/semantic-trace/tests/x-trace.test.mjs',
+            title: 'WHAT[SEMANTIC-TRACE-003] cursor vocabulary is monotonic and opaque',
+            what_id: 'SEMANTIC-TRACE-003',
+            surface_module: 'Context/Trace/SemanticTraceSurface.js',
+          },
           justification: 'The durable semantic cursor records replay evidence and never selects executable workflow control.',
         },
       ],
@@ -356,6 +368,198 @@ test('WHAT[STRUCTURED-WORKFLOW-011] durable semantic cursor evidence crosses the
   })
 
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence without an exact production surface is rejected', () => {
+  const cursor = file('src/Wanxiangshu/Context/Trace/Cursor.fs')
+  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
+  const symbol = 'Wanxiangshu.Context.Trace.XTraceCursor.sequence'
+  const result = analyze({
+    files: [cursor, consumer],
+    owners: [
+      { path: cursor.path, owner: 'semantic-trace' },
+      { path: consumer.path, owner: 'consumer' },
+    ],
+    contracts: registry({ contracts: [{
+      path: cursor.path,
+      owner: 'semantic-trace',
+      kind: 'semantic-evidence',
+      consumers: ['consumer'],
+      symbols: [symbol],
+      law: 'WHAT[SEMANTIC-TRACE-003]',
+      proof: {
+        path: 'requirements/semantic-trace/tests/x-trace.test.mjs',
+        title: 'WHAT[SEMANTIC-TRACE-003] cursor vocabulary is monotonic and opaque',
+        what_id: 'SEMANTIC-TRACE-003',
+      },
+      justification: 'A trace edge without its production surface does not prove production behavior.',
+    }] }),
+    uses: [symbolUse(consumer, cursor, symbol)],
+  })
+
+  assert.ok(codes(result).includes('invalid-semantic-evidence-metadata'))
+  assert.ok(codes(result).includes('foreign-execution-position'))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] an active same-owner proof without callback surface use is rejected', () => {
+  const cursor = file('src/Wanxiangshu/Context/Trace/Cursor.fs')
+  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
+  const symbol = 'Wanxiangshu.Context.Trace.XTraceCursor.sequence'
+  const result = analyze({
+    files: [cursor, consumer],
+    owners: [
+      { path: cursor.path, owner: 'semantic-trace' },
+      { path: consumer.path, owner: 'consumer' },
+    ],
+    contracts: registry({ contracts: [{
+      path: cursor.path,
+      owner: 'semantic-trace',
+      kind: 'semantic-evidence',
+      consumers: ['consumer'],
+      symbols: [symbol],
+      law: 'WHAT[SEMANTIC-TRACE-005]',
+      proof: {
+        path: 'requirements/semantic-trace/tests/x-trace-capture-boundary.test.mjs',
+        title: 'WHAT[SEMANTIC-TRACE-005] raw projection storage is rejected while copied semantic query is admitted',
+        what_id: 'SEMANTIC-TRACE-005',
+        surface_module: 'Context/Trace/SemanticTraceSurface.js',
+      },
+      justification: 'An active owner-law proof that does not call this surface cannot authorize the edge.',
+    }] }),
+    uses: [symbolUse(consumer, cursor, symbol)],
+  })
+
+  assert.ok(codes(result).includes('invalid-semantic-evidence-metadata'))
+  assert.ok(codes(result).includes('foreign-execution-position'))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] a comment-only WHAT mention cannot authorize semantic evidence', () => {
+  const cursor = file('src/Wanxiangshu/ExternalInvestigation/Cursor.fs')
+  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
+  const symbol = 'Wanxiangshu.ExternalInvestigation.Cursor.current'
+  const result = analyze({
+    files: [cursor, consumer],
+    owners: [
+      { path: cursor.path, owner: 'external-investigation' },
+      { path: consumer.path, owner: 'consumer' },
+    ],
+    contracts: registry({
+      contracts: [
+        {
+          path: cursor.path,
+          owner: 'external-investigation',
+          kind: 'semantic-evidence',
+          consumers: ['consumer'],
+          symbols: [symbol],
+          law: 'WHAT[EXTERNAL-INVESTIGATION-010]',
+          proof: {
+            path: 'requirements/external-investigation/tests/browser-provenance-canary.test.mjs',
+            title: 'WHAT[EXTERNAL-INVESTIGATION-010] browser_is_the_only_network_office',
+            what_id: 'EXTERNAL-INVESTIGATION-010',
+            surface_module: 'Context/Trace/SemanticTraceSurface.js',
+          },
+          justification: 'A comment that names another proof must never grant an execution-position exception.',
+        },
+      ],
+    }),
+    uses: [symbolUse(consumer, cursor, symbol)],
+  })
+
+  assert.ok(codes(result).includes('invalid-semantic-evidence-metadata'))
+  assert.ok(codes(result).includes('foreign-execution-position'))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence rejects bare paths wrong identities traversal and inactive tests', () => {
+  const cursor = file('src/Wanxiangshu/Context/Trace/Cursor.fs')
+  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
+  const symbol = 'Wanxiangshu.Context.Trace.XTraceCursor.sequence'
+  const exact = {
+    path: 'requirements/semantic-trace/tests/x-trace.test.mjs',
+    title: 'WHAT[SEMANTIC-TRACE-003] cursor vocabulary is monotonic and opaque',
+    what_id: 'SEMANTIC-TRACE-003',
+    surface_module: 'Context/Trace/SemanticTraceSurface.js',
+  }
+  const malformed = [
+    exact.path,
+    { ...exact, title: `${exact.title} renamed` },
+    { ...exact, what_id: 'SEMANTIC-TRACE-006' },
+    { ...exact, path: 'requirements/semantic-trace/tests/../tests/x-trace.test.mjs' },
+  ]
+  const run = (proof, requirementTrace = REQUIREMENT_TRACE) => analyze({
+    files: [cursor, consumer],
+    owners: [
+      { path: cursor.path, owner: 'semantic-trace' },
+      { path: consumer.path, owner: 'consumer' },
+    ],
+    contracts: registry({
+      contracts: [{
+        path: cursor.path,
+        owner: 'semantic-trace',
+        kind: 'semantic-evidence',
+        consumers: ['consumer'],
+        symbols: [symbol],
+        law: 'WHAT[SEMANTIC-TRACE-003]',
+        proof,
+        justification: 'Malformed semantic evidence must never grant an execution-position exception.',
+      }],
+    }),
+    uses: [symbolUse(consumer, cursor, symbol)],
+    requirementTrace,
+  })
+
+  for (const proof of malformed) {
+    const result = run(proof)
+    assert.ok(codes(result).includes('invalid-semantic-evidence-metadata'))
+    assert.ok(codes(result).includes('foreign-execution-position'))
+  }
+
+  const skippedProof = {
+    path: 'requirements/semantic-trace/tests/skipped.test.mjs',
+    title: 'WHAT[SEMANTIC-TRACE-003] skipped cursor claim',
+    what_id: 'SEMANTIC-TRACE-003',
+    surface_module: 'Context/Trace/SemanticTraceSurface.js',
+  }
+  for (const state of ['skip', 'todo']) {
+    const inactiveTrace = {
+      whats: new Map([['SEMANTIC-TRACE-003', { package: 'semantic-trace' }]]),
+      proofEdges: [{
+        file: join(ROOT, skippedProof.path),
+        proofFile: join(ROOT, 'requirements/semantic-trace/HOW.md'),
+        state,
+        title: skippedProof.title,
+        whatId: skippedProof.what_id,
+      }],
+    }
+    const inactive = run(skippedProof, inactiveTrace)
+    assert.ok(codes(inactive).includes('invalid-semantic-evidence-metadata'))
+    assert.ok(codes(inactive).includes('foreign-execution-position'))
+  }
+
+  const foreignLaw = analyze({
+    files: [cursor, consumer],
+    owners: [
+      { path: cursor.path, owner: 'semantic-trace' },
+      { path: consumer.path, owner: 'consumer' },
+    ],
+    contracts: registry({ contracts: [{
+      path: cursor.path,
+      owner: 'semantic-trace',
+      kind: 'semantic-evidence',
+      consumers: ['consumer'],
+      symbols: [symbol],
+      law: 'WHAT[EXTERNAL-INVESTIGATION-010]',
+      proof: {
+        path: 'requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs',
+        title: 'WHAT[EXTERNAL-INVESTIGATION-010] browser_is_the_only_network_office',
+        what_id: 'EXTERNAL-INVESTIGATION-010',
+        surface_module: 'Context/Trace/SemanticTraceSurface.js',
+      },
+      justification: 'A foreign owner law must never grant this provider an execution-position exception.',
+    }] }),
+    uses: [symbolUse(consumer, cursor, symbol)],
+  })
+  assert.ok(codes(foreignLaw).includes('invalid-semantic-evidence-metadata'))
+  assert.ok(codes(foreignLaw).includes('foreign-execution-position'))
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence fails closed without normative metadata or with symbol roots', () => {
@@ -445,7 +649,7 @@ const migrationContractFixture = ({
   closed = true,
   entryNode = 'provider-cutover',
   nodeState = 'DONE',
-  proofs = ['requirements/structured-workflow/tests/owner-dependencies.test.mjs'],
+  proofs,
   publishes = ['Provider.Contract'],
 } = {}) => {
   const provider = file('src/Wanxiangshu/Provider/Contract.fs')
@@ -454,8 +658,8 @@ const migrationContractFixture = ({
   const node = {
     id: 'provider-cutover',
     state: nodeState,
-    proofs,
     publishes,
+    ...(proofs === undefined ? {} : { proofs }),
   }
   return analyze({
     files: [provider, consumer],
@@ -487,7 +691,7 @@ const migrationContractFixture = ({
   })
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-011] a published contract binds its exact DONE node, proof, and vocabulary', () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] a published contract binds its exact DONE node and vocabulary', () => {
   const result = migrationContractFixture()
 
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
@@ -514,29 +718,19 @@ test('WHAT[STRUCTURED-WORKFLOW-011] pending providers stay visible and cannot pu
   assert.ok(codes(migrationContractFixture({ closed: false })).includes('contract-before-cutover'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] stale migration node, proof, and vocabulary bindings fail closed', () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] stale migration node and vocabulary bindings fail closed', () => {
   assert.ok(codes(migrationContractFixture({ entryNode: 'other-cutover' })).includes('contract-node-mismatch'))
   assert.ok(codes(migrationContractFixture({ nodeState: 'RUNNING' })).includes('contract-node-mismatch'))
-  assert.ok(codes(migrationContractFixture({ proofs: [] })).includes('contract-without-proof'))
   assert.ok(codes(migrationContractFixture({ publishes: [] })).includes('contract-vocabulary-mismatch'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] migration proofs must be existing repository test files for their package', () => {
-  const invalidProofs = [
-    ['null proof collection', null],
-    ['prose instead of an array', 'verified manually by the migration owner'],
-    ['null entry', [null]],
-    ['prose entry', ['verified manually by the migration owner']],
-    ['absolute path', ['/tmp/provider-contract.test.mjs']],
-    ['path outside requirement tests', ['scripts/check.mjs']],
-    ['stale path', ['requirements/structured-workflow/tests/missing-contract.test.mjs']],
-    ['directory', ['requirements/structured-workflow/tests']],
-    ['non-test file', ['requirements/structured-workflow/tests/fixtures/owner-dependencies/Provider.fs']],
-  ]
+test('WHAT[STRUCTURED-WORKFLOW-011] migration proof inventory cannot grant or deny contract authority', () => {
+  const absent = migrationContractFixture()
+  const unrelated = migrationContractFixture({ proofs: ['requirements/structured-workflow/tests/missing-contract.test.mjs'] })
 
-  for (const [name, proofs] of invalidProofs) {
-    assert.ok(codes(migrationContractFixture({ proofs })).includes('contract-without-proof'), name)
-  }
+  assert.equal(absent.ok, true, JSON.stringify(absent.violations, null, 2))
+  assert.equal(unrelated.ok, true, JSON.stringify(unrelated.violations, null, 2))
+  assert.equal(codes(unrelated).includes('contract-without-proof'), false)
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] wildcard authorizations and stale consumer grants fail closed', () => {

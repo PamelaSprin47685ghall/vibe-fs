@@ -80,8 +80,22 @@ test('WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_pac
   )
   assert.match(
     pipeline,
+    /node requirements\/verification-system\/tests\/integration\/run\.mjs/,
+    'release proof must invoke the integration orchestrator',
+  )
+  assert.doesNotMatch(
+    pipeline,
     /node requirements\/distribution\/tests\/integration\/package\/run\.mjs/,
-    'release proof must run package install/import/resources checks (distribution package suite)',
+    'release sink must not duplicate the integration-owned package suite',
+  )
+  const integration = fs.readFileSync(
+    path.join(root, 'requirements/verification-system/tests/integration/run.mjs'),
+    'utf8',
+  )
+  assert.match(
+    integration,
+    /requirements\/distribution\/tests\/integration\/package\/run\.mjs/,
+    'integration orchestrator must run package install/import/resources checks',
   )
   assert.match(pipeline, /npm pack --dry-run$/, 'release proof must end with npm pack --dry-run (packing membership)')
 })

@@ -194,6 +194,19 @@
       ]
     },
     {
+      "id": "opencode-nodefs-port-contract",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/NodeFs.fs"
+      ],
+      "proofs": [
+        "requirements/structured-workflow/tests/owner-project-boundaries.test.mjs"
+      ],
+      "publishes": [
+        "ToolOwner.NodeFsPort"
+      ]
+    },
+    {
       "id": "opencode-host-signal-bootstrap-cutover",
       "state": "DONE",
       "files": [
