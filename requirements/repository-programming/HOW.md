@@ -94,4 +94,4 @@ Synthetic TOML 渲染器 (# ok / # failed + [data] / [fs])
 
 ## GAP 状态
 
-- **GAP-030 — CLOSED**：普通局部修改曾只能由模型手工重建完整文件，且 mismatch 缺少可复制、保守、有界的恢复反馈。现由 `js-edit.test.mjs` 与 capability-projected surface oracle 独立承载；closing feature commit 在根 `requirements/GAP.md` 中登记。
+- **GAP-030 — CLOSED**：普通局部修改曾只能由模型手工重建完整文件，且 mismatch 缺少可复制、保守、有界的恢复反馈。现由 `js-edit.test.mjs` 与 capability-projected surface oracle 独立承载；closing feature commit `e54e51ed5`。
