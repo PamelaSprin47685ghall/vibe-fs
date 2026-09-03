@@ -75,6 +75,8 @@ Review opening prompt 已从历史 `mission-review-fact` 混合 composition 抽�
 
 Review judgement request identity 与 challenge renderer 已继续从 `mission-review-fact` 抽离：`mission-review-judgement-requestidentity` 只依赖 foundation identity，并只向 host-boundary/managed-session-lifecycle 发布 canonical key 与 ownership predicate；`mission-review-judgement-challenge` 只依赖 provider-projection 的 `LlmFacing` contract，并只向 review-assurance 发布 path/renderer。Host、managed runtime 与 JudgeTool 删除旧 mixed direct edge；review-assurance 因仍真实消费 Fact/Witness 暂留旧 edge并新增 Challenge edge。旧 locality 同时删除只由 Challenge 引入的 provider-projection reference，剩余 Fact/Witness 等待最终切分。Host focused compile 暴露 `PluginSessionScope`/`PluginRecoveryScope` 的 WorkRecord namespace 原由旧 mixed closure 偶然提供；Host 现显式引用既有、已向 host-boundary 发布的 `mission-workrecord-materialize-runtime`。Review-assurance compile 又暴露 behavior-diagnosis Enforcer Cycle 四对 `.fsi/.fs` 只有未使用的 WorkRecord open、没有任何 WorkRecord symbol；删除八条死 open，不扩 contract consumer 伪造依赖。本批固定 exact direct cohort，不声称消除经其他已授权 contract 进入的传递 closure。
 
+Review Witness 已收敛到 `mission-review-judgement-witness`：唯一依赖是 foundation identity，durable-events、finality 与 review-assurance 分别显式取得同一 witnessed confirmation contract；owner 内 ReviewFactFold 也显式声明真实依赖。Finality 与 Barrier Projection 不再引用旧 Fact locality，durable runtime、Barrier Workflow 与 ReviewFactFold 因真实构造 durable Review fact而保留 Fact edge。Witness `.fsi` 同时删除 manifest 未授权的 `isQualifiedConfirmationFor` 与 `witnesses`：前者只留实现文件内参与 `create`，后者无调用并删除实现。七个 provider/consumer focused closure 全绿，未暴露新的 incidental dependency；GAP census 留给最终 Fact 批统一裁决。
+
 ### 6. Owner/impact flat compile
 
 `scripts/lib/owner-compile.mjs` 同时生成 owner closure 与 changed-source impact plan。实现 `.fs` 使用 owning locality 的 forward closure；公开 `.fsi` 使用 owning locality 的 transitive reverse consumers，再求所有 root 的 forward union。工程、aggregate、lockfile 与 Fable tool manifest 变化直接选择 full；选中 production `.fs` 超过 aggregate 60% 也选择 full。所有模式共用 aggregate-order、zero-ProjectReference materializer 与单一 Fable launcher。
@@ -109,3 +111,5 @@ STRUCTURED-WORKFLOW-011 的纯 vocabulary cohort counterexample：`requirements/
 STRUCTURED-WORKFLOW-011 的 Review Prompt cohort counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] review opening prompt has a source-pure compiler boundary`。
 
 STRUCTURED-WORKFLOW-011 的 Review request/challenge cohort counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] review request identity and challenge have source-pure compiler boundaries`。
+
+STRUCTURED-WORKFLOW-011 的 Review Witness cohort counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] review witness has a source-pure compiler boundary`。

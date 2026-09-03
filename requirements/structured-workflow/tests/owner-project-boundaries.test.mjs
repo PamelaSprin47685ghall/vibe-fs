@@ -232,6 +232,90 @@ test('WHAT[STRUCTURED-WORKFLOW-011] review request identity and challenge have s
   assert.ok(localities.includes('mission-review-judgement-challenge'))
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-011] review witness has a source-pure compiler boundary', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const contract = manifest.contracts.find(
+    (entry) => entry.path === 'src/Wanxiangshu/Mission/Review/Judgement/Witness.fs',
+  )
+  assert.ok(contract)
+  assert.deepEqual(contract.consumers, ['durable-events', 'finality', 'review-assurance'])
+  assert.deepEqual(contract.symbols, [
+    'BarrierId',
+    'First',
+    'FirstPhysicalUserMessageId',
+    'GitTreeHash',
+    'Report',
+    'Second',
+    'SecondPhysicalUserMessageId',
+    'Wanxiangshu.Mission.Review.Judgement.CandidateVerificationFailure',
+    'Wanxiangshu.Mission.Review.Judgement.CandidateVerificationFailure.IncompleteCohort',
+    'Wanxiangshu.Mission.Review.Judgement.CandidateVerificationFailure.StaleWitness',
+    'Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitness',
+    'Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitnessModule.create',
+    'Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitnessModule.gitTreeHash',
+    'Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitnessModule.lifeId',
+    'Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitnessModule.requestId',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewCandidate.isWitnessValidForTree',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewCandidate.verifyCandidate',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitness',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitness.Confirmed',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitness.NoReview',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitness.RevisionWitness',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.attemptIdentity',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.confirm',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.confirmedReviewer',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.gitTreeHash',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.isConfirmed',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.isDistinctAttempt',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.isRevision',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.isValidForTree',
+    'Wanxiangshu.Mission.Review.Judgement.VerdictWitness',
+    'Wanxiangshu.Mission.Review.Judgement.VerdictWitness.GitTreeHash',
+    'Wanxiangshu.Mission.Review.Judgement.VerdictWitness.ProviderRun',
+    'Wanxiangshu.Mission.Review.Judgement.VerdictWitness.ReviewerSessionId',
+    'Wanxiangshu.Mission.Review.Judgement.VerdictWitness.ToolCallId',
+  ])
+
+  const witnessProject = 'Wanxiangshu.Owner.review-judgement.mission-review-judgement-witness.fsproj'
+  const mixedProject = 'Wanxiangshu.Owner.review-judgement.mission-review-fact.fsproj'
+  const projectSource = (projectName) => readFileSync(join(SRC, projectName), 'utf8')
+  const compileItems = (projectName) =>
+    [...projectSource(projectName).matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(([, path]) => path)
+  const references = (projectName) =>
+    [...projectSource(projectName).matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+
+  const provider = projectSource(witnessProject)
+  assert.match(provider, /<WanxiangshuOwnerLocality>mission-review-judgement-witness<\/WanxiangshuOwnerLocality>/)
+  assert.match(provider, /<WanxiangshuOwnerLocalityKind>contract<\/WanxiangshuOwnerLocalityKind>/)
+  assert.deepEqual(compileItems(witnessProject), [
+    'Mission/Review/Judgement/Witness.fsi',
+    'Mission/Review/Judgement/Witness.fs',
+  ])
+  assert.deepEqual(references(witnessProject), [
+    'Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj',
+  ])
+  assert.doesNotMatch(
+    projectSource(mixedProject),
+    /<Compile Include="Mission\/Review\/Judgement\/Witness\.(?:fsi|fs)"\s*\/>/,
+  )
+
+  const durableRefs = references('Wanxiangshu.Owner.durable-events.runtime.fsproj')
+  const finalityRefs = references('Wanxiangshu.Owner.finality.mission-finality-prompt.fsproj')
+  const projectionRefs = references('Wanxiangshu.Owner.review-assurance.mission-review-barrier-projection.fsproj')
+  const workflowRefs = references('Wanxiangshu.Owner.review-assurance.mission-review-barrier-workflow.fsproj')
+  const foldRefs = references('Wanxiangshu.Owner.review-judgement.mission-review-reviewfactfold.fsproj')
+  assert.ok(durableRefs.includes(witnessProject) && durableRefs.includes(mixedProject))
+  assert.ok(finalityRefs.includes(witnessProject) && !finalityRefs.includes(mixedProject))
+  assert.ok(projectionRefs.includes(witnessProject) && !projectionRefs.includes(mixedProject))
+  assert.ok(workflowRefs.includes(witnessProject) && workflowRefs.includes(mixedProject))
+  assert.ok(foldRefs.includes(witnessProject) && foldRefs.includes(mixedProject))
+
+  const signature = readFileSync(join(SRC, 'Mission/Review/Judgement/Witness.fsi'), 'utf8')
+  assert.doesNotMatch(signature, /\bval (?:isQualifiedConfirmationFor|witnesses):/)
+})
+
 test('WHAT[STRUCTURED-WORKFLOW-011] NodeFs physical port and tool contracts have isolated compiler boundaries', () => {
   const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
   const contractAt = (path) => manifest.contracts.find((entry) => entry.path === path)

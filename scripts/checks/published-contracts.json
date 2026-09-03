@@ -1892,8 +1892,13 @@
     },
     {
       "owner": "review-judgement",
+      "locality": "mission-review-judgement-witness",
+      "justification": "The witnessed dual-PERFECT confirmation and candidate verification algebra form a source-pure signed contract over graduated identity; durable fact routing, prompts, challenges and request identity are absent."
+    },
+    {
+      "owner": "review-judgement",
       "locality": "mission-review-fact",
-      "justification": "Review fact routing and witnessed dual-PERFECT confirmation remain a signed composition locality over graduated identity and durable routing pending the final GAP-031 Fact/Witness cut."
+      "justification": "ReviewFactCases to AgentFact routing is a source-pure signed composition locality over graduated identity and durable routing."
     },
     {
       "owner": "finality",

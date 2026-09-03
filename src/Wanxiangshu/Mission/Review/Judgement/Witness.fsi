@@ -30,13 +30,6 @@ module ReviewWitness =
     val attemptIdentity: barrierId: ReviewBarrierId -> witness: VerdictWitness -> ReviewAttemptIdentity
     val isDistinctAttempt: barrierId: ReviewBarrierId -> first: VerdictWitness -> second: VerdictWitness -> bool
 
-    val isQualifiedConfirmationFor:
-        reviewerSessionId: SessionId ->
-        barrierId: ReviewBarrierId ->
-        gitTreeHash: GitTreeHash ->
-        witness: ReviewWitness ->
-            bool
-
     val confirm:
         barrierId: ReviewBarrierId ->
         firstPhysicalUserMessageId: PhysicalUserMessageId ->
@@ -60,8 +53,6 @@ module ConfirmedReviewWitness =
     val gitTreeHash: ConfirmedReviewWitness -> GitTreeHash
     val lifeId: ConfirmedReviewWitness -> ManagerLifeId
     val requestId: ConfirmedReviewWitness -> FinalityRequestId
-    val witnesses: ConfirmedReviewWitness -> (SessionId * ReviewBarrierId * ReviewWitness) list
-
     val create:
         lifeId: ManagerLifeId ->
         requestId: FinalityRequestId ->
