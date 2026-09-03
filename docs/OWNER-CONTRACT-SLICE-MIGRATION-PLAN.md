@@ -1532,7 +1532,7 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 5. `B4 foundational capabilities`（TEMPORAL PROOF + SOURCE/PROJECT SPLIT DONE；INJECTION + CAUSALWAIT + PROCESS/PTY PENDING）：Temporal synthetic blueprint已替换为production-bound行为proof；clock/timer capability、Deadline、SessionStartedAt projection、Node adapter、virtual implementation与representation Surface已分为六个locality。ordinary runtime对Node adapter的direct construction/default fallback仍须在后续B4/B6迁为mandatory injection；CausalWait与Process/PTY继续按先contract、再consumer、最后删旧路径施工。
 6. `B5 Delegation ownership`（PENDING）：迁owner fact/append/query/wait/clock ports与pure projections/folds，durable composition只保留outer routing/combine。
 7. `B6 Delegation Host/PTY wiring`（PENDING）：拆host runtime/窄adapter，删除PTY对HostForkRuntime与Process implementation反向依赖，由现有composition roots注入。
-8. `B7 full adjudication`（TAXONOMY CHECKPOINT DONE；ADJUDICATION PENDING）：F# compiler-resolved结构、mutable scope、exact external authority/pure family与stable occurrence identity首批闭合；fresh仍有315,949条fail-closed Unknown与`RootWorkspace` extraction blocker。后续按exact family/type/escape证据分组关闭，再逐条写入非current-reference-derived裁决，最终零undecided、零extractor blocker。
+8. `B7 full adjudication`（TAXONOMY CHECKPOINT B DONE；ADJUDICATION PENDING）：F# compiler-resolved结构、mutable scope、exact external authority/pure family、recursive closed-type algebra与stable occurrence identity已闭合两批；fresh仍有172,735条fail-closed Unknown与`RootWorkspace` extraction blocker。后续按exact family/type/escape证据分组关闭，再逐条写入非current-reference-derived裁决，最终零undecided、零extractor blocker。
 9. `C M6.3c staged audit`（PENDING，禁止独立commit）：只准备旧ACL无法表达的最小cutover与终态manifest；stage全部input，fresh重建world/query/index并生成一次formal snapshot，任一mismatch整体重生。
 10. `D M6.4 atomic cutover`（PENDING）：同一staged state复验；单commit启用v2/fresh scan唯一authority并删除v1 owner-wide/per-symbol/compile-support权威、worksheet与迁移残余。随后fixed RED、fast-check、真实production scan、完整release sink、upstream同步、diff审计与PR更新。
 
@@ -1604,3 +1604,11 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - primitive、immutable container与array通过同一exact assembly+namespace+compiled-name classifier；production canary固定wrong/blank assembly不命中。external pure/authority同样要求exact assembly+FQN/component；8个authority family均有wrong-assembly exact counterexample。
 - recursive/mutual recursion、changing generic cycle、nested capability/array/function、mutable field、wrong-assembly与ordinal stability均由production-bound fixture固定；test中的Fable类型字面改为真实compiler-resolved `FSharpEntity` observation，JS boundary保持零债。
 - final fresh report：186 localities、713 sources、1,888 refs、4,408 edges、861,926 facts、457 traversals、172,735 Unknown、1 diagnostic，digest `sha256:d278fb53142f30691dad36b17932f5683123b1f090c360469be8dadbbeb0ef7a`。中间156,553 Unknown结果因assembly-agnostic false green废弃。`RootWorkspace` diagnostic与EventStore blocker明确保留给B7后续/M6.3c前关闭；旧gate仍是唯一authority。targeted 12/12、JS boundary与`node scripts/check.mjs`全绿。
+
+### 2026-09-04 — M6.3b remaining-scope ruling
+
+- 本轮只完成M6既有owner裁决要求的contract/runtime/adapter分离、mandatory capability injection、authority closure与production-bound proof；不得把施工中发现的更强设计偏好冒充M6产品语义。现有WHAT已足以机械实施剩余节点，外部owner阻断集为零。
+- `RootWorkspace`保留现有first-bind结果，只把public mutable移入private Host runtime并公开最窄bind/read capability；不引入Git-derived family root。Causal diagnostics保留`CAUSAL-008`的process-local single target，只隔离path/Node adapter并由composition注入；不引入multi-family partition。
+- Fatal按现有caller-owner settlement law迁sealed incident与mandatory port；`NoOwnedEffect`只允许真实pre-effect失败。重复规则只覆盖现有“same incident exact-once”；不新增different-incident优先级。partial initialization只按既有law先逆序settle已取得资源，再fatal，不定义新的业务结果。
+- Process spool采用runtime-owned bracketed lifetime，消除当前Git consumer遗失临时文件的明确资源bug；LargeGate仍归`output-distillation`并保留现有`world_lock → Large`语义，只拆pure capability、mutable runtime与composition injection，不迁owner或重定义admission。
+- Delegation terminal无需新裁决：`IA-018`、`DELEG-025`、`MANAGED-SESSION-008/017`唯一推出`HandleCompleted` envelope为`ChildLogicalRunTerminal` source witness，envelope `EventId`为`FactId`，并绑定exact owner/child logical run、Authority Root、provider run与closed outcome；`HandleRetired`仅为consumption tombstone。rootless physical failure不得反查current active run或发布logical closure。
