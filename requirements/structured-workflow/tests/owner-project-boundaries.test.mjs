@@ -123,6 +123,115 @@ test('WHAT[STRUCTURED-WORKFLOW-011] review opening prompt has a source-pure comp
   assert.ok(finalityRefs.includes(promptProject))
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-011] review request identity and challenge have source-pure compiler boundaries', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const contractAt = (path) => manifest.contracts.find((entry) => entry.path === path)
+  const projectSource = (projectName) => readFileSync(join(SRC, projectName), 'utf8')
+  const compileItems = (projectName) =>
+    [...projectSource(projectName).matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(([, path]) => path)
+  const references = (projectName) =>
+    [...projectSource(projectName).matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(
+      ([, path]) => path,
+    )
+
+  const mixedProject = 'Wanxiangshu.Owner.review-judgement.mission-review-fact.fsproj'
+  const requestProject =
+    'Wanxiangshu.Owner.review-judgement.mission-review-judgement-requestidentity.fsproj'
+  const challengeProject = 'Wanxiangshu.Owner.review-judgement.mission-review-judgement-challenge.fsproj'
+  const mixedSource = projectSource(mixedProject)
+
+  assert.doesNotMatch(
+    mixedSource,
+    /<Compile Include="Mission\/Review\/Judgement\/(?:RequestIdentity|Challenge)\.(?:fsi|fs)"\s*\/>/,
+  )
+  assert.doesNotMatch(
+    mixedSource,
+    /ProjectReference Include="Wanxiangshu\.Owner\.provider-projection\.participant-provider-projection-model\.fsproj"/,
+  )
+  assert.deepEqual(compileItems(requestProject), [
+    'Mission/Review/Judgement/RequestIdentity.fsi',
+    'Mission/Review/Judgement/RequestIdentity.fs',
+  ])
+  assert.deepEqual(compileItems(challengeProject), [
+    'Mission/Review/Judgement/Challenge.fsi',
+    'Mission/Review/Judgement/Challenge.fs',
+  ])
+  assert.deepEqual(references(requestProject), [
+    'Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj',
+  ])
+  assert.deepEqual(references(challengeProject), [
+    'Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj',
+  ])
+
+  assert.deepEqual(
+    contractAt('src/Wanxiangshu/Mission/Review/Judgement/RequestIdentity.fs')?.consumers,
+    ['host-boundary', 'managed-session-lifecycle'],
+  )
+  assert.deepEqual(
+    contractAt('src/Wanxiangshu/Mission/Review/Judgement/RequestIdentity.fs')?.symbols,
+    [
+      'Wanxiangshu.Mission.Review.Judgement.JudgementRequestIdentity.belongsTo',
+      'Wanxiangshu.Mission.Review.Judgement.JudgementRequestIdentity.key',
+    ],
+  )
+  assert.deepEqual(contractAt('src/Wanxiangshu/Mission/Review/Judgement/Challenge.fs')?.consumers, [
+    'review-assurance',
+  ])
+  assert.deepEqual(contractAt('src/Wanxiangshu/Mission/Review/Judgement/Challenge.fs')?.symbols, [
+    'Wanxiangshu.Mission.Review.Judgement.ReviewChallenge.Path',
+    'Wanxiangshu.Mission.Review.Judgement.ReviewChallenge.promptOf',
+  ])
+
+  const requestSignature = readFileSync(join(SRC, 'Mission/Review/Judgement/RequestIdentity.fsi'), 'utf8')
+  assert.deepEqual(
+    [...requestSignature.matchAll(/^\s*val ([A-Za-z0-9_]+):/gm)].map(([, name]) => name),
+    ['key', 'belongsTo'],
+  )
+  const challengeSignature = readFileSync(join(SRC, 'Mission/Review/Judgement/Challenge.fsi'), 'utf8')
+  assert.deepEqual(
+    [...challengeSignature.matchAll(/^\s*val ([A-Za-z0-9_]+):/gm)].map(([, name]) => name),
+    ['Path', 'promptOf'],
+  )
+
+  const hostRefs = references('Wanxiangshu.Owner.host-boundary.opencode-host-sharedstatesurface.fsproj')
+  assert.ok(hostRefs.includes(requestProject))
+  assert.ok(!hostRefs.includes(mixedProject))
+  assert.ok(!hostRefs.includes(challengeProject))
+  assert.ok(hostRefs.includes('Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj'))
+
+  const managedRefs = references(
+    'Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj',
+  )
+  assert.ok(managedRefs.includes(requestProject))
+  assert.ok(!managedRefs.includes(mixedProject))
+  assert.ok(!managedRefs.includes(challengeProject))
+
+  const assuranceRefs = references('Wanxiangshu.Owner.review-assurance.mission-review-barrier-workflow.fsproj')
+  assert.ok(assuranceRefs.includes(challengeProject))
+  assert.ok(assuranceRefs.includes(mixedProject))
+  assert.ok(!assuranceRefs.includes(requestProject))
+
+  const judgeRefs = references('Wanxiangshu.Owner.review-judgement.mission-review-opencode-judgetool.fsproj')
+  assert.ok(judgeRefs.includes(requestProject))
+  assert.ok(judgeRefs.includes(challengeProject))
+  assert.ok(!judgeRefs.includes(mixedProject))
+
+  for (const unrelated of [
+    'Wanxiangshu.Owner.durable-events.runtime.fsproj',
+    'Wanxiangshu.Owner.finality.mission-finality-prompt.fsproj',
+    'Wanxiangshu.Owner.change-integration.git-integrationgate.fsproj',
+  ]) {
+    assert.ok(!references(unrelated).includes(requestProject))
+    assert.ok(!references(unrelated).includes(challengeProject))
+  }
+
+  const localities = manifest.compiler_boundary_localities
+    .filter((entry) => entry.owner === 'review-judgement')
+    .map((entry) => entry.locality)
+  assert.ok(localities.includes('mission-review-judgement-requestidentity'))
+  assert.ok(localities.includes('mission-review-judgement-challenge'))
+})
+
 test('WHAT[STRUCTURED-WORKFLOW-011] NodeFs physical port and tool contracts have isolated compiler boundaries', () => {
   const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
   const contractAt = (path) => manifest.contracts.find((entry) => entry.path === path)

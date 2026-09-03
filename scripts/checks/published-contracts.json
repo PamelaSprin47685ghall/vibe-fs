@@ -1882,8 +1882,18 @@
     },
     {
       "owner": "review-judgement",
+      "locality": "mission-review-judgement-challenge",
+      "justification": "The provider-visible review challenge path and renderer form a source-pure signed contract consumed only by review-assurance; request identity and durable review facts are absent."
+    },
+    {
+      "owner": "review-judgement",
+      "locality": "mission-review-judgement-requestidentity",
+      "justification": "The canonical judgement request key and ownership predicate form a source-pure signed contract consumed only by host-boundary and managed-session-lifecycle; challenge and durable review facts are absent."
+    },
+    {
+      "owner": "review-judgement",
       "locality": "mission-review-fact",
-      "justification": "Review fact routing, witnessed dual-PERFECT confirmation, challenge rendering and judgement request identity remain a signed composition locality over graduated identity, durable routing and provider representation boundaries pending the remaining GAP-031 cohort cuts."
+      "justification": "Review fact routing and witnessed dual-PERFECT confirmation remain a signed composition locality over graduated identity and durable routing pending the final GAP-031 Fact/Witness cut."
     },
     {
       "owner": "finality",
@@ -4793,7 +4803,7 @@
         "Wanxiangshu.Mission.Review.Judgement.ReviewChallenge.Path",
         "Wanxiangshu.Mission.Review.Judgement.ReviewChallenge.promptOf"
       ],
-      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+      "justification": "The source-pure Review challenge contract publishes exactly its path and renderer to review-assurance; request identity and durable review facts are absent."
     },
     {
       "path": "src/Wanxiangshu/Mission/Review/Judgement/RequestIdentity.fs",
@@ -4809,7 +4819,7 @@
         "Wanxiangshu.Mission.Review.Judgement.JudgementRequestIdentity.belongsTo",
         "Wanxiangshu.Mission.Review.Judgement.JudgementRequestIdentity.key"
       ],
-      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+      "justification": "The source-pure judgement request identity contract publishes exactly its canonical key and ownership predicate to host-boundary and managed-session-lifecycle."
     },
     {
       "path": "src/Wanxiangshu/Mission/Review/Judgement/Verdict.fs",

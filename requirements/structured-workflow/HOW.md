@@ -73,6 +73,8 @@ exact contract 的编译承载单位是 consumer cohort 单一的 owner locality
 
 Review opening prompt 已从历史 `mission-review-fact` 混合 composition 抽离为无依赖、单 source 的 `mission-review-prompt` contract locality。`change-integration` 与 `finality` 显式引用该 edge；前者不再因一个 opening path 获得 Fact/Witness/Challenge/RequestIdentity，后者在 Witness cohort 切分前仍因真实 Witness 消费暂留旧 mixed edge。永久 counterexample 固定 Prompt 的唯一 symbol、exact two-owner cohort、source-pure compile set 与 Change 的 sibling 隔离，不提前宣称 GAP-031 Review 五类已全部毕业。
 
+Review judgement request identity 与 challenge renderer 已继续从 `mission-review-fact` 抽离：`mission-review-judgement-requestidentity` 只依赖 foundation identity，并只向 host-boundary/managed-session-lifecycle 发布 canonical key 与 ownership predicate；`mission-review-judgement-challenge` 只依赖 provider-projection 的 `LlmFacing` contract，并只向 review-assurance 发布 path/renderer。Host、managed runtime 与 JudgeTool 删除旧 mixed direct edge；review-assurance 因仍真实消费 Fact/Witness 暂留旧 edge并新增 Challenge edge。旧 locality 同时删除只由 Challenge 引入的 provider-projection reference，剩余 Fact/Witness 等待最终切分。Host focused compile 暴露 `PluginSessionScope`/`PluginRecoveryScope` 的 WorkRecord namespace 原由旧 mixed closure 偶然提供；Host 现显式引用既有、已向 host-boundary 发布的 `mission-workrecord-materialize-runtime`。Review-assurance compile 又暴露 behavior-diagnosis Enforcer Cycle 四对 `.fsi/.fs` 只有未使用的 WorkRecord open、没有任何 WorkRecord symbol；删除八条死 open，不扩 contract consumer 伪造依赖。本批固定 exact direct cohort，不声称消除经其他已授权 contract 进入的传递 closure。
+
 ### 6. Owner/impact flat compile
 
 `scripts/lib/owner-compile.mjs` 同时生成 owner closure 与 changed-source impact plan。实现 `.fs` 使用 owning locality 的 forward closure；公开 `.fsi` 使用 owning locality 的 transitive reverse consumers，再求所有 root 的 forward union。工程、aggregate、lockfile 与 Fable tool manifest 变化直接选择 full；选中 production `.fs` 超过 aggregate 60% 也选择 full。所有模式共用 aggregate-order、zero-ProjectReference materializer 与单一 Fable launcher。
@@ -105,3 +107,5 @@ STRUCTURED-WORKFLOW-011 的首个 physical capability counterexample：`requirem
 STRUCTURED-WORKFLOW-011 的纯 vocabulary cohort counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] request kind and fallback facts have disjoint compiler boundaries`。
 
 STRUCTURED-WORKFLOW-011 的 Review Prompt cohort counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] review opening prompt has a source-pure compiler boundary`。
+
+STRUCTURED-WORKFLOW-011 的 Review request/challenge cohort counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] review request identity and challenge have source-pure compiler boundaries`。
