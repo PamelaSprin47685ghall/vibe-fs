@@ -29,6 +29,9 @@
 - **locality 海关由 compiler-resolved source edge + ProjectReference closure + F# signature 共同承载**：semantic owner 负责命题与业务承诺；production file 另有恰一个稳定 locality，每个 locality 恰一个 fsproj。`Wanxiangshu.fsproj` 只作为 Fable emit 的扁平副本，不参与授权 topology。Fable 会递归 source-merge ProjectReference closure；`.fsi` 是 slice 唯一 export inventory，manifest 不得再声称编译器不能兑现的 per-symbol/per-owner ACL。真实 declaration use 映射成 locality edge 后必须位于 consumer 的 ProjectReference closure；漏 reference 即使在 aggregate 中可编译也必须 RED。
 - **slice 按 authority 与共同 audience 划界**：同 owner、同目录、同为纯类型不等于同一 contract slice。一个 slice 内的全部 `.fsi` export 对其完整 effective audience 可见；若该事实不可接受，就拆 slice。private 禁止外部 locality 到达；shared 只能承载无 authority 的不可变词汇与纯函数；bounded 必须限制传递 audience；effect implementation 只能由 composition 到达。
 - **物理能力必须独居**：文件、进程、网络等 Host API 是 capability，不是相邻 policy module 的便利 helper。物理 port 必须只有一份 import、独立 signed adapter locality、精确公开实际调用的方法；consumer adapter 只获得它声明的 port。把文件删除能力塞进 tool-policy contract，或在另一个 consumer 内复制第二套 import，会让无关 cohort 获得未登记副作用并制造两个物理 owner。
+- **观测先于声明**：locality kind、exposure、grant、relation 与 annotation 都是待验证 claim，不能决定源码里存在什么能力。每个 production observation 必须进入唯一 canonical world；capability observation `C(W)` 与 JavaScript AST traversal `J(W)` 分开闭合，避免把“遍历了所有节点”偷换成“只记录了已认识的危险节点”。
+- **生成物必须绑定来源**：deterministic 只证明相同输入产生相同 bytes，不证明 bytes 无 authority。repository-generated module 必须同时绑定 output digest、selector 实际读取的 input digest、generator/build/selector lineage、package import linkage 与完整 AST traversal；fact 只引用唯一 artifact identity，禁止复制 linkage 形成第二事实源。
+- **裁决必须绑定同一世界**：migration worksheet 只帮助施工，不能授权；formal adjudication 只冻结 M6.4 cutover 的同一 staged input。canonical encoder、world/query/index digest 与 tracking reader共同防止“扫描一棵树、提交另一棵树”，但冻结快照不得在 cutover 后继续充当 live authority。
 - **局部编译只改变输入集合，不改变编译器模型**：owner/impact compile 先计算 ProjectReference closure 或 reverse-consumer impact，再按 aggregate source order 合并成一个零 ProjectReference flat fsproj，仅启动一次 Fable。实现 `.fs` 且 sibling `.fsi` 未变时不重编普通 consumer；`.fsi` 改动必须纳入全部 reverse consumers；工程/工具链输入变化保守走 full flat build。全量 release 继续编译与原始单工程完全相同的 source/config union，绝不逐 owner 启动 Fable，因此多工程边界不能给全量构建叠加工程图税。
 
 ## 核心不变量与违约状态（RED）
@@ -43,3 +46,6 @@
 7. 任意其他 locality 直接读取 private implementation、Stage/Step/cursor/registry presence，或 composition root 匹配 foreign policy DU。
 8. composition root 实现深层 semantic helper、动态 pipeline 或 generic middleware/decorator interface。
 9. semantic-evidence 通过裸 proof 路径、源码字符串、错误 owner 的 WHAT，或未被 exact test callback 可达使用的 Surface 取得跨 locality 授权。
+10. capability observation、disposition 或 JavaScript AST visit 集合缺失、重复、碰撞或含未知项，导致源码能力未进入唯一 canonical fact set。
+11. generated artifact 的 output/input digest、lineage、package linkage、traversal 或fact reference任一缺失/漂移，或以 `RuntimeV1.Node` 标签代替真实 authority 判定。
+12. cutover 读取未绑定 stage-0 的 repository bytes、按扩展名猜 input closure、容忍 unstaged/untracked/dynamic input，或让 worksheet/frozen snapshot取得 live release authority。

@@ -120,3 +120,7 @@ HumanRoot Life 仅在权威配置与消息标识严格匹配时开启。旧 Life
 ## FINALITY-028: ManagerJob 不复活
 
 已发布或已释放的 ManagerJob 永久不得复活；处于 active 状态的 Job 可由编排方追加需求并在同一会话与 worktree 中延续执行。
+
+## FINALITY-029: Finality infrastructure fatal只经mandatory injected fuse执行
+
+现代Finality的closed business adjudication完成后，只有typed infrastructure incident可请求fatal；已有review、Life与ManagerJob settlement必须先保留。Finality tool/runtime不得直接引用fatal physical adapter或使用optional/default/global fallback；composition注入唯一capability，同一incident只允许一次report与kill，且不得把业务REVISE/阻塞裁决升级为fatal。

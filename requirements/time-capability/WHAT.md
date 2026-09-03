@@ -31,3 +31,7 @@
 ## TIME-007: HOST-013 的 SessionStartedAt 绑定首次 prompt，一次采样形成新 marker 的 elapsed
 
 每个面向 Provider 的 Session 的起始时刻 `SessionStartedAt`，严格定义为该 Session 首次开始构建或发送 prompt 时，由显式注入的 `IClockPort.UtcNow()` 采样获得的时刻，并执行持久化单次绑定（bind-once）。后续每次新 occurrence 再从同一时钟采样当前时间计算经过时长并生成人类可读片段，随当前 MarkerText 固化持久化，严禁在重试或重启时重置时间原点。
+
+## TIME-008: temporal vocabulary、capability、adapter与projection必须分居
+
+pure clock/timer capability与pure `Deadline`分别形成无physical value/factory的contract；Node clock/timer implementation位于唯一adapter，virtual verification implementation独立且不得进入production authority。`SessionStartedAt`是独立owner projection，不得与clock implementation同居。runtime只消费composition注入的mandatory capability；direct `Date.now`、`setTimeout`、ambient fallback与contract→adapter反向closure一律拒绝。

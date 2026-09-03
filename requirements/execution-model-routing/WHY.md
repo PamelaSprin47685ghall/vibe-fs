@@ -41,3 +41,7 @@ MJS 表达策略        ──► (role, running, previous) -> { model, reasonin
 - `managed-chat-execution`
 - `execution-failure-policy`
 - `host-boundary`
+
+## Physical fatal boundary
+
+Routing owns exact capacity fence与execution binding settlement；Host process fuse不属于router。direct fatal可在lease仍active或settlement unknown时终止，留下无法区分的capacity world，并允许Host与router双重报告。

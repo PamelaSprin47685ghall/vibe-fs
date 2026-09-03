@@ -63,3 +63,4 @@
 | BD-016 | `requirements/behavior-diagnosis/tests/observation-projection.test.mjs::WHAT[BD-016] OBS_PROJ_003_squash_co_moves_tips_and_frames_as_observation` |
 | BD-017 | `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs::WHAT[BD-017] ENFORCER_066_first_pure_terminal_issues_interaction_nudge` |
 | BD-018 | `requirements/behavior-diagnosis/tests/rulebook-system-composition.test.mjs::WHAT[BD-018] BEHAVIOR_DIAGNOSIS_SYSTEM_005_rulebook_revision_freezes_system_prompt_and_tool_definitions` |
+| BD-019 | `requirements/behavior-diagnosis/tests/m6-fatal-boundary.test.mjs::WHAT[BD-019] Enforcer fatal requires typed settlement and one injected fuse` |

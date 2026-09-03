@@ -20,6 +20,8 @@
 - **Current 不能领先于事实**：积分可以在内存中预计算，但物理追加失败时必须丢弃预计算结果；否则查询会看见无法由重启重放恢复的未来。
 - **共享 Integrator 必须由行为证明**：注册表名称、函数名和调用次数只能证明源码形状。每个注册业务 oracle 必须在 live append 后改变 production Current，并从相同 durable history 重启得到同一观察结果。
 - **StorageInvalid 全局 Fail-Closed**：JSON 损坏、非 canonical 格式、标识冲突或环状依赖必须立即拒绝构建投影并阻断运行，防止系统在错误地基上继续派生事实。
+- **纯 codec 与物理 store 分居**：canonical identity codec 是可共同授权的纯协议；process log、store factory、锁与文件 authority 是 effect。把二者放进同一 public slice会让只需 canonical bytes 的 consumer获得完整存储闭包。
+- **fatal 是注入的物理 fuse**：durable owner只决定 typed semantic-cut incident，并先持久化cut-tail与settlement evidence；console/kill/exit由Host唯一physical adapter执行。直接调用全局fuse会让领域owner同时拥有进程authority并允许重复fatal。
 
 ## DEPENDS ON
 

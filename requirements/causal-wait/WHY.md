@@ -29,3 +29,4 @@
 3. 跨 Owner、跨 Turn 或跨能力的异步等待未进行因果描述登记，退化为无因果上下文的裸 Task 等待。
 4. 使用轮询休眠（sleep/polling）代替事件驱动机制来等待业务条件达成。
 5. 等待任务在取消或超时后，其观测状态未被正确注销，复活已终止的业务机会。
+6. frontier vocabulary、registry/await runtime、Node diagnostic adapter、CompletionMailbox与proof Surface处于同一project，使只需typed wait capability的consumer获得mutable waiter与physical diagnostic authority。

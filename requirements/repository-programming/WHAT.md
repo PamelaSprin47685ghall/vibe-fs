@@ -151,3 +151,7 @@
    不足时宁可省略建议，也不得让失败 reason 退化为超大输出或资源故障；
 7. provider-visible 控制语必须完整本地化；稳定 code、API 字段名和 path 等协议 token 可保持原样，
    候选、行号、原子性后果与修复动作不得混入另一语言的说明句。
+
+## REPOSITORY-PROGRAMMING-025: transaction fatal先settle cut-tail再经注入fuse执行
+
+JS transaction invariant failure必须先完成CAS-preserving rollback或durable semantic cut-tail并取得committed/unknown settlement evidence，再构造typed incident。TransactionStore只接受composition注入的mandatory fatal capability，不得直接引用physical adapter、optional/default/global fallback。同一incident只允许一次report与kill；stale snapshot、第三方change与普通edit rejection保持typed nonfatal，fatal不得覆盖working tree。

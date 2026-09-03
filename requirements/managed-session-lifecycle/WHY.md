@@ -27,3 +27,4 @@
 - 父会话宣布中断后，后台子会话仍在隐蔽运行并产生副作用。
 - 内部错误将局部 attempt 中断放大为整棵会话树的逻辑取消，导致根会话意外退出。
 - 插件释放持久化存储时仍有未排空的异步写入，引发写入损坏与悬挂异常。
+- session deletion、turn observer与strength cut若直接执行Host fatal effect，可能绕开exact execution/child settlement并让同一lifecycle incident被多个callback重复kill。

@@ -123,3 +123,7 @@ checkpoint 提交不产生未决过程评审负担，Manager 工作就绪后可�
 2. `mid`：结果级粒度，明确下一层产出与依赖，暂不展开内部步骤。
 3. `far`：覆盖级粒度，粗粒度覆盖剩余已知债务。
 随执行前沿推进，粗粒度债务逐步由细粒度 obligations 替换。`planComplete=true` 仅要求道路完整覆盖且近处可执行，禁止要求将所有远期工作均拆解为 `near` 粒度。
+
+## OBLIGATION-LEDGER-028: ledger fatal绑定checkpoint settlement与注入fuse
+
+只有typed materialization/acceptance invariant incident可以请求fatal；Prepared、physical success与Accepted checkpoint的exact durable状态必须先settle。MagicTodo membrane/Host codec只接受composition注入的mandatory fatal capability，不得直接引用physical adapter、optional/default/global fallback。同一incident只允许一次report与kill；普通输入错误、unknown physical success与业务拒绝保持typed nonfatal。
