@@ -17,6 +17,18 @@ test('WHAT[DURABLE-EVENTS-003] MISC_canonical_json_sorts_keys_recursively', () =
   assert.equal(canonical.canonicalJson(null), 'null')
 })
 
+test('WHAT[DURABLE-EVENTS-003] canonical JSON orders numeric-looking and non-BMP keys by Unicode code point', () => {
+  assert.equal(canonical.canonicalJson({ 2: 'two', 10: 'ten' }), '{"10":"ten","2":"two"}')
+  assert.equal(
+    canonical.canonicalJson({ '\u{10000}': 'supplementary', '\uE000': 'bmp' }),
+    '{"":"bmp","𐀀":"supplementary"}',
+  )
+})
+
+test('WHAT[DURABLE-EVENTS-003] canonical JSON preserves JSON sparse-array null semantics', () => {
+  assert.equal(canonical.canonicalJson(new Array(2)), '[null,null]')
+})
+
 test('WHAT[DURABLE-EVENTS-003] MISC_canonical_json_equal_ignores_key_order', () => {
   assert.equal(canonical.equal({ a: 1, b: 2 }, { b: 2, a: 1 }), true)
   assert.equal(canonical.equal({ a: 1 }, { a: 2 }), false)

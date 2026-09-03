@@ -77,7 +77,7 @@ module HandleCompletionCodec =
                   "child_session_id", str ""
                   "agent_id", str agentId ]
 
-        CanonicalJson.canonicalJson (createObj fields)
+        Wanxiangshu.Foundation.CanonicalJson.canonicalJson (createObj fields)
 
     let private coerceFieldValue (value: obj) : string =
         if isNull value then

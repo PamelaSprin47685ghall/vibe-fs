@@ -20,6 +20,8 @@
     <Compile Include="Host/Digest.fs"/>
     <Compile Include="Foundation/Identity.fsi"/>
     <Compile Include="Foundation/Identity.fs"/>
+    <Compile Include="Foundation/CanonicalJson.fsi"/>
+    <Compile Include="Foundation/CanonicalJson.fs"/>
     <Compile Include="OpenCode/Host/Message.fsi"/>
     <Compile Include="OpenCode/Host/Message.fs"/>
     <Compile Include="OpenCode/Host/SessionContract.fsi"/>
@@ -748,8 +750,6 @@
     <Compile Include="OpenCode/Host/ManagedAgentConfig.fs"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfigSurface.fsi"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfigSurface.fs"/>
-    <Compile Include="OpenCode/Codec/CanonicalJson.fsi"/>
-    <Compile Include="OpenCode/Codec/CanonicalJson.fs"/>
     <Compile Include="OpenCode/Codec/CanonicalJsonSurface.fsi"/>
     <Compile Include="OpenCode/Codec/CanonicalJsonSurface.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/MetadataCodec.fsi"/>

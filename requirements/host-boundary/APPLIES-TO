@@ -19,7 +19,7 @@
 /src/Wanxiangshu/Foundation/McpLaunch.fs
 
 /src/Wanxiangshu/Host/Digest.fs
-/src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs
+/src/Wanxiangshu/Foundation/CanonicalJson.fs
 /src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs
 /src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs
 /src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs

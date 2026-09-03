@@ -1568,7 +1568,7 @@
       "id": "host-boundary-frontier-keep",
       "state": "DONE",
       "files": [
-        "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
+        "src/Wanxiangshu/Foundation/CanonicalJson.fs",
         "src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs",
         "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs",
         "src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs",

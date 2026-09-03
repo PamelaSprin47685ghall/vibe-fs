@@ -724,6 +724,7 @@ export function materializeOwnerCompile(plan, {
   const scratchPropsContent = `<Project>
   <PropertyGroup>
     <ArtifactsDir>${escapeXmlAttr(artifactRoot)}</ArtifactsDir>
+    <NuGetAudit>false</NuGetAudit>
   </PropertyGroup>
   <Import Project="${escapeXmlAttr(resolvedRootPropsPath)}" />
 </Project>

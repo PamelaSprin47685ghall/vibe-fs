@@ -145,6 +145,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection materializes zero Proj
     // Scratch Directory.Build.props must define isolated ArtifactsDir and import root props
     const scratchProps = readFileSync(join(materialized.scratchDir, 'Directory.Build.props'), 'utf8')
     assert.match(scratchProps, /<ArtifactsDir>\$\(MSBuildThisFileDirectory\)artifacts\/<\/ArtifactsDir>/)
+    assert.match(scratchProps, /<NuGetAudit>false<\/NuGetAudit>/)
     assert.match(scratchProps, new RegExp(`<Import Project="${rootPropsPath}"\\s*/>`))
 
     // Deterministic fingerprint

@@ -132,7 +132,7 @@ module BloggerCoordinator =
             Task.FromResult(Ok(openReq.ContextRef, openReq.ContextDigest))
         | _ ->
             taskResult {
-                let! blob = journal.WriteBlob(CanonicalJson.canonicalJson contextPayload)
+                let! blob = journal.WriteBlob(Wanxiangshu.Foundation.CanonicalJson.canonicalJson contextPayload)
                 return blob.BlobRef, blob.BlobDigest
             }
 
