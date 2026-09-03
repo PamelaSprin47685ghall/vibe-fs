@@ -15,6 +15,7 @@
 5. **过程与终结回执语义混淆**：过程评审单次判断即已完成本轮请求，回执应指示结束；终审首个 PERFECT 仅为确认协议的前半段，须要求再次评估。若混淆两类回执，将导致 Reviewer 收到相互冲突的控制指令。
 6. **终止只靠文案劝告**：若过程 Reviewer 第一次 `judge` 后仅收到「请结束对话」文本，而 Host 直到第二次 `judge` 才中断物理 attempt，模型仍可在同一请求内继续生成、调用其它工具或重复判断。terminal 语义必须在成功回执进入下一次 Host→LLM transform 时由物理 interrupt 强制兑现，而不是等待模型自觉服从。
 7. **interrupt 截断 durable closure**：若 transform 在 judge tool result 已形成后直接中断 reviewer，而 `ReviewAttemptClosed` 仍依赖稍后的通用 turn-completion observer，则 verdict 会永久停在 `VerdictKnown`；Main 下一次 `todowrite` 只能再次发起 review 或无限等待。强制终止必须先冻结 exact tool-result frontier，再执行 interrupt。
+8. **验证面复制生产判断**：若测试 surface 自行重写 closure、record-capture 或 interrupt 顺序，即使 production `JudgeTool` 已退化，测试仍可能保持全绿。可执行 proof 必须穿过 production entry；surface 只允许转换输入、注入物理端口并捕获 background scheduling。
 
 `review-judgement` 保证：**PERFECT 与 REVISE 必须由 discrimination 挣得**。Acceptance 需要证据挣得，Rejection 同样需要证据挣得；唯有 material defect 才能扣留 acceptance；非阻断工艺观察可与 acceptance 共存；PERFECT 不代表全知；REVISE 必须购买实质上更好、更真实的结果。
 
@@ -38,6 +39,7 @@
 - Examiner's Ledger 被固化为必填 report schema、Pass 表或固定标题模板。
 - 过程评审与终审 challenge 的回执语义混淆，导致单次请求收到相互矛盾的终止与继续指令。
 - 已 durable 的 terminal judgement 仅靠回执文案劝告结束，同一物理请求仍能进入下一次 LLM continuation；或把 interrupt 延迟到第二次 `judge` 才发生。
+- terminal proof 绕过 `JudgeTool.interruptAfterSubmittedJudgement`，或用源码排版、复制状态机代替真实 journal + physical port 行为。
 
 ## 4. 依赖边界
 

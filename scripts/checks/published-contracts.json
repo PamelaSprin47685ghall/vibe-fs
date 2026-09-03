@@ -1536,7 +1536,7 @@
     {
       "path": "src/Wanxiangshu/Mission/Review/OpenCode/JudgeSurface.fs",
       "owner": "review-judgement",
-      "justification": "Signed JS-native judge tool surface exposing verdict schemas and parsers; ToolRuntimeScope and HostToolCodec remain signature-hidden."
+      "justification": "Signed JS-native judge tool surface exposing verdict schemas, parsers and a production-bound physical interrupt probe; ToolRuntimeScope and HostToolCodec remain signature-hidden."
     },
     {
       "path": "src/Wanxiangshu/Mission/Review/ReviewTodoSurface.fs",

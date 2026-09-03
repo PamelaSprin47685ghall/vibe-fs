@@ -115,67 +115,67 @@ module JudgeSurface =
 
     let clearVerdictSubmissions () : unit = SharedState.VerdictSubmissions.Clear()
 
-    let private tryGetJournal (handle: JournalHandle) : Result<AgentJournal, string> =
-        try
-            Ok handle.Journal
-        with ex ->
-            Error ex.Message
+    type private PhysicalPort(raw: obj) =
+        let unavailable () =
+            Task.FromResult(Error "JudgeSurface physical probe supports only InterruptAttempt")
 
-    let ensureSubmittedAttemptClosed (handle: JournalHandle) (sessionId: string) : Task<obj> =
-        task {
-            let! result =
-                match tryGetJournal handle with
-                | Error reason -> Task.FromResult(Error reason)
-                | Ok journal -> ReviewerWorkflow.ensureSubmittedAttemptClosed journal (SessionId.create sessionId)
+        interface ISessionHostPort with
+            member _.SubscribeTerminal(_, _) =
+                { new IDisposable with
+                    member _.Dispose() = () }
 
-            match result with
-            | Ok closed -> return box {| ok = true; closed = closed |}
-            | Error reason -> return box {| ok = false; error = reason |}
-        }
+            member _.SubscribeFutureTerminal(_, _) =
+                { new IDisposable with
+                    member _.Dispose() = () }
+
+            member _.SendPrompt(_, _, _) =
+                Task.FromResult(Wanxiangshu.Foundation.Outcome.SendOutcome.Fatal "JudgeSurface physical probe")
+
+            member _.AbortSession(_) = unavailable ()
+
+            member _.InterruptAttempt(sessionId) =
+                task {
+                    let! _ = Fable.Core.JsInterop.emitJsExpr (raw, SessionId.value sessionId) "$0.InterruptAttempt($1)"
+
+                    return Ok()
+                }
+
+            member _.IsManagedChild(_) = false
+            member _.AbortChildren(_) = Task.FromResult()
+            member _.CreateSiblingSession(_, _, _) = unavailable ()
+            member _.TryGetParentSession(_) = unavailable ()
+            member _.CreateChildSession(_, _) = unavailable ()
+            member _.ListChildren(_) = unavailable ()
+            member _.FamilyRootOf(sessionId) = sessionId
 
     let interruptAfterSubmittedJudgement
         (handle: JournalHandle)
         (physicalUserMessageId: string)
+        (runBackground: obj)
         (sessionPort: obj)
         (sessionId: string)
         : Task<obj> =
         task {
-            let reviewer = SessionId.create sessionId
+            let currentPhysicalUserMessage candidate =
+                if candidate = sessionId then
+                    Some physicalUserMessageId
+                else
+                    None
 
-            let isSubmitted =
-                JudgementRequestIdentity.key reviewer (PhysicalUserMessageId.create physicalUserMessageId)
-                |> SharedState.VerdictSubmissions.Contains
+            let schedule work =
+                Fable.Core.JsInterop.emitJsExpr (runBackground, work) "$0($1)" |> ignore
 
-            let! closedResult =
-                match isSubmitted, tryGetJournal handle with
-                | false, _ -> Task.FromResult(Ok false)
-                | true, Error reason -> Task.FromResult(Error reason)
-                | true, Ok journal -> ReviewerWorkflow.ensureSubmittedAttemptClosed journal reviewer
+            try
+                do!
+                    JudgeTool.interruptAfterSubmittedJudgement
+                        (Some handle.Journal)
+                        CancellationToken.None
+                        currentPhysicalUserMessage
+                        schedule
+                        (PhysicalPort(sessionPort) :> ISessionHostPort)
+                        (Some sessionId)
 
-            match closedResult with
-            | Ok true ->
-                match! ReviewerWorkflow.awaitSubmittedRecordCapture CancellationToken.None handle.Journal reviewer with
-                | Error reason ->
-                    return
-                        box
-                            {| ok = false
-                               error = "REVIEW_013_RECORD_CAPTURE_FAILED:" + reason
-                               interrupted = false |}
-                | Ok() ->
-                    let fn = Fable.Core.JsInterop.emitJsExpr (sessionPort, "InterruptAttempt") "$0[$1]"
-
-                    let! _ =
-                        if isNull fn then
-                            Task.FromResult(Ok())
-                        else
-                            Fable.Core.JsInterop.emitJsExpr (sessionPort, sessionId) "$0.InterruptAttempt($1)"
-
-                    return box {| ok = true; interrupted = true |}
-            | Ok false -> return box {| ok = true; interrupted = false |}
-            | Error reason ->
-                return
-                    box
-                        {| ok = false
-                           error = "REVIEW_013_TERMINAL_CLOSURE_FAILED:" + reason
-                           interrupted = false |}
+                return box {| ok = true; error = "" |}
+            with ex ->
+                return box {| ok = false; error = ex.Message |}
         }

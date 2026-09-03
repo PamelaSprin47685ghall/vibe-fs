@@ -17,6 +17,8 @@
 
 - **事实不可篡改**：已提交事件永远不可删除、修改或原地升级；错误必须通过追加新事实纠正；若破坏，审计链与重放确定性即刻失效。
 - **本地提交以完整 NDJSON 行为准**：运行时追加绝不创建 Git object、Git ref 或执行 Git CAS，仅当完整 canonical 行落盘并释放门禁后视为提交。
+- **Current 不能领先于事实**：积分可以在内存中预计算，但物理追加失败时必须丢弃预计算结果；否则查询会看见无法由重启重放恢复的未来。
+- **共享 Integrator 必须由行为证明**：注册表名称、函数名和调用次数只能证明源码形状。每个注册业务 oracle 必须在 live append 后改变 production Current，并从相同 durable history 重启得到同一观察结果。
 - **StorageInvalid 全局 Fail-Closed**：JSON 损坏、非 canonical 格式、标识冲突或环状依赖必须立即拒绝构建投影并阻断运行，防止系统在错误地基上继续派生事实。
 
 ## DEPENDS ON

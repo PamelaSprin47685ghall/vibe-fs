@@ -1,80 +1,142 @@
-//
-// DURABLE-EVENTS-013/014/019: one canonical F# CE Integrator owns history iteration.
-// Business modules register single-event integration rules and read Current; they never replay history themselves.
-
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 
-const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
+import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
+import * as transaction from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
+import * as strength from '../../../dist/Strength/Surface.js'
 
-test('WHAT[DURABLE-EVENTS-019] DURABLE_EVENTS_019_canonical_integrator_is_an_FSharp_CE_with_registered_business_rules', async () => {
-  const source = await read('src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs')
+const id = (n) => n.toString(16).padStart(40, '0')
+const hash = (text) => `proof-hash(${text})`
 
-  assert.match(source, /type\s+IntegratorBuilder|type\s+CanonicalIntegratorBuilder/)
-  assert.match(source, /member\s+_\.(Bind|Combine|Yield|Return)/)
-  assert.match(source, /integrator\s*\{/)
+const structuralEvent = {
+  id: id(1),
+  stream: 'canonical-integrator/proof',
+  type: 'JobRequested',
+  parents: [],
+  payload: { proof: 'structural' },
+  payloadRefs: [],
+}
 
-  for (const registration of [
-    'StructuralIntegration.rule',
-    'JournalIntegration.rule',
-    'StrengthIntegration.rule',
-    'CasebookIntegration.rule',
-    'JsTransactionIntegration.rule',
-  ]) {
-    assert.equal(source.includes(registration), true, `canonical program must register ${registration}`)
-  }
+const mustOk = (result, label) => {
+  assert.equal(result.ok, true, `${label}: ${JSON.stringify(result.error)}`)
+  return result
+}
 
-  assert.match(source, /integrateBusiness/, 'one event may feed structural + business registered oracles')
-  assert.match(source, /ProjectionCutTail/, 'business rule failures are reset by durable cut-tail facts')
-  assert.doesNotMatch(source, /multiple integration rules accepted one event/)
-  assert.doesNotMatch(source, /type\s+\w*(StateMachine|LifecycleState)\b/)
-})
+test('WHAT[DURABLE-EVENTS-019] every registered business oracle changes its production Current', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-integrator-registration-'))
+  const commonDir = join(root, '.git')
+  mkdirSync(commonDir, { recursive: true })
 
-test('WHAT[DURABLE-EVENTS-019] DURABLE_EVENTS_013_019_business_modules_do_not_own_history_read_or_replay_loops', async () => {
-  const forbiddenOwners = [
-    'src/Wanxiangshu/Strength/Persistence/Store.fs',
-    'src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs',
-    'src/Wanxiangshu/Repository/Knowledge/Casebook/Index.fs',
-    'src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs',
-    'src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs',
-  ]
+  try {
+    const store = eventStore.create(commonDir, 'business-registration')
 
-  const forbiddenHistoryTokens = [
-    'EventStoreMergeSpec.merge',
-    'GitRawStore.loadEventEnvelopes',
-    'loadEventEnvelopes raw',
-    'loadEvents raw',
-    'EventStoreFold.fold envelopes',
-  ]
+    try {
+      mustOk(await eventStore.append(store, [structuralEvent]), 'append Structural fact')
 
-  for (const file of forbiddenOwners) {
-    const source = await read(file)
-    for (const token of forbiddenHistoryTokens) {
-      assert.equal(source.includes(token), false, `${file} must not manually integrate history via ${token}`)
+      const payload = mustOk(
+        await strength.storeWritePayload(store, new TextEncoder().encode('canonical strength material')),
+        'write Strength payload',
+      )
+      const strengthFact = strength.eventPrepared(
+        'canonical-owner',
+        'canonical-decision',
+        'canonical-target-run',
+        'canonical-replica',
+        'K1',
+        'canonical-anchor',
+        'canonical-frame',
+        27,
+        [payload.value],
+      )
+      mustOk(await strength.storeAppend(store, hash, strengthFact), 'append Strength fact')
+
+      mustOk(
+        await casebook.archive(store, {
+          sessionId: 'canonical-case',
+          q: 'Q',
+          a: 'A',
+          observations: [],
+          lastAccessOrder: 0,
+        }),
+        'append Casebook fact',
+      )
+
+      mustOk(
+        await transaction.appendPrepared(store, {
+          transactionId: 'canonical-transaction',
+          workspaceRoot: '/canonical-workspace',
+          mutations: [{ path: 'a.txt', originalText: 'before', newText: 'after' }],
+        }),
+        'append JsTransaction fact',
+      )
+
+      const fetched = mustOk(await casebook.fetchCase(store, 10, 'canonical-case'), 'read Casebook Current')
+      const strengthCurrent = strength.storeCurrent(store)
+
+      assert.deepEqual(
+        {
+          structuralHead: eventStore.head(store, structuralEvent.stream),
+          structuralEvent: eventStore.read(store, structuralEvent.id)?.payload?.proof ?? null,
+          strengthDecision: strength.projectionDecisionForTarget('canonical-target-run', strengthCurrent),
+          caseAnswer: fetched.value?.a ?? null,
+          pendingTransactions: transaction.pending(store).map(({ transactionId }) => transactionId).sort(),
+        },
+        {
+          structuralHead: structuralEvent.id,
+          structuralEvent: 'structural',
+          strengthDecision: 'canonical-decision',
+          caseAnswer: 'A',
+          pendingTransactions: ['canonical-transaction'],
+        },
+      )
+    } finally {
+      eventStore.dispose(store)
     }
+
+    const booted = mustOk(
+      await journal.JournalSurface_bootWithWriterId(
+        commonDir,
+        'journal-registration',
+        'runtime-journal-registration',
+        4242,
+        '9999-01-01T00:00:00Z',
+      ),
+      'boot Journal',
+    )
+
+    try {
+      const payload = mustOk(
+        await journal.JournalSurface_writePayload(booted.journal, 'canonical opening text'),
+        'write Journal payload',
+      )
+      mustOk(
+        await journal.JournalSurface_appendManagerLifecycle(
+          booted.journal,
+          { kind: 'Session', session: 'canonical-session' },
+          {
+            case: 'LifeOpened',
+            payload: {
+              SessionId: 'canonical-session',
+              LifeId: 'canonical-life',
+              OpeningUserMessageId: 'canonical-message',
+              OpeningTextRef: payload.blobRef,
+              OpeningTextDigest: payload.blobDigest,
+              OpeningCursorSequence: 1,
+            },
+          },
+        ),
+        'append Journal fact',
+      )
+      assert.equal(journal.JournalSurface_hasSession(booted.journal, 'canonical-session'), true)
+    } finally {
+      journal.JournalSurface_dispose(booted.journal)
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
   }
-})
-
-test('WHAT[DURABLE-EVENTS-013] DURABLE_EVENTS_013_boot_and_live_share_the_same_single_event_integration_program', async () => {
-  const source = await read('src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs')
-
-  assert.match(source, /integrateOne/)
-  assert.match(source, /replay/)
-  assert.match(source, /prepareLive/)
-
-  // Both entry points must delegate to the same single-event primitive rather than maintaining two folds.
-  const calls = source.match(/integrateOne/g) ?? []
-  assert.ok(calls.length >= 3, 'definition + replay + live preparation should all reference integrateOne')
-  assert.doesNotMatch(source, /replayFold|liveFold|replayReducer|liveReducer/)
-})
-
-test('WHAT[DURABLE-EVENTS-019] DURABLE_EVENTS_019_only_CanonicalIntegrator_may_derive_Current_from_event_history', async () => {
-  const project = await read('src/Wanxiangshu/Wanxiangshu.fsproj')
-  assert.match(project, /Persistence\/EventStore\/CanonicalIntegrator\.fs/)
-  assert.match(project, /Persistence\/EventStore\/ProcessEventLog\.fs/)
-
-  const workspaceStore = await read('src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs')
-  assert.match(workspaceStore, /CanonicalIntegrator|EventStore\.createLocal/)
-  assert.doesNotMatch(workspaceStore, /ProcessGitRawStore\.create/)
 })

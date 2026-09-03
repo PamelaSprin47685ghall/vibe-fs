@@ -50,7 +50,7 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 
 ## DURABLE-EVENTS-013: 查询只读正规 Integrator 的 Current 且先 commit 后 integrate
 
-任何业务查询不得手动全量扫描、过滤或折叠事件历史，必须且只能读取唯一的规范 Integrator 维护的 `Current` 积分状态。修改状态必须先完成本地事实追加，再交由 Integrator 推进 `Current`。
+任何业务查询不得手动全量扫描、过滤或折叠事件历史，必须且只能读取唯一的规范 Integrator 维护的 `Current` 积分状态。修改状态可以先计算待提交状态，但只有本地事实完整追加成功后才能原子推进 `Current`；追加失败或提交闭包未执行时，事件、结构 head 与所有业务 Current 必须保持提交前状态。
 
 ## DURABLE-EVENTS-014: k-way 输入顺序与确定性积分
 
@@ -74,7 +74,7 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 
 ## DURABLE-EVENTS-019: 唯一 canonical Integrator 与业务注册 integration oracle
 
-系统仅存在一个规范的 Integrator 负责历史事实的解释与积分。各业务模块仅向 Integrator 注册单个信封的纯计算折叠规则，业务模块自身不拥有读取底层历史或重写重放循环的权限。
+系统仅存在一个规范的 Integrator 负责历史事实的解释与积分。各业务模块仅向 Integrator 注册单个信封的纯计算折叠规则，业务模块自身不拥有读取底层历史或重写重放循环的权限。Structural、Journal、Strength、Casebook 与 JsTransaction 的注册必须可由 production surface 上的反例观察：删除任一注册后，该领域的合法 live fact 不得仍产生预期 Current；源码 token、注册名称或调用次数不构成语义证明。
 
 ## DURABLE-EVENTS-020: plugin load 仅验证物理可读性且延迟业务激活
 

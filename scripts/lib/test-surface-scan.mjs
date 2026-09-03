@@ -472,7 +472,11 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Repository/Knowledge/Casebook/Surface.js',
     owner: 'knowledge-reuse',
-    laws: ['KNOWLEDGE-REUSE-002', 'KNOWLEDGE-REUSE-003', 'KNOWLEDGE-REUSE-004', 'KNOWLEDGE-REUSE-008', 'KNOWLEDGE-REUSE-010'],
+    laws: ['DURABLE-EVENTS-019', 'DURABLE-CONVERGENCE-007', 'KNOWLEDGE-REUSE-002', 'KNOWLEDGE-REUSE-003', 'KNOWLEDGE-REUSE-004', 'KNOWLEDGE-REUSE-008', 'KNOWLEDGE-REUSE-010'],
+    lawOwners: {
+      'DURABLE-EVENTS-019': 'durable-events',
+      'DURABLE-CONVERGENCE-007': 'durable-convergence',
+    },
     source: 'src/Wanxiangshu/Repository/Knowledge/Casebook/Surface.fs',
     representation: 'json',
     kind: 'pure',
@@ -669,6 +673,8 @@ export const SURFACE_MANIFEST = [
     module: 'Repository/Programming/Js/TransactionSurface.js',
     owner: 'repository-programming',
     laws: [
+      'DURABLE-EVENTS-019',
+      'DURABLE-CONVERGENCE-007',
       'REPOSITORY-PROGRAMMING-007',
       'REPOSITORY-PROGRAMMING-010',
       'REPOSITORY-PROGRAMMING-013',
@@ -676,6 +682,10 @@ export const SURFACE_MANIFEST = [
       'REPOSITORY-PROGRAMMING-015',
       'REPOSITORY-PROGRAMMING-018',
     ],
+    lawOwners: {
+      'DURABLE-EVENTS-019': 'durable-events',
+      'DURABLE-CONVERGENCE-007': 'durable-convergence',
+    },
     source: 'src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -915,7 +925,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Persistence/Journal/Surface.js',
     owner: 'durable-events',
-    laws: ['DURABLE-EVENTS-009', 'DURABLE-EVENTS-010', 'DURABLE-EVENTS-013', 'EFFECT-ACCOUNTING-008', 'EFFECT-ACCOUNTING-011'],
+    laws: ['DURABLE-EVENTS-009', 'DURABLE-EVENTS-010', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-019', 'EFFECT-ACCOUNTING-008', 'EFFECT-ACCOUNTING-011'],
     lawOwners: {
       'EFFECT-ACCOUNTING-008': 'effect-accounting',
       'EFFECT-ACCOUNTING-011': 'effect-accounting',
@@ -927,7 +937,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Persistence/EventStore/Surface.js',
     owner: 'durable-events',
-    laws: ['DURABLE-EVENTS-001', 'DURABLE-EVENTS-004', 'DURABLE-EVENTS-005', 'DURABLE-EVENTS-006'],
+    laws: ['DURABLE-EVENTS-001', 'DURABLE-EVENTS-004', 'DURABLE-EVENTS-005', 'DURABLE-EVENTS-006', 'DURABLE-EVENTS-013', 'DURABLE-EVENTS-019', 'DURABLE-CONVERGENCE-007'],
+    lawOwners: { 'DURABLE-CONVERGENCE-007': 'durable-convergence' },
     source: 'src/Wanxiangshu/Persistence/EventStore/Surface.fs',
     representation: 'json',
     kind: 'resource',
@@ -1318,6 +1329,8 @@ export const SURFACE_MANIFEST = [
     module: 'Strength/Surface.js',
     owner: 'speculative-investigation',
     laws: [
+      'DURABLE-EVENTS-019',
+      'DURABLE-CONVERGENCE-007',
       'SPEC-INV-001',
       'SPEC-INV-002',
       'SPEC-INV-003',
@@ -1332,6 +1345,10 @@ export const SURFACE_MANIFEST = [
       'SPEC-INV-012',
       'SPEC-INV-013',
     ],
+    lawOwners: {
+      'DURABLE-EVENTS-019': 'durable-events',
+      'DURABLE-CONVERGENCE-007': 'durable-convergence',
+    },
     source: 'src/Wanxiangshu/Strength/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1690,8 +1707,8 @@ export const SURFACE_MANIFEST = [
     owner: 'review-judgement',
     laws: ['REVIEW-JUDGEMENT-001', 'REVIEW-JUDGEMENT-008'],
     source: 'src/Wanxiangshu/Mission/Review/OpenCode/JudgeSurface.fs',
-    representation: 'json',
-    kind: 'pure',
+    representation: 'opaque-capability',
+    kind: 'resource',
   },
   {
     module: 'Mission/Review/ReviewTodoSurface.js',
