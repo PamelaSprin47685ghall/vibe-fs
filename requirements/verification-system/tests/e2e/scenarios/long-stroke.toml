@@ -91,10 +91,11 @@ must = [
   "continue.0",
   "continue.1",
   "manager-resume.0",
-  "manager-resume.8",
+  "manager-resume.10",
   "coder.0",
   "coder.1",
   "coder.2",
+  "coder-reuse.0",
   "manager-resume.1",
   "conflict-resume.0",
   "coder-resolve.0",
@@ -175,9 +176,12 @@ flow = [
   { wait = "coder-fix.0", timeoutMs = 60000 },
   { wait = "manager-resume.5" },
   { wait = "manager-resume.6" },
+  { wait = "coder-reuse.0", timeoutMs = 60000 },
+  { wait = "manager-resume.7" },
+  { wait = "manager-resume.8" },
   { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ReviewAttemptClosed", "ConfirmedReviewWitness", "FinalityReviewerEnlisted", "BlogObservationCommitted"] }, timeoutMs = 180000 },
-  { wait = "manager-resume.7", timeoutMs = 30000 },
-  { wait = "manager-resume.8", timeoutMs = 30000 },
+  { wait = "manager-resume.9", timeoutMs = 30000 },
+  { wait = "manager-resume.10", timeoutMs = 30000 },
   { waitFact = { name = "LifeCompleted", gte = 1 } },
   { waitFact = { name = "CandidateReady", eq = 1 }, timeoutMs = 60000 },
 
@@ -474,6 +478,12 @@ tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
   respond = { type = "tool-call", tool = "join", args = {} }
 
   [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { name = "Proof Finisher", charge = "Verify the reused subagent received this second charge and publish_proof.txt is exact." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
   respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
 
   [[turn.step]]
@@ -516,6 +526,18 @@ tools = ["js-coder"]
 
   [[turn.step]]
   respond = { type = "text", text = "Coder repaired proof file." }
+
+[[turn]]
+id = "coder-reuse"
+lane = "fast-coder"
+user = "# Verify the reused subagent received this second charge and publish_proof.txt is exact."
+tools = ["read"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "read", args = { filePath = "publish_proof.txt" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Reused subagent received the second charge and verified the proof file." }
 
 # ORCH-007 conflict resume — same Manager session; do NOT restart original task.
 [[turn]]

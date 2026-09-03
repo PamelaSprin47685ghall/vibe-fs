@@ -76,6 +76,15 @@ test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI incremental compile detec
     const xml = readFileSync(projectPath, 'utf8')
     assert.ok(!xml.includes('<ProjectReference'), 'impact CLI must not hand the owner ProjectReference graph to Fable')
     assert.ok(hasEmittedJsFiles(outputDir), 'focused impact compile must emit JavaScript to output directory')
+
+    const result2 = spawnSync(
+      process.execPath,
+      [CLI, '--scratch', scratchRoot, '-o', outputDir],
+      { cwd: ROOT, encoding: 'utf8', timeout: 110_000 },
+    )
+    assert.equal(result2.status, 0, result2.stderr || result2.stdout)
+    assert.match(result2.stdout, /up-to-date \(cached\)/)
+    assert.doesNotMatch(result2.stdout, /Started Fable compilation/)
   } finally {
     rmSync(scratchRoot, { recursive: true, force: true })
   }

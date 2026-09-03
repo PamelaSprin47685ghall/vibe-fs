@@ -69,6 +69,33 @@ module ExecutionFactFold =
         else
             byname
 
+    let private closeCompletedChildAuthority
+        (childIdOpt: SessionId option)
+        (projectionResult: Result<AgentProjectionSet, FoldRejection>)
+        : Result<AgentProjectionSet, FoldRejection> =
+        match childIdOpt, projectionResult with
+        | Some childId, Ok proj ->
+            AgentProjection.tryUpdate
+                childId
+                (fun session ->
+                    let authority =
+                        session.PromptAuthority
+                        |> Option.bind (fun current ->
+                            current.ActiveLogicalRun
+                            |> Option.bind (fun active ->
+                                PromptAuthorityRun.closeCompletedAgentOwnerChildWork
+                                    active.LogicalRunId
+                                    active.AuthorityRootUserMessageId
+                                    current
+                                |> Result.toOption))
+                        |> Option.orElse session.PromptAuthority
+
+                    Ok { session with PromptAuthority = authority })
+                proj
+            |> Result.defaultValue proj
+            |> Ok
+        | _, res -> res
+
     let fold (projection: AgentProjectionSet) (fact: ExecutionFactCases) : Result<AgentProjectionSet, FoldRejection> =
         // ── execution handles ───────────────────────────────────────────────
         match fact with
@@ -92,6 +119,12 @@ module ExecutionFactFold =
             |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
 
         | ExecutionFactCases.HandleCompleted payload ->
+            let childIdOpt =
+                AgentProjection.tryFind payload.ParentSessionId projection
+                |> Option.bind (fun session -> session.Handles)
+                |> Option.bind (HandleProjection.tryFind payload.Handle)
+                |> Option.map (fun record -> record.ChildSessionId)
+
             AgentProjection.tryUpdate
                 payload.ParentSessionId
                 (fun session ->
@@ -105,8 +138,15 @@ module ExecutionFactFold =
                 projection
             |> handleOutcome "HandleCompleted" projection
             |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
+            |> closeCompletedChildAuthority childIdOpt
 
         | ExecutionFactCases.HandleRetired payload ->
+            let childIdOpt =
+                AgentProjection.tryFind payload.ParentSessionId projection
+                |> Option.bind (fun session -> session.Handles)
+                |> Option.bind (HandleProjection.tryFind payload.Handle)
+                |> Option.map (fun record -> record.ChildSessionId)
+
             AgentProjection.tryUpdate
                 payload.ParentSessionId
                 (fun session ->
@@ -115,6 +155,7 @@ module ExecutionFactFold =
                 projection
             |> handleOutcome "HandleRetired" projection
             |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
+            |> closeCompletedChildAuthority childIdOpt
 
         | ExecutionFactCases.HandleAbandoned payload ->
             AgentProjection.tryUpdate

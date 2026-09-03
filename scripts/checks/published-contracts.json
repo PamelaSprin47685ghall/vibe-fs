@@ -11287,6 +11287,7 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.DispatchStatus.Pending",
         "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.activeProfile",
         "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.dispatchStatusFor",
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.lastAuthorityProfile",
         "Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.pendingDispatchClaim"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to interaction-authority."
@@ -12238,6 +12239,20 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthorityRun.AuthorityRegistrationRejection"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'managed-chat-execution'; every unlisted sibling remains private to interaction-authority."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Run.fs",
+      "owner": "interaction-authority",
+      "node": "interaction-authority-frontier-keep",
+      "contract": "interaction-authority.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Authority.PromptAuthorityRun.closeCompletedAgentOwnerChildWork"
+      ],
+      "justification": "interaction-authority.Contract publishes exact AgentOwnerRoot child-work closure to 'delegation'; every unlisted sibling remains private to interaction-authority."
     },
     {
       "path": "src/Wanxiangshu/Interaction/Authority/Run.fs",

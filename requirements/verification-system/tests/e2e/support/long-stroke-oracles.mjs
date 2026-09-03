@@ -244,6 +244,23 @@ export function assertPublishConflict(workDir, label = 'long-stroke') {
   );
 }
 
+/** §21 / MANAGED-SESSION-020: subagent reuse — same child session reused across distinct task runs. */
+export function assertSubagentReuse(workDir, label = 'long-stroke') {
+  const linked = factPayloads(workDir, 'HandleLinked');
+  const proofFinisherLinks = linked.filter((p) => p.Byname === 'Proof Finisher');
+  assert.ok(
+    proofFinisherLinks.length >= 2,
+    `${label}: Proof Finisher must be linked at least twice for subagent reuse (got ${proofFinisherLinks.length})`,
+  );
+  const firstChild = proofFinisherLinks[0].ChildSessionId;
+  const secondChild = proofFinisherLinks[1].ChildSessionId;
+  assert.deepEqual(
+    firstChild,
+    secondChild,
+    `${label}: subagent reuse must preserve the same physical child session (first=${firstChild}, second=${secondChild})`,
+  );
+}
+
 /** §21: successful reconciliation — Orchestrator Published case exactly once. */
 export function assertSuccessfulReconciliation(workDir, label = 'long-stroke') {
   // countFactCase digs to the innermost DU case name (`Published`). Do NOT pass the
@@ -260,6 +277,7 @@ export function assertSuccessfulReconciliation(workDir, label = 'long-stroke') {
 /** Back-compat composite for publish axis. */
 export async function assertPublishReconcile(workDir, label = 'long-stroke') {
   assertPublishConflict(workDir, label);
+  assertSubagentReuse(workDir, label);
   assertSuccessfulReconciliation(workDir, label);
 }
 
@@ -443,6 +461,7 @@ export async function oracleLongStroke(scenario, _ctx) {
   assertFinalityTemporarilyBlocked(workDir);
   assertLaterSuccessfulFinality(workDir);
   assertPublishConflict(workDir);
+  assertSubagentReuse(workDir);
   assertSuccessfulReconciliation(workDir);
   assertNativeReadProbeTimeline(scenario);
 
@@ -569,6 +588,12 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
     oracle: 'assertPublishConflict',
   },
   {
+    id: 'subagent-session-reuse',
+    covered: true,
+    injection: 'manager-resume reuses Proof Finisher on same child session → coder-reuse',
+    oracle: 'assertSubagentReuse',
+  },
+  {
     id: 'successful-reconciliation',
     covered: true,
     injection: 'conflict-resume → coder-resolve → Orchestrator Published eq 1',
@@ -592,6 +617,7 @@ export const ADVERSITY_ORACLES = Object.freeze({
   assertFinalityTemporarilyBlocked,
   assertDurableRecovery,
   assertPublishConflict,
+  assertSubagentReuse,
   assertSuccessfulReconciliation,
   assertLaterSuccessfulFinality,
   // composites / aliases retained for older call sites

@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import { loopDetectorRepositoryInputFiles } from '../../../scripts/lib/loop-detector-repository-corpus.mjs'
-import { checkBuildFreshness } from './support/build-freshness.mjs'
+import { checkBuildFreshness, collectBuildInputs } from './support/build-freshness.mjs'
 
 test('WHAT[VERIFICATION-SYSTEM-008] build freshness includes repository-derived artifact inputs beyond F# sources', () => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiang-build-freshness-'))
@@ -51,6 +51,25 @@ test('WHAT[VERIFICATION-SYSTEM-008] local repository export shards are excluded 
     assert.ok(
       !inputs.includes(join(root, 'repomix-src-part1.xml')),
       'ignored local repository export must never become a build-freshness input',
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[VERIFICATION-SYSTEM-008] generated Fable scratch projects are never freshness inputs', () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-build-scratch-ignore-'))
+  try {
+    const productionRoot = join(root, 'src')
+    const source = join(productionRoot, 'Main.fs')
+    const scratch = join(productionRoot, '.fable-build', 'fingerprint', 'Wanxiangshu.Impact.fsproj')
+    mkdirSync(join(productionRoot, '.fable-build', 'fingerprint'), { recursive: true })
+    writeFileSync(source, 'module Main\n', 'utf8')
+    writeFileSync(scratch, '<Project />\n', 'utf8')
+
+    assert.deepEqual(
+      collectBuildInputs({ productionRoot, repositoryInputs: [] }),
+      [source],
     )
   } finally {
     rmSync(root, { recursive: true, force: true })

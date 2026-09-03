@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Interaction.Authority
 
 open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Pure authority-run lifecycle transitions. Types and identity rules live in
@@ -187,6 +188,20 @@ module PromptAuthorityRun =
                     (LogicalRunId.value logicalRunId)
             )
         | None -> Error(sprintf "logical-run close has no matching authority: %s" (LogicalRunId.value logicalRunId))
+
+    let closeCompletedAgentOwnerChildWork
+        (logicalRunId: LogicalRunId)
+        (authorityRoot: AuthorityRootUserMessageId)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        : Result<PromptAuthority.PromptAuthorityProjection, string> =
+        match projection.ActiveLogicalRun with
+        | Some active when
+            active.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+            && active.CanonicalRole <> Role.Manager
+            ->
+            closeAuthority logicalRunId authorityRoot projection
+        | Some _ -> Error "child-work closure requires a non-Manager AgentOwnerRoot authority"
+        | None -> closeAuthority logicalRunId authorityRoot projection
 
     /// Register a claim and consume its ClaimSequence.
     ///

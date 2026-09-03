@@ -58,6 +58,12 @@ module PromptAuthorityRun =
         projection: PromptAuthority.PromptAuthorityProjection ->
             Result<PromptAuthority.PromptAuthorityProjection, string>
 
+    val closeCompletedAgentOwnerChildWork:
+        logicalRunId: LogicalRunId ->
+        authorityRoot: AuthorityRootUserMessageId ->
+        projection: PromptAuthority.PromptAuthorityProjection ->
+            Result<PromptAuthority.PromptAuthorityProjection, string>
+
     val registerClaim:
         claim: PromptAuthority.PromptClaim ->
         projection: PromptAuthority.PromptAuthorityProjection ->
