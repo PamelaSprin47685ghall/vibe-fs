@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
-open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Context.Prefix
@@ -203,25 +202,26 @@ module RecoveryRuntimeSurface =
         | ChatExecutionTerminalDisposition.Rejected -> "Rejected"
         | ChatExecutionTerminalDisposition.Failed -> "Failed"
 
-    let private effectPorts (effects: HashSet<string>) : ChatExecutionRecoveryActionPorts =
-        let once effect =
-            effects.Add effect |> ignore
+    let private effectPorts (effects: ResizeArray<string>) : ChatExecutionRecoveryActionPorts =
+        let record effect =
+            effects.Add effect
             Task.FromResult(()) :> Task
 
         { ReconcilePhysical =
             function
-            | PhysicalReconciliationRequest.PersistProviderStarted _ -> once "ReconcilePhysical:PersistProviderStarted"
+            | PhysicalReconciliationRequest.PersistProviderStarted _ ->
+                record "ReconcilePhysical:PersistProviderStarted"
             | PhysicalReconciliationRequest.PersistProviderStartedAndTerminal(_, disposition) ->
-                once $"ReconcilePhysical:PersistProviderStartedAndTerminal:{dispositionName disposition}"
+                record $"ReconcilePhysical:PersistProviderStartedAndTerminal:{dispositionName disposition}"
             | PhysicalReconciliationRequest.ReleaseTerminalResource _ ->
-                once "ReconcilePhysical:ReleaseTerminalResource"
-          ResumePreProvider = fun _ -> once "ResumePreProvider"
+                record "ReconcilePhysical:ReleaseTerminalResource"
+          ResumePreProvider = fun _ -> record "ResumePreProvider"
           RequeueEligible =
             function
-            | ProviderRequeueRequest.RetryFreshAttempt _ -> once "RequeueEligible:RetryFreshAttempt"
-            | ProviderRequeueRequest.AdvanceFallback _ -> once "RequeueEligible:AdvanceFallback"
-          Finalize = fun request -> once $"Finalize:{dispositionName request.TerminalDisposition}"
-          MarkManualIntervention = fun request -> once $"MarkManualIntervention:{request.InterventionReason}" }
+            | ProviderRequeueRequest.RetryFreshAttempt _ -> record "RequeueEligible:RetryFreshAttempt"
+            | ProviderRequeueRequest.AdvanceFallback _ -> record "RequeueEligible:AdvanceFallback"
+          Finalize = fun request -> record $"Finalize:{dispositionName request.TerminalDisposition}"
+          MarkManualIntervention = fun request -> record $"MarkManualIntervention:{request.InterventionReason}" }
 
     let private decisionName (decision: ChatExecutionRecoveryDecision) =
         match decision with
@@ -232,7 +232,7 @@ module RecoveryRuntimeSurface =
         | ChatExecutionRecoveryDecision.Finalize _ -> "Finalize"
         | ChatExecutionRecoveryDecision.MarkManualIntervention _ -> "MarkManualIntervention"
 
-    let private run (effects: HashSet<string>) (scenarios: string array) =
+    let private run (effects: ResizeArray<string>) (scenarios: string array) =
         task {
             let ports = effectPorts effects
             let decisions = ResizeArray<string>()
@@ -244,17 +244,22 @@ module RecoveryRuntimeSurface =
             return
                 box
                     {| decisions = decisions.ToArray()
-                       effects = effects |> Seq.sort |> Seq.toArray |}
+                       effects = effects.ToArray() |}
         }
 
-    let recoverScenarios (scenarios: string array) : Task<obj> = run (HashSet<string>()) scenarios
+    let recoverScenarios (scenarios: string array) : Task<obj> = run (ResizeArray<string>()) scenarios
 
     let recoverAcrossRestart (scenarios: string array) : Task<obj> =
         task {
-            let effects = HashSet<string>()
             let midpoint = scenarios.Length / 2
-            let! _ = run effects scenarios.[0 .. midpoint - 1]
-            return! run effects scenarios.[midpoint..]
+            let beforeScenarios, afterScenarios = Array.splitAt midpoint scenarios
+            let! beforeRestart = run (ResizeArray<string>()) beforeScenarios
+            let! afterRestart = run (ResizeArray<string>()) afterScenarios
+
+            return
+                box
+                    {| beforeRestart = beforeRestart
+                       afterRestart = afterRestart |}
         }
 
     let interpretFailurePolicy
@@ -319,13 +324,13 @@ module RecoveryRuntimeSurface =
                   PersistenceCommitment = persistence
                   FailureDecisionEvidence = policy }
 
-            let effects = HashSet<string>()
+            let effects = ResizeArray<string>()
             let! decision = ChatExecutionRecoveryRuntime.recover (effectPorts effects) evidence
 
             return
                 box
                     {| decision = decisionName decision
-                       effects = effects |> Seq.sort |> Seq.toArray |}
+                       effects = effects.ToArray() |}
         }
 
     let admissionCrashPointScenarios
@@ -344,27 +349,6 @@ module RecoveryRuntimeSurface =
 
             let outcomes = ResizeArray<obj>()
 
-            let beforeRestart cut =
-                match cut with
-                | "A"
-                | "B" -> 0, 0, false
-                | "C" -> 1, 0, false
-                | "D" -> 1, 1, false
-                | "E"
-                | "F"
-                | "G" -> 1, 1, true
-                | "H"
-                | "I" -> 0, 0, true
-                | value -> invalidArg "cut" $"unknown admission crash cut '{value}'"
-
-            let snapshot cut restarted =
-                let capacity, binding, hostProjected = beforeRestart cut
-
-                box
-                    {| activeCapacity = if restarted then 0 else capacity
-                       providerBinding = if restarted then 0 else binding
-                       hostProjected = if restarted then false else hostProjected |}
-
             for cut in cuts do
                 if cut = "A" then
                     outcomes.Add(
@@ -374,9 +358,7 @@ module RecoveryRuntimeSurface =
                                decisions = [| "NoDurableExecution"; "NoDurableExecution" |]
                                effects = [||]
                                commitment = commitment
-                               capacityOutcome = capacityOutcome
-                               beforeRestart = snapshot cut false
-                               afterRestart = snapshot cut (restartKind = "ProcessRestart") |}
+                               capacityOutcome = capacityOutcome |}
                     )
                 else
                     let scenario =
@@ -407,7 +389,7 @@ module RecoveryRuntimeSurface =
                             PersistenceCommitment = persistence
                             ResourceObservation = resource }
 
-                    let effects = HashSet<string>()
+                    let effects = ResizeArray<string>()
                     let ports = effectPorts effects
                     let decisions = ResizeArray<string>()
 
@@ -420,11 +402,9 @@ module RecoveryRuntimeSurface =
                             {| cut = cut
                                restart = restartKind
                                decisions = decisions.ToArray()
-                               effects = effects |> Seq.sort |> Seq.toArray
+                               effects = effects.ToArray()
                                commitment = commitment
-                               capacityOutcome = capacityOutcome
-                               beforeRestart = snapshot cut false
-                               afterRestart = snapshot cut (restartKind = "ProcessRestart") |}
+                               capacityOutcome = capacityOutcome |}
                     )
 
             return box {| scenarios = outcomes.ToArray() |}

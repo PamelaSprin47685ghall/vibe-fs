@@ -52,6 +52,8 @@ logical cancel 与 session delete 必须枚举 durable projection 中该作用�
 
 排列、重复事件与 crash cut proof 必须调用已注册 production Surface。测试内重建 decision、terminal、release 或 dispatch 公式并 mutation 该副本，不构成本命题的 executable proof。
 
+Recovery Surface 的 port observation 必须逐次追加每个真实 invocation，不得在 observer 内去重。process restart 两侧必须创建独立 observer；跨重启幂等只能由 durable owner 实现，测试观察器不得代替 owner 吞掉重复请求。
+
 ## CHATEXEC-013: Execution reliability query 只投影 canonical lifecycle
 
 `Accepted without Terminal`、`ProviderStarted without Terminal` 与每个 `LogicalRunId` 的 physical attempt 数只能从 canonical `ChatExecutionProjection` 只读导出。查询返回不可变 process-local snapshot，不写 durable fact，不 terminalize execution，不授权 retry/fallback，不读取 diagnostic counter 作为恢复 evidence。Recovery pending/manual intervention 只投影 `PluginRecoveryScope.PendingChatRecoveryOwnership()` 的 typed ownership，不复制或清理其状态。

@@ -86,6 +86,17 @@ test('WHAT[CHATEXEC-002] schema v1 Accepted ProviderStarted and Terminal round-t
   ])
 })
 
+test('WHAT[CHATEXEC-009] durable execution fact round-trip excludes process-local artifacts', () => {
+  const history = [canonicalize(fixture), canonicalize(started), canonicalize(terminal)]
+
+  for (const line of history) {
+    assert.doesNotMatch(
+      line,
+      /"[^"]*(?:lease|handle|binding|waiter|callback|queue|cancellationToken|subscription)[^"]*"\s*:/i,
+    )
+  }
+})
+
 test('WHAT[CHATEXEC-002] unknown schema version fails closed during production fold', () => {
   const unknown = JSON.parse(fixture)
   acceptedPayload(unknown).SchemaVersion = 2

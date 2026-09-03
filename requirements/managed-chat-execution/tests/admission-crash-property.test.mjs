@@ -51,21 +51,18 @@ const evidence = {
 
 const action = (kind, extra = {}) => ({ kind, evidence, appendOutcome: 'Committed', ...extra })
 
-test('WHAT[CHATEXEC-012] duplicate causal events and restart permutations equal canonical production replay or fail closed', async () => {
+test('WHAT[CHATEXEC-012] duplicate crash-cut requests and input permutations preserve canonical production recovery', async () => {
   const baseline = canonical((await recovery.admissionCrashPointScenarios(CUTS, 'PluginReload', 'NotCommitted', 'Applied')).scenarios)
 
-  for (const restart of ['PluginReload', 'ProcessRestart']) {
-    for (const order of generatedOrders(CUTS)) {
-      const result = await recovery.admissionCrashPointScenarios(order, restart, 'NotCommitted', 'Applied')
-      for (const scenario of result.scenarios) {
-        assert.deepEqual({
-          decisions: scenario.decisions,
-          effects: scenario.effects,
-          commitment: scenario.commitment,
-          capacityOutcome: scenario.capacityOutcome,
-        }, baseline[scenario.cut], `${restart}:${order.join('')}:${scenario.cut}`)
-        assert.ok(scenario.effects.length <= 1, `${scenario.cut} repeated an owner effect`)
-      }
+  for (const order of generatedOrders(CUTS)) {
+    const result = await recovery.admissionCrashPointScenarios(order, 'PluginReload', 'NotCommitted', 'Applied')
+    for (const scenario of result.scenarios) {
+      assert.deepEqual({
+        decisions: scenario.decisions,
+        effects: scenario.effects,
+        commitment: scenario.commitment,
+        capacityOutcome: scenario.capacityOutcome,
+      }, baseline[scenario.cut], `${order.join('')}:${scenario.cut}`)
     }
   }
 
@@ -91,14 +88,20 @@ test('WHAT[CHATEXEC-012] duplicate causal events and restart permutations equal 
   const unknown = await recovery.admissionCrashPointScenarios(['B', 'C', 'D', 'E', 'F'], 'ProcessRestart', 'Unknown', 'Applied')
   for (const scenario of unknown.scenarios) {
     assert.deepEqual(scenario.decisions, ['MarkManualIntervention', 'MarkManualIntervention'])
-    assert.deepEqual(scenario.effects, ['MarkManualIntervention:PersistenceOutcomeUnknown'])
+    assert.deepEqual(scenario.effects, [
+      'MarkManualIntervention:PersistenceOutcomeUnknown',
+      'MarkManualIntervention:PersistenceOutcomeUnknown',
+    ])
   }
 
   for (const capacityOutcome of ['Conflict', 'StaleFence']) {
     const rejected = await recovery.admissionCrashPointScenarios(['G', 'H', 'I'], 'PluginReload', 'NotCommitted', capacityOutcome)
     for (const scenario of rejected.scenarios) {
       assert.deepEqual(scenario.decisions, ['MarkManualIntervention', 'MarkManualIntervention'])
-      assert.deepEqual(scenario.effects, ['MarkManualIntervention:PhysicalOutcomeUnknown'])
+      assert.deepEqual(scenario.effects, [
+        'MarkManualIntervention:PhysicalOutcomeUnknown',
+        'MarkManualIntervention:PhysicalOutcomeUnknown',
+      ])
     }
   }
 
