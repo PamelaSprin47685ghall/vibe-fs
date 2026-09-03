@@ -1526,7 +1526,7 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 #### 后续执行账本
 
 1. `R0 M6.3a repair`（DONE）：关闭canonical fact、J→C、generated relation、world/traversal/input closure与Host raw membrane反例；定向proof、fast gate、clean build、受影响测试与真实Host Long Stroke全绿后建立Git节点。
-2. `B1 M6.3b extractor`（IN PROGRESS）：B1-A已实现report-only fresh F#/FCS/JS/generated extractor、唯一canonical world/summary/full report与178-record closed worksheet；待B1-B以B1-A exact commit完成fixed impact corpus三次clean baseline。production gate仍未接入。
+2. `B1 M6.3b extractor`（IN PROGRESS）：B1-A=`5830fa473`已实现report-only fresh F#/FCS/JS/generated extractor、唯一canonical world/summary/full report与178-record closed worksheet；B1-A2固化baseline定义与clean exact-commit writer；待B1-B以B1-A2 exact commit完成fixed impact corpus三次clean baseline。production gate仍未接入。
 3. `B2 EventStore slice`（PENDING）：抽`eventstore-canonical-codec` bounded contract，迁fresh direct consumers；旧gate下provider/direct/reverse-impact编译全绿。
 4. `B3 Host slices`（PENDING）：抽HostMessage/HostEventEnvelope/LoopEvent contracts，完成typed subscription、diagnostic injection与fatal port/adapter分离。
 5. `B4 foundational capabilities`（PENDING）：依序拆Temporal、CausalWait、Process/PTY纯词汇与窄capability，先立contract再迁consumer，最后删旧路径。
@@ -1554,3 +1554,4 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - fresh production run成功生成178条全`undecided`worksheet：178 localities、711 production sources、1,853 ProjectReferences、4,402 actual source edges、868,429 capability facts、459 JavaScript traversals、1 generated artifact。FCS 83.761s、dependency 0.459s、artifact 2.835s、extractor 58.713s、canonical world 115.524s。唯一missing closure仍是EventStore既定atomic blocker。
 - 本轮没有伪称classifier已闭合。fresh census真实暴露857,589条Unknown与`SharedState.RootWorkspace` mutable public export；旧fixture使用scanner不会产生的`constant`别名也已改为真实`const`并绑定integration scan。这些是B3/B7的明确输入；M6.4前必须归零。
 - B1-A验证：production report exit 0并生成178条closed worksheet；定向canonical/capability/extractor/report/FCS tests绿色；`node scripts/check.mjs`作为本节点Git前置验证。B1-B必须在本节点exact commit的clean checkout执行固定corpus structural + fresh FCS + full release三次raw/median测量，完成前禁止任何production split。
+- B1-A Git节点为`5830fa473`。后续复核发现原runner只固定ID，可替换PLAN指定path/config/command；也允许dirty tree被标记为HEAD，且需人工拼baseline。B1-A2因此固定全部定义，只允许successor path迁移；baseline要求clean exact commit、null-only写入、测量前后Git复验、完整schema复验与atomic rename。candidate拒绝null baseline与dirty/changed checkout。永久proof覆盖definition/command drift、dirty、HEAD mismatch与overwrite。

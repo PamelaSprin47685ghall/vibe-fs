@@ -2,7 +2,7 @@
 
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir, platform, arch, cpus, release } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -34,6 +34,79 @@ export const OWNER_IMPACT_TIMING_IDS = Object.freeze([
   'full-release-build',
 ])
 
+export const OWNER_IMPACT_STABLE_CASES = Object.freeze([
+  {
+    id: 'canonical-codec-implementation',
+    baseline_changed_path: 'src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs',
+    change_kind: 'target-contract-implementation',
+    coverage: 'low-closure',
+  },
+  {
+    id: 'canonical-codec-signature',
+    baseline_changed_path: 'src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fsi',
+    change_kind: 'public-sibling-signature',
+    coverage: 'high-or-full-fallback',
+  },
+  {
+    id: 'delegation-pty-adapter',
+    baseline_changed_path: 'src/Wanxiangshu/Execution/Delegation/Fork/Host/Pty.fs',
+    change_kind: 'adapter-implementation',
+    coverage: 'high-closure',
+  },
+  {
+    id: 'fatal-process-implementation',
+    baseline_changed_path: 'src/Wanxiangshu/Foundation/FatalProcess.fs',
+    change_kind: 'effect-implementation',
+    coverage: 'low-closure',
+  },
+  {
+    id: 'host-signal-adapter',
+    baseline_changed_path: 'src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs',
+    change_kind: 'adapter-implementation',
+    coverage: 'medium-or-high-closure',
+  },
+  {
+    id: 'host-signal-bootstrap',
+    baseline_changed_path: 'src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs',
+    change_kind: 'composition-implementation',
+    coverage: 'high-or-full-fallback',
+  },
+  {
+    id: 'loop-detector-runtime',
+    baseline_changed_path: 'src/Wanxiangshu/Execution/Session/LoopDetector.fs',
+    change_kind: 'runtime-implementation',
+    coverage: 'medium-closure',
+  },
+])
+
+export const OWNER_IMPACT_CONTROL_CASES = Object.freeze([
+  {
+    id: 'fsproj-control',
+    baseline_changed_path: 'src/Wanxiangshu/Wanxiangshu.Owner.host-boundary.host-fatal-effect.fsproj',
+    change_kind: 'project-control',
+    coverage: 'full-fallback-control',
+  },
+  {
+    id: 'toolchain-control',
+    baseline_changed_path: 'package.json',
+    change_kind: 'toolchain-control',
+    coverage: 'full-fallback-control',
+  },
+])
+
+export const OWNER_IMPACT_TIMING_COMMANDS = Object.freeze([
+  { id: 'fresh-production-scan', command: Object.freeze(['node', 'scripts/checks/locality-dependencies.mjs', '--report-only']) },
+  { id: 'full-release-build', command: Object.freeze(['npm', 'run', 'format-build-test']) },
+])
+
+const OWNER_IMPACT_CONFIG = Object.freeze({
+  aggregate_path: 'src/Wanxiangshu/Wanxiangshu.fsproj',
+  project_directory: 'src/Wanxiangshu',
+  full_threshold: 0.6,
+  lockfile_path: 'package-lock.json',
+  tool_manifest_path: '.config/dotnet-tools.json',
+})
+
 const exactKeys = (value, keys) => {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
   const actual = Object.keys(value).sort(compareCanonicalTextV1)
@@ -62,6 +135,17 @@ const timingCommandValid = (row) => exactKeys(row, ['id', 'command'])
   && Array.isArray(row.command)
   && row.command.length > 0
   && row.command.every(text)
+
+const exactDefinition = (row, expected) => row.id === expected.id
+  && row.baseline_changed_path === expected.baseline_changed_path
+  && row.change_kind === expected.change_kind
+  && row.coverage === expected.coverage
+
+const exactDefinitions = (rows, expected) => rows.length === expected.length
+  && expected.every((definition) => {
+    const row = rows.find(({ id }) => id === definition.id)
+    return row !== undefined && exactDefinition(row, definition)
+  })
 
 const planRowValid = (row) => exactKeys(row, [
   'id',
@@ -147,11 +231,15 @@ export const validateOwnerImpactCorpusV1 = (corpus) => {
     || !Array.isArray(corpus.stable_cases)
     || !corpus.stable_cases.every(caseValid)
     || !sameIds(sortedUniqueIds(corpus.stable_cases), OWNER_IMPACT_STABLE_CASE_IDS)
+    || !exactDefinitions(corpus.stable_cases, OWNER_IMPACT_STABLE_CASES)
     || !Array.isArray(corpus.control_cases)
     || !corpus.control_cases.every(caseValid)
     || !sameIds(sortedUniqueIds(corpus.control_cases), OWNER_IMPACT_CONTROL_CASE_IDS)
+    || !exactDefinitions(corpus.control_cases, OWNER_IMPACT_CONTROL_CASES)
     || !Array.isArray(corpus.timing_commands)
-    || !corpus.timing_commands.every(timingCommandValid)) {
+    || !corpus.timing_commands.every(timingCommandValid)
+    || encodeCanonicalJsonV1(corpus.timing_commands) !== encodeCanonicalJsonV1(OWNER_IMPACT_TIMING_COMMANDS)
+    || Object.entries(OWNER_IMPACT_CONFIG).some(([key, value]) => corpus[key] !== value)) {
     throw new TypeError('owner impact corpus does not match its closed report-only schema')
   }
   const timingIds = sortedUniqueIds(corpus.timing_commands)
@@ -315,28 +403,80 @@ export const buildOwnerImpactReportV1 = ({ corpus: corpusInput, candidate_commit
 const parseArguments = (arguments_) => {
   let corpusPath = DEFAULT_CORPUS
   let measureTiming = false
+  let writeBaseline = false
   for (let index = 0; index < arguments_.length; index += 1) {
     if (arguments_[index] === '--measure-timing') measureTiming = true
+    else if (arguments_[index] === '--write-baseline') writeBaseline = true
     else if (arguments_[index] === '--corpus' && arguments_[index + 1]) corpusPath = resolve(arguments_[++index])
     else throw new Error(`unknown or incomplete option: ${arguments_[index]}`)
   }
-  return { corpusPath, measureTiming }
+  if (writeBaseline && measureTiming) throw new Error('--write-baseline always performs timing; do not combine it with --measure-timing')
+  return { corpusPath, measureTiming, writeBaseline }
 }
 
-const currentCommit = () => {
-  const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' })
-  if (result.status !== 0) throw new Error(result.stderr || 'cannot resolve current Git commit')
-  return result.stdout.trim()
+const gitState = (root = ROOT) => {
+  const commit = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' })
+  const status = spawnSync('git', ['status', '--porcelain=v1', '--untracked-files=all'], { cwd: root, encoding: 'utf8' })
+  if (commit.status !== 0 || status.status !== 0) throw new Error(commit.stderr || status.stderr || 'cannot inspect Git state')
+  return { commit: commit.stdout.trim(), clean: status.stdout.length === 0 }
+}
+
+export const writeOwnerImpactBaselineV1 = (corpusPath, {
+  root = ROOT,
+  inspectGit = gitState,
+  measureStructure = measureOwnerImpactStructureV1,
+  measureTiming = measureOwnerImpactTimingV1,
+  writeText = writeFileSync,
+  rename = renameSync,
+  unlink = unlinkSync,
+} = {}) => {
+  const corpus = validateOwnerImpactCorpusV1(JSON.parse(readFileSync(corpusPath, 'utf8')))
+  const before = inspectGit(root)
+  if (!before.clean) throw new Error('baseline measurement requires a clean Git checkout')
+  if (before.commit !== corpus.baseline_commit) throw new Error('baseline checkout does not match baseline_commit')
+  if (corpus.baseline_measurement !== null) throw new Error('refusing to overwrite an existing baseline measurement')
+  const structural = measureStructure(corpus, { root })
+  const measuredTiming = measureTiming(corpus, { root })
+  const after = inspectGit(root)
+  if (!after.clean || after.commit !== before.commit) throw new Error('baseline checkout changed during measurement')
+  const completed = validateOwnerImpactCorpusV1({
+    ...corpus,
+    baseline_measurement: {
+      commit: before.commit,
+      environment: measuredTiming.environment,
+      structural,
+      timing: measuredTiming.timing,
+    },
+  })
+  const temporaryPath = `${corpusPath}.tmp-${process.pid}`
+  try {
+    writeText(temporaryPath, `${JSON.stringify(completed, null, 2)}\n`, 'utf8')
+    validateOwnerImpactCorpusV1(JSON.parse(readFileSync(temporaryPath, 'utf8')))
+    rename(temporaryPath, corpusPath)
+  } catch (error) {
+    try { unlink(temporaryPath) } catch {}
+    throw error
+  }
+  return completed
 }
 
 const main = () => {
-  const { corpusPath, measureTiming } = parseArguments(process.argv.slice(2))
+  const { corpusPath, measureTiming, writeBaseline } = parseArguments(process.argv.slice(2))
+  if (writeBaseline) {
+    writeOwnerImpactBaselineV1(corpusPath)
+    return
+  }
   const corpus = validateOwnerImpactCorpusV1(JSON.parse(readFileSync(corpusPath, 'utf8')))
+  if (corpus.baseline_measurement === null) throw new Error('candidate report requires a completed baseline measurement')
+  const before = gitState()
+  if (!before.clean) throw new Error('candidate measurement requires a clean Git checkout')
   const structural = measureOwnerImpactStructureV1(corpus)
   const timing = measureTiming ? measureOwnerImpactTimingV1(corpus) : null
+  const after = gitState()
+  if (!after.clean || after.commit !== before.commit) throw new Error('candidate checkout changed during measurement')
   process.stdout.write(`${JSON.stringify(buildOwnerImpactReportV1({
     corpus,
-    candidate_commit: currentCommit(),
+    candidate_commit: before.commit,
     structural,
     timing,
   }), null, 2)}\n`)

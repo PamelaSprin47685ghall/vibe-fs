@@ -89,6 +89,8 @@ cutover state validator不接收已求值closure。调用方只交exact `closure
 
 canonical JSON仍只有一套byte protocol；digest改用同一recursive encoder直接增量写入SHA-256，避免先物化超大字符串。文本比较器按Unicode scalar逐项读取，不分配code-point数组。derived disposition与caller-supplied fact最终都经过同一classifier、identity、collision、partition与coverage校验；production summary只把海量Unknown violation坐标压成带exact count的单行finding，canonical facts与`unknown_count`不丢失，显式full模式保留逐坐标诊断。
 
+`scripts/owner-impact-report.mjs`把PLAN规定的7个stable case、2个full-fallback control、aggregate/project directory、threshold、lockfile、tool manifest与两条timing command固化为closed schema；只有同ID的`successor_path`可随迁移更新。baseline writer要求clean checkout且`HEAD == baseline_commit`，拒绝已有measurement，自动执行structural measurement与一轮warmup+三轮recorded timing，测量前后复核同一clean commit，并以同目录temporary file经完整schema复验后原子rename。普通candidate report拒绝空baseline与dirty/changed checkout；性能finding不取得correctness authority。
+
 source graph 与 requirement graph 分别输出、分别验证，只共享 owner identity，不要求边集合相等。semantic-evidence 是唯一额外连接：它不关闭 WHAT，只消费 requirement graph 已建立的唯一 active、无 rejection exact edge来授权架构例外。compiler-resolved evidence 只证明 actual source edge 位于声明 closure；`.fsi` 证明 slice 完整公开面；行为 oracle 证明对应 WHAT，三者不得互相冒充。
 
 M6 前完成的 locality 拆分是可复用的结构准备，不构成旧 ACL 的延续。`GitGateway` 已从混合 `git-integrationgate` 剥离到单文件 `git-gateway` locality，删除未使用的 `SyncActiveEnv`，由 `.fsi` 仅公开 `GitGatewayRunner`、`converge`、`createDefaultRunner`；其 direct consumer 集将在 M6 slice manifest 中按 locality 表达。
