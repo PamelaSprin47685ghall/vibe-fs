@@ -316,6 +316,61 @@ test('WHAT[STRUCTURED-WORKFLOW-011] review witness has a source-pure compiler bo
   assert.doesNotMatch(signature, /\bval (?:isQualifiedConfirmationFor|witnesses):/)
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-011] review fact routing has exact per-consumer authorization', () => {
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
+  const factPath = 'src/Wanxiangshu/Mission/Review/Fact.fs'
+  const contracts = manifest.contracts.filter((entry) => entry.path === factPath)
+  const allFactSymbols = [
+    'Wanxiangshu.Mission.Review.ReviewFact.ConfirmedReviewWitness',
+    'Wanxiangshu.Mission.Review.ReviewFact.ReviewAttemptClosed',
+    'Wanxiangshu.Mission.Review.ReviewFact.ReviewBarrierStarted',
+    'Wanxiangshu.Mission.Review.ReviewFact.ReviewVerdictRecorded',
+  ]
+  assert.deepEqual(
+    contracts.map(({ consumers, symbols }) => ({ consumers, symbols })),
+    [
+      { consumers: ['durable-events'], symbols: allFactSymbols },
+      {
+        consumers: ['review-assurance'],
+        symbols: ['Wanxiangshu.Mission.Review.ReviewFact.ReviewBarrierStarted'],
+      },
+    ],
+  )
+
+  const factProject = 'Wanxiangshu.Owner.review-judgement.mission-review-fact.fsproj'
+  const projectSource = (projectName) => readFileSync(join(SRC, projectName), 'utf8')
+  const provider = projectSource(factProject)
+  assert.match(provider, /<WanxiangshuOwnerLocalityKind>composition<\/WanxiangshuOwnerLocalityKind>/)
+  assert.deepEqual(
+    [...provider.matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(([, path]) => path),
+    ['Mission/Review/Fact.fsi', 'Mission/Review/Fact.fs'],
+  )
+  assert.deepEqual(
+    [...provider.matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(([, path]) => path),
+    [
+      'Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj',
+      'Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj',
+      'Wanxiangshu.Owner.review-judgement.mission-review-facts.fsproj',
+    ],
+  )
+
+  const referencers = readdirSync(SRC)
+    .filter((name) => /^Wanxiangshu\.Owner\..+\.fsproj$/.test(name) && name !== factProject)
+    .filter((name) => projectSource(name).includes(`ProjectReference Include="${factProject}"`))
+    .sort()
+  assert.deepEqual(referencers, [
+    'Wanxiangshu.Owner.durable-events.runtime.fsproj',
+    'Wanxiangshu.Owner.review-assurance.mission-review-barrier-workflow.fsproj',
+    'Wanxiangshu.Owner.review-judgement.mission-review-reviewfactfold.fsproj',
+  ])
+
+  const locality = manifest.compiler_boundary_localities.find(
+    (entry) => entry.owner === 'review-judgement' && entry.locality === 'mission-review-fact',
+  )
+  assert.match(locality?.justification ?? '', /ReviewFactCases to AgentFact routing/)
+  assert.doesNotMatch(locality?.justification ?? '', /Prompt|Witness|Challenge|RequestIdentity/)
+})
+
 test('WHAT[STRUCTURED-WORKFLOW-011] NodeFs physical port and tool contracts have isolated compiler boundaries', () => {
   const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
   const contractAt = (path) => manifest.contracts.find((entry) => entry.path === path)

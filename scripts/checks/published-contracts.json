@@ -4746,8 +4746,7 @@
       "contract": "Review.Judgement.Workflow",
       "kind": "published-contract",
       "consumers": [
-        "durable-events",
-        "review-assurance"
+        "durable-events"
       ],
       "symbols": [
         "Wanxiangshu.Mission.Review.ReviewFact.ConfirmedReviewWitness",
@@ -4755,7 +4754,21 @@
         "Wanxiangshu.Mission.Review.ReviewFact.ReviewBarrierStarted",
         "Wanxiangshu.Mission.Review.ReviewFact.ReviewVerdictRecorded"
       ],
-      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+      "justification": "Durable event codecs consume all four Review fact constructors; unrelated owners receive no constructor through this exact contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Fact.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.Judgement.Workflow",
+      "kind": "published-contract",
+      "consumers": [
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.ReviewFact.ReviewBarrierStarted"
+      ],
+      "justification": "Review assurance may start a barrier through the exact ReviewBarrierStarted constructor; verdict, attempt-close and confirmed-witness routing remain unauthorized."
     },
     {
       "path": "src/Wanxiangshu/Mission/Review/Facts.fs",

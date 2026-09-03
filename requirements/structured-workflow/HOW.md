@@ -77,6 +77,8 @@ Review judgement request identity 与 challenge renderer 已继续从 `mission-r
 
 Review Witness 已收敛到 `mission-review-judgement-witness`：唯一依赖是 foundation identity，durable-events、finality 与 review-assurance 分别显式取得同一 witnessed confirmation contract；owner 内 ReviewFactFold 也显式声明真实依赖。Finality 与 Barrier Projection 不再引用旧 Fact locality，durable runtime、Barrier Workflow 与 ReviewFactFold 因真实构造 durable Review fact而保留 Fact edge。Witness `.fsi` 同时删除 manifest 未授权的 `isQualifiedConfirmationFor` 与 `witnesses`：前者只留实现文件内参与 `create`，后者无调用并删除实现。七个 provider/consumer focused closure 全绿，未暴露新的 incidental dependency；GAP census 留给最终 Fact 批统一裁决。
 
+最终 `mission-review-fact` 保持 composition：它只编译 Fact sibling pair，并以 identity、ReviewFactCases、Composition AgentFact 三条显式边完成内层 Review fact 到 durable outer union 的路由；改成 contract 会让 contract closure 反向包含 composition。全仓 direct referencer 恰为 durable runtime、Barrier Workflow 与 owner 内 ReviewFactFold。manifest 按实际使用拆成两条授权：durable-events 取得四个 constructor，review-assurance 只取得 `ReviewBarrierStarted`。固定 counterexample 以旧笛卡尔授权为 RED，同时锁定 source-pure compile set、三条 dependency、三个 referencer 与 composition kind。四个 focused closure 全绿。Review 五类 source-locality cut 至此闭合；Fact 单 source 内的 per-symbol consumer 差异继续由 manifest 表达，不伪装成 compiler 能提供 per-consumer signature。
+
 ### 6. Owner/impact flat compile
 
 `scripts/lib/owner-compile.mjs` 同时生成 owner closure 与 changed-source impact plan。实现 `.fs` 使用 owning locality 的 forward closure；公开 `.fsi` 使用 owning locality 的 transitive reverse consumers，再求所有 root 的 forward union。工程、aggregate、lockfile 与 Fable tool manifest 变化直接选择 full；选中 production `.fs` 超过 aggregate 60% 也选择 full。所有模式共用 aggregate-order、zero-ProjectReference materializer 与单一 Fable launcher。
@@ -113,3 +115,5 @@ STRUCTURED-WORKFLOW-011 的 Review Prompt cohort counterexample：`requirements/
 STRUCTURED-WORKFLOW-011 的 Review request/challenge cohort counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] review request identity and challenge have source-pure compiler boundaries`。
 
 STRUCTURED-WORKFLOW-011 的 Review Witness cohort counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] review witness has a source-pure compiler boundary`。
+
+STRUCTURED-WORKFLOW-011 的 Review Fact exact authorization counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] review fact routing has exact per-consumer authorization`。
