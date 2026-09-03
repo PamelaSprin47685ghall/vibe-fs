@@ -10,6 +10,8 @@ import {
   canonicalWorldDigestV1,
   classifyTerminalV1,
   deriveAdjudicationCandidates,
+  projectCanonicalLocalityReportV1,
+  queryAllCanonicalLocalitiesV1,
   queryCanonicalLocalityV1,
   serializeCanonicalWorldV1,
 } from '../../../scripts/lib/locality-slice-world-v1.mjs'
@@ -93,6 +95,7 @@ test('WHAT[STRUCTURED-WORKFLOW-013] canonical world has one closed byte identity
 
   for (const invalid of [undefined, -0, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 1n, new Date(0), [, 1]]) {
     assert.throws(() => encodeCanonicalJsonV1(invalid), { name: 'CanonicalJsonV1Error' })
+    assert.throws(() => canonicalDigestV1('fixture/v1\0', invalid), { name: 'CanonicalJsonV1Error' })
   }
   const keyedArray = [1]
   keyedArray.extra = 2
@@ -102,6 +105,7 @@ test('WHAT[STRUCTURED-WORKFLOW-013] canonical world has one closed byte identity
   Object.defineProperty(accessor, 'value', { enumerable: true, get: () => 1 })
   assert.throws(() => encodeCanonicalJsonV1(accessor), { code: 'canonical-json-invalid-value' })
   assert.throws(() => encodeCanonicalJsonV1('\ud800'), { code: 'canonical-json-unpaired-surrogate' })
+  assert.throws(() => canonicalDigestV1('fixture/v1\0', '\ud800'), { code: 'canonical-json-unpaired-surrogate' })
 
   const world = buildCanonicalWorldV1(minimalWorld())
   assert.equal(classifyTerminalV1(world, 'provider').case, 'contract-shared')
@@ -109,6 +113,28 @@ test('WHAT[STRUCTURED-WORKFLOW-013] canonical world has one closed byte identity
   const candidates = deriveAdjudicationCandidates(world)
   assert.deepEqual(candidates.map(({ locality_id: localityId }) => localityId), ['consumer', 'provider'])
   assert.ok(candidates.find(({ locality_id: localityId }) => localityId === 'provider').reasons.includes('RelationEndpoint:slice:provider:provider-slice'))
+  const batchQueries = queryAllCanonicalLocalitiesV1(world)
+  assert.deepEqual(batchQueries.map(({ locality_id: localityId }) => localityId), ['consumer', 'provider'])
+  assert.deepEqual(
+    batchQueries,
+    candidates.map((candidate) => ({
+      ...candidate,
+      queries: queryCanonicalLocalityV1(world, candidate.locality_id),
+    })),
+  )
+  const reportProjection = projectCanonicalLocalityReportV1(world)
+  assert.deepEqual(reportProjection.localities, batchQueries)
+  assert.equal(reportProjection.canonical_world_digest, canonicalWorldDigestV1(world))
+  assert.deepEqual(reportProjection.census, {
+    locality_count: 2,
+    production_source_count: 2,
+    project_reference_count: 1,
+    actual_source_edge_count: 1,
+    generated_artifact_count: 0,
+    javascript_traversal_count: 0,
+    capability_fact_count: 0,
+    unknown_capability_count: 0,
+  })
   const providerQuery = queryCanonicalLocalityV1(world, 'provider')
   assert.deepEqual(Object.keys(providerQuery.capability).sort(), [
     'declared_kind_mismatch',

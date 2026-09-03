@@ -24,7 +24,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] compiler-resolved locality edges must stay i
 
   const result = analyzeLocalityDependencies({
     localities: [provider, middle, direct, transitive, missing, external],
-    compilerUses: [
+    declarationUses: [
       use(direct.sources[0], provider.sources[0]),
       use(transitive.sources[0], provider.sources[0], { isFromType: true, symbolKind: 'FSharpEntity' }),
       use(missing.sources[0], provider.sources[0], { isFromPattern: true, symbolKind: 'FSharpUnionCase' }),
@@ -58,6 +58,20 @@ test('WHAT[STRUCTURED-WORKFLOW-011] compiler-resolved locality edges must stay i
   assert.equal(result.census.localities, 6)
   assert.equal(result.census.actualSourceEdges, 4)
   assert.equal(result.census.missingClosureEdges, 1)
+
+  const diagnosticOnlyChanges = analyzeLocalityDependencies({
+    localities: [provider, direct],
+    declarationUses: [
+      use(direct.sources[0], provider.sources[0], { symbol: 'later', line: 12, column: 8 }),
+      use(direct.sources[0], provider.sources[0], { symbol: 'earlier', line: 2, column: 1 }),
+    ],
+  })
+  assert.equal(diagnosticOnlyChanges.edges.length, 1)
+  assert.deepEqual(
+    diagnosticOnlyChanges.edges.map(({ consumerSource, providerSource }) => ({ consumerSource, providerSource })),
+    [{ consumerSource: direct.sources[0], providerSource: provider.sources[0] }],
+    'symbol and source coordinates must not participate in edge identity',
+  )
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] locality analysis is owner-independent and fail-closed', () => {
@@ -66,19 +80,19 @@ test('WHAT[STRUCTURED-WORKFLOW-011] locality analysis is owner-independent and f
 
   const sameOwnerLeak = analyzeLocalityDependencies({
     localities: [provider, consumer],
-    compilerUses: [use(consumer.sources[0], provider.sources[0])],
+    declarationUses: [use(consumer.sources[0], provider.sources[0])],
   })
   assert.equal(sameOwnerLeak.violations[0]?.code, 'missing-closure-edge')
 
   assert.throws(
     () => analyzeLocalityDependencies({ localities: [provider, consumer] }),
-    /compilerUses must be an array/,
+    /declarationUses must be an array/,
   )
   assert.throws(
     () =>
       analyzeLocalityDependencies({
         localities: [provider, locality('duplicate', provider.sources)],
-        compilerUses: [],
+        declarationUses: [],
       }),
     /compiled by multiple localities/,
   )

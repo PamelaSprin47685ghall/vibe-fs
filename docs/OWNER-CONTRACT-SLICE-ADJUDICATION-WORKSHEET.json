@@ -1,0 +1,1608 @@
+{
+  "schema_version": 1,
+  "purpose": "m6.3b-migration-only",
+  "records": [
+    {
+      "locality_id": "assemblyinfo",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "authority-runtime-surface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "casebook-runtime-surface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "change-fact",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "change-facts",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "change-fold",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "composition-durable-fact",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "composition-durable-projection",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "composition-turn-ordinaryturnworkflow",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "composition-turn-reconcilesurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "composition-turn-workflow",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "context-companion-companionfactfold",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "context-companion-fact",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "context-companion-facts",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "context-companion-foldsurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "context-companion-runtimesurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "context-compression-runtime-surface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "context-prefix-candidate",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "context-prefix-wire",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "context-trace-capture",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "context-trace-cursor",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "context-trace-model",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "context-trace-semantictracesurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "delegation-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "delegation-fold",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "delegation-fork-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "delegation-host-adapter",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "delegation-ledger",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "delegation-pty-adapter",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "delegation-recovery-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "delegation-runtime-surface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "delegation-sync-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "delegation-sync-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "dispatch-model-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "dispatch-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "durable-runtime-surface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "enforcer-catalog",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "enforcer-codec",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "enforcer-continuation",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "enforcer-guidance-tip",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "enforcer-institutionallearning-facts",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "enforcer-institutionallearning-fold",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "enforcer-projection",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "eventstore-core-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "eventstore-event-vocabulary-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "eventstore-git-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "eventstore-git-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "eventstore-integrator-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "eventstore-merge-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "eventstore-model-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "eventstore-port-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "eventstore-sync-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-delegation-hostturnobservedsurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-failure-model",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-fission-fact",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-fission-fold",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-fission-opencode-host",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-association",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-chatexecution-fact",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-chatexecution-facts",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-chatexecution-fold",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-loopdetector",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-opencode-horizontool",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-ownership",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-recoveryclosureprojection",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-sessionstartedatledger",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-wait-causalwait",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "foundation-identity",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "foundation-officecapability",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "foundation-roles",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "foundation-taskresult",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "foundation-temporal",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "git-gateway",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "git-hook-sync",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "git-integrationgate",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "host-contract-toolresultbound",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "host-diagnostics-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "host-fact",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "host-fatal-effect",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "host-session-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "host-session-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "host-signal-adapter",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "host-signal-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "interaction-attention-facts",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "interaction-attention-fold",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "interaction-authority-fact",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "interaction-authority-fold",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "interaction-authority-identityseed",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "interaction-authority-ledger",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "interaction-concern-facts",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "interaction-concern-fold",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "interaction-dispatch-opencode-ingresscodec",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "interaction-repair-interactionrepair",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "js-programming-runtime-surface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "managed-chat-runtime-surface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-finality-prompt",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-manager-life-facts",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-manager-life-openingfloor",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-manager-life-projection",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-obligation-todo-magictodosemanticsurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-obligation-todo-model",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-obligation-todo-prefixepoch",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-review-barrier-projection",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-review-barrier-workflow",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-review-fact",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-review-facts",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-review-judgement-challenge",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-review-judgement-requestidentity",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-review-judgement-witness",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-review-opencode-judgetool",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-review-prompt",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-review-reviewfactfold",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-workrecord-materialize-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-workrecord-model-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "mission-workrecord-surface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-codec-providerprojectionsurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-codec-providerwiredecode",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-chatadmission-intent",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-chatadmission-transaction",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-fissionhostsurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-hostsignalbootstrap",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-managedagentconfig",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-messagevisibility",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-modelroutingsurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-opencodeport",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-opencodeport-adapter",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-pairprogramming-guidelineprojection",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-pluginruntimescope",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-providerrunbinding",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-requirementgrounding-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-sessionbindingsurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-sharedstatesurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-stealthbrowsermcp",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-host-turnruntimepreparation",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-tools-distillationsurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-tools-executortoolsurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-tools-filemutationtools",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-tools-inspectortool",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-tools-managedagent",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-tools-nodefs",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-tools-ptytool",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "opencode-tools-statictools",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "participant-provider-attempt-fallback-fact",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "participant-provider-attempt-fallback-facts",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "participant-provider-attempt-fallback-ledger",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "participant-provider-attempt-planner",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "participant-provider-attempt-requestkind",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "participant-provider-language",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "participant-provider-languagesurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "participant-provider-projection-model",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "persistence-eventstore-canonicalintegrator",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "persistence-eventstore-surface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "persistence-journal-promptfactcodec",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "process-largegatesurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "process-processrequest",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "repository-investigation-semble-mcp",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "repository-knowledge-casebook-bookkeeper",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "repository-knowledge-casebook-lifecyclesurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "repository-knowledge-casebook-model",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "repository-programming-js-capability",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "requirement-grounding-model",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "resources-enforcercatalogresource",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "resources-promptresources",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "resources-promptsurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "session-attachment-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "session-attachment-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "sphinx-host-adapter",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "sphinx-mcp",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "sphinx-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "strength-budget",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "strength-event-vocabulary-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "strength-opencode-settings",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "strength-persistence-durabilityport",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "strength-policy",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "strength-prediction-predictor",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "strength-turnevidence",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "tool-runtime-surface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "verification-eventstorewritersurface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    }
+  ]
+}

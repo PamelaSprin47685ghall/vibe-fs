@@ -110,6 +110,11 @@ test('WHAT[STRUCTURED-WORKFLOW-014] capability observations and JavaScript trave
   const extracted = extractObservedCapabilityFactsV1(observations)
   assert.deepEqual(extracted.violations, [])
   assert.equal(extracted.facts.length, 2)
+  assert.deepEqual(
+    validateCapabilityPartitionV1({ observations, facts: extracted.facts }),
+    extracted,
+    'derived and caller-supplied fact paths must produce the same canonical result',
+  )
 
   const dispositionRows = extracted.facts.map(({ observation_id: observationId, disposition }) => ({ observation_id: observationId, disposition }))
   assert.deepEqual(codes(validateCapabilityPartitionV1({ observations, dispositions: dispositionRows.slice(1) })), ['capability-observation-missing'])

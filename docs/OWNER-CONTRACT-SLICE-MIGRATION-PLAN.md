@@ -1526,7 +1526,7 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 #### 后续执行账本
 
 1. `R0 M6.3a repair`（DONE）：关闭canonical fact、J→C、generated relation、world/traversal/input closure与Host raw membrane反例；定向proof、fast gate、clean build、受影响测试与真实Host Long Stroke全绿后建立Git节点。
-2. `B1 M6.3b extractor`（PENDING）：实现report-only fresh F#/FCS/JS/generated extractor、唯一canonical world/report与closed worksheet生成；固定impact corpus三次baseline，禁止production gate阻断release。
+2. `B1 M6.3b extractor`（IN PROGRESS）：B1-A已实现report-only fresh F#/FCS/JS/generated extractor、唯一canonical world/summary/full report与178-record closed worksheet；待B1-B以B1-A exact commit完成fixed impact corpus三次clean baseline。production gate仍未接入。
 3. `B2 EventStore slice`（PENDING）：抽`eventstore-canonical-codec` bounded contract，迁fresh direct consumers；旧gate下provider/direct/reverse-impact编译全绿。
 4. `B3 Host slices`（PENDING）：抽HostMessage/HostEventEnvelope/LoopEvent contracts，完成typed subscription、diagnostic injection与fatal port/adapter分离。
 5. `B4 foundational capabilities`（PENDING）：依序拆Temporal、CausalWait、Process/PTY纯词汇与窄capability，先立contract再迁consumer，最后删旧路径。
@@ -1545,3 +1545,12 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - Host ingress边界按JavaScript真实primitive/plain-own-data shape解码。SessionId保持opaque原字节；同义carrier只允许唯一同值，非法/冲突/accessor/boxed/coercible值fail-closed；parts只接受Array，boolean不接受truthy替代。ToolHost optional number把null/undefined解释为缺省，string/bool/array/boxed number拒绝，修复了G6 finalize被提前返回后永久等待prompt的真实回归。
 - 完整sink首次暴露upstream Long Stroke未声明的合法Manager JoinGuard并发suffix。durable日志证明`manager.1`已先承担唯一400 fault，fresh JoinGuard随后与`manager-resume`并发；因此没有复制fault或放宽matcher。scenario新增exact Manager tool surface的optional suffix，逐项镜像resume.1..10；event-driven `waitAny`原子选择winner并注销全部loser waiter，终局逐步要求original+guarded=1且禁止中途换支。
 - 收口阶梯：structured-workflow 258/258；Host/dispatch/loop/G6定向测试全绿；verification waitAny定向12/12；harness 275/275；`node scripts/check.mjs`全绿（807 WHAT、4,032 tests）；clean Fable build解析1,460 sources、编译1,422 items；真实Host Long Stroke绿色。最终`npm run format-build-test`退出0是建立R0提交的硬前提，完整计数与耗时写入该Git节点正文。
+
+### 2026-09-04 — M6.3b B1-A production extractor与fresh report
+
+- `CompilerObservationsV1`由一次production aggregate FCS check与每个`.fs` implementation check生成，闭合711份implementation、711份sibling signature、declaration/external use、typed F# expression、Fable interop与public export。fixture保留aggregate-green/missing-closure反例，并补`.fsi`、Import/Emit/emitJsExpr及正式scanner taxonomy。
+- production extractor只接受inventory、compiler observations、raw JavaScript unit与generated artifact。Acorn AST、scope provenance、visit partition、canonical fact与traversal均在内部同次生成；caller提交这些mirror字段稳定RED。JavaScript fact按source预索引后交正式traversal validator，消除原先每个traversal扫描全部fact的二次复杂度，不改变source projection。
+- canonical digest不再先构造超大字符串；同一canonical encoder直接stream到SHA-256。Unicode scalar comparator改为零中间数组。默认report输出summary，显式`--full`才展开actual query；两者共享同一world digest/census/candidates。summary只压缩Unknown violation坐标，不删除canonical fact或coverage count。
+- fresh production run成功生成178条全`undecided`worksheet：178 localities、711 production sources、1,853 ProjectReferences、4,402 actual source edges、868,429 capability facts、459 JavaScript traversals、1 generated artifact。FCS 83.761s、dependency 0.459s、artifact 2.835s、extractor 58.713s、canonical world 115.524s。唯一missing closure仍是EventStore既定atomic blocker。
+- 本轮没有伪称classifier已闭合。fresh census真实暴露857,589条Unknown与`SharedState.RootWorkspace` mutable public export；旧fixture使用scanner不会产生的`constant`别名也已改为真实`const`并绑定integration scan。这些是B3/B7的明确输入；M6.4前必须归零。
+- B1-A验证：production report exit 0并生成178条closed worksheet；定向canonical/capability/extractor/report/FCS tests绿色；`node scripts/check.mjs`作为本节点Git前置验证。B1-B必须在本节点exact commit的clean checkout执行固定corpus structural + fresh FCS + full release三次raw/median测量，完成前禁止任何production split。

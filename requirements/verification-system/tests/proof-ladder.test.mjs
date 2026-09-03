@@ -174,6 +174,7 @@ const WIRED_ALLOWLIST = new Set([
   'js-module-linkage.mjs', // post-build linkage gate: invoked by build.mjs after Fable emit, cannot run pre-build
   'legacy-horizon-census.mjs', // census tool：由 OBL-007 历史 detector 退出验证调用
   'locality-dependencies.mjs', // report-only integration analyzer：M6.4 原子切换前不得成为 pre-build release gate
+  'locality-slice-report.mjs', // M6.3b fresh report/worksheet producer：无strict mode，不进入release gate
 ])
 
 /** 解析 check.mjs 的 checks 数组，返回 wired basename 清单（保持声明顺序）。 */

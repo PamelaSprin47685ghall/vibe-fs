@@ -10,9 +10,9 @@ const requireText = (value, label) => {
   return value.trim()
 }
 
-export function analyzeLocalityDependencies({ localities, compilerUses } = {}) {
+export function analyzeLocalityDependencies({ localities, declarationUses } = {}) {
   if (!Array.isArray(localities)) throw new Error('localities must be an array')
-  if (!Array.isArray(compilerUses)) throw new Error('compilerUses must be an array')
+  if (!Array.isArray(declarationUses)) throw new Error('declarationUses must be an array')
 
   const localityById = new Map()
   const localityOfSource = new Map()
@@ -50,7 +50,7 @@ export function analyzeLocalityDependencies({ localities, compilerUses } = {}) {
   }
   for (const id of localityById.keys()) closureOf(id)
 
-  const normalizedUses = compilerUses
+  const normalizedUses = declarationUses
     .map((entry) => ({
       ...entry,
       consumerPath: semanticSource(requireText(entry?.consumerPath, 'compiler use consumerPath')),

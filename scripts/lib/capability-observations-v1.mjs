@@ -39,15 +39,15 @@ const UNKNOWN_CLASSES = new Set([
   'incomplete-generated-linkage',
 ])
 const KNOWN_NODE_TYPES = new Set([
-  'ArrayExpression', 'ArrowFunctionExpression', 'AssignmentExpression', 'AwaitExpression',
+  'ArrayExpression', 'ArrayPattern', 'ArrowFunctionExpression', 'AssignmentExpression', 'AssignmentPattern', 'AwaitExpression',
   'BinaryExpression', 'BlockStatement', 'BreakStatement', 'CallExpression', 'CatchClause',
   'ChainExpression', 'ClassBody', 'ClassDeclaration', 'ClassExpression', 'ConditionalExpression',
   'ContinueStatement', 'DebuggerStatement', 'DoWhileStatement', 'EmptyStatement',
-  'ExportAllDeclaration', 'ExportDefaultDeclaration', 'ExportNamedDeclaration', 'ExpressionStatement',
+  'ExportAllDeclaration', 'ExportDefaultDeclaration', 'ExportNamedDeclaration', 'ExportSpecifier', 'ExpressionStatement',
   'ForInStatement', 'ForOfStatement', 'ForStatement', 'FunctionDeclaration', 'FunctionExpression',
   'Identifier', 'IfStatement', 'ImportDeclaration', 'ImportDefaultSpecifier', 'ImportExpression',
   'ImportNamespaceSpecifier', 'ImportSpecifier', 'LabeledStatement', 'Literal', 'LogicalExpression',
-  'MemberExpression', 'MetaProperty', 'MethodDefinition', 'NewExpression', 'ObjectExpression',
+  'MemberExpression', 'MetaProperty', 'MethodDefinition', 'NewExpression', 'ObjectExpression', 'ObjectPattern',
   'PrivateIdentifier', 'Program', 'Property', 'PropertyDefinition', 'RestElement', 'ReturnStatement',
   'SequenceExpression', 'SpreadElement', 'StaticBlock', 'Super', 'SwitchCase', 'SwitchStatement',
   'TaggedTemplateExpression', 'TemplateElement', 'TemplateLiteral', 'ThisExpression', 'ThrowStatement',
@@ -214,7 +214,7 @@ export const classifyCapabilityObservationV1 = (observation) => {
   if (observation.case === 'fsharp-node') {
     const known = labelsForIdentity(payload.semantic_identity, 'fsharp')
     if (known) return known
-    if (['constant', 'record', 'union-case', 'pure-call', 'binding'].includes(payload.node_kind)) {
+    if (payload.node_kind === 'const') {
       return classified({ runtimes: ['fsharp'], semanticClasses: ['pure-representation'] })
     }
     return unknown('unsupported-ast', payload.node_kind, payload.semantic_identity)
@@ -273,18 +273,27 @@ export const validateCapabilityDispositionV1 = (disposition) => {
 
 const violation = (code, coordinates = {}) => ({ code, ...coordinates })
 
-const sortedViolations = (violations) => violations.sort((left, right) => {
-  const byCode = compareCanonicalTextV1(left.code, right.code)
-  return byCode || compareCanonicalTextV1(encodeCanonicalJsonV1(left), encodeCanonicalJsonV1(right))
-})
+const sortedViolations = (violations) => violations
+  .map((row) => ({ row, encoded: encodeCanonicalJsonV1(row) }))
+  .sort((left, right) => {
+    const byCode = compareCanonicalTextV1(left.row.code, right.row.code)
+    return byCode || compareCanonicalTextV1(left.encoded, right.encoded)
+  })
+  .map(({ row }) => row)
 
-export const validateCapabilityPartitionV1 = (input = {}) => {
+export const validateCapabilityPartitionV1 = (input = {}, {
+  collectUnknownViolations = true,
+  deriveDispositions = false,
+} = {}) => {
   const observations = input?.observations
   const dispositions = input?.dispositions
   const facts = input?.facts
   const diagnostics = input?.extraction_diagnostics ?? []
   const violations = []
   const explicitFacts = facts !== undefined
+  if (deriveDispositions && (dispositions !== undefined || explicitFacts)) {
+    return { facts: [], coverage: null, violations: [violation('capability-extraction-incomplete')] }
+  }
   if (!Array.isArray(observations)
     || !Array.isArray(diagnostics)
     || (dispositions !== undefined && !Array.isArray(dispositions))
@@ -293,11 +302,21 @@ export const validateCapabilityPartitionV1 = (input = {}) => {
   }
   const validObservations = observations.filter(validateRawCapabilityObservationV1)
   if (diagnostics.length > 0 || validObservations.length !== observations.length) violations.push(violation('capability-extraction-incomplete'))
-  const observationRows = validObservations.map((observation) => ({ observation, observation_id: capabilityObservationIdV1(observation) }))
+  const observationRows = validObservations.map((observation) => {
+    const encodedObservation = encodeCanonicalJsonV1(observation)
+    const expectedDisposition = classifyCapabilityObservationV1(observation)
+    return {
+      observation,
+      observation_id: capabilityObservationIdV1(observation),
+      encodedObservation,
+      expectedDisposition,
+      encodedExpectedDisposition: encodeCanonicalJsonV1(expectedDisposition),
+    }
+  })
   const observationsById = new Map()
   for (const row of observationRows) {
     const prior = observationsById.get(row.observation_id)
-    if (prior && encodeCanonicalJsonV1(prior.observation) !== encodeCanonicalJsonV1(row.observation)) {
+    if (prior && prior.encodedObservation !== row.encodedObservation) {
       violations.push(violation('capability-observation-duplicate', { observation_id: row.observation_id }))
     } else observationsById.set(row.observation_id, row)
   }
@@ -305,7 +324,10 @@ export const validateCapabilityPartitionV1 = (input = {}) => {
   let factRows = facts
   if (factRows === undefined) {
     const byObservation = new Map()
-    for (const row of dispositions ?? []) {
+    const dispositionRows = deriveDispositions
+      ? observationRows.map(({ observation_id: observationId, expectedDisposition: disposition }) => ({ observation_id: observationId, disposition }))
+      : dispositions ?? []
+    for (const row of dispositionRows) {
       if (!exactKeys(row, ['observation_id', 'disposition']) || !validateCapabilityDispositionV1(row.disposition)) {
         violations.push(violation('capability-extraction-incomplete'))
         continue
@@ -331,33 +353,53 @@ export const validateCapabilityPartitionV1 = (input = {}) => {
   }
 
   const factIdPayload = new Map()
+  const payloadByFact = new WeakMap()
+  const expectedFactIds = new Map()
   const collidingFactIds = new Set()
   const structurallyValidFacts = []
   for (const fact of factRows ?? []) {
+    const observationRow = observationsById.get(fact?.observation_id)
+    const factObservation = validateRawCapabilityObservationV1(fact?.observation)
+      ? encodeCanonicalJsonV1(fact.observation)
+      : null
+    const encodedDisposition = validateCapabilityDispositionV1(fact?.disposition)
+      ? encodeCanonicalJsonV1(fact.disposition)
+      : null
     if (!exactKeys(fact, ['observation_id', 'fact_id', 'observation', 'disposition'])
-      || !validateRawCapabilityObservationV1(fact.observation)
-      || !validateCapabilityDispositionV1(fact.disposition)
-      || fact.observation_id !== capabilityObservationIdV1(fact.observation)) {
+      || factObservation === null
+      || encodedDisposition === null
+      || !observationRow
+      || observationRow.encodedObservation !== factObservation) {
       violations.push(violation('capability-extraction-incomplete'))
       continue
     }
-    const payload = encodeCanonicalJsonV1(fact)
+    const payload = `${factObservation}\0${encodedDisposition}`
+    payloadByFact.set(fact, payload)
     if (factIdPayload.has(fact.fact_id) && factIdPayload.get(fact.fact_id) !== payload) {
       violations.push(violation('capability-fact-id-collision', { fact_id: fact.fact_id }))
       collidingFactIds.add(fact.fact_id)
     } else factIdPayload.set(fact.fact_id, payload)
+    const expectedFactKey = `${fact.observation_id}\0${encodedDisposition}`
+    if (!expectedFactIds.has(expectedFactKey)) {
+      expectedFactIds.set(expectedFactKey, capabilityFactIdV1(fact.observation_id, fact.disposition))
+    }
     structurallyValidFacts.push(fact)
   }
   for (const fact of structurallyValidFacts) {
-    if (fact.fact_id !== capabilityFactIdV1(fact.observation_id, fact.disposition) && !collidingFactIds.has(fact.fact_id)) {
+    const encodedDisposition = encodeCanonicalJsonV1(fact.disposition)
+    const expectedFactId = expectedFactIds.get(`${fact.observation_id}\0${encodedDisposition}`)
+    if (fact.fact_id !== expectedFactId && !collidingFactIds.has(fact.fact_id)) {
       violations.push(violation('capability-extraction-incomplete'))
     }
-    if (encodeCanonicalJsonV1(fact.disposition) !== encodeCanonicalJsonV1(classifyCapabilityObservationV1(fact.observation))) {
+    if (encodedDisposition !== observationsById.get(fact.observation_id).encodedExpectedDisposition) {
       violations.push(violation('capability-extraction-incomplete', { observation_id: fact.observation_id }))
     }
   }
 
-  const uniqueFacts = [...new Map(structurallyValidFacts.map((fact) => [encodeCanonicalJsonV1(fact), fact])).values()]
+  const uniqueFacts = [...new Map(structurallyValidFacts.map((fact) => [
+    `${fact.fact_id}\0${payloadByFact.get(fact)}`,
+    fact,
+  ])).values()]
     .sort((left, right) => compareCanonicalTextV1(`${left.observation_id}\0${left.fact_id}`, `${right.observation_id}\0${right.fact_id}`))
   const factsByObservation = new Map()
   for (const fact of uniqueFacts) {
@@ -371,11 +413,18 @@ export const validateCapabilityPartitionV1 = (input = {}) => {
       if (matches.length > 1) violations.push(violation('capability-observation-duplicate', { observation_id: observationId }))
     }
   }
+  let unknownCount = 0
   for (const [observationId, rows] of factsByObservation) {
     if (!observationsById.has(observationId)) violations.push(violation('capability-extraction-incomplete'))
     for (const fact of rows) {
-      if (fact.disposition.case === 'unknown') violations.push(violation('unknown-capability-classification', { observation_id: fact.observation_id }))
+      if (fact.disposition.case === 'unknown') {
+        unknownCount += 1
+        if (collectUnknownViolations) violations.push(violation('unknown-capability-classification', { observation_id: fact.observation_id }))
+      }
     }
+  }
+  if (!collectUnknownViolations && unknownCount > 0) {
+    violations.push(violation('unknown-capability-classification', { count: unknownCount }))
   }
   const counts = { irrelevant: 0, classified: 0, unknown: 0 }
   for (const fact of uniqueFacts) if (Object.hasOwn(counts, fact.disposition.case)) counts[fact.disposition.case] += 1
@@ -384,21 +433,25 @@ export const validateCapabilityPartitionV1 = (input = {}) => {
     irrelevant_count: counts.irrelevant,
     classified_count: counts.classified,
     unknown_count: counts.unknown,
-    capability_observation_digest: canonicalDigestV1('capability-observations/v1\0', [...observationsById.values()].map(({ observation }) => observation).sort((left, right) => compareCanonicalTextV1(capabilityObservationIdV1(left), capabilityObservationIdV1(right)))),
+    capability_observation_digest: canonicalDigestV1(
+      'capability-observations/v1\0',
+      [...observationsById.entries()]
+        .sort(([left], [right]) => compareCanonicalTextV1(left, right))
+        .map(([, { observation }]) => observation),
+    ),
     disposition_digest: canonicalDigestV1('capability-dispositions/v1\0', uniqueFacts),
   }
   return { facts: uniqueFacts, coverage, violations: sortedViolations(violations) }
 }
 
-export const extractObservedCapabilityFactsV1 = (observations, extractionDiagnostics = []) => {
+export const extractObservedCapabilityFactsV1 = (observations, extractionDiagnostics = [], options = {}) => {
   if (!Array.isArray(observations) || !Array.isArray(extractionDiagnostics)) {
     return { facts: [], coverage: null, violations: [violation('capability-extraction-incomplete')] }
   }
-  const dispositions = observations.map((observation) => ({
-    observation_id: capabilityObservationIdV1(observation),
-    disposition: classifyCapabilityObservationV1(observation),
-  }))
-  return validateCapabilityPartitionV1({ observations, dispositions, extraction_diagnostics: extractionDiagnostics })
+  return validateCapabilityPartitionV1(
+    { observations, extraction_diagnostics: extractionDiagnostics },
+    { ...options, deriveDispositions: true },
+  )
 }
 
 const childNodes = (node) => Object.keys(node)
@@ -417,12 +470,17 @@ export const enumerateJavaScriptAstNodesV1 = (ast, sourceId, bindingProvenanceFo
   const rows = []
   const visit = (node, path) => {
     const nodeId = `${sourceId}#${path}`
-    const row = { node_id: nodeId, node_type: node.type, node: structuredClone(node) }
+    const scope = typeof bindingProvenanceForNode === 'function'
+      ? bindingProvenanceForNode({ node_id: nodeId, node_type: node.type, node })
+      : 'unresolved'
+    const bindingProvenance = typeof scope === 'string' ? scope : scope?.binding_provenance
+    const programScope = typeof scope === 'object' && scope?.program_scope === true
     rows.push({
-      ...row,
-      binding_provenance: closedBindingProvenance(typeof bindingProvenanceForNode === 'function'
-        ? bindingProvenanceForNode(row)
-        : 'unresolved'),
+      node_id: nodeId,
+      node_type: node.type,
+      node: structuredClone(node),
+      binding_provenance: closedBindingProvenance(bindingProvenance),
+      program_scope: programScope,
     })
     for (const child of childNodes(node)) visit(child.node, `${path}/${child.segment}`)
   }
@@ -461,7 +519,7 @@ const emittedResult = (row, observations) => ({
 const noCapabilityResult = (row) => ({ node_id: row.node_id, result: { case: 'no-capability-observation', payload: {} } })
 
 const dynamicIdentity = { root: '<dynamic>', member_path: [] }
-const identifierOwnedByParent = (nodeId) => /\/(callee|id|key|local|object|param|params\[\d+\]|property)$/.test(nodeId)
+const identifierOwnedByParent = (nodeId) => /\/(callee|exported|id|imported|key|label|local|object|param|params\[\d+\])$/.test(nodeId)
 
 export const visitJavaScriptNodeV1 = (row) => {
   const node = row.node
@@ -480,19 +538,25 @@ export const visitJavaScriptNodeV1 = (row) => {
     const root = typeof node.source?.value === 'string' && node.source.value.length > 0 ? node.source.value : '<dynamic>'
     return emittedResult(row, [observed('dynamic-import', { root, member_path: [] }, root === '<dynamic>' ? 'unresolved' : 'imported')])
   }
+  if ((node.type === 'ExportAllDeclaration' || node.type === 'ExportNamedDeclaration') && node.source !== null) {
+    const root = typeof node.source?.value === 'string' && node.source.value.length > 0 ? node.source.value : '<dynamic>'
+    return emittedResult(row, [observed('static-import', { root, member_path: [] }, root === '<dynamic>' ? 'unresolved' : 'imported')])
+  }
   if (node.type === 'Identifier' && !identifierOwnedByParent(row.node_id) && bindingProvenance !== 'local') {
     return emittedResult(row, [observed(bindingProvenance === 'free' ? 'free-global' : 'member-read', { root: node.name, member_path: [] })])
   }
-  if (node.type === 'VariableDeclaration' && node.kind !== 'const') {
+  if (node.type === 'VariableDeclaration' && node.kind !== 'const' && row.program_scope === true) {
     const observations = (node.declarations ?? []).map((declaration) =>
       observed('mutable-binding', { root: declaration.id?.name ?? '<dynamic>', member_path: [] }, 'local'))
     return observations.length > 0 ? emittedResult(row, observations) : noCapabilityResult(row)
   }
   if (node.type === 'UpdateExpression') {
+    if (bindingProvenance === 'local' && row.program_scope !== true) return noCapabilityResult(row)
     const identity = memberIdentity(node.argument) ?? dynamicIdentity
     return emittedResult(row, [observed('update', identity)])
   }
   if (node.type === 'AssignmentExpression') {
+    if (bindingProvenance === 'local' && row.program_scope !== true) return noCapabilityResult(row)
     return emittedResult(row, [observed('member-write', memberIdentity(node.left) ?? dynamicIdentity)])
   }
   if (node.type === 'MemberExpression') {
@@ -632,7 +696,7 @@ export const validateJavaScriptTraversalV1 = (input = {}) => {
   const factRows = capabilityFacts
   const nodeCounts = new Map()
   for (const row of nodes) {
-    const valid = exactKeys(row, ['node_id', 'node_type', 'node', 'binding_provenance'])
+    const valid = exactKeys(row, ['node_id', 'node_type', 'node', 'binding_provenance', 'program_scope'])
       && nonEmptyText(row.node_id)
       && nonEmptyText(row.node_type)
       && row.node !== null
@@ -640,6 +704,7 @@ export const validateJavaScriptTraversalV1 = (input = {}) => {
       && !Array.isArray(row.node)
       && row.node.type === row.node_type
       && JAVASCRIPT_BINDING_PROVENANCES.has(row.binding_provenance)
+      && typeof row.program_scope === 'boolean'
       && row.node_id.startsWith(`${sourceId}#`)
     if (!valid) incomplete = true
     if (nonEmptyText(row?.node_id)) nodeCounts.set(row.node_id, (nodeCounts.get(row.node_id) ?? 0) + 1)

@@ -1,11 +1,13 @@
 open System
+open System.Collections
+open System.Collections.Generic
 open System.Diagnostics
 open System.IO
 open System.Reflection
 open System.Runtime.Loader
 open System.Text.Json
 
-type SymbolUseRecord =
+type DeclarationUseRecord =
     { ConsumerPath: string
       ProviderPaths: string array
       Symbol: string
@@ -20,10 +22,47 @@ type SymbolUseRecord =
       IsFromType: bool
       IsFromUse: bool }
 
+type ObservationSite =
+    { SourcePath: string
+      SemanticDeclarationAnchor: string
+      SameAnchorOccurrenceOrdinal: int }
+
+type ExternalSymbolUseRecord =
+    { Assembly: string
+      FullyQualifiedSymbol: string
+      SymbolKind: string
+      Site: ObservationSite }
+
+type FSharpNodeRecord =
+    { NodeKind: string
+      SemanticIdentity: string
+      Site: ObservationSite }
+
+type SignatureExportRecord =
+    { ExportKind: string
+      DeclarationIdentity: string
+      Site: ObservationSite }
+
+type ExtractionDiagnosticRecord =
+    { Code: string
+      SourcePath: string
+      SemanticDeclarationAnchor: string
+      SyntaxKind: string
+      Line: int
+      Column: int
+      RawIdentity: string }
+
 type ScanResult =
-    { ProjectFile: string
+    { SchemaVersion: int
+      ProjectFile: string
       ProductionFiles: string array
-      SymbolUses: SymbolUseRecord array
+      SignatureFiles: string array
+      DeclarationUses: DeclarationUseRecord array
+      ExternalSymbolUses: ExternalSymbolUseRecord array
+      FsharpNodes: FSharpNodeRecord array
+      FableInterop: obj array
+      SignatureExports: SignatureExportRecord array
+      Diagnostics: ExtractionDiagnosticRecord array
       ElapsedMilliseconds: int64 }
 
 let arguments = fsi.CommandLineArgs |> Array.skip 1
@@ -221,6 +260,23 @@ let projectOptions =
         |> Option.defaultWith (fun () -> failwith $"cannot clone FSharpProjectOptions constructor field: {parameter.Name}"))
     |> constructor.Invoke
 let sourceFiles = propertyValue projectOptions "SourceFiles" :?> string array
+let implementationProjectOptions =
+    let projectOptionsType = projectOptions.GetType()
+    let constructor =
+        projectOptionsType.GetConstructors flags
+        |> Array.maxBy (fun candidate -> candidate.GetParameters().Length)
+    let implementationSources = sourceFiles |> Array.filter (fun path -> Path.GetExtension path = ".fs")
+    constructor.GetParameters()
+    |> Array.map (fun parameter ->
+        projectOptionsType.GetProperties flags
+        |> Array.tryFind (fun property ->
+            property.GetIndexParameters().Length = 0
+            && String.Equals(property.Name, parameter.Name, StringComparison.OrdinalIgnoreCase))
+        |> Option.map (fun property ->
+            if String.Equals(property.Name, "SourceFiles", StringComparison.OrdinalIgnoreCase) then box implementationSources
+            else property.GetValue projectOptions)
+        |> Option.defaultWith (fun () -> failwith $"cannot clone implementation FSharpProjectOptions field: {parameter.Name}"))
+    |> constructor.Invoke
 let missingSources = sourceFiles |> Array.filter (File.Exists >> not)
 if missingSources.Length > 0 then
     let sample = missingSources |> Array.truncate 8 |> String.concat ", "
@@ -254,15 +310,17 @@ let checkAsync =
 
 let checkResultType = requireType fcsAssembly "FSharp.Compiler.CodeAnalysis.FSharpCheckProjectResults"
 
-let checkResult =
+let runAsync resultType asyncValue =
     requireType fsharpCore "Microsoft.FSharp.Control.FSharpAsync"
     |> fun candidate -> candidate.GetMethods flags
     |> Array.find (fun methodInfo ->
         methodInfo.Name = "RunSynchronously"
         && methodInfo.IsGenericMethodDefinition
         && methodInfo.GetParameters().Length = 3)
-    |> fun methodInfo -> methodInfo.MakeGenericMethod [| checkResultType |]
-    |> fun methodInfo -> methodInfo.Invoke(null, [| checkAsync; null; null |])
+    |> fun methodInfo -> methodInfo.MakeGenericMethod [| resultType |]
+    |> fun methodInfo -> methodInfo.Invoke(null, [| asyncValue; null; null |])
+
+let checkResult = runAsync checkResultType checkAsync
 
 let diagnostics = propertyValue checkResult "Diagnostics" :?> Array
 let errors =
@@ -290,6 +348,243 @@ let symbolName symbol =
         | _ -> propertyValue symbol "DisplayName" :?> string
     with _ -> propertyValue symbol "DisplayName" :?> string
 
+let optionValue (value: obj) =
+    if isNull value then None
+    elif value.GetType().FullName.StartsWith("Microsoft.FSharp.Core.FSharpOption`1", StringComparison.Ordinal) then
+        Some(propertyValue value "Value")
+    else Some value
+
+let asObjects (value: obj) =
+    match value with
+    | :? string -> Seq.empty
+    | :? IEnumerable as values -> values |> Seq.cast<obj>
+    | _ -> Seq.empty
+
+let rangeStart (range: obj) =
+    propertyValue range "StartLine" :?> int, propertyValue range "StartColumn" :?> int
+
+let sourceRange (value: obj) =
+    try
+        let range = propertyValue value "Range"
+        let line, column = rangeStart range
+        let sourcePath = propertyValue range "FileName" :?> string |> normalizePath
+        sourcePath, line, column
+    with _ -> "", 0, 0
+
+let occurrenceByAnchor = Dictionary<string, int>(StringComparer.Ordinal)
+
+let observationSite sourcePath anchor =
+    let key = sourcePath + "\u0000" + anchor
+    let ordinal =
+        match occurrenceByAnchor.TryGetValue key with
+        | true, value -> value
+        | false, _ -> 0
+    occurrenceByAnchor.[key] <- ordinal + 1
+    { SourcePath = sourcePath
+      SemanticDeclarationAnchor = anchor
+      SameAnchorOccurrenceOrdinal = ordinal }
+
+let diagnosticsOut = ResizeArray<ExtractionDiagnosticRecord>()
+
+let diagnostic code sourcePath anchor syntaxKind line column rawIdentity =
+    diagnosticsOut.Add
+        { Code = code
+          SourcePath = if String.IsNullOrWhiteSpace sourcePath then null else sourcePath
+          SemanticDeclarationAnchor = if String.IsNullOrWhiteSpace anchor then null else anchor
+          SyntaxKind = syntaxKind
+          Line = line
+          Column = column
+          RawIdentity = rawIdentity }
+
+let fsharpValue = requireType fsharpCore "Microsoft.FSharp.Reflection.FSharpValue"
+
+let getUnionFields =
+    fsharpValue.GetMethods flags
+    |> Array.find (fun methodInfo ->
+        methodInfo.Name = "GetUnionFields"
+        && methodInfo.GetParameters().Length = 3)
+
+let unionFields (value: obj) =
+    let pair = getUnionFields.Invoke(null, [| value; value.GetType(); null |])
+    let caseInfo = propertyValue pair "Item1"
+    propertyValue caseInfo "Name" :?> string, propertyValue pair "Item2" :?> obj array
+
+let rec payloadObjects (value: obj) =
+    seq {
+        if not (isNull value) then
+            yield value
+            let candidateType = value.GetType()
+            if candidateType.FullName.StartsWith("System.Tuple`", StringComparison.Ordinal) then
+                for property in candidateType.GetProperties flags |> Array.filter (fun item -> item.Name.StartsWith("Item", StringComparison.Ordinal)) do
+                    yield! payloadObjects (property.GetValue value)
+            elif candidateType.FullName.StartsWith("Microsoft.FSharp.Core.FSharpOption`1", StringComparison.Ordinal) then
+                yield! payloadObjects (propertyValue value "Value")
+            elif not (value :? string) then
+                for item in asObjects value do yield! payloadObjects item
+    }
+
+let symbolTypes =
+    [| "FSharp.Compiler.Symbols.FSharpMemberOrFunctionOrValue"
+       "FSharp.Compiler.Symbols.FSharpEntity"
+       "FSharp.Compiler.Symbols.FSharpUnionCase"
+       "FSharp.Compiler.Symbols.FSharpField" |]
+    |> Array.map (requireType fcsAssembly)
+
+let tryPayloadSymbol payload =
+    payloadObjects payload
+    |> Seq.tryFind (fun value -> symbolTypes |> Array.exists (fun symbolType -> symbolType.IsInstanceOfType value))
+
+let kebabCase (value: string) =
+    System.Text.RegularExpressions.Regex.Replace(value, "(?<!^)([A-Z])", "-$1").ToLowerInvariant()
+
+let expressionType = requireType fcsAssembly "FSharp.Compiler.Symbols.FSharpExpr"
+let declarationType = requireType fcsAssembly "FSharp.Compiler.Symbols.FSharpImplementationFileDeclaration"
+let expressionPatterns = requireType fcsAssembly "FSharp.Compiler.Symbols.FSharpExprPatterns"
+
+let expressionPatternMethods =
+    expressionPatterns.GetMethods flags
+    |> Array.filter (fun methodInfo ->
+        methodInfo.IsStatic
+        && methodInfo.Name.StartsWith("|", StringComparison.Ordinal)
+        && methodInfo.GetParameters().Length = 1
+        && methodInfo.GetParameters().[0].ParameterType = expressionType)
+    |> Array.sortBy (fun methodInfo -> methodInfo.Name)
+
+let expressionPattern (expression: obj) =
+    expressionPatternMethods
+    |> Array.tryPick (fun methodInfo ->
+        match optionValue (methodInfo.Invoke(null, [| expression |])) with
+        | None -> None
+        | Some payload ->
+            let pieces = methodInfo.Name.Split '|'
+            Some(pieces.[1], payload))
+
+let immediateExpressions expression =
+    propertyValue expression "ImmediateSubExpressions"
+    |> asObjects
+    |> Seq.filter expressionType.IsInstanceOfType
+    |> Seq.toArray
+
+let constantString expression =
+    match expressionPattern expression with
+    | Some("Const", payload) -> payloadObjects payload |> Seq.tryPick (function :? string as text -> Some text | _ -> None)
+    | _ -> None
+
+let fsharpNodesOut = ResizeArray<FSharpNodeRecord>()
+let fableInteropOut = ResizeArray<obj>()
+let fableInteropKeys = HashSet<string>(StringComparer.Ordinal)
+
+let addFableImport moduleSpecifier selector (site: ObservationSite) =
+    let key = $"fable-import\u0000{moduleSpecifier}\u0000{selector}\u0000{site.SourcePath}\u0000{site.SemanticDeclarationAnchor}\u0000{site.SameAnchorOccurrenceOrdinal}"
+    if fableInteropKeys.Add key then
+        fableInteropOut.Add(
+            dict [
+                "kind", box "fable-import"
+                "moduleSpecifier", box moduleSpecifier
+                "selector", box selector
+                "site", box site
+            ])
+
+let addFableEmit kind expression (site: ObservationSite) =
+    let key = $"{kind}\u0000{expression}\u0000{site.SourcePath}\u0000{site.SemanticDeclarationAnchor}\u0000{site.SameAnchorOccurrenceOrdinal}"
+    if fableInteropKeys.Add key then
+        fableInteropOut.Add(
+            dict [
+                "kind", box kind
+                "expression", box expression
+                "site", box site
+            ])
+
+let rec visitExpression sourcePath anchor expression =
+    let line, column =
+        let _, line, column = sourceRange expression
+        line, column
+    match expressionPattern expression with
+    | None ->
+        diagnostic "unsupported-fsharp-expression" sourcePath anchor "unknown" line column (expression.GetType().FullName)
+    | Some(patternName, payload) ->
+        let identity =
+            tryPayloadSymbol payload
+            |> Option.map symbolName
+            |> Option.defaultValue $"fsharp:{kebabCase patternName}"
+        fsharpNodesOut.Add
+            { NodeKind = kebabCase patternName
+              SemanticIdentity = identity
+              Site = observationSite sourcePath anchor }
+        if identity.EndsWith("emitJsExpr", StringComparison.Ordinal) then
+            immediateExpressions expression
+            |> Array.choose constantString
+            |> Array.tryLast
+            |> function
+                | Some emitted -> addFableEmit "emit-js-expr" emitted (observationSite sourcePath anchor)
+                | None -> diagnostic "dynamic-emit-expression" sourcePath anchor (kebabCase patternName) line column identity
+    for child in immediateExpressions expression do visitExpression sourcePath anchor child
+
+let rec valuesOfType (candidateType: Type) (value: obj) =
+    seq {
+        if not (isNull value) then
+            if candidateType.IsInstanceOfType value then yield value
+            elif not (value :? string) then
+                for item in asObjects value do yield! valuesOfType candidateType item
+    }
+
+let rec visitDeclaration sourcePath fallbackAnchor declaration =
+    let caseName, fields = unionFields declaration
+    let anchor =
+        fields
+        |> Array.tryPick (fun field ->
+            symbolTypes
+            |> Array.tryFind (fun symbolType -> symbolType.IsInstanceOfType field)
+            |> Option.map (fun _ -> symbolName field))
+        |> Option.defaultValue fallbackAnchor
+    for field in fields do
+        for expression in valuesOfType expressionType field do visitExpression sourcePath anchor expression
+        for nested in valuesOfType declarationType field do
+            if not (obj.ReferenceEquals(nested, declaration)) then visitDeclaration sourcePath anchor nested
+
+let parseAndCheckFile =
+    checkerType.GetMethods flags
+    |> Array.find (fun methodInfo ->
+        methodInfo.Name = "ParseAndCheckFileInProject"
+        && methodInfo.GetParameters().Length = 5
+        && methodInfo.GetParameters().[1].ParameterType = typeof<int>)
+
+let sourceTextOfString =
+    requireType fcsAssembly "FSharp.Compiler.Text.SourceText"
+    |> fun candidate -> candidate.GetMethods flags
+    |> Array.find (fun methodInfo -> methodInfo.Name = "ofString" && methodInfo.IsStatic)
+
+let implementationFiles =
+    sourceFiles
+    |> Array.filter (fun path -> isProductionPath path && Path.GetExtension path = ".fs")
+    |> Array.choose (fun sourcePath ->
+        let sourceText = sourceTextOfString.Invoke(null, [| File.ReadAllText sourcePath |])
+        let check = parseAndCheckFile.Invoke(checker, [| sourcePath; box 0; sourceText; implementationProjectOptions; null |])
+        let resultType = parseAndCheckFile.ReturnType.GetGenericArguments().[0]
+        let pair = runAsync resultType check
+        let answer = propertyValue pair "Item2"
+        let answerCase, answerFields = unionFields answer
+        let fileResult = if answerCase = "Succeeded" then Some answerFields.[0] else None
+        match fileResult |> Option.bind (fun result -> optionValue (propertyValue result "ImplementationFile")) with
+        | Some implementationFile -> Some implementationFile
+        | None ->
+            diagnostic
+                "fsharp-implementation-file-missing"
+                (normalizePath sourcePath)
+                ("source:" + normalizePath sourcePath)
+                "implementation-file"
+                0
+                0
+                (normalizePath sourcePath)
+            None)
+
+for implementationFile in implementationFiles do
+    let sourcePath = propertyValue implementationFile "FileName" :?> string |> normalizePath
+    if isProductionPath sourcePath && Path.GetExtension sourcePath = ".fs" then
+        let anchor = propertyValue implementationFile "QualifiedName" :?> string
+        for declaration in propertyValue implementationFile "Declarations" |> asObjects do
+            visitDeclaration sourcePath anchor declaration
+
 let symbolLocations symbol =
     [| "DeclarationLocation"; "ImplementationLocation"; "SignatureLocation" |]
     |> Array.choose (fun name ->
@@ -305,15 +600,23 @@ let symbolLocations symbol =
     |> Array.map normalizePath
     |> Array.distinct
 
-let symbolUses = checkResultType.GetMethod("GetAllUsesOfAllSymbols", flags).Invoke(checkResult, [| null |]) :?> Array
-
-let records =
-    symbolUses
+let symbolUses =
+    checkResultType.GetMethod("GetAllUsesOfAllSymbols", flags).Invoke(checkResult, [| null |]) :?> Array
     |> Seq.cast<obj>
+    |> Seq.sortBy (fun symbolUse ->
+        let range = propertyValue symbolUse "Range"
+        propertyValue symbolUse "FileName" :?> string,
+        propertyValue range "StartLine" :?> int,
+        propertyValue range "StartColumn" :?> int,
+        symbolName (propertyValue symbolUse "Symbol"))
+    |> Seq.toArray
+
+let declarationUses =
+    symbolUses
     |> Seq.choose (fun symbolUse ->
         let consumer = propertyValue symbolUse "FileName" :?> string
         let isDefinition = propertyValue symbolUse "IsFromDefinition" :?> bool
-        if isDefinition || not (isProductionPath consumer) then None
+        if isDefinition || not (isProductionPath consumer) || Path.GetExtension consumer <> ".fs" then None
         else
             let symbol = propertyValue symbolUse "Symbol"
             let providers = symbolLocations symbol |> Array.filter isProductionPath |> Array.distinct
@@ -339,11 +642,144 @@ let records =
     |> Seq.sortBy (fun item -> item.ConsumerPath, item.ProviderPaths, item.Symbol, item.Line, item.Column)
     |> Seq.toArray
 
+let externalSymbolUses =
+    symbolUses
+    |> Seq.choose (fun symbolUse ->
+        let consumer = propertyValue symbolUse "FileName" :?> string |> normalizePath
+        let isDefinition = propertyValue symbolUse "IsFromDefinition" :?> bool
+        if isDefinition || not (isProductionPath consumer) || Path.GetExtension consumer <> ".fs" then None
+        else
+            let symbol = propertyValue symbolUse "Symbol"
+            let providers = symbolLocations symbol |> Array.filter isProductionPath
+            if providers.Length > 0 then None
+            else
+                let range = propertyValue symbolUse "Range"
+                let line, column = rangeStart range
+                let identity = symbolName symbol
+                let assembly =
+                    try propertyValue (propertyValue symbol "Assembly") "SimpleName" :?> string
+                    with _ -> ""
+                if String.IsNullOrWhiteSpace identity || String.IsNullOrWhiteSpace assembly then
+                    diagnostic "unresolved-external-symbol" consumer ("source:" + consumer) (symbol.GetType().Name) line column identity
+                    None
+                else
+                    Some
+                        { Assembly = assembly
+                          FullyQualifiedSymbol = identity
+                          SymbolKind = symbol.GetType().Name
+                          Site = observationSite consumer ("source:" + consumer) })
+    |> Seq.distinct
+    |> Seq.toArray
+
+let attributeStrings attribute =
+    try
+        propertyValue attribute "ConstructorArguments"
+        |> payloadObjects
+        |> Seq.choose (function :? string as text -> Some text | _ -> None)
+        |> Seq.toArray
+    with _ -> [||]
+
+let definitionSymbols =
+    symbolUses
+    |> Seq.filter (fun symbolUse -> propertyValue symbolUse "IsFromDefinition" :?> bool)
+    |> Seq.map (fun symbolUse ->
+        propertyValue symbolUse "FileName" :?> string |> normalizePath,
+        propertyValue symbolUse "Range",
+        propertyValue symbolUse "Symbol")
+    |> Seq.filter (fun (sourcePath, _, _) -> isProductionPath sourcePath)
+    |> Seq.toArray
+
+for sourcePath, range, symbol in definitionSymbols do
+    let identity = symbolName symbol
+    let line, column = rangeStart range
+    let interopSourcePath =
+        if sourcePath.EndsWith(".fsi", StringComparison.Ordinal) then sourcePath.Substring(0, sourcePath.Length - 1)
+        else sourcePath
+    try
+        for attribute in propertyValue symbol "Attributes" |> asObjects do
+            let attributeName = symbolName (propertyValue attribute "AttributeType")
+            let arguments = attributeStrings attribute
+            if attributeName.EndsWith("ImportAttribute", StringComparison.Ordinal) then
+                if arguments.Length >= 2 then
+                    addFableImport arguments.[1] arguments.[0] (observationSite interopSourcePath identity)
+                else
+                    diagnostic "unparsed-fable-import" interopSourcePath identity attributeName line column identity
+            elif attributeName.EndsWith("EmitAttribute", StringComparison.Ordinal) then
+                if arguments.Length >= 1 then
+                    addFableEmit "fable-emit" arguments.[0] (observationSite interopSourcePath identity)
+                else
+                    diagnostic "unparsed-fable-emit" interopSourcePath identity attributeName line column identity
+    with _ -> ()
+
+let isPublic symbol =
+    try boolPropertyOrFalse (propertyValue symbol "Accessibility") "IsPublic"
+    with _ -> false
+
+let hasFunctionType value =
+    try boolPropertyOrFalse (propertyValue value "FullType") "IsFunctionType"
+    with _ -> false
+
+let capabilityEntity entity =
+    let abstractMember =
+        try propertyValue entity "MembersFunctionsAndValues" |> asObjects |> Seq.exists (fun memberValue -> boolPropertyOrFalse memberValue "IsAbstractMember")
+        with _ -> false
+    let functionField =
+        try propertyValue entity "FSharpFields" |> asObjects |> Seq.exists (fun field -> boolPropertyOrFalse (propertyValue field "FieldType") "IsFunctionType")
+        with _ -> false
+    boolPropertyOrFalse entity "IsInterface" || abstractMember || functionField
+
+let signatureExports =
+    definitionSymbols
+    |> Seq.choose (fun (sourcePath, range, symbol) ->
+        if Path.GetExtension sourcePath <> ".fsi" || not (isPublic symbol) then None
+        else
+            let identity = symbolName symbol
+            let symbolKind = symbol.GetType().Name
+            let line, column = rangeStart range
+            let exportKind =
+                if symbolKind = "FSharpEntity" then
+                    if boolPropertyOrFalse symbol "IsNamespace" || boolPropertyOrFalse symbol "IsFSharpModule" then None
+                    elif capabilityEntity symbol then Some "capability-type"
+                    else Some "pure-type"
+                elif symbolKind = "FSharpMemberOrFunctionOrValue" then
+                    if boolPropertyOrFalse symbol "IsMutable" then None
+                    elif hasFunctionType symbol then Some "pure-function"
+                    else Some "pure-value"
+                elif symbolKind = "FSharpField" then Some "pure-value"
+                elif symbolKind = "FSharpUnionCase" then
+                    let hasFields =
+                        try propertyValue symbol "Fields" |> asObjects |> Seq.isEmpty |> not
+                        with _ -> false
+                    Some(if hasFields then "pure-function" else "pure-value")
+                else None
+            match exportKind with
+            | Some kind ->
+                Some
+                    { ExportKind = kind
+                      DeclarationIdentity = identity
+                      Site = observationSite sourcePath identity }
+            | None ->
+                let containedDeclaration =
+                    [ "FSharpParameter"; "FSharpGenericParameter" ]
+                    |> List.contains symbolKind
+                if not containedDeclaration && not (boolPropertyOrFalse symbol "IsNamespace" || boolPropertyOrFalse symbol "IsFSharpModule") then
+                    diagnostic "unclassified-signature-export" sourcePath identity symbolKind line column identity
+                None)
+    |> Seq.distinct
+    |> Seq.toArray
+
 stopwatch.Stop()
 let result =
-    { ProjectFile = normalizePath projectFile
-      ProductionFiles = sourceFiles |> Array.filter isProductionPath |> Array.map normalizePath |> Array.sort
-      SymbolUses = records
+    { SchemaVersion = 1
+      ProjectFile = normalizePath projectFile
+      ProductionFiles = sourceFiles |> Array.filter (fun path -> isProductionPath path && Path.GetExtension path = ".fs") |> Array.map normalizePath |> Array.sort
+      SignatureFiles = sourceFiles |> Array.filter (fun path -> isProductionPath path && Path.GetExtension path = ".fsi") |> Array.map normalizePath |> Array.sort
+      DeclarationUses = declarationUses
+      ExternalSymbolUses = externalSymbolUses
+      FsharpNodes = fsharpNodesOut |> Seq.distinct |> Seq.toArray
+      FableInterop = fableInteropOut.ToArray()
+      SignatureExports = signatureExports
+      Diagnostics = diagnosticsOut.ToArray()
       ElapsedMilliseconds = stopwatch.ElapsedMilliseconds }
 
 Directory.CreateDirectory(Path.GetDirectoryName resultPath) |> ignore

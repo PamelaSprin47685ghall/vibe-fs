@@ -465,7 +465,7 @@ export const buildCanonicalWorldV1 = (input) => {
   const derivedCapabilityPartition = validateCapabilityPartitionV1({
     observations: world.observed.capability_facts.map(({ observation }) => observation),
     facts: world.observed.capability_facts,
-  })
+  }, { collectUnknownViolations: false })
   if (encodeCanonicalJsonV1(world.observed.capability_extraction) !== encodeCanonicalJsonV1(derivedCapabilityPartition.coverage)) {
     fail('canonical-world-schema', '$.observed.capability_extraction', 'capability extraction coverage does not match canonical facts')
   }
@@ -475,16 +475,21 @@ export const buildCanonicalWorldV1 = (input) => {
 
 export const serializeCanonicalWorldV1 = (world) => encodeCanonicalJsonV1(buildCanonicalWorldV1(world))
 
-export const canonicalWorldDigestV1 = (world) => canonicalDigestV1('canonical-world/v1\0', buildCanonicalWorldV1(world))
+const digestCanonicalWorld = (world) => canonicalDigestV1('canonical-world/v1\0', world)
 
-const adjacency = (world) => {
-  const result = new Map(world.observed.localities.map(({ id }) => [id, []]))
-  for (const { consumer_locality: consumer, provider_locality: provider } of world.observed.project_references) result.get(consumer).push(provider)
-  return result
+export const canonicalWorldDigestV1 = (world) => digestCanonicalWorld(buildCanonicalWorldV1(world))
+
+const projectGraphs = (world) => {
+  const forward = new Map(world.observed.localities.map(({ id }) => [id, []]))
+  const reverse = new Map(world.observed.localities.map(({ id }) => [id, []]))
+  for (const { consumer_locality: consumer, provider_locality: provider } of world.observed.project_references) {
+    forward.get(consumer).push(provider)
+    reverse.get(provider).push(consumer)
+  }
+  return { forward, reverse }
 }
 
-const forwardProjectClosure = (world, localityId) => {
-  const graph = adjacency(world)
+const graphClosure = (graph, localityId, includeOrigin) => {
   if (!graph.has(localityId)) fail('canonical-world-schema', '$.locality_id', `unknown locality ${localityId}`)
   const seen = new Set([localityId])
   const pending = [localityId]
@@ -495,28 +500,26 @@ const forwardProjectClosure = (world, localityId) => {
       pending.push(provider)
     }
   }
+  if (!includeOrigin) seen.delete(localityId)
   return [...seen].sort(compareCanonicalTextV1)
 }
+
+const memoizedClosure = (graph, includeOrigin) => {
+  const memo = new Map()
+  return (localityId) => {
+    if (!memo.has(localityId)) memo.set(localityId, graphClosure(graph, localityId, includeOrigin))
+    return memo.get(localityId)
+  }
+}
+
+const forwardProjectClosure = (world, localityId) =>
+  graphClosure(projectGraphs(world).forward, localityId, true)
 
 export const forwardProjectClosureV1 = (worldInput, localityId) =>
   forwardProjectClosure(buildCanonicalWorldV1(worldInput), localityId)
 
-const actualEffectiveConsumers = (world, localityId) => {
-  const reverse = new Map(world.observed.localities.map(({ id }) => [id, []]))
-  if (!reverse.has(localityId)) fail('canonical-world-schema', '$.locality_id', `unknown locality ${localityId}`)
-  for (const { consumer_locality: consumer, provider_locality: provider } of world.observed.project_references) reverse.get(provider).push(consumer)
-  const seen = new Set([localityId])
-  const pending = [localityId]
-  while (pending.length > 0) {
-    for (const consumer of reverse.get(pending.pop())) {
-      if (seen.has(consumer)) continue
-      seen.add(consumer)
-      pending.push(consumer)
-    }
-  }
-  seen.delete(localityId)
-  return [...seen].sort(compareCanonicalTextV1)
-}
+const actualEffectiveConsumers = (world, localityId) =>
+  graphClosure(projectGraphs(world).reverse, localityId, false)
 
 export const actualEffectiveConsumersV1 = (worldInput, localityId) =>
   actualEffectiveConsumers(buildCanonicalWorldV1(worldInput), localityId)
@@ -535,38 +538,9 @@ export const classifyTerminalV1 = (worldInput, localityId) => {
   return terminal(`${classification.kind}-${classification.exposure}`)
 }
 
-const missingClosureEdges = (world) => world.observed.actual_source_edges.filter((edge) =>
+const missingClosureEdges = (world, forwardClosure = (localityId) => forwardProjectClosure(world, localityId)) => world.observed.actual_source_edges.filter((edge) =>
   edge.consumer_locality !== edge.provider_locality
-  && !forwardProjectClosure(world, edge.consumer_locality).includes(edge.provider_locality))
-
-export const deriveAdjudicationCandidates = (worldInput) => {
-  const world = buildCanonicalWorldV1(worldInput)
-  const referenced = new Set(world.observed.project_references.map((row) => row.provider_locality))
-  for (const edge of world.observed.actual_source_edges) referenced.add(edge.provider_locality)
-  const missing = missingClosureEdges(world)
-  const sliceById = new Map(world.normative.slices.map((row) => [row.id, row]))
-  return world.observed.localities.map((row) => {
-    const reasons = new Set(['TerminalClassificationRequired'])
-    if (referenced.has(row.id)) reasons.add('ReferencedProvider')
-    if (row.kind === 'composition' && referenced.has(row.id)) reasons.add('CompositionProvider')
-    const localFacts = world.observed.capability_facts.filter((fact) => factLocality(fact) === row.id)
-    if (localFacts.some(({ disposition }) => disposition.case !== 'irrelevant')) reasons.add('CapabilityBearing')
-    if (declaredKindMismatch(world, row.id)) reasons.add('KindCapabilityMismatch')
-    for (const sliceRow of world.normative.slices) {
-      if (sliceRow.provider_locality === row.id) reasons.add(`RelationEndpoint:slice:provider:${sliceRow.id}`)
-    }
-    for (const relation of world.normative.capability_relations) {
-      const provider = sliceById.get(relation.provider_slice)?.provider_locality
-      if (relation.consumer_locality === row.id) reasons.add(`RelationEndpoint:${relation.kind}:consumer:${relation.id}`)
-      if (provider === row.id) reasons.add(`RelationEndpoint:${relation.kind}:provider:${relation.id}`)
-    }
-    for (const relation of world.normative.generated_module_relations) {
-      if (relation.consumer_locality === row.id) reasons.add(`RelationEndpoint:generated-module:consumer:${relation.id}`)
-    }
-    if (missing.some((edge) => edge.consumer_locality === row.id || edge.provider_locality === row.id)) reasons.add('MissingClosureEndpoint')
-    return { locality_id: row.id, reasons: [...reasons].sort(compareCanonicalTextV1) }
-  })
-}
+  && !forwardClosure(edge.consumer_locality).includes(edge.provider_locality))
 
 export const queryDigestV1 = (queryId, result) => {
   if (typeof queryId !== 'string' || !/^(surface|audience|capability)\/v1:[A-Za-z0-9._:-]+$/.test(queryId)) {
@@ -589,71 +563,206 @@ const declaredKindMismatch = (world, localityId) => {
 export const declaredKindMismatchV1 = (worldInput, localityId) =>
   declaredKindMismatch(buildCanonicalWorldV1(worldInput), localityId)
 
-export const queryCanonicalLocalityV1 = (worldInput, localityId) => {
+const indexedLists = (localityIds) => new Map(localityIds.map((id) => [id, []]))
+
+const canonicalUniqueTexts = (values) => [...new Set(values)].sort(compareCanonicalTextV1)
+
+const createLocalityQueryContext = (worldInput) => {
   const world = buildCanonicalWorldV1(worldInput)
-  const localityRow = world.observed.localities.find(({ id }) => id === localityId)
-  if (!localityRow) fail('canonical-world-schema', '$.locality_id', `unknown locality ${localityId}`)
-  const sourceConsumers = [...new Set(world.observed.actual_source_edges
-    .filter(({ provider_locality: provider }) => provider === localityId)
-    .map(({ consumer_locality: consumer }) => consumer))]
-    .sort(compareCanonicalTextV1)
-  const directConsumers = [...new Set(world.observed.project_references
-    .filter(({ provider_locality: provider }) => provider === localityId)
-    .map(({ consumer_locality: consumer }) => consumer))]
-    .sort(compareCanonicalTextV1)
+  const localityIds = world.observed.localities.map(({ id }) => id)
+  const localityById = new Map(world.observed.localities.map((row) => [row.id, row]))
+  const { forward, reverse } = projectGraphs(world)
+  const forwardClosure = memoizedClosure(forward, true)
+  const reverseClosure = memoizedClosure(reverse, false)
+  const factsByLocality = indexedLists(localityIds)
+  const directConsumersByProvider = indexedLists(localityIds)
+  const sourceConsumersByProvider = indexedLists(localityIds)
+  const relationEndpointsByLocality = indexedLists(localityIds)
+  const missingEdgesByLocality = indexedLists(localityIds)
   const sliceById = new Map(world.normative.slices.map((row) => [row.id, row]))
-  const relationEndpoints = []
+  const providerSlicesByLocality = indexedLists(localityIds)
+  const artifactsById = new Map(world.observed.generated_artifacts.map((row) => [row.id, row]))
+  const traversalsById = new Map(world.observed.javascript_traversals.map((row) => [row.id, row]))
+
+  for (const fact of world.observed.capability_facts) factsByLocality.get(factLocality(fact)).push(fact)
+  for (const { consumer_locality: consumer, provider_locality: provider } of world.observed.project_references) {
+    directConsumersByProvider.get(provider).push(consumer)
+  }
+  for (const { consumer_locality: consumer, provider_locality: provider } of world.observed.actual_source_edges) {
+    sourceConsumersByProvider.get(provider).push(consumer)
+  }
+  for (const sliceRow of world.normative.slices) providerSlicesByLocality.get(sliceRow.provider_locality).push(sliceRow)
   for (const relation of world.normative.capability_relations) {
-    if (relation.consumer_locality === localityId) relationEndpoints.push({ relation_kind: relation.kind, role: 'consumer', relation_id: relation.id })
-    if (sliceById.get(relation.provider_slice)?.provider_locality === localityId) relationEndpoints.push({ relation_kind: relation.kind, role: 'provider', relation_id: relation.id })
+    relationEndpointsByLocality.get(relation.consumer_locality).push({
+      relation_kind: relation.kind,
+      role: 'consumer',
+      relation_id: relation.id,
+    })
+    relationEndpointsByLocality.get(sliceById.get(relation.provider_slice).provider_locality).push({
+      relation_kind: relation.kind,
+      role: 'provider',
+      relation_id: relation.id,
+    })
   }
   for (const relation of world.normative.generated_module_relations) {
-    if (relation.consumer_locality === localityId) relationEndpoints.push({ relation_kind: 'generated-module', role: 'consumer', relation_id: relation.id })
+    relationEndpointsByLocality.get(relation.consumer_locality).push({
+      relation_kind: 'generated-module',
+      role: 'consumer',
+      relation_id: relation.id,
+    })
   }
-  relationEndpoints.sort((left, right) => compareCanonicalTextV1(`${left.relation_kind}\0${left.role}\0${left.relation_id}`, `${right.relation_kind}\0${right.role}\0${right.relation_id}`))
-  const localFacts = world.observed.capability_facts.filter((fact) => factLocality(fact) === localityId)
-  const artifactIds = new Set(localFacts.flatMap(({ observation }) => {
-    if (observation.case === 'javascript-capability' && observation.payload.generated_artifact_id !== null) return [observation.payload.generated_artifact_id]
-    if (observation.case === 'fable-import' && observation.payload.generated_artifact_id !== null) return [observation.payload.generated_artifact_id]
-    return []
+  for (const endpoints of relationEndpointsByLocality.values()) {
+    endpoints.sort((left, right) => compareCanonicalTextV1(
+      `${left.relation_kind}\0${left.role}\0${left.relation_id}`,
+      `${right.relation_kind}\0${right.role}\0${right.relation_id}`,
+    ))
+  }
+  const missing = missingClosureEdges(world, forwardClosure)
+  for (const edge of missing) {
+    missingEdgesByLocality.get(edge.consumer_locality).push(edge)
+    if (edge.provider_locality !== edge.consumer_locality) missingEdgesByLocality.get(edge.provider_locality).push(edge)
+  }
+
+  const detailsByLocality = new Map(localityIds.map((localityId) => {
+    const localityRow = localityById.get(localityId)
+    const facts = factsByLocality.get(localityId)
+    const artifactIds = new Set(facts.flatMap(({ observation }) => {
+      if (observation.case === 'javascript-capability' && observation.payload.generated_artifact_id !== null) return [observation.payload.generated_artifact_id]
+      if (observation.case === 'fable-import' && observation.payload.generated_artifact_id !== null) return [observation.payload.generated_artifact_id]
+      return []
+    }))
+    const generatedArtifacts = [...artifactIds]
+      .map((id) => artifactsById.get(id))
+      .sort((left, right) => compareCanonicalTextV1(left.id, right.id))
+    const traversalIds = new Set([
+      ...facts.flatMap(({ observation }) => ['fable-emit', 'emit-js-expr'].includes(observation.case)
+        && observation.payload.javascript_traversal_id !== null
+        ? [observation.payload.javascript_traversal_id]
+        : []),
+      ...generatedArtifacts.map(({ javascript_traversal_id: traversalId }) => traversalId),
+    ])
+    const signatures = localityRow.sources.map((source) => ({
+      signature_path: source.signature_path,
+      signature_digest: source.signature_digest,
+      exports: sortedUnique(facts
+        .filter((fact) => fact.observation?.case === 'public-signature-export' && fact.observation.payload.site.source_path === source.signature_path)
+        .map((fact) => ({
+          export_kind: fact.observation.payload.export_kind,
+          declaration_identity: fact.observation.payload.declaration_identity,
+        })),
+      (row) => `${row.export_kind}\0${row.declaration_identity}`,
+      '$.query.surface.exports', { allowIdentical: true }),
+    }))
+    return [localityId, {
+      signatures,
+      facts,
+      generatedArtifacts,
+      javascriptTraversals: [...traversalIds].map((id) => traversalsById.get(id)).sort((left, right) => compareCanonicalTextV1(left.id, right.id)),
+      declaredKindMismatch: localityRow.kind === 'contract'
+        && facts.some(({ disposition }) => capabilityDispositionViolatesContractV1(disposition)),
+    }]
   }))
-  const generatedArtifacts = world.observed.generated_artifacts.filter(({ id }) => artifactIds.has(id))
-  const traversalIds = new Set([
-    ...localFacts.flatMap(({ observation }) => ['fable-emit', 'emit-js-expr'].includes(observation.case)
-      && observation.payload.javascript_traversal_id !== null
-      ? [observation.payload.javascript_traversal_id]
-      : []),
-    ...generatedArtifacts.map(({ javascript_traversal_id: traversalId }) => traversalId),
-  ])
-  const javascriptTraversals = world.observed.javascript_traversals.filter(({ id }) => traversalIds.has(id))
-  const signatures = localityRow.sources.map((source) => ({
-    signature_path: source.signature_path,
-    signature_digest: source.signature_digest,
-    exports: sortedUnique(localFacts
-      .filter((fact) => fact.observation?.case === 'public-signature-export' && fact.observation.payload.site.source_path === source.signature_path)
-      .map((fact) => ({
-        export_kind: fact.observation.payload.export_kind,
-        declaration_identity: fact.observation.payload.declaration_identity,
-      })),
-    (row) => `${row.export_kind}\0${row.declaration_identity}`,
-    '$.query.surface.exports', { allowIdentical: true }),
-  }))
-  const missing = missingClosureEdges(world).filter((edge) => edge.consumer_locality === localityId || edge.provider_locality === localityId)
+
   return {
-    surface: { signatures },
+    world,
+    localityById,
+    reverseClosure,
+    directConsumersByProvider,
+    sourceConsumersByProvider,
+    relationEndpointsByLocality,
+    missingEdgesByLocality,
+    providerSlicesByLocality,
+    detailsByLocality,
+  }
+}
+
+const queryCanonicalLocalityFromContext = (context, localityId) => {
+  if (!context.localityById.has(localityId)) fail('canonical-world-schema', '$.locality_id', `unknown locality ${localityId}`)
+  const details = context.detailsByLocality.get(localityId)
+  return {
+    surface: { signatures: details.signatures },
     audience: {
-      direct_project_consumers: directConsumers,
-      actual_source_consumers: sourceConsumers,
-      reverse_closure_effective_consumers: actualEffectiveConsumers(world, localityId),
-      relation_endpoints: relationEndpoints,
-      missing_closure_violations: missing,
+      direct_project_consumers: canonicalUniqueTexts(context.directConsumersByProvider.get(localityId)),
+      actual_source_consumers: canonicalUniqueTexts(context.sourceConsumersByProvider.get(localityId)),
+      reverse_closure_effective_consumers: context.reverseClosure(localityId),
+      relation_endpoints: context.relationEndpointsByLocality.get(localityId),
+      missing_closure_violations: context.missingEdgesByLocality.get(localityId),
     },
     capability: {
-      facts: localFacts,
-      generated_artifacts: generatedArtifacts,
-      javascript_traversals: javascriptTraversals,
-      declared_kind_mismatch: declaredKindMismatch(world, localityId),
+      facts: details.facts,
+      generated_artifacts: details.generatedArtifacts,
+      javascript_traversals: details.javascriptTraversals,
+      declared_kind_mismatch: details.declaredKindMismatch,
     },
+  }
+}
+
+const adjudicationCandidateFromContext = (context, localityId) => {
+  const localityRow = context.localityById.get(localityId)
+  if (!localityRow) fail('canonical-world-schema', '$.locality_id', `unknown locality ${localityId}`)
+  const reasons = new Set(['TerminalClassificationRequired'])
+  const referenced = context.directConsumersByProvider.get(localityId).length > 0
+    || context.sourceConsumersByProvider.get(localityId).length > 0
+  if (referenced) reasons.add('ReferencedProvider')
+  if (localityRow.kind === 'composition' && referenced) reasons.add('CompositionProvider')
+  const details = context.detailsByLocality.get(localityId)
+  if (details.facts.some(({ disposition }) => disposition.case !== 'irrelevant')) reasons.add('CapabilityBearing')
+  if (details.declaredKindMismatch) reasons.add('KindCapabilityMismatch')
+  for (const sliceRow of context.providerSlicesByLocality.get(localityId)) {
+    reasons.add(`RelationEndpoint:slice:provider:${sliceRow.id}`)
+  }
+  for (const endpoint of context.relationEndpointsByLocality.get(localityId)) {
+    reasons.add(`RelationEndpoint:${endpoint.relation_kind}:${endpoint.role}:${endpoint.relation_id}`)
+  }
+  if (context.missingEdgesByLocality.get(localityId).length > 0) reasons.add('MissingClosureEndpoint')
+  return { locality_id: localityId, reasons: [...reasons].sort(compareCanonicalTextV1) }
+}
+
+export const deriveAdjudicationCandidates = (worldInput) => {
+  const context = createLocalityQueryContext(worldInput)
+  return context.world.observed.localities.map(({ id }) => adjudicationCandidateFromContext(context, id))
+}
+
+export const queryCanonicalLocalityV1 = (worldInput, localityId) =>
+  queryCanonicalLocalityFromContext(createLocalityQueryContext(worldInput), localityId)
+
+const queryAllCanonicalLocalitiesFromContext = (context) =>
+  context.world.observed.localities.map(({ id }) => ({
+    ...adjudicationCandidateFromContext(context, id),
+    queries: queryCanonicalLocalityFromContext(context, id),
+  }))
+
+export const queryAllCanonicalLocalitiesV1 = (worldInput) =>
+  queryAllCanonicalLocalitiesFromContext(createLocalityQueryContext(worldInput))
+
+const censusFromCanonicalWorld = (world) => ({
+  locality_count: world.observed.localities.length,
+  production_source_count: world.observed.localities.reduce((count, locality) => count + locality.sources.length, 0),
+  project_reference_count: world.observed.project_references.length,
+  actual_source_edge_count: world.observed.actual_source_edges.length,
+  generated_artifact_count: world.observed.generated_artifacts.length,
+  javascript_traversal_count: world.observed.javascript_traversals.length,
+  capability_fact_count: world.observed.capability_facts.length,
+  unknown_capability_count: world.observed.capability_extraction.unknown_count,
+})
+
+export const projectCanonicalLocalitySummaryV1 = (worldInput) => {
+  const context = createLocalityQueryContext(worldInput)
+  const world = context.world
+  return {
+    canonical_world_digest: digestCanonicalWorld(world),
+    census: censusFromCanonicalWorld(world),
+    localities: world.observed.localities.map(({ id }) => adjudicationCandidateFromContext(context, id)),
+  }
+}
+
+export const projectCanonicalLocalityReportV1 = (worldInput) => {
+  const context = createLocalityQueryContext(worldInput)
+  const world = context.world
+  return {
+    canonical_world_digest: digestCanonicalWorld(world),
+    census: censusFromCanonicalWorld(world),
+    localities: queryAllCanonicalLocalitiesFromContext(context),
   }
 }
 

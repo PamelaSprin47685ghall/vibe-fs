@@ -395,6 +395,38 @@ const canonicalProofs = (proofs) => Array.isArray(proofs)
   && proofs.every(proofValid)
   && proofs.every((proof, index) => index === 0 || compareCanonicalTextV1(proofIdentity(proofs[index - 1]), proofIdentity(proof)) < 0)
 
+export const buildFreshMigrationWorksheetV1 = (candidates) => {
+  if (!Array.isArray(candidates)) throw new TypeError('migration worksheet candidates must be an array')
+  const localityIds = candidates.map((candidate, index) => {
+    if (!exactKeys(candidate, ['locality_id', 'reasons'])
+      || typeof candidate.locality_id !== 'string'
+      || candidate.locality_id.length === 0
+      || !canonicalTexts(candidate.reasons)
+      || !candidate.reasons.includes('TerminalClassificationRequired')) {
+      throw new TypeError(`migration worksheet candidate ${index} is invalid`)
+    }
+    return candidate.locality_id
+  }).sort(compareCanonicalTextV1)
+  for (let index = 1; index < localityIds.length; index += 1) {
+    if (localityIds[index - 1] === localityIds[index]) {
+      throw new TypeError(`duplicate migration worksheet locality: ${localityIds[index]}`)
+    }
+  }
+  return {
+    schema_version: 1,
+    purpose: 'm6.3b-migration-only',
+    records: localityIds.map((localityId) => ({
+      locality_id: localityId,
+      status: 'undecided',
+      draft_reason: null,
+      draft_target_classification: null,
+      draft_migration_path: null,
+      draft_what_ids: [],
+      draft_proofs: [],
+    })),
+  }
+}
+
 export const validateMigrationWorksheetV1 = (worksheet) => {
   const schemaViolation = (path) => [{ code: 'migration-worksheet-schema', path, reason: 'unknown-or-missing-key' }]
   if (!exactKeys(worksheet, ['schema_version', 'purpose', 'records']) || worksheet.schema_version !== 1 || worksheet.purpose !== 'm6.3b-migration-only' || !Array.isArray(worksheet.records)) return schemaViolation('$')

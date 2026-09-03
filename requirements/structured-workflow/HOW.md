@@ -79,6 +79,16 @@ generated relation validator只消费closed relation/artifact/traversal/actual-i
 
 cutover state validator不接收已求值closure。调用方只交exact `closure_input`原始扫描集合、全量index rows、object format与两份byte map；validator内部唯一调用`resolveCutoverInputClosureV1`并从其结果取得closure与build-output exception。formal snapshot/worksheet exclusion是模块内固定协议常量，不是调用参数。collection与row先做closed-shape验证，再检查全index只有stage 0、`100644/100755` regular blob、byte map与index key全等、working tree bytes等于index blob；unsupported object format直接停止，不能按sha1继续。selector/build-output交集、symlink、额外byte row、任意caller closure/build-output/exclusion字段均由`cutover-input-closure.test.mjs`固定为RED。
 
+### 5.2 M6.3b production report
+
+`scripts/checks/locality-dependencies.mjs`一次读取`owner-projects` inventory，并由`locality-symbol-uses.fsx`在同一FCS checker中解析完整production aggregate、每个`.fs` typed implementation AST与全部sibling `.fsi`。`CompilerObservationsV1`同时承载declaration use、external symbol use、F# expression node、Fable interop、signature export与closed diagnostic；dependency analyzer只消费其中declaration use。fixture永久证明aggregate可绿而missing locality closure必红，并以正式scanner输出的`const/if-then-else/new-record`等node kind约束classifier，禁止测试手写不存在的alias。
+
+`scripts/lib/production-capability-extractor-v1.mjs`是raw compiler observations到canonical facts的唯一production入口。它内部完成Acorn parse、lexical scope resolution、generic AST enumeration、semantic visit、same-run traversal validation与generated artifact byte/linkage核对；caller只能提交raw source bytes与compiler/inventory事实，不能提交AST、visit、binding provenance或fact。每个traversal只消费预先按`source_kind/source_id`索引出的同source canonical JavaScript facts；这与validator原有source projection等价，避免对全部facts重复扫描。
+
+`scripts/checks/locality-slice-report.mjs`组合inventory、compiler scan、dependency analysis、tracked generator、capability extractor与唯一canonical world。默认summary仍对完整world验schema、reference、partition与digest，只输出census、全部locality candidate/reason及按code聚合的finding；`--full`才展开逐locality actual queries。`--write-fresh-worksheet`只从同一candidate projection生成178条closed、全`undecided`、无digest/授权力的migration worksheet，拒绝覆盖任何已裁决记录。report与worksheet未接入`check.mjs`、Wireit或release sink；M6.4前旧gate仍是唯一authority。
+
+canonical JSON仍只有一套byte protocol；digest改用同一recursive encoder直接增量写入SHA-256，避免先物化超大字符串。文本比较器按Unicode scalar逐项读取，不分配code-point数组。derived disposition与caller-supplied fact最终都经过同一classifier、identity、collision、partition与coverage校验；production summary只把海量Unknown violation坐标压成带exact count的单行finding，canonical facts与`unknown_count`不丢失，显式full模式保留逐坐标诊断。
+
 source graph 与 requirement graph 分别输出、分别验证，只共享 owner identity，不要求边集合相等。semantic-evidence 是唯一额外连接：它不关闭 WHAT，只消费 requirement graph 已建立的唯一 active、无 rejection exact edge来授权架构例外。compiler-resolved evidence 只证明 actual source edge 位于声明 closure；`.fsi` 证明 slice 完整公开面；行为 oracle 证明对应 WHAT，三者不得互相冒充。
 
 M6 前完成的 locality 拆分是可复用的结构准备，不构成旧 ACL 的延续。`GitGateway` 已从混合 `git-integrationgate` 剥离到单文件 `git-gateway` locality，删除未使用的 `SyncActiveEnv`，由 `.fsi` 仅公开 `GitGatewayRunner`、`converge`、`createDefaultRunner`；其 direct consumer 集将在 M6 slice manifest 中按 locality 表达。

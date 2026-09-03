@@ -28,31 +28,40 @@ const assertScalarString = (value, path) => {
   }
 }
 
-const codePoints = (value) => Array.from(value, (scalar) => scalar.codePointAt(0))
-
 export const compareCanonicalTextV1 = (left, right) => {
   if (left === right) return 0
-  const leftPoints = codePoints(left)
-  const rightPoints = codePoints(right)
-  const length = Math.min(leftPoints.length, rightPoints.length)
-  for (let index = 0; index < length; index += 1) {
-    if (leftPoints[index] !== rightPoints[index]) return leftPoints[index] < rightPoints[index] ? -1 : 1
+  let leftIndex = 0
+  let rightIndex = 0
+  while (leftIndex < left.length && rightIndex < right.length) {
+    const leftPoint = left.codePointAt(leftIndex)
+    const rightPoint = right.codePointAt(rightIndex)
+    if (leftPoint !== rightPoint) return leftPoint < rightPoint ? -1 : 1
+    leftIndex += leftPoint > 0xffff ? 2 : 1
+    rightIndex += rightPoint > 0xffff ? 2 : 1
   }
-  return leftPoints.length < rightPoints.length ? -1 : 1
+  return leftIndex < left.length ? 1 : -1
 }
 
-const encode = (value, path, ancestors) => {
-  if (value === null) return 'null'
-  if (typeof value === 'boolean') return value ? 'true' : 'false'
+const writeCanonicalJsonV1 = (value, path, ancestors, write) => {
+  if (value === null) {
+    write('null')
+    return
+  }
+  if (typeof value === 'boolean') {
+    write(value ? 'true' : 'false')
+    return
+  }
   if (typeof value === 'string') {
     assertScalarString(value, path)
-    return JSON.stringify(value)
+    write(JSON.stringify(value))
+    return
   }
   if (typeof value === 'number') {
     if (!Number.isSafeInteger(value) || value < 0 || Object.is(value, -0)) {
       fail('canonical-json-invalid-number', path, 'number must be a non-negative safe integer')
     }
-    return String(value)
+    write(String(value))
+    return
   }
   if (typeof value !== 'object') {
     fail('canonical-json-invalid-value', path, `unsupported ${typeof value}`)
@@ -76,7 +85,13 @@ const encode = (value, path, ancestors) => {
           fail('canonical-json-invalid-value', `${path}[${index}]`, 'array elements must be enumerable data values')
         }
       }
-      return `[${value.map((item, index) => encode(item, `${path}[${index}]`, ancestors)).join(',')}]`
+      write('[')
+      for (let index = 0; index < value.length; index += 1) {
+        if (index > 0) write(',')
+        writeCanonicalJsonV1(value[index], `${path}[${index}]`, ancestors, write)
+      }
+      write(']')
+      return
     }
     const prototype = Object.getPrototypeOf(value)
     if (prototype !== Object.prototype && prototype !== null) {
@@ -93,13 +108,24 @@ const encode = (value, path, ancestors) => {
     }
     for (const key of keys) assertScalarString(key, `${path}.<key>`)
     keys.sort(compareCanonicalTextV1)
-    return `{${keys.map((key) => `${JSON.stringify(key)}:${encode(value[key], `${path}.${key}`, ancestors)}`).join(',')}}`
+    write('{')
+    for (let index = 0; index < keys.length; index += 1) {
+      if (index > 0) write(',')
+      const key = keys[index]
+      write(`${JSON.stringify(key)}:`)
+      writeCanonicalJsonV1(value[key], `${path}.${key}`, ancestors, write)
+    }
+    write('}')
   } finally {
     ancestors.delete(value)
   }
 }
 
-export const encodeCanonicalJsonV1 = (value) => encode(value, '$', new WeakSet())
+export const encodeCanonicalJsonV1 = (value) => {
+  const chunks = []
+  writeCanonicalJsonV1(value, '$', new WeakSet(), (chunk) => chunks.push(chunk))
+  return chunks.join('')
+}
 
 export const sha256BytesV1 = (bytes) => `sha256:${createHash('sha256').update(bytes).digest('hex')}`
 
@@ -109,7 +135,7 @@ export const canonicalDigestV1 = (domain, value) => {
   }
   const hash = createHash('sha256')
   hash.update(Buffer.from(domain, 'utf8'))
-  hash.update(Buffer.from(encodeCanonicalJsonV1(value), 'utf8'))
+  writeCanonicalJsonV1(value, '$', new WeakSet(), (chunk) => hash.update(chunk, 'utf8'))
   return `sha256:${hash.digest('hex')}`
 }
 

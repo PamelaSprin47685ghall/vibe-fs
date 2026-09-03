@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  buildFreshMigrationWorksheetV1,
   canonicalInputIndexDigestV1,
   resolveCutoverInputClosureV1,
   validateCutoverInputStateV1,
@@ -231,6 +232,25 @@ test('WHAT[STRUCTURED-WORKFLOW-016] cutover closure and stage index reject every
       draft_proofs: [],
     }],
   }), [])
+  const freshWorksheet = buildFreshMigrationWorksheetV1([
+    { locality_id: 'locality-b', reasons: ['TerminalClassificationRequired'] },
+    { locality_id: 'locality-a', reasons: ['ReferencedProvider', 'TerminalClassificationRequired'] },
+  ])
+  assert.deepEqual(freshWorksheet.records.map(({ locality_id: localityId }) => localityId), ['locality-a', 'locality-b'])
+  assert.ok(freshWorksheet.records.every((record) => record.status === 'undecided'
+    && record.draft_reason === null
+    && record.draft_target_classification === null
+    && record.draft_migration_path === null
+    && record.draft_what_ids.length === 0
+    && record.draft_proofs.length === 0))
+  assert.deepEqual(validateMigrationWorksheetV1(freshWorksheet), [])
+  assert.throws(() => buildFreshMigrationWorksheetV1([
+    { locality_id: 'locality-a', reasons: ['TerminalClassificationRequired'] },
+    { locality_id: 'locality-a', reasons: ['TerminalClassificationRequired'] },
+  ]), /duplicate migration worksheet locality/)
+  assert.throws(() => buildFreshMigrationWorksheetV1([
+    { locality_id: 'locality-a', reasons: [] },
+  ]), /migration worksheet candidate 0 is invalid/)
   const decidedWorksheet = {
     schema_version: 1,
     purpose: 'm6.3b-migration-only',
