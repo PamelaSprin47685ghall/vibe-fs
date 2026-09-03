@@ -4,7 +4,12 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
-import { checkOwnerProjects, projectArchitectureViolations } from '../../../scripts/checks/owner-projects.mjs'
+import {
+  checkOwnerProjects,
+  projectArchitectureViolations,
+  validateProjectContractEvidence,
+} from '../../../scripts/checks/owner-projects.mjs'
+import { buildTraceGraph } from '../../../scripts/lib/requirement-trace.mjs'
 import { planOwnerCompile, materializeOwnerCompile, compileOwnerProject } from '../../../scripts/lib/owner-compile.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../..')
@@ -34,6 +39,32 @@ test('WHAT[STRUCTURED-WORKFLOW-011] owner-locality project graph is complete, au
   assert.equal(result.ok, true, result.violations.join('\n'))
   assert.ok(result.sourceCount > 0, 'owner-locality graph must cover production sources')
   assert.equal(result.contractLeakSourceCount, 0, 'published contract compile closure must contain no runtime/private source')
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] owner-project authorization rejects a comment-only semantic proof independently', () => {
+  const result = validateProjectContractEvidence(
+    {
+      contracts: [
+        {
+          path: 'src/Wanxiangshu/ExternalInvestigation/Cursor.fs',
+          owner: 'external-investigation',
+          kind: 'semantic-evidence',
+          consumers: ['consumer'],
+          symbols: ['Wanxiangshu.ExternalInvestigation.Cursor.current'],
+          law: 'WHAT[EXTERNAL-INVESTIGATION-010]',
+          proof: {
+            path: 'requirements/external-investigation/tests/browser-provenance-canary.test.mjs',
+            title: 'WHAT[EXTERNAL-INVESTIGATION-010] browser_is_the_only_network_office',
+            what_id: 'EXTERNAL-INVESTIGATION-010',
+          },
+        },
+      ],
+    },
+    buildTraceGraph(join(ROOT, 'requirements')),
+  )
+
+  assert.equal(result.contractManifest.contracts.length, 0)
+  assert.match(result.violations.join('\n'), /invalid-semantic-evidence-metadata/)
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] GitGateway exact contract has an isolated compiler boundary', () => {

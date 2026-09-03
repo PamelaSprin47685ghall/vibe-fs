@@ -40,6 +40,8 @@
 
 `Fallback/CursorSurface.fs` 是唯一 recovery JS proof surface；两个旧 proof surface 已删除，不是合同路径。
 
+`Cursor.fs` 只保存 `FallbackOffset + ConsecutiveFailureCount` 领域值；`Fallback/CursorSurface.fs` 以 opaque projection handle 折叠真实 durable facts，并只投影 logical run、authority root、offset、failure count、dedupe cardinality 与 exhausted。surface 不暴露 continuation、next action、recovery opportunity 或物理发送能力。`PAR-020` 的 exact production-bound proof 固定同一事实重放同一受限 view；流程许可仍由 `RecoverySlot` 与 typed failure policy 独立拥有。
+
 ## 依赖关系
 
 DEPENDS ON:
@@ -75,3 +77,4 @@ DEPENDS ON:
 
 P0 recovery re-entry proof：`requirements/structured-workflow/tests/recovery-reentry.test.mjs`；hard gate：`scripts/checks/p0-recovery-join.mjs`。该 gate 同时约束 Blogger failure 在追加 ledger 前解析 exact main session，以及 `NoActiveRun` 不得继续 recovery。
 | PAR-019 | `requirements/provider-attempt-recovery/tests/retry-owner.test.mjs::WHAT[PAR-019] one policy owner licenses every provider recovery attempt`；`requirements/verification-system/tests/retry-owner.test.mjs::WHAT[PAR-019] rejects nested physical retry owner`；`requirements/verification-system/tests/retry-owner.test.mjs::WHAT[PAR-019] rejects retry classification from diagnostic text` |
+| PAR-020 | `requirements/provider-attempt-recovery/tests/cursor.test.mjs::WHAT[PAR-020] fallback_cursor_replay_exposes_domain_evidence_without_resume_authority` |

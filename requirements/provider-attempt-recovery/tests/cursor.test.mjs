@@ -142,6 +142,33 @@ test('WHAT[PAR-002] FALLBACK_002_an_offset_outside_zero_to_three_is_not_a_cursor
   }
 })
 
+test('WHAT[PAR-020] fallback_cursor_replay_exposes_domain_evidence_without_resume_authority', () => {
+  const facts = [
+    rootFact(),
+    advanceFact({ run: 'provider-1', previous: 0, next: 1, count: 1 }),
+  ]
+  const first = fallbackOf(foldFacts(facts).value)
+  const replay = fallbackOf(foldFacts(facts).value)
+
+  assert.deepEqual(replay, first)
+  assert.deepEqual(first, {
+    logicalRun: RUN,
+    authorityRoot: ROOT,
+    offset: 1,
+    failures: 1,
+    dedupeKeys: 1,
+    exhausted: false,
+  })
+  assert.deepEqual(Object.keys(first).sort(), [
+    'authorityRoot',
+    'dedupeKeys',
+    'exhausted',
+    'failures',
+    'logicalRun',
+    'offset',
+  ])
+})
+
 test('WHAT[PAR-006] FALLBACK_006_the_side_sequence_table_is_unbounded_by_construction', () => {
   // The clause states the table for the first attempts; the property is that it
   // repeats forever rather than stopping at the fourth.

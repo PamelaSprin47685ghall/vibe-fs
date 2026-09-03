@@ -281,6 +281,7 @@ export const SURFACE_MANIFEST = [
       'PAR-014',
       'PAR-016',
       'PAR-019',
+      'PAR-020',
       'EFFECT-ACCOUNTING-004',
       'VERIFICATION-SYSTEM-008',
     ],

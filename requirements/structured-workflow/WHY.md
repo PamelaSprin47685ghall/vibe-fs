@@ -25,6 +25,7 @@
 - **root 宽而浅**：composition root 可看见大量 construction/topology/order/lifetime wiring，但不得因此拥有 foreign policy；深语义必须回到 owner，不能以 LOC/import-count 代替语义审查。
 - **以可观察效果证明流程**：流程的正确性完全由领域事实、端口交互、调用 trace 与最终状态证明，不由内部解释器运行到了哪一步来定义。
 - **依赖必须穿过 owner 海关**：编译引用只说明实现依赖，requirement 引用只说明命题前提；两张图不可混同。跨 owner 的生产依赖必须落到 owner 明确承诺的 published contract、physical port/adapter 或 composition-root wiring。语言层面的 `public`、目录位置和 `Surface.fs` 文件名都不构成授权。
+- **语义豁免必须消费真实 proof edge**：执行位置词汇的 semantic-evidence 豁免只能引用 `requirement-trace` 已解析的唯一 active `(path,title,WHAT)` 边。文件存在、注释、字符串、skip/todo 或另一文件中的同 WHAT proof 都不能授权架构边。
 - **owner 海关最终必须由 compile-input boundary + F# signature 承载**：semantic owner 仍负责命题与 contract 承诺；production file 另有恰一个 owner-boundary locality，每个 locality 恰一个 fsproj。`Wanxiangshu.fsproj` 只作为 Fable emit 的扁平副本再次列出同一 compile set，不参与 owner topology。Fable 会递归 source-merge ProjectReference closure，所以 `internal`、top-level `module private` 与 `DisableTransitiveProjectReferences` 都不是跨工程 firewall；`.fsi` 则会在 source-merge 后真实隐藏未签名 implementation symbol，但 signature-only project 不能充当可消费 header，仍需真实 contract implementation。foreign semantic owner 只能引用 dependency-inverted 的 contract/adapter locality；这些 locality 及其 transitive closure 不能反向引用 provider runtime/private locality。provider runtime 依赖 contract，而不是 contract 依赖 runtime。只有 runtime source 完全不在 foreign consumer 的 Fable closure 中，且 contract implementation 由 `.fsi` 封口，漏 reference / 越 runtime boundary / sibling implementation access 才会由 compiler 直接拒绝。`published-contracts` 继续约束语言无法表达的 per-consumer exact symbol 承诺。
 - **局部编译只改变输入集合，不改变编译器模型**：owner/impact compile 先计算 ProjectReference closure 或 reverse-consumer impact，再按 aggregate source order 合并成一个零 ProjectReference flat fsproj，仅启动一次 Fable。实现 `.fs` 且 sibling `.fsi` 未变时不重编普通 consumer；`.fsi` 改动必须纳入全部 reverse consumers；工程/工具链输入变化保守走 full flat build。全量 release 继续编译与原始单工程完全相同的 source/config union，绝不逐 owner 启动 Fable，因此多工程边界不能给全量构建叠加工程图税。
 
@@ -39,3 +40,4 @@
 6. 使用无界并发或无界重试作为业务流程的默认行为，或把 repeated/recovery-path invocation 藏进无 owner/WHAT/relation/proof/policy 的 decorator。
 7. foreign owner 直接读取 private implementation、Stage/Step/cursor/registry presence，或 composition root 匹配 foreign policy DU。
 8. composition root 实现深层 semantic helper、动态 pipeline 或 generic middleware/decorator interface。
+9. semantic-evidence 通过裸 proof 路径、源码字符串或错误 owner 的 WHAT 取得跨 owner 授权。

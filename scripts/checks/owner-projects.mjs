@@ -4,6 +4,9 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { buildTraceGraph } from '../lib/requirement-trace.mjs'
+import { validatedSemanticEvidenceContracts } from '../lib/semantic-evidence.mjs'
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
 const AGGREGATE = join(SOURCE_ROOT, 'Wanxiangshu.fsproj')
@@ -157,6 +160,14 @@ function allowedForeignReferences(projects, projectOfSource, contracts) {
   return allowed
 }
 
+export function validateProjectContractEvidence(contractManifest, requirementTrace, repositoryRoot = ROOT) {
+  const result = validatedSemanticEvidenceContracts(contractManifest.contracts, requirementTrace, repositoryRoot)
+  return {
+    contractManifest: { ...contractManifest, contracts: result.contracts },
+    violations: result.findings.map(({ code, message }) => `${code}: ${message}`),
+  }
+}
+
 export function checkOwnerProjects() {
   const violations = []
   const fail = (message) => violations.push(message)
@@ -164,7 +175,12 @@ export function checkOwnerProjects() {
   if (!existsSync(SHARED_PROPS)) return { ok: false, violations: [`${repoPath(SHARED_PROPS)}: missing owner-project props`] }
 
   const ownerManifest = JSON.parse(readFileSync(OWNERS, 'utf8'))
-  const contractManifest = JSON.parse(readFileSync(CONTRACTS, 'utf8'))
+  const contractEvidence = validateProjectContractEvidence(
+    JSON.parse(readFileSync(CONTRACTS, 'utf8')),
+    buildTraceGraph(join(ROOT, 'requirements')),
+  )
+  const contractManifest = contractEvidence.contractManifest
+  for (const violation of contractEvidence.violations) fail(violation)
   const semanticOwner = new Map(ownerManifest.ownership.map((entry) => [entry.path, entry.owner]))
   const projectPaths = readdirSync(SOURCE_ROOT)
     .filter((name) => OWNER_PROJECT.test(name))

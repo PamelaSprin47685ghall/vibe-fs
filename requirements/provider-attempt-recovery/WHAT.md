@@ -75,3 +75,7 @@ WorkMain 失败进入 primed recovery opportunity 后，若 linked Blogger 已�
 ## PAR-019: 只消费 typed provider recovery licence
 
 FallbackController 只接受 `execution-failure-policy` 针对 `ProviderTransient | ProviderPermanent` 产生的 typed `RetryFreshAttempt` / `AdvanceFallback` licence；licence 必须绑定 exact `ProviderRunIdentity`、request kind 与 policy decision identity，controller 只验证当前 attempt 匹配，不重复计算 budget、breaker 或 failure class。`LocalInvariant`、`ProtocolRejection`、`AuthorizationDenied`、`UserCancelled`、`Superseded`、`CapacityQueueFull`、`AcceptanceUnknown`、`StreamInterruptedAfterFirstToken` 与任一 `PersistenceFailure` 均不得推进 cursor、消耗 provider 失败预算或创建 retry/fallback attempt。严禁 wildcard retry、按异常/terminal 文本重分类，或将未决 acceptance 当作 provider failure。
+
+## PAR-020: Fallback cursor 是 durable domain evidence，不是 resume authority
+
+Fallback cursor 只能由已提交的 Authority Root、typed provider failure 与 eligible business-main success 事实折叠得出，并只表达当前 logical run 的 side、连续失败预算与派生 EffectiveAgent。它不得携带或恢复 callback、continuation、next action、process-local recovery opportunity、物理请求许可或 workflow 入口。相同 durable facts 的 replay 必须得到相同 cursor view；仅有 cursor，尤其是 primed Offset，不得授权 retry、fallback、squash、continuation 或任一物理请求。所有推进仍须消费 exact typed failure licence，本次 recovery opportunity 仍须由当次成功提交的 failure advance 产生。

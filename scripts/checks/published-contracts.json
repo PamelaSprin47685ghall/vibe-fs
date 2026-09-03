@@ -3738,7 +3738,11 @@
       "contract": "SemanticTrace.Contract",
       "kind": "semantic-evidence",
       "law": "WHAT[SEMANTIC-TRACE-003]",
-      "proof": "requirements/semantic-trace/tests/x-trace.test.mjs",
+      "proof": {
+        "path": "requirements/semantic-trace/tests/x-trace.test.mjs",
+        "title": "WHAT[SEMANTIC-TRACE-003] cursor vocabulary is monotonic and opaque",
+        "what_id": "SEMANTIC-TRACE-003"
+      },
       "consumers": [
         "behavior-diagnosis",
         "context-compression",
@@ -5682,8 +5686,12 @@
       "node": "provider-attempt-recovery-cutover",
       "contract": "Provider.AttemptRecovery",
       "kind": "semantic-evidence",
-      "law": "WHAT[PAR-016]",
-      "proof": "requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs",
+      "law": "WHAT[PAR-020]",
+      "proof": {
+        "path": "requirements/provider-attempt-recovery/tests/cursor.test.mjs",
+        "title": "WHAT[PAR-020] fallback_cursor_replay_exposes_domain_evidence_without_resume_authority",
+        "what_id": "PAR-020"
+      },
       "consumers": [
         "context-compression",
         "execution-model-routing",
