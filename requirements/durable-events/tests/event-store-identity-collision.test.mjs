@@ -102,6 +102,14 @@ test('WHAT[DURABLE-EVENTS-003] canonical_bytes_are_utf8_json_plus_single_LF_with
   assert.equal(eventCodec.encode(value), eventCodec.encode(value))
 })
 
+test('WHAT[DURABLE-EVENTS-003] event payload keys follow Unicode code-point order without integer-key reordering', () => {
+  const text = eventCodec.encode(envelope({
+    payload: { 2: 'two', 10: 'ten', '\u{10000}': 'supplementary', '\uE000': 'bmp' },
+  }))
+
+  assert.match(text, /"payload":\{"10":"ten","2":"two","":"bmp","𐀀":"supplementary"\}/u)
+})
+
 test('WHAT[DURABLE-EVENTS-003] distinct_EventIds_are_both_retained', () => {
   const a = envelope({ id: '1111111111111111111111111111111111111111' })
   const b = envelope({

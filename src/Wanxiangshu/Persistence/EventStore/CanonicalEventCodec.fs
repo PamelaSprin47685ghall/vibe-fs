@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Persistence.EventStore
 
-open System.Text
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
@@ -8,31 +7,6 @@ open Wanxiangshu.Foundation.Identity
 /// §5.0 canonical event bytes: UTF-8, no BOM, single trailing LF,
 /// recursive Unicode-codepoint key order, parents / payload_refs set-normalized.
 module CanonicalEventCodec =
-
-    let private normalizeJson (value: obj) : obj =
-        emitJsExpr
-            value
-            """
-            (function (value) {
-                function normalize(current) {
-                    if (Array.isArray(current)) {
-                        return current.map(normalize);
-                    }
-
-                    if (current !== null && typeof current === "object") {
-                        const result = {};
-                        Object.keys(current).sort().forEach(function (key) {
-                            result[key] = normalize(current[key]);
-                        });
-                        return result;
-                    }
-
-                    return current;
-                }
-
-                return normalize(value);
-            })($0)
-            """
 
     let private envelopeObject (envelope: EventEnvelope) : obj =
         let normalized = EventEnvelope.normalize envelope
@@ -48,7 +22,9 @@ module CanonicalEventCodec =
 
     /// Canonical JSON text including exactly one trailing LF (§5.0).
     let encode (envelope: EventEnvelope) : string =
-        let json = JS.JSON.stringify (normalizeJson (envelopeObject envelope))
+        let json =
+            Wanxiangshu.Foundation.CanonicalJson.canonicalJson (envelopeObject envelope)
+
         json + "\n"
 
     /// Same EventId with different canonical bytes → IdentityCollision (§5.3).
@@ -85,26 +61,6 @@ module CanonicalEventCodec =
 
     [<Emit("""
     (function (value) {
-      function orderedTree(current) {
-        if (Array.isArray(current)) {
-          for (let i = 0; i < current.length; i += 1) {
-            if (!orderedTree(current[i])) return false;
-          }
-          return true;
-        }
-
-        if (current !== null && typeof current === 'object') {
-          const keys = Object.keys(current);
-          for (let i = 1; i < keys.length; i += 1) {
-            if (keys[i - 1] > keys[i]) return false;
-          }
-          for (const key of keys) {
-            if (!orderedTree(current[key])) return false;
-          }
-        }
-        return true;
-      }
-
       function sortedUnique(values) {
         for (let i = 1; i < values.length; i += 1) {
           if (!(values[i - 1] < values[i])) return false;
@@ -114,15 +70,14 @@ module CanonicalEventCodec =
 
       const allowed = new Set(['event_id', 'event_type', 'parents', 'payload', 'payload_refs', 'stream_id']);
       return Object.keys(value).every(key => allowed.has(key))
-        && orderedTree(value)
         && sortedUnique(value.parents)
         && sortedUnique(value.payload_refs);
     })($0)
     """)>]
     let private hasCanonicalStructure (parsed: obj) : bool = jsNative
 
-    [<Emit("JSON.stringify($0) + '\\n' === $1")>]
-    let private hasCanonicalJsonText (parsed: obj) (text: string) : bool = jsNative
+    let private hasCanonicalJsonText (parsed: obj) (text: string) : bool =
+        Wanxiangshu.Foundation.CanonicalJson.canonicalJson parsed + "\n" = text
 
     let private ensureCanonicalParsed (text: string) (parsed: obj) =
         if hasCanonicalStructure parsed && hasCanonicalJsonText parsed text then
@@ -168,5 +123,23 @@ module CanonicalEventCodec =
         else
             tryDecodeCanonical text
 
+    [<Emit("new TextDecoder('utf-8', { fatal: true }).decode($0)")>]
+    let private decodeUtf8Fatal (bytes: byte[]) : string = jsNative
+
+    [<Emit("$0.length >= 3 && $0[0] === 0xef && $0[1] === 0xbb && $0[2] === 0xbf")>]
+    let private hasUtf8Bom (bytes: byte[]) : bool = jsNative
+
+    let private decodeUtf8WithoutBom bytes =
+        try
+            Ok(decodeUtf8Fatal bytes)
+        with _ ->
+            Error(StorageInvalid.NonCanonical "event bytes are not valid UTF-8")
+
+    let tryDecodeUtf8Text (bytes: byte[]) : Result<string, StorageInvalid> =
+        if hasUtf8Bom bytes then
+            Error(StorageInvalid.NonCanonical "event bytes must not contain a BOM")
+        else
+            decodeUtf8WithoutBom bytes
+
     let tryDecodeUtf8 (bytes: byte[]) : Result<EventEnvelope, StorageInvalid> =
-        tryDecode (Encoding.UTF8.GetString bytes)
+        tryDecodeUtf8Text bytes |> Result.bind tryDecode

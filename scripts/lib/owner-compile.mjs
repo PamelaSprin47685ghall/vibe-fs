@@ -667,7 +667,7 @@ export function materializeOwnerCompile(plan, {
   }
 
   const defaultScratch = outputDir
-    ? path.resolve(path.dirname(plan.aggregatePath), '.fable-build')
+    ? path.resolve(REPO_ROOT, '.fable-build/output-compile')
     : DEFAULT_SCRATCH_ROOT
   const resolvedScratchRoot = norm(scratchRoot ?? defaultScratch)
   const resolvedRootPropsPath = norm(rootPropsPath)
@@ -705,8 +705,12 @@ export function materializeOwnerCompile(plan, {
   const fingerprint = hasher.digest('hex')
 
   const fingerprintDir = norm(path.join(resolvedScratchRoot, fingerprint))
-  const generatedProjectPath = norm(path.join(fingerprintDir, plan.candidateBasename))
-  const scratchPropsPath = norm(path.join(fingerprintDir, 'Directory.Build.props'))
+  const outputCompileInstance = crypto.createHash('sha256').update(fingerprintDir).digest('hex').slice(0, 16)
+  const generatedProjectDir = outputDir
+    ? norm(path.join(path.dirname(plan.aggregatePath), '.fable-build/output-compile', fingerprint, outputCompileInstance))
+    : fingerprintDir
+  const generatedProjectPath = norm(path.join(generatedProjectDir, plan.candidateBasename))
+  const scratchPropsPath = norm(path.join(generatedProjectDir, 'Directory.Build.props'))
 
   const projectName = path.basename(plan.candidateBasename, path.extname(plan.candidateBasename))
   const assetsPath = norm(path.join(fingerprintDir, 'artifacts', 'obj', projectName, 'project.assets.json'))
@@ -717,9 +721,13 @@ export function materializeOwnerCompile(plan, {
   const flatXml = generateFlatProjectXml(plan.aggregateContent, plan.aggregatePath, plan.compileItems)
 
   // Generate scratch Directory.Build.props setting isolated ArtifactsDir then importing root props
+  const artifactRoot = outputDir
+    ? `${norm(path.join(fingerprintDir, 'artifacts'))}/`
+    : '$(MSBuildThisFileDirectory)artifacts/'
   const scratchPropsContent = `<Project>
   <PropertyGroup>
-    <ArtifactsDir>$(MSBuildThisFileDirectory)artifacts/</ArtifactsDir>
+    <ArtifactsDir>${escapeXmlAttr(artifactRoot)}</ArtifactsDir>
+    <NuGetAudit>false</NuGetAudit>
   </PropertyGroup>
   <Import Project="${escapeXmlAttr(resolvedRootPropsPath)}" />
 </Project>
@@ -737,6 +745,7 @@ export function materializeOwnerCompile(plan, {
     successMarkerPath: markerPath,
     fingerprint,
     scratchDir: fingerprintDir,
+    projectDir: generatedProjectDir,
     candidateBasename: plan.candidateBasename,
   }
 }
@@ -838,6 +847,12 @@ export function removeOutputDirectory(outputDir) {
       // ignore
     }
   }
+}
+
+export function resetOutputDirectory(outputDir) {
+  if (!outputDir) throw new Error('outputDir is required')
+  fs.rmSync(outputDir, { recursive: true, force: true })
+  fs.mkdirSync(outputDir, { recursive: true })
 }
 
 /**

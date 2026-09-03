@@ -24,6 +24,7 @@ module ProcessEventLog =
     val filePath: log: ProcessEventLog -> string
     val append: log: ProcessEventLog -> events: EventEnvelope list -> unit
     val decodeWriterText: label: string -> text: string -> Result<EventEnvelope list, StorageInvalid>
+    val decodeWriterBytes: label: string -> bytes: byte[] -> Result<EventEnvelope list, StorageInvalid>
     val readLastCompleteLine: path: string -> Result<string option, string>
     val writerRetentionMilliseconds: unit -> float
     val isWriterActiveAt: nowMs: float -> lastActivityMs: float -> bool
@@ -33,7 +34,6 @@ module ProcessEventLog =
     val payloadPhysicalStats: commonDir: string -> (string * string) list
     val readWriterFileBytes: commonDir: string -> name: string -> byte[]
     val readPayloadFileBytes: commonDir: string -> name: string -> byte[]
-    val readWriterTexts: commonDir: string -> (string * string) list
 
     val mergeWriterTextWithActivity:
         commonDir: string ->

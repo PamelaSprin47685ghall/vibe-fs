@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
@@ -71,11 +71,11 @@ test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI incremental compile detec
     assert.equal(result1.status, 0, result1.stderr || result1.stdout)
     assert.match(result1.stdout, /\[owner-compile\] OK: Wanxiangshu\.Impact\.fsproj/)
 
-    const projectPath = findImpactProject(scratchRoot)
-    assert.ok(projectPath, 'CLI must materialize Wanxiangshu.Impact.fsproj')
-    const xml = readFileSync(projectPath, 'utf8')
-    assert.ok(!xml.includes('<ProjectReference'), 'impact CLI must not hand the owner ProjectReference graph to Fable')
     assert.ok(hasEmittedJsFiles(outputDir), 'focused impact compile must emit JavaScript to output directory')
+    assert.ok(
+      existsSync(join(outputDir, 'Foundation', 'FatalProcess.js')),
+      'focused flat compile must preserve the aggregate emitter output layout',
+    )
 
     const result2 = spawnSync(
       process.execPath,

@@ -506,7 +506,7 @@ module MagicTodoHostHooks =
         if isNull output || isNull output?output then
             ""
         else
-            CanonicalJson.canonicalJson output?output
+            Wanxiangshu.Foundation.CanonicalJson.canonicalJson output?output
 
     let private sessionTextOf (input: obj) =
         if isNull input || isNull input?sessionID then

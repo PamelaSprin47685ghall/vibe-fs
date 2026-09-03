@@ -90,7 +90,9 @@ module ExecutionFactFold =
                                 |> Result.toOption))
                         |> Option.orElse session.PromptAuthority
 
-                    Ok { session with PromptAuthority = authority })
+                    Ok
+                        { session with
+                            PromptAuthority = authority })
                 proj
             |> Result.defaultValue proj
             |> Ok

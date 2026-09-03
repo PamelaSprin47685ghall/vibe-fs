@@ -29,7 +29,7 @@ module HostMessageCodec =
         elif emitJsExpr value "typeof $0 === 'string'" then
             unbox<string> value
         else
-            CanonicalJson.canonicalJson value
+            Wanxiangshu.Foundation.CanonicalJson.canonicalJson value
 
     let private firstCanonical (value: obj) (fields: string list) =
         fields

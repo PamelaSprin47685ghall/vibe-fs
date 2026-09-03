@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Persistence.EventStore
 
 open System
-open System.Text
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
@@ -115,9 +114,6 @@ module ProcessEventLog =
 
     [<Import("appendFileSync", "node:fs")>]
     let private AppendAllText (path: string) (content: string) (encoding: string) : unit = jsNative
-
-    [<Import("readFileSync", "node:fs")>]
-    let private readTextFileSync (path: string) (encoding: string) : string = jsNative
 
     [<Import("readFileSync", "node:fs")>]
     let private readBytesFileSync (path: string) : byte[] = jsNative
@@ -328,8 +324,12 @@ module ProcessEventLog =
         else
             decodeWriterLines label (text.Split('\n'))
 
+    let decodeWriterBytes (label: string) (bytes: byte[]) : Result<EventEnvelope list, StorageInvalid> =
+        CanonicalEventCodec.tryDecodeUtf8Text bytes
+        |> Result.bind (decodeWriterText label)
+
     let private decodeFile (path: string) : Result<EventEnvelope list, StorageInvalid> =
-        decodeWriterText path (readTextFileSync path "utf8")
+        decodeWriterBytes path (readBytesFileSync path)
 
     let private lastIndexOfLf (buffer: byte[]) count =
         buffer
@@ -406,9 +406,10 @@ module ProcessEventLog =
         if length <= 0 then
             Error(sprintf "writer file contains empty final line: %s" path)
         else
-            Ok
-                { Start = lineStart
-                  Text = readExactAt fd lineStart length |> Encoding.UTF8.GetString }
+            readExactAt fd lineStart length
+            |> CanonicalEventCodec.tryDecodeUtf8Text
+            |> Result.mapError (fun _ -> sprintf "writer file contains invalid UTF-8: %s" path)
+            |> Result.map (fun text -> { Start = lineStart; Text = text })
 
     let private readCompleteLineBefore fd path lineEnd : Result<TailLine, string> =
         if lineEnd <= 0 then
@@ -618,13 +619,6 @@ module ProcessEventLog =
     let readPayloadFileBytes (commonDir: string) (name: string) : byte[] =
         readBytesFileSync (join2 (payloadsDirectory commonDir) name)
 
-    /// Frozen writer files as exact UTF-8 text. Sync owns bytes, not event meaning.
-    let readWriterTexts (commonDir: string) : (string * string) list =
-        writerFileNames commonDir
-        |> List.map (fun name ->
-            let writer = name.Substring(0, name.Length - ".ndjson".Length)
-            writer, readTextFileSync (join2 (eventsDirectory commonDir) name) "utf8")
-
     let private writeExtendedWriter (path: string) (existing: string) (incoming: string) =
         if incoming.Length > existing.Length then
             writeTextFileSync path incoming "utf8"
@@ -663,21 +657,25 @@ module ProcessEventLog =
         ensureDirectory directory
         let path = join2 directory (writer + ".ndjson")
         let exists = existsSync path
-        let existing = if exists then readTextFileSync path "utf8" else ""
 
-        if existing = incoming then
-            someWhen exists path
-            |> Option.iter (fun _ -> reconcileEqualWriterActivity path incomingActivityMs)
+        result {
+            let! existing =
+                if exists then
+                    readBytesFileSync path
+                    |> CanonicalEventCodec.tryDecodeUtf8Text
+                    |> Result.mapError (fun _ -> sprintf "writer history is not valid UTF-8: %s" writer)
+                else
+                    Ok ""
 
-            Ok()
-        elif incoming.StartsWith(existing, StringComparison.Ordinal) then
-            writeExtendedWriter path existing incoming
-            incomingActivityMs |> Option.iter (setWriterActivity path)
-            Ok()
-        elif existing.StartsWith(incoming, StringComparison.Ordinal) then
-            Ok()
-        else
-            Error(sprintf "writer history diverged: %s" writer)
+            if existing = incoming then
+                someWhen exists path
+                |> Option.iter (fun _ -> reconcileEqualWriterActivity path incomingActivityMs)
+            elif incoming.StartsWith(existing, StringComparison.Ordinal) then
+                writeExtendedWriter path existing incoming
+                incomingActivityMs |> Option.iter (setWriterActivity path)
+            elif not (existing.StartsWith(incoming, StringComparison.Ordinal)) then
+                return! Error(sprintf "writer history diverged: %s" writer)
+        }
 
     /// Replace/import one writer file only when the incoming bytes extend the
     /// local complete-line prefix. Divergence is fail-closed physical corruption.

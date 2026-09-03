@@ -11,6 +11,7 @@ import {
 } from './lib/derive-loop-detector-envelope.mjs'
 import {
   compileIncremental,
+  resetOutputDirectory,
 } from './lib/owner-compile.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -115,7 +116,8 @@ class CrossProcessMutex {
 // ── Fable Compile ─────────────────────────────────────────────────────────────
 
 async function compileFable() {
-  logInfo('Compiling F# with automatic incremental Fable...')
+  logInfo('Compiling F# with one clean full Fable invocation...')
+  resetOutputDirectory(dist)
   const result = await compileIncremental({
     root,
     outputDir: dist,
@@ -128,7 +130,7 @@ async function compileFable() {
   }
 
   if (result.cached) {
-    logInfo('up-to-date (cached)')
+    fail('release build unexpectedly reused cached output')
   } else {
     logInfo(`compiled ${result.mode} impact (${result.compileItems?.length ?? 0} items in ${result.elapsedMs}ms)`)
   }

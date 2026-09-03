@@ -5935,7 +5935,8 @@
       "symbols": [
         "Wanxiangshu.Persistence.EventStore.CanonicalEventCodec.checkIdentity",
         "Wanxiangshu.Persistence.EventStore.CanonicalEventCodec.encode",
-        "Wanxiangshu.Persistence.EventStore.CanonicalEventCodec.tryDecode"
+        "Wanxiangshu.Persistence.EventStore.CanonicalEventCodec.tryDecode",
+        "Wanxiangshu.Persistence.EventStore.CanonicalEventCodec.tryDecodeUtf8Text"
       ],
       "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
     },
@@ -15093,74 +15094,23 @@
       "justification": "repository-programming.Contract publishes exactly these symbols to 'knowledge-reuse'; every unlisted sibling remains private to repository-programming."
     },
     {
-      "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
+      "path": "src/Wanxiangshu/Foundation/CanonicalJson.fs",
       "owner": "dispatch-protocol",
       "node": "host-boundary-frontier-keep",
       "contract": "host-boundary.Contract",
       "kind": "published-contract",
       "consumers": [
-        "context-compression"
-      ],
-      "symbols": [
-        "Wanxiangshu.OpenCode.CanonicalJson.canonicalJson"
-      ],
-      "justification": "host-boundary.Contract publishes exactly these symbols to 'context-compression'; every unlisted sibling remains private to host-boundary."
-    },
-    {
-      "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
-      "owner": "dispatch-protocol",
-      "node": "host-boundary-frontier-keep",
-      "contract": "host-boundary.Contract",
-      "kind": "published-contract",
-      "consumers": [
-        "delegation"
-      ],
-      "symbols": [
-        "Wanxiangshu.OpenCode.CanonicalJson.canonicalJson"
-      ],
-      "justification": "host-boundary.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to host-boundary."
-    },
-    {
-      "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
-      "owner": "dispatch-protocol",
-      "node": "host-boundary-frontier-keep",
-      "contract": "host-boundary.Contract",
-      "kind": "published-contract",
-      "consumers": [
-        "obligation-ledger"
-      ],
-      "symbols": [
-        "Wanxiangshu.OpenCode.CanonicalJson.canonicalJson"
-      ],
-      "justification": "host-boundary.Contract publishes exactly these symbols to 'obligation-ledger'; every unlisted sibling remains private to host-boundary."
-    },
-    {
-      "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
-      "owner": "dispatch-protocol",
-      "node": "host-boundary-frontier-keep",
-      "contract": "host-boundary.Contract",
-      "kind": "published-contract",
-      "consumers": [
-        "provider-projection"
-      ],
-      "symbols": [
-        "Wanxiangshu.OpenCode.CanonicalJson.canonicalJson"
-      ],
-      "justification": "host-boundary.Contract publishes exactly these symbols to 'provider-projection'; every unlisted sibling remains private to host-boundary."
-    },
-    {
-      "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
-      "owner": "dispatch-protocol",
-      "node": "host-boundary-frontier-keep",
-      "contract": "host-boundary.Contract",
-      "kind": "published-contract",
-      "consumers": [
+        "context-compression",
+        "delegation",
+        "durable-events",
+        "obligation-ledger",
+        "provider-projection",
         "requirement-grounding"
       ],
       "symbols": [
-        "Wanxiangshu.OpenCode.CanonicalJson.canonicalJson"
+        "Wanxiangshu.Foundation.CanonicalJson.canonicalJson"
       ],
-      "justification": "host-boundary.Contract publishes exactly these symbols to 'requirement-grounding'; every unlisted sibling remains private to host-boundary."
+      "justification": "The Foundation canonical JSON encoder publishes one Unicode code-point identity formula to the exact production consumers; every unlisted sibling remains private to dispatch-protocol."
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs",

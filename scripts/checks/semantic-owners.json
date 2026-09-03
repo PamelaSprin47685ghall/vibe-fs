@@ -1537,7 +1537,7 @@
       "owner": "work-record"
     },
     {
-      "path": "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
+      "path": "src/Wanxiangshu/Foundation/CanonicalJson.fs",
       "owner": "dispatch-protocol"
     },
     {

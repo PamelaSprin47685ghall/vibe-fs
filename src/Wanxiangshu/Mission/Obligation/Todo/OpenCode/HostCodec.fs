@@ -144,7 +144,8 @@ module MagicTodoHostCodec =
         | Ok input -> input
         | Error reason -> raise (ProviderInputRejection reason)
 
-    let canonicalInput (args: obj) : string = CanonicalJson.canonicalJson args
+    let canonicalInput (args: obj) : string =
+        Wanxiangshu.Foundation.CanonicalJson.canonicalJson args
 
     let canonicalInputDigest (sha256: string -> string) (args: obj) : string = canonicalInput args |> sha256
 
