@@ -373,8 +373,11 @@ let sourceRange (value: obj) =
 
 let occurrenceByAnchor = Dictionary<string, int>(StringComparer.Ordinal)
 
-let observationSite sourcePath anchor =
-    let key = sourcePath + "\u0000" + anchor
+let observationSite (sourcePath: string) (anchor: string) (rawCase: string) (rawPayload: string list) =
+    let key =
+        [ sourcePath; anchor; rawCase ] @ rawPayload
+        |> List.map (fun value -> $"{value.Length}:{value}")
+        |> String.concat "\u0000"
     let ordinal =
         match occurrenceByAnchor.TryGetValue key with
         | true, value -> value
@@ -436,6 +439,103 @@ let tryPayloadSymbol payload =
 
 let kebabCase (value: string) =
     System.Text.RegularExpressions.Regex.Replace(value, "(?<!^)([A-Z])", "-$1").ToLowerInvariant()
+
+let tryBooleanProperty value name =
+    try
+        match propertyValue value name with
+        | :? bool as result -> Some result
+        | _ -> None
+    with _ -> None
+
+let hasDeclaringEntity value =
+    try propertyValue value "DeclaringEntity" |> optionValue |> Option.isSome
+    with _ -> false
+
+let entityHasCapabilityShape entity =
+    let abstractMember =
+        try propertyValue entity "MembersFunctionsAndValues" |> asObjects |> Seq.exists (fun memberValue -> boolPropertyOrFalse memberValue "IsAbstractMember")
+        with _ -> false
+    let functionField =
+        try propertyValue entity "FSharpFields" |> asObjects |> Seq.exists (fun field -> boolPropertyOrFalse (propertyValue field "FieldType") "IsFunctionType")
+        with _ -> false
+    boolPropertyOrFalse entity "IsInterface" || abstractMember || functionField
+
+let entityHasMutableField entity =
+    try propertyValue entity "FSharpFields" |> asObjects |> Seq.exists (fun field -> boolPropertyOrFalse field "IsMutable")
+    with _ -> false
+
+let pureRepresentationTypes =
+    HashSet<string>(
+        [ "Microsoft.FSharp.Core.Unit"
+          "System.Boolean"
+          "System.Byte"
+          "System.Char"
+          "System.DateTime"
+          "System.DateTimeOffset"
+          "System.Decimal"
+          "System.Double"
+          "System.Guid"
+          "System.Int16"
+          "System.Int32"
+          "System.Int64"
+          "System.SByte"
+          "System.Single"
+          "System.String"
+          "System.TimeSpan"
+          "System.UInt16"
+          "System.UInt32"
+          "System.UInt64" ],
+        StringComparer.Ordinal)
+
+let immutableValueNodeKind symbol =
+    try
+        let fullType = propertyValue symbol "FullType"
+        if boolPropertyOrFalse fullType "IsFunctionType" then "capability-immutable-value"
+        elif boolPropertyOrFalse fullType "IsArrayType" then "mutable-container-value"
+        elif boolPropertyOrFalse fullType "HasTypeDefinition" then
+            let entity = propertyValue fullType "TypeDefinition"
+            if entityHasMutableField entity then "mutable-container-value"
+            elif entityHasCapabilityShape entity then "capability-immutable-value"
+            elif pureRepresentationTypes.Contains(symbolName entity) then "pure-immutable-value"
+            else "immutable-value"
+        else "immutable-value"
+    with _ -> "immutable-value"
+
+let resolvedFSharpNodeKind patternName payload =
+    let fallback = kebabCase patternName
+    match patternName, tryPayloadSymbol payload with
+    | "Value", Some symbol ->
+        match tryBooleanProperty symbol "IsMutable", tryBooleanProperty symbol "IsModuleValueOrMember" with
+        | Some false, _ -> immutableValueNodeKind symbol
+        | Some true, Some true -> "module-mutable-value-read"
+        | Some true, Some false ->
+            if hasDeclaringEntity symbol then "captured-mutable-value-read"
+            else "local-mutable-value-read"
+        | _ -> fallback
+    | "CallWithWitnesses", Some symbol ->
+        match tryBooleanProperty symbol "IsMutable", tryBooleanProperty symbol "IsModuleValueOrMember" with
+        | Some true, Some true -> "module-mutable-value-read"
+        | Some true, Some false ->
+            if hasDeclaringEntity symbol then "captured-mutable-value-read"
+            else "local-mutable-value-read"
+        | _ -> fallback
+    | "ValueSet", Some symbol ->
+        match tryBooleanProperty symbol "IsMutable", tryBooleanProperty symbol "IsModuleValueOrMember" with
+        | Some true, Some true -> "module-mutable-value-set"
+        | Some true, Some false ->
+            if hasDeclaringEntity symbol then "captured-mutable-value-set"
+            else "local-mutable-value-set"
+        | _ -> fallback
+    | "FSharpFieldGet", Some field ->
+        match tryBooleanProperty field "IsMutable" with
+        | Some false -> "immutable-field-get"
+        | Some true -> "mutable-field-get"
+        | None -> fallback
+    | "FSharpFieldSet", Some field ->
+        match tryBooleanProperty field "IsMutable" with
+        | Some true -> "mutable-field-set"
+        | _ -> fallback
+    | _ -> fallback
 
 let expressionType = requireType fcsAssembly "FSharp.Compiler.Symbols.FSharpExpr"
 let declarationType = requireType fcsAssembly "FSharp.Compiler.Symbols.FSharpImplementationFileDeclaration"
@@ -503,21 +603,22 @@ let rec visitExpression sourcePath anchor expression =
     | None ->
         diagnostic "unsupported-fsharp-expression" sourcePath anchor "unknown" line column (expression.GetType().FullName)
     | Some(patternName, payload) ->
+        let nodeKind = resolvedFSharpNodeKind patternName payload
         let identity =
             tryPayloadSymbol payload
             |> Option.map symbolName
-            |> Option.defaultValue $"fsharp:{kebabCase patternName}"
+            |> Option.defaultValue $"fsharp:{nodeKind}"
         fsharpNodesOut.Add
-            { NodeKind = kebabCase patternName
+            { NodeKind = nodeKind
               SemanticIdentity = identity
-              Site = observationSite sourcePath anchor }
+              Site = observationSite sourcePath anchor "fsharp-node" [ nodeKind; identity ] }
         if identity.EndsWith("emitJsExpr", StringComparison.Ordinal) then
             immediateExpressions expression
             |> Array.choose constantString
             |> Array.tryLast
             |> function
-                | Some emitted -> addFableEmit "emit-js-expr" emitted (observationSite sourcePath anchor)
-                | None -> diagnostic "dynamic-emit-expression" sourcePath anchor (kebabCase patternName) line column identity
+                | Some emitted -> addFableEmit "emit-js-expr" emitted (observationSite sourcePath anchor "emit-js-expr" [ emitted ])
+                | None -> diagnostic "dynamic-emit-expression" sourcePath anchor nodeKind line column identity
     for child in immediateExpressions expression do visitExpression sourcePath anchor child
 
 let rec valuesOfType (candidateType: Type) (value: obj) =
@@ -642,7 +743,7 @@ let declarationUses =
     |> Seq.sortBy (fun item -> item.ConsumerPath, item.ProviderPaths, item.Symbol, item.Line, item.Column)
     |> Seq.toArray
 
-let externalSymbolUses =
+let externalSymbolOccurrences =
     symbolUses
     |> Seq.choose (fun symbolUse ->
         let consumer = propertyValue symbolUse "FileName" :?> string |> normalizePath
@@ -663,13 +764,19 @@ let externalSymbolUses =
                     diagnostic "unresolved-external-symbol" consumer ("source:" + consumer) (symbol.GetType().Name) line column identity
                     None
                 else
-                    Some
-                        { Assembly = assembly
-                          FullyQualifiedSymbol = identity
-                          SymbolKind = symbol.GetType().Name
-                          Site = observationSite consumer ("source:" + consumer) })
+                    Some(consumer, assembly, identity, symbol.GetType().Name, line, column))
     |> Seq.distinct
+    |> Seq.sortBy (fun (consumer, assembly, identity, symbolKind, line, column) ->
+        consumer, line, column, assembly, identity, symbolKind)
     |> Seq.toArray
+
+let externalSymbolUses =
+    externalSymbolOccurrences
+    |> Array.map (fun (consumer, assembly, identity, symbolKind, _, _) ->
+        { Assembly = assembly
+          FullyQualifiedSymbol = identity
+          SymbolKind = symbolKind
+          Site = observationSite consumer ("source:" + consumer) "fcs-external-symbol-use" [ assembly; identity ] })
 
 let attributeStrings attribute =
     try
@@ -701,12 +808,12 @@ for sourcePath, range, symbol in definitionSymbols do
             let arguments = attributeStrings attribute
             if attributeName.EndsWith("ImportAttribute", StringComparison.Ordinal) then
                 if arguments.Length >= 2 then
-                    addFableImport arguments.[1] arguments.[0] (observationSite interopSourcePath identity)
+                    addFableImport arguments.[1] arguments.[0] (observationSite interopSourcePath identity "fable-import" [ arguments.[1]; arguments.[0] ])
                 else
                     diagnostic "unparsed-fable-import" interopSourcePath identity attributeName line column identity
             elif attributeName.EndsWith("EmitAttribute", StringComparison.Ordinal) then
                 if arguments.Length >= 1 then
-                    addFableEmit "fable-emit" arguments.[0] (observationSite interopSourcePath identity)
+                    addFableEmit "fable-emit" arguments.[0] (observationSite interopSourcePath identity "fable-emit" [ arguments.[0] ])
                 else
                     diagnostic "unparsed-fable-emit" interopSourcePath identity attributeName line column identity
     with _ -> ()
@@ -720,13 +827,7 @@ let hasFunctionType value =
     with _ -> false
 
 let capabilityEntity entity =
-    let abstractMember =
-        try propertyValue entity "MembersFunctionsAndValues" |> asObjects |> Seq.exists (fun memberValue -> boolPropertyOrFalse memberValue "IsAbstractMember")
-        with _ -> false
-    let functionField =
-        try propertyValue entity "FSharpFields" |> asObjects |> Seq.exists (fun field -> boolPropertyOrFalse (propertyValue field "FieldType") "IsFunctionType")
-        with _ -> false
-    boolPropertyOrFalse entity "IsInterface" || abstractMember || functionField
+    entityHasCapabilityShape entity
 
 let signatureExports =
     definitionSymbols
@@ -757,7 +858,7 @@ let signatureExports =
                 Some
                     { ExportKind = kind
                       DeclarationIdentity = identity
-                      Site = observationSite sourcePath identity }
+                      Site = observationSite sourcePath identity "public-signature-export" [ kind; identity ] }
             | None ->
                 let containedDeclaration =
                     [ "FSharpParameter"; "FSharpGenericParameter" ]

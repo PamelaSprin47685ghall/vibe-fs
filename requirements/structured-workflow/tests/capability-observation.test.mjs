@@ -25,6 +25,16 @@ const external = (symbol, ordinal = 0) => ({
   payload: { assembly: 'node', fully_qualified_symbol: symbol, site: site(ordinal) },
 })
 
+const externalFsharp = (assembly, symbol, ordinal = 0) => ({
+  case: 'fcs-external-symbol-use',
+  payload: { assembly, fully_qualified_symbol: symbol, site: site(ordinal) },
+})
+
+const fsharpNode = (nodeKind, semanticIdentity = `fsharp:${nodeKind}`, ordinal = 0) => ({
+  case: 'fsharp-node',
+  payload: { node_kind: nodeKind, semantic_identity: semanticIdentity, site: site(ordinal) },
+})
+
 const codes = (result) => result.violations.map(({ code }) => code)
 
 const bindingRoot = (node) => {
@@ -185,6 +195,217 @@ test('WHAT[STRUCTURED-WORKFLOW-014] capability observations and JavaScript trave
     generated('generated-artifact/v1:fixture', { kind: 'call', root: 'decoy', member_path: [], binding_provenance: 'unresolved' }, 9),
   ]).facts
   assert.deepEqual(codes(validateJavaScriptTraversalV1({ source_kind: 'generated-artifact', source_id: 'generated-artifact/v1:fixture', observation_site: site(), ast, binding_provenance_for_node: fixtureBindingProvenance, visits, capability_facts: mismatchedFacts })), ['javascript-traversal-source-mismatch'])
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-014] FCS-accounted F# structure closes explicitly while mutable and future syntax stay Unknown', () => {
+  const compilerAccountedStructure = [
+    'anon-record-get',
+    'application',
+    'call-with-witnesses',
+    'coerce',
+    'decision-tree',
+    'decision-tree-success',
+    'default-value',
+    'fast-integer-for-loop',
+    'if-then-else',
+    'lambda',
+    'let',
+    'let-rec',
+    'new-anon-record',
+    'new-delegate',
+    'new-record',
+    'new-tuple',
+    'new-union-case',
+    'sequential',
+    'try-finally',
+    'try-with',
+    'tuple-get',
+    'type-lambda',
+    'type-test',
+    'union-case-get',
+    'union-case-tag',
+    'union-case-test',
+    'while-loop',
+  ]
+  for (const [ordinal, nodeKind] of compilerAccountedStructure.entries()) {
+    assert.deepEqual(classifyCapabilityObservationV1(fsharpNode(nodeKind, `fsharp:${nodeKind}`, ordinal)), {
+      case: 'irrelevant',
+      payload: { closed_rule_id: 'fsharp-compiler-accounted-structure' },
+    })
+  }
+
+  for (const [ordinal, nodeKind] of [
+    'address-of',
+    'f-sharp-field-get',
+    'f-sharp-field-set',
+    'i-l-asm',
+    'i-l-field-get',
+    'new-object',
+    'new-array',
+    'object-expr',
+    'immutable-value',
+    'this-value',
+    'trait-call',
+    'value',
+    'value-set',
+    'future-expression',
+  ].entries()) {
+    assert.deepEqual(classifyCapabilityObservationV1(fsharpNode(nodeKind, `fsharp:${nodeKind}`, ordinal + 40)), {
+      case: 'unknown',
+      payload: {
+        unknown_class: 'unsupported-ast',
+        syntax_kind: nodeKind,
+        raw_identity: `fsharp:${nodeKind}`,
+      },
+    })
+  }
+
+  assert.deepEqual(classifyCapabilityObservationV1(fsharpNode('application', 'System.IO.File.ReadAllText', 60)), {
+    case: 'classified',
+    payload: {
+      runtimes: ['fsharp'],
+      authorities: ['file-system'],
+      mutable_resources: [],
+      semantic_classes: ['capability-value'],
+    },
+  })
+
+  assert.deepEqual(classifyCapabilityObservationV1(fsharpNode('pure-immutable-value', 'Fixture.count', 70)), {
+    case: 'irrelevant',
+    payload: { closed_rule_id: 'fsharp-pure-immutable-value' },
+  })
+  for (const [ordinal, nodeKind] of ['local-mutable-value-read', 'local-mutable-value-set'].entries()) {
+    assert.deepEqual(classifyCapabilityObservationV1(fsharpNode(nodeKind, `Fixture.${nodeKind}`, ordinal + 70)), {
+      case: 'unknown',
+      payload: {
+        unknown_class: 'unsupported-ast',
+        syntax_kind: nodeKind,
+        raw_identity: `Fixture.${nodeKind}`,
+      },
+    })
+  }
+  for (const [ordinal, nodeKind] of ['module-mutable-value-read', 'module-mutable-value-set'].entries()) {
+    assert.deepEqual(classifyCapabilityObservationV1(fsharpNode(nodeKind, 'Fixture.moduleCell', ordinal + 80)), {
+      case: 'classified',
+      payload: {
+        runtimes: ['fsharp'],
+        authorities: [],
+        mutable_resources: ['top-level-mutable'],
+        semantic_classes: ['capability-value'],
+      },
+    })
+  }
+  for (const [ordinal, nodeKind] of [
+    'captured-mutable-value-read',
+    'captured-mutable-value-set',
+    'mutable-container-value',
+    'mutable-field-get',
+    'mutable-field-set',
+  ].entries()) {
+    assert.deepEqual(classifyCapabilityObservationV1(fsharpNode(nodeKind, 'Fixture.MutableCell.Value', ordinal + 90)), {
+      case: 'classified',
+      payload: {
+        runtimes: ['fsharp'],
+        authorities: [],
+        mutable_resources: ['runtime-cell'],
+        semantic_classes: ['capability-value'],
+      },
+    })
+  }
+  assert.deepEqual(classifyCapabilityObservationV1(fsharpNode('capability-immutable-value', 'Fixture.timer', 100)), {
+    case: 'classified',
+    payload: {
+      runtimes: ['fsharp'],
+      authorities: [],
+      mutable_resources: [],
+      semantic_classes: ['capability-value'],
+    },
+  })
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-014] external FCS symbols use closed semantic families rather than assembly defaults or substring guesses', () => {
+  for (const [ordinal, [assembly, symbol]] of [
+    ['FSharp.Core', 'Microsoft.FSharp.Collections.List.map'],
+    ['FSharp.Core', 'Microsoft.FSharp.Core.LanguagePrimitives.GenericEquality'],
+    ['FsToolkit.ErrorHandling', 'FsToolkit.ErrorHandling.ResultCE.Bind'],
+    ['Thoth.Json', 'Thoth.Json.Decode.string'],
+  ].entries()) {
+    assert.deepEqual(classifyCapabilityObservationV1(externalFsharp(assembly, symbol, ordinal + 100)), {
+      case: 'classified',
+      payload: {
+        runtimes: ['external-package'],
+        authorities: [],
+        mutable_resources: [],
+        semantic_classes: ['pure-representation'],
+      },
+    })
+  }
+
+  assert.equal(classifyCapabilityObservationV1(externalFsharp(
+    'FSharp.Core',
+    'Microsoft.FSharp.Collections.ListModuleUnsafe.Map',
+    110,
+  )).case, 'unknown')
+  assert.equal(classifyCapabilityObservationV1(externalFsharp(
+    'FSharp.Core',
+    'Microsoft.FSharp.Collections.ArrayModule.Map',
+    111,
+  )).case, 'unknown')
+  assert.equal(classifyCapabilityObservationV1(externalFsharp(
+    'FSharp.Core',
+    'Microsoft.FSharp.Collections.List.toArray',
+    112,
+  )).case, 'unknown')
+  assert.equal(classifyCapabilityObservationV1(externalFsharp(
+    'FSharp.Core',
+    'Future.Namespace.Member',
+    113,
+  )).case, 'unknown')
+  assert.deepEqual(classifyCapabilityObservationV1(externalFsharp(
+    'System.Runtime',
+    'System.IO.File.ReadAllText',
+    114,
+  )).payload.authorities, ['file-system'])
+  assert.equal(classifyCapabilityObservationV1(externalFsharp(
+    'Example',
+    'Acme.System.IOish.Parser',
+    115,
+  )).case, 'unknown')
+
+  const exactAuthorities = [
+    ['System.Runtime', 'System.Console.WriteLine', 'console'],
+    ['System.Runtime', 'System.DateTime.UtcNow', 'clock'],
+    ['System.Runtime', 'System.Diagnostics.Process.Kill', 'process-control'],
+    ['System.Runtime', 'System.Environment.GetEnvironmentVariable', 'environment'],
+    ['System.Runtime', 'System.Guid.NewGuid', 'randomness'],
+    ['System.Runtime', 'System.Net.Http.HttpClient.SendAsync', 'network'],
+    ['System.Runtime', 'System.Threading.Tasks.Task.Delay', 'timer'],
+    ['Host.Runtime', 'Host.Invoke', 'host'],
+  ]
+  for (const [ordinal, [assembly, symbol, authority]] of exactAuthorities.entries()) {
+    assert.deepEqual(
+      classifyCapabilityObservationV1(externalFsharp(assembly, symbol, ordinal + 120)).payload.authorities,
+      [authority],
+    )
+  }
+
+  for (const [ordinal, symbol] of [
+    'System.Consoleish.WriteLine',
+    'System.DateTime.Nowish',
+    'System.Diagnostics.Processish.Kill',
+    'System.Environmental.GetEnvironmentVariable',
+    'System.Randomish.Next',
+    'System.Net.Http.HttpClientish.SendAsync',
+    'System.Threading.Tasks.Task.Delayed',
+    'Hostile.Invoke',
+    'Acme.child_process_wrapper.Run',
+  ].entries()) {
+    assert.equal(
+      classifyCapabilityObservationV1(externalFsharp('Example', symbol, ordinal + 140)).case,
+      'unknown',
+      `${symbol} must not inherit authority from a substring`,
+    )
+  }
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-014] JavaScript visitor closes dynamic computed CommonJS and parameterless Date capabilities', () => {

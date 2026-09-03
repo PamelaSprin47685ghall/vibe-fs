@@ -1532,7 +1532,7 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 5. `B4 foundational capabilities`（T0 PROOF DONE；SPLITS PENDING）：Temporal synthetic blueprint已替换为production-bound行为proof；后续依序拆Temporal、CausalWait、Process/PTY纯词汇与窄capability，先立contract再迁consumer，最后删旧路径。
 6. `B5 Delegation ownership`（PENDING）：迁owner fact/append/query/wait/clock ports与pure projections/folds，durable composition只保留outer routing/combine。
 7. `B6 Delegation Host/PTY wiring`（PENDING）：拆host runtime/窄adapter，删除PTY对HostForkRuntime与Process implementation反向依赖，由现有composition roots注入。
-8. `B7 full adjudication`（PENDING）：fresh生成全locality worksheet，逐条写入非current-reference-derived裁决，零undecided、零extractor blocker；每组绿色Git节点。
+8. `B7 full adjudication`（TAXONOMY CHECKPOINT DONE；ADJUDICATION PENDING）：F# compiler-resolved结构、mutable scope、exact external authority/pure family与stable occurrence identity首批闭合；fresh仍有315,949条fail-closed Unknown与`RootWorkspace` extraction blocker。后续按exact family/type/escape证据分组关闭，再逐条写入非current-reference-derived裁决，最终零undecided、零extractor blocker。
 9. `C M6.3c staged audit`（PENDING，禁止独立commit）：只准备旧ACL无法表达的最小cutover与终态manifest；stage全部input，fresh重建world/query/index并生成一次formal snapshot，任一mismatch整体重生。
 10. `D M6.4 atomic cutover`（PENDING）：同一staged state复验；单commit启用v2/fresh scan唯一authority并删除v1 owner-wide/per-symbol/compile-support权威、worksheet与迁移残余。随后fixed RED、fast-check、真实production scan、完整release sink、upstream同步、diff审计与PR更新。
 
@@ -1576,3 +1576,10 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - `LoopSensor`改为composition必填diagnostic callback，内部吸收观测异常；`HostSignalBootstrap`注入`Diagnostic.emit`，`PluginRuntimeScope`删除默认no-op sensor。production-bound DG-013固定callback抛错时arm、interrupt、consume、continuation不变；loop runtime不再引用完整signal或diagnostics implementation。
 - direct compile另暴露两条upstream `ed21b6d31`已存在、此前被flattened aggregate隐藏的closure：`opencode-host-sessionbindingsurface/Sessions.fs → host-diagnostics-runtime/Diagnostic.fs`与`resources-promptsurface/SessionExecutionBinding.fs → host-signal-adapter/HostEventCodec.fs`。源码行为未改；给两个真实composition consumer补exact ProjectReference后各自owner compile绿色。另把`dispatch-runtime/Send.fs → Diagnostic.fatal`记为显式现状边，留给后续fatal-port节点删除，不借wide codec closure偶然放行。
 - 3个provider、全部direct consumer、Host bootstrap/runtime-scope与四个`.fsi` full reverse-impact compile绿色；受影响targeted 77/77、fresh worksheet后短复验16/16、`node scripts/check.mjs`全绿。fresh report为181 localities、712 sources、1,864 ProjectReferences、4,406 source edges、460 traversals；closure只剩既定EventStore原子切换blocker。worksheet仍0 decided且无授权力；旧v1 gate仍为唯一release authority。
+
+### 2026-09-04 — M6.3b B7-A compiler-resolved capability taxonomy
+
+- F# scanner不再按同anchor的所有节点共享ordinal；先按ephemeral source range+symbol去重同一external occurrence，再按`(source, anchor, raw case, full payload)`分别编号。相同payload的两个真实range保持两个连续ID，无关observation插入不再改变fact identity。
+- classifier只把显式穷举、其能力已由child/compiler symbol/dependency observation承接的结构node判irrelevant。FCS `FullType`、mutability、module/local scope、declaring entity与field facts区分primitive pure value、local scratch、top-level mutable、runtime cell与capability carrier；array、object/IL/address/trait/`this`及未证明immutable carrier继续Unknown。
+- external classification只采用exact FQN family/member/component。删除ArrayModule整族pure与substring authority命中；FileSystem、ProcessControl、Environment、Console、Clock、Randomness、Timer、Network、Host均有positive与near-miss反例。assembly名不能使symbol自动变pure。
+- 基于独立B3 commit `b166c0c77`的fresh run耗时约266.3s：181 localities、712 sources、1,864 refs、4,406 edges、861,657 facts、460 traversals；Unknown从857,589降为315,949，其中F# node 234,212、external 81,290、JS/Fable 447。唯一extraction diagnostic仍是`SharedState.RootWorkspace` signature export；唯一closure finding仍是既定EventStore blocker。该节点只增强report-only extractor，不启用v2 authority、不伪称B7 adjudication完成。

@@ -72,6 +72,125 @@ test('WHAT[STRUCTURED-WORKFLOW-011] compiler-resolved analyzer rejects an aggreg
         },
       },
     }).case, 'unknown', 'a production scanner const node must not depend on a test-only node-kind alias')
+    const duplicateConstants = result.compilerObservations.fsharpNodes.filter(({ nodeKind, semanticIdentity, site }) =>
+      nodeKind === 'const'
+      && semanticIdentity === 'fsharp:const'
+      && site.semanticDeclarationAnchor.endsWith('.duplicateConstants'))
+    assert.deepEqual(
+      duplicateConstants.map(({ site }) => site.sameAnchorOccurrenceOrdinal).sort((left, right) => left - right),
+      [0, 1],
+      'same payload occurrences count independently of unrelated nodes under the same declaration anchor',
+    )
+    const duplicateExternal = result.compilerObservations.externalSymbolUses.filter(({ fullyQualifiedSymbol, site }) =>
+      fullyQualifiedSymbol === 'Microsoft.FSharp.Collections.List.map'
+      && site.sourcePath.endsWith('/locality-dependencies/Provider.fs'))
+    assert.deepEqual(
+      duplicateExternal.map(({ site }) => site.sameAnchorOccurrenceOrdinal).sort((left, right) => left - right),
+      [0, 1],
+      'two real same-symbol ranges stay distinct after duplicate extraction of one range is removed',
+    )
+    const observationGroups = new Map()
+    const addObservation = (rawCase, payload, observedSite) => {
+      const key = JSON.stringify([observedSite.sourcePath, observedSite.semanticDeclarationAnchor, rawCase, payload])
+      const ordinals = observationGroups.get(key) ?? []
+      ordinals.push(observedSite.sameAnchorOccurrenceOrdinal)
+      observationGroups.set(key, ordinals)
+    }
+    for (const { nodeKind, semanticIdentity, site } of result.compilerObservations.fsharpNodes) {
+      addObservation('fsharp-node', [nodeKind, semanticIdentity], site)
+    }
+    for (const { assembly, fullyQualifiedSymbol, site } of result.compilerObservations.externalSymbolUses) {
+      addObservation('fcs-external-symbol-use', [assembly, fullyQualifiedSymbol], site)
+    }
+    for (const { kind, moduleSpecifier, selector, expression, site } of result.compilerObservations.fableInterop) {
+      addObservation(kind, kind === 'fable-import' ? [moduleSpecifier, selector] : [expression], site)
+    }
+    for (const { exportKind, declarationIdentity, site } of result.compilerObservations.signatureExports) {
+      addObservation('public-signature-export', [exportKind, declarationIdentity], site)
+    }
+    for (const ordinals of observationGroups.values()) {
+      assert.deepEqual(
+        ordinals.sort((left, right) => left - right),
+        Array.from({ length: ordinals.length }, (_, ordinal) => ordinal),
+        'each exact raw observation payload owns an independent contiguous occurrence sequence',
+      )
+    }
+    const mutableScopeNodes = result.compilerObservations.fsharpNodes.filter(({ site }) =>
+      site.semanticDeclarationAnchor.endsWith('.classifyMutableScope'))
+    for (const nodeKind of [
+      'local-mutable-value-read',
+      'local-mutable-value-set',
+      'module-mutable-value-read',
+      'module-mutable-value-set',
+      'mutable-field-get',
+      'mutable-field-set',
+    ]) {
+      const node = mutableScopeNodes.find((candidate) => candidate.nodeKind === nodeKind)
+      assert.ok(node, `production FCS facts must distinguish ${nodeKind}`)
+      const disposition = classifyCapabilityObservationV1({
+        case: 'fsharp-node',
+        payload: {
+          node_kind: node.nodeKind,
+          semantic_identity: node.semanticIdentity,
+          site: {
+            locality_id: 'fixture-provider',
+            source_path: node.site.sourcePath,
+            semantic_declaration_anchor: node.site.semanticDeclarationAnchor,
+            same_anchor_occurrence_ordinal: node.site.sameAnchorOccurrenceOrdinal,
+          },
+        },
+      })
+      if (nodeKind.startsWith('local-')) {
+        assert.equal(disposition.case, 'unknown')
+      } else {
+        assert.equal(disposition.case, 'classified')
+        assert.deepEqual(
+          disposition.payload.mutable_resources,
+          nodeKind.startsWith('module-') ? ['top-level-mutable'] : ['runtime-cell'],
+        )
+      }
+    }
+    const objectStateNodes = result.compilerObservations.fsharpNodes.filter(({ semanticIdentity }) =>
+      semanticIdentity.includes('MutableOwner.state'))
+    assert.ok(objectStateNodes.some(({ nodeKind }) => nodeKind === 'mutable-field-get'))
+    assert.ok(objectStateNodes.some(({ nodeKind }) => nodeKind === 'mutable-field-set'))
+    const capabilityBinding = result.compilerObservations.fsharpNodes.find(({ nodeKind, semanticIdentity }) =>
+      nodeKind === 'capability-immutable-value' && semanticIdentity === 'capability')
+    assert.ok(capabilityBinding, 'an immutable binding that carries a capability must never become irrelevant')
+    const capabilityDisposition = classifyCapabilityObservationV1({
+      case: 'fsharp-node',
+      payload: {
+        node_kind: capabilityBinding.nodeKind,
+        semantic_identity: capabilityBinding.semanticIdentity,
+        site: {
+          locality_id: 'fixture-provider',
+          source_path: capabilityBinding.site.sourcePath,
+          semantic_declaration_anchor: capabilityBinding.site.semanticDeclarationAnchor,
+          same_anchor_occurrence_ordinal: capabilityBinding.site.sameAnchorOccurrenceOrdinal,
+        },
+      },
+    })
+    assert.deepEqual(capabilityDisposition.payload.semantic_classes, ['capability-value'])
+    const capturedMutable = result.compilerObservations.fsharpNodes.filter(({ nodeKind, semanticIdentity }) =>
+      ['local-mutable-value-read', 'local-mutable-value-set'].includes(nodeKind)
+      && semanticIdentity === 'count')
+    assert.deepEqual([...new Set(capturedMutable.map(({ nodeKind }) => nodeKind))].sort(), [
+      'local-mutable-value-read',
+      'local-mutable-value-set',
+    ])
+    assert.ok(capturedMutable.every((node) => classifyCapabilityObservationV1({
+      case: 'fsharp-node',
+      payload: {
+        node_kind: node.nodeKind,
+        semantic_identity: node.semanticIdentity,
+        site: {
+          locality_id: 'fixture-provider',
+          source_path: node.site.sourcePath,
+          semantic_declaration_anchor: node.site.semanticDeclarationAnchor,
+          same_anchor_occurrence_ordinal: node.site.sameAnchorOccurrenceOrdinal,
+        },
+      },
+    }).case === 'unknown'), 'without a closed escape proof even a lexical local must stay Unknown')
     assert.deepEqual(
       [...new Set(result.compilerObservations.fableInterop.map(({ kind }) => kind))].sort(),
       ['emit-js-expr', 'fable-emit', 'fable-import'],

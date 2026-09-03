@@ -12,6 +12,12 @@ module Provider =
     val preserve: value: 'value -> 'value
     val choose: condition: bool -> whenTrue: 'value -> whenFalse: 'value -> 'value
 
+    val duplicateConstants: condition: bool -> int
+
+    val duplicateExternal: values: 'value list -> 'value list * 'value list
+
+    val classifyMutableScope: value: int -> int
+
 module FixtureInterop =
     [<Import("join", "node:path")>]
     val join: left: string -> right: string -> string

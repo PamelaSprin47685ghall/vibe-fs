@@ -54,6 +54,35 @@ const KNOWN_NODE_TYPES = new Set([
   'TryStatement', 'UnaryExpression', 'UpdateExpression', 'VariableDeclaration', 'VariableDeclarator',
   'WhileStatement', 'WithStatement', 'YieldExpression',
 ])
+const FSHARP_COMPILER_ACCOUNTED_STRUCTURE = new Set([
+  'anon-record-get',
+  'application',
+  'call-with-witnesses',
+  'coerce',
+  'decision-tree',
+  'decision-tree-success',
+  'default-value',
+  'fast-integer-for-loop',
+  'if-then-else',
+  'lambda',
+  'let',
+  'let-rec',
+  'new-anon-record',
+  'new-delegate',
+  'new-record',
+  'new-tuple',
+  'new-union-case',
+  'sequential',
+  'try-finally',
+  'try-with',
+  'tuple-get',
+  'type-lambda',
+  'type-test',
+  'union-case-get',
+  'union-case-tag',
+  'union-case-test',
+  'while-loop',
+])
 
 const exactKeys = (value, keys) => {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
@@ -143,9 +172,25 @@ const identityIsOrExtends = (identity, owner, separators = '.') => identity === 
     && identity.slice(0, owner.length) === owner
     && separators.includes(identity[owner.length]))
 
+const CLOSED_PURE_IDENTITY_FAMILIES = [
+  'fstoolkit.errorhandling',
+  'microsoft.fsharp.core.languageprimitives',
+  'microsoft.fsharp.core.optionmodule',
+  'microsoft.fsharp.core.resultmodule',
+  'microsoft.fsharp.core.valueoption',
+  'thoth.json',
+]
+const CLOSED_PURE_IDENTITIES = new Set([
+  'microsoft.fsharp.collections.list.map',
+  'microsoft.fsharp.collections.listmodule',
+])
+const identityIsOneOf = (identity, values) => values.includes(identity)
+const identityBelongsToOneOf = (identity, owners, separators = '.') =>
+  owners.some((owner) => identityIsOrExtends(identity, owner, separators))
+
 const labelsForIdentity = (identity, runtime = 'fsharp') => {
   const lower = identity.toLowerCase()
-  if (lower === 'date.parse' || lower.includes('date.parse(') || lower.includes('new date(epoch)')) {
+  if (identityIsOneOf(lower, ['date.parse', 'new date(epoch)'])) {
     return classified({ runtimes: [runtime], semanticClasses: ['pure-representation'] })
   }
   if (identityIsOrExtends(lower, 'gpt-tokenizer/encoding/o200k_base')) {
@@ -157,31 +202,74 @@ const labelsForIdentity = (identity, runtime = 'fsharp') => {
   if (identityIsOrExtends(lower, 'node:path', './')) {
     return classified({ runtimes: ['node'], authorities: ['environment'], semanticClasses: ['capability-value'] })
   }
-  if (lower.includes('node:fs') || lower.startsWith('fs.') || lower.includes('system.io')) {
-    return classified({ runtimes: [runtime === 'fsharp' ? 'fsharp' : 'node'], authorities: ['file-system'], semanticClasses: ['capability-value'] })
+  if (CLOSED_PURE_IDENTITIES.has(lower)
+    || CLOSED_PURE_IDENTITY_FAMILIES.some((owner) => identityIsOrExtends(lower, owner))) {
+    return classified({ runtimes: [runtime], semanticClasses: ['pure-representation'] })
   }
-  if (lower.includes('child_process') || lower.includes('process.kill') || lower.includes('process.exit') || lower.includes('process.pid')) {
-    return classified({ runtimes: ['node'], authorities: ['process-control'], semanticClasses: ['capability-value'] })
+  if (identityIsOrExtends(lower, 'node:fs', './')
+    || identityIsOrExtends(lower, 'fs')
+    || identityIsOrExtends(lower, 'system.io')) {
+    const resolvedRuntime = identityBelongsToOneOf(lower, ['fs', 'node:fs'], './') ? 'node' : runtime
+    return classified({ runtimes: [resolvedRuntime], authorities: ['file-system'], semanticClasses: ['capability-value'] })
   }
-  if (lower.includes('process.env') || lower.includes('getenvironmentvariable') || lower.includes('process.cwd') || lower.includes('process.platform')) {
+  if (identityBelongsToOneOf(lower, ['child_process', 'node:child_process'], './')
+    || identityIsOneOf(lower, ['process.kill', 'process.exit', 'process.pid'])
+    || identityIsOrExtends(lower, 'system.diagnostics.process')) {
+    const resolvedRuntime = identityBelongsToOneOf(lower, ['child_process', 'node:child_process'], './')
+      || identityIsOrExtends(lower, 'process') ? 'node' : runtime
+    return classified({ runtimes: [resolvedRuntime], authorities: ['process-control'], semanticClasses: ['capability-value'] })
+  }
+  if (identityIsOrExtends(lower, 'process.env')
+    || identityIsOneOf(lower, [
+      'process.cwd',
+      'process.platform',
+      'system.environment.commandline',
+      'system.environment.currentdirectory',
+      'system.environment.getenvironmentvariable',
+      'system.environment.getenvironmentvariables',
+      'system.environment.getfolderpath',
+      'system.environment.machinename',
+      'system.environment.osversion',
+      'system.environment.processorcount',
+      'system.environment.setenvironmentvariable',
+      'system.environment.userdomainname',
+      'system.environment.username',
+    ])) {
     return classified({ runtimes: [runtime], authorities: ['environment'], semanticClasses: ['capability-value'] })
   }
-  if (lower.startsWith('console.') || lower.includes('system.console')) {
+  if (identityIsOrExtends(lower, 'console') || identityIsOrExtends(lower, 'system.console')) {
     return classified({ runtimes: [runtime], authorities: ['console'], semanticClasses: ['capability-value'] })
   }
-  if (lower.includes('date.now') || lower.includes('datetime.now') || lower.includes('datetime.utcnow') || lower.includes('datetimeoffset.utcnow') || lower.includes('performance.now')) {
+  if (identityIsOneOf(lower, [
+    'date.now',
+    'performance.now',
+    'system.datetime.now',
+    'system.datetime.utcnow',
+    'system.datetimeoffset.utcnow',
+  ])) {
     return classified({ runtimes: [runtime], authorities: ['clock'], semanticClasses: ['capability-value'] })
   }
-  if (lower.includes('math.random') || lower.includes('guid.newguid') || lower.includes('system.random') || lower.includes('randomuuid')) {
+  if (identityIsOneOf(lower, ['crypto.randomuuid', 'math.random', 'system.guid.newguid'])
+    || identityIsOrExtends(lower, 'system.random')) {
     return classified({ runtimes: [runtime], authorities: ['randomness'], semanticClasses: ['capability-value'] })
   }
-  if (lower.includes('settimeout') || lower.includes('cleartimeout') || lower.includes('setinterval') || lower.includes('clearinterval') || lower.includes('task.delay')) {
+  if (identityIsOneOf(lower, [
+    'clearinterval',
+    'cleartimeout',
+    'microsoft.fsharp.control.fsharpasync.sleep',
+    'setinterval',
+    'settimeout',
+    'system.threading.tasks.task.delay',
+  ])
+    || identityBelongsToOneOf(lower, ['system.threading.timer', 'system.timers.timer'])) {
     return classified({ runtimes: [runtime], authorities: ['timer'], semanticClasses: ['capability-value'] })
   }
-  if (lower === 'fetch' || lower.startsWith('node:http') || lower.startsWith('node:https') || lower.startsWith('node:net')) {
+  if (lower === 'fetch'
+    || identityBelongsToOneOf(lower, ['node:http', 'node:https', 'node:net'], './')
+    || identityBelongsToOneOf(lower, ['system.net.http.httpclient', 'system.net.sockets.socket'])) {
     return classified({ runtimes: [runtime], authorities: ['network'], semanticClasses: ['capability-value'] })
   }
-  if (lower === 'host' || lower.startsWith('host.')) {
+  if (identityIsOrExtends(lower, 'host')) {
     return classified({ runtimes: [runtime], authorities: ['host'], semanticClasses: ['capability-value'] })
   }
   return null
@@ -216,6 +304,25 @@ export const classifyCapabilityObservationV1 = (observation) => {
     if (known) return known
     if (payload.node_kind === 'const') {
       return classified({ runtimes: ['fsharp'], semanticClasses: ['pure-representation'] })
+    }
+    if (payload.node_kind === 'pure-immutable-value' || payload.node_kind === 'immutable-field-get') {
+      return { case: 'irrelevant', payload: { closed_rule_id: 'fsharp-pure-immutable-value' } }
+    }
+    if (payload.node_kind === 'module-mutable-value-read' || payload.node_kind === 'module-mutable-value-set') {
+      return classified({ runtimes: ['fsharp'], mutableResources: ['top-level-mutable'], semanticClasses: ['capability-value'] })
+    }
+    if (payload.node_kind === 'capability-immutable-value') {
+      return classified({ runtimes: ['fsharp'], semanticClasses: ['capability-value'] })
+    }
+    if (payload.node_kind === 'captured-mutable-value-read'
+      || payload.node_kind === 'captured-mutable-value-set'
+      || payload.node_kind === 'mutable-container-value'
+      || payload.node_kind === 'mutable-field-get'
+      || payload.node_kind === 'mutable-field-set') {
+      return classified({ runtimes: ['fsharp'], mutableResources: ['runtime-cell'], semanticClasses: ['capability-value'] })
+    }
+    if (FSHARP_COMPILER_ACCOUNTED_STRUCTURE.has(payload.node_kind)) {
+      return { case: 'irrelevant', payload: { closed_rule_id: 'fsharp-compiler-accounted-structure' } }
     }
     return unknown('unsupported-ast', payload.node_kind, payload.semantic_identity)
   }
