@@ -4,7 +4,18 @@ import fc from 'fast-check'
 
 import * as merge from '../../../dist/Persistence/EventStore/MergeSurface.js'
 
-const makeId = (index) => (index + 1).toString(16).padStart(40, '0')
+const eventId = fc
+  .uint8Array({ minLength: 20, maxLength: 20 })
+  .map((bytes) => Buffer.from(bytes).toString('hex'))
+
+const uniqueEventIds = (count) =>
+  fc.uniqueArray(eventId, { minLength: count, maxLength: count })
+
+const reverseCausalEventIds = (count) =>
+  uniqueEventIds(count).map((ids) => {
+    const [lower, higher] = [ids[0], ids[1]].sort()
+    return [higher, lower, ...ids.slice(2)]
+  })
 
 const node = fc.record({
   writerSeed: fc.nat(),
@@ -12,25 +23,40 @@ const node = fc.record({
   payload: fc.record({ sequence: fc.integer(), text: fc.string({ maxLength: 24 }) }),
 })
 
-const scenario = fc.integer({ min: 2, max: 8 }).chain((writerCount) =>
+const scenario = fc
+  .tuple(fc.integer({ min: 2, max: 8 }), fc.integer({ min: 2, max: 18 }))
+  .chain(([writerCount, eventCount]) =>
+    fc.record({
+      writerCount: fc.constant(writerCount),
+      nodes: fc.array(node, { minLength: eventCount, maxLength: eventCount }),
+      eventIds: reverseCausalEventIds(eventCount),
+      writerOrder: fc.shuffledSubarray(
+        Array.from({ length: writerCount }, (_, index) => index),
+        { minLength: writerCount, maxLength: writerCount },
+      ),
+    }),
+  )
+
+const independentScenario = fc.integer({ min: 3, max: 24 }).chain((eventCount) =>
   fc.record({
-    writerCount: fc.constant(writerCount),
-    nodes: fc.array(node, { minLength: 1, maxLength: 18 }),
-    writerOrder: fc.shuffledSubarray(
-      Array.from({ length: writerCount }, (_, index) => index),
-      { minLength: writerCount, maxLength: writerCount },
-    ),
+    nodes: fc.array(node, { minLength: eventCount, maxLength: eventCount }),
+    eventIds: uniqueEventIds(eventCount),
   }),
 )
 
-const eventOf = (nodes, index) => ({
-  id: makeId(index),
+const eventOf = (nodes, eventIds, index) => ({
+  id: eventIds[index],
   stream: 'property/k-way',
   type: 'JobRequested',
   parents:
     index === 0
       ? []
-      : [...new Set(nodes[index].parentSeeds.map((seed) => makeId(seed % index)))].sort(),
+      : [
+          ...new Set([
+            ...(index === 1 ? [eventIds[0]] : []),
+            ...nodes[index].parentSeeds.map((seed) => eventIds[seed % index]),
+          ]),
+        ].sort(),
   payload: nodes[index].payload,
   payloadRefs: [],
 })
@@ -67,17 +93,25 @@ const assertSetAndCausalOrder = (events, expectedEvents) => {
   }
 }
 
+const hasReverseLexicalCausalEdge = (events) =>
+  events.some((event) => event.parents.some((parent) => parent > event.id))
+
 test('WHAT[DURABLE-CONVERGENCE-002] cross-writer dependency is ordered before its child', () => {
-  const parent = eventOf([{ parentSeeds: [], payload: { sequence: 0, text: 'parent' } }], 0)
+  const parent = {
+    id: 'ffffffffffffffffffffffffffffffffffffffff',
+    stream: 'property/k-way',
+    type: 'JobRequested',
+    parents: [],
+    payload: { sequence: 0, text: 'parent' },
+    payloadRefs: [],
+  }
   const child = {
-    ...eventOf(
-      [
-        { parentSeeds: [], payload: { sequence: 0, text: 'parent' } },
-        { parentSeeds: [0], payload: { sequence: 1, text: 'child' } },
-      ],
-      1,
-    ),
+    id: '0000000000000000000000000000000000000000',
+    stream: 'property/k-way',
+    type: 'JobRequested',
     parents: [parent.id],
+    payload: { sequence: 1, text: 'child' },
+    payloadRefs: [],
   }
 
   assert.deepEqual(
@@ -92,7 +126,14 @@ test('WHAT[DURABLE-CONVERGENCE-002] cross-writer dependency is ordered before it
 test('WHAT[DURABLE-CONVERGENCE-002] generated k-way merge preserves union across writer permutations and exact duplicates', () => {
   fc.assert(
     fc.property(scenario, (generated) => {
-      const events = generated.nodes.map((_, index) => eventOf(generated.nodes, index))
+      const events = generated.nodes.map((_, index) =>
+        eventOf(generated.nodes, generated.eventIds, index),
+      )
+      assert.equal(
+        hasReverseLexicalCausalEdge(events),
+        true,
+        'generated DAG must contain a parent whose EventId sorts after its child',
+      )
       const streams = streamsOf(generated, events)
       const canonical = successfulEvents(streams)
       const permuted = generated.writerOrder.map((index) => streams[index])
@@ -108,11 +149,11 @@ test('WHAT[DURABLE-CONVERGENCE-002] generated k-way merge preserves union across
 
 test('WHAT[DURABLE-CONVERGENCE-002] generated independent streams compose associatively', () => {
   fc.assert(
-    fc.property(fc.array(node, { minLength: 3, maxLength: 24 }), (nodes) => {
+    fc.property(independentScenario, ({ nodes, eventIds }) => {
       const streams = Array.from({ length: 3 }, (_, writer) => [
         `writer-${writer}`,
         nodes
-          .map((_, index) => eventOf(nodes, index))
+          .map((_, index) => eventOf(nodes, eventIds, index))
           .filter((_, index) => index % 3 === writer)
           .map((event) => ({ ...event, parents: [] })),
       ])

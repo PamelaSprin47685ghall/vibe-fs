@@ -8,6 +8,7 @@
    - 算法为每个写者流维护一个游标，按 `(canonical sort key, EventId)` 确定性前进。
    - 相同 `EventId` 且相同规范字节自动幂等去重，相同 `EventId` 产生不同字节则阻断报错。
    - writer bytes 永久不可变；游标以不可变 `{ Offset; Readiness }` 快照原子替换。`Readiness = Dormant | Waiting n | Queued | Exhausted` 是唯一 readiness 表示，不允许 `MissingParents + Queued + Generation + Remaining` 等平行可变轴。waiter 的陈旧性直接由其捕获的 `Offset` 判定，禁止维护第二个 generation 计数。
+   - `DURABLE-CONVERGENCE-002` 的 property proof 独立生成 DAG 拓扑与唯一 40-hex `EventId`，并在每个生成场景中强制至少一条 parent `EventId` 字典序大于 child 的因果边；固定反例使用同一逆序关系。oracle 直接调用 production `MergeSurface.merge` 并验证集合、幂等、输入流排列与因果序，不在测试内重写归并算法。
    - 本地启动与远程同步均复用同一归并原语。
    - 收敛验收不止比较 merged event 序列：用真实 EventStore、Strength、Casebook 与 JsTransaction surfaces 写入包含多个注册 oracle 的 history，记录 live Current，再由新 Integrator 重启重放并逐项比较 production 观察。
 

@@ -6,7 +6,7 @@
 
 ## DURABLE-CONVERGENCE-002: k-way merge 是统一 primitive
 
-多流合并原语 `KWayMerge(writerStreams[])` 必须满足结合律、交换律、幂等性与确定性。同一组有序写者流无论以何种枚举顺序输入、由哪个进程或在哪台机器上执行，都必须产生完全相同的规范事件序列。
+多流合并原语 `KWayMerge(writerStreams[])` 必须满足结合律、交换律、幂等性与确定性。同一组有序写者流无论以何种枚举顺序输入、由哪个进程或在哪台机器上执行，都必须产生完全相同的规范事件序列。`EventId` 字典序不得替代因果序：即使 parent `EventId` 字典序大于 child，规范序列仍必须先输出 parent。
 
 ## DURABLE-CONVERGENCE-003: 生产 writer-stream k-way merge 等价于 retained-union oracle
 

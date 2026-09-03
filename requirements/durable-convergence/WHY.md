@@ -21,6 +21,7 @@
 - **Activity 不等于 fetch 时间**：远端 snapshot 必须携带 writer blob OID 绑定的 activity manifest；否则一次下载就会错误延长 writer 寿命，导致历史无法按窗口收缩。
 - **Payload identity 已经是内容证明**：payload 文件名/缓存 OID 与远端 payload tree OID 同属 content-addressed identity；本地 stat identity 未变且缓存 OID 等于远端 OID 时，再读取同一 remote payload blob 不增加任何事实，只会把同步成本放大到历史 payload 总量，并让持有 store gate 的 Git Hook 长时间阻塞在线 append。
 - **收敛比较必须覆盖业务 Current**：相同 retained history 只得到相同事件顺序仍不充分；Structural、Journal、Strength、Casebook 与 JsTransaction 的 production Current 观察也必须逐项相同，否则重复 reducer 或遗漏注册仍可隐藏在绿色结构测试后。
+- **EventId 顺序不是因果顺序**：`EventId` 只提供稳定身份与同级确定性 tie-break，不编码 parent→child 关系。若测试只生成 parent `EventId` 字典序小于 child 的 DAG，错误的纯 `EventId` 排序会伪装成拓扑归并；验证必须包含 parent `EventId` 字典序大于 child 的反例。
 
 ## DEPENDS ON
 
