@@ -26,3 +26,7 @@
 
 - `participant-identity`
 - `session-ontology`
+
+## Physical fatal boundary
+
+InteractionRepair owns gate/claim/fresh-terminal policy；process fuse是foreign physical effect。若repair runtime直接fatal，claim与physical acceptance可能未settle，重复idle/reconcile也可能对同一incident重复kill。

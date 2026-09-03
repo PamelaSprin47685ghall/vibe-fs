@@ -156,8 +156,6 @@ module ConfirmedReviewWitness =
 
     let requestId (ConfirmedReviewWitness payload) : FinalityRequestId = payload.RequestId
 
-    let witnesses (ConfirmedReviewWitness payload) = payload.Witnesses
-
     /// Build a ConfirmedReviewWitness from two or more legitimate cohort members' confirmed review witnesses
     /// on the exact same tree.
     let private isConfirmedOnTree

@@ -722,6 +722,8 @@
     <Compile Include="OpenCode/Tools/ToolContext.fs"/>
     <Compile Include="OpenCode/Tools/StaticTools.fsi"/>
     <Compile Include="OpenCode/Tools/StaticTools.fs"/>
+    <Compile Include="OpenCode/Tools/NodeFs.fsi"/>
+    <Compile Include="OpenCode/Tools/NodeFs.fs"/>
     <Compile Include="OpenCode/Tools/FileTools.fsi"/>
     <Compile Include="OpenCode/Tools/FileTools.fs"/>
     <Compile Include="OpenCode/Codec/OpencodeTypes.fsi"/>

@@ -78,3 +78,7 @@ Observation 历史是诊断 tip 与 Blog frame 的不可拆心配对视图：前
 ## BD-018: RulebookRevision 按 Blogger life 冻结与生效边界
 
 每个 Blogger participant life 在创建时绑定确定的 `RulebookRevision`，同时决定 system prompt 字节、`chronicle.tip` 枚举、解码映射表与 Main 处置索引。Blogger life 存活期间四者保持冻结，新规则的诞生不打断当前 in-flight cycle，仅在下一 cycle 创建 fresh life 时绑定最新 revision，确保 byte stability 与工具定义不分叉。
+
+## BD-019: Enforcer fatal 只解释typed incident且经mandatory capability执行
+
+cycle failure必须先得到typed protocol-exhausted或commit-unknown evidence，并完成该路径要求的durable settlement，再构造behavior-diagnosis incident。runtime只接受构造时必填的fatal capability；不得直接引用physical adapter、使用optional/default/global fallback，或在Host/Journal层重复fatal。同一incident只允许一次report与一次kill。

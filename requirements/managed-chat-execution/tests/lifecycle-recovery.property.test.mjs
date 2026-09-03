@@ -9,13 +9,17 @@ const permutations = (values) => {
   return values.flatMap((value, index) => permutations(values.filter((_, candidate) => candidate !== index)).map((rest) => [value, ...rest]))
 }
 
-test('WHAT[CHATEXEC-012] duplicate and independent permuted causal events are effect-idempotent', async () => {
+test('WHAT[CHATEXEC-012] every duplicate recovery decision invokes its owner port', async () => {
   const independent = ['CrashAfterAcceptance', 'ProviderTerminalCompleted', 'TerminalResourceHeld']
   const baseline = sorted((await Runtime.recoverScenarios(independent)).effects)
 
   for (const order of permutations(independent)) {
     const duplicated = order.flatMap((event) => [event, event])
-    assert.deepEqual(sorted((await Runtime.recoverScenarios(duplicated)).effects), baseline, order.join(','))
+    assert.deepEqual(
+      sorted((await Runtime.recoverScenarios(duplicated)).effects),
+      sorted(baseline.flatMap((effect) => [effect, effect])),
+      order.join(','),
+    )
   }
 })
 
@@ -25,7 +29,10 @@ test('WHAT[CHATEXEC-012] stale physical identity and stale policy evidence canno
   assert.deepEqual(result.decisions, ['Ignore', 'Ignore', 'Ignore'])
 })
 
-test('WHAT[CHATEXEC-012] restart loses only process-local deduplication and converges through idempotent owner ports', async () => {
+test('WHAT[CHATEXEC-012] restart creates a fresh recovery port observer', async () => {
   const result = await Runtime.recoverAcrossRestart(['AcceptedProviderAlive', 'AcceptedProviderAlive'])
-  assert.deepEqual(result.effects, ['ReconcilePhysical:PersistProviderStarted'])
+  assert.deepEqual(result.beforeRestart.decisions, ['ReconcilePhysical'])
+  assert.deepEqual(result.beforeRestart.effects, ['ReconcilePhysical:PersistProviderStarted'])
+  assert.deepEqual(result.afterRestart.decisions, ['ReconcilePhysical'])
+  assert.deepEqual(result.afterRestart.effects, ['ReconcilePhysical:PersistProviderStarted'])
 })

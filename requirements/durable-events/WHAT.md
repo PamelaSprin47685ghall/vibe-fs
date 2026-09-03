@@ -50,7 +50,7 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 
 ## DURABLE-EVENTS-013: 查询只读正规 Integrator 的 Current 且先 commit 后 integrate
 
-任何业务查询不得手动全量扫描、过滤或折叠事件历史，必须且只能读取唯一的规范 Integrator 维护的 `Current` 积分状态。修改状态必须先完成本地事实追加，再交由 Integrator 推进 `Current`。
+任何业务查询不得手动全量扫描、过滤或折叠事件历史，必须且只能读取唯一的规范 Integrator 维护的 `Current` 积分状态。修改状态可以先计算待提交状态，但只有本地事实完整追加成功后才能原子推进 `Current`；追加失败或提交闭包未执行时，事件、结构 head 与所有业务 Current 必须保持提交前状态。
 
 ## DURABLE-EVENTS-014: k-way 输入顺序与确定性积分
 
@@ -74,7 +74,7 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 
 ## DURABLE-EVENTS-019: 唯一 canonical Integrator 与业务注册 integration oracle
 
-系统仅存在一个规范的 Integrator 负责历史事实的解释与积分。各业务模块仅向 Integrator 注册单个信封的纯计算折叠规则，业务模块自身不拥有读取底层历史或重写重放循环的权限。
+系统仅存在一个规范的 Integrator 负责历史事实的解释与积分。各业务模块仅向 Integrator 注册单个信封的纯计算折叠规则，业务模块自身不拥有读取底层历史或重写重放循环的权限。Structural、Journal、Strength、Casebook 与 JsTransaction 的注册必须可由 production surface 上的反例观察：删除任一注册后，该领域的合法 live fact 不得仍产生预期 Current；源码 token、注册名称或调用次数不构成语义证明。
 
 ## DURABLE-EVENTS-020: plugin load 仅验证物理可读性且延迟业务激活
 
@@ -89,3 +89,11 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 `EventStore.Model.Contract` 只拥有 `EventEnvelope`、`EventStreamId`、`PayloadRef` 等稳定领域模型；`EventStore.Port.Contract` 只拥有 append/read 所需 request/result/error 与 `IEventStore` capability；`EventStore.EventVocabulary.Contract` 只拥有 canonical EventStore event type 集合，并仅依赖 `Strength.EventVocabulary.Contract` 等更基础词汇。`EventStore.Core.Runtime`、`EventStore.Git.Runtime`、Canonical Integrator、Journal、Host acquisition 与 test surface 必须依赖这些 contract，反向依赖禁止。业务 consumer 的 transitive compile input 不得包含 Git object/ref、process/file codec、Canonical Integrator、Strength predictor/replica/runtime 或 Host adapter。
 
 Git 同步所需 object/ref 类型与 `IGitRawStore` 只能位于独立 physical-port contract，由 Git/sync adapter 消费，不得经 `EventStore.Port.Contract` 暴露给业务消费者。Contract locality 的 transitive production `.fs` 不得超过 100；focused EventStore runtime locality 不得超过 185。所有 locality compile 必须由 ProjectReference closure 生成一个零 ProjectReference flat project，并由一次 Fable invocation 编译。
+
+## DURABLE-EVENTS-023: canonical codec、领域 fold 与物理 store 必须分层
+
+`CanonicalEventCodec`六个公开操作共同定义同一canonical identity协议，必须形成durable-events拥有的bounded pure contract；merge、sync、integrator、surface及core runtime按locality显式引用该完整slice。禁止让merge runtime为取得codec反向依赖`EventStore.Core.Runtime`。Delegation及其它领域constructor只能产生owner-owned fact case、intent、fold state与closed rejection；`AgentFact` outer union、跨projection组合及journal append只由durable composition routing拥有。`ProcessEventLog`、Store factory、file/lock lifecycle继续是effect，不得进入codec或领域fold contract。
+
+## DURABLE-EVENTS-024: semantic cut fatal 必须先settle再经mandatory capability执行
+
+semantic fold失败必须先durable写入对应bad fact与`ProjectionCutTail`，取得committed或unknown settlement evidence，再构造typed fatal incident。caller只持有构造时必填的fatal capability；不得直接引用`FatalProcess` physical implementation、optional/default fallback、module-global binding或service locator。同一incident只有一个report owner与一个kill owner，重复调用及fatal-before-settlement一律拒绝。

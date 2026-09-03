@@ -8,13 +8,11 @@
 // 不存在的路径、fail-closed 传播被改成吞错——都不会有任何测试变红。
 //
 // 本测试只 pin 三个事实：
-//   1. format-build-test 的层序（Wireit format → L0 text/FCS gates → Wireit
-//      build → unit → integration → integration/package → warmup → L4
-//      e2e/entry（恰一个）→ L5 npm pack --dry-run），以及每个 Wireit step
-//      解析到的真实仓库命令；
+//   1. format-build-test 的层序（read-only format → L0 text gates → Wireit
+//      build → unit → integration orchestrator → L4 e2e/entry（恰一个）→
+//      L5 npm pack --dry-run），以及每个 Wireit step 解析到的真实仓库命令；
 //   2. check.mjs 的 wired gate 清单：每个 wired 路径存在；
-//      scripts/checks/*.mjs == wired ∪ {spec-rules.mjs(lib)、
-//      semantic-anchors.mjs(catalog)}；
+//      scripts/checks/*.mjs == wired ∪ explicit non-prebuild entrypoints；
 //   3. check.mjs fail-closed：`process.exit(result.status ?? 1)` 传播非零。
 //
 // 「可红」由现有 per-gate red fixture（tests/unit/verify/*.test.mjs 与
@@ -48,8 +46,6 @@ test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the five layer
     'npm run build', // build（dist 生产字节）
     'node requirements/verification-system/tests/run.mjs', // L1 pure laws + L2 temporal + L3 adapter 契约面
     'node requirements/verification-system/tests/integration/run.mjs',
-    'node requirements/distribution/tests/integration/package/run.mjs',
-    'node scripts/warmup-opencode.mjs',
     'node requirements/verification-system/tests/e2e/entry.test.mjs', // L4 唯一 Long Stroke
     'npm pack --dry-run', // L5 release（打包面）
   ])
@@ -70,6 +66,66 @@ test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the five layer
       check: 'node scripts/check.mjs',
       build: 'node scripts/build.mjs',
     },
+  )
+})
+
+const occurrences = (text, needle) => text.split(needle).length - 1
+
+const releaseOwnershipViolations = (pipeline, integrationSource) => [
+  ...(occurrences(pipeline, 'requirements/distribution/tests/integration/package/run.mjs') === 0
+    ? []
+    : ['top-level-package-owner']),
+  ...(occurrences(pipeline, 'scripts/warmup-opencode.mjs') === 0 ? [] : ['top-level-warmup-owner']),
+  ...(occurrences(integrationSource, 'requirements/distribution/tests/integration/package/run.mjs') === 1
+    ? []
+    : ['integration-package-owner']),
+  ...(occurrences(integrationSource, 'scripts/warmup-opencode.mjs') === 1
+    ? []
+    : ['integration-warmup-owner']),
+]
+
+test('WHAT[VERIFICATION-SYSTEM-001] release leaf steps have one orchestrator owner and duplicate ownership is red', () => {
+  const { scripts } = JSON.parse(read('package.json'))
+  const pipeline = scripts['format-build-test']
+  const integrationSource = read('requirements/verification-system/tests/integration/run.mjs')
+  const duplicateWarmup = `${integrationSource}\nspawnSync(process.execPath, [path.join(root, 'scripts/warmup-opencode.mjs')])`
+  const duplicatePackage = `${integrationSource}\nspawnSync(process.execPath, [path.join(root, 'requirements/distribution/tests/integration/package/run.mjs')])`
+  assert.deepEqual(releaseOwnershipViolations(pipeline, integrationSource), [])
+  assert.match(
+    integrationSource,
+    /spawnSync\(process\.execPath, \[path\.join\(root, 'scripts\/warmup-opencode\.mjs'\)\]/,
+    'integration warmup path must feed the executed process spawn',
+  )
+  assert.match(
+    integrationSource,
+    /args: \[path\.join\(root, 'requirements\/distribution\/tests\/integration\/package\/run\.mjs'\)\]/,
+    'distribution package path must feed an integration child step',
+  )
+  assert.match(
+    integrationSource,
+    /for \(const step of childSteps\)[\s\S]*spawnSync\(process\.execPath, step\.args,/,
+    'integration child steps must be executed exactly by the declared child runner',
+  )
+
+  assert.ok(
+    releaseOwnershipViolations(
+      `${pipeline} && node requirements/distribution/tests/integration/package/run.mjs`,
+      integrationSource,
+    ).includes('top-level-package-owner'),
+  )
+  assert.ok(
+    releaseOwnershipViolations(`${pipeline} && node scripts/warmup-opencode.mjs`, integrationSource)
+      .includes('top-level-warmup-owner'),
+  )
+  assert.ok(
+    releaseOwnershipViolations(pipeline, duplicateWarmup).includes('integration-warmup-owner'),
+  )
+  assert.ok(
+    releaseOwnershipViolations(pipeline, duplicatePackage).includes('integration-package-owner'),
+  )
+  assert.ok(
+    integrationSource.indexOf('scripts/warmup-opencode.mjs') < integrationSource.indexOf('for (const step of nodeTestSteps)'),
+    'integration warmup must precede every node:test integration child',
   )
 })
 
@@ -117,6 +173,7 @@ const WIRED_ALLOWLIST = new Set([
   'js-surface-manifest.mjs', // post-build gate：由 build.mjs 在 fable precompile 后调用（依赖 dist 产物，不能 pre-build）
   'js-module-linkage.mjs', // post-build linkage gate: invoked by build.mjs after Fable emit, cannot run pre-build
   'legacy-horizon-census.mjs', // census tool：由 OBL-007 历史 detector 退出验证调用
+  'locality-dependencies.mjs', // report-only integration analyzer：M6.4 原子切换前不得成为 pre-build release gate
 ])
 
 /** 解析 check.mjs 的 checks 数组，返回 wired basename 清单（保持声明顺序）。 */
@@ -173,7 +230,7 @@ test('WHAT[VERIFICATION-SYSTEM-004] checks directory is wired plus allowlist onl
   assert.deepEqual(
     actual,
     [...new Set([...wired, ...WIRED_ALLOWLIST])].sort(),
-    'scripts/checks/*.mjs must equal wired gates ∪ {spec-rules(lib), semantic-anchors(catalog)}',
+    'scripts/checks/*.mjs must equal wired gates ∪ explicit non-prebuild entrypoints',
   )
 })
 

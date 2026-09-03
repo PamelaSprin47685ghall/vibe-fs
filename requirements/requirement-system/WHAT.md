@@ -74,4 +74,4 @@ package 的语义身份由包名唯一确定。包的物理目录布局、文件
 
 ## REQUIREMENT-SYSTEM-018: 可执行证明双向可追溯
 
-`requirements/**/tests/**/*.test.mjs` 中的每个有效可执行测试用例，必须由真实 `node:test` binding 直接注册为 `test()`，或由已绑定父测试的 TestContext 直接注册为 `t.test()`；shadow binding、未调用 helper 内的间接注册、无 callback、动态 skip/todo 状态与未绑定 TestContext 均不得取得 proof authority。每个有效测试必须在标题显式声明恰好一个当前合法的命题标签 `WHAT[<PACKAGE-NNN>]`。每个有效的 WHAT 命题必须至少被一个处于激活状态的非 skip、非 todo 测试用例所证明，且其 HOW 证明行必须包含至少一条可唯一解析的精确 `(path, title)` 边；同一命题可以拥有多个分别精确锚定的可执行证明，裸测试文件名或路径本身必须产生缺失/悬空证明诊断，不得被推断为证明充分性。测试与规范之间严禁存在悬空引用、多重 primary 归属或无标签的孤立测试。
+`requirements/**/tests/**/*.test.mjs` 中的每个有效可执行测试用例，必须由真实 `node:test` binding 直接注册为 `test()`，或由已绑定父测试的 TestContext 直接注册为 `t.test()`；shadow binding、未调用 helper 内的间接注册、无 callback、动态 skip/todo 状态与未绑定 TestContext 均不得取得 proof authority。每个有效测试必须在标题显式声明恰好一个当前合法的命题标签 `WHAT[<PACKAGE-NNN>]`。每个有效的 WHAT 命题必须至少被一个处于激活状态的非 skip、非 todo 测试用例所证明，且其 HOW 证明行必须包含至少一条可唯一解析的精确 `(path, title)` 边；同一命题可以拥有多个分别精确锚定的可执行证明，裸测试文件名或路径本身必须产生缺失/悬空证明诊断，不得被推断为证明充分性。WHAT↔HOW↔active test 拓扑只由 `requirement-trace` 裁决；release/migration ledger、合同册、proof-level 登记与任意其他文件清单只能消费或分类已经成立的精确证据边，不得凭路径存在、文件归档或 DONE 状态另行关闭 WHAT。测试与规范之间严禁存在悬空引用、多重 primary 归属或无标签的孤立测试。

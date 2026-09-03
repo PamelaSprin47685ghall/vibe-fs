@@ -1,9 +1,18 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
 import { encode, vocabularySize } from 'gpt-tokenizer/encoding/o200k_base'
-import { loopDetectorRepositoryTexts } from './loop-detector-repository-corpus.mjs'
+import {
+  loopDetectorRepositoryCorpusTexts,
+  loopDetectorRepositoryInputFiles,
+} from './loop-detector-repository-corpus.mjs'
+import {
+  buildGeneratedArtifactRowV1,
+  canonicalizeSelectedInputPathsV1,
+  createTrackingReaderV1,
+  readSelectedInputsV1,
+} from './generated-artifact-v1.mjs'
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const halfLife = 256
@@ -197,8 +206,34 @@ export const encodeParallel = async (text, workerCount = 0) => {
   return encodeWithWorkerThreads(text, chunks, workerCount)
 }
 
-export const deriveLoopDetectorEnvelope = async (root = defaultRoot) => {
-  const texts = loopDetectorRepositoryTexts(root)
+export const loopDetectorEnvelopeLinkageV1 = Object.freeze({
+  import_specifier: '#wanxiangshu-loop-detector-envelope',
+  package_import_target: './dist/Execution/Session/LoopDetectorEnvelope.js',
+  generator_path: 'scripts/lib/derive-loop-detector-envelope.mjs',
+  generator_entry: 'writeLoopDetectorEnvelopeArtifact',
+  input_selector_path: 'scripts/lib/loop-detector-repository-corpus.mjs',
+  input_selector_entry: 'loopDetectorRepositoryInputFiles',
+  build_path: 'scripts/build.mjs',
+  build_entry: 'verifyArtifacts',
+})
+
+export const loadLoopDetectorRepositoryCorpusV1 = (root = defaultRoot, {
+  selectInputFiles = loopDetectorRepositoryInputFiles,
+  readFile = readFileSync,
+} = {}) => {
+  const trackingReader = createTrackingReaderV1({ root, readFile })
+  const selectedPaths = canonicalizeSelectedInputPathsV1(root, selectInputFiles(root))
+  const selectedInputs = readSelectedInputsV1(selectedPaths, trackingReader)
+  return {
+    selectedInputs: selectedInputs.map(({ path: inputPath, blob_digest: blobDigest }) => ({
+      path: inputPath,
+      blob_digest: blobDigest,
+    })),
+    texts: loopDetectorRepositoryCorpusTexts(selectedInputs),
+  }
+}
+
+const deriveEnvelopeFromCorpus = async ({ selectedInputs, texts }) => {
   const lambda = 2 ** (-1 / halfLife)
   const tokens = await encodeParallel(texts.join('\n'))
 
@@ -217,8 +252,12 @@ export const deriveLoopDetectorEnvelope = async (root = defaultRoot) => {
     minimum: envelope.minimum,
     maximum: envelope.maximum,
     corpusTokens: tokens.length,
+    selectedInputs,
   }
 }
+
+export const deriveLoopDetectorEnvelope = async (root = defaultRoot, dependencies = {}) =>
+  deriveEnvelopeFromCorpus(loadLoopDetectorRepositoryCorpusV1(root, dependencies))
 
 const artifactSource = (envelope) => `// Generated from the current repository SSOT by scripts/build.mjs.
 // Ephemeral build input; never hand-edit or copy these values into tracked source.
@@ -239,8 +278,17 @@ export const corpusTokens = ${envelope.corpusTokens}
 
 export const writeLoopDetectorEnvelopeArtifact = async (root = defaultRoot) => {
   const envelope = await deriveLoopDetectorEnvelope(root)
+  const artifactBytes = Buffer.from(artifactSource(envelope), 'utf8')
   const targetDirectory = path.join(root, 'dist/Execution/Session')
   mkdirSync(targetDirectory, { recursive: true })
-  writeFileSync(path.join(targetDirectory, 'LoopDetectorEnvelope.js'), artifactSource(envelope), 'utf8')
-  return envelope
+  writeFileSync(path.join(targetDirectory, 'LoopDetectorEnvelope.js'), artifactBytes)
+  return {
+    ...envelope,
+    generatedArtifact: buildGeneratedArtifactRowV1({
+      artifact_path: 'dist/Execution/Session/LoopDetectorEnvelope.js',
+      artifact_bytes: artifactBytes,
+      selected_inputs: envelope.selectedInputs,
+      linkage: loopDetectorEnvelopeLinkageV1,
+    }),
+  }
 }

@@ -7,14 +7,6 @@ type GitGatewayRunner = string list -> Task<int * string * string>
 
 [<RequireQualifiedAccess>]
 module GitGateway =
-    [<Literal>]
-    val SyncActiveEnv: string = "WANXIANG_GIT_SYNC_ACTIVE"
-
-    val discoverRemote:
-        run: GitGatewayRunner ->
-        remote: string ->
-            Task<Result<StoreSnapshot option * GitObjectId option, ConvergeError>>
-
     val converge:
         raw: IGitRawStore ->
         commonDir: string ->

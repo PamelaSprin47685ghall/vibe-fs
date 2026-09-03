@@ -129,11 +129,16 @@ const inheritedProfile = () => {
 test('WHAT[PID-008] current v2 durable identity recovers exact participant and owner provenance', () => {
   const profile = inheritedProfile()
   const payload = journalRoundTripPayload(authorityFact(profile))
-  const replayed = profileFromPayload(payload)
+  assert.deepEqual(payload, {
+    SchemaVersion: 2,
+    SessionId: profile.session,
+    LogicalRunId: profile.logicalRun,
+    AuthorityRootUserMessageId: profile.authorityRoot,
+    AuthorityKind: profile.authorityKind,
+    IdentitySeed: profile.identitySeed,
+  })
 
-  const recovered = authority.recoverActiveIdentity(register(replayed))
-
-  assert.deepEqual(recovered, {
+  assert.deepEqual(authority.recoverActiveIdentity(register(profileFromPayload(payload))), {
     ok: true,
     value: {
       participantIdentity: profile.participantIdentity,
@@ -151,13 +156,22 @@ test('WHAT[PID-008] supported legacy HumanRoot deterministically recovers its up
   assert.equal(first.ok, true, first.ok ? '' : first.error)
   assert.equal(second.ok, true, second.ok ? '' : second.error)
   assert.deepEqual(second.payload, first.payload)
+  assert.deepEqual(first.payload, {
+    SchemaVersion: 2,
+    SessionId: profile.session,
+    LogicalRunId: profile.logicalRun,
+    AuthorityRootUserMessageId: profile.authorityRoot,
+    AuthorityKind: profile.authorityKind,
+    IdentitySeed: rootSeed,
+  })
 
-  const replayed = profileFromPayload(first.payload)
-  const recovered = authority.recoverActiveIdentity(register(replayed))
-
-  assert.deepEqual(recovered.value, {
-    participantIdentity: rootSeed.participantIdentity,
-    identitySeed: rootSeed,
+  assert.deepEqual(authority.recoverActiveIdentity(register(profileFromPayload(first.payload))), {
+    ok: true,
+    value: {
+      participantIdentity: rootSeed.participantIdentity,
+      identitySeed: rootSeed,
+    },
+    error: '',
   })
 })
 

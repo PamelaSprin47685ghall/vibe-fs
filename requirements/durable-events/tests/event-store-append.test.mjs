@@ -55,6 +55,26 @@ test('WHAT[DURABLE-EVENTS-001] append_commits_complete_canonical_line_then_updat
   }
 })
 
+test('WHAT[DURABLE-EVENTS-013] physical append failure leaves event and structural Current unchanged', async () => {
+  const dir = withTemp((base) => base)
+  const store = eventStore.create(dir, 'append-failure-proof')
+  try {
+    const wanxiangDir = path.join(dir, 'wanxiang')
+    mkdirSync(wanxiangDir, { recursive: true })
+    writeFileSync(path.join(wanxiangDir, 'events'), 'not a directory')
+
+    const rejected = await eventStore.append(store, [event(3)])
+
+    assert.equal(rejected.ok, false)
+    assert.equal(rejected.error.code, 'AppendFailed')
+    assert.equal(eventStore.read(store, id(3)), null, 'failed durability must not publish the prepared event')
+    assert.equal(eventStore.head(store, 'append/proof'), null, 'failed durability must not advance Current')
+  } finally {
+    eventStore.dispose(store)
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[DURABLE-EVENTS-021] semantic_failure_writes_cut_tail_reset_and_the_same_feature_can_succeed_next', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'semantic-cut-proof')

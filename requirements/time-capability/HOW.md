@@ -44,3 +44,4 @@
 | TIME-005 | `requirements/time-capability/tests/deadline-typed.test.mjs::WHAT[TIME-005] TIME_005_verdict_follows_injected_clock_not_value` |
 | TIME-006 | `requirements/time-capability/tests/until-signal-or-deadline.test.mjs::WHAT[TIME-006] THEOREM_untilSignalOrDeadline_deadline_without_material_is_WaitTimedOut` |
 | TIME-007 | `requirements/time-capability/tests/pair-session-elapsed.test.mjs::WHAT[TIME-007] TIME_007_session_started_at_is_bind_once_to_first_prompt_sample`；`requirements/time-capability/tests/session-started-at-bind-surface.test.mjs::WHAT[TIME-007] SessionStartedAtLedger owns bindSessionStartedAt entry point for transform boundary` |
+| TIME-008 | `requirements/time-capability/tests/m6-slice-boundary.test.mjs::WHAT[TIME-008] temporal contracts exclude Node adapters mutable timers and SessionStartedAt projection` |

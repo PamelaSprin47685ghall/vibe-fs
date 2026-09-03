@@ -13,7 +13,7 @@ test('WHAT[CHATEXEC-008] recovery begins from durable activation and re-enters o
   assert.deepEqual(beforeDurability.decisions, ['NoDurableExecution', 'NoDurableExecution'])
   assert.deepEqual(beforeDurability.effects, [])
   assert.deepEqual(afterDurability.decisions, ['ResumePreProvider', 'ResumePreProvider'])
-  assert.deepEqual(afterDurability.effects, ['ResumePreProvider'])
+  assert.deepEqual(afterDurability.effects, ['ResumePreProvider', 'ResumePreProvider'])
   assert.deepEqual(Runtime.lifecycleSignals(), [
     'DurabilityActivated',
     'PluginRuntimeReloaded',

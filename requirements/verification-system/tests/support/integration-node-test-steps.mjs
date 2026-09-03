@@ -57,6 +57,7 @@ export function integrationNodeTestSteps(root) {
       files: [
         path.join(root, 'requirements/structured-workflow/tests/integration/owner-project-compiler-boundary.test.mjs'),
         path.join(root, 'requirements/structured-workflow/tests/integration/owner-impact-compile-cli.test.mjs'),
+        path.join(root, 'requirements/structured-workflow/tests/integration/locality-dependency-analyzer.test.mjs'),
       ],
       perTestTimeoutMs: PROJECT_CHECK_TIMEOUT_MS,
     },
@@ -67,6 +68,12 @@ export function integrationNodeTestSteps(root) {
     {
       label: 'strength/lifecycle.test.mjs (speculative-investigation)',
       files: [path.join(root, 'requirements/speculative-investigation/tests/integration/strength/lifecycle.test.mjs')],
+    },
+    {
+      label: 'process-restart-canary.test.mjs (managed-chat-execution)',
+      files: [
+        path.join(root, 'requirements/managed-chat-execution/tests/integration/process-restart-canary.test.mjs'),
+      ],
     },
     // Persist owns the only durable substrate, and these three files were reachable only by
     // running them by hand — a self-test outside the gate is not a gate. `object-identity` in

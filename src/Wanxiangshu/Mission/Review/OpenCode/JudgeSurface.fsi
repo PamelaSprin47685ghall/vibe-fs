@@ -34,7 +34,10 @@ module JudgeSurface =
 
     val clearVerdictSubmissions: unit -> unit
 
-    val ensureSubmittedAttemptClosed: handle: JournalHandle -> sessionId: string -> Task<obj>
-
     val interruptAfterSubmittedJudgement:
-        handle: JournalHandle -> physicalUserMessageId: string -> sessionPort: obj -> sessionId: string -> Task<obj>
+        handle: JournalHandle ->
+        physicalUserMessageId: string ->
+        runBackground: obj ->
+        sessionPort: obj ->
+        sessionId: string ->
+            Task<obj>

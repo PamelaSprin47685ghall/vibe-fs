@@ -1,4 +1,4 @@
-// requirements/verification-system/tests/integration/run.mjs — sequential integration suite orchestrator.
+// requirements/verification-system/tests/integration/run.mjs — sole integration child/warmup orchestrator.
 
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'

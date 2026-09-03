@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>provider-attempt-recovery</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>participant-provider-attempt-fallback-facts</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Facts.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Facts.fs"/>
+  </ItemGroup>
+</Project>

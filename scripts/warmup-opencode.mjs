@@ -4,7 +4,8 @@
  *
  * First launch on a machine (or fresh CI runner) pays package resolution /
  * native binary extract / OS page-cache costs. Later ProcessHost.serve starts
- * then compete with per-test timeouts. Invoked from npm run format-build-test before e2e.
+ * then compete with per-test timeouts. The integration orchestrator invokes
+ * this once before any integration child; the release sink never duplicates it.
  *
  * Exit 0 on success; non-zero if the binary is missing or version fails.
  */

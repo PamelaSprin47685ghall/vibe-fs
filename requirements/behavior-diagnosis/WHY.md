@@ -31,3 +31,7 @@
 ## DEPENDS ON
 
 `behavior-diagnosis → semantic-trace, durable-events, prefix-stability, managed-session-lifecycle`
+
+## Physical fatal boundary
+
+Enforcer cycle的protocol exhaustion与commit-unknown是本owner的typed incident；process termination不是领域能力。直接调用Host fatal implementation会跳过composition injection并允许同一incident被多个层重复报告或kill。

@@ -19,6 +19,9 @@
 - 观测不足或存在多解时一律安全失败（fail closed）。
 - 插件加载初始化阶段保持纯洁，严禁执行业务恢复或反向调用宿主业务接口。
 - Host 契约闭包严格排除 Sphinx、诊断、消息修改与进程运行时实现。
+- Host envelope、message codec与loop codec拥有不同consumer cohort；共享解析只下沉到无状态envelope contract，不能用一个宽adapter公开全部codec、subscription与diagnostics。
+- Node runtime只是机制标签。纯`node:path/posix`表示不得被误判为authority；console、environment、process control及mutable registry按实际capability facts判定。
+- fatal incident vocabulary与capability type属于纯contract；console report、process kill/exit属于唯一adapter。composition负责mandatory injection及settlement ordering，普通runtime不能直接到达physical implementation。
 
 ## 违反边界的后果（RED）
 

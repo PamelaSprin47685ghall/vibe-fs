@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>fixture</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>fixture-consumer</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Consumer.fs"/>
+  </ItemGroup>
+</Project>

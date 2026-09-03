@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, statSync } from 'node:fs'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+
+import { buildTraceGraph } from '../lib/requirement-trace.mjs'
+import { validateSemanticEvidenceProof } from '../lib/semantic-evidence.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -113,42 +116,14 @@ const isExecutionPosition = (edge) =>
   (EXECUTION_POSITION.test(edge.providerPath) ||
     (edge.symbolKind !== 'FSharpField' && EXECUTION_POSITION.test(edge.symbol)))
 
-const semanticEvidenceMetadata = (entry, fail) => {
-  const lawMatch = /^WHAT\[([A-Z0-9]+(?:-[A-Z0-9]+)*)\]$/.exec(entry?.law ?? '')
-  const proof = norm(entry?.proof ?? '')
-  const proofMatch = /^requirements\/([^/]+)\/tests\/.+\.test\.mjs$/.exec(proof)
-  const proofPath = resolve(ROOT, proof)
-  const proofExists =
-    proofMatch &&
-    proof === entry.proof &&
-    !isAbsolute(entry.proof) &&
-    existsSync(proofPath) &&
-    statSync(proofPath).isFile()
-  const whatPath = proofMatch ? join(ROOT, 'requirements', proofMatch[1], 'WHAT.md') : ''
-  const lawId = lawMatch?.[1]
-  const normative =
-    proofExists &&
-    lawId &&
-    existsSync(whatPath) &&
-    new RegExp(`^##\\s+${lawId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`, 'm').test(readFileSync(whatPath, 'utf8')) &&
-    readFileSync(proofPath, 'utf8').includes(`WHAT[${lawId}]`)
-  if (!normative) {
-    fail(
-      'invalid-semantic-evidence-metadata',
-      `${entry?.path ?? ''}: semantic-evidence needs an exact normative WHAT law and existing proof that cites it`,
-      { path: entry?.path },
-    )
-    return false
-  }
-  return true
-}
-
 export function analyzeOwnerContracts({
   compilePaths,
   semanticOwners,
   publishedContracts,
   symbolUses,
   migrationState,
+  requirementTrace,
+  repositoryRoot = ROOT,
 }) {
   const violations = []
   const fail = (code, message, details = {}) => violations.push({ code, message, ...details })
@@ -279,30 +254,6 @@ export function analyzeOwnerContracts({
         })
         return null
       }
-      const proofs = node.proofs
-      const invalidProofs = Array.isArray(proofs)
-        ? proofs.filter((proof) => {
-            if (typeof proof !== 'string' || proof.length === 0 || proof !== norm(proof) || isAbsolute(proof)) return true
-            if (!/^requirements\/[^/]+\/tests\/.+\.test\.mjs$/.test(proof)) return true
-            const resolved = resolve(ROOT, proof)
-            const repositoryRelative = norm(relative(ROOT, resolved))
-            return (
-              repositoryRelative === '..' ||
-              repositoryRelative.startsWith('../') ||
-              repositoryRelative !== proof ||
-              !existsSync(resolved) ||
-              !statSync(resolved).isFile()
-            )
-          })
-        : []
-      if (!Array.isArray(proofs) || proofs.length === 0 || invalidProofs.length > 0) {
-        fail(
-          'contract-without-proof',
-          `${path}: migration node '${nodeId}' must have existing executable proofs under requirements/<package>/tests/*.test.mjs`,
-          { path, invalidProofs },
-        )
-        return null
-      }
       if (publication && (!entry.contract || !node.publishes?.includes(entry.contract))) {
         fail('contract-vocabulary-mismatch', `${path}: '${entry.contract ?? ''}' is not published by migration node '${nodeId}'`, {
           path,
@@ -321,7 +272,13 @@ export function analyzeOwnerContracts({
     }
     const path = validateOwnedPath(entry, 'contract', true)
     const authorization = authorizationOf(entry, `contract ${entry?.path ?? ''}`, fail)
-    const semanticEvidence = entry.kind !== 'semantic-evidence' || semanticEvidenceMetadata(entry, fail)
+    const semanticEvidenceFinding = validateSemanticEvidenceProof(entry, requirementTrace, repositoryRoot)
+    if (semanticEvidenceFinding) fail(
+      semanticEvidenceFinding.code,
+      semanticEvidenceFinding.message,
+      { path: semanticEvidenceFinding.path },
+    )
+    const semanticEvidence = !semanticEvidenceFinding
     if (
       entry.kind === 'semantic-evidence' &&
       authorization &&
@@ -673,6 +630,8 @@ function readProductionInput() {
     publishedContracts: JSON.parse(readFileSync(CONTRACTS, 'utf8')),
     symbolUses: [],
     migrationState: readMigrationState(semanticOwners),
+    requirementTrace: buildTraceGraph(join(ROOT, 'requirements')),
+    repositoryRoot: ROOT,
   }
 }
 

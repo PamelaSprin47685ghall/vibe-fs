@@ -39,3 +39,7 @@ Manager 自行宣告「工作已完成」仅属于参与者的单方主张。在
 ```text
 DEPENDS ON: obligation-ledger, review-assurance, participant-horizon
 ```
+
+## Physical fatal boundary
+
+Finality owns infrastructure-failure classification and the point beyond which no business fallback exists；console/process termination remains aHost adapter capability。Direct fatal would mix adjudication withphysical authority and permit duplicate termination across tool and composition layers。

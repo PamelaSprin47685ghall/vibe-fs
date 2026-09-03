@@ -45,3 +45,7 @@ Gate 有、Schema 无   ──► 产生安全隐患：模型虽不可见但可�
 - `attention-regulation`
 - `concern-routing`
 - `institutional-learning`
+
+## Physical fatal boundary
+
+Host configuration rejection belongs to capability-enforcement validation；console/process termination belongs toHost physical adapter。把两者合并成直接`Diagnostic.fatal`调用会让纯admission owner获得process authority，并使漏注入无法由类型系统发现。

@@ -26,3 +26,7 @@ Provider 会话历史可能超过模型的可用上下文窗口。如果压缩�
 
 - `semantic-trace`
 - `provider-projection`
+
+## Physical fatal boundary
+
+Blogger flight claim/release conflict与compression invariant由context-compression裁决；process fuse是foreign effect。直接fatal会绕开durable claim/settlement次序，并允许旧callback杀死已由新RequestId接管的世界。

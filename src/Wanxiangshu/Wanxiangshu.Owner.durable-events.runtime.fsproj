@@ -28,6 +28,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-judgement-witness.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
     <Compile Include="Persistence/Journal/ObligationEnvelopeSurface.fsi"/>

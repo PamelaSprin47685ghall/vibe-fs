@@ -68,3 +68,4 @@ ehthumbs.db
 /vibe-fs.xml
 /local/
 /local:/
+/requirements/structured-workflow/tests/fixtures/locality-dependencies/.local/
