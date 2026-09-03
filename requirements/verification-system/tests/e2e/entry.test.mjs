@@ -67,6 +67,7 @@ assert.equal(typeof ADVERSITY_ORACLES.assertReviewerRevise, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertFinalityTemporarilyBlocked, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertDurableRecovery, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertPublishConflict, 'function');
+assert.equal(typeof ADVERSITY_ORACLES.assertSubagentReuse, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertSuccessfulReconciliation, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertLaterSuccessfulFinality, 'function');
 assert.equal(typeof CUSTOMS.holdChildC1UntilLabor, 'function');

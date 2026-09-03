@@ -66,7 +66,9 @@ export const collectBuildInputs = ({
     ...walk(productionRoot, ['.fs']),
     ...walk(productionRoot, ['.fsproj']),
     ...repositoryInputs,
-  ].map((file) => resolve(file))
+  ]
+    .map((file) => resolve(file))
+    .filter((file) => !file.split(/[\\/]/).includes('.fable-build'))
 
   return [...new Set(sources)]
 }

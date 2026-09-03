@@ -368,6 +368,8 @@ function requiresFullImpact(changedPath, aggregatePath) {
     || path.extname(changedPath).toLowerCase() === '.fsproj'
     || FULL_IMPACT_BASENAMES.has(basename)
     || /(?:^|\/)\.config\/dotnet-tools\.json$/.test(changedPath)
+    || /(?:^|\/)scripts\/(?:build|compile-impact)\.mjs$/.test(changedPath)
+    || /(?:^|\/)scripts\/lib\/owner-compile\.mjs$/.test(changedPath)
 }
 
 function discoverOwnerProjects(projectDirectory, aggregatePath) {
@@ -429,6 +431,7 @@ export function planImpactCompile({
   projectDirectory,
   aggregatePath = DEFAULT_AGGREGATE_PATH,
   fullThreshold = 0.6,
+  isClean = false,
 } = {}) {
   if (!Array.isArray(changedPaths) || changedPaths.length === 0) {
     throw new Error('changedPaths must contain at least one path for planImpactCompile')
@@ -579,7 +582,7 @@ export function planImpactCompile({
     .filter((sourcePath) => sourcePath.endsWith('.fs')).length
   const aggregateProductionCount = aggregate.compileItems.filter((sourcePath) => sourcePath.endsWith('.fs')).length
 
-  if (selectedProductionCount / aggregateProductionCount > fullThreshold) {
+  if (isClean || selectedProductionCount / aggregateProductionCount > fullThreshold) {
     return impactPlan({
       mode: 'full',
       aggregate,
@@ -587,7 +590,7 @@ export function planImpactCompile({
       roots,
       selectedProjects: allProjects,
       changedPaths: normalizedChanges,
-      reason: 'impact-exceeds-full-threshold',
+      reason: isClean ? 'clean-build' : 'impact-exceeds-full-threshold',
     })
   }
 
@@ -1061,6 +1064,9 @@ export function collectTrackedInputs({
     path.resolve(root, 'package.json'),
     path.resolve(root, 'package-lock.json'),
     path.resolve(root, '.config/dotnet-tools.json'),
+    path.resolve(root, 'scripts/build.mjs'),
+    path.resolve(root, 'scripts/compile-impact.mjs'),
+    path.resolve(root, 'scripts/lib/owner-compile.mjs'),
     path.resolve(resolvedProjectDirectory, 'Directory.Build.props'),
   ]
 
@@ -1091,9 +1097,10 @@ export function detectChangedFiles({
     path.join(resolvedOutputDir, 'Sphinx/McpServer.js'),
   ]
 
+  const isProductionOutput = resolvedOutputDir === norm(path.resolve(root, 'dist'))
   const hasOutputs = fs.existsSync(resolvedOutputDir)
-    && essentialOutputs.every((p) => fs.existsSync(p))
     && hasEmittedJsFiles(resolvedOutputDir)
+    && (!isProductionOutput || essentialOutputs.every((p) => fs.existsSync(p)))
 
   let manifest = null
   if (fs.existsSync(resolvedManifestPath)) {
@@ -1133,13 +1140,7 @@ export function detectChangedFiles({
 
     const stat = fs.statSync(file)
     const oldEntry = oldFiles[file]
-
-    let hash
-    if (oldEntry && oldEntry.mtimeMs === stat.mtimeMs && oldEntry.size === stat.size && oldEntry.hash) {
-      hash = oldEntry.hash
-    } else {
-      hash = computeFileHash(file)
-    }
+    const hash = computeFileHash(file)
 
     currentFiles[file] = { mtimeMs: stat.mtimeMs, size: stat.size, hash }
 
@@ -1229,6 +1230,7 @@ export async function compileIncremental({
     aggregatePath: resolvedAggregate,
     fullThreshold,
     projectDirectory: path.dirname(resolvedAggregate),
+    isClean,
   })
 
   if (plan.mode === 'none') {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { EventEmitter } from 'node:events'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import test from 'node:test'
@@ -126,6 +126,39 @@ test('WHAT[STRUCTURED-WORKFLOW-012] incremental compile executes focused flat co
     assert.notEqual(calls[0].args[4], fixture.projects.runtime)
     assert.ok(!readFileSync(calls[0].args[4], 'utf8').includes('<ProjectReference'))
     assert.ok(existsSync(manifestPath), 'manifest must be recorded on successful compilation')
+
+    const cached = await compileIncremental({
+      aggregatePath: fixture.aggregate,
+      rootPropsPath: join(fixture.root, 'Directory.Build.props'),
+      scratchRoot: join(fixture.root, '.scratch'),
+      outputDir,
+      manifestPath,
+      spawn,
+      stdio: 'pipe',
+    })
+
+    assert.equal(cached.cached, true)
+    assert.equal(calls.length, 1)
+
+    const runtimeSource = join(fixture.root, 'Source/Runtime.fs')
+    const originalStat = statSync(runtimeSource)
+    const originalText = readFileSync(runtimeSource, 'utf8')
+    writeFileSync(runtimeSource, originalText.replace('"Runtime"', '"Runtimf"'))
+    utimesSync(runtimeSource, originalStat.atimeMs / 1000, originalStat.mtimeMs / 1000)
+    assert.equal(statSync(runtimeSource).size, originalStat.size)
+
+    const contentChangedAtSameMetadata = await compileIncremental({
+      aggregatePath: fixture.aggregate,
+      rootPropsPath: join(fixture.root, 'Directory.Build.props'),
+      scratchRoot: join(fixture.root, '.scratch'),
+      outputDir,
+      manifestPath,
+      spawn,
+      stdio: 'pipe',
+    })
+
+    assert.equal(contentChangedAtSameMetadata.cached, false)
+    assert.equal(calls.length, 2, 'content hash must invalidate cache even when size and mtime are unchanged')
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }

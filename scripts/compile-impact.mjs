@@ -179,10 +179,16 @@ async function main() {
       scratchRoot: options.scratchRoot,
       rootPropsPath: options.rootPropsPath,
       outputDir: options.outputDir,
+      manifestPath: resolve(options.scratchRoot, 'impact-manifest.json'),
       fullThreshold: options.fullThreshold,
     })
     if (!result.ok) {
       process.exit(result.code || 1)
+    }
+    if (result.cached) {
+      console.log('[impact-compile] up-to-date (cached)')
+    } else {
+      console.log(`[impact-compile] compiled ${result.mode} impact (${result.compileItems.length} items)`)
     }
   } catch (error) {
     console.error(`[impact-compile] FAILED: ${error.message}`)

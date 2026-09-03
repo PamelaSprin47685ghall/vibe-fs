@@ -759,6 +759,21 @@ module RuntimeSurface =
                 | Error _ -> projectionToJs typed
             | _ -> projectionToJs typed
 
+    let closeCompletedAgentOwnerChildWork (logicalRun: string) (authorityRoot: string) (projection: obj) : obj =
+        match projectionValidation projection with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok() ->
+            let typed = projectionOf projection
+
+            match
+                PromptAuthorityRun.closeCompletedAgentOwnerChildWork
+                    (LogicalRunId.create logicalRun)
+                    (AuthorityRootUserMessageId.create authorityRoot)
+                    typed
+            with
+            | Ok closed -> projectionToJs closed
+            | Error error -> box {| ok = false; error = error |}
+
     let resolveKnownOrigin (physical: string) (promptKey: string) (hostCompaction: bool) (projection: obj) : string =
         match projectionValidation projection with
         | Error _ -> "UnknownOrigin"
