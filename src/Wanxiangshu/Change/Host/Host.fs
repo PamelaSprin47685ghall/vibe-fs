@@ -129,7 +129,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let awaitPendingSource (agentId: string) (source: Task<AgentCompletionOutcome>) =
         task {
             let! completedFirst =
-                Wanxiangshu.Process.PtyTiming.raceExit (source :> Task) Distillation.AwaitAgentTimeoutMs
+                Wanxiangshu.Process.NodeTiming.raceExit (source :> Task) Distillation.AwaitAgentTimeoutMs
 
             if not completedFirst then
                 return Error(sprintf "await agent timed out: %s" agentId)
@@ -258,7 +258,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                                 (conflictTimeoutBody grepOut)
                         )
                 else
-                    do! Wanxiangshu.Process.PtyTiming.timerTask 50 |> TaskResultCE.ofTask
+                    do! Wanxiangshu.Process.NodeTiming.timerTask 50 |> TaskResultCE.ofTask
                     return! loop ()
             }
 

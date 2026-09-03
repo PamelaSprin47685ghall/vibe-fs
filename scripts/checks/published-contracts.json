@@ -2273,7 +2273,32 @@
     {
       "owner": "time-capability",
       "locality": "foundation-temporal",
-      "justification": "Clock/deadline capabilities, session-start projection and registered Node/virtual timing adapters form one signed locality depending only on graduated bounded-task primitives; DeadlineSurface is signed representation support."
+      "justification": "DeadlineSurface and the registered temporal representation Surface form one composition locality; formulas and factories remain in their narrower provider localities."
+    },
+    {
+      "owner": "time-capability",
+      "locality": "foundation-temporal-contract",
+      "justification": "Clock, timer and deadline-handle capability types form a zero-dependency bounded contract with no physical value or factory."
+    },
+    {
+      "owner": "time-capability",
+      "locality": "process-deadline-contract",
+      "justification": "The immutable Deadline value and its pure calculations form a zero-dependency bounded contract."
+    },
+    {
+      "owner": "time-capability",
+      "locality": "execution-session-sessionstartedatprojection",
+      "justification": "The bind-once SessionStartedAt projection forms a zero-dependency bounded contract independent of timing implementations."
+    },
+    {
+      "owner": "time-capability",
+      "locality": "process-node-timing-adapter",
+      "justification": "The Node clock and timer physical implementations form one adapter locality independent of virtual verification state."
+    },
+    {
+      "owner": "time-capability",
+      "locality": "process-virtual-timing",
+      "justification": "Virtual clock and timer factories form one verification runtime locality unavailable to ordinary production consumers."
     },
     {
       "owner": "provider-projection",
@@ -9219,7 +9244,7 @@
       "justification": "time-capability.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9228,13 +9253,13 @@
         "change-integration"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.raceExit",
-        "Wanxiangshu.Process.PtyTiming.timerTask"
+        "Wanxiangshu.Process.NodeTiming.raceExit",
+        "Wanxiangshu.Process.NodeTiming.timerTask"
       ],
       "justification": "time-capability.Contract publishes exactly these symbols to 'change-integration'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9243,14 +9268,14 @@
         "delegation"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.nodeClockPort",
-        "Wanxiangshu.Process.PtyTiming.raceExit",
-        "Wanxiangshu.Process.PtyTiming.timerTask"
+        "Wanxiangshu.Process.NodeTiming.nodeClockPort",
+        "Wanxiangshu.Process.NodeTiming.raceExit",
+        "Wanxiangshu.Process.NodeTiming.timerTask"
       ],
       "justification": "time-capability.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9259,12 +9284,12 @@
         "review-judgement"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.raceExit"
+        "Wanxiangshu.Process.NodeTiming.raceExit"
       ],
       "justification": "time-capability.Contract publishes exactly these symbols to 'review-judgement'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9273,13 +9298,13 @@
         "host-boundary"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.nodeClockPort",
-        "Wanxiangshu.Process.PtyTiming.nodeTimerPort"
+        "Wanxiangshu.Process.NodeTiming.nodeClockPort",
+        "Wanxiangshu.Process.NodeTiming.nodeTimerPort"
       ],
       "justification": "time-capability.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9288,12 +9313,12 @@
         "output-distillation"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.timerTask"
+        "Wanxiangshu.Process.NodeTiming.timerTask"
       ],
       "justification": "time-capability.Contract publishes exactly these symbols to 'output-distillation'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9302,13 +9327,13 @@
         "process-execution"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.raceExit",
-        "Wanxiangshu.Process.PtyTiming.timerTask"
+        "Wanxiangshu.Process.NodeTiming.raceExit",
+        "Wanxiangshu.Process.NodeTiming.timerTask"
       ],
       "justification": "time-capability.Contract publishes exactly these symbols to 'process-execution'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/VirtualTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9317,8 +9342,8 @@
         "verification-system"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.createVirtualClockPort",
-        "Wanxiangshu.Process.PtyTiming.createVirtualTimerPort",
+        "Wanxiangshu.Process.VirtualTiming.createVirtualClockPort",
+        "Wanxiangshu.Process.VirtualTiming.createVirtualTimerPort",
         "Wanxiangshu.Process.VirtualClockPort",
         "Wanxiangshu.Process.VirtualClockPort.AdvanceMs",
         "Wanxiangshu.Process.VirtualClockPort.Port",

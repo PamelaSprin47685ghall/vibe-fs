@@ -194,7 +194,7 @@ module PtySupervisor =
         session.AwaitingFirstByte <- true
 
         task {
-            do! PtyTiming.timerTask PtyReadFirstByteMs
+            do! NodeTiming.timerTask PtyReadFirstByteMs
             resolveSilentRead supervisor port id
         }
         |> ignore

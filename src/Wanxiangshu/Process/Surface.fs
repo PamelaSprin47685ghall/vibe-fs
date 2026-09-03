@@ -164,7 +164,7 @@ module ProcessSurface =
     let private idValue (id: PtyId) = id.Value
 
     let createVirtualTimer () : obj =
-        TimerPortHandle(PtyTiming.createVirtualTimerPort ()) :> obj
+        TimerPortHandle(VirtualTiming.createVirtualTimerPort ()) :> obj
 
     let timerDelay (timer: obj) (milliseconds: int) : obj =
         let port = (timer :?> TimerPortHandle).Port.Port
@@ -184,13 +184,13 @@ module ProcessSurface =
     let timerDispose (timer: obj) : unit =
         (timer :?> TimerPortHandle).Port.Port.Dispose()
 
-    let createNodeTimer () : obj = box (PtyTiming.nodeTimerPort ())
+    let createNodeTimer () : obj = box (NodeTiming.nodeTimerPort ())
 
     let nodeTimerDispose (timer: obj) : unit =
         (unbox<ITimerPort> timer).Dispose()
 
     let createVirtualClock () : obj =
-        ClockPortHandle(PtyTiming.createVirtualClockPort ()) :> obj
+        ClockPortHandle(VirtualTiming.createVirtualClockPort ()) :> obj
 
     let clockNowIso (clock: obj) : string =
         (clock :?> ClockPortHandle).Port.Port.UtcNow().ToString("o")
@@ -204,7 +204,7 @@ module ProcessSurface =
     let clockSet (clock: obj) (iso: string) : unit =
         (clock :?> ClockPortHandle).Port.Set(DateTimeOffset.Parse iso)
 
-    let createNodeClock () : obj = box (PtyTiming.nodeClockPort ())
+    let createNodeClock () : obj = box (NodeTiming.nodeClockPort ())
 
     let effectiveDeadlineSeconds (runtimeSeconds: float) (hardLimitSeconds: float) : float =
         if
@@ -927,7 +927,7 @@ module ProcessSurface =
         (ptyPortOf port).RegisterExitTask(ptyIdOf id, unbox<Task> taskValue)
 
     let ptyRaceExit (exitTask: obj) (milliseconds: int) : Task<bool> =
-        PtyTiming.raceExit (unbox<Task> exitTask) milliseconds
+        NodeTiming.raceExit (unbox<Task> exitTask) milliseconds
 
     let portComplete (port: obj) (id: obj) (outcome: obj) : unit =
         match optionalResult outcome with

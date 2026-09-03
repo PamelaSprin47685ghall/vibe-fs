@@ -634,8 +634,10 @@
     <Compile Include="Process/Deadline.fs"/>
     <Compile Include="Process/DeadlineSurface.fsi"/>
     <Compile Include="Process/DeadlineSurface.fs"/>
-    <Compile Include="Process/PtyTiming.fsi"/>
-    <Compile Include="Process/PtyTiming.fs"/>
+    <Compile Include="Process/NodeTiming.fsi"/>
+    <Compile Include="Process/NodeTiming.fs"/>
+    <Compile Include="Process/VirtualTiming.fsi"/>
+    <Compile Include="Process/VirtualTiming.fs"/>
     <Compile Include="Execution/Session/Wait/CompletionMailbox.fsi"/>
     <Compile Include="Execution/Session/Wait/CompletionMailbox.fs"/>
     <Compile Include="Execution/Delegation/Fork/RuntimeContract.fsi"/>

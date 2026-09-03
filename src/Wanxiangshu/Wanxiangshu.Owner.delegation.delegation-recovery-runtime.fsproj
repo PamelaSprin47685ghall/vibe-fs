@@ -17,7 +17,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecovery.fsi"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecovery.fs"/>
     <Compile Include="Execution/Delegation/Handle/Controller.fsi"/>

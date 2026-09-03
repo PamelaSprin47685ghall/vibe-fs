@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>time-capability</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-session-sessionstartedatprojection</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Execution/Session/SessionStartedAtProjection.fsi"/>
+    <Compile Include="Execution/Session/SessionStartedAtProjection.fs"/>
+  </ItemGroup>
+</Project>

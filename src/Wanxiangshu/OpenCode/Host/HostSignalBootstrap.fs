@@ -115,7 +115,7 @@ module HostSignalBootstrap =
 
             // Host visibility catch-up still owns a Node timer backstop. Provider
             // recovery itself is causal and no longer uses a wall-clock deadline.
-            let recoveryTimerPort = PtyTiming.nodeTimerPort ()
+            let recoveryTimerPort = NodeTiming.nodeTimerPort ()
 
             // HOST-BOUNDARY-008: projection catch-up wakes on the session's
             // message.updated signal; recoveryTimerPort supplies the backstop.

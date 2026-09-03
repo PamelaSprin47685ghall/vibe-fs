@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Process
 
 open System
-open System.Threading.Tasks
 open Wanxiangshu.Foundation
 
 type VirtualTimerPort =
@@ -14,10 +13,6 @@ type VirtualClockPort =
       AdvanceMs: int -> unit
       Set: DateTimeOffset -> unit }
 
-module PtyTiming =
-    val timerTask: milliseconds: int -> Task<unit>
-    val raceExit: exitTask: Task -> milliseconds: int -> Task<bool>
-    val nodeTimerPort: unit -> ITimerPort
-    val nodeClockPort: unit -> IClockPort
+module VirtualTiming =
     val createVirtualTimerPort: unit -> VirtualTimerPort
     val createVirtualClockPort: unit -> VirtualClockPort

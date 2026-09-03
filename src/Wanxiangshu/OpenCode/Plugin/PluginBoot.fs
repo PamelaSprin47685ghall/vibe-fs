@@ -72,7 +72,7 @@ module PluginBoot =
                 | Error err -> raise (InvalidOperationException err)
 
             let scope = new PluginRuntimeScope(journal)
-            let clock = PtyTiming.nodeClockPort ()
+            let clock = NodeTiming.nodeClockPort ()
 
             let strengthFailClosed (reason: string) : unit =
                 scope.Strength.TripStrengthFuse reason

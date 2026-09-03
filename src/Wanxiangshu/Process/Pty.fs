@@ -111,7 +111,7 @@ module private PtyPortSupport =
 
     let continueAfterExitFound (handler: PtyBackendHandler) (exitTask: Task) (grace: int) (id: PtyId) =
         task {
-            let! exited = PtyTiming.raceExit exitTask grace
+            let! exited = NodeTiming.raceExit exitTask grace
 
             if exited then () else do! applyKill handler exitTask id
         }

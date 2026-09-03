@@ -40,7 +40,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-budget.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-prediction-predictor.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.execution-session-sessionstartedatprojection.fsproj"/>
     <Compile Include="Strength/Persistence/DurabilityPort.fsi"/>
     <Compile Include="Strength/Persistence/DurabilityPort.fs"/>
     <Compile Include="Strength/Persistence/Store.fsi"/>

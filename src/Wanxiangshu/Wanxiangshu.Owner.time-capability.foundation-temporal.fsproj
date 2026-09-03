@@ -1,1 +1,30 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><WanxiangshuSemanticOwner>time-capability</WanxiangshuSemanticOwner>…<WanxiangshuOwnerLocality>foundation-temporal</WanxiangshuOwnerLocality><WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>…</PropertyGroup><ItemGroup><ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/><Compile Include="Foundation/Temporal.fsi"/><Compile Include="Foundation/Temporal.fs"/><Compile Include="Execution/Session/SessionStartedAtProjection.fsi"/><Compile Include="Execution/Session/SessionStartedAtProjection.fs"/><Compile Include="Process/Deadline.fsi"/><Compile Include="Process/Deadline.fs"/><Compile Include="Process/DeadlineSurface.fsi"/><Compile Include="Process/DeadlineSurface.fs"/><Compile Include="Process/PtyTiming.fsi"/><Compile Include="Process/PtyTiming.fs"/></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>time-capability</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>foundation-temporal</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-causalwait.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-processrequest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.host-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.execution-session-sessionstartedatprojection.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-deadline-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-virtual-timing.fsproj"/>
+    <Compile Include="Process/DeadlineSurface.fsi"/>
+    <Compile Include="Process/DeadlineSurface.fs"/>
+    <Compile Include="Process/Surface.fsi"/>
+    <Compile Include="Process/Surface.fs"/>
+  </ItemGroup>
+</Project>

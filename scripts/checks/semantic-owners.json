@@ -2449,7 +2449,11 @@
       "owner": "process-execution"
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
+      "owner": "time-capability"
+    },
+    {
+      "path": "src/Wanxiangshu/Process/VirtualTiming.fs",
       "owner": "time-capability"
     },
     {

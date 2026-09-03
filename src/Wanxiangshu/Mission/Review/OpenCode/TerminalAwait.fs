@@ -83,7 +83,7 @@ module ReviewerTerminalAwait =
 
             accepting.Value <- true
 
-            let! completedBeforeDeadline = Wanxiangshu.Process.PtyTiming.raceExit (completed.Task :> Task) timeoutMs
+            let! completedBeforeDeadline = Wanxiangshu.Process.NodeTiming.raceExit (completed.Task :> Task) timeoutMs
 
             if not completedBeforeDeadline then
                 return Error "await reviewer timed out"

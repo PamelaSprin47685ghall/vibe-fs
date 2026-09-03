@@ -6,7 +6,6 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Process
 open Wanxiangshu.Execution.Session
 
 /// EXEC-018: single-join batch ceiling. One source of truth for runtime + wire.

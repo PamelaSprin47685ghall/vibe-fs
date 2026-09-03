@@ -1529,7 +1529,7 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 2. `B1 M6.3b extractor`（DONE）：B1-A=`5830fa473`实现report-only fresh F#/FCS/JS/generated extractor、唯一canonical world/summary/full report与178-record closed worksheet；B1-A2=`4c831aca0`固化baseline定义与clean exact-commit writer；A3=`e6268f35a`删除synthetic FCS node alias。B1-B在A3 exact clean checkout完成fixed impact corpus，production gate仍未接入。
 3. `B2 EventStore slice`（PROOF DONE；PRODUCTION DEFERRED TO C/D）：production-bound codec proof已锁定六项公开协议；在M6.3c同一未提交cutover state抽`eventstore-canonical-codec` bounded contract并迁fresh direct consumers，再随M6.4原子提交。它不能形成旧gate下独立节点：旧ACL正借codec与`ProcessEventLog`同project偶然授权，过渡节点若维持绿色只能扩张错误的owner-wide权限。provider/direct/reverse-impact编译仍须在原子提交前全绿。
 4. `B3 Host slices`（CODEC + DIAGNOSTIC + SUBSCRIPTION DONE；FATAL PENDING）：HostMessage/HostEventEnvelope/LoopEvent三个bounded contract、LoopSensor mandatory diagnostic injection、closed typed subscription与Bootstrap唯一failure owner已完成；下一节点迁fatal port/adapter。
-5. `B4 foundational capabilities`（T0 PROOF DONE；SPLITS PENDING）：Temporal synthetic blueprint已替换为production-bound行为proof；后续依序拆Temporal、CausalWait、Process/PTY纯词汇与窄capability，先立contract再迁consumer，最后删旧路径。
+5. `B4 foundational capabilities`（TEMPORAL PROOF + SOURCE/PROJECT SPLIT DONE；INJECTION + CAUSALWAIT + PROCESS/PTY PENDING）：Temporal synthetic blueprint已替换为production-bound行为proof；clock/timer capability、Deadline、SessionStartedAt projection、Node adapter、virtual implementation与representation Surface已分为六个locality。ordinary runtime对Node adapter的direct construction/default fallback仍须在后续B4/B6迁为mandatory injection；CausalWait与Process/PTY继续按先contract、再consumer、最后删旧路径施工。
 6. `B5 Delegation ownership`（PENDING）：迁owner fact/append/query/wait/clock ports与pure projections/folds，durable composition只保留outer routing/combine。
 7. `B6 Delegation Host/PTY wiring`（PENDING）：拆host runtime/窄adapter，删除PTY对HostForkRuntime与Process implementation反向依赖，由现有composition roots注入。
 8. `B7 full adjudication`（TAXONOMY CHECKPOINT DONE；ADJUDICATION PENDING）：F# compiler-resolved结构、mutable scope、exact external authority/pure family与stable occurrence identity首批闭合；fresh仍有315,949条fail-closed Unknown与`RootWorkspace` extraction blocker。后续按exact family/type/escape证据分组关闭，再逐条写入非current-reference-derived裁决，最终零undecided、零extractor blocker。
@@ -1569,6 +1569,13 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - TIME-008删除synthetic contract blueprint；三个正式测试直接穿越registered `Process/Surface.js`与`Process/DeadlineSurface.js`，分别固定virtual clock/timer实例隔离、Deadline只由显式clock input决定、构造Node capability不改变virtual state。
 - proof不读取墙钟、不等待真实timer、不扫描源码。Node clock/timer只验证最窄opaque capability construction；物理时间正确性仍属于adapter canary，locality/source/closure/injection仍由后续production inventory/v2 validator承接。
 - executable RED由旧Surface缺少`createNodeClock`/`createNodeTimer`稳定触发；实现只增加production `PtyTiming` Node capability的直接opaque投影及timer disposal，不复制时间算法或第二状态机。time-capability、Surface/trace meta、clean Fable build与旧release gates全绿；本节点未切fsproj、未启用v2 authority。
+
+### 2026-09-04 — M6.3b B4-T1 Temporal source/project split
+
+- `Foundation/Temporal`、`Process/Deadline`与`SessionStartedAtProjection`分别进入零实现值的bounded contract；原`PtyTiming` clean-break为唯一Node物理adapter `NodeTiming`与独立virtual verification runtime `VirtualTiming`，旧module/source删除。registered `DeadlineSurface + ProcessSurface`独占无production consumer的representation composition locality，不把virtual factory传给ordinary runtime。
+- 六个provider source闭集、kind、direct consumer cohort与零reverse consumer的representation locality由production owner-project inventory proof固定。17个真实direct consumer按compiler-resolved需要迁到最窄ProjectReference；没有保留旧project/ref、duplicate Compile或compat facade。Node adapter仍有Fork/Host default fallback及Join、OneShot、Change、Review、Distillation、Process等ordinary direct consumer；该mandatory injection债明确留给后续B4/B6，本节点不宣称TIME-008已全闭合。
+- 独立consumer compile暴露`process-largegatesurface`的dead `open Wanxiangshu.Mission.WorkRecord`此前依赖旧wide transitive closure；删除dead open后绿色，没有新增宽ref或suppression。旧`PtyTiming`只保留于不可改写的历史PLAN文本、fixed impact baseline与synthetic token fixture，不存在production、time spec、semantic owner、published contract、release node或ambient-time allowlist残留。
+- 验证：6/6 provider与17/17 direct consumer focused compile绿色；5个signature union的full reverse impact执行1,426 items并绿色；隔离staged index production build为1,426 items、165 Surfaces、782 modules；time + process targeted 181/181；TIME-008 4/4；e2e-watchdog与requirement trace 807 WHAT/4,053 tests绿色；diff check绿色。同期全`check.mjs`唯一红灯来自未提交B7 fixture新增的5个`fsharp-type` hit，与本节点文件无关且不据此削弱验收。
 
 ### 2026-09-04 — M6.3b B3 Host codec与diagnostic injection
 

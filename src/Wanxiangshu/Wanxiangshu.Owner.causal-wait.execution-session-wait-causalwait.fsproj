@@ -8,7 +8,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
     <Compile Include="Execution/Session/Wait/CausalWait.fsi"/>
     <Compile Include="Execution/Session/Wait/CausalWait.fs"/>
     <Compile Include="Execution/Session/Wait/CompletionMailbox.fsi"/>

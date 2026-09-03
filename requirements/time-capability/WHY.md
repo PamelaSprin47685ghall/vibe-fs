@@ -26,3 +26,8 @@
 4. 测试用例因缺少虚拟时间支持，被迫使用真实等待（sleep）进行时序验证。
 5. Session 起始时间原点在重试或回放中发生漂移，未能严格执行单次绑定。
 6. pure clock/timer capability type与Node clock/timer implementation处于同一slice，使普通consumer传递获得ambient time、timer或mutable runtime authority。
+7. pure `Deadline` 或 `SessionStartedAtProjection` 与Node/virtual timing实现共处同一project，导致只需确定性表示或投影的consumer被迫获得物理timer与可变verification runtime的完整编译闭包。
+
+## M6 Temporal locality 裁决
+
+compiler-resolved census证明六类知识具有不同consumer cohort：clock/timer capability type、pure `Deadline`、bind-once `SessionStartedAtProjection`、Node timing adapter、virtual timing implementation、production-bound representation Surface。它们不得继续借同一个project互相扩张可见面。前三者各自形成bounded contract；Node adapter与virtual implementation分居独立locality；原`foundation-temporal`只保留representation Surface。consumer按真实source edge引用最窄slice，同一consumer确实使用多个知识时显式引用多个project。

@@ -38,7 +38,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-capture.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Runtime.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Runtime.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/PendingRun.fsi"/>

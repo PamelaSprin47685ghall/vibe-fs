@@ -1166,11 +1166,13 @@
         "src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibrationSurface.fs",
         "src/Wanxiangshu/Execution/Session/SessionStartedAtLedger.fs",
         "src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs",
-        "src/Wanxiangshu/Process/PtyTiming.fs",
+        "src/Wanxiangshu/Process/NodeTiming.fs",
+        "src/Wanxiangshu/Process/VirtualTiming.fs",
         "src/Wanxiangshu/Process/Surface.fs"
       ],
       "proofs": [
-        "requirements/time-capability/tests/ambient-time-forbidden.test.mjs"
+        "requirements/time-capability/tests/ambient-time-forbidden.test.mjs",
+        "requirements/time-capability/tests/m6-slice-boundary.test.mjs"
       ],
       "publishes": [
         "time-capability.Contract"

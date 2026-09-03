@@ -45,7 +45,7 @@ module HostForkRestart =
           // Do not inject RecoveryInFlight — that forced RecoveryIncomplete and blocked permit.
           Observations = [ HostObservation.SessionActive ]
           Pulse = Some(fun () -> runtime.PulseAgentHandle(AgentHandleId.create agentId))
-          Clock = PtyTiming.nodeClockPort () }
+          Clock = NodeTiming.nodeClockPort () }
 
     let private blockReasons
         (blocks: Wanxiangshu.Execution.Delegation.Fork.ChildRecovery.NonEmpty<ChildRecoveryBlock>)

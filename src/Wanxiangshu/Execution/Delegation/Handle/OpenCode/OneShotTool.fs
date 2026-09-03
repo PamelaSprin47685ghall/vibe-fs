@@ -292,7 +292,7 @@ module OneShotAgentTool =
         task {
             // Bound the wait: race completion against a management timer.
             // On timeout abort the child and return Error — never hang.
-            let! finished = PtyTiming.raceExit (outputTask :> Task) CompletionTimeoutMs
+            let! finished = NodeTiming.raceExit (outputTask :> Task) CompletionTimeoutMs
 
             if not finished then
                 ensureAbortStarted abortTask startAbort

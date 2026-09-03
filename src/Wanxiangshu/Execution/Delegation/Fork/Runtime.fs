@@ -52,7 +52,7 @@ module private ForkRuntimeControl =
 
     let awaitPendingWithTimeout (agentId: string) (pending: Task<RunCompletion>) (ms: int) =
         task {
-            let! completedFirst = PtyTiming.raceExit (pending :> Task) ms
+            let! completedFirst = NodeTiming.raceExit (pending :> Task) ms
 
             if completedFirst then
                 let! value = pending
@@ -89,7 +89,7 @@ type private ForkRuntimeBackendState
         ?runner: string -> Role -> string option -> Task<AgentCompletionOutcome>,
         ?listener: RunCompletion -> unit,
         ?cleanup: string -> unit,
-        /// Injectable wall clock (PtyTiming.nodeClockPort at Host/Session composition).
+        /// Injectable wall clock (NodeTiming.nodeClockPort at Host/Session composition).
         ?clock: IClockPort
     ) =
 
@@ -99,7 +99,7 @@ type private ForkRuntimeBackendState
 
     let terminalListener = defaultArg listener ignore
     let cleanupPort = defaultArg cleanup ignore
-    let clockPort = defaultArg clock (PtyTiming.nodeClockPort ())
+    let clockPort = defaultArg clock (NodeTiming.nodeClockPort ())
 
     // DSL-MUTABLE: resource — live child agent registry under lockObj
     let mutable agents: Map<string, ChildRun> = Map.empty
@@ -270,7 +270,7 @@ type private ForkRuntimeBackendState
         lock lockObj (fun () -> agents <- ForkRecovery.bindChildSession agentId childSessionId agents)
 
     /// Internal targeted completion handle. Model-visible join remains join-any.
-    /// Optional timeoutMs races the completion cell via PtyTiming.raceExit.
+    /// Optional timeoutMs races the completion cell via NodeTiming.raceExit.
     member _.AwaitAgent(agentId: string, ?timeoutMs: int) : Task<Result<RunCompletion, string>> =
         let completion =
             lock lockObj (fun () -> agents |> Map.tryFind agentId |> Option.map (fun run -> run.Completion.Await))

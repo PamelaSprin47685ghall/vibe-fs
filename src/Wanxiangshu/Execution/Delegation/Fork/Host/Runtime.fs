@@ -69,10 +69,10 @@ type HostForkRuntime
         /// The hidden Finality workflow passes `HostOwnedHidden` so its Reviewer
         /// never enters the Manager's list/join/guard or parent recovery.
         ?ownership: HandleOwnership,
-        /// Injectable wall clock (PtyTiming.nodeClockPort at Host/Session composition).
+        /// Injectable wall clock (NodeTiming.nodeClockPort at Host/Session composition).
         ?clock: IClockPort
     ) as this =
-    let clockPort = defaultArg clock (PtyTiming.nodeClockPort ())
+    let clockPort = defaultArg clock (NodeTiming.nodeClockPort ())
     let runtime = ForkRuntimeBackend.create clockPort
     // DSL-MUTABLE: resource — live child session registry by agent id
     let children = Dictionary<string, SessionId>()
