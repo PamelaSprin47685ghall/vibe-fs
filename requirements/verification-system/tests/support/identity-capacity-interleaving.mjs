@@ -34,7 +34,7 @@ const permutationsOf = (values) => {
 
 export const permutations = Object.freeze(permutationsOf(operations))
 
-export const invalidCausalEdge = (schedule) => {
+const invalidCausalEdge = (schedule) => {
   const completed = new Set()
   for (const operation of schedule) {
     const missing = prerequisites[operation].find((required) => !completed.has(required))

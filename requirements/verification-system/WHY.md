@@ -11,6 +11,7 @@
 - process-isolated runner 把叶子测试预算施加到整份测试文件，使健康断言因模块加载与调度竞争被误杀。
 - release sink 与 integration orchestrator 重复调度同一 package suite 或物理 warmup，使一次验收执行两遍同一昂贵步骤并产生两个 owner。
 - 测试直接断言内部实现细节或模拟桩迎合错误实现，失去了对真实契约的证明力。
+- interleaving helper 在进入 production 前按测试自建 prerequisite graph 拒绝输入，再把该 helper rejection 冒充 production fail-closed。
 - 验收标准事后缩水，在未达成既定目标时单方面放宽通过条件。
 
 `verification-system` 的核心存在理由是：**把「什么构成有效证明」本身变成被严格检验和证明的元规则。** 证据必须分层，验证必须真正具备失败能力（可红性），时序推进必须确定且可重放，并在遇到未知或损坏状态时严格 fail-closed。
