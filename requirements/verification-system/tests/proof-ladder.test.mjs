@@ -43,7 +43,7 @@ test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the five layer
   const normalized = steps.map((step) => step.replace(/\s+/g, ' '))
 
   assert.deepEqual(normalized, [
-    'npm run format', // format
+    'npm run format:check', // read-only format verification
     'npm run check', // L0 text gates
     'npm run build', // build（dist 生产字节）
     'node requirements/verification-system/tests/run.mjs', // L1 pure laws + L2 temporal + L3 adapter 契约面
@@ -55,8 +55,13 @@ test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the five layer
   ])
 
   assert.deepEqual(
-    Object.fromEntries(['format', 'check', 'build'].map((name) => [name, scripts[name]])),
-    { format: 'wireit', check: 'wireit', build: 'wireit' },
+    Object.fromEntries(['format', 'format:check', 'check', 'build'].map((name) => [name, scripts[name]])),
+    {
+      format: 'wireit',
+      'format:check': 'dotnet tool run fantomas --check src/Wanxiangshu',
+      check: 'wireit',
+      build: 'wireit',
+    },
   )
   assert.deepEqual(
     Object.fromEntries(['format', 'check', 'build'].map((name) => [name, wireit[name]?.command])),
