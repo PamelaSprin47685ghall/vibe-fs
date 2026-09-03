@@ -6,6 +6,7 @@
 /src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fs
 /src/Wanxiangshu/OpenCode/Host/LoopSensor.fs
 /src/Wanxiangshu/OpenCode/Host/LoopSensorSurface.fs
+/src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs
 /src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs
 /src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
 /src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs

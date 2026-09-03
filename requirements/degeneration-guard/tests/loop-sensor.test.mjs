@@ -12,6 +12,7 @@ import * as providerLanguage from '../../../dist/Participant/Provider/LanguageSu
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const wait = (ms = 15) => new Promise((resolve) => setTimeout(resolve, ms))
 const repetitiveText = () => ' retry'.repeat(2000)
+const createSensor = (options) => loopSensor.create({ diagnostic: () => {}, ...options })
 const chaoticText = () => {
   const pieces = []
 
@@ -46,8 +47,8 @@ const rawDelta = (session, field, text) => ({
 })
 
 test('WHAT[DG-008] LOOP_001_armed_anomaly_is_process_local', async () => {
-  const first = loopSensor.create({ owned: ['ses_a'], abort: () => {}, continue: () => {} })
-  const second = loopSensor.create({ owned: ['ses_a'], abort: () => {}, continue: () => {} })
+  const first = createSensor({ owned: ['ses_a'], abort: () => {}, continue: () => {} })
+  const second = createSensor({ owned: ['ses_a'], abort: () => {}, continue: () => {} })
 
   loopSensor.observe(first, loopSensor.textDelta('ses_a', repetitiveText()))
   await wait()
@@ -61,7 +62,7 @@ test('WHAT[DG-008] LOOP_001_armed_anomaly_is_process_local', async () => {
 
 test('WHAT[DG-002] LOOP_002_sensor_observes_text_and_reasoning_only', async () => {
   const aborts = []
-  const sensor = loopSensor.create({
+  const sensor = createSensor({
     owned: ['ses_text'],
     abort: (session) => aborts.push(session),
     continue: () => {},
@@ -81,7 +82,7 @@ test('WHAT[DG-002] LOOP_002_sensor_observes_text_and_reasoning_only', async () =
 test('WHAT[DG-007] LOOP_006_low_side_interrupts_once_but_does_not_continue_before_reconcile', async () => {
   const aborts = []
   const continuations = []
-  const sensor = loopSensor.create({
+  const sensor = createSensor({
     owned: ['ses_low'],
     abort: (session) => aborts.push(session),
     continue: (session, anomaly) => continuations.push([session, anomaly]),
@@ -113,7 +114,7 @@ test('WHAT[DG-001] LOOP_003_high_side_is_too_random_and_owns_its_continuation', 
   assert.equal(evaluation.state, 'TooRandom', `weightedDistinct=${evaluation.weightedDistinctTokens}`)
 
   const continuations = []
-  const sensor = loopSensor.create({
+  const sensor = createSensor({
     owned: ['ses_high'],
     abort: () => {},
     continue: (session, anomaly) => continuations.push([session, anomaly]),
@@ -131,7 +132,7 @@ test('WHAT[DG-001] LOOP_003_high_side_is_too_random_and_owns_its_continuation', 
 
 test('WHAT[DG-007] LOOP_006_abort_failure_rolls_back_guard_ownership', async () => {
   const continuations = []
-  const sensor = loopSensor.create({
+  const sensor = createSensor({
     owned: ['ses_fail'],
     abort: () => ({ ok: false, error: 'host refused interrupt' }),
     continue: (session, anomaly) => continuations.push([session, anomaly]),
@@ -145,7 +146,7 @@ test('WHAT[DG-007] LOOP_006_abort_failure_rolls_back_guard_ownership', async () 
 
 test('WHAT[DG-010] LOOP_007_unowned_session_never_interrupts', async () => {
   const aborts = []
-  const sensor = loopSensor.create({
+  const sensor = createSensor({
     owned: ['ses_owned'],
     abort: (session) => aborts.push(session),
     continue: () => {},
@@ -159,7 +160,7 @@ test('WHAT[DG-010] LOOP_007_unowned_session_never_interrupts', async () => {
 
 test('WHAT[DG-006] LOOP_006_attempt_reset_preserves_armed_cause_until_reconcile', async () => {
   const aborts = []
-  const sensor = loopSensor.create({
+  const sensor = createSensor({
     owned: ['ses_idle'],
     abort: (session) => aborts.push(session),
     continue: () => {},
@@ -216,7 +217,7 @@ test('WHAT[DG-009] LOOP_008_guard_has_no_fallback_or_nudge_recovery_path', () =>
 
 test('WHAT[DG-012] LOOP_012_degeneration_guard_is_the_single_closed_recovery_owner', async () => {
   const continuations = []
-  const sensor = loopSensor.create({
+  const sensor = createSensor({
     owned: ['ses_closed'],
     abort: () => {},
     continue: (session, anomaly) => continuations.push([session, anomaly]),

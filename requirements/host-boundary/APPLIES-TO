@@ -22,6 +22,7 @@
 /src/Wanxiangshu/Foundation/CanonicalJson.fs
 /src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs
 /src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs
+/src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs
 /src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs
 /src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs
 /src/Wanxiangshu/OpenCode/Codec/OpencodeTypes.fs

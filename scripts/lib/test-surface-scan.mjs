@@ -1472,7 +1472,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Host/HostSignalSurface.js',
     owner: 'host-boundary',
-    laws: ['HOST-BOUNDARY-001', 'HOST-BOUNDARY-002', 'HOST-BOUNDARY-003', 'HOST-BOUNDARY-027'],
+    laws: ['HOST-BOUNDARY-001', 'HOST-BOUNDARY-002', 'HOST-BOUNDARY-003', 'HOST-BOUNDARY-027', 'HOST-BOUNDARY-030'],
     source: 'src/Wanxiangshu/OpenCode/Host/HostSignalSurface.fs',
     representation: 'json',
     kind: 'pure',

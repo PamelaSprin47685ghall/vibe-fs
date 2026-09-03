@@ -248,6 +248,7 @@ module HostSignalBootstrap =
 
                             return outcome |> Result.map ignore
                         })
+                    Diagnostic.emit
 
             do scope.AttachLoopSensor loopSensor
 

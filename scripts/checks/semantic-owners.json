@@ -1,5 +1,5 @@
 {
-  "total": 696,
+  "total": 697,
   "owners": [
     "action-affordance",
     "attention-regulation",
@@ -1546,6 +1546,10 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs",
+      "owner": "host-boundary"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs",
       "owner": "host-boundary"
     },
     {

@@ -39,10 +39,10 @@ module SyncDelegateHostObservation =
             observeToolCallIdentity runtime owner part
 
     let private observeEvent (runtime: SyncDelegateRuntime) (raw: obj) =
-        match HostEventCodec.eventTypeOf raw, HostEventCodec.trySessionId raw with
+        match HostEventEnvelope.eventTypeOf raw, HostEventEnvelope.trySessionId raw with
         | "message.part.updated", Some owner -> observeToolPart runtime owner raw
         | _ -> ()
 
     let observe (runtime: SyncDelegateRuntime option) (rawInput: obj) =
         runtime
-        |> Option.iter (fun active -> observeEvent active (HostEventCodec.unwrap rawInput))
+        |> Option.iter (fun active -> observeEvent active (HostEventEnvelope.unwrap rawInput))

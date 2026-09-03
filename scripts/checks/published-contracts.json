@@ -1842,6 +1842,21 @@
     },
     {
       "owner": "host-boundary",
+      "locality": "host-event-envelope",
+      "justification": "Raw Host envelope projection is one signed immutable contract locality over opaque session identity."
+    },
+    {
+      "owner": "host-boundary",
+      "locality": "host-message-codec",
+      "justification": "Raw Host message-part decoding is one signed stateless contract locality over canonical Host message vocabulary."
+    },
+    {
+      "owner": "host-boundary",
+      "locality": "loop-event-codec",
+      "justification": "Loop text-delta decoding is one signed stateless contract locality over the immutable Host envelope projection."
+    },
+    {
+      "owner": "host-boundary",
       "locality": "host-signal-adapter",
       "justification": "Host signal adapter, signal router, listener subscription and terminal event bus form one adapter locality over host signal and diagnostics runtimes."
     },
@@ -15396,7 +15411,7 @@
       "justification": "The Foundation canonical JSON encoder publishes one Unicode code-point identity formula to the exact production consumers; every unlisted sibling remains private to dispatch-protocol."
     },
     {
-      "path": "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs",
+      "path": "src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs",
       "owner": "host-boundary",
       "node": "host-boundary-frontier-keep",
       "contract": "host-boundary.Contract",
@@ -15405,14 +15420,14 @@
         "delegation"
       ],
       "symbols": [
-        "Wanxiangshu.OpenCode.HostEventCodec.eventTypeOf",
-        "Wanxiangshu.OpenCode.HostEventCodec.trySessionId",
-        "Wanxiangshu.OpenCode.HostEventCodec.unwrap"
+        "Wanxiangshu.OpenCode.HostEventEnvelope.eventTypeOf",
+        "Wanxiangshu.OpenCode.HostEventEnvelope.trySessionId",
+        "Wanxiangshu.OpenCode.HostEventEnvelope.unwrap"
       ],
       "justification": "host-boundary.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to host-boundary."
     },
     {
-      "path": "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs",
+      "path": "src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs",
       "owner": "host-boundary",
       "node": "host-boundary-frontier-keep",
       "contract": "host-boundary.Contract",
@@ -15421,9 +15436,9 @@
         "participant-horizon"
       ],
       "symbols": [
-        "Wanxiangshu.OpenCode.HostEventCodec.eventTypeOf",
-        "Wanxiangshu.OpenCode.HostEventCodec.tryMessageSessionId",
-        "Wanxiangshu.OpenCode.HostEventCodec.unwrap"
+        "Wanxiangshu.OpenCode.HostEventEnvelope.eventTypeOf",
+        "Wanxiangshu.OpenCode.HostEventEnvelope.tryMessageSessionId",
+        "Wanxiangshu.OpenCode.HostEventEnvelope.unwrap"
       ],
       "justification": "host-boundary.Contract publishes exactly these symbols to 'participant-horizon'; every unlisted sibling remains private to host-boundary."
     },

@@ -104,10 +104,13 @@ Host 只通过 `ReliabilityDiagnostics.CausalDiagnosticRecord` 发布结构化�
 
 Host 边界严格切分为 Contract、Runtime 与 Adapter 架构 locality：
 - `Host.Session.Contract`（`host-session-contract`）：仅包含会话静止 capability 与纯 `SessionSnapshot` 词汇、端口、定位 decision，不依赖 SDK/HTTP 投影、具体 Host 运行时、进程控制、诊断或 Sphinx MCP。
-- `Host.Signal.Contract`（`host-signal-contract`）：包含 `HostDigest` sha256 词汇、`McpLaunch` 物理启动描述与共享终端词汇（`EventContract`、`Message`/`MessagePart`、`OpencodeTypes`/`OpencodeModel`），无状态且零副作用；`HostSignal` 词汇与编解码器词汇表（`HostEventCodec`、`LoopEventCodec`、`HostMessageCodec`、`ToolHostCodec`、`CanonicalJson`）中，`CanonicalJson` 归 `dispatch-protocol.foundation-identity`，`HostSignal` 与剩余 codec 归 `Host.Signal.Adapter`。
+- `Host.Signal.Contract`（`host-signal-contract`）：包含 `HostDigest` sha256 词汇、`McpLaunch` 物理启动描述与共享终端词汇（`EventContract`、`Message`/`MessagePart`、`OpencodeTypes`/`OpencodeModel`），无状态且零副作用。
+- `Host.Event.Envelope`（`host-event-envelope`）：只发布 raw Host envelope unwrap、event type、session identity 与 message-session identity 的唯一无状态公式；不得修改输入对象。
+- `Host.Message.Codec`（`host-message-codec`）：只发布 raw Host message part → `MessagePart` 的无状态 decode；其 bounded audience 只包含实际 message consumer。
+- `Host.Loop.Event.Codec`（`loop-event-codec`）：只发布 loop text-delta decode/query，并单向依赖 `Host.Event.Envelope`；不得获得完整 provider failure/terminal codec。
 - `Host.Fatal.Effect`（`host-fatal-effect`）：进程级 fatal fuse（`Foundation/FatalProcess`）的窄物理效果边界，零依赖 contract，供诊断 runtime 与 journal spine 各自引用。
 - `Host.Diagnostics.Runtime`（`host-diagnostics-runtime`）：封闭 Hook 策略元数据与因果诊断单向消费 Contract，不得反向侵入应用契约闭包。
-- `Host.Signal.Adapter`（`host-signal-adapter`）：宿主信号词汇 `HostSignal`、编解码器（`HostEventCodec`/`LoopEventCodec`/`HostMessageCodec`/`ToolHostCodec`）、信号路由（`HostSignalAdapter`）、物理订阅与事件总线适配器（`SharedTerminalBus`/`Events`），仅作为 Adapter 实现契约；共享终端词汇 `EventContract`/`Message`/`OpencodeTypes` 已在 `Host.Signal.Contract`。
+- `Host.Signal.Adapter`（`host-signal-adapter`）：宿主信号词汇 `HostSignal`、完整 provider failure/terminal `HostEventCodec`、`ToolHostCodec`、信号路由（`HostSignalAdapter`）、物理订阅与事件总线适配器（`SharedTerminalBus`/`Events`）；它消费三个窄 codec contract，不再向 message/loop consumer输出自身完整闭包。
 - `Host.Session.Runtime`（`host-session-runtime`）：SDK/HTTP 快照投影、进程级静止门禁状态机（`SessionQuiescenceGate`、`QuiescenceSurface`）、消息就地变更与宿主上下文投影，禁止被普通业务契约直接引用。
 - `Sphinx.Host.Adapter`（`sphinx-host-adapter`）：外部 Sphinx MCP 启动配置与环境适配器，隔离于核心契约之外。
 

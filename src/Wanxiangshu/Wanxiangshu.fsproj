@@ -838,6 +838,8 @@
     <Compile Include="OpenCode/Host/EventsSurface.fs"/>
     <Compile Include="OpenCode/Signals/HostSignal.fsi"/>
     <Compile Include="OpenCode/Signals/HostSignal.fs"/>
+    <Compile Include="OpenCode/Codec/HostEventEnvelope.fsi"/>
+    <Compile Include="OpenCode/Codec/HostEventEnvelope.fs"/>
     <Compile Include="OpenCode/Codec/HostEventCodec.fsi"/>
     <Compile Include="OpenCode/Codec/HostEventCodec.fs"/>
     <Compile Include="OpenCode/Codec/LoopEventCodec.fsi"/>

@@ -12,6 +12,7 @@ Provider attempt 可能在尚未正常结束前向两个方向退化：重复度
 - **选择 path，追踪 bytes**：selector 只声明 canonical repository path；generator 对每个声明输入都经同一 tracking reader 取得 raw bytes，再做 strict UTF-8 与 generated marker 判定。artifact identity、output digest、selected-input digest、build/generator/selector lineage 与 package import必须绑定为一个事实，不能“列出输入”后从旁路重读另一棵工作树。
 - **有界内存与严格绑定**：检测器状态仅保存有限 token 词表的最近出现步数，生命周期绑定单次 `ProviderRunIdentity`，禁止跨 attempt 复用。
 - **诊断不拥有控制后果**：LoopSensor可发出非权威diagnostic observation，但诊断端口失败不得改变detector、interrupt或continuation的因果结果；否则可选观测会成为第二控制owner。
+- **loop wire不等于完整Host signal authority**：detector只消费独立`loop-event-codec`的text-delta词汇；该codec只消费无状态`host-event-envelope`，不得把provider terminal、subscription或diagnostics adapter闭包带入guard runtime。
 
 ## 违反边界的失败意义
 

@@ -30,11 +30,7 @@ type ExactProviderStartObservation =
       ProviderRun: ProviderRunIdentity }
 
 module HostEventCodec =
-    val unwrap: rawInput: obj -> obj
-    val eventTypeOf: raw: obj -> string
-    val trySessionId: raw: obj -> SessionId option
     val tryDecode: rawInput: obj -> HostSignal option
-    val tryMessageSessionId: rawInput: obj -> SessionId option
     val tryDecodeExactProviderStart: rawInput: obj -> ExactProviderStartObservation option
     val tryDecodeExactProviderTerminal: rawInput: obj -> ExactProviderTerminalObservation option
     val tryDecodeProviderStepEnd: rawInput: obj -> (SessionId * PhysicalUserMessageId * ProviderRunIdentity) option

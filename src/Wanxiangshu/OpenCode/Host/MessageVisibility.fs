@@ -88,7 +88,7 @@ type MessageVisibilityHub(timerPort: ITimerPort) =
 module MessageVisibilitySignal =
 
     let observeEvent (hub: MessageVisibilityHub) (rawInput: obj) =
-        let raw = HostEventCodec.unwrap rawInput
+        let raw = HostEventEnvelope.unwrap rawInput
 
-        if HostEventCodec.eventTypeOf raw = "message.updated" then
-            HostEventCodec.tryMessageSessionId raw |> Option.iter hub.Notify
+        if HostEventEnvelope.eventTypeOf raw = "message.updated" then
+            HostEventEnvelope.tryMessageSessionId raw |> Option.iter hub.Notify
