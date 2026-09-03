@@ -23,13 +23,22 @@ module PromptIngressCodec =
     let private agentOf (source: obj) : string option =
         let message = childObject source "message"
         let properties = childObject source "properties"
+        let session = childObject source "session"
+        let body = childObject source "body"
+        let options = childObject source "options"
 
         [ source
           childObject source "info"
           message
           childObject message "info"
           properties
-          childObject properties "info" ]
+          childObject properties "info"
+          session
+          childObject session "info"
+          body
+          childObject body "info"
+          options
+          childObject options "info" ]
         |> List.tryPick (fun candidate -> readString candidate "agent")
 
     let private metadataOf (source: obj) (key: string) : string option =

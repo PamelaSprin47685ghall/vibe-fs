@@ -71,23 +71,35 @@ module HostSignalBootstrap =
     let private infoValue (properties: obj) =
         if isNull properties then null else properties?info
 
-    let private hostAuxiliaryChild (raw: obj) =
-        let event = HostEventCodec.unwrap raw
-
-        if HostEventCodec.eventTypeOf event <> "session.created" then
-            None
+    let private agentValue (properties: obj) (info: obj) =
+        if not (isNull info) && not (isNull info?agent) then
+            info?agent
+        elif not (isNull properties) && not (isNull properties?agent) then
+            properties?agent
         else
+            null
+
+    let private observeSessionIdentity (sessionId: SessionId) (hasParent: bool) (agent: string option) =
+        if hasParent then
+            SessionExecutionBinding.observeHostAuxiliaryChild sessionId
+
+        agent
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+        |> Option.iter (SessionExecutionBinding.observeUserFacingAgent sessionId)
+
+    let private observeSessionEvent (raw: obj) =
+        let event = HostEventCodec.unwrap raw
+        let eventType = HostEventCodec.eventTypeOf event
+
+        if eventType = "session.created" || eventType = "session.updated" then
             let properties = event?properties
             let info = infoValue properties
+            let hasParent = (hostText (parentIdValue info)).IsSome
+            let agentOpt = hostText (agentValue properties info)
 
             hostText (sessionIdValue properties)
-            |> Option.bind (fun sessionId ->
-                hostText (parentIdValue info)
-                |> Option.map (fun _ -> SessionId.create sessionId))
-
-    let private observeHostAuxiliaryChild raw =
-        hostAuxiliaryChild raw
-        |> Option.iter SessionExecutionBinding.observeHostAuxiliaryChild
+            |> Option.map SessionId.create
+            |> Option.iter (fun sessionId -> observeSessionIdentity sessionId hasParent agentOpt)
 
     let wire
         (sessionPort: ISessionHostPort)
@@ -738,7 +750,7 @@ module HostSignalBootstrap =
                             HostEventCodec.tryDecodeExactProviderTerminal raw
                             |> Option.iter observeHostInternalTerminal
 
-                            observeHostAuxiliaryChild raw
+                            observeSessionEvent raw
                             do! signalRouter.ObserveLocal raw
                             SyncDelegateHostObservation.observe scope.SyncDelegateRuntime raw
                             MessageVisibilitySignal.observeEvent messageVisibility raw
