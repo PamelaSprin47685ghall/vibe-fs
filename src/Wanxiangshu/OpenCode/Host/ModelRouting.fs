@@ -541,11 +541,53 @@ module ModelRouting =
             | (false, _), true -> None
             | (false, _), false -> tryReserveFresh sessionId agent
 
+        let adoptExistingReservation sessionId physicalUserMessageId agent (lease: ExecutionLease) =
+            capacity.AdoptReservation(sessionId, physicalUserMessageId, lease.Target)
+
+            let updated =
+                { lease with
+                    PhysicalUserMessageId = Some physicalUserMessageId
+                    Agent = adoptedAgent lease agent }
+
+            activeBySession.[sessionId] <- updated
+            lastPhysicalTargetBySession.[sessionId] <- lease.Target
+            Some lease.Target
+
+        let routeFreshOrNone sessionId physicalUserMessageId agent previous =
+            match routeFreshOrPoison sessionId None physicalUserMessageId agent previous with
+            | Some target ->
+                activeBySession.[sessionId] <-
+                    { PhysicalUserMessageId = Some physicalUserMessageId
+                      Agent = agent
+                      RoutingAgent = agent
+                      Target = target }
+
+                lastPhysicalTargetBySession.[sessionId] <- target
+                drainDemands ()
+                Some target
+            | None -> None
+
+        let tryAcquireFreshLease sessionId physicalUserMessageId agent =
+            if admissionQueue.ContainsSession sessionId then
+                None
+            else
+                let previous = previousTarget sessionId
+                routeFreshOrNone sessionId physicalUserMessageId agent previous
+
         let tryLeaseLocked sessionId physicalUserMessageId agent =
             match activeBySession.TryGetValue sessionId with
-            | true, lease when lease.PhysicalUserMessageId = Some physicalUserMessageId && lease.Agent = agent ->
+            | true, lease when
+                lease.PhysicalUserMessageId = Some physicalUserMessageId
+                && (lease.Agent = agent || lease.Agent = "predictor")
+                ->
                 Some lease.Target
-            | _ -> None
+            | true, lease when
+                lease.PhysicalUserMessageId.IsNone
+                && (lease.Agent = agent || lease.Agent = "predictor")
+                ->
+                adoptExistingReservation sessionId physicalUserMessageId agent lease
+            | true, _ -> None
+            | false, _ -> tryAcquireFreshLease sessionId physicalUserMessageId agent
 
         let exactTargetAvailable agent target running =
             match scheduleOrPoison running agent (Some target) with
