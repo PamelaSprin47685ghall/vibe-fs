@@ -77,6 +77,78 @@ export class StrictMockSignals {
     });
   }
 
+  /**
+   * Claim the first match from a closed set of alternative expectation ids.
+   * One shared settlement removes every registration, so the losing branch
+   * cannot retain a waiter or later change the chosen causal edge.
+   */
+  waitForAnyExpectation(ids, timeoutMs) {
+    if (!Array.isArray(ids) || ids.length < 2) {
+      return Promise.reject(new Error('waitAny expectations must be an array of at least two ids'));
+    }
+    if (ids.some((id) => typeof id !== 'string' || id.trim() === '') || new Set(ids).size !== ids.length) {
+      return Promise.reject(new Error('waitAny expectations must be unique non-blank ids'));
+    }
+    if (this._fatalError) return Promise.reject(this._fatalError);
+
+    for (const id of ids) {
+      if (this._consumed.has(id)) return Promise.resolve(id);
+      if (this.matchCount(id) > this.claimCount(id)) {
+        this._claimCount.set(id, this.claimCount(id) + 1);
+        return Promise.resolve(id);
+      }
+    }
+
+    return new Promise((resolve, reject) => {
+      const registrations = [];
+      let settled = false;
+      let timeout;
+
+      const removeAll = () => {
+        for (const { id, entry } of registrations) {
+          const waiters = this._expectationWaiters.get(id);
+          waiters?.delete(entry);
+          if (waiters?.size === 0) this._expectationWaiters.delete(id);
+        }
+      };
+      const settle = (id) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        removeAll();
+        if (!this._consumed.has(id) && this.matchCount(id) > this.claimCount(id)) {
+          this._claimCount.set(id, this.claimCount(id) + 1);
+        }
+        resolve(id);
+      };
+      const cancel = (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        removeAll();
+        reject(error);
+      };
+
+      for (const id of ids) {
+        const waiters = this._expectationWaiters.get(id) || new Set();
+        const entry = {
+          resolve: () => settle(id),
+          reject: cancel,
+        };
+        registrations.push({ id, entry });
+        waiters.add(entry);
+        this._expectationWaiters.set(id, waiters);
+      }
+
+      if (timeoutMs !== undefined) {
+        timeout = setTimeout(
+          () => cancel(new Error(`Timed out waiting for any expectation: ${ids.join(', ')}`)),
+          timeoutMs,
+        );
+      }
+    });
+  }
+
   waitForExpectationAttempt(id, attempts, timeoutMs) {
     if (!Number.isInteger(attempts) || attempts < 1) {
       return Promise.reject(new Error(`expectation attempts must be a positive integer: ${attempts}`));

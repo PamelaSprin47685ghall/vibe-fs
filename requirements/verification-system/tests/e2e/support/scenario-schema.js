@@ -87,6 +87,7 @@ const collectionShapeProblems = (raw) => {
  */
 const FLOW_VERBS = new Set([
   'wait',
+  'waitAny',
   'waitFact',
   'armIdle',
   'awaitIdle',
@@ -122,6 +123,25 @@ const unknownFlowVerbs = (flow) =>
       .filter((verb) => !FLOW_VERBS.has(verb))
       .map((verb) => `flow[${index}]: unknown verb '${verb}'; a misspelled verb is silently ignored`),
   );
+
+const waitAnyProblems = (flow) =>
+  (flow ?? []).flatMap((flowStep, index) => {
+    const alternatives = flowStep?.waitAny;
+    if (alternatives === undefined) return [];
+    if (!Array.isArray(alternatives)) return [`flow[${index}] waitAny must be an array`];
+
+    const problems = [];
+    if (alternatives.length < 2) {
+      problems.push(`flow[${index}] waitAny requires at least two alternatives`);
+    }
+    if (alternatives.some((id) => typeof id !== 'string' || id.trim() === '')) {
+      problems.push(`flow[${index}] waitAny alternatives must be non-blank signal identifiers`);
+    }
+    if (new Set(alternatives).size !== alternatives.length) {
+      problems.push(`flow[${index}] waitAny alternatives must be unique`);
+    }
+    return problems;
+  });
 
 const BIND_CHILD_KEYS = new Set(['agent', 'bind']);
 
@@ -674,6 +694,12 @@ const danglingReferences = (entries, scenario) => {
       problems.push(`flow wait references '${waited}', which is not a declared step or turn`);
     }
 
+    for (const alternative of Array.isArray(flowStep.waitAny) ? flowStep.waitAny : []) {
+      if (!entries.some((entry) => entry.id === alternative || entry.turnId === alternative)) {
+        problems.push(`flow waitAny references '${alternative}', which is not a declared step or turn`);
+      }
+    }
+
     const idleAfter = flowStep.awaitIdle?.after;
     if (typeof idleAfter === 'string' && !entries.some((entry) => entry.id === idleAfter || entry.turnId === idleAfter)) {
       problems.push(`flow awaitIdle references '${idleAfter}', which is not a declared step or turn`);
@@ -850,6 +876,7 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
 
   const validationProblems = [
     ...unknownFlowVerbs(raw.flow),
+    ...waitAnyProblems(raw.flow),
     ...bindChildProblems(raw.flow),
     ...awaitIdleProblems(raw.flow),
     ...armIdleProblems(raw.flow),

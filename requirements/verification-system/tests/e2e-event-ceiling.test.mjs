@@ -9,6 +9,7 @@ import {
   isCountedSseEvent,
   normalizeEventCeilings,
 } from './e2e/support/event-ceiling.js';
+import { resolveEntry } from './e2e/support/runtime-key.js';
 import { compileScenario } from './e2e/support/scenario-schema.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -92,4 +93,77 @@ test('WHAT[VERIFICATION-SYSTEM-003] long-stroke.toml declares theoretical exact 
   // before an unconfirmed-reviewer roster can grow quadratically.
   assert.equal(result.scenario.setup.maxJournalEvents, 700);
   assert.equal(result.scenario.setup.maxSseEvents, 3450);
+});
+
+test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke selects one exact Manager suffix without moving its sole fault', () => {
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const source = readFileSync(path.join(dir, 'e2e/scenarios/long-stroke.toml'), 'utf8');
+  const result = compileScenario(source, { name: 'long-stroke.toml' });
+  assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'));
+
+  const byId = new Map(result.scenario.entries.map((entry) => [entry.id, entry]));
+  const ordinary = byId.get('manager.1');
+
+  assert.deepEqual(
+    { optional: ordinary?.optional, lane: ordinary?.lane, step: ordinary?.step },
+    { optional: false, lane: 'manager', step: 1 },
+  );
+  assert.deepEqual(
+    result.scenario.faults.filter((fault) => fault.kind === 'provider-error' && fault.status === 400)
+      .map((fault) => fault.entryId),
+    ['manager.1'],
+  );
+
+  const managerTools = ['fork', 'join', 'horizon', 'fission', 'todowrite', 'suicide'];
+  const request = (turn, step) => ({
+    messages: [
+      { role: 'user', content: turn },
+      ...Array.from({ length: step }, (_, index) => ({ role: 'assistant', content: `reply-${index}` })),
+    ],
+    tools: managerTools.map((name) => ({ name })),
+  });
+  const bindings = new Map([['manager', 'ses_manager']]);
+  const context = { sessionId: 'ses_manager' };
+
+  assert.equal(
+    resolveEntry(request('Continue after the interrupted join.', 1), result.scenario.entries, bindings, context).matched?.id,
+    'manager-resume.1',
+  );
+  assert.equal(
+    resolveEntry(request('# Work remains away.', 1), result.scenario.entries, bindings, context).matched?.id,
+    'manager-join-guard.0',
+  );
+
+  const suffixWaits = result.scenario.flow.filter((step) => step.waitAny).map((step) => step.waitAny);
+  assert.equal(suffixWaits.length, 10);
+  for (let index = 0; index < 10; index += 1) {
+    const originalId = `manager-resume.${index + 1}`;
+    const guardedId = `manager-join-guard.${index}`;
+    const original = byId.get(originalId);
+    const guarded = byId.get(guardedId);
+
+    assert.deepEqual(suffixWaits[index], [originalId, guardedId]);
+    assert.deepEqual(guarded?.respond, original?.respond);
+    assert.deepEqual(
+      {
+        optional: guarded?.optional,
+        internal: guarded?.internal,
+        step: guarded?.step,
+        tools: guarded?.tools,
+        forbiddenTools: guarded?.forbiddenTools,
+      },
+      {
+        optional: true,
+        internal: true,
+        step: index + 1,
+        tools: managerTools,
+        forbiddenTools: ['commission'],
+      },
+    );
+  }
+
+  assert.ok(result.scenario.must.includes('manager.1'));
+  assert.ok(result.scenario.must.includes('manager-resume.0'));
+  assert.ok(!result.scenario.must.some((id) => /^manager-resume\.(?:[1-9]|10)$/.test(id)));
+  assert.ok(!result.scenario.must.some((id) => id.startsWith('manager-join-guard.')));
 });
