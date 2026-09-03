@@ -663,6 +663,81 @@ module HostSignalBootstrap =
                 | ChatAdmissionIntent.Decision.PendingPromptIntent _, _, _ ->
                     rejectedChatMessage (IntentRejected ChatAdmissionIntent.Rejection.DurableAuthorityUnavailable)
 
+            let client = if isNull input then null else input?client
+
+            let sessionAgentOfResponse (rawBody: obj) : string option =
+                if isNull rawBody || isNull rawBody?agent then
+                    None
+                else
+                    string rawBody?agent
+                    |> Some
+                    |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                    |> Option.map (fun s -> s.Trim())
+
+            let executeSessionGet (sessObj: obj) (getFn: obj) (sId: string) : Task<string option> =
+                task {
+                    let payload =
+                        createObj
+                            [ "path", box (createObj [ "id", box sId ])
+                              "sessionID", box sId
+                              "headers", box (createObj []) ]
+
+                    let! res = unbox<Task<obj>> (getFn?call (sessObj, payload))
+                    let body = if isNull res then null else res?data
+                    let rawBody = if isNull body then res else body
+                    return sessionAgentOfResponse rawBody
+                }
+
+            let canQuerySession =
+                not (isNull client)
+                && not (isNull client?session)
+                && not (isNull client?session?get)
+
+            let safeQuerySession (sessionId: SessionId) : Task<string option> =
+                task {
+                    try
+                        return! executeSessionGet client?session client?session?get (SessionId.value sessionId)
+                    with _ ->
+                        return None
+                }
+
+            let tryGetSessionAgent (sessionId: SessionId) : Task<string option> =
+                if not canQuerySession then
+                    Task.FromResult None
+                else
+                    safeQuerySession sessionId
+
+            let queryMissingAgent sid =
+                task {
+                    let! fetched = tryGetSessionAgent sid
+                    fetched |> Option.iter (SessionExecutionBinding.observeUserFacingAgent sid)
+                    return fetched
+                }
+
+            let resolveAgentForSession sid =
+                task {
+                    match SessionExecutionBinding.tryAgent sid with
+                    | Some agent -> return Some agent
+                    | None -> return! queryMissingAgent sid
+                }
+
+            let applyResolvedAgent agentOpt (decoded: PromptIngressCodec.DecodedMessage) =
+                match agentOpt with
+                | Some agent ->
+                    { decoded with
+                        ExplicitAgent = Some agent }
+                | None -> decoded
+
+            let resolveAgentForDecodedMessage (decoded: PromptIngressCodec.DecodedMessage) =
+                task {
+                    match decoded.ExplicitAgent, decoded.SessionId with
+                    | Some _, _
+                    | _, None -> return decoded
+                    | None, Some sid ->
+                        let! agentOpt = resolveAgentForSession sid
+                        return applyResolvedAgent agentOpt decoded
+                }
+
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
                     task {
@@ -671,6 +746,7 @@ module HostSignalBootstrap =
                         // Decode and resolve once; routing and physical authority consume
                         // the same frozen claim and identity evidence.
                         let decoded = PromptIngressCodec.decode input output
+                        let! decoded = resolveAgentForDecodedMessage decoded
 
                         let intent =
                             match decoded.SessionId with

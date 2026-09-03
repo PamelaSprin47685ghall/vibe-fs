@@ -83,16 +83,29 @@ module PromptIngressCodec =
         parts output
         |> Array.exists (fun part -> isTrue (if isNull part then null else part?synthetic))
 
+    let private sessionIdOfPart (sess: obj) : string option =
+        if isNull sess then
+            None
+        elif not (isNull sess?id) then
+            Some(string sess?id)
+        elif not (isNull sess?sessionID) then
+            Some(string sess?sessionID)
+        elif not (isNull sess?sessionId) then
+            Some(string sess?sessionId)
+        else
+            let s = string sess
+            if s.StartsWith("ses_") then Some s else None
+
     let private sessionIdOf (input: obj) (output: obj) =
         let fromSource (source: obj) =
             if isNull source then
                 None
             elif not (isNull source?sessionID) then
-                Some(unbox<string> source?sessionID)
+                Some(string source?sessionID)
             elif not (isNull source?sessionId) then
-                Some(unbox<string> source?sessionId)
+                Some(string source?sessionId)
             elif not (isNull source?session) then
-                Some(unbox<string> source?session)
+                sessionIdOfPart source?session
             else
                 None
 
