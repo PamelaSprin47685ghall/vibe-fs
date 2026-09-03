@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { loadGecSurface } from './gec-support.mjs'
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js'
 
 // WHAT[EPI-027]: OpenCode dispatch reuses the existing managed-session owner
 // (delegation/fission, capacity, failure policy). Sphinx only describes which
@@ -26,8 +26,6 @@ const dispatchInput = {
 }
 
 test('WHAT[EPI-027] blind_dispatch_forks_common_root_child_with_depth_one_and_new_child_per_retry', async () => {
-  const gecSurface = await loadGecSurface()
-
   const first = await gecSurface.planOpenCodeDispatch(dispatchInput)
   assert.equal(first.error, undefined)
   // Child isolation: common root snapshot, parent is the managed session,
@@ -59,8 +57,6 @@ test('WHAT[EPI-027] blind_dispatch_forks_common_root_child_with_depth_one_and_ne
 })
 
 test('WHAT[EPI-027] abort_and_drain_terminate_dispatched_work_and_workers_cannot_recurse', async () => {
-  const gecSurface = await loadGecSurface()
-
   const first = await gecSurface.planOpenCodeDispatch(dispatchInput)
   assert.equal(first.error, undefined)
 

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { loadGecSurface } from './gec-support.mjs'
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js'
 
 const subjects8 = ['s01', 's02', 's03', 's04', 's05', 's06', 's07', 's08']
 const treatmentsAB = ['wording-a', 'wording-b']
@@ -16,7 +16,6 @@ const assignmentInput = (seed) => ({
 })
 
 test('WHAT[EPI-023] deterministic-seed-reproduces-identical-balanced-assignment-matrix', async () => {
-  const gecSurface = await loadGecSurface()
   const first = await gecSurface.splitBallot(assignmentInput(1234))
   const second = await gecSurface.splitBallot(assignmentInput(1234))
   assert.equal(first.ok, true)
@@ -40,7 +39,6 @@ test('WHAT[EPI-023] deterministic-seed-reproduces-identical-balanced-assignment-
 })
 
 test('WHAT[EPI-023] blind-branch-view-exposes-no-sibling-answer-ranking-or-aggregate', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.splitBallot(assignmentInput(77))
   assert.equal(result.ok, true)
   for (const item of result.assignments) {
@@ -57,7 +55,6 @@ test('WHAT[EPI-023] blind-branch-view-exposes-no-sibling-answer-ranking-or-aggre
 })
 
 test('WHAT[EPI-023] wording-effect-reports-signed-difference-in-means-not-absolute-distance', async () => {
-  const gecSurface = await loadGecSurface()
   const base = {
     rootSnapshot: 'snap-split-b',
     seed: 9,
@@ -89,7 +86,6 @@ test('WHAT[EPI-023] wording-effect-reports-signed-difference-in-means-not-absolu
 })
 
 test('WHAT[EPI-023] ate-interpretation-declares-causal-assumptions-and-permutation-uncertainty', async () => {
-  const gecSurface = await loadGecSurface()
   const base = {
     rootSnapshot: 'snap-split-c',
     seed: 21,
@@ -127,7 +123,6 @@ test('WHAT[EPI-023] ate-interpretation-declares-causal-assumptions-and-permutati
 })
 
 test('WHAT[EPI-023] missing-root-snapshot-fails-closed-before-randomization', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.splitBallot({
     seed: 5,
     subjects: ['s1', 's2'],

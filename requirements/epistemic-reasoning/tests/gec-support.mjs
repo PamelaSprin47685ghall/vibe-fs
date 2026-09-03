@@ -7,9 +7,10 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 export const fixture = (...parts) => path.join(here, "fixtures", ...parts)
 export const source = (...parts) => path.join(here, "..", "..", "..", "src", "Wanxiangshu", "Sphinx", ...parts)
 
+import { gecSurface as staticGecSurface } from "../../../dist/Sphinx/GecSurface.js"
+
 export async function loadGecSurface() {
-  const { gecSurface } = await import("../../../dist/Sphinx/GecSurface.js")
-  return gecSurface
+  return staticGecSurface
 }
 
 export async function readJson(file) {

@@ -492,3 +492,48 @@ test('WHAT[EPI-013] generic_start_status_cancel_envelope_with_iq_ids_and_stale_s
   })
   assert.equal(gone.isError, true)
 })
+
+test('WHAT[EPI-013] generic_submit_with_results_advances_revision_and_status_follows', async () => {
+  const tools = mcpServer(createStore())._registeredTools
+
+  const started = await tools.sphinx_inquiry_start.handler({
+    question: ROOT_QUESTION,
+    profile: 'default-legacy',
+    plugins: [],
+    executionMode: 'mcp',
+    budget: {},
+  })
+  assert.equal(started.isError, undefined)
+  const inquiryId = started.structuredContent.inquiryId
+
+  const first = await tools.sphinx_work_submit.handler({
+    inquiryId,
+    expectedRevision: 0,
+    results: [{ workId: 'work_001', attempt: 1, payload: { text: 'first observation' } }],
+  })
+  assert.equal(first.isError, undefined)
+  assert.equal(first.structuredContent.revision, 1)
+
+  const mid = await tools.sphinx_inquiry_status.handler({ inquiryId })
+  assert.equal(mid.isError, undefined)
+  assert.equal(mid.structuredContent.revision, 1)
+
+  const second = await tools.sphinx_work_submit.handler({
+    inquiryId,
+    expectedRevision: 1,
+    results: [{ workId: 'work_002', attempt: 1, payload: { text: 'second observation' } }],
+  })
+  assert.equal(second.isError, undefined)
+  assert.equal(second.structuredContent.revision, 2)
+
+  // The first revision is now stale: replaying it conflicts without advancing.
+  const replayed = await tools.sphinx_work_submit.handler({
+    inquiryId,
+    expectedRevision: 1,
+    results: [],
+  })
+  assert.equal(replayed.isError, true)
+  assert.match(replayed._meta.error.code, /REVISION_CONFLICT/)
+  const held = await tools.sphinx_inquiry_status.handler({ inquiryId })
+  assert.equal(held.structuredContent.revision, 2)
+})

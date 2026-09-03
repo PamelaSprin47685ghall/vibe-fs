@@ -1886,7 +1886,7 @@ export const SURFACE_CONSUMERS = {
   'Participant/Provider/LanguageSurface.js': ['cognitive-environment', 'degeneration-guard', 'guidance-delivery', 'review-judgement'],
   'Participant/Provider/Projection/Surface.js': ['context-compression', 'interaction-authority', 'prefix-stability', 'speculative-investigation'],
   'Persistence/EventStore/MergeSurface.js': ['durable-events'],
-  'Persistence/EventStore/Surface.js': ['durable-convergence', 'durable-events', 'effect-accounting', 'knowledge-reuse', 'repository-programming'],
+  'Persistence/EventStore/Surface.js': ['durable-convergence', 'durable-events', 'effect-accounting', 'epistemic-reasoning', 'knowledge-reuse', 'repository-programming'],
   'Persistence/Journal/CodecSurface.js': ['interaction-authority', 'participant-identity', 'verification-system'],
   'Persistence/Journal/FactCodecSurface.js': ['interaction-authority', 'participant-identity', 'verification-system'],
   'Persistence/Journal/ObligationJournalSurface.js': ['host-boundary', 'interaction-authority'],

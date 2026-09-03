@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { loadGecSurface } from './gec-support.mjs'
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js'
 
 const tinyFactors = Array.from({ length: 40 }, (_, index) => ({
   dependencyKey: `tiny-dep-${String(index + 1).padStart(2, '0')}`,
@@ -9,7 +9,6 @@ const tinyFactors = Array.from({ length: 40 }, (_, index) => ({
 }))
 
 test('WHAT[EPI-010] log-space-bayes-survives-likelihood-product-underflow', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.refineCertificate(
     { hypotheses: ['a', 'b'], priors: { a: 0.5, b: 0.5 } },
     { kind: 'bayes-exact', factors: tinyFactors },
@@ -26,7 +25,6 @@ test('WHAT[EPI-010] log-space-bayes-survives-likelihood-product-underflow', asyn
 })
 
 test('WHAT[EPI-010] exact-bayes-matches-brute-force-normalized-product-when-representable', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.refineCertificate(
     { hypotheses: ['up', 'down'], priors: { up: 0.3, down: 0.7 } },
     {
@@ -43,7 +41,6 @@ test('WHAT[EPI-010] exact-bayes-matches-brute-force-normalized-product-when-repr
 })
 
 test('WHAT[EPI-010] astar-reports-global-frontier-bound-incumbent-and-reopens-better-g', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.refineCertificate(
     {},
     {
@@ -73,7 +70,6 @@ test('WHAT[EPI-010] astar-reports-global-frontier-bound-incumbent-and-reopens-be
 })
 
 test('WHAT[EPI-010] seeded-mcts-returns-coverage-metadata-not-deterministic-truth', async () => {
-  const gecSurface = await loadGecSurface()
   const patch = {
     kind: 'mcts-sample',
     root: 'root',

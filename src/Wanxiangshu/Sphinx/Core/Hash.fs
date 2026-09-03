@@ -14,7 +14,7 @@ module CoreHash =
 
     let sha256Hex value =
         let hash = createHash "sha256"
-        hash.update(value).digest("hex")
+        hash.update(value).digest ("hex")
 
     let canonical value = CanonicalJson.canonicalJson value
 

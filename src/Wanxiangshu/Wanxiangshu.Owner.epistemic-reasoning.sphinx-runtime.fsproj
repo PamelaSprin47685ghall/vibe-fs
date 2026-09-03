@@ -41,12 +41,10 @@
     <Compile Include="Sphinx/Codec.fs"/>
     <Compile Include="Sphinx/Session.fsi"/>
     <Compile Include="Sphinx/Session.fs"/>
+    <Compile Include="Sphinx/GecInquiry.fsi"/>
+    <Compile Include="Sphinx/GecInquiry.fs"/>
     <Compile Include="Sphinx/McpContract.fsi"/>
     <Compile Include="Sphinx/McpContract.fs"/>
-    <Compile Include="Sphinx/McpServer.fsi"/>
-    <Compile Include="Sphinx/McpServer.fs"/>
-    <Compile Include="Sphinx/Surface.fsi"/>
-    <Compile Include="Sphinx/Surface.fs"/>
     <Compile Include="Sphinx/Core/Model.fsi"/>
     <Compile Include="Sphinx/Core/Model.fs"/>
     <Compile Include="Sphinx/Core/Hash.fsi"/>
@@ -83,7 +81,19 @@
     <Compile Include="Sphinx/GecElicit.fs"/>
     <Compile Include="Sphinx/GecHost.fsi"/>
     <Compile Include="Sphinx/GecHost.fs"/>
+    <Compile Include="Sphinx/GecLegacy.fsi"/>
+    <Compile Include="Sphinx/GecLegacy.fs"/>
+    <Compile Include="Sphinx/LegacyDurability.fsi"/>
+    <Compile Include="Sphinx/LegacyDurability.fs"/>
+    <Compile Include="Sphinx/LegacyIntegrator.fsi"/>
+    <Compile Include="Sphinx/LegacyIntegrator.fs"/>
+    <Compile Include="Sphinx/GecStore.fsi"/>
+    <Compile Include="Sphinx/GecStore.fs"/>
     <Compile Include="Sphinx/GecSurface.fsi"/>
     <Compile Include="Sphinx/GecSurface.fs"/>
+    <Compile Include="Sphinx/McpServer.fsi"/>
+    <Compile Include="Sphinx/McpServer.fs"/>
+    <Compile Include="Sphinx/Surface.fsi"/>
+    <Compile Include="Sphinx/Surface.fs"/>
   </ItemGroup>
 </Project>

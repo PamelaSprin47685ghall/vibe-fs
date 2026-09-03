@@ -2,7 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import { loadGecSurface, fixture, readJson, sha256File } from './gec-support.mjs'
+import { fixture, readJson, sha256File } from './gec-support.mjs'
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js'
 
 // WHAT[EPI-030]: the default Legacy profile must replay the frozen
 // programming-quality transcript through the public adapter and stay
@@ -23,8 +24,12 @@ import { loadGecSurface, fixture, readJson, sha256File } from './gec-support.mjs
 const FROZEN_HANDLE = 'b04716f1-811b-4869-90ae-5bc055d81a48'
 const LEGACY_TOOLS = ['start', 'assess', 'propose', 'investigate', 'synthesize']
 
+// MCP namespaced-tool separator, not Fable name mangling: assistant writes go
+// to xd://mcp__sphinx_<tool> paths and join by toolCallId.
+const sphinxToolPrefix = 'xd://mcp__sphinx_'
+
 function sphinxToolOf(path) {
-  return path.replace('xd://mcp__sphinx_', '')
+  return path.replace(sphinxToolPrefix, '')
 }
 
 async function loadTranscript() {
@@ -36,7 +41,7 @@ async function loadTranscript() {
     if (line.type !== 'message' || line.message?.role !== 'assistant') continue
     for (const item of line.message.content ?? []) {
       if (item.type !== 'toolCall' || item.name !== 'write') continue
-      if (!item.arguments?.path?.startsWith('xd://mcp__sphinx_')) continue
+      if (!item.arguments?.path?.startsWith(sphinxToolPrefix)) continue
       calls.push({
         id: item.id,
         tool: sphinxToolOf(item.arguments.path),
@@ -82,7 +87,6 @@ test('WHAT[EPI-030] frozen_transcript_sha_and_projection_match_before_replay', a
 })
 
 test('WHAT[EPI-030] fifty_eight_accepted_calls_replay_to_identical_revision_tool_sequence_with_golden_anchors', async () => {
-  const gecSurface = await loadGecSurface()
   const { calls, outcomes } = await loadTranscript()
   const projection = await readJson(fixture('legacy', 'programming-quality.event-projection.json'))
   const summary = await readJson(fixture('legacy', 'programming-quality.expected-summary.json'))

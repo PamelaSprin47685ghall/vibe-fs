@@ -8,7 +8,16 @@ open Wanxiangshu.Sphinx.Runtime
 
 module GecDecode =
 
-    let private fail code message : Result<'value, CoreError> = Error { Code = code; Message = message }
+    let private fail code message : Result<'value, CoreError> =
+        Error { Code = code; Message = message }
+
+    let private withCode (code: string) (outcome: Result<'value, string>) : Result<'value, CoreError> =
+        outcome
+        |> Result.mapError (fun message -> ({ Code = code; Message = message }: CoreError))
+
+    let private fieldError (name: string) (expectation: string) : CoreError =
+        { Code = "invalid-" + name
+          Message = name + " must be " + expectation }
 
     let private isNullish (value: obj) : bool = emitJsExpr value "$0 == null"
 
@@ -43,9 +52,7 @@ module GecDecode =
         if isNullish found then
             fail ("missing-" + name) (name + " is required")
         else
-            match asString found with
-            | Ok text -> Ok text
-            | Error _ -> fail ("invalid-" + name) (name + " must be a string")
+            asString found |> Result.mapError (fun _ -> fieldError name "a string")
 
     let private optString (raw: obj) (name: string) : string option =
         let found = getField raw name
@@ -53,9 +60,9 @@ module GecDecode =
         if isNullish found then
             None
         else
-            match asString found with
-            | Ok text when not (String.IsNullOrWhiteSpace text) -> Some text
-            | _ -> None
+            asString found
+            |> Result.toOption
+            |> Option.filter (fun text -> not (String.IsNullOrWhiteSpace text))
 
     let private fieldInt (raw: obj) (name: string) : Result<int, CoreError> =
         let found = getField raw name
@@ -63,9 +70,9 @@ module GecDecode =
         if isNullish found then
             fail ("missing-" + name) (name + " is required")
         else
-            match asFloat found with
-            | Ok number -> Ok(int number)
-            | Error _ -> fail ("invalid-" + name) (name + " must be a finite number")
+            asFloat found
+            |> Result.mapError (fun _ -> fieldError name "a finite number")
+            |> Result.map int
 
     let private optFloat (raw: obj) (name: string) : float option =
         let found = getField raw name
@@ -73,9 +80,15 @@ module GecDecode =
         if isNullish found then
             None
         else
-            match asFloat found with
-            | Ok number -> Some number
-            | Error _ -> None
+            asFloat found |> Result.toOption
+
+    let private stringListItem (item: obj) : Result<string, CoreError> =
+        item
+        |> asString
+        |> Result.mapError (fun _ ->
+            ({ Code = "invalid-list"
+               Message = "array items must be strings" }
+            : CoreError))
 
     let private stringArrayValue (value: obj) : Result<string list, CoreError> =
         if not (isArray value) then
@@ -87,19 +100,22 @@ module GecDecode =
             |> List.fold
                 (fun state item ->
                     state
-                    |> Result.bind (fun acc ->
-                        match asString item with
-                        | Ok text -> Ok(acc @ [ text ])
-                        | Error _ -> fail "invalid-list" "array items must be strings"))
+                    |> Result.bind (fun (acc: string list) ->
+                        stringListItem item |> Result.map (fun text -> acc @ [ text ])))
                 (Ok [])
 
     let private optStringArray (raw: obj) (name: string) : Result<string list, CoreError> =
         let found = getField raw name
 
-        if isNullish found then
-            Ok []
-        else
-            stringArrayValue found
+        if isNullish found then Ok [] else stringArrayValue found
+
+    let private budgetAmountOf (key: string) (amount: obj) : Result<float, CoreError> =
+        amount
+        |> asFloat
+        |> Result.mapError (fun _ ->
+            ({ Code = "invalid-budget"
+               Message = "budget " + key + " must be finite" }
+            : CoreError))
 
     let private budgetValue (value: obj) : Result<ResourceBudget, CoreError> =
         if isNullish value || jsType value <> "object" || isArray value then
@@ -110,13 +126,22 @@ module GecDecode =
             |> List.fold
                 (fun state key ->
                     state
-                    |> Result.bind (fun acc ->
+                    |> Result.bind (fun (acc: ResourceBudget) ->
                         let amount = getField value key
 
-                        match asFloat amount with
-                        | Ok number -> Ok(Map.add key number acc)
-                        | Error _ -> fail "invalid-budget" ("budget " + key + " must be finite")))
+                        budgetAmountOf key amount |> Result.map (fun number -> Map.add key number acc)))
                 (Ok Map.empty)
+
+    let private schemaFieldText (field: obj) : string =
+        asString field |> Result.toOption |> Option.defaultValue ""
+
+    let private validateSchemaFields (idField: obj) (hashField: obj) : Result<unit, CoreError> =
+        if jsType idField <> "string" && not (isNullish idField) then
+            fail "invalid-schema" "schema id must be a string"
+        elif jsType hashField <> "string" && not (isNullish hashField) then
+            fail "invalid-schema" "schema hash must be a string"
+        else
+            Ok()
 
     let private schemaRefValue (value: obj) : Result<SchemaRef, CoreError> =
         if isNullish value || jsType value <> "object" then
@@ -124,29 +149,11 @@ module GecDecode =
         else
             let idField = getField value "id"
             let hashField = getField value "hash"
+            let idText = schemaFieldText idField
+            let hashText = schemaFieldText hashField
 
-            let idText =
-                if isNullish idField then
-                    ""
-                else
-                    match asString idField with
-                    | Ok text -> text
-                    | Error _ -> ""
-
-            let hashText =
-                if isNullish hashField then
-                    ""
-                else
-                    match asString hashField with
-                    | Ok text -> text
-                    | Error _ -> ""
-
-            if jsType idField <> "string" && not (isNullish idField) then
-                fail "invalid-schema" "schema id must be a string"
-            elif jsType hashField <> "string" && not (isNullish hashField) then
-                fail "invalid-schema" "schema hash must be a string"
-            else
-                Ok { Id = idText; Hash = hashText }
+            validateSchemaFields idField hashField
+            |> Result.map (fun () -> ({ Id = idText; Hash = hashText }: SchemaRef))
 
     let private manifestSchemas (raw: obj) : Result<Map<string, SchemaRef>, CoreError> =
         let found = getField raw "schemas"
@@ -207,7 +214,10 @@ module GecDecode =
                             |> Result.bind (fun dependencies ->
                                 manifestSchemas raw
                                 |> Result.map (fun schemas ->
-                                    { Plugin = { Id = id; Release = release; AbiHash = abiHash }
+                                    { Plugin =
+                                        { Id = id
+                                          Release = release
+                                          AbiHash = abiHash }
                                       Capabilities = Set.ofList capabilities
                                       Dependencies = Set.ofList dependencies
                                       Schemas = schemas }))))))
@@ -225,16 +235,17 @@ module GecDecode =
             |> List.fold
                 (fun state item ->
                     state
-                    |> Result.bind (fun acc ->
-                        lockEntryOfRaw item |> Result.map (fun entry -> acc @ [ entry ])))
+                    |> Result.bind (fun acc -> lockEntryOfRaw item |> Result.map (fun entry -> acc @ [ entry ])))
                 (Ok [])
 
     let private envelopeWith (schema: SchemaRef) (payload: obj) : Result<JsonEnvelope, CoreError> =
         let body = if isNullish payload then box {| |} else payload
 
-        match JsonEnvelope.create schema body with
-        | Ok envelope -> Ok envelope
-        | Error message -> fail "invalid-envelope" message
+        JsonEnvelope.create schema body
+        |> Result.mapError (fun message ->
+            ({ Code = "invalid-envelope"
+               Message = message }
+            : CoreError))
 
     let private emptySchema (id: string) (hash: string) : SchemaRef = { Id = id; Hash = hash }
 
@@ -274,7 +285,8 @@ module GecDecode =
                     |> fun result ->
                         match result with
                         | Ok body when String.IsNullOrWhiteSpace question ->
-                            fail "missing-question" "question must not be blank" |> Result.bind (fun _ -> Ok body)
+                            fail "missing-question" "question must not be blank"
+                            |> Result.bind (fun _ -> Ok body)
                         | _ -> result)))
 
     let private workIds (raw: obj) (name: string) : Result<WorkId list, CoreError> =
@@ -284,11 +296,42 @@ module GecDecode =
             |> List.fold
                 (fun state name ->
                     state
-                    |> Result.bind (fun acc ->
-                        match WorkId.tryCreate name with
-                        | Ok id -> Ok(acc @ [ id ])
-                        | Error message -> fail "invalid-dependency" message))
+                    |> Result.bind (fun (acc: WorkId list) ->
+                        WorkId.tryCreate name
+                        |> withCode "invalid-dependency"
+                        |> Result.map (fun id -> acc @ [ id ])))
                 (Ok []))
+
+    let private decodeWorkIds (idText: string) (branchText: string) : Result<WorkId * BranchId, CoreError> =
+        match WorkId.tryCreate idText, BranchId.tryCreate branchText with
+        | Error message, _ -> fail "invalid-work-id" message
+        | _, Error message -> fail "invalid-branch-id" message
+        | Ok id, Ok branch -> Ok(id, branch)
+
+    let private buildWorkSpec
+        (id: WorkId)
+        (branch: BranchId)
+        (attempt: int)
+        (dependencies: WorkId list)
+        : Result<WorkSpec, CoreError> =
+        if attempt < 1 then
+            fail "invalid-attempt" "work attempt must be positive"
+        else
+            Ok(
+                { Id = id
+                  BranchId = branch
+                  Attempt = attempt
+                  Producer = None
+                  Capability = ""
+                  Input = None
+                  OutputSchema = None
+                  Dependencies = Set.ofList dependencies
+                  ConflictKeys = Set.empty
+                  BlindToken = None
+                  RandomSeed = "0"
+                  Budget = Map.empty }
+                : WorkSpec
+            )
 
     let private decodeWorkSpec (work: obj) : Result<WorkSpec, CoreError> =
         fieldString work "id"
@@ -299,28 +342,8 @@ module GecDecode =
                 |> Result.bind (fun attempt ->
                     workIds work "dependencies"
                     |> Result.bind (fun dependencies ->
-                        match WorkId.tryCreate idText with
-                        | Error message -> fail "invalid-work-id" message
-                        | Ok id ->
-                            match BranchId.tryCreate branchText with
-                            | Error message -> fail "invalid-branch-id" message
-                            | Ok branch ->
-                                if attempt < 1 then
-                                    fail "invalid-attempt" "work attempt must be positive"
-                                else
-                                    Ok
-                                        { Id = id
-                                          BranchId = branch
-                                          Attempt = attempt
-                                          Producer = None
-                                          Capability = ""
-                                          Input = None
-                                          OutputSchema = None
-                                          Dependencies = Set.ofList dependencies
-                                          ConflictKeys = Set.empty
-                                          BlindToken = None
-                                          RandomSeed = "0"
-                                          Budget = Map.empty })))))
+                        decodeWorkIds idText branchText
+                        |> Result.bind (fun (id, branch) -> buildWorkSpec id branch attempt dependencies)))))
 
     let private decodeWorkPlanned (raw: obj) : Result<CoreEventBody, CoreError> =
         let work = getField raw "work"
@@ -330,7 +353,7 @@ module GecDecode =
         else
             decodeWorkSpec work |> Result.map (fun spec -> WorkPlanned [ spec ])
 
-    let private wallClockFields : string list =
+    let private wallClockFields: string list =
         [ "leaseExpiresAt"; "heartbeatTimeout"; "wallClock"; "expiresAt"; "timeoutMs" ]
 
     let private hasWallClock (raw: obj) (work: obj) : bool =
@@ -340,13 +363,13 @@ module GecDecode =
             || (not (isNullish work) && hasKey work name))
 
     let private leaseProofOf (work: obj) (attempt: int) : LeaseProof =
-        let fence =
-            match optString work "fence" with
-            | Some text -> text
-            | None -> ""
-
+        let fence = optString work "fence" |> Option.defaultValue ""
         let session = optString work "session"
-        { Attempt = attempt; Fence = fence; Session = session }
+
+        ({ Attempt = attempt
+           Fence = fence
+           Session = session }
+        : LeaseProof)
 
     let private completionProofOf (raw: obj) (attempt: int) : Result<CompletionProof, CoreError> =
         let observation = getField raw "observation"
@@ -364,10 +387,48 @@ module GecDecode =
                 null, "", ""
 
         if isNullish chosen then
-            Ok { Attempt = attempt; EventId = None; Detail = None }
+            Ok
+                { Attempt = attempt
+                  EventId = None
+                  Detail = None }
         else
             envelopeWith (emptySchema schemaId schemaHash) chosen
-            |> Result.map (fun detail -> { Attempt = attempt; EventId = None; Detail = Some detail })
+            |> Result.map (fun detail ->
+                { Attempt = attempt
+                  EventId = None
+                  Detail = Some detail })
+
+    let private successorIdText (successor: obj) : string =
+        if jsType successor = "string" then
+            unbox<string> successor
+        else
+            schemaFieldText (getField successor "id")
+
+    let private decodeSupersededState (raw: obj) : Result<WorkId, CoreError> =
+        let successor = getField raw "successor"
+
+        if isNullish successor then
+            fail "missing-successor" "superseded work requires a successor"
+        else
+            WorkId.tryCreate (successorIdText successor) |> withCode "invalid-successor"
+
+    let private decodeWorkState
+        (raw: obj)
+        (work: obj)
+        (spec: WorkSpec)
+        (toState: string)
+        : Result<WorkState, CoreError> =
+        match toState with
+        | "Planned" -> Ok Planned
+        | "Ready" -> Ok Ready
+        | "Leased" -> Ok(Leased(leaseProofOf work spec.Attempt))
+        | "Executing" -> Ok(Executing(leaseProofOf work spec.Attempt))
+        | "InputRequired" -> Ok(WorkState.InputRequired(leaseProofOf work spec.Attempt))
+        | "Succeeded" -> completionProofOf raw spec.Attempt |> Result.map Succeeded
+        | "Failed" -> completionProofOf raw spec.Attempt |> Result.map WorkState.Failed
+        | "Cancelled" -> completionProofOf raw spec.Attempt |> Result.map WorkState.Cancelled
+        | "Superseded" -> decodeSupersededState raw |> Result.map Superseded
+        | _ -> fail "illegal-transition" ("unknown work state " + toState)
 
     let private decodeWorkTransitioned (raw: obj) : Result<CoreEventBody, CoreError> =
         let work = getField raw "work"
@@ -378,53 +439,63 @@ module GecDecode =
             fail "wall-clock-field" "wall clock fields must never drive the lifecycle"
         else
             decodeWorkSpec work
-            |> Result.bind (fun spec ->
+            |> Result.bind (fun (spec: WorkSpec) ->
                 fieldString raw "from"
                 |> Result.bind (fun fromState ->
                     fieldString raw "to"
                     |> Result.bind (fun toState ->
-                        match toState with
-                        | "Planned" -> Ok(WorkTransitioned(spec, fromState, Planned))
-                        | "Ready" -> Ok(WorkTransitioned(spec, fromState, Ready))
-                        | "Leased" ->
-                            let proof = leaseProofOf work spec.Attempt
-                            Ok(WorkTransitioned(spec, fromState, Leased proof))
-                        | "Running" ->
-                            let proof = leaseProofOf work spec.Attempt
-                            Ok(WorkTransitioned(spec, fromState, Running proof))
-                        | "InputRequired" ->
-                            let proof = leaseProofOf work spec.Attempt
-                            Ok(WorkTransitioned(spec, fromState, WorkState.InputRequired proof))
-                        | "Succeeded" ->
-                            completionProofOf raw spec.Attempt
-                            |> Result.map (fun proof -> WorkTransitioned(spec, fromState, Succeeded proof))
-                        | "Failed" ->
-                            completionProofOf raw spec.Attempt
-                            |> Result.map (fun proof -> WorkTransitioned(spec, fromState, WorkState.Failed proof))
-                        | "Cancelled" ->
-                            completionProofOf raw spec.Attempt
-                            |> Result.map (fun proof -> WorkTransitioned(spec, fromState, WorkState.Cancelled proof))
-                        | "Superseded" ->
-                            let successor = getField raw "successor"
+                        decodeWorkState raw work spec toState
+                        |> Result.map (fun (next: WorkState) -> WorkTransitioned(spec, fromState, next)))))
 
-                            if isNullish successor then
-                                fail "missing-successor" "superseded work requires a successor"
-                            else
-                                let successorText =
-                                    if jsType successor = "string" then
-                                        unbox<string> successor
-                                    else
-                                        let idField = getField successor "id"
+    let private validateGraphPatch (kind: string) (relation: string) : Result<unit, CoreError> =
+        if String.IsNullOrWhiteSpace kind then
+            fail "invalid-patch" "node kind must not be blank"
+        elif String.IsNullOrWhiteSpace relation then
+            fail "invalid-patch" "edge relation must not be blank"
+        else
+            Ok()
 
-                                        if not (isNullish idField) && jsType idField = "string" then
-                                            unbox<string> idField
-                                        else
-                                            ""
+    let private decodeGraphPayload (raw: obj) : Result<JsonEnvelope, CoreError> =
+        let envelopeRaw = getField raw "envelope"
 
-                                match WorkId.tryCreate successorText with
-                                | Ok successorId -> Ok(WorkTransitioned(spec, fromState, Superseded successorId))
-                                | Error message -> fail "invalid-successor" message
-                        | _ -> fail "illegal-transition" ("unknown work state " + toState))))
+        if isNullish envelopeRaw then
+            emptyEnvelope "sphinx.graph/empty@1" "sphinx-graph-empty-v1"
+        else
+            schemaRefValue (getField envelopeRaw "schema")
+            |> Result.bind (fun (schema: SchemaRef) ->
+                let payload = getField envelopeRaw "payload"
+                let body = if isNullish payload then box {| |} else payload
+                envelopeWith schema body)
+
+    let private graphPatchedOf
+        (target: NodeId)
+        (kind: string)
+        (relation: string)
+        (payload: JsonEnvelope)
+        (revision: int)
+        : CoreEventBody =
+        let node: GraphNode =
+            { Id = target
+              Kind = kind
+              Payload = payload
+              Revision = int64 revision }
+
+        let edgeId = EdgeId.create ("e" + string revision)
+
+        let edge: HyperEdge =
+            { Id = edgeId
+              Tails = Set.ofList [ target ]
+              Heads = Set.ofList [ target ]
+              Relation = relation
+              Payload = None }
+
+        GraphPatched(
+            { UpsertNodes = [ node ]
+              RemoveNodes = []
+              UpsertEdges = [ edge ]
+              RemoveEdges = [] }
+            : GraphPatch
+        )
 
     let private decodeGraphPatched (raw: obj) (revision: int) : Result<CoreEventBody, CoreError> =
         let patch = getField raw "patch"
@@ -438,44 +509,13 @@ module GecDecode =
                 |> Result.bind (fun relation ->
                     fieldString patch "target"
                     |> Result.bind (fun targetText ->
-                        match NodeId.tryCreate targetText with
-                        | Error message -> fail "invalid-node" message
-                        | Ok target ->
-                            if String.IsNullOrWhiteSpace kind then
-                                fail "invalid-patch" "node kind must not be blank"
-                            elif String.IsNullOrWhiteSpace relation then
-                                fail "invalid-patch" "edge relation must not be blank"
-                            else
-                                let envelopeRaw = getField raw "envelope"
-
-                                (if isNullish envelopeRaw then
-                                     emptyEnvelope "sphinx.graph/empty@1" "sphinx-graph-empty-v1"
-                                 else
-                                     schemaRefValue (getField envelopeRaw "schema")
-                                     |> Result.bind (fun schema ->
-                                         let payload = getField envelopeRaw "payload"
-                                         envelopeWith schema (if isNullish payload then box {| |} else payload)))
-                                |> Result.map (fun payload ->
-                                    let node =
-                                        { Id = target
-                                          Kind = kind
-                                          Payload = payload
-                                          Revision = int64 revision }
-
-                                    let edgeId = EdgeId.create ("e" + string revision)
-
-                                    let edge =
-                                        { Id = edgeId
-                                          Tails = Set.ofList [ target ]
-                                          Heads = Set.ofList [ target ]
-                                          Relation = relation
-                                          Payload = None }
-
-                                    GraphPatched
-                                        { UpsertNodes = [ node ]
-                                          RemoveNodes = []
-                                          UpsertEdges = [ edge ]
-                                          RemoveEdges = [] })))))
+                        NodeId.tryCreate targetText
+                        |> withCode "invalid-node"
+                        |> Result.bind (fun (target: NodeId) ->
+                            validateGraphPatch kind relation
+                            |> Result.bind (fun () ->
+                                decodeGraphPayload raw
+                                |> Result.map (fun payload -> graphPatchedOf target kind relation payload revision))))))
 
     let private bindingEnvelope
         (observation: obj)
@@ -486,13 +526,62 @@ module GecDecode =
         : Result<JsonEnvelope, CoreError> =
         let found = getField observation name
 
-        if isNullish found then
-            if required then
-                fail ("missing-" + name) (name + " is required")
-            else
-                emptyEnvelope schemaId schemaHash
+        match isNullish found, required with
+        | true, true -> fail ("missing-" + name) (name + " is required")
+        | true, false -> emptyEnvelope schemaId schemaHash
+        | false, _ -> envelopeWith (emptySchema schemaId schemaHash) found
+
+    let private observationRequiredFields: string list =
+        [ "rootSnapshotHash"
+          "branch"
+          "work"
+          "attempt"
+          "pluginLock"
+          "schema"
+          "promptId"
+          "questionId"
+          "wording"
+          "permutation"
+          "treatment"
+          "blindToken"
+          "seed"
+          "model"
+          "sampling"
+          "usage" ]
+
+    let private missingObservationField (observation: obj) : string option =
+        observationRequiredFields
+        |> List.tryFind (fun name -> isNullish (getField observation name))
+
+    let private requireObservationFields (observation: obj) : Result<unit, CoreError> =
+        match missingObservationField observation with
+        | Some name -> fail ("missing-" + name) (name + " is required")
+        | None -> Ok()
+
+    let private decodeObservationIds
+        (branchText: string)
+        (workText: string)
+        (blindText: string)
+        : Result<BranchId * WorkId * BlindToken, CoreError> =
+        match BranchId.tryCreate branchText, WorkId.tryCreate workText, BlindToken.tryCreate blindText with
+        | Error message, _, _ -> fail "invalid-branch-id" message
+        | _, Error message, _ -> fail "invalid-work-id" message
+        | _, _, Error message -> fail "invalid-blind-token" message
+        | Ok branch, Ok work, Ok blind -> Ok(branch, work, blind)
+
+    let private validateObservationScalars
+        (attempt: int)
+        (rootSnapshot: string)
+        (seed: string)
+        : Result<unit, CoreError> =
+        if attempt < 1 then
+            fail "invalid-attempt" "attempt must be positive"
+        elif String.IsNullOrWhiteSpace rootSnapshot then
+            fail "missing-rootSnapshotHash" "root snapshot must not be blank"
+        elif String.IsNullOrWhiteSpace seed then
+            fail "missing-seed" "seed must not be blank"
         else
-            envelopeWith (emptySchema schemaId schemaHash) found
+            Ok()
 
     let private decodeObservation (raw: obj) : Result<CoreEventBody, CoreError> =
         let observation = getField raw "observation"
@@ -500,30 +589,8 @@ module GecDecode =
         if isNullish observation then
             fail "missing-observation" "observation is required"
         else
-            let required =
-                [ "rootSnapshotHash"
-                  "branch"
-                  "work"
-                  "attempt"
-                  "pluginLock"
-                  "schema"
-                  "promptId"
-                  "questionId"
-                  "wording"
-                  "permutation"
-                  "treatment"
-                  "blindToken"
-                  "seed"
-                  "model"
-                  "sampling"
-                  "usage" ]
-
-            let missing =
-                required |> List.tryFind (fun name -> isNullish (getField observation name))
-
-            match missing with
-            | Some name -> fail ("missing-" + name) (name + " is required")
-            | None ->
+            requireObservationFields observation
+            |> Result.bind (fun () ->
                 fieldString observation "rootSnapshotHash"
                 |> Result.bind (fun rootSnapshot ->
                     fieldString observation "branch"
@@ -546,52 +613,103 @@ module GecDecode =
                                                     |> Result.bind (fun blindText ->
                                                         fieldString observation "seed"
                                                         |> Result.bind (fun seed ->
-                                                            match BranchId.tryCreate branchText with
-                                                            | Error message -> fail "invalid-branch-id" message
-                                                            | Ok branch ->
-                                                                match WorkId.tryCreate workText with
-                                                                | Error message -> fail "invalid-work-id" message
-                                                                | Ok work ->
-                                                                    match BlindToken.tryCreate blindText with
-                                                                    | Error message -> fail "invalid-blind-token" message
-                                                                    | Ok blind ->
-                                                                        if attempt < 1 then
-                                                                            fail "invalid-attempt" "attempt must be positive"
-                                                                        elif String.IsNullOrWhiteSpace rootSnapshot then
-                                                                            fail "missing-rootSnapshotHash" "root snapshot must not be blank"
-                                                                        elif String.IsNullOrWhiteSpace seed then
-                                                                            fail "missing-seed" "seed must not be blank"
-                                                                        else
-                                                                            bindingEnvelope observation "wording" "sphinx.wording@1" "sphinx-wording-v1" true
-                                                                            |> Result.bind (fun wording ->
-                                                                                bindingEnvelope observation "permutation" "sphinx.permutation@1" "sphinx-permutation-v1" true
-                                                                                |> Result.bind (fun permutation ->
-                                                                                    bindingEnvelope observation "model" "sphinx.model@1" "sphinx-model-v1" true
-                                                                                    |> Result.bind (fun model ->
-                                                                                        bindingEnvelope observation "sampling" "sphinx.sampling@1" "sphinx-sampling-v1" true
-                                                                                        |> Result.bind (fun sampling ->
-                                                                                            bindingEnvelope observation "usage" "sphinx.usage@1" "sphinx-usage-v1" true
-                                                                                            |> Result.bind (fun usage ->
-                                                                                                bindingEnvelope observation "payload" "sphinx.observation/payload@1" "sphinx-observation-payload-v1" false
-                                                                                                |> Result.map (fun payload ->
-                                                                                                    ObservationAccepted
-                                                                                                        { RootSnapshotHash = rootSnapshot
-                                                                                                          BranchId = branch
-                                                                                                          WorkId = work
-                                                                                                          Attempt = attempt
-                                                                                                          PluginLock = pluginLock
-                                                                                                          Schema = schema
-                                                                                                          PromptId = promptId
-                                                                                                          QuestionId = questionId
-                                                                                                          Wording = wording
-                                                                                                          Permutation = permutation
-                                                                                                          Treatment = treatment
-                                                                                                          BlindToken = blind
-                                                                                                          RandomSeed = seed
-                                                                                                          Model = model
-                                                                                                          Sampling = sampling
-                                                                                                          Usage = usage
-                                                                                                          Payload = payload }))))))))))))))))))
+                                                            decodeObservationIds
+                                                                branchText
+                                                                workText
+                                                                blindText
+                                                            |> Result.bind (fun (branch, work, blind) ->
+                                                                validateObservationScalars
+                                                                    attempt
+                                                                    rootSnapshot
+                                                                    seed
+                                                                |> Result.bind (fun () ->
+                                                                    bindingEnvelope
+                                                                        observation
+                                                                        "wording"
+                                                                        "sphinx.wording@1"
+                                                                        "sphinx-wording-v1"
+                                                                        true
+                                                                    |> Result.bind (fun wording ->
+                                                                        bindingEnvelope
+                                                                            observation
+                                                                            "permutation"
+                                                                            "sphinx.permutation@1"
+                                                                            "sphinx-permutation-v1"
+                                                                            true
+                                                                        |> Result.bind
+                                                                            (fun permutation ->
+                                                                                bindingEnvelope
+                                                                                    observation
+                                                                                    "model"
+                                                                                    "sphinx.model@1"
+                                                                                    "sphinx-model-v1"
+                                                                                    true
+                                                                                |> Result.bind
+                                                                                    (fun model ->
+                                                                                        bindingEnvelope
+                                                                                            observation
+                                                                                            "sampling"
+                                                                                            "sphinx.sampling@1"
+                                                                                            "sphinx-sampling-v1"
+                                                                                            true
+                                                                                        |> Result.bind
+                                                                                            (fun
+                                                                                                sampling ->
+                                                                                                bindingEnvelope
+                                                                                                    observation
+                                                                                                    "usage"
+                                                                                                    "sphinx.usage@1"
+                                                                                                    "sphinx-usage-v1"
+                                                                                                    true
+                                                                                                |> Result.bind
+                                                                                                    (fun
+                                                                                                        usage ->
+                                                                                                        bindingEnvelope
+                                                                                                            observation
+                                                                                                            "payload"
+                                                                                                            "sphinx.observation/payload@1"
+                                                                                                            "sphinx-observation-payload-v1"
+                                                                                                            false
+                                                                                                        |> Result.map
+                                                                                                            (fun
+                                                                                                                payload ->
+                                                                                                                ObservationAccepted(
+                                                                                                                    { RootSnapshotHash =
+                                                                                                                        rootSnapshot
+                                                                                                                      BranchId =
+                                                                                                                        branch
+                                                                                                                      WorkId =
+                                                                                                                        work
+                                                                                                                      Attempt =
+                                                                                                                        attempt
+                                                                                                                      PluginLock =
+                                                                                                                        pluginLock
+                                                                                                                      Schema =
+                                                                                                                        schema
+                                                                                                                      PromptId =
+                                                                                                                        promptId
+                                                                                                                      QuestionId =
+                                                                                                                        questionId
+                                                                                                                      Wording =
+                                                                                                                        wording
+                                                                                                                      Permutation =
+                                                                                                                        permutation
+                                                                                                                      Treatment =
+                                                                                                                        treatment
+                                                                                                                      BlindToken =
+                                                                                                                        blind
+                                                                                                                      RandomSeed =
+                                                                                                                        seed
+                                                                                                                      Model =
+                                                                                                                        model
+                                                                                                                      Sampling =
+                                                                                                                        sampling
+                                                                                                                      Usage =
+                                                                                                                        usage
+                                                                                                                      Payload =
+                                                                                                                        payload }
+                                                                                                                    : ProtocolBinding
+                                                                                                                )))))))))))))))))))))
 
     let private stringArrayOption (raw: obj) (name: string) : string[] option =
         let found = getField raw name
@@ -599,9 +717,13 @@ module GecDecode =
         if isNullish found then
             None
         else
-            match stringArrayValue found with
-            | Ok items -> Some(List.toArray items)
-            | Error _ -> None
+            stringArrayValue found |> Result.toOption |> Option.map List.toArray
+
+    let private tryEventId (item: obj) : EventId option =
+        if jsType item = "string" then
+            EventId.tryCreate (unbox<string> item) |> Result.toOption
+        else
+            None
 
     let private eventIdList (raw: obj) (name: string) : EventId list =
         let found = getField raw name
@@ -609,15 +731,188 @@ module GecDecode =
         if isNullish found || not (isArray found) then
             []
         else
-            unbox<obj array> found
-            |> Array.toList
-            |> List.choose (fun item ->
-                if jsType item = "string" then
-                    match EventId.tryCreate (unbox<string> item) with
-                    | Ok id -> Some id
-                    | Error _ -> None
-                else
-                    None)
+            unbox<obj array> found |> Array.toList |> List.choose tryEventId
+
+    let private rawText (value: obj) : string option =
+        if not (isNullish value) && jsType value = "string" then
+            Some(unbox<string> value)
+        else
+            None
+
+    let private guaranteeOf (patch: obj) (fallback: string) : string option =
+        match rawText (getField patch "guaranteeKind"), rawText (getField patch "guarantee") with
+        | Some text, _ -> Some text
+        | None, Some text -> Some text
+        | None, None -> Some fallback
+
+    let private scopeOf (patch: obj) (fallback: string) : string option =
+        match rawText (getField patch "scope") with
+        | Some text -> Some text
+        | None -> Some fallback
+
+    let private storedCertificate (state: InquiryState option) (node: NodeId) : ValueCertificate =
+        state
+        |> Option.bind (fun (current: InquiryState) -> Map.tryFind node current.Certificates)
+        |> Option.defaultValue (Certificate.empty node)
+
+    let private residualSourceOf (patch: obj) : obj =
+        let primary = getField patch "residualValue"
+        let secondary = getField patch "residual"
+
+        if not (isNullish primary) then primary
+        elif not (isNullish secondary) then secondary
+        else getField patch "value"
+
+    let private certificateRequestOf (patch: obj) (slot: string) : CertificatePatchRequest =
+        match slot with
+        | "exact" ->
+            { Slot = slot
+              Value = (let v = getField patch "value" in if isNullish v then None else Some v)
+              Lower = None
+              Upper = None
+              Summary = None
+              Constraints = None
+              Posterior = None
+              ResidualValue = None
+              GuaranteeKind = guaranteeOf patch "inclusion"
+              Level = None
+              Error = None
+              Assumptions = stringArrayOption patch "assumptions"
+              Scope = scopeOf patch "exact"
+              Witnesses = eventIdList patch "witnesses"
+              Derivations = eventIdList patch "derivations" }
+        | "bound" ->
+            { Slot = slot
+              Value = None
+              Lower = optFloat patch "lower"
+              Upper = optFloat patch "upper"
+              Summary = None
+              Constraints = None
+              Posterior = None
+              ResidualValue = None
+              GuaranteeKind = guaranteeOf patch "inclusion"
+              Level = None
+              Error = None
+              Assumptions = stringArrayOption patch "assumptions"
+              Scope = scopeOf patch "bound"
+              Witnesses = eventIdList patch "witnesses"
+              Derivations = eventIdList patch "derivations" }
+        | "sample" ->
+            let summary = getField patch "summary"
+
+            { Slot = slot
+              Value = None
+              Lower = None
+              Upper = None
+              Summary = (if isNullish summary then None else Some summary)
+              Constraints = None
+              Posterior = None
+              ResidualValue = None
+              GuaranteeKind = guaranteeOf patch "coverage"
+              Level = optFloat patch "level"
+              Error = optFloat patch "error"
+              Assumptions = stringArrayOption patch "assumptions"
+              Scope = scopeOf patch "sample"
+              Witnesses = eventIdList patch "witnesses"
+              Derivations = eventIdList patch "derivations" }
+        | "ordinal" ->
+            let constraints = getField patch "constraints"
+
+            { Slot = slot
+              Value = None
+              Lower = None
+              Upper = None
+              Summary = None
+              Constraints = (if isNullish constraints then None else Some constraints)
+              Posterior = None
+              ResidualValue = None
+              GuaranteeKind = guaranteeOf patch "ordinal"
+              Level = None
+              Error = None
+              Assumptions = stringArrayOption patch "assumptions"
+              Scope = scopeOf patch "ordinal"
+              Witnesses = eventIdList patch "witnesses"
+              Derivations = eventIdList patch "derivations" }
+        | "latent" ->
+            let posterior = getField patch "posterior"
+
+            { Slot = slot
+              Value = None
+              Lower = None
+              Upper = None
+              Summary = None
+              Constraints = None
+              Posterior = (if isNullish posterior then None else Some posterior)
+              ResidualValue = None
+              GuaranteeKind = guaranteeOf patch "coverage"
+              Level = optFloat patch "level"
+              Error = optFloat patch "error"
+              Assumptions = stringArrayOption patch "assumptions"
+              Scope = scopeOf patch "latent"
+              Witnesses = eventIdList patch "witnesses"
+              Derivations = eventIdList patch "derivations" }
+        | "residual" ->
+            let residualRaw = residualSourceOf patch
+
+            { Slot = slot
+              Value = None
+              Lower = None
+              Upper = None
+              Summary = None
+              Constraints = None
+              Posterior = None
+              ResidualValue = (asFloat residualRaw |> Result.toOption)
+              GuaranteeKind = None
+              Level = None
+              Error = None
+              Assumptions = stringArrayOption patch "assumptions"
+              Scope = scopeOf patch "residual"
+              Witnesses = eventIdList patch "witnesses"
+              Derivations = eventIdList patch "derivations" }
+        | "witness" ->
+            { Slot = slot
+              Value = None
+              Lower = None
+              Upper = None
+              Summary = None
+              Constraints = None
+              Posterior = None
+              ResidualValue = None
+              GuaranteeKind = None
+              Level = None
+              Error = None
+              Assumptions = stringArrayOption patch "assumptions"
+              Scope = scopeOf patch "witness"
+              Witnesses = eventIdList patch "witnesses"
+              Derivations = eventIdList patch "derivations" }
+        | _ ->
+            { Slot = slot
+              Value = None
+              Lower = None
+              Upper = None
+              Summary = None
+              Constraints = None
+              Posterior = None
+              ResidualValue = None
+              GuaranteeKind = None
+              Level = None
+              Error = None
+              Assumptions = None
+              Scope = None
+              Witnesses = []
+              Derivations = [] }
+
+    let private applyCertificate
+        (stored: ValueCertificate)
+        (request: CertificatePatchRequest)
+        : Result<CoreEventBody, CoreError> =
+        Certificate.apply stored request
+        |> Result.map (fun (certificate: ValueCertificate) ->
+            CertificatePatched({ Certificate = certificate }: CertificatePatch))
+        |> Result.mapError (fun fault ->
+            ({ Code = fault.Code
+               Message = fault.Message }
+            : CoreError))
 
     let private decodeCertificate (state: InquiryState option) (raw: obj) : Result<CoreEventBody, CoreError> =
         let patch = getField raw "patch"
@@ -629,197 +924,10 @@ module GecDecode =
             |> Result.bind (fun nodeText ->
                 fieldString patch "slot"
                 |> Result.bind (fun slot ->
-                    match NodeId.tryCreate nodeText with
-                    | Error message -> fail "invalid-node" message
-                    | Ok node ->
-                        let stored =
-                            match state with
-                            | Some current ->
-                                match Map.tryFind node current.Certificates with
-                                | Some certificate -> certificate
-                                | None -> Certificate.empty node
-                            | None -> Certificate.empty node
-
-                        let guaranteeOf (fallback: string) : string option =
-                            let direct = getField patch "guaranteeKind"
-
-                            if not (isNullish direct) && jsType direct = "string" then
-                                Some(unbox<string> direct)
-                            else
-                                let legacy = getField patch "guarantee"
-
-                                if not (isNullish legacy) && jsType legacy = "string" then
-                                    Some(unbox<string> legacy)
-                                else
-                                    Some fallback
-
-                        let scopeOf (fallback: string) : string option =
-                            let found = getField patch "scope"
-
-                            if isNullish found || jsType found <> "string" then
-                                Some fallback
-                            else
-                                Some(unbox<string> found)
-
-                        let request : CertificatePatchRequest =
-                            match slot with
-                            | "exact" ->
-                                { Slot = slot
-                                  Value = (let v = getField patch "value" in if isNullish v then None else Some v)
-                                  Lower = None
-                                  Upper = None
-                                  Summary = None
-                                  Constraints = None
-                                  Posterior = None
-                                  ResidualValue = None
-                                  GuaranteeKind = guaranteeOf "inclusion"
-                                  Level = None
-                                  Error = None
-                                  Assumptions = stringArrayOption patch "assumptions"
-                                  Scope = scopeOf "exact"
-                                  Witnesses = eventIdList patch "witnesses"
-                                  Derivations = eventIdList patch "derivations" }
-                            | "bound" ->
-                                { Slot = slot
-                                  Value = None
-                                  Lower = optFloat patch "lower"
-                                  Upper = optFloat patch "upper"
-                                  Summary = None
-                                  Constraints = None
-                                  Posterior = None
-                                  ResidualValue = None
-                                  GuaranteeKind = guaranteeOf "inclusion"
-                                  Level = None
-                                  Error = None
-                                  Assumptions = stringArrayOption patch "assumptions"
-                                  Scope = scopeOf "bound"
-                                  Witnesses = eventIdList patch "witnesses"
-                                  Derivations = eventIdList patch "derivations" }
-                            | "sample" ->
-                                let summary = getField patch "summary"
-
-                                { Slot = slot
-                                  Value = None
-                                  Lower = None
-                                  Upper = None
-                                  Summary = (if isNullish summary then None else Some summary)
-                                  Constraints = None
-                                  Posterior = None
-                                  ResidualValue = None
-                                  GuaranteeKind = guaranteeOf "coverage"
-                                  Level = optFloat patch "level"
-                                  Error = optFloat patch "error"
-                                  Assumptions = stringArrayOption patch "assumptions"
-                                  Scope = scopeOf "sample"
-                                  Witnesses = eventIdList patch "witnesses"
-                                  Derivations = eventIdList patch "derivations" }
-                            | "ordinal" ->
-                                let constraints = getField patch "constraints"
-
-                                { Slot = slot
-                                  Value = None
-                                  Lower = None
-                                  Upper = None
-                                  Summary = None
-                                  Constraints = (if isNullish constraints then None else Some constraints)
-                                  Posterior = None
-                                  ResidualValue = None
-                                  GuaranteeKind = guaranteeOf "ordinal"
-                                  Level = None
-                                  Error = None
-                                  Assumptions = stringArrayOption patch "assumptions"
-                                  Scope = scopeOf "ordinal"
-                                  Witnesses = eventIdList patch "witnesses"
-                                  Derivations = eventIdList patch "derivations" }
-                            | "latent" ->
-                                let posterior = getField patch "posterior"
-
-                                { Slot = slot
-                                  Value = None
-                                  Lower = None
-                                  Upper = None
-                                  Summary = None
-                                  Constraints = None
-                                  Posterior = (if isNullish posterior then None else Some posterior)
-                                  ResidualValue = None
-                                  GuaranteeKind = guaranteeOf "coverage"
-                                  Level = optFloat patch "level"
-                                  Error = optFloat patch "error"
-                                  Assumptions = stringArrayOption patch "assumptions"
-                                  Scope = scopeOf "latent"
-                                  Witnesses = eventIdList patch "witnesses"
-                                  Derivations = eventIdList patch "derivations" }
-                            | "residual" ->
-                                let residualRaw =
-                                    let primary = getField patch "residualValue"
-
-                                    if not (isNullish primary) then
-                                        primary
-                                    else
-                                        let secondary = getField patch "residual"
-
-                                        if not (isNullish secondary) then
-                                            secondary
-                                        else
-                                            getField patch "value"
-
-                                { Slot = slot
-                                  Value = None
-                                  Lower = None
-                                  Upper = None
-                                  Summary = None
-                                  Constraints = None
-                                  Posterior = None
-                                  ResidualValue =
-                                    (if isNullish residualRaw then
-                                         None
-                                     else
-                                         match asFloat residualRaw with
-                                         | Ok number -> Some number
-                                         | Error _ -> None)
-                                  GuaranteeKind = None
-                                  Level = None
-                                  Error = None
-                                  Assumptions = stringArrayOption patch "assumptions"
-                                  Scope = scopeOf "residual"
-                                  Witnesses = eventIdList patch "witnesses"
-                                  Derivations = eventIdList patch "derivations" }
-                            | "witness" ->
-                                { Slot = slot
-                                  Value = None
-                                  Lower = None
-                                  Upper = None
-                                  Summary = None
-                                  Constraints = None
-                                  Posterior = None
-                                  ResidualValue = None
-                                  GuaranteeKind = None
-                                  Level = None
-                                  Error = None
-                                  Assumptions = stringArrayOption patch "assumptions"
-                                  Scope = scopeOf "witness"
-                                  Witnesses = eventIdList patch "witnesses"
-                                  Derivations = eventIdList patch "derivations" }
-                            | _ ->
-                                { Slot = slot
-                                  Value = None
-                                  Lower = None
-                                  Upper = None
-                                  Summary = None
-                                  Constraints = None
-                                  Posterior = None
-                                  ResidualValue = None
-                                  GuaranteeKind = None
-                                  Level = None
-                                  Error = None
-                                  Assumptions = None
-                                  Scope = None
-                                  Witnesses = []
-                                  Derivations = [] }
-
-                        match Certificate.apply stored request with
-                        | Ok certificate -> Ok(CertificatePatched { Certificate = certificate })
-                        | Error fault -> fail fault.Code fault.Message))
+                    NodeId.tryCreate nodeText
+                    |> withCode "invalid-node"
+                    |> Result.bind (fun (node: NodeId) ->
+                        applyCertificate (storedCertificate state node) (certificateRequestOf patch slot))))
 
     let private decodeBudgetDebited (raw: obj) : Result<CoreEventBody, CoreError> =
         let debit = getField raw "debit"
@@ -848,6 +956,12 @@ module GecDecode =
         else
             decodeLockEntries chosen |> Result.map PluginSetBound
 
+    let private statusFailureReason (raw: obj) : string =
+        match optString raw "reason", optString raw "error" with
+        | Some text, _ -> text
+        | None, Some text -> text
+        | None, None -> ""
+
     let private decodeStatusChanged (raw: obj) : Result<CoreEventBody, CoreError> =
         fieldString raw "status"
         |> Result.bind (fun status ->
@@ -857,32 +971,46 @@ module GecDecode =
             | "Cancelling" -> Ok(InquiryStatusChanged Cancelling)
             | "Completed" -> Ok(InquiryStatusChanged Completed)
             | "Cancelled" -> Ok(InquiryStatusChanged InquiryStatus.Cancelled)
-            | "Suspended" ->
-                let reason =
-                    match optString raw "reason" with
-                    | Some text -> text
-                    | None -> ""
-                Ok(InquiryStatusChanged(Suspended reason))
+            | "Suspended" -> Ok(InquiryStatusChanged(Suspended(optString raw "reason" |> Option.defaultValue "")))
             | _ when status.StartsWith("Suspended:", StringComparison.Ordinal) ->
                 Ok(InquiryStatusChanged(Suspended(status.Substring("Suspended:".Length))))
             | _ when status.StartsWith("Failed:", StringComparison.Ordinal) ->
                 Ok(InquiryStatusChanged(InquiryStatus.Failed(status.Substring("Failed:".Length))))
-            | "Failed" ->
-                let reason =
-                    match optString raw "reason" with
-                    | Some text -> text
-                    | None ->
-                        match optString raw "error" with
-                        | Some text -> text
-                        | None -> ""
-                Ok(InquiryStatusChanged(InquiryStatus.Failed reason))
+            | "Failed" -> Ok(InquiryStatusChanged(InquiryStatus.Failed(statusFailureReason raw)))
             | _ -> fail "invalid-status" ("unknown inquiry status " + status))
 
-    let decodeEventAt
+    let private validateRevision (position: int) (revision: int) : Result<unit, CoreError> =
+        if revision <> position then
+            fail "revision-conflict" "event revision must equal its position"
+        else
+            Ok()
+
+    let private decodeParent (parentText: string) : Result<EventId option, CoreError> =
+        if parentText = "none" then
+            Ok None
+        else
+            EventId.tryCreate parentText |> withCode "invalid-parent" |> Result.map Some
+
+    let private decodeEventBody
         (state: InquiryState option)
         (raw: obj)
-        (position: int)
-        : Result<InquiryEvent, CoreError> =
+        (eventType: string)
+        (revision: int)
+        : Result<CoreEventBody, CoreError> =
+        match eventType with
+        | "InquiryCreated" -> decodeInquiryCreated raw
+        | "WorkPlanned" -> decodeWorkPlanned raw
+        | "WorkTransitioned" -> decodeWorkTransitioned raw
+        | "GraphPatched" -> decodeGraphPatched raw revision
+        | "ObservationAccepted" -> decodeObservation raw
+        | "CertificatePatched" -> decodeCertificate state raw
+        | "BudgetDebited" -> decodeBudgetDebited raw
+        | "AnswerCommitted" -> decodeAnswerCommitted raw
+        | "PluginSetBound" -> decodePluginSetBound raw
+        | "InquiryStatusChanged" -> decodeStatusChanged raw
+        | _ -> fail "unknown-event-type" ("unknown event type " + eventType)
+
+    let decodeEventAt (state: InquiryState option) (raw: obj) (position: int) : Result<InquiryEvent, CoreError> =
         if isNullish raw || jsType raw <> "object" then
             fail "invalid-event" "event must be an object"
         else
@@ -894,42 +1022,18 @@ module GecDecode =
                     |> Result.bind (fun revision ->
                         fieldString raw "parent"
                         |> Result.bind (fun parentText ->
-                            if revision <> position then
-                                fail "revision-conflict" "event revision must equal its position"
-                            else
-                                match InquiryId.tryCreate inquiryText with
-                                | Error message -> fail "invalid-inquiry" message
-                                | Ok inquiry ->
-                                    let parent =
-                                        if parentText = "none" then
-                                            Ok None
-                                        else
-                                            match EventId.tryCreate parentText with
-                                            | Ok parentId -> Ok(Some parentId)
-                                            | Error message -> fail "invalid-parent" message
-
-                                    parent
+                            validateRevision position revision
+                            |> Result.bind (fun () ->
+                                InquiryId.tryCreate inquiryText
+                                |> withCode "invalid-inquiry"
+                                |> Result.bind (fun (inquiry: InquiryId) ->
+                                    decodeParent parentText
                                     |> Result.bind (fun parentId ->
-                                        let id = EventId.create ("ev" + string revision)
-
-                                        let body =
-                                            match eventType with
-                                            | "InquiryCreated" -> decodeInquiryCreated raw
-                                            | "WorkPlanned" -> decodeWorkPlanned raw
-                                            | "WorkTransitioned" -> decodeWorkTransitioned raw
-                                            | "GraphPatched" -> decodeGraphPatched raw revision
-                                            | "ObservationAccepted" -> decodeObservation raw
-                                            | "CertificatePatched" -> decodeCertificate state raw
-                                            | "BudgetDebited" -> decodeBudgetDebited raw
-                                            | "AnswerCommitted" -> decodeAnswerCommitted raw
-                                            | "PluginSetBound" -> decodePluginSetBound raw
-                                            | "InquiryStatusChanged" -> decodeStatusChanged raw
-                                            | _ -> fail "unknown-event-type" ("unknown event type " + eventType)
-
-                                        body
-                                        |> Result.map (fun decoded ->
-                                            { Id = id
-                                              InquiryId = inquiry
-                                              Revision = int64 revision
-                                              Parent = parentId
-                                              Body = decoded }))))))
+                                        decodeEventBody state raw eventType revision
+                                        |> Result.map (fun (decoded: CoreEventBody) ->
+                                            ({ Id = EventId.create ("ev" + string revision)
+                                               InquiryId = inquiry
+                                               Revision = int64 revision
+                                               Parent = parentId
+                                               Body = decoded }
+                                            : InquiryEvent)))))))))

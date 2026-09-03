@@ -1735,6 +1735,22 @@
       "publishes": [
         "delegation.Contract"
       ]
+    },
+    {
+      "id": "epistemic-reasoning-sphinx-gec",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Sphinx/EventVocabulary.fs",
+        "src/Wanxiangshu/Sphinx/LegacyIntegrator.fs"
+      ],
+      "proofs": [
+        "requirements/epistemic-reasoning/tests/durable-event-store.test.mjs",
+        "requirements/epistemic-reasoning/tests/research-export.test.mjs",
+        "requirements/epistemic-reasoning/tests/mcp-stdio.test.mjs"
+      ],
+      "publishes": [
+        "epistemic-reasoning.Contract"
+      ]
     }
   ],
   "coverage_backlog": {}

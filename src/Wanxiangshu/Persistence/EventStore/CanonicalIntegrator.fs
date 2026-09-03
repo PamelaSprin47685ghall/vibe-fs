@@ -9,6 +9,7 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Strength.Projection
+open Wanxiangshu.Sphinx
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
 
@@ -71,6 +72,52 @@ module StrengthIntegration =
           PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
           ApplyCut = fun current _ -> Ok current }
 
+/// WHAT[EPI-030]: durable restart oracle for legacy Sphinx inquiries. It folds
+/// accepted sphinx-legacy observations into per-handle cursors; every other
+/// sphinx kind is forward-compatible vocabulary and leaves Current unchanged.
+[<RequireQualifiedAccess>]
+module SphinxIntegration =
+    let private toFields
+        (handle: string, tool: string, argsJson: string, revision: int, question: string)
+        : LegacyIntegrator.LegacyObservationFields =
+        { Handle = handle
+          Tool = tool
+          ArgsJson = argsJson
+          Revision = revision
+          Question = question }
+
+    let private legacyDecoder =
+        Decode.object (fun get ->
+            (get.Required.Field "handle" Decode.string,
+             get.Required.Field "tool" Decode.string,
+             get.Required.Field "args_json" Decode.string,
+             get.Required.Field "revision" Decode.int,
+             get.Optional.Field "question" Decode.string |> Option.defaultValue ""))
+
+    let private tryLegacyInput (envelope: EventEnvelope) : Result<LegacyIntegrator.LegacyEnvelopeInput, string> =
+        if envelope.EventType <> SphinxEventTypes.LegacyObservation then
+            Ok(LegacyIntegrator.LegacyEnvelopeInput.OtherSphinxEvent envelope.EventType)
+        else
+            Decode.fromValue "$" legacyDecoder envelope.Payload
+            |> Result.map (toFields >> LegacyIntegrator.LegacyEnvelopeInput.LegacyObservation)
+            |> Result.mapError (fun error -> sprintf "Sphinx legacy observation decode failed: %s" error)
+
+    let rule: IntegrationRule =
+        { Name = "Sphinx"
+          Initial = box LegacyIntegrator.empty
+          FaultScope = fun _ -> "global"
+          Accepts = fun envelope -> SphinxEventTypes.isSphinxEvent envelope.EventType
+          Integrate =
+            fun current envelope ->
+                match tryLegacyInput envelope with
+                | Error error -> Error error
+                | Ok input ->
+                    LegacyIntegrator.applyOne (unbox<LegacyIntegrator.SphinxLegacyCurrent> current) (box input)
+                    |> Result.map box
+                    |> Result.mapError (fun error -> sprintf "Sphinx integration rejected: %s" error)
+          PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
+          ApplyCut = fun current _ -> Ok current }
+
 [<RequireQualifiedAccess>]
 module CasebookIntegration =
     let rule: IntegrationRule =
@@ -130,6 +177,7 @@ module CanonicalIntegrator =
             register StructuralIntegration.rule
             register JournalIntegration.rule
             register StrengthIntegration.rule
+            register SphinxIntegration.rule
             register CasebookIntegration.rule
             register JsTransactionIntegration.rule
         }

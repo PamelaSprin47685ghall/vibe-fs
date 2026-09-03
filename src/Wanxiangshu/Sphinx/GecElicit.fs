@@ -9,7 +9,8 @@ open Wanxiangshu.Sphinx.Plugins.Stop
 
 module GecElicit =
 
-    let private isFiniteNumber (value: float) : bool = not (Double.IsNaN value || Double.IsInfinity value)
+    let private isFiniteNumber (value: float) : bool =
+        not (Double.IsNaN value || Double.IsInfinity value)
 
     let private isUndefined (value: obj) : bool = emitJsExpr value "$0 === undefined"
 
@@ -18,15 +19,19 @@ module GecElicit =
     let private isJsArray (value: obj) : bool = emitJsExpr value "Array.isArray($0)"
 
     let private fieldOf (value: obj) (name: string) : obj =
-        if isNullish value then null
-        else emitJsExpr (value, name) "$0[$1]"
+        if isNullish value then
+            null
+        else
+            emitJsExpr (value, name) "$0[$1]"
 
     let private textOf (value: obj) : string =
         if isNullish value then "" else string value
 
     let private arrayOf (value: obj) : obj array =
-        if isNullish value || not (isJsArray value) then [||]
-        else unbox<obj array> value
+        if isNullish value || not (isJsArray value) then
+            [||]
+        else
+            unbox<obj array> value
 
     let private stringArrayOf (value: obj) : string list =
         arrayOf value |> Array.map textOf |> Array.toList
@@ -64,11 +69,9 @@ module GecElicit =
             {| ok = false
                error = box {| code = code; message = message |} |}
 
-    let private stringError (message: string) : obj =
-        box {| ok = false; error = message |}
+    let private stringError (message: string) : obj = box {| ok = false; error = message |}
 
-    let private okResult (fields: (string * obj) list) : obj =
-        ("ok", box true) :: fields |> createObj
+    let private okResult (fields: (string * obj) list) : obj = ("ok", box true) :: fields |> createObj
 
     let private treatmentOf (name: string) : Protocol.Treatment =
         { Name = name
@@ -104,7 +107,9 @@ module GecElicit =
 
         let request: Protocol.ContrastInput =
             { Assignment =
-                allocation.Envelopes |> List.map (fun envelope -> envelope.Subject, envelope.Treatment) |> Map.ofList
+                allocation.Envelopes
+                |> List.map (fun envelope -> envelope.Subject, envelope.Treatment)
+                |> Map.ofList
               Seed = seed
               Outcomes = responses
               Control = control
@@ -139,17 +144,42 @@ module GecElicit =
 
             okResult [ "assignments", assignments; "effect", effect ]
 
+    let private renderContrast
+        (seed: int)
+        (allocation: Protocol.Allocation)
+        (outcomesRaw: obj)
+        (assignments: obj)
+        (contrastRaw: obj)
+        : obj =
+        match arrayOf contrastRaw |> Array.map textOf |> Array.toList with
+        | [ treatment; control ] -> splitContrast seed allocation treatment control outcomesRaw assignments
+        | _ -> typedError "invalid-contrast" "contrast needs a treatment and a control arm"
+
     let private splitOutcome (input: obj) (seed: int) (allocation: Protocol.Allocation) : obj =
-        let assignments = allocation.Envelopes |> List.map assignmentView |> List.toArray |> box
+        let assignments =
+            allocation.Envelopes |> List.map assignmentView |> List.toArray |> box
+
         let outcomesRaw = fieldOf input "outcomes"
         let contrastRaw = fieldOf input "contrast"
 
         if isNullish outcomesRaw || isNullish contrastRaw then
             okResult [ "assignments", assignments ]
         else
-            match arrayOf contrastRaw |> Array.map textOf |> Array.toList with
-            | [ treatment; control ] -> splitContrast seed allocation treatment control outcomesRaw assignments
-            | _ -> typedError "invalid-contrast" "contrast needs a treatment and a control arm"
+            renderContrast seed allocation outcomesRaw assignments contrastRaw
+
+    let private allocateBallot (input: obj) (seed: int) (snapshot: string) : obj =
+        let request: Protocol.AllocationInput =
+            { Seed = seed
+              RootSnapshotHash = snapshot
+              Subjects = stringArrayOf (fieldOf input "subjects")
+              Treatments = stringArrayOf (fieldOf input "treatments") |> List.map treatmentOf
+              Candidates = stringArrayOf (fieldOf input "candidates") }
+
+        match Protocol.allocate request with
+        | Error fault ->
+            let code = Protocol.allocationErrorCode fault
+            typedError code code
+        | Ok(allocation: Protocol.Allocation) -> splitOutcome input seed allocation
 
     let splitBallot (input: obj) : obj =
         let primary = textOf (fieldOf input "rootSnapshot")
@@ -165,18 +195,7 @@ module GecElicit =
         else
             let seed = floatField input "seed" |> Option.map int |> Option.defaultValue 0
 
-            let request: Protocol.AllocationInput =
-                { Seed = seed
-                  RootSnapshotHash = snapshot
-                  Subjects = stringArrayOf (fieldOf input "subjects")
-                  Treatments = stringArrayOf (fieldOf input "treatments") |> List.map treatmentOf
-                  Candidates = stringArrayOf (fieldOf input "candidates") }
-
-            match Protocol.allocate request with
-            | Error fault ->
-                let code = Protocol.allocationErrorCode fault
-                typedError code code
-            | Ok allocation -> splitOutcome input seed allocation
+            allocateBallot input seed snapshot
 
     let selfPrediction (input: obj) : obj =
         let request: SelfPrediction.AssessmentInput =
@@ -203,30 +222,41 @@ module GecElicit =
                   "sharpness", box assessment.Sharpness
                   "calibrationUpdateAllowed", box assessment.CalibrationUpdateAllowed ]
 
+    let private pairRange (first: obj) (second: obj) : float =
+        let lo: float = emitJsExpr first "$0"
+        let hi: float = emitJsExpr second "$0"
+
+        if isFiniteNumber lo && isFiniteNumber hi then
+            abs (hi - lo)
+        else
+            0.0
+
+    let private pairWidth (items: obj list) : float =
+        match items with
+        | [ first; second ] -> pairRange first second
+        | _ -> 0.0
+
+    let private bandWidth (stability: obj) (name: string) : float =
+        let band = fieldOf stability name
+
+        if not (isJsArray band) then
+            0.0
+        else
+            pairWidth (unbox<obj array> band |> Array.toList)
+
+    let private rangeWidths (stability: obj) : float list =
+        keysOf stability |> Array.toList |> List.map (bandWidth stability)
+
+    let private maxRangeWidth (ranges: float list) : float =
+        match ranges with
+        | [] -> 0.0
+        | _ -> ranges |> List.max
+
     let private reversalBoundOf (stability: obj) : float =
         if isNullish stability then
             0.0
         else
-            let ranges =
-                keysOf stability
-                |> Array.toList
-                |> List.map (fun name ->
-                    let band = fieldOf stability name
-
-                    if not (isJsArray band) then
-                        0.0
-                    else
-                        match unbox<obj array> band |> Array.toList with
-                        | [ first; second ] ->
-                            let lo: float = emitJsExpr first "$0"
-                            let hi: float = emitJsExpr second "$0"
-
-                            if isFiniteNumber lo && isFiniteNumber hi then abs (hi - lo) else 0.0
-                        | _ -> 0.0)
-
-            match ranges with
-            | [] -> 0.0
-            | _ -> ranges |> List.max
+            maxRangeWidth (rangeWidths stability)
 
     let private stopView (decisions: Certificate.DecisionMass list) (certificate: Certificate.StopCertificate) : obj =
         let decision =
@@ -241,7 +271,10 @@ module GecElicit =
                     {| kind = "decision-distribution"
                        modes =
                         decisions
-                        |> List.map (fun mode -> box {| decision = mode.Decision; mass = mode.Probability |})
+                        |> List.map (fun mode ->
+                            box
+                                {| decision = mode.Decision
+                                   mass = mode.Probability |})
                         |> List.toArray
                         |> box |}
 
@@ -285,7 +318,10 @@ module GecElicit =
             |> List.map (fun (name, mass) -> { Decision = name; Probability = mass })
 
         let top =
-            decisions |> List.tryHead |> Option.map (fun decision -> decision.Decision) |> Option.defaultValue ""
+            decisions
+            |> List.tryHead
+            |> Option.map (fun decision -> decision.Decision)
+            |> Option.defaultValue ""
 
         let minors =
             if boolField input "minorityStable" false then
@@ -314,7 +350,10 @@ module GecElicit =
     let stopCertificate (input: obj) : obj =
         let framings = stringArrayOf (fieldOf input "testedFramings")
         let posterior = floatMapKeep (fieldOf input "decisionPosterior")
-        let checks = floatField input "checksSoFar" |> Option.map int |> Option.defaultValue 1
+
+        let checks =
+            floatField input "checksSoFar" |> Option.map int |> Option.defaultValue 1
+
         let alpha = floatField input "alpha" |> Option.defaultValue 0.05
         let vocRaw = fieldOf input "voc"
 
@@ -328,7 +367,11 @@ module GecElicit =
                       Threshold = floatField vocRaw "threshold" |> Option.defaultValue Double.NaN }
 
         match voc with
-        | Some band when isFiniteNumber band.Point && isFiniteNumber band.Upper && band.Upper < band.Point ->
+        | Some band when
+            isFiniteNumber band.Point
+            && isFiniteNumber band.Upper
+            && band.Upper < band.Point
+            ->
             typedError "invalid-voc-upper" "voc upper must stay above the point estimate"
         | _ -> decideStop input framings posterior checks alpha voc
 

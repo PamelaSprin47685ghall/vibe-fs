@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { loadGecSurface } from './gec-support.mjs'
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js'
 
 // WHAT[EPI-018]: the two hosts must fold the same canonical accepted-event
 // list through the same reducer to the same semantic state and hash.
@@ -53,8 +53,8 @@ const canonicalEvents = [
 
 const resourceFacts = [{ workId: 'work_blind_001', debited: 1 }]
 
-const foldVia = (gecSurface, host, hostSessionId, extra = {}) =>
-  gecSurface.foldHostEvents({
+const foldVia = (surface, host, hostSessionId, extra = {}) =>
+  surface.foldHostEvents({
     host,
     hostSessionId,
     transportReceipt: { receiptId: `${host}-receipt-1`, ...(extra.transportReceipt ?? {}) },
@@ -66,8 +66,6 @@ const foldVia = (gecSurface, host, hostSessionId, extra = {}) =>
   })
 
 test('WHAT[EPI-018] same_ordered_canonical_events_fold_to_same_semantic_hash_across_hosts', async () => {
-  const gecSurface = await loadGecSurface()
-
   const mcp = await foldVia(gecSurface, 'mcp', 'mcp-session-aaa', { arrivedAtMs: 1000 })
   const opencode = await foldVia(gecSurface, 'opencode', 'oc-session-bbb', { arrivedAtMs: 9281 })
 
@@ -93,8 +91,6 @@ test('WHAT[EPI-018] same_ordered_canonical_events_fold_to_same_semantic_hash_acr
 })
 
 test('WHAT[EPI-018] reordered_arrivals_do_not_fold_to_the_same_semantic_hash', async () => {
-  const gecSurface = await loadGecSurface()
-
   const ordered = await foldVia(gecSurface, 'mcp', 'mcp-session-aaa')
   assert.equal(ordered.error, undefined)
 

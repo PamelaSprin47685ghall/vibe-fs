@@ -1,10 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { loadGecSurface } from './gec-support.mjs'
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js'
 
 test('WHAT[EPI-025] epsilon-clipped-log-score-stays-finite-on-zero-probability', async () => {
-  const gecSurface = await loadGecSurface()
   const clipped = await gecSurface.selfPrediction({
     workId: 'work_001',
     predicted: { a: 0, b: 1 },
@@ -31,7 +30,6 @@ test('WHAT[EPI-025] epsilon-clipped-log-score-stays-finite-on-zero-probability',
 })
 
 test('WHAT[EPI-025] brier-score-on-valid-simplex-computes-squared-error', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.selfPrediction({
     workId: 'work_002',
     predicted: { a: 0.7, b: 0.2, c: 0.1 },
@@ -45,7 +43,6 @@ test('WHAT[EPI-025] brier-score-on-valid-simplex-computes-squared-error', async 
 })
 
 test('WHAT[EPI-025] brier-score-rejects-prediction-outside-the-simplex', async () => {
-  const gecSurface = await loadGecSurface()
   const negative = await gecSurface.selfPrediction({
     workId: 'work_003',
     predicted: { a: -0.2, b: 1.2 },
@@ -69,7 +66,6 @@ test('WHAT[EPI-025] brier-score-rejects-prediction-outside-the-simplex', async (
 })
 
 test('WHAT[EPI-025] commit-before-reveal-rejects-unsealed-prediction-and-binds-work', async () => {
-  const gecSurface = await loadGecSurface()
   const sealed = await gecSurface.selfPrediction({
     workId: 'work_004',
     predicted: { a: 0.6, b: 0.4 },
@@ -93,7 +89,6 @@ test('WHAT[EPI-025] commit-before-reveal-rejects-unsealed-prediction-and-binds-w
 })
 
 test('WHAT[EPI-025] raw-score-keeps-calibration-sharpness-separate-and-held-out-gates-update', async () => {
-  const gecSurface = await loadGecSurface()
   const base = {
     workId: 'work_005',
     predicted: { a: 0.6, b: 0.4 },

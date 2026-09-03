@@ -3,7 +3,8 @@ import test from 'node:test';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadGecSurface, source } from './gec-support.mjs';
+import { source } from './gec-support.mjs';
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..', '..');
@@ -53,7 +54,7 @@ test('WHAT[EPI-015] core_sources_exclude_epistemic_vocabulary_or_naive_core_rein
 });
 
 test('WHAT[EPI-015] ids_are_kind_specific_opaque_or_stringly_typed_core_accepts_any_string', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const valid = [
     { kind: 'InquiryId', value: 'iq_01h455vb4pex5vsknk084sn02x' },
     { kind: 'InquiryId', value: 'iq_00000000000000000000000001' },
@@ -101,7 +102,7 @@ test('WHAT[EPI-015] ids_are_kind_specific_opaque_or_stringly_typed_core_accepts_
 });
 
 test('WHAT[EPI-015] envelopes_compare_by_schema_identity_not_payload_semantics_or_core_interprets_payload', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const basePayload = { text: 'same bytes', n: 3 };
   const eventWith = (schemaId, kind) => ({
     type: 'GraphPatched',

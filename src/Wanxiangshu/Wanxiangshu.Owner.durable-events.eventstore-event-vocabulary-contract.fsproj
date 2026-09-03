@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-event-vocabulary-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-event-vocabulary-contract.fsproj"/>
     <Compile Include="Persistence/EventStore/EventVocabulary.fsi"/>
     <Compile Include="Persistence/EventStore/EventVocabulary.fs"/>
   </ItemGroup>

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Sphinx.Plugins.Questionnaire
 
 open System
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Sphinx.Core
 
 module Protocol =
@@ -45,9 +46,7 @@ module Protocol =
           BlockCount: int
           Assumptions: Set<string> }
 
-    type ArmOutcome =
-        { Subject: string
-          Response: float }
+    type ArmOutcome = { Subject: string; Response: float }
 
     type ContrastInput =
         { Assignment: Map<string, string>
@@ -115,9 +114,7 @@ module Protocol =
           Estimand: string
           Assumptions: Set<string> }
 
-    type ResponseCommit =
-        { Subject: string
-          Digest: string }
+    type ResponseCommit = { Subject: string; Digest: string }
 
     let maxNullPermutations = 1024
 
@@ -139,8 +136,8 @@ module Protocol =
         | EmptyArm _ -> "empty-arm"
         | DuplicateOutcome _ -> "duplicate-outcome"
         | UnknownOutcomeSubject _ -> "unknown-outcome-subject"
-        | NonFiniteResponse _ -> "non-finite-response"
-        | NonPositivePermutations -> "non-positive-permutations"
+        | ContrastError.NonFiniteResponse _ -> "non-finite-response"
+        | ContrastError.NonPositivePermutations -> "non-positive-permutations"
 
     let carryoverErrorCode =
         function
@@ -150,8 +147,8 @@ module Protocol =
         | MissingCurrentTreatment _ -> "missing-current-treatment"
         | DuplicateResponse _ -> "duplicate-response"
         | UnknownResponseSubject _ -> "unknown-response-subject"
-        | NonFiniteResponse _ -> "non-finite-response"
-        | NonPositivePermutations -> "non-positive-permutations"
+        | CarryoverError.NonFiniteResponse _ -> "non-finite-response"
+        | CarryoverError.NonPositivePermutations -> "non-positive-permutations"
         | EmptyPriorArm _ -> "empty-prior-arm"
 
     let private modulus = 2147483647
@@ -186,14 +183,11 @@ module Protocol =
         loop state (array.Length - 1)
 
     let private firstDuplicate (items: string list) : string option =
-        let rec loop seen rest =
+        let rec loop (seen: Set<string>) (rest: string list) : string option =
             match rest with
             | [] -> None
-            | head :: tail ->
-                if Set.contains head seen then
-                    Some head
-                else
-                    loop (Set.add head seen) tail
+            | head :: tail when Set.contains head seen -> Some head
+            | head :: tail -> loop (Set.add head seen) tail
 
         loop Set.empty items
 
@@ -204,11 +198,13 @@ module Protocol =
     let private allocationAssumptions (treatments: Treatment list) (exposure: Map<string, int>) =
         let missing =
             treatments
-            |> List.exists (fun treatment ->
-                exposure |> Map.tryFind treatment.Name |> Option.defaultValue 0 = 0)
+            |> List.exists (fun treatment -> exposure |> Map.tryFind treatment.Name |> Option.defaultValue 0 = 0)
 
         let singlePolarity =
-            treatments |> List.map (fun treatment -> treatment.Polarity) |> Set.ofList |> Set.count = 1
+            treatments
+            |> List.map (fun treatment -> treatment.Polarity)
+            |> Set.ofList
+            |> Set.count = 1
 
         let anyOpenFirst = treatments |> List.exists (fun treatment -> treatment.OpenFirst)
 
@@ -237,90 +233,124 @@ module Protocol =
               "same-prefix"
               "sutva-no-interference" ]
 
-    let allocate (input: AllocationInput) =
+    let private checkRootSnapshot (input: AllocationInput) : Result<unit, AllocationError> =
         if String.IsNullOrWhiteSpace input.RootSnapshotHash then
             Error BlankRootSnapshotHash
-        elif List.isEmpty input.Subjects then
+        else
+            Ok()
+
+    let private checkAllocationSubjects (input: AllocationInput) : Result<unit, AllocationError> =
+        if List.isEmpty input.Subjects then
             Error EmptySubjects
-        elif List.isEmpty input.Treatments then
+        else
+            Ok()
+
+    let private checkAllocationTreatments (input: AllocationInput) : Result<unit, AllocationError> =
+        if List.isEmpty input.Treatments then
             Error EmptyTreatments
-        elif List.isEmpty input.Candidates then
+        else
+            Ok()
+
+    let private checkAllocationCandidates (input: AllocationInput) : Result<unit, AllocationError> =
+        if List.isEmpty input.Candidates then
             Error EmptyCandidates
         else
-            match firstDuplicate input.Subjects with
-            | Some subject -> Error(DuplicateSubject subject)
-            | None ->
-                match firstDuplicate (input.Treatments |> List.map (fun treatment -> treatment.Name)) with
-                | Some name -> Error(DuplicateTreatment name)
-                | None ->
-                    match firstDuplicate input.Candidates with
-                    | Some candidate -> Error(DuplicateCandidate candidate)
-                    | None ->
-                        match input.Treatments |> List.tryFind (fun treatment -> treatment.Polarity <> 1 && treatment.Polarity <> -1) with
-                        | Some treatment -> Error(InvalidPolarity treatment.Name)
-                        | None ->
-                            let subjects = input.Subjects |> List.sort
-                            let treatmentCount = input.Treatments.Length
-                            let blockCount = (subjects.Length + treatmentCount - 1) / treatmentCount
-                            let indices = [ 0 .. treatmentCount - 1 ]
+            Ok()
 
-                            let rec assignBlocks state block acc =
-                                if block >= blockCount then
-                                    List.rev acc, state
-                                else
-                                    let order, next = shuffleWith state indices
-                                    assignBlocks next (block + 1) ((block, order) :: acc)
+    let private checkDuplicateSubject (input: AllocationInput) : Result<unit, AllocationError> =
+        match firstDuplicate input.Subjects with
+        | Some subject -> Error(DuplicateSubject subject)
+        | None -> Ok()
 
-                            let blocks, afterBlocks = assignBlocks (normalizeSeed input.Seed) 0 []
+    let private checkDuplicateTreatment (input: AllocationInput) : Result<unit, AllocationError> =
+        match firstDuplicate (input.Treatments |> List.map (fun treatment -> treatment.Name)) with
+        | Some name -> Error(DuplicateTreatment name)
+        | None -> Ok()
 
-                            let blockOf =
-                                blocks
-                                |> List.collect (fun (block, order) -> order |> List.mapi (fun slot index -> block * treatmentCount + slot, index))
-                                |> Map.ofList
+    let private checkDuplicateCandidate (input: AllocationInput) : Result<unit, AllocationError> =
+        match firstDuplicate input.Candidates with
+        | Some candidate -> Error(DuplicateCandidate candidate)
+        | None -> Ok()
 
-                            let treatmentAt position =
-                                blockOf |> Map.find position |> fun index -> input.Treatments.[index]
+    let private checkPolarity (input: AllocationInput) : Result<unit, AllocationError> =
+        match
+            input.Treatments
+            |> List.tryFind (fun treatment -> treatment.Polarity <> 1 && treatment.Polarity <> -1)
+        with
+        | Some treatment -> Error(InvalidPolarity treatment.Name)
+        | None -> Ok()
 
-                            let rec envelop state position acc exposure =
-                                if position >= subjects.Length then
-                                    List.rev acc, state, exposure
-                                else
-                                    let subject = subjects.[position]
-                                    let treatment = treatmentAt position
-                                    let treatmentIndex = blockOf |> Map.find position
-                                    let labels, afterLabels = shuffleWith state input.Candidates
-                                    let order, afterOrder = shuffleWith afterLabels input.Candidates
+    let private buildAllocation (input: AllocationInput) : Allocation =
+        let subjects = input.Subjects |> List.sort
+        let treatmentCount = input.Treatments.Length
+        let blockCount = (subjects.Length + treatmentCount - 1) / treatmentCount
+        let indices = [ 0 .. treatmentCount - 1 ]
 
-                                    let envelope =
-                                        { Subject = subject
-                                          Treatment = treatment.Name
-                                          TreatmentIndex = treatmentIndex
-                                          Wording = treatment.Wording
-                                          Polarity = treatment.Polarity
-                                          LabelPermutation = labels
-                                          OrderPermutation = order
-                                          BlindToken =
-                                            "blind"
-                                            + CoreHash.sha256Hex (sprintf "%s|%s|%d|%d" subject treatment.Name treatmentIndex input.Seed) }
+        let rec assignBlocks state block acc =
+            if block >= blockCount then
+                List.rev acc, state
+            else
+                let order, next = shuffleWith state indices
+                assignBlocks next (block + 1) ((block, order) :: acc)
 
-                                    let count =
-                                        exposure |> Map.tryFind treatment.Name |> Option.defaultValue 0
+        let blocks, afterBlocks = assignBlocks (normalizeSeed input.Seed) 0 []
 
-                                    envelop
-                                        afterOrder
-                                        (position + 1)
-                                        (envelope :: acc)
-                                        (exposure |> Map.add treatment.Name (count + 1))
+        let blockOf =
+            blocks
+            |> List.collect (fun (block, order) ->
+                order |> List.mapi (fun slot index -> block * treatmentCount + slot, index))
+            |> Map.ofList
 
-                            let envelopes, _, exposure = envelop afterBlocks 0 [] Map.empty
+        let treatmentAt position =
+            blockOf |> Map.find position |> (fun index -> input.Treatments.[index])
 
-                            Ok
-                                { RootSnapshotHash = input.RootSnapshotHash
-                                  Seed = input.Seed
-                                  Envelopes = envelopes
-                                  Exposure = exposure
-                                  BlockCount = blockCount
-                                  Assumptions = allocationAssumptions input.Treatments exposure }
+        let rec envelop state position acc exposure =
+            if position >= subjects.Length then
+                List.rev acc, state, exposure
+            else
+                let subject = subjects.[position]
+                let treatment = treatmentAt position
+                let treatmentIndex = blockOf |> Map.find position
+                let labels, afterLabels = shuffleWith state input.Candidates
+                let order, afterOrder = shuffleWith afterLabels input.Candidates
+
+                let envelope: SubjectEnvelope =
+                    { Subject = subject
+                      Treatment = treatment.Name
+                      TreatmentIndex = treatmentIndex
+                      Wording = treatment.Wording
+                      Polarity = treatment.Polarity
+                      LabelPermutation = labels
+                      OrderPermutation = order
+                      BlindToken =
+                        "blind"
+                        + CoreHash.sha256Hex (sprintf "%s|%s|%d|%d" subject treatment.Name treatmentIndex input.Seed) }
+
+                let count = exposure |> Map.tryFind treatment.Name |> Option.defaultValue 0
+
+                envelop afterOrder (position + 1) (envelope :: acc) (exposure |> Map.add treatment.Name (count + 1))
+
+        let envelopes, _, exposure = envelop afterBlocks 0 [] Map.empty
+
+        { RootSnapshotHash = input.RootSnapshotHash
+          Seed = input.Seed
+          Envelopes = envelopes
+          Exposure = exposure
+          BlockCount = blockCount
+          Assumptions = allocationAssumptions input.Treatments exposure }
+
+    let allocate (input: AllocationInput) =
+        result {
+            do! checkRootSnapshot input
+            do! checkAllocationSubjects input
+            do! checkAllocationTreatments input
+            do! checkAllocationCandidates input
+            do! checkDuplicateSubject input
+            do! checkDuplicateTreatment input
+            do! checkDuplicateCandidate input
+            do! checkPolarity input
+            return buildAllocation input
+        }
 
     let private finiteResponse value =
         not (Double.IsNaN value || Double.IsInfinity value)
@@ -339,163 +369,272 @@ module Protocol =
                 extreme
             else
                 let shuffled, next = shuffleWith state pooled
-                let redrawn = abs (meanOf (shuffled |> List.take treatmentN) - meanOf (shuffled |> List.skip treatmentN))
 
-                nullLoop
-                    next
-                    (remaining - 1)
-                    (if redrawn >= observed then extreme + 1 else extreme)
+                let redrawn =
+                    abs (
+                        meanOf (shuffled |> List.take treatmentN)
+                        - meanOf (shuffled |> List.skip treatmentN)
+                    )
+
+                nullLoop next (remaining - 1) (if redrawn >= observed then extreme + 1 else extreme)
 
         let extreme = nullLoop (normalizeSeed seed) capped 0
         float (extreme + 1) / float (capped + 1), capped
 
-    let contrast (input: ContrastInput) =
+    let private checkContrastPermutations (input: ContrastInput) : Result<unit, ContrastError> =
         if input.Permutations <= 0 then
-            Error NonPositivePermutations
-        elif input.Treatment = input.Control then
+            Error ContrastError.NonPositivePermutations
+        else
+            Ok()
+
+    let private checkContrastDistinctArms (input: ContrastInput) : Result<unit, ContrastError> =
+        if input.Treatment = input.Control then
             Error SameArm
         else
-            let arms =
-                input.Assignment |> Map.toSeq |> Seq.map snd |> Set.ofSeq
+            Ok()
 
-            if not (Set.contains input.Treatment arms) then
-                Error(UnknownTreatment input.Treatment)
-            elif not (Set.contains input.Control arms) then
-                Error(UnknownTreatment input.Control)
-            else
-                let rec collect rest seen acc =
-                    match rest with
-                    | [] -> Ok acc
-                    | outcome :: tail ->
-                        if Set.contains outcome.Subject seen then
-                            Error(DuplicateOutcome outcome.Subject)
-                        elif not (Map.containsKey outcome.Subject input.Assignment) then
-                            Error(UnknownOutcomeSubject outcome.Subject)
-                        elif not (finiteResponse outcome.Response) then
-                            Error(NonFiniteResponse outcome.Subject)
-                        else
-                            collect tail (Set.add outcome.Subject seen) ((outcome.Subject, outcome.Response) :: acc)
+    let private checkContrastArmKnown (input: ContrastInput) : Result<unit, ContrastError> =
+        let arms = input.Assignment |> Map.toSeq |> Seq.map snd |> Set.ofSeq
 
-                match collect input.Outcomes Set.empty [] with
-                | Error error -> Error error
-                | Ok pairs ->
-                    let responses = Map.ofList pairs
-                    let armOf name =
-                        input.Assignment
-                        |> Map.filter (fun _ treatment -> treatment = name)
-                        |> Map.toList
-                        |> List.choose (fun (subject, _) -> responses |> Map.tryFind subject |> Option.map (fun response -> response))
-                    let excluded =
-                        input.Assignment
-                        |> Map.filter (fun subject _ -> not (Map.containsKey subject responses))
-                        |> Map.toList
-                        |> List.map fst
-                        |> List.sort
-                    let treatmentValues = armOf input.Treatment
-                    let controlValues = armOf input.Control
+        if not (Set.contains input.Treatment arms) then
+            Error(UnknownTreatment input.Treatment)
+        elif not (Set.contains input.Control arms) then
+            Error(UnknownTreatment input.Control)
+        else
+            Ok()
 
-                    if List.isEmpty treatmentValues then
-                        Error(EmptyArm input.Treatment)
-                    elif List.isEmpty controlValues then
-                        Error(EmptyArm input.Control)
-                    else
-                        let treatmentMean = meanOf treatmentValues
-                        let controlMean = meanOf controlValues
-                        let pValue, nullCount = permutationP input.Seed input.Permutations treatmentValues controlValues
+    let private checkContrastOutcome
+        (input: ContrastInput)
+        (seen: Set<string>)
+        (outcome: ArmOutcome)
+        : Result<string * float, ContrastError> =
+        if Set.contains outcome.Subject seen then
+            Error(DuplicateOutcome outcome.Subject)
+        elif not (Map.containsKey outcome.Subject input.Assignment) then
+            Error(UnknownOutcomeSubject outcome.Subject)
+        elif not (finiteResponse outcome.Response) then
+            Error(ContrastError.NonFiniteResponse outcome.Subject)
+        else
+            Ok(outcome.Subject, outcome.Response)
 
-                        Ok
-                            { Treatment = input.Treatment
-                              Control = input.Control
-                              TreatmentMean = treatmentMean
-                              ControlMean = controlMean
-                              Estimate = treatmentMean - controlMean
-                              TreatmentN = treatmentValues.Length
-                              ControlN = controlValues.Length
-                              ExcludedSubjects = excluded
-                              PermutationP = pValue
-                              NullPermutations = nullCount
-                              Estimand = "difference-in-means"
-                              Assumptions = contrastAssumptions }
+    let private collectContrastOutcomes (input: ContrastInput) : Result<(string * float) list, ContrastError> =
+        let folder (seen: Set<string>, pairs: (string * float) list) (outcome: ArmOutcome) =
+            checkContrastOutcome input seen outcome
+            |> Result.map (fun pair -> Set.add outcome.Subject seen, pair :: pairs)
 
-    let carryover (input: CarryoverInput) =
+        input.Outcomes
+        |> List.fold (fun acc outcome -> acc |> Result.bind (fun state -> folder state outcome)) (Ok(Set.empty, []))
+        |> Result.map (fun (_, pairs) -> pairs)
+
+    let private checkContrastNonEmpty
+        (input: ContrastInput)
+        (treatmentValues: float list)
+        (controlValues: float list)
+        : Result<unit, ContrastError> =
+        if List.isEmpty treatmentValues then
+            Error(EmptyArm input.Treatment)
+        elif List.isEmpty controlValues then
+            Error(EmptyArm input.Control)
+        else
+            Ok()
+
+    let private buildContrast
+        (input: ContrastInput)
+        (excluded: string list)
+        (treatmentValues: float list)
+        (controlValues: float list)
+        : Contrast =
+        let treatmentMean = meanOf treatmentValues
+        let controlMean = meanOf controlValues
+
+        let pValue, nullCount =
+            permutationP input.Seed input.Permutations treatmentValues controlValues
+
+        { Treatment = input.Treatment
+          Control = input.Control
+          TreatmentMean = treatmentMean
+          ControlMean = controlMean
+          Estimate = treatmentMean - controlMean
+          TreatmentN = treatmentValues.Length
+          ControlN = controlValues.Length
+          ExcludedSubjects = excluded
+          PermutationP = pValue
+          NullPermutations = nullCount
+          Estimand = "difference-in-means"
+          Assumptions = contrastAssumptions }
+
+    let contrast (input: ContrastInput) =
+        result {
+            do! checkContrastPermutations input
+            do! checkContrastDistinctArms input
+            do! checkContrastArmKnown input
+            let! pairs = collectContrastOutcomes input
+            let responses = Map.ofList pairs
+
+            let armOf name =
+                input.Assignment
+                |> Map.filter (fun _ treatment -> treatment = name)
+                |> Map.toList
+                |> List.choose (fun (subject, _) ->
+                    responses |> Map.tryFind subject |> Option.map (fun response -> response))
+
+            let excluded =
+                input.Assignment
+                |> Map.filter (fun subject _ -> not (Map.containsKey subject responses))
+                |> Map.toList
+                |> List.map fst
+                |> List.sort
+
+            let treatmentValues = armOf input.Treatment
+            let controlValues = armOf input.Control
+            do! checkContrastNonEmpty input treatmentValues controlValues
+            return buildContrast input excluded treatmentValues controlValues
+        }
+
+    let private checkCarryoverPermutations (input: CarryoverInput) : Result<unit, CarryoverError> =
         if input.Permutations <= 0 then
-            Error NonPositivePermutations
-        elif input.Treatment = input.Control then
+            Error CarryoverError.NonPositivePermutations
+        else
+            Ok()
+
+    let private checkCarryoverDistinctArms (input: CarryoverInput) : Result<unit, CarryoverError> =
+        if input.Treatment = input.Control then
             Error SamePriorArm
         else
-            let priorArms =
-                input.PriorExposure |> Map.toSeq |> Seq.map snd |> Set.ofSeq
+            Ok()
 
-            if not (Set.contains input.Treatment priorArms) then
-                Error(UnknownPriorArm input.Treatment)
-            elif not (Set.contains input.Control priorArms) then
-                Error(UnknownPriorArm input.Control)
-            else
-                let rec collect rest seen acc =
-                    match rest with
-                    | [] -> Ok acc
-                    | outcome :: tail ->
-                        if Set.contains outcome.Subject seen then
-                            Error(DuplicateResponse outcome.Subject)
-                        elif not (Map.containsKey outcome.Subject input.PriorExposure) then
-                            Error(UnknownResponseSubject outcome.Subject)
-                        elif not (finiteResponse outcome.Response) then
-                            Error(NonFiniteResponse outcome.Subject)
-                        else
-                            collect tail (Set.add outcome.Subject seen) ((outcome.Subject, outcome.Response) :: acc)
+    let private checkCarryoverArmKnown (input: CarryoverInput) : Result<unit, CarryoverError> =
+        let priorArms = input.PriorExposure |> Map.toSeq |> Seq.map snd |> Set.ofSeq
 
-                match collect input.Responses Set.empty [] with
-                | Error error -> Error error
-                | Ok pairs ->
-                    let responses = Map.ofList pairs
+        if not (Set.contains input.Treatment priorArms) then
+            Error(UnknownPriorArm input.Treatment)
+        elif not (Set.contains input.Control priorArms) then
+            Error(UnknownPriorArm input.Control)
+        else
+            Ok()
 
-                    let rec group subjects missingCurrent treatmentValues controlValues excluded =
-                        match subjects with
-                        | [] -> Ok(treatmentValues, controlValues, excluded)
-                        | subject :: tail ->
-                            match Map.tryFind subject input.CurrentTreatment with
-                            | None -> Error(MissingCurrentTreatment subject)
-                            | Some current ->
-                                match Map.tryFind subject responses with
-                                | None -> group tail missingCurrent treatmentValues controlValues (subject :: excluded)
-                                | Some response when current <> input.FocalCurrent ->
-                                    group tail missingCurrent treatmentValues controlValues (subject :: excluded)
-                                | Some response ->
-                                    match Map.tryFind subject input.PriorExposure with
-                                    | None -> Error(MissingPriorExposure subject)
-                                    | Some prior when prior = input.Treatment ->
-                                        group tail missingCurrent (response :: treatmentValues) controlValues excluded
-                                    | Some prior when prior = input.Control ->
-                                        group tail missingCurrent treatmentValues (response :: controlValues) excluded
-                                    | Some _ -> group tail missingCurrent treatmentValues controlValues (subject :: excluded)
+    let private checkCarryoverResponse
+        (input: CarryoverInput)
+        (seen: Set<string>)
+        (outcome: ArmOutcome)
+        : Result<string * float, CarryoverError> =
+        if Set.contains outcome.Subject seen then
+            Error(DuplicateResponse outcome.Subject)
+        elif not (Map.containsKey outcome.Subject input.PriorExposure) then
+            Error(UnknownResponseSubject outcome.Subject)
+        elif not (finiteResponse outcome.Response) then
+            Error(CarryoverError.NonFiniteResponse outcome.Subject)
+        else
+            Ok(outcome.Subject, outcome.Response)
 
-                    match group (input.PriorExposure |> Map.toList |> List.map fst |> List.sort) [] [] [] [] with
-                    | Error error -> Error error
-                    | Ok (treatmentValues, controlValues, excluded) ->
-                        if List.isEmpty treatmentValues then
-                            Error(EmptyPriorArm input.Treatment)
-                        elif List.isEmpty controlValues then
-                            Error(EmptyPriorArm input.Control)
-                        else
-                            let treatmentMean = meanOf treatmentValues
-                            let controlMean = meanOf controlValues
-                            let pValue, nullCount = permutationP input.Seed input.Permutations treatmentValues controlValues
+    let private collectCarryoverResponses (input: CarryoverInput) : Result<(string * float) list, CarryoverError> =
+        let folder (seen: Set<string>, pairs: (string * float) list) (outcome: ArmOutcome) =
+            checkCarryoverResponse input seen outcome
+            |> Result.map (fun pair -> Set.add outcome.Subject seen, pair :: pairs)
 
-                            Ok
-                                { FocalCurrent = input.FocalCurrent
-                                  Treatment = input.Treatment
-                                  Control = input.Control
-                                  TreatmentMean = treatmentMean
-                                  ControlMean = controlMean
-                                  Estimate = treatmentMean - controlMean
-                                  TreatmentN = treatmentValues.Length
-                                  ControlN = controlValues.Length
-                                  ExcludedSubjects = excluded |> List.sort
-                                  PermutationP = pValue
-                                  NullPermutations = nullCount
-                                  Estimand = "carryover-difference-in-means"
-                                  Assumptions =
-                                    contrastAssumptions |> Set.add "current-arm-held-fixed" }
+        input.Responses
+        |> List.fold (fun acc outcome -> acc |> Result.bind (fun state -> folder state outcome)) (Ok(Set.empty, []))
+        |> Result.map (fun (_, pairs) -> pairs)
+
+    type private CarryoverPlacement =
+        | CarryoverExcluded
+        | CarryoverTreatment of float
+        | CarryoverControl of float
+
+    let private classifyCarryoverSubject
+        (input: CarryoverInput)
+        (responses: Map<string, float>)
+        (subject: string)
+        : Result<CarryoverPlacement, CarryoverError> =
+        match
+            Map.tryFind subject input.CurrentTreatment,
+            Map.tryFind subject responses,
+            Map.tryFind subject input.PriorExposure
+        with
+        | None, _, _ -> Error(MissingCurrentTreatment subject)
+        | Some _, None, _ -> Ok CarryoverExcluded
+        | Some current, Some _, _ when current <> input.FocalCurrent -> Ok CarryoverExcluded
+        | Some _, Some _, None -> Error(MissingPriorExposure subject)
+        | Some _, Some response, Some prior when prior = input.Treatment -> Ok(CarryoverTreatment response)
+        | Some _, Some response, Some prior when prior = input.Control -> Ok(CarryoverControl response)
+        | Some _, Some _, Some _ -> Ok CarryoverExcluded
+
+    let private applyCarryoverPlacement
+        (subject: string)
+        (placement: CarryoverPlacement)
+        (treatmentValues: float list, controlValues: float list, excluded: string list)
+        : float list * float list * string list =
+        match placement with
+        | CarryoverExcluded -> treatmentValues, controlValues, subject :: excluded
+        | CarryoverTreatment response -> response :: treatmentValues, controlValues, excluded
+        | CarryoverControl response -> treatmentValues, response :: controlValues, excluded
+
+    let private groupCarryoverSubjects
+        (input: CarryoverInput)
+        (responses: Map<string, float>)
+        (subjects: string list)
+        : Result<float list * float list * string list, CarryoverError> =
+        let folder (treatmentValues: float list, controlValues: float list, excluded: string list) (subject: string) =
+            classifyCarryoverSubject input responses subject
+            |> Result.map (fun placement ->
+                applyCarryoverPlacement subject placement (treatmentValues, controlValues, excluded))
+
+        subjects
+        |> List.fold (fun acc subject -> acc |> Result.bind (fun state -> folder state subject)) (Ok([], [], []))
+
+    let private checkCarryoverNonEmpty
+        (input: CarryoverInput)
+        (treatmentValues: float list)
+        (controlValues: float list)
+        : Result<unit, CarryoverError> =
+        if List.isEmpty treatmentValues then
+            Error(EmptyPriorArm input.Treatment)
+        elif List.isEmpty controlValues then
+            Error(EmptyPriorArm input.Control)
+        else
+            Ok()
+
+    let private buildCarryover
+        (input: CarryoverInput)
+        (excluded: string list)
+        (treatmentValues: float list)
+        (controlValues: float list)
+        : Carryover =
+        let treatmentMean = meanOf treatmentValues
+        let controlMean = meanOf controlValues
+
+        let pValue, nullCount =
+            permutationP input.Permutations input.Permutations treatmentValues controlValues
+
+        { FocalCurrent = input.FocalCurrent
+          Treatment = input.Treatment
+          Control = input.Control
+          TreatmentMean = treatmentMean
+          ControlMean = controlMean
+          Estimate = treatmentMean - controlMean
+          TreatmentN = treatmentValues.Length
+          ControlN = controlValues.Length
+          ExcludedSubjects = excluded |> List.sort
+          PermutationP = pValue
+          NullPermutations = nullCount
+          Estimand = "carryover-difference-in-means"
+          Assumptions = contrastAssumptions |> Set.add "current-arm-held-fixed" }
+
+    let carryover (input: CarryoverInput) =
+        result {
+            do! checkCarryoverPermutations input
+            do! checkCarryoverDistinctArms input
+            do! checkCarryoverArmKnown input
+            let! pairs = collectCarryoverResponses input
+            let responses = Map.ofList pairs
+
+            let! grouped =
+                groupCarryoverSubjects input responses (input.PriorExposure |> Map.toList |> List.map fst |> List.sort)
+
+            let treatmentValues, controlValues, excluded = grouped
+            do! checkCarryoverNonEmpty input treatmentValues controlValues
+            return buildCarryover input excluded treatmentValues controlValues
+        }
     // L-5: the two-party digest binds subject|response without a salt (binding without
     // hiding). Callers needing hiding must use the salted variant below.
     let commitResponse (subject: string) (responseText: string) =

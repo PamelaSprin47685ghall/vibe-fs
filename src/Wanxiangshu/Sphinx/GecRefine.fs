@@ -9,7 +9,8 @@ open Wanxiangshu.Sphinx.Runtime
 
 module GecRefine =
 
-    let private isFiniteNumber (value: float) : bool = not (Double.IsNaN value || Double.IsInfinity value)
+    let private isFiniteNumber (value: float) : bool =
+        not (Double.IsNaN value || Double.IsInfinity value)
 
     module BayesExact = Wanxiangshu.Sphinx.Plugins.Bayes.Exact
     module AStarRefiner = Wanxiangshu.Sphinx.Plugins.AStar.Refiner
@@ -23,15 +24,19 @@ module GecRefine =
     let private isJsArray (value: obj) : bool = emitJsExpr value "Array.isArray($0)"
 
     let private fieldOf (value: obj) (name: string) : obj =
-        if isNullish value then null
-        else emitJsExpr (value, name) "$0[$1]"
+        if isNullish value then
+            null
+        else
+            emitJsExpr (value, name) "$0[$1]"
 
     let private textOf (value: obj) : string =
         if isNullish value then "" else string value
 
     let private arrayOf (value: obj) : obj array =
-        if isNullish value || not (isJsArray value) then [||]
-        else unbox<obj array> value
+        if isNullish value || not (isJsArray value) then
+            [||]
+        else
+            unbox<obj array> value
 
     let private stringArrayOf (value: obj) : string list =
         arrayOf value |> Array.map textOf |> Array.toList
@@ -81,14 +86,15 @@ module GecRefine =
             {| ok = false
                error = box {| code = code; message = message |} |}
 
-    let private stringError (message: string) : obj =
-        box {| ok = false; error = message |}
+    let private stringError (message: string) : obj = box {| ok = false; error = message |}
 
-    let private okResult (fields: (string * obj) list) : obj =
-        ("ok", box true) :: fields |> createObj
+    let private okResult (fields: (string * obj) list) : obj = ("ok", box true) :: fields |> createObj
 
     let private mapView (entries: Map<string, float>) : obj =
-        entries |> Map.toList |> List.map (fun (key, value) -> key ==> value) |> createObj
+        entries
+        |> Map.toList
+        |> List.map (fun (key, value) -> key ==> value)
+        |> createObj
 
     [<RequireQualifiedAccess>]
     type private CertFault =
@@ -98,12 +104,12 @@ module GecRefine =
     let private certFaultCode (fault: CertFault) : string =
         match fault with
         | CertFault.InvalidNode _ -> "invalid-certificate"
-        | CertFault.Upstream (code, _) -> code
+        | CertFault.Upstream(code, _) -> code
 
     let private certFaultMessage (fault: CertFault) : string =
         match fault with
         | CertFault.InvalidNode detail -> sprintf "certificate node id is unusable: %s" detail
-        | CertFault.Upstream (_, message) -> message
+        | CertFault.Upstream(_, message) -> message
 
     type private DecodedCertificate =
         { NodeId: NodeId
@@ -120,6 +126,37 @@ module GecRefine =
             | Ok event -> Some event
             | Error _ -> None)
 
+    let private guaranteeScopeOf (entry: obj) (slot: string) : string =
+        let raw = textOf (fieldOf entry "scope")
+
+        if String.IsNullOrWhiteSpace raw then slot else raw
+
+    let private decodeGuaranteeKind (entry: obj) (slot: string) : CertificateGuarantee =
+        let kind = textOf (fieldOf entry "kind")
+
+        let assumptions =
+            stringArrayOf (fieldOf entry "assumptions")
+            |> List.filter (not << String.IsNullOrWhiteSpace)
+            |> Set.ofList
+
+        match kind with
+        | "coverage" ->
+            let level = floatField entry "level" |> Option.defaultValue 0.95
+            let margin = floatField entry "error" |> Option.defaultValue 0.0
+
+            ProbabilisticCoverage(level, margin, assumptions, guaranteeScopeOf entry slot)
+        | "ordinal" -> OrdinalModel assumptions
+        | "residual" -> ResidualOnly
+        | _ -> DeterministicInclusion assumptions
+
+    let private decodeGuaranteeSlot (root: obj) (slot: string) : (string * CertificateGuarantee) option =
+        let entry = fieldOf root slot
+
+        if isNullish entry then
+            None
+        else
+            Some(slot, decodeGuaranteeKind entry slot)
+
     let private decodeGuarantees (certificate: obj) : Map<string, CertificateGuarantee> =
         let root = fieldOf certificate "guarantees"
 
@@ -127,36 +164,7 @@ module GecRefine =
             Map.empty
         else
             [ "exact"; "bound"; "sample"; "ordinal"; "latent"; "residual" ]
-            |> List.choose (fun slot ->
-                let entry = fieldOf root slot
-
-                if isNullish entry then
-                    None
-                else
-                    let kind = textOf (fieldOf entry "kind")
-
-                    let assumptions =
-                        stringArrayOf (fieldOf entry "assumptions")
-                        |> List.filter (not << String.IsNullOrWhiteSpace)
-                        |> Set.ofList
-
-                    let guarantee =
-                        match kind with
-                        | "coverage" ->
-                            let level = floatField entry "level" |> Option.defaultValue 0.95
-                            let margin = floatField entry "error" |> Option.defaultValue 0.0
-
-                            let scope =
-                                let raw = textOf (fieldOf entry "scope")
-
-                                if String.IsNullOrWhiteSpace raw then slot else raw
-
-                            ProbabilisticCoverage(level, margin, assumptions, scope)
-                        | "ordinal" -> OrdinalModel assumptions
-                        | "residual" -> ResidualOnly
-                        | _ -> DeterministicInclusion assumptions
-
-                    Some(slot, guarantee))
+            |> List.choose (decodeGuaranteeSlot root)
             |> Map.ofList
 
     let private singlePayload (certificate: obj) (names: string list) : obj option =
@@ -166,37 +174,54 @@ module GecRefine =
 
             if isNullish entry then None else Some entry)
 
+    let private boundSideEntry (bound: obj) (side: string) : obj option =
+        let isObject: bool = emitJsExpr bound "typeof $0 === 'object'"
+        let entry = if isObject then fieldOf bound side else bound
+
+        if isNullish entry then None else Some entry
+
+    let private boundSideFallback (certificate: obj) (side: string) : obj option =
+        let bound = fieldOf certificate "bound"
+
+        if isNullish bound then None
+        elif isJsArray bound then None
+        else boundSideEntry bound side
+
     let private boundSide (certificate: obj) (direct: string list) (side: string) : obj option =
         match singlePayload certificate direct with
         | Some entry -> Some entry
-        | None ->
-            let bound = fieldOf certificate "bound"
+        | None -> boundSideFallback certificate side
 
-            if isNullish bound then
-                None
-            elif isJsArray bound then
-                None
-            else
-                let isObject: bool = emitJsExpr bound "typeof $0 === 'object'"
-                let entry = if isObject then fieldOf bound side else bound
+    let private splitOrdinalSource (source: obj) : obj list =
+        let items = unbox<obj array> source |> Array.toList
 
-                if isNullish entry then None else Some entry
+        match items with
+        | [] -> []
+        | first :: _ when isJsArray first -> items
+        | _ -> [ source ]
 
     let private decodeOrdinal (certificate: obj) : obj list =
         let stored = fieldOf certificate "ordinalConstraints"
-        let source = if isNullish stored then fieldOf certificate "ordinal" else stored
 
-        if isNullish source then
-            []
-        elif isJsArray source then
-            let items = unbox<obj array> source |> Array.toList
+        let source =
+            if isNullish stored then
+                fieldOf certificate "ordinal"
+            else
+                stored
 
-            match items with
-            | [] -> []
-            | first :: _ when isJsArray first -> items
-            | _ -> [ source ]
-        else
-            [ source ]
+        if isNullish source then []
+        elif isJsArray source then splitOrdinalSource source
+        else [ source ]
+
+    let private boundNumbersOf (low: obj) (high: obj) : Result<float * float, CertFault> =
+        match numberOf low, numberOf high with
+        | Some lowNumber, Some highNumber -> Ok(lowNumber, highNumber)
+        | _ -> Error(CertFault.Upstream("invalid-patch", "bound slot carries non-numeric envelopes"))
+
+    let private decodeResidualNumber (payload: obj) : Result<float, CertFault> =
+        match numberOf payload with
+        | Some number -> Ok number
+        | None -> Error(CertFault.Upstream("invalid-patch", "residual slot carries a non-numeric value"))
 
     let private siblingPatches
         (certificate: obj)
@@ -223,12 +248,12 @@ module GecRefine =
 
         let inclusion name =
             match Map.tryFind name guarantees with
-            | Some (DeterministicInclusion assumptions) -> Some(assumptions |> Set.toArray)
+            | Some(DeterministicInclusion assumptions) -> Some(assumptions |> Set.toArray)
             | _ -> None
 
         let coverage name =
             match Map.tryFind name guarantees with
-            | Some (ProbabilisticCoverage(level, margin, assumptions, scope)) ->
+            | Some(ProbabilisticCoverage(level, margin, assumptions, scope)) ->
                 level, margin, Some(assumptions |> Set.toArray), Some scope
             | _ -> 0.95, 0.0, Some [| "guarantee-not-recorded" |], Some name
 
@@ -238,9 +263,9 @@ module GecRefine =
             | Some payload ->
                 Ok
                     [ { baseOf "exact" with
-                            Value = Some payload
-                            GuaranteeKind = Some "inclusion"
-                            Assumptions = inclusion "exact" } ]
+                          Value = Some payload
+                          GuaranteeKind = Some "inclusion"
+                          Assumptions = inclusion "exact" } ]
 
         let boundPart =
             let lower = boundSide certificate [ "lowerEnvelope"; "lower" ] "lower"
@@ -249,15 +274,13 @@ module GecRefine =
             match lower, upper with
             | None, None -> Ok []
             | Some low, Some high ->
-                match numberOf low, numberOf high with
-                | Some lowNumber, Some highNumber ->
-                    Ok
-                        [ { baseOf "bound" with
-                                Lower = Some lowNumber
-                                Upper = Some highNumber
-                                GuaranteeKind = Some "inclusion"
-                                Assumptions = inclusion "bound" } ]
-                | _ -> Error(CertFault.Upstream("invalid-patch", "bound slot carries non-numeric envelopes"))
+                boundNumbersOf low high
+                |> Result.map (fun (lowNumber, highNumber) ->
+                    [ { baseOf "bound" with
+                          Lower = Some lowNumber
+                          Upper = Some highNumber
+                          GuaranteeKind = Some "inclusion"
+                          Assumptions = inclusion "bound" } ])
             | _ -> Error(CertFault.Upstream("invalid-patch", "bound slot needs both lower and upper envelopes"))
 
         let samplePart =
@@ -268,17 +291,17 @@ module GecRefine =
 
                 Ok
                     [ { baseOf "sample" with
-                            Summary = Some payload
-                            GuaranteeKind = Some "coverage"
-                            Level = Some level
-                            Error = Some margin
-                            Assumptions = assumptions
-                            Scope = scope } ]
+                          Summary = Some payload
+                          GuaranteeKind = Some "coverage"
+                          Level = Some level
+                          Error = Some margin
+                          Assumptions = assumptions
+                          Scope = scope } ]
 
         let ordinalPart =
             let assumptions =
                 match Map.tryFind "ordinal" guarantees with
-                | Some (OrdinalModel names) -> Some(names |> Set.toArray)
+                | Some(OrdinalModel names) -> Some(names |> Set.toArray)
                 | _ -> None
 
             Ok(
@@ -298,21 +321,21 @@ module GecRefine =
 
                 Ok
                     [ { baseOf "latent" with
-                            Posterior = Some payload
-                            GuaranteeKind = Some "coverage"
-                            Level = Some level
-                            Error = Some margin
-                            Assumptions = assumptions
-                            Scope = scope } ]
+                          Posterior = Some payload
+                          GuaranteeKind = Some "coverage"
+                          Level = Some level
+                          Error = Some margin
+                          Assumptions = assumptions
+                          Scope = scope } ]
 
         let residualPart =
             match singlePayload certificate [ "residual" ] with
             | None -> Ok []
             | Some payload ->
-                match numberOf payload with
-                | Some number -> Ok [ { baseOf "residual" with ResidualValue = Some number } ]
-                | None ->
-                    Error(CertFault.Upstream("invalid-patch", "residual slot carries a non-numeric value"))
+                decodeResidualNumber payload
+                |> Result.map (fun number ->
+                    [ { baseOf "residual" with
+                          ResidualValue = Some number } ])
 
         [ exactPart; boundPart; samplePart; ordinalPart; latentPart; residualPart ]
         |> List.fold
@@ -321,83 +344,89 @@ module GecRefine =
                 |> Result.bind (fun patches -> part |> Result.map (fun group -> patches @ group)))
             (Ok [])
 
+    let private revisionOf (certificate: obj) : int64 =
+        match floatField certificate "revision" with
+        | Some number -> int64 number
+        | None -> 0L
+
     let private decodeCertificate (certificate: obj) : Result<DecodedCertificate, CertFault> =
         let rawNode = fieldOf certificate "nodeId"
 
         let nodeText =
-            if isNullish rawNode then textOf (fieldOf certificate "node") else textOf rawNode
+            if isNullish rawNode then
+                textOf (fieldOf certificate "node")
+            else
+                textOf rawNode
 
         match NodeId.tryCreate nodeText with
         | Error _ -> Error(CertFault.InvalidNode nodeText)
         | Ok node ->
-            match siblingPatches certificate (decodeGuarantees certificate) with
-            | Error fault -> Error fault
-            | Ok siblings ->
-                Ok
-                    { NodeId = node
-                      Siblings = siblings
-                      Witnesses = decodeEventIds certificate "witnesses"
-                      Derivations = decodeEventIds certificate "derivations"
-                      Revision =
-                        match floatField certificate "revision" with
-                        | Some number -> int64 number
-                        | None -> 0L }
+            siblingPatches certificate (decodeGuarantees certificate)
+            |> Result.map (fun siblings ->
+                { NodeId = node
+                  Siblings = siblings
+                  Witnesses = decodeEventIds certificate "witnesses"
+                  Derivations = decodeEventIds certificate "derivations"
+                  Revision = revisionOf certificate })
+
+    let private decodePatchSlot (patch: obj) : Result<string, CertFault> =
+        let slot = textOf (fieldOf patch "slot")
+
+        if String.IsNullOrWhiteSpace slot then
+            Error(CertFault.Upstream("invalid-patch", "certificate patch names an unknown slot"))
+        else
+            Ok slot
+
+    let private decodePatchAssumptions (guarantee: obj) : string[] option =
+        let raw = fieldOf guarantee "assumptions"
+
+        if isNullish raw then
+            None
+        else
+            Some(
+                stringArrayOf raw
+                |> List.filter (not << String.IsNullOrWhiteSpace)
+                |> List.toArray
+            )
+
+    let private decodePatchScope (patch: obj) (guarantee: obj) : string option =
+        let scopeText = textOf (fieldOf guarantee "scope")
+        let direct = textOf (fieldOf patch "scope")
+
+        match scopeText, direct with
+        | scope, _ when not (String.IsNullOrWhiteSpace scope) -> Some scope
+        | _, direct when not (String.IsNullOrWhiteSpace direct) -> Some direct
+        | _ -> None
 
     let private decodePatch (patch: obj) : Result<CertificatePatchRequest, CertFault> =
         if isNullish patch then
             Error(CertFault.Upstream("invalid-patch", "certificate patch is missing"))
         else
-            let slot = textOf (fieldOf patch "slot")
-
-            if String.IsNullOrWhiteSpace slot then
-                Error(CertFault.Upstream("invalid-patch", "certificate patch names an unknown slot"))
-            else
+            decodePatchSlot patch
+            |> Result.map (fun slot ->
                 let guarantee = fieldOf patch "guarantee"
                 let kindText = textOf (fieldOf guarantee "kind")
-
-                let assumptions =
-                    let raw = fieldOf guarantee "assumptions"
-
-                    if isNullish raw then None
-                    else
-                        Some(
-                            stringArrayOf raw
-                            |> List.filter (not << String.IsNullOrWhiteSpace)
-                            |> List.toArray
-                        )
-
-                let scopeText = textOf (fieldOf guarantee "scope")
-
-                let scope =
-                    if String.IsNullOrWhiteSpace scopeText then
-                        let direct = textOf (fieldOf patch "scope")
-
-                        if String.IsNullOrWhiteSpace direct then None else Some direct
-                    else
-                        Some scopeText
 
                 let valueOf name =
                     let entry = fieldOf patch name
 
                     if isNullish entry then None else Some entry
 
-                Ok
-                    { Slot = slot
-                      Value = valueOf "value"
-                      Lower = floatField patch "lower"
-                      Upper = floatField patch "upper"
-                      Summary = valueOf "summary"
-                      Constraints = valueOf "constraints"
-                      Posterior = valueOf "posterior"
-                      ResidualValue = floatField patch "value"
-                      GuaranteeKind =
-                        if String.IsNullOrWhiteSpace kindText then None else Some kindText
-                      Level = floatField guarantee "level"
-                      Error = floatField guarantee "error"
-                      Assumptions = assumptions
-                      Scope = scope
-                      Witnesses = decodeEventIds patch "witnesses"
-                      Derivations = decodeEventIds patch "derivations" }
+                { Slot = slot
+                  Value = valueOf "value"
+                  Lower = floatField patch "lower"
+                  Upper = floatField patch "upper"
+                  Summary = valueOf "summary"
+                  Constraints = valueOf "constraints"
+                  Posterior = valueOf "posterior"
+                  ResidualValue = floatField patch "value"
+                  GuaranteeKind = Option.ofObj kindText |> Option.filter (not << String.IsNullOrWhiteSpace)
+                  Level = floatField guarantee "level"
+                  Error = floatField guarantee "error"
+                  Assumptions = decodePatchAssumptions guarantee
+                  Scope = decodePatchScope patch guarantee
+                  Witnesses = decodeEventIds patch "witnesses"
+                  Derivations = decodeEventIds patch "derivations" })
 
     let private rebuildBase (decoded: DecodedCertificate) : Result<ValueCertificate, CertFault> =
         let seed =
@@ -424,8 +453,11 @@ module GecRefine =
     let private guaranteeView (slot: string) (guarantee: CertificateGuarantee) : string * obj =
         match guarantee with
         | DeterministicInclusion assumptions ->
-            slot, box {| kind = "inclusion"; assumptions = assumptions |> Set.toArray |> box |}
-        | ProbabilisticCoverage (level, margin, assumptions, scope) ->
+            slot,
+            box
+                {| kind = "inclusion"
+                   assumptions = assumptions |> Set.toArray |> box |}
+        | ProbabilisticCoverage(level, margin, assumptions, scope) ->
             slot,
             box
                 {| kind = "coverage"
@@ -434,7 +466,10 @@ module GecRefine =
                    assumptions = assumptions |> Set.toArray |> box
                    scope = scope |}
         | OrdinalModel assumptions ->
-            slot, box {| kind = "ordinal"; assumptions = assumptions |> Set.toArray |> box |}
+            slot,
+            box
+                {| kind = "ordinal"
+                   assumptions = assumptions |> Set.toArray |> box |}
         | ResidualOnly -> slot, box {| kind = "residual" |}
 
     let private certificateView (certificate: ValueCertificate) : obj =
@@ -447,7 +482,10 @@ module GecRefine =
         let residual = envelopePayload certificate.Residual
 
         let ordinalSingle =
-            match certificate.OrdinalConstraints |> List.map (fun entry -> JS.JSON.parse entry.CanonicalPayload) with
+            match
+                certificate.OrdinalConstraints
+                |> List.map (fun entry -> JS.JSON.parse entry.CanonicalPayload)
+            with
             | [ single ] -> single
             | [] -> null
             | many -> many |> List.toArray |> box
@@ -474,8 +512,7 @@ module GecRefine =
                 |> List.map (fun (slot, guarantee) -> guaranteeView slot guarantee)
                 |> createObj
                witnesses = certificate.WitnessEvents |> List.map EventId.value |> List.toArray |> box
-               derivations =
-                certificate.DerivationEvents |> List.map EventId.value |> List.toArray |> box
+               derivations = certificate.DerivationEvents |> List.map EventId.value |> List.toArray |> box
                revision = float certificate.Revision |}
 
     let private refineSlot (certificate: obj) (patch: obj) : obj =
@@ -487,7 +524,10 @@ module GecRefine =
                     rebuildBase decoded
                     |> Result.bind (fun rebuilt ->
                         match Certificate.apply rebuilt request with
-                        | Ok advanced -> Ok { advanced with Revision = decoded.Revision + 1L }
+                        | Ok advanced ->
+                            Ok
+                                { advanced with
+                                    Revision = decoded.Revision + 1L }
                         | Error fault -> Error(CertFault.Upstream(fault.Code, fault.Message)))))
 
         match outcome with
@@ -522,6 +562,18 @@ module GecRefine =
         | Ok posterior -> okResult [ "posterior", mapView posterior.Probabilities ]
         | Error fault -> typedError (BayesExact.code fault) (BayesExact.message fault)
 
+    let private astarOutcomeView (outcome: AStarRefiner.Outcome) : obj =
+        match outcome with
+        | AStarRefiner.Outcome.Optimal proof ->
+            okResult
+                [ "path", proof.Path |> List.toArray |> box
+                  "cost", box proof.Cost
+                  "expanded", proof.Expanded |> List.toArray |> box
+                  "lowerBound", box proof.LowerBound
+                  "upperBound", box proof.UpperBound ]
+        | AStarRefiner.Outcome.Unreachable _ ->
+            typedError "unreachable" "astar exhausted the frontier without reaching the goal"
+
     let private astarSolve (patch: obj) : obj =
         let edges: AStarRefiner.Edge list =
             arrayOf (fieldOf patch "edges")
@@ -539,39 +591,33 @@ module GecRefine =
 
         match AStarRefiner.solve problem with
         | Error fault -> typedError (AStarRefiner.code fault) (AStarRefiner.message fault)
-        | Ok outcome ->
-            match outcome with
-            | AStarRefiner.Outcome.Optimal proof ->
-                okResult
-                    [ "path", proof.Path |> List.toArray |> box
-                      "cost", box proof.Cost
-                      "expanded", proof.Expanded |> List.toArray |> box
-                      "lowerBound", box proof.LowerBound
-                      "upperBound", box proof.UpperBound ]
-            | AStarRefiner.Outcome.Unreachable _ ->
-                typedError "unreachable" "astar exhausted the frontier without reaching the goal"
+        | Ok outcome -> astarOutcomeView outcome
+
+    let rec private walkPath (children: Map<string, string list>) (visited: Set<string>) (node: string) : int =
+        if Set.contains node visited then
+            0
+        else
+            walkChildDepths children visited node
+
+    and private walkChildDepths (children: Map<string, string list>) (visited: Set<string>) (node: string) : int =
+        match Map.tryFind node children with
+        | None -> 0
+        | Some moves ->
+            moves
+            |> List.filter (fun move -> not (Set.contains move visited))
+            |> List.fold (fun best move -> max best (1 + walkPath children (Set.add node visited) move)) 0
 
     let private longestPath (children: Map<string, string list>) (root: string) : int =
-        let rec walk (visited: Set<string>) (node: string) : int =
-            if Set.contains node visited then
-                0
-            else
-                match Map.tryFind node children with
-                | None -> 0
-                | Some moves ->
-                    let fresh = moves |> List.filter (fun move -> not (Set.contains move visited))
-
-                    match fresh with
-                    | [] -> 0
-                    | _ -> 1 + (fresh |> List.map (walk (Set.add node visited)) |> List.max)
-
-        max 1 (walk Set.empty root)
+        max 1 (walkPath children Set.empty root)
 
     let private mctsSample (patch: obj) : obj =
         let root = textOf (fieldOf patch "root")
         let children = stringListMapOf (fieldOf patch "children")
         let rewards = floatMapKeep (fieldOf patch "terminalReward")
-        let iterations = floatField patch "iterations" |> Option.map int |> Option.defaultValue 100
+
+        let iterations =
+            floatField patch "iterations" |> Option.map int |> Option.defaultValue 100
+
         let seed = floatField patch "seed" |> Option.map int |> Option.defaultValue 0
         let delta = floatField patch "delta" |> Option.defaultValue 0.05
 
@@ -581,8 +627,10 @@ module GecRefine =
             | values -> values |> List.max
 
         let actions =
-            if Map.containsKey root children then children
-            else Map.add root [] children
+            if Map.containsKey root children then
+                children
+            else
+                Map.add root [] children
 
         let transitions: MctsRefiner.KernelEntry list =
             actions
@@ -594,7 +642,10 @@ module GecRefine =
 
                     { State = state
                       Action = move
-                      Outcomes = [ { Next = move; Probability = 1.0; Reward = reward } ] }))
+                      Outcomes =
+                        [ { Next = move
+                            Probability = 1.0
+                            Reward = reward } ] }))
 
         let model: MctsRefiner.GenerativeModel =
             { Root = root
@@ -619,7 +670,9 @@ module GecRefine =
 
             okResult
                 [ "estimates",
-                  result.ActionStats |> List.map (fun stats -> stats.Action ==> stats.Mean) |> createObj
+                  result.ActionStats
+                  |> List.map (fun stats -> stats.Action ==> stats.Mean)
+                  |> createObj
                   "coverage",
                   box
                       {| delta = result.Coverage.Delta
@@ -640,17 +693,17 @@ module GecRefine =
                   )
                   "seed", box seed ]
 
+    let private ballotRanksOf (items: obj list) : string list list =
+        match items with
+        | [] -> []
+        | first :: _ when isJsArray first -> items |> List.map stringArrayOf
+        | _ -> items |> List.map (fun (label: obj) -> [ textOf label ])
+
     let private decodeBallot (entry: obj) : OrdinalInference.Ballot =
         if not (isJsArray entry) then
             { Ranks = [] }
         else
-            let items = unbox<obj array> entry |> Array.toList
-
-            match items with
-            | [] -> { Ranks = [] }
-            | first :: _ when isJsArray first ->
-                { Ranks = items |> List.map stringArrayOf }
-            | _ -> { Ranks = items |> List.map (fun label -> [ textOf label ]) }
+            { Ranks = ballotRanksOf (unbox<obj array> entry |> Array.toList) }
 
     let private borda (input: obj) : obj =
         let request: OrdinalInference.BordaInput =
@@ -710,8 +763,7 @@ module GecRefine =
                          gradientNorm = outcome.Diagnostics.GradientNorm
                          maxAbsStrength = outcome.Diagnostics.MaxAbsStrength
                          regularization = outcome.Diagnostics.Regularization |}
-                  "uncertainty",
-                  box {| standardErrors = mapView outcome.Uncertainty.StandardErrors |}
+                  "uncertainty", box {| standardErrors = mapView outcome.Uncertainty.StandardErrors |}
                   "assumptions", outcome.Assumptions |> Set.toArray |> box ]
 
     let private refineKind (state: obj) (patch: obj) : obj =
@@ -721,19 +773,23 @@ module GecRefine =
         | "mcts-sample" -> mctsSample patch
         | kind -> typedError "unknown-kind" (sprintf "refinement kind is not supported: %s" kind)
 
-    let refineCertificate (first: obj) (second: obj) : obj =
-        if isNullish second then
-            let certificate = fieldOf first "certificate"
-            let patch = fieldOf first "patch"
+    let refineCertificate (first: obj) (second: obj) : obj = refineKind first second
 
-            if isNullish certificate || isNullish patch then
-                typedError "invalid-patch" "refineCertificate needs a certificate and a patch"
-            else
-                refineSlot certificate patch
+    let private refineSlotEntry (input: obj) : obj =
+        let certificate = fieldOf input "certificate"
+        let patch = fieldOf input "patch"
+
+        if isNullish certificate || isNullish patch then
+            typedError "invalid-patch" "refineCertificate needs a certificate and a patch"
         else
-            refineKind first second
+            refineSlot certificate patch
+
+    let private refineCertificateEntry: obj =
+        emitJsExpr
+            (refineSlotEntry, refineCertificate)
+            "(...args) => args.length > 1 ? $1(args[0], args[1]) : $0(args[0])"
 
     let methods: (string * obj) list =
-        [ "refineCertificate", box refineCertificate
+        [ "refineCertificate", refineCertificateEntry
           "borda", box borda
           "bradleyTerry", box bradleyTerry ]

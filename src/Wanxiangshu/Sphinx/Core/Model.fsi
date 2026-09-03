@@ -56,9 +56,7 @@ module BlindToken =
     val create: string -> BlindToken
     val value: BlindToken -> string
 
-type SchemaRef =
-    { Id: string
-      Hash: string }
+type SchemaRef = { Id: string; Hash: string }
 
 type JsonEnvelope =
     { Schema: SchemaRef
@@ -144,16 +142,14 @@ type WorkState =
     | Planned
     | Ready
     | Leased of LeaseProof
-    | Running of LeaseProof
+    | Executing of LeaseProof
     | InputRequired of LeaseProof
     | Succeeded of CompletionProof
     | Failed of CompletionProof
     | Cancelled of CompletionProof
     | Superseded of WorkId
 
-type WorkItem =
-    { Spec: WorkSpec
-      State: WorkState }
+type WorkItem = { Spec: WorkSpec; State: WorkState }
 
 type InquiryStatus =
     | Active
@@ -170,8 +166,7 @@ type GraphPatch =
       UpsertEdges: HyperEdge list
       RemoveEdges: EdgeId list }
 
-type CertificatePatch =
-    { Certificate: ValueCertificate }
+type CertificatePatch = { Certificate: ValueCertificate }
 
 type ProtocolBinding =
     { RootSnapshotHash: string
@@ -225,6 +220,4 @@ type InquiryState =
       Status: InquiryStatus
       Answer: JsonEnvelope option }
 
-type CoreError =
-    { Code: string
-      Message: string }
+type CoreError = { Code: string; Message: string }

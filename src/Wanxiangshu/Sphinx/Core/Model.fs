@@ -43,43 +43,55 @@ module private OpaqueId =
         | Error message -> invalidArg "value" message
 
 module InquiryId =
-    let tryCreate value = OpaqueId.tryCreate "InquiryId" "iq_" InquiryId value
+    let tryCreate value =
+        OpaqueId.tryCreate "InquiryId" "iq_" InquiryId value
+
     let create value = OpaqueId.create tryCreate value
     let value (InquiryId value) = value
 
 module EventId =
-    let tryCreate value = OpaqueId.tryCreate "EventId" "ev" EventId value
+    let tryCreate value =
+        OpaqueId.tryCreate "EventId" "ev" EventId value
+
     let create value = OpaqueId.create tryCreate value
     let value (EventId value) = value
 
 module NodeId =
-    let tryCreate value = OpaqueId.tryCreate "NodeId" "n" NodeId value
+    let tryCreate value =
+        OpaqueId.tryCreate "NodeId" "n" NodeId value
+
     let create value = OpaqueId.create tryCreate value
     let value (NodeId value) = value
 
 module EdgeId =
-    let tryCreate value = OpaqueId.tryCreate "EdgeId" "e" EdgeId value
+    let tryCreate value =
+        OpaqueId.tryCreate "EdgeId" "e" EdgeId value
+
     let create value = OpaqueId.create tryCreate value
     let value (EdgeId value) = value
 
 module WorkId =
-    let tryCreate value = OpaqueId.tryCreate "WorkId" "work_" WorkId value
+    let tryCreate value =
+        OpaqueId.tryCreate "WorkId" "work_" WorkId value
+
     let create value = OpaqueId.create tryCreate value
     let value (WorkId value) = value
 
 module BranchId =
-    let tryCreate value = OpaqueId.tryCreate "BranchId" "branch_" BranchId value
+    let tryCreate value =
+        OpaqueId.tryCreate "BranchId" "branch_" BranchId value
+
     let create value = OpaqueId.create tryCreate value
     let value (BranchId value) = value
 
 module BlindToken =
-    let tryCreate value = OpaqueId.tryCreate "BlindToken" "blind" BlindToken value
+    let tryCreate value =
+        OpaqueId.tryCreate "BlindToken" "blind" BlindToken value
+
     let create value = OpaqueId.create tryCreate value
     let value (BlindToken value) = value
 
-type SchemaRef =
-    { Id: string
-      Hash: string }
+type SchemaRef = { Id: string; Hash: string }
 
 type JsonEnvelope =
     { Schema: SchemaRef
@@ -101,16 +113,18 @@ module JsonEnvelope =
             { Schema = valid
               CanonicalPayload = CanonicalJson.canonicalJson payload })
 
+    let private canonicalizePayload (valid: SchemaRef) (payload: string) : Result<JsonEnvelope, string> =
+        try
+            Ok
+                { Schema = valid
+                  CanonicalPayload = payload |> JS.JSON.parse |> CanonicalJson.canonicalJson }
+        with _ ->
+            Error "payload is not valid JSON"
+
     let ofCanonical schema payload =
         match validateSchema schema with
         | Error error -> Error error
-        | Ok valid ->
-            try
-                Ok
-                    { Schema = valid
-                      CanonicalPayload = payload |> JS.JSON.parse |> CanonicalJson.canonicalJson }
-            with _ ->
-                Error "payload is not valid JSON"
+        | Ok valid -> canonicalizePayload valid payload
 
     let payload envelope = JS.JSON.parse envelope.CanonicalPayload
 
@@ -189,16 +203,14 @@ type WorkState =
     | Planned
     | Ready
     | Leased of LeaseProof
-    | Running of LeaseProof
+    | Executing of LeaseProof
     | InputRequired of LeaseProof
     | Succeeded of CompletionProof
     | Failed of CompletionProof
     | Cancelled of CompletionProof
     | Superseded of WorkId
 
-type WorkItem =
-    { Spec: WorkSpec
-      State: WorkState }
+type WorkItem = { Spec: WorkSpec; State: WorkState }
 
 type InquiryStatus =
     | Active
@@ -215,8 +227,7 @@ type GraphPatch =
       UpsertEdges: HyperEdge list
       RemoveEdges: EdgeId list }
 
-type CertificatePatch =
-    { Certificate: ValueCertificate }
+type CertificatePatch = { Certificate: ValueCertificate }
 
 type ProtocolBinding =
     { RootSnapshotHash: string
@@ -270,6 +281,4 @@ type InquiryState =
       Status: InquiryStatus
       Answer: JsonEnvelope option }
 
-type CoreError =
-    { Code: string
-      Message: string }
+type CoreError = { Code: string; Message: string }

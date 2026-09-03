@@ -1,12 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { loadGecSurface } from './gec-support.mjs'
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js'
 
 const strict2 = (order) => order.map((label) => [label])
 
 test('WHAT[EPI-024] candidate-label-equivariance-permuted-labels-permute-scores-identically', async () => {
-  const gecSurface = await loadGecSurface()
   const ballots = [strict2(['a', 'b', 'c']), strict2(['a', 'b', 'c'])]
   const original = await gecSurface.borda({ candidates: ['a', 'b', 'c'], ballots })
   assert.equal(original.ok, true)
@@ -24,7 +23,6 @@ test('WHAT[EPI-024] candidate-label-equivariance-permuted-labels-permute-scores-
 })
 
 test('WHAT[EPI-024] fractional-tie-extension-shares-average-borda-points', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.borda({
     candidates: ['a', 'b', 'c'],
     ballots: [[['a', 'b'], ['c']]],
@@ -37,7 +35,6 @@ test('WHAT[EPI-024] fractional-tie-extension-shares-average-borda-points', async
 })
 
 test('WHAT[EPI-024] appearance-normalized-extension-divides-by-ballot-appearance-not-raw-sum', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.borda({
     candidates: ['a', 'b', 'c'],
     ballots: [
@@ -57,7 +54,6 @@ test('WHAT[EPI-024] appearance-normalized-extension-divides-by-ballot-appearance
 })
 
 test('WHAT[EPI-024] borda-guarantees-claim-only-ballot-order-invariance-and-label-equivariance', async () => {
-  const gecSurface = await loadGecSurface()
   const input = {
     candidates: ['a', 'b', 'c'],
     ballots: [strict2(['a', 'b', 'c']), strict2(['c', 'a', 'b'])],
@@ -76,7 +72,6 @@ test('WHAT[EPI-024] borda-guarantees-claim-only-ballot-order-invariance-and-labe
 })
 
 test('WHAT[EPI-024] zero-sum-gauge-fixes-location-with-strengths-summing-to-zero', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.bradleyTerry({
     candidates: ['a', 'b', 'c'],
     comparisons: [
@@ -97,7 +92,6 @@ test('WHAT[EPI-024] zero-sum-gauge-fixes-location-with-strengths-summing-to-zero
 })
 
 test('WHAT[EPI-024] disconnected-comparison-graph-returns-typed-unidentifiable-error', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.bradleyTerry({
     candidates: ['a', 'b', 'c', 'd'],
     comparisons: [
@@ -113,7 +107,6 @@ test('WHAT[EPI-024] disconnected-comparison-graph-returns-typed-unidentifiable-e
 })
 
 test('WHAT[EPI-024] separation-with-regularization-stays-finite-and-reports-diagnostics', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.bradleyTerry({
     candidates: ['a', 'b'],
     comparisons: [{ a: 'a', b: 'b', winsA: 10, winsB: 0 }],

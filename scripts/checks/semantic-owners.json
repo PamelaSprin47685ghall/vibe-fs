@@ -2733,6 +2733,10 @@
       "owner": "epistemic-reasoning"
     },
     {
+      "path": "src/Wanxiangshu/Sphinx/EventVocabulary.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
       "path": "src/Wanxiangshu/Sphinx/GecDecode.fs",
       "owner": "epistemic-reasoning"
     },
@@ -2750,6 +2754,26 @@
     },
     {
       "path": "src/Wanxiangshu/Sphinx/GecSurface.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecInquiry.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecLegacy.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GecStore.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/LegacyDurability.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/LegacyIntegrator.fs",
       "owner": "epistemic-reasoning"
     },
     {

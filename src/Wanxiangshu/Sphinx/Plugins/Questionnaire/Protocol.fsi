@@ -42,9 +42,7 @@ module Protocol =
           BlockCount: int
           Assumptions: Set<string> }
 
-    type ArmOutcome =
-        { Subject: string
-          Response: float }
+    type ArmOutcome = { Subject: string; Response: float }
 
     type ContrastInput =
         { Assignment: Map<string, string>
@@ -112,9 +110,7 @@ module Protocol =
           Estimand: string
           Assumptions: Set<string> }
 
-    type ResponseCommit =
-        { Subject: string
-          Digest: string }
+    type ResponseCommit = { Subject: string; Digest: string }
 
     val maxNullPermutations: int
     val allocationErrorCode: AllocationError -> string
@@ -128,4 +124,6 @@ module Protocol =
     val verifyResponse: commit: ResponseCommit -> subject: string -> responseText: string -> bool
     /// Salted hiding variant over subject|response|salt.
     val commitResponseWithSalt: subject: string -> responseText: string -> salt: string -> ResponseCommit
-    val verifyResponseWithSalt: commit: ResponseCommit -> subject: string -> responseText: string -> salt: string -> bool
+
+    val verifyResponseWithSalt:
+        commit: ResponseCommit -> subject: string -> responseText: string -> salt: string -> bool

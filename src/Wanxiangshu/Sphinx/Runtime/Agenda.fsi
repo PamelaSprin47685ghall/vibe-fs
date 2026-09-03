@@ -20,9 +20,7 @@ type ScheduleResult =
       Pareto: string list
       Order: string list }
 
-type ScheduleError =
-    { Code: string
-      Message: string }
+type ScheduleError = { Code: string; Message: string }
 
 type ClosureDomain =
     | FiniteDag of nodes: int * edges: (int * int) list

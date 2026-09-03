@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadGecSurface } from './gec-support.mjs';
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js';
 
 function baseEvents() {
   return [
@@ -82,7 +82,7 @@ function reverseKeys(value) {
 }
 
 test('WHAT[EPI-017] replay_is_key_order_invariant_or_stringify_hash_breaks_on_reordered_keys', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const events = baseEvents();
   const first = await surface.semanticHash({ events });
   assert.match(first.hash, /^[0-9a-f]{64}$/);
@@ -106,7 +106,7 @@ test('WHAT[EPI-017] replay_is_key_order_invariant_or_stringify_hash_breaks_on_re
 });
 
 test('WHAT[EPI-017] replay_consumes_accepted_observations_without_provider_recall_or_replay_hits_network', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const events = baseEvents();
   const first = await surface.replay({ events });
   const second = await surface.replay({ events });
@@ -124,7 +124,7 @@ test('WHAT[EPI-017] replay_consumes_accepted_observations_without_provider_recal
 });
 
 test('WHAT[EPI-017] replay_rejects_observations_missing_protocol_bindings_or_partial_provenance_replays', async () => {
-  const surface = await loadGecSurface();
+  const surface = gecSurface;
   const required = [
     'rootSnapshotHash',
     'branch',

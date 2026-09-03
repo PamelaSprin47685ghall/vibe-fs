@@ -1,12 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { loadGecSurface } from './gec-support.mjs'
+import { gecSurface } from '../../../dist/Sphinx/GecSurface.js'
 
 const posterior = { approve: 0.68, reject: 0.32 }
 
 test('WHAT[EPI-029] certificate-bounds-guarantee-to-tested-framing-family-only', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.stopCertificate({
     testedFramings: ['neutral', 'reverse-wording'],
     decisionPosterior: { ...posterior },
@@ -23,7 +22,6 @@ test('WHAT[EPI-029] certificate-bounds-guarantee-to-tested-framing-family-only',
 })
 
 test('WHAT[EPI-029] sequential-error-control-tightens-with-repeated-checks', async () => {
-  const gecSurface = await loadGecSurface()
   const base = {
     testedFramings: ['neutral', 'reverse-wording'],
     decisionPosterior: { ...posterior },
@@ -40,7 +38,6 @@ test('WHAT[EPI-029] sequential-error-control-tightens-with-repeated-checks', asy
 })
 
 test('WHAT[EPI-029] stable-minority-mode-returns-decision-distribution-not-single-winner', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.stopCertificate({
     testedFramings: ['neutral', 'reverse-wording'],
     decisionPosterior: { ...posterior },
@@ -59,7 +56,6 @@ test('WHAT[EPI-029] stable-minority-mode-returns-decision-distribution-not-singl
 })
 
 test('WHAT[EPI-029] conservative-upper-voc-blocks-stopping-on-point-estimate-alone', async () => {
-  const gecSurface = await loadGecSurface()
   const result = await gecSurface.stopCertificate({
     testedFramings: ['neutral', 'reverse-wording'],
     decisionPosterior: { ...posterior },

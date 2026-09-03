@@ -171,7 +171,7 @@ module McpContract =
                 "unknown handle"
                 false
                 false
-                "Start a new inquiry with start; inquiry handles are process-local and do not survive restart."
+                "Start a new inquiry with start; this handle is unknown to this store. Cancelled handles stay unknown; durable handles recover by replaying their accepted observations into a fresh store before retry."
                 failure.Handle
                 None
                 None
