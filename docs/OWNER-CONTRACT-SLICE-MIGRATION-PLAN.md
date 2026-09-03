@@ -2,7 +2,7 @@
 
 日期：2026-09-03
 
-状态：M6.0–M6.2 已完成；M6.3 全局规则及 EventStore/Host/Delegation 点名边界已裁决；全部 locality terminal classification、graph + capability facts 派生的全部 live candidate adjudication、完整 capability census 与全量 slice manifest 尚未完成；不得进入 M6.3c/M6.4。当前 92 个 composition provider 只是 pre-cutover candidate 子集，不是永久 gate 数量或完整 adjudication universe。
+状态：M6.0–M6.2 已完成；M6.3 全局规则及 EventStore/Host/Delegation 点名边界已裁决；全部 live locality 的 terminal classification/adjudication、完整 capability census 与全量 slice manifest 尚未完成；不得进入 M6.3c/M6.4。`deriveAdjudicationCandidates` 的 key universe 固定为 fresh owner-project graph 的全部 locality；当前 92 个 composition provider 只是带 `CompositionProvider` reason 的 pre-cutover 子集，不是永久 gate 数量。
 
 适用背景：Fable owner-project 编译边界、published contract 授权与 semantic owner 重整
 
@@ -93,7 +93,7 @@ actual compiler-resolved cross-locality source edges
 ⊆ declared ProjectReference transitive closure
 ```
 
-本方案选择轻量 compiler-resolved locality dependency analyzer：读取编译器解析后的 consumer declaration use，只保留 consumer locality 与 provider locality，随后丢弃 symbol identity。它不承担 per-symbol ACL，不保存 snapshot，不做 delta/cache 复用。
+本方案选择轻量 compiler-resolved locality dependency analyzer：读取编译器解析后的 declaration use，semantic edge 只保留 consumer/provider source + locality；symbol identity 与 line/column 仅进入本次 scan 的 ephemeral diagnostic side channel，scratch 随 invocation 删除。它不承担 per-symbol ACL，不保存 snapshot，不做 delta/cache 复用。
 
 固定反例：consumer 引用 aggregate 中存在的公开 provider symbol，但 provider 不在 consumer 的 ProjectReference closure；aggregate compile 可以绿色，architecture gate 必须红色。
 
@@ -251,7 +251,7 @@ merge(ownerA, ownerB)
 }
 ```
 
-symbol 只用于编译器解析 declaration owner；映射到 provider locality 后立即丢弃，不进入 ACL 或持久 snapshot。
+FCS symbol identity 与 line/column 只允许作为当前 scan 的 ephemeral diagnostic payload，用于定位已经映射出的 source-pair edge。edge identity、dedupe、authorization、census、property comparison 与 normalized projection 只使用 consumer/provider source + locality；manifest、snapshot、cache、baseline、adjudication record 均不得保存或消费 symbol/location。scan scratch 在本次 invocation 结束时删除，不恢复 per-symbol ACL。
 
 必须验证：
 
@@ -260,11 +260,79 @@ symbol 只用于编译器解析 declaration owner；映射到 provider locality 
 P ∈ projectReferenceClosure(C)
 ```
 
-增量开发可以只分析 changed locality；release sink 必须对完整 production compile set 重新分析。禁止复用旧 FCS snapshot、delta、mtime cache 或人工 baseline。
+当前 analyzer 只有 fixture-project scan 与 fresh full-production scan，不存在 changed-locality production lane。pre-cutover live report 与 M6.4 release sink 都扫描完整 production compile set；禁止复用旧 FCS snapshot、delta、mtime cache 或人工 baseline。若未来有性能证据要求局部诊断，必须另立 node，定义 changed source/locality 输入与受影响 consumer/provider closure，并证明局部结果是 full scan 的保守投影；局部结果不得取得 release authority。
 
 ### 4.4 Locality capability facts
 
-源码能力必须形成唯一、规范化的 production fact set。提取边界读取 F# source、`.fsi`、owner project 与既有 authority metadata；其 normalizer、locality join 与 policy decision 必须是可由 fixture/property test 直接调用的纯函数。至少输出：
+源码能力必须形成唯一、规范化的 production fact set。提取边界读取 F# source、`.fsi`、compiler declaration use 与 build linkage；owner、locality kind、目标 exposure、grant、relation 与既有 authority annotation 全部是待验证的 normative claim，不能制造或删除 observed fact。normalizer、locality join 与 policy decision 必须是可由 fixture/property test 直接调用的 production pure function。
+
+fact schema 固定为 version 1 的封闭代数；新增 case 必须提升版本并同步 fixture、record 与 world digest：
+
+```text
+ObservedCapabilityFactV1 =
+  | FableInteropUse of ImportOrEmit * RawInterop * Observation
+  | PhysicalUse of PhysicalAuthority * Observation
+  | MutableRuntimeResource of MutableResourceClass * Observation
+  | CapabilityDeclaration of CapabilityForm * Observation
+  | GeneratedModuleImport of ObservedGeneratedLinkage * Observation
+  | UnknownObservation of UnknownClass * Observation
+
+ClassifiedCapabilityV1 =
+  | PureRepresentation of FactId
+  | VerifiedRepositoryGenerated of FactId * RelationId
+  | PhysicalAuthorityUse of FactId * PhysicalAuthority
+  | MutableRuntimeUse of FactId * MutableResourceClass
+  | CapabilityTypeOnly of FactId
+  | CapabilityValue of FactId
+  | CapabilityFactory of FactId
+  | EffectConstructor of FactId
+  | UnknownCapability of FactId * UnknownClass
+
+ImportOrEmit = Import | Emit
+RawInterop = { specifier_or_expression }
+PhysicalAuthority = Node | Host | Process | FileSystem | Network | Git | Provider
+CapabilityForm = TypeOnly | Value | Factory | EffectConstructor | UnknownForm
+MutableResourceClass = TopLevelMutable | Registry | Waiter | TaskCompletionSource | RuntimeCell
+UnknownClass = UnclassifiedInterop | UnclassifiedCapability | UnsupportedSourceConstruct | IncompleteGeneratedLinkage
+ObservedGeneratedLinkage = {
+  import_specifier, package_import_target,
+  generator, input_selector, build_invocation
+}
+Observation = {
+  locality_id, source_path, semantic_declaration_anchor,
+  same_anchor_occurrence_ordinal, semantic_payload
+}
+```
+
+信任边界固定为 `ObservedFacts := extract(source/.fsi/FCS/build)`、`NormativeClaims := owner/kind/exposure/grant/relation/generated_owner/law/evidence metadata`、`ClassifiedCapabilities := policy(ObservedFacts, NormativeClaims)`。manifest 不能直接提交 observed/classified fact；只有 extractor/normalizer 能产生 `ObservedCapabilityFactV1`，只有 production policy 能产生 `ClassifiedCapabilityV1`。`UnknownObservation`、`UnknownCapability` 与 `UnknownForm` 一律阻断 adjudication/cutover。physical observation 优先于任何 metadata；normative claim 不得把 physical、mutable、value、factory 或 effect constructor 降格为 pure。`PureRepresentation` 只由 production classifier 的显式 closed rule 产生，每条允许的 `Emit` template 都有正例与邻近物理反例；未匹配 interop 进入 `UnknownCapability`。`VerifiedRepositoryGenerated` 只有在 observed import、package target、generator、repository input selector、build invocation 与 normative generated-owner/determinism proof 全部闭合后由 policy 产生；仅存在 manifest relation 不足以自证。
+
+每条 fact 的稳定身份必须覆盖去掉诊断位置后的完整 observed DU，而不是只覆盖公共 `Observation.semantic_payload`：
+
+```text
+fact_id := "sha256:" + SHA256(
+  UTF8("capability-fact/v1\u0000" + canonicalJson(
+    stripDiagnosticLocation(fullObservedCapabilityFactV1)
+  ))
+)
+
+stripDiagnosticLocation(case(constructor_payload..., observation)) := {
+  fact_case: case,
+  constructor_payload: constructor_payload...,
+  observation: {
+    locality_id,
+    source_path,
+    semantic_declaration_anchor,
+    same_anchor_occurrence_ordinal,
+    semantic_payload
+  }
+}
+```
+
+`constructor_payload` 必须保留各 case 的全部 payload：`ImportOrEmit + RawInterop`、`PhysicalAuthority`、`MutableResourceClass`、`CapabilityForm`、`ObservedGeneratedLinkage` 或 `UnknownClass`。`semantic_declaration_anchor` 是 compiler-resolved fully-qualified containing declaration；module initializer 使用稳定 `<module-init>`，同名 local declaration 再带 AST child-index path。`same_anchor_occurrence_ordinal` 是同一 `(source_path,semantic_declaration_anchor,fact_case,constructor_payload,semantic_payload)` 在 compiler traversal 中的 zero-based occurrence。它保留同一 declaration 内两个内容完全相同的 use，同时不把 line/column 写入 identity。fixture 必须证明：不同 constructor payload 不碰撞；两处完整 payload 相同的 occurrence 产生两个 fact ID；重复提取同一 occurrence 才按 fact ID 去重。
+
+`canonicalJson` 递归按 key 排序；set/array 按各类型的稳定 identity 排序；路径转为 POSIX repository-relative form；字符串保持原 UTF-8 值。symbol、line/column、诊断文案与扫描临时路径不进入 fact/world，只留在单独的本次诊断 side channel。
+
+canonical fact query 至少输出：
 
 - provider locality 的全部 sibling `.fsi` surface。
 - 每个 Fable `Import`/`Emit` 的 exact specifier/expression 及其语义分类；语法 token 本身不等于 effect。
@@ -273,13 +341,132 @@ P ∈ projectReferenceClosure(C)
 - capability type、capability value、factory 与 effect constructor 的区别。
 - deterministic repository-generated module 及其 producer/build/input linkage。
 
-actual capability facts 不得复制进 manifest、baseline 或 adjudication record形成第二事实源。adjudication record只保存同次 fresh canonical fact query 的稳定 fact ID/digest与决策摘要，不能保存可被后续当成 actual 集合的副本。slice validator、effect purity census、compile-contract-support validator、physical-port/adapter/composition checks 与 fast-check 只消费同一 typed fact set；不得重扫源码、解析其他 gate 的诊断字符串，或以 locality kind metadata 代替源码事实。
+actual capability facts 不得复制进 manifest、baseline 或 adjudication record 形成第二事实源。slice validator、effect purity census、generated-module validator、physical-port/adapter/composition checks 与 fast-check 只消费同一 typed fact set；不得重扫源码、解析其他 gate 的诊断字符串，或以 locality kind metadata 代替源码事实。
 
-实现时从现有 `authority-boundary`、`dsl-ownership` 与 owner-project parsing 抽取、复用 pure fact primitives；唯一新增层是 source facts → locality join。compiler-resolved locality dependency analyzer 继续只拥有 declaration-use edge，不扩成第二 capability scanner。固定 fixture 必须覆盖：kind 误标为 contract、源码却执行 `console.error/process.kill` 的 `FatalProcess` 反例；Node/process import 反例；mutable registry 与 capability value/factory 反例；pure `Emit` 正例；通过 exact relation 的 deterministic generated-module 正例。同一组 facts 必须驱动全部相关 policy verdict。
+实现时从现有 `authority-boundary`、`dsl-ownership` 与 owner-project parsing 抽取、复用 pure observation primitives；旧 annotation 只能帮助定位 symbol/owner，不能决定 effect classification。唯一新增层是 observation normalization + source facts → locality join。compiler-resolved locality dependency analyzer 继续只拥有 declaration-use edge，不扩成第二 capability scanner。固定 fixture 必须覆盖：kind 误标为 contract、源码却执行 `console.error/process.kill` 的 `FatalProcess` 反例；Node/process import 反例；mutable registry 与 capability type/value/factory/effect-constructor 边界；pure `Emit` 正例与相邻 unknown/physical 反例；缺 linkage 的 generated import RED；通过 exact relation 的 deterministic generated-module GREEN。同一组 facts 必须驱动全部相关 policy verdict。
 
-### 4.5 Contract slice
+### 4.5 Canonical world、adjudication candidate 与 freshness
 
-每个允许被其他 locality 使用的 provider locality 是一个 contract slice。一个 slice 只能拥有：
+production pure `buildCanonicalWorldV1` 产生唯一 adjudication 输入：
+
+```text
+CanonicalWorldV1 = {
+  fact_schema_version: 1,
+  observed: {
+    localities: stable(locality id → source/.fsi inventory),
+    project_references: stable(direct locality edges),
+    actual_source_edges: stable(source/locality pairs without diagnostics),
+    capability_facts: stable(ObservedCapabilityFactV1),
+    generated_linkage: stable(observed build/package/import linkage)
+  },
+  normative: {
+    semantic_owners_and_declared_kinds,
+    staged_v2_slice_authorization_projection,
+    staged_relation_projection,
+    exact_law_and_evidence_identities
+  }
+}
+```
+
+`canonical_world_digest := "sha256:" + SHA256(UTF8("canonical-world/v1\u0000" + canonicalJson(CanonicalWorldV1)))`。adjudication record、自述 justification、诊断 payload 与 actual dump 不进入 world，避免循环自证；授权字段、law/evidence identity 与 relation 会进入 world，改变它们必然使旧 record 失效。
+
+candidate 不再采用可漏项的选择性筛选。每个 live locality 都需要 terminal classification，因此：
+
+```text
+deriveAdjudicationCandidates(world) :=
+  stableSort(world.observed.localities.keys).map(locality_id => ({
+    locality_id,
+    reasons: stableSort({
+      TerminalClassificationRequired,
+      ReferencedProvider
+        if exists C: (C, locality_id) in ProjectReference or actual-source edges,
+      CompositionProvider
+        if declaredKind(locality_id) = composition and ReferencedProvider,
+      CapabilityBearing
+        if exists capability fact owned by locality_id,
+      KindCapabilityMismatch
+        if capabilityPolicy(observedFacts(locality_id), declaredKind(locality_id)) = RED,
+      RelationEndpoint(kind, role, relation_id)
+        for each locality endpoint named by each staged RelationKindV1 at locality_id,
+      MissingClosureEndpoint
+        if locality_id is either endpoint of an actual edge outside ProjectReference closure
+    })
+  }))
+```
+
+`TerminalClassificationRequired` 使 candidate key universe 精确等于 live locality ID 集合；其他 predicate 只增加 review reason，不能过滤 locality。relation 指向不存在的 locality 在 world validation 阶段直接 RED。production function 输出 stable locality ID/reason；fixture 必须精确覆盖 locality add/delete、one-to-many split、kind/capability mismatch、每个 `RelationKindV1` 的全部 locality endpoint、composition provider 与 missing-closure 两端，并断言 key/reason 的唯一预期变化。
+
+canonical relation endpoint 与 target classification 同样使用 closed algebra：
+
+```text
+RelationKindV1 =
+  | SliceSemanticEvidence of provider_locality
+  | PhysicalPort of consumer_locality * provider_locality
+  | PhysicalAdapter of consumer_locality * provider_locality
+  | CompositionWiring of consumer_locality * provider_locality
+  | GeneratedModule of consumer_locality * generated_owner
+
+TerminalClassificationV1 =
+  | Private
+  | ContractShared
+  | ContractBounded
+  | RuntimeEffect
+  | AdapterEffect
+  | CompositionTerminal
+```
+
+三个 production pure query 的 ID 与 result shape 固定为：
+
+```text
+surface/v1:<locality> =
+  stable(exact sibling-.fsi export identity + signature digest)
+
+audience/v1:<locality> = {
+  direct_project_consumers,
+  actual_source_consumers,
+  reverse_closure_effective_consumers,
+  relation_endpoints: stable(RelationKindV1),
+  missing_closure_violations
+}
+
+capability/v1:<locality> = {
+  observed_fact_ids_and_cases,
+  classified_capabilities: stable(ClassifiedCapabilityV1),
+  declared_kind_mismatch
+}
+```
+
+export/signature digest 与 query digest 都复用同一 `canonicalJson + SHA256`；query digest 为 `SHA256(UTF8("query/v1\u0000" + query_id + "\u0000" + canonicalJson(query(world, locality))))`。query result 可在 live report 展示，禁止写入 record。
+
+`docs/OWNER-CONTRACT-SLICE-ADJUDICATIONS.json` 的顶层 exact shape 为 `{schema_version: 1, records: {<locality_id>: <record>}}`；未知字段 RED。每个 record 只允许：
+
+```text
+{
+  locality_id,
+  fact_schema_version,
+  canonical_world_digest,
+  queries: {
+    surface: { query_id, query_digest },
+    audience: { query_id, query_digest },
+    capability: { query_id, query_digest }
+  },
+  decision: {
+    reason,
+    target_classification: TerminalClassificationV1,
+    migration_path,
+    what_ids,
+    proofs
+  }
+}
+```
+
+record 禁止保存 `.fsi` export、direct/effective consumer、source edge、capability fact、fact ID list 或 query result。`records.keys` 必须精确等于 `deriveAdjudicationCandidates(world).locality_id`，每个 value 的 `locality_id` 必须等于 key，零 duplicate/undecided。
+
+M6.3c 完成 production/source/`.fsi`/fsproj/target manifest/relation 修改后，必须在最终 staged tree 重新运行 fresh full scan，重建 canonical world、candidate keys 与全部 query digest。任一 key、world digest 或 query digest 失配即令该 decision 失效；必须由 owner 重新裁决，禁止自动改摘要。零失配才可进入 M6.4。临时 actual fact/query dump 必须删除；adjudication file 作为绑定该 world digest 的正式历史执行记录保留，但永不参与 release authorization。目标 grant/relation 进入 manifest，理由与 WHAT/proof 留在 manifest justification、requirements 与该执行记录。
+
+### 4.6 Published slice authorization
+
+每个允许被其他 locality 使用的 provider locality 必须有一个 published slice authorization，本文简称 slice。这里的 slice 是授权记录总称，不等于 `locality kind = contract`；runtime、adapter 与被 terminal wiring 引用的 composition provider 也必须有各自的 slice row。一个 slice 只能拥有：
 
 - 一个 semantic owner。
 - 一个 authority class。
@@ -290,9 +477,9 @@ actual capability facts 不得复制进 manifest、baseline 或 adjudication rec
 
 grant 授权该并集的完整 public surface；manifest 不得复制 symbol 清单。同一 slice 内全部 `.fsi` exports 对全部 effective audience 可见。若并集中任一 export 不能与其余 export 共同授权给同一 audience，必须拆 locality/slice；禁止用 JSON 写出无法执行的更细权限。
 
-`private` locality 不是 slice：除自身 source 外，不允许任何 locality dependency 或 ProjectReference 指向它。
+`private` locality 没有 slice row：除自身 source 外，不允许任何 locality dependency 或 ProjectReference 指向它。
 
-### 4.6 三种 exposure 与机械矩阵
+### 4.7 三种 exposure 与机械矩阵
 
 | locality kind | 合法 exposure | 可执行约束 |
 |---|---|---|
@@ -312,7 +499,7 @@ composition 是 locality kind，不是第四种 exposure。它位于依赖图末
 
 纯度不由手写 `"exposure": "shared"` 自证。gate 必须消费 4.4 的 canonical capability facts。`Import`/`Emit` 是待分类的源码事实，不是 effect 的同义词：Node/Host/process/network/fs/Git/provider authority 与 mutable/capability value/factory 必须 RED；纯表示 `Emit` 与 exact deterministic generated-module relation 不得误杀。
 
-### 4.7 Port + capability injection
+### 4.8 Port + capability injection
 
 高风险 effect 不直接把 constructor、runner 或 mutable registry 发布给 consumer：
 
@@ -326,36 +513,30 @@ composition 是 locality kind，不是第四种 exposure。它位于依赖图末
 
 ## 5. Manifest 终态
 
-建议把现有 per-symbol consumer ACL 替换为规范性 slice 记录。允许集合写入 manifest；实际集合只由 analyzer 推导，禁止落盘形成第二事实源：
+`scripts/checks/published-contracts.json` 原位升级为 closed schema v2。顶层只允许四个 exact key；缺字段、未知字段、旧字段或非 `2` 版本均 RED。下列是 schema skeleton，不是可迁入 live manifest 的 grant 示例：
 
 ```json
 {
-  "id": "git-convergence",
-  "owner": "change-integration",
-  "provider_locality": "git-convergence-contract",
-  "exposure": "bounded",
-  "allowed_direct_consumers": [
-    "git-hook-sync"
-  ],
-  "allowed_effective_consumers": [
-    "git-hook-sync",
-    "git-hook-composition"
-  ],
-  "laws": [
-    "STRUCTURED-WORKFLOW-011",
-    "DURABLE-CONVERGENCE-..."
-  ],
-  "semantic_evidence": [
-    {
-      "path": "requirements/.../tests/...test.mjs",
-      "title": "WHAT[...] ...",
-      "what_id": "...",
-      "surface_module": "..."
-    }
-  ],
-  "justification": "..."
+  "schema_version": 2,
+  "slices": [],
+  "capability_relations": [],
+  "generated_module_relations": []
 }
 ```
+
+`slices[]` 只记录被其他 locality 使用的 provider；未出现的 live locality 机械分类为 `private`。slice 的 `classification` 是 exact tagged union：
+
+```text
+{ kind: "contract", exposure: "shared" }
+{ kind: "contract", exposure: "bounded" }
+{ kind: "runtime", exposure: "effect" }
+{ kind: "adapter", exposure: "effect" }
+{ kind: "composition" }
+```
+
+slice base exact keys 为 `id/owner/provider_locality/classification/allowed_direct_consumers/laws/semantic_evidence/justification`；bounded variant 额外且只额外允许 `allowed_effective_consumers`。未知 key RED。evidence identity 固定为 `(what_id,path,title,surface_module)`；所有 ID、consumer、law 与 evidence identity 唯一且稳定排序，所有 locality reference 必须解析。`allowed_direct_consumers` 对全部 slice 必填且非空；composition slice 有稳定 slice identity、owner、direct grant、law/evidence 与 justification，但禁止 `exposure`；其实际到达还必须逐边满足 composition-wiring relation。unreferenced locality 必须 private；任何有 inbound ProjectReference 或 actual source edge 的 provider 必须有且仅有一个 slice。slice ID 与 provider locality 都全局唯一；slice 的 owner/kind 必须与 owner-project graph 中同一 `provider_locality` 的唯一 metadata 相等。
+
+terminal classifier 为：无 slice row → private；有 row → 取上述唯一 tag。private locality 禁止 inbound ProjectReference、inbound actual source edge，且不得作为 capability relation 的 provider；它仍可作为合法 consumer，包括 generated-module relation 的 consumer。由此 owner-project graph 的每个 live locality 恰有一种 terminal classification，manifest 不复制 locality 全集。
 
 Analyzer 同次运行产生但不写入 manifest：
 
@@ -373,23 +554,41 @@ actual_source_edges        := compiler-resolved declaration use 映射出的 loc
 - `allowed_effective_consumers` 是 bounded slice 的规范上界。
 - `actual_effective_consumers` 由反向闭包推导，必须是该上界的子集。
 - shared 不枚举完整 effective 上界，但必须通过无 effect authority 的机械矩阵。
-- effect 由 gate 强制 composition-only，不授权普通 consumer。
-- `laws[]` 至少一项，可链接多个真实 WHAT；不存在单个 `law` 限制。
-- `semantic_evidence` 保留 exact `{path,title,what_id,surface_module}` validator 与 requirement-trace/Surface closure 证明，不降低为文件存在或 prose。
-
-physical port、adapter、composition wiring 不并入模糊的普通 slice edge。迁移为等价的 exact capability relation：
+- effect 的 actual direct/effective consumer 必须全为 composition；仍需逐条 direct grant，不能只靠 kind 放行。
+- composition 的每条 actual direct edge 同时需要 direct grant 与 exact composition-wiring；relation 不能代替 grant。
+- `laws[]` 至少一项，只允许 provider locality owner 自己定义的 semantic WHAT。`STRUCTURED-WORKFLOW-011` 由 v2 gate 自动作用于全部 slice，不复制进每条 row。
+- 每个 law 至少有一份 exact evidence；每份 evidence 的 `what_id` 必须已列入 `laws[]`，拒绝 orphan law/evidence。
+- 每份 `semantic_evidence` 保留 exact `{path,title,what_id,surface_module}`：WHAT definition owner、proof 所在 requirement package、HOW 唯一 active edge、registered Surface owner 与 slice owner 必须相同，callback closure 必须实际消费该 Surface。evidence 只证明语义，不产生 grant，也不缩小或扩大 `.fsi` union。以下对象只固定 evidence element shape，不是 slice/grant row：
 
 ```json
 {
-  "kind": "physical-port | adapter | composition-wiring",
-  "consumer_locality": "...",
-  "provider_slice": "...",
-  "consumer_module": "...",
-  "provider_surface_module": "...",
-  "laws": ["..."],
-  "justification": "..."
+  "path": "requirements/durable-events/tests/event-store-identity-collision.test.mjs",
+  "title": "WHAT[DURABLE-EVENTS-003] same_EventId_different_canonical_bytes_fail_closed",
+  "what_id": "DURABLE-EVENTS-003",
+  "surface_module": "Persistence/EventStore/CodecSurface.js"
 }
 ```
+
+physical port、adapter、composition wiring 不并入模糊的普通 slice edge。迁移为等价的 exact capability relation。`capability_relations[]` element 的 exact keys 为 `id/kind/consumer_locality/provider_slice/consumer_module/provider_surface_module/laws/semantic_evidence/justification`；未知 key RED，ID 与 evidence identity 唯一且稳定排序。`kind` 只能取下列三个 JSON literal，不能写 union string 或自由文本：
+
+```text
+CapabilityRelationKindV2 =
+  | "physical-port"
+  | "adapter"
+  | "composition-wiring"
+```
+
+`provider_slice` 必须解析为一个现存 slice，包括无 exposure 的 composition slice。specialized relation 与合法 graph/slice policy 取交集：physical-port、adapter 仍需 provider direct grant；composition-wiring 仍需 composition provider direct grant；relation 不得放行 private、非法 kind/exposure、缺失 ProjectReference 或越界 actual source edge。relation 的 law/evidence 归 consumer locality owner，按相同 exact validator 证明 adapter/wiring 行为；provider law/evidence只放 provider slice，同一 proof 不得同时冒充两侧证据。
+
+relation kind × terminal classification 是 closed matrix：
+
+| relation kind | consumer | provider | 额外约束 |
+|---|---|---|---|
+| `physical-port` | contract/runtime/adapter/composition | contract shared/bounded | provider 只含 capability type；contract consumer 的 actual use 必须全为 `CapabilityTypeOnly`，不得取得 value/factory。 |
+| `adapter` | adapter effect | contract shared/bounded | 同一 consumer/provider pair 必须另有 `physical-port` relation；consumer 是该 exact relation 的 physical implementation owner，不能消费 runtime/adapter implementation。 |
+| `composition-wiring` | composition | contract shared/bounded、runtime effect、adapter effect或composition | runtime/adapter/composition provider 的每条 direct edge都必须有该 relation；contract provider 仅在真实 terminal construction/wiring 时登记，不把普通 query import冒充 wiring。 |
+
+其余 endpoint 组合全部 RED。每条 relation 还必须同时匹配 exact consumer/provider locality、direct ProjectReference、provider direct grant、consumer/provider module 与 actual compiler-resolved module edge；一个 relation 不能授权 sibling module或 transitive-only consumer。
 
 现有 physical import uniqueness、adapter target、composition callback reachability 与 semantic-evidence validator 必须继续消费这些关系。physical port slice 的 `.fsi` 必须只含该 relation 授权的完整 port；若两个 adapter 获得的能力不同，就拆成不同 port slice。schema 迁移不得把 exact relation 降级为 owner pair、裸路径或仅 ProjectReference 存在。
 
@@ -426,9 +625,30 @@ deterministic repository-generated module 使用独立 exact relation，不得�
 }
 ```
 
-M6.3a 先按 WHY → WHAT → HOW → GAP 把该 relation 写入 `structured-workflow`，再实现 schema。actual imported member、package import target、generated output 与 repository input digest 仍由同次 analyzer/build 推导，不复制进 manifest。relation-specific validator必须证明 build invocation触达 exact generator、input selector，且 exact test callback同时触达 generator lineage与 registered runtime Surface；普通 semantic-evidence validator不能代替 generator lineage proof。gate 必须拒绝 missing、stale、duplicate、actual import/relation mismatch、specifier/target/build invocation漂移、缺 determinism proof、非 repository-content-determined output，以及 Node/Host/process/network/fs/Git/provider import 冒充 compile support。
+`generated_module_relations[]` element 的 exact keys 为 `id/kind/consumer_locality/import_specifier/generated_owner/package_import_target/generator/build_invocation/input_selector/runtime_surface_module/laws/determinism_proof/justification`；`kind` 只能是 `"compile-contract-support"`。`generator`、`build_invocation`、`input_selector` 只允许 `path/entry`，`determinism_proof` 只允许 `path/title/what_id`。`laws` 必须是 singleton 且精确等于 `[determinism_proof.what_id]`；不允许 orphan law 或一个 proof 暗中替多个 law 作证。新增第二条独立 law 需要提升 schema 并显式改为双向全覆盖的 proof collection，不能在 v2 自行扩张。未知 key RED；relation ID、law 与 proof identity 唯一且稳定排序。
+
+M6.3a 先按 WHY → WHAT → HOW → GAP 把该 relation 写入 `structured-workflow`，再实现 schema。actual imported member、package import target、generated output 与 repository input digest 仍由同次 analyzer/build 推导，不复制进 manifest。relation-specific validator 必须证明 build invocation 触达 exact generator、input selector，且 exact test callback 同时触达 generator lineage 与 registered runtime Surface；普通 semantic-evidence validator 不能代替 generator lineage proof。`laws[]` 与 determinism proof 的 owner 必须等于 `generated_owner`，该 relation 仍与 consumer locality kind/capability policy 叠加。gate 必须拒绝 missing、stale、duplicate、actual import/relation mismatch、specifier/target/build invocation漂移、缺 determinism proof、非 repository-content-determined output，以及 Node/Host/process/network/fs/Git/provider import 冒充 compile support。
 
 当前 `published-contracts.json.compile_contract_support` 的 `{path,owner,justification}` 记录是旧 owner gate 的 source-path 豁免，不是上述 relation。M6.4 必须把这些 F# source 纳入普通 locality slice 的完整 `.fsi` 语义后删除旧字段与 parser；禁止兼容读取两种 shape。`#wanxiangshu-loop-detector-envelope` 是当前唯一已裁决实例，仍须由 package import linkage、generated member 存在与 executable determinism proof 共同验收。
+
+### 5.1 v1 → v2 clean-break ledger
+
+当前 v1 顶层为 `schema_version`、`compile_contract_support`、`compiler_boundary_localities`、`contracts`、`physical_adapters`、`composition_roots`、`requirement_dependencies`；parser 还接受当前 JSON 不存在的 `owner_cycle_justifications`。M6.4 同一 commit 逐项完成。
+
+clean-break 映射规则固定：v1 `owner/path/consumer/port/wires` 只作为定位旧 row 的迁移输入，必须与 fresh owner-project graph、source/module edge 重验；v2 slice `owner` 由 provider locality 的 fresh graph metadata 唯一派生，relation law/evidence owner 由 consumer locality 的 fresh graph metadata验证。旧 metadata 不产生新授权。多个 v1 row 映射到一个 v2 slice/relation 时，不拼接、挑选或自动继承旧 `justification`；对应 v2 owner 必须依据 formal adjudication 重写一个唯一理由，旧字符串随 v1 row 删除。
+
+| v1 字段 | v2 命运 |
+|---|---|
+| `schema_version: 1` | 改为 `2`；v2 exact top-level keys 只有 `schema_version/slices/capability_relations/generated_module_relations`。 |
+| `compiler_boundary_localities[]` | 删除字段/parser；locality/source/owner/kind/ProjectReference 全部从 owner-project fsproj graph 唯一派生。 |
+| `compile_contract_support[]` | 313 个当前 signed F# source 由 locality sibling `.fsi` union 承接，旧 `path/owner/contract/justification` shape 全删；只有真实 repository-generated JS exception 进入 `generated_module_relations[]`。 |
+| `contracts[]` | `published-contract` 按 provider locality 合并进 slice；`physical-port` 进入 provider contract slice + exact capability relation；`semantic-evidence` 不再是授权 kind，proof 迁到 slice/relation。旧 `path/consumers/symbols/symbol_roots/law/proof/node/contract/justification` 删除；consumer owner 扩张改为 fresh direct consumer locality；目标 provider/relation owner 按上述规则重写唯一 justification。当前 8 条 physical-port 没有 law/proof，必须由 relation consumer owner 在 M6.3a 新增 `laws[] + semantic_evidence`；当前两条 semantic-evidence 只有在各自 provider locality 的完整 `.fsi` union 可共同授权后迁移，否则先拆 locality。 |
+| `physical_adapters[]` | 迁为 `capability_relations[kind=adapter]`；consumer/port path 只用于映射并重验 exact locality/module；旧 `symbols/node/justification` 删除，relation consumer owner 重写唯一 v2 justification。当前记录没有 law/proof；M6.3a 必须由 relation consumer owner 新增 `laws[] + semantic_evidence`，缺失则不得迁移/cutover。 |
+| `composition_roots[]` | 迁为 `capability_relations[kind=composition-wiring]`；consumer/provider 只用于映射并重验 exact locality/slice/module；旧 `wires/node/justification` 删除，relation consumer owner 重写唯一 v2 justification。当前记录没有 law/proof；M6.3a 必须由 relation consumer owner 新增 `laws[] + semantic_evidence`，缺失则不得迁移/cutover。 |
+| `requirement_dependencies[]` | 当前为空且不属于编译授权；字段/parser 删除。requirement dependency 只由 requirements HOW + requirement-trace 拥有。 |
+| `owner_cycle_justifications[]` | 当前 manifest 不存在；删除兼容 parser/fixture。ProjectReference DAG 无豁免；若 requirement owner cycle 仍需治理，由 requirement system 的唯一 registry 承担。 |
+
+同一 commit 更新所有 manifest consumer：`scripts/checks/owner-projects.mjs`、`scripts/checks/owner-contracts.mjs` 共同消费一个 v2 parser/pure validator，`scripts/check.mjs` 仍只接一套权威；同步迁移 `requirements/structured-workflow/tests/owner-project-boundaries.test.mjs`、`requirements/structured-workflow/tests/owner-dependencies.test.mjs` 与 `requirements/semantic-trace/tests/x-trace-capture-boundary.test.mjs`。最后一项的旧 `symbols[]` assertion 必须改为 production extractor 得到的 exact provider-locality sibling `.fsi` union，禁止为保测试恢复旧 symbol inventory。
 
 ## 6. 迁移步骤
 
@@ -472,7 +692,7 @@ spec(architecture): adopt locality slice authorization
 4. 输出规范化、去重、稳定排序的 cross-locality edge。
 5. 验证 provider locality 属于 consumer locality 的 ProjectReference closure。
 6. 不输出 symbol ACL；不持久化 snapshot；不做 delta、mtime 或跨 run cache。
-7. changed-locality lane 可分析局部；release lane 必须 fresh 全量分析。
+7. M6.1 不实现 changed-locality shortcut；fixture aggregate 只证明 compiler extraction，不构成增量分析能力。pre-cutover live report 与 M6.4 release lane 均 fresh 扫描完整 production compile set。
 
 固定反例：
 
@@ -533,8 +753,9 @@ refactor(owner): remove <cutover-blocker> locality leak
 3. `laws[]`。
 4. exact `semantic_evidence`。
 5. physical-port、adapter、composition-wiring capability relations。
-6. exact `compile-contract-support` relations；旧 `compile_contract_support` 裸路径记录的迁移与删除。
+6. exact `generated_module_relations`；旧 `compile_contract_support` 裸路径记录的迁移与删除。
 7. canonical locality capability facts。
+8. production pure `buildCanonicalWorldV1`、`deriveAdjudicationCandidates` 与三个 canonical query。
 
 新 manifest 可在 cutover 工作树中准备和验证，但不得先以独立绿色提交落地并与旧 manifest 同时成为权威。实际集合一律由 analyzer 临时生成，不写入 manifest。
 
@@ -542,13 +763,14 @@ refactor(owner): remove <cutover-blocker> locality leak
 
 M6.3 完成条件：
 
-1. 同次 fresh census 的每个 locality均有 terminal classification；graph与canonical capability facts派生的全部 live adjudication candidate均有 record。当前 92 个 composition provider只是其中一个 pre-cutover子集，不得把 92硬编码进 gate或完成集合。
+1. 同次 fresh canonical world 的每个 locality 均有 terminal classification；`deriveAdjudicationCandidates(world)` 的 key universe 固定为全部 live locality。`records.keys` 必须与其精确相等。当前 92 个 composition provider 只是 reason 含 `CompositionProvider` 的 pre-cutover 子集，不得把 92 硬编码进 gate 或完成集合。
 2. 零 `undecided`；零从当前 ProjectReference、旧 owner ACL 或 composition 标签自动生成的 grant/relation。
-3. 每份 record 包含当前 owner/kind、provider locality 全部 sibling `.fsi` exports、direct/effective consumers、source effect/physical capability fact ID/digest与决策摘要、唯一 decision owner、终态 kind/exposure、拆分或 injection 路径、WHAT/proof。
-4. record 只作 review evidence，不是授权事实源，不进入 manifest/allowlist；actual direct/effective/source/capability 集合仍由同次 analyzer 推导，临时 ledger 在 cutover 前删除。
+3. 每份 record 只含 locality ID、fact-schema version、canonical-world digest、surface/audience/capability query ID+digest，以及 decision reason、target classification、migration path、WHAT/proof；禁止保存任何 query result、export、consumer、source edge、capability fact 或 fact ID list。
+4. live report 可展示 actual direct/effective/source/capability 集合；生成 dump 在 cutover 前删除。`docs/OWNER-CONTRACT-SLICE-ADJUDICATIONS.json` 保留为绑定 cutover world digest 的正式历史执行记录，但不是 manifest、allowlist 或 release fact source。
 5. 对应 WHY → WHAT → HOW → GAP 与 executable negative oracle 已落盘；“RED”指旧世界被 oracle 识别为违规，提交后的 test suite 必须全绿。
 6. 旧 gate 下可独立绿色的 contract/port split 已完成；新 pure validator/property 可提交，但 live 新模型只能 report-only，不能阻断 release。
-7. 进入 M6.3c 前，1–6 必须全部成立且 fresh report 不再有未裁决 blocker。M6.3c 只准备旧 ACL 无法表达的最小 production cut、全量终态 manifest 与 exact relations；这些准备完成才算 M6.3 完成，随后进入 M6.4。仅完成点名 owner 裁决不等于 M6.3 完成。
+7. M6.3c 最终 staged tree 已 fresh 重建 canonical world、candidate keys 与 query digests；任一 record key/world/query digest 失配均已重新裁决，最终 mismatch 为零。
+8. 进入 M6.3c 前，1–6 必须全部成立且 fresh report 不再有未裁决 blocker。M6.3c 只准备旧 ACL 无法表达的最小 production cut、全量终态 manifest 与 exact relations；第 7 项成立才算 M6.3 完成，随后进入 M6.4。仅完成点名 owner 裁决不等于 M6.3 完成。
 
 ### M6.4：单个原子提交切换权威
 
@@ -563,10 +785,10 @@ M6.3 完成条件：
 7. shared 通过 authority/physical-import 机械矩阵。
 8. effect 只被 composition 反向到达。
 9. composition 只被 composition consumer 通过 exact composition-wiring relation 到达；private locality 无外部引用。
-10. canonical capability facts、exact compile-contract-support、semantic-evidence、physical adapter、composition wiring 通过同一 pure policy validator。
-11. 同次 fresh census 的全部 locality classification与 graph/capability candidate adjudication已落实为终态结构和 relation，无 stale/duplicate grant、reference、relation 或缺 law/evidence。
+10. canonical capability facts、exact generated-module、semantic-evidence、physical adapter、composition wiring 通过同一 pure policy validator。
+11. 同次 fresh canonical world 的全部 locality classification 与 adjudication record 已落实为终态 slice/relation；record keys/digests 零 mismatch，无 stale/duplicate grant、reference、relation 或缺 law/evidence。
 12. 删除 owner-wide authorization expansion、per-symbol consumer ACL、旧 schema/parser 与旧 `compile_contract_support` 裸路径豁免。
-13. 删除 dead production `symbolUses: []`、旧 FCS snapshot/delta/cache、临时 classification ledger、compat facade、过渡 adapter、旧空路径与 pre-cutover report-only release bypass；保留 `owner-projects` 对 source→locality、ProjectReference DAG 与 closure 的唯一职责。
+13. 删除 dead production `symbolUses: []`、旧 FCS snapshot/delta/cache、临时 actual fact/query dump、compat facade、过渡 adapter、旧空路径与 pre-cutover report-only release bypass；保留 formal adjudication record，且保留 `owner-projects` 对 source→locality、ProjectReference DAG 与 closure 的唯一职责。
 14. 新 schema/validator 进入 release authority；fresh production compiler scan 恰一次进入 integration release path。
 
 同一 commit 的 gate 必须全绿。不存在“先启新 gate、后分类”或“新 gate 已启用、旧模型 M6.7 再删除”的过渡态。`published-contracts.json` 可以原位迁移到终态 schema；必须删除旧字段/parser，不要求删除文件本身。
@@ -597,31 +819,36 @@ graph analyzer 必须是 production pure function；property test 直接调用�
 - locality kind/exposure、direct grant、bounded audience。
 - actual compiler-resolved locality edges。
 - canonical source-capability facts。
-- exact compile-contract-support、physical-port、adapter 与 composition-wiring relations。
+- exact generated-module、physical-port、adapter 与 composition-wiring relations。
 
-生成器先构造一个合法 world，再对每条性质施加单一目标 mutation；避免 cycle 等无关早期错误遮蔽目标 verdict。fast-check 只生成 canonical analyzer 已产出的 facts，不扫描源码或复制 effect/closure 公式。
+生成器先构造一个 schema-valid world，调用 production pure validator 并断言 `violations = []`，再对每条性质施加一个目标 mutation。mutation 后必须精确断言预期 stable violation code + 最窄 relation coordinates；禁止只断言非空、任意 throw、message substring 或 regex。若一项语义必然产生级联错误，property 必须事先列出完整 expected code multiset，并证明没有额外 code；不得让 cycle、shape 或排序错误抢先满足 RED。
+
+fast-check shrink 的值必须始终是 `{ legal_base_world, single_target_mutation }`；每次 shrink 后先重验 base world 仍为零 violation，再重验 mutation 只改变目标坐标并产生同一 expected code multiset。owner rename/merge 与 legal split 两条正向 metamorphic property 则要求变换前后都零 violation，再比较 normalized authorization projection。violation code 是 closed v2 schema 的稳定词汇；FCS symbol/line、诊断文案与 owner 名不参与 code identity。fast-check 只生成 canonical analyzer 已产出的 facts，不扫描源码或复制 effect/closure 公式。
 
 性质：
 
-1. actual source edge 逃出 ProjectReference closure → RED。
-2. direct reference 缺 exact grant，包括 same-owner edge → RED。
-3. stale 或 duplicate grant → RED。
-4. bounded effective audience 越界 → RED。
-5. shared 携带 canonical effect-authority、mutable、capability value/factory fact → RED。
-6. effect 被任一 non-composition consumer 反向到达 → RED。
-7. composition 被普通 consumer 引用或缺 exact composition-wiring relation → RED。
-8. private locality 被引用 → RED。
-9. contract closure 含 non-contract locality或越过明示预算 → RED。
-10. ProjectReference cycle → RED。
+1. actual source edge 逃出 ProjectReference closure → exact `missing-closure-edge`。
+2. direct reference 缺 exact grant，包括 same-owner edge → exact `missing-slice-grant`。
+3. stale grant → exact `stale-slice-grant`；duplicate grant → exact `duplicate-slice-grant`。
+4. bounded effective audience 越界 → exact `bounded-audience-exceeded`。
+5. shared 携带 canonical physical/mutable/capability value/factory fact → exact `impure-contract-slice`。
+6. effect 被任一 non-composition consumer 反向到达 → exact `effect-consumer-not-composition`。
+7. composition 被普通 consumer 引用 → exact `invalid-composition-consumer`；缺 relation → exact `missing-composition-wiring`。
+8. private locality 被引用 → exact `private-provider-referenced`。
+9. contract closure 含 non-contract locality → exact `contract-closure-kind-violation`；contract transitive production source count 超过 100 → exact `contract-closure-budget-exceeded`。
+10. ProjectReference cycle → exact `locality-reference-cycle`。
 11. owner rename/merge 后 normalized authorization projection 不变。
 12. legal split 不扩大 capability audience：生成 `old locality → new locality partition`、source/export/capability 映射及 consumer/grant/reference 重映射；证明每个 source 恰映射一次、旧边均有映射、新边不跨 capability 偷渡，并按 capability 比较 normalized external direct/effective audience。owner 名不得作为映射键。
-13. compile-contract-support missing、stale、duplicate、specifier/target mismatch、nondeterministic 或 physical import → RED。
+13. generated-module relation 分别断言：missing → `missing-generated-module-relation`；stale → `stale-generated-module-relation`；duplicate → `duplicate-generated-module-relation`；specifier mismatch → `generated-module-specifier-mismatch`；target mismatch → `generated-module-target-mismatch`；nondeterministic → `generated-module-nondeterministic`；physical import → `generated-module-physical-authority`。每个 mutation 独立，不得用一个泛化 RED 覆盖多种失败。
+14. 任一 `UnknownObservation`、`UnknownCapability` 或 `UnknownForm` → exact `unknown-capability-classification`；mutation 只把一个已知 GREEN fact 改为对应 unknown case，禁止同时改变 locality kind、grant 或 relation。
 
 条目数量不是验收目标；每条性质必须消灭独立错误世界。固定 seed，失败输出最小 counterexample graph。`.fsi` export extraction、compiler declaration extraction、compile-set drift、Import/Emit 分类与 package-import linkage 由固定 fixture/真实 compiler gate证明，不伪装成随机图性质。pure `Emit` 与已批准 deterministic compile support 是 GREEN；canonical effect-capability 才是 RED。
 
 ### M6.5：切换后实施收益明确的 slice 拆分
 
 M6.5 只承接可测量的 authority/audience/closure/impact 优化，不承接任何 M6.4 correctness debt。若发现旧权威、未落实 adjudication、stale relation、composition 业务判断或 capability matrix 违规，必须重开 M6.3/M6.4 修复。
+
+changed-locality scan 不属于 M6.5 correctness。只有 full-scan 耗时的 tracked 性能证据达到另立 node 的门槛时，才可在 M6.5 之后实现；其 permanent property 必须证明对任意 changed set，局部 finding 是同一 world full-scan finding 的保守投影，release 仍只信 full scan。
 
 优先顺序：
 
@@ -683,7 +910,7 @@ refactor(owner): isolate <capability> contract slice
 4. 更新 requirement ownership 与 semantic-owners。
 5. locality/project 保持独立。
 6. 重命名因旧 owner 名称而误导的 project 文件。
-7. 比较稳定排序、去 owner label 的 normalized authorization projection：locality identity、ProjectReference edge、provider slice/exposure、slice grant、actual source edge、effective audience、physical/adapter/composition/compile-support capability relation与 authorization violation set必须完全相同。
+7. 比较稳定排序、去 owner label 的 normalized authorization projection：locality identity、ProjectReference edge、provider slice/exposure、slice grant、actual source edge、effective audience、physical/adapter/composition/generated-module capability relation与 authorization violation set必须完全相同。
 8. owner/evidence metadata、requirement ownership、WHAT law与重命名路径另行验证更新后合法；诊断文本、owner 名和文件重命名路径不进入授权等价比较，也不得被 normalization 用来隐藏 law/evidence 缺失。
 9. 运行两个原 owner 的全部 proof。
 
@@ -767,9 +994,23 @@ docs(architecture): close locality slice authorization gap
 
 ### 性能
 
-- 代表性改动的 impact source 中位数下降 25%是优化方向，不是 correctness gate。
-- full release build 不得出现无法解释的显著退化；5% 以内视为测量波动，超过则必须分析。
-- 新 project 若既不收窄 audience，也不缩小 compile closure，应撤销。
+性能是可重放报告，不是 correctness/CI gate。任何 M6.3b production split 开始前，在当前 pre-split commit 建立 tracked `scripts/checks/owner-impact-corpus.json`，记录 exact baseline commit 并完成 baseline structural measurement；测量入口只读该文件。初始 stable case 不得因结果不利删除或替换，source 移动只更新同一 ID 的 successor path：
+
+| stable case ID | baseline changed path | change kind / coverage |
+|---|---|---|
+| `canonical-codec-implementation` | `src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs` | target contract implementation；低 closure |
+| `loop-detector-runtime` | `src/Wanxiangshu/Execution/Session/LoopDetector.fs` | runtime implementation；中 closure |
+| `host-signal-adapter` | `src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs` | adapter implementation；中/高 closure |
+| `host-signal-bootstrap` | `src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs` | composition implementation；高/full fallback |
+| `canonical-codec-signature` | `src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fsi` | public sibling signature；高/full fallback |
+| `fatal-process-implementation` | `src/Wanxiangshu/Foundation/FatalProcess.fs` | effect implementation；低 closure |
+| `delegation-pty-adapter` | `src/Wanxiangshu/Execution/Delegation/Fork/Host/Pty.fs` | adapter implementation；高 closure |
+
+fsproj 与 toolchain control 分别固定为 `src/Wanxiangshu/Wanxiangshu.Owner.host-boundary.host-fatal-effect.fsproj`、`package.json`；它们验证 full fallback，不进入 impact median。
+
+baseline/candidate 对同一 stable ID 集逐项调用 production `planImpactCompile`，固定 aggregate、`fullThreshold=0.6`、lockfile 与 tool manifest，记录 mode、reason、root/project/source 数及 compile-item identity。impact source count 是确定性主指标；中位数下降 25%只作优化方向。
+
+full release build 与 fresh FCS scan 的 wall-clock 比较使用同一机器、toolchain、dependency cache、命令与输入；baseline commit 和 candidate commit 各做三次 clean run，保留三份 raw sample并取中位数。超过 5% 只触发报告与因果调查，不自动改变 correctness verdict或阻断 CI；“5%以内”不宣称统计等价。新 project 若既不收窄 normalized audience，也不缩小 fixed corpus 中任何相关 closure/impact，应撤销该优化 split。
 
 ## 9. 可行性与风险
 
@@ -826,7 +1067,7 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - M6.0 将老板既有裁决写入 tracked WHY/WHAT/HOW/GAP：授权主键改为 locality→slice，same-owner 不豁免，`.fsi` 成为唯一 export inventory，GAP-031 保持 PARTIAL。
 - M6.0 验证：`spec.mjs`、`requirement-trace.mjs`、旧权威 `owner-contracts.mjs`、`owner-projects.mjs` 全绿。该绿色只证明规范文档闭合且旧 gate 未被提前切换，不宣称 M6 新 gate 已实现。
 - M6.1 RED：`locality-dependencies.test.mjs` 首次执行因 production analyzer module 不存在而失败；该测试先固定 missing closure、合法 direct/transitive、same-owner 不豁免、open/type/pattern 与 external symbol 边界，再实现纯 analyzer。
-- M6.1 analyzer：`locality-symbol-uses.fsx` 从 fresh fingerprint flat project 读取 FCS declaration use；`locality-dependencies.mjs` 将 use 映射为稳定去重的 cross-locality source edge，再验证 ProjectReference transitive closure。扫描产物只存在于本次临时目录；无 snapshot、delta、mtime、跨 run cache 或 symbol ACL。
+- M6.1 analyzer：`locality-symbol-uses.fsx` 从 fresh fingerprint flat project 读取 FCS declaration use；`locality-dependencies.mjs` 以 consumer/provider source pair 映射、去重并验证 locality closure。symbol 与 line/column 只服务本次诊断，不参与 edge identity 或授权；临时结果随 invocation 删除。无 snapshot、delta、mtime、跨 run cache 或 symbol ACL。
 - M6.1 永久反例：fixture 的 consumer 与 provider 同属 `fixture` owner、consumer 无 provider ProjectReference；真实 flattened Fable aggregate 编译绿色，而 analyzer 必须输出唯一 `fixture-consumer → fixture-provider` missing-closure-edge。fixture 同时覆盖 open、alias/generic type、union-case pattern、value use 与 external package 排除。
 - M6.1 fresh live census：178 localities、711 production sources、4,420 条 actual cross-locality source edges、3 条 missing closure edges；FCS 35.6s。三处 blocker 是 `InstitutionalLearningTools.fs → ToolHostCodec.fs`、`EventKWayMerge.fs → CanonicalEventCodec.fs`、`MessageVisibility.fs → HostEventCodec.fs`。这些事实进入 M6.2 修复，不写入 manifest/baseline。
 - M6.1 仍不改变 release 权威：新 analyzer 只提供报告与自证反例；旧 `owner-contracts.mjs` 继续单独决定 release，直至 M6.4 原子切换。
@@ -862,7 +1103,7 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 
 #### EventStore 裁决
 
-1. `CanonicalEventCodec.{fsi,fs}` 从 `eventstore-core-runtime` 拆为独立 `eventstore-canonical-codec` bounded contract。六个公开函数 `encode/checkIdentity/mergeByIdentity/tryDecode/tryDecodeUtf8Text/tryDecodeUtf8` 同属一个 canonical identity protocol，批准共同授权；禁止只复制或另写 `checkIdentity` 公式。
+1. `CanonicalEventCodec.{fsi,fs}` 从 `eventstore-core-runtime` 拆为 semantic owner 仍为 `durable-events` 的独立 `eventstore-canonical-codec` bounded contract。六个公开函数 `encode/checkIdentity/mergeByIdentity/tryDecode/tryDecodeUtf8Text/tryDecodeUtf8` 同属一个 canonical identity protocol，批准共同授权；禁止只复制或另写 `checkIdentity` 公式。
 2. 初始 direct consumers 必须由 cutover 工作树 fresh 推导，并至少包含五个已证实 locality：`eventstore-core-runtime`、`eventstore-merge-runtime`、`eventstore-sync-runtime`、`persistence-eventstore-canonicalintegrator`、`durable-runtime-surface`。same-owner consumer 不豁免；bounded effective audience 只写允许上界，不把本次约 49 个反向可达 locality 的临时数值当事实源。
 3. 禁止新增 `eventstore-merge-runtime → eventstore-core-runtime`。该边会把 `ProcessEventLog`、Store factory、文件/锁 authority 带入 merge runtime，旧 gate 与新矩阵都应 RED。
 4. 接受 M6.4 时剩余 `ProcessEventLog + Store` 暂为一个 effect slice：它们共同拥有本地 EventStore 创建、读取、append、锁与恢复生命周期，且当前九个 direct consumers 均为 composition。该裁决只承认编译器已经存在的完整 `.fsi` 可见性，不恢复旧 manifest 声称的伪 symbol 隔离；M6.5 必须按 consumer cohort 与 authority 使用量复测，若完整 surface 共同授权不可接受，再拆 ProcessEventLog、store factory 与 lock adapter。
@@ -877,7 +1118,7 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 5. 当前 `HostSignalSubscribe` 返回 `Task<Result<HostSignalSubscription option * string,string>>`，并用 `option + "events.listen"/"local-event-hook"` 拼状态；这不是 typed error且可表达非法组合。先定义封闭 `HostSignalSubscriptionError` DU 与 subscription mode/source DU，例如 `LocalEventHook | EventsListen of HostSignalSubscription`，返回 `Task<Result<HostSignalSubscriptionMode,HostSignalSubscriptionError>>`；移除未使用的 optional timer。JS/Surface边界负责把 typed failure 渲染成字符串，JS decode failure 不污染 core DU。
 6. 删除 `HostSignalSubscribe → Diagnostic.fatal`。`HostSignalBootstrap` 在 composition 边界解释 typed failure并执行 fatal，成为同一失败的唯一 fatal owner；不得让 adapter 与 composition 重复 fatal。若未来要求 adapter 独立报告，只可注入最窄 typed event capability，不能注入整个 Diagnostic 模块。
 7. `LoopSensor` 继续与 `LoopDetector` 同属 `execution-session-loopdetector` runtime；本次不为文件数量而强拆。向其构造器注入最窄 `emitDiagnostic: string -> (string * string) list -> unit`，由 `HostSignalBootstrap` composition 传入 `Diagnostic.emit`。行为 proof 必须令 `emitDiagnostic` 抛错，并证明 arm、interrupt、consume、continuation 结果完全不变。
-8. `#wanxiangshu-loop-detector-envelope` 是仓库内容派生的确定性 tokenizer/envelope artifact，裁决为 exact `compile-contract-support`，不是 Host/IO effect。必须保留 repository-SSOT、生成 determinism 与 import linkage proof；`LoopDetector` 因 process-local Dictionary scratch 继续是 runtime，不伪装成纯 contract。
+8. `#wanxiangshu-loop-detector-envelope` 是仓库内容派生的确定性 tokenizer/envelope artifact，裁决为 `generated_module_relations[kind=compile-contract-support]`，不是 Host/IO effect。必须保留 repository-SSOT、生成 determinism 与 import linkage proof；`LoopDetector` 因 process-local Dictionary scratch 继续是 runtime，不伪装成纯 contract。
 9. `host-diagnostics-runtime` 保持 runtime；`Diagnostic` 读取 process env、写 console，`ReliabilityCounters` 持有可变状态。完成第 5–7 条后，非 composition consumer 不再直接引用该实现。
 10. `host-fatal-effect` 当前 kind=`contract` 与源码冲突：`FatalProcess` 写 console 并调用 `process.kill/process.exit`。不为它设特例。bounded `FatalProcessPort` contract 只定义 incident vocabulary与 capability type，不包含 value/factory；fatal report path 的唯一 Node process adapter拥有该路径的 `console.error`、`process.kill`、`process.exit` 与 report/kill物理执行。该唯一性不吞并 `host-diagnostics-runtime` 的普通 diagnostic console effect。
 11. composition 以必填构造参数把 fatal capability注入 Diagnostic、journal、recovery与 fresh census 找到的全部直接调用者。禁止 optional/default fallback、module-global mutable binding、service locator或直接到达 physical adapter；漏注入必须造成构造签名/类型失败。同一 typed fatal incident只有一个 report owner与一个 kill owner，不得重复输出/kill；committed/unknown settlement evidence必须先于 fatal。
@@ -899,14 +1140,14 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 1. 先处理全部 non-composition → composition edge；这些边不得登记 composition-wiring。纯 vocabulary/decision/codec 拆为 bounded/shared contract，effect 通过 capability injection，真正 consumer orchestration 改到 composition。
 2. 再处理 composition → composition edge。只有“下游 composition 是上游 terminal wiring 的组成层”且两端 module、capability、WHAT law 与 semantic evidence 均明确时，才登记 exact composition-wiring；公共 query、fact、projection、codec、registry 或 helper 不因 consumer 也是 composition 就自动合法。
 3. `Composition.Durable.Fact/Projection` 保持 durable composition，不改成公共 shared contract。非 composition runtime 必须改为返回 owner-owned case/intent、消费 owner-owned query/append capability；由 durable composition统一 outer routing与跨 projection协调。
-4. 同次 fresh census 的每个候选 locality 输出同一 adjudication record：当前 owner/kind、全部 sibling `.fsi` exports、actual direct/effective consumer query、source effect/physical capability fact ID/digest与决策摘要、唯一 decision owner、裁决后的 kind/exposure、拆分或 injection 路径、对应 WHAT/proof。记录是 review evidence，不是允许集合，不复制 actual fact set；actual 集合仍由 analyzer 同次推导。零 `undecided`、零 current-reference-derived grant；若切分改变候选数，以 fresh 集合全覆盖为准，不硬编码 92。
+4. `deriveAdjudicationCandidates` 为每个 fresh live locality 输出 stable key + reasons；formal record 只保存 locality ID、fact-schema/world/query digest 与 decision reason、target classification、migration path、WHAT/proof。live report 可显示 `.fsi` exports、actual audience/source/capability facts，record 禁止复制这些集合。`records.keys` 必须与 fresh candidate keys 精确相等，零 `undecided`、零 current-reference-derived grant；split 由 locality key 变化自动反映，不硬编码 92。
 
 #### 裁决后的施工批次与停止条件
 
-1. M6.3a：更新 durable-events、host-boundary、degeneration-guard、delegation、time-capability、causal-wait、process-execution与所有 FatalProcess caller owner 的 WHY/WHAT/HOW/GAP；建立行为 oracle与 architecture/closure illegal fixture。先观察旧世界被新 oracle判为违规，再提交全绿 fixture；禁止提交红色 suite。
+1. M6.3a：先更新 `requirements/structured-workflow/{WHY,WHAT,HOW}.md` 与全局 `requirements/GAP.md`，固定 v2 schema、canonical facts/world/candidates、generated-module relation 与 violation code；再更新 durable-events、host-boundary、degeneration-guard、delegation、time-capability、causal-wait、process-execution及 fresh census 找到的所有 FatalProcess caller owner WHY/WHAT/HOW/GAP。建立行为 oracle与 architecture/closure illegal fixture；先观察旧世界被新 oracle判为违规，再提交全绿 fixture，禁止提交红色 suite。
 2. M6.3b：提交 report-only pure validator/property、fresh 全集 adjudication evidence，以及旧 gate 下可独立绿色的 contract/port split。pure property可进入 unit sink；live新模型不得阻断 release。每组一个绿色 Git节点，运行 provider、direct consumer与 reverse impact compile。
-3. M6.3c：只在同一未提交 cutover工作树准备旧 gate确实无法表达的最小 production切换与最终 manifest；不夹带 M6.5优化，不形成独立 commit，不长期堆入与 cutover无关改动。
-4. M6.4：单个绿色 commit启用 pure validator/schema/new authority，接入恰一次 production fresh scan，激活最终 manifest，并删除旧 owner-wide/per-symbol/compile-support权威及所有临时迁移路径。执行 fixed negative oracle、fast-check、fresh production scan与完整 release sink。
+3. M6.3c：只在同一未提交 cutover工作树准备旧 gate确实无法表达的最小 production切换与最终 manifest；不夹带 M6.5优化，不形成独立 commit，不长期堆入与 cutover无关改动。最终 staged tree 必须重建 canonical world/candidates/query digests；任何 formal record mismatch 都要重裁，零 mismatch 后才可进入 M6.4。
+4. M6.4：单个绿色 commit启用 pure validator/schema/new authority，接入恰一次 production fresh scan，激活最终 manifest，并删除旧 owner-wide/per-symbol/compile-support权威、临时 actual dump及所有迁移路径；formal adjudication record保留为历史 review evidence。执行 fixed negative oracle、fast-check、fresh production scan与完整 release sink。
 5. report-only parser/analyzer/fixture存在不等于第二权威；只有 live old/new gate同时能够阻断 `format-build-test` 才是双 release authority。M6.4 后不得保留可供 release 降级的 report-only bypass。
 6. M6.5：只按可测量 audience/closure收益继续拆 `ProcessEventLog + Store`、完整 HostEvent/HostSignal codec与已正确迁出的 Delegation projection；没有收益就不拆，不承接 correctness debt。
 7. 任一阶段若需要放宽矩阵、把 current refs 自动变 grant、让 adapter/runtime直接消费 effect implementation、把 central composition下沉为公共 contract，或新增本节未定义的业务 owner 转移，必须停止并请求新裁决。
@@ -914,10 +1155,22 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 ### 2026-09-03 — 外部建议逐项复核与施工边界修订
 
 - 已按源码、`.fsi`、fsproj、现行 gate与 fresh FCS scan复核全部建议；EventStore既有裁决不变。
-- 状态与完成集合改为“全部 locality classification + graph/capability派生的全部 live candidate”；92只保留为当前 composition-provider子集。
-- public surface固定为同 locality全部 sibling `.fsi` exports并集；新增 canonical locality capability facts与 clean-break exact compile-contract-support schema。旧 `compile_contract_support`裸路径语义明确退役。
+- 状态与完成集合改为全部 live locality classification/adjudication；92只保留为当前带 `CompositionProvider` reason的子集。
+- public surface固定为同 locality全部 sibling `.fsi` exports并集；新增 canonical locality capability facts与 clean-break exact generated-module relation。旧 `compile_contract_support`裸路径语义明确退役。
 - Host subscription改用 typed error/mode计划；FatalProcess固定 mandatory capability injection与唯一 fatal Node adapter；HostForkRuntime constructor census修正为5 sites/4 localities；PTY/Temporal/CausalWait/Process边界按实际 effect面扩充。
 - Delegation business fold不得改标签塞入 composition；M6.4前迁 owner projection、child index与closed rejection，durable composition只保留outer routing/combine并调用 PromptAuthority owner decision。
 - production fresh scan固定只在integration release path执行一次；fast-check消费production pure decision与canonical facts，采用legal-world + single mutation；M6.5只优化，M6.6比较normalized authorization projection，M6.7只做final census/release/report/GAP close。
-- 两条字面建议未采用：不把任意 `Import`/`Emit`等同effect；不把92硬编码为完成数量。前者会误杀pure `Emit`与已裁决generated module，后者会在split后失真。两者均已替换为更强的语义条件。
+- 三处没有按建议例句的字面 shape 落盘：不把任意 `Import`/`Emit`等同 effect；不把92硬编码为完成数量；adjudication record不复制 actual facts，只保存 versioned world/query digest与decision。前两项会分别误杀pure/generated case、在split后失真；第三项避免把review evidence变成第二事实源。三者均以更强、可执行的语义条件替代。
 - 验证：`spec.mjs` 291条款绿色；`requirement-trace.mjs` 780 WHAT/3977 tests绿色；`owner-contracts.mjs` 784 contracts绿色；`owner-projects.mjs` 178 localities/711 sources/1853 refs/DAG绿色；`npm run check`完整fast gate绿色。fresh analyzer重现4420 actual source edges与唯一已知missing closure，故GAP-031保持PARTIAL。
+
+### 2026-09-03 — reviewer 第二轮执行阻断与收口意见闭合
+
+- 4 个 P1 全部接受。v2 顶层、slice、capability relation、generated relation 均改为 closed schema；private 由无 slice row 唯一表示，composition 有 slice identity但禁止 exposure。v1 全部顶层字段、nested metadata与 parser兼容路径逐项给出 clean-break命运。
+- `deriveAdjudicationCandidates(world)` 固定以全部 live locality 为 key universe；graph、capability、composition、每种 closed relation endpoint与 missing closure只增加稳定 reason。增删 locality、split、mismatch与全部 endpoint均有指定 fixture，M6.3以`records.keys == candidate keys`验收。
+- adjudication record只保存 schema/world/query digest与decision；actual export/audience/edge/fact只进ephemeral live report。M6.3c最终staged tree必须fresh重建world/candidate/query digest，失配即重裁；只删除actual dump，formal decision record永久保留但不参与release authorization。
+- capability fact拆成observed DU与classified DU；manifest metadata只属normative claim。Unknown阻断cutover，physical observation不能被metadata降格。fact ID哈希去掉诊断位置后的完整observed DU，包含case全部constructor payload、semantic anchor与同anchor occurrence ordinal；world/query digest共用versioned canonical JSON规则。
+- 4 个 P2 全部接受。slice law只归provider owner，架构law自动施加；slice/relation evidence与law双向覆盖，specialized relation与graph/direct grant/source edge取交集。M6.3a首项显式更新structured-workflow与全局GAP。fast-check固定legal GREEN base→single mutation→exact code/coordinates，shrink保持同一前提；Unknown另有exact property。不存在的changed-locality lane从当前能力删除，仅可在M6.5后凭性能证据另立node，release永远信full scan。
+- 低风险项全部接受：symbol/line只允许ephemeral diagnosis；fixed impact corpus在任何M6.3b production split前落盘，baseline/candidate各三次同环境clean run并保留raw/median，5%只触发调查；执行记录按真实三项非字面采用修正。
+- 后续终检补出的三处歧义也已闭合：删除会被误认成live grant且consumer不完整的EventStore row，改为空schema skeleton与独立evidence shape；generated v2固定`laws = [determinism_proof.what_id]`；v1 owner/path只作迁移定位并与fresh graph重验，N→1 justification不拼接或继承，由目标owner依据formal adjudication重写。
+- 两个独立 blocker-only复核均返回“无阻断”。本轮只修改计划，不启用v2 schema/gate、不改变production，也不改变GAP-031=PARTIAL。
+- 验证：`spec.mjs` 291条款；`requirement-trace.mjs` 780 WHAT/3977 tests；`owner-contracts.mjs` 784 contracts/0 requirement dependencies；`owner-projects.mjs` 178 localities/711 sources/1853 refs/DAG；structured-workflow 244/244；`node scripts/check.mjs`完整fast gate全部绿色。
