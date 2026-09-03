@@ -53,6 +53,7 @@ module ConfirmedReviewWitness =
     val gitTreeHash: ConfirmedReviewWitness -> GitTreeHash
     val lifeId: ConfirmedReviewWitness -> ManagerLifeId
     val requestId: ConfirmedReviewWitness -> FinalityRequestId
+
     val create:
         lifeId: ManagerLifeId ->
         requestId: FinalityRequestId ->
