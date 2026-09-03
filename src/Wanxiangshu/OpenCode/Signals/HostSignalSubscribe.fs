@@ -1,88 +1,121 @@
 namespace Wanxiangshu.OpenCode
 
+open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Foundation
-open Wanxiangshu.Process
 
-/// Subscribes coarse host signals for the plugin instance.
-/// The standard OpenCode contract delivers directory-scoped events via the
-/// in-process `hooks.event` hook (`local-event-hook`). Legacy `events.listen`
-/// is supported when passed explicitly on input.
 module HostSignalSubscribe =
 
-    /// Snapshot of the signal transport.
-    type SignalHealth =
-        { IsConnected: bool
-          ReconnectAttempts: int }
+    [<RequireQualifiedAccess>]
+    type HostSignalSubscriptionError =
+        | InvalidInput
+        | EventsListenUnavailable
+        | EventsListenReturnedInvalidDisposer
+        | EventsListenFailed of diagnostic: string
 
-    /// Disposable subscription plus a health probe for downstream consumers.
-    type HostSignalSubscription =
-        { Health: unit -> SignalHealth
-          Dispose: unit -> unit }
+    [<Sealed>]
+    type HostSignalSubscription internal (dispose: unit -> unit) =
+        interface IDisposable with
+            member _.Dispose() = dispose ()
+
+    [<RequireQualifiedAccess>]
+    type HostSignalSubscriptionMode =
+        | LocalEventHook
+        | EventsListen of HostSignalSubscription
+
+    [<Emit("typeof $0 === 'function'")>]
+    let private isFunction (value: obj) : bool = jsNative
+
+    [<Emit("(() => { try { if ($0 === null || typeof $0 !== 'object' || Array.isArray($0)) return false; const p = Object.getPrototypeOf($0); return p === Object.prototype || p === null; } catch { return false; } })()")>]
+    let private isPlainRecord (value: obj) : bool = jsNative
+
+    [<Emit("(() => { try { const message = $0?.message; return typeof message === 'string' ? message : String($0); } catch { return 'unknown JavaScript exception'; } })()")>]
+    let private exceptionDiagnostic (value: obj) : string = jsNative
 
     [<Emit("$0()")>]
     let private invokeDisposer (value: obj) : unit = jsNative
 
-    let private alwaysHealthy () : SignalHealth =
-        { IsConnected = true
-          ReconnectAttempts = 0 }
-
     let private subscribeValue events listen onSignalEvent =
-        let callback = box onSignalEvent
-        let subscription = listen?call (events, callback)
+        let subscription = listen?call (events, box onSignalEvent)
 
-        if isNull subscription then
-            Error "OPENCODE-SIGNAL-SUBSCRIBE: events.listen returned no subscription"
+        if isFunction subscription then
+            new HostSignalSubscription(fun () -> invokeDisposer subscription)
+            |> HostSignalSubscriptionMode.EventsListen
+            |> Ok
         else
-            Ok
-                { Health = alwaysHealthy
-                  Dispose = fun () -> invokeDisposer subscription }
+            Error HostSignalSubscriptionError.EventsListenReturnedInvalidDisposer
 
-    let private trySubscribeValue events listen onSignalEvent =
+    let private invokeListen events listen onSignalEvent =
         try
             subscribeValue events listen onSignalEvent
         with ex ->
-            Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
+            Error(HostSignalSubscriptionError.EventsListenFailed(exceptionDiagnostic (box ex)))
 
-    let private subscribeListen (events: obj) (onSignalEvent: obj -> unit) : Result<HostSignalSubscription, string> =
-        let listen = events?listen
+    let private readListen events =
+        try
+            Ok events?listen
+        with ex ->
+            Error(HostSignalSubscriptionError.EventsListenFailed(exceptionDiagnostic (box ex)))
 
-        if isNull listen then
-            Error "OPENCODE-SIGNAL-SUBSCRIBE: events.listen unavailable"
+    let private useListen events onSignalEvent listen =
+        if isFunction listen then
+            invokeListen events listen onSignalEvent
         else
-            trySubscribeValue events listen onSignalEvent
+            Error HostSignalSubscriptionError.EventsListenUnavailable
 
-    let private clientEvents client =
-        if not (isNull client) && not (isNull client?events) then
-            Some client?events
-        else
-            None
+    let private subscribeListen events onSignalEvent =
+        readListen events |> Result.bind (useListen events onSignalEvent)
+
+    let private optionalPlainRecord value =
+        if isNull value then Ok None
+        elif isPlainRecord value then Ok(Some value)
+        else Error HostSignalSubscriptionError.InvalidInput
+
+    let private readClientEvents client =
+        try
+            Ok client?events
+        with _ ->
+            Error HostSignalSubscriptionError.InvalidInput
+
+    let private clientEvents =
+        function
+        | None -> Ok None
+        | Some client -> readClientEvents client |> Result.bind optionalPlainRecord
+
+    let private readInputEvents input =
+        try
+            Ok input?events
+        with _ ->
+            Error HostSignalSubscriptionError.InvalidInput
+
+    let private readInputClient input =
+        try
+            Ok input?client
+        with _ ->
+            Error HostSignalSubscriptionError.InvalidInput
 
     let private listenTargetFromInput input =
-        if not (isNull input?events) then
-            Some input?events
-        else
-            clientEvents input?client
+        readInputEvents input
+        |> Result.bind optionalPlainRecord
+        |> Result.bind (function
+            | Some events -> Ok(Some events)
+            | None ->
+                readInputClient input
+                |> Result.bind optionalPlainRecord
+                |> Result.bind clientEvents)
 
     let private listenTarget input =
-        if isNull input then None else listenTargetFromInput input
+        if isPlainRecord input then
+            listenTargetFromInput input
+        else
+            Error HostSignalSubscriptionError.InvalidInput
 
-    let private subscribeTarget events onSignalEvent =
-        match subscribeListen events onSignalEvent with
-        | Ok localSub -> Ok(Some localSub, "events.listen")
-        | Error localError ->
-            Diagnostic.fatal "signal-subscribe-failed" [ "result", localError ]
-            Error localError
-
-    let trySubscribe
-        (input: obj)
-        (onSignalEvent: obj -> unit)
-        (_timerPort: ITimerPort option)
-        : Task<Result<HostSignalSubscription option * string, string>> =
+    let trySubscribe (input: obj) (onSignalEvent: obj -> unit) =
         task {
-            match listenTarget input with
-            | Some events -> return subscribeTarget events onSignalEvent
-            | None -> return Ok(None, "local-event-hook")
+            return
+                match listenTarget input with
+                | Error error -> Error error
+                | Ok(Some events) -> subscribeListen events onSignalEvent
+                | Ok None -> Ok HostSignalSubscriptionMode.LocalEventHook
         }

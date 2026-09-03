@@ -122,7 +122,7 @@ Host 边界严格切分为 Contract、Runtime 与 Adapter 架构 locality：
 
 ## HOST-BOUNDARY-028: signal subscription 与optional diagnostic 必须分型
 
-Host signal subscription必须返回closed typed error与`LocalEventHook | EventsListen of Subscription` mode，不得以`option + string`表达非法组合。adapter只报告typed failure；composition是该失败的唯一fatal解释者。Loop diagnostic经必填窄`emitDiagnostic` capability注入；其失败只能产生非权威诊断outcome，不得改变arm、interrupt、consume或continuation结果。
+Host signal subscription必须返回closed `HostSignalSubscriptionError`与`LocalEventHook | EventsListen of HostSignalSubscription` mode，不得以`option + string`表达非法组合。顶层input与显式非null `events`/`client` carrier必须是plain record；primitive、array、boxed object与坏direct events一律`InvalidInput`，且坏direct events不得借合法client旁路。顶层carrier getter或Proxy抛错收敛为`InvalidInput`；`events.listen`读取或调用抛错收敛为`EventsListenFailed`，Surface promise必须resolve typed error而非reject。`EventsListen`必须携带唯一opaque disposable owner；缺失或非函数`listen`、缺失或非函数disposer均返回对应typed failure，禁止延迟到dispose时才爆炸；合法disposer自身抛出的异常必须原样传播给资源owner。未提供legacy events capability时只返回`LocalEventHook`，不得制造disposer。callback等JavaScript decode failure只在Surface膜上fail closed，不污染production DU。adapter只报告typed failure且不得到达Diagnostic或Temporal；`HostSignalBootstrap` composition是`signal-subscribe-failed`的唯一fatal解释者。Loop diagnostic经必填窄`emitDiagnostic` capability注入；其失败只能产生非权威诊断outcome，不得改变arm、interrupt、consume或continuation结果。
 
 ## HOST-BOUNDARY-029: fatal process 是唯一注入的physical adapter
 

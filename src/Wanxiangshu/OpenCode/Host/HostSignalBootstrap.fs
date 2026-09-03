@@ -398,21 +398,17 @@ module HostSignalBootstrap =
                             })
                 )
 
-            let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.Observe None
+            let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.Observe
 
             let subscription: IDisposable option =
                 match subscriptionResult with
-                | Error err ->
-                    Diagnostic.fatal "signal-subscribe-failed" [ "result", err ]
-                    raise (InvalidOperationException err)
+                | Error error ->
+                    let evidence = sprintf "%A" error
+                    Diagnostic.fatal "signal-subscribe-failed" [ "result", evidence ]
+                    raise (InvalidOperationException evidence)
 
-                | Ok(sub, _source) ->
-                    // TrackSubscription only needs IDisposable; Health stays on the
-                    // subscription record for future recovery consumers.
-                    sub
-                    |> Option.map (fun s ->
-                        { new IDisposable with
-                            member _.Dispose() = s.Dispose() })
+                | Ok HostSignalSubscribe.HostSignalSubscriptionMode.LocalEventHook -> None
+                | Ok(HostSignalSubscribe.HostSignalSubscriptionMode.EventsListen active) -> Some(active :> IDisposable)
 
             do scope.TrackSubscription subscription
 

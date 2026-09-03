@@ -1528,7 +1528,7 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 1. `R0 M6.3a repair`（DONE）：关闭canonical fact、J→C、generated relation、world/traversal/input closure与Host raw membrane反例；定向proof、fast gate、clean build、受影响测试与真实Host Long Stroke全绿后建立Git节点。
 2. `B1 M6.3b extractor`（DONE）：B1-A=`5830fa473`实现report-only fresh F#/FCS/JS/generated extractor、唯一canonical world/summary/full report与178-record closed worksheet；B1-A2=`4c831aca0`固化baseline定义与clean exact-commit writer；A3=`e6268f35a`删除synthetic FCS node alias。B1-B在A3 exact clean checkout完成fixed impact corpus，production gate仍未接入。
 3. `B2 EventStore slice`（PROOF DONE；PRODUCTION DEFERRED TO C/D）：production-bound codec proof已锁定六项公开协议；在M6.3c同一未提交cutover state抽`eventstore-canonical-codec` bounded contract并迁fresh direct consumers，再随M6.4原子提交。它不能形成旧gate下独立节点：旧ACL正借codec与`ProcessEventLog`同project偶然授权，过渡节点若维持绿色只能扩张错误的owner-wide权限。provider/direct/reverse-impact编译仍须在原子提交前全绿。
-4. `B3 Host slices`（CODEC + DIAGNOSTIC DONE；SUBSCRIPTION + FATAL PENDING）：HostMessage/HostEventEnvelope/LoopEvent三个bounded contract与LoopSensor mandatory diagnostic injection已完成；下一节点关闭typed subscription与唯一failure owner，随后迁fatal port/adapter。
+4. `B3 Host slices`（CODEC + DIAGNOSTIC + SUBSCRIPTION DONE；FATAL PENDING）：HostMessage/HostEventEnvelope/LoopEvent三个bounded contract、LoopSensor mandatory diagnostic injection、closed typed subscription与Bootstrap唯一failure owner已完成；下一节点迁fatal port/adapter。
 5. `B4 foundational capabilities`（T0 PROOF DONE；SPLITS PENDING）：Temporal synthetic blueprint已替换为production-bound行为proof；后续依序拆Temporal、CausalWait、Process/PTY纯词汇与窄capability，先立contract再迁consumer，最后删旧路径。
 6. `B5 Delegation ownership`（PENDING）：迁owner fact/append/query/wait/clock ports与pure projections/folds，durable composition只保留outer routing/combine。
 7. `B6 Delegation Host/PTY wiring`（PENDING）：拆host runtime/窄adapter，删除PTY对HostForkRuntime与Process implementation反向依赖，由现有composition roots注入。
@@ -1576,6 +1576,13 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - `LoopSensor`改为composition必填diagnostic callback，内部吸收观测异常；`HostSignalBootstrap`注入`Diagnostic.emit`，`PluginRuntimeScope`删除默认no-op sensor。production-bound DG-013固定callback抛错时arm、interrupt、consume、continuation不变；loop runtime不再引用完整signal或diagnostics implementation。
 - direct compile另暴露两条upstream `ed21b6d31`已存在、此前被flattened aggregate隐藏的closure：`opencode-host-sessionbindingsurface/Sessions.fs → host-diagnostics-runtime/Diagnostic.fs`与`resources-promptsurface/SessionExecutionBinding.fs → host-signal-adapter/HostEventCodec.fs`。源码行为未改；给两个真实composition consumer补exact ProjectReference后各自owner compile绿色。另把`dispatch-runtime/Send.fs → Diagnostic.fatal`记为显式现状边，留给后续fatal-port节点删除，不借wide codec closure偶然放行。
 - 3个provider、全部direct consumer、Host bootstrap/runtime-scope与四个`.fsi` full reverse-impact compile绿色；受影响targeted 77/77、fresh worksheet后短复验16/16、`node scripts/check.mjs`全绿。fresh report为181 localities、712 sources、1,864 ProjectReferences、4,406 source edges、460 traversals；closure只剩既定EventStore原子切换blocker。worksheet仍0 decided且无授权力；旧v1 gate仍为唯一release authority。
+
+### 2026-09-04 — M6.3b B3 Host typed subscription
+
+- `HostSignalSubscribe`删除`option + string`、未消费的timer与伪health状态，改为closed `HostSignalSubscriptionError`及`LocalEventHook | EventsListen of HostSignalSubscription`。legacy listener的disposer由opaque `IDisposable`唯一持有；无legacy capability的公开Hook路径不制造资源。
+- dynamic membrane只接受plain record。primitive、array、boxed carrier、坏direct events/client、accessor/Proxy异常、缺失或非函数listen、非函数/Promise disposer及任意JavaScript thrown value均有永久反例；坏direct carrier不能借client fallback旁路。listener读取/执行失败收敛为typed error，合法disposer自身异常原样交给资源owner。
+- `HostSignalSubscribeSurface`只用F# typed pattern match投影plain JS verdict，不读取Fable `.tag/.fields`。`HostSignalSubscribe`不再到达Diagnostic或Temporal；`HostSignalBootstrap`是唯一`signal-subscribe-failed`解释者。旧release authority未改变。
+- 最终字节验证：provider与direct Bootstrap project独立编译绿色；真实reverse impact因ProjectReference变化执行full 1,424 items并绿色；clean production build绿色；Host targeted 40/40；requirement trace为807 WHAT/4,052 tests；test-boundary、owner-contracts、owner-projects、control-pyramid、Fantomas与diff check全绿。同期全`check.mjs`的唯一红灯来自未提交B7 fixture新增的5行`fsharp-type`分类，不属于本节点且不据此削弱B3验收。
 
 ### 2026-09-04 — M6.3b B7-A compiler-resolved capability taxonomy
 

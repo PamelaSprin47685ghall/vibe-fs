@@ -700,7 +700,7 @@
     {
       "path": "src/Wanxiangshu/OpenCode/Signals/HostSignalSubscribe.fs",
       "owner": "host-boundary",
-      "justification": "Signed physical Host signal subscription capability with typed health/disposal result; dynamic listener invocation remains hidden."
+      "justification": "Signed physical Host signal subscription capability with closed error/mode vocabulary and an opaque owned disposer; dynamic listener invocation remains hidden."
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/HostSignalSubscribeSurface.fs",

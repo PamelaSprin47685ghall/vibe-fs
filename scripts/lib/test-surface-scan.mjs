@@ -1480,7 +1480,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Host/HostSignalSubscribeSurface.js',
     owner: 'host-boundary',
-    laws: ['HOST-BOUNDARY-003'],
+    laws: ['HOST-BOUNDARY-003', 'HOST-BOUNDARY-028'],
     source: 'src/Wanxiangshu/OpenCode/Host/HostSignalSubscribeSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',

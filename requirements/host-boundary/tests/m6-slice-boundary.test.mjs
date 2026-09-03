@@ -84,6 +84,14 @@ test('WHAT[HOST-BOUNDARY-030] Host envelope rejects adjacent malformed event and
 })
 
 test('WHAT[HOST-BOUNDARY-028] typed subscription and diagnostic injection preserve one failure owner', async () => {
+  const inventory = readOwnerProjectInventoryV1()
+  const adapter = locality(inventory, 'host-signal-adapter')
+  const composition = locality(inventory, 'opencode-host-hostsignalbootstrap')
+
+  assert.ok(!adapter.references.includes('host-diagnostics-runtime'))
+  assert.ok(!adapter.references.includes('foundation-temporal'))
+  assert.ok(composition.references.includes('host-signal-adapter'))
+  assert.ok(composition.references.includes('host-diagnostics-runtime'))
   await assertOptionalObservationNoninterference()
   assertEffectIsInjected('console')
 })
