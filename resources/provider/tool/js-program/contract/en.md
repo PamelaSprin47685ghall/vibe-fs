@@ -5,8 +5,9 @@ Do not use the legacy tools read/edit/write/glob/grep/patch for new work when {{
 request. It can {{verbs}} files in one transactional program — including large parallel batches.
 
 Strongly recommended:
-1. Call {{toolName}} instead of read/edit/write/glob/grep/patch whenever possible.
-2. Write complex JavaScript in one {{toolName}} program rather than many legacy RPCs.
+- Call {{toolName}} instead of read/edit/write/glob/grep/patch whenever possible.
+{{editRecommendation}}
+- Write complex JavaScript in one {{toolName}} program rather than many legacy RPCs.
 {{parallelLine}}
 
 Call tools in parallel whenever needed. Parallel reads, parallel edits, same-file

@@ -27,7 +27,8 @@ module JsFragmentRegistry =
     val read: JsCapabilityFragment
     val glob: JsCapabilityFragment
     val grep: JsCapabilityFragment
+    val edit: JsCapabilityFragment
     val rewrite: JsCapabilityFragment
     val write: JsCapabilityFragment
     val all: JsCapabilityFragment list
-    val byCapability: Map<JsCapability, JsCapabilityFragment>
+    val byCapability: Map<JsCapability, JsCapabilityFragment list>

@@ -6,10 +6,12 @@
 
 ## REPOSITORY-PROGRAMMING-002: 四层同构应用
 
-对当前 Attempt 的每个 JS filesystem capability，以下四层必须保持严格一致：
-1. 生成的 `JsProgram` 基类中声明对应方法；
-2. `js-*` 工具 description 中包含该方法的说明与规范；
-3. Canonical examples 中包含该方法的使用范式；
+对当前 Attempt 的每个 JS filesystem capability 所投影出的每个成员，以下四层必须保持严格一致；
+一个 capability 可以投影一个有确定顺序的同权成员族（例如 Edit → `edit` + `rewrite`），但不得
+借此产生第二份权限判定：
+1. 生成的 `JsProgram` 基类中声明对应成员；
+2. `js-*` 工具 description 中包含该成员的说明与规范；
+3. Canonical examples 中包含该成员族的使用范式；
 4. 底层 runtime gate 实施严格门禁（即使调用被伪造，仍 fail closed）。
 能力缺失时四层同步缺失，模型可见的方法集即为运行时真正可执行的完整能力集。
 
@@ -94,8 +96,58 @@
 
 ## REPOSITORY-PROGRAMMING-022: 高显著性工具选择与失败经验引导
 
-生成的工具描述文档必须通过高显著性风险提示与明确的失败经验引导模型合理选择原语：
-1. 优先使用不可变快照、ordered anchors 与结构化切片，严禁在具备高级原语时默认退化为手工 `indexOf`/`substring` 字符串计算或大面积盲目替换；
-2. Grep 仅作为候选发现工具，不承担文件切片与重组语义；
-3. 编辑操作必须在内存快照中完整构造目标状态后单次提交，禁止将初次错误编辑产生的残留留作多轮修补的工作流；
-4. 程序应在返回前对关键不变量与数据规模进行前置检查，并在异常时主动抛出异常取消事务提交。
+生成的工具描述文档必须先给出可执行的 canonical shape 与原语选择阶梯，再用高显著性风险提示
+和明确失败经验巩固选择；禁止让较弱模型读完长篇事故叙事后仍不知道下一行代码该写什么：
+1. 已知当前文本与目标文本的普通替换、插入、删除或全匹配修改，默认使用 `edit(path, changes)`；
+2. 同一文件的多个独立局部修改合并为一个 `edit` 数组；当 `Read` 同时可用时，结构切片、重排、计算式变换才使用不可变快照、ordered anchors、`text()` 与 `rewrite()`；否则文档只能教授当前 surface 实际存在的 `rewrite()`；
+3. 严禁在具备高级原语时默认退化为手工 `indexOf`/`substring` 边界计算或大面积盲目替换；Grep 仅发现候选，不承担结构所有权；
+4. 示例必须覆盖 replace / insert / delete / all 的最小 copy-ready 形态，并保留一个责任形状的 Ultra Example 展示多文件事务；
+5. 编辑必须在一个快照上形成完整目标状态后单次 staging，禁止把错误残留留给第二、第三个清理 program；
+6. 程序应在返回前对关键不变量与数据规模进行前置检查，并在异常时主动抛出异常取消事务提交。
+
+## REPOSITORY-PROGRAMMING-023: Edit capability 的渐进式成员族
+
+`Edit` capability 必须按固定顺序同时投影两个同权成员：
+
+1. `edit(path, changes)` 是普通局部编辑的默认入口。`changes` 接受一个 change object 或非空数组；
+   canonical change 为 `{ find, put, all? }`，其中 `find` 是非空 string 或非零宽 RegExp，`put`
+   是完整目标文本，`all` 缺省为 `false`；
+2. `rewrite(path, newText)` 保留为完整文件替换的无上限逃生舱，不得因新增 `edit` 而削弱、隐藏或
+   改变既有事务语义；
+3. 一个 `edit` 调用的所有 change 都在同一个不可变目标快照上定位。缺省 change 必须恰好匹配
+   一处；`all: true` 必须匹配至少一处并替换全部非重叠命中；
+4. 所有 change 均解析成功且彼此不重叠后，才允许产生恰好一个 `Rewrite` staging intent。
+   任一 change 失败时，该调用产生零 staging；
+5. 字符串模式允许把一致的 CRLF 文件与调用方书写的 LF 视为同一换行语义，最终文件必须保持
+   原有一致换行风格。除换行规范化外，只有精确匹配可获得写权限；
+6. 为降低常见模型格式错误，单个 object 可自动包成数组，并可无歧义接受
+   `oldText/newText` 或 `search/replace` 作为 `find/put` 别名；文档与生成示例只教授一套
+   canonical `find/put` 形态；
+7. change 必须是 plain object，除 canonical 字段与上述恢复别名外的未知字段必须拒绝为
+   `INVALID_EDIT`，避免把 `al: true` 等拼写错误静默解释为默认值；所有纯参数规范化必须先于
+   文件读取，使 malformed change 不被 `FILE_NOT_FOUND` 掩盖，也不污染 ReadSet；
+8. edit 成功返回冻结的 `{ path, changed, operations, replacements }` 摘要。完整结果与原文相同
+   时 `changed: false`、零 staging，仍视为成功；
+9. edit 对目标的内部读取必须进入既有 ReadSet/快照冲突检测；外部修改发生在规划与 commit 之间时，
+   仍按 `FILE_CHANGED` fail closed，绝不覆盖第三方新内容；该内部读取是 Edit 成员族的私有实现细节，
+   不要求公开 `Read` capability，也不得让 `file()` 出现在 Edit-only surface。
+
+## REPOSITORY-PROGRAMMING-024: 编辑失败恢复协议与保守近似
+
+`edit()` 的可预期失败必须进入稳定失败代数，而非压缩为 `PROGRAM_FAILED`：至少包括
+`INVALID_EDIT`、`EDIT_NOT_FOUND`、`EDIT_AMBIGUOUS` 与 `EDIT_OVERLAP`。这些失败必须满足：
+
+1. 在任何 staging 发生前返回，reason 明确包含受控长度的 path、change ordinal、尝试的 find、
+   失败种类与“本调用零修改”的原子性后果；
+2. `EDIT_NOT_FOUND` 在 string 模式下返回最接近当前文本的有限带行号窗口；若唯一近似候选达到
+   保守置信阈值且完整建议未超过诊断预算，还应给出只修正 `find`、保留原 `put` 的 copy-ready
+   change。修正后的 `find` 必须是目标文件中真实存在的精确子串，不得以整行近似代替原 span；
+3. `EDIT_AMBIGUOUS` 返回有限个候选行号/窗口，并明确给出两个合法下一步：扩充只有目标位置拥有的
+   上下文，或仅在所有命中都应修改时设置 `all: true`；
+4. 近似、编辑距离或标点容错只用于诊断与建议，严禁自动落盘。没有唯一证据时必须 fail closed；
+5. 多个 change 在原快照上出现重叠时返回 `EDIT_OVERLAP`，要求合并成一个声明最终文本的 change，
+   不得按数组顺序猜测覆盖优先级；
+6. 所有窗口、字段名、候选数与 copy-ready payload 均必须有独立于文件/put 大小的上界；诊断预算
+   不足时宁可省略建议，也不得让失败 reason 退化为超大输出或资源故障；
+7. provider-visible 控制语必须完整本地化；稳定 code、API 字段名和 path 等协议 token 可保持原样，
+   候选、行号、原子性后果与修复动作不得混入另一语言的说明句。

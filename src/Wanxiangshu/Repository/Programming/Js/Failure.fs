@@ -20,6 +20,10 @@ type JsFailure =
     | AnchorNotFound of string
     | AnchorNotUnique
     | AnchorCrossFile
+    | InvalidEdit of string
+    | EditNotFound of string
+    | EditAmbiguous of string
+    | EditOverlap of string
     | DuplicateMutationTarget of string
     | ResultTooLarge of string option
     | InvalidReturnValue
@@ -50,6 +54,10 @@ module JsFailure =
         | JsFailure.AnchorNotFound _ -> "ANCHOR_NOT_FOUND"
         | JsFailure.AnchorNotUnique -> "ANCHOR_NOT_UNIQUE"
         | JsFailure.AnchorCrossFile -> "ANCHOR_CROSS_FILE"
+        | JsFailure.InvalidEdit _ -> "INVALID_EDIT"
+        | JsFailure.EditNotFound _ -> "EDIT_NOT_FOUND"
+        | JsFailure.EditAmbiguous _ -> "EDIT_AMBIGUOUS"
+        | JsFailure.EditOverlap _ -> "EDIT_OVERLAP"
         | JsFailure.DuplicateMutationTarget _ -> "DUPLICATE_MUTATION_TARGET"
         | JsFailure.ResultTooLarge _ -> "RESULT_TOO_LARGE"
         | JsFailure.InvalidReturnValue -> "INVALID_RETURN_VALUE"
@@ -84,6 +92,10 @@ module JsFailure =
         | JsFailure.AnchorNotFound detail -> reasonWithMessage "anchor did not match" "" detail
         | JsFailure.AnchorNotUnique -> "anchor matches multiple locations and no occurrence was declared"
         | JsFailure.AnchorCrossFile -> "anchor declaration crosses files"
+        | JsFailure.InvalidEdit detail -> reasonWithMessage "edit declaration is invalid" "" detail
+        | JsFailure.EditNotFound detail -> reasonWithMessage "edit find matched no locations" "" detail
+        | JsFailure.EditAmbiguous detail -> reasonWithMessage "edit find matched multiple locations" "" detail
+        | JsFailure.EditOverlap detail -> reasonWithMessage "edit changes overlap" "" detail
         | JsFailure.DuplicateMutationTarget path -> "the same path was mutated twice in one program: " + path
         | JsFailure.ResultTooLarge _ -> "result exceeds the output bound"
         | JsFailure.InvalidReturnValue -> "run() return value is not JSON-compatible"
@@ -129,6 +141,10 @@ module JsFailure =
         | "ANCHOR_NOT_FOUND" -> JsFailure.AnchorNotFound text
         | "ANCHOR_NOT_UNIQUE" -> JsFailure.AnchorNotUnique
         | "ANCHOR_CROSS_FILE" -> JsFailure.AnchorCrossFile
+        | "INVALID_EDIT" -> JsFailure.InvalidEdit text
+        | "EDIT_NOT_FOUND" -> JsFailure.EditNotFound text
+        | "EDIT_AMBIGUOUS" -> JsFailure.EditAmbiguous text
+        | "EDIT_OVERLAP" -> JsFailure.EditOverlap text
         | "DUPLICATE_MUTATION_TARGET" ->
             JsFailure.DuplicateMutationTarget(after "the same path was mutated twice in one program: ")
         | "RESULT_TOO_LARGE" -> JsFailure.ResultTooLarge None

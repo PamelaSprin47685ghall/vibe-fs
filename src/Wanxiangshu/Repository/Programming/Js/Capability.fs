@@ -29,7 +29,8 @@ module JsCapability =
     let ofToolCapabilities (capabilities: Set<ToolPermission>) : Set<JsCapability> =
         capabilities |> Set.toList |> List.choose ofToolPermission |> Set.ofList
 
-    /// Fixed canonical member order (JS-002): file, glob, grep, rewrite, write.
+    /// Fixed canonical capability-family order (JS-002). A capability may
+    /// project more than one ordered member (Edit → edit, rewrite).
     let order (capability: JsCapability) : int =
         match capability with
         | JsCapability.Read -> 0
@@ -102,6 +103,27 @@ module JsFragmentRegistry =
             + "}"
           RuntimeBindingKey = "js.grep" }
 
+    let edit: JsCapabilityFragment =
+        { Capability = JsCapability.Edit
+          MemberName = "edit"
+          Signature = "edit(path, changes)"
+          Description =
+            "edit(path, changes) — atomically apply one { find, put, all? } change or a non-empty "
+            + "array against one immutable target snapshot. Exact by default; 0, ambiguous, or "
+            + "overlapping matches fail before staging."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    this.edit(\"src/foo.js\", [\n"
+            + "      { find: \"const oldName = 1;\", put: \"const newName = 1;\" },\n"
+            + "    ]);\n"
+            + "    return { edited: \"src/foo.js\" };\n"
+            + "  }\n"
+            + "}"
+          // edit() is a derived SDK affordance over the same guarded staging
+          // executor as rewrite(); no second Edit permission exists.
+          RuntimeBindingKey = "js.edit" }
+
     let rewrite: JsCapabilityFragment =
         { Capability = JsCapability.Edit
           MemberName = "rewrite"
@@ -112,15 +134,8 @@ module JsFragmentRegistry =
           CanonicalExample =
             "class Js extends JsProgram {\n"
             + "  async run() {\n"
-            + "    const file = await this.file(\"src/foo.js\", [\n"
-            + "      [\"begin\", \"end\", \"oldString\"],\n"
-            + "    ]);\n"
-            + "    this.rewrite(\n"
-            + "      \"src/foo.js\",\n"
-            + "      file.text(\"^\", \"begin\")\n"
-            + "        + \"newString\"\n"
-            + "        + file.text(\"end\", \"$\")\n"
-            + "    );\n"
+            + "    this.rewrite(\"src/foo.js\", \"export const value = 2;\\n\");\n"
+            + "    return { rewritten: \"src/foo.js\" };\n"
             + "  }\n"
             + "}"
           RuntimeBindingKey = "js.edit" }
@@ -144,7 +159,9 @@ module JsFragmentRegistry =
             + "}"
           RuntimeBindingKey = "js.write" }
 
-    let all: JsCapabilityFragment list = [ read; glob; grep; rewrite; write ]
+    /// Canonical member order inside capability families. Filtering this list
+    /// is the deterministic projection; never rebuild member order elsewhere.
+    let all: JsCapabilityFragment list = [ read; glob; grep; edit; rewrite; write ]
 
-    let byCapability: Map<JsCapability, JsCapabilityFragment> =
-        all |> List.map (fun fragment -> fragment.Capability, fragment) |> Map.ofList
+    let byCapability: Map<JsCapability, JsCapabilityFragment list> =
+        all |> List.groupBy _.Capability |> Map.ofList

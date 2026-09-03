@@ -29,9 +29,10 @@ module JsFragmentRegistry =
     let read: JsCapabilityFragment = Unchecked.defaultof<_>
     let glob: JsCapabilityFragment = Unchecked.defaultof<_>
     let grep: JsCapabilityFragment = Unchecked.defaultof<_>
+    let edit: JsCapabilityFragment = Unchecked.defaultof<_>
     let rewrite: JsCapabilityFragment = Unchecked.defaultof<_>
     let write: JsCapabilityFragment = Unchecked.defaultof<_>
-    let all: JsCapabilityFragment list = [ read; glob; grep; rewrite; write ]
+    let all: JsCapabilityFragment list = [ read; glob; grep; edit; rewrite; write ]
 `
 
 const GOOD_SURFACE_TEST = `
@@ -50,7 +51,7 @@ type Role =
 `
 
 test('WHAT[ENF-008] capability_iso_documents_required_tokens', () => {
-  assert.deepEqual([...REQUIRED_FRAGMENT_CAPS], ['read', 'glob', 'grep', 'rewrite', 'write'])
+  assert.deepEqual([...REQUIRED_FRAGMENT_CAPS], ['read', 'glob', 'grep', 'edit', 'rewrite', 'write'])
   assert.deepEqual([...REQUIRED_SURFACE_TEST_TOKENS], ['JS004', 'layersOf', 'memberBinding'])
   assert.deepEqual([...FORBIDDEN_ROLE_TOKENS], ['Student', 'Teacher'])
 })

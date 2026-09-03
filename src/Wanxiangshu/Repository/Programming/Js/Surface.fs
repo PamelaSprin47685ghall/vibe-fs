@@ -25,7 +25,8 @@ module JsToolGenerator =
         capabilities
         |> Set.toList
         |> List.sortBy JsCapability.order
-        |> List.choose (fun capability -> Map.tryFind capability JsFragmentRegistry.byCapability)
+        |> List.collect (fun capability ->
+            Map.tryFind capability JsFragmentRegistry.byCapability |> Option.defaultValue [])
 
     let toolNameFor (roleName: string) : string = "js-" + roleName.ToLowerInvariant()
 
@@ -48,11 +49,11 @@ module JsToolGenerator =
         JsCanonicalDescription.render prose roleName (toolNameFor roleName) capabilities
 
     let renderExamples
-        (_prose: JsCanonicalDescription.Prose)
+        (prose: JsCanonicalDescription.Prose)
         (roleName: string)
         (capabilities: Set<JsCapability>)
         : string list =
-        JsCanonicalDescription.ultraExample roleName capabilities
+        JsCanonicalDescription.ultraExample prose roleName capabilities
         |> Option.map (fun example -> [ example.Source ])
         |> Option.defaultValue []
 

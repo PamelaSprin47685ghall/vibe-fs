@@ -4,8 +4,8 @@
  *
  * Fail-closed on source-level isomorphism contracts:
  *   1. ToolRegistry.fs projects js-* only via JsToolGenerator.generate
- *   2. JsCapability.fs JsFragmentRegistry declares the member caps:
- *      read / glob / grep / rewrite / write
+ *   2. JsCapability.fs JsFragmentRegistry declares the member fragments:
+ *      read / glob / grep / edit / rewrite / write
  *   3. requirements/repository-programming/tests/js-surface.test.mjs keeps JS004 / layersOf /
  *      memberBinding layer tokens
  *   4. Roles.fs has no Student / Teacher role surface
@@ -27,6 +27,7 @@ export const REQUIRED_FRAGMENT_CAPS = Object.freeze([
   'read',
   'glob',
   'grep',
+  'edit',
   'rewrite',
   'write',
 ])
@@ -90,7 +91,7 @@ export const scanToolRegistry = (text) => {
 }
 
 /**
- * JsFragmentRegistry must expose exactly the five named fragment bindings.
+ * JsFragmentRegistry must expose the complete ordered named fragment family.
  * @param {string} text
  * @returns {Violation[]}
  */
@@ -119,7 +120,7 @@ export const scanJsFragmentRegistry = (text) => {
     }
   }
 
-  // `let all` should list the five caps so isomorphism stays closed.
+  // `let all` should list the complete family so isomorphism stays closed.
   const allMatch = text.match(/\blet\s+all\s*:\s*[^=]*=\s*\[([^\]]*)\]/)
   if (!allMatch) {
     violations.push({

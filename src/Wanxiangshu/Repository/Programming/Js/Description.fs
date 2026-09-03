@@ -16,10 +16,19 @@ module JsCanonicalDescription =
         let Header = "tool/js-program/header"
 
         [<Literal>]
+        let EditPrelude = "tool/js-program/edit-prelude"
+
+        [<Literal>]
+        let EditStructuralGuidance = "tool/js-program/edit-structural-guidance"
+
+        [<Literal>]
         let Footer = "tool/js-program/footer"
 
         [<Literal>]
         let Contract = "tool/js-program/contract"
+
+        [<Literal>]
+        let ContractEditRecommendation = "tool/js-program/contract-edit-recommendation"
 
         [<Literal>]
         let ContractParallelEdits = "tool/js-program/contract-parallel-edits"
@@ -65,6 +74,9 @@ module JsCanonicalDescription =
 
         [<Literal>]
         let UltraUnavailable = "tool/js-program/ultra-unavailable"
+
+        [<Literal>]
+        let UltraCoder = "tool/js-program/ultra-coder"
 
         [<Literal>]
         let MechanicalSemantic = "tool/js-program/mechanical-semantic"
@@ -115,6 +127,42 @@ module JsCanonicalDescription =
         let ReasonRunUnimplemented = "tool/js-program/reason-run-unimplemented"
 
         [<Literal>]
+        let ReasonEditInvalid = "tool/js-program/reason-edit-invalid"
+
+        [<Literal>]
+        let ReasonEditNotFound = "tool/js-program/reason-edit-not-found"
+
+        [<Literal>]
+        let ReasonEditAmbiguous = "tool/js-program/reason-edit-ambiguous"
+
+        [<Literal>]
+        let ReasonEditOverlap = "tool/js-program/reason-edit-overlap"
+
+        [<Literal>]
+        let ReasonEditAtomicity = "tool/js-program/reason-edit-atomicity"
+
+        [<Literal>]
+        let ReasonEditPreview = "tool/js-program/reason-edit-preview"
+
+        [<Literal>]
+        let ReasonEditCopyReady = "tool/js-program/reason-edit-copy-ready"
+
+        [<Literal>]
+        let ReasonEditAttempted = "tool/js-program/reason-edit-attempted"
+
+        [<Literal>]
+        let ReasonEditUnknownFields = "tool/js-program/reason-edit-unknown-fields"
+
+        [<Literal>]
+        let ReasonEditCandidate = "tool/js-program/reason-edit-candidate"
+
+        [<Literal>]
+        let ReasonEditLine = "tool/js-program/reason-edit-line"
+
+        [<Literal>]
+        let ReasonEditOverlaps = "tool/js-program/reason-edit-overlaps"
+
+        [<Literal>]
         let ArgProgram = "tool/js-program/arg-program"
 
         [<Literal>]
@@ -125,8 +173,11 @@ module JsCanonicalDescription =
 
     type Prose =
         { Header: string
+          EditPrelude: string
+          EditStructuralGuidance: string
           Footer: string
           Contract: string
+          ContractEditRecommendation: string
           ContractParallelEdits: string
           ContractParallelReads: string
           VerbRead: string
@@ -142,6 +193,7 @@ module JsCanonicalDescription =
           MutationRules: string
           UltraFraming: string
           UltraUnavailable: string
+          UltraCoder: string
           MechanicalSemantic: string
           CommentAnchorOwnSearch: string
           CommentIgnoreGy: string
@@ -157,7 +209,19 @@ module JsCanonicalDescription =
           ReasonUnknownAnchor: string
           ReasonInvalidSlice: string
           ReasonFileReadFailed: string
-          ReasonRunUnimplemented: string }
+          ReasonRunUnimplemented: string
+          ReasonEditInvalid: string
+          ReasonEditNotFound: string
+          ReasonEditAmbiguous: string
+          ReasonEditOverlap: string
+          ReasonEditAtomicity: string
+          ReasonEditPreview: string
+          ReasonEditCopyReady: string
+          ReasonEditAttempted: string
+          ReasonEditUnknownFields: string
+          ReasonEditCandidate: string
+          ReasonEditLine: string
+          ReasonEditOverlaps: string }
 
     let private fill (template: string) (pairs: (string * string) list) =
         let replaced =
@@ -352,6 +416,13 @@ module JsCanonicalDescription =
   }"""
             [ "comment_host_capability", prose.CommentHostCapability ]
 
+    let private editStub (prose: Prose) =
+        fill
+            """  edit(path, changes) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
     let private writeStub (prose: Prose) =
         fill
             """  write(path, newText) {
@@ -392,6 +463,8 @@ class JsProgram {"""
               if has capabilities JsCapability.Grep then
                   grepStub prose
               if has capabilities JsCapability.Edit then
+                  editStub prose
+              if has capabilities JsCapability.Edit then
                   rewriteStub prose
               if has capabilities JsCapability.Write then
                   writeStub prose
@@ -418,6 +491,438 @@ class JsProgram {"""
 const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
             .Trim()
 
+    /// High-level Edit affordance. It deliberately lives in the generated SDK
+    /// rather than a second Host mutation primitive: matching is pure and the
+    /// only effect remains the existing guarded js.edit staging executor.
+    /// Every change addresses the same immutable snapshot; approximate
+    /// similarity is diagnostic-only and can never authorize a write.
+    let private editAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
+        fill
+            """  edit(path, changes) {
+    const fail = (code, reason) => {
+      {{raise_failure}}
+    };
+    const bounded = (value, limit = 240) => {
+      let text;
+      try {
+        text = typeof value === "string" ? value : String(value);
+      } catch {
+        text = "<unprintable>";
+      }
+      return text.length > limit ? text.slice(0, limit) + "…" : text;
+    };
+    const shownPath =
+      typeof path === "string" ? JSON.stringify(bounded(path)) : bounded(path);
+    const atomicity = "{{reason_edit_atomicity}}";
+    const failEdit = (code, message, operation, details = []) => {
+      const location = `path=${shownPath}; change ${operation}.`;
+      fail(code, [message, location, ...details, atomicity].join("\n"));
+    };
+
+    if (typeof path !== "string" || path.length === 0) {
+      failEdit("INVALID_EDIT", "{{reason_edit_invalid}}", 1);
+    }
+
+    const declarations = Array.isArray(changes) ? changes : [changes];
+
+    if (declarations.length === 0) {
+      failEdit("INVALID_EDIT", "{{reason_edit_invalid}}", 1);
+    }
+
+    const own = (value, name) => Object.prototype.hasOwnProperty.call(value, name);
+    const allowedFields = new Set([
+      "find", "put", "all", "oldText", "newText", "search", "replace",
+    ]);
+    const describeFind = find => {
+      if (typeof find === "string") return JSON.stringify(bounded(find, 320));
+      if (find instanceof RegExp) {
+        return `/${bounded(find.source, 300)}/${bounded(find.flags, 20)}`;
+      }
+      return bounded(find, 320);
+    };
+    const aliased = (change, names, operation) => {
+      const present = names.filter(name => own(change, name));
+      if (present.length === 0) {
+        failEdit("INVALID_EDIT", "{{reason_edit_invalid}}", operation);
+      }
+      const value = change[present[0]];
+      if (present.some(name => change[name] !== value)) {
+        failEdit("INVALID_EDIT", "{{reason_edit_invalid}}", operation);
+      }
+      return value;
+    };
+
+    // Normalize the complete declaration before touching the filesystem. A
+    // malformed change must not be masked by FILE_NOT_FOUND or create a read
+    // observation that never contributed to a valid edit plan.
+    const canonicalChanges = [];
+    let declarationOrdinal = 0;
+    for (const declaration of declarations) {
+      declarationOrdinal += 1;
+      if (!declaration || typeof declaration !== "object" || Array.isArray(declaration)) {
+        failEdit("INVALID_EDIT", "{{reason_edit_invalid}}", declarationOrdinal);
+      }
+      const prototype = Object.getPrototypeOf(declaration);
+      if (prototype !== Object.prototype && prototype !== null) {
+        failEdit("INVALID_EDIT", "{{reason_edit_invalid}}", declarationOrdinal);
+      }
+      const unknownFields = Object.keys(declaration).filter(field => !allowedFields.has(field));
+      if (unknownFields.length > 0) {
+        const shownUnknownFields = unknownFields
+          .slice(0, 8)
+          .map(field => bounded(field, 80))
+          .join(", ") + (unknownFields.length > 8 ? ", …" : "");
+        failEdit(
+          "INVALID_EDIT",
+          "{{reason_edit_invalid}}",
+          declarationOrdinal,
+          [`{{reason_edit_unknown_fields}} ${shownUnknownFields}`]
+        );
+      }
+
+      const find = aliased(declaration, ["find", "oldText", "search"], declarationOrdinal);
+      const put = aliased(declaration, ["put", "newText", "replace"], declarationOrdinal);
+      if (typeof put !== "string") {
+        failEdit("INVALID_EDIT", "{{reason_edit_invalid}}", declarationOrdinal);
+      }
+      if (own(declaration, "all") && typeof declaration.all !== "boolean") {
+        failEdit("INVALID_EDIT", "{{reason_edit_invalid}}", declarationOrdinal);
+      }
+      if (typeof find === "string") {
+        if (find.length === 0) {
+          failEdit("INVALID_EDIT", "{{reason_edit_invalid}}", declarationOrdinal);
+        }
+      } else if (!(find instanceof RegExp)) {
+        failEdit("INVALID_EDIT", "{{reason_edit_invalid}}", declarationOrdinal);
+      }
+
+      canonicalChanges.push({
+        find,
+        put,
+        all: declaration.all === true,
+        operation: declarationOrdinal,
+      });
+    }
+
+    {{read_source}}
+
+    // A consistent CRLF file is matched in LF space and restored after the
+    // plan is applied. Mixed-EOL files remain byte-for-byte exact.
+    const consistentCrlf =
+      source.includes("\r\n") && !source.replace(/\r\n/g, "").includes("\n");
+    const working = consistentCrlf ? source.replace(/\r\n/g, "\n") : source;
+    const normalizeAuthored = text =>
+      consistentCrlf ? text.replace(/\r\n/g, "\n") : text;
+    const restoreEol = text =>
+      consistentCrlf ? text.replace(/\n/g, "\r\n") : text;
+
+    const sourceLines = working.split("\n");
+    const lineStarts = [0];
+    for (let i = 0; i < working.length; i += 1) {
+      if (working[i] === "\n") lineStarts.push(i + 1);
+    }
+
+    const lineIndexAt = offset => {
+      let low = 0;
+      let high = lineStarts.length - 1;
+      while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (lineStarts[mid] <= offset) low = mid + 1;
+        else high = mid - 1;
+      }
+      return Math.max(0, high);
+    };
+
+    const clipLine = (line, column = 0) => {
+      const limit = 240;
+      if (line.length <= limit) return line;
+      const start = Math.min(
+        Math.max(0, column - 80),
+        Math.max(0, line.length - limit)
+      );
+      const end = Math.min(line.length, start + limit);
+      return (start > 0 ? "…" : "")
+        + line.slice(start, end)
+        + (end < line.length ? "…" : "");
+    };
+
+    const numberedWindow = (offset, radius = 2) => {
+      const center = lineIndexAt(offset);
+      const centerColumn = Math.max(0, offset - lineStarts[center]);
+      const from = Math.max(0, center - radius);
+      const to = Math.min(sourceLines.length, center + radius + 1);
+      return sourceLines
+        .slice(from, to)
+        .map((line, index) => {
+          const lineIndex = from + index;
+          const column = lineIndex === center ? centerColumn : 0;
+          return `${lineIndex + 1} | ${clipLine(line, column)}`;
+        })
+        .join("\n");
+    };
+
+    const compact = value =>
+      value.slice(0, 480).replace(/\s+/g, " ").trim().slice(0, 240);
+
+    // Bounded Dice similarity is cheap enough for diagnostics on large files.
+    // It never participates in the mutation plan.
+    const similarity = (left, right) => {
+      const a = compact(left);
+      const b = compact(right);
+      if (a === b) return 1;
+      if (a.length === 0 || b.length === 0) return 0;
+      if (a.length === 1 || b.length === 1) return a === b ? 1 : 0;
+
+      const grams = value => {
+        const counts = new Map();
+        for (let i = 0; i < value.length - 1; i += 1) {
+          const gram = value.slice(i, i + 2);
+          counts.set(gram, (counts.get(gram) || 0) + 1);
+        }
+        return counts;
+      };
+
+      const aa = grams(a);
+      const bb = grams(b);
+      let shared = 0;
+      for (const [gram, count] of aa) {
+        shared += Math.min(count, bb.get(gram) || 0);
+      }
+      return (2 * shared) / (Math.max(1, a.length - 1) + Math.max(1, b.length - 1));
+    };
+
+    const closestCandidate = authoredNeedle => {
+      const needle = normalizeAuthored(authoredNeedle);
+      if (compact(needle).length === 0 || working.length === 0) return null;
+
+      // Diagnostics are bounded independently of file size. Stable tokens find
+      // plausible locations; exact-length-neighbourhood scoring chooses an
+      // existing substring. Neither score nor candidate ever enters the plan.
+      const searchNeedle = needle.length <= 4000 ? needle : needle.slice(0, 4000);
+      const tokenPattern = /[\p{L}\p{N}_$.-]{3,}/gu;
+      const seenTokens = new Set();
+      const tokens = [];
+      let tokenMatch;
+      while ((tokenMatch = tokenPattern.exec(searchNeedle)) !== null) {
+        if (!seenTokens.has(tokenMatch[0])) {
+          seenTokens.add(tokenMatch[0]);
+          tokens.push({ text: tokenMatch[0], offset: tokenMatch.index });
+        }
+      }
+
+      const occurrences = (token, limit = 64) => {
+        const offsets = [];
+        let cursor = 0;
+        while (offsets.length < limit && cursor <= working.length - token.length) {
+          const at = working.indexOf(token, cursor);
+          if (at < 0) break;
+          offsets.push(at);
+          cursor = at + Math.max(1, token.length);
+        }
+        return offsets;
+      };
+
+      const anchors = tokens
+        .sort((left, right) => right.text.length - left.text.length)
+        .slice(0, 24)
+        .map(token => ({ ...token, occurrences: occurrences(token.text) }))
+        .filter(token => token.occurrences.length > 0)
+        .sort((left, right) =>
+          left.occurrences.length - right.occurrences.length
+          || right.text.length - left.text.length
+        );
+
+      let bases;
+      if (anchors.length > 0) {
+        const anchor = anchors[0];
+        bases = anchor.occurrences.map(offset => offset - anchor.offset);
+      } else {
+        const count = Math.min(96, lineStarts.length);
+        bases = [];
+        for (let i = 0; i < count; i += 1) {
+          const index = count === 1
+            ? 0
+            : Math.floor((i * (lineStarts.length - 1)) / (count - 1));
+          bases.push(lineStarts[index]);
+        }
+      }
+
+      const delta = Math.min(24, Math.max(3, Math.ceil(searchNeedle.length * 0.12)));
+      const shifts = [...new Set([0, -1, 1, -2, 2, -4, 4, -delta, delta])];
+      const groups = [];
+      for (const base of bases) {
+        let groupBest = null;
+        for (const shift of shifts) {
+          const start = Math.min(Math.max(0, base + shift), Math.max(0, working.length - 1));
+          const shortest = Math.max(1, searchNeedle.length - delta);
+          const longest = Math.min(working.length - start, searchNeedle.length + delta);
+          for (let length = shortest; length <= longest; length += 1) {
+            const end = start + length;
+            const candidatePrefix = working.slice(start, Math.min(end, start + 480));
+            const score = similarity(searchNeedle, candidatePrefix);
+            if (!groupBest || score > groupBest.score) {
+              groupBest = { start, end, score };
+            }
+          }
+        }
+        if (groupBest) groups.push(groupBest);
+      }
+
+      groups.sort((left, right) => right.score - left.score);
+      const best = groups[0];
+      if (!best) return null;
+      const secondScore = groups.length > 1 ? groups[1].score : -1;
+      const confident = needle.length <= 480
+        && best.score >= 0.72
+        && (best.score >= 0.92 || best.score - secondScore >= 0.08);
+      return {
+        offset: best.start,
+        corrected: working.slice(best.start, best.end),
+        confident,
+      };
+    };
+
+    const stringMatches = (needle, collectAll) => {
+      const matches = [];
+      let cursor = 0;
+      while (cursor <= working.length - needle.length) {
+        const start = working.indexOf(needle, cursor);
+        if (start < 0) break;
+        matches.push({ start, end: start + needle.length });
+        if (!collectAll && matches.length === 2) break;
+        cursor = start + needle.length;
+      }
+      return matches;
+    };
+
+    const regexpMatches = (pattern, operation, collectAll) => {
+      // g is call-site multiplicity and is replaced by all; sticky y is a
+      // positional constraint and must remain part of write authority.
+      const flags = [...new Set(pattern.flags.replace(/g/g, "") + "g")].join("");
+      let regexp;
+      try {
+        regexp = new RegExp(pattern.source, flags);
+      } catch {
+        failEdit("INVALID_EDIT", "{{reason_edit_invalid}}", operation);
+      }
+
+      const matches = [];
+      let match;
+      while ((match = regexp.exec(working)) !== null) {
+        if (match[0].length === 0) {
+          failEdit("INVALID_EDIT", "{{reason_edit_invalid}}", operation);
+        }
+        matches.push({ start: match.index, end: match.index + match[0].length });
+        if (!collectAll && matches.length === 2) break;
+      }
+      return matches;
+    };
+
+    const planned = [];
+    for (const declaration of canonicalChanges) {
+      const { find, put, all, operation } = declaration;
+      let matches;
+      let normalizedFind = find;
+      if (typeof find === "string") {
+        normalizedFind = normalizeAuthored(find);
+        matches = stringMatches(normalizedFind, all);
+      } else if (find instanceof RegExp) {
+        matches = regexpMatches(find, operation, all);
+      }
+
+      if (matches.length === 0) {
+        const details = ["{{reason_edit_attempted}}", describeFind(find)];
+        if (typeof normalizedFind === "string") {
+          const closest = closestCandidate(normalizedFind);
+          if (closest) {
+            details.push("{{reason_edit_preview}}", numberedWindow(closest.offset));
+            if (closest.confident && closest.corrected.length + put.length <= 3000) {
+              const corrected = { find: closest.corrected, put };
+              if (all) corrected.all = true;
+              details.push("{{reason_edit_copy_ready}}", JSON.stringify(corrected, null, 2));
+            }
+          }
+        }
+        failEdit("EDIT_NOT_FOUND", "{{reason_edit_not_found}}", operation, details);
+      }
+
+      if (!all && matches.length !== 1) {
+        const details = ["{{reason_edit_attempted}}", describeFind(find)];
+        for (const [index, match] of matches.slice(0, 4).entries()) {
+          details.push(
+            `{{reason_edit_candidate}} ${index + 1}: {{reason_edit_line}} ${lineIndexAt(match.start) + 1}.`,
+            numberedWindow(match.start, 1)
+          );
+        }
+        failEdit("EDIT_AMBIGUOUS", "{{reason_edit_ambiguous}}", operation, details);
+      }
+
+      const selected = all ? matches : [matches[0]];
+      const replacement = normalizeAuthored(put);
+      for (const match of selected) {
+        planned.push({ ...match, operation, put: replacement });
+      }
+    }
+
+    const ascending = [...planned].sort(
+      (left, right) => left.start - right.start || left.end - right.end
+    );
+    for (let i = 1; i < ascending.length; i += 1) {
+      const previous = ascending[i - 1];
+      const current = ascending[i];
+      if (current.start < previous.end) {
+        failEdit(
+          "EDIT_OVERLAP",
+          "{{reason_edit_overlap}}",
+          current.operation,
+          [`{{reason_edit_overlaps}} ${previous.operation}; {{reason_edit_line}} ${lineIndexAt(current.start) + 1}.`]
+        );
+      }
+    }
+
+    let edited = working;
+    const descending = [...planned].sort(
+      (left, right) => right.start - left.start || right.end - left.end
+    );
+    for (const change of descending) {
+      edited = edited.slice(0, change.start) + change.put + edited.slice(change.end);
+    }
+
+    const finalText = restoreEol(edited);
+    if (finalText === source) {
+      return Object.freeze({
+        path,
+        changed: false,
+        operations: declarations.length,
+        replacements: planned.length,
+      });
+    }
+
+    const result = this._api.js.edit(path, finalText);
+    {{rethrow_host}}
+    return Object.freeze({
+      path,
+      changed: true,
+      operations: declarations.length,
+      replacements: planned.length,
+    });
+  }"""
+            [ "raise_failure", raiseFailure
+              "read_source", readSourceLine
+              "rethrow_host", rethrowHost
+              "reason_edit_invalid", prose.ReasonEditInvalid
+              "reason_edit_not_found", prose.ReasonEditNotFound
+              "reason_edit_ambiguous", prose.ReasonEditAmbiguous
+              "reason_edit_overlap", prose.ReasonEditOverlap
+              "reason_edit_atomicity", prose.ReasonEditAtomicity
+              "reason_edit_preview", prose.ReasonEditPreview
+              "reason_edit_copy_ready", prose.ReasonEditCopyReady
+              "reason_edit_attempted", prose.ReasonEditAttempted
+              "reason_edit_unknown_fields", prose.ReasonEditUnknownFields
+              "reason_edit_candidate", prose.ReasonEditCandidate
+              "reason_edit_line", prose.ReasonEditLine
+              "reason_edit_overlaps", prose.ReasonEditOverlaps ]
+
     let runtimeBaseClass (prose: Prose) (capabilities: Set<JsCapability>) : string =
         let methods =
             [ """
@@ -443,6 +948,8 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
   }"""
                       [ "rethrow_host", rethrowHost ]
                   |> fun s -> s.TrimStart('\n')
+              if has capabilities JsCapability.Edit then
+                  editAlgorithm prose (runtimeReadSource prose) runtimeRaiseFailure
               if has capabilities JsCapability.Edit then
                   fill
                       """  rewrite(path, newText) {
@@ -494,6 +1001,11 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
             prose.Contract
             [ "toolName", toolName
               "verbs", verbs
+              "editRecommendation",
+              if has capabilities JsCapability.Edit then
+                  prose.ContractEditRecommendation
+              else
+                  ""
               "parallelLine", fill parallelTemplate [ "toolName", toolName ] ]
 
     let rules (prose: Prose) (capabilities: Set<JsCapability>) : string =
@@ -512,35 +1024,6 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                   prose.MutationRules ]
 
         String.concat "\n\n" blocks
-
-    let private coderUltra =
-        """class Js extends JsProgram {
-  async run() {
-    const refs = await this.grep(/\boldApi\b/, "{src,tests}/**/*.{js,ts}");
-    const paths = [...new Set(refs.matches.map(x => x.path))];
-    const core = await this.file("src/api.js", [
-      ["definition", "afterDefinition", /const oldApi = buildApi\(\);/],
-      ["export", "afterExport", /export \{ oldApi \};/],
-      ["registration", "afterRegistration", /registry\.register\("oldApi", oldApi\);/],
-    ]);
-    const consumers = await Promise.all(
-      paths.filter(path => path !== "src/api.js").map(async path => [path, await this.file(path)])
-    );
-    this.rewrite(
-      "src/api.js",
-      core.text("^", "definition") + `const newApi = buildApi();`
-        + core.text("afterDefinition", "export") + `registry.register("newApi", newApi);`
-        + core.text("afterExport", "registration") + `export { newApi };`
-        + core.text("afterRegistration", "$")
-    );
-    for (const [path, file] of consumers) {
-      const before = file.text();
-      const after = before.replace(/\boldApi\b/g, "newApi");
-      if (after !== before) this.rewrite(path, after);
-    }
-    return { migrated: `oldApi → newApi`, referencesObserved: refs.matches.length };
-  }
-}"""
 
     let private inspectorUltra =
         """class Js extends JsProgram {
@@ -626,10 +1109,10 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
   }
 }"""
 
-    let ultraExample (roleName: string) (capabilities: Set<JsCapability>) : JsExample option =
+    let ultraExample (prose: Prose) (roleName: string) (capabilities: Set<JsCapability>) : JsExample option =
         let candidate =
             match roleName.Trim().ToLowerInvariant() with
-            | "coder" -> Some(set [ JsCapability.Read; JsCapability.Grep; JsCapability.Edit ], coderUltra)
+            | "coder" -> Some(set [ JsCapability.Read; JsCapability.Grep; JsCapability.Edit ], prose.UltraCoder)
             | "inspector" -> Some(set [ JsCapability.Read; JsCapability.Grep ], inspectorUltra)
             | "reviewer" -> Some(set [ JsCapability.Read; JsCapability.Grep ], reviewerUltra)
             | "devops" -> Some(set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ], devOpsUltra)
@@ -645,16 +1128,21 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
 
     let render (prose: Prose) (roleName: string) (toolName: string) (capabilities: Set<JsCapability>) : string =
         let ultraBlock =
-            match ultraExample roleName capabilities with
+            match ultraExample prose roleName capabilities with
             | Some example -> prose.UltraFraming + "\n\n```js\n" + example.Source + "\n```"
             | None -> prose.UltraUnavailable
 
-        String.concat
-            "\n\n"
-            [ prose.Header
+        let blocks =
+            [ if has capabilities JsCapability.Edit then
+                  prose.EditPrelude
+              if has capabilities JsCapability.Edit && has capabilities JsCapability.Read then
+                  prose.EditStructuralGuidance
+              prose.Header
               contract prose toolName capabilities
               "```js\n" + publicBaseClass prose capabilities + "\n```"
               rules prose capabilities
               prose.MechanicalSemantic
               ultraBlock
               prose.Footer ]
+
+        String.concat "\n\n" blocks

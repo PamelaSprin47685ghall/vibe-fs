@@ -17,6 +17,10 @@ type JsFailure =
     | AnchorNotFound of string
     | AnchorNotUnique
     | AnchorCrossFile
+    | InvalidEdit of string
+    | EditNotFound of string
+    | EditAmbiguous of string
+    | EditOverlap of string
     | DuplicateMutationTarget of string
     | ResultTooLarge of string option
     | InvalidReturnValue
