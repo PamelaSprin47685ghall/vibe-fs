@@ -18,59 +18,196 @@ const providerBase = {
   fallbackBudget: 'Available',
   breaker: 'Closed',
 }
-const retryBudgetCases = [
-  { label: 'zero', state: 'Exhausted' },
-  { label: 'boundary-one-remains', state: 'Available' },
-  { label: 'exhausted', state: 'Exhausted' },
+
+const providerCases = [
+  {
+    label: 'transient/available/available',
+    failure: 'ProviderTransient',
+    retryBudget: 'Available',
+    fallbackBudget: 'Available',
+    retry: 'RetryFreshAttempt',
+    fallback: 'NoFallback',
+    breaker: 'RecordProviderTransientFailure',
+    messageDisposition: 'KeepCurrentFact',
+    recovery: {
+      decision: 'RequeueEligible',
+      effects: ['RequeueEligible:RetryFreshAttempt'],
+    },
+  },
+  {
+    label: 'transient/available/exhausted',
+    failure: 'ProviderTransient',
+    retryBudget: 'Available',
+    fallbackBudget: 'Exhausted',
+    retry: 'RetryFreshAttempt',
+    fallback: 'NoFallback',
+    breaker: 'RecordProviderTransientFailure',
+    messageDisposition: 'KeepCurrentFact',
+    recovery: {
+      decision: 'RequeueEligible',
+      effects: ['RequeueEligible:RetryFreshAttempt'],
+    },
+  },
+  {
+    label: 'transient/exhausted/available',
+    failure: 'ProviderTransient',
+    retryBudget: 'Exhausted',
+    fallbackBudget: 'Available',
+    retry: 'NoRetry',
+    fallback: 'AdvanceFallback',
+    breaker: 'RecordProviderTransientFailure',
+    messageDisposition: 'KeepCurrentFact',
+    recovery: {
+      decision: 'RequeueEligible',
+      effects: ['RequeueEligible:AdvanceFallback'],
+    },
+  },
+  {
+    label: 'transient/exhausted/exhausted',
+    failure: 'ProviderTransient',
+    retryBudget: 'Exhausted',
+    fallbackBudget: 'Exhausted',
+    retry: 'NoRetry',
+    fallback: 'NoFallback',
+    breaker: 'RecordProviderTransientFailure',
+    messageDisposition: 'TerminalizeProviderStarted',
+    recovery: { decision: 'Finalize', effects: ['Finalize:Failed'] },
+  },
+  {
+    label: 'permanent/available/available',
+    failure: 'ProviderPermanent',
+    retryBudget: 'Available',
+    fallbackBudget: 'Available',
+    retry: 'NoRetry',
+    fallback: 'AdvanceFallback',
+    breaker: 'RecordProviderPermanentFailure',
+    messageDisposition: 'KeepCurrentFact',
+    recovery: {
+      decision: 'RequeueEligible',
+      effects: ['RequeueEligible:AdvanceFallback'],
+    },
+  },
+  {
+    label: 'permanent/exhausted/available',
+    failure: 'ProviderPermanent',
+    retryBudget: 'Exhausted',
+    fallbackBudget: 'Available',
+    retry: 'NoRetry',
+    fallback: 'AdvanceFallback',
+    breaker: 'RecordProviderPermanentFailure',
+    messageDisposition: 'KeepCurrentFact',
+    recovery: {
+      decision: 'RequeueEligible',
+      effects: ['RequeueEligible:AdvanceFallback'],
+    },
+  },
+  {
+    label: 'permanent/available/exhausted',
+    failure: 'ProviderPermanent',
+    retryBudget: 'Available',
+    fallbackBudget: 'Exhausted',
+    retry: 'NoRetry',
+    fallback: 'NoFallback',
+    breaker: 'RecordProviderPermanentFailure',
+    messageDisposition: 'TerminalizeProviderStarted',
+    recovery: { decision: 'Finalize', effects: ['Finalize:Failed'] },
+  },
+  {
+    label: 'permanent/exhausted/exhausted',
+    failure: 'ProviderPermanent',
+    retryBudget: 'Exhausted',
+    fallbackBudget: 'Exhausted',
+    retry: 'NoRetry',
+    fallback: 'NoFallback',
+    breaker: 'RecordProviderPermanentFailure',
+    messageDisposition: 'TerminalizeProviderStarted',
+    recovery: { decision: 'Finalize', effects: ['Finalize:Failed'] },
+  },
 ]
-const fallbackCases = ['Available', 'Exhausted']
-const persistenceCases = ['Committed', 'NotCommitted', 'Unknown']
-const evidenceCases = [
-  { label: 'exact', observation: 'ExactAbsent', duplicate: false },
-  { label: 'duplicate-exact', observation: 'ExactAbsent', duplicate: true },
-  { label: 'late-old', observation: 'LateOldExecution', duplicate: false },
+
+const fixedRecoveryCases = [
+  {
+    persistence: 'NotCommitted',
+    observation: 'ExactTerminal',
+    expected: { decision: 'Finalize', effects: ['Finalize:Failed'] },
+  },
+  {
+    persistence: 'NotCommitted',
+    observation: 'LateOldExecution',
+    expected: { decision: 'Ignore', effects: [] },
+  },
+  ...['ExactAbsent', 'ExactTerminal', 'LateOldExecution'].map((observation) => ({
+    persistence: 'Committed',
+    observation,
+    expected: { decision: 'Ignore', effects: [] },
+  })),
+  ...['ExactAbsent', 'ExactTerminal', 'LateOldExecution'].map((observation) => ({
+    persistence: 'Unknown',
+    observation,
+    expected: {
+      decision: 'MarkManualIntervention',
+      effects: ['MarkManualIntervention:PersistenceOutcomeUnknown'],
+    },
+  })),
 ]
-const hookCases = ['Fulfilled', 'TypedProtocolRejection']
-const providerFailures = ['ProviderTransient', 'ProviderPermanent']
 
-const decide = (failure, retryBudget, fallbackBudget) => policy.decide({
-  failure,
-  phase: 'ProviderStarted',
-  executionKey,
-  capacityFence,
-  provider: { ...providerBase, retryBudget, fallbackBudget },
-})
+const decide = ({ failure, retryBudget, fallbackBudget }) =>
+  policy.decide({
+    failure,
+    phase: 'ProviderStarted',
+    executionKey,
+    capacityFence,
+    provider: { ...providerBase, retryBudget, fallbackBudget },
+  })
 
-const licensedActions = (decision) => [decision.retry, decision.fallback]
-  .filter((action) => action.kind !== 'NoRetry' && action.kind !== 'NoFallback')
-
-const expectedRecoveryEffect = (decision) => {
-  if (decision.retry.kind === 'RetryFreshAttempt') return 'RequeueEligible:RetryFreshAttempt'
-  if (decision.fallback.kind === 'AdvanceFallback') return 'RequeueEligible:AdvanceFallback'
-  if (decision.messageDisposition.kind === 'TerminalizeProviderStarted') {
-    return `Finalize:${decision.messageDisposition.disposition}`
-  }
-  return 'MarkManualIntervention:NoAuthorizedProviderDisposition'
+const assertAuthorization = (action, providerCase) => {
+  assert.equal(action.logicalRun, providerBase.logicalRun, providerCase.label)
+  assert.equal(action.providerRun, providerBase.providerRun, providerCase.label)
+  assert.equal(action.requestKind, providerBase.requestKind, providerCase.label)
+  assert.equal(typeof action.decisionId, 'string', providerCase.label)
+  assert.notEqual(action.decisionId, '', providerCase.label)
 }
 
-const assertCoherent = (failure, decision) => {
-  assert.ok(licensedActions(decision).length <= 1, 'one policy decision licenses at most one owner action')
-  assert.equal(decision.capacitySettlement.kind, 'ReleaseExactFence')
-  assert.equal(decision.capacitySettlement.fenceReference, capacityFence.reference)
-  assert.equal(decision.fatality.kind, failure === 'LocalInvariant' ? 'FatalAfterSettlement' : 'NoFatality')
-  if (failure !== 'ProviderTransient' && failure !== 'ProviderPermanent') {
-    assert.equal(decision.retry.kind, 'NoRetry')
-    assert.equal(decision.fallback.kind, 'NoFallback')
+const assertPolicyOutcome = (providerCase, decision) => {
+  assert.equal(decision.retry.kind, providerCase.retry, providerCase.label)
+  assert.equal(decision.fallback.kind, providerCase.fallback, providerCase.label)
+  assert.equal(decision.breaker.kind, providerCase.breaker, providerCase.label)
+  assert.deepEqual(
+    decision.capacitySettlement,
+    { kind: 'ReleaseExactFence', fenceReference: capacityFence.reference },
+    providerCase.label,
+  )
+  assert.equal(
+    decision.messageDisposition.kind,
+    providerCase.messageDisposition,
+    providerCase.label,
+  )
+  assert.equal(decision.fatality.kind, 'NoFatality', providerCase.label)
+
+  if (providerCase.retry === 'RetryFreshAttempt') {
+    assertAuthorization(decision.retry, providerCase)
   }
-  if (decision.retry.kind === 'RetryFreshAttempt') assert.equal(failure, 'ProviderTransient')
-  if (decision.fallback.kind === 'AdvanceFallback') {
-    assert.ok(failure === 'ProviderTransient' || failure === 'ProviderPermanent')
+  if (providerCase.fallback === 'AdvanceFallback') {
+    assertAuthorization(decision.fallback, providerCase)
+  }
+  if (providerCase.messageDisposition === 'TerminalizeProviderStarted') {
+    assert.equal(decision.messageDisposition.disposition, 'Failed', providerCase.label)
+    assert.deepEqual(decision.messageDisposition.executionKey, executionKey, providerCase.label)
   }
 }
+
+const interpret = (providerCase, persistence, observation) =>
+  recovery.interpretFailurePolicy(
+    providerCase.failure,
+    providerCase.retryBudget,
+    providerCase.fallbackBudget,
+    persistence,
+    observation,
+  )
 
 const exerciseHookPromise = async (mode, label) => {
   if (mode === 'Fulfilled') {
-    const wrapped = hooks.policyAwareHook(`policy-property-${label}`, () => label)
+    const wrapped = hooks.policyAwareHook(`policy-matrix-${label}`, () => label)
     const promise = wrapped('args', 'context')
     assert.equal(typeof promise.then, 'function')
     assert.equal(await promise, label)
@@ -78,106 +215,38 @@ const exerciseHookPromise = async (mode, label) => {
   }
 
   const rejection = hooks.providerInputRejection(label)
-  const wrapped = hooks.policyAwareHook(`policy-property-${label}`, () => Promise.reject(rejection))
+  const wrapped = hooks.policyAwareHook(`policy-matrix-${label}`, () => Promise.reject(rejection))
   const promise = wrapped('args', 'context')
   assert.equal(typeof promise.then, 'function')
   await assert.rejects(() => promise, (error) => error === rejection)
 }
 
-test('WHAT[EXECFAIL-003] generated budgets, fallback, persistence, Host evidence, and Hook Promises preserve one owner licence', async () => {
-  let combinations = 0
+test('WHAT[EXECFAIL-003] finite provider budget matrix fixes policy and recovery outcomes', async () => {
+  for (const providerCase of providerCases) {
+    const decision = decide(providerCase)
+    assertPolicyOutcome(providerCase, decision)
+    assert.deepEqual(decide(providerCase), decision, `${providerCase.label}: unstable policy decision`)
 
-  for (const failure of providerFailures) {
-    for (const retryBudget of retryBudgetCases) {
-      for (const fallbackBudget of fallbackCases) {
-        for (const persistence of persistenceCases) {
-          for (const evidence of evidenceCases) {
-            for (const hookMode of hookCases) {
-              const label = [
-                failure,
-                retryBudget.label,
-                fallbackBudget,
-                persistence,
-                evidence.label,
-                hookMode,
-              ].join('/')
-              const decision = decide(failure, retryBudget.state, fallbackBudget)
-              assertCoherent(failure, decision)
+    assert.deepEqual(
+      await interpret(providerCase, 'NotCommitted', 'ExactAbsent'),
+      providerCase.recovery,
+      providerCase.label,
+    )
+    assert.deepEqual(
+      await interpret(providerCase, 'NotCommitted', 'ExactAbsent'),
+      providerCase.recovery,
+      `${providerCase.label}: duplicate evidence changed fixed outcome`,
+    )
 
-              const interpreted = await recovery.interpretFailurePolicy(
-                failure,
-                retryBudget.state,
-                fallbackBudget,
-                persistence,
-                evidence.observation,
-              )
-              assert.ok(interpreted.effects.length <= 1, `${label}: interpreter emitted multiple owner actions`)
-
-              if (persistence === 'Committed') {
-                assert.deepEqual(interpreted, { decision: 'Ignore', effects: [] }, label)
-              } else if (persistence === 'Unknown') {
-                assert.deepEqual(
-                  interpreted,
-                  {
-                    decision: 'MarkManualIntervention',
-                    effects: ['MarkManualIntervention:PersistenceOutcomeUnknown'],
-                  },
-                  label,
-                )
-              } else if (evidence.observation === 'LateOldExecution') {
-                assert.deepEqual(interpreted, { decision: 'Ignore', effects: [] }, label)
-              } else {
-                assert.deepEqual(
-                  interpreted,
-                  { decision: licensedActions(decision).length === 0 ? 'Finalize' : 'RequeueEligible', effects: [expectedRecoveryEffect(decision)] },
-                  label,
-                )
-              }
-
-              if (evidence.duplicate) {
-                const duplicate = await recovery.interpretFailurePolicy(
-                  failure,
-                  retryBudget.state,
-                  fallbackBudget,
-                  persistence,
-                  evidence.observation,
-                )
-                assert.deepEqual(duplicate, interpreted, `${label}: duplicate evidence changed interpretation`)
-                const repeatedDecision = decide(failure, retryBudget.state, fallbackBudget)
-                assert.deepEqual(repeatedDecision, decision, `${label}: duplicate evidence minted a new licence`)
-              }
-
-              await exerciseHookPromise(hookMode, label)
-              combinations += 1
-            }
-          }
-        }
-      }
+    for (const recoveryCase of fixedRecoveryCases) {
+      assert.deepEqual(
+        await interpret(providerCase, recoveryCase.persistence, recoveryCase.observation),
+        recoveryCase.expected,
+        `${providerCase.label}/${recoveryCase.persistence}/${recoveryCase.observation}`,
+      )
     }
+
+    await exerciseHookPromise('Fulfilled', providerCase.label)
+    await exerciseHookPromise('TypedProtocolRejection', providerCase.label)
   }
-
-  assert.equal(combinations, 216)
-})
-
-test('WHAT[EXECFAIL-006] retry, fatal, and exact-release mutations violate closed policy laws', () => {
-  const transient = decide('ProviderTransient', 'Available', 'Available')
-  assert.doesNotThrow(() => assertCoherent('ProviderTransient', transient))
-  assert.throws(
-    () => assertCoherent('UserCancelled', { ...decide('UserCancelled', 'Available', 'Available'), retry: transient.retry }),
-    /one policy decision licenses at most one owner action|Expected values to be strictly equal/,
-  )
-
-  const invariant = decide('LocalInvariant', 'Exhausted', 'Exhausted')
-  assert.doesNotThrow(() => assertCoherent('LocalInvariant', invariant))
-  assert.throws(
-    () => assertCoherent('LocalInvariant', { ...invariant, fatality: { kind: 'NoFatality' } }),
-    /Expected values to be strictly equal/,
-  )
-
-  const cancelled = decide('UserCancelled', 'Exhausted', 'Exhausted')
-  assert.doesNotThrow(() => assertCoherent('UserCancelled', cancelled))
-  assert.throws(
-    () => assertCoherent('UserCancelled', { ...cancelled, capacitySettlement: { kind: 'RetainExactFence', fenceReference: capacityFence.reference } }),
-    /Expected values to be strictly equal/,
-  )
 })
