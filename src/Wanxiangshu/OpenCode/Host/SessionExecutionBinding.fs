@@ -560,18 +560,141 @@ module SessionExecutionBinding =
                 |> Result.mapError ProviderStartObservationError.PersistenceFailed
         }
 
+    let private admitContinuation
+        (durable: AgentJournal)
+        (key: ChatExecutionKey)
+        (authority: PromptAuthority.AuthorityExecutionProfile)
+        =
+        let evidence =
+            ManagedChatAcceptance.evidenceFromIntent
+                authority
+                key.PhysicalUserMessageId
+                (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.HumanMessage)
+                authority.SelectedAgent
+
+        ManagedChatAcceptance.accept durable key evidence
+
+    let private admitExternalRoot (durable: AgentJournal) (key: ChatExecutionKey) (agent: string) =
+        task {
+            match ParticipantIdentity.resolveAtRoot agent with
+            | Ok identity ->
+                let logicalRunId =
+                    LogicalRunId.create (sprintf "run-%s-1" (SessionId.value key.SessionId))
+
+                let rootUserMsgId =
+                    AuthorityRootUserMessageId.create (PhysicalUserMessageId.value key.PhysicalUserMessageId)
+
+                let rootPayload: AuthorityRootAcceptedPayload =
+                    { SchemaVersion = 1
+                      SessionId = key.SessionId
+                      LogicalRunId = logicalRunId
+                      AuthorityRootUserMessageId = rootUserMsgId
+                      AuthorityKind = "HumanRoot"
+                      IdentitySeed = PromptAuthority.IdentitySeed.RootSelection identity }
+
+                let! _ =
+                    AgentJournal.appendAgent
+                        (StreamId.Session key.SessionId)
+                        None
+                        (PromptFact.AuthorityRootAccepted rootPayload)
+                        durable
+
+                let evidence: AcceptedChatExecutionEvidence =
+                    { SessionId = key.SessionId
+                      LogicalRunId = logicalRunId
+                      AuthorityRootUserMessageId = rootUserMsgId
+                      AuthorityKind = PromptRootAuthorityKind.HumanRoot
+                      PhysicalUserMessageId = key.PhysicalUserMessageId
+                      EffectiveAgent = agent
+                      IdentitySeed = PromptAuthority.IdentitySeed.RootSelection identity
+                      Origin = PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot }
+
+                let! res = ManagedChatAcceptance.accept durable key evidence
+                return res |> Result.map ignore |> Result.mapError (fun e -> sprintf "%A" e)
+            | Error err -> return Error(sprintf "%A" err)
+        }
+
+    let private establishAdmission
+        (durable: AgentJournal)
+        (key: ChatExecutionKey)
+        (agent: string)
+        (projection: ProjectionSet)
+        =
+        task {
+            match PromptAuthorityLedger.activeProfile key.SessionId projection.AgentProjections with
+            | Some authority when authority.SelectedAgent = agent ->
+                let! res = admitContinuation durable key authority
+                return res |> Result.map ignore |> Result.mapError (fun e -> sprintf "%A" e)
+            | _ -> return! admitExternalRoot durable key agent
+        }
+
+    let private admitUnestablishedKey
+        (durable: AgentJournal)
+        (key: ChatExecutionKey)
+        (agentOpt: string option)
+        (projection: ProjectionSet)
+        =
+        task {
+            match agentOpt with
+            | Some agent ->
+                let! _ = establishAdmission durable key agent projection
+                ()
+            | None -> ()
+        }
+
+    let private ensureChatExecutionAccepted
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        : Task<unit> =
+        task {
+            let key: ChatExecutionKey =
+                { SessionId = sessionId
+                  PhysicalUserMessageId = physicalUserMessageId }
+
+            let projection = AgentJournal.snapshot durable
+
+            if
+                (ChatExecutionProjection.byKey key projection.AgentProjections.ChatExecutions)
+                    .IsNone
+            then
+                let agentOpt = baseAgent (SessionId.value sessionId)
+                do! admitUnestablishedKey durable key agentOpt projection
+        }
+
+    let private freezeExistingDurablePlan
+        (journal: AgentJournal option)
+        (freezeAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan -> Result<unit, 'bindingError>)
+        (sessionId: SessionId)
+        (durable: AgentJournal)
+        (outObj: obj)
+        : Task<Result<unit, ProviderStartObservationError<'bindingError>>> =
+        task {
+            let rawMessages =
+                ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
+
+            match ProviderWireCapture.lastUserMessageId rawMessages with
+            | None -> return Ok()
+            | Some physical ->
+                do! ensureChatExecutionAccepted durable sessionId physical
+                return freezeManagedProviderAttemptPlan journal freezeAttemptPlan sessionId outObj
+        }
+
     let freezeProviderAttemptPlanForTransform
         (journal: AgentJournal option)
         (freezeAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan -> Result<unit, 'bindingError>)
         (projectionSessionIdOpt: string option)
         (outObj: obj)
         : Task<Result<unit, ProviderStartObservationError<'bindingError>>> =
-        match projectionSessionIdOpt with
-        | None -> Task.FromResult(Ok())
-        | Some sessionText when not (providerBindingRequired (SessionId.create sessionText)) -> Task.FromResult(Ok())
-        | Some sessionText ->
-            freezeManagedProviderAttemptPlan journal freezeAttemptPlan (SessionId.create sessionText) outObj
-            |> Task.FromResult
+        task {
+            match projectionSessionIdOpt, journal with
+            | None, _ -> return Ok()
+            | Some sessionText, _ when not (providerBindingRequired (SessionId.create sessionText)) -> return Ok()
+            | Some sessionText, Some durable ->
+                return!
+                    freezeExistingDurablePlan journal freezeAttemptPlan (SessionId.create sessionText) durable outObj
+            | Some _, None -> return Error ProviderStartObservationError.DurableJournalUnavailable
+        }
 
     let private persistObservedProviderStart
         (durable: AgentJournal)

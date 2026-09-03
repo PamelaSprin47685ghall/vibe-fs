@@ -192,19 +192,19 @@ docs/adr/
 
 建议在 EPI-014 后新增：
 
-### EPI-015：认识论零硬编码
+### PROPOSED_EPI_015：认识论零硬编码
 
 Core 不得导入方法论、证据本体、信念更新、排序、停止或综合插件。
 
-### EPI-016：单一证书空间
+### PROPOSED_EPI_016：单一证书空间
 
 Bayes、A*、MCTS 不得拥有互斥 `SolverMode`；它们必须精化同一个认识图上的证书。
 
-### EPI-017：探究协议是可回放实验
+### PROPOSED_EPI_017：探究协议是可回放实验
 
 每次措辞、选项顺序、候选标签、上下文分支和随机种子都必须可重放。
 
-### EPI-018：宿主等价
+### PROPOSED_EPI_018：宿主等价
 
 给定相同初始状态、插件锁文件与观测事件序列，MCP Host 和 OpenCode Host 必须产生相同 Core 状态。
 
@@ -2663,7 +2663,7 @@ research-modern:
 
 ## Commit 1
 
-新增 ADR、EPI-015 至 EPI-018，不改代码。
+新增 ADR、PROPOSED_EPI_015 至 PROPOSED_EPI_018，不改代码。
 
 验证：
 

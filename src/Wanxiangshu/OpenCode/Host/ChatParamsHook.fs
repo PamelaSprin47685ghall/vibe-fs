@@ -181,6 +181,7 @@ module ChatParamsHook =
         match trySessionAndAgent input with
         | Some(sessionId, _) when SessionExecutionBinding.isUnboundHostAuxiliaryChild sessionId -> ()
         | Some(sessionId, agent) ->
+            SessionExecutionBinding.observeUserFacingAgent sessionId agent
             validateModel sessionId agent input
             applyManagedTemperature input output
         | None -> ()
