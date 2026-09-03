@@ -2,20 +2,30 @@ namespace Wanxiangshu.Interaction.Dispatch.OpenCode
 
 open Wanxiangshu.OpenCode
 open System
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 
 /// Decodes the raw chat.message hook payload before authority policy sees it.
 module PromptIngressCodec =
 
+    [<Emit("typeof $0 === 'string'")>]
+    let private isString (value: obj) : bool = jsNative
+
     type DecodedMessage = ChatAdmissionIntent.DecodedMessage
 
-    let private readString (source: obj) (name: string) : string option =
-        if isNull source || isNull (source?(name)) then
+    let private nonBlankString (value: obj) : string option =
+        if isNull value || not (isString value) then
             None
         else
-            let value = unbox<string> (source?(name))
-            if String.IsNullOrWhiteSpace value then None else Some value
+            let text = unbox<string> value
+            if String.IsNullOrWhiteSpace text then None else Some text
+
+    let private readString (source: obj) (name: string) : string option =
+        if isNull source then
+            None
+        else
+            nonBlankString (source?(name))
 
     let private childObject (source: obj) (name: string) : obj =
         if isNull source then null else source?(name)
@@ -86,28 +96,20 @@ module PromptIngressCodec =
     let private sessionIdOfPart (sess: obj) : string option =
         if isNull sess then
             None
-        elif not (isNull sess?id) then
-            Some(string sess?id)
-        elif not (isNull sess?sessionID) then
-            Some(string sess?sessionID)
-        elif not (isNull sess?sessionId) then
-            Some(string sess?sessionId)
+        elif isString sess then
+            nonBlankString sess
         else
-            let s = string sess
-            if s.StartsWith("ses_") then Some s else None
+            [ readString sess "id"
+              readString sess "sessionID"
+              readString sess "sessionId" ]
+            |> List.tryPick id
 
     let private sessionIdOf (input: obj) (output: obj) =
         let fromSource (source: obj) =
-            if isNull source then
-                None
-            elif not (isNull source?sessionID) then
-                Some(string source?sessionID)
-            elif not (isNull source?sessionId) then
-                Some(string source?sessionId)
-            elif not (isNull source?session) then
-                sessionIdOfPart source?session
-            else
-                None
+            [ readString source "sessionID"
+              readString source "sessionId"
+              sessionIdOfPart (childObject source "session") ]
+            |> List.tryPick id
 
         let message = if isNull output then null else output?message
         let info = if isNull output then null else output?info
