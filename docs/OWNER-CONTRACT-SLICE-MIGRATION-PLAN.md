@@ -2,7 +2,7 @@
 
 日期：2026-09-03
 
-状态：老板裁决已成立；M6.0–M6.1 已完成，M6.2 待执行
+状态：老板裁决已成立；M6.0–M6.2 已完成，M6.3 待执行
 
 适用背景：Fable owner-project 编译边界、published contract 授权与 semantic owner 重整
 
@@ -748,3 +748,4 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - M6.2b RED：直接令 `eventstore-merge-runtime → eventstore-core-runtime` 会触发旧 gate 的 `foreign-runtime-reference/composition-only-runtime-binding`；因此拒绝用扩大 runtime closure 的方式掩盖缺边。
 - M6.2b sequencing：`CanonicalEventCodec` 应从混装的 `eventstore-core-runtime` 移到独立 contract slice；但旧 gate 依靠 codec 与 `ProcessEventLog` 共处一 project，偶然放行三条既存 durable-convergence → core-runtime 引用。拆分后若为维持旧 gate 而新增 owner-wide `ProcessEventLog` ACL，会延续错误授权模型。因此该拆分不得形成旧 gate 下的独立提交，必须与 M6.3 manifest 和 M6.4 gate replacement 原子落地。
 - M6.2c：`opencode-host-messagevisibility` 已补上其 `HostEventCodec.unwrap/eventTypeOf/tryMessageSessionId` 依赖对应的 `host-signal-adapter` ProjectReference。旧 manifest 已有 `host-boundary.Contract → participant-horizon` exact grant；本次只修复 compiler closure。
+- M6.2 verification：旧权威 `owner-contracts.mjs` 与 `owner-projects.mjs` 绿色；178 localities、711 sources、1,853 refs、DAG。两个可独立提交的缺边已关闭，相关 consumer focused Fable compile 绿色。fresh analyzer 现只报告 `eventstore-merge-runtime → eventstore-core-runtime/CanonicalEventCodec` 一条原子 cutover blocker；它将在 M6.3 工作树准备并随 M6.4 单提交切换，不会制造旧 ACL 例外。
