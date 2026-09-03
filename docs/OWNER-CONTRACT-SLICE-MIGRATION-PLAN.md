@@ -2,7 +2,7 @@
 
 日期：2026-09-03
 
-状态：老板裁决已成立；M6.0–M6.2 已完成，M6.3 待执行
+状态：M6.0–M6.2 已完成；M6.3 preflight 等待 owner 裁决
 
 适用背景：Fable owner-project 编译边界、published contract 授权与 semantic owner 重整
 
@@ -749,3 +749,12 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - M6.2b sequencing：`CanonicalEventCodec` 应从混装的 `eventstore-core-runtime` 移到独立 contract slice；但旧 gate 依靠 codec 与 `ProcessEventLog` 共处一 project，偶然放行三条既存 durable-convergence → core-runtime 引用。拆分后若为维持旧 gate 而新增 owner-wide `ProcessEventLog` ACL，会延续错误授权模型。因此该拆分不得形成旧 gate 下的独立提交，必须与 M6.3 manifest 和 M6.4 gate replacement 原子落地。
 - M6.2c：`opencode-host-messagevisibility` 已补上其 `HostEventCodec.unwrap/eventTypeOf/tryMessageSessionId` 依赖对应的 `host-signal-adapter` ProjectReference。旧 manifest 已有 `host-boundary.Contract → participant-horizon` exact grant；本次只修复 compiler closure。
 - M6.2 verification：旧权威 `owner-contracts.mjs` 与 `owner-projects.mjs` 绿色；178 localities、711 sources、1,853 refs、DAG。两个可独立提交的缺边已关闭，相关 consumer focused Fable compile 绿色。fresh analyzer 现只报告 `eventstore-merge-runtime → eventstore-core-runtime/CanonicalEventCodec` 一条原子 cutover blocker；它将在 M6.3 工作树准备并随 M6.4 单提交切换，不会制造旧 ACL 例外。
+
+### 2026-09-03 — M6.3 classification preflight：等待 owner 裁决
+
+- 当前 direct ProjectReference 按 provider kind：contract 921、composition 797、adapter 54、runtime 81；其中 foreign 1,614、same-owner 239。新模型不豁免后者。
+- 92 个标为 composition 的 locality 正在充当 provider，共 797 条 direct edge：768 条来自 composition consumer、19 条来自 adapter、10 条来自 runtime。现有 10 份旧 composition-root relation 不能证明这 797 条边全是 terminal wiring；自动把它们全部改写成 wiring 会把错误分类固化。
+- effect matrix 有 10 条直接违规：`execution-session-loopdetector → host-signal-adapter`、`host-session-runtime → host-signal-adapter`、`host-signal-adapter → host-diagnostics-runtime`；`delegation-host-adapter → delegation-{recovery,fork,fold,sync}-runtime`、`delegation-pty-adapter → delegation-host-adapter/delegation-fork-runtime`、`delegation-recovery-runtime → delegation-fold`。反向闭包共影响 12 个 effect provider。
+- 这些事实要求逐 owner 判断：①旧 composition kind 是错标，可改为 shared/bounded contract；②locality 混合 public capability 与 terminal wiring，必须拆 source/project；③确属 terminal composition，只能增加 exact composition-wiring relation；④effect consumer 本身应成为 composition，或抽 port 并改为 capability injection。引用图无法替 owner 做此选择。
+- 推荐裁决：保持 M6.0 kind × exposure 矩阵不变；授权按上述四分法逐 locality 审核，先处理 29 条 non-composition → composition direct edge与 10 条 direct effect violation，再审核 768 条 composition → composition edge。禁止把当前 ProjectReference 集合自动抄成 grant。
+- 在裁决前停止 M6.3；未生成新 manifest，未启用新 gate，旧 gate 仍是唯一 release authority，工作树保持可回溯绿色停点。
