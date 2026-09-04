@@ -6,7 +6,6 @@
 /src/Wanxiangshu/Participant/Persona/Identity.fs
 /src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs
 /src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs
-/src/Wanxiangshu/Participant/Persona/RoleIdentity.fs
 /src/Wanxiangshu/Participant/Persona/Surface.fs
 /src/Wanxiangshu/Foundation/Roles.fs
 /src/Wanxiangshu/Foundation/RolesSurface.fs
