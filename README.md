@@ -216,7 +216,6 @@ resources/provider/
   delegation/<scenario>/{en,zh-CN}.md
   host/<guideline>/{en,zh-CN}.md
   lifecycle/<phase>/{en,zh-CN}.md
-  review/challenge/{en,zh-CN}.md
   runtime/<scenario>/{en,zh-CN}.md
   library/<office>/{en,zh-CN}.md
 resources/enforcer/<TipName>/{enforcer,main}{,.zh-CN}.md
