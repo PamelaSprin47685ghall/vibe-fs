@@ -74,7 +74,6 @@ test('WHAT[ENF-002] Inquiry_host_schema_allow_list_is_inspect_sphinx_and_fission
     'coder',
     'inspector',
     'browser',
-    'reviewer',
     'devops',
     'distiller',
     'blogger',

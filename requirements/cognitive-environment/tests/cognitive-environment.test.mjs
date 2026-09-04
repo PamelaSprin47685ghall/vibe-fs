@@ -228,14 +228,14 @@ test('WHAT[COGNITIVE-ENVIRONMENT-010] CE_010_lifecycle_texts_orient_without_educ
   }
 })
 
-test('WHAT[COGNITIVE-ENVIRONMENT-012] CE_012_reviewer_prompt_carries_role_law_and_ledger_without_process_mechanics', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-012] CE_012_relay_assessment_prompt_carries_ledger_without_process_mechanics', () => {
   for (const locale of ['en', 'zh-CN']) {
-    const text = read(`resources/provider/role/reviewer/${locale}.md`)
-    assert.match(text, /Examiner|Ledger|判断|judge/i, 'Reviewer prompt = Role Law + Examiner Ledger composition')
+    const text = read(`resources/provider/library/relay/quality-ledger/${locale}.md`)
+    assert.match(text, /Ledger|judgment|acceptance/i, 'Relay assessment prompt carries Ledger guidance')
     assert.doesNotMatch(
       text,
       /\bbarrier\b|\b2N\b|\bwitness\b|\bcohort\b|confirmation rounds|dedicated session|双 PERFECT|双完美/i,
-      `${locale}: hidden PERFECT-process mechanics must not enter the Reviewer prompt`,
+      `${locale}: hidden PERFECT-process mechanics must not enter the assessment prompt`,
     )
   }
 })

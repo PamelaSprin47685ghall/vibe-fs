@@ -4,7 +4,7 @@
 // or null for a new conversation. It is a preference hint, not occupancy.
 // Return a target to acquire it, or null to wait for an occupancy change.
 // `role` is always a canonical lowercase role name (manager, orchestrator,
-// coder, inspector, devops, browser, inquiry, reviewer, blogger, distiller,
+// coder, inspector, devops, browser, inquiry, blogger, distiller,
 // bookkeeper, predictor). Unknown roles fail closed.
 
 // Provider-level concurrency limits (maximum concurrent active leases per provider).
@@ -122,11 +122,6 @@ const INQUIRY_POOL = [
   ...FLASH,
 ]
 
-const REVIEWER_POOL = [
-  ...PREMIUM,
-  ...STANDARD,
-]
-
 const BROWSER_POOL = [
   ...BROWSER_A,
   ...BROWSER_B,
@@ -159,7 +154,6 @@ const pools = new Map([
   ['orchestrator', ORCHESTRATOR_POOL],
   ['devops', DEVOPS_POOL],
   ['inquiry', INQUIRY_POOL],
-  ['reviewer', REVIEWER_POOL],
   ['browser', BROWSER_POOL],
   ['blogger', BLOGGER_POOL],
   ['distiller', DISTILLER_POOL],

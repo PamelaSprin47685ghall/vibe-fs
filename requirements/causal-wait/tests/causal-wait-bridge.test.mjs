@@ -28,9 +28,9 @@ test('WHAT[CAUSAL-008] CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json', (
   fs.mkdirSync(path.join(workspace, '.git', 'info'), { recursive: true })
   const registry = causal.createRegistry()
   const wait = mkWait(
-    'provider-verdict',
-    'ReviewerWorkflow',
-    { reviewer: 'R2', barrier: 'B17' },
+    'provider-assessment',
+    'RelayWorkflow',
+    { incumbency: 'I2', road: 'R17' },
     externalProducer('provider', { run: 'P81' }),
   )
   const lease = causal.enter(registry, wait)
@@ -44,7 +44,7 @@ test('WHAT[CAUSAL-008] CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json', (
     assert.equal(typeof snap.pid, 'number')
     assert.ok(String(snap.sequence).length > 0)
     assert.equal(snap.active.length, 1)
-    assert.equal(snap.active[0].waitKind, 'provider-verdict')
+    assert.equal(snap.active[0].waitKind, 'provider-assessment')
     assert.ok(Array.isArray(snap.history))
     assert.ok(Array.isArray(snap.frontiers))
     assert.ok(snap.frontiers.length >= 1)

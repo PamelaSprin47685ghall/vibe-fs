@@ -35,7 +35,7 @@ PromptResources.systemForRole (语言 lang, 角色 role)
 | COGNITIVE-ENVIRONMENT-009 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-009] CE_prompt_016_office_library_closing_work_not_forced_to_resemble_book` |
 | COGNITIVE-ENVIRONMENT-010 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-010] CE_010_lifecycle_texts_orient_without_educating_or_replacing_system_prompt` |
 | COGNITIVE-ENVIRONMENT-011 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-011] CE_011_transient_texts_do_not_rewrite_role_self_model` |
-| COGNITIVE-ENVIRONMENT-012 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-012] CE_012_reviewer_prompt_carries_role_law_and_ledger_without_process_mechanics` |
+| COGNITIVE-ENVIRONMENT-012 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-012] CE_012_relay_assessment_prompt_carries_ledger_without_process_mechanics` |
 | COGNITIVE-ENVIRONMENT-013 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_teaches_continuous_ready_frontier_without_batch_barriers` |
 | COGNITIVE-ENVIRONMENT-014 | `requirements/guidance-delivery/tests/pair-calibration.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-014] CE_014_tool_estimate_is_explicitly_advisory_in_both_provider_languages` |
 | COGNITIVE-ENVIRONMENT-015 | `requirements/cognitive-environment/tests/blogger-chronicle-text.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_TEXT_is_companion_only_ephemeral_assistant_text_injection` |

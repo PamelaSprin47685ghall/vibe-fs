@@ -12,7 +12,6 @@
 /resources/provider/role/devops/**
 /resources/provider/role/browser/**
 /resources/provider/role/inquiry/**
-/resources/provider/role/reviewer/**
 /resources/provider/role/orchestrator/**
 /resources/provider/tool/fork/**
 /resources/provider/tool/inspect/**

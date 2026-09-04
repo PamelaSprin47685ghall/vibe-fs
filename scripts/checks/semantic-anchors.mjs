@@ -10,7 +10,6 @@ export const ROLE_ANCHOR_DIRS = Object.freeze([
   'inspector',
   'devops',
   'inquiry',
-  'reviewer',
   'orchestrator',
   'browser',
   'blogger',
@@ -192,21 +191,6 @@ export const ROLE_SEMANTIC_ANCHORS = Object.freeze({
       en: /Do not decorate a canonical synthesis|strongest synthesis the evidence has earned/i,
       zh: /不要用这场探究并未赢得的确定性，去装饰 canonical synthesis|留下证据真正赢得的最强 synthesis/,
     },
-  ]),
-  reviewer: Object.freeze([
-    { id: 'discrimination', en: /discrimination/i, zh: /有区分力的判断/ },
-    {
-      id: 'rejection-must-purchase',
-      en: /Rejection must (also be earned|purchase)/i,
-      zh: /拒绝必须买到/,
-    },
-    { id: 'non-blocking', en: /non-blocking/i, zh: /非阻断性/ },
-    {
-      id: 'perfect-not-flawless',
-      en: /PERFECT means|literal flawlessness/i,
-      zh: /并不意味着字面上的毫无瑕疵/,
-    },
-    { id: 'acceptance-not-omniscience', en: /omniscience/i, zh: /全知/ },
   ]),
   orchestrator: Object.freeze([
     { id: 'owns-roads', en: /own(?:s)?(?:\s+the)?\s+roads/i, zh: /你拥有的是道路/ },

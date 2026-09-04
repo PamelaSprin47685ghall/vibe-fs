@@ -175,7 +175,6 @@ async function verifyArtifacts() {
     'coder',
     'devops',
     'inspector',
-    'reviewer',
     'browser',
     'inquiry',
     'orchestrator',
