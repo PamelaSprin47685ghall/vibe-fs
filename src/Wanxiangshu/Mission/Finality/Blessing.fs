@@ -19,6 +19,7 @@ open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
@@ -103,6 +104,7 @@ module BlessingWorkflow =
                 | BlessingAdmissionFailure.IncompleteCohort reason -> "Incomplete cohort: " + reason))
 
     let private prepareBlessing
+        (observer: IWaitObserver)
         (treePort: FinalityTreePort)
         (journal: AgentJournal)
         (managerSessionId: SessionId)
@@ -111,7 +113,7 @@ module BlessingWorkflow =
         =
         taskResult {
             let! permit = checkAdmission treePort managerSessionId witness
-            let! orderedRecords = RecordWorkflow.awaitCanonicalCohortRecords journal members
+            let! orderedRecords = RecordWorkflow.awaitCanonicalCohortRecords observer journal members
 
             let! orderedRecords =
                 if List.length orderedRecords = List.length members then
@@ -131,6 +133,7 @@ module BlessingWorkflow =
         }
 
     let blessIfAdmitted
+        (observer: IWaitObserver)
         (reviewerPort: FinalityReviewerPort)
         (treePort: FinalityTreePort)
         (journal: AgentJournal)
@@ -139,7 +142,7 @@ module BlessingWorkflow =
         (members: EnlistedMember list)
         : Task<FinalityOutcome> =
         task {
-            match! prepareBlessing treePort journal managerSessionId members witness with
+            match! prepareBlessing observer treePort journal managerSessionId members witness with
             | Error error -> return raise (InvalidOperationException("Finality blessing preparation failed: " + error))
             | Ok(logs, blob, permit) ->
                 let lifeId = FinalityAdmission.permitLifeId permit
@@ -163,6 +166,7 @@ module BlessingWorkflow =
         }
 
     let blessIfTreeUnchanged
+        (observer: IWaitObserver)
         (reviewerPort: FinalityReviewerPort)
         (treePort: FinalityTreePort)
         (journal: AgentJournal)
@@ -186,4 +190,4 @@ module BlessingWorkflow =
         match ConfirmedReviewWitness.create lifeId requestId requestTree memberWitnesses with
         | Error error ->
             raise (InvalidOperationException("Finality confirmed review witness projection failed: " + error))
-        | Ok witness -> blessIfAdmitted reviewerPort treePort journal managerSessionId witness members
+        | Ok witness -> blessIfAdmitted observer reviewerPort treePort journal managerSessionId witness members

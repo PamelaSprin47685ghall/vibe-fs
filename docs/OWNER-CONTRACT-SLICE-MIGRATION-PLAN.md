@@ -1618,3 +1618,16 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - upstream已合并M6.3a PR `23370fea9`，其tree与本地`f3ee0fb39`精确相等；新upstream另含SelfPrediction与Sphinx。新累计分支从`a92d6278b`建立，只重放`f3ee0fb39`之后的M6.3a repair与M6.3b节点，避免把已squash的旧历史再次提交。重放零冲突，fast gate为738 production files、187 localities、823 WHAT/4,117 tests，全绿。
 - B7-C0增加report-only `unknown_capability_census`：只在canonical world验证后按observation case、closed Unknown class、syntax kind与raw identity分组；组内fact总数必须等于canonical `unknown_count`。完整affected locality/source集合只进入distinct count与domain-separated digest，各组最多输出5个canonical representative。
 - census不进入world、worksheet、manifest、cutover或授权输入；fact permutation与完全相同的duplicate observation不改变group/digest，full与summary投影一致。production-bound proof 15/15；`node scripts/check.mjs`为823 WHAT/4,118 tests且全绿；未刷新worksheet与fresh production report。
+
+### 2026-09-04 — M6.3b G4 CausalWait green checkpoint
+
+- `causal-wait`从旧混合locality clean-break为`execution-session-wait-contract`、`execution-session-wait-runtime`、`execution-session-wait-diagnostic-adapter`、`execution-session-wait-completion-mailbox`与`execution-session-wait-proof-surface`。旧project、global `CausalWaitHub`与`Process/Surface` mailbox mirror删除；proof Surface无production consumer。
+- `CausalWaitProcess.local()`只在Host composition取得process-local runtime；Change、Finality、Delegation、Tool与Host workflow全部显式注入`IWaitObserver`。diagnostic sink first-bind且只写，Node/path/fs只留在adapter；G4保持现有single-target与RootWorkspace first-bind结果，不引入workspace-family新语义。
+- worksheet writer增加topology-change bootstrap：仅当现有记录全部`undecided`时，才可由同次live owner inventory原子替换locality key全集；任何decided记录仍拒绝覆盖。worksheet保持migration-only、无digest、无授权力。
+- 验证：五个provider locality独立compile绿色；五个public `.fsi`联合reverse impact触发full flat 1,476 items并绿色；aggregate Fable为1,514 sources/1,476 items；causal、`PROC-008`、`TIME-008`与worksheet regression合计51/51；`node scripts/check.mjs`为738 production files、191 localities、1,911 refs、823 WHAT/4,121 tests且全绿；diff check绿色。staged fresh world为4,438 edges、967,429 facts、512 traversals、188,498 Unknown、1 diagnostic，digest `sha256:9f2fa4d90a7230dbd5d6b1f394bfb98ebb2ce060428af912af6d6264977093cb`。12条missing closure中1条为既定EventStore edge，另11条来自upstream Sphinx（9条到Foundation/EventStore，2条到`sphinx-event-vocabulary-contract`）；均保留为M6.3c前blocker，不归因于G4。
+
+#### G4后暂停与恢复
+
+- 暂停边界：G4提交后不启动Fatal、Process/PTY、Delegation或B7-C1。恢复时先执行`git status --short --branch`、`git log -3 --oneline`与`node scripts/check.mjs`，确认工作树干净且HEAD为本checkpoint。
+- 下一实施节点为B7 RootWorkspace effect隔离：保持现有first-bind结果，把public mutable移入private Host runtime并注入最窄bind/read capability；该节点同时为Fatal partial-init exact acquisition token铺路。随后依次执行Fatal原子迁移、Process/PTY、Delegation G6/G7、B7 compiler-evidence分类、M6.3c staged audit与M6.4原子cutover。
+- release sink前另有五个非G4 Fantomas失败需要单独绿色节点收口：`Interaction/Authority/Child.fs`、`OpenCode/Host/LoopSensorSurface.fs`、`OpenCode/Host/HostSignalSurface.fs`、`OpenCode/Codec/HostEventCodec.fs`、`OpenCode/Codec/HostEventEnvelope.fs`。不得把格式修正混入G4语义提交。

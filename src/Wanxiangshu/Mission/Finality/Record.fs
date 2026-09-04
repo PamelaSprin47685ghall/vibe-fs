@@ -230,6 +230,7 @@ module RecordWorkflow =
         loop ()
 
     let awaitCanonicalCohortRecords
+        (observer: IWaitObserver)
         (journal: AgentJournal)
         (members: EnlistedMember list)
         : Task<Result<(int * string) list, string>> =
@@ -271,11 +272,7 @@ module RecordWorkflow =
                             [ WaitEscape.ProcessLifetime; WaitEscape.OpenEndedExternal ]
                             "RecordWorkflow.awaitCanonicalCohortRecords"
 
-                    let! _ =
-                        CausalAwait.awaitTask
-                            CausalWaitHub.observer
-                            descriptor
-                            (AgentJournal.awaitChangeFrom revision journal)
+                    let! _ = CausalAwait.awaitTask observer descriptor (AgentJournal.awaitChangeFrom revision journal)
 
                     return! loop ()
                 | None ->

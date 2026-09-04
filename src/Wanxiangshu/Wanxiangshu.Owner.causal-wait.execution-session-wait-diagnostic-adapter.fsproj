@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>causal-wait</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-session-wait-diagnostic-adapter</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-contract.fsproj"/>
+    <Compile Include="Execution/Session/Wait/Bridge.fsi"/>
+    <Compile Include="Execution/Session/Wait/Bridge.fs"/>
+  </ItemGroup>
+</Project>

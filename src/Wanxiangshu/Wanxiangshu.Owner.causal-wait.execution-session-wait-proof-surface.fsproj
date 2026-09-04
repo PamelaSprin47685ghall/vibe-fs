@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>causal-wait</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-session-wait-proof-surface</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-completion-mailbox.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-diagnostic-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
+    <Compile Include="Execution/Session/Wait/Surface.fsi"/>
+    <Compile Include="Execution/Session/Wait/Surface.fs"/>
+  </ItemGroup>
+</Project>

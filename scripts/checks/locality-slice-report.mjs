@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { performance } from 'node:perf_hooks'
@@ -218,7 +218,11 @@ export const writeFreshMigrationWorksheetFileV1 = ({
   worksheetPath = WORKSHEET,
   fileExists = existsSync,
   readText = (path) => readFileSync(path, 'utf8'),
-  writeText = (path, text) => writeFileSync(path, text, 'utf8'),
+  writeText = (path, text) => {
+    const temporaryPath = `${path}.${process.pid}.tmp`
+    writeFileSync(temporaryPath, text, 'utf8')
+    renameSync(temporaryPath, path)
+  },
 }) => {
   if (fileExists(worksheetPath)) {
     const existing = JSON.parse(readText(worksheetPath))
@@ -237,8 +241,20 @@ export const writeFreshMigrationWorksheetFileV1 = ({
   return worksheet
 }
 
+export const freshWorksheetReportFromInventoryV1 = (inventory) => ({
+  localities: inventory.localities.map(({ id: localityId }) => ({
+    locality_id: localityId,
+    reasons: ['TerminalClassificationRequired'],
+  })),
+})
+
 const main = async () => {
   const options = argumentsV1(process.argv.slice(2))
+  if (options.writeFreshWorksheet) {
+    writeFreshMigrationWorksheetFileV1({
+      report: freshWorksheetReportFromInventoryV1(readOwnerProjectInventoryV1()),
+    })
+  }
   const result = await scanProductionLocalitySliceReportV1({
     observeStage: (stage) => process.stderr.write(`${encodeCanonicalJsonV1(stage)}\n`),
     reportDetail: options.reportDetail,

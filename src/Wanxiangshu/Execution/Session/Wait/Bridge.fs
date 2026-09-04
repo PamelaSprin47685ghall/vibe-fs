@@ -3,7 +3,6 @@ namespace Wanxiangshu.Execution.Session.Wait
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Foundation
 
 /// Scheme B diagnostic file bridge. Not Journal. Business code must not read it.
 module CausalWaitBridge =
@@ -154,8 +153,7 @@ module CausalWaitBridge =
               "cycle", box (frontier.Cycle |> List.map ownerObj |> Array.ofList) ]
 
     /// Plain JS object for diagnostics consumers. Never authoritative.
-    let toPlainObject (reader: IWaitSnapshotReader) : obj =
-        let snapshot = reader.Snapshot()
+    let toPlainObject (snapshot: DiagnosticWaitSnapshot) : obj =
         let frontiers = CausalFrontier.ofSnapshot snapshot
 
         createObj
@@ -165,19 +163,23 @@ module CausalWaitBridge =
               "history", box (snapshot.History |> List.map transitionObj |> Array.ofList)
               "frontiers", box (frontiers |> List.map frontierObj |> Array.ofList) ]
 
-    let private writeSnapshotUnsafe (workspace: string) (reader: IWaitSnapshotReader) =
+    let private writeSnapshotUnsafe (workspace: string) (snapshot: DiagnosticWaitSnapshot) =
         try
             ensureDiagnosticsGitExcluded workspace
             let diagnosticsDir = pathJoin (pathJoin (workspace, ".wanxiangshu"), "diagnostics")
             mkdirSync (diagnosticsDir, {| recursive = true |})
             let filePath = pathJoin (diagnosticsDir, "causal-waits.json")
-            writeFileSync (filePath, stringify (toPlainObject reader), "utf8")
+            writeFileSync (filePath, stringify (toPlainObject snapshot), "utf8")
         with _ ->
             ()
 
     /// Best-effort overwrite of `<workspace>/.wanxiangshu/diagnostics/causal-waits.json`.
-    let writeSnapshot (workspace: string) (reader: IWaitSnapshotReader) : unit =
+    let writeSnapshot (workspace: string) (snapshot: DiagnosticWaitSnapshot) : unit =
         if String.IsNullOrWhiteSpace workspace then
             ()
         else
-            writeSnapshotUnsafe workspace reader
+            writeSnapshotUnsafe workspace snapshot
+
+    let target (workspace: string) : IWaitDiagnosticSink =
+        { new IWaitDiagnosticSink with
+            member _.Publish(snapshot) = writeSnapshot workspace snapshot }

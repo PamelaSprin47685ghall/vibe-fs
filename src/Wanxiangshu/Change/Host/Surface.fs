@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Wanxiangshu.Change
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
@@ -345,6 +346,7 @@ module OrchestratorHostSurface =
 
         let deps: OrchestratorHostDeps =
             { Sessions = sessions
+              WaitObserver = CausalWaitRuntime().Observer
               Journal = journal
               SessionSnapshot = None
               OnChildCreated = fun _ _ _ -> ()

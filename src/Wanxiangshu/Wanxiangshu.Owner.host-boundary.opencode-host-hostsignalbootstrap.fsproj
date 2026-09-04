@@ -9,7 +9,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-statictools.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-continuation.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-causalwait.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-completion-mailbox.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-contract.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-diagnostic-adapter.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptresources.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj"/>

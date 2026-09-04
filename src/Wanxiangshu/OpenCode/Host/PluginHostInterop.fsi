@@ -4,6 +4,7 @@ open System.Threading.Tasks
 open Fable.Core
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Review
@@ -69,6 +70,7 @@ module PluginHostInterop =
     val toolHooks:
         toolModule: obj ->
         sessionPort: ISessionHostPort ->
+        waitObserver: IWaitObserver ->
         journal: AgentJournal option ->
         gitTreePort: GitTreePort option ->
         workspaceDirectory: string option ->

@@ -10,6 +10,7 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session.Attachment
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
@@ -566,6 +567,7 @@ module SyncDelegateSurface =
             let runtime =
                 new SyncDelegateRuntime(
                     sessions,
+                    CausalWaitRuntime().Observer,
                     dispatcher,
                     journal,
                     (attached :> IAttachedSessionPort),
@@ -579,6 +581,7 @@ module SyncDelegateSurface =
             let scope =
                 new ToolRuntimeScope(
                     sessions,
+                    CausalWaitRuntime().Observer,
                     Some journal,
                     None,
                     Some directory,

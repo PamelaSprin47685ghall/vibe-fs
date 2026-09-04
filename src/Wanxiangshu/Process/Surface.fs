@@ -8,7 +8,6 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -68,12 +67,6 @@ module ProcessSurface =
 
     type private PtySupervisorHandle(supervisor: PtySupervisor) =
         member _.Supervisor = supervisor
-
-    type internal MailboxHandle(mailbox: CompletionMailbox) =
-        member _.Mailbox = mailbox
-
-    type private JoinInterruptHandle(interrupt: JoinInterrupt) =
-        member _.Interrupt = interrupt
 
     type private PendingHandle(entries: (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list) =
         member _.Entries = entries
@@ -186,8 +179,7 @@ module ProcessSurface =
 
     let createNodeTimer () : obj = box (NodeTiming.nodeTimerPort ())
 
-    let nodeTimerDispose (timer: obj) : unit =
-        (unbox<ITimerPort> timer).Dispose()
+    let nodeTimerDispose (timer: obj) : unit = (unbox<ITimerPort> timer).Dispose()
 
     let createVirtualClock () : obj =
         ClockPortHandle(VirtualTiming.createVirtualClockPort ()) :> obj
@@ -718,26 +710,6 @@ module ProcessSurface =
     let completionView (item: obj) : obj =
         completionViewItem (unbox<PtyJoinItem> item)
 
-    /// Create a standalone PTY completion mailbox (EXEC-015/EXEC-018).
-    /// The mailbox is a bounded FIFO queue of physical PTY facts; publish,
-    /// drain and pending-count are the sole operations a join consumer needs.
-    let completionMailboxCreate () : obj =
-        MailboxHandle(CompletionMailbox(obj ())) :> obj
-
-    let completionMailboxPublishPty (mailbox: obj) (item: obj) : unit =
-        (mailbox :?> MailboxHandle)
-            .Mailbox.PublishPtyCompletion(unbox<PtyJoinItem> item)
-
-    let completionMailboxDrainPty (mailbox: obj) (maxCount: int) : obj array =
-        (mailbox :?> MailboxHandle).Mailbox
-        |> fun value ->
-            value.DrainPtyCompletions maxCount
-            |> List.map completionViewItem
-            |> List.toArray
-
-    let completionMailboxPendingCount (mailbox: obj) : int =
-        (mailbox :?> MailboxHandle).Mailbox.PendingCount
-
     let ptyExited (id: string) (outcome: string) : obj =
         box (
             PtyExited
@@ -963,7 +935,6 @@ module ProcessSurface =
                ptys = ptys |> List.map ptyHandleView |> List.toArray |}
 
 
-    let maxJoinBatch = JoinBatch.MaxJoinBatch
 
 
     let sessionCreate (id: string) (backend: obj) : obj =

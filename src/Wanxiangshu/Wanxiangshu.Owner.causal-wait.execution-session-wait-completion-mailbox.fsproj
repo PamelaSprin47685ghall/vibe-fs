@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>causal-wait</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-session-wait-completion-mailbox</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
+    <Compile Include="Execution/Session/Wait/CompletionMailbox.fsi"/>
+    <Compile Include="Execution/Session/Wait/CompletionMailbox.fs"/>
+  </ItemGroup>
+</Project>

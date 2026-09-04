@@ -17,6 +17,7 @@ import {
 } from '../../../scripts/lib/locality-slice-report-v1.mjs'
 import {
   scanProductionLocalitySliceReportV1,
+  freshWorksheetReportFromInventoryV1,
   writeFreshMigrationWorksheetFileV1,
 } from '../../../scripts/checks/locality-slice-report.mjs'
 
@@ -310,4 +311,16 @@ test('WHAT[STRUCTURED-WORKFLOW-016] M6.3b report and worksheet remain outside ev
   } finally {
     rmSync(fixture, { recursive: true, force: true })
   }
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-016] fresh worksheet bootstrap contains every live locality and no stale row', () => {
+  const report = freshWorksheetReportFromInventoryV1({
+    localities: [{ id: 'new-adapter' }, { id: 'new-contract' }],
+  })
+  assert.deepEqual(report, {
+    localities: [
+      { locality_id: 'new-adapter', reasons: ['TerminalClassificationRequired'] },
+      { locality_id: 'new-contract', reasons: ['TerminalClassificationRequired'] },
+    ],
+  })
 })

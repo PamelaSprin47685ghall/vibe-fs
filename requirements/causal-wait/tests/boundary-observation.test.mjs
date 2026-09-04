@@ -109,6 +109,24 @@ test('WHAT[CAUSAL-003] analyzer rejects snapshot reads in an unlisted future dec
   ])
 })
 
+test('WHAT[CAUSAL-009] analyzer rejects a global observer hub in a business workflow', () => {
+  const violations = boundaryGate.analyzeObservationBoundary(
+    mutate('Interaction/Dispatch/NewDecision.fs', 'let observer = CausalWaitHub.observer\n'),
+  )
+  assert.deepEqual(violations, [
+    'Interaction/Dispatch/NewDecision.fs: diagnostics read capability "CausalWaitHub" is confined to Execution/Session/Wait',
+  ])
+})
+
+test('WHAT[CAUSAL-009] analyzer rejects the Node diagnostic adapter outside composition', () => {
+  const violations = boundaryGate.analyzeObservationBoundary(
+    mutate('Interaction/Dispatch/NewDecision.fs', 'let sink = CausalWaitBridge.target workspace\n'),
+  )
+  assert.deepEqual(violations, [
+    'Interaction/Dispatch/NewDecision.fs: diagnostics read capability "CausalWaitBridge" is confined to Execution/Session/Wait',
+  ])
+})
+
 test('WHAT[CAUSAL-003] analyzer rejects the diagnostic bridge locator outside its owner', () => {
   const violations = boundaryGate.analyzeObservationBoundary(
     mutate(

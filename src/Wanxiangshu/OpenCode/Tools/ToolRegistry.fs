@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session.OpenCode
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host.Contract
@@ -123,6 +124,7 @@ module ToolRegistry =
     let create
         (toolModule: obj)
         (sessionPort: ISessionHostPort)
+        (waitObserver: IWaitObserver)
         (journal: AgentJournal option)
         (gitTreePort: GitTreePort option)
         (workspaceDirectory: string option)
@@ -156,6 +158,7 @@ module ToolRegistry =
         let runtime =
             new ToolRuntimeScope(
                 sessionPort,
+                waitObserver,
                 journal,
                 gitTreePort,
                 workspaceDirectory,

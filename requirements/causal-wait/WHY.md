@@ -30,3 +30,4 @@
 4. 使用轮询休眠（sleep/polling）代替事件驱动机制来等待业务条件达成。
 5. 等待任务在取消或超时后，其观测状态未被正确注销，复活已终止的业务机会。
 6. frontier vocabulary、registry/await runtime、Node diagnostic adapter、CompletionMailbox与proof Surface处于同一project，使只需typed wait capability的consumer获得mutable waiter与physical diagnostic authority。
+7. business workflow从全局hub取得observer，或后启动的plugin实例可改写diagnostic target，使composition wiring退化为可变service locator。

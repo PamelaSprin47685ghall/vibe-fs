@@ -71,7 +71,8 @@ module PluginHostWiring =
           SharedTerminalKey: string option
           SharedTerminalPort: Events.HostEventPort option
           GitTreePort: Wanxiangshu.Mission.Review.GitTreePort option
-          StrengthDurability: StrengthDurabilityPort option }
+          StrengthDurability: StrengthDurabilityPort option
+          CausalWaitObserver: IWaitObserver }
 
     let create (boot: PluginBoot.Boot) : Task<Host> =
         task {
@@ -104,10 +105,15 @@ module PluginHostWiring =
                             |> Option.map StrengthDurability.create
                         | _ -> None
 
+                    let causalWait = CausalWaitProcess.local ()
+
                     // Keep the causal wait bridge on the root workspace.
                     if SharedState.RootWorkspace.IsNone then
                         SharedState.RootWorkspace <- workspaceDirectory
-                        CausalWaitHub.setWorkspace workspaceDirectory
+
+                    SharedState.RootWorkspace
+                    |> Option.iter (fun workspace ->
+                        causalWait.BindDiagnosticTarget(CausalWaitBridge.target workspace) |> ignore)
 
                     CasebookLifecycle.setEnabled workspaceDirectory
 
@@ -140,7 +146,8 @@ module PluginHostWiring =
                           SharedTerminalKey = terminalKey
                           SharedTerminalPort = sharedTerminalPort
                           GitTreePort = boot.GitTreePort
-                          StrengthDurability = strengthDurability }
+                          StrengthDurability = strengthDurability
+                          CausalWaitObserver = causalWait.Observer }
                 }
 
             match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent) with

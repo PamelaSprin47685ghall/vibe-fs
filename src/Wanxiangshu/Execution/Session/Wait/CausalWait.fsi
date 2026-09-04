@@ -57,6 +57,9 @@ type IWaitObserver =
 type IWaitSnapshotReader =
     abstract Snapshot: unit -> DiagnosticWaitSnapshot
 
+type IWaitDiagnosticSink =
+    abstract Publish: DiagnosticWaitSnapshot -> unit
+
 module CausalOwner =
     val key: owner: CausalOwnerRef -> string
     val create: kind: string -> identity: (string * string) list -> CausalOwnerRef

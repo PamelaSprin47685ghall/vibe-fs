@@ -37,7 +37,7 @@ type ManagerJob =
 /// Completion mailbox for published verdicts. It only stores the final
 /// OrchestratorVerdict after FF; the publish program runs as an owned task.
 /// EXEC-019: FIFO batch drain, MaxJoinBatch ceiling.
-type VerdictMailbox() =
+type VerdictMailbox(observer: IWaitObserver) =
     let gate = obj ()
     // DSL-MUTABLE: resource — verdict FIFO queue
     let verdicts = Queue<OrchestratorVerdict>()
@@ -101,7 +101,7 @@ type VerdictMailbox() =
                     [ WaitEscape.ProcessLifetime ]
                     "VerdictMailbox.awaitSignal"
 
-            CausalAwait.awaitTask CausalWaitHub.observer descriptor waiter.Task
+            CausalAwait.awaitTask observer descriptor waiter.Task
 
     /// Remove this join's waiter from the queue (interrupt won). Completing alone is not enough:
     /// a completed TCS left in the queue would absorb the next Publish wake.
@@ -196,7 +196,7 @@ type VerdictMailbox() =
             task {
                 let! winner =
                     CausalAwait.awaitTask
-                        CausalWaitHub.observer
+                        observer
                         descriptor
                         (emitJsExpr (waitTask, interruptTask) "Promise.race([$0, $1])": Task<obj>)
 

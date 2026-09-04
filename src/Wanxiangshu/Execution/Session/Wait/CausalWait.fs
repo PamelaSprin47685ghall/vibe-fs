@@ -1,7 +1,5 @@
 namespace Wanxiangshu.Execution.Session.Wait
 
-open Wanxiangshu.Foundation
-
 open System
 
 /// DSL-012: process-local, non-authoritative causal wait observations.
@@ -74,6 +72,11 @@ type IWaitObserver =
 /// Diagnostics surfaces may read; Application must not hold this interface.
 type IWaitSnapshotReader =
     abstract Snapshot: unit -> DiagnosticWaitSnapshot
+
+/// Physical diagnostic target. Composition injects one target into the
+/// process-local runtime; business workflows never receive this capability.
+type IWaitDiagnosticSink =
+    abstract Publish: DiagnosticWaitSnapshot -> unit
 
 module CausalOwner =
 

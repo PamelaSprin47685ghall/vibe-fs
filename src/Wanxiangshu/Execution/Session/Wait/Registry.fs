@@ -85,47 +85,59 @@ type CausalWaitRegistry(?historyCapacity: int) =
                   History = history |> Seq.toList
                   Sequence = snapshotSequence })
 
-/// Process-local default registry used by production wiring and diagnostics.
-/// Safe to lose on crash; never authoritative.
-module CausalWaitHub =
+type private PublishingWaitLease(inner: IWaitLease, publish: unit -> unit) =
+    interface IWaitLease with
+        member _.MarkExit(exit) = inner.MarkExit exit
 
-    // DSL-MUTABLE: resource — process-local diagnostic wait registry singleton
-    let private registry = CausalWaitRegistry()
+        member _.Dispose() =
+            inner.Dispose()
+            publish ()
 
-    // DSL-MUTABLE: resource — workspace path for Scheme B diagnostic file bridge
-    let mutable private workspaceDirectory: string option = None
+/// One registry plus its write-only business capability. The diagnostic target
+/// is first-bind: a later plugin instance cannot redirect process diagnostics.
+type CausalWaitRuntime(?historyCapacity: int) =
+    let registry = CausalWaitRegistry(?historyCapacity = historyCapacity)
+    let reader = registry :> IWaitSnapshotReader
+    let inner = registry :> IWaitObserver
+    let targetGate = obj ()
+    // DSL-MUTABLE: resource — first-bound process diagnostic target
+    let mutable diagnosticTarget: IWaitDiagnosticSink option = None
 
-    let reader: IWaitSnapshotReader = registry :> IWaitSnapshotReader
+    let publish () =
+        let target = lock targetGate (fun () -> diagnosticTarget)
 
-    let private refreshBridge () =
-        match workspaceDirectory with
-        | Some workspace -> CausalWaitBridge.writeSnapshot workspace reader
-        | None -> ()
+        target
+        |> Option.iter (fun sink ->
+            try
+                sink.Publish(reader.Snapshot())
+            with _ ->
+                ())
 
-    /// Observer that refreshes the Scheme B snapshot file after each transition.
     let observer: IWaitObserver =
-        let inner = registry :> IWaitObserver
-
         { new IWaitObserver with
             member _.Enter(wait) =
                 let lease = inner.Enter wait
-                refreshBridge ()
+                publish ()
+                new PublishingWaitLease(lease, publish) :> IWaitLease }
 
-                { new IWaitLease with
-                    member _.MarkExit(exit) = lease.MarkExit exit
+    member _.BindDiagnosticTarget(target: IWaitDiagnosticSink) =
+        let bound =
+            lock targetGate (fun () ->
+                match diagnosticTarget with
+                | Some _ -> false
+                | None ->
+                    diagnosticTarget <- Some target
+                    true)
 
-                    member _.Dispose() =
-                        lease.Dispose()
-                        refreshBridge () } }
+        if bound then
+            publish ()
 
-    let snapshot () = reader.Snapshot()
+        bound
 
-    let frontiers () = CausalFrontier.ofSnapshot (snapshot ())
+    member _.Observer = observer
+    member _.SnapshotReader = reader
+    member _.HistoryCapacity = registry.HistoryCapacity
 
-    /// Plugin boot sets the workspace so Enter/Leave can overwrite the bridge file.
-    let setWorkspace (directory: string option) =
-        workspaceDirectory <- directory
-        refreshBridge ()
-
-    /// Explicit best-effort write (boot / tests). Never throws into business flow.
-    let writeToWorkspace () = refreshBridge ()
+module CausalWaitProcess =
+    let private processLocal = CausalWaitRuntime()
+    let local () = processLocal

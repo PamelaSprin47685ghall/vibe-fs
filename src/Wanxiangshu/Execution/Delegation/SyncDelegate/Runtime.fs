@@ -69,6 +69,7 @@ module internal SyncDelegatePhysicalIdentity =
 type SyncDelegateRuntime
     (
         sessions: ISessionHostPort,
+        waitObserver: IWaitObserver,
         dispatcher: PromptDispatcher.Runtime,
         journal: AgentJournal,
         attached: IAttachedSessionPort,
@@ -270,6 +271,7 @@ type SyncDelegateRuntime
 
     let deps: SyncDelegateWorkflow.Dependencies =
         { Attached = attached
+          WaitObserver = waitObserver
           ObserveChild = observeChild
           CreateChild = createChild
           BindChild = bindChild

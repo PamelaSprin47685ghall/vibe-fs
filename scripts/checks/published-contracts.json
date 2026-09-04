@@ -303,11 +303,6 @@
       "justification": "Signed JS-native projection over the durable session-association contract; parser/boxing helpers stay private and the surface grants no additional foreign semantic contract."
     },
     {
-      "path": "src/Wanxiangshu/Execution/Session/Wait/Bridge.fs",
-      "owner": "causal-wait",
-      "justification": "Signed diagnostics-only filesystem bridge over causal-wait snapshots; Node fs/path imports and serialization helpers stay private and it grants no business control authority."
-    },
-    {
       "path": "src/Wanxiangshu/Execution/Session/Wait/Surface.fs",
       "owner": "causal-wait",
       "justification": "Signed JS-native facade over causal-wait contracts; registry/lease wrappers and JS invocation helpers remain private and the surface grants no additional semantic contract."
@@ -2327,8 +2322,28 @@
     },
     {
       "owner": "causal-wait",
-      "locality": "execution-session-wait-causalwait",
-      "justification": "Causal wait vocabulary, mailbox/observer capabilities and await mechanisms depend only on graduated completion, identity, task and timing boundaries; diagnostics bridge and JS facade are explicitly signed support."
+      "locality": "execution-session-wait-contract",
+      "justification": "Causal wait identity, frontier and reader/writer capability vocabulary form a zero-dependency contract."
+    },
+    {
+      "owner": "causal-wait",
+      "locality": "execution-session-wait-runtime",
+      "justification": "The process-local registry and causal await implementation depend only on the causal-wait and temporal capability contracts."
+    },
+    {
+      "owner": "causal-wait",
+      "locality": "execution-session-wait-diagnostic-adapter",
+      "justification": "The Node filesystem diagnostic sink is isolated behind the causal-wait diagnostic capability."
+    },
+    {
+      "owner": "causal-wait",
+      "locality": "execution-session-wait-completion-mailbox",
+      "justification": "CompletionMailbox owns its process-local physical wake resource independently of causal-wait observation."
+    },
+    {
+      "owner": "causal-wait",
+      "locality": "execution-session-wait-proof-surface",
+      "justification": "The JS proof Surface composes owner capabilities for verification and has no production consumer."
     },
     {
       "owner": "obligation-ledger",
@@ -4236,9 +4251,13 @@
       "contract": "Session.Quiescence",
       "kind": "published-contract",
       "consumers": [
+        "action-affordance",
+        "capability-enforcement",
         "change-integration",
         "delegation",
-        "finality"
+        "finality",
+        "host-boundary",
+        "managed-session-lifecycle"
       ],
       "symbols": [
         "Wanxiangshu.Execution.Session.Wait.CausalOwner.create",
@@ -4246,6 +4265,7 @@
         "Wanxiangshu.Execution.Session.Wait.CausalProducerRef.WorkflowProducer",
         "Wanxiangshu.Execution.Session.Wait.DiagnosticWait",
         "Wanxiangshu.Execution.Session.Wait.DiagnosticWaitModule.create",
+        "Wanxiangshu.Execution.Session.Wait.IWaitObserver",
         "Wanxiangshu.Execution.Session.Wait.WaitEscape",
         "Wanxiangshu.Execution.Session.Wait.WaitEscape.CancelledBy",
         "Wanxiangshu.Execution.Session.Wait.WaitEscape.DeadlineAt",
@@ -4265,7 +4285,7 @@
         "change-integration",
         "delegation",
         "host-boundary",
-        "time-capability"
+        "managed-session-lifecycle"
       ],
       "symbols": [
         "Wanxiangshu.Execution.Session.Wait.CompletionMailbox",
@@ -4311,16 +4331,33 @@
       "contract": "Session.Quiescence",
       "kind": "physical-port",
       "consumers": [
+        "action-affordance",
         "change-integration",
         "delegation",
         "finality",
         "host-boundary"
       ],
       "symbols": [
-        "Wanxiangshu.Execution.Session.Wait.CausalWaitHub.observer",
-        "Wanxiangshu.Execution.Session.Wait.CausalWaitHub.setWorkspace"
+        "Wanxiangshu.Execution.Session.Wait.CausalWaitProcess.local",
+        "Wanxiangshu.Execution.Session.Wait.CausalWaitRuntime",
+        "Wanxiangshu.Execution.Session.Wait.CausalWaitRuntime.BindDiagnosticTarget",
+        "Wanxiangshu.Execution.Session.Wait.CausalWaitRuntime.Observer"
       ],
       "justification": "The listed owners consume this exact process-local causal-wait port; it carries no durable business state."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Wait/Bridge.fs",
+      "owner": "causal-wait",
+      "node": "execution-quiescence",
+      "contract": "Session.Quiescence",
+      "kind": "physical-port",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.Wait.CausalWaitBridge.target"
+      ],
+      "justification": "Host composition consumes the exact Node diagnostic sink factory; no business workflow receives filesystem authority."
     },
     {
       "path": "src/Wanxiangshu/Git/Gateway.fs",

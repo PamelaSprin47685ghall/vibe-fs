@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation.Identity
 
 type Orchestrator =
     new:
+        observer: IWaitObserver *
         git: GitPort *
         manager: ManagerPort *
         repoPath: string *

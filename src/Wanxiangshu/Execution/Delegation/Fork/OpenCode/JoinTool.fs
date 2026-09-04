@@ -84,7 +84,7 @@ module JoinTool =
 
             let! outcome =
                 CausalAwait.awaitTask
-                    CausalWaitHub.observer
+                    scope.WaitObserver
                     joinDescriptor
                     (scope
                         .OrchestratorHostFor(context.SessionId)
@@ -215,7 +215,7 @@ module JoinTool =
                 |> Option.map (fun binding -> binding.GroupId, binding.LaneIndex)
 
             let joinTask = joinTaskForMembership runtime permit waitTask fissionMembership
-            let! joined = CausalAwait.awaitTask CausalWaitHub.observer joinDescriptor joinTask
+            let! joined = CausalAwait.awaitTask scope.WaitObserver joinDescriptor joinTask
             let root = scope.LogicalOwnerFor sessionId
 
             return

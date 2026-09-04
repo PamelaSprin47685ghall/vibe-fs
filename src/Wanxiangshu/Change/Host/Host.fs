@@ -195,7 +195,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 "OrchestratorHost.awaitManager"
 
         taskResult {
-            do! CausalAwait.awaitTask CausalWaitHub.observer descriptor (awaitChild agentId)
+            do! CausalAwait.awaitTask deps.WaitObserver descriptor (awaitChild agentId)
             return! finalizeRegisteredWorktree agentId
         }
 
@@ -445,7 +445,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
             do!
                 CausalAwait.awaitTask
-                    CausalWaitHub.observer
+                    deps.WaitObserver
                     sweepDescriptor
                     (OrchestratorSweep.sweepLocked sweepLockPath gitPort (fun () ->
                         deps.Journal
@@ -457,6 +457,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
             let value =
                 Orchestrator(
+                    deps.WaitObserver,
                     gitPort,
                     managerPort,
                     deps.RepoPath,
@@ -553,7 +554,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 return WorktreePath.value handle.WorktreePath
             }
 
-        CausalAwait.awaitTask CausalWaitHub.observer descriptor pending
+        CausalAwait.awaitTask deps.WaitObserver descriptor pending
 
     /// GLORY-068: `commission(existing_job_id, charge)` — continue the SAME
     /// Manager job (same worktree, same session) with an appended requirement.

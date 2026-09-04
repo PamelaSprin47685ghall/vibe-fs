@@ -101,10 +101,6 @@ module ProcessSurface =
     val ptyCommandView: value: obj -> obj
 
     val completionView: item: obj -> obj
-    val completionMailboxCreate: unit -> obj
-    val completionMailboxPublishPty: mailbox: obj -> item: obj -> unit
-    val completionMailboxDrainPty: mailbox: obj -> maxCount: int -> obj array
-    val completionMailboxPendingCount: mailbox: obj -> int
     val ptyExited: id: string -> outcome: string -> obj
     val ptyFailed: id: string -> message: string -> obj
     val ptyAborted: id: string -> message: string -> obj
@@ -138,7 +134,6 @@ module ProcessSurface =
     val portCloseAll: port: obj -> graceMs: obj -> Task<unit>
     val agentView: agent: AgentRecord -> obj
     val portList: port: obj -> obj
-    val maxJoinBatch: int
 
     val sessionCreate: id: string -> backend: obj -> obj
     val sessionView: session: obj -> obj

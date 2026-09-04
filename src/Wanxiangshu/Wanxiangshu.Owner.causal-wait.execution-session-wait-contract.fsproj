@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>causal-wait</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-session-wait-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Execution/Session/Wait/CausalWait.fsi"/>
+    <Compile Include="Execution/Session/Wait/CausalWait.fs"/>
+  </ItemGroup>
+</Project>

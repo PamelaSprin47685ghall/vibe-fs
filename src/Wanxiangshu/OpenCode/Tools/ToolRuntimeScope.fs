@@ -9,6 +9,7 @@ open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -30,6 +31,7 @@ open Wanxiangshu.Process
 type ToolRuntimeScope
     (
         sessions: ISessionHostPort,
+        waitObserver: IWaitObserver,
         journal: AgentJournal option,
         gitTreePort: GitTreePort option,
         workspaceDirectory: string option,
@@ -373,6 +375,7 @@ type ToolRuntimeScope
 
     member _.FinalityReviewerTimeoutMs = finalityTimeoutMs
     member _.Sessions = sessions
+    member _.WaitObserver = waitObserver
     member _.Journal = journal
     member _.Snapshot = snapshot
     member _.EventPort = terminalPort
@@ -482,6 +485,7 @@ type ToolRuntimeScope
                 let host =
                     OrchestratorHost(
                         { Sessions = sessions
+                          WaitObserver = waitObserver
                           Journal = journal
                           SessionSnapshot = snapshot
                           OnChildCreated = fun _ role childId -> registerChild sessionId role childId

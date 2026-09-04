@@ -19,7 +19,7 @@ type ManagerJob =
 /// OrchestratorVerdict after FF; the publish program runs as an owned task.
 /// EXEC-019: FIFO batch drain, MaxJoinBatch ceiling.
 type VerdictMailbox =
-    new: unit -> VerdictMailbox
+    new: observer: IWaitObserver -> VerdictMailbox
     member StartJob: unit -> unit
     member Publish: verdict: OrchestratorVerdict -> unit
     member DrainAvailable: maxCount: int -> OrchestratorVerdict list

@@ -93,13 +93,14 @@ module FinalityTool =
             source
 
     let private awaitFinalityStart
+        (observer: IWaitObserver)
         (sid: SessionId)
         (lifeId: ManagerLifeId)
         (requestId: FinalityRequestId)
         (source: string)
         (pending: Task<FinalityOutcome>)
         : Task<FinalityOutcome> =
-        CausalAwait.awaitTask CausalWaitHub.observer (describeFinalityRequest sid lifeId requestId source) pending
+        CausalAwait.awaitTask observer (describeFinalityRequest sid lifeId requestId source) pending
 
     let private finalityPorts (scope: ToolRuntimeScope) (sessionId: SessionId) =
         FinalityHostPort.create
@@ -211,11 +212,13 @@ module FinalityTool =
 
             let! outcome =
                 awaitFinalityStart
+                    scope.WaitObserver
                     sid
                     life.LifeId
                     request.RequestId
                     "FinalityTool.recoverEmptyMembers"
                     (FinalityWorkflow.start
+                        scope.WaitObserver
                         reviewerPort
                         treePort
                         scope.Journal
@@ -253,11 +256,13 @@ module FinalityTool =
 
             let! outcome =
                 awaitFinalityStart
+                    scope.WaitObserver
                     sid
                     life.LifeId
                     requestId
                     "FinalityTool.acceptSuicide"
                     (FinalityWorkflow.start
+                        scope.WaitObserver
                         reviewerPort
                         treePort
                         scope.Journal

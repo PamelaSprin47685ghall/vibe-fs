@@ -10,7 +10,7 @@ const {
   completionMailboxPendingCount,
   maxJoinBatch,
   ptyExited,
-} = await import('../../../dist/Process/Surface.js')
+} = await import('../../../dist/Execution/Session/Wait/Surface.js')
 
 test('WHAT[PROC-008] EXEC_018_drain_available_returns_two_completions_in_publish_order', () => {
   const mailbox = completionMailboxCreate()

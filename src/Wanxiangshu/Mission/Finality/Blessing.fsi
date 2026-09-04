@@ -2,6 +2,7 @@ namespace Wanxiangshu.Mission.Finality
 
 open System.Threading.Tasks
 open Wanxiangshu.Change
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Review.Judgement
@@ -24,6 +25,7 @@ module FinalityAdmission =
 module BlessingWorkflow =
 
     val blessIfAdmitted:
+        observer: IWaitObserver ->
         reviewerPort: FinalityReviewerPort ->
         treePort: FinalityTreePort ->
         journal: AgentJournal ->
@@ -33,6 +35,7 @@ module BlessingWorkflow =
             Task<FinalityOutcome>
 
     val blessIfTreeUnchanged:
+        observer: IWaitObserver ->
         reviewerPort: FinalityReviewerPort ->
         treePort: FinalityTreePort ->
         journal: AgentJournal ->

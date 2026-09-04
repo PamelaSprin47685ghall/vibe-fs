@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>causal-wait</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-session-wait-runtime</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
+    <Compile Include="Execution/Session/Wait/Registry.fsi"/>
+    <Compile Include="Execution/Session/Wait/Registry.fs"/>
+    <Compile Include="Execution/Session/Wait/Await.fsi"/>
+    <Compile Include="Execution/Session/Wait/Await.fs"/>
+  </ItemGroup>
+</Project>

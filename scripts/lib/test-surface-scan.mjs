@@ -1382,7 +1382,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Execution/Session/Wait/Surface.js',
     owner: 'causal-wait',
-    laws: ['CAUSAL-001', 'CAUSAL-002', 'CAUSAL-003', 'CAUSAL-004', 'CAUSAL-005', 'CAUSAL-006', 'CAUSAL-007', 'CAUSAL-008'],
+    laws: ['CAUSAL-001', 'CAUSAL-002', 'CAUSAL-003', 'CAUSAL-004', 'CAUSAL-005', 'CAUSAL-006', 'CAUSAL-007', 'CAUSAL-008', 'CAUSAL-009', 'PROC-008'],
+    lawOwners: { 'PROC-008': 'process-execution' },
     source: 'src/Wanxiangshu/Execution/Session/Wait/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1845,7 +1846,7 @@ export const SURFACE_CONSUMERS = {
   'Execution/Session/ChatExecution/StatusSurface.js': ['host-boundary', 'managed-chat-execution'],
   'Execution/Session/ChatExecution/Surface.js': ['managed-chat-execution', 'verification-system'],
   'Execution/Session/Recovery/Surface.js': ['managed-session-lifecycle'],
-  'Execution/Session/Wait/Surface.js': ['time-capability'],
+  'Execution/Session/Wait/Surface.js': ['process-execution', 'time-capability'],
   'Foundation/RolesSurface.js': ['capability-enforcement', 'cognitive-environment', 'participant-identity', 'repository-programming', 'session-ontology'],
   'Git/Hook/Surface.js': ['durable-convergence'],
   'Host/Contract/CompactionPolicySurface.js': ['host-boundary'],

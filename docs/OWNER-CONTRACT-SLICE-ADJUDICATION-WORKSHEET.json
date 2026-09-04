@@ -606,7 +606,43 @@
       "draft_proofs": []
     },
     {
-      "locality_id": "execution-session-wait-causalwait",
+      "locality_id": "execution-session-wait-completion-mailbox",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-wait-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-wait-diagnostic-adapter",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-wait-proof-surface",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "execution-session-wait-runtime",
       "status": "undecided",
       "draft_reason": null,
       "draft_target_classification": null,
@@ -1561,6 +1597,15 @@
     },
     {
       "locality_id": "session-attachment-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "sphinx-event-vocabulary-contract",
       "status": "undecided",
       "draft_reason": null,
       "draft_target_classification": null,
