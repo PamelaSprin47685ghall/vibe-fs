@@ -1963,7 +1963,7 @@
     {
       "owner": "action-affordance",
       "locality": "opencode-tools-statictools",
-      "justification": "Static tool names, permission projection, reviewer verdict parsing and agent config construction form one signed policy contract; managed-agent parsing and physical filesystem access are absent."
+      "justification": "Static tool names, permission projection and agent config construction form one signed policy contract; managed-agent parsing and physical filesystem access are absent."
     },
     {
       "owner": "provider-projection",
@@ -4980,9 +4980,6 @@
         "Wanxiangshu.OpenCode.StaticTools.managerAgentConfig",
         "Wanxiangshu.OpenCode.StaticTools.orchestratorAgentConfig",
         "Wanxiangshu.OpenCode.StaticTools.requestToolMap",
-        "Wanxiangshu.OpenCode.StaticTools.reviewerAgentConfig",
-        "Wanxiangshu.OpenCode.StaticTools.reviewerVerdictOfString",
-        "Wanxiangshu.OpenCode.StaticTools.reviewerVerdictSchemaJson",
         "Wanxiangshu.OpenCode.StaticTools.toolNames"
       ],
       "justification": "ToolOwner.ToolSpec publishes exactly these symbols to the listed owners; every unlisted sibling remains private to action-affordance."

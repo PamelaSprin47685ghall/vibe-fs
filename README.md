@@ -81,7 +81,6 @@ npm install wanxiangshu --registry <your-private-registry>
 | 变量 | 作用 |
 |------|------|
 | `WANXIANGSHU_SKIP_AUTO_INJECTED=1` | 跳过 HOST-013 新的 `auto-injected` 伪工具注入；已落盘历史 pair 仍会 replay（`provider=cursor` 时同样跳过新注入） |
-| `WANXIANGSHU_CHAT_MAX_RETRIES` | 覆盖 Host `experimental.chatMaxRetries`（非负整数） |
 | `WANXIANGSHU_PROCESS_HARD_LIMIT_SECS` | executor 单进程硬超时上限（秒） |
 | `WANXIANGSHU_NO_FATAL_EXIT=1` | 诊断路径禁止 `process.exit`（测试用） |
 
@@ -100,26 +99,24 @@ Orchestrator
         ├── Coder
         ├── Inspector
         ├── DevOps
-        ├── Browser / Inquiry
-        └── Reviewer
+        └── Browser / Inquiry
 ```
 
 Distiller、Blogger 等由编排路径调用，不作为单独“安装角色”配置。
 
 ### 智能体角色
 
-十个 public Role，与 `requirements/participant-identity`、`requirements/cognitive-environment` 一致。工具面由 `Roles.permissions` 定义（`requirements/capability-enforcement` 四层同构）：
+九个 public Role，与 `requirements/participant-identity`、`requirements/cognitive-environment` 一致。工具面由 `Roles.permissions` 定义（`requirements/capability-enforcement` 四层同构）：
 
 | 角色 | 典型工具面 | 说明 |
 |------|------------|------|
 | Orchestrator | `fork-manager`, `join`, `horizon` | 顶层编排 |
-| Manager | `fork-manager`, `join`, `horizon`, `todowrite`, `fission` | 任务分解与子会话 |
+| Manager | `fork-manager`, `join`, `horizon`, `todowrite`, `review`, `suicide`, `fission` | 接力评审、任务分解与责任推进 |
 | Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspect`, `fetch`, `fission` | 源码修改 |
 | Inspector | `read`, `glob`, `grep`, `query-shell`, `fetch`, `fission` | 只读调查 |
 | DevOps | `fork-pty`, `executor`, `inspect`, `behavior` 等 | 进程与环境 |
 | Browser | `read`, `glob`, `grep`, `stealth-browser-mcp`, `fission` | 浏览类任务 |
 | Inquiry | `inspect`, `sphinx`, `fission` | 语义调查与分析 |
-| Reviewer | `read`, `glob`, `grep`, `judge` | 审阅与裁决 |
 | Distiller | 无工具 | 输出蒸馏/摘要 |
 | Blogger | `chronicle` | Companion 叶子，写认知上下文 |
 
