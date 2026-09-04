@@ -96,8 +96,8 @@ module Identity =
 
     /// One tool invocation inside a provider run. `ToolContext.callID`.
     ///
-    /// Distinct from ProviderRunIdentity because REVIEW-004 requires both: two
-    /// PERFECT verdicts must differ in run AND in call. Sharing a type would
+    /// Distinct from ProviderRunIdentity because causal idempotency requires both: two
+    /// distinct tool invocations must differ in run AND in call. Sharing a type would
     /// make that check expressible but meaningless.
     type ToolCallId = private ToolCallId of string
 

@@ -26,7 +26,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 
 /// Host wiring for one Change Road. One physical Manager session can host many
-/// logical Relay incumbencies; Change never creates a Reviewer session.
+/// logical Relay incumbencies; Change never creates a second audit session.
 type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     // DSL-MUTABLE: resource — manager worktree path registry
     let worktrees = Dictionary<string, string>()

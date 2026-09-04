@@ -11,8 +11,8 @@ open Wanxiangshu.Persistence.Journal
 /// SharedAgentJournal. OpenCode loads the plugin once for the root workspace and
 /// again for each manager worktree; AwaitAgent subscriptions live on the parent
 /// instance while child terminal NotifyTerminal often fires on the worktree
-/// instance. Without a shared bus, dual-PERFECT can confirm in the journal while
-/// OrchestratorHost.reverify never observes the reviewer completion.
+/// instance. Without a shared bus, candidate confirmation can occur in the journal while
+/// OrchestratorHost never observes the completion signal.
 module SharedTerminalBus =
 
     /// DSL-state-combination: physical — shared terminal port refcount resource

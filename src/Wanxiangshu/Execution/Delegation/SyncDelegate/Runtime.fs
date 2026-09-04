@@ -335,7 +335,7 @@ type SyncDelegateRuntime
 
     let handleCompletedCall (turn: ReconciledTurn) (call: SyncDelegateCall) =
         task {
-            // Completion marker for ManagerLife/Reviewer. HandleTurn
+            // Completion marker for ManagerLife. HandleTurn
             // does not use Terminal to build the inspect payload;
             // the bounded WorkRecord is the invocation's parts range.
             match! XTraceCapture.captureTerminalWithReceipt (Some journal) turn with

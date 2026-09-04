@@ -602,7 +602,7 @@ module ChangeSurface =
         | OrchestratorVerdict.Empty -> box {| kind = "Empty"; detail = "" |}
 
     /// Executes the real OrchestratorProgram against deterministic in-memory
-    /// ports. The surface exposes domain effects, not old Reviewer stages, so
+    /// ports. The surface exposes domain effects, not old review stages, so
     /// integration requirements can prove invalidation/successor/Git/CAS order.
     let observeRelayProgram (scenarioName: string) : Task<obj> =
         task {

@@ -6,7 +6,7 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation.Identity
 
 /// Host wiring for one Change Road. One physical Manager session can host many
-/// logical Relay incumbencies; no Reviewer session participates in publication.
+/// logical Relay incumbencies; no second audit session participates in publication.
 type OrchestratorHost =
     new: deps: OrchestratorHostDeps * orchestratorId: SessionId -> OrchestratorHost
 

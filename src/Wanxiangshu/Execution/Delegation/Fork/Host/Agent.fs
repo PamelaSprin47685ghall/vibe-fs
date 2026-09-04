@@ -262,10 +262,9 @@ module HostForkAgent =
                 runtime.ChildCreated agentId role childId
                 runtime.ChildCreatedDir agentId childId (runtime.DirectoryOf agentId)
 
-                // GLORY-033: the fork surface no longer opens review barriers. A
-                // Manager cannot fork a Reviewer at all (GLORY-031), and every
-                // Host-owned barrier opens at its reverify site
-                // (HostReviewProgram / ORCH-006).
+                // GLORY-033: the fork surface no longer opens barriers. An
+                // incumbent cannot fork an unauthorized role, and every
+                // Host-owned barrier opens at its dedicated site.
                 let result =
                     runtime.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
 
@@ -643,10 +642,8 @@ module HostForkAgent =
                 // The ARCH-010 first-prompt payload is computed once and used by
                 // both child paths: a brand-new child AND an idle restored child
                 // receive the same envelope, so a canary declaration anchored on
-                // the envelope cannot tell which path produced the request
-                // (measured: the post-restart review fork sent the raw opening
-                // prompt and every barrier-reviewer declaration failed to match).
-                // Continuations (busy nudge, challenge, manager resume) opt out.
+                // the envelope cannot tell which path produced the request.
+                // Continuations (busy nudge, nudge, manager resume) opt out.
                 //
                 // PENDING 7: `?renderedPrompt: string` (not `string option`) so the
                 // body sees `string option`. Caller supplies a pre-rendered ARCH-010

@@ -595,7 +595,7 @@ module PromptDispatcherSend =
                 None
 
         /// Non-idle gate reminder with exact terminal occasion identity. Used by
-        /// terminal-subscriber gates (for example Reviewer verdict-required)
+        /// terminal-subscriber gates (for example Relay exit-required)
         /// that do not derive authority from SessionIdle.
         member this.SendGateNudge
             (port: ISessionHostPort)

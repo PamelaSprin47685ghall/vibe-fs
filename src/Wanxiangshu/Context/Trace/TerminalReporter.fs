@@ -17,8 +17,8 @@ type XTraceTerminalCompletion =
     | RejectedEmptyOutput
 
 /// Physical terminal materialisation: ReconciledTurn → AgentRunResult →
-/// XTrace capture → NotifyTerminal. No Fallback / Manager / Reviewer /
-/// cohort lifecycle / JoinGuard / IdleRepair / LoopSensor.
+/// XTrace capture → NotifyTerminal. No Fallback / Manager /
+/// lifecycle / JoinGuard / IdleRepair / LoopSensor.
 module TerminalReporter =
 
     let private reportResolvedRole

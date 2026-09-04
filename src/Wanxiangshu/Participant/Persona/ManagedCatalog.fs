@@ -49,7 +49,6 @@ module ManagedAgentCatalog =
         | "inquiry"
         | "inquirer" -> Some Persona.Analyst
         | "auditor"
-        | "reviewer"
         | "examiner" -> Some Persona.Auditor
         | "chronicler"
         | "blogger"
@@ -68,9 +67,8 @@ module ManagedAgentCatalog =
 
     let allInternalRoles: Role list = allRoles |> List.filter Roles.isInternal
 
-    /// Manager fork-agent enum (AGENT-009 / GLORY-031): the Reviewer is
-    /// Host-owned and does not exist on the Manager's surface. No
-    /// orchestrator/manager/blogger/distiller either.
+    /// Manager fork-agent enum (AGENT-009 / GLORY-031):
+    /// No orchestrator/manager/blogger/distiller.
     let managerForkableRoles: Role list =
         [ Role.Coder; Role.Inspector; Role.DevOps; Role.Browser; Role.Inquiry ]
 

@@ -274,7 +274,7 @@ type HostForkRuntime
     /// Wall-clock read for Session extension modules (avoids raw DateTimeOffset stamps).
     member internal _.Now() = clockPort.UtcNow()
 
-    /// GLORY-045: re-enlist a still-ungraduated historical Reviewer into this
+    /// GLORY-045: re-enlist a still-ungraduated historical child into this
     /// runtime before Fork, so Fork's existing-child path reuses the SAME Host
     /// session (X/Y context preserved) instead of creating a second one.
     member internal _.AdoptChild(agentId: string, childId: SessionId) : unit =
