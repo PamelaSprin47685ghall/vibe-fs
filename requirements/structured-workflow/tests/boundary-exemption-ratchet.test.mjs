@@ -86,14 +86,14 @@ test('WHAT[STRUCTURED-WORKFLOW-003] production_source_has_no_ResumeAtXxx_durable
 
 // ── 3. SuicideTool retirement dispatch ownership ────────────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-006] Finality_fs_defines_handleEnding_and_boundary_types', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] SuicideTool_fs_defines_spec_executePrepared_and_retirement_freeze', () => {
   const source = read('src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs')
   assert.match(source, /let spec/, 'SuicideTool.fs must define spec')
   assert.match(source, /let private executePrepared/, 'SuicideTool.fs must define executePrepared')
   assert.match(source, /ToolPermission\.Finality/, 'SuicideTool.fs must require ToolPermission.Finality')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-006] Tool_fs_calls_handleEnding_and_matches_FinalityEndingOutcome_only', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] SuicideTool_fs_freezes_retirement_without_session_abort', () => {
   const source = read('src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs')
   assert.doesNotMatch(source, /\.AbortSession\b/, 'SuicideTool must never issue session-scoped abort')
   assert.match(source, /TryFreezeRetirement/, 'SuicideTool must freeze retirement before check')
