@@ -48,6 +48,7 @@ module Refiner =
         | NonFiniteCost of fromNode: string * toNode: string
         | NegativeHeuristic of node: string
         | NonFiniteHeuristic of node: string
+        | NonZeroGoalHeuristic of goal: string * estimate: float
 
     let code (fault: GraphFault) : string =
         match fault with
@@ -55,6 +56,7 @@ module Refiner =
         | GraphFault.NonFiniteCost _ -> "non-finite-cost"
         | GraphFault.NegativeHeuristic _ -> "negative-heuristic"
         | GraphFault.NonFiniteHeuristic _ -> "non-finite-heuristic"
+        | GraphFault.NonZeroGoalHeuristic _ -> "non-zero-goal-heuristic"
 
     let message (fault: GraphFault) : string =
         match fault with
@@ -66,6 +68,8 @@ module Refiner =
             sprintf "heuristic for node %s is negative; estimates must be nonnegative" node
         | GraphFault.NonFiniteHeuristic node ->
             sprintf "heuristic for node %s is non-finite; estimates must be finite" node
+        | GraphFault.NonZeroGoalHeuristic(goal, estimate) ->
+            sprintf "heuristic for goal %s is %g; goal estimates must be zero" goal estimate
 
     let toCoreError (fault: GraphFault) : CoreError =
         { Code = code fault
@@ -102,12 +106,18 @@ module Refiner =
         | Some(node, _) -> Error(GraphFault.NegativeHeuristic node)
         | None -> Ok()
 
+    let private checkGoalHeuristic (problem: Problem) : Result<unit, GraphFault> =
+        match problem.Heuristic |> Map.tryFind problem.Goal with
+        | Some estimate when estimate <> 0.0 -> Error(GraphFault.NonZeroGoalHeuristic(problem.Goal, estimate))
+        | _ -> Ok()
+
     let private validate (problem: Problem) : Result<unit, GraphFault> =
         result {
             do! checkNonFiniteCost problem
             do! checkNegativeCost problem
             do! checkNonFiniteHeuristic problem
             do! checkNegativeHeuristic problem
+            do! checkGoalHeuristic problem
         }
 
     type private FrontierEntry = { Node: string; G: float; F: float }

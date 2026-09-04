@@ -511,6 +511,47 @@ test('WHAT[EPI-013] text_outputs_carry_handle_and_inquiry_id_for_text_only_model
   const unknown = await tools.sphinx_inquiry_status.handler({ inquiryId: 'iq_nope' })
   assert.equal(unknown.isError, true)
   assert.match(unknown.content[0].text, /iq_nope/)
+  assert.equal(unknown._meta.error.code, 'UNKNOWN_HANDLE')
+})
+
+test('WHAT[EPI-013] empty_forms_assessment_abstains_but_advances', async () => {
+  const tools = mcpServer(createStore())._registeredTools
+
+  const started = await tools.start.handler({ question: ROOT_QUESTION })
+  const handle = started.structuredContent.handle
+
+  const assessed = await tools.assess.handler({ handle, forms: {} })
+  assert.equal(assessed.isError, undefined)
+  assert.equal(assessed.structuredContent.status, 'yield')
+  assert.equal(assessed.structuredContent.nextTool, 'propose')
+  assert.equal(assessed.structuredContent.revision, 1)
+})
+
+test('WHAT[EPI-013] generic_cancel_reports_cancelled_code_and_blank_start_names_its_tool', async () => {
+  const tools = mcpServer(createStore())._registeredTools
+
+  const blank = await tools.sphinx_inquiry_start.handler({ question: '  ' })
+  assert.equal(blank.isError, true)
+  assert.equal(blank._meta.error.code, 'QUESTION_REQUIRED')
+  assert.match(blank.content[0].text, /sphinx_inquiry_start/)
+
+  const started = await tools.sphinx_inquiry_start.handler({ question: ROOT_QUESTION })
+  const inquiryId = started.structuredContent.inquiryId
+  const cancelled = await tools.sphinx_inquiry_cancel.handler({ inquiryId })
+  assert.equal(cancelled.isError, undefined)
+
+  const statusAfter = await tools.sphinx_inquiry_status.handler({ inquiryId })
+  assert.equal(statusAfter.isError, true)
+  assert.equal(statusAfter._meta.error.code, 'inquiry-cancelled')
+  assert.match(statusAfter.content[0].text, new RegExp(inquiryId))
+
+  const submitAfter = await tools.sphinx_work_submit.handler({ inquiryId, expectedRevision: 0, results: [] })
+  assert.equal(submitAfter.isError, true)
+  assert.equal(submitAfter._meta.error.code, 'inquiry-cancelled')
+})
+
+test('WHAT[EPI-013] legacy_shaped_id_in_generic_tool_gets_iq_hint', async () => {
+  const tools = mcpServer(createStore())._registeredTools
 
   const legacyShaped = await tools.sphinx_inquiry_status.handler({ inquiryId: '0702fb48-6517-4875-8fee-33ed6ad2cc38' })
   assert.equal(legacyShaped.isError, true)

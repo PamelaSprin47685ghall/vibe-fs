@@ -82,7 +82,8 @@ module Protocol =
           FocalCurrent: string
           Control: string
           Treatment: string
-          Permutations: int }
+          Permutations: int
+          Seed: int }
 
     type CarryoverError =
         | UnknownPriorArm of string

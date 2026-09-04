@@ -69,6 +69,66 @@ test('WHAT[EPI-010] astar-reports-global-frontier-bound-incumbent-and-reopens-be
   assert.ok(Math.abs(result.upperBound - 5) < 1e-12)
 })
 
+test('WHAT[EPI-010] astar-rejects-nonzero-goal-heuristic-and-exposes-admissibility-assumption', async () => {
+  const rejected = await gecSurface.refineCertificate(
+    {},
+    {
+      kind: 'astar',
+      start: 'S',
+      goal: 'G',
+      edges: [{ from: 'S', to: 'G', cost: 2 }],
+      heuristic: { S: 1, G: 5 },
+    },
+  )
+  assert.equal(rejected.ok, false)
+  assert.equal(rejected.error.code, 'non-zero-goal-heuristic')
+
+  const admitted = await gecSurface.refineCertificate(
+    {},
+    {
+      kind: 'astar',
+      start: 'S',
+      goal: 'G',
+      edges: [{ from: 'S', to: 'G', cost: 2 }],
+      heuristic: { S: 1 },
+    },
+  )
+  assert.equal(admitted.ok, true)
+  assert.deepEqual(admitted.path, ['S', 'G'])
+  assert.ok(admitted.assumptions.includes('admissible-heuristic-assumed-unverified'))
+})
+
+test('WHAT[EPI-010] exact-bayes-reports-canonical-factors-and-ignores-invalid-shadows', async () => {
+  const result = await gecSurface.refineCertificate(
+    { hypotheses: ['up', 'down'], priors: { up: 0.3, down: 0.7 } },
+    {
+      kind: 'bayes-exact',
+      factors: [
+        { dependencyKey: 'dep-one', likelihoods: { up: 0.8, down: 0.2 } },
+        { dependencyKey: 'dep-two', likelihoods: { up: 0.6, down: 0.4 } },
+      ],
+    },
+  )
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.usedFactors, ['dep-one', 'dep-two'])
+  assert.ok(Number.isFinite(result.logPartition))
+  assert.ok(Math.abs(result.posterior.up - 0.72) < 1e-12)
+
+  const shadowed = await gecSurface.refineCertificate(
+    { hypotheses: ['up', 'down'], priors: { up: 0.3, down: 0.7 } },
+    {
+      kind: 'bayes-exact',
+      factors: [
+        { dependencyKey: 'dep-one', likelihoods: { up: 0.8, down: 0.2 } },
+        { dependencyKey: 'dep-one', likelihoods: { up: 0.9 } },
+      ],
+    },
+  )
+  assert.equal(shadowed.ok, true)
+  assert.deepEqual(shadowed.usedFactors, ['dep-one'])
+  assert.ok(Math.abs(shadowed.posterior.up - (0.8 * 0.3) / (0.8 * 0.3 + 0.2 * 0.7)) < 1e-12)
+})
+
 test('WHAT[EPI-010] seeded-mcts-returns-descriptive-sample-summary-not-deterministic-truth', async () => {
   const patch = {
     kind: 'mcts-sample',
@@ -101,4 +161,32 @@ test('WHAT[EPI-010] seeded-mcts-returns-descriptive-sample-summary-not-determini
   assert.ok(!/deterministic truth/i.test(guaranteeText))
   assert.ok(!/singleton/i.test(guaranteeText))
   assert.ok(!/probabilistic-coverage/i.test(guaranteeText))
+})
+
+test('WHAT[EPI-010] mcts-sample-accepts-negative-rewards-and-ignores-legacy-prior', async () => {
+  const patch = {
+    kind: 'mcts-sample',
+    root: 'root',
+    children: {
+      root: ['loss', 'gain'],
+      loss: ['loss-terminal'],
+      gain: ['gain-terminal'],
+    },
+    terminalReward: { 'loss-terminal': -2.0, 'gain-terminal': 4.0 },
+    iterations: 40,
+    seed: 11,
+    delta: 0.05,
+  }
+  const first = await gecSurface.refineCertificate({}, patch)
+  assert.equal(first.ok, true)
+  assert.equal(first.coverage.rewardLo, -2.0)
+  assert.equal(first.coverage.rewardHi, 4.0)
+  for (const key of Object.keys(first.estimates)) {
+    assert.ok(Number.isFinite(first.estimates[key]))
+  }
+  assert.match(first.guarantee, /prior.*ignored|ignored.*prior/i)
+
+  const withPrior = await gecSurface.refineCertificate({}, { ...patch, prior: { loss: 0.9, gain: 0.1 } })
+  assert.equal(withPrior.ok, true)
+  assert.deepEqual(withPrior.estimates, first.estimates)
 })

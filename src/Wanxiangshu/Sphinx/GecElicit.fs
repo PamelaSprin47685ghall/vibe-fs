@@ -98,37 +98,28 @@ module GecElicit =
                OpenFirst = boolField details "openFirst" true }
             : Protocol.Treatment))
 
-    let private assignmentWordingOf
+    let private assignmentOf
         (envelope: Protocol.SubjectEnvelope)
         (treatments: Protocol.Treatment list)
-        : string =
+        : Protocol.Treatment option =
         treatments
         |> List.tryFind (fun treatment -> treatment.Name = envelope.Treatment)
-        |> Option.map (fun treatment -> treatment.Wording)
-        |> Option.defaultValue envelope.Treatment
-
-    let private assignmentPolarityOf (envelope: Protocol.SubjectEnvelope) (treatments: Protocol.Treatment list) : int =
-        treatments
-        |> List.tryFind (fun treatment -> treatment.Name = envelope.Treatment)
-        |> Option.map (fun treatment -> treatment.Polarity)
-        |> Option.defaultValue 1
-
-    let private assignmentOpenFirstOf
-        (envelope: Protocol.SubjectEnvelope)
-        (treatments: Protocol.Treatment list)
-        : bool =
-        treatments
-        |> List.tryFind (fun treatment -> treatment.Name = envelope.Treatment)
-        |> Option.map (fun treatment -> treatment.OpenFirst)
-        |> Option.defaultValue true
 
     let private assignmentView (treatments: Protocol.Treatment list) (envelope: Protocol.SubjectEnvelope) : obj =
+        let treatment = assignmentOf envelope treatments
+
         box
             {| subject = envelope.Subject
                treatment = envelope.Treatment
-               wording = assignmentWordingOf envelope treatments
-               polarity = assignmentPolarityOf envelope treatments
-               openFirst = assignmentOpenFirstOf envelope treatments
+               wording =
+                treatment
+                |> Option.map (fun found -> found.Wording)
+                |> Option.defaultValue envelope.Treatment
+               polarity = treatment |> Option.map (fun found -> found.Polarity) |> Option.defaultValue 1
+               openFirst =
+                treatment
+                |> Option.map (fun found -> found.OpenFirst)
+                |> Option.defaultValue true
                blindToken = envelope.BlindToken
                labelPermutation = envelope.LabelPermutation |> List.toArray |> box
                orderPermutation = envelope.OrderPermutation |> List.toArray |> box |}
@@ -266,6 +257,60 @@ module GecElicit =
 
             allocateBallot input seed snapshot
 
+    let private stringMapOf (value: obj) : Map<string, string> =
+        if isNullish value then
+            Map.empty
+        else
+            keysOf value
+            |> Array.toList
+            |> List.map (fun key -> key, textOf (fieldOf value key))
+            |> Map.ofList
+
+    let private armOutcomesOf (value: obj) : Protocol.ArmOutcome list =
+        arrayOf value
+        |> Array.toList
+        |> List.map (fun entry ->
+            ({ Subject = textOf (fieldOf entry "subject")
+               Response =
+                 match floatField entry "response" with
+                 | Some number -> number
+                 | None -> Double.NaN }
+            : Protocol.ArmOutcome))
+
+    let carryover (input: obj) : obj =
+        let request: Protocol.CarryoverInput =
+            { Responses = armOutcomesOf (fieldOf input "responses")
+              PriorExposure = stringMapOf (fieldOf input "priorExposure")
+              CurrentTreatment = stringMapOf (fieldOf input "currentTreatment")
+              FocalCurrent = textOf (fieldOf input "focalCurrent")
+              Control = textOf (fieldOf input "control")
+              Treatment = textOf (fieldOf input "treatment")
+              Permutations = floatField input "permutations" |> Option.map int |> Option.defaultValue 1024
+              Seed = floatField input "seed" |> Option.map int |> Option.defaultValue 0 }
+
+        match Protocol.carryover request with
+        | Error fault ->
+            let code = Protocol.carryoverErrorCode fault
+            typedError code code
+        | Ok outcome ->
+            okResult
+                [ "focalCurrent", box outcome.FocalCurrent
+                  "treatment", box outcome.Treatment
+                  "control", box outcome.Control
+                  "estimate", box outcome.Estimate
+                  "treatmentMean", box outcome.TreatmentMean
+                  "controlMean", box outcome.ControlMean
+                  "treatmentN", box outcome.TreatmentN
+                  "controlN", box outcome.ControlN
+                  "excludedSubjects", outcome.ExcludedSubjects |> List.toArray |> box
+                  "estimand", box outcome.Estimand
+                  "assumptions", outcome.Assumptions |> Set.toArray |> box
+                  "uncertainty",
+                  box
+                      {| kind = "permutation-null"
+                         pValue = outcome.PermutationP
+                         nullPermutations = outcome.NullPermutations |} ]
+
     let selfPrediction (input: obj) : obj =
         let request: SelfPrediction.AssessmentInput =
             { WorkId = textOf (fieldOf input "workId")
@@ -313,30 +358,14 @@ module GecElicit =
         else
             pairWidth (unbox<obj array> band |> Array.toList)
 
-    let private rangeWidths (stability: obj) : float list =
-        keysOf stability |> Array.toList |> List.map (bandWidth stability)
-
-    let private maxRangeWidth (ranges: float list) : float =
-        match ranges with
-        | [] -> 0.0
-        | _ -> ranges |> List.max
-
     let private reversalBoundOf (stability: obj) : float =
         if isNullish stability then
             0.0
         else
-            maxRangeWidth (rangeWidths stability)
+            keysOf stability
+            |> Array.fold (fun best name -> max best (bandWidth stability name)) 0.0
 
     let private stopView (decisions: Certificate.DecisionMass list) (certificate: Certificate.StopCertificate) : obj =
-        let minorityView =
-            Certificate.answerModes certificate.Answer
-            |> List.map (fun mode ->
-                box
-                    {| decision = mode.Decision
-                       mass = mode.Probability |})
-            |> List.toArray
-            |> box
-
         let decision =
             if Certificate.answerKind certificate.Answer = "single-winner" then
                 box
@@ -345,6 +374,15 @@ module GecElicit =
                         Certificate.answerWinner certificate.Answer
                         |> Option.defaultValue certificate.TopDecision |}
             else
+                let minorityView =
+                    Certificate.answerModes certificate.Answer
+                    |> List.map (fun mode ->
+                        box
+                            {| decision = mode.Decision
+                               mass = mode.Probability |})
+                    |> List.toArray
+                    |> box
+
                 box
                     {| kind = "decision-distribution"
                        modes =
@@ -373,6 +411,8 @@ module GecElicit =
                   {| testedFamily = certificate.TestedFamily |> List.toArray |> box
                      scope = certificate.Scope
                      guarantee = certificate.Guarantee
+                     requiredCoverage = certificate.RequiredCoverage
+                     minorityThreshold = certificate.MinorityThreshold
                      sequentialAlpha = certificate.SequentialAlpha
                      sequentialError =
                       box
@@ -423,8 +463,8 @@ module GecElicit =
               Evidence = floatField input "evidence" |> Option.defaultValue 0.0
               ErrorBudget = alpha
               ChecksPerformed = checks
-              RequiredCoverage = 0.5
-              MinorityThreshold = 0.05
+              RequiredCoverage = floatField input "requiredCoverage" |> Option.defaultValue 0.5
+              MinorityThreshold = floatField input "minorityThreshold" |> Option.defaultValue 0.05
               MinorModes = minors
               Voc = voc }
 
@@ -464,5 +504,6 @@ module GecElicit =
 
     let methods: (string * obj) list =
         [ "splitBallot", box splitBallot
+          "carryover", box carryover
           "selfPrediction", box selfPrediction
           "stopCertificate", box stopCertificate ]

@@ -125,8 +125,14 @@ module McpContract =
           Revision = revision
           ExpectedTool = expectedTool }
 
-    let questionRequiredView (message: string) : ErrorView =
-        view codeQuestionRequired message true false "Call start with a non-empty question." None None None
+    let questionRequiredView (message: string) (guidance: string) : ErrorView =
+        view codeQuestionRequired message true false guidance None None None
+
+    let startQuestionRequiredView (message: string) : ErrorView =
+        questionRequiredView message "Call start with a non-empty question."
+
+    let genericStartQuestionRequiredView (message: string) : ErrorView =
+        questionRequiredView message "Call sphinx_inquiry_start with a non-empty question."
 
     let invalidObservationView (handle: string option) (message: string) : ErrorView =
         view

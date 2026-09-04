@@ -49,6 +49,7 @@ module Refiner =
         | NonFiniteCost of fromNode: string * toNode: string
         | NegativeHeuristic of node: string
         | NonFiniteHeuristic of node: string
+        | NonZeroGoalHeuristic of goal: string * estimate: float
 
     val code: fault: GraphFault -> string
     val message: fault: GraphFault -> string

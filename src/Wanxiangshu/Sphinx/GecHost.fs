@@ -88,20 +88,20 @@ module GecHost =
         (parentSessionId: string)
         (depth: int)
         : Result<DispatchPlan, HostFault> =
-        requireText HostFault.MissingWorkId workId
-        |> Result.bind (fun wid ->
-            requireText HostFault.MissingSnapshotHash snapshotHash
-            |> Result.bind (fun snap ->
-                requireText HostFault.MissingParentSession parentSessionId
-                |> Result.bind (fun parent ->
-                    if depth > 1 then
-                        Error(HostFault.DepthExceeded depth)
-                    else
-                        Ok
-                            { ParentSessionId = parent
-                              SnapshotHash = snap
-                              Depth = 1
-                              ChildSessionId = childSessionFor wid attempt snap })))
+        result {
+            let! wid = requireText HostFault.MissingWorkId workId
+            let! snap = requireText HostFault.MissingSnapshotHash snapshotHash
+            let! parent = requireText HostFault.MissingParentSession parentSessionId
+
+            if depth > 1 then
+                return! Error(HostFault.DepthExceeded depth)
+            else
+                return
+                    { ParentSessionId = parent
+                      SnapshotHash = snap
+                      Depth = 1
+                      ChildSessionId = childSessionFor wid attempt snap }
+        }
 
     let private childView (plan: DispatchPlan) : obj =
         box
@@ -128,6 +128,10 @@ module GecHost =
     let private intField (fallback: int) (value: obj) : int =
         if isNullish value then fallback else unbox<int> value
 
+    let private depthOf (input: obj) : int =
+        let depthRaw: obj = input?depth
+        intField 1 depthRaw
+
     // Siblings are accepted but never read: the child carries no sibling payload
     // by construction, so nothing from a sibling branch can leak into the plan.
     let planOpenCodeDispatch (input: obj) : obj =
@@ -135,18 +139,11 @@ module GecHost =
 
         let attempt = if isNullish attemptRaw then -1 else unbox<int> attemptRaw
 
-        let depthRaw: obj = input?depth
-
         let planned: Result<DispatchPlan, HostFault> =
             if attempt < 0 then
                 Error HostFault.MissingAttempt
             else
-                planChild
-                    (text input?workId)
-                    attempt
-                    (snapshotHashOf input)
-                    (parentSessionOf input)
-                    (intField 1 depthRaw)
+                planChild (text input?workId) attempt (snapshotHashOf input) (parentSessionOf input) (depthOf input)
 
         renderPlan planned
 
@@ -154,7 +151,6 @@ module GecHost =
     // snapshot under the next attempt, so failure output never propagates.
     let planOpenCodeRetry (input: obj) : obj =
         let nextRaw: obj = input?nextAttempt
-        let depthRaw: obj = input?depth
 
         let planned: Result<DispatchPlan, HostFault> =
             if isNullish nextRaw then
@@ -165,22 +161,24 @@ module GecHost =
                     (unbox<int> nextRaw)
                     (snapshotHashOf input)
                     (parentSessionOf input)
-                    (intField 1 depthRaw)
+                    (depthOf input)
 
         renderPlan planned
 
     let abortOpenCodeWork (input: obj) : obj =
-        requireText HostFault.MissingWorkId (text input?workId)
-        |> Result.bind (fun wid ->
-            requireText HostFault.MissingChildSession (text input?childSessionId)
-            |> Result.map (fun cid -> wid, cid))
-        |> function
-            | Ok(wid, cid) ->
+        result {
+            let! wid = requireText HostFault.MissingWorkId (text input?workId)
+            let! cid = requireText HostFault.MissingChildSession (text input?childSessionId)
+
+            return
                 box
                     {| ok = true
                        aborted = true
                        workId = wid
                        childSessionId = cid |}
+        }
+        |> function
+            | Ok view -> view
             | Error fault -> faultView fault
 
     let drainOpenCodeHost (input: obj) : obj =

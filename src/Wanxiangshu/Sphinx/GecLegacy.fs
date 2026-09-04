@@ -51,15 +51,10 @@ module GecLegacy =
               "answer" ==> fieldOf payload "answer" ]
 
     let private currentView (inquiryId: string) (liveHandle: string) (state: EpistemicState) (error: obj) : obj =
-        let nextTool: obj =
+        let nextTool, request =
             match state.PendingRequest with
-            | Some(request: Request) -> box (McpContract.nextTool request)
-            | None -> null
-
-        let request: obj =
-            match state.PendingRequest with
-            | Some(request: Request) -> Codec.requestObject request
-            | None -> null
+            | Some(request: Request) -> box (McpContract.nextTool request), Codec.requestObject request
+            | None -> null, null
 
         createObj
             [ "inquiryId" ==> inquiryId
@@ -90,7 +85,7 @@ module GecLegacy =
 
         match store.StartTyped(question) with
         | StartOutcome.Rejected(message: string) ->
-            let view = McpContract.questionRequiredView message
+            let view = McpContract.startQuestionRequiredView message
 
             createObj [ "inquiryId" ==> fresh; "error" ==> McpContract.errorObject view ]
         | StartOutcome.Started(liveHandle: string, state: EpistemicState, result: InquiryResult) ->
