@@ -15,12 +15,10 @@
 //    - change-integration HOW must restate the no-fold constraint.
 //    - Production source must not introduce ResumeAtXxx durable log patterns.
 //
-// 3. ManagerFinality handleEnding dispatch ownership (FINALITY-003 ↔ SW-017①):
-//    - Finality.fs must define handleEnding, FinalityEndingOutcome, and
-//      FinalityEndingExecution.
-//    - Tool.fs must call handleEnding and match FinalityEndingOutcome — never
-//      match EndingDisposition cases directly.
-//    - FINALITY-003 WHAT must mention handleEnding and FinalityEndingOutcome.
+// 3. SuicideTool retirement dispatch ownership (SW-006 / RETIRE-001 / RETIRE-003 ↔ SW-017①):
+//    - SuicideTool.fs must define spec, executePrepared, and require ToolPermission.Finality.
+//    - SuicideTool.fs must freeze retirement before check and never issue session-scoped abort.
+//    - relay-retirement WHAT must define RETIRE-001 and RETIRE-003.
 //
 // Source-tree proof: each assertion reads production source or requirements
 // docs and checks for the presence (or absence) of specific strings. If a
@@ -101,7 +99,7 @@ test('WHAT[STRUCTURED-WORKFLOW-006] Tool_fs_calls_handleEnding_and_matches_Final
   assert.match(source, /TryFreezeRetirement/, 'SuicideTool must freeze retirement before check')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-006] FINALITY_003_WHT_documents_handleEnding_and_FinalityEndingOutcome', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] RETIREMENT_WHT_documents_retirement_dispatch_and_blockers', () => {
   const what = read('requirements/relay-retirement/WHAT.md')
   assert.match(what, /RETIRE-001/, 'relay-retirement WHAT must define RETIRE-001')
   assert.match(what, /RETIRE-003/, 'relay-retirement WHAT must define RETIRE-003')

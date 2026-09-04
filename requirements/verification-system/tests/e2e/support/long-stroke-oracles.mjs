@@ -167,16 +167,10 @@ export async function assertFallbackContinuation(workDir, label = 'long-stroke')
   );
 }
 
-/** Back-compat alias used by older skeleton comments. */
-export async function assertProviderFallback(workDir, label = 'long-stroke') {
-  await assertProviderTransientFailure(workDir, label);
-  await assertFallbackContinuation(workDir, label);
-}
-
 /**
  * §21: join blocked then causally awakened — HandleCompleted after user_message wake.
  * The join-wake itself only requires the harvest fact; the full agent lifecycle is
- * proven later by FinalityBlessed + LifeCompleted (assertLaterSuccessfulFinality).
+ * proven later by RetirementCommitted (assertLaterSuccessfulFinality).
  */
 export async function assertJoinWakePath(workDir, label = 'long-stroke') {
   assert.ok(
@@ -276,35 +270,11 @@ export function assertSuccessfulReconciliation(workDir, label = 'long-stroke') {
   );
 }
 
-/** Back-compat composite for publish axis. */
-export async function assertPublishReconcile(workDir, label = 'long-stroke') {
-  assertPublishConflict(workDir, label);
-  assertSubagentReuse(workDir, label);
-  assertSuccessfulReconciliation(workDir, label);
-}
-
 /** §21: later successful finality — RetirementCommitted after resources converge. */
 export function assertLaterSuccessfulFinality(workDir, label = 'long-stroke') {
   assert.ok(
     countFactCase(workDir, 'RetirementCommitted') >= 1,
     `${label}: RetirementCommitted required after resources converge`,
-  );
-}
-
-/** Back-compat aliases. */
-export async function assertFinalityAdversity(workDir, label = 'long-stroke') {
-  assertReviewerRevise(workDir, label);
-  assertFinalityTemporarilyBlocked(workDir, label);
-  assert.ok(
-    countFactCase(workDir, 'FinalityBlessed') >= 1,
-    `${label}: FinalityBlessed required after resources converge`,
-  );
-}
-
-export async function assertLifeCompleted(workDir, label = 'long-stroke') {
-  assert.ok(
-    countFactCase(workDir, 'LifeCompleted') >= 1,
-    `${label}: LifeCompleted required before clean shutdown`,
   );
 }
 
@@ -555,16 +525,13 @@ export async function oracleLongStroke(scenario, _ctx) {
 export const PLANNED_WAIT_FACTS = Object.freeze({
   handleCompleted: waitFactShape('HandleCompleted', { gte: 1 }),
   fallbackCursor: waitFactShape('FallbackCursorAdvanced', { eq: 1 }),
-  finalityRejected: waitFactShape('FinalityRejected', { gte: 1 }),
-  finalityBlessed: waitFactShape('FinalityBlessed', {
-    gte: 1,
-    renewOn: ['ReviewVerdictRecorded', 'ReviewAttemptClosed', 'ConfirmedReviewWitness', 'FinalityReviewerEnlisted', 'BlogObservationCommitted'],
-  }),
+  assessmentCommitted: waitFactShape('AssessmentCommitted', { gte: 1 }),
+  retirementCommitted: waitFactShape('RetirementCommitted', { gte: 1 }),
+  successorActivated: waitFactShape('SuccessorActivated', { gte: 1 }),
   conflictDetected: waitFactShape('ConflictDetected', { gte: 1 }),
+  rebasedCandidateReady: waitFactShape('RebasedCandidateReady', { gte: 1 }),
   // Orchestrator-tagged Published (bare "Published" false-matches assignment text).
   published: waitFactShape('"Orchestrator",["Published"', { eq: 1 }),
-  confirmedWitness: waitFactShape('ConfirmedReviewWitness', { gte: 1 }),
-  lifeCompleted: waitFactShape('LifeCompleted', { gte: 1 }),
   candidateReady: waitFactShape('CandidateReady', { eq: 1 }),
 });
 
@@ -654,11 +621,6 @@ export const ADVERSITY_ORACLES = Object.freeze({
   assertSubagentReuse,
   assertSuccessfulReconciliation,
   assertLaterSuccessfulFinality,
-  // composites / aliases retained for older call sites
-  assertProviderFallback,
-  assertFinalityAdversity,
-  assertPublishReconcile,
-  assertLifeCompleted,
 });
 
 export const G2_INSPECTOR_CANARY_PROMPT =

@@ -20,13 +20,15 @@
 #     ↓
 #   harvest → sole provider-error → FallbackCursorAdvanced eq 1
 #     ↓
-#   first legal suicide → migration Life opened → Host finality REVISE → FinalityRejected
+#   Incumbent #1: audit assigns work on low dimension → exit-required nudge → RetirementCommitted
 #     ↓
-#   repair fork → dual PERFECT → FinalityBlessed → last_words → LifeCompleted
+#   Successor #1: 8×10 independent audit → RetirementCommitted → CandidateReady
 #     ↓
-#   CandidateReady; gitConflictProof (no restart) already diverged target
+#   stale target forces rebase → ConflictDetected (no restart)
 #     ↓
-#   ConflictDetected → conflict-resume (same Manager) → coder-resolve → Published
+#   Successor #2: fresh AuditPending → low-score work assigned → repairs conflict → RetirementCommitted
+#     ↓
+#   Successor #3: fresh independent re-audit 8×10 → RetirementCommitted → RebasedCandidateReady → Published
 #     ↓
 #   orch join / expectSatisfied / oracleLongStroke
 #
@@ -35,32 +37,30 @@
 #   [x] provider transient failure          — [[fault]] provider-error + assertProviderTransientFailure
 #   [x] fallback                            — manager.1→continue.0 + assertFallbackContinuation
 #   [x] join blocked then causally awakened — flow.prompt wake + assertJoinWakePath
-#   [x] reviewer REVISE                     — first unified barrier-reviewer verdict + assertReviewerRevise
+#   [x] reviewer REVISE                     — non-10 assessment assigns work + assertReviewerRevise
 #   [x] interrupted/aborted child or session— holdChildC1UntilLabor + assertInterruptedJoin
-#   [x] finality temporarily blocked        — FinalityRejected + assertFinalityTemporarilyBlocked
+#   [x] finality temporarily blocked        — non-10 blocks publication + successor required + assertFinalityTemporarilyBlocked
 #   [x] durable recovery/continuation       — same PID FallbackCursorAdvanced + assertDurableRecovery
 #   [x] publish conflict / stale target     — gitConflictProof on manager.0 (no restart) + assertPublishConflict
+#   [x] subagent session reuse              — successor-2 reuses Proof Writer child + assertSubagentReuse
 #   [x] successful reconciliation           — Orchestrator-tagged Published eq 1 + assertSuccessfulReconciliation
-#   [x] later successful finality           — FinalityBlessed + LifeCompleted + assertLaterSuccessfulFinality
+#   [x] later successful finality           — RetirementCommitted after resources converge + assertLaterSuccessfulFinality
 #   [x] simultaneous Inspector batch        — streamed 3× inspect + assertG2InspectorBatchCoalescing
 #
 # Yield / hang risks (estimated):
-#   - FinalityBlessed waitFact: widen via renewOn; journal noise without renew can trip silence
+#   - RetirementCommitted waitFact: waits for recursive resource closure
 #   - ConflictDetected / Published: rebase+barrier lag; timeouts mirror orch-unhappy (60–90s caps)
-#   - AgentOwnerRoot migration Life is opened on first suicide (FinalityTool
-#     ensureMigrationLife), NOT at fork — the lifecycle is proven by LifeCompleted later
 #   - interrupt requires holdChildC1UntilLabor; without hold, drain completes child and skips user_message
-#   - REVISE→PERFECT uses one Reviewer protocol: the first unified barrier verdict is REVISE,
-#     then bindFinalityReviseThenPerfect flips later barrier verdicts to PERFECT; no alternate surface
+#   - non-10 assessment assigns WorkOwned; successor independently re-audits before publication
 #   - blogger pad undersize → unmatched companion requests (fail closed)
 #   - wall <6s target vs orch publish chain — risk of §16 miss until flesh/perf pass
 #
 # Anchors (lean extract, not a paste): orchestrator-unhappy-path (conflict→Published,
-# no restart), manager-unhappy (join wake / REVISE), fallback.toml (sole provider-error).
+# no restart), manager-unhappy (join wake / low assessment), fallback.toml (sole provider-error).
 
 scenario = "long-stroke"
 description = "G4R-3 The Long Stroke: orchestrator shell, one OpenCode world through adversity to clean shutdown"
-pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fallback, REVISE→FinalityRejected→Blessed→LifeCompleted, gitConflictProof→ConflictDetected→Published (no restart)."
+pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fallback, audit-low-score→WorkOwned→Retirement→Successor, gitConflictProof→ConflictDetected→RebasedCandidate→Published (no restart)."
 
 # Event ceilings (fail-closed on dead loops; primary over silence watchdog):
 #   maxJournalEvents — complete 63-step legal stroke after explicit preflow authority, real K2

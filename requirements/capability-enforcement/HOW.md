@@ -35,9 +35,9 @@ Roles.permissions (Kernel 层单一真相源)
    - `TryConsume` / `TryRelease` 返回 `Result<unit, QuiescencePermitFailure>`；owner mismatch、重复、attempt supersede、revoke、无 fresh idle 各自保持稳定 typed 分支并且 Error 零效果。
    - JS `QuiescenceSurface` 只暴露 typed result view。重启恢复 durable facts 后仍由普通 attempt composition 重新 `ObserveIdle`，不编码或复活旧 permit。
 
-6. **复用既有终局证明**：
-   - `ConfirmedReviewWitness` 继续由 `FINALITY-002` / `FINALITY-010` 的 Life、request、barrier 与 current Git tree 合同建立。
-   - `BlessingPermit` 只由 current tree 对 confirmed witness 的 typed admission 发行；durable `FinalityBlessed` 是结果，permit 本身不耐久。
+6. **复用既有离任与集成证明**：
+   - 离任准入与资源闭包继续由 `RETIRE-001` ~ `RETIRE-008` 的 IncumbencyId、WorkspaceSnapshotId 与 recursive live resources closure 合同建立。
+   - 确定性发布与集成门禁由 `CHGINT-001` ~ `CHGINT-006` 对有效 quality candidate 的 typed admission 发行；durable `PublicationCommitted` 是结果，不另造第二套审查权威。
 
 ## 验证与测试落点
 
