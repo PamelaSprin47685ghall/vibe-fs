@@ -217,7 +217,7 @@ module McpServer =
             logSuccess McpContract.toolStart handle status revision startedMs
             successResult (McpContract.summarizeSuccess success) (McpContract.successPayload success)
         | StartOutcome.Rejected message ->
-            let view = McpContract.questionRequiredView message
+            let view = McpContract.startQuestionRequiredView message
             logError McpContract.toolStart view startedMs
             errorResult McpContract.toolStart view
 
@@ -335,7 +335,7 @@ module McpServer =
         let question = textField args "question"
 
         if System.String.IsNullOrWhiteSpace question then
-            let view = McpContract.questionRequiredView "question is required"
+            let view = McpContract.genericStartQuestionRequiredView "question required"
             logError GecInquiry.toolGenericStart view startedMs
             errorResult GecInquiry.toolGenericStart view
         else
@@ -507,7 +507,7 @@ module McpServer =
             let question = textField args "question"
 
             if System.String.IsNullOrWhiteSpace question then
-                let view = McpContract.questionRequiredView "question is required"
+                let view = McpContract.genericStartQuestionRequiredView "question required"
                 logError GecInquiry.toolGenericStart view startedMs
                 return errorResult GecInquiry.toolGenericStart view
             else
@@ -938,7 +938,7 @@ module McpServer =
         registerDurable
             McpContract.toolAssess
             "Assess question semantics"
-            "Answer the pending SemanticAssessmentRequest. forms maps QuestionForm (Why/How/What/Who/Where/When/Which/Polar/Other) to belief mass; facets, targets and intents are optional."
+            "Answer the pending SemanticAssessmentRequest. forms maps QuestionForm (Why/How/What/Who/Where/When/Which/Polar/Other) to belief mass; facets, targets and intents are optional. An empty forms map abstains (no belief mass) and still advances the inquiry."
             (createObj
                 [ "handle" ==> zString "Opaque inquiry handle returned by start"
                   "forms" ==> zNumberRecord "QuestionForm → belief mass"

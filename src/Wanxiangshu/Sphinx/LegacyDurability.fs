@@ -117,7 +117,7 @@ module LegacyDurability =
                        message = "replay must open with the start observation" |} |}
 
     let private startRejectedView (message: string) : obj =
-        let view = McpContract.questionRequiredView message
+        let view = McpContract.startQuestionRequiredView message
 
         box
             {| ok = false

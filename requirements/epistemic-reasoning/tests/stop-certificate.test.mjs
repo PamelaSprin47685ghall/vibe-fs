@@ -56,6 +56,24 @@ test('WHAT[EPI-029] stable-minority-mode-returns-decision-distribution-not-singl
   assert.deepEqual(result.decision.minorityModes, [{ decision: 'reject', mass: 0.32 }])
 })
 
+test('WHAT[EPI-029] caller-supplied-coverage-and-minority-thresholds-bind', async () => {
+  const base = {
+    testedFramings: ['neutral', 'reverse-wording'],
+    decisionPosterior: { ...posterior },
+    checksSoFar: 1,
+    alpha: 0.05,
+  }
+  const custom = await gecSurface.stopCertificate({ ...base, requiredCoverage: 0.9, minorityThreshold: 0.4 })
+  assert.equal(custom.ok, true)
+  assert.ok(Math.abs(custom.certificate.requiredCoverage - 0.9) < 1e-12)
+  assert.ok(Math.abs(custom.certificate.minorityThreshold - 0.4) < 1e-12)
+
+  const fallback = await gecSurface.stopCertificate(base)
+  assert.equal(fallback.ok, true)
+  assert.ok(Math.abs(fallback.certificate.requiredCoverage - 0.5) < 1e-12)
+  assert.ok(Math.abs(fallback.certificate.minorityThreshold - 0.05) < 1e-12)
+})
+
 test('WHAT[EPI-029] caller-evidence-fires-stop-when-all-checks-pass', async () => {
   const result = await gecSurface.stopCertificate({
     testedFramings: ['neutral', 'reverse-wording'],

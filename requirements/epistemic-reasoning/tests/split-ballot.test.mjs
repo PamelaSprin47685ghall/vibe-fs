@@ -163,6 +163,41 @@ test('WHAT[EPI-023] invalid-treatment-polarity-fails-closed', async () => {
   assert.match(result.error.code, /invalid-polarity/i)
 })
 
+test('WHAT[EPI-023] carryover-permutation-null-is-seeded-deterministic-and-capped', async () => {
+  const input = (seed, permutations) => ({
+    responses: subjects8.map((subject, index) => ({ subject, response: index < 4 ? 4.0 : 1.0 })),
+    priorExposure: Object.fromEntries(subjects8.map((subject, index) => [subject, index < 4 ? 'arm-a' : 'arm-b'])),
+    currentTreatment: Object.fromEntries(subjects8.map((subject) => [subject, 'arm-c'])),
+    focalCurrent: 'arm-c',
+    control: 'arm-b',
+    treatment: 'arm-a',
+    permutations,
+    seed,
+  })
+  const first = await gecSurface.carryover(input(7, 64))
+  const second = await gecSurface.carryover(input(7, 64))
+  assert.equal(first.ok, true)
+  assert.deepEqual(second, first)
+  assert.equal(first.estimand, 'carryover-difference-in-means')
+  assert.equal(first.uncertainty.kind, 'permutation-null')
+  assert.equal(first.uncertainty.nullPermutations, 64)
+  assert.ok(first.uncertainty.pValue >= 0 && first.uncertainty.pValue <= 1)
+
+  const other = await gecSurface.carryover(input(99, 64))
+  const otherAgain = await gecSurface.carryover(input(99, 64))
+  assert.equal(other.ok, true)
+  assert.deepEqual(otherAgain, other)
+  // The seed reaches the permutation null: distinct seeds draw distinct
+  // nulls (a seed-ignoring null would report one shared p-value).
+  assert.ok(Math.abs(first.uncertainty.pValue - 0.06153846153846154) < 1e-12)
+  assert.ok(Math.abs(other.uncertainty.pValue - 0.015384615384615385) < 1e-12)
+  assert.notEqual(other.uncertainty.pValue, first.uncertainty.pValue)
+
+  const capped = await gecSurface.carryover(input(7, 4096))
+  assert.equal(capped.ok, true)
+  assert.equal(capped.uncertainty.nullPermutations, 1024)
+})
+
 test('WHAT[EPI-023] missing-root-snapshot-fails-closed-before-randomization', async () => {
   const result = await gecSurface.splitBallot({
     seed: 5,

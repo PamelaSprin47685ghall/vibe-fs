@@ -101,8 +101,9 @@ module GecDecode =
                 (fun state item ->
                     state
                     |> Result.bind (fun (acc: string list) ->
-                        stringListItem item |> Result.map (fun text -> acc @ [ text ])))
+                        stringListItem item |> Result.map (fun text -> text :: acc)))
                 (Ok [])
+            |> Result.map List.rev
 
     let private optStringArray (raw: obj) (name: string) : Result<string list, CoreError> =
         let found = getField raw name
@@ -199,9 +200,11 @@ module GecDecode =
     let private lockEntryOfManifest (manifest: PluginManifest) : PluginLockEntry = Plugin.toLockEntry manifest
 
     let private lockEntryOfRaw (raw: obj) : Result<PluginLockEntry, CoreError> =
-        if not (isNullish (getField raw "plugin")) then
-            let plugin = getField raw "plugin"
+        let plugin = getField raw "plugin"
 
+        if isNullish plugin then
+            decodeManifest raw |> Result.map lockEntryOfManifest
+        else
             fieldString plugin "id"
             |> Result.bind (fun id ->
                 fieldString plugin "release"
@@ -221,8 +224,6 @@ module GecDecode =
                                       Capabilities = Set.ofList capabilities
                                       Dependencies = Set.ofList dependencies
                                       Schemas = schemas }))))))
-        else
-            decodeManifest raw |> Result.map lockEntryOfManifest
 
     let decodeLockEntries (raw: obj) : Result<PluginLockEntry list, CoreError> =
         if isNullish raw then
@@ -235,8 +236,9 @@ module GecDecode =
             |> List.fold
                 (fun state item ->
                     state
-                    |> Result.bind (fun acc -> lockEntryOfRaw item |> Result.map (fun entry -> acc @ [ entry ])))
+                    |> Result.bind (fun acc -> lockEntryOfRaw item |> Result.map (fun entry -> entry :: acc)))
                 (Ok [])
+            |> Result.map List.rev
 
     let private envelopeWith (schema: SchemaRef) (payload: obj) : Result<JsonEnvelope, CoreError> =
         let body = if isNullish payload then box {| |} else payload
@@ -281,13 +283,13 @@ module GecDecode =
                                   let payload = getField envelopeRaw "payload"
                                   let body = if isNullish payload then box {| |} else payload
                                   envelopeWith schema body)))
-                    |> Result.map (fun rootEnvelope -> InquiryCreated(rootEnvelope, lockEntries, budget))
-                    |> fun result ->
-                        match result with
-                        | Ok body when String.IsNullOrWhiteSpace question ->
+                    |> Result.bind (fun rootEnvelope ->
+                        let body = InquiryCreated(rootEnvelope, lockEntries, budget)
+
+                        if String.IsNullOrWhiteSpace question then
                             fail "missing-question" "question must not be blank"
-                            |> Result.bind (fun _ -> Ok body)
-                        | _ -> result)))
+                        else
+                            Ok body))))
 
     let private workIds (raw: obj) (name: string) : Result<WorkId list, CoreError> =
         optStringArray raw name
@@ -299,8 +301,9 @@ module GecDecode =
                     |> Result.bind (fun (acc: WorkId list) ->
                         WorkId.tryCreate name
                         |> withCode "invalid-dependency"
-                        |> Result.map (fun id -> acc @ [ id ])))
-                (Ok []))
+                        |> Result.map (fun id -> id :: acc)))
+                (Ok [])
+            |> Result.map List.rev)
 
     let private decodeWorkIds (idText: string) (branchText: string) : Result<WorkId * BranchId, CoreError> =
         match WorkId.tryCreate idText, BranchId.tryCreate branchText with
@@ -763,144 +766,70 @@ module GecDecode =
         elif not (isNullish secondary) then secondary
         else getField patch "value"
 
+    let private certificateBase (patch: obj) (slot: string) : CertificatePatchRequest =
+        { Slot = slot
+          Value = None
+          Lower = None
+          Upper = None
+          Summary = None
+          Constraints = None
+          Posterior = None
+          ResidualValue = None
+          GuaranteeKind = None
+          Level = None
+          Error = None
+          Assumptions = stringArrayOption patch "assumptions"
+          Scope = scopeOf patch slot
+          Witnesses = eventIdList patch "witnesses"
+          Derivations = eventIdList patch "derivations" }
+
     let private certificateRequestOf (patch: obj) (slot: string) : CertificatePatchRequest =
+        let baseOf = certificateBase patch slot
+
         match slot with
         | "exact" ->
-            { Slot = slot
-              Value = (let v = getField patch "value" in if isNullish v then None else Some v)
-              Lower = None
-              Upper = None
-              Summary = None
-              Constraints = None
-              Posterior = None
-              ResidualValue = None
-              GuaranteeKind = guaranteeOf patch "inclusion"
-              Level = None
-              Error = None
-              Assumptions = stringArrayOption patch "assumptions"
-              Scope = scopeOf patch "exact"
-              Witnesses = eventIdList patch "witnesses"
-              Derivations = eventIdList patch "derivations" }
+            let value = getField patch "value"
+
+            { baseOf with
+                Value = (if isNullish value then None else Some value)
+                GuaranteeKind = guaranteeOf patch "inclusion" }
         | "bound" ->
-            { Slot = slot
-              Value = None
-              Lower = optFloat patch "lower"
-              Upper = optFloat patch "upper"
-              Summary = None
-              Constraints = None
-              Posterior = None
-              ResidualValue = None
-              GuaranteeKind = guaranteeOf patch "inclusion"
-              Level = None
-              Error = None
-              Assumptions = stringArrayOption patch "assumptions"
-              Scope = scopeOf patch "bound"
-              Witnesses = eventIdList patch "witnesses"
-              Derivations = eventIdList patch "derivations" }
+            { baseOf with
+                Lower = optFloat patch "lower"
+                Upper = optFloat patch "upper"
+                GuaranteeKind = guaranteeOf patch "inclusion" }
         | "sample" ->
             let summary = getField patch "summary"
 
-            { Slot = slot
-              Value = None
-              Lower = None
-              Upper = None
-              Summary = (if isNullish summary then None else Some summary)
-              Constraints = None
-              Posterior = None
-              ResidualValue = None
-              GuaranteeKind = guaranteeOf patch "coverage"
-              Level = optFloat patch "level"
-              Error = optFloat patch "error"
-              Assumptions = stringArrayOption patch "assumptions"
-              Scope = scopeOf patch "sample"
-              Witnesses = eventIdList patch "witnesses"
-              Derivations = eventIdList patch "derivations" }
+            { baseOf with
+                Summary = (if isNullish summary then None else Some summary)
+                GuaranteeKind = guaranteeOf patch "coverage"
+                Level = optFloat patch "level"
+                Error = optFloat patch "error" }
         | "ordinal" ->
             let constraints = getField patch "constraints"
 
-            { Slot = slot
-              Value = None
-              Lower = None
-              Upper = None
-              Summary = None
-              Constraints = (if isNullish constraints then None else Some constraints)
-              Posterior = None
-              ResidualValue = None
-              GuaranteeKind = guaranteeOf patch "ordinal"
-              Level = None
-              Error = None
-              Assumptions = stringArrayOption patch "assumptions"
-              Scope = scopeOf patch "ordinal"
-              Witnesses = eventIdList patch "witnesses"
-              Derivations = eventIdList patch "derivations" }
+            { baseOf with
+                Constraints = (if isNullish constraints then None else Some constraints)
+                GuaranteeKind = guaranteeOf patch "ordinal" }
         | "latent" ->
             let posterior = getField patch "posterior"
 
-            { Slot = slot
-              Value = None
-              Lower = None
-              Upper = None
-              Summary = None
-              Constraints = None
-              Posterior = (if isNullish posterior then None else Some posterior)
-              ResidualValue = None
-              GuaranteeKind = guaranteeOf patch "coverage"
-              Level = optFloat patch "level"
-              Error = optFloat patch "error"
-              Assumptions = stringArrayOption patch "assumptions"
-              Scope = scopeOf patch "latent"
-              Witnesses = eventIdList patch "witnesses"
-              Derivations = eventIdList patch "derivations" }
+            { baseOf with
+                Posterior = (if isNullish posterior then None else Some posterior)
+                GuaranteeKind = guaranteeOf patch "coverage"
+                Level = optFloat patch "level"
+                Error = optFloat patch "error" }
         | "residual" ->
-            let residualRaw = residualSourceOf patch
-
-            { Slot = slot
-              Value = None
-              Lower = None
-              Upper = None
-              Summary = None
-              Constraints = None
-              Posterior = None
-              ResidualValue = (asFloat residualRaw |> Result.toOption)
-              GuaranteeKind = None
-              Level = None
-              Error = None
-              Assumptions = stringArrayOption patch "assumptions"
-              Scope = scopeOf patch "residual"
-              Witnesses = eventIdList patch "witnesses"
-              Derivations = eventIdList patch "derivations" }
-        | "witness" ->
-            { Slot = slot
-              Value = None
-              Lower = None
-              Upper = None
-              Summary = None
-              Constraints = None
-              Posterior = None
-              ResidualValue = None
-              GuaranteeKind = None
-              Level = None
-              Error = None
-              Assumptions = stringArrayOption patch "assumptions"
-              Scope = scopeOf patch "witness"
-              Witnesses = eventIdList patch "witnesses"
-              Derivations = eventIdList patch "derivations" }
+            { baseOf with
+                ResidualValue = (asFloat (residualSourceOf patch) |> Result.toOption) }
+        | "witness" -> baseOf
         | _ ->
-            { Slot = slot
-              Value = None
-              Lower = None
-              Upper = None
-              Summary = None
-              Constraints = None
-              Posterior = None
-              ResidualValue = None
-              GuaranteeKind = None
-              Level = None
-              Error = None
-              Assumptions = None
-              Scope = None
-              Witnesses = []
-              Derivations = [] }
+            { baseOf with
+                Assumptions = None
+                Scope = None
+                Witnesses = []
+                Derivations = [] }
 
     let private applyCertificate
         (stored: ValueCertificate)

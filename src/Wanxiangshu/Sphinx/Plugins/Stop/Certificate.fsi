@@ -65,6 +65,8 @@ module Certificate =
           TestedFamily: string list
           Scope: string
           Guarantee: string
+          RequiredCoverage: float
+          MinorityThreshold: float
           SequentialAlpha: float
           CumulativeError: float
           SequentialMethod: string

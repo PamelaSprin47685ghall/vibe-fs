@@ -71,6 +71,18 @@ test('WHAT[EPI-022] incomparable_losses_keep_pareto_frontier_or_scalar_sum_hides
   assert.ok(summed.batch.includes('t-one'), 'with a declared common currency the better loss must be preferred');
 });
 
+test('WHAT[EPI-022] unconverted-loss-currencies-stay-incomparable-despite-shared-common-currency', async () => {
+  const surface = gecSurface;
+  const targets = [
+    target({ id: 't-one', loss: { currency: 'alpha-loss', value: 0.2 }, commonCurrency: 'shared' }),
+    target({ id: 't-two', loss: { currency: 'beta-loss', value: 0.5 }, commonCurrency: 'shared' }),
+  ];
+  const result = await surface.schedule({ targets, budget: { compute: 10, budget: 10 }, completed: [] });
+  assert.equal(result.ok, true);
+  assert.ok(result.pareto.includes('t-one'), 'a loss in another currency must not be dominated without conversion');
+  assert.ok(result.pareto.includes('t-two'), 'the numerically larger unconverted loss must stay on the frontier');
+});
+
 test('WHAT[EPI-022] batch_composes_by_canonical_order_not_input_sum_or_delta_addition_reorders_semantics', async () => {
   const surface = gecSurface;
   const targets = [

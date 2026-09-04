@@ -105,15 +105,15 @@ Plugin 提交 refinement target、依赖、conflict keys、资源请求、预期
 
 ## EPI-023: Split-ballot 随机化与问法效应估计可审计
 
-Questionnaire plugin 必须先保存共同 root snapshot，再以可复现 PRNG 完成处理、candidate label 与 order 分配，执行 open-before-closed、balanced incomplete block、reverse wording、共同 anchor 与 commit–reveal–revise。blind branch 不接收 sibling answer、当前 ranking 或 aggregate tendency。问法效应使用有方向的 difference-in-means 或声明的模型系数，并报告 uncertainty/permutation null；ATE 解释必须声明 SUTVA/no-interference、positivity、同前缀、无 differential attrition 与 estimand，非负距离不得冒充无偏 ATE。
+Questionnaire plugin 必须先保存共同 root snapshot，再以可复现 PRNG 完成处理、candidate label 与 order 分配，执行 open-before-closed、balanced incomplete block、reverse wording、共同 anchor 与 commit–reveal–revise。blind branch 不接收 sibling answer、当前 ranking 或 aggregate tendency。问法效应使用有方向的 difference-in-means 或声明的模型系数，并报告 uncertainty/permutation null；ATE 解释必须声明 SUTVA/no-interference、positivity、同前缀、无 differential attrition 与 estimand，非负距离不得冒充无偏 ATE。Carryover permutation null 必须使用 caller 传入的 seed；treatment polarity 缺省为 1、openFirst 缺省为 true，均为 caller-side 约定，confirmatory 设计应显式传入 treatmentDetails。
 
 ## EPI-024: Borda 与 Bradley–Terry 的适用域显式
 
-Borda 只作为 complete/equal-exposure ranking 的 baseline；存在 tie、abstention、top-k 或不平衡 exposure 时必须使用声明的 fractional/appearance-normalized extension。Borda 只保证 ballot-order invariance 与 candidate-label equivariance，不声称 clone independence、IIA 或是 BTL 的严格退化。BTL 必须固定 location gauge、检查 comparison graph/design rank、用稳定 sigmoid 与 regularization 处理 separation，并返回 finite estimate、fit diagnostics 与 uncertainty；无法识别时返回 typed error，不输出伪 posterior。
+Borda 只作为 complete/equal-exposure ranking 的 baseline；存在 tie、abstention、top-k 或不平衡 exposure 时必须使用声明的 fractional/appearance-normalized extension。Borda 只保证 ballot-order invariance 与 candidate-label equivariance，不声称 clone independence、IIA 或是 BTL 的严格退化。BTL 必须固定 location gauge、检查 comparison graph/design rank、用稳定 sigmoid 与 regularization 处理 separation，并返回 finite estimate、fit diagnostics 与 uncertainty；无法识别时返回 typed error，不输出伪 posterior。当前实现为 vanilla connected-graph BTL；提案 Eq(23)—(25) 的 wording-aware/contamination/mixture 扩展是未来接口，不在本 plugin 断言范围内。
 
 ## EPI-025: Proper self-prediction 密封且数值安全
 
-Future-self prediction 必须在 reflection stimulus 前 commit 并绑定 WorkId；target observation 不得受未密封预测内容影响。Log score 对概率使用声明的正 epsilon floor，Brier score验证 simplex 后计算。Raw score 不替代最终答案；calibration 与 sharpness 分开报告，held-out target 才可更新 branch/protocol calibration certificate。
+Future-self prediction 必须在 reflection stimulus 前 commit 并绑定 WorkId；target observation 不得受未密封预测内容影响。Log score 对概率使用声明的正 epsilon floor，Brier score验证 simplex 后计算（实现采用 loss 形态 `Σ(q−1_y)² = 1 − S_max`，越小越好）。Raw score 不替代最终答案；calibration 与 sharpness 分开报告，held-out target 才可更新 branch/protocol calibration certificate。
 
 ## EPI-026: 固定点存在性与异步收敛不得过度宣称
 
@@ -125,11 +125,11 @@ OpenCode Host 暴露与 MCP 同义的 start/status/cancel/explain/export，并�
 
 ## EPI-028: Research export 区分可识别对象与外部真值
 
-Export bundle 至少包含 canonical event trace、event head/semantic hash、plugin/schema/model manifest、branch tree、randomization matrix、resource ledger、certificate、ranking/framing/calibration diagnostics、initial/reflective disposition、stable minority modes 与 answer。Renderer 必须区分 `model-belief`、`reflective-model-belief`、`cross-branch-consensus`、`protocol-stable-judgment`、`externally-grounded-claim`；无外部 source 时最后一类为空。全新进程重放 bundle 必须得到相同 semantic hash 与 answer hash。
+Export bundle 是 envelope skeleton：canonical event trace、event head/semantic hash、answer、branch tree、initial disposition 与 `model-belief`/`externally-grounded-claim` 两类 claim 已填充；plugin/schema manifest、model manifest（当前固定 `sphinx-unknown`）、randomization matrix、resource ledger、certificate、ranking/framing/calibration diagnostics、reflective disposition、stable minority modes 结构存在但内容待 caller 供给。Renderer 必须区分 `model-belief`、`reflective-model-belief`、`cross-branch-consensus`、`protocol-stable-judgment`、`externally-grounded-claim`；无外部 source 时最后一类为空。全新进程重放 bundle 必须得到相同 semantic hash 与 answer hash。
 
 ## EPI-029: Stop certificate 只覆盖已检验的决策域
 
-Stop plugin 可基于 decision-equivalence posterior、tested framing family 内的 reversal bound、anytime-valid sequential evidence、major-mode coverage、budget 与 conservative upper-confidence VOC 生成证书。不得把未测试问法的稳定性、misspecified posterior 或 plugin 自报点估值当作普适保证；重复检查必须控制 sequential error。存在稳定少数模式时答案输出 decision class/distribution，不强压成单一 winner。
+Stop plugin 可基于 decision-equivalence posterior、tested framing family 内的 reversal bound、anytime-valid sequential evidence、major-mode coverage、budget 与 conservative upper-confidence VOC 生成证书。VOC gate 只在 caller 传入 voc 时约束；缺省通过但记录 `no-voc-evidence-provided`。`requiredCoverage`/`minorityThreshold` 可由 caller 覆盖（缺省 0.5/0.05）。不得把未测试问法的稳定性、misspecified posterior 或 plugin 自报点估值当作普适保证；重复检查必须控制 sequential error。存在稳定少数模式时答案输出 decision class/distribution，不强压成单一 winner；view 中 `decision.modes` 为完整 posterior 排序，`decision.minorityModes` 为稳定子集。
 
 ## EPI-030: Legacy Adapter 黄金轨迹保持可观察兼容
 

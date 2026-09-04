@@ -9,6 +9,7 @@ module GecInquiry =
 
     val codeRevisionConflict: string
     val codeUnknownInquiry: string
+    val codeInquiryCancelled: string
 
     type GecInquiryEntry =
         { InquiryId: string

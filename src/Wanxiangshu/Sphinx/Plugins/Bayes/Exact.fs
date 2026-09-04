@@ -161,14 +161,16 @@ module Exact =
     let private checkFactors (keys: Set<string>) (factors: Factor list) : Result<unit, ExactFault> =
         factors |> List.traverseResultM (checkFactor keys) |> Result.map (fun _ -> ())
 
+    let private canonicalHeads (factors: Factor list) : Factor list =
+        factors
+        |> List.groupBy (fun factor -> factor.DependencyKey)
+        |> List.map (fun (_, group) -> group |> List.sortBy (fun factor -> factor.SemanticKey) |> List.head)
+        |> List.sortBy (fun factor -> factor.SemanticKey)
+
     let private posteriorFrom (prior: Map<string, float>) (factors: Factor list) : Result<Posterior, ExactFault> =
         let orderedKeys = prior |> Map.toList |> List.map fst
 
-        let used =
-            factors
-            |> List.groupBy (fun factor -> factor.DependencyKey)
-            |> List.map (fun (_, group) -> group |> List.sortBy (fun factor -> factor.SemanticKey) |> List.head)
-            |> List.sortBy (fun factor -> factor.SemanticKey)
+        let used = canonicalHeads factors
 
         let logMass key =
             used
@@ -207,7 +209,9 @@ module Exact =
             let! prior = normalizedPrior hypotheses
             let keys = prior |> Map.toSeq |> Seq.map fst |> Set.ofSeq
             let qualified = factors |> List.filter (fun factor -> factor.Qualified)
-            do! checkFactors keys qualified
             do! checkQualified qualified
+            // Validate only the canonical head per DependencyKey: shadowed
+            // duplicates are discarded by canonicalization, never evaluated.
+            do! checkFactors keys (canonicalHeads qualified)
             return! posteriorFrom prior qualified
         }

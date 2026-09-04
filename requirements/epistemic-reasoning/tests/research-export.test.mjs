@@ -13,10 +13,13 @@ import { gecSurface } from '../../../dist/Sphinx/GecSurface.js'
 // from external truth. Sphinx observations are encoded by the pure
 // `encodeSphinxEnvelope` codec and appended to the canonical EventStore; the
 // bundle is rendered from the durable spine by the pure `exportFromEvents`
-// fold. The bundle carries every required manifest, tree, matrix, ledger,
-// certificate and diagnostic field; a fresh replay of the bundle yields the
-// same semantic and answer hashes; and no claim is rendered as externally
-// grounded without an external source.
+// fold. The bundle is an envelope skeleton: events, head, hashes, answer,
+// branch tree, initial disposition and two claim kinds are populated, while
+// plugin/schema manifests, model manifest, randomization matrix, resource
+// ledger, certificates, diagnostics, reflective disposition and minority
+// modes are structurally present but content-vacuous. A fresh replay of the
+// bundle yields the same semantic and answer hashes; and no claim is
+// rendered as externally grounded without an external source.
 
 const REQUIRED_BUNDLE_FIELDS = [
   'events',
@@ -127,6 +130,14 @@ test('WHAT[EPI-028] export_contains_every_required_field_and_replay_matches_sema
   for (const claim of bundle.claims) {
     assert.ok(CLAIM_KINDS.includes(claim.kind), `unknown claim kind ${claim.kind}`)
   }
+
+  // Envelope-skeleton honesty: manifests, matrices, ledgers and diagnostics
+  // are structurally present but content-vacuous until callers supply them.
+  assert.equal(bundle.modelManifest.id, 'sphinx-unknown')
+  assert.deepEqual(bundle.randomizationMatrix.assignments, [])
+  assert.deepEqual(bundle.resourceLedger.entries, [])
+  assert.deepEqual(bundle.certificates, {})
+  assert.deepEqual(bundle.minorityModes, [])
 
   // A fresh process replaying only the bundle must converge on both hashes.
   const replayed = gecSurface.replayExportBundle({ bundle })

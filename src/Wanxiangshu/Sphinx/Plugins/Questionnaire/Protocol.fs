@@ -86,7 +86,8 @@ module Protocol =
           FocalCurrent: string
           Control: string
           Treatment: string
-          Permutations: int }
+          Permutations: int
+          Seed: int }
 
     type CarryoverError =
         | UnknownPriorArm of string
@@ -604,7 +605,7 @@ module Protocol =
         let controlMean = meanOf controlValues
 
         let pValue, nullCount =
-            permutationP input.Permutations input.Permutations treatmentValues controlValues
+            permutationP input.Seed input.Permutations treatmentValues controlValues
 
         { FocalCurrent = input.FocalCurrent
           Treatment = input.Treatment

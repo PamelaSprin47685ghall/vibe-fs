@@ -86,10 +86,21 @@ module Agenda =
             true
         | _ -> false
 
+    let private lossInCommonCurrency (target: RefinementTarget) : float option =
+        match target.LossCurrency, target.LossValue, target.CommonCurrency with
+        | Some loss, Some value, Some common when
+            loss = common && not (String.IsNullOrWhiteSpace common) && isFiniteNumber value
+            ->
+            Some value
+        | _ -> None
+
     let private comparable (left: RefinementTarget) (right: RefinementTarget) : bool =
         match lossOf left, lossOf right with
         | Some(currencyLeft, _), Some(currencyRight, _) when currencyLeft = currencyRight -> true
-        | Some _, Some _ -> shareCommonCurrency left right
+        | Some _, Some _ ->
+            shareCommonCurrency left right
+            && (lossInCommonCurrency left).IsSome
+            && (lossInCommonCurrency right).IsSome
         | _ -> false
 
     let private dominates winner loser =

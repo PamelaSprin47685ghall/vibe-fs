@@ -153,9 +153,7 @@ module GecStore =
         let inquiryId: string = textOf (fieldOf input "inquiryId")
         let kind: string = textOf (fieldOf input "kind")
 
-        if isNullish input then
-            typedError "missing-event" "sphinx event must be an object"
-        elif not (isJsObject input) then
+        if isNullish input || not (isJsObject input) then
             typedError "missing-event" "sphinx event must be an object"
         elif String.IsNullOrWhiteSpace inquiryId then
             typedError "missing-inquiry" "sphinx event needs a non-blank inquiryId"
@@ -197,9 +195,7 @@ module GecStore =
         let seen: Map<string, string> = seenOf current
         let expected: int = appendExpectedRevision input revision
 
-        if isNullish input then
-            typedError "missing-input" "checkAppend needs current and envelope"
-        elif isNullish current || isNullish envelope then
+        if isNullish input || isNullish current || isNullish envelope then
             typedError "missing-input" "checkAppend needs current and envelope"
         elif expected <> revision then
             typedError "REVISION_CONFLICT" (sprintf "expected revision %d but current is %d" expected revision)
@@ -273,20 +269,18 @@ module GecStore =
             isObject && nonBlank (textOf (fieldOf source "id"))
 
     let private claimWithSource (claim: string) (source: obj) : obj option =
-        if hasSource source then
-            Some(
-                box
-                    {| kind = "externally-grounded-claim"
-                       text = claim
-                       sources = box [| source |] |}
-            )
-        else
-            Some(
-                box
-                    {| kind = "model-belief"
-                       text = claim
-                       sources = box Array.empty<obj> |}
-            )
+        let kind, sources =
+            if hasSource source then
+                "externally-grounded-claim", box [| source |]
+            else
+                "model-belief", box Array.empty<obj>
+
+        Some(
+            box
+                {| kind = kind
+                   text = claim
+                   sources = sources |}
+        )
 
     let private claimOf (envelope: obj) : obj option =
         let payload: obj = fieldOf envelope "payload"
@@ -322,12 +316,6 @@ module GecStore =
             if String.IsNullOrWhiteSpace claim then None else Some claim)
         |> Option.defaultValue ""
 
-    let private exportHeadOf (envelopes: obj array) : obj =
-        if envelopes.Length = 0 then
-            null
-        else
-            box (textOf (fieldOf envelopes.[envelopes.Length - 1] "id"))
-
     let private exportBundleOf (envelopes: obj array) : obj =
         let answer: obj = answerOf envelopes
 
@@ -336,7 +324,7 @@ module GecStore =
 
         createObj
             [ "events" ==> box envelopes
-              "eventHead" ==> exportHeadOf envelopes
+              "eventHead" ==> sphinxHeadOf envelopes
               "semanticHash" ==> box (CoreHash.canonicalSha256 envelopes)
               "answerHash" ==> box (CoreHash.canonicalSha256 answer)
               "pluginManifests" ==> box Array.empty<obj>

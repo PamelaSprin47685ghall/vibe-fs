@@ -22,6 +22,7 @@ module GecInquiry =
 
     let codeRevisionConflict = "REVISION_CONFLICT"
     let codeUnknownInquiry = "UNKNOWN_HANDLE"
+    let codeInquiryCancelled = "inquiry-cancelled"
 
     type GecInquiryEntry =
         { InquiryId: string
@@ -44,7 +45,7 @@ module GecInquiry =
         match fault with
         | InquiryFault.RevisionConflict _ -> codeRevisionConflict
         | InquiryFault.UnknownInquiry _ -> codeUnknownInquiry
-        | InquiryFault.InquiryCancelled _ -> codeUnknownInquiry
+        | InquiryFault.InquiryCancelled _ -> codeInquiryCancelled
 
     let private unknownInquiryHint (inquiryId: string) : string =
         if inquiryId.StartsWith "iq_" then
@@ -57,7 +58,7 @@ module GecInquiry =
     let faultMessage (fault: InquiryFault) : string =
         match fault with
         | InquiryFault.UnknownInquiry inquiryId -> unknownInquiryHint inquiryId
-        | InquiryFault.InquiryCancelled _ -> "inquiry is cancelled"
+        | InquiryFault.InquiryCancelled inquiryId -> sprintf "inquiry is cancelled: %s" inquiryId
         | InquiryFault.RevisionConflict(_, current) -> sprintf "stale expectedRevision: current revision is %d" current
 
     module private InquiryIdGen =
@@ -140,29 +141,24 @@ module GecInquiry =
             | true, (entry: GecInquiryEntry) -> Some entry
             | false, _ -> None
 
+        member private this.Update
+            (inquiryId: string, decide: GecInquiryEntry -> Result<GecInquiryEntry, InquiryFault>)
+            : Result<GecInquiryEntry, InquiryFault> =
+            match this.TryFind inquiryId with
+            | None -> Error(InquiryFault.UnknownInquiry inquiryId)
+            | Some(entry: GecInquiryEntry) ->
+                decide entry
+                |> Result.map (fun (next: GecInquiryEntry) ->
+                    table[inquiryId] <- next
+                    next)
+
         member this.Submit
             (inquiryId: string, expectedRevision: int, results: obj list)
             : Result<GecInquiryEntry, InquiryFault> =
-            let decided: Result<GecInquiryEntry, InquiryFault> =
-                match this.TryFind inquiryId with
-                | None -> Error(InquiryFault.UnknownInquiry inquiryId)
-                | Some(entry: GecInquiryEntry) -> DecideSubmit(entry, expectedRevision, results)
-
-            decided
-            |> Result.map (fun (next: GecInquiryEntry) ->
-                table[inquiryId] <- next
-                next)
+            this.Update(inquiryId, (fun entry -> DecideSubmit(entry, expectedRevision, results)))
 
         member this.Cancel(inquiryId: string) : Result<GecInquiryEntry, InquiryFault> =
-            let decided: Result<GecInquiryEntry, InquiryFault> =
-                match this.TryFind inquiryId with
-                | None -> Error(InquiryFault.UnknownInquiry inquiryId)
-                | Some(entry: GecInquiryEntry) -> DecideCancel entry
-
-            decided
-            |> Result.map (fun (next: GecInquiryEntry) ->
-                table[inquiryId] <- next
-                next)
+            this.Update(inquiryId, DecideCancel)
 
     let private statusName (entry: GecInquiryEntry) : string =
         if entry.InquiryCancelled then "cancelled" else "active"
