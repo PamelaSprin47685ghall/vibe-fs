@@ -1,86 +1,85 @@
-// EFFECT-ACCOUNTING-011 §九: TodoWriteAccepted must name the exact
-// TodoWritePrepared envelope. The test crosses the Review-owned Magic Todo
-// surface with plain payloads and an opaque projection handle.
+// EFFECT-ACCOUNTING-011: TodoWriteAccepted must name the exact
+// TodoWritePrepared envelope. The test crosses the obligation-ledger-owned
+// Magic Todo projection surface with plain payloads.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as todo from '../../../dist/Mission/Review/ReviewTodoSurface.js'
+import * as projection from '../../../dist/Mission/Obligation/Todo/MagicTodoProjectionSurface.js'
+import * as todo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
 
 const sha256 = (value) => `digest:${value}`
-const life = 'manager-life-011'
-const managerSession = 'manager-session-011'
-const call = 'todo-call-011'
-const preparedFactRef = 'prepared-fact-ref-011'
-const ids = todo.ids(sha256, life, call)
-const write = ids.todoWriteId
+const life = 'effect-life-011'
+const incumbency = 'effect-incumbency-011'
+const managerSession = 'effect-session-011'
+const call = 'effect-call-011'
+const preparedFactRef = 'effect-prepared-fact-ref-011'
+const ids = todo.todoWriteId(sha256, incumbency, call)
+const write = ids.todoWriteId ?? ids
 
-const prepared = {
+const cursor = (sequence) => ({ Sequence: sequence })
+const fact = (caseName, payload) => JSON.stringify({ case: caseName, ...payload })
+const ok = (result) => {
+  assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
+  return result
+}
+const foldError = (result) => {
+  assert.equal(result.ok, false, 'expected the projection to reject this fact')
+  return result.error.code
+}
+let nextEvent = 0
+const foldMagic = (handle, magicFact, eventId = undefined) => {
+  nextEvent += 1
+  return projection.MagicTodoProjectionSurface_fold(handle, eventId ?? `effect-todo-${nextEvent}`, magicFact)
+}
+
+const prepared = fact('TodoWritePrepared', {
   ManagerSessionId: managerSession,
-  ManagerLifeId: life,
+  IncumbencyId: incumbency,
   TodoWriteId: write,
   ToolCallId: call,
   ToolPartOrdinal: 2,
-  BaseTodoRef: 'base-list-011',
-  BaseTodoDigest: 'base-digest-011',
-  ProposedTodoRef: 'proposal-list-011',
-  ProposedTodoDigest: 'proposal-digest-011',
+  BaseTodoRef: 'effect-base-list-011',
+  BaseTodoDigest: 'effect-base-digest-011',
+  ProposedTodoRef: 'effect-proposal-list-011',
+  ProposedTodoDigest: 'effect-proposal-digest-011',
   PlanCompleteDeclared: false,
-  ProviderInputDigest: 'provider-input-digest-011',
-  ReviewFrontier: { Sequence: 10 },
+  ProviderInputDigest: 'effect-provider-input-digest-011',
+  ReviewFrontier: cursor(10),
   SemanticVersion: 'magic-v1',
-}
+})
 
-const accepted = (preparedRef = preparedFactRef) => ({
-  ManagerLifeId: life,
+const accepted = (preparedRef = preparedFactRef) => fact('TodoWriteAccepted', {
+  IncumbencyId: incumbency,
   TodoWriteId: write,
   ToolCallId: call,
   PreparedFactRef: preparedRef,
-  InputDigest: 'provider-input-digest-011',
-  OutputDigest: 'output-digest-011',
+  InputDigest: 'effect-provider-input-digest-011',
+  OutputDigest: 'effect-output-digest-011',
   PhysicalSuccessEvidence: 'LiveAfterSuccess',
   SemanticVersion: 'magic-v1',
 })
 
-const foldError = (result) => {
-  assert.equal(result.ok, false, 'expected the fold to reject this fact')
-  return result.error.code
-}
-
-const acceptedState = (projection, eventId, caseName, payload) => {
-  const result = todo.fold(projection, eventId, caseName, payload)
-  assert.equal(result.ok, true, result.ok ? '' : result.error.code)
-  return projection
-}
-
 test('WHAT[EFFECT-ACCOUNTING-011] accepted_without_any_prepared_is_rejected', () => {
   // No TodoWritePrepared means Accept is rejected, never silently accepted.
-  const projection = todo.newProjection()
-  const rejected = todo.fold(projection, 'env-011-1', 'TodoWriteAccepted', accepted())
-  assert.equal(foldError(rejected), 'PreparedMissingForAccept')
+  const handle = projection.MagicTodoProjectionSurface_create()
+  assert.equal(foldError(foldMagic(handle, accepted())), 'PreparedMissingForAccept')
 })
 
 test('WHAT[EFFECT-ACCOUNTING-011] accepted_naming_another_prepared_envelope_is_identity_corruption', () => {
   // A Prepared exists, but Accepted names another envelope: identity corruption.
-  const projection = todo.newProjection()
-  acceptedState(projection, preparedFactRef, 'TodoWritePrepared', prepared)
-
-  const rejected = todo.fold(
-    projection,
-    'env-011-2',
-    'TodoWriteAccepted',
-    accepted('different-prepared-fact-ref-011'),
-  )
-  assert.equal(foldError(rejected), 'IdentityCorruption')
+  const handle = projection.MagicTodoProjectionSurface_create()
+  ok(foldMagic(handle, prepared, preparedFactRef))
+  assert.equal(foldError(foldMagic(handle, accepted('different-prepared-fact-ref-011'))), 'IdentityCorruption')
 })
 
 test('WHAT[EFFECT-ACCOUNTING-011] accepted_naming_exact_prepared_switches_current_immediately', () => {
   // Naming the exact Prepared envelope succeeds and immediately switches Current
   // to the proposal list; a later review conclusion cannot roll it back.
-  const projection = todo.newProjection()
-  acceptedState(projection, preparedFactRef, 'TodoWritePrepared', prepared)
-  acceptedState(projection, 'env-011-3', 'TodoWriteAccepted', accepted(preparedFactRef))
+  const handle = projection.MagicTodoProjectionSurface_create()
+  ok(foldMagic(handle, prepared, preparedFactRef))
+  ok(foldMagic(handle, accepted(preparedFactRef)))
 
-  assert.deepEqual(todo.view(projection, life).currentObligations, {
-    reference: 'proposal-list-011',
-    digest: 'proposal-digest-011',
+  assert.deepEqual(projection.MagicTodoProjectionSurface_view(handle, incumbency).currentObligations, {
+    reference: 'effect-proposal-list-011',
+    digest: 'effect-proposal-digest-011',
   })
 })

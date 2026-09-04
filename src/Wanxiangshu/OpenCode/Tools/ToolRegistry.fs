@@ -232,6 +232,23 @@ module ToolRegistry =
                     Path.DeniedRelayPhase
                     (Map [ "tool", spec.Name; "phase", sprintf "%A" phase ])
 
+            let executeManager args (ctx: HostToolContext) =
+                task {
+                    let phase = runtime.ManagerPhaseFor ctx.SessionId
+                    let frozen = runtime.IsRetirementFrozen ctx.SessionId
+
+                    match managerPermission with
+                    | Some permission
+                        when frozen
+                             && permission <> ToolPermission.Join
+                             && permission <> ToolPermission.Finality ->
+                        return denyRelayPhase ctx ManagerCapabilityPhase.RetirementCleanupBlocked
+                    | Some permission
+                        when not (OfficeCapability.isAllowedForPhase Role.Manager (Some phase) permission) ->
+                        return denyRelayPhase ctx phase
+                    | _ -> return! original args ctx
+                }
+
             let executeKnownRole officeAdmission args (ctx: HostToolContext) (role: Role) =
                 task {
                     if not (officeAdmission ctx role) then
@@ -239,24 +256,7 @@ module ToolRegistry =
                     elif role <> Role.Manager then
                         return! original args ctx
                     else
-                        let phase = runtime.ManagerPhaseFor ctx.SessionId
-                        let frozen = runtime.IsRetirementFrozen ctx.SessionId
-
-                        match managerPermission with
-                        | Some permission
-                            when frozen
-                                 && permission <> ToolPermission.Join
-                                 && permission <> ToolPermission.Finality ->
-                            return denyRelayPhase ctx ManagerCapabilityPhase.RetirementCleanupBlocked
-                        | Some permission
-                            when not (
-                                OfficeCapability.isAllowedForPhase
-                                    Role.Manager
-                                    (Some phase)
-                                    permission
-                            ) ->
-                            return denyRelayPhase ctx phase
-                        | _ -> return! original args ctx
+                        return! executeManager args ctx
                 }
 
             let executeAfterEnsure officeAdmission args (ctx: HostToolContext) =

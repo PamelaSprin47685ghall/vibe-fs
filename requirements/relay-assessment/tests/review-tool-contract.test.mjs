@@ -24,7 +24,7 @@ test('WHAT[ASSESS-001] review schema is exactly eight required integer scores wi
   }
 })
 
-test('WHAT[ASSESS-001] WHAT[ASSESS-007] malformed scores are rejected without coercion', () => {
+test('WHAT[ASSESS-001] malformed scores are rejected without coercion', () => {
   for (const payload of [
     { ...perfect, simplicity: 9.5 },
     { ...perfect, simplicity: '10' },

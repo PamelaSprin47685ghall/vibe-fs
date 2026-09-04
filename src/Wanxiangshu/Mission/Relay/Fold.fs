@@ -1,5 +1,8 @@
 namespace Wanxiangshu.Mission.Relay
 
+open FsToolkit.ErrorHandling
+open Wanxiangshu.Foundation.Identity
+
 type private AssessmentRecord =
     { Id: AssessmentId
       Binding: AssessmentBinding
@@ -15,6 +18,8 @@ type private ActiveIncumbency =
 
 type private RoadState =
     { AuthorityRevision: AuthorityRevision
+      AuthorityRevisions: AuthorityRevision list
+      AuthorityMessageIds: PhysicalUserMessageId list
       Active: ActiveIncumbency option
       Retired: IncumbencyId list
       OpenObligations: ScoreDimension list
@@ -26,6 +31,8 @@ type RelayState = private RelayState of Map<string, RoadState>
 
 type RoadView =
     { AuthorityRevision: AuthorityRevision
+      AuthorityRevisions: AuthorityRevision list
+      AuthorityMessageIds: PhysicalUserMessageId list
       ActiveIncumbency: IncumbencyId option
       ActivePhase: IncumbencyPhase option
       ActiveSource: BatonSource option
@@ -46,32 +53,222 @@ module private Internal =
     let certificateId assessmentId =
         QualityCertificateId.create ("certificate:" + AssessmentId.value assessmentId)
 
-    let applyEvent roadId state event =
-        match event with
-        | RelayEvent.RoadOpened(eventRoadId, authorityRevision) ->
-            if eventRoadId <> roadId then
-                Error "RoadIdentityMismatch"
-            else
-                match road roadId state with
-                | Some _ -> Error "RoadAlreadyOpen"
-                | None ->
-                    { AuthorityRevision = authorityRevision
-                      Active = None
-                      Retired = []
-                      OpenObligations = []
-                      ExitRequiredNudgeFrontiers = Set.empty
-                      Certificate = None
-                      LatestRetirement = None }
-                    |> fun opened -> update roadId opened state
-                    |> Ok
-        | RelayEvent.IncumbencyOpened(incumbentId, snapshotId, source) ->
-            match road roadId state with
-            | None -> Error "RoadNotOpen"
-            | Some current ->
+    let require error = function
+        | Some value -> Ok value
+        | None -> Error error
+
+    let private newCertificate
+        perfect
+        assessmentId
+        (active: ActiveIncumbency)
+        snapshotId
+        authorityRevision
+        binding
+        =
+        if perfect then
+            Some
+                { Id = certificateId assessmentId
+                  AssessmentId = assessmentId
+                  IncumbencyId = active.Id
+                  SnapshotId = snapshotId
+                  AuthorityRevision = authorityRevision
+                  Binding = binding
+                  Valid = true
+                  InvalidationReason = None }
+        else
+            None
+
+    let private phaseAfterAssessment perfect =
+        if perfect then IncumbencyPhase.PerfectAwaitingRetirement else IncumbencyPhase.WorkOwned
+
+    let private acceptAssessment
+        roadId
+        state
+        (current: RoadState)
+        (active: ActiveIncumbency)
+        assessmentId
+        binding
+        snapshotId
+        authorityRevision
+        scores
+        =
+        let perfect = ScoreVector.allPerfect scores
+        let certificate = newCertificate perfect assessmentId active snapshotId authorityRevision binding
+
+        let updatedActive =
+            { active with
+                Assessment =
+                    Some
+                        { Id = assessmentId
+                          Binding = binding
+                          Scores = scores }
+                Phase = phaseAfterAssessment perfect }
+
+        { current with
+            Active = Some updatedActive
+            OpenObligations = ScoreVector.lowDimensions scores
+            Certificate = certificate }
+        |> fun updated -> update roadId updated state
+        |> Ok
+
+    let private assess
+        roadId
+        state
+        (current: RoadState)
+        (active: ActiveIncumbency)
+        assessmentId
+        binding
+        snapshotId
+        authorityRevision
+        scores
+        =
+        match active.Assessment with
+        | Some accepted
+            when accepted.Binding.ToolCallId = binding.ToolCallId
+                 && accepted.Binding.PayloadDigest = binding.PayloadDigest ->
+            Ok state
+        | Some accepted when accepted.Binding.ToolCallId = binding.ToolCallId -> Error "AssessmentReplayConflict"
+        | Some _ -> Error "AssessmentAlreadySubmitted"
+        | None when active.Phase <> IncumbencyPhase.AuditPending -> Error "AssessmentNotAllowedInCurrentPhase"
+        | None when active.SnapshotId <> snapshotId -> Error "AuditSnapshotStale"
+        | None when active.AuthorityRevision <> authorityRevision -> Error "AuthorityRevisionStale"
+        | None -> acceptAssessment roadId state current active assessmentId binding snapshotId authorityRevision scores
+
+    let private authorityReplay exactReplay state =
+        if exactReplay then Ok state else Error "AuthorityRevisionReplayConflict"
+
+    let private invalidateForAuthorityRevision next (certificate: QualityCertificate) =
+        if certificate.Valid then
+            { certificate with
+                Valid = false
+                InvalidationReason = Some("AuthorityRevisionAdvanced:" + AuthorityRevision.value next) }
+        else
+            certificate
+
+    let private advanceAuthority
+        roadId
+        state
+        (current: RoadState)
+        (active: ActiveIncumbency)
+        incumbentId
+        expected
+        next
+        authorityMessageId
+        snapshotId
+        =
+        let exactReplay =
+            active.AuthorityRevision = next
+            && active.SnapshotId = snapshotId
+            && current.AuthorityRevisions |> List.tryLast = Some next
+            && current.AuthorityMessageIds |> List.tryLast = Some authorityMessageId
+
+        if active.Id <> incumbentId then
+            Error "IncumbencyNotActive"
+        elif current.AuthorityRevision = next then
+            authorityReplay exactReplay state
+        elif List.contains next current.AuthorityRevisions then
+            Error "AuthorityRevisionAlreadySuperseded"
+        elif current.AuthorityRevision <> expected || active.AuthorityRevision <> expected then
+            Error "AuthorityRevisionStale"
+        elif next = expected then
+            Error "AuthorityRevisionUnchanged"
+        elif List.contains authorityMessageId current.AuthorityMessageIds then
+            Error "AuthorityMessageAlreadyUsed"
+        else
+            let updatedActive =
+                { active with
+                    AuthorityRevision = next
+                    SnapshotId = snapshotId }
+
+            { current with
+                AuthorityRevision = next
+                AuthorityRevisions = current.AuthorityRevisions @ [ next ]
+                AuthorityMessageIds = current.AuthorityMessageIds @ [ authorityMessageId ]
+                Active = Some updatedActive
+                Certificate = current.Certificate |> Option.map (invalidateForAuthorityRevision next) }
+            |> fun updated -> update roadId updated state
+            |> Ok
+
+    let private retire roadId state (current: RoadState) (retirement: RetirementSummary) =
+        match current.Active, current.LatestRetirement with
+        | None, Some accepted
+            when accepted.Id = retirement.Id
+                 && accepted.IncumbencyId = retirement.IncumbencyId ->
+            Ok state
+        | None, Some accepted when accepted.Id = retirement.Id -> Error "RetirementReplayConflict"
+        | None, _ -> Error "NoActiveIncumbency"
+        | Some active, _ when active.Id <> retirement.IncumbencyId -> Error "IncumbencyNotActive"
+        | Some _, _ when List.contains retirement.IncumbencyId current.Retired -> Error "IncumbencyAlreadyRetired"
+        | Some _, _ ->
+            { current with
+                Active = None
+                Retired = current.Retired @ [ retirement.IncumbencyId ]
+                LatestRetirement = Some retirement }
+            |> fun updated -> update roadId updated state
+            |> Ok
+
+    let private activateSuccessor
+        roadId
+        state
+        (current: RoadState)
+        predecessor
+        incumbentId
+        snapshotId
+        authorityRevision
+        =
+        match current.LatestRetirement, current.Active with
+        | None, _ -> Error "PredecessorRetirementNotCommitted"
+        | Some retirement, _ when retirement.Id <> predecessor -> Error "PredecessorRetirementNotCommitted"
+        | Some retirement, _ when not retirement.SuccessorRequested -> Error "SuccessorNotRequested"
+        | Some _, Some active
+            when active.Id = incumbentId
+                 && active.Source = BatonSource.Retirement predecessor
+                 && active.SnapshotId = snapshotId
+                 && active.AuthorityRevision = authorityRevision ->
+            Ok state
+        | Some _, Some _ -> Error "ActiveIncumbencyAlreadyExists"
+        | Some _, None when current.Retired |> List.contains incumbentId -> Error "RetiredIncumbencyCannotReactivate"
+        | Some _, None ->
+            let active =
+                { Id = incumbentId
+                  SnapshotId = snapshotId
+                  AuthorityRevision = authorityRevision
+                  Source = BatonSource.Retirement predecessor
+                  Phase = IncumbencyPhase.AuditPending
+                  Assessment = None }
+
+            { current with
+                AuthorityRevision = authorityRevision
+                Active = Some active
+                ExitRequiredNudgeFrontiers = Set.empty }
+            |> fun updated -> update roadId updated state
+            |> Ok
+
+    let private openRoad roadId state eventRoadId authorityRevision authorityMessageId =
+        match eventRoadId = roadId, road roadId state with
+        | false, _ -> Error "RoadIdentityMismatch"
+        | true, Some _ -> Error "RoadAlreadyOpen"
+        | true, None ->
+            { AuthorityRevision = authorityRevision
+              AuthorityRevisions = [ authorityRevision ]
+              AuthorityMessageIds = [ authorityMessageId ]
+              Active = None
+              Retired = []
+              OpenObligations = []
+              ExitRequiredNudgeFrontiers = Set.empty
+              Certificate = None
+              LatestRetirement = None }
+            |> fun opened -> update roadId opened state
+            |> Ok
+
+    let private openIncumbency roadId state incumbentId snapshotId source =
+        result {
+            let! current = road roadId state |> require "RoadNotOpen"
+
+            return!
                 match current.Active with
                 | Some _ -> Error "ActiveIncumbencyAlreadyExists"
-                | None when List.contains incumbentId current.Retired ->
-                    Error "RetiredIncumbencyCannotReactivate"
+                | None when List.contains incumbentId current.Retired -> Error "RetiredIncumbencyCannotReactivate"
                 | None ->
                     let active =
                         { Id = incumbentId
@@ -82,67 +279,13 @@ module private Internal =
                           Assessment = None }
 
                     update roadId { current with Active = Some active } state |> Ok
-        | RelayEvent.AssessmentCommitted(assessmentId, binding, snapshotId, authorityRevision, scores) ->
-            match road roadId state with
-            | None -> Error "RoadNotOpen"
-            | Some current ->
-                match current.Active with
-                | None -> Error "NoActiveIncumbency"
-                | Some active when active.Assessment |> Option.isSome ->
-                    match active.Assessment with
-                    | Some accepted
-                        when accepted.Binding.ToolCallId = binding.ToolCallId
-                             && accepted.Binding.PayloadDigest = binding.PayloadDigest ->
-                        Ok state
-                    | Some accepted when accepted.Binding.ToolCallId = binding.ToolCallId ->
-                        Error "AssessmentReplayConflict"
-                    | Some _ -> Error "AssessmentAlreadySubmitted"
-                    | None -> Error "AssessmentAlreadySubmitted"
-                | Some active when active.Phase <> IncumbencyPhase.AuditPending ->
-                    Error "AssessmentNotAllowedInCurrentPhase"
-                | Some active when active.SnapshotId <> snapshotId -> Error "AuditSnapshotStale"
-                | Some active when active.AuthorityRevision <> authorityRevision ->
-                    Error "AuthorityRevisionStale"
-                | Some active ->
-                    let perfect = ScoreVector.allPerfect scores
+        }
 
-                    let certificate =
-                        if perfect then
-                            Some
-                                { Id = certificateId assessmentId
-                                  AssessmentId = assessmentId
-                                  IncumbencyId = active.Id
-                                  SnapshotId = snapshotId
-                                  AuthorityRevision = authorityRevision
-                                  Binding = binding
-                                  Valid = true
-                                  InvalidationReason = None }
-                        else
-                            None
+    let private invalidateCertificate roadId state certificateId reason =
+        result {
+            let! current = road roadId state |> require "RoadNotOpen"
 
-                    let updatedActive =
-                        { active with
-                            Assessment =
-                                Some
-                                    { Id = assessmentId
-                                      Binding = binding
-                                      Scores = scores }
-                            Phase =
-                                if perfect then
-                                    IncumbencyPhase.PerfectAwaitingRetirement
-                                else
-                                    IncumbencyPhase.WorkOwned }
-
-                    { current with
-                        Active = Some updatedActive
-                        OpenObligations = ScoreVector.lowDimensions scores
-                        Certificate = certificate }
-                    |> fun updated -> update roadId updated state
-                    |> Ok
-        | RelayEvent.QualityCertificateInvalidated(certificateId, reason) ->
-            match road roadId state with
-            | None -> Error "RoadNotOpen"
-            | Some current ->
+            return!
                 match current.Certificate with
                 | Some certificate when certificate.Id = certificateId && certificate.Valid ->
                     let invalidated =
@@ -153,10 +296,13 @@ module private Internal =
                     update roadId { current with Certificate = Some invalidated } state |> Ok
                 | Some certificate when certificate.Id = certificateId -> Ok state
                 | _ -> Error "QualityCertificateNotFound"
-        | RelayEvent.RetirementCleanupBlocked(incumbencyId, _) ->
-            match road roadId state with
-            | None -> Error "RoadNotOpen"
-            | Some current ->
+        }
+
+    let private blockRetirementCleanup roadId state incumbencyId =
+        result {
+            let! current = road roadId state |> require "RoadNotOpen"
+
+            return!
                 match current.Active with
                 | Some active when active.Id = incumbencyId ->
                     update
@@ -167,10 +313,13 @@ module private Internal =
                     |> Ok
                 | Some _ -> Error "IncumbencyNotActive"
                 | None -> Error "NoActiveIncumbency"
-        | RelayEvent.ExitRequiredNudgeScheduled(incumbencyId, causalFrontier) ->
-            match road roadId state with
-            | None -> Error "RoadNotOpen"
-            | Some current ->
+        }
+
+    let private scheduleExitNudge roadId state incumbencyId causalFrontier =
+        result {
+            let! current = road roadId state |> require "RoadNotOpen"
+
+            return!
                 match current.Active with
                 | Some active when active.Id = incumbencyId ->
                     update
@@ -181,33 +330,13 @@ module private Internal =
                     |> Ok
                 | Some _ -> Error "IncumbencyNotActive"
                 | None -> Error "NoActiveIncumbency"
-        | RelayEvent.RetirementCommitted retirement ->
-            match road roadId state with
-            | None -> Error "RoadNotOpen"
-            | Some current ->
-                match current.Active with
-                | None ->
-                    match current.LatestRetirement with
-                    | Some accepted
-                        when accepted.Id = retirement.Id
-                             && accepted.IncumbencyId = retirement.IncumbencyId ->
-                        Ok state
-                    | Some accepted when accepted.Id = retirement.Id -> Error "RetirementReplayConflict"
-                    | _ -> Error "NoActiveIncumbency"
-                | Some active when active.Id <> retirement.IncumbencyId -> Error "IncumbencyNotActive"
-                | Some _ when List.contains retirement.IncumbencyId current.Retired ->
-                    Error "IncumbencyAlreadyRetired"
-                | Some _ ->
-                    { current with
-                        Active = None
-                        Retired = current.Retired @ [ retirement.IncumbencyId ]
-                        LatestRetirement = Some retirement }
-                    |> fun updated -> update roadId updated state
-                    |> Ok
-        | RelayEvent.SuccessorRequested(predecessor, _) ->
-            match road roadId state with
-            | None -> Error "RoadNotOpen"
-            | Some current ->
+        }
+
+    let private requestSuccessor roadId state predecessor =
+        result {
+            let! current = road roadId state |> require "RoadNotOpen"
+
+            return!
                 match current.LatestRetirement with
                 | Some retirement when retirement.Id = predecessor && retirement.SuccessorRequested -> Ok state
                 | Some retirement when retirement.Id = predecessor ->
@@ -218,41 +347,44 @@ module private Internal =
                         state
                     |> Ok
                 | _ -> Error "PredecessorRetirementNotCommitted"
-        | RelayEvent.SuccessorActivated(predecessor, incumbentId, snapshotId, authorityRevision) ->
-            match road roadId state with
-            | None -> Error "RoadNotOpen"
-            | Some current ->
-                match current.LatestRetirement with
-                | None -> Error "PredecessorRetirementNotCommitted"
-                | Some retirement when retirement.Id <> predecessor ->
-                    Error "PredecessorRetirementNotCommitted"
-                | Some retirement when not retirement.SuccessorRequested -> Error "SuccessorNotRequested"
-                | Some _ ->
-                    match current.Active with
-                    | Some active
-                        when active.Id = incumbentId
-                             && active.Source = BatonSource.Retirement predecessor
-                             && active.SnapshotId = snapshotId
-                             && active.AuthorityRevision = authorityRevision ->
-                        Ok state
-                    | Some _ -> Error "ActiveIncumbencyAlreadyExists"
-                    | None when current.Retired |> List.contains incumbentId ->
-                        Error "RetiredIncumbencyCannotReactivate"
-                    | None ->
-                        let active =
-                            { Id = incumbentId
-                              SnapshotId = snapshotId
-                              AuthorityRevision = authorityRevision
-                              Source = BatonSource.Retirement predecessor
-                              Phase = IncumbencyPhase.AuditPending
-                              Assessment = None }
+        }
 
-                        { current with
-                            AuthorityRevision = authorityRevision
-                            Active = Some active
-                            ExitRequiredNudgeFrontiers = Set.empty }
-                        |> fun updated -> update roadId updated state
-                        |> Ok
+    let applyEvent roadId state event =
+        match event with
+        | RelayEvent.RoadOpened(eventRoadId, authorityRevision, authorityMessageId) ->
+            openRoad roadId state eventRoadId authorityRevision authorityMessageId
+        | RelayEvent.IncumbencyOpened(incumbentId, snapshotId, source) ->
+            openIncumbency roadId state incumbentId snapshotId source
+        | RelayEvent.AssessmentCommitted(assessmentId, binding, snapshotId, authorityRevision, scores) ->
+            result {
+                let! current = road roadId state |> require "RoadNotOpen"
+                let! active = current.Active |> require "NoActiveIncumbency"
+                return! assess roadId state current active assessmentId binding snapshotId authorityRevision scores
+            }
+        | RelayEvent.AuthorityRevisionAdvanced(incumbentId, expected, next, authorityMessageId, snapshotId) ->
+            result {
+                let! current = road roadId state |> require "RoadNotOpen"
+                let! active = current.Active |> require "NoActiveIncumbency"
+                return! advanceAuthority roadId state current active incumbentId expected next authorityMessageId snapshotId
+            }
+        | RelayEvent.QualityCertificateInvalidated(certificateId, reason) ->
+            invalidateCertificate roadId state certificateId reason
+        | RelayEvent.RetirementCleanupBlocked(incumbencyId, _) ->
+            blockRetirementCleanup roadId state incumbencyId
+        | RelayEvent.ExitRequiredNudgeScheduled(incumbencyId, causalFrontier) ->
+            scheduleExitNudge roadId state incumbencyId causalFrontier
+        | RelayEvent.RetirementCommitted retirement ->
+            result {
+                let! current = road roadId state |> require "RoadNotOpen"
+                return! retire roadId state current retirement
+            }
+        | RelayEvent.SuccessorRequested(predecessor, _) ->
+            requestSuccessor roadId state predecessor
+        | RelayEvent.SuccessorActivated(predecessor, incumbentId, snapshotId, authorityRevision) ->
+            result {
+                let! current = road roadId state |> require "RoadNotOpen"
+                return! activateSuccessor roadId state current predecessor incumbentId snapshotId authorityRevision
+            }
 
 module Fold =
     let empty = RelayState Map.empty
@@ -270,6 +402,8 @@ module Fold =
         Internal.road roadId state
         |> Option.map (fun (road: RoadState) ->
             { AuthorityRevision = road.AuthorityRevision
+              AuthorityRevisions = road.AuthorityRevisions
+              AuthorityMessageIds = road.AuthorityMessageIds
               ActiveIncumbency = road.Active |> Option.map (fun active -> active.Id)
               ActivePhase = road.Active |> Option.map (fun active -> active.Phase)
               ActiveSource = road.Active |> Option.map (fun active -> active.Source)
@@ -295,12 +429,21 @@ module Decision =
     let openIncumbency state roadId incumbentId snapshotId authorityRevision source =
         match Fold.view state roadId with
         | None ->
+            let authorityMessageId =
+                PhysicalUserMessageId.create (AuthorityRevision.value authorityRevision)
+
             commit
                 state
                 roadId
-                [ RelayEvent.RoadOpened(roadId, authorityRevision)
+                [ RelayEvent.RoadOpened(roadId, authorityRevision, authorityMessageId)
                   RelayEvent.IncumbencyOpened(incumbentId, snapshotId, source) ]
         | Some _ -> commit state roadId [ RelayEvent.IncumbencyOpened(incumbentId, snapshotId, source) ]
+
+    let advanceAuthority state roadId incumbentId expected next authorityMessageId snapshotId =
+        commit
+            state
+            roadId
+            [ RelayEvent.AuthorityRevisionAdvanced(incumbentId, expected, next, authorityMessageId, snapshotId) ]
 
     let assess state roadId incumbentId assessmentId binding snapshotId authorityRevision scores =
         match Fold.view state roadId with
@@ -319,13 +462,11 @@ module Decision =
         | Some _ -> Error "IncumbencyNotActive"
 
     let invalidateCertificate state roadId reason =
-        match Fold.view state roadId with
-        | Some view ->
-            match view.Certificate with
-            | Some certificate ->
-                commit state roadId [ RelayEvent.QualityCertificateInvalidated(certificate.Id, reason) ]
-            | None -> Error "QualityCertificateNotFound"
-        | None -> Error "RoadNotOpen"
+        result {
+            let! view = Fold.view state roadId |> Internal.require "RoadNotOpen"
+            let! certificate = view.Certificate |> Internal.require "QualityCertificateNotFound"
+            return! commit state roadId [ RelayEvent.QualityCertificateInvalidated(certificate.Id, reason) ]
+        }
 
     let retire state roadId incumbentId retirement =
         match Fold.view state roadId with

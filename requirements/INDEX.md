@@ -82,14 +82,17 @@
 | `crash-reconciliation` | 进程/插件中断后只能从 durable facts 与可信物理观察重新进入普通程序，不能从临时内存或猜测恢复。 |
 | `degeneration-guard` | 尚未结束的 attempt 若 token 多样性越出正常语料经验边界，应在污染更多历史前主动终止并由本包自行要求改写。 |
 
-## 9. Mission / judgement / finality
+## 9. Mission / relay
 
 | Package | 一句话 WHY |
 |---|---|
 | `obligation-ledger` | 长期 mission 必须持续维护当前仍欠世界什么，而不是用 phase/status 伪装工作进度。 |
-| `review-judgement` | PERFECT/REVISE 的意义必须来自有区分力、按比例、证据驱动的判断，而不是表演式谨慎或固定 checklist。 |
-| `review-assurance` | 一个 review judgement 何时有资格被消费，必须由 bounded evidence、fresh witness 与因果确认建立。 |
-| `finality` | mission 的不可逆结束资格必须在当前义务、当前 tree 与合格 review 证据上建立，而不能由 participant 自宣告完成。 |
+| `relay-incumbency` | 每一任都从只读 audit 开始；低分即接责，退休永不恢复，同一 Road 至多一个 active 任期。 |
+| `relay-assessment` | 每任期至多一次八维整数评审；低分原子生成义务，全满分生成快照绑定证书。 |
+| `relay-retirement` | suicide 是唯一正常出口；只有递归 live 资源能阻塞退休，静默停止持续事件驱动 nudge。 |
+| `relay-context-projection` | 审计保留全量历史，provider 只见切段后事实；接力棒确定性、有界、脱敏。 |
+
+旧 `review-judgement` / `review-assurance` / `finality` 已按接力语义 clean break：评审并入 `relay-assessment`，终结并入 `relay-retirement`，上下文切段并入 `relay-context-projection`。
 
 ## 10. Feedback
 
@@ -184,9 +187,10 @@ provider-attempt-recovery→ participant-identity, execution-failure-policy, exe
 crash-reconciliation     → durable-events, effect-accounting, structured-workflow, host-boundary
 degeneration-guard       → interaction-authority, dispatch-protocol, host-boundary
 obligation-ledger        → durable-events, effect-accounting, semantic-trace
-review-judgement         → cognitive-environment, participant-horizon
-review-assurance         → review-judgement, semantic-trace, durable-events, causal-wait
-finality                 → obligation-ledger, review-assurance, participant-horizon
+relay-incumbency         → obligation-ledger, participant-identity
+relay-assessment         → relay-incumbency, obligation-ledger
+relay-retirement         → relay-incumbency, relay-assessment, relay-context-projection
+relay-context-projection → relay-incumbency, participant-identity
 behavior-diagnosis       → semantic-trace, durable-events, prefix-stability, managed-session-lifecycle
 guidance-delivery        → behavior-diagnosis, participant-horizon, durable-events, concern-routing
 institutional-learning   → attention-regulation, behavior-diagnosis, durable-events
@@ -205,7 +209,7 @@ Phase E 审计结论：3 条 coupling edge 已删（见 `AUDIT.md` Phase E）：
 structured-workflow  → causal-wait         删（CE builder 是实现耦合，非定义前提）
 time-capability      → causal-wait         删（deadline 是可选 escape，条件依赖非 hard）
 guidance-delivery    → provider-projection 删（渲染是下游机制）
-finality             → participant-horizon 保留（隐藏机制=信息准入边界，与 delegation 同型）
+finality             → participant-horizon 删（包已退役为 relay-*；隐藏 Reviewer 机制随之删除）
 ```
 
 当前 149 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。`epistemic-reasoning` 的 durable inquiry、受管 blind branch 与 capacity-safe OpenCode dispatch 分别直接依赖 `durable-events`、`delegation` 与 `execution-model-routing` 的 guarantee；这些不是存储、Host 或 proof 的偶然耦合。

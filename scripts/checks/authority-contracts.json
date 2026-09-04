@@ -15,58 +15,6 @@
       }
     },
     {
-      "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
-      "symbol": "ReviewWitness.confirm",
-      "classification": "Admission",
-      "result": "Option",
-      "resultSymbol": "ReviewWitness",
-      "owner": "review-judgement",
-      "what": "FINALITY-002, ENF-015",
-      "whatOwners": {
-        "FINALITY-002": "finality",
-        "ENF-015": "capability-enforcement"
-      }
-    },
-    {
-      "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
-      "symbol": "FinalityAdmission.grantBlessing",
-      "classification": "Admission",
-      "result": "Capability",
-      "resultSymbol": "BlessingPermit",
-      "owner": "finality",
-      "what": "FINALITY-002, ENF-015",
-      "whatOwners": {
-        "FINALITY-002": "finality",
-        "ENF-015": "capability-enforcement"
-      }
-    },
-    {
-      "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
-      "symbol": "BlessingWorkflow.checkAdmission",
-      "classification": "Admission",
-      "result": "Capability",
-      "resultSymbol": "BlessingPermit",
-      "owner": "finality",
-      "what": "FINALITY-002, ENF-015",
-      "whatOwners": {
-        "FINALITY-002": "finality",
-        "ENF-015": "capability-enforcement"
-      }
-    },
-    {
-      "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
-      "symbol": "BlessingWorkflow.prepareBlessing",
-      "classification": "Admission",
-      "result": "Capability",
-      "resultSymbol": "BlessingPermit",
-      "owner": "finality",
-      "what": "FINALITY-002, ENF-015",
-      "whatOwners": {
-        "FINALITY-002": "finality",
-        "ENF-015": "capability-enforcement"
-      }
-    },
-    {
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
       "symbol": "AgentJournal.appendAgent",
       "classification": "Effect",
@@ -97,26 +45,6 @@
       }
     },
     {
-      "file": "src/Wanxiangshu/Mission/Finality/Record.fs",
-      "symbol": "FinalityJournal.appendLifecycle",
-      "classification": "Effect",
-      "owner": "finality",
-      "what": "ENF-015",
-      "whatOwners": {
-        "ENF-015": "capability-enforcement"
-      }
-    },
-    {
-      "file": "src/Wanxiangshu/Mission/Finality/Ports.fs",
-      "symbol": "FinalityReviewerPortModule.abortAll",
-      "classification": "Effect",
-      "owner": "finality",
-      "what": "ENF-015",
-      "whatOwners": {
-        "ENF-015": "capability-enforcement"
-      }
-    },
-    {
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
       "symbol": "AgentJournal.AppendAgent",
       "classification": "DurableSink",
@@ -141,16 +69,6 @@
       "symbol": "AgentJournal.WriteBlob",
       "classification": "DurableSink",
       "owner": "durable-events",
-      "what": "ENF-019",
-      "whatOwners": {
-        "ENF-019": "capability-enforcement"
-      }
-    },
-    {
-      "file": "src/Wanxiangshu/Mission/Finality/Record.fs",
-      "symbol": "FinalityJournal.appendLifecycle",
-      "classification": "DurableSink",
-      "owner": "finality",
       "what": "ENF-019",
       "whatOwners": {
         "ENF-019": "capability-enforcement"
@@ -319,158 +237,6 @@
       "whatOwners": {
         "ENF-014": "capability-enforcement",
         "ENF-016": "capability-enforcement"
-      }
-    },
-    {
-      "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
-      "symbol": "VerdictWitness",
-      "anchor": "type VerdictWitness =",
-      "classification": "Authority",
-      "class": "Witness",
-      "owner": "review-judgement",
-      "what": "FINALITY-002, FINALITY-010, ENF-015",
-      "scope": "provider run + tool call + current Git tree + reviewer",
-      "freshness": "valid only for the compared current tree and barrier",
-      "multiplicity": "two distinct attempts form confirmation",
-      "consume": "pure admission derives ReviewWitness",
-      "durability": "evidence may fold from facts; witness itself grants no effect",
-      "admissions": [
-        {
-          "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
-          "symbol": "ReviewWitness.confirm"
-        }
-      ],
-      "issuers": [
-        {
-          "file": "src/Wanxiangshu/Mission/Review/Judgement/Verdict.fs",
-          "symbol": "verdictWitness",
-          "anchor": "let private verdictWitness (tree: GitTreeHash) (judgement: ReviewJudgement) : VerdictWitness =",
-          "owner": "review-judgement"
-        },
-        {
-          "file": "src/Wanxiangshu/Mission/Manager/FinalitySurface.fs",
-          "symbol": "witnessOf",
-          "anchor": "let private witnessOf (value: obj) : VerdictWitness =",
-          "owner": "finality"
-        },
-        {
-          "file": "src/Wanxiangshu/Mission/Review/Assurance/Surface.fs",
-          "symbol": "witnessOf",
-          "anchor": "let private witnessOf (value: obj) : VerdictWitness =",
-          "owner": "review-assurance"
-        },
-        {
-          "file": "src/Wanxiangshu/Mission/Review/ReviewFactFold.fs",
-          "symbol": "fold",
-          "anchor": "let fold (projection: AgentProjectionSet) (fact: ReviewFactCases) : Result<AgentProjectionSet, FoldRejection> =",
-          "owner": "review-judgement"
-        }
-      ],
-      "whatOwners": {
-        "FINALITY-002": "finality",
-        "FINALITY-010": "finality",
-        "ENF-015": "capability-enforcement"
-      }
-    },
-    {
-      "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
-      "symbol": "ReviewWitness",
-      "anchor": "type ReviewWitness =",
-      "classification": "Authority",
-      "class": "Witness",
-      "owner": "review-judgement",
-      "what": "FINALITY-002, FINALITY-010, ENF-015",
-      "scope": "review barrier + two attempts + physical messages + Git tree",
-      "freshness": "rechecked against the current Git tree",
-      "multiplicity": "confirmation requires two distinct PERFECT attempts",
-      "consume": "pure current-tree admission only",
-      "durability": "projection evidence, never direct effect authority",
-      "admissions": [
-        {
-          "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
-          "symbol": "ReviewWitness.confirm"
-        }
-      ],
-      "issuers": [
-        {
-          "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
-          "symbol": "confirm",
-          "anchor": ": ReviewWitness option =",
-          "owner": "review-judgement"
-        }
-      ],
-      "whatOwners": {
-        "FINALITY-002": "finality",
-        "FINALITY-010": "finality",
-        "ENF-015": "capability-enforcement"
-      }
-    },
-    {
-      "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
-      "symbol": "ConfirmedReviewWitness",
-      "anchor": "type ConfirmedReviewWitness =",
-      "classification": "Authority",
-      "class": "Witness",
-      "owner": "review-judgement",
-      "what": "FINALITY-002, FINALITY-010, ENF-015",
-      "scope": "LifeId + FinalityRequestId + Git tree + cohort witnesses",
-      "freshness": "candidate tree must equal the witness tree",
-      "multiplicity": "one cohort confirmation from at least two legitimate members",
-      "consume": "ReviewCandidate.verifyCandidate returns typed failure",
-      "durability": "derived from durable facts; never a separate event",
-      "admissions": [
-        {
-          "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
-          "symbol": "FinalityAdmission.grantBlessing"
-        },
-        {
-          "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
-          "symbol": "BlessingWorkflow.checkAdmission"
-        },
-        {
-          "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
-          "symbol": "BlessingWorkflow.prepareBlessing"
-        }
-      ],
-      "issuers": [
-        {
-          "file": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
-          "symbol": "create",
-          "anchor": "let create",
-          "owner": "review-judgement"
-        }
-      ],
-      "whatOwners": {
-        "FINALITY-002": "finality",
-        "FINALITY-010": "finality",
-        "ENF-015": "capability-enforcement"
-      }
-    },
-    {
-      "file": "src/Wanxiangshu/Mission/Finality/Types.fs",
-      "symbol": "BlessingPermit",
-      "anchor": "type BlessingPermit =",
-      "classification": "Authority",
-      "class": "Capability",
-      "owner": "finality",
-      "what": "FINALITY-002, FINALITY-010, ENF-015",
-      "scope": "LifeId + FinalityRequestId + current Git tree",
-      "freshness": "issued only after current tree equals confirmed witness tree",
-      "multiplicity": "one-shot authority to record one blessing",
-      "consume": "typed BlessingAdmissionFailure on stale/incomplete admission",
-      "durability": "permit is process-local; FinalityBlessed is the durable outcome",
-      "issuers": [
-        {
-          "file": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
-          "symbol": "grantBlessing",
-          "anchor": ": Result<BlessingPermit, BlessingAdmissionFailure> =",
-          "owner": "finality"
-        }
-      ],
-      "whatOwners": {
-        "FINALITY-002": "finality",
-        "FINALITY-010": "finality",
-        "ENF-015": "capability-enforcement"
       }
     },
     {

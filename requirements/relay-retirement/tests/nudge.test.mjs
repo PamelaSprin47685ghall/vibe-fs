@@ -2,7 +2,14 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as retirement from '../../../dist/Mission/Relay/Retirement/Surface.js'
 
-test('WHAT[RELAY-007] WHAT[RETIRE-005] each fresh normal terminal frontier schedules at most one nudge without a protocol retry ceiling', () => {
+test('WHAT[RELAY-007] silent normal terminal schedules an exit nudge instead of ending the incumbency', () => {
+  const state = retirement.emptyNudges()
+  const scheduled = retirement.observeNormalTerminal(state, 'inc-1', 1)
+  assert.equal(scheduled.scheduled, true)
+  assert.equal(retirement.nudgeCount(scheduled.state), 1)
+})
+
+test('WHAT[RETIRE-005] each fresh frontier schedules at most one nudge without a protocol retry ceiling', () => {
   let state = retirement.emptyNudges()
   for (let frontier = 1; frontier <= 100; frontier++) {
     const scheduled = retirement.observeNormalTerminal(state, 'inc-1', frontier)

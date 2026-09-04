@@ -2,10 +2,13 @@ namespace Wanxiangshu.Change
 
 open System
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Persistence.Journal
 
 /// One Road owns one stable worktree. Human quality decisions come only from
 /// Relay incumbencies; Change owns deterministic Git admission, rebase and CAS.
@@ -24,7 +27,20 @@ module OrchestratorProgram =
             return mapper value
         }
 
-    let private mapTaskError mapper operation = mapTask (Result.mapError mapper) operation
+    let private mapTaskError mapper operation =
+        mapTask (Result.mapError mapper) operation
+
+    let private continueResult binder operation =
+        task {
+            let! outcome = operation
+
+            match outcome with
+            | Ok value -> return! binder value
+            | Error verdict -> return verdict
+        }
+
+    let private continueUnit binder operation =
+        continueResult (fun () -> binder ()) operation
 
     let private append (deps: OrchestratorProgramDeps) (job: ManagerJob) fact =
         taskResult { do! deps.AppendFact StreamId.Workspace fact |> mapTaskError (failed job) }
@@ -101,11 +117,7 @@ module OrchestratorProgram =
                    ConflictFiles = files
                    DiagnosticsDigest = HostDigest.sha256Hex (String.Join("\n", files)) |})
 
-    let private completeClaimAndFf
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        (current: CommitHash)
-        =
+    let private completeClaimAndFf (deps: OrchestratorProgramDeps) (job: ManagerJob) (current: CommitHash) =
         taskResult {
             do!
                 append
@@ -135,11 +147,7 @@ module OrchestratorProgram =
                 return Landed landed
         }
 
-    let private claimAndFf
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        (expectedHead: CommitHash)
-        =
+    let private claimAndFf (deps: OrchestratorProgramDeps) (job: ManagerJob) (expectedHead: CommitHash) =
         taskResult {
             let! current = targetHead deps job
 
@@ -149,11 +157,7 @@ module OrchestratorProgram =
                 return! completeClaimAndFf deps job current
         }
 
-    let private publishUnderGate
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        (expectedHead: CommitHash)
-        =
+    let private publishUnderGate (deps: OrchestratorProgramDeps) (job: ManagerJob) (expectedHead: CommitHash) =
         task {
             let! gate = deps.AcquirePublishGate()
 
@@ -175,11 +179,7 @@ module OrchestratorProgram =
             return! job.Worktree.Release()
         }
 
-    let private settleLanded
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        (commit: CommitHash)
-        =
+    let private settleLanded (deps: OrchestratorProgramDeps) (job: ManagerJob) (commit: CommitHash) =
         task {
             match! releaseTerminalWorktree deps job with
             | Ok() -> return OrchestratorVerdict.Published(job.JobId, commit)
@@ -229,16 +229,24 @@ module OrchestratorProgram =
             return snapshot = certificate.SnapshotId, snapshot
         }
 
-    let private requestAfterBindingChange
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        reason
-        =
+    let private requestAfterBindingChange (deps: OrchestratorProgramDeps) (job: ManagerJob) reason =
         taskResult {
             do! invalidate deps job reason
             let! _ = successor deps job reason
             return ()
         }
+
+    let private captureSnapshotResult (deps: OrchestratorProgramDeps) (job: ManagerJob) details =
+        deps.Relay.CaptureSnapshot job.JobId
+        |> mapTaskError (fun error -> failed job (sprintf "%s: %s" details error))
+
+    let private conflictedFilesResult (deps: OrchestratorProgramDeps) (job: ManagerJob) =
+        deps.Git.ConflictedFiles job.Worktree.Path
+        |> mapTaskError (fun error -> failed job (sprintf "Conflict-file lookup failed: %s" error))
+
+    let private prepareCandidateResult (deps: OrchestratorProgramDeps) (job: ManagerJob) =
+        deps.Relay.PrepareCandidate job.JobId
+        |> mapTaskError (fun error -> failed job (sprintf "Candidate admission failed: %s" error))
 
     let rec private runRoad (deps: OrchestratorProgramDeps) (job: ManagerJob) : Task<OrchestratorVerdict> =
         task {
@@ -246,9 +254,9 @@ module OrchestratorProgram =
             | Error error -> return failed job (sprintf "Relay signal failed: %s" error)
             | Ok(RoadSignal.ExceptionalTerminal reason) -> return failed job reason
             | Ok(RoadSignal.IncumbencyRetired _) ->
-                match! successor deps job "IndependentAssessmentRequired" with
-                | Error verdict -> return verdict
-                | Ok _ -> return! runRoad deps job
+                return!
+                    successor deps job "IndependentAssessmentRequired"
+                    |> continueResult (fun _ -> runRoad deps job)
             | Ok(RoadSignal.QualityCandidateAccepted(_, certificate)) ->
                 return! handleQualityCandidate deps job certificate
         }
@@ -261,36 +269,49 @@ module OrchestratorProgram =
         (target: CommitHash)
         reason
         : Task<OrchestratorVerdict> =
-        task {
-            match! invalidate deps job reason with
-            | Error verdict -> return verdict
-            | Ok() ->
-                match! deps.Git.Rebase job.Worktree.Path job.TargetRef with
-                | Ok() ->
-                    match! deps.Relay.CaptureSnapshot job.JobId with
-                    | Error error -> return failed job (sprintf "Post-rebase snapshot failed: %s" error)
-                    | Ok snapshot ->
-                        match! recordRebased deps job target snapshot with
-                        | Error verdict -> return verdict
-                        | Ok _ ->
-                            match! successor deps job "PostRebaseIndependentAssessment" with
-                            | Error verdict -> return verdict
-                            | Ok _ -> return! runRoad deps job
-                | Error rebaseError ->
-                    match! deps.Git.ConflictedFiles job.Worktree.Path with
-                    | Error error -> return failed job (sprintf "Conflict-file lookup failed: %s" error)
-                    | Ok [] -> return failed job (sprintf "Rebase failed without conflicts: %s" rebaseError)
-                    | Ok files ->
-                        match! deps.Relay.CaptureSnapshot job.JobId with
-                        | Error error -> return failed job (sprintf "Conflict snapshot failed: %s" error)
-                        | Ok snapshot ->
-                            match! recordConflict deps job candidate target snapshot files with
-                            | Error verdict -> return verdict
-                            | Ok() ->
-                                match! successor deps job "RebaseConflict" with
-                                | Error verdict -> return verdict
-                                | Ok _ -> return! runRoad deps job
-        }
+        let afterRebaseSuccessor _ = runRoad deps job
+
+        let afterRebasedRecord _ =
+            successor deps job "PostRebaseIndependentAssessment"
+            |> continueResult afterRebaseSuccessor
+
+        let afterRebaseSnapshot snapshot =
+            recordRebased deps job target snapshot |> continueResult afterRebasedRecord
+
+        let onRebaseSuccess () =
+            captureSnapshotResult deps job "Post-rebase snapshot failed"
+            |> continueResult afterRebaseSnapshot
+
+        let afterConflictSuccessor _ = runRoad deps job
+
+        let afterConflictRecord _ =
+            successor deps job "RebaseConflict" |> continueResult afterConflictSuccessor
+
+        let afterConflictSnapshot files snapshot =
+            recordConflict deps job candidate target snapshot files
+            |> continueResult afterConflictRecord
+
+        let handleConflictFiles rebaseError files =
+            if List.isEmpty files then
+                Task.FromResult(failed job (sprintf "Rebase failed without conflicts: %s" rebaseError))
+            else
+                captureSnapshotResult deps job "Conflict snapshot failed"
+                |> continueResult (afterConflictSnapshot files)
+
+        let onRebaseFailure rebaseError =
+            conflictedFilesResult deps job
+            |> continueResult (handleConflictFiles rebaseError)
+
+        let afterInvalidation () =
+            task {
+                let! rebase = deps.Git.Rebase job.Worktree.Path job.TargetRef
+
+                match rebase with
+                | Ok() -> return! onRebaseSuccess ()
+                | Error rebaseError -> return! onRebaseFailure rebaseError
+            }
+
+        invalidate deps job reason |> continueUnit afterInvalidation
 
     and private publishCertified
         (deps: OrchestratorProgramDeps)
@@ -299,68 +320,109 @@ module OrchestratorProgram =
         (candidate: CommitHash)
         (expectedHead: CommitHash)
         : Task<OrchestratorVerdict> =
-        task {
-            match! publishUnderGate deps job expectedHead with
-            | Error verdict -> return verdict
-            | Ok(Landed commit) -> return! settleLanded deps job commit
-            | Ok TargetMoved ->
-                match! targetHead deps job with
-                | Error verdict -> return verdict
-                | Ok refreshed ->
-                    return! handleRebase deps job certificate candidate refreshed "PublishCasMissed"
-        }
+        let afterTargetRefresh refreshed =
+            handleRebase deps job certificate candidate refreshed "PublishCasMissed"
+
+        let handlePublishAttempt =
+            function
+            | Landed commit -> settleLanded deps job commit
+            | TargetMoved -> targetHead deps job |> continueResult afterTargetRefresh
+
+        publishUnderGate deps job expectedHead |> continueResult handlePublishAttempt
 
     and private handleQualityCandidate
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
         (certificate: QualityCertificate)
         : Task<OrchestratorVerdict> =
+        let resumeRoad () = runRoad deps job
+
+        let bindingChanged () =
+            requestAfterBindingChange deps job "WorkspaceChangedAfterAssessment"
+            |> continueUnit resumeRoad
+
+        let afterConflictBindingChange () = runRoad deps job
+
+        let afterConflictRecord () =
+            requestAfterBindingChange deps job "ArtifactAdmissionUnmerged"
+            |> continueUnit afterConflictBindingChange
+
+        let recordObservedConflict currentSnapshot files candidate target =
+            recordConflict deps job candidate target currentSnapshot files
+            |> continueUnit afterConflictRecord
+
+        let afterConflictHead currentSnapshot files candidate =
+            targetHead deps job
+            |> continueResult (recordObservedConflict currentSnapshot files candidate)
+
+        let handleObservedConflict currentSnapshot files =
+            readHead deps job |> continueResult (afterConflictHead currentSnapshot files)
+
+        let rebaseReason =
+            function
+            | Some _ -> "TargetAdvanced"
+            | None -> "InitialRebaseRequired"
+
+        let recordInitialCandidate candidate target rebased =
+            let afterCandidateRecord () =
+                handleRebase deps job certificate candidate target (rebaseReason rebased)
+
+            recordCandidate deps job candidate certificate
+            |> continueUnit afterCandidateRecord
+
+        let admitPreparedCandidate candidate target =
+            let rebased =
+                currentRecord deps job
+                |> Option.bind (fun record -> record.RebasedCandidateReady)
+
+            match rebased with
+            | Some admitted when admitted.RebasedCommit = candidate && admitted.TargetHeadSnapshot = target ->
+                publishCertified deps job certificate candidate target
+            | _ -> recordInitialCandidate candidate target rebased
+
+        let afterPreparedCandidate candidate =
+            targetHead deps job |> continueResult (admitPreparedCandidate candidate)
+
+        let handleConflictFiles currentSnapshot files =
+            match files with
+            | [] -> prepareCandidateResult deps job |> continueResult afterPreparedCandidate
+            | _ -> handleObservedConflict currentSnapshot files
+
+        let inspectCurrentArtifact currentSnapshot =
+            conflictedFilesResult deps job
+            |> continueResult (handleConflictFiles currentSnapshot)
+
+        let handleSnapshotAdmission (matches, currentSnapshot) =
+            if matches then
+                inspectCurrentArtifact currentSnapshot
+            else
+                bindingChanged ()
+
+        artifactSnapshotMatches deps job certificate
+        |> continueResult handleSnapshotAdmission
+
+    let private resumePublishReady (deps: OrchestratorProgramDeps) (job: ManagerJob) (expectedHead: CommitHash) =
         task {
-            match! artifactSnapshotMatches deps job certificate with
+            match! publishUnderGate deps job expectedHead with
             | Error verdict -> return verdict
-            | Ok(false, _) ->
-                match! requestAfterBindingChange deps job "WorkspaceChangedAfterAssessment" with
-                | Error verdict -> return verdict
-                | Ok() -> return! runRoad deps job
-            | Ok(true, currentSnapshot) ->
-                match! deps.Git.ConflictedFiles job.Worktree.Path with
-                | Error error -> return failed job (sprintf "Conflict-file lookup failed: %s" error)
-                | Ok(_ :: _ as files) ->
-                    match! readHead deps job, targetHead deps job with
-                    | Error verdict, _
-                    | _, Error verdict -> return verdict
-                    | Ok candidate, Ok target ->
-                        match! recordConflict deps job candidate target currentSnapshot files with
-                        | Error verdict -> return verdict
-                        | Ok() ->
-                            match! requestAfterBindingChange deps job "ArtifactAdmissionUnmerged" with
-                            | Error verdict -> return verdict
-                            | Ok() -> return! runRoad deps job
-                | Ok [] ->
-                    match! deps.Relay.PrepareCandidate job.JobId with
-                    | Error error -> return failed job (sprintf "Candidate admission failed: %s" error)
-                    | Ok candidate ->
-                        match! targetHead deps job with
-                        | Error verdict -> return verdict
-                        | Ok target ->
-                            let rebased = currentRecord deps job |> Option.bind (fun record -> record.RebasedCandidateReady)
-
-                            match rebased with
-                            | Some admitted
-                                when admitted.RebasedCommit = candidate
-                                     && admitted.TargetHeadSnapshot = target ->
-                                return! publishCertified deps job certificate candidate target
-                            | _ ->
-                                match! recordCandidate deps job candidate certificate with
-                                | Error verdict -> return verdict
-                                | Ok() ->
-                                    let reason =
-                                        match rebased with
-                                        | Some _ -> "TargetAdvanced"
-                                        | None -> "InitialRebaseRequired"
-
-                                    return! handleRebase deps job certificate candidate target reason
+            | Ok(Landed commit) -> return! settleLanded deps job commit
+            | Ok TargetMoved -> return! runRoad deps job
         }
+
+    let private resumePublishReality
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (rebasedCommit: CommitHash)
+        (expectedHead: CommitHash)
+        (current: CommitHash)
+        (reality: PublishClaimReality)
+        =
+        match reality with
+        | PublishClaimReality.HeadUnreadable ->
+            Task.FromResult(failed job "GetTargetHead failed during publish recovery")
+        | PublishClaimReality.AlreadyFastForwarded -> backfillPublished deps job rebasedCommit current
+        | PublishClaimReality.PublishReady -> resumePublishReady deps job expectedHead
+        | PublishClaimReality.ClaimExpired -> runRoad deps job
 
     let private reenterPublishClaim
         (deps: OrchestratorProgramDeps)
@@ -370,19 +432,15 @@ module OrchestratorProgram =
                ExpectedHead: CommitHash |})
         =
         task {
-            match! deps.Git.GetTargetHead job.TargetRef with
+            let! headResult = deps.Git.GetTargetHead job.TargetRef
+
+            match headResult with
             | Error _ -> return failed job "GetTargetHead failed; refusing publish recovery"
             | Ok current ->
-                match OrchestratorProjection.classifyPublishClaim (Some current) claim.RebasedCommit claim.ExpectedHead with
-                | PublishClaimReality.HeadUnreadable -> return failed job "GetTargetHead failed during publish recovery"
-                | PublishClaimReality.AlreadyFastForwarded ->
-                    return! backfillPublished deps job claim.RebasedCommit current
-                | PublishClaimReality.PublishReady ->
-                    match! publishUnderGate deps job claim.ExpectedHead with
-                    | Error verdict -> return verdict
-                    | Ok(Landed commit) -> return! settleLanded deps job commit
-                    | Ok TargetMoved -> return! runRoad deps job
-                | PublishClaimReality.ClaimExpired -> return! runRoad deps job
+                let reality =
+                    OrchestratorProjection.classifyPublishClaim (Some current) claim.RebasedCommit claim.ExpectedHead
+
+                return! resumePublishReality deps job claim.RebasedCommit claim.ExpectedHead current reality
         }
 
     let private cleanUp (deps: OrchestratorProgramDeps) (job: ManagerJob) =

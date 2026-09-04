@@ -18,9 +18,9 @@ Manager 作为长期 mission 的执行者，系统必须随时回答核心问题
 
 ## 2. 独立存在测试（Independent Change Test）
 
-若重写 `todowrite` 的 UI、schema 或工具名，只要保持「canonical account + checkpoint + supersession」语义不变，`finality`、`review-assurance` 与 `prefix-stability` 的规范定义无需改动。
+若重写 `todowrite` 的 UI、schema 或工具名，只要保持「canonical account + checkpoint + supersession」语义不变，`relay-retirement`、`relay-assessment` 与 `prefix-stability` 的规范定义无需改动。
 
-反之，若破坏「Accepted 立即 supersede CurrentObligations」、引入评审者写权或加入 `status` 冷状态机，`finality` 的判定、崩溃恢复与义务账本将同时失效。这是一个独立的失败域。
+反之，若破坏「Accepted 立即 supersede CurrentObligations」、引入评审者写权或加入 `status` 冷状态机，`relay-retirement` 的判定、崩溃恢复与义务账本将同时失效。这是一个独立的失败域。
 
 ## 3. 核心不变量与失败判定
 

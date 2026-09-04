@@ -31,6 +31,16 @@ module Surface =
 
     val invalidateCertificate: state: RelayState -> road: string -> reason: string -> obj
 
+    val advanceAuthority:
+        state: RelayState ->
+        road: string ->
+        incumbent: string ->
+        expected: string ->
+        next: string ->
+        authorityMessageId: string ->
+        snapshot: string ->
+        obj
+
     val retire:
         state: RelayState ->
         road: string ->
@@ -53,6 +63,7 @@ module Surface =
 
     val view: state: RelayState -> road: string -> obj
     val obligations: state: RelayState -> road: string -> string array
+    val authority: state: RelayState -> road: string -> obj
     val certificate: state: RelayState -> road: string -> obj
     val retirement: state: RelayState -> road: string -> obj
 

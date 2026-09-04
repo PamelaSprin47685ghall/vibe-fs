@@ -14,10 +14,15 @@ type OrchestratorHost =
         jobId: ManagerJobId * managerAgent: string * prompt: string * ?byname: string * ?expectedToolCalls: int ->
             Task<Result<string, string>>
 
-    /// GLORY-068: `commission(existing_job_id, charge)` — continue the SAME
-    /// Manager job (same worktree, same session) with an appended requirement.
+    /// Same-road charge update: retain physical Session/worktree while advancing
+    /// durable Relay AuthorityRevision for one exact caller tool invocation.
     member ContinueManagerJob:
-        jobId: ManagerJobId * prompt: string * ?expectedToolCalls: int -> Task<Result<string, string>>
+        jobId: ManagerJobId *
+        prompt: string *
+        callerProviderRun: ProviderRunIdentity *
+        callerToolCallId: ToolCallId *
+        ?expectedToolCalls: int ->
+            Task<Result<string, string>>
 
     /// EXEC-019: FIFO batch + local interrupt (JoinTool renders wire).
     member JoinPublishedAvailable:

@@ -6,6 +6,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Foundation.Identity
@@ -116,33 +117,27 @@ type HostToolArguments internal (raw: obj) =
             HostArgDecode.nonNegativeIntegerFromValue (raw?(name))
 
     member _.ExactBoundedIntegers(names: string list, minimum: int, maximum: int) =
+        let validateRange name score =
+            if score < minimum || score > maximum then
+                Error(sprintf "%s must be between %d and %d" name minimum maximum)
+            else
+                Ok(name, score)
+
+        let boundedInteger name =
+            let value = raw?(name)
+            let valid: bool = emitJsExpr value "Number.isInteger($0)"
+
+            if not valid then
+                Error(sprintf "%s must be an integer" name)
+            else
+                value |> unbox<float> |> int |> validateRange name
+
         if isNull raw then
             Error "arguments must be an object"
+        elif emitJsExpr raw "Object.keys($0)" |> Set.ofArray <> (names |> Set.ofList) then
+            Error "arguments must contain exactly the required fields"
         else
-            let actual: string array = emitJsExpr raw "Object.keys($0)"
-            let expected = names |> Set.ofList
-
-            if Set.ofArray actual <> expected then
-                Error "arguments must contain exactly the required fields"
-            else
-                let rec loop remaining collected =
-                    match remaining with
-                    | [] -> Ok(List.rev collected)
-                    | name :: rest ->
-                        let value = raw?(name)
-                        let valid: bool = emitJsExpr value "Number.isInteger($0)"
-
-                        if not valid then
-                            Error(sprintf "%s must be an integer" name)
-                        else
-                            let score = int (unbox<float> value)
-
-                            if score < minimum || score > maximum then
-                                Error(sprintf "%s must be between %d and %d" name minimum maximum)
-                            else
-                                loop rest ((name, score) :: collected)
-
-                loop names []
+            names |> List.traverseResultM boundedInteger
 
     member _.OptionalBool(name: string) =
         if isNull raw || isNull raw?(name) then

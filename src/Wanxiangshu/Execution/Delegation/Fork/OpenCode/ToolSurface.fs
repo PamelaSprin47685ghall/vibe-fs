@@ -404,11 +404,9 @@ module ForkToolSurface =
                 new ToolRuntimeScope(
                     sessions,
                     Some journal,
-                    None,
                     Some directory,
                     Dictionary<string, string>(),
                     (fun _ -> None),
-                    HashSet<string>(),
                     Dictionary<string, string>(),
                     None,
                     None,

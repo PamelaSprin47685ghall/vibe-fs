@@ -3,6 +3,7 @@ namespace Wanxiangshu.Mission.Manager
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Composition.Turn
@@ -22,42 +23,45 @@ module ManagerWorkflow =
 
     let private roadId (sessionId: SessionId) = RoadId.create (SessionId.value sessionId)
 
-    let private relayState (journal: AgentJournal) sessionId =
+    let private relayState (journal: AgentJournal) (sessionId: SessionId) =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
         |> Option.bind (fun session -> session.Relay)
 
-    let private currentView journal sessionId =
+    let private currentView (journal: AgentJournal) (sessionId: SessionId) =
         relayState journal sessionId |> Option.bind (fun state -> Fold.view state (roadId sessionId))
 
-    let private initialIncumbency sessionId physicalUserMessageId =
+    let private initialIncumbency (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) =
         let session = SessionId.value sessionId
         let physical = PhysicalUserMessageId.value physicalUserMessageId
 
         HostDigest.sha256Hex ("incumbency-v1\n" + session + "\n" + physical)
         |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
 
-    let private openingEvents turn view =
-        match view with
-        | Some road ->
-            match road.ActiveIncumbency with
-            | Some incumbent -> Ok(incumbent, [])
-            | None -> Error "active Relay road has no incumbent"
-        | None ->
-            match turn.Directory with
-            | None -> Error "Manager Relay nudge requires a workspace directory"
-            | Some directory ->
-                let road = roadId turn.SessionId
-                let authority = AuthorityRevision.create (PhysicalUserMessageId.value turn.PhysicalUserMessageId)
-                let snapshot = WorkspaceSnapshot.capture directory
-                let incumbent = initialIncumbency turn.SessionId turn.PhysicalUserMessageId
+    let private openingEvents (turn: ReconciledTurn) (view: RoadView option) =
+        match view, turn.Directory with
+        | Some road, _ ->
+            road.ActiveIncumbency
+            |> Result.requireSome "active Relay road has no incumbent"
+            |> Result.map (fun incumbent -> incumbent, [])
+        | None, None -> Error "Manager Relay nudge requires a workspace directory"
+        | None, Some directory ->
+            let road = roadId turn.SessionId
+            let authority = AuthorityRevision.create (PhysicalUserMessageId.value turn.PhysicalUserMessageId)
+            let snapshot = WorkspaceSnapshot.capture directory
+            let incumbent = initialIncumbency turn.SessionId turn.PhysicalUserMessageId
 
-                Ok(
-                    incumbent,
-                    [ RelayEvent.RoadOpened(road, authority)
-                      RelayEvent.IncumbencyOpened(incumbent, snapshot, BatonSource.ExistingWorld) ]
-                )
+            Ok(
+                incumbent,
+                [ RelayEvent.RoadOpened(road, authority, turn.PhysicalUserMessageId)
+                  RelayEvent.IncumbencyOpened(incumbent, snapshot, BatonSource.ExistingWorld) ]
+            )
 
-    let private appendNudge journal turn incumbent opening =
+    let private appendNudge
+        (journal: AgentJournal)
+        (turn: ReconciledTurn)
+        (incumbent: IncumbencyId)
+        (opening: RelayEvent list)
+        =
         let road = roadId turn.SessionId
         let frontier = ProviderRunIdentity.value turn.ProviderRun
 
@@ -84,7 +88,7 @@ module ManagerWorkflow =
                     | Error failure -> return Error(JournalAppendFailure.describe failure)
                 }
 
-    let private sendNudge sessionPort journal turn =
+    let private sendNudge (sessionPort: ISessionHostPort) (journal: AgentJournal) (turn: ReconciledTurn) =
         HostSessionNudge.trySendGateContinuationPhysical
             sessionPort
             turn.SessionId
@@ -95,50 +99,72 @@ module ManagerWorkflow =
             (exitRequiredPath + ":" + ProviderRunIdentity.value turn.ProviderRun)
             turn.ProviderRun
 
-    let private scheduleNudge sessionPort journal turn =
+    let private shouldSchedule view frontier =
+        match view with
+        | Some road when road.ActiveIncumbency.IsNone -> false
+        | Some road when Set.contains frontier road.ExitRequiredNudgeFrontiers -> false
+        | _ -> true
+
+    let private bindTaskResult binder pending =
+        task {
+            let! outcome = pending
+
+            match outcome with
+            | Ok value -> return! binder value
+            | Error error -> return Error error
+        }
+
+    let private tryScheduleNudge sessionPort journal turn view =
+        match openingEvents turn view with
+        | Error error -> Task.FromResult(Error error)
+        | Ok(incumbent, opening) ->
+            sendNudge sessionPort journal turn
+            |> bindTaskResult (fun _ -> appendNudge journal turn incumbent opening)
+
+    let private scheduleNudge (sessionPort: ISessionHostPort) (journal: AgentJournal) (turn: ReconciledTurn) =
         task {
             let view = currentView journal turn.SessionId
             let frontier = ProviderRunIdentity.value turn.ProviderRun
 
-            match view with
-            | Some road when road.ActiveIncumbency.IsNone -> return ()
-            | Some road when Set.contains frontier road.ExitRequiredNudgeFrontiers -> return ()
-            | _ ->
-                match openingEvents turn view with
-                | Error _ -> return ()
-                | Ok(incumbent, opening) ->
-                    match! sendNudge sessionPort journal turn with
-                    | Error _ -> return ()
-                    | Ok _ ->
-                        let! _ = appendNudge journal turn incumbent opening
-                        return ()
+            if shouldSchedule view frontier then
+                let! _ = tryScheduleNudge sessionPort journal turn view
+                return ()
+            else
+                return ()
         }
         :> Task
 
     let observeIdle
-        sessionPort
-        _eventPort
-        journal
-        (_nudgeSent: HashSet<string>)
-        _hasLivePty
-        _quiescence
-        context
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (nudgeSent: HashSet<string>)
+        (hasLivePty: string -> bool)
+        (quiescence: ISessionQuiescenceGate)
+        (context: ReconciledTurnContext)
         : Task =
+        ignore eventPort
+        ignore nudgeSent
+        ignore hasLivePty
+        ignore quiescence
+
         match journal, context.Failure, context.Turn.Outcome with
         | Some durable, None, ReconcileProgram.TurnCompleted -> scheduleNudge sessionPort durable context.Turn
         | _ -> Task.FromResult()
 
     let observe
-        sessionPort
-        eventPort
-        journal
-        nudgeSent
-        _joinGuardNudges
-        hasLivePty
-        quiescence
-        observeOrdinary
-        context
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (nudgeSent: HashSet<string>)
+        (joinGuardNudges: HashSet<string>)
+        (hasLivePty: string -> bool)
+        (quiescence: ISessionQuiescenceGate)
+        (observeOrdinary: ReconciledTurnContext -> Task)
+        (context: ReconciledTurnContext)
         : Task =
+        ignore joinGuardNudges
+
         match context.Failure, context.Turn.Outcome with
         | Some _, _ -> observeOrdinary context
         | None, ReconcileProgram.TurnCompleted ->

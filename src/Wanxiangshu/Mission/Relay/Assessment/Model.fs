@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Mission.Relay.Assessment
 
+open FsToolkit.ErrorHandling
 open Fable.Core.JsInterop
 open Wanxiangshu.Mission.Relay
 
@@ -22,27 +23,17 @@ module Model =
             None
 
     let private readScores value =
-        let rec loop remaining collected =
-            match remaining with
-            | [] -> Ok(List.rev collected)
-            | field :: rest ->
-                match property value field |> integer with
-                | Some score -> loop rest (score :: collected)
-                | None -> Error("review score must be an integer from 0 through 10: " + field)
-
-        loop expectedFields []
+        expectedFields
+        |> List.traverseResultM (fun field ->
+            property value field
+            |> integer
+            |> Result.requireSome ("review score must be an integer from 0 through 10: " + field))
 
     let tryParse (value: obj) =
         if isNull value then
             Error "review arguments must be an object"
+        elif keys value |> Set.ofArray <> (expectedFields |> Set.ofList) then
+            Error "review arguments must contain exactly the eight required score fields"
         else
-            let actual = keys value |> Set.ofArray
-            let expected = expectedFields |> Set.ofList
-
-            if actual <> expected then
-                Error "review arguments must contain exactly the eight required score fields"
-            else
-                match readScores value with
-                | Error error -> Error error
-                | Ok scores -> ScoreVector.tryCreate scores
+            readScores value |> Result.bind ScoreVector.tryCreate
 

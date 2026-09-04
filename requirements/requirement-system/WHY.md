@@ -14,7 +14,7 @@ docs 说 A，gate 说 B，test 证明 C，code 实现 D —— 四者同时为�
 
 ## 核心张力与元规则定位
 
-领域包（如 `durable-events`、`review-assurance`）拥有具体的产品与业务事实，回答「世界是什么」；而 `requirement-system` 不拥有任何具体业务领域断言，它拥有的是跨包语义治理的元规则：
+领域包（如 `durable-events`、`relay-assessment`）拥有具体的产品与业务事实，回答「世界是什么」；而 `requirement-system` 不拥有任何具体业务领域断言，它拥有的是跨包语义治理的元规则：
 
 ```text
 这条命题归哪个包拥有？

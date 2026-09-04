@@ -2,7 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>relay-assessment</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-relay-assessment</WanxiangshuOwnerLocality>
-    <WanxiangshuOwnerLocalityKind>domain</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>

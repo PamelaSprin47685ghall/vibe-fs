@@ -10,7 +10,6 @@ open Wanxiangshu.Persistence.Journal
 type OrchestratorVerdict =
     | Published of jobId: ManagerJobId * head: CommitHash
     | RejectedDirty of reason: string
-    | NeedsReview of jobId: ManagerJobId * reviewDetails: string
     | IntegrationFailed of jobId: ManagerJobId * errorDetails: string
     | Empty
 
@@ -50,8 +49,8 @@ type RelayPort =
     { OpenRoad: RoadStart -> Task<Result<SessionId, string>>
       ActivateRoad: ManagerJobId -> Task<Result<unit, string>>
       AwaitRoadSignal: ManagerJobId -> Task<Result<RoadSignal, string>>
-      InvalidateCertificate: ManagerJobId -> reason: string -> Task<Result<unit, string>>
-      RequestSuccessor: ManagerJobId -> WorktreePath -> reason: string -> Task<Result<IncumbencyId, string>>
+      InvalidateCertificate: ManagerJobId -> string -> Task<Result<unit, string>>
+      RequestSuccessor: ManagerJobId -> WorktreePath -> string -> Task<Result<IncumbencyId, string>>
       CaptureSnapshot: ManagerJobId -> Task<Result<WorkspaceSnapshotId, string>>
       PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
       TerminateRoadResources: ManagerJobId -> Task<unit> }

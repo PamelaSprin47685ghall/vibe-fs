@@ -2,7 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>relay-incumbency</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-relay-core</WanxiangshuOwnerLocality>
-    <WanxiangshuOwnerLocalityKind>domain</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Mission/Relay/Contract.fsi"/>

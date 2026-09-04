@@ -396,26 +396,24 @@ type ToolRuntimeScope
     member _.ManagerPhaseFor(sessionId: string) =
         let roadId = RoadId.create sessionId
 
-        match journal with
-        | None -> ManagerCapabilityPhase.AuditPending
-        | Some durable ->
-            match AgentProjection.tryFind (SessionId.create sessionId) (AgentJournal.snapshot durable).AgentProjections with
-            | None -> ManagerCapabilityPhase.AuditPending
-            | Some session ->
-                match session.Relay with
-                | None -> ManagerCapabilityPhase.AuditPending
-                | Some relay ->
-                    match Wanxiangshu.Mission.Relay.Fold.view relay roadId with
-                    | None -> ManagerCapabilityPhase.AuditPending
-                    | Some view ->
-                        match view.ActivePhase with
-                        | Some IncumbencyPhase.AuditPending -> ManagerCapabilityPhase.AuditPending
-                        | Some IncumbencyPhase.WorkOwned -> ManagerCapabilityPhase.WorkOwned
-                        | Some IncumbencyPhase.PerfectAwaitingRetirement ->
-                            ManagerCapabilityPhase.PerfectAwaitingRetirement
-                        | Some IncumbencyPhase.RetirementCleanupBlocked ->
-                            ManagerCapabilityPhase.RetirementCleanupBlocked
-                        | None -> ManagerCapabilityPhase.Retired
+        let roadView =
+            journal
+            |> Option.bind (fun durable ->
+                AgentProjection.tryFind
+                    (SessionId.create sessionId)
+                    (AgentJournal.snapshot durable).AgentProjections)
+            |> Option.bind (fun session -> session.Relay)
+            |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay roadId)
+
+        let managerPhaseOfView (view: RoadView) =
+            match view.ActivePhase with
+            | Some IncumbencyPhase.AuditPending -> ManagerCapabilityPhase.AuditPending
+            | Some IncumbencyPhase.WorkOwned -> ManagerCapabilityPhase.WorkOwned
+            | Some IncumbencyPhase.PerfectAwaitingRetirement -> ManagerCapabilityPhase.PerfectAwaitingRetirement
+            | Some IncumbencyPhase.RetirementCleanupBlocked -> ManagerCapabilityPhase.RetirementCleanupBlocked
+            | None -> ManagerCapabilityPhase.Retired
+
+        roadView |> Option.map managerPhaseOfView |> Option.defaultValue ManagerCapabilityPhase.AuditPending
 
     member _.TryFreezeRetirement(sessionId: string) =
         lock gate (fun () -> retirementFrozen.Add sessionId)
@@ -427,15 +425,19 @@ type ToolRuntimeScope
         lock gate (fun () -> retirementFrozen.Contains sessionId)
 
     member _.RetirementBlockersFor(sessionId: string) =
+        let parentOf candidate =
+            match sessionParents.TryGetValue candidate with
+            | true, parent -> Some parent
+            | _ -> None
+
         let rec belongsToRoot (candidate: string) visited =
             if candidate = sessionId then
                 true
             elif Set.contains candidate visited then
                 false
             else
-                match sessionParents.TryGetValue candidate with
-                | true, parent -> belongsToRoot parent (Set.add candidate visited)
-                | _ -> false
+                parentOf candidate
+                |> Option.exists (fun parent -> belongsToRoot parent (Set.add candidate visited))
 
         let runtimeBlockers prefix ownerKey (runtime: HostForkRuntime) =
             let agents =

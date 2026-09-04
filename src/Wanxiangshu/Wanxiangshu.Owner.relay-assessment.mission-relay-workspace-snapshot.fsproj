@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>relay-assessment</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>mission-relay-workspace-snapshot</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
+    <Compile Include="Mission/Relay/OpenCode/WorkspaceSnapshot.fsi"/>
+    <Compile Include="Mission/Relay/OpenCode/WorkspaceSnapshot.fs"/>
+  </ItemGroup>
+</Project>

@@ -193,7 +193,6 @@ module JoinSurface =
                 match name with
                 | "Published" -> OrchestratorVerdict.Published(ManagerJobId.create "job", CommitHash.create "head")
                 | "RejectedDirty" -> OrchestratorVerdict.RejectedDirty "dirty"
-                | "NeedsReview" -> OrchestratorVerdict.NeedsReview(ManagerJobId.create "job", "review")
                 | "IntegrationFailed" -> OrchestratorVerdict.IntegrationFailed(ManagerJobId.create "job", "failed")
                 | _ -> OrchestratorVerdict.Empty)
             |> Array.toList

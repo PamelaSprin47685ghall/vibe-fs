@@ -24,9 +24,9 @@ DEPENDS ON: durable-events, effect-accounting, semantic-trace
 
 ## 4. 边界（DOES NOT OWN）
 
-- Reviewer 判定哲学与具体语义 → `review-judgement`
-- 评审证据可消费性、witness 与因果确认 → `review-assurance`
-- 终结资格、cohort 编排与 rest 经验 → `finality`
+- 八维评审与质量义务物化 → `relay-assessment`
+- 退休、接棒与 projection 切段 → `relay-retirement`、`relay-context-projection`
+- 任期同一性与单 active 任期 → `relay-incumbency`
 - 原始语义追踪与 XTrace cursor → `semantic-trace`
 - 物理执行结果分类与记账 → `effect-accounting`
 - 提示词文本本地化 → `provider-language`

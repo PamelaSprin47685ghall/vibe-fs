@@ -85,12 +85,10 @@ test('WHAT[SESSION-ONTOLOGY-001] session_ownership_ratchet_documents_closed_kind
     'SyncInspector',
     'SyncCoder',
     'Bookkeeper',
-    'hidden Reviewer',
     'StrengthReplica',
     'fork agent',
     'Distiller child',
   ])
-  assert.equal(relatedEvidenceToken('hidden Reviewer'), 'Reviewer')
   assert.equal(relatedEvidenceToken('fork agent'), 'Fork')
   assert.equal(relatedEvidenceToken('Distiller child'), 'Distiller')
   assert.equal(relatedEvidenceToken('Bookkeeper'), 'Bookkeeper')

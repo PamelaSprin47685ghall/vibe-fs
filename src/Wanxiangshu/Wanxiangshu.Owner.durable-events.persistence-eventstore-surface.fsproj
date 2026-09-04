@@ -16,7 +16,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.strength-persistence-durabilityport.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.finality.mission-manager-life-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-model.fsproj"/>
     <Compile Include="Persistence/EventStore/StrengthSurface.fsi"/>
     <Compile Include="Persistence/EventStore/StrengthSurface.fs"/>

@@ -1,1 +1,29 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><WanxiangshuSemanticOwner>interaction-authority</WanxiangshuSemanticOwner><WanxiangshuOwnerLocality>interaction-authority-fold</WanxiangshuOwnerLocality><WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind></PropertyGroup><ItemGroup><ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.review-assurance.mission-review-barrier-projection.fsproj"/><Compile Include="Interaction/Authority/Fold.fsi"/><Compile Include="Interaction/Authority/Fold.fs"/><Compile Include="Interaction/Repair/CompletedTurn.fsi"/><Compile Include="Interaction/Repair/CompletedTurn.fs"/><Compile Include="Interaction/Authority/Child.fsi"/><Compile Include="Interaction/Authority/Child.fs"/></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>interaction-authority</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>interaction-authority-fold</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj"/>
+    <Compile Include="Interaction/Authority/Fold.fsi"/>
+    <Compile Include="Interaction/Authority/Fold.fs"/>
+    <Compile Include="Interaction/Repair/CompletedTurn.fsi"/>
+    <Compile Include="Interaction/Repair/CompletedTurn.fs"/>
+    <Compile Include="Interaction/Authority/Child.fsi"/>
+    <Compile Include="Interaction/Authority/Child.fs"/>
+  </ItemGroup>
+</Project>

@@ -656,15 +656,21 @@ module ForkTool =
         task {
             let host = scope.OrchestratorHostFor context.SessionId
 
-            match!
-                host.ContinueManagerJob(
-                    job.ManagerJobId,
-                    request.Charge,
-                    ?expectedToolCalls = request.ExpectedToolCalls
-                )
-            with
-            | Ok _ -> return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
-            | Error _ -> return consequence (prose language Path.Commission.RoadCannotTakeCharge)
+            match context.ProviderRunId, context.ToolCallId with
+            | Some providerRun, Some toolCallId ->
+                match!
+                    host.ContinueManagerJob(
+                        job.ManagerJobId,
+                        request.Charge,
+                        providerRun,
+                        toolCallId,
+                        ?expectedToolCalls = request.ExpectedToolCalls
+                    )
+                with
+                | Ok _ ->
+                    return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
+                | Error _ -> return consequence (prose language Path.Commission.RoadCannotTakeCharge)
+            | _ -> return consequence (prose language Path.Commission.RoadCannotTakeCharge)
         }
 
     let private commissionExistingByname

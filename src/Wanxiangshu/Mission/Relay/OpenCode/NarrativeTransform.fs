@@ -5,7 +5,6 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
@@ -17,13 +16,6 @@ module RelayNarrativeTransform =
         |> Option.bind (fun session -> session.Relay)
         |> Option.bind (fun relay -> Fold.view relay (RoadId.create (SessionId.value sessionId)))
 
-    let private rootAuthorityId (journal: AgentJournal) (sessionId: SessionId) =
-        let projection = AgentJournal.snapshot journal
-
-        PromptAuthorityLedger.activeProfile sessionId projection.AgentProjections
-        |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projection.AgentProjections)
-        |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
-
     let private messageId message = ProviderWireDecode.hostMessageId message
 
     let private messageContainsToolCall callId message =
@@ -34,7 +26,7 @@ module RelayNarrativeTransform =
             | WireToolResult(toolCallId, _) -> ToolCallId.value toolCallId = callId
             | _ -> false)
 
-    let private cutMessages rootId (cut: ProjectionCut) messages =
+    let private cutMessages authorityMessageIds (cut: ProjectionCut) messages =
         match messages |> List.tryFindIndex (fun message -> messageId message = Some cut.ThroughProviderRunId) with
         | None -> Error("relay projection cut provider run is absent: " + cut.ThroughProviderRunId)
         | Some cutIndex ->
@@ -44,11 +36,13 @@ module RelayNarrativeTransform =
             |> List.mapi (fun index message -> index, message)
             |> List.choose (fun (index, message) ->
                 let id = messageId message
-                let keepRoot = id = rootId
-                let oldEpoch = index <= cutIndex && not keepRoot
+                let keepAuthority = id |> Option.exists (fun value -> Set.contains value authorityMessageIds)
+                let oldEpoch = index <= cutIndex && not keepAuthority
                 let staleRun = id |> Option.exists (fun value -> Set.contains value stale)
                 let retirementTool = messageContainsToolCall cut.ThroughToolCallId message
-                if oldEpoch || staleRun || retirementTool then None else Some message)
+                if keepAuthority then Some message
+                elif oldEpoch || staleRun || retirementTool then None
+                else Some message)
             |> Ok
 
     let private phaseName =
@@ -93,13 +87,17 @@ module RelayNarrativeTransform =
               "parts", box [| createObj [ "type", box "text"; "text", box (batonText road) ] |] ]
 
     let private project journal sessionId road outObj =
+        ignore journal
         let messages = ProviderWireDecode.messagesFromTransformOutput outObj
-        let rootId = rootAuthorityId journal sessionId
+        let authorityMessageIds =
+            road.AuthorityMessageIds
+            |> List.map PhysicalUserMessageId.value
+            |> Set.ofList
 
         let projected =
             match road.ActiveSource, road.LatestRetirement with
             | Some(BatonSource.Retirement predecessor), Some retirement when retirement.Id = predecessor ->
-                cutMessages rootId retirement.ProjectionCut messages
+                cutMessages authorityMessageIds retirement.ProjectionCut messages
             | _ -> Ok messages
 
         match projected with
@@ -107,14 +105,16 @@ module RelayNarrativeTransform =
         | Ok current ->
             HostMessageProjection.replaceMessagesInPlace outObj (syntheticContext sessionId road :: current)
 
-    let apply (journal: AgentJournal option) (sessionIdValue: string option) (outObj: obj) : Task<unit> =
+    let apply (journal: AgentJournal option) (sessionId: string option) (outObj: obj) : Task<unit> =
         task {
-            match journal, sessionIdValue with
-            | Some durable, Some value when not (String.IsNullOrWhiteSpace value) ->
-                let sessionId = SessionId.create value
+            let context =
+                match journal, sessionId with
+                | Some durable, Some value when not (String.IsNullOrWhiteSpace value) ->
+                    Some(durable, SessionId.create value)
+                | _ -> None
 
-                match relayRoad durable sessionId with
-                | Some road -> project durable sessionId road outObj
-                | None -> ()
-            | _ -> ()
+            context
+            |> Option.iter (fun (durable, currentSessionId) ->
+                relayRoad durable currentSessionId
+                |> Option.iter (fun road -> project durable currentSessionId road outObj))
         }

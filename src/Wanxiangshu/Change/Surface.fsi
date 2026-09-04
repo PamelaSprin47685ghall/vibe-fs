@@ -31,6 +31,8 @@ module ChangeSurface =
 
     val unwrapFold: result: obj -> obj
 
+    val observeRelayProgram: scenarioName: string -> Task<obj>
+
     val createGit: repo: string -> runner: obj -> obj
 
     val gitIsDirty: git: obj -> path: string -> Task<bool>

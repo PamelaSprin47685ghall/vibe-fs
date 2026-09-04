@@ -12,20 +12,20 @@ export const PLUGIN_TRANSFORMS_FILE = 'src/Wanxiangshu/OpenCode/Plugin/PluginTra
 export const ORDERING_STEPS = Object.freeze([
   'caps.BeginPhysicalProviderAttempt',
   'caps.BindSessionStartedAt',
+  'caps.ApplyRelayProjection',
   'caps.ApplyStrengthReplay',
   'caps.CaptureXTraceMessages',
   'caps.CommitStrengthTrace',
   'caps.RefreshCompanionXTrace',
-  'caps.ApplyManagerNarrative',
   'caps.ApplyCompanion',
   'caps.ApplyXWire',
+  'caps.FreezeProviderAttemptPlan',
   'caps.ApplyEnforcerContinuation',
   'caps.ApplyStrengthSpeculate',
   'caps.InjectPairGuideline',
   'caps.ProjectRequirementGrounding',
   'caps.InjectBloggerChronicle',
   'caps.SanitizeMessages',
-  'caps.InterruptAfterSubmittedJudgement',
 ])
 
 const DYNAMIC_PIPELINE_PATTERNS = Object.freeze([

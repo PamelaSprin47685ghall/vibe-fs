@@ -41,11 +41,9 @@ module ExecutorToolSurface =
             new ToolRuntimeScope(
                 sessions,
                 None,
-                None,
                 workspaceDirectory,
                 Dictionary<string, string>(),
                 (fun _ -> None),
-                HashSet<string>(),
                 Dictionary<string, string>(),
                 None,
                 None,

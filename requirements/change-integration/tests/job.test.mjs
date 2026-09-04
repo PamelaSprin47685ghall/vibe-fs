@@ -21,20 +21,21 @@ const payload = (overrides = {}) => ({
 
 const created = (overrides) => change.createJob(change.empty(), payload(overrides))
 const fact = {
-  candidateReady: (candidateCommit = 'c1', barrier = 'bar_1') =>
-    change.fact('CandidateReady', { candidateCommit, preRebaseReviewBarrierId: barrier }),
+  candidateReady: (candidateCommit = 'c1', workspaceSnapshotId = 'snapshot-1', qualityCertificateId = 'certificate-1') =>
+    change.fact('CandidateReady', { candidateCommit, workspaceSnapshotId, qualityCertificateId }),
   conflictDetected: (conflictFiles = ['a.fs', 'b.fs']) =>
     change.fact('ConflictDetected', {
       candidateCommit: 'c1',
       targetHeadSnapshot: 'h1',
+      workspaceSnapshotId: 'snapshot-conflict',
       conflictFiles,
       diagnosticsDigest: 'digest',
     }),
-  rebased: (snapshot = 'h1') =>
+  rebased: (targetHeadSnapshot = 'h1', workspaceSnapshotId = 'snapshot-rebased') =>
     change.fact('RebasedCandidateReady', {
       rebasedCommit: 'r1',
-      targetHeadSnapshot: snapshot,
-      postRebaseReviewBarrierId: 'bar_2',
+      targetHeadSnapshot,
+      workspaceSnapshotId,
     }),
   publishClaimed: () => change.fact('PublishClaimed', { rebasedCommit: 'r1', expectedHead: 'h1' }),
   published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
@@ -51,7 +52,7 @@ const classifyRebased = (head, rebasedCommit = 'r1', snapshot = 'h1') =>
 const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
   change.classifyPublishClaim(head ?? null, rebasedCommit, expectedHead)
 
-// ── one job, one worktree, one Manager ────────────────────────────────────────
+// ── one Road/job, one stable worktree ───────────────────────────────────────
 
 test('WHAT[CHGINT-001] ORCH_003_a_created_job_persists_the_manager_agent_and_the_worktree_identity', () => {
   const job = change.find(created(), JOB)
@@ -146,12 +147,13 @@ test('WHAT[CHGINT-006] ORCH_007_projection_keeps_independent_facts_instead_of_la
   assert.deepEqual(conflicted.job.facts, ['CandidateReady', 'ConflictDetected'])
 })
 
-test('WHAT[CHGINT-005] ORCH_003_a_conflict_goes_back_to_the_same_manager_with_the_conflicted_files', () => {
+test('WHAT[CHGINT-005] ConflictDetected_preserves_machine_conflict_evidence_on_the_same_Road_worktree', () => {
   const { job } = jobAt(fact.conflictDetected(['src/a.fs', 'src/b.fs']))
   assert.deepEqual(job.facts, ['ConflictDetected'])
   const conflict = change.fact('ConflictDetected', {
     candidateCommit: 'c1',
     targetHeadSnapshot: 'h1',
+    workspaceSnapshotId: 'snapshot-conflict',
     conflictFiles: ['src/a.fs', 'src/b.fs'],
     diagnosticsDigest: 'digest',
   })
@@ -163,7 +165,7 @@ test('WHAT[CHGINT-010] ORCH_005_a_rebased_candidate_publishes_only_while_the_tar
   assert.equal(classifyRebased('h2').kind, 'NeedsRebase')
 })
 
-test('WHAT[CHGINT-013] REVIEW_008_a_moved_target_discards_the_post_rebase_witness', () => {
+test('WHAT[CHGINT-013] target_movement_makes_the_rebased_binding_stale', () => {
   assert.equal(classifyRebased('h2').kind, 'NeedsRebase')
 })
 
@@ -199,7 +201,12 @@ const createdEvent = {
 }
 const candidateEvent = {
   kind: 'CandidateReady',
-  payload: { jobId: JOB, candidateCommit: 'c1', preRebaseReviewBarrierId: 'bar_1' },
+  payload: {
+    jobId: JOB,
+    candidateCommit: 'c1',
+    workspaceSnapshotId: 'snapshot-1',
+    qualityCertificateId: 'certificate-1',
+  },
 }
 const publishedEvent = {
   kind: 'Published',

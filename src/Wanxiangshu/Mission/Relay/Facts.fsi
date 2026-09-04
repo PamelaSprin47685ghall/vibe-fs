@@ -1,11 +1,15 @@
 namespace Wanxiangshu.Mission.Relay
 
+open Wanxiangshu.Foundation.Identity
+
 [<RequireQualifiedAccess>]
 type RelayEvent =
-    | RoadOpened of RoadId * AuthorityRevision
+    | RoadOpened of RoadId * AuthorityRevision * PhysicalUserMessageId
     | IncumbencyOpened of IncumbencyId * WorkspaceSnapshotId * BatonSource
     | AssessmentCommitted of
         AssessmentId * AssessmentBinding * WorkspaceSnapshotId * AuthorityRevision * ScoreVector
+    | AuthorityRevisionAdvanced of
+        IncumbencyId * expected: AuthorityRevision * next: AuthorityRevision * PhysicalUserMessageId * WorkspaceSnapshotId
     | QualityCertificateInvalidated of QualityCertificateId * reason: string
     | RetirementCleanupBlocked of IncumbencyId * blockerDigest: string
     | ExitRequiredNudgeScheduled of IncumbencyId * causalFrontier: string

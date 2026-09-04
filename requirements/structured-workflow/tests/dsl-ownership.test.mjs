@@ -310,6 +310,29 @@ test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_domain_pending_evidence_is_not
   assert.deepEqual(hits, [])
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_relay_domain_phases_are_not_behaviour_bool', () => {
+  const source = [
+    'module Sample',
+    'type IncumbencyPhase = | AuditPending | WorkOwned | Retired',
+    'type ManagerCapabilityPhase = | AuditPending | WorkOwned | Retired',
+    'type RoadView = { ActivePhase: IncumbencyPhase option }',
+    'let permissionsForPhase phase = Set.empty',
+    'let isAllowedForPhase role permission phase = permissionsForPhase phase |> Set.contains permission',
+    'let denyRelayPhase ctx phase = ()',
+    'let current = RoadView.ActivePhase',
+    'let deniedPath = DeniedRelayPhase',
+    'let permissionCheck = isAllowedForPhase role permission phase',
+    'let denial = denyRelayPhase ctx phase',
+    'let projected = match role with | Role.Manager, Some managerPhase -> managerPhase | _ -> ManagerCapabilityPhase.Retired',
+    'let rejection = Error "AssessmentNotAllowedInCurrentPhase"',
+  ].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/Mission/Relay/Fold.fs')
+  assert.ok(
+    !hits.some((h) => h.gate === 'behaviour-bool'),
+    'Relay incumbency/capability phase vocabulary is durable domain evidence rather than an execution-position latch',
+  )
+})
+
 test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_verb_named_function_ending_Pending_is_not_behaviour_bool', () => {
   // A verb-named function that ends in a nominal suffix is a pure operation,
   // not a stored stage latch. `clearStalePending` / `tryClaimStartupProbe` are

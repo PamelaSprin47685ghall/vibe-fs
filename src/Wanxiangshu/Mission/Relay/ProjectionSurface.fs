@@ -19,6 +19,10 @@ module ProjectionSurface =
         let candidate = property value name
         if isNull candidate then None else Some(unbox<string> candidate)
 
+    let private intProperty value name =
+        let candidate = property value name
+        if isNull candidate then 0 else unbox<int> candidate
+
     let private stringArrayProperty value name =
         let candidate = property value name
         let isArray: bool = if isNull candidate then false else emitJsExpr candidate "Array.isArray($0)"
@@ -55,15 +59,25 @@ module ProjectionSurface =
                canonical = canonical
                digest = HostDigest.sha256Hex canonical |}
 
-    let applyCut (messages: obj array) (cutSequence: int) (staleRunIds: string array) =
-        let _ = cutSequence
+    let applyCut
+        (messages: obj array)
+        (cutSequence: int)
+        (staleRunIds: string array)
+        (authorityMessageIds: string array)
+        =
         let stale = Set.ofArray staleRunIds
+        let authority = Set.ofArray authorityMessageIds
 
         let provider =
             messages
             |> Array.filter (fun message ->
+                let id = stringProperty message "id"
+                let sequence = intProperty message "sequence"
                 let run = stringProperty message "run"
-                String.IsNullOrEmpty run || not (Set.contains run stale))
+                let authorityMessage = Set.contains id authority
+                let predecessorEpoch = sequence <= cutSequence && not authorityMessage
+                let staleRun = not (String.IsNullOrEmpty run) && Set.contains run stale
+                authorityMessage || (not predecessorEpoch && not staleRun))
 
         box {| audit = messages; provider = provider |}
 

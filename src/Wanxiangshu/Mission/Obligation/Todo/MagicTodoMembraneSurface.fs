@@ -136,11 +136,6 @@ module MagicTodoMembraneSurface =
         | "LiveAfterSuccess" -> Ok PhysicalSuccessEvidence.LiveAfterSuccess
         | unknown -> Error(sprintf "unknown physical success evidence: %s" unknown)
 
-    let private physicalOf value =
-        match physicalResult value with
-        | Ok evidence -> evidence
-        | Error error -> invalidArg "physicalEvidence" error
-
     let prepare
         (handle: JournalHandle)
         (sessionId: string)

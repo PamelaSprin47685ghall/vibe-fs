@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Mission.Relay
 
+open Wanxiangshu.Foundation.Identity
+
 module Surface =
     let empty () = Fold.empty
 
@@ -83,6 +85,17 @@ module Surface =
     let invalidateCertificate state road reason =
         Decision.invalidateCertificate state (RoadId.create road) reason |> result
 
+    let advanceAuthority state road incumbent expected next authorityMessageId snapshot =
+        Decision.advanceAuthority
+            state
+            (RoadId.create road)
+            (IncumbencyId.create incumbent)
+            (AuthorityRevision.create expected)
+            (AuthorityRevision.create next)
+            (PhysicalUserMessageId.create authorityMessageId)
+            (WorkspaceSnapshotId.create snapshot)
+        |> result
+
     let retire state road incumbent retirement snapshot baton cut qualityCandidateAccepted =
         let envelope =
             { SchemaVersion = 1
@@ -157,6 +170,29 @@ module Surface =
         | None -> [||]
         | Some roadView ->
             roadView.OpenObligations |> List.map ScoreDimension.fieldName |> List.toArray
+
+    let authority state road =
+        match Fold.view state (RoadId.create road) with
+        | None -> null
+        | Some roadView ->
+            box
+                {| roadRevision = AuthorityRevision.value roadView.AuthorityRevision
+                   revisionHistory =
+                    roadView.AuthorityRevisions
+                    |> List.map AuthorityRevision.value
+                    |> List.toArray
+                   activeRevision =
+                    roadView.ActiveAuthorityRevision
+                    |> Option.map AuthorityRevision.value
+                    |> nullableString
+                   activeSnapshot =
+                    roadView.ActiveSnapshotId
+                    |> Option.map WorkspaceSnapshotId.value
+                    |> nullableString
+                   messageIds =
+                    roadView.AuthorityMessageIds
+                    |> List.map PhysicalUserMessageId.value
+                    |> List.toArray |}
 
     let certificate state road =
         match Fold.view state (RoadId.create road) with

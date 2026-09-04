@@ -9,14 +9,11 @@ open Wanxiangshu.Persistence.Journal
 
 /// What one ManagerJob's publication attempt resolved to.
 ///
-/// Typed ids throughout. These used to be bare `string` manager ids, which made
-/// `ManagerJobId`, the Manager's Host `SessionId`, and the reviewer's agent id
-/// (built as `<managerId>-reviewer`) all the same type — so a function taking two
-/// of them accepted them in either order.
+/// Typed ids keep the durable Road identity separate from its physical Manager
+/// session and Git binding.
 type OrchestratorVerdict =
     | Published of jobId: ManagerJobId * head: CommitHash
     | RejectedDirty of reason: string
-    | NeedsReview of jobId: ManagerJobId * reviewDetails: string
     | IntegrationFailed of jobId: ManagerJobId * errorDetails: string
     | Empty
 
@@ -88,8 +85,8 @@ type RelayPort =
     { OpenRoad: RoadStart -> Task<Result<SessionId, string>>
       ActivateRoad: ManagerJobId -> Task<Result<unit, string>>
       AwaitRoadSignal: ManagerJobId -> Task<Result<RoadSignal, string>>
-      InvalidateCertificate: ManagerJobId -> reason: string -> Task<Result<unit, string>>
-      RequestSuccessor: ManagerJobId -> WorktreePath -> reason: string -> Task<Result<IncumbencyId, string>>
+      InvalidateCertificate: ManagerJobId -> string -> Task<Result<unit, string>>
+      RequestSuccessor: ManagerJobId -> WorktreePath -> string -> Task<Result<IncumbencyId, string>>
       CaptureSnapshot: ManagerJobId -> Task<Result<WorkspaceSnapshotId, string>>
       PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
       TerminateRoadResources: ManagerJobId -> Task<unit> }
@@ -120,7 +117,7 @@ type OrchestratorProgramDeps =
 
 module OrchestratorConstants =
     /// `FfMerge` reports this when the target advanced between the head read and
-    /// the ref update. ORCH-005 turns it into "rebase and review again", never into
-    /// a retry that reuses the old post-rebase witness.
+    /// the ref update. ORCH-005 turns it into certificate invalidation, rebase and
+    /// an ordinary Relay successor; the old certificate is never reused.
     [<Literal>]
     let targetRefMovedError = "target ref moved"

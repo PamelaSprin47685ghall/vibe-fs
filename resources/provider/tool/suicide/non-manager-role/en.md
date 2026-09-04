@@ -1,0 +1,1 @@
+suicide is Manager-only

@@ -19,7 +19,11 @@ DEPENDS ON:
 
 | 命题 | executable proof |
 |---|---|
-| ASSESS-001/002/007 | `requirements/relay-assessment/tests/review-tool-contract.test.mjs` |
-| ASSESS-004 | `requirements/relay-assessment/tests/assessment-transaction.test.mjs` |
-| ASSESS-005/006 | `requirements/relay-assessment/tests/certificate.test.mjs` |
+| ASSESS-001 | `requirements/relay-assessment/tests/review-tool-contract.test.mjs::WHAT[ASSESS-001] review schema is exactly eight required integer scores with no extras`；`requirements/relay-assessment/tests/review-tool-contract.test.mjs::WHAT[ASSESS-001] malformed scores are rejected without coercion`；`requirements/relay-assessment/tests/review-tool-contract.test.mjs::WHAT[ASSESS-001] valid payload preserves all eight exact integers` |
+| ASSESS-002 | `requirements/relay-assessment/tests/assessment-transaction.test.mjs::WHAT[ASSESS-002] second assessment in one incumbency is rejected without overwriting the first` |
+| ASSESS-003 | `requirements/relay-assessment/tests/assessment-transaction.test.mjs::WHAT[ASSESS-003] assessment binds exact execution identity and rejects mismatched authority or incumbency` |
+| ASSESS-004 | `requirements/relay-assessment/tests/assessment-transaction.test.mjs::WHAT[ASSESS-004] low-score assessment atomically records obligations and grants work ownership` |
+| ASSESS-005 | `requirements/relay-assessment/tests/certificate.test.mjs::WHAT[ASSESS-005] all-ten assessment creates an exact-bound certificate and downgrades the phase` |
+| ASSESS-006 | `requirements/relay-assessment/tests/certificate.test.mjs::WHAT[ASSESS-006] assessed incumbency cannot submit a second review after work begins` |
+| ASSESS-007 | `requirements/relay-assessment/tests/assessment-transaction.test.mjs::WHAT[ASSESS-007] stale snapshot does not consume the one semantic assessment slot` |
 

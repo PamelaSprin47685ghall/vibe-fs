@@ -1093,8 +1093,6 @@
     <Compile Include="Interaction/Repair/InteractionRepair.fs"/>
     <Compile Include="Composition/Turn/OrdinaryTurnWorkflow.fsi"/>
     <Compile Include="Composition/Turn/OrdinaryTurnWorkflow.fs"/>
-    <Compile Include="Mission/Manager/Background.fsi"/>
-    <Compile Include="Mission/Manager/Background.fs"/>
     <Compile Include="Mission/Manager/Workflow.fsi"/>
     <Compile Include="Mission/Manager/Workflow.fs"/>
     <Compile Include="Mission/WorkRecord/Materialize.fsi"/>

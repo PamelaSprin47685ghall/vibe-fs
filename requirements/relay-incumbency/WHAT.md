@@ -32,3 +32,7 @@ SuccessorActivated 只能发生在 predecessor retirement、机器生成 baton �
 
 AuthorityRevision、WorkspaceSnapshotId、requirement digest、target/base horizon 任一变化都使旧 QualityCertificate 显式失效。失效不会恢复 assessor，只会驱动普通 successor。
 
+## RELAY-009: active authority update 是 durable revision，不是普通 prompt
+
+已有 active incumbent 接纳追加要求时，必须以 expected previous `AuthorityRevision`、精确 `IncumbencyId`、新 `AuthorityRevision`、物理 accepted authority message 与 fresh `WorkspaceSnapshotId` 写入同一 Relay authority update。fold 原子推进 Road 与 active incumbent 的 revision/snapshot，并使旧有效 QualityCertificate 失效；同一精确 update 重放幂等，stale previous revision、错误 incumbent 或冲突 replay 必须 fail closed。单独发送 continuation 不构成 authority change，retired incumbent 也永远不能成为 authority update 目标。
+

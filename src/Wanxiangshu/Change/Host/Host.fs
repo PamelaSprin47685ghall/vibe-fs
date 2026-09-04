@@ -5,6 +5,8 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Change
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Session
@@ -12,6 +14,7 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Git
+open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
@@ -30,6 +33,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let joinGate = obj ()
     // DSL-MUTABLE: single-flight — join-in-flight latch under joinGate
     let mutable joinInFlight = false
+    let authorityUpdateGate = obj ()
+    let authorityUpdatesInFlight = HashSet<string>()
 
     let gitPort = GitOperations.createWithRepo deps.RepoPath OrchestratorGit.run
 
@@ -176,39 +181,48 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         |> Option.bind (fun session -> session.Relay)
         |> Option.bind (fun relay -> Fold.view relay (roadIdOf record))
 
+    let roadSignalOfRetirement (road: RoadView) (retirement: RetirementSummary) =
+        match road.Certificate with
+        | Some certificate when retirement.QualityCandidateAccepted && certificate.Valid ->
+            RoadSignal.QualityCandidateAccepted(retirement, certificate)
+        | _ -> RoadSignal.IncumbencyRetired retirement
+
+    let roadSignalOfRoad (road: RoadView) =
+        if road.ActiveIncumbency.IsSome then
+            None
+        else
+            road.LatestRetirement |> Option.map (roadSignalOfRetirement road)
+
     let signalOfProjection projection record =
-        relayView projection record
-        |> Option.bind (fun road ->
-            if road.ActiveIncumbency.IsSome then
-                None
-            else
-                road.LatestRetirement
-                |> Option.map (fun retirement ->
-                    match road.Certificate with
-                    | Some certificate when retirement.QualityCandidateAccepted && certificate.Valid ->
-                        RoadSignal.QualityCandidateAccepted(retirement, certificate)
-                    | _ -> RoadSignal.IncumbencyRetired retirement))
+        relayView projection record |> Option.bind roadSignalOfRoad
 
-    let rec awaitRoadSignal (jobId: ManagerJobId) : Task<Result<RoadSignal, string>> =
-        task {
-            match deps.Journal, requireJobRecord jobId with
-            | None, _ -> return Error "Relay Road requires a durable journal"
-            | _, Error error -> return Error error
-            | Some journal, Ok record ->
-                let projection, revision = AgentJournal.snapshotWithRevision journal
+    let requireJournalAndJob (journal: AgentJournal option) (jobId: ManagerJobId) (journalError: string) =
+        match journal, requireJobRecord jobId with
+        | None, _ -> Error journalError
+        | _, Error error -> Error error
+        | Some journal, Ok record -> Ok(journal, record)
 
-                match signalOfProjection projection record with
-                | Some signal -> return Ok signal
-                | None ->
-                    let! _ = AgentJournal.awaitChangeFrom revision journal
-                    return! awaitRoadSignal jobId
-        }
-
-    let appendRelay
+    let rec awaitRoadSignalFromJournal
+        (jobId: ManagerJobId)
         (journal: AgentJournal)
         (record: ManagerJobProjection)
-        (transaction: RelayTransaction)
-        =
+        : Task<Result<RoadSignal, string>> =
+        task {
+            let projection, revision = AgentJournal.snapshotWithRevision journal
+
+            match signalOfProjection projection record with
+            | Some signal -> return Ok signal
+            | None ->
+                let! _ = AgentJournal.awaitChangeFrom revision journal
+                return! awaitRoadSignal jobId
+        }
+
+    and awaitRoadSignal (jobId: ManagerJobId) : Task<Result<RoadSignal, string>> =
+        match requireJournalAndJob deps.Journal jobId "Relay Road requires a durable journal" with
+        | Error error -> Task.FromResult(Error error)
+        | Ok(journal, record) -> awaitRoadSignalFromJournal jobId journal record
+
+    let appendRelay (journal: AgentJournal) (record: ManagerJobProjection) (transaction: RelayTransaction) =
         AgentJournal.appendAgent
             (StreamId.Session record.ManagerSessionId)
             None
@@ -219,33 +233,57 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             ))
             journal
 
-    let invalidateCertificate (jobId: ManagerJobId) reason : Task<Result<unit, string>> =
+    let appendRelayResult journal record transaction =
         task {
-            match deps.Journal, requireJobRecord jobId with
-            | None, _ -> return Error "Certificate invalidation requires a durable journal"
-            | _, Error error -> return Error error
-            | Some journal, Ok record ->
-                match relayView (AgentJournal.snapshot journal) record |> Option.bind (fun road -> road.Certificate) with
-                | None -> return Ok()
-                | Some certificate ->
-                    match RelayTransaction.create [ RelayEvent.QualityCertificateInvalidated(certificate.Id, reason) ] with
-                    | Error error -> return Error error
-                    | Ok transaction ->
-                        match! appendRelay journal record transaction with
-                        | Ok _ -> return Ok()
-                        | Error failure -> return Error(JournalAppendFailure.describe failure)
+            let! result = appendRelay journal record transaction
+            return result |> Result.mapError JournalAppendFailure.describe
         }
 
-    let captureSnapshot (jobId: ManagerJobId) : Task<Result<WorkspaceSnapshotId, string>> =
-        task {
-            match requireJobRecord jobId with
-            | Error error -> return Error error
-            | Ok record ->
-                try
-                    return Ok(WorkspaceSnapshot.capture (WorktreePath.value record.WorktreePath))
-                with error ->
-                    return Error error.Message
+    let certificateToInvalidate (journal: AgentJournal) (record: ManagerJobProjection) =
+        relayView (AgentJournal.snapshot journal) record
+        |> Option.bind (fun road -> road.Certificate)
+        |> Option.map (fun cert -> cert.Id)
+
+    let buildInvalidationTransaction reason certificateIdOpt =
+        match certificateIdOpt with
+        | None -> Ok None
+        | Some certificateId ->
+            RelayTransaction.create [ RelayEvent.QualityCertificateInvalidated(certificateId, reason) ]
+            |> Result.map Some
+
+    let appendInvalidation
+        (journal: AgentJournal)
+        (record: ManagerJobProjection)
+        (transactionOpt: RelayTransaction option)
+        : Task<Result<unit, string>> =
+        match transactionOpt with
+        | None -> Task.FromResult(Ok())
+        | Some transaction ->
+            taskResult {
+                let! _ = appendRelayResult journal record transaction
+                return ()
+            }
+
+    let invalidateCertificate (jobId: ManagerJobId) reason : Task<Result<unit, string>> =
+        taskResult {
+            let! journal, record =
+                requireJournalAndJob deps.Journal jobId "Certificate invalidation requires a durable journal"
+
+            let certIdOpt = certificateToInvalidate journal record
+            let! transactionOpt = buildInvalidationTransaction reason certIdOpt
+            return! appendInvalidation journal record transactionOpt
         }
+
+    let tryCaptureSnapshot (worktreePath: WorktreePath) : Result<WorkspaceSnapshotId, string> =
+        try
+            Ok(WorkspaceSnapshot.capture (WorktreePath.value worktreePath))
+        with error ->
+            Error error.Message
+
+    let captureSnapshot (jobId: ManagerJobId) : Task<Result<WorkspaceSnapshotId, string>> =
+        requireJobRecord jobId
+        |> Result.bind (fun record -> tryCaptureSnapshot record.WorktreePath)
+        |> Task.FromResult
 
     let deterministicSuccessor (retirementId: RetirementId) =
         HostDigest.sha256Hex ("successor-v1\n" + RetirementId.value retirementId)
@@ -254,11 +292,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let successorPrompt (sessionId: SessionId) =
         ProviderProse.documentFor sessionId "runtime/relay-successor" Map.empty
 
-    let sendSuccessor
-        (record: ManagerJobProjection)
-        (retirement: RetirementSummary)
-        =
-        let terminalRun = ProviderRunIdentity.create retirement.ProjectionCut.ThroughProviderRunId
+    let sendSuccessor (record: ManagerJobProjection) (retirement: RetirementSummary) =
+        let terminalRun =
+            ProviderRunIdentity.create retirement.ProjectionCut.ThroughProviderRunId
 
         HostSessionNudge.trySendGateContinuationPhysical
             deps.Sessions
@@ -270,45 +306,72 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             ("relay-successor:" + RetirementId.value retirement.Id)
             terminalRun
 
-    let requestSuccessor
-        (jobId: ManagerJobId)
+    let requireOpenRoad (journal: AgentJournal) (record: ManagerJobProjection) =
+        let projection = AgentJournal.snapshot journal
+
+        relayView projection record |> Result.requireSome "Relay Road is not open"
+
+    let requireCommittedRetirement (road: RoadView) =
+        road.LatestRetirement
+        |> Result.requireSome "Successor requires a committed predecessor retirement"
+
+    let buildSuccessorTransaction
+        (retirementId: RetirementId)
+        (incumbent: IncumbencyId)
+        (snapshot: WorkspaceSnapshotId)
+        (authority: AuthorityRevision)
+        reason
+        =
+        RelayTransaction.create
+            [ RelayEvent.SuccessorRequested(retirementId, reason)
+              RelayEvent.SuccessorActivated(retirementId, incumbent, snapshot, authority) ]
+
+    let activateSuccessorIfAbsent
+        (journal: AgentJournal)
+        (record: ManagerJobProjection)
+        (road: RoadView)
+        (retirement: RetirementSummary)
+        (incumbent: IncumbencyId)
         (worktree: WorktreePath)
         reason
+        : Task<Result<unit, string>> =
+        if road.ActiveIncumbency.IsSome then
+            Task.FromResult(Ok())
+        else
+            taskResult {
+                let snapshot = WorkspaceSnapshot.capture (WorktreePath.value worktree)
+
+                let! transaction =
+                    buildSuccessorTransaction retirement.Id incumbent snapshot road.AuthorityRevision reason
+
+                let! _ = appendRelayResult journal record transaction
+                return ()
+            }
+
+    let deliverActivatedSuccessor
+        (record: ManagerJobProjection)
+        (retirement: RetirementSummary)
+        (incumbent: IncumbencyId)
         : Task<Result<IncumbencyId, string>> =
-        task {
-            match deps.Journal, requireJobRecord jobId with
-            | None, _ -> return Error "Successor activation requires a durable journal"
-            | _, Error error -> return Error error
-            | Some journal, Ok record ->
-                let projection = AgentJournal.snapshot journal
+        taskResult {
+            let! _ = sendSuccessor record retirement
+            return incumbent
+        }
 
-                match relayView projection record with
-                | None -> return Error "Relay Road is not open"
-                | Some road ->
-                    match road.LatestRetirement with
-                    | None -> return Error "Successor requires a committed predecessor retirement"
-                    | Some retirement ->
-                        let incumbent =
-                            road.ActiveIncumbency |> Option.defaultValue (deterministicSuccessor retirement.Id)
+    let requestSuccessor (jobId: ManagerJobId) (worktree: WorktreePath) reason : Task<Result<IncumbencyId, string>> =
+        taskResult {
+            let! journal, record =
+                requireJournalAndJob deps.Journal jobId "Successor activation requires a durable journal"
 
-                        if road.ActiveIncumbency.IsNone then
-                            let snapshot = WorkspaceSnapshot.capture (WorktreePath.value worktree)
-                            let authority = road.AuthorityRevision
+            let! road = requireOpenRoad journal record
+            let! retirement = requireCommittedRetirement road
 
-                            match
-                                RelayTransaction.create
-                                    [ RelayEvent.SuccessorRequested(retirement.Id, reason)
-                                      RelayEvent.SuccessorActivated(retirement.Id, incumbent, snapshot, authority) ]
-                            with
-                            | Error error -> return Error error
-                            | Ok transaction ->
-                                match! appendRelay journal record transaction with
-                                | Error failure -> return Error(JournalAppendFailure.describe failure)
-                                | Ok _ -> ()
+            let incumbent =
+                road.ActiveIncumbency
+                |> Option.defaultValue (deterministicSuccessor retirement.Id)
 
-                        match! sendSuccessor record retirement with
-                        | Error error -> return Error error
-                        | Ok _ -> return Ok incumbent
+            do! activateSuccessorIfAbsent journal record road retirement incumbent worktree reason
+            return! deliverActivatedSuccessor record retirement incumbent
         }
 
     let finalizeRegisteredWorktree (agentId: string) =
@@ -319,8 +382,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let prepareCandidate (jobId: ManagerJobId) : Task<Result<CommitHash, string>> =
         taskResult {
             let! record = requireJobRecord jobId
-            do! finalizeRegisteredWorktree (managerAgentId jobId) |> TaskResultCE.ofTask
-            return! gitPort.ReadHead record.WorktreePath |> TaskResultCE.ofTask
+            do! finalizeRegisteredWorktree (managerAgentId jobId)
+            return! gitPort.ReadHead record.WorktreePath
         }
 
     let terminateRoadResources (jobId: ManagerJobId) : Task<unit> =
@@ -374,12 +437,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let recoverJobsIfPresent (value: Orchestrator) =
         match deps.Journal with
         | Some journal ->
-            OrchestratorManagerJob.recoverJobs
-                journal
-                orchestratorId
-                worktrees
-                deps.RegisterChildDirectory
-                value
+            OrchestratorManagerJob.recoverJobs journal orchestratorId worktrees deps.RegisterChildDirectory value
         | None -> task { return () }
 
     let mapSweepError (pending: Task<Result<unit, string>>) : Task<Result<unit, string>> =
@@ -473,6 +531,28 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             DelegatedToolEstimateLedger.replace journal record.ManagerSessionId expected
         | _ -> task { return () }
 
+    let authorityRevisionFor
+        (record: ManagerJobProjection)
+        (callerProviderRun: ProviderRunIdentity)
+        (callerToolCallId: ToolCallId)
+        (prompt: string)
+        =
+        String.concat
+            "\n"
+            [ "relay-authority-revision-v1"
+              RoadId.value (roadIdOf record)
+              ProviderRunIdentity.value callerProviderRun
+              ToolCallId.value callerToolCallId
+              HostDigest.sha256Hex prompt ]
+        |> HostDigest.sha256Hex
+        |> fun digest -> AuthorityRevision.create ("authority-revision:" + digest)
+
+    let tryEnterAuthorityUpdate (jobId: ManagerJobId) =
+        lock authorityUpdateGate (fun () -> authorityUpdatesInFlight.Add(ManagerJobId.value jobId))
+
+    let leaveAuthorityUpdate (jobId: ManagerJobId) =
+        lock authorityUpdateGate (fun () -> authorityUpdatesInFlight.Remove(ManagerJobId.value jobId) |> ignore)
+
     let joinPublishedBatchOnce
         (maxCount: int)
         (interrupt: Task<JoinInterruptReason>)
@@ -484,6 +564,86 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 return outcome
             finally
                 lock joinGate (fun () -> joinInFlight <- false)
+        }
+
+    let requireActiveWorkOwnedIncumbent (road: RoadView) : Result<IncumbencyId, string> =
+        match road.ActiveIncumbency, road.ActivePhase with
+        | Some active, Some IncumbencyPhase.WorkOwned -> Ok active
+        | Some _, Some phase -> Error(sprintf "Relay incumbency cannot take new charge in phase %A" phase)
+        | _ -> Error "Relay Road has no active incumbent"
+
+    let advanceAuthorityRevision
+        (journal: AgentJournal)
+        (record: ManagerJobProjection)
+        (road: RoadView)
+        (incumbent: IncumbencyId)
+        (nextRevision: AuthorityRevision)
+        (prompt: string)
+        (callerProviderRun: ProviderRunIdentity)
+        : Task<Result<string, string>> =
+        taskResult {
+            let expectedRevision = road.AuthorityRevision
+            let! snapshot = captureSnapshot record.ManagerJobId
+            let gateKind = "relay-authority-update:" + AuthorityRevision.value nextRevision
+
+            let! physicalAuthorityMessage =
+                HostSessionNudge.trySendGateContinuationPhysical
+                    deps.Sessions
+                    record.ManagerSessionId
+                    prompt
+                    PromptAuthority.ContinuationKind.ManagedDelegationAssignment
+                    (Some(WorktreePath.value record.WorktreePath))
+                    (Some journal)
+                    gateKind
+                    callerProviderRun
+
+            let! transaction =
+                RelayTransaction.create
+                    [ RelayEvent.AuthorityRevisionAdvanced(
+                          incumbent,
+                          expectedRevision,
+                          nextRevision,
+                          physicalAuthorityMessage,
+                          snapshot
+                      ) ]
+
+            let! _ = appendRelayResult journal record transaction
+            return WorktreePath.value record.WorktreePath
+        }
+
+    let continueManagerJobCore
+        (jobId: ManagerJobId)
+        (prompt: string)
+        (callerProviderRun: ProviderRunIdentity)
+        (callerToolCallId: ToolCallId)
+        (expectedToolCalls: int option)
+        : Task<Result<string, string>> =
+        taskResult {
+            do! replaceEstimateIfPresent jobId expectedToolCalls |> TaskResultCE.ofTask
+            let! record = requireJobRecord jobId
+
+            let! journal =
+                deps.Journal
+                |> Result.requireSome "Relay authority update requires a durable journal"
+
+            let! road = requireOpenRoad journal record
+
+            let nextRevision =
+                authorityRevisionFor record callerProviderRun callerToolCallId prompt
+
+            if List.contains nextRevision road.AuthorityRevisions then
+                return WorktreePath.value record.WorktreePath
+            else
+                let! incumbent = requireActiveWorkOwnedIncumbent road
+                return! advanceAuthorityRevision journal record road incumbent nextRevision prompt callerProviderRun
+        }
+
+    let runAuthorityUpdate (jobId: ManagerJobId) (action: unit -> Task<Result<string, string>>) =
+        task {
+            try
+                return! action ()
+            finally
+                leaveAuthorityUpdate jobId
         }
 
     member _.ForkManagerJob
@@ -519,17 +679,23 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
         CausalAwait.awaitTask CausalWaitHub.observer descriptor pending
 
-    /// GLORY-068: `commission(existing_job_id, charge)` — continue the SAME
-    /// Manager job (same worktree, same session) with an appended requirement.
+    /// Same-road charge update. The physical Session/worktree stay stable, but
+    /// the requirement is a new durable Relay AuthorityRevision. Exact tool
+    /// replay reuses the same gate occasion and therefore the same physical
+    /// authority message; it never creates a second revision.
     member _.ContinueManagerJob
-        (jobId: ManagerJobId, prompt: string, ?expectedToolCalls: int)
-        : Task<Result<string, string>> =
-        taskResult {
-            do! replaceEstimateIfPresent jobId expectedToolCalls |> TaskResultCE.ofTask
-            let! engine = engine ()
-            let! path = engine.ContinueManager(jobId, prompt)
-            return WorktreePath.value path
-        }
+        (
+            jobId: ManagerJobId,
+            prompt: string,
+            callerProviderRun: ProviderRunIdentity,
+            callerToolCallId: ToolCallId,
+            ?expectedToolCalls: int
+        ) : Task<Result<string, string>> =
+        if not (tryEnterAuthorityUpdate jobId) then
+            Task.FromResult(Error "Relay authority update is already in flight for this Road")
+        else
+            runAuthorityUpdate jobId (fun () ->
+                continueManagerJobCore jobId prompt callerProviderRun callerToolCallId expectedToolCalls)
 
     /// EXEC-019: FIFO batch + local interrupt (JoinTool renders wire).
     member _.JoinPublishedAvailable

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
-test('WHAT[ASSESS-005] WHAT[ASSESS-006] all-ten assessment creates an exact-bound certificate and permanently removes work/review phase', () => {
+test('WHAT[ASSESS-005] all-ten assessment creates an exact-bound certificate and downgrades the phase', () => {
   const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1', 'ExistingWorld')
   const assessed = relay.assess(
     opened.state,
@@ -21,6 +21,20 @@ test('WHAT[ASSESS-005] WHAT[ASSESS-006] all-ten assessment creates an exact-boun
     authorityRevision: 'authority-1',
     valid: true,
   })
+})
+
+test('WHAT[ASSESS-006] assessed incumbency cannot submit a second review after work begins', () => {
+  const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1', 'ExistingWorld')
+  const assessed = relay.assess(
+    opened.state,
+    'road-1',
+    'inc-1',
+    'assessment-1',
+    'snapshot-1',
+    'authority-1',
+    ...Array(8).fill(10),
+  )
+  assert.equal(assessed.ok, true)
   assert.deepEqual(
     relay.assess(
       assessed.state,

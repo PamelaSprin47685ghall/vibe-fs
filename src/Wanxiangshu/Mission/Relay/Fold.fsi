@@ -1,9 +1,13 @@
 namespace Wanxiangshu.Mission.Relay
 
+open Wanxiangshu.Foundation.Identity
+
 type RelayState
 
 type RoadView =
     { AuthorityRevision: AuthorityRevision
+      AuthorityRevisions: AuthorityRevision list
+      AuthorityMessageIds: PhysicalUserMessageId list
       ActiveIncumbency: IncumbencyId option
       ActivePhase: IncumbencyPhase option
       ActiveSource: BatonSource option
@@ -40,6 +44,16 @@ module Decision =
         snapshotId: WorkspaceSnapshotId ->
         authorityRevision: AuthorityRevision ->
         scores: ScoreVector ->
+        Result<RelayState, string>
+
+    val advanceAuthority:
+        state: RelayState ->
+        roadId: RoadId ->
+        incumbentId: IncumbencyId ->
+        expected: AuthorityRevision ->
+        next: AuthorityRevision ->
+        authorityMessageId: PhysicalUserMessageId ->
+        snapshotId: WorkspaceSnapshotId ->
         Result<RelayState, string>
 
     val invalidateCertificate: state: RelayState -> roadId: RoadId -> reason: string -> Result<RelayState, string>

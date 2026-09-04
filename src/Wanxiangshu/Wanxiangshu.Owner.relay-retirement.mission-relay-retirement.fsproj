@@ -2,7 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSemanticOwner>relay-retirement</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-relay-retirement</WanxiangshuOwnerLocality>
-    <WanxiangshuOwnerLocalityKind>domain</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Mission/Relay/Retirement/Surface.fsi"/>

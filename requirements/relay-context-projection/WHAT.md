@@ -28,3 +28,7 @@ Baton 只能由 durable facts 机器生成，相同 facts 产生 byte-for-byte �
 
 已 committed retirement/cut 在 Host crash 后仍是 provider projection 的下界。迟到旧 ProviderRunIdentity parts 只能进入 audit 或 stale diagnostics，不能进入 successor context。
 
+## PROJ-008: authority message chain 跨 cut 保留，普通前任消息不借机穿透
+
+初始 root authority message 与之后每个 durable accepted `AuthorityRevision` 对应的物理 authority message 都是 Road 的权威输入，successor projection 必须按 typed message identity 保留它们，即使它们位于 predecessor cut 之前。除此之外的 predecessor user/assistant/tool/nudge 原始消息仍必须被 cut；不得为了保留追加要求而放宽成“保留所有 user message”或文本匹配例外。
+
