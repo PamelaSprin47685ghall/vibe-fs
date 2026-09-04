@@ -2640,7 +2640,6 @@
         "Wanxiangshu.Change.Host.OrchestratorHostDeps.OnRunStarted",
         "Wanxiangshu.Change.Host.OrchestratorHostDeps.ParentWorkRecordFor",
         "Wanxiangshu.Change.Host.OrchestratorHostDeps.RegisterChildDirectory",
-        "Wanxiangshu.Change.Host.OrchestratorHostDeps.RegisterReviewerTree",
         "Wanxiangshu.Change.Host.OrchestratorHostDeps.RepoPath",
         "Wanxiangshu.Change.Host.OrchestratorHostDeps.SessionSnapshot",
         "Wanxiangshu.Change.Host.OrchestratorHostDeps.Sessions",
@@ -2946,14 +2945,12 @@
         "provider-attempt-recovery"
       ],
       "symbols": [
-        "Wanxiangshu.Composition.Durable.ProjectionUpdate.bindTerminalFrontier",
         "Wanxiangshu.Composition.Durable.ProjectionUpdate.prefixOutcome",
         "Wanxiangshu.Composition.Durable.ProjectionUpdate.retireAuxiliaryInjectionVisibility",
         "Wanxiangshu.Composition.Durable.ProjectionUpdate.tryUpdateBlog",
         "Wanxiangshu.Composition.Durable.ProjectionUpdate.updateAuthority",
         "Wanxiangshu.Composition.Durable.ProjectionUpdate.updateCompanion",
         "Wanxiangshu.Composition.Durable.ProjectionUpdate.updateOrchestrator",
-        "Wanxiangshu.Composition.Durable.ProjectionUpdate.updateRequirements",
         "Wanxiangshu.Composition.Durable.ProjectionUpdate.updateSession"
       ],
       "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
@@ -4384,7 +4381,6 @@
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.EvidenceKind",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.FrozenRecordPrefixDigest",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.FrozenRecordPrefixRef",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.ManagerLifeId",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.NextEpochId",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.PreviousEpochId",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.ProviderPrefixDigest",
@@ -4396,7 +4392,6 @@
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.YBundleRef",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted.InputDigest",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted.ManagerLifeId",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted.OutputDigest",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted.PhysicalSuccessEvidence",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted.PreparedFactRef",
@@ -4406,7 +4401,6 @@
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.BaseTodoDigest",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.BaseTodoRef",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.ManagerLifeId",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.ManagerSessionId",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.PlanCompleteDeclared",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.ProposedTodoDigest",
@@ -4468,7 +4462,6 @@
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjectionHandle",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjectionSurface.create",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjectionSurface.fold",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjectionSurface.lifeView",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjectionSurface.view"
       ],
       "justification": "MagicTodo.Surface publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
@@ -4533,9 +4526,7 @@
       "symbols": [
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.CheckpointRecord.ProposedTodoDigest",
         "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.LifeMagicTodoState.Checkpoints",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.MagicTodoProjectionState.ByLife",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.isPlanCommitted",
-        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.tryLife"
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.isPlanCommitted"
       ],
       "justification": "Obligation.LedgerContract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
     },
@@ -5032,15 +5023,12 @@
         "Wanxiangshu.OpenCode.ToolRuntimeScope.EnsureRoleFor",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.EventPort",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.ExecutorRuntimeFor",
-        "Wanxiangshu.OpenCode.ToolRuntimeScope.FinalityReviewerTimeoutMs",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.HasLivePty",
-        "Wanxiangshu.OpenCode.ToolRuntimeScope.HasVerdictSubmitted",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.IsRole",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.JoinAttempts",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.Journal",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.LogicalOwnerFor",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.ManagedAgentFor",
-        "Wanxiangshu.OpenCode.ToolRuntimeScope.MarkVerdictSubmitted",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.OrchestratorHostFor",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.ParentWorkRecordFor",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.ProcessHardLimit",
@@ -5054,10 +5042,8 @@
         "Wanxiangshu.OpenCode.ToolRuntimeScope.SessionParents",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.Sessions",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.Snapshot",
-        "Wanxiangshu.OpenCode.ToolRuntimeScope.TreePortFor",
         "Wanxiangshu.OpenCode.ToolRuntimeScope.WorkspaceDirectory",
-        "eventPort",
-        "finalityReviewerTimeoutMs"
+        "eventPort"
       ],
       "justification": "Session.Lifecycle publishes exactly these symbols to the listed owners; every unlisted sibling remains private to managed-session-lifecycle."
     },
@@ -5892,7 +5878,6 @@
         "Wanxiangshu.Persistence.Journal.AgentJournalModule.createFromProjection",
         "Wanxiangshu.Persistence.Journal.AgentJournalModule.handleProjection",
         "Wanxiangshu.Persistence.Journal.AgentJournalModule.isPoisoned",
-        "Wanxiangshu.Persistence.Journal.AgentJournalModule.pendingReviewRequirements",
         "Wanxiangshu.Persistence.Journal.AgentJournalModule.revision",
         "Wanxiangshu.Persistence.Journal.AgentJournalModule.runtimeId",
         "Wanxiangshu.Persistence.Journal.AgentJournalModule.snapshot",
@@ -6304,17 +6289,14 @@
         "Wanxiangshu.Strength.StrengthOpportunity.CostModelAvailable",
         "Wanxiangshu.Strength.StrengthOpportunity.EffectiveAgent",
         "Wanxiangshu.Strength.StrengthOpportunity.EventStoreHealthy",
-        "Wanxiangshu.Strength.StrengthOpportunity.FastPeerAvailable",
         "Wanxiangshu.Strength.StrengthOpportunity.HasPrefixProbe",
         "Wanxiangshu.Strength.StrengthOpportunity.HostCanaryHealthy",
         "Wanxiangshu.Strength.StrengthOpportunity.IsAttachedOrInternalLeaf",
         "Wanxiangshu.Strength.StrengthOpportunity.IsFallbackRetry",
-        "Wanxiangshu.Strength.StrengthOpportunity.IsReviewerOrFinality",
         "Wanxiangshu.Strength.StrengthOpportunity.IsRootWork",
         "Wanxiangshu.Strength.StrengthOpportunity.OwnerCancelled",
         "Wanxiangshu.Strength.StrengthOpportunity.RequestKind",
         "Wanxiangshu.Strength.StrengthOpportunity.SelectedAgent",
-        "Wanxiangshu.Strength.StrengthOpportunity.SelectedTier",
         "Wanxiangshu.Strength.StrengthOpportunity.TargetProviderRunBound",
         "Wanxiangshu.Strength.StrengthPolicy.controlBucket",
         "Wanxiangshu.Strength.StrengthPolicy.decideFromFacts",
@@ -6729,7 +6711,6 @@
         "Wanxiangshu.Foundation.ToolPermission.Horizon",
         "Wanxiangshu.Foundation.ToolPermission.Inspect",
         "Wanxiangshu.Foundation.ToolPermission.Join",
-        "Wanxiangshu.Foundation.ToolPermission.Judge",
         "Wanxiangshu.Foundation.ToolPermission.Move",
         "Wanxiangshu.Foundation.ToolPermission.Network",
         "Wanxiangshu.Foundation.ToolPermission.Pty",
@@ -6923,8 +6904,7 @@
         "Wanxiangshu.Interaction.Dispatch.RuntimeNudge.BackgroundJoin",
         "Wanxiangshu.Interaction.Dispatch.RuntimeNudge.InteractionContinue",
         "Wanxiangshu.Interaction.Dispatch.RuntimeNudge.MissingClosingReport",
-        "Wanxiangshu.Interaction.Dispatch.RuntimeNudge.ProviderRetry",
-        "Wanxiangshu.Interaction.Dispatch.RuntimeNudge.ReviewerVerdictRequired"
+        "Wanxiangshu.Interaction.Dispatch.RuntimeNudge.ProviderRetry"
       ],
       "justification": "PromptDispatch.RuntimeNudge publishes exactly the compiler-observed symbols required by the listed production owners; every unlisted sibling remains private to dispatch-protocol."
     },
@@ -7363,7 +7343,6 @@
         "Wanxiangshu.Foundation.Identity.FallbackAttemptIdentity.ProviderRun",
         "Wanxiangshu.Foundation.Identity.FallbackAttemptIdentity.SessionId",
         "Wanxiangshu.Foundation.Identity.FallbackAttemptIdentityModule.dedupeKey",
-        "Wanxiangshu.Foundation.Identity.FinalityRequestId",
         "Wanxiangshu.Foundation.Identity.FinalityRequestIdModule.create",
         "Wanxiangshu.Foundation.Identity.FinalityRequestIdModule.value",
         "Wanxiangshu.Foundation.Identity.FrameEpochId",
@@ -7400,9 +7379,6 @@
         "Wanxiangshu.Foundation.Identity.ManagerJobId",
         "Wanxiangshu.Foundation.Identity.ManagerJobIdModule.create",
         "Wanxiangshu.Foundation.Identity.ManagerJobIdModule.value",
-        "Wanxiangshu.Foundation.Identity.ManagerLifeId",
-        "Wanxiangshu.Foundation.Identity.ManagerLifeIdModule.create",
-        "Wanxiangshu.Foundation.Identity.ManagerLifeIdModule.value",
         "Wanxiangshu.Foundation.Identity.PhysicalUserMessageId",
         "Wanxiangshu.Foundation.Identity.PhysicalUserMessageIdModule.create",
         "Wanxiangshu.Foundation.Identity.PhysicalUserMessageIdModule.isNonBlank",
@@ -7423,17 +7399,8 @@
         "Wanxiangshu.Foundation.Identity.ProviderRunIdentityModule.create",
         "Wanxiangshu.Foundation.Identity.ProviderRunIdentityModule.value",
         "Wanxiangshu.Foundation.Identity.PtyHandleIdModule.create",
-        "Wanxiangshu.Foundation.Identity.ReviewAttemptIdentity",
         "Wanxiangshu.Foundation.Identity.ReviewAttemptIdentity.GitTreeHash",
         "Wanxiangshu.Foundation.Identity.ReviewAttemptIdentity.ProviderRun",
-        "Wanxiangshu.Foundation.Identity.ReviewAttemptIdentity.ReviewBarrierId",
-        "Wanxiangshu.Foundation.Identity.ReviewAttemptIdentity.ReviewerSessionId",
-        "Wanxiangshu.Foundation.Identity.ReviewAttemptIdentity.ToolCallId",
-        "Wanxiangshu.Foundation.Identity.ReviewAttemptIdentityModule.dedupeKey",
-        "Wanxiangshu.Foundation.Identity.ReviewAttemptIdentityModule.isDistinctAttempt",
-        "Wanxiangshu.Foundation.Identity.ReviewBarrierId",
-        "Wanxiangshu.Foundation.Identity.ReviewBarrierIdModule.create",
-        "Wanxiangshu.Foundation.Identity.ReviewBarrierIdModule.value",
         "Wanxiangshu.Foundation.Identity.RuntimeId",
         "Wanxiangshu.Foundation.Identity.RuntimeIdModule.create",
         "Wanxiangshu.Foundation.Identity.RuntimeIdModule.value",
@@ -7696,7 +7663,6 @@
         "Wanxiangshu.Resources.PromptCatalog.InspectorSystemPrompt",
         "Wanxiangshu.Resources.PromptCatalog.ManagerSystemPrompt",
         "Wanxiangshu.Resources.PromptCatalog.OrchestratorSystemPrompt",
-        "Wanxiangshu.Resources.PromptCatalog.ReviewerSystemPrompt",
         "Wanxiangshu.Resources.PromptResources.loadBookkeeperSystem"
       ],
       "justification": "cognitive-environment.Contract publishes exactly these symbols to 'capability-enforcement'; every unlisted sibling remains private to cognitive-environment."
@@ -7721,7 +7687,6 @@
         "Wanxiangshu.Resources.PromptCatalog.InspectorSystemPrompt",
         "Wanxiangshu.Resources.PromptCatalog.ManagerSystemPrompt",
         "Wanxiangshu.Resources.PromptCatalog.OrchestratorSystemPrompt",
-        "Wanxiangshu.Resources.PromptCatalog.ReviewerSystemPrompt",
         "Wanxiangshu.Resources.PromptResources.instructionTextsForRole",
         "Wanxiangshu.Resources.PromptResources.loadBookkeeperSystemFor",
         "Wanxiangshu.Resources.PromptResources.systemForRole"
@@ -7791,8 +7756,7 @@
         "Wanxiangshu.Resources.PromptCatalog.InquirySystemPrompt",
         "Wanxiangshu.Resources.PromptCatalog.InspectorSystemPrompt",
         "Wanxiangshu.Resources.PromptCatalog.ManagerSystemPrompt",
-        "Wanxiangshu.Resources.PromptCatalog.OrchestratorSystemPrompt",
-        "Wanxiangshu.Resources.PromptCatalog.ReviewerSystemPrompt"
+        "Wanxiangshu.Resources.PromptCatalog.OrchestratorSystemPrompt"
       ],
       "justification": "cognitive-environment.Contract publishes exactly these symbols to 'speculative-investigation'; every unlisted sibling remains private to cognitive-environment."
     },
@@ -10708,7 +10672,6 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.LogicalRunId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.PeerAgent",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedTier",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SessionId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.ActiveLogicalRun",
@@ -10775,8 +10738,6 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.gateNudgePayloadDigest",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedOwner",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.idleAlreadyAdmitted",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.idlePayloadDigest",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.nextClaimSequence",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.originLabel",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.repairAlreadyClaimed",
@@ -10923,7 +10884,6 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.IdentitySeed",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.PeerAgent",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedTier",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.PendingClaims",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.IdentitySeed",
@@ -11143,7 +11103,6 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityRootUserMessageId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedTier",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.ActiveLogicalRun",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.issueInheritedIdentitySeed",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.systemPromptIdFor",
@@ -11188,8 +11147,7 @@
         "change-integration"
       ],
       "symbols": [
-        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ManagedDelegationAssignment",
-        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ReviewerGuard"
+        "Wanxiangshu.Interaction.Authority.PromptContinuationKind.ManagedDelegationAssignment"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'change-integration'; every unlisted sibling remains private to interaction-authority."
     },
@@ -16731,8 +16689,7 @@
         "onRunStarted",
         "ownership",
         "parentWorkRecordFor",
-        "sessionSnapshot",
-        "treeHashFor"
+        "sessionSnapshot"
       ],
       "justification": "delegation.Contract publishes exactly these symbols to 'managed-session-lifecycle'; every unlisted sibling remains private to delegation."
     },
@@ -17365,7 +17322,6 @@
       ],
       "symbols": [
         "Wanxiangshu.Execution.Delegation.SyncDelegate.SyncDelegateRuntime",
-        "Wanxiangshu.Execution.Delegation.SyncDelegate.SyncDelegateTier.fromDispatcher",
         "onInspectorAnswer",
         "onInspectorCleanup",
         "onInspectorPrompt",

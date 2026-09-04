@@ -44,7 +44,6 @@ const preparedFact = ({
 } = {}) => fact('TodoWritePrepared', {
   ManagerSessionId: managerSessionId,
   IncumbencyId: incumbencyId,
-  ManagerLifeId: managerLifeId,
   TodoWriteId: todoWriteId,
   ToolCallId: toolCallId,
   ToolPartOrdinal: toolPartOrdinal,
@@ -70,7 +69,6 @@ const acceptedFact = ({
   semanticVersion = 'magic-v1',
 } = {}) => fact('TodoWriteAccepted', {
   IncumbencyId: incumbencyId,
-  ManagerLifeId: managerLifeId,
   TodoWriteId: todoWriteId,
   ToolCallId: toolCallId,
   PreparedFactRef: preparedFactRef,
@@ -152,7 +150,6 @@ test('WHAT[OBLIGATION-LEDGER-019] rejects a legacy seed after the first Magic pr
   const legacySeed = fact('LegacyTodoSeedAdopted', {
     ManagerSessionId: managerSession,
     IncumbencyId: life,
-    ManagerLifeId: life,
     SeedTodoRef: 'legacy-list',
     SeedTodoDigest: 'legacy-digest',
   })

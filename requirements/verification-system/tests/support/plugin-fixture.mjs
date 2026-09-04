@@ -451,7 +451,6 @@ export const acceptFirstTodoWrite = async (runtime, sessionId) => {
     JSON.stringify({
       case: 'TodoWritePrepared',
       ManagerSessionId: sessionId,
-      ManagerLifeId: lifeId,
       TodoWriteId: writeId,
       ToolCallId: callId,
       ToolPartOrdinal: 0,
@@ -474,7 +473,6 @@ export const acceptFirstTodoWrite = async (runtime, sessionId) => {
     null,
     JSON.stringify({
       case: 'TodoWriteAccepted',
-      ManagerLifeId: lifeId,
       TodoWriteId: writeId,
       ToolCallId: callId,
       PreparedFactRef: prepared.eventId,

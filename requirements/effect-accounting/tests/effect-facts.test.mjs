@@ -27,7 +27,7 @@ const requested = { kind: 'WorktreeCreateRequested', payload: { jobId: JOB, work
 const created = { kind: 'WorktreeCreated', payload: { jobId: JOB, worktreeIdentity: WT, worktreePath: WT_PATH } }
 const rebased = {
   kind: 'RebasedCandidateReady',
-  payload: { jobId: JOB, rebasedCommit: 'r1', targetHeadSnapshot: 'h1', postRebaseReviewBarrierId: 'bar_2' },
+  payload: { jobId: JOB, rebasedCommit: 'r1', targetHeadSnapshot: 'h1', workspaceSnapshotId: 'snap_2' },
 }
 const claimed = { kind: 'PublishClaimed', payload: { jobId: JOB, expectedHead: 'h1' } }
 
