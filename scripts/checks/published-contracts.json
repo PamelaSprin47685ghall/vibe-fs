@@ -951,7 +951,12 @@
     {
       "path": "src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs",
       "owner": "host-boundary",
-      "justification": "Signed JS-native boundary for HOST-BOUNDARY-010 / HOST-012 shared cross-instance state; the physical Map/Set/atom singletons in SharedState remain signature-hidden and only narrow put/get/clear/root operations cross the edge."
+      "justification": "Signed JS-native boundary for HOST-BOUNDARY-010 / HOST-012 / HOST-BOUNDARY-031 process-local Host resources; the physical SharedState collections and RootWorkspace runtime cell remain signature-hidden behind their typed capabilities."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/RootWorkspaceRuntime.fs",
+      "owner": "host-boundary",
+      "justification": "Signed process-local implementation of the RootWorkspace first-bind capability; the private cell has no setter, clear, Git discovery or foreign consumer surface."
     },
     {
       "path": "src/Wanxiangshu/Repository/Knowledge/Casebook/SessionDraft.fs",
@@ -2344,6 +2349,16 @@
       "owner": "causal-wait",
       "locality": "execution-session-wait-proof-surface",
       "justification": "The JS proof Surface composes owner capabilities for verification and has no production consumer."
+    },
+    {
+      "owner": "host-boundary",
+      "locality": "host-root-workspace-contract",
+      "justification": "RootWorkspace first-bind and read capability types plus the pure live-directory selector form a zero-dependency Host contract."
+    },
+    {
+      "owner": "host-boundary",
+      "locality": "host-root-workspace-runtime",
+      "justification": "The process-local first-bind cell is private to this Host runtime and only exposes the contract binder and reader capabilities."
     },
     {
       "owner": "obligation-ledger",
@@ -4266,46 +4281,11 @@
         "Wanxiangshu.Execution.Session.Wait.DiagnosticWait",
         "Wanxiangshu.Execution.Session.Wait.DiagnosticWaitModule.create",
         "Wanxiangshu.Execution.Session.Wait.IWaitObserver",
-        "Wanxiangshu.Execution.Session.Wait.WaitEscape",
-        "Wanxiangshu.Execution.Session.Wait.WaitEscape.CancelledBy",
-        "Wanxiangshu.Execution.Session.Wait.WaitEscape.DeadlineAt",
-        "Wanxiangshu.Execution.Session.Wait.WaitEscape.OpenEndedExternal",
-        "Wanxiangshu.Execution.Session.Wait.WaitEscape.ProcessLifetime",
-        "Wanxiangshu.Execution.Session.Wait.WaitEscape.SessionLifetime"
-      ],
-      "justification": "Session.Quiescence publishes exactly these symbols to the listed owners; every unlisted sibling remains private to causal-wait."
-    },
-    {
-      "path": "src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs",
-      "owner": "causal-wait",
-      "node": "execution-quiescence",
-      "contract": "Session.Quiescence",
-      "kind": "published-contract",
-      "consumers": [
-        "change-integration",
-        "delegation",
-        "host-boundary",
-        "managed-session-lifecycle"
-      ],
-      "symbols": [
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.Cancel",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.DrainAgentWakes",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.DrainPtyCompletions",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.IsCancelled",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PendingCount",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PendingPtyCount",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PublishPtyCompletion",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PulseAgentHandle",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PulseWake",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.WaitForSignal",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.WaitForWake",
         "Wanxiangshu.Execution.Session.Wait.JoinBatch.Max",
         "Wanxiangshu.Execution.Session.Wait.JoinBatch.MaxJoinBatch",
         "Wanxiangshu.Execution.Session.Wait.JoinInterrupt",
         "Wanxiangshu.Execution.Session.Wait.JoinInterrupt.Signal",
         "Wanxiangshu.Execution.Session.Wait.JoinInterrupt.Wait",
-        "Wanxiangshu.Execution.Session.Wait.JoinInterruptModule.create",
         "Wanxiangshu.Execution.Session.Wait.JoinInterruptReason",
         "Wanxiangshu.Execution.Session.Wait.JoinInterruptReason.DeadlineExpired",
         "Wanxiangshu.Execution.Session.Wait.JoinInterruptReason.OperatorAbort",
@@ -4320,7 +4300,34 @@
         "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch.ofHeadTail",
         "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch.toList",
         "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch.tryOfList",
-        "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch`1"
+        "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch`1",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.CancelledBy",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.DeadlineAt",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.OpenEndedExternal",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.ProcessLifetime",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.SessionLifetime"
+      ],
+      "symbol_roots": [
+        "Wanxiangshu.Execution.Session.Wait.ICompletionMailbox"
+      ],
+      "justification": "Session.Quiescence publishes exactly these symbols to the listed owners; every unlisted sibling remains private to causal-wait."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs",
+      "owner": "causal-wait",
+      "node": "execution-quiescence",
+      "contract": "Session.Quiescence",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "delegation",
+        "finality",
+        "host-boundary",
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailboxRuntime.create"
       ],
       "justification": "Session.Quiescence publishes exactly these symbols to the listed owners; every unlisted sibling remains private to causal-wait."
     },
@@ -5498,7 +5505,6 @@
         "Wanxiangshu.OpenCode.SharedState.BloggerFlights",
         "Wanxiangshu.OpenCode.SharedState.BloggerMaterializationAdmission",
         "Wanxiangshu.OpenCode.SharedState.ReviewGuardNudges",
-        "Wanxiangshu.OpenCode.SharedState.RootWorkspace",
         "Wanxiangshu.OpenCode.SharedState.SessionDirectories",
         "Wanxiangshu.OpenCode.SharedState.SessionParents",
         "Wanxiangshu.OpenCode.SharedState.VerdictSubmissions",
@@ -17088,6 +17094,32 @@
       "justification": "host-boundary.Contract publishes exactly these symbols to 'provider-language'; every unlisted sibling remains private to host-boundary."
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/RootWorkspace.fs",
+      "owner": "host-boundary",
+      "node": "host-root-workspace-effect-isolation",
+      "contract": "Host.RootWorkspace.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "delegation",
+        "dispatch-protocol",
+        "finality",
+        "interaction-authority",
+        "intra-participant-parallelism",
+        "managed-session-lifecycle",
+        "provider-attempt-recovery",
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.IRootWorkspaceBinder",
+        "Wanxiangshu.OpenCode.IRootWorkspaceBinder.TryBind",
+        "Wanxiangshu.OpenCode.IRootWorkspaceReader",
+        "Wanxiangshu.OpenCode.IRootWorkspaceReader.TryRead",
+        "Wanxiangshu.OpenCode.RootWorkspaceDirectory.select"
+      ],
+      "justification": "Host.RootWorkspace.Contract publishes only typed first-bind/read capabilities and the pure fallback selector; the process-local cell and acquisition remain runtime-private."
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Host/SessionContract.fs",
       "owner": "host-boundary",
       "node": "host-boundary-frontier-keep",
@@ -19615,12 +19647,6 @@
             "Wanxiangshu.OpenCode.PluginRuntimeScope.RunBackground",
             "Wanxiangshu.OpenCode.PluginRuntimeScope.Sessions",
             "Wanxiangshu.OpenCode.PluginRuntimeScope.Strength"
-          ]
-        },
-        {
-          "path": "src/Wanxiangshu/OpenCode/Host/SharedState.fs",
-          "symbols": [
-            "Wanxiangshu.OpenCode.SharedState.RootWorkspace"
           ]
         }
       ],

@@ -328,6 +328,7 @@ module HostEventCodec =
     let tryDecodeProviderStepEnd (rawInput: obj) : (SessionId * PhysicalUserMessageId * ProviderRunIdentity) option =
         let raw = HostEventEnvelope.unwrap rawInput
         let info = messageInfo raw
+
         let isMessageUpdated = not (isNull raw) && HostEventEnvelope.eventTypeOf raw = "message.updated"
 
         let sessionId =

@@ -1913,6 +1913,14 @@
       "owner": "session-ontology"
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/RootWorkspace.fs",
+      "owner": "host-boundary"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/RootWorkspaceRuntime.fs",
+      "owner": "host-boundary"
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Host/SharedState.fs",
       "owner": "review-assurance"
     },

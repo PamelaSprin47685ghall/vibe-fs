@@ -1059,6 +1059,10 @@
     <Compile Include="Execution/Session/Recovery/Surface.fs"/>
     <Compile Include="Execution/Delegation/Join.fsi"/>
     <Compile Include="Execution/Delegation/Join.fs"/>
+    <Compile Include="OpenCode/Host/RootWorkspace.fsi"/>
+    <Compile Include="OpenCode/Host/RootWorkspace.fs"/>
+    <Compile Include="OpenCode/Host/RootWorkspaceRuntime.fsi"/>
+    <Compile Include="OpenCode/Host/RootWorkspaceRuntime.fs"/>
     <Compile Include="OpenCode/Host/SharedState.fsi"/>
     <Compile Include="OpenCode/Host/SharedState.fs"/>
     <Compile Include="OpenCode/Host/SharedStateSurface.fsi"/>

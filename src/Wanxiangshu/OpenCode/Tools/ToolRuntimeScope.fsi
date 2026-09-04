@@ -26,6 +26,7 @@ type ToolRuntimeScope =
     new:
         sessions: ISessionHostPort *
         waitObserver: IWaitObserver *
+        rootWorkspace: IRootWorkspaceReader *
         journal: AgentJournal option *
         gitTreePort: GitTreePort option *
         workspaceDirectory: string option *
@@ -48,6 +49,7 @@ type ToolRuntimeScope =
     member FinalityReviewerTimeoutMs: int option
     member Sessions: ISessionHostPort
     member WaitObserver: IWaitObserver
+    member RootWorkspace: IRootWorkspaceReader
     member Journal: AgentJournal option
     member Snapshot: ISessionSnapshotPort option
     member EventPort: IEventObservationPort option

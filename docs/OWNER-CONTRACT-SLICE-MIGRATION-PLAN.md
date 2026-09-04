@@ -1631,3 +1631,27 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - 暂停边界：G4提交后不启动Fatal、Process/PTY、Delegation或B7-C1。恢复时先执行`git status --short --branch`、`git log -3 --oneline`与`node scripts/check.mjs`，确认工作树干净且HEAD为本checkpoint。
 - 下一实施节点为B7 RootWorkspace effect隔离：保持现有first-bind结果，把public mutable移入private Host runtime并注入最窄bind/read capability；该节点同时为Fatal partial-init exact acquisition token铺路。随后依次执行Fatal原子迁移、Process/PTY、Delegation G6/G7、B7 compiler-evidence分类、M6.3c staged audit与M6.4原子cutover。
 - release sink前另有五个非G4 Fantomas失败需要单独绿色节点收口：`Interaction/Authority/Child.fs`、`OpenCode/Host/LoopSensorSurface.fs`、`OpenCode/Host/HostSignalSurface.fs`、`OpenCode/Codec/HostEventCodec.fs`、`OpenCode/Codec/HostEventEnvelope.fs`。不得把格式修正混入G4语义提交。
+
+### 2026-09-04 — RootWorkspace节点完成记录
+
+- 暂停基线：分支`codex/m6-owner-slice-cutover`，已提交HEAD=`f116ae670`；本节以下RootWorkspace与G4补完仍未提交，`host-root-workspace-effect-isolation`保持`IN_PROGRESS`。禁止把当前状态称为release closure、PR-ready或RootWorkspace DONE。
+- RootWorkspace已从`SharedState.RootWorkspace`公开mutable迁入独立Host contract/runtime；composition取得唯一binder，其余Change、Finality、Delegation、Dispatch、Review、Tool与provider路径均显式传递`IRootWorkspaceReader`。production runtime与目录selector共同拒绝`None`、空串与纯空白；首次合法path原子绑定，后续候选不覆盖。旧Surface的任意set/clear删除，正式proof固定非法空白、first-bind、later redirect、无clear与显式目录优先。
+- 全量unit首次把G4 checkpoint未闭合的两个事实暴露出来：`delegation-sync-runtime`与`delegation-fork-runtime`在`f116ae670`被误标成composition。Sync的两个observed-await现由Host adapter注入；Join/Outcome/Wake/Batch纯词汇已从具体`CompletionMailbox`迁入wait contract；Fork runtime只消费注入的mailbox factory。DELEG-028/029保持原runtime语义，未修改或削弱测试。
+- 已完成验证：aggregate clean Fable build=1,518 sources/1,480 items；联合public-signature reverse impact=1,480 items；Root/Causal/DELEG/mailbox定向16/16；full unit=4,073/4,074，唯一失败为sandbox禁止loopback的`EPERM`，提升权限后真实OpenCode canary=2/2；wait contract/mailbox/sync/fork/recovery/host adapter及Dispatch proof adapter focused compile全绿。owner-projects、control-pyramid、authority、causal-wait、DSL、JS/test boundary、requirement trace、deadcode与P0 recovery gate在各自最新合法输入上全绿。
+- 第一次staged fresh report成功完成：193 localities、740 production sources、1,915 ProjectReferences、4,465 actual source edges、968,007 capability facts、512 JavaScript traversals、188,662 Unknown、0 extraction diagnostic，digest=`sha256:cbe3737159911238896d07310c8f84f541ae033c4d6b57bf2b0044a9697fa9f9`。RootWorkspace原唯一diagnostic已归零；14项finding为13条`missing-closure-edge`加1项Unknown汇总。
+- 相对G4 checkpoint的12条既有missing closure新增1条：`delegation-host-adapter`中的`HostForkRuntime`直接构造causal-wait `CompletionMailbox`，但项目只声明wait contract。直接补foreign runtime ProjectReference虽可focused compile，却被`owner-projects`正确拒绝为`foreign-runtime-reference/composition-only-runtime-binding`；该无效ref已撤回，gate未放宽。
+
+#### 恢复步骤
+
+1. 先运行`git status --short --branch`与`git diff --check`；预期HEAD仍为`f116ae670`，所有施工字节已暂存但无新commit。不要丢弃工作树或重做已完成迁移。
+2. 关闭唯一新增closure：让`HostForkRuntime`接收窄mailbox factory/capability，具体`CompletionMailbox`只在合法composition locality构造并注入。不得让delegation adapter直接引用foreign runtime，不得把Fork改回composition，不得复制mailbox状态机或新增owner-project豁免。先枚举并迁移5处`HostForkRuntime(...)`构造点，再以focused compile与DELEG-028/029证明边界。
+3. 精确stage全部最终输入，重新运行`node scripts/checks/locality-slice-report.mjs --write-fresh-worksheet`。验收必须是diagnostic=0、missing closure恢复为既有12条；任何新增项继续修复。由于本节文档与closure修复改变staged bytes，禁止复用上面的digest冒充最终report。
+4. fresh与全部非循环gate绿色后，才可把`host-root-workspace-effect-isolation`从`IN_PROGRESS`改为`DONE`并运行`node scripts/check.mjs`。随后建立G4 closure与RootWorkspace可回溯Git节点；若metadata文件交叠无法安全拆分，提交正文必须分别列出两条因果链。
+5. 单独收口五个既有Fantomas失败并建立format-only节点。再fetch/细粒度合并最新upstream，运行最终`npm run format-build-test`、diff审计、push与PR。PR创建后立即暂停，不启动Fatal、Process/PTY、Delegation G6/G7或B7-C1。
+
+#### 恢复后施工记录
+
+- 唯一新增closure已按mandatory injection关闭：pure wait contract新增泛型`ICompletionMailbox<'agent,'pty,'interrupt,'wake>`，只表达wake资源capability；具体Queue/TCS/cancel状态仍唯一留在`CompletionMailbox`。`CompletionMailboxRuntime.create`是唯一physical factory，Fork runtime仅保存绑定领域类型的alias。
+- `HostForkRuntime`删除concrete constructor与十一字段projection，factory改为必填构造参数。5处构造点由`git-integrationgate`、`mission-finality-prompt`、`opencode-host-pluginruntimescope`及proof-only`delegation-runtime-surface`四个composition locality显式注入；Finality补唯一缺失的exact ProjectReference。`delegation-host-adapter`与`delegation-fork-runtime`均不引用foreign mailbox runtime，DELEG-028/029继续保持runtime分类。
+- 永久inventory proof要求所有physical mailbox direct consumer均为composition，四个constructor locality声明exact provider，Host adapter与Fork runtime不得引用mailbox runtime。aggregate build为1,518 sources/1,480 items；wait contract、mailbox、Fork runtime、Host adapter与四个composition consumer focused compile全绿；Root/Causal/DELEG/mailbox/PTY定向25/25，owner-projects=193 localities/740 sources/1,916 refs/DAG，DSL、control-pyramid、causal-wait、authority、test/JS boundary与requirement trace全绿。
+- pre-DONE staged fresh report为193 localities、740 sources、1,916 refs、4,468 edges、967,993 facts、512 traversals、188,664 Unknown、0 diagnostic，digest=`sha256:2b545b76a70418ca1720f776857ccf5e7c35c48d7b6dbffce5fd37dd302fe18f`；missing closure从首次report的13回到既有12，证明新增foreign runtime edge已消失。RootWorkspace release node随后置`DONE`，`node scripts/check.mjs`全绿：316条规范、740 production files、791 contracts、193 localities、1,916 refs、824 WHAT/4,122 tests。最终文档与DONE metadata的fresh复验digest记录在Git commit正文，避免digest写回自身输入产生漂移。

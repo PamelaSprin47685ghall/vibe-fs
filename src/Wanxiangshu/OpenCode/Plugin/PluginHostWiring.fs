@@ -72,6 +72,7 @@ module PluginHostWiring =
           SharedTerminalPort: Events.HostEventPort option
           GitTreePort: Wanxiangshu.Mission.Review.GitTreePort option
           StrengthDurability: StrengthDurabilityPort option
+          RootWorkspace: IRootWorkspaceReader
           CausalWaitObserver: IWaitObserver }
 
     let create (boot: PluginBoot.Boot) : Task<Host> =
@@ -106,12 +107,12 @@ module PluginHostWiring =
                         | _ -> None
 
                     let causalWait = CausalWaitProcess.local ()
+                    let rootWorkspace = RootWorkspaceProcess.local ()
 
                     // Keep the causal wait bridge on the root workspace.
-                    if SharedState.RootWorkspace.IsNone then
-                        SharedState.RootWorkspace <- workspaceDirectory
+                    rootWorkspace.Binder.TryBind workspaceDirectory |> ignore
 
-                    SharedState.RootWorkspace
+                    rootWorkspace.Reader.TryRead()
                     |> Option.iter (fun workspace ->
                         causalWait.BindDiagnosticTarget(CausalWaitBridge.target workspace) |> ignore)
 
@@ -125,6 +126,7 @@ module PluginHostWiring =
                             boot.Journal
                             strengthDurability
                             scope
+                            rootWorkspace.Reader
                             input
                             BookkeeperRuntime.tryConsumePromptAuthorization
                             (fun terminal ->
@@ -147,6 +149,7 @@ module PluginHostWiring =
                           SharedTerminalPort = sharedTerminalPort
                           GitTreePort = boot.GitTreePort
                           StrengthDurability = strengthDurability
+                          RootWorkspace = rootWorkspace.Reader
                           CausalWaitObserver = causalWait.Observer }
                 }
 

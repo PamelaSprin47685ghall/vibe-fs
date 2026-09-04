@@ -37,6 +37,29 @@ test('WHAT[CAUSAL-009] production inventory separates contract runtime adapter m
     'execution-session-wait-contract',
     'foundation-temporal-contract',
   ])
+  for (const consumer of inventory.localities.filter(({ references }) => references.includes(mailbox.id))) {
+    assert.equal(consumer.kind, 'composition', `${consumer.id} must inject the physical mailbox from composition`)
+  }
+  for (const id of [
+    'delegation-runtime-surface',
+    'git-integrationgate',
+    'mission-finality-prompt',
+    'opencode-host-pluginruntimescope',
+  ]) {
+    const composition = locality(inventory, id)
+    assert.equal(composition.kind, 'composition')
+    assert.ok(composition.references.includes(mailbox.id), `${id} must declare its physical mailbox provider`)
+  }
+  assert.equal(
+    locality(inventory, 'delegation-host-adapter').references.includes(mailbox.id),
+    false,
+    'the Host adapter must receive a mailbox factory instead of constructing a foreign runtime',
+  )
+  assert.equal(
+    locality(inventory, 'delegation-fork-runtime').references.includes(mailbox.id),
+    false,
+    'the Fork runtime must consume only the injected mailbox capability',
+  )
   assert.equal(inventory.localities.some(({ id }) => id === 'execution-session-wait-causalwait'), false)
   assert.deepEqual(
     inventory.localities.filter(({ references }) => references.includes(proof.id)),

@@ -786,6 +786,24 @@
       "draft_proofs": []
     },
     {
+      "locality_id": "host-root-workspace-contract",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
+      "locality_id": "host-root-workspace-runtime",
+      "status": "undecided",
+      "draft_reason": null,
+      "draft_target_classification": null,
+      "draft_migration_path": null,
+      "draft_what_ids": [],
+      "draft_proofs": []
+    },
+    {
       "locality_id": "host-session-contract",
       "status": "undecided",
       "draft_reason": null,

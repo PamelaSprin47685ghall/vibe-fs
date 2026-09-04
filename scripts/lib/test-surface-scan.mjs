@@ -1432,7 +1432,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Host/SharedStateSurface.js',
     owner: 'host-boundary',
-    laws: ['HOST-BOUNDARY-010'],
+    laws: ['HOST-BOUNDARY-010', 'HOST-BOUNDARY-031'],
     source: 'src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',

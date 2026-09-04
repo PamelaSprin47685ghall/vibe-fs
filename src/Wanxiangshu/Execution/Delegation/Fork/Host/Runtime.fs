@@ -45,6 +45,7 @@ type HostForkRuntime
         parentId: SessionId,
         sessions: ISessionHostPort,
         childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>,
+        createMailbox: obj -> ForkCompletionMailbox,
         ?journal: AgentJournal,
         ?onChildCreated: string -> Role -> SessionId -> unit,
         ?onChildCreatedDir: string -> SessionId -> string option -> unit,
@@ -73,7 +74,7 @@ type HostForkRuntime
         ?clock: IClockPort
     ) as this =
     let clockPort = defaultArg clock (NodeTiming.nodeClockPort ())
-    let runtime = ForkRuntimeBackend.create clockPort
+    let runtime = ForkRuntimeBackend.create clockPort createMailbox
     // DSL-MUTABLE: resource — live child session registry by agent id
     let children = Dictionary<string, SessionId>()
     // DSL-MUTABLE: resource — process-owned agent handle set

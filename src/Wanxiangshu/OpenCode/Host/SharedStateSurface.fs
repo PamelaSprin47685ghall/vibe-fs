@@ -1,11 +1,11 @@
 namespace Wanxiangshu.OpenCode
 
-/// JS-native boundary for HOST-BOUNDARY-010 / HOST-012 shared cross-instance
-/// state. The physical Map/Set/atom singletons in SharedState stay opaque;
-/// only narrow put/get/clear/root operations cross the edge. Every operation
+/// JS-native boundary for HOST-BOUNDARY-010 shared cross-instance state and
+/// HOST-BOUNDARY-031 root workspace first-binding. The physical Map/Set
+/// singletons and RootWorkspace runtime stay opaque. Every operation
 /// closes over the same module-level singleton, so a mutation made through
 /// one import is visible through another — the behavioral proof that
-/// SessionParents / ReviewGuardNudges / RootWorkspace are live singletons
+/// SessionParents / ReviewGuardNudges / RootWorkspace are live process singletons
 /// shared across plugin instances (root + worktree), not per-instance copies.
 module SharedStateSurface =
 
@@ -34,12 +34,24 @@ module SharedStateSurface =
     let clearReviewGuardNudges () : unit =
         SharedState.clearReviewGuardNudgesForTests ()
 
-    /// RootWorkspace: mutable atom set by whichever plugin instance boots
-    /// first. Worktree instances pin blogger companions here so the system
-    /// prompt survives the manager worktree release at publish.
-    let setRootWorkspace (path: string) : unit = SharedState.RootWorkspace <- Some path
-
-    let clearRootWorkspace () : unit = SharedState.RootWorkspace <- None
+    let tryBindRootWorkspace (path: string) : bool =
+        (RootWorkspaceProcess.local ()).Binder.TryBind(Option.ofObj path)
 
     let tryGetRootWorkspace () : string =
-        SharedState.RootWorkspace |> Option.defaultValue null
+        (RootWorkspaceProcess.local ()).Reader.TryRead() |> Option.defaultValue null
+
+    let firstBoundRootWorkspace (candidates: string array) : string =
+        let runtime = RootWorkspaceRuntime()
+
+        candidates
+        |> Array.iter (fun candidate -> runtime.Binder.TryBind(Option.ofObj candidate) |> ignore)
+
+        runtime.Reader.TryRead() |> Option.defaultValue null
+
+    let selectContinuationDirectory (candidate: string) (candidateExists: bool) (rootWorkspace: string) : string =
+        let reader =
+            { new IRootWorkspaceReader with
+                member _.TryRead() = Option.ofObj rootWorkspace }
+
+        RootWorkspaceDirectory.select (fun path -> candidateExists && path = candidate) reader (Option.ofObj candidate)
+        |> Option.defaultValue null

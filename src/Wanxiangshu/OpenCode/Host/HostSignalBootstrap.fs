@@ -77,6 +77,7 @@ module HostSignalBootstrap =
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
         (scope: PluginRuntimeScope)
+        (rootWorkspace: IRootWorkspaceReader)
         (input: obj)
         /// Exact process-local private-agent attachment; it cannot establish a public authority profile.
         (tryConsumeHostInternalPrompt: SessionId -> string option -> string option -> bool)
@@ -122,7 +123,8 @@ module HostSignalBootstrap =
             let messageVisibility = MessageVisibilityHub(recoveryTimerPort)
             scope.AttachMessageVisibility messageVisibility
 
-            let reviewerContinuationPort = HostReviewGuard.continuationPort sessionPort journal
+            let reviewerContinuationPort =
+                HostReviewGuard.continuationPort sessionPort rootWorkspace journal
 
             let resolveProjection (sessionId: SessionId) : AgentProjectionSet option =
                 match journal with
@@ -132,7 +134,14 @@ module HostSignalBootstrap =
             let binding = TurnBinding.Store()
 
             let onTurn =
-                HostTurnObserver.observe sessionPort eventPort journal strengthDurability scope reviewerContinuationPort
+                HostTurnObserver.observe
+                    sessionPort
+                    rootWorkspace
+                    eventPort
+                    journal
+                    strengthDurability
+                    scope
+                    reviewerContinuationPort
 
             let onSnapshot = HostCompactionObserver.observe scope journal
 
@@ -238,6 +247,7 @@ module HostSignalBootstrap =
                             let! outcome =
                                 HostSessionNudge.sendContinuationResult
                                     sessionPort
+                                    rootWorkspace
                                     sessionId
                                     prompt
                                     PromptAuthority.ContinuationKind.DegenerationGuard

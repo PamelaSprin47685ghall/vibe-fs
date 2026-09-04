@@ -57,6 +57,7 @@ module FissionHost =
     /// turns return false so ordinary repair/recovery behavior still runs.
     val observeLaneTurn:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         joinGuardNudges: HashSet<string> ->

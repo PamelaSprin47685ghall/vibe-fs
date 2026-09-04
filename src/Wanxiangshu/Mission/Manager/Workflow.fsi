@@ -12,6 +12,7 @@ module ManagerWorkflow =
 
     val observeIdle:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         nudgeSent: HashSet<string> ->
@@ -25,6 +26,7 @@ module ManagerWorkflow =
     /// workflow rather than returned as a handled-bool program counter.
     val observe:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         nudgeSent: HashSet<string> ->

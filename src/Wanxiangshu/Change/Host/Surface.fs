@@ -346,6 +346,9 @@ module OrchestratorHostSurface =
 
         let deps: OrchestratorHostDeps =
             { Sessions = sessions
+              RootWorkspace =
+                { new IRootWorkspaceReader with
+                    member _.TryRead() = None }
               WaitObserver = CausalWaitRuntime().Observer
               Journal = journal
               SessionSnapshot = None

@@ -44,6 +44,7 @@ module HostSignalBootstrap =
         journal: AgentJournal option ->
         strengthDurability: StrengthDurabilityPort option ->
         scope: PluginRuntimeScope ->
+        rootWorkspace: IRootWorkspaceReader ->
         input: obj ->
         tryConsumeHostInternalPrompt: (SessionId -> string option -> string option -> bool) ->
         observeHostInternalTerminal: (ExactProviderTerminalObservation -> unit) ->

@@ -42,6 +42,8 @@ module ExecutorToolSurface =
             new ToolRuntimeScope(
                 sessions,
                 CausalWaitRuntime().Observer,
+                { new IRootWorkspaceReader with
+                    member _.TryRead() = workspaceDirectory },
                 None,
                 None,
                 workspaceDirectory,

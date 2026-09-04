@@ -23,6 +23,7 @@ module HostReviewGuard =
 
     val nudgeReviewer:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         journal: AgentJournal option ->
         sessionId: SessionId ->
         terminalProviderRun: ProviderRunIdentity ->
@@ -30,4 +31,8 @@ module HostReviewGuard =
 
     /// Infrastructure adapter only: expose Host delivery/dedupe as the typed
     /// ReviewerContinuationPort consumed by Application ReviewerWorkflow.
-    val continuationPort: sessionPort: ISessionHostPort -> journal: AgentJournal option -> ReviewerContinuationPort
+    val continuationPort:
+        sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
+        journal: AgentJournal option ->
+            ReviewerContinuationPort

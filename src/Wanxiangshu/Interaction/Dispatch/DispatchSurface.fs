@@ -74,6 +74,11 @@ module DispatchSurface =
     let internal sessionPort (port: obj) : Wanxiangshu.OpenCode.ISessionHostPort =
         PlainSessionPort(port) :> Wanxiangshu.OpenCode.ISessionHostPort
 
+    let internal rootWorkspaceReader (directory: obj) : Wanxiangshu.OpenCode.IRootWorkspaceReader =
+        { new Wanxiangshu.OpenCode.IRootWorkspaceReader with
+            member _.TryRead() =
+                if isNull directory then None else Some(string directory) }
+
     /// JS-safe controlled Host child listing for adapter proofs. The F# Result
     /// and OpenCodeChildInfo representations stay on this registered surface.
     let acceptedChild

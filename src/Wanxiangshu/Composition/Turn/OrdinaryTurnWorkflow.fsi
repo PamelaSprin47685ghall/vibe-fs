@@ -14,6 +14,7 @@ module OrdinaryTurnWorkflow =
     val observeIdle:
         quiescence: ISessionQuiescenceGate ->
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         context: ReconciledTurnContext ->
@@ -21,6 +22,7 @@ module OrdinaryTurnWorkflow =
 
     val observe:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         recoveryScope: IBloggerRuntimeHost ->

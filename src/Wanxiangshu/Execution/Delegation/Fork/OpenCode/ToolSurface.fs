@@ -405,6 +405,8 @@ module ForkToolSurface =
                 new ToolRuntimeScope(
                     sessions,
                     CausalWaitRuntime().Observer,
+                    { new IRootWorkspaceReader with
+                        member _.TryRead() = Some directory },
                     Some journal,
                     None,
                     Some directory,

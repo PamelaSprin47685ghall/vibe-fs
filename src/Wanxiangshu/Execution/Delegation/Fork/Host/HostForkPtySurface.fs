@@ -5,6 +5,7 @@ open System.Text
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Process
@@ -93,6 +94,7 @@ module HostForkPtySurface =
                     SessionId.create "pty-owner",
                     Unchecked.defaultof<ISessionHostPort>,
                     (fun _ _ _ -> Task.FromResult None),
+                    CompletionMailboxRuntime.create,
                     ptyPort = port
                 )
 

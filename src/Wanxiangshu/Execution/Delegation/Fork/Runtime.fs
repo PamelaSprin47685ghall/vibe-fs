@@ -11,6 +11,8 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Process
 
+type ForkCompletionMailbox = ICompletionMailbox<AgentHandleId, PtyJoinItem, JoinInterruptReason, MailboxWakeReason>
+
 module private ForkRuntimeControl =
     let runChildWork
         (workOpt: (unit -> Task<AgentCompletionOutcome>) option)
@@ -24,14 +26,14 @@ module private ForkRuntimeControl =
         | None -> childRunner agentId role promptOpt
 
     let publishAgentCompletion
-        (mailbox: CompletionMailbox)
+        (mailbox: ForkCompletionMailbox)
         (terminalListener: RunCompletion -> unit)
         (childRun: ChildRun)
         (agentId: string)
         (completion: RunCompletion)
         =
         childRun.Completion.TrySet(completion) |> ignore
-        mailbox.PulseAgentHandle(AgentHandleId.create agentId)
+        mailbox.PulseAgent(AgentHandleId.create agentId)
 
         try
             terminalListener completion
@@ -86,6 +88,7 @@ module private ForkRuntimeControl =
 /// All public members are thread-safe (lockObj synchronizes map/mailbox access).
 type private ForkRuntimeBackendState
     (
+        createMailbox: obj -> ForkCompletionMailbox,
         ?runner: string -> Role -> string option -> Task<AgentCompletionOutcome>,
         ?listener: RunCompletion -> unit,
         ?cleanup: string -> unit,
@@ -107,7 +110,7 @@ type private ForkRuntimeBackendState
     let mutable ptys: Map<string, PtyRecord> = Map.empty
     let lockObj = obj ()
 
-    let mailbox = CompletionMailbox(lockObj)
+    let mailbox = createMailbox lockObj
 
     let cancelAllAgentsAndClearPtys () =
         lock lockObj (fun () ->
@@ -223,7 +226,7 @@ type private ForkRuntimeBackendState
     member _.PulseWake() : unit = mailbox.PulseWake()
 
     /// Agent wake only — never carries completion payload (GREEN-5).
-    member _.PulseAgentHandle(handle: AgentHandleId) : unit = mailbox.PulseAgentHandle handle
+    member _.PulseAgentHandle(handle: AgentHandleId) : unit = mailbox.PulseAgent handle
 
     /// PTY physical result (EXEC-015).
     member _.PublishPtyCompletion(item: PtyJoinItem) : unit =
@@ -232,13 +235,13 @@ type private ForkRuntimeBackendState
         let owned = lock lockObj (fun () -> ptys |> Map.containsKey id)
 
         if owned then
-            mailbox.PublishPtyCompletion item
+            mailbox.PublishPty item
 
     /// Drain agent wake tokens (no payload). Callers re-read Journal.
-    member _.DrainAgentWakes(maxCount: int) : AgentHandleId list = mailbox.DrainAgentWakes maxCount
+    member _.DrainAgentWakes(maxCount: int) : AgentHandleId list = mailbox.DrainAgents maxCount
 
     /// EXEC-018: bounded drain of PTY fact queue.
-    member _.DrainPtyCompletions(maxCount: int) : PtyJoinItem list = mailbox.DrainPtyCompletions maxCount
+    member _.DrainPtyCompletions(maxCount: int) : PtyJoinItem list = mailbox.DrainPtys maxCount
 
     // -----------------------------------------------------------------------
     // Public API — PTY management
@@ -296,7 +299,7 @@ type private ForkRuntimeBackendState
             let agentList =
                 agents
                 |> Map.toList
-                |> List.map (fun (agentId, run) -> ChildRunProjection.toRecord mailbox.IsCancelled agentId run)
+                    |> List.map (fun (agentId, run) -> ChildRunProjection.toRecord mailbox.IsCancelled agentId run)
 
             let ptyList = ptys |> Map.toList |> List.map snd
             (agentList, ptyList))
@@ -357,5 +360,5 @@ type private ForkRuntimeBackendState
 [<RequireQualifiedAccess>]
 module ForkRuntimeBackend =
 
-    let create (clock: IClockPort) : ForkRuntime =
-        ForkRuntime(backend = (ForkRuntimeBackendState(clock = clock) :> IForkRuntimeBackend))
+    let create (clock: IClockPort) (createMailbox: obj -> ForkCompletionMailbox) : ForkRuntime =
+        ForkRuntime(backend = (ForkRuntimeBackendState(createMailbox, clock = clock) :> IForkRuntimeBackend))

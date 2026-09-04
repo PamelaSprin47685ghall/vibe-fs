@@ -16,7 +16,12 @@ module internal SyncDelegateWorkflow =
     /// runs against the store + dependencies without touching runtime fields.
     type Dependencies =
         { Attached: IAttachedSessionPort
-          WaitObserver: IWaitObserver
+          AwaitWorkRecord:
+              DiagnosticWait -> Task<Result<string, string>> -> Task<Result<string, string>>
+          AwaitInvocation:
+              DiagnosticWait
+                  -> Task<Result<SyncDelegateInvocationResult, string>>
+                  -> Task<Result<SyncDelegateInvocationResult, string>>
           ObserveChild:
               SessionId -> ReuseScopeId -> SyncDelegateRole -> string -> Task<Result<AttachedChildObservation, string>>
           CreateChild:
@@ -181,8 +186,7 @@ module internal SyncDelegateWorkflow =
                 deps.NoteInspectorPrompt (SessionId.value delegateSession) request.Charge
 
             let! workRecord =
-                CausalAwait.awaitTask
-                    deps.WaitObserver
+                deps.AwaitWorkRecord
                     (deps.DescribeWait(DelegateCompletion(batchOwner, delegateSession, role)))
                     call.Answer.Task
 
@@ -387,6 +391,5 @@ module internal SyncDelegateWorkflow =
             | SyncDelegateAdmission.Waiting -> ()
             | SyncDelegateAdmission.Ready invocations -> do! runReadyBatch store deps ownerScope role invocations
 
-            return!
-                CausalAwait.awaitTask deps.WaitObserver (deps.DescribeWait(InvocationJoin(owner, role))) completion.Task
+            return! deps.AwaitInvocation (deps.DescribeWait(InvocationJoin(owner, role))) completion.Task
         }

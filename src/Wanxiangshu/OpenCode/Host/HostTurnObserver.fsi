@@ -11,6 +11,7 @@ module HostTurnObserver =
 
     val observe:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         strengthDurability: StrengthDurabilityPort option ->

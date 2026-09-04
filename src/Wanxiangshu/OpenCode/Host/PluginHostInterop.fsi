@@ -71,6 +71,7 @@ module PluginHostInterop =
         toolModule: obj ->
         sessionPort: ISessionHostPort ->
         waitObserver: IWaitObserver ->
+        rootWorkspace: IRootWorkspaceReader ->
         journal: AgentJournal option ->
         gitTreePort: GitTreePort option ->
         workspaceDirectory: string option ->

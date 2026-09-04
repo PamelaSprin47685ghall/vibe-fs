@@ -19,6 +19,7 @@ type HostForkRuntime =
         parentId: SessionId *
         sessions: ISessionHostPort *
         childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
+        createMailbox: (obj -> ForkCompletionMailbox) *
         ?journal: AgentJournal *
         ?onChildCreated: (string -> Role -> SessionId -> unit) *
         ?onChildCreatedDir: (string -> SessionId -> string option -> unit) *

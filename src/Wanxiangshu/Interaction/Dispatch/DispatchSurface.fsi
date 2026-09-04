@@ -11,6 +11,7 @@ open Wanxiangshu.Persistence.Journal
 [<RequireQualifiedAccess>]
 module DispatchSurface =
     val internal sessionPort: port: obj -> ISessionHostPort
+    val internal rootWorkspaceReader: directory: obj -> IRootWorkspaceReader
 
     /// JS-safe controlled Host child listing for adapter proofs. The F# Result
     /// and OpenCodeChildInfo representations stay on this registered surface.

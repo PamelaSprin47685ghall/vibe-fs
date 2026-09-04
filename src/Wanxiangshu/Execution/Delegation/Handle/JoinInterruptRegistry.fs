@@ -16,6 +16,7 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Attempt-scoped join interrupt registry (EXEC-017).
@@ -73,10 +74,17 @@ type JoinAttemptRegistry() =
             | true, list -> removeLease key list lease
             | false, _ -> ())
 
+    let createInterrupt () =
+        let completion =
+            TaskCompletionSource<JoinInterruptReason>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        { Wait = completion.Task
+          Signal = fun reason -> AsyncSupport.trySetResult completion reason |> ignore }
+
     interface IJoinAttemptRegistry with
         member _.Begin(sessionId: SessionId, _toolCall: ToolCallId option) : JoinAttemptLease =
             let key = SessionId.value sessionId
-            let interrupt = JoinInterrupt.create ()
+            let interrupt = createInterrupt ()
             // A mutable cell lets the dispose closure reference the lease without a
             // recursive-object construction (avoids F# warning 40 / TreatWarningsAsErrors).
             // DSL-MUTABLE: resource — lease self-reference cell for dispose closure

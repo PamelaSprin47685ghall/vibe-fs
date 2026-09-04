@@ -100,3 +100,35 @@ test('WHAT[HOST-BOUNDARY-029] fatal vocabulary stays pure and physical execution
   assertPureContract('capability-type-only')
   assertFatalBoundary('host-boundary')
 })
+
+test('WHAT[HOST-BOUNDARY-031] RootWorkspace runtime is private and every observer consumes only the typed contract', () => {
+  const inventory = readOwnerProjectInventoryV1()
+  const contract = locality(inventory, 'host-root-workspace-contract')
+  const runtime = locality(inventory, 'host-root-workspace-runtime')
+
+  assert.equal(contract.kind, 'contract')
+  assert.deepEqual(sourcePaths(contract), ['src/Wanxiangshu/OpenCode/Host/RootWorkspace.fs'])
+  assert.deepEqual(contract.references, [])
+  assert.equal(runtime.kind, 'runtime')
+  assert.deepEqual(sourcePaths(runtime), ['src/Wanxiangshu/OpenCode/Host/RootWorkspaceRuntime.fs'])
+  assert.deepEqual(runtime.references, ['host-root-workspace-contract'])
+
+  const runtimeConsumers = inventory.localities
+    .filter(({ references }) => references.includes('host-root-workspace-runtime'))
+    .map(({ id }) => id)
+    .sort()
+  assert.deepEqual(runtimeConsumers, ['opencode-host-hostsignalbootstrap', 'opencode-host-sharedstatesurface'])
+
+  assert.ok(locality(inventory, 'interaction-dispatch-opencode-ingresscodec').references.includes('host-root-workspace-contract'))
+
+  for (const id of [
+    'execution-delegation-hostturnobservedsurface',
+    'git-integrationgate',
+    'interaction-repair-interactionrepair',
+    'mission-finality-prompt',
+    'mission-review-barrier-workflow',
+    'opencode-host-pluginruntimescope',
+    'participant-provider-attempt-fallback-ledger',
+  ])
+    assert.ok(!locality(inventory, id).references.includes('host-root-workspace-runtime'), `${id} must not acquire the process-local runtime`)
+})

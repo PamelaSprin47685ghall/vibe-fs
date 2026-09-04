@@ -85,6 +85,7 @@ module ManagerBackground =
 
     let private sendJoinGuard
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
@@ -100,6 +101,7 @@ module ManagerBackground =
                 match!
                     HostJoinGuard.nudge
                         sessionPort
+                        rootWorkspace
                         journal
                         joinGuardNudges
                         (fun () -> quiescence.TryConsume permit)
@@ -123,6 +125,7 @@ module ManagerBackground =
     /// defer; otherwise report Settled for this observation.
     let ensureSettled
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
@@ -134,7 +137,7 @@ module ManagerBackground =
             let turn = context.Turn
 
             if TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId then
-                do! sendJoinGuard sessionPort eventPort journal joinGuardNudges quiescence context
+                do! sendJoinGuard sessionPort rootWorkspace eventPort journal joinGuardNudges quiescence context
                 return BackgroundSettlement.Deferred
             else
                 return BackgroundSettlement.Settled

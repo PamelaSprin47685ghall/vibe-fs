@@ -43,19 +43,11 @@ module SharedState =
     let clearReviewGuardNudgesForTests () =
         lock ReviewGuardNudgeGate (fun () -> ReviewGuardNudges.Clear())
 
-    /// The ROOT workspace, set by whichever plugin instance boots first (the
-    /// main workspace loads before the manager worktrees). Worktree instances
-    /// pin their blogger companions here so the blogger's system prompt
-    /// (Host instruction loading from the session directory) survives the
-    /// manager worktree release at publish.
-    // DSL-MUTABLE: resource — process-local root workspace pin for worktree plugin instances
-    let mutable RootWorkspace: string option = None
-
     /// Physical Blogger flight ownership (HasFlight / ClaimCurrentRequest).
     ///
     /// Same cross-instance rule as SessionParents: the worktree plugin materializes
     /// the companion request (ClaimCurrentRequest) while the blogger session itself
-    /// lives under RootWorkspace, so BlogTool runs on the root plugin instance.
+    /// lives under the root workspace, so BlogTool runs on the root plugin instance.
     /// Per-instance flights made HasFlight miss → AbortSession → no BlogObservationCommitted
     /// → Finality hung on journal-work-log (orchestrator-publish frontier).
     let BloggerFlightGate = obj ()

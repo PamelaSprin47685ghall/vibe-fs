@@ -23,6 +23,7 @@ module HostSessionNudge =
 
     val sendContinuationResult:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         sessionId: SessionId ->
         prompt: string ->
         kind: PromptAuthority.ContinuationKind ->
@@ -34,6 +35,7 @@ module HostSessionNudge =
 
     val sendContinuation:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         sessionId: SessionId ->
         prompt: string ->
         kind: PromptAuthority.ContinuationKind ->
@@ -43,6 +45,7 @@ module HostSessionNudge =
 
     val trySendGateContinuation:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         sessionId: SessionId ->
         prompt: string ->
         continuation: PromptAuthority.ContinuationKind ->
@@ -54,6 +57,7 @@ module HostSessionNudge =
 
     val trySendGateContinuationPhysical:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         sessionId: SessionId ->
         prompt: string ->
         continuation: PromptAuthority.ContinuationKind ->
@@ -65,6 +69,7 @@ module HostSessionNudge =
 
     val trySendInteractionRepair:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         sessionId: SessionId ->
         prompt: string ->
         directory: string option ->
@@ -87,6 +92,7 @@ module HostSessionNudge =
         quiescence: ISessionQuiescenceGate ->
         permit: QuiescencePermit ->
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         sessionId: SessionId ->
         prompt: string ->
         directory: string option ->
@@ -100,6 +106,7 @@ module HostSessionNudge =
         physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) ->
         releaseAdmission: (unit -> Result<unit, QuiescencePermitFailure>) ->
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         sessionId: SessionId ->
         prompt: string ->
         continuation: PromptAuthority.ContinuationKind ->
@@ -114,6 +121,7 @@ module HostSessionNudge =
         quiescence: ISessionQuiescenceGate ->
         permit: QuiescencePermit ->
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         sessionId: SessionId ->
         prompt: string ->
         continuation: PromptAuthority.ContinuationKind ->
@@ -128,6 +136,7 @@ module HostSessionNudge =
         quiescence: ISessionQuiescenceGate ->
         permit: QuiescencePermit ->
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         sessionId: SessionId ->
         prompt: string ->
         directory: string option ->
@@ -140,6 +149,7 @@ module HostSessionNudge =
         quiescence: ISessionQuiescenceGate ->
         permit: QuiescencePermit ->
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         sessionId: SessionId ->
         prompt: string ->
         directory: string option ->

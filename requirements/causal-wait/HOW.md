@@ -8,6 +8,7 @@
 
 - **数据模型**：定义 `CausalOwnerRef`（等待主体标识）、`CausalProducerRef`（生产者引用）、`WaitEscape`（五种强类型终止逃逸：`DeadlineAt`、`CancelledBy`、`ProcessLifetime`、`SessionLifetime`、`OpenEndedExternal`）与 `DiagnosticWait` 描述符。
 - **退出状态**：`DiagnosticWaitExit`（`WaitResolved`、`WaitFailed`、`WaitCancelled`、`WaitTimedOut`、`WaitDisposed`）仅用于退出时的诊断分类。
+- **join/wake纯词汇**：`JoinInterruptReason`、`JoinWaitOutcome`、`MailboxWakeReason`与`NonEmptyBatch`只描述typed等待结果；contract不构造`TaskCompletionSource`或mailbox。
 - **因果前沿纯算法（`CausalFrontier.ofSnapshot`）**：从根节点出发遍历因果等待图，识别外部阻塞点（`ExternalProducerFrontier`）、断裂边（`BrokenCausalEdge`）、死锁环（`CausalWaitCycle`）与无等待运行（`ProducerRunningWithoutWait`），提供纯诊断输出。
 
 ### 2. Registry / await runtime（`execution-session-wait-runtime`）
@@ -30,7 +31,7 @@
 
 ### 4. CompletionMailbox runtime（`execution-session-wait-completion-mailbox`）
 
-`CompletionMailbox`独占PTY/agent completion的process-local wake resource。它不进入pure wait contract，也不借诊断registry证明业务完成。
+`CompletionMailbox`独占PTY/agent completion的process-local wake resource。pure wait contract只定义无状态泛型`ICompletionMailbox` capability，不包含实现；delegation fork runtime把它收窄为`ForkCompletionMailbox`并只消费必填factory。`CompletionMailboxRuntime.create`是唯一physical constructor；Change、Finality、ToolRuntimeScope与proof composition显式选择并注入，Host adapter与Fork runtime均不引用foreign runtime。Sync runtime同样只接收两个结果类型精确的await函数；`CausalAwait`只在Host composition绑定。由此delegation sync/fork/recovery locality继续是runtime，不因跨owner physical implementation被误标为composition。
 
 ### 5. Proof Surface（`execution-session-wait-proof-surface`）
 

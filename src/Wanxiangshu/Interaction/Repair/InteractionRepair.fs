@@ -40,6 +40,7 @@ module InteractionRepairWorkflow =
         (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
@@ -52,6 +53,7 @@ module InteractionRepairWorkflow =
                     quiescence
                     permit
                     sessionPort
+                    rootWorkspace
                     turn.SessionId
                     prompt
                     turn.Directory
@@ -90,6 +92,7 @@ module InteractionRepairWorkflow =
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (prompt: string)
@@ -97,7 +100,8 @@ module InteractionRepairWorkflow =
         : Task =
         match context.Quiescence with
         | None -> AsyncSupport.completedTask ()
-        | Some permit -> sendRepair quiescence permit sessionPort eventPort journal context.Turn prompt repairKind
+        | Some permit ->
+            sendRepair quiescence permit sessionPort rootWorkspace eventPort journal context.Turn prompt repairKind
 
     let private continuationKindOf (journal: AgentJournal option) (turn: ReconciledTurn) =
         journal
@@ -113,6 +117,7 @@ module InteractionRepairWorkflow =
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (prompt: string)
@@ -127,7 +132,7 @@ module InteractionRepairWorkflow =
                 turn.Outcome
         with
         | CompletedTurnClassifier.RepairDefectDecision.RequestRepair ->
-            trySendIdleRepair quiescence context sessionPort eventPort journal prompt repairKind
+            trySendIdleRepair quiescence context sessionPort rootWorkspace eventPort journal prompt repairKind
         | CompletedTurnClassifier.RepairDefectDecision.AwaitRepairTerminal
         | CompletedTurnClassifier.RepairDefectDecision.NoRepair -> AsyncSupport.completedTask ()
 
@@ -201,6 +206,7 @@ module InteractionRepairWorkflow =
     let private sendBloggerAabbAfterPermitConsumed
         (host: IBloggerRuntimeHost)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal)
         (context: ReconciledTurnContext)
@@ -217,6 +223,7 @@ module InteractionRepairWorkflow =
                     match!
                         HostSessionNudge.trySendInteractionRepair
                             sessionPort
+                            rootWorkspace
                             turn.SessionId
                             EnforcerRepair.RepairInstruction
                             turn.Directory
@@ -259,6 +266,7 @@ module InteractionRepairWorkflow =
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal)
         (requestId: BloggerRequestId)
@@ -271,6 +279,7 @@ module InteractionRepairWorkflow =
             sendBloggerAabbAfterPermitConsumed
                 host
                 sessionPort
+                rootWorkspace
                 eventPort
                 journal
                 context
@@ -286,6 +295,7 @@ module InteractionRepairWorkflow =
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal)
         (requestId: BloggerRequestId)
@@ -300,6 +310,7 @@ module InteractionRepairWorkflow =
                         quiescence
                         permit
                         sessionPort
+                        rootWorkspace
                         context.Turn.SessionId
                         EnforcerRepair.RepairInstruction
                         context.Turn.Directory
@@ -318,6 +329,7 @@ module InteractionRepairWorkflow =
                         sendBloggerAabbAfterPermitConsumed
                             host
                             sessionPort
+                            rootWorkspace
                             eventPort
                             journal
                             context
@@ -347,6 +359,7 @@ module InteractionRepairWorkflow =
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (request: BloggerRequestContext)
@@ -363,7 +376,7 @@ module InteractionRepairWorkflow =
                 context.Turn.ProviderRun
         with
         | BloggerRecoveryProbe.InvalidTerminalRepairState.NoRecovery ->
-            sendBloggerNudge host quiescence context sessionPort eventPort durable requestId requestKind
+            sendBloggerNudge host quiescence context sessionPort rootWorkspace eventPort durable requestId requestKind
         | BloggerRecoveryProbe.InvalidTerminalRepairState.InteractionNudgeIssued issuedRun when
             issuedRun = context.Turn.ProviderRun
             ->
@@ -374,6 +387,7 @@ module InteractionRepairWorkflow =
                 quiescence
                 context
                 sessionPort
+                rootWorkspace
                 eventPort
                 durable
                 requestId
@@ -390,6 +404,7 @@ module InteractionRepairWorkflow =
                 quiescence
                 context
                 sessionPort
+                rootWorkspace
                 eventPort
                 durable
                 requestId
@@ -408,6 +423,7 @@ module InteractionRepairWorkflow =
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         : Task =
@@ -441,7 +457,7 @@ module InteractionRepairWorkflow =
                 AsyncSupport.completedTask ()
             | BloggerTerminalRequestOwnership.Current
             | BloggerTerminalRequestOwnership.Unproven ->
-                repairOwnedBloggerProtocol host quiescence context sessionPort eventPort durable request
+                repairOwnedBloggerProtocol host quiescence context sessionPort rootWorkspace eventPort durable request
 
     /// CTX-010 recovery continue owns the physical run until its own terminal is
     /// published. Missing-final-report / interaction-repair on that run hijacks the
@@ -475,6 +491,7 @@ module InteractionRepairWorkflow =
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         : Task =
@@ -488,6 +505,7 @@ module InteractionRepairWorkflow =
                 quiescence
                 context
                 sessionPort
+                rootWorkspace
                 eventPort
                 journal
                 (ProviderProse.documentFor context.Turn.SessionId RuntimeNudge.MissingClosingReport Map.empty)
@@ -499,6 +517,7 @@ module InteractionRepairWorkflow =
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         : Task =
@@ -511,6 +530,7 @@ module InteractionRepairWorkflow =
                 quiescence
                 context
                 sessionPort
+                rootWorkspace
                 eventPort
                 journal
                 (ProviderProse.documentFor turn.SessionId RuntimeNudge.InteractionContinue Map.empty)

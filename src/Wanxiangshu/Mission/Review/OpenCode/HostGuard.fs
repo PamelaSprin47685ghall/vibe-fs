@@ -123,6 +123,7 @@ module HostReviewGuard =
 
     let private sendReservedGuardNudge
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (durable: AgentJournal)
         (targetSessionId: SessionId)
         (continuationKind: PromptAuthority.ContinuationKind)
@@ -145,6 +146,7 @@ module HostReviewGuard =
                 let! sent =
                     HostSessionNudge.trySendGateContinuation
                         sessionPort
+                        rootWorkspace
                         targetSessionId
                         prompt
                         continuationKind
@@ -158,6 +160,7 @@ module HostReviewGuard =
 
     let private sendGuardForDurable
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (durable: AgentJournal)
         (targetSessionId: SessionId)
         (occasion: GuardNudgeOccasion)
@@ -169,10 +172,19 @@ module HostReviewGuard =
         if not (tryReserve nudgeKey durable targetSessionId continuationKind occasion) then
             Task.FromResult GuardNudgeOutcome.AlreadyOutstanding
         else
-            sendReservedGuardNudge sessionPort durable targetSessionId continuationKind occasion nudgeKey prompt
+            sendReservedGuardNudge
+                sessionPort
+                rootWorkspace
+                durable
+                targetSessionId
+                continuationKind
+                occasion
+                nudgeKey
+                prompt
 
     let private sendGuardNudge
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal option)
         (targetSessionId: SessionId)
         (occasion: GuardNudgeOccasion)
@@ -181,11 +193,13 @@ module HostReviewGuard =
         task {
             match journal with
             | None -> return GuardNudgeOutcome.Failed "Review guard nudge requires an AgentJournal"
-            | Some durable -> return! sendGuardForDurable sessionPort durable targetSessionId occasion prompt
+            | Some durable ->
+                return! sendGuardForDurable sessionPort rootWorkspace durable targetSessionId occasion prompt
         }
 
     let private nudgeDurableReviewer
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal)
         (sessionId: SessionId)
         (terminalProviderRun: ProviderRunIdentity)
@@ -197,6 +211,7 @@ module HostReviewGuard =
                 return!
                     sendGuardNudge
                         sessionPort
+                        rootWorkspace
                         (Some journal)
                         sessionId
                         (GuardNudgeOccasion.MissingVerdict(barrierId, terminalProviderRun))
@@ -205,21 +220,26 @@ module HostReviewGuard =
 
     let nudgeReviewer
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal option)
         (sessionId: SessionId)
         (terminalProviderRun: ProviderRunIdentity)
         : Task<GuardNudgeOutcome> =
         match journal with
         | None -> Task.FromResult(GuardNudgeOutcome.Failed "Review guard nudge requires an AgentJournal")
-        | Some durable -> nudgeDurableReviewer sessionPort durable sessionId terminalProviderRun
+        | Some durable -> nudgeDurableReviewer sessionPort rootWorkspace durable sessionId terminalProviderRun
 
     /// Infrastructure adapter only: expose Host delivery/dedupe as the typed
     /// ReviewerContinuationPort consumed by Application ReviewerWorkflow.
-    let continuationPort (sessionPort: ISessionHostPort) (journal: AgentJournal option) : ReviewerContinuationPort =
+    let continuationPort
+        (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
+        (journal: AgentJournal option)
+        : ReviewerContinuationPort =
         { NudgeMissingVerdict =
             fun sessionId terminalProviderRun ->
                 task {
-                    let! _ = nudgeReviewer sessionPort journal sessionId terminalProviderRun
+                    let! _ = nudgeReviewer sessionPort rootWorkspace journal sessionId terminalProviderRun
                     // Preserve existing boundary: missing-verdict send failure was
                     // not terminal; the next durable observation may re-enter.
                     return Ok()

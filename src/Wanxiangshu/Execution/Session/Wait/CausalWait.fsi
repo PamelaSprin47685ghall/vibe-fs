@@ -1,6 +1,52 @@
 namespace Wanxiangshu.Execution.Session.Wait
 
 open System
+open System.Threading.Tasks
+
+module JoinBatch =
+    val Max: int
+    val MaxJoinBatch: int
+
+type NonEmptyBatch<'item> = private NonEmptyBatch of head: 'item * tail: 'item list
+
+module NonEmptyBatch =
+    val ofHeadTail: head: 'item -> tail: 'item list -> NonEmptyBatch<'item>
+    val tryOfList: ('item list -> NonEmptyBatch<'item> option)
+    val toList: NonEmptyBatch<'item> -> 'item list
+    val length: NonEmptyBatch<'item> -> int
+    val map: f: ('a -> 'b) -> NonEmptyBatch<'a> -> NonEmptyBatch<'b>
+
+[<RequireQualifiedAccess>]
+type JoinInterruptReason =
+    | OperatorAbort
+    | UserMessageArrived
+    | DeadlineExpired
+
+type JoinWaitOutcome<'item> =
+    | ResultsAvailable of NonEmptyBatch<'item>
+    | Interrupted of JoinInterruptReason
+
+type MailboxWakeReason =
+    | CompletionMayBeAvailable
+    | LocalInterrupt of JoinInterruptReason
+    | MailboxCancelled
+
+type JoinInterrupt =
+    { Wait: Task<JoinInterruptReason>
+      Signal: JoinInterruptReason -> unit }
+
+type ICompletionMailbox<'agent, 'pty, 'interrupt, 'wake> =
+    abstract PulseAgent: 'agent -> unit
+    abstract PublishPty: 'pty -> unit
+    abstract PulseWake: unit -> unit
+    abstract WaitForWake: unit -> Task<'wake>
+    abstract WaitForSignal: Task<'interrupt> -> Task<'wake>
+    abstract DrainAgents: int -> 'agent list
+    abstract DrainPtys: int -> 'pty list
+    abstract Cancel: unit -> bool
+    abstract PendingCount: int
+    abstract PendingPtyCount: int
+    abstract IsCancelled: bool
 
 type CausalOwnerRef =
     { Kind: string

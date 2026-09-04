@@ -159,7 +159,8 @@ module PluginSessionWiring =
             let syncDelegate =
                 new SyncDelegateRuntime(
                     sessionPort,
-                    host.CausalWaitObserver,
+                    CausalAwait.awaitTask host.CausalWaitObserver,
+                    CausalAwait.awaitTask host.CausalWaitObserver,
                     dispatcher,
                     durable,
                     (attached :> IAttachedSessionPort),

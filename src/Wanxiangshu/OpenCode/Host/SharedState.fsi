@@ -27,9 +27,6 @@ module SharedState =
     /// Unit-test isolation only: production must not wipe cross-instance reservations.
     val clearReviewGuardNudgesForTests: unit -> unit
 
-    /// The ROOT workspace, set by whichever plugin instance boots first.
-    val mutable RootWorkspace: string option
-
     /// Gate object for blogger flight ownership.
     val BloggerFlightGate: obj
 

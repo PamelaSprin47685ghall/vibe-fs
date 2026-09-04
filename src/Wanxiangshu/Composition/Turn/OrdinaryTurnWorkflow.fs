@@ -77,6 +77,7 @@ module OrdinaryTurnWorkflow =
     let observeIdle
         (quiescence: ISessionQuiescenceGate)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (context: ReconciledTurnContext)
@@ -93,11 +94,29 @@ module OrdinaryTurnWorkflow =
         match isFissionReplaced, context.Turn.Observation, context.Turn.Outcome with
         | true, _, _ -> AsyncSupport.completedTask ()
         | false, Some ReconcileProgram.TurnUnknown, _ ->
-            InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
+            InteractionRepairWorkflow.repairMissingFinalReport
+                quiescence
+                context
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
         | false, None, ReconcileProgram.TurnInProgress ->
-            InteractionRepairWorkflow.repairIncompleteInteraction quiescence context sessionPort eventPort journal
+            InteractionRepairWorkflow.repairIncompleteInteraction
+                quiescence
+                context
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
         | false, None, ReconcileProgram.TurnNeedsContinuation _ ->
-            InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
+            InteractionRepairWorkflow.repairMissingFinalReport
+                quiescence
+                context
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
         | false, None, (ReconcileProgram.TurnCompleted | ReconcileProgram.TurnAborted _ | ReconcileProgram.TurnFailed _) ->
             AsyncSupport.completedTask ()
 
@@ -133,6 +152,7 @@ module OrdinaryTurnWorkflow =
 
     let private applyJoinGuardNudge
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
@@ -148,6 +168,7 @@ module OrdinaryTurnWorkflow =
                 match!
                     HostJoinGuard.nudge
                         sessionPort
+                        rootWorkspace
                         journal
                         joinGuardNudges
                         (fun () -> quiescence.TryConsume permit)
@@ -166,6 +187,7 @@ module OrdinaryTurnWorkflow =
 
     let private handleCompleted
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
@@ -199,7 +221,8 @@ module OrdinaryTurnWorkflow =
             if TerminalPolicy.sessionDead journal turn.SessionId then
                 return ()
             elif joinOutstanding then
-                return! applyJoinGuardNudge sessionPort eventPort journal joinGuardNudges quiescence context
+                return!
+                    applyJoinGuardNudge sessionPort rootWorkspace eventPort journal joinGuardNudges quiescence context
             else
                 return ()
         }
@@ -207,6 +230,7 @@ module OrdinaryTurnWorkflow =
 
     let private handleFailedTurn
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (recoveryScope: IBloggerRuntimeHost)
@@ -217,6 +241,7 @@ module OrdinaryTurnWorkflow =
         | Some failure ->
             ProviderRecoveryWorkflow.continueAfterConfirmedFailure
                 sessionPort
+                rootWorkspace
                 eventPort
                 journal
                 recoveryScope
@@ -234,6 +259,7 @@ module OrdinaryTurnWorkflow =
 
     let private handleOutcome
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (recoveryScope: IBloggerRuntimeHost)
@@ -248,20 +274,42 @@ module OrdinaryTurnWorkflow =
 
         match turn.Outcome with
         | ReconcileProgram.TurnInProgress ->
-            InteractionRepairWorkflow.repairIncompleteInteraction quiescence context sessionPort eventPort journal
+            InteractionRepairWorkflow.repairIncompleteInteraction
+                quiescence
+                context
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
         | ReconcileProgram.TurnNeedsContinuation _ ->
             // Absorb text and reasoning into the XTrace even though this turn is
             // not completable, then ask for the missing report. Still not fallback.
             // (The XTrace parts are captured at the transform boundary.)
-            InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
+            InteractionRepairWorkflow.repairMissingFinalReport
+                quiescence
+                context
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
         | ReconcileProgram.TurnAborted reason -> handleAborted eventPort abortCause turn reason
         | ReconcileProgram.TurnFailed error ->
-            handleFailedTurn sessionPort eventPort journal recoveryScope context error
+            handleFailedTurn sessionPort rootWorkspace eventPort journal recoveryScope context error
         | ReconcileProgram.TurnCompleted ->
-            handleCompleted sessionPort eventPort journal joinGuardNudges hasLivePty quiescence context completeAgent
+            handleCompleted
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
+                joinGuardNudges
+                hasLivePty
+                quiescence
+                context
+                completeAgent
 
     let observe
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (recoveryScope: IBloggerRuntimeHost)
@@ -285,13 +333,20 @@ module OrdinaryTurnWorkflow =
         match isFissionReplaced, turn.Observation with
         | true, _ -> AsyncSupport.completedTask ()
         | false, Some ReconcileProgram.TurnUnknown ->
-            InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
+            InteractionRepairWorkflow.repairMissingFinalReport
+                quiescence
+                context
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
         | false, None ->
             let completeAgent () =
                 TerminalReporter.completeWithEvidence eventPort journal turn
 
             handleOutcome
                 sessionPort
+                rootWorkspace
                 eventPort
                 journal
                 recoveryScope

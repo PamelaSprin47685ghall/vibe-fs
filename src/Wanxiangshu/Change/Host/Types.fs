@@ -10,6 +10,7 @@ open Wanxiangshu.Persistence.Journal
 
 type OrchestratorHostDeps =
     { Sessions: ISessionHostPort
+      RootWorkspace: IRootWorkspaceReader
       WaitObserver: IWaitObserver
       Journal: AgentJournal option
       SessionSnapshot: ISessionSnapshotPort option

@@ -50,7 +50,13 @@
 ### M6.3b G4 execution record
 
 - `causal-wait`已拆为contract、registry/await runtime、Node diagnostic adapter、CompletionMailbox runtime与proof Surface五个compiler boundary locality。production workflow只消费Host composition注入的`IWaitObserver`；旧`CausalWaitHub`与`Process/Surface` mailbox mirror已删除。production inventory、first-bind redirect counterworld、global-hub/adapter boundary mutation与`PROC-008`真实mailbox proof承接该节点。G4只关闭CausalWait局部边界，不改变GAP-031整体`PARTIAL`与M6.4 cutover条件。
+- G4提交`f116ae670`把delegation sync/fork/recovery runtime误标为composition，且unit在sync首个kind断言短路后未枚举其余两项。闭环修复把join/outcome/wake/batch纯词汇移入wait contract；sync接受composition注入的typed await函数，fork接受Host投影真实`CompletionMailbox`形成的typed factory，recovery只消费contract。三条locality恢复runtime，未复制await/mailbox公式、未削弱DELEG-028/029。
 - 基于staged G4 bytes的fresh world为191 localities、738 sources、1,911 refs、4,438 edges、967,429 facts、512 traversals、188,498 Unknown、1 diagnostic，digest `sha256:9f2fa4d90a7230dbd5d6b1f394bfb98ebb2ce060428af912af6d6264977093cb`。12条missing closure中1条仍是既定EventStore codec edge，另11条均来自本轮已保留的upstream Sphinx：9条`Sphinx → Foundation/EventStore`及2条`Sphinx runtime → sphinx-event-vocabulary-contract`；它们不是G4引入，但必须在M6.3c前按owner边界闭合。唯一diagnostic仍是`SharedState.RootWorkspace`。
+
+### M6.3b B7 RootWorkspace effect isolation
+
+- `SharedState.RootWorkspace`公开可写atom违反Host capability injection并产生formal scanner唯一signature diagnostic。正式反例要求`None`/空串/纯空白不占位、首个非空白`Some`胜出、后续候选不能覆盖；implementation必须把cell收进private Host runtime，只向composition发布binder并向其余consumer注入reader。该节点不引入Git-derived family root、multi-family语义或Fatal cleanup。
+- G4 checkpoint的全量unit/fresh scan暴露sync/fork两个runtime被误标composition及Host adapter直接构造foreign mailbox。纯join/wake vocabulary与泛型mailbox capability归wait contract；sync await与fork mailbox factory均由composition必填注入。Host adapter和Fork runtime不再引用physical wait runtime，DELEG-028/029保持runtime且无gate豁免。
 
 ## 纪律
 

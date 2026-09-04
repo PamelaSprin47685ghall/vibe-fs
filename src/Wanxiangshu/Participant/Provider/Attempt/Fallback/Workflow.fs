@@ -174,12 +174,14 @@ module ProviderRecoveryWorkflow =
 
     let private sendContinuation
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (turn: ReconciledTurn)
         (journal: AgentJournal option)
         (prompt: string)
         =
         HostSessionNudge.sendContinuationResult
             sessionPort
+            rootWorkspace
             turn.SessionId
             prompt
             PromptAuthority.ContinuationKind.ProviderRetryAttempt
@@ -200,6 +202,7 @@ module ProviderRecoveryWorkflow =
 
     let rec private sendStagedBloggerContinuation
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
@@ -216,7 +219,7 @@ module ProviderRecoveryWorkflow =
                         |> TaskResult.mapError BloggerContinuationFailure.Materialize
 
                     let! promptKey =
-                        sendContinuation sessionPort turn (Some durable) prompt
+                        sendContinuation sessionPort rootWorkspace turn (Some durable) prompt
                         |> TaskResult.mapError BloggerContinuationFailure.Send
 
                     do!
@@ -250,6 +253,7 @@ module ProviderRecoveryWorkflow =
 
     let private replaceFailedBloggerRequest
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
@@ -262,11 +266,22 @@ module ProviderRecoveryWorkflow =
         task {
             do! BloggerCoordinator.abandonContinuationContext scope durable failed "provider-attempt-failed"
 
-            return! sendStagedBloggerContinuation sessionPort eventPort durable scope turn next prompt failureReason
+            return!
+                sendStagedBloggerContinuation
+                    sessionPort
+                    rootWorkspace
+                    eventPort
+                    durable
+                    scope
+                    turn
+                    next
+                    prompt
+                    failureReason
         }
 
     let private continueFailedBloggerMain
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
@@ -282,6 +297,7 @@ module ProviderRecoveryWorkflow =
         | Ok ProviderRequestKind.BloggerSquash, Some squashCtx ->
             replaceFailedBloggerRequest
                 sessionPort
+                rootWorkspace
                 eventPort
                 durable
                 scope
@@ -291,7 +307,17 @@ module ProviderRecoveryWorkflow =
                 (squashPrompt mainSessionId)
                 error
         | Ok ProviderRequestKind.BloggerMain, _ ->
-            replaceFailedBloggerRequest sessionPort eventPort durable scope turn failed failed continuationPrompt error
+            replaceFailedBloggerRequest
+                sessionPort
+                rootWorkspace
+                eventPort
+                durable
+                scope
+                turn
+                failed
+                failed
+                continuationPrompt
+                error
         | Ok _, _
         | Error _, _ ->
             notifyFailure eventPort turn "Blogger recovery produced an invalid next request kind"
@@ -299,6 +325,7 @@ module ProviderRecoveryWorkflow =
 
     let private rebuildMainAfterFailedSquash
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
@@ -315,6 +342,7 @@ module ProviderRecoveryWorkflow =
                 return!
                     replaceFailedBloggerRequest
                         sessionPort
+                        rootWorkspace
                         eventPort
                         durable
                         scope
@@ -327,6 +355,7 @@ module ProviderRecoveryWorkflow =
 
     let private continueFailedBloggerSquash
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
@@ -345,6 +374,7 @@ module ProviderRecoveryWorkflow =
         | Ok ProviderRequestKind.BloggerMain ->
             rebuildMainAfterFailedSquash
                 sessionPort
+                rootWorkspace
                 eventPort
                 durable
                 scope
@@ -359,6 +389,7 @@ module ProviderRecoveryWorkflow =
 
     let private continueBlogger
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
@@ -378,6 +409,7 @@ module ProviderRecoveryWorkflow =
                 return!
                     continueFailedBloggerMain
                         sessionPort
+                        rootWorkspace
                         eventPort
                         durable
                         scope
@@ -392,6 +424,7 @@ module ProviderRecoveryWorkflow =
                 return!
                     continueFailedBloggerSquash
                         sessionPort
+                        rootWorkspace
                         eventPort
                         durable
                         scope
@@ -406,6 +439,7 @@ module ProviderRecoveryWorkflow =
 
     let private continueWorkMain
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
@@ -418,12 +452,13 @@ module ProviderRecoveryWorkflow =
             if opportunity = RecoveryOpportunity.RecoveryAttempt then
                 do! awaitRecoveryMaterial scope durable turn.SessionId
 
-            let! continuation = sendContinuation sessionPort turn (Some durable) continuationPrompt
+            let! continuation = sendContinuation sessionPort rootWorkspace turn (Some durable) continuationPrompt
             handleContinuation eventPort turn error continuation
         }
 
     let private continueAdvancedFailure
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
@@ -434,11 +469,23 @@ module ProviderRecoveryWorkflow =
         : Task =
         match mainSessionOfBlogger durable turn.SessionId with
         | Some mainSessionId ->
-            continueBlogger sessionPort eventPort durable scope turn mainSessionId continuationPrompt error opportunity
-        | None -> continueWorkMain sessionPort eventPort durable scope turn continuationPrompt error opportunity
+            continueBlogger
+                sessionPort
+                rootWorkspace
+                eventPort
+                durable
+                scope
+                turn
+                mainSessionId
+                continuationPrompt
+                error
+                opportunity
+        | None ->
+            continueWorkMain sessionPort rootWorkspace eventPort durable scope turn continuationPrompt error opportunity
 
     let private settleFailureAdmission
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
@@ -459,7 +506,16 @@ module ProviderRecoveryWorkflow =
             notifyFailure eventPort turn "Confirmed provider failure has no active fallback run"
             Task.FromResult(()) :> Task
         | Ok(ConfirmedFailureOutcome.RecoveryAdvanced opportunity) ->
-            continueAdvancedFailure sessionPort eventPort durable scope turn continuationPrompt error opportunity
+            continueAdvancedFailure
+                sessionPort
+                rootWorkspace
+                eventPort
+                durable
+                scope
+                turn
+                continuationPrompt
+                error
+                opportunity
 
     let private fallbackBudgetOf (current: FallbackProjection) =
         if FallbackProjection.mayContinue AgentPairCursor.DefaultAutoRecoveryBudget current then
@@ -567,6 +623,7 @@ module ProviderRecoveryWorkflow =
 
     let private executeFallbackDecision
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
@@ -584,11 +641,21 @@ module ProviderRecoveryWorkflow =
                 let! admission = FallbackLedger.recordAuthorizedFailure durable turn.SessionId authorization error
 
                 return!
-                    settleFailureAdmission sessionPort eventPort durable scope turn continuationPrompt error admission
+                    settleFailureAdmission
+                        sessionPort
+                        rootWorkspace
+                        eventPort
+                        durable
+                        scope
+                        turn
+                        continuationPrompt
+                        error
+                        admission
             }
 
     let private executeAuthorizedRecovery
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
@@ -600,7 +667,7 @@ module ProviderRecoveryWorkflow =
         (requestKind: ProviderRequestKind)
         =
         recoveryDecision turn failure current requestKind
-        |> executeFallbackDecision sessionPort eventPort durable scope turn continuationPrompt error
+        |> executeFallbackDecision sessionPort rootWorkspace eventPort durable scope turn continuationPrompt error
 
     let private providerOfTarget (target: Wanxiangshu.OpenCode.ModelRoutingTarget) : string =
         let slash = target.Model.IndexOf '/'
@@ -612,6 +679,7 @@ module ProviderRecoveryWorkflow =
 
     let private continueDurableFailure
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
@@ -648,6 +716,7 @@ module ProviderRecoveryWorkflow =
                     return!
                         executeAuthorizedRecovery
                             sessionPort
+                            rootWorkspace
                             eventPort
                             durable
                             scope
@@ -670,6 +739,7 @@ module ProviderRecoveryWorkflow =
     /// advance, which is why nothing here writes again.
     let continueAfterConfirmedFailure
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (scope: IBloggerRuntimeHost)
@@ -682,6 +752,16 @@ module ProviderRecoveryWorkflow =
             match journal with
             | None -> notifyFailure eventPort turn error
             | Some durable ->
-                return! continueDurableFailure sessionPort eventPort durable scope turn failure continuationPrompt error
+                return!
+                    continueDurableFailure
+                        sessionPort
+                        rootWorkspace
+                        eventPort
+                        durable
+                        scope
+                        turn
+                        failure
+                        continuationPrompt
+                        error
         }
         :> Task

@@ -52,6 +52,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             orchestratorId,
             deps.Sessions,
             childWorkRecordForRun,
+            CompletionMailboxRuntime.create,
             ?journal = deps.Journal,
             onChildCreated = onChildCreated,
             onChildCreatedDir =
@@ -289,6 +290,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let! _ =
                 HostSessionNudge.sendContinuation
                     deps.Sessions
+                    deps.RootWorkspace
                     record.ManagerSessionId
                     prompt
                     PromptAuthority.ContinuationKind.ManagedDelegationAssignment
@@ -351,6 +353,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             =
             HostSessionNudge.trySendGateContinuationPhysical
                 deps.Sessions
+                deps.RootWorkspace
                 reviewerSessionId
                 (ProviderProse.documentFor reviewerSessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
                 PromptAuthority.ContinuationKind.ReviewerGuard

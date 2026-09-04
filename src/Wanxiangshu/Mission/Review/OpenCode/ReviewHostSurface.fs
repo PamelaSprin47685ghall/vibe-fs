@@ -135,6 +135,8 @@ module ReviewHostSurface =
             let! outcome =
                 HostReviewGuard.nudgeReviewer
                     (sessionPort port)
+                    { new IRootWorkspaceReader with
+                        member _.TryRead() = None }
                     journal
                     (SessionId.create reviewerSession)
                     (ProviderRunIdentity.create terminalProviderRun)

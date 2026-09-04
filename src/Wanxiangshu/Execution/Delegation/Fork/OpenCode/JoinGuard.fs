@@ -70,6 +70,7 @@ module HostJoinGuard =
 
     let private sendReservedNudge
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (durable: AgentJournal)
         (nudgeKeys: HashSet<string>)
         (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
@@ -90,6 +91,7 @@ module HostJoinGuard =
                     physicalAdmission
                     releaseAdmission
                     sessionPort
+                    rootWorkspace
                     sessionId
                     (ProviderProse.documentFor sessionId RuntimeNudge.BackgroundJoin Map.empty)
                     PromptAuthority.ContinuationKind.JoinGuard
@@ -119,6 +121,7 @@ module HostJoinGuard =
 
     let private nudgeWithJournal
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (durable: AgentJournal)
         (nudgeKeys: HashSet<string>)
         (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
@@ -137,6 +140,7 @@ module HostJoinGuard =
                 return!
                     sendReservedNudge
                         sessionPort
+                        rootWorkspace
                         durable
                         nudgeKeys
                         physicalAdmission
@@ -152,6 +156,7 @@ module HostJoinGuard =
     /// terminal occasion and consumes the fresh idle permit at physical send.
     let nudge
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
         (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
@@ -167,6 +172,7 @@ module HostJoinGuard =
                 return!
                     nudgeWithJournal
                         sessionPort
+                        rootWorkspace
                         durable
                         nudgeKeys
                         physicalAdmission

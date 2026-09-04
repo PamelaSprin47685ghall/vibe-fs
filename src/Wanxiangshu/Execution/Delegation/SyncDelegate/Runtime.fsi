@@ -19,7 +19,11 @@ module internal SyncDelegatePhysicalIdentity =
 type SyncDelegateRuntime =
     new:
         sessions: ISessionHostPort *
-        waitObserver: IWaitObserver *
+        awaitWorkRecord: (DiagnosticWait -> Task<Result<string, string>> -> Task<Result<string, string>>) *
+        awaitInvocation:
+            (DiagnosticWait
+                -> Task<Result<SyncDelegateInvocationResult, string>>
+                -> Task<Result<SyncDelegateInvocationResult, string>>) *
         dispatcher: PromptDispatcher.Runtime *
         journal: AgentJournal *
         attached: IAttachedSessionPort *

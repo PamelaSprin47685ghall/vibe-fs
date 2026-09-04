@@ -23,6 +23,7 @@ module HostJoinGuard =
     /// terminal occasion and consumes the fresh idle permit at physical send.
     val nudge:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         journal: AgentJournal option ->
         nudgeKeys: HashSet<string> ->
         physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) ->

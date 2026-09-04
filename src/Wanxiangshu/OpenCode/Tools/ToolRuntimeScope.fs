@@ -32,6 +32,7 @@ type ToolRuntimeScope
     (
         sessions: ISessionHostPort,
         waitObserver: IWaitObserver,
+        rootWorkspace: IRootWorkspaceReader,
         journal: AgentJournal option,
         gitTreePort: GitTreePort option,
         workspaceDirectory: string option,
@@ -173,6 +174,7 @@ type ToolRuntimeScope
             SessionId.create sid,
             sessions,
             childRecordForRun,
+            CompletionMailboxRuntime.create,
             ?journal = journal,
             onChildCreated = (fun _ role childId -> registerChild sid role childId),
             onChildCreatedDir =
@@ -376,6 +378,7 @@ type ToolRuntimeScope
     member _.FinalityReviewerTimeoutMs = finalityTimeoutMs
     member _.Sessions = sessions
     member _.WaitObserver = waitObserver
+    member _.RootWorkspace = rootWorkspace
     member _.Journal = journal
     member _.Snapshot = snapshot
     member _.EventPort = terminalPort
@@ -464,6 +467,7 @@ type ToolRuntimeScope
                         SessionId.create ctx.SessionId,
                         sessions,
                         childRecordForRun,
+                        CompletionMailboxRuntime.create,
                         ?journal = journal,
                         onChildCreated = (fun _ role childId -> registerChild ctx.SessionId role childId),
                         // EXEC-014: map/reduce Distiller children are Host-owned and
@@ -485,6 +489,7 @@ type ToolRuntimeScope
                 let host =
                     OrchestratorHost(
                         { Sessions = sessions
+                          RootWorkspace = rootWorkspace
                           WaitObserver = waitObserver
                           Journal = journal
                           SessionSnapshot = snapshot

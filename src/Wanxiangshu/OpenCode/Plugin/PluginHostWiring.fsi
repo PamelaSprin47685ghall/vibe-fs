@@ -19,6 +19,7 @@ module PluginHostWiring =
           SharedTerminalPort: Events.HostEventPort option
           GitTreePort: GitTreePort option
           StrengthDurability: StrengthDurabilityPort option
+          RootWorkspace: IRootWorkspaceReader
           CausalWaitObserver: IWaitObserver }
 
     val create: boot: PluginBoot.Boot -> Task<Host>

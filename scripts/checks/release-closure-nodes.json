@@ -1654,6 +1654,21 @@
       ]
     },
     {
+      "id": "host-root-workspace-effect-isolation",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/RootWorkspace.fs",
+        "src/Wanxiangshu/OpenCode/Host/RootWorkspaceRuntime.fs"
+      ],
+      "proofs": [
+        "requirements/host-boundary/tests/m6-slice-boundary.test.mjs",
+        "requirements/host-boundary/tests/shared-state.test.mjs"
+      ],
+      "publishes": [
+        "Host.RootWorkspace.Contract"
+      ]
+    },
+    {
       "id": "delegation-frontier-keep",
       "state": "DONE",
       "files": [
