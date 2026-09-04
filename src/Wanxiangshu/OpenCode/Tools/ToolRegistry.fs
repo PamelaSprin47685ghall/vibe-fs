@@ -11,9 +11,7 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host.Contract
-open Wanxiangshu.Mission.Finality.OpenCode
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.OpenCode
+open Wanxiangshu.Mission.Relay.OpenCode
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
@@ -40,6 +38,9 @@ module ToolRegistry =
         [<Literal>]
         let DeniedUnestablished = "tool/registry/denied-unestablished"
 
+        [<Literal>]
+        let DeniedRelayPhase = "tool/registry/denied-relay-phase"
+
     let private lang (ctx: HostToolContext) =
         let sessionText = ctx.SessionId
 
@@ -55,8 +56,8 @@ module ToolRegistry =
           "join", JoinTool.admission
           "horizon", HorizonTool.admission
           "fission", FissionTool.admission
-          "judge", JudgeTool.admission
-          "suicide", FinalityTool.admission
+          "review", ReviewTool.admission
+          "suicide", SuicideTool.admission
           "run", ExecutorTool.runAdmission
           "query-shell", ExecutorTool.queryShellAdmission
           "inspect", InspectorTool.admission
@@ -124,11 +125,9 @@ module ToolRegistry =
         (toolModule: obj)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
-        (gitTreePort: GitTreePort option)
         (workspaceDirectory: string option)
         (sessionParents: Dictionary<string, string>)
         (currentPhysicalUserMessage: string -> string option)
-        (verdictSubmissions: HashSet<string>)
         (sessionDirectories: Dictionary<string, string>)
         (onRunStarted: (SessionId -> Role -> string option -> unit) option)
         (parentWorkRecordFor: (string -> Task<string option>) option)
@@ -139,7 +138,6 @@ module ToolRegistry =
         (bloggerHost: IBloggerRuntimeHost option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (strengthRuntime: StrengthRuntime option)
-        (finalityReviewerTimeoutMs: int option)
         (casebookToolSpecs: ToolSpec list)
         (jsTransactionPersistence: IJsTransactionPersistence option)
         =
@@ -157,19 +155,16 @@ module ToolRegistry =
             new ToolRuntimeScope(
                 sessionPort,
                 journal,
-                gitTreePort,
                 workspaceDirectory,
                 sessionParents,
                 currentPhysicalUserMessage,
-                verdictSubmissions,
                 sessionDirectories,
                 onRunStarted,
                 parentWorkRecordFor,
                 childWorkRecordFor,
                 snapshot,
                 cancelSignals,
-                ?eventPort = eventPort,
-                ?finalityReviewerTimeoutMs = finalityReviewerTimeoutMs
+                ?eventPort = eventPort
             )
 
         let generatedJsSpecs () =
@@ -192,8 +187,8 @@ module ToolRegistry =
               yield JoinTool.spec runtime
               yield HorizonTool.spec runtime
               yield FissionTool.spec factory runtime
-              yield JudgeTool.spec factory runtime
-              yield FinalityTool.spec factory runtime
+              yield ReviewTool.spec factory runtime
+              yield SuicideTool.spec factory runtime
               yield ExecutorTool.runSpec factory runtime
               yield ExecutorTool.queryShellSpec factory runtime
               yield InspectorTool.spec factory runtime syncDelegateRuntime
@@ -215,18 +210,53 @@ module ToolRegistry =
         let gateExecute (spec: ToolSpec) =
             let original = spec.Execute
 
+            let managerPermission =
+                match spec.Name with
+                | "fork" -> Some ToolPermission.Fork
+                | "join" -> Some ToolPermission.Join
+                | "horizon" -> Some ToolPermission.Horizon
+                | "fission" -> Some ToolPermission.Fission
+                | "review" -> Some ToolPermission.ReviewAssessment
+                | "suicide" -> Some ToolPermission.Finality
+                | _ -> None
+
             let denied (ctx: HostToolContext) path (subs: Map<string, string>) =
                 ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] []
 
             let denyRole (ctx: HostToolContext) (role: Role) =
                 denied ctx Path.DeniedRole (Map [ "tool", spec.Name; "role", sprintf "%A" role ])
 
+            let denyRelayPhase (ctx: HostToolContext) phase =
+                denied
+                    ctx
+                    Path.DeniedRelayPhase
+                    (Map [ "tool", spec.Name; "phase", sprintf "%A" phase ])
+
             let executeKnownRole officeAdmission args (ctx: HostToolContext) (role: Role) =
                 task {
-                    if officeAdmission ctx role then
+                    if not (officeAdmission ctx role) then
+                        return denyRole ctx role
+                    elif role <> Role.Manager then
                         return! original args ctx
                     else
-                        return denyRole ctx role
+                        let phase = runtime.ManagerPhaseFor ctx.SessionId
+                        let frozen = runtime.IsRetirementFrozen ctx.SessionId
+
+                        match managerPermission with
+                        | Some permission
+                            when frozen
+                                 && permission <> ToolPermission.Join
+                                 && permission <> ToolPermission.Finality ->
+                            return denyRelayPhase ctx ManagerCapabilityPhase.RetirementCleanupBlocked
+                        | Some permission
+                            when not (
+                                OfficeCapability.isAllowedForPhase
+                                    Role.Manager
+                                    (Some phase)
+                                    permission
+                            ) ->
+                            return denyRelayPhase ctx phase
+                        | _ -> return! original args ctx
                 }
 
             let executeAfterEnsure officeAdmission args (ctx: HostToolContext) =

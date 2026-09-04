@@ -10,7 +10,6 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.Journal
 
@@ -22,30 +21,15 @@ module BloggerMainContext =
         | Ok value -> value
         | Error error -> raise (InvalidOperationException error)
 
-    let private openingFloor (journal: AgentJournal option) (mainSessionId: SessionId) =
-        journal
-        |> Option.bind (fun durable ->
-            ManagerOpeningFloor.floorSequence mainSessionId (AgentJournal.snapshot durable).AgentProjections)
-
     let private nextChunk
-        (journal: AgentJournal option)
-        (mainSessionId: SessionId)
+        (_journal: AgentJournal option)
+        (_mainSessionId: SessionId)
         (blog: BlogProjectionState)
         (xTrace: XTraceProjectionState)
         (projection: ProviderProjection.ProviderSemanticProjection)
         =
         let ingested = blog.Coverage.IngestedThroughSequence |> XTraceCursor.create
-
-        let effectiveIngested =
-            openingFloor journal mainSessionId
-            |> Option.map XTraceCursor.create
-            |> Option.map (fun floor ->
-                if XTraceCursor.isAfter floor ingested then
-                    floor
-                else
-                    ingested)
-            |> Option.defaultValue ingested
-            |> RecordCoverage.create
+        let effectiveIngested = RecordCoverage.create ingested
 
         BloggerDelta.nextChunk
             BloggerDelta.DeltaLimitBytes

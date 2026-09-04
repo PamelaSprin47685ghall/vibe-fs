@@ -5,6 +5,7 @@ open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Relay
 
 /// MagicTodoProjection — canonical todo list from facts.
 ///
@@ -36,12 +37,12 @@ module MagicTodoProjection =
           PreparedFactRef: EventId
           Lifecycle: CheckpointLifecycle }
 
-    /// Per-Life Magic Todo derived view.
+    /// Per-incumbency Magic Todo derived view.
     /// DSL-state-combination: domain — checkpoint locators are durable event-integral
     /// evidence; each records facts already observed and none selects the next workflow step.
-    type LifeMagicTodoState =
+    type IncumbencyMagicTodoState =
         {
-            LifeId: ManagerLifeId
+            IncumbencyId: IncumbencyId
             /// Canonical provider account: the latest Accepted checkpoint's Submitted account.
             /// None means a normal new Life before T1 (or no legacy seed).
             CurrentObligationsRef: (BlobRef * BlobDigest) option
@@ -58,23 +59,23 @@ module MagicTodoProjection =
         }
 
     type MagicTodoProjectionState =
-        { ByLife: Map<string, LifeMagicTodoState> }
+        { ByIncumbency: Map<string, IncumbencyMagicTodoState> }
 
     [<RequireQualifiedAccess>]
     type MagicTodoFoldRejection =
-        | LifeMismatch of expected: string * actual: string
+        | IncumbencyMismatch of expected: string * actual: string
         | PreparedMissingForAccept of todoWriteId: string
         | IdentityCorruption of field: string
         | LegacySeedAfterCheckpoint
 
-    let empty: MagicTodoProjectionState = { ByLife = Map.empty }
+    let empty: MagicTodoProjectionState = { ByIncumbency = Map.empty }
 
-    let private lifeKey (lifeId: ManagerLifeId) = ManagerLifeId.value lifeId
+    let private incumbencyKey (incumbencyId: IncumbencyId) = IncumbencyId.value incumbencyId
 
     let private writeKey (writeId: TodoWriteId) = TodoWriteId.value writeId
 
-    let emptyLife (lifeId: ManagerLifeId) : LifeMagicTodoState =
-        { LifeId = lifeId
+    let emptyIncumbency (incumbencyId: IncumbencyId) : IncumbencyMagicTodoState =
+        { IncumbencyId = incumbencyId
           CurrentObligationsRef = None
           FirstAcceptedCheckpoint = None
           LatestAcceptedCheckpoint = None
@@ -84,27 +85,31 @@ module MagicTodoProjection =
           Checkpoints = Map.empty
           LegacySeed = None }
 
-    let tryLife (lifeId: ManagerLifeId) (state: MagicTodoProjectionState) : LifeMagicTodoState option =
-        Map.tryFind (lifeKey lifeId) state.ByLife
-
-    let ensureLife
-        (lifeId: ManagerLifeId)
+    let tryIncumbency
+        (incumbencyId: IncumbencyId)
         (state: MagicTodoProjectionState)
-        : LifeMagicTodoState * MagicTodoProjectionState =
-        match tryLife lifeId state with
-        | Some life -> life, state
+        : IncumbencyMagicTodoState option =
+        Map.tryFind (incumbencyKey incumbencyId) state.ByIncumbency
+
+    let ensureIncumbency
+        (incumbencyId: IncumbencyId)
+        (state: MagicTodoProjectionState)
+        : IncumbencyMagicTodoState * MagicTodoProjectionState =
+        match tryIncumbency incumbencyId state with
+        | Some incumbency -> incumbency, state
         | None ->
-            let life = emptyLife lifeId
+            let incumbency = emptyIncumbency incumbencyId
 
-            life,
+            incumbency,
             { state with
-                ByLife = Map.add (lifeKey lifeId) life state.ByLife }
+                ByIncumbency = Map.add (incumbencyKey incumbencyId) incumbency state.ByIncumbency }
 
-    let private putLife (life: LifeMagicTodoState) (state: MagicTodoProjectionState) =
+    let private putIncumbency (incumbency: IncumbencyMagicTodoState) (state: MagicTodoProjectionState) =
         { state with
-            ByLife = Map.add (lifeKey life.LifeId) life state.ByLife }
+            ByIncumbency =
+                Map.add (incumbencyKey incumbency.IncumbencyId) incumbency state.ByIncumbency }
 
-    let isPlanCommitted (life: LifeMagicTodoState) : bool = life.FirstPlanCommitment.IsSome
+    let isPlanCommitted (incumbency: IncumbencyMagicTodoState) : bool = incumbency.FirstPlanCommitment.IsSome
 
     let acceptedEvidence (checkpoint: CheckpointRecord) : AcceptedCheckpointEvidence option =
         match checkpoint.Lifecycle with
@@ -146,7 +151,7 @@ module MagicTodoProjection =
     let private insertPreparedCheckpoint
         (preparedFactRef: EventId)
         (payload: TodoWritePrepared)
-        (life: LifeMagicTodoState)
+        (incumbency: IncumbencyMagicTodoState)
         (state: MagicTodoProjectionState)
         =
         let key = writeKey payload.TodoWriteId
@@ -167,9 +172,9 @@ module MagicTodoProjection =
               PreparedFactRef = preparedFactRef
               Lifecycle = CheckpointLifecycle.Prepared }
 
-        putLife
-            { life with
-                Checkpoints = Map.add key cp life.Checkpoints }
+        putIncumbency
+            { incumbency with
+                Checkpoints = Map.add key cp incumbency.Checkpoints }
             state
 
     let private requireAcceptedReplay
@@ -186,16 +191,20 @@ module MagicTodoProjection =
         | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedDigest")
         | None -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedState")
 
-    let private commitmentAfterAccept (life: LifeMagicTodoState) (writeId: TodoWriteId) (planCompleteDeclared: bool) =
-        match life.FirstPlanCommitment with
+    let private commitmentAfterAccept
+        (incumbency: IncumbencyMagicTodoState)
+        (writeId: TodoWriteId)
+        (planCompleteDeclared: bool)
+        =
+        match incumbency.FirstPlanCommitment with
         | None when planCompleteDeclared -> Some writeId, None, Some writeId
         | None -> None, None, None
-        | Some first -> Some first, life.LatestCommittedCheckpoint, Some writeId
+        | Some first -> Some first, incumbency.LatestCommittedCheckpoint, Some writeId
 
     let private acceptCheckpoint
         (payload: TodoWriteAccepted)
         (cp: CheckpointRecord)
-        (life: LifeMagicTodoState)
+        (incumbency: IncumbencyMagicTodoState)
         (state: MagicTodoProjectionState)
         =
         let key = writeKey payload.TodoWriteId
@@ -209,14 +218,14 @@ module MagicTodoProjection =
                 Lifecycle = CheckpointLifecycle.Accepted accepted }
 
         let firstAccepted =
-            life.FirstAcceptedCheckpoint |> Option.orElse (Some payload.TodoWriteId)
+            incumbency.FirstAcceptedCheckpoint |> Option.orElse (Some payload.TodoWriteId)
 
         let firstCommitment, previousCommitted, latestCommitted =
-            commitmentAfterAccept life payload.TodoWriteId cp.PlanCompleteDeclared
+            commitmentAfterAccept incumbency payload.TodoWriteId cp.PlanCompleteDeclared
 
-        putLife
-            { life with
-                Checkpoints = Map.add key cp life.Checkpoints
+        putIncumbency
+            { incumbency with
+                Checkpoints = Map.add key cp incumbency.Checkpoints
                 FirstAcceptedCheckpoint = firstAccepted
                 LatestAcceptedCheckpoint = Some payload.TodoWriteId
                 FirstPlanCommitment = firstCommitment
@@ -230,25 +239,25 @@ module MagicTodoProjection =
         (payload: TodoWritePrepared)
         (state: MagicTodoProjectionState)
         : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
-        let life, state = ensureLife payload.ManagerLifeId state
+        let incumbency, state = ensureIncumbency payload.IncumbencyId state
         let key = writeKey payload.TodoWriteId
 
-        match Map.tryFind key life.Checkpoints with
+        match Map.tryFind key incumbency.Checkpoints with
         | Some existing ->
             result {
                 do! requirePreparedReplayIdentity existing payload
                 return state
             }
-        | None -> Ok(insertPreparedCheckpoint preparedFactRef payload life state)
+        | None -> Ok(insertPreparedCheckpoint preparedFactRef payload incumbency state)
 
     let foldAccepted
         (payload: TodoWriteAccepted)
         (state: MagicTodoProjectionState)
         : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
-        let life, state = ensureLife payload.ManagerLifeId state
+        let incumbency, state = ensureIncumbency payload.IncumbencyId state
         let key = writeKey payload.TodoWriteId
 
-        match Map.tryFind key life.Checkpoints with
+        match Map.tryFind key incumbency.Checkpoints with
         | None -> Error(MagicTodoFoldRejection.PreparedMissingForAccept key)
         | Some cp when cp.PreparedFactRef <> payload.PreparedFactRef ->
             Error(MagicTodoFoldRejection.IdentityCorruption "PreparedFactRef")
@@ -258,24 +267,26 @@ module MagicTodoProjection =
             Error(MagicTodoFoldRejection.IdentityCorruption "InputDigest")
         | Some cp when cp.SemanticVersion <> payload.SemanticVersion ->
             Error(MagicTodoFoldRejection.IdentityCorruption "SemanticVersion")
-        | Some({ Lifecycle = CheckpointLifecycle.Prepared } as cp) -> Ok(acceptCheckpoint payload cp life state)
+        | Some({ Lifecycle = CheckpointLifecycle.Prepared } as cp) ->
+            Ok(acceptCheckpoint payload cp incumbency state)
         | Some cp -> requireAcceptedReplay cp payload state
 
     let foldLegacySeed
         (payload: LegacyTodoSeedAdopted)
         (state: MagicTodoProjectionState)
         : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
-        let life, state = ensureLife payload.ManagerLifeId state
+        let incumbency, state = ensureIncumbency payload.IncumbencyId state
 
-        match life.LegacySeed with
+        match incumbency.LegacySeed with
         | Some(seedRef, seedDigest) when seedRef = payload.SeedTodoRef && seedDigest = payload.SeedTodoDigest ->
             Ok state
         | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "LegacyTodoSeed")
-        | None when not (Map.isEmpty life.Checkpoints) -> Error MagicTodoFoldRejection.LegacySeedAfterCheckpoint
+        | None when not (Map.isEmpty incumbency.Checkpoints) ->
+            Error MagicTodoFoldRejection.LegacySeedAfterCheckpoint
         | None ->
             Ok(
-                putLife
-                    { life with
+                putIncumbency
+                    { incumbency with
                         CurrentObligationsRef = Some(payload.SeedTodoRef, payload.SeedTodoDigest)
                         LegacySeed = Some(payload.SeedTodoRef, payload.SeedTodoDigest) }
                     state

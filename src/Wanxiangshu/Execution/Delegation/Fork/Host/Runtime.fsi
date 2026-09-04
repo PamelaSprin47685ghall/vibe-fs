@@ -30,8 +30,6 @@ type HostForkRuntime =
         ?handoff: ReusableHandoffPort *
         ?sessionSnapshot: ISessionSnapshotPort *
         ?cancelSignals: (SessionId seq -> unit) *
-        ?managerOpensReviewBarrier: bool *
-        ?treeHashFor: (string -> GitTreeHash option) *
         ?ownership: HandleOwnership *
         ?clock: IClockPort ->
             HostForkRuntime
@@ -92,8 +90,6 @@ type HostForkRuntime =
 
     member internal SendBusyNudge: (string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
     member internal ParentAbortToken: int
-    member internal ManagerOpensReviewBarrier: bool
-    member internal TreeHashFor: (string -> GitTreeHash option)
     member IsRetiredHandle: agentId: string -> bool option
     member Complete: run: PendingHostRun * outcome: TerminalOutcome -> unit
 

@@ -4,7 +4,6 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Change
-open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System.Threading.Tasks
@@ -23,10 +22,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
@@ -688,35 +684,6 @@ module PromptDispatcherSend =
                 onAccepted
                 None
 
-        /// GLORY-029: one Manager idle encouragement per exact terminal occasion.
-        /// Fresh ProviderRun identities are deliberately unbounded; the terminal
-        /// identity only prevents duplicate idle delivery from double-sending.
-        member this.SendManagerIdleEncouragement
-            (port: ISessionHostPort)
-            (sessionId: SessionId)
-            (text: string)
-            (lifeId: ManagerLifeId)
-            (conditionKey: string)
-            (terminalProviderRun: ProviderRunIdentity)
-            (profile: PromptAuthority.AuthorityExecutionProfile)
-            (effectiveAgent: string)
-            (directory: string option)
-            (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
-            : Task<Result<PromptKey, string>> =
-            this.SendContinuationWithDigest
-                port
-                sessionId
-                text
-                (PromptAuthority.idlePayloadDigest lifeId conditionKey terminalProviderRun)
-                PromptAuthority.ContinuationKind.ManagerIdleEncouragement
-                profile
-                effectiveAgent
-                directory
-                awaitMode
-                onAccepted
-                None
-
         /// HOST-004: idle-derived continuation whose quiescence permit is
         /// consumed at the final physical SendPrompt boundary, after durable
         /// claim persistence. This is the only continuation send surface that
@@ -803,29 +770,3 @@ module PromptDispatcherSend =
                 None
                 (Some physicalAdmission)
 
-        member internal this.SendIdleManagerIdleEncouragement
-            (port: ISessionHostPort)
-            (sessionId: SessionId)
-            (text: string)
-            (lifeId: ManagerLifeId)
-            (conditionKey: string)
-            (terminalProviderRun: ProviderRunIdentity)
-            (profile: PromptAuthority.AuthorityExecutionProfile)
-            (effectiveAgent: string)
-            (directory: string option)
-            (awaitMode: PromptDispatcher.AwaitMode)
-            (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
-            : Task<PromptDispatcher.SendAttemptOutcome> =
-            this.SendContinuationWithDigestAttempt
-                port
-                sessionId
-                text
-                (PromptAuthority.idlePayloadDigest lifeId conditionKey terminalProviderRun)
-                PromptAuthority.ContinuationKind.ManagerIdleEncouragement
-                profile
-                effectiveAgent
-                directory
-                awaitMode
-                None
-                None
-                (Some physicalAdmission)

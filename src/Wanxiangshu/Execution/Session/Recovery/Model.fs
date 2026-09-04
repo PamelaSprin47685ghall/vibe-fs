@@ -44,7 +44,6 @@ module SessionRecovery =
         | Companion of main: SessionId * companion: SessionId
         | Blogger of main: SessionId * blogger: SessionId
         | ManagerJob of ManagerJobId * manager: SessionId
-        | Reviewer of ManagerJobId * reviewer: SessionId
 
     module RecoveryNode =
         /// One member's stable token. Owned here rather than in the projection because two things
@@ -63,7 +62,6 @@ module SessionRecovery =
             | RecoveryNode.Companion(main, companion) -> "C:" + SessionId.value main + ">" + SessionId.value companion
             | RecoveryNode.Blogger(main, blogger) -> "B:" + SessionId.value main + ">" + SessionId.value blogger
             | RecoveryNode.ManagerJob(jobId, manager) -> "M:" + ManagerJobId.value jobId + ":" + SessionId.value manager
-            | RecoveryNode.Reviewer(jobId, reviewer) -> "R:" + ManagerJobId.value jobId + ":" + SessionId.value reviewer
 
     type RecoveryReceipt =
         private
@@ -322,8 +320,7 @@ module SessionRecovery =
         | RecoveryNode.AgentChild(_, id, _)
         | RecoveryNode.Companion(_, id)
         | RecoveryNode.Blogger(_, id)
-        | RecoveryNode.ManagerJob(_, id)
-        | RecoveryNode.Reviewer(_, id) -> id
+        | RecoveryNode.ManagerJob(_, id) -> id
 
     /// Pure: duplicate session in ordered nodes → cycle block; else wrap.
     let validateClosurePure (closure: RecoveryClosure) : Result<ValidatedClosure, NonEmpty<RecoveryBlock>> =

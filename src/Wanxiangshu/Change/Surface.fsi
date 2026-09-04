@@ -83,6 +83,3 @@ module ChangeSurface =
 
     val disposeGate: gate: obj -> Task<unit>
 
-    val observeProgramGateScope: scenario: string -> Task<obj>
-
-    val observeMovedTargetRecovery: unit -> Task<obj>

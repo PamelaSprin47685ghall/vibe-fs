@@ -15,7 +15,6 @@ type StrengthOpportunity =
       EffectiveAgent: string
       IsFallbackRetry: bool
       HasPrefixProbe: bool
-      IsReviewerOrFinality: bool
       IsAttachedOrInternalLeaf: bool
       OwnerCancelled: bool
       TargetProviderRunBound: bool
@@ -62,8 +61,6 @@ module StrengthPolicy =
             StrengthEligibility.Ineligible "fallback-retry"
         elif opportunity.HasPrefixProbe then
             StrengthEligibility.Ineligible "prefix-probe"
-        elif opportunity.IsReviewerOrFinality then
-            StrengthEligibility.Ineligible "review-or-finality"
         elif opportunity.IsAttachedOrInternalLeaf then
             StrengthEligibility.Ineligible "attached-or-internal-leaf"
         elif opportunity.OwnerCancelled then

@@ -29,7 +29,6 @@ module SessionRecovery =
         | Companion of main: SessionId * companion: SessionId
         | Blogger of main: SessionId * blogger: SessionId
         | ManagerJob of ManagerJobId * manager: SessionId
-        | Reviewer of ManagerJobId * reviewer: SessionId
 
     module RecoveryNode =
         val token: node: RecoveryNode -> string

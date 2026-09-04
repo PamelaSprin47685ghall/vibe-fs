@@ -8,7 +8,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Persistence.EventStore
@@ -92,9 +91,6 @@ module JournalSurface =
         else
             Some(ProviderRunIdentity.create (str value))
 
-    let private blobDigest (value: obj) : BlobDigest = BlobDigest.create (str value)
-    let private blobRef (value: obj) : BlobRef = BlobRef.create (str value)
-
     let private agentFactOfJs (value: obj) : AgentFact =
         let family = str (value?family)
         let case = str (value?case)
@@ -104,21 +100,6 @@ module JournalSurface =
         | "Companion", "CompanionBloggerClosed" ->
             CompanionFact.CompanionBloggerClosed {| SessionId = sessionIdOf (payload?SessionId) |}
         | _ -> failwith $"JournalSurface: unknown AgentFact {family}.{case}"
-
-    let private managerLifecycleOfJs (value: obj) : ManagerLifecycleFact =
-        let case = str (value?case)
-        let payload = unbox<obj> (value?payload)
-
-        match case with
-        | "LifeOpened" ->
-            ManagerLifecycleFact.LifeOpened
-                {| SessionId = sessionIdOf (payload?SessionId)
-                   LifeId = ManagerLifeId.create (str (payload?LifeId))
-                   OpeningUserMessageId = PhysicalUserMessageId.create (str (payload?OpeningUserMessageId))
-                   OpeningTextRef = blobRef (payload?OpeningTextRef)
-                   OpeningTextDigest = blobDigest (payload?OpeningTextDigest)
-                   OpeningCursorSequence = unbox<int64> (payload?OpeningCursorSequence) |}
-        | other -> failwith $"JournalSurface: unknown ManagerLifecycle case '{other}'"
 
     let private streamOfJs (value: obj) : StreamId =
         match str (value?kind) with
@@ -229,23 +210,6 @@ module JournalSurface =
         task {
             let! result =
                 AgentJournal.appendAgent (streamOfJs stream) (providerRunOf run) (agentFactOfJs fact) handle.Journal
-
-            return
-                match result with
-                | Ok projection ->
-                    box
-                        {| ok = true
-                           projection = projectionToJs projection |}
-                | Error error ->
-                    box
-                        {| ok = false
-                           error = error.ToString() |}
-        }
-
-    let appendManagerLifecycle (handle: JournalHandle) (stream: obj) (fact: obj) : Task<obj> =
-        task {
-            let! result =
-                AgentJournal.appendManagerLifecycle (streamOfJs stream) (managerLifecycleOfJs fact) handle.Journal
 
             return
                 match result with

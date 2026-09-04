@@ -1,7 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
-open Wanxiangshu.Mission.Review
+open Wanxiangshu.Git
 open Wanxiangshu.Strength.Persistence
 
 module PluginHostWiring =
@@ -16,7 +16,6 @@ module PluginHostWiring =
           Wired: HostSignalBootstrap.WiredSignals
           SharedTerminalKey: string option
           SharedTerminalPort: Events.HostEventPort option
-          GitTreePort: GitTreePort option
           StrengthDurability: StrengthDurabilityPort option }
 
     val create: boot: PluginBoot.Boot -> Task<Host>

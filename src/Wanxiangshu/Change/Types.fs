@@ -4,6 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.Journal
 
 /// What one ManagerJob's publication attempt resolved to.
@@ -70,42 +71,28 @@ type GitPort =
 /// A record, not four positional arguments: `ManagerAgent` and `Prompt` are both
 /// `string` and adjacent, which is exactly where positional arguments get swapped —
 /// and a swapped pair would fork an agent named after the task text.
-type ManagerStart =
+type RoadStart =
     { JobId: ManagerJobId
       ManagerAgent: string
       Worktree: WorktreePath
-      Prompt: string
+      RootRequest: string
       ExpectedToolCalls: int option }
 
-/// Manager and reviewer execution, as the Host layer provides it.
-///
-/// `StartManager` and `AwaitManager` are separate because ORCH-006 requires
-/// `ManagerJobCreated` to carry the Manager's `SessionId`, which only exists once
-/// the fork has happened. A single combined call could only write that fact after
-/// the Manager had already finished — a crash in between would leave a live
-/// Manager with no durable job.
-type ManagerPort =
-    {
-        StartManager: ManagerStart -> Task<Result<SessionId, string>>
-        SendManagerPrompt: ManagerJobId -> Task<Result<unit, string>>
-        AwaitManager: ManagerJobId -> Task<Result<unit, string>>
+[<RequireQualifiedAccess>]
+type RoadSignal =
+    | IncumbencyRetired of RetirementSummary
+    | QualityCandidateAccepted of RetirementSummary * QualityCertificate
+    | ExceptionalTerminal of string
 
-        /// One review barrier: fork a reviewer, open the barrier, and wait for a
-        /// confirmed dual PERFECT on the current tree. REVIEW-008 requires a fresh
-        /// barrier per round, so the id is supplied by the caller rather than derived
-        /// from the tree.
-        Reverify: ManagerJobId -> SessionId -> WorktreePath -> ReviewBarrierId -> Task<Result<unit, string>>
-
-        /// Hand a rebase conflict back to the SAME Manager in the SAME worktree
-        /// (ORCH-003/ORCH-007).
-        ResumeManager: ManagerJobId -> WorktreePath -> string -> Task<Result<unit, string>>
-
-        /// ORCH-006: abort the Manager's Host session and every reviewer child
-        /// session before the worktree is released.  This prevents residual guard
-        /// nudges and continuations from building a system prompt against the
-        /// deleted worktree after `Published` has been appended.
-        TerminateChildren: ManagerJobId -> Task<unit>
-    }
+type RelayPort =
+    { OpenRoad: RoadStart -> Task<Result<SessionId, string>>
+      ActivateRoad: ManagerJobId -> Task<Result<unit, string>>
+      AwaitRoadSignal: ManagerJobId -> Task<Result<RoadSignal, string>>
+      InvalidateCertificate: ManagerJobId -> reason: string -> Task<Result<unit, string>>
+      RequestSuccessor: ManagerJobId -> WorktreePath -> reason: string -> Task<Result<IncumbencyId, string>>
+      CaptureSnapshot: ManagerJobId -> Task<Result<WorkspaceSnapshotId, string>>
+      PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
+      TerminateRoadResources: ManagerJobId -> Task<unit> }
 
 type OrchestratorJournalPort =
     { AppendFact: StreamId -> AgentFact -> Task<Result<ProjectionSet, string>>
@@ -126,7 +113,7 @@ type PublishGateLease = { Release: unit -> Task<unit> }
 
 type OrchestratorProgramDeps =
     { Git: GitPort
-      Manager: ManagerPort
+      Relay: RelayPort
       AppendFact: StreamId -> AgentFact -> Task<Result<unit, string>>
       Snapshot: unit -> ProjectionSet
       AcquirePublishGate: unit -> Task<PublishGateLease> }

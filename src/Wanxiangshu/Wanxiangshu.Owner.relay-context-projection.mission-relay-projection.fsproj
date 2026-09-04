@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>relay-context-projection</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>mission-relay-projection</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
+    <Compile Include="Mission/Relay/ProjectionSurface.fsi"/>
+    <Compile Include="Mission/Relay/ProjectionSurface.fs"/>
+  </ItemGroup>
+</Project>

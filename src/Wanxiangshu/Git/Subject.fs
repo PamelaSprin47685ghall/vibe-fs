@@ -3,6 +3,11 @@ namespace Wanxiangshu.Git
 open Fable.Core
 open Fable.Core.JsInterop
 
+/// Minimal synchronous Git tree capability shared by Host/runtime consumers.
+/// Review no longer owns repository state in the Relay architecture.
+[<Struct>]
+type GitTreePort = { GetTreeHash: unit -> string }
+
 /// Subject verbs that own the production `git` executable token (§37).
 /// Tree-hash / common-dir / orchestrator-host callers outside Infrastructure/Git|Persist
 /// must go through here (pre-GitGateway cutover).
@@ -47,6 +52,18 @@ module GitSubject =
 
     let lsFilesUntracked (directory: string) : string =
         execIn directory [| "ls-files"; "--others"; "--exclude-standard" |]
+
+    let lsFilesUntrackedZ (directory: string) : string =
+        execIn directory [| "ls-files"; "--others"; "--exclude-standard"; "-z" |]
+
+    let statusPorcelainV2Z (directory: string) : string =
+        execIn directory [| "status"; "--porcelain=v2"; "-z"; "--untracked-files=all" |]
+
+    let lsFilesStageZ (directory: string) : string =
+        execIn directory [| "ls-files"; "--stage"; "-z" |]
+
+    let hashObjectNoFilters (directory: string) (path: string) : string =
+        (execIn directory [| "hash-object"; "--no-filters"; "--"; path |]).Trim()
 
     let revParseHeadTree (directory: string) : string =
         (execIn directory [| "rev-parse"; "HEAD^{tree}" |]).Trim()

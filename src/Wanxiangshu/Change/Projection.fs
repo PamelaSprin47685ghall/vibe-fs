@@ -2,6 +2,7 @@ namespace Wanxiangshu.Change
 
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Relay
 
 [<RequireQualifiedAccess>]
 type TerminalOutcome =
@@ -22,16 +23,18 @@ type ManagerJobProjection =
       TargetBranchFrozen: string
       CandidateReady:
           {| CandidateCommit: CommitHash
-             PreRebaseReviewBarrierId: ReviewBarrierId |} option
+             WorkspaceSnapshotId: WorkspaceSnapshotId
+             QualityCertificateId: QualityCertificateId |} option
       ConflictDetected:
           {| CandidateCommit: CommitHash
              TargetHeadSnapshot: CommitHash
+             WorkspaceSnapshotId: WorkspaceSnapshotId
              ConflictFiles: string list
              DiagnosticsDigest: string |} option
       RebasedCandidateReady:
           {| RebasedCommit: CommitHash
              TargetHeadSnapshot: CommitHash
-             PostRebaseReviewBarrierId: ReviewBarrierId |} option
+             WorkspaceSnapshotId: WorkspaceSnapshotId |} option
       PublishClaimed:
           {| RebasedCommit: CommitHash
              ExpectedHead: CommitHash |} option
@@ -263,7 +266,8 @@ module OrchestratorProjection =
         (jobId: ManagerJobId)
         (payload:
             {| CandidateCommit: CommitHash
-               PreRebaseReviewBarrierId: ReviewBarrierId |})
+               WorkspaceSnapshotId: WorkspaceSnapshotId
+               QualityCertificateId: QualityCertificateId |})
         (projection: OrchestratorProjection)
         =
         updateActiveJob
@@ -278,6 +282,7 @@ module OrchestratorProjection =
         (payload:
             {| CandidateCommit: CommitHash
                TargetHeadSnapshot: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId
                ConflictFiles: string list
                DiagnosticsDigest: string |})
         (projection: OrchestratorProjection)
@@ -294,7 +299,7 @@ module OrchestratorProjection =
         (payload:
             {| RebasedCommit: CommitHash
                TargetHeadSnapshot: CommitHash
-               PostRebaseReviewBarrierId: ReviewBarrierId |})
+               WorkspaceSnapshotId: WorkspaceSnapshotId |})
         (projection: OrchestratorProjection)
         =
         updateActiveJob

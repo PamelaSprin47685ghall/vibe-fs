@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Change
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Relay
 
 [<RequireQualifiedAccess>]
 type TerminalOutcome =
@@ -21,16 +22,18 @@ type ManagerJobProjection =
       TargetBranchFrozen: string
       CandidateReady:
           {| CandidateCommit: CommitHash
-             PreRebaseReviewBarrierId: ReviewBarrierId |} option
+             WorkspaceSnapshotId: WorkspaceSnapshotId
+             QualityCertificateId: QualityCertificateId |} option
       ConflictDetected:
           {| CandidateCommit: CommitHash
              TargetHeadSnapshot: CommitHash
+             WorkspaceSnapshotId: WorkspaceSnapshotId
              ConflictFiles: string list
              DiagnosticsDigest: string |} option
       RebasedCandidateReady:
           {| RebasedCommit: CommitHash
              TargetHeadSnapshot: CommitHash
-             PostRebaseReviewBarrierId: ReviewBarrierId |} option
+             WorkspaceSnapshotId: WorkspaceSnapshotId |} option
       PublishClaimed:
           {| RebasedCommit: CommitHash
              ExpectedHead: CommitHash |} option
@@ -123,7 +126,8 @@ module OrchestratorProjection =
     val recordCandidateReady:
         ManagerJobId ->
         {| CandidateCommit: CommitHash
-           PreRebaseReviewBarrierId: ReviewBarrierId |} ->
+           WorkspaceSnapshotId: WorkspaceSnapshotId
+           QualityCertificateId: QualityCertificateId |} ->
         OrchestratorProjection ->
             OrchestratorProjection
 
@@ -131,6 +135,7 @@ module OrchestratorProjection =
         ManagerJobId ->
         {| CandidateCommit: CommitHash
            TargetHeadSnapshot: CommitHash
+           WorkspaceSnapshotId: WorkspaceSnapshotId
            ConflictFiles: string list
            DiagnosticsDigest: string |} ->
         OrchestratorProjection ->
@@ -140,7 +145,7 @@ module OrchestratorProjection =
         ManagerJobId ->
         {| RebasedCommit: CommitHash
            TargetHeadSnapshot: CommitHash
-           PostRebaseReviewBarrierId: ReviewBarrierId |} ->
+           WorkspaceSnapshotId: WorkspaceSnapshotId |} ->
         OrchestratorProjection ->
             OrchestratorProjection
 

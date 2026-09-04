@@ -4,9 +4,7 @@ open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 
@@ -60,85 +58,16 @@ module ObligationEnvelopeSurface =
         | Ok projection ->
             let magic = projection.AgentProjections.MagicTodo
 
-            let lives =
-                magic.ByLife
+            let incumbencies =
+                magic.ByIncumbency
                 |> Map.toArray
-                |> Array.map (fun (lifeId, life) ->
+                |> Array.map (fun (incumbencyId, incumbency) ->
                     box
-                        {| lifeId = lifeId
-                           checkpoints = life.Checkpoints.Count
+                        {| incumbencyId = incumbencyId
+                           checkpoints = incumbency.Checkpoints.Count
                            proposedDigests =
-                            life.Checkpoints
+                            incumbency.Checkpoints
                             |> Map.toArray
                             |> Array.map (fun (_, checkpoint) -> BlobDigest.value checkpoint.ProposedTodoDigest) |})
 
-            box {| ok = true; lives = lives |}
-
-    let private managerLifecycleFactOf (caseName: string) (payload: obj) : ManagerLifecycleFact =
-        let sessionId = SessionId.create (text (payload?sessionId))
-        let lifeId = ManagerLifeId.create (text (payload?lifeId))
-
-        match caseName with
-        | "LifeOpened" ->
-            ManagerLifecycleFact.LifeOpened
-                {| SessionId = sessionId
-                   LifeId = lifeId
-                   OpeningUserMessageId = PhysicalUserMessageId.create (text (payload?openingUserMessageId))
-                   OpeningTextRef = BlobRef.create (text (payload?openingTextRef))
-                   OpeningTextDigest = BlobDigest.create (text (payload?openingTextDigest))
-                   OpeningCursorSequence = int64 (unbox<int> (payload?openingCursorSequence)) |}
-        | "WorkActivated" ->
-            ManagerLifecycleFact.WorkActivated
-                {| SessionId = sessionId
-                   LifeId = lifeId
-                   ActivationPromptKey = PromptKey.create (text (payload?activationPromptKey))
-                   ProtectedPrefixEndSequence = int64 (unbox<int> (payload?protectedPrefixEndSequence)) |}
-        | other -> failwith $"ObligationEnvelopeSurface: unknown lifecycle case '{other}'"
-
-    let foldLifecycleSequence (sessionId: string) (events: obj array) : obj =
-        let values = if isNull events then [||] else events
-        // DSL-MUTABLE: algorithm-scratch — lifecycle fold accumulator
-        let mutable current = Fold.empty
-        // DSL-MUTABLE: algorithm-scratch — first fold rejection
-        let mutable failure: string option = None
-        // DSL-MUTABLE: algorithm-scratch — synthetic envelope sequence
-        let mutable sequence = 0
-
-        for value in values do
-            if failure.IsNone then
-                let caseName = text (value?caseName)
-                let fact = managerLifecycleFactOf caseName (unbox<obj> (value?payload))
-                sequence <- sequence + 1
-
-                let envelope =
-                    { RuntimeId = RuntimeId.create "obligation-ledger-lifecycle-surface"
-                      LocalSeq = LocalSeq.create (int64 sequence)
-                      ObservedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
-                      EventId = EventId.create ($"obligation-ledger-lifecycle-event-{sequence}")
-                      Stream = streamOfSession sessionId
-                      ProviderRun = None
-                      Fact = Fact.ManagerLifecycle fact }
-
-                match Fold.foldEnvelope current envelope with
-                | Error rejection -> failure <- Some rejection.Reason
-                | Ok next -> current <- next
-
-        match failure with
-        | Some error -> box {| ok = false; error = error |}
-        | None ->
-            match AgentProjection.tryFind (SessionId.create sessionId) current.AgentProjections with
-            | None ->
-                box
-                    {| ok = true
-                       protectedPrefixEnd = null |}
-            | Some session ->
-                let protectedPrefixEnd =
-                    session.ManagerLife
-                    |> Option.bind (fun value -> value.CurrentLife)
-                    |> Option.bind (fun value -> value.ProtectedPrefixEnd)
-                    |> Option.map (XTraceCursor.sequence >> int >> box)
-                    |> Option.toObj
-
-                box
-                    {| ok = true
-                       protectedPrefixEnd = protectedPrefixEnd |}
+            box {| ok = true; incumbencies = incumbencies |}

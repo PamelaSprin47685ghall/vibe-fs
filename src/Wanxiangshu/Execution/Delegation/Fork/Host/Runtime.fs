@@ -56,18 +56,8 @@ type HostForkRuntime
         ?handoff: ReusableHandoffPort,
         ?sessionSnapshot: ISessionSnapshotPort,
         ?cancelSignals: SessionId seq -> unit,
-        /// REVIEW-007: a Manager's own review fork opens a barrier for the forked
-        /// Reviewer. The Orchestrator's runtime keeps this off — it opens barriers
-        /// itself (ORCH-006) — so exactly one writer owns each barrier.
-        ?managerOpensReviewBarrier: bool,
-        /// REVIEW-007: the Git tree hash of a forked Reviewer's directory, used to
-        /// open the barrier. `None` for a directory with no readable tree: the
-        /// Reviewer's verdict then fails closed under REVIEW-008, which is the
-        /// correct outcome for a review without a tree.
-        ?treeHashFor: string -> GitTreeHash option,
-        /// GLORY-002 / SURFACE-006: ownership of every handle this runtime forks.
-        /// The hidden Finality workflow passes `HostOwnedHidden` so its Reviewer
-        /// never enters the Manager's list/join/guard or parent recovery.
+        /// Ownership of every handle this runtime forks. Host-owned hidden
+        /// children stay outside the parent's list/join/recovery surface.
         ?ownership: HandleOwnership,
         /// Injectable wall clock (PtyTiming.nodeClockPort at Host/Session composition).
         ?clock: IClockPort
@@ -418,11 +408,6 @@ type HostForkRuntime
                 values)
 
         subscriptions |> List.iter (fun subscription -> subscription.Dispose())
-
-    member internal _.ManagerOpensReviewBarrier =
-        defaultArg managerOpensReviewBarrier false
-
-    member internal _.TreeHashFor = defaultArg treeHashFor (fun _ -> None)
 
     /// EXEC-009: retired OR abandoned ids must never re-fork under the same handle.
     member _.IsRetiredHandle(agentId: string) =

@@ -14,7 +14,6 @@ type PromptContinuationKind =
     | InteractionRepair
     | JoinGuard
     | ManagerGuard
-    | ReviewerGuard
     | BusyAgentNudge
     /// A later external user message admitted into the same active HumanRoot.
     | HumanMessage
@@ -27,15 +26,6 @@ type PromptContinuationKind =
     /// Same-run Fission delivery: predecessor work or a pre-Fission shared
     /// external completion enters a lane only at a safe provider boundary.
     | FissionHandoff
-    /// GLORY-029: pure encouragement for an idle Manager; carries no work
-    /// record and no specific issue.
-    | ManagerIdleEncouragement
-    /// GLORY-053: a suicide was rejected; the reviewer's canonical work
-    /// record is the feedback body.
-    | FinalityRejected
-    /// GLORY-044: a later durable sibling REVISE, delivered as steer
-    /// continuation (not the suicide tool result).
-    | FinalitySteer
 
 type PromptOrigin =
     | AuthorityRoot of PromptRootAuthorityKind

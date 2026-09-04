@@ -30,9 +30,6 @@ module Identity =
         | After of TranscriptMessageAddress
 
     type SystemPromptId = private SystemPromptId of string
-    type ReviewBarrierId = private ReviewBarrierId of string
-    type GitTreeHash = private GitTreeHash of string
-    type SealDigest = private SealDigest of string
     type BlobRef = private BlobRef of string
     type BlobDigest = private BlobDigest of string
     type FrameEpochId = private FrameEpochId of int64
@@ -138,18 +135,6 @@ module Identity =
         val create: value: string -> SystemPromptId
         val value: id: SystemPromptId -> string
 
-    module ReviewBarrierId =
-        val create: value: string -> ReviewBarrierId
-        val value: id: ReviewBarrierId -> string
-
-    module GitTreeHash =
-        val create: value: string -> GitTreeHash
-        val value: hash: GitTreeHash -> string
-
-    module SealDigest =
-        val create: value: string -> SealDigest
-        val value: digest: SealDigest -> string
-
     module BlobRef =
         val create: value: string -> BlobRef
         val value: blobRef: BlobRef -> string
@@ -202,33 +187,11 @@ module Identity =
         val create: value: string -> CommitHash
         val value: hash: CommitHash -> string
 
-    type ManagerLifeId = private ManagerLifeId of string
-    type FinalityRequestId = private FinalityRequestId of string
-
-    module ManagerLifeId =
-        val create: value: string -> ManagerLifeId
-        val value: id: ManagerLifeId -> string
-
-    module FinalityRequestId =
-        val create: value: string -> FinalityRequestId
-        val value: id: FinalityRequestId -> string
-
     type FallbackAttemptIdentity =
         { SessionId: SessionId
           LogicalRunId: LogicalRunId
           AuthorityRootUserMessageId: AuthorityRootUserMessageId
           ProviderRun: ProviderRunIdentity }
 
-    type ReviewAttemptIdentity =
-        { ReviewBarrierId: ReviewBarrierId
-          GitTreeHash: GitTreeHash
-          ReviewerSessionId: SessionId
-          ProviderRun: ProviderRunIdentity
-          ToolCallId: ToolCallId }
-
     module FallbackAttemptIdentity =
         val dedupeKey: identity: FallbackAttemptIdentity -> string
-
-    module ReviewAttemptIdentity =
-        val dedupeKey: identity: ReviewAttemptIdentity -> string
-        val isDistinctAttempt: first: ReviewAttemptIdentity -> second: ReviewAttemptIdentity -> bool

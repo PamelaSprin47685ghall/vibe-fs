@@ -12,13 +12,6 @@ module SharedStateSurface =
 
     val clearSessionParents: unit -> unit
 
-    /// ReviewGuardNudges: cross-instance at-most-once reservation.
-    val addReviewGuardNudge: key: string -> unit
-
-    val hasReviewGuardNudge: key: string -> bool
-
-    val clearReviewGuardNudges: unit -> unit
-
     /// RootWorkspace: mutable atom set by whichever plugin instance boots first.
     val setRootWorkspace: path: string -> unit
 

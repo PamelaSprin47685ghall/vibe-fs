@@ -44,7 +44,8 @@ module OrchestratorFactFold =
                     (OrchestratorProjection.recordCandidateReady
                         payload.ManagerJobId
                         {| CandidateCommit = payload.CandidateCommit
-                           PreRebaseReviewBarrierId = payload.PreRebaseReviewBarrierId |})
+                           WorkspaceSnapshotId = payload.WorkspaceSnapshotId
+                           QualityCertificateId = payload.QualityCertificateId |})
                     projection
             )
         | OrchestratorFactCases.ConflictDetected payload ->
@@ -54,6 +55,7 @@ module OrchestratorFactFold =
                         payload.ManagerJobId
                         {| CandidateCommit = payload.CandidateCommit
                            TargetHeadSnapshot = payload.TargetHeadSnapshot
+                           WorkspaceSnapshotId = payload.WorkspaceSnapshotId
                            ConflictFiles = payload.ConflictFiles
                            DiagnosticsDigest = payload.DiagnosticsDigest |})
                     projection
@@ -65,7 +67,7 @@ module OrchestratorFactFold =
                         payload.ManagerJobId
                         {| RebasedCommit = payload.RebasedCommit
                            TargetHeadSnapshot = payload.TargetHeadSnapshot
-                           PostRebaseReviewBarrierId = payload.PostRebaseReviewBarrierId |})
+                           WorkspaceSnapshotId = payload.WorkspaceSnapshotId |})
                     projection
             )
         | OrchestratorFactCases.PublishClaimed payload -> foldPublishClaimed payload projection

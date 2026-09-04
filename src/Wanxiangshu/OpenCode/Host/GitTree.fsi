@@ -1,6 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Mission.Review
+open Wanxiangshu.Git
 
 /// Git tree hash for the current workspace.
 module GitTree =

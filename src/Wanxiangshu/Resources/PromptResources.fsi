@@ -8,7 +8,6 @@ type PromptCatalog =
       CoderSystemPrompt: string
       DevopsSystemPrompt: string
       InspectorSystemPrompt: string
-      ReviewerSystemPrompt: string
       BrowserSystemPrompt: string
       InquirySystemPrompt: string
       OrchestratorSystemPrompt: string

@@ -68,7 +68,6 @@ module PersonaCatalog =
         | Role.DevOps -> Persona.Operator
         | Role.Browser -> Persona.Researcher
         | Role.Inquiry -> Persona.Analyst
-        | Role.Reviewer -> Persona.Auditor
         | Role.Blogger -> Persona.Chronicler
         | Role.Distiller -> Persona.Distiller
 

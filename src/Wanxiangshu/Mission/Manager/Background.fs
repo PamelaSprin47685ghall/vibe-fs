@@ -4,7 +4,6 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Mission.Obligation
-open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Strength.Persistence
 
 open System.Collections.Generic
@@ -25,11 +24,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider

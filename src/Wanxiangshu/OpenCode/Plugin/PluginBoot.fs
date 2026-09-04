@@ -17,10 +17,8 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Finality.OpenCode
 open Wanxiangshu.Mission.Manager.OpenCode
 open Wanxiangshu.Mission.Obligation.Todo.OpenCode
-open Wanxiangshu.Mission.Review.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
@@ -50,7 +48,6 @@ module PluginBoot =
           Clock: IClockPort
           StrengthFailClosed: string -> unit
           WorkspaceDirectory: string option
-          GitTreePort: Wanxiangshu.Mission.Review.GitTreePort option
           FamilyParent: SessionId -> SessionId option }
 
     let create (input: obj) : Task<Boot> =
@@ -90,11 +87,6 @@ module PluginBoot =
             // instance starts before the manager worktree instances.
             let workspaceDirectory = PluginHost.workspaceDirectory input
 
-            let gitTreePort =
-                match PluginHost.gitTreePortFromInput input with
-                | Some port -> Some port
-                | None -> workspaceDirectory |> Option.map GitTree.create
-
             return
                 { Input = input
                   PortOpt = portOpt
@@ -103,6 +95,5 @@ module PluginBoot =
                   Clock = clock
                   StrengthFailClosed = strengthFailClosed
                   WorkspaceDirectory = workspaceDirectory
-                  GitTreePort = gitTreePort
                   FamilyParent = familyParent }
         }

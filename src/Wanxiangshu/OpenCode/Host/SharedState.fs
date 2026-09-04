@@ -7,14 +7,8 @@ open Wanxiangshu.Context.Companion.Blogger.Runtime
 /// HOST-012: 跨实例共享状态——模块级单例，所有插件实例同一引用。
 ///
 /// Host 的 `InstanceStore` 按 directory 实例化插件（worktree = 独立 project =
-/// 第二个插件实例），而 fork→verdict 因果链跨越实例边界（主实例的 reverify
-/// fork 的 worktree 子会话由 worktree 实例的工具处理）。这些集合被这条链的
-/// 两端读写，per-instance 时必然失配——实测 deep-reviewer 的 `VerdictTool`
-/// 读不到主实例注册的 `SessionParents`，REVIEW-008 fail closed 拒绝 verdict；
-/// worktree 上 claim 的 blogger flight 读不到 root 实例 BlogTool 的
-/// HasFlight，会 AbortSession → Finality journal-work-log hang；guard nudge
-/// 若按 RuntimeId 分槽，root+worktree 会对同一 occasion 各发一次
-/// ReviewerVerdictRequired。
+/// 第二个插件实例）。跨实例的 parent/directory registry 与 Blogger flight
+/// 必须共享，否则 worktree 实例无法与 root 实例观察到同一物理会话家族。
 ///
 /// 每实例独有（不得放进这里）：AgentJournal（独立 runtimeId 文件）、Companions、
 /// OwnedSessions、UserMessageBindings、hook 订阅、每实例 NudgeSent（非 guard）。
@@ -22,32 +16,14 @@ module SharedState =
 
     // DSL-MUTABLE: resource — cross-instance session parent map
     let SessionParents = Dictionary<string, string>()
-    // DSL-MUTABLE: resource — judged physical review request identities across plugin instances
-    let VerdictSubmissions = HashSet<string>()
     // DSL-MUTABLE: resource — cross-instance session directory map
     let SessionDirectories = Dictionary<string, string>()
-
-    /// REVIEW-003 / HOST-012: missing-verdict + confirm-perfect guard nudge
-    /// reservations. Root and worktree plugin instances each own a journal
-    /// (distinct RuntimeId) and a per-scope NudgeSent set; keying a reservation
-    /// by RuntimeId made the "process-wide" lock miss its twin, so the same
-    /// ReviewerVerdictRequired prose was always delivered twice. Missing-verdict
-    /// identity is session + durable ReviewBarrierId — never RuntimeId and never
-    /// the provider run that merely observed the missing judge. Confirmation is
-    /// session + the first PERFECT provider run whose challenge is outstanding.
-    let ReviewGuardNudgeGate = obj ()
-    // DSL-MUTABLE: single-flight — cross-instance review guard nudge reservation set
-    let ReviewGuardNudges = HashSet<string>()
-
-    /// Unit-test isolation only: production must not wipe cross-instance reservations.
-    let clearReviewGuardNudgesForTests () =
-        lock ReviewGuardNudgeGate (fun () -> ReviewGuardNudges.Clear())
 
     /// The ROOT workspace, set by whichever plugin instance boots first (the
     /// main workspace loads before the manager worktrees). Worktree instances
     /// pin their blogger companions here so the blogger's system prompt
     /// (Host instruction loading from the session directory) survives the
-    /// manager worktree release at publish.
+    /// Road worktree release at publish.
     // DSL-MUTABLE: resource — process-local root workspace pin for worktree plugin instances
     let mutable RootWorkspace: string option = None
 

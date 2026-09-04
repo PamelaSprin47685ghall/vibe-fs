@@ -34,7 +34,7 @@ module JsGeneratorSurface =
         | "Exec" -> Some ToolPermission.Exec
         | "Pty" -> Some ToolPermission.Pty
         | "Network" -> Some ToolPermission.Network
-        | "Judge" -> Some ToolPermission.Judge
+        | "ReviewAssessment" -> Some ToolPermission.ReviewAssessment
         | "Chronicle" -> Some ToolPermission.Chronicle
         | "Fetch" -> Some ToolPermission.Fetch
         | "Finality" -> Some ToolPermission.Finality
@@ -61,7 +61,7 @@ module JsGeneratorSurface =
         | ToolPermission.Exec -> "Exec"
         | ToolPermission.Pty -> "Pty"
         | ToolPermission.Network -> "Network"
-        | ToolPermission.Judge -> "Judge"
+        | ToolPermission.ReviewAssessment -> "ReviewAssessment"
         | ToolPermission.Chronicle -> "Chronicle"
         | ToolPermission.Fetch -> "Fetch"
         | ToolPermission.Finality -> "Finality"

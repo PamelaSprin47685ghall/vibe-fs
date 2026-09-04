@@ -19,10 +19,8 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Finality.OpenCode
 open Wanxiangshu.Mission.Manager.OpenCode
 open Wanxiangshu.Mission.Obligation.Todo.OpenCode
-open Wanxiangshu.Mission.Review.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
@@ -70,7 +68,6 @@ module PluginHostWiring =
           Wired: HostSignalBootstrap.WiredSignals
           SharedTerminalKey: string option
           SharedTerminalPort: Events.HostEventPort option
-          GitTreePort: Wanxiangshu.Mission.Review.GitTreePort option
           StrengthDurability: StrengthDurabilityPort option }
 
     let create (boot: PluginBoot.Boot) : Task<Host> =
@@ -139,7 +136,6 @@ module PluginHostWiring =
                           Wired = wired
                           SharedTerminalKey = terminalKey
                           SharedTerminalPort = sharedTerminalPort
-                          GitTreePort = boot.GitTreePort
                           StrengthDurability = strengthDurability }
                 }
 

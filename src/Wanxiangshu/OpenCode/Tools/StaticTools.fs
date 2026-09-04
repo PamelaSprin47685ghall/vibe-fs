@@ -5,7 +5,6 @@ open Wanxiangshu.Sphinx
 open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
-open Wanxiangshu.Mission.Review
 
 module StaticTools =
 
@@ -31,7 +30,7 @@ module StaticTools =
         | ToolPermission.Pty -> [ "open-terminal"; "send-terminal"; "read-terminal"; "signal-terminal" ]
         | ToolPermission.Network -> [ StealthBrowserMcp.permissionKey ]
         | ToolPermission.Sphinx -> [ SphinxMcp.permissionKey ]
-        | ToolPermission.Judge -> [ "judge" ]
+        | ToolPermission.ReviewAssessment -> [ "review" ]
         | ToolPermission.Chronicle -> [ "chronicle" ]
         | ToolPermission.Fetch -> [ "fetch" ]
         | ToolPermission.Finality -> [ "suicide" ]
@@ -99,7 +98,7 @@ module StaticTools =
           "query-shell"
           StealthBrowserMcp.permissionKey
           SphinxMcp.permissionKey
-          "judge"
+          "review"
           "chronicle"
           "fetch"
           "suicide"
@@ -109,7 +108,6 @@ module StaticTools =
           "js-inspector"
           "js-browser"
           "js-inquiry"
-          "js-reviewer"
           "js-devops"
           "js-distiller"
           "js-blogger"
@@ -214,25 +212,11 @@ module StaticTools =
               "temperature", box 1.0
               "options", box (createObj [ "temperature", box 1.0 ]) ]
 
-    /// The only values accepted by the OpenCode judge tool.  Keep this
-    /// parser deliberately independent of assistant text: a verdict is a tool
-    /// argument, never something inferred from a transcript.
-    let reviewerVerdictOfString (value: string) : Result<ReviewGuardVerdict, string> =
-        match value with
-        | "PERFECT" -> Ok ReviewGuardVerdict.Perfect
-        | "REVISE" -> Ok ReviewGuardVerdict.Revise
-        | _ -> Error "verdict must be exactly PERFECT or REVISE"
-
-    let reviewerVerdictSchemaJson =
-        """{"type":"object","properties":{"verdict":{"type":"string","enum":["PERFECT","REVISE"]}},"required":["verdict"],"additionalProperties":false}"""
-
     let managerAgentConfig (prompt: string option) : obj = primaryAgent Role.Manager prompt
 
     let orchestratorAgentConfig (prompt: string option) : obj = primaryAgent Role.Orchestrator prompt
 
     let coderAgentConfig (prompt: string option) : obj = primaryAgent Role.Coder prompt
-
-    let reviewerAgentConfig (prompt: string option) : obj = primaryAgent Role.Reviewer prompt
 
     /// Companion Session Y: tool set is exactly { chronicle } (ENFORCER-010).
     /// System prompt for B-record distillation with chronicle tool protocol.

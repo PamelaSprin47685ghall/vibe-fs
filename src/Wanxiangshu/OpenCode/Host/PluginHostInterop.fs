@@ -22,10 +22,8 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Finality.OpenCode
 open Wanxiangshu.Mission.Manager.OpenCode
 open Wanxiangshu.Mission.Obligation.Todo.OpenCode
-open Wanxiangshu.Mission.Review.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
@@ -41,7 +39,6 @@ open Wanxiangshu.Context.Companion
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Review
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer
@@ -342,7 +339,6 @@ module PluginHostInterop =
         (toolModule: obj)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
-        (gitTreePort: GitTreePort option)
         (workspaceDirectory: string option)
         (scope: PluginRuntimeScope)
         (currentPhysicalUserMessage: string -> string option)
@@ -352,7 +348,6 @@ module PluginHostInterop =
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
-        (finalityReviewerTimeoutMs: int option)
         (casebookToolSpecs: ToolSpec list)
         : ToolRegistration =
         let jsTransactionPersistence =
@@ -365,11 +360,9 @@ module PluginHostInterop =
                 toolModule
                 sessionPort
                 journal
-                gitTreePort
                 workspaceDirectory
                 scope.Sessions.SessionParents
                 currentPhysicalUserMessage
-                scope.Sessions.VerdictSubmissions
                 scope.Sessions.SessionDirectories
                 onRunStarted
                 parentWorkRecordFor
@@ -380,7 +373,6 @@ module PluginHostInterop =
                 (Some scope.BloggerRuntimeHost)
                 scope.SyncDelegateRuntime
                 (Some scope.Strength.StrengthRuntime)
-                finalityReviewerTimeoutMs
                 casebookToolSpecs
                 jsTransactionPersistence
 

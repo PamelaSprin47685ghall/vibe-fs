@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>relay-retirement</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>mission-relay-retirement</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>domain</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Mission/Relay/Retirement/Surface.fsi"/>
+    <Compile Include="Mission/Relay/Retirement/Surface.fs"/>
+  </ItemGroup>
+</Project>

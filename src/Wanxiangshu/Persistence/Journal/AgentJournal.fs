@@ -8,7 +8,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Outcome
@@ -16,7 +15,6 @@ open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Execution.Failure
 
@@ -230,18 +228,6 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
             | Error err -> return Error err
         }
 
-    /// GLORY-010: append one Manager lifecycle fact. Envelope `ProviderRun` is
-    /// `None` — the payload carries its own run identities (FinalityRequested).
-    member this.AppendManagerLifecycle
-        (stream: StreamId)
-        (fact: ManagerLifecycleFact)
-        : Task<Result<ProjectionSet, JournalAppendFailure>> =
-        task {
-            match! this.AppendEnvelope stream None (Fact.ManagerLifecycle fact) with
-            | Ok(updated, _) -> return Ok updated
-            | Error err -> return Error err
-        }
-
     member private this.PublishCommitted(envelope: Envelope) =
         lock gate (fun () ->
             // The EventStore append already validated and committed the
@@ -346,14 +332,6 @@ module AgentJournal =
         : Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>> =
         journal.AppendMagicTodo stream providerRun fact
 
-    /// GLORY-010: append one Manager lifecycle fact.
-    let appendManagerLifecycle
-        (stream: StreamId)
-        (fact: ManagerLifecycleFact)
-        (journal: AgentJournal)
-        : Task<Result<ProjectionSet, JournalAppendFailure>> =
-        journal.AppendManagerLifecycle stream fact
-
     let snapshot (journal: AgentJournal) : ProjectionSet = journal.Snapshot
 
     let revision (journal: AgentJournal) : JournalRevision = journal.Revision
@@ -370,8 +348,6 @@ module AgentJournal =
         : Task<JournalChange option> =
         journal.AwaitChangeFromOrCancel(fromRevision, cancellation)
 
-
-
     let handleProjection (journal: AgentJournal) (sessionId: SessionId) : AgentLinkageProjection =
         AgentProjection.tryFind sessionId (snapshot journal).AgentProjections
         |> Option.bind (fun session -> session.Handles)
@@ -383,21 +359,3 @@ module AgentJournal =
         journal.WriteBlob content
 
     let isPoisoned (journal: AgentJournal) : bool = journal.IsPoisoned
-
-    /// REVIEW-007: which human prompts in this session still await a confirmed
-    /// review.
-    ///
-    /// Keyed directly by session (PERSIST-008). The previous version walked a
-    /// parent chain with `Map.tryPick` to find a "review requirement scope",
-    /// scanning every session at each step. That is gone because the reason for
-    /// it is gone: requirements are created by the fold on the session that
-    /// received the HumanRoot, and cleared by `ConfirmedReviewWitness` on the
-    /// Manager session, so no ownership has to be rediscovered by search.
-    let pendingReviewRequirements (journal: AgentJournal option) (sessionId: SessionId) : ReviewRequirementInput list =
-        match journal with
-        | None -> []
-        | Some value ->
-            AgentProjection.tryFind sessionId (snapshot value).AgentProjections
-            |> Option.bind (fun session -> session.ReviewRequirements)
-            |> Option.map ReviewRequirementProjection.inputs
-            |> Option.defaultValue []

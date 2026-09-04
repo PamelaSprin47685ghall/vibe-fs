@@ -30,7 +30,6 @@ module JoinSurface =
         | "DevOps" -> Some Role.DevOps
         | "Browser" -> Some Role.Browser
         | "Inquiry" -> Some Role.Inquiry
-        | "Reviewer" -> Some Role.Reviewer
         | "Distiller" -> Some Role.Distiller
         | "Blogger" -> Some Role.Blogger
         | _ -> None

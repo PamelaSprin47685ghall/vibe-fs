@@ -20,7 +20,6 @@ open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Review.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
@@ -153,8 +152,6 @@ module HostSignalBootstrap =
             let messageVisibility = MessageVisibilityHub(recoveryTimerPort)
             scope.AttachMessageVisibility messageVisibility
 
-            let reviewerContinuationPort = HostReviewGuard.continuationPort sessionPort journal
-
             let resolveProjection (sessionId: SessionId) : AgentProjectionSet option =
                 match journal with
                 | None -> None
@@ -163,7 +160,7 @@ module HostSignalBootstrap =
             let binding = TurnBinding.Store()
 
             let onTurn =
-                HostTurnObserver.observe sessionPort eventPort journal strengthDurability scope reviewerContinuationPort
+                HostTurnObserver.observe sessionPort eventPort journal strengthDurability scope
 
             let onSnapshot = HostCompactionObserver.observe scope journal
 

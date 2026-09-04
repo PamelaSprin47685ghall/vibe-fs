@@ -117,7 +117,7 @@ module CompanionFactFold =
                     |> Result.map (fun updated -> { session with XTrace = Some updated }))
                 projection
             |> function
-                | Ok updated -> Ok(bindTerminalFrontier payload.SessionId payload.TextRef payload.TextDigest updated)
+                | Ok updated -> Ok updated
                 | Error XTraceFoldRejection.TerminalAlreadyCaptured ->
                     reject
                         "TerminalOutputCaptured"

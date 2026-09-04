@@ -3,7 +3,6 @@ namespace Wanxiangshu.Change.Host
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Review
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 
@@ -13,7 +12,6 @@ type OrchestratorHostDeps =
       SessionSnapshot: ISessionSnapshotPort option
       OnChildCreated: string -> Role -> SessionId -> unit
       RegisterChildDirectory: SessionId -> string -> unit
-      RegisterReviewerTree: string -> GitTreePort -> unit
       OnRunStarted: SessionId -> Role -> string option -> unit
       RepoPath: string
       TargetBranch: string

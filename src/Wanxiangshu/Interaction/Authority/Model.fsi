@@ -194,18 +194,6 @@ module PromptAuthority =
         projection: PromptAuthorityProjection ->
             bool
 
-    val idlePayloadDigest:
-        lifeId: ManagerLifeId -> conditionKey: string -> terminalProviderRun: ProviderRunIdentity -> string
-
-    val idleAlreadyAdmitted:
-        sessionId: SessionId ->
-        logicalRunId: LogicalRunId ->
-        lifeId: ManagerLifeId ->
-        conditionKey: string ->
-        terminalProviderRun: ProviderRunIdentity ->
-        projection: PromptAuthorityProjection ->
-            bool
-
     val systemPromptIdFor: role: Role -> SystemPromptId
     val toolCapabilitiesFor: role: Role -> requestKind: ProviderRequestKind -> Set<ToolPermission>
 

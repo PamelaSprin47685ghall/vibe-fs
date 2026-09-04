@@ -5,8 +5,8 @@ open Wanxiangshu.Change
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation.Identity
 
-/// Host wiring for the Orchestrator: forks Managers and reviewers under one
-/// runtime, and supplies `ManagerPort` to the pure publish program.
+/// Host wiring for one Change Road. One physical Manager session can host many
+/// logical Relay incumbencies; no Reviewer session participates in publication.
 type OrchestratorHost =
     new: deps: OrchestratorHostDeps * orchestratorId: SessionId -> OrchestratorHost
 

@@ -11,7 +11,7 @@ open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.Journal
 
 /// Owns every per-session tool runtime.
@@ -25,33 +25,28 @@ type ToolRuntimeScope =
     new:
         sessions: ISessionHostPort *
         journal: AgentJournal option *
-        gitTreePort: GitTreePort option *
         workspaceDirectory: string option *
         sessionParents: Dictionary<string, string> *
         currentPhysicalUserMessage: (string -> string option) *
-        verdictSubmissions: HashSet<string> *
         sessionDirectories: Dictionary<string, string> *
         onRunStarted: (SessionId -> Role -> string option -> unit) option *
         parentWorkRecordFor: (string -> Task<string option>) option *
         childWorkRecordFor: (string -> Task<string option>) option *
         snapshot: ISessionSnapshotPort option *
         cancelSignals: (SessionId seq -> unit) option *
-        ?eventPort: IEventObservationPort *
-        ?finalityReviewerTimeoutMs: int ->
+        ?eventPort: IEventObservationPort ->
             ToolRuntimeScope
 
     interface ISessionRuntimeOwner
     interface IDisposable
 
-    member FinalityReviewerTimeoutMs: int option
     member Sessions: ISessionHostPort
     member Journal: AgentJournal option
     member Snapshot: ISessionSnapshotPort option
     member EventPort: IEventObservationPort option
     member WorkspaceDirectory: string option
     member ActiveProfileFor: sessionId: SessionId -> PromptAuthority.AuthorityExecutionProfile option
-    /// GLORY-003: the run-started callback wired by the plugin bootstrap, exposed
-    /// so the Finality workflow's hidden Reviewer binds the same reconciler.
+    /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member RunStarted: (SessionId -> Role -> string option -> unit)
 
     /// EXEC-011: the administrator's ceiling on any single process.
@@ -76,6 +71,11 @@ type ToolRuntimeScope =
 
     member RoleFor: ctx: HostToolContext -> Role option
     member EnsureRoleFor: ctx: HostToolContext -> Task<Role option>
+    member ManagerPhaseFor: sessionId: string -> ManagerCapabilityPhase
+    member TryFreezeRetirement: sessionId: string -> bool
+    member UnfreezeRetirement: sessionId: string -> unit
+    member IsRetirementFrozen: sessionId: string -> bool
+    member RetirementBlockersFor: sessionId: string -> string list
 
     /// AGENT-013 + PROMPT-008: the managed agent a PTY is opened for.
     member ManagedAgentFor: ctx: HostToolContext -> ManagedAgent option
@@ -103,12 +103,6 @@ type ToolRuntimeScope =
     member ExecutorRuntimeFor: ctx: HostToolContext -> HostForkRuntime
 
     member OrchestratorHostFor: sessionId: string -> OrchestratorHost
-
-    member TreePortFor: reviewerId: string -> GitTreePort option
-
-    member MarkVerdictSubmitted: reviewerId: string * physicalUserMessageId: PhysicalUserMessageId -> unit
-
-    member HasVerdictSubmitted: reviewerId: string * physicalUserMessageId: PhysicalUserMessageId -> bool
 
     member RunOwnedWork: start: (unit -> Task) -> bool
 

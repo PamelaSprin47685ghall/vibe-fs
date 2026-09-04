@@ -3,6 +3,7 @@ namespace Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 
 module MagicTodoProjection =
@@ -31,8 +32,8 @@ module MagicTodoProjection =
           PreparedFactRef: EventId
           Lifecycle: CheckpointLifecycle }
 
-    type LifeMagicTodoState =
-        { LifeId: ManagerLifeId
+    type IncumbencyMagicTodoState =
+        { IncumbencyId: IncumbencyId
           CurrentObligationsRef: (BlobRef * BlobDigest) option
           FirstAcceptedCheckpoint: TodoWriteId option
           LatestAcceptedCheckpoint: TodoWriteId option
@@ -43,23 +44,27 @@ module MagicTodoProjection =
           LegacySeed: (BlobRef * BlobDigest) option }
 
     type MagicTodoProjectionState =
-        { ByLife: Map<string, LifeMagicTodoState> }
+        { ByIncumbency: Map<string, IncumbencyMagicTodoState> }
 
     [<RequireQualifiedAccess>]
     type MagicTodoFoldRejection =
-        | LifeMismatch of expected: string * actual: string
+        | IncumbencyMismatch of expected: string * actual: string
         | PreparedMissingForAccept of todoWriteId: string
         | IdentityCorruption of field: string
         | LegacySeedAfterCheckpoint
 
     val empty: MagicTodoProjectionState
-    val emptyLife: lifeId: ManagerLifeId -> LifeMagicTodoState
-    val tryLife: lifeId: ManagerLifeId -> state: MagicTodoProjectionState -> LifeMagicTodoState option
+    val emptyIncumbency: incumbencyId: IncumbencyId -> IncumbencyMagicTodoState
 
-    val ensureLife:
-        lifeId: ManagerLifeId -> state: MagicTodoProjectionState -> LifeMagicTodoState * MagicTodoProjectionState
+    val tryIncumbency:
+        incumbencyId: IncumbencyId -> state: MagicTodoProjectionState -> IncumbencyMagicTodoState option
 
-    val isPlanCommitted: life: LifeMagicTodoState -> bool
+    val ensureIncumbency:
+        incumbencyId: IncumbencyId ->
+        state: MagicTodoProjectionState ->
+            IncumbencyMagicTodoState * MagicTodoProjectionState
+
+    val isPlanCommitted: incumbency: IncumbencyMagicTodoState -> bool
     val acceptedEvidence: checkpoint: CheckpointRecord -> AcceptedCheckpointEvidence option
     val isAccepted: checkpoint: CheckpointRecord -> bool
 

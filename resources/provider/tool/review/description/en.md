@@ -1,0 +1,1 @@
+Submit your one assessment for this incumbency. Score all eight quality dimensions from 0 through 10. Any score below 10 transfers implementation responsibility to you; eight 10s create a snapshot-bound quality certificate and leave only cleanup plus suicide.

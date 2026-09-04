@@ -10,7 +10,6 @@ type PromptCatalog =
       CoderSystemPrompt: string
       DevopsSystemPrompt: string
       InspectorSystemPrompt: string
-      ReviewerSystemPrompt: string
       BrowserSystemPrompt: string
       InquirySystemPrompt: string
       OrchestratorSystemPrompt: string
@@ -27,7 +26,6 @@ module PromptResources =
         | Role.Inspector -> "role/inspector"
         | Role.Browser -> "role/browser"
         | Role.Inquiry -> "role/inquiry"
-        | Role.Reviewer -> "role/reviewer"
         | Role.DevOps -> "role/devops"
         | Role.Distiller -> "role/distiller"
         | Role.Blogger -> "role/blogger"
@@ -38,12 +36,11 @@ module PromptResources =
           "library/closing"
           "library/kolmogorov"
           "library/scarcity"
-          "library/reviewer/quality-ledger"
+          "library/relay/quality-ledger"
           "role/manager"
           "role/coder"
           "role/devops"
           "role/inspector"
-          "role/reviewer"
           "role/browser"
           "role/inquiry"
           "role/orchestrator"
@@ -58,9 +55,8 @@ module PromptResources =
 
     let private libraryPaths =
         function
-        | Role.Manager -> [ "library/kolmogorov"; "library/scarcity" ]
+        | Role.Manager -> [ "library/kolmogorov"; "library/scarcity"; "library/relay/quality-ledger" ]
         | Role.Coder -> [ "library/kolmogorov" ]
-        | Role.Reviewer -> [ "library/kolmogorov"; "library/reviewer/quality-ledger" ]
         | Role.Inspector
         | Role.DevOps -> [ "library/scarcity" ]
         | _ -> []
@@ -107,7 +103,6 @@ module PromptResources =
           CoderSystemPrompt = systemForRole lang Role.Coder
           DevopsSystemPrompt = systemForRole lang Role.DevOps
           InspectorSystemPrompt = systemForRole lang Role.Inspector
-          ReviewerSystemPrompt = systemForRole lang Role.Reviewer
           BrowserSystemPrompt = systemForRole lang Role.Browser
           InquirySystemPrompt = systemForRole lang Role.Inquiry
           OrchestratorSystemPrompt = systemForRole lang Role.Orchestrator

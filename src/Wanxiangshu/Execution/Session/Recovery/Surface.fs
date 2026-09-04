@@ -33,11 +33,6 @@ module RecoverySurface =
                 ManagerJobId.create (text (value?job)),
                 SessionId.create (text (value?manager))
             )
-        | "reviewer" ->
-            SessionRecovery.RecoveryNode.Reviewer(
-                ManagerJobId.create (text (value?job)),
-                SessionId.create (text (value?reviewer))
-            )
         | _ -> SessionRecovery.RecoveryNode.WorkSession(SessionId.create (text (value?session)))
 
     let token (value: obj) : string =

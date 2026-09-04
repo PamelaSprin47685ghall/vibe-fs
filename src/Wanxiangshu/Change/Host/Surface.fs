@@ -11,10 +11,9 @@ open Wanxiangshu.Persistence.Journal
 
 /// JS-native owner for the OrchestratorHost semantic harness.
 ///
-/// Host runtime state, ManagerPort, journal projection and typed ports remain
+/// Host runtime state, Relay port, journal projection and typed ports remain
 /// opaque. The harness supplies plain JavaScript port observations; this owner
-/// translates them once into the real Host contracts and exposes only the
-/// ManagerPort capability plus a child-presence observation.
+/// translates them once into the real Host contracts.
 [<RequireQualifiedAccess>]
 module OrchestratorHostSurface =
 
@@ -41,9 +40,6 @@ module OrchestratorHostSurface =
 
     [<Emit("typeof $0[$1] === 'function' ? Boolean($0[$1](...$2)) : false")>]
     let private invokeRawBoolOrFalse (value: obj) (name: string) (args: obj array) : bool = jsNative
-
-    [<Emit("$0.managerPort")>]
-    let private managerPortOf (host: OrchestratorHost) : obj = jsNative
 
     [<Emit("$0.gitPort = $1")>]
     let private replaceGitPort (host: OrchestratorHost) (port: GitPort) : unit = jsNative
@@ -106,7 +102,6 @@ module OrchestratorHostSurface =
         | "DevOps" -> Some Role.DevOps
         | "Distiller" -> Some Role.Distiller
         | "Blogger" -> Some Role.Blogger
-        | "Reviewer" -> Some Role.Reviewer
         | _ -> None
 
     let private terminalOutcome (value: obj) : TerminalOutcome =
@@ -326,9 +321,8 @@ module OrchestratorHostSurface =
                     return plainResult value commitValue
                 } }
 
-    type private HostHandle(host: OrchestratorHost, manager: obj) =
+    type private HostHandle(host: OrchestratorHost) =
         member _.Host = host
-        member _.Manager = manager
 
     let private journalOf (value: obj) : AgentJournal option =
         if isNullish value then
@@ -349,7 +343,6 @@ module OrchestratorHostSurface =
               SessionSnapshot = None
               OnChildCreated = fun _ _ _ -> ()
               RegisterChildDirectory = fun _ _ -> ()
-              RegisterReviewerTree = fun _ _ -> ()
               OnRunStarted = fun _ _ _ -> ()
               RepoPath = stringOf (field options "repoPath")
               TargetBranch = stringOf (field options "targetBranch")
@@ -364,9 +357,7 @@ module OrchestratorHostSurface =
         if not (isNullish rawGit) then
             replaceGitPort host (gitPort rawGit)
 
-        HostHandle(host, managerPortOf host) :> obj
-
-    let managerPort (handle: obj) : obj = (handle :?> HostHandle).Manager
+        HostHandle(host) :> obj
 
     let detachAndDrain (handle: obj) : Task =
         (handle :?> HostHandle).Host.DetachAndDrain()

@@ -12,6 +12,8 @@ type HostToolArguments =
     member Texts: name: string -> string list
     member OptionalNumber: name: string -> float option
     member OptionalNonNegativeInteger: name: string -> Result<int option, unit>
+    member ExactBoundedIntegers:
+        names: string list * minimum: int * maximum: int -> Result<(string * int) list, string>
     member OptionalBool: name: string -> bool option
 
 type HostToolContext =
@@ -45,6 +47,8 @@ module ToolHostCodec =
     val stringSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val numberSchema: factory: HostToolFactory -> HostSchema
     val numberSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
+    val boundedIntegerSchema:
+        minimum: int -> maximum: int -> description: string -> factory: HostToolFactory -> HostSchema
     val boolSchema: factory: HostToolFactory -> HostSchema
     val boolSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val enumSchema: values: string list -> factory: HostToolFactory -> HostSchema

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>relay-assessment</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>mission-relay-assessment</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>domain</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
+    <Compile Include="Mission/Relay/Assessment/Model.fsi"/>
+    <Compile Include="Mission/Relay/Assessment/Model.fs"/>
+    <Compile Include="Mission/Relay/Assessment/Surface.fsi"/>
+    <Compile Include="Mission/Relay/Assessment/Surface.fs"/>
+  </ItemGroup>
+</Project>

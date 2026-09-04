@@ -15,15 +15,15 @@ open Wanxiangshu.Git
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.OpenCode
+open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Relay.OpenCode
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 
-/// Host wiring for the Orchestrator: forks Managers and reviewers under one
-/// runtime, and supplies `ManagerPort` to the pure publish program.
+/// Host wiring for one Change Road. One physical Manager session can host many
+/// logical Relay incumbencies; Change never creates a Reviewer session.
 type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     // DSL-MUTABLE: resource — manager worktree path registry
     let worktrees = Dictionary<string, string>()
@@ -33,15 +33,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let gitPort = GitOperations.createWithRepo deps.RepoPath OrchestratorGit.run
 
-    let registerReviewerTreeIfPresent (agentId: string) (childId: SessionId) =
-        match worktrees.TryGetValue agentId with
-        | true, path -> deps.RegisterReviewerTree (SessionId.value childId) (GitTree.create path)
-        | false, _ -> ()
-
     let onChildCreated (agentId: string) (role: Role) (childId: SessionId) =
-        if role = Role.Reviewer then
-            registerReviewerTreeIfPresent agentId childId
-
         deps.OnChildCreated agentId role childId
 
     let runtime =
@@ -156,234 +148,207 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
         awaitPendingOrJoin agentId sourceOpt
 
-    // ── ManagerPort ─────────────────────────────────────────────────────────
+    // ── RelayPort ───────────────────────────────────────────────────────────
 
-    let startManager (start: ManagerStart) : Task<Result<SessionId, string>> =
+    let openRoad (start: RoadStart) : Task<Result<SessionId, string>> =
         forkChild
             (managerAgentId start.JobId)
             Role.Manager
             start.ManagerAgent
             start.Worktree
-            start.Prompt
+            start.RootRequest
             true
             start.ExpectedToolCalls
 
-    let sendManagerPrompt (jobId: ManagerJobId) : Task<Result<unit, string>> =
+    let activateRoad (jobId: ManagerJobId) : Task<Result<unit, string>> =
         runtime.SendDeferredFirstPrompt(managerAgentId jobId)
-
-    let finalizeRegisteredWorktree (agentId: string) =
-        match worktrees.TryGetValue agentId with
-        | true, path -> OrchestratorGit.finalizeWorktree OrchestratorGit.run agentId path
-        | false, _ -> Task.FromResult(Error(sprintf "No worktree registered for manager job '%s'" agentId))
-
-    /// Await the Manager, then stage its work into a candidate commit.
-    ///
-    /// `finalizeWorktree` runs only on a completed Manager: a failed or aborted run
-    /// has nothing to commit, and committing anyway would produce a candidate the
-    /// Manager never claimed was done.
-    let awaitManager (jobId: ManagerJobId) : Task<Result<unit, string>> =
-        let agentId = managerAgentId jobId
-
-        let descriptor =
-            DiagnosticWait.create
-                "manager-job-completion"
-                (CausalOwner.create "OrchestratorJob" [ "job", ManagerJobId.value jobId ])
-                [ "job", ManagerJobId.value jobId; "manager_agent", agentId ]
-                (WorkflowProducer(CausalOwner.create "ManagerWorkflow" [ "agent", agentId ]))
-                [ WaitEscape.DeadlineAt(DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs))
-                  WaitEscape.ProcessLifetime ]
-                "OrchestratorHost.awaitManager"
-
-        taskResult {
-            do! CausalAwait.awaitTask CausalWaitHub.observer descriptor (awaitChild agentId)
-            return! finalizeRegisteredWorktree agentId
-        }
-
-    /// Drop a leftover Host pending for this agent so Resume can install a fresh
-    /// work unit. A stuck unfinished pending (e.g. dual-suicide race) would make
-    /// sendToExistingChild take the busy-nudge path and never re-installRun, so the
-    /// resumed work unit would not observe conflict resolution (ORCH-003 measured:
-    /// conflict-resume on wire, REBASE_HEAD unmerged).
-    let clearStaleHostRun (agentId: string) =
-        lock runtime.Gate (fun () ->
-            match runtime.PendingRuns.TryGetValue agentId with
-            | true, run when not run.Finished ->
-                run.Finished <- true
-                run.Subscription |> Option.iter (fun s -> s.Dispose())
-
-                run.Source.SetResult(
-                    AgentCompletion.failed
-                        agentId
-                        ("run-" + agentId)
-                        (Some Role.Manager)
-                        None
-                        "SUPERSEDED"
-                        "superseded by ResumeManager"
-                )
-
-                runtime.PendingRuns.Remove agentId |> ignore
-            | true, _ -> runtime.PendingRuns.Remove agentId |> ignore
-            | false, _ -> ())
-
-    let adoptChildIfMissing (agentId: string) (sessionId: SessionId) =
-        match runtime.Children.TryGetValue agentId with
-        | true, _ -> ()
-        | false, _ -> runtime.AdoptChild(agentId, sessionId)
-
-    let conflictTimeoutBody (grepOut: string) =
-        if String.IsNullOrWhiteSpace grepOut then
-            "(no grep body)"
-        else
-            grepOut.Trim()
-
-    let waitConflictResolved (path: string) (deadline: DateTimeOffset) : Task<Result<unit, string>> =
-        let rec loop () =
-            taskResult {
-                let! grepCode, grepOut, _ =
-                    OrchestratorGit.run (
-                        OrchestratorGit.command path [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ]
-                    )
-                    |> TaskResultCE.ofTask
-
-                // git grep: 0 = markers present, 1 = clean, >1 = error
-                if grepCode = 1 then
-                    return ()
-                elif grepCode > 1 then
-                    return! Error "conflict-marker scan failed"
-                elif DateTimeOffset.UtcNow >= deadline then
-                    return!
-                        Error(
-                            sprintf
-                                "conflict resolution timed out (markers still present):\n%s"
-                                (conflictTimeoutBody grepOut)
-                        )
-                else
-                    do! Wanxiangshu.Process.PtyTiming.timerTask 50 |> TaskResultCE.ofTask
-                    return! loop ()
-            }
-
-        loop ()
 
     let requireJobRecord (jobId: ManagerJobId) =
         match jobRecord jobId with
         | Some record -> Ok record
         | None -> Error(sprintf "No durable job record for '%s'" (ManagerJobId.value jobId))
 
-    /// ORCH-003/ORCH-007: hand work back to the SAME Manager in the SAME worktree.
-    ///
-    /// Fork the conflict-resume prompt, then wait until the worktree has no
-    /// unmerged paths / conflict markers (Coder resolution on disk), then
-    /// finalizeWorktree. Do not await Host pending terminal alone: after
-    /// LifeCompleted the Manager turn often stays on IdleEncouragement and never
-    /// NotifyTerminal (measured: conflict-resume.2 + coder resolved, REBASE_HEAD
-    /// stuck, no manager HandleCompleted for the resume unit).
-    let resumeManager (jobId: ManagerJobId) (worktree: WorktreePath) (prompt: string) =
+    let roadIdOf (record: ManagerJobProjection) =
+        RoadId.create (SessionId.value record.ManagerSessionId)
+
+    let relayView (projection: ProjectionSet) (record: ManagerJobProjection) =
+        AgentProjection.tryFind record.ManagerSessionId projection.AgentProjections
+        |> Option.bind (fun session -> session.Relay)
+        |> Option.bind (fun relay -> Fold.view relay (roadIdOf record))
+
+    let signalOfProjection projection record =
+        relayView projection record
+        |> Option.bind (fun road ->
+            if road.ActiveIncumbency.IsSome then
+                None
+            else
+                road.LatestRetirement
+                |> Option.map (fun retirement ->
+                    match road.Certificate with
+                    | Some certificate when retirement.QualityCandidateAccepted && certificate.Valid ->
+                        RoadSignal.QualityCandidateAccepted(retirement, certificate)
+                    | _ -> RoadSignal.IncumbencyRetired retirement))
+
+    let rec awaitRoadSignal (jobId: ManagerJobId) : Task<Result<RoadSignal, string>> =
+        task {
+            match deps.Journal, requireJobRecord jobId with
+            | None, _ -> return Error "Relay Road requires a durable journal"
+            | _, Error error -> return Error error
+            | Some journal, Ok record ->
+                let projection, revision = AgentJournal.snapshotWithRevision journal
+
+                match signalOfProjection projection record with
+                | Some signal -> return Ok signal
+                | None ->
+                    let! _ = AgentJournal.awaitChangeFrom revision journal
+                    return! awaitRoadSignal jobId
+        }
+
+    let appendRelay
+        (journal: AgentJournal)
+        (record: ManagerJobProjection)
+        (transaction: RelayTransaction)
+        =
+        AgentJournal.appendAgent
+            (StreamId.Session record.ManagerSessionId)
+            None
+            (AgentFact.Relay(
+                RelayFactCases.TransactionCommitted
+                    {| RoadId = roadIdOf record
+                       Transaction = transaction |}
+            ))
+            journal
+
+    let invalidateCertificate (jobId: ManagerJobId) reason : Task<Result<unit, string>> =
+        task {
+            match deps.Journal, requireJobRecord jobId with
+            | None, _ -> return Error "Certificate invalidation requires a durable journal"
+            | _, Error error -> return Error error
+            | Some journal, Ok record ->
+                match relayView (AgentJournal.snapshot journal) record |> Option.bind (fun road -> road.Certificate) with
+                | None -> return Ok()
+                | Some certificate ->
+                    match RelayTransaction.create [ RelayEvent.QualityCertificateInvalidated(certificate.Id, reason) ] with
+                    | Error error -> return Error error
+                    | Ok transaction ->
+                        match! appendRelay journal record transaction with
+                        | Ok _ -> return Ok()
+                        | Error failure -> return Error(JournalAppendFailure.describe failure)
+        }
+
+    let captureSnapshot (jobId: ManagerJobId) : Task<Result<WorkspaceSnapshotId, string>> =
+        task {
+            match requireJobRecord jobId with
+            | Error error -> return Error error
+            | Ok record ->
+                try
+                    return Ok(WorkspaceSnapshot.capture (WorktreePath.value record.WorktreePath))
+                with error ->
+                    return Error error.Message
+        }
+
+    let deterministicSuccessor (retirementId: RetirementId) =
+        HostDigest.sha256Hex ("successor-v1\n" + RetirementId.value retirementId)
+        |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
+
+    let successorPrompt (sessionId: SessionId) =
+        ProviderProse.documentFor sessionId "runtime/relay-successor" Map.empty
+
+    let sendSuccessor
+        (record: ManagerJobProjection)
+        (retirement: RetirementSummary)
+        =
+        let terminalRun = ProviderRunIdentity.create retirement.ProjectionCut.ThroughProviderRunId
+
+        HostSessionNudge.trySendGateContinuationPhysical
+            deps.Sessions
+            record.ManagerSessionId
+            (successorPrompt record.ManagerSessionId)
+            PromptAuthority.ContinuationKind.ManagerGuard
+            (Some(WorktreePath.value record.WorktreePath))
+            deps.Journal
+            ("relay-successor:" + RetirementId.value retirement.Id)
+            terminalRun
+
+    let requestSuccessor
+        (jobId: ManagerJobId)
+        (worktree: WorktreePath)
+        reason
+        : Task<Result<IncumbencyId, string>> =
+        task {
+            match deps.Journal, requireJobRecord jobId with
+            | None, _ -> return Error "Successor activation requires a durable journal"
+            | _, Error error -> return Error error
+            | Some journal, Ok record ->
+                let projection = AgentJournal.snapshot journal
+
+                match relayView projection record with
+                | None -> return Error "Relay Road is not open"
+                | Some road ->
+                    match road.LatestRetirement with
+                    | None -> return Error "Successor requires a committed predecessor retirement"
+                    | Some retirement ->
+                        let incumbent =
+                            road.ActiveIncumbency |> Option.defaultValue (deterministicSuccessor retirement.Id)
+
+                        if road.ActiveIncumbency.IsNone then
+                            let snapshot = WorkspaceSnapshot.capture (WorktreePath.value worktree)
+                            let authority = road.AuthorityRevision
+
+                            match
+                                RelayTransaction.create
+                                    [ RelayEvent.SuccessorRequested(retirement.Id, reason)
+                                      RelayEvent.SuccessorActivated(retirement.Id, incumbent, snapshot, authority) ]
+                            with
+                            | Error error -> return Error error
+                            | Ok transaction ->
+                                match! appendRelay journal record transaction with
+                                | Error failure -> return Error(JournalAppendFailure.describe failure)
+                                | Ok _ -> ()
+
+                        match! sendSuccessor record retirement with
+                        | Error error -> return Error error
+                        | Ok _ -> return Ok incumbent
+        }
+
+    let finalizeRegisteredWorktree (agentId: string) =
+        match worktrees.TryGetValue agentId with
+        | true, path -> OrchestratorGit.finalizeWorktree OrchestratorGit.run agentId path
+        | false, _ -> Task.FromResult(Error(sprintf "No worktree registered for manager job '%s'" agentId))
+
+    let prepareCandidate (jobId: ManagerJobId) : Task<Result<CommitHash, string>> =
         taskResult {
             let! record = requireJobRecord jobId
-            let agentId = managerAgentId jobId
-            let path = WorktreePath.value worktree
-            worktrees.[agentId] <- path
-            clearStaleHostRun agentId
-            adoptChildIfMissing agentId record.ManagerSessionId
-
-            let! _ =
-                HostSessionNudge.sendContinuation
-                    deps.Sessions
-                    record.ManagerSessionId
-                    prompt
-                    PromptAuthority.ContinuationKind.ManagedDelegationAssignment
-                    (Some path)
-                    deps.Journal
-
-            let resolutionDeadline =
-                DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs)
-
-            // Gate on disk content only. Unmerged index entries clear only
-            // after `git add`; that belongs to finalizeWorktree. Waiting for
-            // empty `--diff-filter=U` before add is a deadlock (Coder can
-            // rewrite the file while paths stay AA until staged).
-            do! waitConflictResolved path resolutionDeadline
-            return! OrchestratorGit.finalizeWorktree OrchestratorGit.run agentId path
+            do! finalizeRegisteredWorktree (managerAgentId jobId) |> TaskResultCE.ofTask
+            return! gitPort.ReadHead record.WorktreePath |> TaskResultCE.ofTask
         }
 
-    /// ORCH-006: abort the manager and every reviewer child session for a job
-    /// before the worktree is released. This is a non-failing cleanup step.
-    let terminateChildren (jobId: ManagerJobId) : Task<unit> =
+    let terminateRoadResources (jobId: ManagerJobId) : Task<unit> =
         task {
             let managerId = managerAgentId jobId
-            let reviewerPrefix = OrchestratorManagerJob.reviewerAgentId jobId + "-"
 
-            let entries =
+            let entry =
                 lock runtime.Gate (fun () ->
-                    runtime.Children
-                    |> Seq.choose (fun kv ->
-                        let id = kv.Key
+                    match runtime.Children.TryGetValue managerId with
+                    | true, sessionId -> Some sessionId
+                    | false, _ -> None)
 
-                        if id = managerId || id.StartsWith(reviewerPrefix) then
-                            Some(kv.Value, id)
-                        else
-                            None)
-                    |> Seq.toList)
-
-            let sessions, ids = List.unzip entries
-            let! _ = HostForkChildDispatch.teardownChildren runtime.Sessions sessions
-
-            lock runtime.Gate (fun () ->
-                for id in ids do
-                    runtime.Children.Remove id |> ignore)
+            match entry with
+            | None -> return ()
+            | Some sessionId ->
+                let! _ = HostForkChildDispatch.teardownChildren runtime.Sessions [ sessionId ]
+                lock runtime.Gate (fun () -> runtime.Children.Remove managerId |> ignore)
         }
 
-    /// One review barrier. A fresh reviewer agent id per barrier, so REVIEW-008's
-    /// "fresh dual PERFECT" is structural: a new session's guard starts empty.
-    let reverify
-        (jobId: ManagerJobId)
-        (managerSessionId: SessionId)
-        (worktree: WorktreePath)
-        (barrierId: ReviewBarrierId)
-        =
-        let reviewerAgentId =
-            sprintf "%s-%s" (OrchestratorManagerJob.reviewerAgentId jobId) (ReviewBarrierId.value barrierId)
-
-        let sendReviewerNudge
-            (durable: AgentJournal)
-            (reviewerSessionId: SessionId)
-            (terminalProviderRun: ProviderRunIdentity)
-            =
-            HostSessionNudge.trySendGateContinuationPhysical
-                deps.Sessions
-                reviewerSessionId
-                (ProviderProse.documentFor reviewerSessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
-                PromptAuthority.ContinuationKind.ReviewerGuard
-                (Some(WorktreePath.value worktree))
-                (Some durable)
-                (RuntimeNudge.ReviewerVerdictRequired + ":" + ReviewBarrierId.value barrierId)
-                terminalProviderRun
-
-        let nudgeReviewer reviewerSessionId terminalProviderRun =
-            match deps.Journal with
-            | None -> Task.FromResult(Error "No journal: a result-review nudge cannot be claimed")
-            | Some durable -> sendReviewerNudge durable reviewerSessionId terminalProviderRun
-
-        OrchestratorHostReview.reverify
-            deps.Journal
-            (fun _ path prompt ->
-                forkChild reviewerAgentId Role.Reviewer OrchestratorHostReview.DeepReviewerAgent path prompt true None)
-            (fun _ -> runtime.SendDeferredFirstPrompt reviewerAgentId)
-            (fun (occasion: ReviewerTerminalOccasion) ->
-                ReviewerTerminalAwait.awaitFuture deps.Journal deps.Sessions occasion Distillation.AwaitAgentTimeoutMs)
-            nudgeReviewer
-            jobId
-            managerSessionId
-            worktree
-            barrierId
-
-    let managerPort: ManagerPort =
-        { StartManager = startManager
-          SendManagerPrompt = sendManagerPrompt
-          AwaitManager = awaitManager
-          Reverify = reverify
-          ResumeManager = resumeManager
-          TerminateChildren = terminateChildren }
+    let relayPort: RelayPort =
+        { OpenRoad = openRoad
+          ActivateRoad = activateRoad
+          AwaitRoadSignal = awaitRoadSignal
+          InvalidateCertificate = invalidateCertificate
+          RequestSuccessor = requestSuccessor
+          CaptureSnapshot = captureSnapshot
+          PrepareCandidate = prepareCandidate
+          TerminateRoadResources = terminateRoadResources }
 
     // ── engine ──────────────────────────────────────────────────────────────
 
@@ -414,7 +379,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 orchestratorId
                 worktrees
                 deps.RegisterChildDirectory
-                deps.RegisterReviewerTree
                 value
         | None -> task { return () }
 
@@ -458,7 +422,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let value =
                 Orchestrator(
                     gitPort,
-                    managerPort,
+                    relayPort,
                     deps.RepoPath,
                     target,
                     ?journal = (deps.Journal |> Option.map OrchestratorJournalPort.fromAgentJournal),

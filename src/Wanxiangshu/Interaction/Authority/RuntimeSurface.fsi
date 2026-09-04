@@ -81,11 +81,3 @@ module RuntimeSurface =
         projection: obj ->
             bool
 
-    val idleAlreadyAdmitted:
-        session: string ->
-        logicalRun: string ->
-        life: string ->
-        condition: string ->
-        providerRun: string ->
-        projection: obj ->
-            bool

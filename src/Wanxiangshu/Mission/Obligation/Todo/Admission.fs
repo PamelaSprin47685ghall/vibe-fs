@@ -3,6 +3,7 @@ namespace Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Relay
 
 /// Pure before-hook admission pipeline (protocol §11.3).
 /// Host callID→ToolPart localization and Journal append remain at the membrane
@@ -53,14 +54,14 @@ module MagicTodoAdmission =
 
     let private decideReplay
         (sha256: string -> string)
-        (lifeId: ManagerLifeId)
+        (incumbencyId: IncumbencyId)
         (settledCurrent: ObligationList)
         (localized: AdmissionLocalizedToolCall)
         (existing: ExistingPrepared)
         (writeId: TodoWriteId)
         : AdmissionOutcome<ObligationPrepareSuccess> =
         let observed =
-            { ManagerLifeId = lifeId
+            { IncumbencyId = incumbencyId
               ProviderInputDigest = localized.ProviderInputDigest
               BaseTodoDigest = MagicTodo.obligationListDigest sha256 settledCurrent
               ToolPartOrdinal = localized.ToolPartOrdinal }
@@ -71,11 +72,11 @@ module MagicTodoAdmission =
             // Keep the durable call identity checks; do not compare that stale
             // base against the post-accept projection.
             match
-                existing.Identity.ManagerLifeId = observed.ManagerLifeId,
+                existing.Identity.IncumbencyId = observed.IncumbencyId,
                 existing.Identity.ProviderInputDigest = observed.ProviderInputDigest,
                 existing.Identity.ToolPartOrdinal = observed.ToolPartOrdinal
             with
-            | false, _, _ -> Error(MagicTodoReject.IdentityCorruption "ManagerLifeId")
+            | false, _, _ -> Error(MagicTodoReject.IdentityCorruption "IncumbencyId")
             | true, false, _ -> Error(MagicTodoReject.IdentityCorruption "ProviderInputDigest")
             | true, true, false -> Error(MagicTodoReject.IdentityCorruption "ToolPartOrdinal")
             | true, true, true -> Ok()
@@ -111,17 +112,17 @@ module MagicTodoAdmission =
 
     let private admitAfterBatch
         (sha256: string -> string)
-        (lifeId: ManagerLifeId)
+        (incumbencyId: IncumbencyId)
         (settledCurrent: ObligationList)
         (existingPrepared: ExistingPrepared option)
         (localized: AdmissionLocalizedToolCall)
         (submitted: ObligationList)
         : AdmissionOutcome<ObligationPrepareSuccess> =
-        let writeId = MagicTodo.todoWriteId sha256 lifeId localized.ToolCallId
+        let writeId = MagicTodo.todoWriteId sha256 incumbencyId localized.ToolCallId
 
         match existingPrepared with
         | Some existing when TodoWriteId.value existing.TodoWriteId = TodoWriteId.value writeId ->
-            decideReplay sha256 lifeId settledCurrent localized existing writeId
+            decideReplay sha256 incumbencyId settledCurrent localized existing writeId
         | Some _ -> AdmissionOutcome.Rejected(MagicTodoReject.IdentityCorruption "TodoWriteId")
         | None -> decideFresh sha256 settledCurrent localized submitted writeId
 
@@ -129,7 +130,7 @@ module MagicTodoAdmission =
     /// provider-visible item ids or status machine. Duplicate names fail closed.
     let admitObligations
         (sha256: string -> string)
-        (lifeId: ManagerLifeId)
+        (incumbencyId: IncumbencyId)
         (settledCurrent: ObligationList)
         (existingPrepared: ExistingPrepared option)
         (localized: AdmissionLocalizedToolCall)
@@ -137,4 +138,4 @@ module MagicTodoAdmission =
         : AdmissionOutcome<ObligationPrepareSuccess> =
         match MagicTodo.admitTodowriteBatch localized.TodowriteCallIdsInMessage with
         | Error e -> AdmissionOutcome.Rejected e
-        | Ok() -> admitAfterBatch sha256 lifeId settledCurrent existingPrepared localized submitted
+        | Ok() -> admitAfterBatch sha256 incumbencyId settledCurrent existingPrepared localized submitted

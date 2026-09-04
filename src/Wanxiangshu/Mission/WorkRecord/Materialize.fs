@@ -9,8 +9,6 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Persistence.Journal
 
@@ -145,19 +143,6 @@ module LifecycleWorkRecordProjection =
         |> Option.map XTraceProjection.frontierAfter
         |> Option.defaultValue XTraceCursor.originCursor
 
-    let private resolveOpeningEnd
-        (life: LifeProjection option)
-        (snapshot: ProjectionSet)
-        (xTrace: XTraceProjectionState)
-        =
-        life
-        |> Option.bind (fun current ->
-            ManagerOpeningFloor.workRecordStart
-                current
-                (MagicTodoProjection.tryLife current.LifeId snapshot.AgentProjections.MagicTodo)
-                xTrace)
-        |> Option.defaultWith (fun () -> immediateOpeningEnd xTrace)
-
     let private renderRange (durable: AgentJournal) (range: XTraceRange) (xTrace: XTraceProjectionState) =
         XTraceMaterialization.renderRange durable range xTrace
 
@@ -186,15 +171,11 @@ module LifecycleWorkRecordProjection =
             | _ -> return renderedGap
         }
 
-    let private materializeOpeningEvidence durable snapshot session includeOpening coverageOverride xTrace opening =
+    let private materializeOpeningEvidence durable session includeOpening coverageOverride xTrace opening =
         task {
             let blog = session.Blog |> Option.defaultValue BlogProjection.empty
             let! frames = BlogProjection.frames blog |> resolveFrames durable
-
-            let life =
-                session.ManagerLife |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-
-            let openingEnd = resolveOpeningEnd life snapshot xTrace
+            let openingEnd = immediateOpeningEnd xTrace
 
             let constitutiveStart =
                 xTrace
@@ -235,7 +216,7 @@ module LifecycleWorkRecordProjection =
             | None -> return None
             | Some opening ->
                 return!
-                    materializeOpeningEvidence durable snapshot session includeOpening coverageOverride xTrace opening
+                    materializeOpeningEvidence durable session includeOpening coverageOverride xTrace opening
         }
 
     let lifecycleWorkRecordFromSnapshot

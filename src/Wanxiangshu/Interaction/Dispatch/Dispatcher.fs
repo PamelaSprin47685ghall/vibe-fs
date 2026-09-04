@@ -3,7 +3,6 @@ namespace Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Change
-open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System
@@ -24,10 +23,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
@@ -685,23 +681,6 @@ module PromptDispatcher =
                 requestId
                 terminalProviderRun
                 repairKind
-                (this.ProjectionFor profile.SessionId)
-
-        /// GLORY-029: has this exact Manager terminal occasion already received
-        /// its encouragement. Fresh ProviderRun identities are intentionally
-        /// unbounded, even within the same Life/business condition.
-        member this.IdleAlreadyAdmitted
-            (profile: PromptAuthority.AuthorityExecutionProfile)
-            (lifeId: ManagerLifeId)
-            (conditionKey: string)
-            (terminalProviderRun: ProviderRunIdentity)
-            : bool =
-            PromptAuthority.idleAlreadyAdmitted
-                profile.SessionId
-                profile.LogicalRunId
-                lifeId
-                conditionKey
-                terminalProviderRun
                 (this.ProjectionFor profile.SessionId)
 
         member internal _.Metadata (key: PromptKey) (origin: string) (logicalRunId: LogicalRunId option) =

@@ -4,6 +4,7 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Relay
 
 /// Speculative PrefixEpoch commit helpers for TodoCheckpoint evidence (§16.7).
 ///
@@ -24,7 +25,7 @@ module MagicTodoPrefixEpoch =
     /// proven Y bundle (never LWR RawGap) and snapshot fields.
     let buildTodoCheckpointCommit
         (sessionId: SessionId)
-        (lifeId: ManagerLifeId)
+        (incumbencyId: IncumbencyId)
         (previousEpoch: PrefixEpochId)
         (snapshot: PrefixSnapshot)
         (previousCommitted: TodoWriteId option)
@@ -34,7 +35,7 @@ module MagicTodoPrefixEpoch =
         (providerPrefixDigest: string)
         : PrefixRebaseCommittedV2 =
         { SessionId = sessionId
-          ManagerLifeId = Some lifeId
+          IncumbencyId = Some incumbencyId
           PreviousEpochId = previousEpoch
           NextEpochId = PrefixEpochId.next previousEpoch
           EvidenceKind = todoCheckpointEvidence trigger previousCommitted

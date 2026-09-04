@@ -4,6 +4,7 @@ open Wanxiangshu.Context.Trace
 
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
+open Wanxiangshu.Mission.Relay
 
 /// Magic Todo durable fact algebra (TODO-004/006/012).
 ///
@@ -24,7 +25,7 @@ module MagicTodoFacts =
     type TodoWritePrepared =
         {
             ManagerSessionId: SessionId
-            ManagerLifeId: ManagerLifeId
+            IncumbencyId: IncumbencyId
             TodoWriteId: TodoWriteId
             ToolCallId: ToolCallId
             ToolPartOrdinal: int
@@ -45,7 +46,7 @@ module MagicTodoFacts =
     /// Accepted: checkpoint SSOT.
     type TodoWriteAccepted =
         {
-            ManagerLifeId: ManagerLifeId
+            IncumbencyId: IncumbencyId
             TodoWriteId: TodoWriteId
             ToolCallId: ToolCallId
             /// Journal envelope identity of the matching Prepared.
@@ -61,7 +62,7 @@ module MagicTodoFacts =
     /// an extra SeedItemIds field; v2 ignores it on decode.
     type LegacyTodoSeedAdopted =
         { ManagerSessionId: SessionId
-          ManagerLifeId: ManagerLifeId
+          IncumbencyId: IncumbencyId
           SeedTodoRef: BlobRef
           SeedTodoDigest: BlobDigest }
 
@@ -81,7 +82,7 @@ module MagicTodoFacts =
     type PrefixRebaseCommittedV2 =
         {
             SessionId: SessionId
-            ManagerLifeId: ManagerLifeId option
+            IncumbencyId: IncumbencyId option
             PreviousEpochId: PrefixEpochId
             NextEpochId: PrefixEpochId
             EvidenceKind: PrefixEvidenceKind

@@ -6,7 +6,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
-open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
@@ -83,7 +83,7 @@ module MagicTodoMembraneSurface =
 
     let private preparedView (bridge: MagicTodoMembrane.PreparedBridge) : obj =
         box
-            {| managerLifeId = ManagerLifeId.value bridge.Prepared.ManagerLifeId
+            {| incumbencyId = IncumbencyId.value bridge.Prepared.IncumbencyId
                todoWriteId = TodoWriteId.value bridge.Prepared.TodoWriteId
                toolCallId = ToolCallId.value bridge.Prepared.ToolCallId
                planCompleteDeclared = bridge.Prepared.PlanCompleteDeclared
@@ -98,7 +98,7 @@ module MagicTodoMembraneSurface =
     let private rejectionView rejection : obj =
         let code =
             match rejection with
-            | MagicTodoMembrane.PrepareRejection.NoOpenManagerLife -> "NoOpenManagerLife"
+            | MagicTodoMembrane.PrepareRejection.NoActiveIncumbency -> "NoActiveIncumbency"
             | MagicTodoMembrane.PrepareRejection.UnexpectedToolName _ -> "UnexpectedToolName"
             | MagicTodoMembrane.PrepareRejection.SnapshotInputMismatch -> "SnapshotInputMismatch"
             | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.MultipleTodowriteInMessage _) ->
@@ -140,19 +140,6 @@ module MagicTodoMembraneSurface =
         match physicalResult value with
         | Ok evidence -> evidence
         | Error error -> invalidArg "physicalEvidence" error
-
-    let openLife (handle: JournalHandle) (sessionId: string) (lifeId: string) : Task<obj> =
-        ObligationJournalSurface.appendManagerLifecycle
-            handle
-            sessionId
-            "LifeOpened"
-            (box
-                {| sessionId = sessionId
-                   lifeId = lifeId
-                   openingUserMessageId = "msg-opening"
-                   openingTextRef = "blob-opening"
-                   openingTextDigest = "digest-opening"
-                   openingCursorSequence = 1 |})
 
     let prepare
         (handle: JournalHandle)
@@ -240,8 +227,8 @@ module MagicTodoMembraneSurface =
     let appendFact (handle: JournalHandle) (sessionId: string) (factJson: string) : Task<obj> =
         ObligationJournalSurface.appendMagicTodo handle sessionId null factJson
 
-    let snapshot (handle: JournalHandle) (lifeId: string) : obj =
-        ObligationJournalSurface.snapshotMagicTodo handle lifeId
+    let snapshot (handle: JournalHandle) (incumbencyId: string) : obj =
+        ObligationJournalSurface.snapshotMagicTodo handle incumbencyId
 
     /// Real Host Before -> controlled builtin executor -> After workflow. Only
     /// successful return from the supplied physical executor reaches After;
@@ -250,7 +237,7 @@ module MagicTodoMembraneSurface =
         (handle: JournalHandle)
         (rawMessages: obj array)
         (sessionId: string)
-        (lifeId: string)
+        (incumbencyId: string)
         (callId: string)
         (args: obj)
         (executor: obj)
@@ -271,5 +258,5 @@ module MagicTodoMembraneSurface =
             return
                 box
                     {| output = hostOutput
-                       life = ObligationJournalSurface.snapshotMagicTodo handle lifeId |}
+                       incumbency = ObligationJournalSurface.snapshotMagicTodo handle incumbencyId |}
         }

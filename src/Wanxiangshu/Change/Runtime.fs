@@ -58,7 +58,7 @@ module private OrchestratorRuntimeDecisions =
 type Orchestrator
     (
         git: GitPort,
-        manager: ManagerPort,
+        relay: RelayPort,
         repoPath: string,
         targetRef: TargetRef,
         ?journal: OrchestratorJournalPort,
@@ -93,7 +93,7 @@ type Orchestrator
 
     let programDeps: OrchestratorProgramDeps =
         { Git = git
-          Manager = manager
+          Relay = relay
           AppendFact = appendFact
           Snapshot = snapshot
           AcquirePublishGate = acquirePublishGate }
@@ -228,19 +228,19 @@ type Orchestrator
                 |> Option.defaultWith (fun () -> Ok() |> Task.FromResult)
                 |> OrchestratorRuntimeDecisions.releaseWorktreeOnError worktree
 
-            let startManager (worktree: WorktreeResource) =
+            let openRoad (worktree: WorktreeResource) =
                 taskResult {
                     // The Manager session is created before the job fact because
                     // ORCH-006 persists its SessionId. Its first prompt remains
                     // deferred until ManagerJobCreated is durable.
                     let! managerSessionId =
-                        manager.StartManager
+                        relay.OpenRoad
                             { JobId = jobId
                               ManagerAgent = managerAgent
                               Worktree = path
-                              Prompt = prompt
+                              RootRequest = prompt
                               ExpectedToolCalls = expectedToolCalls }
-                        |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to start manager")
+                        |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to open Relay Road")
 
                     let fact =
                         OrchestratorFact.ManagerJobCreated
@@ -281,7 +281,7 @@ type Orchestrator
                                         journalPort |> Option.iter (fun _ -> worktree.MarkDurable())
 
                                         return!
-                                            startManager worktree
+                                            openRoad worktree
                                             |> OrchestratorRuntimeDecisions.releaseWorktreeUnlessJournaled
                                                 journalPort
                                                 worktree
@@ -297,9 +297,9 @@ type Orchestrator
                             let! job = outcome
 
                             do!
-                                manager.SendManagerPrompt jobId
+                                relay.ActivateRoad jobId
                                 |> OrchestratorRuntimeDecisions.mapTaskError (
-                                    integration "Failed to send manager prompt"
+                                    integration "Failed to activate Relay Road"
                                 )
 
                             startPublication job
@@ -337,22 +337,6 @@ type Orchestrator
               ManagerAgent = record.ManagerAgent
               TargetRef = record.TargetRef
               Worktree = worktree }
-
-    /// GLORY-068: reuse an active ManagerJob — the SAME worktree and the SAME
-    /// Manager session continue with an appended requirement ("十年修得同船渡").
-    /// Refuses terminal jobs; a finished job never revives.
-    member this.ContinueManager(jobId: ManagerJobId, prompt: string) : Task<Result<WorktreePath, string>> =
-        taskResult {
-            let projection = snapshot ()
-
-            let! record =
-                OrchestratorProjection.tryFind jobId projection.AgentProjections.Orchestrator
-                |> Result.requireSome (sprintf "Unknown manager job: %s" (ManagerJobId.value jobId))
-                |> Result.bind OrchestratorRuntimeDecisions.requireActiveJob
-
-            do! manager.ResumeManager record.ManagerJobId record.WorktreePath prompt
-            return record.WorktreePath
-        }
 
     /// EXEC-019: bounded FIFO batch with local interrupt (≠ lifecycle Cancel).
     member _.JoinPublishedBatch(maxCount: int, interrupt: Task<JoinInterruptReason>) =

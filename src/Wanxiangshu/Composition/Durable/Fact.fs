@@ -12,9 +12,8 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Enforcer.InstitutionalLearning
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Host
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
@@ -34,7 +33,7 @@ module Fact =
     type AgentFact =
         | Prompt of PromptFactCases
         | Fallback of FallbackFactCases
-        | Review of ReviewFactCases
+        | Relay of RelayFactCases
         | Execution of ExecutionFactCases
         | Orchestrator of OrchestratorFactCases
         | Companion of CompanionFactCases
@@ -50,5 +49,4 @@ module Fact =
     type Fact =
         | Runtime of RuntimeFact
         | Agent of AgentFact
-        | ManagerLifecycle of ManagerLifecycleFact
         | MagicTodo of MagicTodoFacts.MagicTodoFact
