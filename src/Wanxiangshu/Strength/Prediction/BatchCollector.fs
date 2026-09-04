@@ -10,9 +10,7 @@ open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt

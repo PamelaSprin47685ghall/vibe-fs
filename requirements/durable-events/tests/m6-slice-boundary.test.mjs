@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as eventCodec from '../../../dist/Persistence/EventStore/CodecSurface.js'
-import { assertFatalBoundary } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
+import { assertEffectIsInjected, assertFatalBoundary, assertPureContract } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
 const event = ({
   id = '1111111111111111111111111111111111111111',
@@ -54,6 +54,11 @@ test('WHAT[DURABLE-EVENTS-023] canonical codec surface keeps encode decode UTF-8
   }
   assert.deepEqual(eventCodec.decodeUtf8Text(invalidUtf8), invalidUtf8Error)
   assert.deepEqual(eventCodec.decodeUtf8(invalidUtf8), invalidUtf8Error)
+})
+
+test('WHAT[DURABLE-EVENTS-023] canonical codec and owner folds reject physical store and outer-union authority', () => {
+  assertPureContract()
+  assertEffectIsInjected('file-system')
 })
 
 test('WHAT[DURABLE-EVENTS-024] semantic cut fatal requires settlement and one injected physical fuse', () => {

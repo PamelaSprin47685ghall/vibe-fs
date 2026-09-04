@@ -125,13 +125,6 @@ module PromptDispatcher =
             repairKind: string ->
                 bool
 
-        member IdleAlreadyAdmitted:
-            profile: PromptAuthority.AuthorityExecutionProfile ->
-            lifeId: ManagerLifeId ->
-            conditionKey: string ->
-            terminalProviderRun: ProviderRunIdentity ->
-                bool
-
         member internal Metadata: key: PromptKey -> origin: string -> logicalRunId: LogicalRunId option -> obj
         member internal SubscribeNoOp: port: ISessionHostPort -> sessionId: SessionId -> IDisposable
 

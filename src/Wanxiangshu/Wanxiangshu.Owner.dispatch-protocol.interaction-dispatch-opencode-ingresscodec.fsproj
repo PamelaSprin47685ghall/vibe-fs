@@ -27,7 +27,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.execution-session-recoveryclosureprojection.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-planner.fsproj" />
-    <ProjectReference Include="Wanxiangshu.Owner.review-assurance.opencode-host-providerrunbinding.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-providerrunbinding.fsproj" />
         <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fsi" />
     <Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fs" />

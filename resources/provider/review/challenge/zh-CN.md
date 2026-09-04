@@ -1,1 +1,0 @@
-不行。重新对照 original task authority 评估，不要拿 worker 当前 account 或它偏爱的 milestone narrative 当量尺。主动尝试说出一个仍能推进未满足 original requirement 的具体 useful authorized action；找到一个，就足以击败 completion。“next session”“continue later”、经过时间、commit 数、大量 progress、整洁 checkpoint 与 handoff readiness 的 completion evidence 权重都为零。如果 required work 现在仍可执行，而且没有具体 boundary 阻止它，verdict 必须保持 REVISE。

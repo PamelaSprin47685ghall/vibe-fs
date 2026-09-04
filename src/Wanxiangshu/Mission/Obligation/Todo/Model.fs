@@ -5,6 +5,7 @@ open Wanxiangshu.Context.Trace
 open System
 open System.Text
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Relay
 
 /// Magic Todo Checkpoint Protocol — GrandRewrite clean-break algebra.
 ///
@@ -15,7 +16,7 @@ module MagicTodo =
 
     // ── Checkpoint identity ─────────────────────────────────────────────────
 
-    /// Digest(ManagerLifeId + ToolCallId). Same ToolCallId replay → same id.
+    /// Digest(IncumbencyId + ToolCallId). Same ToolCallId replay → same id.
     type TodoWriteId = private TodoWriteId of string
 
     module TodoWriteId =
@@ -24,7 +25,7 @@ module MagicTodo =
 
     /// Semantic version frozen into Prepared / Accepted facts.
     [<Literal>]
-    let SemanticVersion = "magic-todo.v5"
+    let SemanticVersion = "magic-todo.v6"
 
     // ── Provider account ───────────────────────────────────────────────────
 
@@ -125,9 +126,9 @@ module MagicTodo =
         | IdentityCorruption of field: string
         | FirstSuicideWithoutCheckpoint
 
-    let todoWriteId (sha256: string -> string) (lifeId: ManagerLifeId) (toolCallId: ToolCallId) : TodoWriteId =
+    let todoWriteId (sha256: string -> string) (incumbencyId: IncumbencyId) (toolCallId: ToolCallId) : TodoWriteId =
         TodoWriteId.create (
-            sha256 (String.concat "|" [ ManagerLifeId.value lifeId; ToolCallId.value toolCallId; "todo-write" ])
+            sha256 (String.concat "|" [ IncumbencyId.value incumbencyId; ToolCallId.value toolCallId; "todo-write" ])
         )
 
     let private escapedJsonCharacter character =
@@ -192,15 +193,15 @@ module MagicTodo =
         Ok()
 
     type PreparedIdentity =
-        { ManagerLifeId: ManagerLifeId
+        { IncumbencyId: IncumbencyId
           ProviderInputDigest: string
           BaseTodoDigest: string
           ToolPartOrdinal: int }
 
     /// Same TodoWriteId replay must match frozen Prepared identity fields.
     let checkPreparedReplay (expected: PreparedIdentity) (observed: PreparedIdentity) : Result<unit, MagicTodoReject> =
-        if expected.ManagerLifeId <> observed.ManagerLifeId then
-            Error(MagicTodoReject.IdentityCorruption "ManagerLifeId")
+        if expected.IncumbencyId <> observed.IncumbencyId then
+            Error(MagicTodoReject.IdentityCorruption "IncumbencyId")
         elif expected.ProviderInputDigest <> observed.ProviderInputDigest then
             Error(MagicTodoReject.IdentityCorruption "ProviderInputDigest")
         elif expected.BaseTodoDigest <> observed.BaseTodoDigest then

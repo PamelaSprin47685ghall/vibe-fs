@@ -29,6 +29,7 @@ const foldMagic = (handle, magicFact, eventId = undefined) => {
 const preparedFact = ({
   managerSessionId = managerSession,
   managerLifeId = life,
+  incumbencyId = life,
   todoWriteId = write,
   toolCallId = call,
   toolPartOrdinal = 2,
@@ -42,7 +43,7 @@ const preparedFact = ({
   semanticVersion = 'magic-v1',
 } = {}) => fact('TodoWritePrepared', {
   ManagerSessionId: managerSessionId,
-  ManagerLifeId: managerLifeId,
+  IncumbencyId: incumbencyId,
   TodoWriteId: todoWriteId,
   ToolCallId: toolCallId,
   ToolPartOrdinal: toolPartOrdinal,
@@ -58,6 +59,7 @@ const preparedFact = ({
 
 const acceptedFact = ({
   managerLifeId = life,
+  incumbencyId = life,
   todoWriteId = write,
   toolCallId = call,
   preparedFactRef = 'prepared-fact-ref',
@@ -66,7 +68,7 @@ const acceptedFact = ({
   physicalSuccessEvidence = 'LiveAfterSuccess',
   semanticVersion = 'magic-v1',
 } = {}) => fact('TodoWriteAccepted', {
-  ManagerLifeId: managerLifeId,
+  IncumbencyId: incumbencyId,
   TodoWriteId: todoWriteId,
   ToolCallId: toolCallId,
   PreparedFactRef: preparedFactRef,
@@ -147,7 +149,7 @@ test('WHAT[OBLIGATION-LEDGER-019] rejects a legacy seed after the first Magic pr
   ok(foldMagic(handle, prepared, 'prepared-fact-ref'))
   const legacySeed = fact('LegacyTodoSeedAdopted', {
     ManagerSessionId: managerSession,
-    ManagerLifeId: life,
+    IncumbencyId: life,
     SeedTodoRef: 'legacy-list',
     SeedTodoDigest: 'legacy-digest',
   })

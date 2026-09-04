@@ -51,9 +51,9 @@
         "headingCount": 9
       }
     },
-    "inquiry": {
+        "inquiry": {
       "en.md": {
-        "normalizedBytes": 5266,
+        "normalizedBytes": 5304,
         "paragraphCount": 42,
         "headingCount": 10
       },
@@ -61,18 +61,6 @@
         "normalizedBytes": 5165,
         "paragraphCount": 42,
         "headingCount": 10
-      }
-    },
-    "reviewer": {
-      "en.md": {
-        "normalizedBytes": 5667,
-        "paragraphCount": 41,
-        "headingCount": 6
-      },
-      "zh-CN.md": {
-        "normalizedBytes": 5640,
-        "paragraphCount": 41,
-        "headingCount": 6
       }
     },
     "orchestrator": {

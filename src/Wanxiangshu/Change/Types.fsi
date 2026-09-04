@@ -4,12 +4,12 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.Journal
 
 type OrchestratorVerdict =
     | Published of jobId: ManagerJobId * head: CommitHash
     | RejectedDirty of reason: string
-    | NeedsReview of jobId: ManagerJobId * reviewDetails: string
     | IntegrationFailed of jobId: ManagerJobId * errorDetails: string
     | Empty
 
@@ -32,20 +32,28 @@ type GitPort =
       ReadHead: WorktreePath -> Task<Result<CommitHash, string>>
       GetTargetHead: TargetRef -> Task<Result<CommitHash, string>> }
 
-type ManagerStart =
+type RoadStart =
     { JobId: ManagerJobId
       ManagerAgent: string
       Worktree: WorktreePath
-      Prompt: string
+      RootRequest: string
       ExpectedToolCalls: int option }
 
-type ManagerPort =
-    { StartManager: ManagerStart -> Task<Result<SessionId, string>>
-      SendManagerPrompt: ManagerJobId -> Task<Result<unit, string>>
-      AwaitManager: ManagerJobId -> Task<Result<unit, string>>
-      Reverify: ManagerJobId -> SessionId -> WorktreePath -> ReviewBarrierId -> Task<Result<unit, string>>
-      ResumeManager: ManagerJobId -> WorktreePath -> string -> Task<Result<unit, string>>
-      TerminateChildren: ManagerJobId -> Task<unit> }
+[<RequireQualifiedAccess>]
+type RoadSignal =
+    | IncumbencyRetired of RetirementSummary
+    | QualityCandidateAccepted of RetirementSummary * QualityCertificate
+    | ExceptionalTerminal of string
+
+type RelayPort =
+    { OpenRoad: RoadStart -> Task<Result<SessionId, string>>
+      ActivateRoad: ManagerJobId -> Task<Result<unit, string>>
+      AwaitRoadSignal: ManagerJobId -> Task<Result<RoadSignal, string>>
+      InvalidateCertificate: ManagerJobId -> string -> Task<Result<unit, string>>
+      RequestSuccessor: ManagerJobId -> WorktreePath -> string -> Task<Result<IncumbencyId, string>>
+      CaptureSnapshot: ManagerJobId -> Task<Result<WorkspaceSnapshotId, string>>
+      PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
+      TerminateRoadResources: ManagerJobId -> Task<unit> }
 
 type OrchestratorJournalPort =
     { AppendFact: StreamId -> AgentFact -> Task<Result<ProjectionSet, string>>
@@ -58,7 +66,7 @@ type PublishGateLease = { Release: unit -> Task<unit> }
 
 type OrchestratorProgramDeps =
     { Git: GitPort
-      Manager: ManagerPort
+      Relay: RelayPort
       AppendFact: StreamId -> AgentFact -> Task<Result<unit, string>>
       Snapshot: unit -> ProjectionSet
       AcquirePublishGate: unit -> Task<PublishGateLease> }

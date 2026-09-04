@@ -132,6 +132,21 @@ test('WHAT[DURABLE-EVENTS-019] every registered business oracle changes its prod
         ),
         'append Journal fact',
       )
+      mustOk(
+        await journal.JournalSurface_appendAgent(
+          booted.journal,
+          { kind: 'Session', session: 'canonical-session' },
+          null,
+          {
+            family: 'Companion',
+            case: 'CompanionBloggerClosed',
+            payload: {
+              SessionId: 'canonical-session',
+            },
+          },
+        ),
+        'append Journal fact',
+      )
       assert.equal(journal.JournalSurface_hasSession(booted.journal, 'canonical-session'), true)
     } finally {
       journal.JournalSurface_dispose(booted.journal)

@@ -12,13 +12,13 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoAdmission
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoSurface
 open Wanxiangshu.Mission.Obligation.Todo.OpenCode
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
@@ -39,7 +39,7 @@ module MagicTodoMembrane =
 
     type PreparedBridge =
         { ManagerSessionId: SessionId
-          ManagerLifeId: ManagerLifeId
+          IncumbencyId: IncumbencyId
           Prepared: TodoWritePrepared
           PreparedFactRef: EventId
           BaseObligations: ObligationList
@@ -51,7 +51,7 @@ module MagicTodoMembrane =
     /// DSL-class: Decision
     [<RequireQualifiedAccess>]
     type PrepareRejection =
-        | NoOpenManagerLife
+        | NoActiveIncumbency
         | UnexpectedToolName of actual: string
         | SnapshotInputMismatch
         | Admission of MagicTodoReject
@@ -68,10 +68,12 @@ module MagicTodoMembrane =
         | OutputDigestMismatch
         | JournalAppend of reason: string
 
-    let private managerLife (sessionId: SessionId) (projection: ProjectionSet) =
+    let private activeIncumbency (sessionId: SessionId) (projection: ProjectionSet) =
         AgentProjection.tryFind sessionId projection.AgentProjections
-        |> Option.bind (fun session -> session.ManagerLife)
-        |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+        |> Option.bind (fun session -> session.Relay)
+        |> Option.bind (fun relay ->
+            Wanxiangshu.Mission.Relay.Fold.view relay (RoadId.create (SessionId.value sessionId)))
+        |> Option.bind (fun road -> road.ActiveIncumbency)
 
     let private readList
         (journal: AgentJournal)
@@ -113,14 +115,14 @@ module MagicTodoMembrane =
         }
 
     let private existingPrepared
-        (lifeId: ManagerLifeId)
+        (incumbencyId: IncumbencyId)
         (writeId: TodoWriteId)
-        (life: MagicTodoProjection.LifeMagicTodoState)
+        (incumbency: MagicTodoProjection.IncumbencyMagicTodoState)
         : ExistingPrepared option =
-        Map.tryFind (TodoWriteId.value writeId) life.Checkpoints
+        Map.tryFind (TodoWriteId.value writeId) incumbency.Checkpoints
         |> Option.map (fun checkpoint ->
             { Identity =
-                { ManagerLifeId = lifeId
+                { IncumbencyId = incumbencyId
                   ProviderInputDigest = checkpoint.ProviderInputDigest
                   BaseTodoDigest = BlobDigest.value checkpoint.BaseTodoDigest
                   ToolPartOrdinal = checkpoint.ToolPartOrdinal }
@@ -132,11 +134,11 @@ module MagicTodoMembrane =
                     MagicTodoAdmission.ExistingPreparedAcceptance.PreparedOnly })
 
     let private preparedFromCheckpoint
-        (lifeId: ManagerLifeId)
+        (incumbencyId: IncumbencyId)
         (checkpoint: MagicTodoProjection.CheckpointRecord)
         : TodoWritePrepared =
         { ManagerSessionId = checkpoint.ManagerSessionId
-          ManagerLifeId = lifeId
+          IncumbencyId = incumbencyId
           TodoWriteId = checkpoint.TodoWriteId
           ToolCallId = checkpoint.ToolCallId
           ToolPartOrdinal = checkpoint.ToolPartOrdinal
@@ -151,7 +153,7 @@ module MagicTodoMembrane =
 
     let private bridge
         (managerSessionId: SessionId)
-        (lifeId: ManagerLifeId)
+        (incumbencyId: IncumbencyId)
         (prepared: TodoWritePrepared)
         (preparedFactRef: EventId)
         (baseObligations: ObligationList)
@@ -159,7 +161,7 @@ module MagicTodoMembrane =
         (acceptance: PreparedBridgeAcceptance)
         =
         { ManagerSessionId = managerSessionId
-          ManagerLifeId = lifeId
+          IncumbencyId = incumbencyId
           Prepared = prepared
           PreparedFactRef = preparedFactRef
           BaseObligations = baseObligations
@@ -182,22 +184,25 @@ module MagicTodoMembrane =
             && snapshotInput.Obligations = submitted
         | Error _ -> false
 
-    let private readCurrentObligations (journal: AgentJournal) (life: MagicTodoProjection.LifeMagicTodoState) =
-        match life.CurrentObligationsRef with
+    let private readCurrentObligations
+        (journal: AgentJournal)
+        (incumbency: MagicTodoProjection.IncumbencyMagicTodoState)
+        =
+        match incumbency.CurrentObligationsRef with
         | None -> Task.FromResult(Ok [])
         | Some(blobRef, digest) -> readList journal "CurrentObligations" blobRef digest
 
     let private replayPreparedBridge
         (journal: AgentJournal)
         (managerSessionId: SessionId)
-        (lifeId: ManagerLifeId)
-        (life: MagicTodoProjection.LifeMagicTodoState)
+        (incumbencyId: IncumbencyId)
+        (incumbency: MagicTodoProjection.IncumbencyMagicTodoState)
         (currentObligations: ObligationList)
         (replayWriteId: TodoWriteId)
         : Task<Result<PreparedBridge, PrepareRejection>> =
         taskResult {
             let! checkpoint =
-                Map.tryFind (TodoWriteId.value replayWriteId) life.Checkpoints
+                Map.tryFind (TodoWriteId.value replayWriteId) incumbency.Checkpoints
                 |> Result.requireSome (PrepareRejection.ProjectionInconsistent "replayed Prepared is absent")
 
             let! proposal = readList journal "ProposedTodo" checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
@@ -205,8 +210,8 @@ module MagicTodoMembrane =
             return
                 bridge
                     managerSessionId
-                    lifeId
-                    (preparedFromCheckpoint lifeId checkpoint)
+                    incumbencyId
+                    (preparedFromCheckpoint incumbencyId checkpoint)
                     checkpoint.PreparedFactRef
                     currentObligations
                     proposal
@@ -216,7 +221,7 @@ module MagicTodoMembrane =
     let private freshPrepareBridge
         (journal: AgentJournal)
         (managerSessionId: SessionId)
-        (lifeId: ManagerLifeId)
+        (incumbencyId: IncumbencyId)
         (locality: MagicTodoLocality.LocalizedToolCall)
         (planCompleteDeclared: bool)
         (currentObligations: ObligationList)
@@ -228,7 +233,7 @@ module MagicTodoMembrane =
 
             let prepared =
                 { ManagerSessionId = managerSessionId
-                  ManagerLifeId = lifeId
+                  IncumbencyId = incumbencyId
                   TodoWriteId = preparedPlan.TodoWriteId
                   ToolCallId = locality.ToolCallId
                   ToolPartOrdinal = preparedPlan.ToolPartOrdinal
@@ -253,7 +258,7 @@ module MagicTodoMembrane =
             return
                 bridge
                     managerSessionId
-                    lifeId
+                    incumbencyId
                     prepared
                     receipt.EventId
                     currentObligations
@@ -264,8 +269,8 @@ module MagicTodoMembrane =
     let private materializeAdmission
         (journal: AgentJournal)
         (managerSessionId: SessionId)
-        (lifeId: ManagerLifeId)
-        (life: MagicTodoProjection.LifeMagicTodoState)
+        (incumbencyId: IncumbencyId)
+        (incumbency: MagicTodoProjection.IncumbencyMagicTodoState)
         (locality: MagicTodoLocality.LocalizedToolCall)
         (planCompleteDeclared: bool)
         (currentObligations: ObligationList)
@@ -274,42 +279,44 @@ module MagicTodoMembrane =
         match admission with
         | AdmissionOutcome.Rejected rejection -> Task.FromResult(Error(PrepareRejection.Admission rejection))
         | AdmissionOutcome.IdempotentReplay replayWriteId ->
-            replayPreparedBridge journal managerSessionId lifeId life currentObligations replayWriteId
+            replayPreparedBridge journal managerSessionId incumbencyId incumbency currentObligations replayWriteId
         | AdmissionOutcome.FreshPrepare preparedPlan ->
             freshPrepareBridge
                 journal
                 managerSessionId
-                lifeId
+                incumbencyId
                 locality
                 planCompleteDeclared
                 currentObligations
                 preparedPlan
 
-    let private prepareForOpenLife
+    let private prepareForIncumbency
         (journal: AgentJournal)
         (managerSessionId: SessionId)
-        (managerLife: LifeProjection)
+        (incumbencyId: IncumbencyId)
         (locality: MagicTodoLocality.LocalizedToolCall)
         (providerInputDigest: string)
         (planCompleteDeclared: bool)
         (submitted: ObligationList)
         : Task<Result<PreparedBridge, PrepareRejection>> =
         taskResult {
-            let lifeId = managerLife.LifeId
             let todoProjection = (AgentJournal.snapshot journal).AgentProjections.MagicTodo
 
-            let life =
-                Map.tryFind (ManagerLifeId.value lifeId) todoProjection.ByLife
-                |> Option.defaultValue (MagicTodoProjection.emptyLife lifeId)
+            let incumbency =
+                Map.tryFind (IncumbencyId.value incumbencyId) todoProjection.ByIncumbency
+                |> Option.defaultValue (MagicTodoProjection.emptyIncumbency incumbencyId)
 
-            let! currentObligations = readCurrentObligations journal life
-            let writeId = MagicTodo.todoWriteId HostDigest.sha256Hex lifeId locality.ToolCallId
-            let prior = existingPrepared lifeId writeId life
+            let! currentObligations = readCurrentObligations journal incumbency
+
+            let writeId =
+                MagicTodo.todoWriteId HostDigest.sha256Hex incumbencyId locality.ToolCallId
+
+            let prior = existingPrepared incumbencyId writeId incumbency
 
             let admission =
                 MagicTodoAdmission.admitObligations
                     HostDigest.sha256Hex
-                    lifeId
+                    incumbencyId
                     currentObligations
                     prior
                     { ToolCallId = locality.ToolCallId
@@ -323,8 +330,8 @@ module MagicTodoMembrane =
                 materializeAdmission
                     journal
                     managerSessionId
-                    lifeId
-                    life
+                    incumbencyId
+                    incumbency
                     locality
                     planCompleteDeclared
                     currentObligations
@@ -343,17 +350,17 @@ module MagicTodoMembrane =
             match
                 locality.ToolName = "todowrite",
                 snapshotMatchesSubmitted locality planCompleteDeclared submitted,
-                managerLife managerSessionId (AgentJournal.snapshot journal)
+                activeIncumbency managerSessionId (AgentJournal.snapshot journal)
             with
             | false, _, _ -> return Error(PrepareRejection.UnexpectedToolName locality.ToolName)
             | true, false, _ -> return Error PrepareRejection.SnapshotInputMismatch
-            | true, true, None -> return Error PrepareRejection.NoOpenManagerLife
-            | true, true, Some openLife ->
+            | true, true, None -> return Error PrepareRejection.NoActiveIncumbency
+            | true, true, Some incumbent ->
                 return!
-                    prepareForOpenLife
+                    prepareForIncumbency
                         journal
                         managerSessionId
-                        openLife
+                        incumbent
                         locality
                         providerInputDigest
                         planCompleteDeclared
@@ -399,15 +406,15 @@ module MagicTodoMembrane =
         taskResult {
             let projection = AgentJournal.snapshot journal
 
-            let life =
-                Map.tryFind (ManagerLifeId.value bridge.ManagerLifeId) projection.AgentProjections.MagicTodo.ByLife
-                |> Option.defaultValue (MagicTodoProjection.emptyLife bridge.ManagerLifeId)
+            let incumbency =
+                Map.tryFind (IncumbencyId.value bridge.IncumbencyId) projection.AgentProjections.MagicTodo.ByIncumbency
+                |> Option.defaultValue (MagicTodoProjection.emptyIncumbency bridge.IncumbencyId)
 
             let isT1Commitment =
-                life.FirstPlanCommitment.IsNone && bridge.Prepared.PlanCompleteDeclared
+                incumbency.FirstPlanCommitment.IsNone && bridge.Prepared.PlanCompleteDeclared
 
             let accepted =
-                { ManagerLifeId = bridge.Prepared.ManagerLifeId
+                { IncumbencyId = bridge.Prepared.IncumbencyId
                   TodoWriteId = bridge.Prepared.TodoWriteId
                   ToolCallId = bridge.Prepared.ToolCallId
                   PreparedFactRef = bridge.PreparedFactRef

@@ -47,7 +47,7 @@ module Roles
 type Role =
     | Coder
     | Inspector
-    | Reviewer
+    | DevOps
 `
 
 test('WHAT[ENF-008] capability_iso_documents_required_tokens', () => {

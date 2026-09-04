@@ -88,6 +88,7 @@ test('WHAT[OBLIGATION-LEDGER-012] replays an identical obligation checkpoint eve
   const current = [obligation('implementation', 'Implement the requested behavior.')]
   const write = todo.todoWriteId(sha256, life, firstCall)
   const existing = {
+    incumbencyId: life,
     managerLifeId: life,
     providerInputDigest: 'provider-input',
     baseTodoDigest: todo.obligationListDigest(sha256, current),
@@ -127,7 +128,7 @@ test('WHAT[OBLIGATION-LEDGER-010] fresh admission freezes Base and Submitted wit
   assert.equal(prepared.proposedDigest, todo.obligationListDigest(sha256, submitted))
 })
 
-test('WHAT[OBLIGATION-LEDGER-022] blocks Finality until plan commitment, not merely until any checkpoint', () => {
+test('WHAT[OBLIGATION-LEDGER-022] blocks retirement suicide until plan commitment, not merely until any checkpoint', () => {
   assert.equal(todo.requirePlanCommitmentBeforeFirstSuicide(false).error.code, 'FirstSuicideWithoutCheckpoint')
   assert.equal(ok(todo.requirePlanCommitmentBeforeFirstSuicide(true)), null)
 })

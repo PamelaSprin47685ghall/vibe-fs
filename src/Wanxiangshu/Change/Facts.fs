@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Change
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Relay
 
 /// Durable orchestration facts owned by the Change/orchestrator boundary.
 type OrchestratorFactCases =
@@ -16,18 +17,20 @@ type OrchestratorFactCases =
     | CandidateReady of
         {| ManagerJobId: ManagerJobId
            CandidateCommit: CommitHash
-           PreRebaseReviewBarrierId: ReviewBarrierId |}
+           WorkspaceSnapshotId: WorkspaceSnapshotId
+           QualityCertificateId: QualityCertificateId |}
     | ConflictDetected of
         {| ManagerJobId: ManagerJobId
            CandidateCommit: CommitHash
            TargetHeadSnapshot: CommitHash
+           WorkspaceSnapshotId: WorkspaceSnapshotId
            ConflictFiles: string list
            DiagnosticsDigest: string |}
     | RebasedCandidateReady of
         {| ManagerJobId: ManagerJobId
            RebasedCommit: CommitHash
            TargetHeadSnapshot: CommitHash
-           PostRebaseReviewBarrierId: ReviewBarrierId |}
+           WorkspaceSnapshotId: WorkspaceSnapshotId |}
     | PublishClaimed of
         {| ManagerJobId: ManagerJobId
            TargetRef: TargetRef

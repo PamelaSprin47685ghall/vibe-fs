@@ -5,7 +5,6 @@
 /src/Wanxiangshu/Execution/Delegation/**
 /src/Wanxiangshu/Change/Host/Host.fs
 /src/Wanxiangshu/Interaction/Authority/Child.fs
-/src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs
 /src/Wanxiangshu/OpenCode/Host/Events.fs
 /src/Wanxiangshu/OpenCode/Host/Sessions.fs
 /src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs

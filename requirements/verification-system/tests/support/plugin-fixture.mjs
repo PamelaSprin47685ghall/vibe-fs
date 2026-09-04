@@ -379,6 +379,12 @@ export const acceptChildAgentOwnerRoot = async (runtime, childSessionId, promptK
   }
 }
 
+export const grantWorkOwned = async (runtime, sessionId, incumbencyId = `inc-${sessionId}`) => {
+  const result = await obligationJournalSurface.grantWorkOwned(runtime.journal, sessionId, incumbencyId)
+  if (!result?.ok) throw new Error(`grantWorkOwned(${sessionId}) rejected: ${result?.error ?? 'unknown error'}`)
+  return result
+}
+
 export const activateLife = async (runtime, sessionId, openingUserMessageId = `root-${sessionId}`) => {
   const lifeId = `life-${sessionId}`
   const opened = await obligationJournalSurface.appendManagerLifecycle(
@@ -445,7 +451,6 @@ export const acceptFirstTodoWrite = async (runtime, sessionId) => {
     JSON.stringify({
       case: 'TodoWritePrepared',
       ManagerSessionId: sessionId,
-      ManagerLifeId: lifeId,
       TodoWriteId: writeId,
       ToolCallId: callId,
       ToolPartOrdinal: 0,
@@ -468,7 +473,6 @@ export const acceptFirstTodoWrite = async (runtime, sessionId) => {
     null,
     JSON.stringify({
       case: 'TodoWriteAccepted',
-      ManagerLifeId: lifeId,
       TodoWriteId: writeId,
       ToolCallId: callId,
       PreparedFactRef: prepared.eventId,

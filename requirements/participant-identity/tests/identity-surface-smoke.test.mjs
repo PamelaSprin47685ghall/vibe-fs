@@ -7,7 +7,6 @@ import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.j
 import * as identity from '../../../dist/Participant/Persona/Surface.js'
 import * as journalCodec from '../../../dist/Persistence/Journal/CodecSurface.js'
 import * as factCodec from '../../../dist/Persistence/Journal/FactCodecSurface.js'
-import * as reviewJournal from '../../../dist/Persistence/Journal/ReviewJournalSurface.js'
 
 test('WHAT[PID-001] registered identity surfaces load and expose their narrow contracts', async () => {
   const coder = identity.resolveParticipantIdentityAtRoot('coder')
@@ -20,7 +19,4 @@ test('WHAT[PID-001] registered identity surfaces load and expose their narrow co
   assert.equal(identity.nameOf('fast', 'coder'), 'coder')
   assert.equal(identity.nameOf('deep', 'coder'), 'coder')
   assert.deepEqual(roles.allInternalRoleLabels, ['blogger', 'distiller'])
-
-  const rejectedAppend = await reviewJournal.appendAgent(null, '', null, '', '', null)
-  assert.equal(rejectedAppend.ok, false)
 })

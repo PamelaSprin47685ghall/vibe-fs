@@ -58,9 +58,9 @@ Office Library 遵循三轴分类：
 
 瞬时任务与运行时事件通过会话消息通道传递，严禁借由提示词路径伪造激活或篡改长期的 Role 自我模型。
 
-## COGNITIVE-ENVIRONMENT-012: Reviewer prompt 不灌输流程机制
+## COGNITIVE-ENVIRONMENT-012: Relay 评审指引不灌输隐藏流程机制
 
-Reviewer 的提示词由 Role Law 与评审账本组合而成。双重确认（Double PERFECT）等流程机制完全由 Host 主持，不写入 Reviewer 的提示词中。
+Manager 在接力接任时的评审提示由 Role Law、Relay 评审指引（Examiner's Ledger）与上下文组合而成。评审依据公开的八维准则与事实证据展开；双重确认、多 Reviewer 循环、隐藏 barrier 等内部流程机制严禁写入模型提示词。
 
 ## COGNITIVE-ENVIRONMENT-013: Pair Hint 是 canonical craft payload
 

@@ -216,13 +216,25 @@ module HostSessionNudge =
         : Task<Result<PhysicalUserMessageId, string>> =
         let rt = PromptDispatcher.forJournal durable
 
-        let physicalResult outcome acceptedPhysical =
-            match outcome, acceptedPhysical with
-            | GateContinuationOutcome.Sent _, Some physical -> Ok physical
-            | GateContinuationOutcome.Sent _, None -> Error "gate nudge was admitted without a PhysicalUserMessageId"
-            | GateContinuationOutcome.AlreadyAdmitted, _ -> Error "gate nudge is pending physical acceptance"
-            | GateContinuationOutcome.Retired, _ -> Error "gate nudge target is retired"
-            | GateContinuationOutcome.Failed error, _ -> Error error
+        let acceptedPhysical =
+            TaskCompletionSource<PhysicalUserMessageId>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        let acceptedAfterSend () =
+            match rt.GateNudgeAcceptedPhysical profile continuation gateKind terminalProviderRun with
+            | Some physical -> Task.FromResult(Ok physical)
+            | None ->
+                task {
+                    let! physical = acceptedPhysical.Task
+                    return Ok physical
+                }
+
+        let physicalResult outcome =
+            match outcome with
+            | GateContinuationOutcome.Sent _ -> acceptedAfterSend ()
+            | GateContinuationOutcome.AlreadyAdmitted ->
+                Task.FromResult(Error "gate nudge is pending physical acceptance")
+            | GateContinuationOutcome.Retired -> Task.FromResult(Error "gate nudge target is retired")
+            | GateContinuationOutcome.Failed error -> Task.FromResult(Error error)
 
         match rt.GateNudgeAcceptedPhysical profile continuation gateKind terminalProviderRun with
         | Some physical -> Task.FromResult(Ok physical)
@@ -230,8 +242,6 @@ module HostSessionNudge =
             Task.FromResult(Error "gate nudge is pending physical acceptance")
         | None ->
             task {
-                let acceptedPhysical = ref None
-
                 let! outcome =
                     sendGateContinuationWithProfile
                         sessionPort
@@ -243,11 +253,11 @@ module HostSessionNudge =
                         journal
                         gateKind
                         terminalProviderRun
-                        (Some(fun physical -> acceptedPhysical.Value <- Some physical))
+                        (Some(fun physical -> AsyncSupport.trySetResult acceptedPhysical physical |> ignore))
                         durable
                         profile
 
-                return physicalResult outcome acceptedPhysical.Value
+                return! physicalResult outcome
             }
 
     let trySendGateContinuationPhysical
@@ -410,80 +420,6 @@ module HostSessionNudge =
             IdleContinuationOutcome.AdmissionRejected failure
         | _ -> idleOutcomeOfDispatch outcome
 
-    /// HOST-004 + GLORY-029: idle-derived Manager encouragement with exact-terminal
-    /// idempotency and no cross-terminal count limit.
-    let private sendIdleManagerWithProfile
-        (quiescence: ISessionQuiescenceGate)
-        (permit: QuiescencePermit)
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (sessionId: SessionId)
-        (prompt: string)
-        (directory: string option)
-        (journal: AgentJournal option)
-        (lifeId: ManagerLifeId)
-        (conditionKey: string)
-        (terminalProviderRun: ProviderRunIdentity)
-        (durable: AgentJournal)
-        (profile: PromptAuthority.AuthorityExecutionProfile)
-        : Task<IdleContinuationOutcome> =
-        let rt = PromptDispatcher.forJournal durable
-
-        if rt.IdleAlreadyAdmitted profile lifeId conditionKey terminalProviderRun then
-            Task.FromResult IdleContinuationOutcome.AlreadyAdmitted
-        else
-            let agent = agentForActiveCursor journal sessionId profile
-
-            rt.SendIdleManagerIdleEncouragement
-                sessionPort
-                sessionId
-                prompt
-                lifeId
-                conditionKey
-                terminalProviderRun
-                profile
-                agent
-                (liveDirectory rootWorkspace directory)
-                PromptDispatcher.AwaitMode.Await
-                (fun () -> quiescence.TryConsume permit)
-            |> TaskValue.map (gateIdleOutcome (fun () -> quiescence.TryRelease permit))
-
-    let trySendIdleManagerEncouragement
-        (quiescence: ISessionQuiescenceGate)
-        (permit: QuiescencePermit)
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (sessionId: SessionId)
-        (prompt: string)
-        (directory: string option)
-        (journal: AgentJournal option)
-        (lifeId: ManagerLifeId)
-        (conditionKey: string)
-        (terminalProviderRun: ProviderRunIdentity)
-        : Task<IdleContinuationOutcome> =
-        task {
-            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
-            | true, _, _ -> return IdleContinuationOutcome.Retired
-            | false, None, _ ->
-                return IdleContinuationOutcome.Failed "No journal: a manager idle encouragement cannot be claimed"
-            | false, Some _, None -> return IdleContinuationOutcome.Failed "No active authority profile"
-            | false, Some durable, Some profile ->
-                return!
-                    sendIdleManagerWithProfile
-                        quiescence
-                        permit
-                        sessionPort
-                        rootWorkspace
-                        sessionId
-                        prompt
-                        directory
-                        journal
-                        lifeId
-                        conditionKey
-                        terminalProviderRun
-                        durable
-                        profile
-        }
 
     let private sendGateContinuationWithAdmissionProfile
         (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)

@@ -4,6 +4,7 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
+open Wanxiangshu.Mission.Relay
 
 module MagicTodoPrefixEpoch =
     val todoCheckpointEvidence: trigger: TodoWriteId -> previousCommitted: TodoWriteId option -> PrefixEvidenceKind
@@ -12,7 +13,7 @@ module MagicTodoPrefixEpoch =
 
     val buildTodoCheckpointCommit:
         sessionId: SessionId ->
-        lifeId: ManagerLifeId ->
+        incumbencyId: IncumbencyId ->
         previousEpoch: PrefixEpochId ->
         snapshot: PrefixSnapshot ->
         previousCommitted: TodoWriteId option ->

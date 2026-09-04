@@ -2,7 +2,7 @@
 
 ## CHGINT-001: 独立道路进共享 ref 走 publish lifecycle
 
-独立 worktree 中的变更候选（candidate）进入共享目标 ref 时，必须经历完整的发布生命周期：产出 candidate → rebase 到目标 head → 变基后 review 确认 → 获取短门禁执行 CAS → 仅快进（ff-only）发布 → 记录持久事实。严禁跳过任何环节向目标 ref 提交未经验证的变更。
+独立 worktree 中的变更候选进入共享目标 ref 时，必须经历完整发布生命周期：Relay 在精确 snapshot/authority 上产出有效 `QualityCertificate` → Change 做确定性 artifact admission → 如需 rebase 则先失效旧证书、执行 rebase 并请求普通 successor → successor 在新 snapshot 上重新独立 assessment → 获取短门禁执行 CAS → ff-only 发布 → 记录 durable facts。严禁模型满分直接越过 Git/CAS。
 
 ## CHGINT-002: Clean Gate——工作区必须干净才受理
 
@@ -14,11 +14,11 @@
 
 ## CHGINT-004: 共享 ref mutation 是唯一短 critical section
 
-Integration Gate 仅在推进共享 ref 物理指针的短暂 CAS 窗口内持有。严禁在代码审查（LLM Review）或冲突修复期间持有该门禁，确保多个任务可并发进行变基与审查。
+Integration Gate 仅在推进共享 ref 物理指针的短暂 CAS 窗口内持有。严禁在 Relay assessment、Manager work、rebase、冲突处理或 successor 等待期间持有该门禁。
 
-## CHGINT-005: conflict 在门外 repair/review，再重新 claim
+## CHGINT-005: conflict 是机器事实，处理者只能是普通 successor
 
-检测到变基冲突时，必须在释放门禁的状态下，在原 worktree 中由原 Manager 解决冲突并重新进行 review 确认；解决完成后重新认领发布，保持上下文连续。
+检测到 unmerged entries 或 rebase conflict 时，Change 必须记录 typed `ConflictDetected` 与精确 `WorkspaceSnapshotId`，失效旧 certificate，并在门禁外请求普通 Relay successor。不得 `ResumeManager`、不得恢复 retired predecessor、不得另起 Reviewer；后续质量判断只能来自 successor 的普通 assessment。
 
 ## CHGINT-006: restart 后从 durable facts + 外部现实重证 outstanding obligation
 
@@ -35,13 +35,13 @@ Integration Gate 仅在推进共享 ref 物理指针的短暂 CAS 窗口内持�
 
 目标分支在委托初始阶段即完成符号引用冻结。读取 head 失败时必须快速失败，发布推进必须同时满足当前分支与冻结目标一致、当前 head 与预期一致、且提交关系为严格快进。
 
-## CHGINT-009: same-road continuation 与独立 road 的 integration identity
+## CHGINT-009: Road/worktree 稳定，authority 与 incumbency 可演化
 
-续做既有道路时，沿用既有的 job 标识、worktree 与 Manager 实例，不创建新 worktree 亦不重置执行绑定。独立道路的集成身份由稳定的标识保证，物理路径仅作诊断。
+同一 Road 沿用既有 `ManagerJobId`、worktree identity 与物理 Manager session 容器，不因追加 charge、冲突或 rebase 创建第二个 worktree。逻辑 `IncumbencyId` 可以并且在 retirement 后必须轮换；追加 charge 通过 durable `AuthorityRevision` 更新当前 active WorkOwned incumbent，而不是把“同一物理 session”误当成同一逻辑 Manager。
 
-## CHGINT-010: 长 review/repair 不占全局门
+## CHGINT-010: 长 incumbent/rebase/conflict 工作不占全局门
 
-变基后的验证审查与冲突修复均在全局门禁之外进行，其他任务在审查期间可自由进行变基、审查与原子发布，避免不必要的串行阻塞。
+Relay incumbent 工作、assessment、certificate invalidation、rebase、conflict resolution 与 successor audit 全部在全局门禁之外；只有 target 重读 + ff-only mutation 处于门内。
 
 ## CHGINT-011: 墙内机械不进 provider horizon
 
@@ -49,8 +49,12 @@ Integration Gate 仅在推进共享 ref 物理指针的短暂 CAS 窗口内持�
 
 ## CHGINT-012: 恢复禁止扫盘反推、禁跳步
 
-恢复流程严禁新建 worktree 替换既有状态、严禁更换执行者、严禁跳过变基后的审查确认，且严禁以磁盘状态替代事实证据。
+恢复流程严禁新建 worktree 替换既有 Road 状态、严禁以磁盘残留替代 durable facts、严禁从旧 stage/program-counter 猜下一步。恢复可以继续等待当前 active incumbent，或在 durable retirement 后创建 successor；绝不能为“身份连续”复活 retired incumbent。
 
-## CHGINT-013: target 变化后旧 post-rebase witness 作废
+## CHGINT-013: target 变化/CAS miss 后旧 certificate 作废
 
-CAS 重读 head 发现目标分支已被其他任务推进时，旧有的变基后审查证据立即失效，必须重新基于最新 head 执行变基并重新获取双重确认。
+在 gate 前重读或 CAS 本身发现目标分支已推进时，旧 `QualityCertificate` 立即失效；Change 释放门禁、基于最新 head 重新 rebase/capture snapshot，并请求普通 successor。旧证书绝不能在新 target/base 上复用。
+
+## CHGINT-014: stale certificate 与 Git machine facts 永远不能被模型满分覆盖
+
+certificate snapshot 与当前 workspace 不一致、存在 unmerged entries、target/base 已变化或 ff-only CAS 条件不成立时，必须在进入共享 ref mutation 前 fail closed / invalidation + successor。`8×10` 只产生质量候选，不能把这些机器事实翻译成“仍然 perfect，所以继续发布”。

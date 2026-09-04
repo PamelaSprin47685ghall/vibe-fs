@@ -14,10 +14,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
@@ -28,7 +25,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Composition.Durable.ProjectionUpdate
 open Wanxiangshu.Composition.Durable
 
@@ -60,19 +56,6 @@ module PromptFactFold =
             |> fun activeOwner ->
                 PromptAuthority.validateInheritedIdentitySeedAgainstActiveOwner activeOwner seed
                 |> Result.map ignore
-
-    let private admitReviewRequirement
-        (authorityKind: PromptAuthority.RootAuthorityKind)
-        (payload: AuthorityRootAcceptedPayload)
-        (projection: AgentProjectionSet)
-        : AgentProjectionSet =
-        match authorityKind with
-        | PromptAuthority.RootAuthorityKind.HumanRoot ->
-            updateRequirements
-                payload.SessionId
-                (ReviewRequirementProjection.addRequirement payload.SessionId payload.AuthorityRootUserMessageId)
-                projection
-        | PromptAuthority.RootAuthorityKind.AgentOwnerRoot -> projection
 
     let private classifyClaimOrigin (continuationKind: string) : PromptAuthority.PromptOrigin option =
         if continuationKind = "AgentOwnerRoot" then
@@ -114,7 +97,7 @@ module PromptFactFold =
 
         match authorityResult with
         | Error reason -> reject "AuthorityRootAccepted" reason
-        | Ok(authorityKind, authority) ->
+        | Ok(_, authority) ->
             updateSession
                 payload.SessionId
                 (fun session ->
@@ -125,7 +108,6 @@ module PromptFactFold =
                                 FallbackProjection.forAuthority payload.LogicalRunId payload.AuthorityRootUserMessageId
                             ) })
                 projection
-            |> admitReviewRequirement authorityKind payload
             |> Ok
 
     let fold (projection: AgentProjectionSet) (fact: PromptFactCases) : Result<AgentProjectionSet, FoldRejection> =

@@ -93,7 +93,7 @@ test('WHAT[INTERACTION-AUTHORITY-004] RECON_no_finish_is_private_unknown_observa
 })
 
 test('WHAT[INTERACTION-AUTHORITY-004] RECON_repair_role_table_respects_host_tool_work', () => {
-  const roles = ['manager', 'orchestrator', 'coder', 'reviewer', 'inspector', 'devops', 'browser', 'inquiry']
+  const roles = ['manager', 'orchestrator', 'coder', 'inspector', 'devops', 'browser', 'inquiry']
   for (const role of roles) {
     assert.equal(turns.needsInteractionRepair(role, false, 'tool-calls', []), true)
     assert.equal(turns.needsInteractionRepair(role, false, 'tool-calls', [toolCall('c-live', 'write', '{}')]), false)
@@ -110,8 +110,8 @@ test('WHAT[INTERACTION-AUTHORITY-004] RECON_repair_role_table_respects_host_tool
 
 test('WHAT[INTERACTION-AUTHORITY-004] RECON_roleOfAgent_prefers_managed_agent_then_fallback', () => {
   assert.equal(turns.roleOfAgent(undefined, 'coder'), 'coder')
-  assert.equal(turns.roleOfAgent('coder', 'reviewer'), 'coder')
-  assert.equal(turns.roleOfAgent('not-a-managed-agent', 'reviewer'), 'reviewer')
+  assert.equal(turns.roleOfAgent('coder', 'inspector'), 'coder')
+  assert.equal(turns.roleOfAgent('not-a-managed-agent', 'inspector'), 'inspector')
   assert.equal(turns.roleOfAgent('not-a-managed-agent', undefined), '')
 })
 
@@ -123,7 +123,7 @@ test('WHAT[INTERACTION-AUTHORITY-004] RECON_buildTurn_returns_plain_identity_and
     {
       id: 'asst-9',
       role: 'assistant',
-      agent: 'reviewer',
+      agent: 'inspector',
       finish: 'stop',
       completed: true,
       parts: [text('LGTM'), reasoning('checked twice')],
@@ -134,7 +134,7 @@ test('WHAT[INTERACTION-AUTHORITY-004] RECON_buildTurn_returns_plain_identity_and
   )
   assert.equal(turn.session, 'ses_build_turn')
   assert.equal(turn.providerRun, 'asst-9')
-  assert.equal(turn.role, 'reviewer')
+  assert.equal(turn.role, 'inspector')
   assert.equal(turn.directory, '/repo/dir')
   assert.equal(turn.outcome, 'TurnCompleted')
   assert.equal(turn.finish, 'stop')

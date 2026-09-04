@@ -98,16 +98,20 @@ grounding 由 `requirement-grounding` package 拥有。
 |---|---|
 | [execution-failure-policy](execution-failure-policy/WHAT.md) | 封闭失败类型由唯一纯策略一次性裁决 retry、fallback、capacity、message 与 fatal 后果。 |
 | [provider-attempt-recovery](provider-attempt-recovery/WHAT.md) | attempt 失败后可 bounded 换 execution binding，不改变 authority/personhood。 |
+| [host-provider-failure-ownership](host-provider-failure-ownership/WHAT.md) | 万象术启用时接管 provider 失败恢复；Host 重试归零，claimed 错误抑制默认弹窗。 |
 | [crash-reconciliation](crash-reconciliation/WHAT.md) | 中断后只从 durable facts + 可信物理观察重入普通程序。 |
 | [degeneration-guard](degeneration-guard/WHAT.md) | 未结束 attempt 病态重复时主动止损再交正常 recovery。 |
 
-### 9. Mission / judgement / finality
+### 9. Mission / relay
 | Package | 一句话 WHY |
 |---|---|
 | [obligation-ledger](obligation-ledger/WHAT.md) | mission 持续维护「仍欠世界什么」，不用 phase/status 伪装进度。 |
-| [review-judgement](review-judgement/WHAT.md) | PERFECT/REVISE 是 discrimination + proportionate evidence judgement。 |
-| [review-assurance](review-assurance/WHAT.md) | judgement 何时可消费由 bounded evidence、fresh witness、causal confirmation 建立。 |
-| [finality](finality/WHAT.md) | 不可逆 mission end 基于 obligations + current tree + qualified review evidence。 |
+| [relay-incumbency](relay-incumbency/WHAT.md) | 每一任从只读 audit 开始；低分即接责，退休永不恢复，单 active 任期。 |
+| [relay-assessment](relay-assessment/WHAT.md) | 每任期至多一次八维整数评审；低分原子生成义务，全满分生成证书。 |
+| [relay-retirement](relay-retirement/WHAT.md) | suicide 是唯一正常出口；只有递归 live 资源阻塞退休。 |
+| [relay-context-projection](relay-context-projection/WHAT.md) | 审计全量保留，provider 切段；接力棒确定性有界脱敏。 |
+
+旧 `review-judgement` / `review-assurance` / `finality` 已 clean break 到上述 relay 包。
 
 ### 10. Feedback
 | Package | 一句话 WHY |

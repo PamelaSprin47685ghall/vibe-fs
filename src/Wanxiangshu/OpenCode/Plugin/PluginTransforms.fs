@@ -23,10 +23,8 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Relay.OpenCode
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
@@ -51,9 +49,7 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Manager.OpenCode
 open Wanxiangshu.Mission.Obligation.Todo.OpenCode
-open Wanxiangshu.Mission.Review.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Knowledge.Casebook
@@ -106,10 +102,10 @@ module PluginTransforms =
         { BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
           BindSessionStartedAt: string option -> Task<DateTimeOffset option>
           ApplyStrengthReplay: string option -> obj -> Task<StrengthReplayPlan list>
+          ApplyRelayProjection: string option -> obj -> Task<unit>
           CaptureXTraceMessages: string option -> obj -> Task<TraceTransformCapture>
           CommitStrengthTrace: string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>
           RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
-          ApplyManagerNarrative: string option -> XTraceProjectionState option -> obj list -> obj -> Task<unit>
           ApplyCompanion: string option -> obj -> obj -> Task<unit>
           ApplyXWire: obj -> Task<PrefixPresentationHorizon>
           FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
@@ -118,8 +114,7 @@ module PluginTransforms =
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           ProjectRequirementGrounding: string option -> obj -> Task<unit>
           InjectBloggerChronicle: string option -> obj -> unit
-          SanitizeMessages: obj -> unit
-          InterruptAfterSubmittedJudgement: string option -> Task<unit> }
+          SanitizeMessages: obj -> unit }
 
     type TransformBranchCapabilities =
         { IsExplicitResume: string option -> obj -> bool
@@ -248,6 +243,12 @@ module PluginTransforms =
           BindSessionStartedAt =
             SessionStartedAtLedger.bindSessionStartedAt journal clock terminateSession Diagnostic.emit
           ApplyStrengthReplay = StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailFuse
+          ApplyRelayProjection =
+            RelayNarrativeTransform.apply journal (fun sid ->
+                task {
+                    let! _ = sessionPort.InterruptAttempt sid
+                    return ()
+                })
           CaptureXTraceMessages =
             fun projectionSessionIdOpt outObj ->
                 task {
@@ -305,18 +306,6 @@ module PluginTransforms =
 
                 if found then
                     traceState |> Option.iter companion.RefreshXTrace
-          ApplyManagerNarrative =
-            fun projectionSessionIdOpt traceState rawMessages outObj ->
-                task {
-                    match projectionSessionIdOpt with
-                    | Some _ ->
-                        match!
-                            ManagerNarrativeTransform.tryTransform journal projectionSessionIdOpt traceState rawMessages
-                        with
-                        | Some rewritten -> HostMessageProjection.replaceMessagesInPlace outObj rewritten
-                        | None -> ()
-                    | None -> ()
-                }
           ApplyCompanion =
             CompanionTransform.applyCompanionForOrdinaryMaterial
                 scope.Sessions.Companions
@@ -369,14 +358,7 @@ module PluginTransforms =
                     projectionSessionIdOpt
                     (languageFor projectionSessionIdOpt)
                     outObj
-          SanitizeMessages = HostMessageProjection.sanitizeOutputMessages
-          InterruptAfterSubmittedJudgement =
-            JudgeTool.interruptAfterSubmittedJudgement
-                journal
-                scope.BloggerRuntimeHost.Cancellation
-                wired.CurrentPhysicalUserMessage
-                scope.RunBackground
-                sessionPort }
+          SanitizeMessages = HostMessageProjection.sanitizeOutputMessages }
 
     let defaultBranchCapabilities (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : TransformBranchCapabilities =
         let scope = boot.Scope
@@ -416,20 +398,22 @@ module PluginTransforms =
             // 2. SessionStartedAtLedger.tryBindOrAbort
             let! sessionStartedAt = caps.BindSessionStartedAt projectionSessionIdOpt
 
-            // 3. StrengthReplay.applyBeforeXTrace
+            // 3. Relay projection cut + bounded baton injection. This MUST run
+            // before every trace/compaction owner so retired raw history cannot
+            // be reintroduced later in the composition.
+            do! caps.ApplyRelayProjection projectionSessionIdOpt outObj
+
+            // 4. StrengthReplay.applyBeforeXTrace
             let! strengthReplayPlans = caps.ApplyStrengthReplay projectionSessionIdOpt outObj
 
-            // 4. XTraceCapture.captureObservedMessagesWithReceipt
+            // 5. XTraceCapture.captureObservedMessagesWithReceipt
             let! traceCapture = caps.CaptureXTraceMessages projectionSessionIdOpt outObj
 
-            // 5. StrengthReplay.commitTracedAfterCapture
+            // 6. StrengthReplay.commitTracedAfterCapture
             do! caps.CommitStrengthTrace projectionSessionIdOpt traceCapture.Current strengthReplayPlans
 
-            // 6. CompanionHost.RefreshXTrace
+            // 7. CompanionHost.RefreshXTrace
             caps.RefreshCompanionXTrace projectionSessionIdOpt traceCapture.Current
-
-            // 7. ManagerNarrativeTransform.tryTransform
-            do! caps.ApplyManagerNarrative projectionSessionIdOpt traceCapture.Current traceCapture.RawMessages outObj
 
             // 8. applyCompanionForOrdinaryMaterial
             do! caps.ApplyCompanion projectionSessionIdOpt inObj outObj
@@ -464,8 +448,6 @@ module PluginTransforms =
             // 16. HostMessageProjection.sanitizeMessages
             caps.SanitizeMessages outObj
 
-            // 17. JudgeTool.interruptAfterSubmittedJudgement
-            do! caps.InterruptAfterSubmittedJudgement projectionSessionIdOpt
             ()
         }
 
@@ -512,8 +494,8 @@ module PluginTransforms =
             }
 
     /// Provider-facing transform composition: order only.
-    /// Strength replay/trace → StrengthReplay; speculation → StrengthSpeculate;
-    /// narrative → ManagerNarrativeTransform; seal → ReviewSeal; replica fast path unchanged.
+    /// Relay cut → Strength replay/trace → Companion/XWire → speculation;
+    /// retired raw history is removed before any downstream context owner.
     let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : obj -> obj -> Task<unit> =
         let caps = defaultCapabilities boot host
         let branches = defaultBranchCapabilities boot host

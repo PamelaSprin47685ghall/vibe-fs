@@ -840,19 +840,3 @@ module RuntimeSurface =
             kind
             (ProviderRunIdentity.create providerRun)
             (projectionOf projection)
-
-    let idleAlreadyAdmitted
-        (session: string)
-        (logicalRun: string)
-        (life: string)
-        (condition: string)
-        (providerRun: string)
-        (projection: obj)
-        : bool =
-        PromptAuthority.idleAlreadyAdmitted
-            (SessionId.create session)
-            (LogicalRunId.create logicalRun)
-            (ManagerLifeId.create life)
-            condition
-            (ProviderRunIdentity.create providerRun)
-            (projectionOf projection)

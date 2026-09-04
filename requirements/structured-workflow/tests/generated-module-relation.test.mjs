@@ -285,14 +285,12 @@ test('WHAT[STRUCTURED-WORKFLOW-015] generated artifact binds tracked inputs byte
   {
     const value = legalFixture()
     value.capability_facts = value.capability_facts.filter(({ observation }) => observation.case !== 'fable-import')
-    value.artifact_references = [{ artifact_id: value.artifacts[0].id }]
     assert.deepEqual(codes(value), ['generated-artifact-reference-missing'])
   }
 
   {
     const value = legalFixture()
     value.proof_observations = []
-    value.deterministic_relation_ids = [value.relations[0].id]
     assert.deepEqual(codes(value), ['generated-module-nondeterministic'])
   }
 

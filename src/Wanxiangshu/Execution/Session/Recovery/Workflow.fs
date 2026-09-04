@@ -43,8 +43,7 @@ module SessionRecoveryWorkflow =
         | RecoveryNode.AgentChild(_, id, _)
         | RecoveryNode.Companion(_, id)
         | RecoveryNode.Blogger(_, id)
-        | RecoveryNode.ManagerJob(_, id)
-        | RecoveryNode.Reviewer(_, id) -> id
+        | RecoveryNode.ManagerJob(_, id) -> id
 
     /// Default RecoverBlogger implementation using BloggerCrashRecovery.
     let defaultRecoverBlogger
@@ -169,7 +168,6 @@ module SessionRecoveryWorkflow =
         | RecoveryNode.Companion(_, id) -> id, None
         | RecoveryNode.Blogger(_, id) -> id, None
         | RecoveryNode.ManagerJob(jobId, id) -> id, Some jobId
-        | RecoveryNode.Reviewer(jobId, id) -> id, Some jobId
 
     let private recoverJobParts (ports: SessionRecoveryPorts) maybeJob =
         match maybeJob with

@@ -47,8 +47,7 @@ test('WHAT[SPEC-INV-001] STRENGTH_002_011_policy_k0_default_when_host_canary_or_
 })
 
 test('WHAT[SPEC-INV-002] STRENGTH_002_013_review_finality_and_attached_internal_leaf_are_always_k0', () => {
-  assert.equal(skipReason(decide({ ...eligibleOpportunity, canonicalRole: 'reviewer', selectedAgent: 'reviewer', effectiveAgent: 'reviewer' })), 'role-ineligible')
-  assert.equal(decide({ ...eligibleOpportunity, isReviewerOrFinality: true }).budget, 'K0')
+  assert.equal(skipReason(decide({ ...eligibleOpportunity, canonicalRole: 'manager', selectedAgent: 'manager', effectiveAgent: 'manager' })), 'role-ineligible')
   assert.equal(decide({ ...eligibleOpportunity, isAttachedOrInternalLeaf: true }).budget, 'K0')
   const notRoot = decide({ ...eligibleOpportunity, isRootWork: false, isAttachedOrInternalLeaf: true })
   assert.equal(skipReason(notRoot), 'not-root-work')

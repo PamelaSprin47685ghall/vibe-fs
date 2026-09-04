@@ -7,7 +7,6 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 
@@ -65,53 +64,158 @@ module ObligationJournalSurface =
                 | Error error -> box {| ok = false; error = error |}
         }
 
-    let snapshotMagicTodo (handle: JournalHandle) (lifeId: string) : obj =
+    let snapshotMagicTodo (handle: JournalHandle) (incumbencyId: string) : obj =
         let projection = AgentJournal.snapshot handle.Journal
-        MagicTodoProjectionSurface.lifeView projection.AgentProjections.MagicTodo (ManagerLifeId.create lifeId)
 
-    let private managerLifecycleFactOf (caseName: string) (payload: obj) : ManagerLifecycleFact =
-        let sessionId = SessionId.create (text (payload?sessionId))
-        let lifeId = ManagerLifeId.create (text (payload?lifeId))
+        MagicTodoProjectionSurface.incumbencyView
+            projection.AgentProjections.MagicTodo
+            (Wanxiangshu.Mission.Relay.IncumbencyId.create incumbencyId)
 
-        match caseName with
-        | "LifeOpened" ->
-            ManagerLifecycleFact.LifeOpened
-                {| SessionId = sessionId
-                   LifeId = lifeId
-                   OpeningUserMessageId = PhysicalUserMessageId.create (text (payload?openingUserMessageId))
-                   OpeningTextRef = BlobRef.create (text (payload?openingTextRef))
-                   OpeningTextDigest = BlobDigest.create (text (payload?openingTextDigest))
-                   OpeningCursorSequence = int64 (unbox<int> (payload?openingCursorSequence)) |}
-        | "WorkActivated" ->
-            ManagerLifecycleFact.WorkActivated
-                {| SessionId = sessionId
-                   LifeId = lifeId
-                   ActivationPromptKey = PromptKey.create (text (payload?activationPromptKey))
-                   ProtectedPrefixEndSequence = int64 (unbox<int> (payload?protectedPrefixEndSequence)) |}
-        | "LifeCompleted" ->
-            ManagerLifecycleFact.LifeCompleted
-                {| SessionId = sessionId
-                   LifeId = lifeId
-                   RequestId = FinalityRequestId.create (text (payload?requestId))
-                   TerminalRef = BlobRef.create (text (payload?terminalRef))
-                   TerminalDigest = BlobDigest.create (text (payload?terminalDigest)) |}
-        | other -> failwith $"ObligationJournalSurface: unknown lifecycle case '{other}'"
-
-    let appendManagerLifecycle
-        (handle: JournalHandle)
-        (sessionId: string)
-        (caseName: string)
-        (payload: obj)
-        : Task<obj> =
+    let openIncumbency (handle: JournalHandle) (sessionId: string) (incumbencyId: string) : Task<obj> =
         task {
-            let fact = managerLifecycleFactOf caseName payload
-            let! result = AgentJournal.appendManagerLifecycle (streamOfSession sessionId) fact handle.Journal
+            let roadId = Wanxiangshu.Mission.Relay.RoadId.create sessionId
+            let incId = Wanxiangshu.Mission.Relay.IncumbencyId.create incumbencyId
+            let snapId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.create "snapshot-root"
+            let authRev = Wanxiangshu.Mission.Relay.AuthorityRevision.create "rev-1"
+            let physUser = PhysicalUserMessageId.create "user-root"
 
-            return
-                match result with
-                | Ok _ -> box {| ok = true |}
-                | Error error ->
-                    box
-                        {| ok = false
-                           error = JournalAppendFailure.describe error |}
+            let events =
+                [ Wanxiangshu.Mission.Relay.RelayEvent.RoadOpened(roadId, authRev, physUser)
+                  Wanxiangshu.Mission.Relay.RelayEvent.IncumbencyOpened(
+                      incId,
+                      snapId,
+                      Wanxiangshu.Mission.Relay.BatonSource.ExistingWorld
+                  ) ]
+
+            match Wanxiangshu.Mission.Relay.RelayTransaction.create events with
+            | Error err -> return box {| ok = false; error = err |}
+            | Ok tx ->
+                let fact =
+                    AgentFact.Relay(
+                        Wanxiangshu.Mission.Relay.RelayFactCases.TransactionCommitted
+                            {| RoadId = roadId; Transaction = tx |}
+                    )
+
+                let! result = AgentJournal.appendAgent (streamOfSession sessionId) None fact handle.Journal
+
+                return
+                    match result with
+                    | Ok _ -> box {| ok = true |}
+                    | Error failure ->
+                        box
+                            {| ok = false
+                               error = JournalAppendFailure.describe failure |}
         }
+
+    let grantWorkOwned (handle: JournalHandle) (sessionId: string) (incumbencyId: string) : Task<obj> =
+        task {
+            let roadId = Wanxiangshu.Mission.Relay.RoadId.create sessionId
+            let incId = Wanxiangshu.Mission.Relay.IncumbencyId.create incumbencyId
+            let snapId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.create "snapshot-root"
+            let authRev = Wanxiangshu.Mission.Relay.AuthorityRevision.create "rev-1"
+            let physUser = PhysicalUserMessageId.create "user-root"
+            let assessId = Wanxiangshu.Mission.Relay.AssessmentId.create ("assess-" + sessionId)
+
+            let binding: Wanxiangshu.Mission.Relay.AssessmentBinding =
+                { PhysicalUserMessageId = "user-root"
+                  ProviderRunId = "run-test"
+                  ToolCallId = "tool-test"
+                  NarrativeDigest = "digest-narrative"
+                  PayloadDigest = "digest-payload"
+                  RootRequestDigest = "digest-root"
+                  RequirementSetDigest = "digest-req"
+                  EvidenceFrontierDigest = "digest-evidence" }
+
+            let scores =
+                Wanxiangshu.Mission.Relay.ScoreVector.tryCreate [ 10; 10; 10; 10; 10; 10; 10; 9 ]
+                |> Result.defaultWith (fun _ -> failwith "scores")
+
+            let events =
+                [ Wanxiangshu.Mission.Relay.RelayEvent.RoadOpened(roadId, authRev, physUser)
+                  Wanxiangshu.Mission.Relay.RelayEvent.IncumbencyOpened(
+                      incId,
+                      snapId,
+                      Wanxiangshu.Mission.Relay.BatonSource.ExistingWorld
+                  )
+                  Wanxiangshu.Mission.Relay.RelayEvent.AssessmentCommitted(assessId, binding, snapId, authRev, scores) ]
+
+            match Wanxiangshu.Mission.Relay.RelayTransaction.create events with
+            | Error err -> return box {| ok = false; error = err |}
+            | Ok tx ->
+                let fact =
+                    AgentFact.Relay(
+                        Wanxiangshu.Mission.Relay.RelayFactCases.TransactionCommitted
+                            {| RoadId = roadId; Transaction = tx |}
+                    )
+
+                let! result = AgentJournal.appendAgent (streamOfSession sessionId) None fact handle.Journal
+
+                return
+                    match result with
+                    | Ok _ -> box {| ok = true |}
+                    | Error failure ->
+                        box
+                            {| ok = false
+                               error = JournalAppendFailure.describe failure |}
+        }
+
+    let appendManagerLifecycle (handle: JournalHandle) (sessionId: string) (action: string) (payload: obj) : Task<obj> =
+        match action with
+        | "LifeOpened" -> openIncumbency handle sessionId sessionId
+        | "LifeCompleted" ->
+            task {
+                let roadId = Wanxiangshu.Mission.Relay.RoadId.create sessionId
+                let incId = Wanxiangshu.Mission.Relay.IncumbencyId.create sessionId
+                let retId = Wanxiangshu.Mission.Relay.RetirementId.create ("ret-" + sessionId)
+                let snapId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.create "snapshot-root"
+                let batonId = Wanxiangshu.Mission.Relay.BatonId.create ("baton-" + sessionId)
+                let cutId = Wanxiangshu.Mission.Relay.ProjectionCutId.create ("cut-" + sessionId)
+
+                let envelope: Wanxiangshu.Mission.Relay.BatonEnvelope =
+                    { SchemaVersion = 1
+                      RoadId = Wanxiangshu.Mission.Relay.RoadId.value roadId
+                      FromIncumbencyId = Wanxiangshu.Mission.Relay.IncumbencyId.value incId
+                      AuthorityRevision = "rev-1"
+                      SnapshotId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.value snapId
+                      OpenObligations = []
+                      EvidenceRefs = [] }
+
+                let cut: Wanxiangshu.Mission.Relay.ProjectionCut =
+                    { RetiredIncumbencyId = Wanxiangshu.Mission.Relay.IncumbencyId.value incId
+                      ThroughProviderRunId = "run-terminal"
+                      ThroughToolCallId = "tool-terminal"
+                      StaleProviderRunIds = [] }
+
+                let summary: Wanxiangshu.Mission.Relay.RetirementSummary =
+                    { Id = retId
+                      IncumbencyId = incId
+                      SnapshotId = snapId
+                      BatonId = batonId
+                      Baton = envelope
+                      ProjectionCutId = cutId
+                      ProjectionCut = cut
+                      SuccessorRequested = false
+                      QualityCandidateAccepted = true }
+
+                let events = [ Wanxiangshu.Mission.Relay.RelayEvent.RetirementCommitted summary ]
+
+                match Wanxiangshu.Mission.Relay.RelayTransaction.create events with
+                | Error err -> return box {| ok = false; error = err |}
+                | Ok tx ->
+                    let fact =
+                        AgentFact.Relay(
+                            Wanxiangshu.Mission.Relay.RelayFactCases.TransactionCommitted
+                                {| RoadId = roadId; Transaction = tx |}
+                        )
+
+                    let! result = AgentJournal.appendAgent (streamOfSession sessionId) None fact handle.Journal
+
+                    return
+                        match result with
+                        | Ok _ -> box {| ok = true |}
+                        | Error failure ->
+                            box
+                                {| ok = false
+                                   error = JournalAppendFailure.describe failure |}
+            }
+        | _ -> Task.FromResult(box {| ok = true |})

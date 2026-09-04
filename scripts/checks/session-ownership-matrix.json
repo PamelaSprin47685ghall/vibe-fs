@@ -42,16 +42,6 @@
       "evidencePath": "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs",
       "notes": "G6 landed BookkeeperRuntime.fs: one CreateChildSession per transaction, js-bookkeeper against process-local staging, then AbortSession. OpenCodeChildOptions stays {Title, Agent, Directory}. CasebookBookkeeper synthesizer/digest is gone; refreshStale calls runTransaction CaseRefresh. AttachmentKind.Bookkeeper remains declared on SessionOwnership.fs."
     },
-    "hidden Reviewer": {
-      "owner": "Host-owned Finality workflow. HostForkRuntime is constructed with HandleOwnership.HostOwnedHidden (FinalityHostPort); the Reviewer is not owned by the Manager list/join surface.",
-      "reusable": "Ungraduated historical Reviewers are reused (GLORY-045). A request's new Reviewer is created once; crash re-entry must reuse the same ReviewerSessionId (FinalityReviewCohort). Retired/abandoned handles never re-fork under the same agent id.",
-      "cancel": "Owning HostForkRuntime.CancelAgent aborts the Host child. HostOwnedHidden keeps the Reviewer out of Manager list/join/guard cancel.",
-      "retire": "HandleController HandleRetired / HandleAbandoned on the hidden handle. HostForkRuntime.IsRetiredHandle blocks reuse of that agent id.",
-      "handle": "Yes, HostOwnedHidden. The handle exists for EXEC-009 identity but never enters Manager list/join/guard or parent RestoreHandles.",
-      "companion": "MAY. Role.Reviewer is Work, so CompanionTransform may attach a Blogger leaf when the session is not a satellite. The Reviewer handle itself stays HostOwnedHidden.",
-      "crashReconcile": "FinalityReviewCohort crash re-entry reuses the enlisted ReviewerSessionId (AdoptChild). HostForkRestart RestoreHandles skips HostOwnedHidden so the Reviewer is not resurrected inside the parent Manager runtime.",
-      "evidencePath": "src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs"
-    },
     "StrengthReplica": {
       "owner": "Owning Work session (StrengthReplicaBinding.OwnerSessionId). InternalLeaf + Attached(StrengthReplica). At most one active replica per owner.",
       "reusable": "No. Decision-local leaf; must not reuse transcript across Strength decisions (STRENGTH-004/014).",

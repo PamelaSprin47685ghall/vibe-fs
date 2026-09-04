@@ -4,10 +4,9 @@ open System.Threading.Tasks
 
 /// JS-native owner for the OrchestratorHost semantic harness.
 ///
-/// Host runtime state, ManagerPort, journal projection and typed ports remain
+/// Host runtime state, Relay port, journal projection and typed ports remain
 /// opaque. The harness supplies plain JavaScript port observations; this owner
-/// translates them once into the real Host contracts and exposes only the
-/// ManagerPort capability plus a child-presence observation.
+/// translates them once into the real Host contracts.
 [<RequireQualifiedAccess>]
 module OrchestratorHostSurface =
 
@@ -15,8 +14,6 @@ module OrchestratorHostSurface =
     /// `sessions`, `gitPort`, and `journal` are capabilities owned by the caller;
     /// this function never projects their internal representation.
     val create: options: obj -> obj
-
-    val managerPort: handle: obj -> obj
 
     val detachAndDrain: handle: obj -> Task
 

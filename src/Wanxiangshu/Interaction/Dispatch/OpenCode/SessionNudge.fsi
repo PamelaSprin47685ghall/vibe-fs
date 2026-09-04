@@ -88,19 +88,6 @@ module HostSessionNudge =
         | NotSent of string
         | Failed of string
 
-    val trySendIdleManagerEncouragement:
-        quiescence: ISessionQuiescenceGate ->
-        permit: QuiescencePermit ->
-        sessionPort: ISessionHostPort ->
-        rootWorkspace: IRootWorkspaceReader ->
-        sessionId: SessionId ->
-        prompt: string ->
-        directory: string option ->
-        journal: AgentJournal option ->
-        lifeId: ManagerLifeId ->
-        conditionKey: string ->
-        terminalProviderRun: ProviderRunIdentity ->
-            Task<IdleContinuationOutcome>
 
     val trySendGateContinuationWithAdmission:
         physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) ->

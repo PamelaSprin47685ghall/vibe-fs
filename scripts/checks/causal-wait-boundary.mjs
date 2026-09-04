@@ -231,11 +231,8 @@ export function runObservationBoundarySelfTest() {
 
 const criticalWaitSites = [
   'Execution/Delegation/SyncDelegate/Workflow.fs',
-  'Mission/Finality/Cohort.fs',
-  'Mission/Finality/OpenCode/Tool.fs',
   'Execution/Delegation/Fork/OpenCode/JoinTool.fs',
   'Change/Host/Host.fs',
-  'Mission/Review/Barrier/Workflow.fs',
   'Change/Job.fs',
 ]
 

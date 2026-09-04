@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { encode } from 'gpt-tokenizer/encoding/o200k_base'
@@ -116,6 +119,24 @@ test('WHAT[DG-004] LOOP_004_repository_corpus_contains_normal_source_documents_o
   assert.ok(!files.some((file) => file.endsWith('/docs/index.html')))
 })
 
+test('WHAT[DG-004] LOOP_004_repository_corpus_excludes_tracked_paths_deleted_from_the_worktree', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'wanxiangshu-loop-selector-'))
+
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root })
+    writeFileSync(path.join(root, 'alive.md'), 'alive\n')
+    writeFileSync(path.join(root, 'deleted.md'), 'deleted\n')
+    execFileSync('git', ['add', 'alive.md', 'deleted.md'], { cwd: root })
+    unlinkSync(path.join(root, 'deleted.md'))
+
+    assert.deepEqual(
+      loopDetectorRepositoryInputFiles(root).map((file) => path.basename(file)),
+      ['alive.md'],
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
 test('WHAT[DG-004] LOOP_004_runtime_envelope_reads_every_selected_repository_input_through_the_tracking_reader', async () => {
   const reads = []
   const bytes = new Map([

@@ -534,10 +534,10 @@ module HostForkRestart =
         (directoryOf: string -> string option)
         : Task<HandleFamilyRecovery> =
         task {
-            // GLORY-002 / SURFACE-006: HostOwnedHidden handles (the Finality
-            // Reviewer) belong to the Host-owned workflow, not to this parent.
+            // GLORY-002 / SURFACE-006: HostOwnedHidden handles belong to the Host-owned workflow,
+            // not to this parent.
             // Restoring one into the parent's runtime would resurrect it inside
-            // the parent's list/join/guard. The Finality workflow re-adopts its
+            // the parent's list/join/guard. The Host workflow re-adopts its
             // own sessions from its durable enlistment facts instead.
             let records =
                 AgentProjection.tryFind parentId (AgentJournal.snapshot journal).AgentProjections

@@ -73,11 +73,13 @@ test('WHAT[MANAGED-SESSION-017] invariant and tool fail-closed paths cannot use 
 })
 
 test('WHAT[MANAGED-SESSION-017] raw InterruptAttempt callers are restricted to workflows with an explicit successor owner', () => {
+  // Relay clean break: Review/Finality owners are deleted, and retirement no
+  // longer issues a session-scoped abort (RETIRE-008) — a late Host kill lands
+  // in the successor's run on the reused session.
   const allowed = new Set([
     'src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs',
-    'src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs',
-    'src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs',
     'src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs',
+    'src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs',
   ])
 
   const callers = walkFs('src/Wanxiangshu')

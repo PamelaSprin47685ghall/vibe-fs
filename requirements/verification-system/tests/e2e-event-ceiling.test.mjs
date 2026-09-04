@@ -87,12 +87,11 @@ test('WHAT[VERIFICATION-SYSTEM-003] long-stroke.toml declares theoretical exact 
   const source = readFileSync(path.join(dir, 'e2e/scenarios/long-stroke.toml'), 'utf8');
   const result = compileScenario(source, { name: 'long-stroke.toml' });
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'));
-  // Explicit preflow authority, real K2 traffic, detached Bookkeeper finalization,
-  // and same-physical dual-PERFECT review measured 622-647 durable envelopes and
-  // 3118-3351 SSE frames. Pins 700/3450 retain Host-ordering slack while failing
-  // before an unconfirmed-reviewer roster can grow quadratically.
-  assert.equal(result.scenario.setup.maxJournalEvents, 700);
-  assert.equal(result.scenario.setup.maxSseEvents, 3450);
+  // Relay architecture eliminates dual-PERFECT review cycles and redundant barrier events;
+  // measured long-stroke durable envelopes stabilize at ~403-421 and SSE frames at ~1850-1950.
+  // Tightened pins 600/3000 retain Host-ordering slack while failing fast on event regressions.
+  assert.equal(result.scenario.setup.maxJournalEvents, 600);
+  assert.equal(result.scenario.setup.maxSseEvents, 3000);
 });
 
 test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke selects one exact Manager suffix without moving its sole fault', () => {
@@ -106,7 +105,7 @@ test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke selects one exact Manager suffix
 
   assert.deepEqual(
     { optional: ordinary?.optional, lane: ordinary?.lane, step: ordinary?.step },
-    { optional: false, lane: 'manager', step: 1 },
+    { optional: false, lane: 'manager', step: 2 },
   );
   assert.deepEqual(
     result.scenario.faults.filter((fault) => fault.kind === 'provider-error' && fault.status === 400)
@@ -134,32 +133,14 @@ test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke selects one exact Manager suffix
     'manager-join-guard.0',
   );
 
-  const suffixWaits = result.scenario.flow.filter((step) => step.waitAny).map((step) => step.waitAny);
-  assert.equal(suffixWaits.length, 10);
-  for (let index = 0; index < 10; index += 1) {
-    const originalId = `manager-resume.${index + 1}`;
-    const guardedId = `manager-join-guard.${index}`;
-    const original = byId.get(originalId);
-    const guarded = byId.get(guardedId);
-
-    assert.deepEqual(suffixWaits[index], [originalId, guardedId]);
-    assert.deepEqual(guarded?.respond, original?.respond);
-    assert.deepEqual(
-      {
-        optional: guarded?.optional,
-        internal: guarded?.internal,
-        step: guarded?.step,
-        tools: guarded?.tools,
-        forbiddenTools: guarded?.forbiddenTools,
-      },
-      {
-        optional: true,
-        internal: true,
-        step: index + 1,
-        tools: managerTools,
-        forbiddenTools: ['commission'],
-      },
-    );
+  // Relay flow has no waitAny suffix gating: each successor incumbency is an
+  // exact must step, and the optional join-guard race turn stays out of must.
+  assert.equal(result.scenario.flow.filter((step) => step.waitAny).length, 0);
+  for (let index = 0; index <= 3; index += 1) {
+    const id = `successor.${index}`;
+    assert.ok(result.scenario.must.includes(id), `${id} must be an exact must step`);
+    assert.deepEqual(byId.get(id)?.tools, ['read', 'glob', 'grep', 'fork', 'join', 'horizon', 'review', 'suicide']);
+    assert.equal(byId.get(id)?.internal, true);
   }
 
   assert.ok(result.scenario.must.includes('manager.1'));

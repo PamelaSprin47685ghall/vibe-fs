@@ -7,14 +7,15 @@ let normalTransform value =
     let nested () =
         caps.BeginPhysicalProviderAttempt value
         caps.BindSessionStartedAt value
+        caps.ApplyRelayProjection value
         caps.ApplyStrengthReplay value
     let delayed = fun () ->
         caps.CaptureXTraceMessages value
         caps.CommitStrengthTrace value
         caps.RefreshCompanionXTrace value
-        caps.ApplyManagerNarrative value
         caps.ApplyCompanion value
         caps.ApplyXWire value
+        caps.FreezeProviderAttemptPlan value
     if false then
         caps.ApplyEnforcerContinuation value
         caps.ApplyStrengthSpeculate value
@@ -23,7 +24,6 @@ let normalTransform value =
         caps.ProjectRequirementGrounding value
         caps.InjectBloggerChronicle value
         caps.SanitizeMessages value
-        caps.InterruptAfterSubmittedJudgement value
     value
 
 let dispatch value =

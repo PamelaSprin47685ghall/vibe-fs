@@ -459,7 +459,7 @@ test('WHAT[DURABLE-EVENTS-009] e2e journal observers that only read wanxiangshu-
     'assert.ok(text.includes("LifeOpened"))',
   ].join('\n')
   assert.equal(
-    scanNoMigrator(observer, 'tests/e2e/cases/reviewer-verdict.test.mjs').length,
+    scanNoMigrator(observer, 'tests/e2e/cases/relay-assessment.test.mjs').length,
     0,
     'live Journal observation is not a legacy migrator',
   )

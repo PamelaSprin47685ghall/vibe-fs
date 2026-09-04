@@ -6,7 +6,6 @@ open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Review.Barrier
 
 module ProjectionUpdate =
     val prefixOutcome:
@@ -37,25 +36,6 @@ module ProjectionUpdate =
             Result<AgentProjectionSet, 'rejection>
 
     val retireAuxiliaryInjectionVisibility: session: SessionAgentProjection -> SessionAgentProjection
-
-    val updateReviewGuard:
-        sessionId: SessionId ->
-        apply: (ReviewGuardProjection -> ReviewGuardProjection) ->
-        projection: AgentProjectionSet ->
-            AgentProjectionSet
-
-    val bindTerminalFrontier:
-        sessionId: SessionId ->
-        terminalRef: BlobRef ->
-        terminalDigest: BlobDigest ->
-        projection: AgentProjectionSet ->
-            AgentProjectionSet
-
-    val updateRequirements:
-        sessionId: SessionId ->
-        apply: (ReviewRequirementProjection -> ReviewRequirementProjection) ->
-        projection: AgentProjectionSet ->
-            AgentProjectionSet
 
     val updateOrchestrator:
         apply: (OrchestratorProjection -> OrchestratorProjection) ->

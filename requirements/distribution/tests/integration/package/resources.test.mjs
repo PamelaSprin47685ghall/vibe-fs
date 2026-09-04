@@ -21,7 +21,6 @@ const PROVIDER_ROLES = [
   'inspector',
   'manager',
   'orchestrator',
-  'reviewer',
 ]
 
 test('WHAT[DISTRIBUTION-008] PACKAGE_resources_provider_role_laws_and_rulebook_present_after_install', () => {
@@ -43,7 +42,7 @@ test('WHAT[DISTRIBUTION-008] PACKAGE_resources_provider_role_laws_and_rulebook_p
       assert.ok(text.trim().length > 0, `Role Law ${role}/${locale} must be non-empty`)
     }
   }
-  assert.equal(PROVIDER_ROLES.length, 11)
+  assert.equal(PROVIDER_ROLES.length, 10)
 
   for (const leaf of ['world/common-law/en.md', 'world/common-law/zh-CN.md']) {
     const full = path.join(providerDir, leaf)

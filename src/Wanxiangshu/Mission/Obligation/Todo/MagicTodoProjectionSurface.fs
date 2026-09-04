@@ -6,6 +6,7 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection
+open Wanxiangshu.Mission.Relay
 
 /// JS-native projection and typed-fact owner for Magic Todo.
 /// The handle is a resource: F# maps, records, unions, and replay state never
@@ -14,9 +15,9 @@ module private MagicTodoProjectionEncoding =
 
     let rejectionView (rejection: MagicTodoProjection.MagicTodoFoldRejection) : obj =
         match rejection with
-        | MagicTodoFoldRejection.LifeMismatch(expected, actual) ->
+        | MagicTodoFoldRejection.IncumbencyMismatch(expected, actual) ->
             box
-                {| code = "LifeMismatch"
+                {| code = "IncumbencyMismatch"
                    expected = expected
                    actual = actual |}
         | MagicTodoFoldRejection.PreparedMissingForAccept writeId ->
@@ -109,36 +110,47 @@ module MagicTodoProjectionSurface =
     let internal rejectionView rejection : obj =
         MagicTodoProjectionEncoding.rejectionView rejection
 
-    let internal lifeView (state: MagicTodoProjection.MagicTodoProjectionState) (lifeId: ManagerLifeId) : obj =
-        match MagicTodoProjection.tryLife lifeId state with
+    let internal incumbencyView
+        (state: MagicTodoProjection.MagicTodoProjectionState)
+        (incumbencyId: IncumbencyId)
+        : obj =
+        match MagicTodoProjection.tryIncumbency incumbencyId state with
         | None -> null
-        | Some life ->
+        | Some incumbency ->
             let checkpoints =
-                life.Checkpoints
+                incumbency.Checkpoints
                 |> Map.toArray
                 |> Array.map (fun (_, checkpoint) -> checkpointView checkpoint)
 
             box
-                {| lifeId = ManagerLifeId.value life.LifeId
-                   currentObligations = refView life.CurrentObligationsRef
+                {| incumbencyId = IncumbencyId.value incumbency.IncumbencyId
+                   currentObligations = refView incumbency.CurrentObligationsRef
                    firstAcceptedCheckpoint =
-                    life.FirstAcceptedCheckpoint |> Option.map TodoWriteId.value |> optionString
+                    incumbency.FirstAcceptedCheckpoint
+                    |> Option.map TodoWriteId.value
+                    |> optionString
                    latestAcceptedCheckpoint =
-                    life.LatestAcceptedCheckpoint |> Option.map TodoWriteId.value |> optionString
-                   firstPlanCommitment = life.FirstPlanCommitment |> Option.map TodoWriteId.value |> optionString
+                    incumbency.LatestAcceptedCheckpoint
+                    |> Option.map TodoWriteId.value
+                    |> optionString
+                   firstPlanCommitment = incumbency.FirstPlanCommitment |> Option.map TodoWriteId.value |> optionString
                    latestCommittedCheckpoint =
-                    life.LatestCommittedCheckpoint |> Option.map TodoWriteId.value |> optionString
+                    incumbency.LatestCommittedCheckpoint
+                    |> Option.map TodoWriteId.value
+                    |> optionString
                    previousCommittedCheckpoint =
-                    life.PreviousCommittedCheckpoint |> Option.map TodoWriteId.value |> optionString
+                    incumbency.PreviousCommittedCheckpoint
+                    |> Option.map TodoWriteId.value
+                    |> optionString
                    checkpoints = checkpoints
-                   legacySeed = refView life.LegacySeed |}
+                   legacySeed = refView incumbency.LegacySeed |}
 
     let create () = MagicTodoProjectionHandle.Create()
 
     let fold (handle: MagicTodoProjectionHandle) (eventId: string) (factJson: string) : obj =
         handle.Fold(eventId, factJson)
 
-    let view (handle: MagicTodoProjectionHandle) (lifeId: string) : obj =
-        lifeView handle.State (ManagerLifeId.create lifeId)
+    let view (handle: MagicTodoProjectionHandle) (incumbencyId: string) : obj =
+        incumbencyView handle.State (IncumbencyId.create incumbencyId)
 
     let state (handle: MagicTodoProjectionHandle) = handle.State

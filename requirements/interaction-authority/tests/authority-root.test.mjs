@@ -92,14 +92,14 @@ test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_carries_resolved_participant_i
     canonicalRole: 'coder',
     selectedTier: 'deep',
   })
-  assert.deepEqual(profile(rootFor('reviewer')), {
+  assert.deepEqual(profile(rootFor('manager')), {
     session: 'ses_a',
     logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
     authorityRoot: 'msg_u1',
     authorityKind: 'HumanRoot',
-    selectedAgent: 'reviewer',
-    peerAgent: 'reviewer',
-    canonicalRole: 'reviewer',
+    selectedAgent: 'manager',
+    peerAgent: 'manager',
+    canonicalRole: 'manager',
     selectedTier: 'deep',
   })
 })
@@ -113,7 +113,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] IA_003_closed_root_replacement_clears_run_
   assert.equal(state.claimSequences.length, 1)
   assert.equal(state.acceptedContinuations.length, 1)
 
-  const second = rootFor('reviewer', 'msg_u2')
+  const second = rootFor('manager', 'msg_u2')
   const premature = authority.registerAuthority(second, state)
   assert.equal(premature.ok, false)
   assert.equal(premature.error.kind, 'ActiveRunIdentityConflict')
@@ -132,7 +132,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] IA_003_closed_root_replacement_clears_run_
 
 // INTERACTION-AUTHORITY-006: canonical bare names resolve; legacy and hyphenated names fail closed.
 test('WHAT[INTERACTION-AUTHORITY-006] IA_006_canonical_names_resolve_and_legacy_or_malformed_are_refused', () => {
-  for (const name of ['coder', 'manager', 'reviewer']) {
+  for (const name of ['coder', 'manager', 'inspector']) {
     const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', 'HumanRoot', 'msg_u1', rootSelection(name))
     assert.equal(result.ok, true, result.error)
     assert.equal(authority.parseAgentName(name).ok, true)
@@ -213,7 +213,7 @@ test('WHAT[INTERACTION-AUTHORITY-011] PROMPT_011_logical_run_id_is_stable_and_in
 })
 
 test('WHAT[INTERACTION-AUTHORITY-012] IA_005_degeneration_guard_is_continuation', () => {
-  for (const kind of ['DegenerationGuard', 'ManagerIdleEncouragement']) {
+  for (const kind of ['DegenerationGuard', 'ManagerGuard']) {
     assert.deepEqual(authority.originForContinuation(kind), { kind: 'Continuation', label: kind })
   }
   assert.equal(authority.tryParseContinuationKind('HumanRoot'), null)

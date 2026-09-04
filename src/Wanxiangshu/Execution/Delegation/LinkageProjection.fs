@@ -279,8 +279,8 @@ module HandleProjection =
     let private recordsWhere predicate (current: AgentLinkageProjection) =
         current.Handles |> Map.toList |> List.map snd |> List.filter predicate
 
-    /// GLORY-002 / SURFACE-006: a HostOwnedHidden handle (the hidden Finality
-    /// Reviewer) is invisible to its nominal parent. Every parent-visible
+    /// GLORY-002 / SURFACE-006: a HostOwnedHidden handle (such as an internal Host workflow)
+    /// is invisible to its nominal parent. Every parent-visible
     /// surface — list, join, background guard, cancellation — filters it out.
     /// The record itself stays durable for audit and for the Host-owned
     /// workflow's own recovery.

@@ -19,12 +19,8 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
@@ -49,8 +45,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Process
 open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Review.OpenCode
-open Wanxiangshu.Mission.Review
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
@@ -173,7 +167,6 @@ module HostTurnObserver =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (scope: PluginRuntimeScope)
-        (reviewerContinuationPort: ReviewerContinuationPort)
         (abortCause: AbortCause)
         (context: ReconciledTurnContext)
         : Task =
@@ -193,7 +186,7 @@ module HostTurnObserver =
                         journal
             else
                 // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
-                // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
+                // multiplexes SyncDelegate / Manager handled-bools.
                 do!
                     TurnWorkflow.observe
                         sessionPort
@@ -202,7 +195,6 @@ module HostTurnObserver =
                         journal
                         scope.BloggerRuntimeHost
                         scope.SyncDelegateRuntime
-                        reviewerContinuationPort
                         scope.Sessions.NudgeSent
                         scope.Sessions.JoinGuardNudges
                         (fun s -> scope.HasLivePty s)
@@ -217,7 +209,6 @@ module HostTurnObserver =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (scope: PluginRuntimeScope)
-        (reviewerContinuationPort: ReviewerContinuationPort)
         (abortCause: AbortCause)
         (context: ReconciledTurnContext)
         : Task =
@@ -240,16 +231,7 @@ module HostTurnObserver =
                     turn
 
             if not isFissionOwner && not fissionHandled then
-                do!
-                    observeApplicationTurn
-                        sessionPort
-                        rootWorkspace
-                        eventPort
-                        journal
-                        scope
-                        reviewerContinuationPort
-                        abortCause
-                        context
+                do! observeApplicationTurn sessionPort rootWorkspace eventPort journal scope abortCause context
         }
 
     let private observeAfterStrength
@@ -258,7 +240,6 @@ module HostTurnObserver =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (scope: PluginRuntimeScope)
-        (reviewerContinuationPort: ReviewerContinuationPort)
         (abortCause: AbortCause)
         (context: ReconciledTurnContext)
         : Task =
@@ -269,16 +250,7 @@ module HostTurnObserver =
             | FamilyRecovery.FamilyBlocked _ -> return ()
             | FamilyRecovery.FamilyWaiting _
             | FamilyRecovery.FamilyReady _ ->
-                return!
-                    observeFamilyReady
-                        sessionPort
-                        rootWorkspace
-                        eventPort
-                        journal
-                        scope
-                        reviewerContinuationPort
-                        abortCause
-                        context
+                return! observeFamilyReady sessionPort rootWorkspace eventPort journal scope abortCause context
         }
 
     let private observeBusinessTurn
@@ -288,7 +260,6 @@ module HostTurnObserver =
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
         (scope: PluginRuntimeScope)
-        (reviewerContinuationPort: ReviewerContinuationPort)
         (context: ReconciledTurnContext)
         : Task =
         let closeDryRunAtPrimaryTerminal (turn: ReconciledTurn) =
@@ -307,7 +278,7 @@ module HostTurnObserver =
             if strengthHandled then
                 // STRENGTH-004/011: Replica observations are leaf-local. They
                 // only reconcile the request plan for cleanup; family recovery,
-                // owner fallback, Companion, Review and ordinary TurnWorkflow
+                // owner fallback, Companion and ordinary TurnWorkflow
                 // must never observe them.
                 do! XWire.reconcileAttempt journal scope turn
                 return ()
@@ -333,16 +304,7 @@ module HostTurnObserver =
                 // consumed a durable Candidate.
                 do! observeStrengthDurability strengthDurability scope turn
 
-                return!
-                    observeAfterStrength
-                        sessionPort
-                        rootWorkspace
-                        eventPort
-                        journal
-                        scope
-                        reviewerContinuationPort
-                        abortCause
-                        context
+                return! observeAfterStrength sessionPort rootWorkspace eventPort journal scope abortCause context
         }
 
     let observe
@@ -352,7 +314,6 @@ module HostTurnObserver =
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
         (scope: PluginRuntimeScope)
-        (reviewerContinuationPort: ReviewerContinuationPort)
         (context: ReconciledTurnContext)
         : Task =
         let turn = context.Turn
@@ -364,12 +325,4 @@ module HostTurnObserver =
             // or interaction-repair effects from this physical material.
             Task.FromResult(()) :> Task
         else
-            observeBusinessTurn
-                sessionPort
-                rootWorkspace
-                eventPort
-                journal
-                strengthDurability
-                scope
-                reviewerContinuationPort
-                context
+            observeBusinessTurn sessionPort rootWorkspace eventPort journal strengthDurability scope context

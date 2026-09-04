@@ -18,7 +18,6 @@ module PromptSurface =
                CoderSystemPrompt = catalog.CoderSystemPrompt
                DevopsSystemPrompt = catalog.DevopsSystemPrompt
                InspectorSystemPrompt = catalog.InspectorSystemPrompt
-               ReviewerSystemPrompt = catalog.ReviewerSystemPrompt
                BrowserSystemPrompt = catalog.BrowserSystemPrompt
                InquirySystemPrompt = catalog.InquirySystemPrompt
                OrchestratorSystemPrompt = catalog.OrchestratorSystemPrompt
@@ -30,7 +29,6 @@ module PromptSurface =
            catalog.CoderSystemPrompt
            catalog.DevopsSystemPrompt
            catalog.InspectorSystemPrompt
-           catalog.ReviewerSystemPrompt
            catalog.BrowserSystemPrompt
            catalog.InquirySystemPrompt
            catalog.OrchestratorSystemPrompt
@@ -55,14 +53,14 @@ module PromptSurface =
                 resources.SimplifiedChineseEnforcerRules |> List.map ruleToJs |> List.toArray
                ProviderLanguageRootsReady = resources.ProviderLanguageRootsReady |}
 
-    /// Canonical English ten-role prompt catalog.
+    /// Canonical English public-role prompt catalog.
     let load () : obj = PromptResources.load () |> catalogToJs
 
-    /// Localized ten-role prompt catalog. Language crosses as a stable string.
+    /// Localized public-role prompt catalog. Language crosses as a stable string.
     let loadForLanguage (language: string) : obj =
         PromptResources.loadForLanguage (languageOf language) |> catalogToJs
 
-    /// The ten prompt bodies in the same public-role order as the catalog.
+    /// Prompt bodies in the same public-role order as the catalog.
     let allForLanguage (language: string) : string array =
         PromptResources.loadForLanguage (languageOf language) |> catalogValues
 

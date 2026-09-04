@@ -1,5 +1,5 @@
 {
-  "total": 699,
+  "total": 705,
   "owners": [
     "action-affordance",
     "attention-regulation",
@@ -20,9 +20,9 @@
     "execution-failure-policy",
     "execution-model-routing",
     "external-investigation",
-    "finality",
     "guidance-delivery",
     "host-boundary",
+    "host-provider-failure-ownership",
     "institutional-learning",
     "interaction-authority",
     "intra-participant-parallelism",
@@ -42,8 +42,10 @@
     "repository-investigation",
     "repository-programming",
     "requirement-grounding",
-    "review-assurance",
-    "review-judgement",
+    "relay-assessment",
+    "relay-context-projection",
+    "relay-incumbency",
+    "relay-retirement",
     "semantic-trace",
     "session-ontology",
     "speculative-investigation",
@@ -74,10 +76,6 @@
     },
     {
       "path": "src/Wanxiangshu/Change/Host/Host.fs",
-      "owner": "change-integration"
-    },
-    {
-      "path": "src/Wanxiangshu/Change/Host/ReviewRunner.fs",
       "owner": "change-integration"
     },
     {
@@ -127,10 +125,6 @@
     {
       "path": "src/Wanxiangshu/Change/Types.fs",
       "owner": "change-integration"
-    },
-    {
-      "path": "src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs",
-      "owner": "finality"
     },
     {
       "path": "src/Wanxiangshu/Composition/Durable/Fact.fs",
@@ -194,7 +188,7 @@
     },
     {
       "path": "src/Wanxiangshu/Composition/Turn/Workflow.fs",
-      "owner": "review-assurance"
+      "owner": "relay-retirement"
     },
     {
       "path": "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs",
@@ -1253,104 +1247,60 @@
       "owner": "dispatch-protocol"
     },
     {
-      "path": "src/Wanxiangshu/Mission/Finality/Blessing.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Finality/Cohort.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Finality/Ports.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Finality/Prompt.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Finality/PromptSurface.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Finality/Record.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Finality/Revision.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Finality/Types.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Finality/Workflow.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Manager/Background.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Manager/Finality.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Manager/FinalitySurface.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Manager/Idle.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Manager/JobHandoff.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Manager/Life/Admission.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Manager/Life/Facts.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs",
+      "path": "src/Wanxiangshu/Mission/Manager/Narrative.fs",
       "owner": "obligation-ledger"
     },
     {
-      "path": "src/Wanxiangshu/Mission/Manager/Life/Projection.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Manager/Life/Prompt.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Manager/Life/Workflow.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Manager/Narrative.fs",
-      "owner": "finality"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Manager/OpenCode/NarrativeTransform.fs",
-      "owner": "finality"
-    },
-    {
       "path": "src/Wanxiangshu/Mission/Manager/Workflow.fs",
-      "owner": "finality"
+      "owner": "relay-retirement"
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Relay/Assessment/Model.fs",
+      "owner": "relay-assessment"
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Relay/Assessment/Surface.fs",
+      "owner": "relay-assessment"
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Relay/Contract.fs",
+      "owner": "relay-incumbency"
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Relay/Facts.fs",
+      "owner": "relay-incumbency"
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Relay/Fold.fs",
+      "owner": "relay-incumbency"
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Relay/OpenCode/NarrativeTransform.fs",
+      "owner": "relay-context-projection"
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Relay/OpenCode/ReviewTool.fs",
+      "owner": "relay-assessment"
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs",
+      "owner": "relay-retirement"
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Relay/OpenCode/WorkspaceSnapshot.fs",
+      "owner": "relay-assessment"
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Relay/ProjectionSurface.fs",
+      "owner": "relay-context-projection"
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Relay/Retirement/Surface.fs",
+      "owner": "relay-retirement"
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Relay/Surface.fs",
+      "owner": "relay-incumbency"
     },
     {
       "path": "src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs",
@@ -1362,10 +1312,6 @@
     },
     {
       "path": "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
-      "owner": "obligation-ledger"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Obligation/Todo/FinalityCohort.fs",
       "owner": "obligation-ledger"
     },
     {
@@ -1427,98 +1373,6 @@
     {
       "path": "src/Wanxiangshu/Mission/Obligation/Todo/Surface.fs",
       "owner": "obligation-ledger"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Assurance/Surface.fs",
-      "owner": "review-assurance"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Barrier/Projection.fs",
-      "owner": "review-assurance"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Barrier/Reverify.fs",
-      "owner": "review-assurance"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Barrier/Workflow.fs",
-      "owner": "review-assurance"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Fact.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Facts.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Judgement/Challenge.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Judgement/Continuation.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Judgement/Evidence.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Judgement/RequestIdentity.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Judgement/Verdict.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/OpenCode/HostGuard.fs",
-      "owner": "review-assurance"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/OpenCode/JudgementInbox.fs",
-      "owner": "review-assurance"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/OpenCode/JudgeSurface.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/OpenCode/TerminalAwait.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/OpenCode/ReviewHostSurface.fs",
-      "owner": "review-assurance"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Ports.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/Prompt.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/ReviewFactFold.fs",
-      "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/ReviewTodoSurface.fs",
-      "owner": "review-judgement"
     },
     {
       "path": "src/Wanxiangshu/Mission/WorkRecord/Materialize.fs",
@@ -1822,11 +1676,15 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/ProviderRunBinding.fs",
-      "owner": "review-assurance"
+      "owner": "host-boundary"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/ProviderRunBindingSurface.fs",
-      "owner": "review-assurance"
+      "owner": "host-boundary"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ProviderFailurePresentation.fs",
+      "owner": "host-provider-failure-ownership"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/ProviderSystemTransform.fs",
@@ -1922,7 +1780,7 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/SharedState.fs",
-      "owner": "review-assurance"
+      "owner": "host-boundary"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs",
@@ -2370,10 +2228,6 @@
     },
     {
       "path": "src/Wanxiangshu/Persistence/Journal/PromptFactCodec.fs",
-      "owner": "durable-events"
-    },
-    {
-      "path": "src/Wanxiangshu/Persistence/Journal/ReviewJournalSurface.fs",
       "owner": "durable-events"
     },
     {

@@ -12,6 +12,11 @@ const locality = (inventory, id) => {
 
 const sourcePaths = (entry) => entry.sources.map(({ implementationPath }) => implementationPath)
 
+test('WHAT[HOST-BOUNDARY-027] Host message loop and envelope slices reject the old wide signal closure', () => {
+  assertPureContract()
+  assertEffectIsInjected('host')
+})
+
 test('WHAT[HOST-BOUNDARY-027] production inventory closes Host codec audiences without the wide signal adapter', () => {
   const inventory = readOwnerProjectInventoryV1()
   const envelope = locality(inventory, 'host-event-envelope')
@@ -125,8 +130,6 @@ test('WHAT[HOST-BOUNDARY-031] RootWorkspace runtime is private and every observe
     'execution-delegation-hostturnobservedsurface',
     'git-integrationgate',
     'interaction-repair-interactionrepair',
-    'mission-finality-prompt',
-    'mission-review-barrier-workflow',
     'opencode-host-pluginruntimescope',
     'participant-provider-attempt-fallback-ledger',
   ])

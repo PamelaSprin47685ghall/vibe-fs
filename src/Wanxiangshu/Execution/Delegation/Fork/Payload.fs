@@ -18,8 +18,7 @@ type ForkChildAssignment =
         CommissionerRecord: string option
         /// Another person's bounded work statement, visible only as background context.
         Attachment: string option
-        /// REVIEW-002 authoritative scope: the HumanRoot prompts received since the previous review
-        /// reached its double-PERFECT barrier. Empty for every non-Reviewer fork.
+        /// Authoritative scope: the HumanRoot prompts received since the previous assessment.
         RootRequirements: string list
         /// ARCH-010: machine-readable data that the child may read but must not mistake for the task.
         Payload: string option

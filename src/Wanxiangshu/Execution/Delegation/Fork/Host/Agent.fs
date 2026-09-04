@@ -34,10 +34,7 @@ open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
@@ -49,7 +46,6 @@ open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.OpenCode
 
@@ -82,133 +78,19 @@ module HostForkAgent =
           Attachment = ProviderProse.render lang ForkChildPayload.AttachmentPath Map.empty
           Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
 
-    let private userPromptText (message: SessionMessage) =
-        message.Parts
-        |> Array.choose (function
-            | MessagePart.Text text -> Some text
-            | _ -> None)
-        |> String.concat "\n"
-        |> fun text -> if String.IsNullOrWhiteSpace text then None else Some text
-
-    let private consumeRequirementText (input: ReviewRequirementInput) (messages: SessionMessage list) =
-        // The Authority Root was promoted from a physical message, so its
-        // value is that message's wire address. Compared as an address
-        // because the transcript has no notion of authority.
-        let address = AuthorityRootUserMessageId.value input.AuthorityRootUserMessageId
-
-        messages
-        |> List.tryFind (fun message -> message.Id = address)
-        |> Option.bind userPromptText
-
-    let rec private resolveReviewRequirementInputs
-        (port: ISessionSnapshotPort)
-        (inputs: ReviewRequirementInput list)
-        (cached: Map<SessionId, SessionMessage list>)
-        (resolved: string list)
-        : Task<Result<string list, string>> =
-        task {
-            match inputs with
-            | [] -> return Ok(List.rev resolved)
-            | input :: remaining -> return! stepRequirementInput port input remaining cached resolved
-        }
-
-    and private advanceResolved
-        (port: ISessionSnapshotPort)
-        (remaining: ReviewRequirementInput list)
-        (cached: Map<SessionId, SessionMessage list>)
-        (resolved: string list)
-        (textOpt: string option)
-        =
-        match textOpt with
-        | Some text -> resolveReviewRequirementInputs port remaining cached (text :: resolved)
-        | None -> resolveReviewRequirementInputs port remaining cached resolved
-
-    and private afterMessagesLoaded
-        (port: ISessionSnapshotPort)
-        (input: ReviewRequirementInput)
-        (remaining: ReviewRequirementInput list)
-        (cached: Map<SessionId, SessionMessage list>)
-        (resolved: string list)
-        (messagesResult: Result<SessionMessage list, string>)
-        =
-        match messagesResult with
-        | Error err -> Task.FromResult(Error(sprintf "Cannot load original user requirements for reviewer: %s" err))
-        | Ok messages ->
-            // Host revert cleanup permanently removes the reverted user
-            // message. Its HumanRoot requirement is therefore withdrawn,
-            // not unavailable: continue with the still-live roots. A
-            // snapshot Error above remains fail-closed and cannot be
-            // mistaken for a withdrawal.
-            let updated = Map.add input.SourceSessionId messages cached
-            advanceResolved port remaining updated resolved (consumeRequirementText input messages)
-
-    and private stepRequirementInput
-        (port: ISessionSnapshotPort)
-        (input: ReviewRequirementInput)
-        (remaining: ReviewRequirementInput list)
-        (cached: Map<SessionId, SessionMessage list>)
-        (resolved: string list)
-        =
-        task {
-            match Map.tryFind input.SourceSessionId cached with
-            | Some messages ->
-                return! advanceResolved port remaining cached resolved (consumeRequirementText input messages)
-            | None ->
-                let! messagesResult = port.GetMessages input.SourceSessionId
-                return! afterMessagesLoaded port input remaining cached resolved messagesResult
-        }
-
-    let private loadReviewerRequirements
-        (snapshot: ISessionSnapshotPort option)
-        (promptInputs: ReviewRequirementInput list)
-        : Task<Result<string list, string>> =
-        match snapshot with
-        | None ->
-            Task.FromResult(
-                Error "Cannot start reviewer: original user requirements are unavailable without a session transcript"
-            )
-        | Some port -> resolveReviewRequirementInputs port promptInputs Map.empty []
-
-    /// REVIEW-002's authoritative review scope, as the texts themselves.
-    ///
-    /// Returns the requirement list rather than a composed prompt, which is the N3 change. It used to
-    /// return `assignment` wrapped in a `[Original user requirements …]` envelope, so the reviewer's
-    /// first prompt had one shape with requirements and another without — and the caller then wrapped
-    /// THAT in a second conditional envelope. ARCH-010 wants the instruction/data split decided by the
-    /// producer, so the producer hands over data and `ForkChildPayload` decides the shape.
-    ///
-    /// An empty list is the ordinary case: every non-Reviewer fork, and a Reviewer forked when no new
-    /// HumanRoot has arrived since the last double-PERFECT barrier.
-    let private resolveReviewerRequirements
-        (journal: AgentJournal option)
-        (snapshot: ISessionSnapshotPort option)
-        (parentId: SessionId)
-        : Task<Result<string list, string>> =
-        let promptInputs = AgentJournal.pendingReviewRequirements journal parentId
-
-        if List.isEmpty promptInputs then
-            Task.FromResult(Ok [])
-        else
-            loadReviewerRequirements snapshot promptInputs
-
-    let private requirementsForRole (runtime: HostForkRuntime) (role: Role) =
-        match role with
-        | Role.Reviewer -> resolveReviewerRequirements runtime.Journal runtime.SessionSnapshot runtime.ParentId
-        | _ -> Task.FromResult(Ok [])
-
     let private buildRelayEnvelope
         (runtime: HostForkRuntime)
-        (role: Role)
+        (_role: Role)
         (prompt: string)
         (payload: string option)
         : Task<Result<string list * string, string>> =
         task {
-            let! requirementsResult = requirementsForRole runtime role
             let! parentWorkRecord = runtime.ParentWorkRecordOf runtime.ParentId
 
+            let requirements = []
+
             return
-                requirementsResult
-                |> Result.map (fun requirements ->
+                Ok(
                     requirements,
                     ForkChildPayload.relay
                         (forkInstructions runtime.ParentId)
@@ -216,7 +98,8 @@ module HostForkAgent =
                         parentWorkRecord
                         None
                         requirements
-                        payload)
+                        payload
+                )
         }
 
     let private enrichFirstPrompt
@@ -379,10 +262,9 @@ module HostForkAgent =
                 runtime.ChildCreated agentId role childId
                 runtime.ChildCreatedDir agentId childId (runtime.DirectoryOf agentId)
 
-                // GLORY-033: the fork surface no longer opens review barriers. A
-                // Manager cannot fork a Reviewer at all (GLORY-031), and every
-                // Host-owned barrier opens at its reverify site
-                // (HostReviewProgram / ORCH-006).
+                // GLORY-033: the fork surface no longer opens barriers. An
+                // incumbent cannot fork an unauthorized role, and every
+                // Host-owned barrier opens at its dedicated site.
                 let result =
                     runtime.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
 
@@ -760,10 +642,8 @@ module HostForkAgent =
                 // The ARCH-010 first-prompt payload is computed once and used by
                 // both child paths: a brand-new child AND an idle restored child
                 // receive the same envelope, so a canary declaration anchored on
-                // the envelope cannot tell which path produced the request
-                // (measured: the post-restart review fork sent the raw opening
-                // prompt and every barrier-reviewer declaration failed to match).
-                // Continuations (busy nudge, challenge, manager resume) opt out.
+                // the envelope cannot tell which path produced the request.
+                // Continuations (busy nudge, nudge, manager resume) opt out.
                 //
                 // PENDING 7: `?renderedPrompt: string` (not `string option`) so the
                 // body sees `string option`. Caller supplies a pre-rendered ARCH-010

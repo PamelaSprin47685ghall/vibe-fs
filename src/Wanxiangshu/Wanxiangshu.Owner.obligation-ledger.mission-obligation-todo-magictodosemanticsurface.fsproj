@@ -9,8 +9,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-surface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.finality.mission-manager-life-facts.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.finality.mission-manager-life-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
@@ -24,6 +22,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Mission/Manager/Narrative.fsi"/>
+    <Compile Include="Mission/Manager/Narrative.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoSemanticSurface.fsi"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoSemanticSurface.fs"/>
     <Compile Include="Mission/Obligation/Todo/OpenCode/HostCodec.fsi"/>

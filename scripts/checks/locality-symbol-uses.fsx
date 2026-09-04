@@ -979,7 +979,6 @@ for implementationFile in implementationFiles do
         let anchor = propertyValue implementationFile "QualifiedName" :?> string
         for declaration in propertyValue implementationFile "Declarations" |> asObjects do
             visitDeclaration sourcePath anchor declaration
-
 let symbolLocations symbol =
     [| "DeclarationLocation"; "ImplementationLocation"; "SignatureLocation" |]
     |> Array.choose (fun name ->

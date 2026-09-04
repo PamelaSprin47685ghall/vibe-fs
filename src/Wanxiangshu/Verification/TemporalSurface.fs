@@ -13,9 +13,6 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -782,112 +779,157 @@ module TemporalSurface =
                        lateBackgroundRejected = not lateBackgroundStarted |}
         }
 
-    /// Finality owner proof: blessing cleanup may retain the reviewer session,
-    /// but every admitted physical abort must settle before the caller can leave
-    /// the Finality owner tree.
-    let finalityReviewerAbortDrainScenario () : Task<obj> =
-        task {
-            let firstEntered =
-                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-            let secondEntered =
-                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-            let releaseFirst =
-                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-            let releaseSecond =
-                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-            let abort reviewerSessionId : Task =
-                task {
-                    match SessionId.value reviewerSessionId with
-                    | "finality-reviewer-1" ->
-                        AsyncSupport.trySetResult firstEntered () |> ignore
-                        do! releaseFirst.Task
-                    | "finality-reviewer-2" ->
-                        AsyncSupport.trySetResult secondEntered () |> ignore
-                        do! releaseSecond.Task
-                    | unknown -> invalidOp (sprintf "unexpected reviewer: %s" unknown)
-                }
-                :> Task
-
-            let reviewerPort: FinalityReviewerPort =
-                { PrepareSession = fun _ -> Task.FromResult(Error "unused")
-                  StartReview = fun _ -> Task.FromResult(Error "unused")
-                  OpenJudgementChannel = fun _ -> Error "unused"
-                  AwaitTerminal = fun _ -> Task.FromResult(Error "unused")
-                  NudgeMissingJudgement = fun _ _ _ -> Task.FromResult(Error "unused")
-                  SendRevisionSteer = fun _ _ -> Task.FromResult(Error "unused")
-                  AbortReviewer = abort }
-
-            let members =
-                [ { ReviewerSessionId = SessionId.create "finality-reviewer-1"
-                    BarrierId = ReviewBarrierId.create "finality-barrier-1"
-                    ReviewerOrdinal = 0
-                    AgentId = "reviewer-1"
-                    IsNew = false }
-                  { ReviewerSessionId = SessionId.create "finality-reviewer-2"
-                    BarrierId = ReviewBarrierId.create "finality-barrier-2"
-                    ReviewerOrdinal = 1
-                    AgentId = "reviewer-2"
-                    IsNew = false } ]
-
-            // DSL-MUTABLE: algorithm-scratch — scenario drain completion observation.
-            let mutable drained = false
-
-            let draining =
-                task {
-                    do! FinalityReviewerPort.abortAll reviewerPort members
-                    drained <- true
-                }
-
-            do! firstEntered.Task
-            let blockedOnFirstAbort = not drained
-
-            AsyncSupport.trySetResult releaseFirst () |> ignore
-            do! secondEntered.Task
-            let blockedOnSecondAbort = not drained
-
-            AsyncSupport.trySetResult releaseSecond () |> ignore
-            do! draining
-
-            return
-                box
-                    {| blockedOnFirstAbort = blockedOnFirstAbort
-                       blockedOnSecondAbort = blockedOnSecondAbort
-                       drained = drained |}
-        }
-
     // ── pure durable fold ───────────────────────────────────────────────────
+
+    let fold (envelopes: obj array) : obj =
+        let rec loop current remaining =
+            match remaining with
+            | [] ->
+                box
+                    {| ok = true
+                       value = projectionToJs current |}
+            | value :: tail ->
+                match Fold.foldEnvelope current (envelopeOfJs value) with
+                | Ok updated -> loop updated tail
+                | Error rejection ->
+                    box
+                        {| ok = false
+                           error = rejectionToJs rejection |}
+
+        loop Fold.empty (envelopes |> Array.toList)
+
+    // ── FallbackProjection's typed transition, exposed as opaque state ───────
+
+    let private fallbackIdentity (value: obj) : FallbackAttemptIdentity =
+        { SessionId = sessionIdOf (value?session)
+          LogicalRunId = logicalRunOf (value?logicalRun)
+          AuthorityRootUserMessageId = authorityRootOf (value?authorityRoot)
+          ProviderRun = providerRunOf (value?providerRun) }
+
+    let private fallbackError (error: FallbackAdvanceRejection) =
+        match error with
+        | FallbackAdvanceRejection.AlreadyObserved -> "AlreadyObserved"
+        | FallbackAdvanceRejection.AlreadyExhausted -> "AlreadyExhausted"
+        | FallbackAdvanceRejection.DifferentRun -> "DifferentRun"
+        | FallbackAdvanceRejection.NoCursor -> "NoCursor"
+        | FallbackAdvanceRejection.InvalidTransition -> "InvalidTransition"
+        | FallbackAdvanceRejection.InvalidFallbackOffset _ -> "InvalidFallbackOffset"
+
+    let fallbackForAuthority (logicalRun: string) (authorityRoot: string) : obj =
+        FallbackHandle(FallbackProjection.forAuthority (logicalRunOf logicalRun) (authorityRootOf authorityRoot)) :> obj
+
+    let fallbackApplyAdvance (identity: obj) (previousOffset: int) (nextOffset: int) (count: int) (current: obj) : obj =
+        let state = (current :?> FallbackHandle).State
+
+        let decodeOffset value =
+            AgentPairCursor.FallbackOffsetCodec.ofByte (byte value)
+
+        match decodeOffset previousOffset, decodeOffset nextOffset with
+        | Error _, _
+        | _, Error _ ->
+            box
+                {| ok = false
+                   error = "InvalidFallbackOffset" |}
+        | Ok previous, Ok next ->
+            match FallbackProjection.applyAdvance (fallbackIdentity identity) previous next count state with
+            | Ok updated ->
+                box
+                    {| ok = true
+                       value = FallbackHandle updated |}
+            | Error error ->
+                box
+                    {| ok = false
+                       error = fallbackError error |}
+
+    let fallbackRead (current: obj) : obj =
+        (current :?> FallbackHandle).State |> fallbackToJs
 
     let sessionReuseIdentityScenario (firstAccepted: obj) (secondAccepted: obj) : obj =
         let firstFact = Fact.Agent(agentFactOfJs firstAccepted)
         let secondFact = Fact.Agent(agentFactOfJs secondAccepted)
         let firstPayload = firstAccepted?payload
         let sessionId = sessionIdOf (firstPayload?SessionId)
-        let lifeId = ManagerLifeId.create "life-session-reuse-a"
+        let roadId = Wanxiangshu.Mission.Relay.RoadId.create (SessionId.value sessionId)
+
+        let incId =
+            Wanxiangshu.Mission.Relay.IncumbencyId.create ("inc-" + SessionId.value sessionId)
+
+        let snapId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.create "snap-1"
+        let authRev = Wanxiangshu.Mission.Relay.AuthorityRevision.create "rev-1"
+
+        let physUser =
+            PhysicalUserMessageId.create (text (firstPayload?AuthorityRootUserMessageId))
+
+        let openEvents =
+            [ Wanxiangshu.Mission.Relay.RelayEvent.RoadOpened(roadId, authRev, physUser)
+              Wanxiangshu.Mission.Relay.RelayEvent.IncumbencyOpened(
+                  incId,
+                  snapId,
+                  Wanxiangshu.Mission.Relay.BatonSource.ExistingWorld
+              ) ]
+
+        let openTx =
+            Wanxiangshu.Mission.Relay.RelayTransaction.create openEvents
+            |> Result.defaultWith (fun _ -> failwith "openTx")
 
         let lifeOpened =
-            Fact.ManagerLifecycle(
-                ManagerLifecycleFact.LifeOpened
-                    {| SessionId = sessionId
-                       LifeId = lifeId
-                       OpeningUserMessageId =
-                        PhysicalUserMessageId.create (text (firstPayload?AuthorityRootUserMessageId))
-                       OpeningTextRef = BlobRef.create "blob:session-reuse-opening"
-                       OpeningTextDigest = BlobDigest.create "sha256:session-reuse-opening"
-                       OpeningCursorSequence = 1L |}
+            Fact.Agent(
+                AgentFact.Relay(
+                    Wanxiangshu.Mission.Relay.RelayFactCases.TransactionCommitted
+                        {| RoadId = roadId
+                           Transaction = openTx |}
+                )
             )
 
+        let retId =
+            Wanxiangshu.Mission.Relay.RetirementId.create ("ret-" + SessionId.value sessionId)
+
+        let batonId =
+            Wanxiangshu.Mission.Relay.BatonId.create ("baton-" + SessionId.value sessionId)
+
+        let cutId =
+            Wanxiangshu.Mission.Relay.ProjectionCutId.create ("cut-" + SessionId.value sessionId)
+
+        let envelopeRelay: Wanxiangshu.Mission.Relay.BatonEnvelope =
+            { SchemaVersion = 1
+              RoadId = Wanxiangshu.Mission.Relay.RoadId.value roadId
+              FromIncumbencyId = Wanxiangshu.Mission.Relay.IncumbencyId.value incId
+              AuthorityRevision = "rev-1"
+              SnapshotId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.value snapId
+              OpenObligations = []
+              EvidenceRefs = [] }
+
+        let cutRelay: Wanxiangshu.Mission.Relay.ProjectionCut =
+            { RetiredIncumbencyId = Wanxiangshu.Mission.Relay.IncumbencyId.value incId
+              ThroughProviderRunId = "run-terminal"
+              ThroughToolCallId = "tool-terminal"
+              StaleProviderRunIds = [] }
+
+        let summary: Wanxiangshu.Mission.Relay.RetirementSummary =
+            { Id = retId
+              IncumbencyId = incId
+              SnapshotId = snapId
+              BatonId = batonId
+              Baton = envelopeRelay
+              ProjectionCutId = cutId
+              ProjectionCut = cutRelay
+              SuccessorRequested = false
+              QualityCandidateAccepted = true }
+
+        let closeEvents =
+            [ Wanxiangshu.Mission.Relay.RelayEvent.RetirementCommitted summary ]
+
+        let closeTx =
+            Wanxiangshu.Mission.Relay.RelayTransaction.create closeEvents
+            |> Result.defaultWith (fun _ -> failwith "closeTx")
+
         let lifeCompleted =
-            Fact.ManagerLifecycle(
-                ManagerLifecycleFact.LifeCompleted
-                    {| SessionId = sessionId
-                       LifeId = lifeId
-                       RequestId = FinalityRequestId.create "finality-session-reuse-a"
-                       TerminalRef = BlobRef.create "blob:session-reuse-terminal"
-                       TerminalDigest = BlobDigest.create "sha256:session-reuse-terminal" |}
+            Fact.Agent(
+                AgentFact.Relay(
+                    Wanxiangshu.Mission.Relay.RelayFactCases.TransactionCommitted
+                        {| RoadId = roadId
+                           Transaction = closeTx |}
+                )
             )
 
         let envelope sequence fact =
@@ -955,66 +997,3 @@ module TemporalSurface =
                afterLife = projectionToJs afterLife
                online = projectionToJs online
                replayed = projectionToJs replayed |}
-
-    let fold (envelopes: obj array) : obj =
-        let rec loop current remaining =
-            match remaining with
-            | [] ->
-                box
-                    {| ok = true
-                       value = projectionToJs current |}
-            | value :: tail ->
-                match Fold.foldEnvelope current (envelopeOfJs value) with
-                | Ok updated -> loop updated tail
-                | Error rejection ->
-                    box
-                        {| ok = false
-                           error = rejectionToJs rejection |}
-
-        loop Fold.empty (envelopes |> Array.toList)
-
-    // ── FallbackProjection's typed transition, exposed as opaque state ───────
-
-    let private fallbackIdentity (value: obj) : FallbackAttemptIdentity =
-        { SessionId = sessionIdOf (value?session)
-          LogicalRunId = logicalRunOf (value?logicalRun)
-          AuthorityRootUserMessageId = authorityRootOf (value?authorityRoot)
-          ProviderRun = providerRunOf (value?providerRun) }
-
-    let private fallbackError (error: FallbackAdvanceRejection) =
-        match error with
-        | FallbackAdvanceRejection.AlreadyObserved -> "AlreadyObserved"
-        | FallbackAdvanceRejection.AlreadyExhausted -> "AlreadyExhausted"
-        | FallbackAdvanceRejection.DifferentRun -> "DifferentRun"
-        | FallbackAdvanceRejection.NoCursor -> "NoCursor"
-        | FallbackAdvanceRejection.InvalidTransition -> "InvalidTransition"
-        | FallbackAdvanceRejection.InvalidFallbackOffset _ -> "InvalidFallbackOffset"
-
-    let fallbackForAuthority (logicalRun: string) (authorityRoot: string) : obj =
-        FallbackHandle(FallbackProjection.forAuthority (logicalRunOf logicalRun) (authorityRootOf authorityRoot)) :> obj
-
-    let fallbackApplyAdvance (identity: obj) (previousOffset: int) (nextOffset: int) (count: int) (current: obj) : obj =
-        let state = (current :?> FallbackHandle).State
-
-        let decodeOffset value =
-            AgentPairCursor.FallbackOffsetCodec.ofByte (byte value)
-
-        match decodeOffset previousOffset, decodeOffset nextOffset with
-        | Error _, _
-        | _, Error _ ->
-            box
-                {| ok = false
-                   error = "InvalidFallbackOffset" |}
-        | Ok previous, Ok next ->
-            match FallbackProjection.applyAdvance (fallbackIdentity identity) previous next count state with
-            | Ok updated ->
-                box
-                    {| ok = true
-                       value = FallbackHandle updated |}
-            | Error error ->
-                box
-                    {| ok = false
-                       error = fallbackError error |}
-
-    let fallbackRead (current: obj) : obj =
-        (current :?> FallbackHandle).State |> fallbackToJs

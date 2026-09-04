@@ -7,6 +7,7 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 
@@ -26,7 +27,7 @@ module MagicTodoMembrane =
 
     type PreparedBridge =
         { ManagerSessionId: SessionId
-          ManagerLifeId: ManagerLifeId
+          IncumbencyId: IncumbencyId
           Prepared: TodoWritePrepared
           PreparedFactRef: EventId
           BaseObligations: ObligationList
@@ -38,7 +39,7 @@ module MagicTodoMembrane =
     /// DSL-class: Decision
     [<RequireQualifiedAccess>]
     type PrepareRejection =
-        | NoOpenManagerLife
+        | NoActiveIncumbency
         | UnexpectedToolName of actual: string
         | SnapshotInputMismatch
         | Admission of MagicTodoReject

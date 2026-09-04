@@ -61,6 +61,30 @@ test('WHAT[CRASH-006] Q04_new_attempt_own_idle_can_send_again', () => {
   assert.deepEqual(quiescence.tryConsume(gate, bPermit), accepted, 'B must be able to send on its own idle')
 })
 
+test('WHAT[CRASH-006] Q04b_transport_idle_waits_for_all_active_tool_bodies', () => {
+  const gate = quiescence.create()
+  quiescence.beginAttempt(gate, S)
+  quiescence.beginTool(gate, S)
+  quiescence.beginTool(gate, S)
+
+  const permit = quiescence.observeIdle(gate, S)
+  assert.deepEqual(
+    quiescence.tryConsume(gate, permit),
+    rejected('NoFreshIdle'),
+    'transport idle alone cannot authorize an idle-derived effect while tools are running',
+  )
+
+  quiescence.endTool(gate, S)
+  assert.deepEqual(quiescence.tryConsume(gate, permit), rejected('NoFreshIdle'), 'one remaining tool still blocks')
+
+  quiescence.endTool(gate, S)
+  assert.deepEqual(
+    quiescence.tryConsume(gate, permit),
+    accepted,
+    'the same exact idle evidence becomes consumable when the final tool body ends',
+  )
+})
+
 test('WHAT[CRASH-006] Q05_new_physical_user_material_revokes_the_previous_idle_before_transform', () => {
   const gate = quiescence.create()
   quiescence.beginAttempt(gate, S)
@@ -183,8 +207,10 @@ test('WHAT[CRASH-008] ESC_P0_3_aborted_attempt_cannot_be_reminted_by_delayed_idl
 test('WHAT[CRASH-006] P4_SURFACE_exports_exact_capability_names', () => {
   assert.deepEqual(Object.getOwnPropertyNames(quiescence).sort(), [
     'beginAttempt',
+    'beginTool',
     'create',
     'dropSession',
+    'endTool',
     'livePermitCount',
     'observeIdle',
     'observePhysicalMessage',

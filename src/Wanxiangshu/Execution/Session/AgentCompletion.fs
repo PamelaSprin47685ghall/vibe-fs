@@ -206,7 +206,7 @@ type RunCompletion =
         /// Unique identity for this run attempt.
         RunId: string
 
-        /// The managed agent name (e.g. "coder", "reviewer").
+        /// The managed agent name (e.g. "coder", "inspector").
         AgentName: string
 
         /// Canonical role of the agent.

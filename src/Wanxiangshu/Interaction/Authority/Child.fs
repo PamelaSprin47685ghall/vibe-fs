@@ -2,7 +2,6 @@ namespace Wanxiangshu.Interaction.Authority
 
 open Wanxiangshu.Change
 open Wanxiangshu.Mission.Obligation
-open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open Wanxiangshu.Composition.Turn
@@ -20,10 +19,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
@@ -90,7 +86,7 @@ module ChildPromptAuthority =
                         snapshot.AgentProjections
                     |> Option.filter (fun claim ->
                         claim.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
-                            PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                                           PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
 
                 let runtime = PromptDispatcher.forJournal durable
                 return! registerLinkedChildIfNeeded runtime turn handle activeProfile accepted

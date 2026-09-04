@@ -118,7 +118,6 @@ export const CONTROL_STATE_EXEMPT = new Set([])
  */
 export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Change/Host/Host.fs',
-  'src/Wanxiangshu/Change/Host/ReviewRunner.fs',
   'src/Wanxiangshu/Change/Host/SessionDirectories.fs',
   'src/Wanxiangshu/Change/Host/Types.fs',
   // JS-native surfaces that are themselves physical adapters. These are
@@ -171,7 +170,6 @@ export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs',
   'src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs',
   'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs',
-  'src/Wanxiangshu/Mission/Manager/Background.fs',
   'src/Wanxiangshu/Mission/Manager/Idle.fs',
   'src/Wanxiangshu/Mission/Manager/JobHandoff.fs',
   'src/Wanxiangshu/Mission/Manager/Workflow.fs',
@@ -179,8 +177,6 @@ export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocalitySurface.fs',
   'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
   'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembraneSurface.fs',
-  'src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs',
-  'src/Wanxiangshu/Mission/Review/Assurance/Surface.fs',
   'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
   'src/Wanxiangshu/Participant/Provider/Projection/Surface.fs',
   'src/Wanxiangshu/Participant/Provider/LanguageSurface.fs',
@@ -265,11 +261,12 @@ export const FORBIDDEN = [
     // Domain evidence DUs / pure queries ending in Pending|Spent|Phase are allowlisted.
     // Physical/algorithm names that merely contain a suffix (EstimatedRunningSeconds,
     // RecoveryStageProbe type alias, Already* fold rejections, Pending* durable fields)
-    // are allowlisted. Residual pattern still catches true stage latches
+    // are allowlisted. Relay incumbency/capability phases are durable domain evidence
+    // and pure capability vocabulary, not stored execution positions. Residual pattern still catches true stage latches
     // (HasPendingCompletion, CompactionProbePending, isRunning-style counters).
     // Verb-named functions (`let clearStalePending agentId =`) are skipped in scanText.
     pattern:
-      /\b(?!PerfectPending\b|isPerfectPending\b|StillPending\b|ConflictPending\b|recoveryBudgetSpent\b|tryTakePending\b|failPending\b|takePending\b|abortPending\b|hasPendingActivation\b|EstimatedRunningSeconds\b|RecoveryStageProbe\b|AlreadyOutstanding\b|AlreadyCounted\b|AlreadyCompleted\b|AlreadyAbandoned\b|AlreadyObserved\b|AlreadyExhausted\b|AlreadyInProgress\b|AlreadyLinkedToOther\b|OpeningAlreadyCaptured\b|TerminalAlreadyCaptured\b|LifeAlreadyOpen\b|FinalityAlreadyActive\b|CompactionAlreadyReanchored\b|PendingConfirmation\b|PendingChallenge\b|PendingClaimUnknown\b|PendingClaims\b|PendingOffer\b|PendingReviewSeals\b|PendingRuns\b|PendingSeal\b|PendingRunCount\b|NoPendingSeal\b)[a-zA-Z]+(?:Stage|Phase|Next|Running|Pending|Spent|Already|Should)\b|\b(HasPendingCompletion|LastCompletionStatus|bloggerTask|bloggerFailed)\b/,
+      /\b(?!PerfectPending\b|isPerfectPending\b|StillPending\b|ConflictPending\b|recoveryBudgetSpent\b|tryTakePending\b|failPending\b|takePending\b|abortPending\b|hasPendingActivation\b|EstimatedRunningSeconds\b|RecoveryStageProbe\b|AlreadyOutstanding\b|AlreadyCounted\b|AlreadyCompleted\b|AlreadyAbandoned\b|AlreadyObserved\b|AlreadyExhausted\b|AlreadyInProgress\b|AlreadyLinkedToOther\b|OpeningAlreadyCaptured\b|TerminalAlreadyCaptured\b|LifeAlreadyOpen\b|FinalityAlreadyActive\b|CompactionAlreadyReanchored\b|PendingConfirmation\b|PendingChallenge\b|PendingClaimUnknown\b|PendingClaims\b|PendingOffer\b|PendingReviewSeals\b|PendingRuns\b|PendingSeal\b|PendingRunCount\b|NoPendingSeal\b|IncumbencyPhase\b|ManagerCapabilityPhase\b|ActivePhase\b|AuditPending\b|DeniedRelayPhase\b|denyRelayPhase\b|permissionsForPhase\b|isAllowedForPhase\b|managerPhase\b|AssessmentNotAllowedInCurrentPhase\b)[a-zA-Z]+(?:Stage|Phase|Next|Running|Pending|Spent|Already|Should)\b|\b(HasPendingCompletion|LastCompletionStatus|bloggerTask|bloggerFailed)\b/,
     label: 'behaviour bool or stage field',
     skipIf: isProcessPhysicalPath,
   },

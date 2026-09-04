@@ -6,7 +6,7 @@ import * as join from '../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurf
 
 const LEGACY_DTO = /\b(status|count|ordinal|kind|agent|code|message)\s*=|\[\[result\]\]|\[error\]/
 const completed = (over = {}) => ({ kind: 'completed', agentId: 'a1', agentName: 'coder', role: 'Coder', runId: 'run-a1', workRecord: '', ...over })
-const failed = (over = {}) => ({ kind: 'failed', agentId: 'a1', agentName: 'reviewer', role: 'Reviewer', runId: 'run-a1', code: 'E1', message: 'boom', ...over })
+const failed = (over = {}) => ({ kind: 'failed', agentId: 'a1', agentName: 'inspector', role: 'Inspector', runId: 'run-a1', code: 'E1', message: 'boom', ...over })
 const pty = (kind, over = {}) => ({ kind, ptyId: 'pty-1', terminalLabel: 'npm test', outcome: 'exit 0', code: '', message: '', ...over, ...(kind ? { kind } : {}) })
 
 const assertClean = (wire, label) => assert.ok(!LEGACY_DTO.test(wire), `${label}: ${wire}`)
@@ -21,14 +21,14 @@ test('WHAT[PARTICIPANT-HORIZON-004] MISC_join_render_batch_agent_completed_natur
 
 test('WHAT[PARTICIPANT-HORIZON-004] MISC_join_render_batch_agent_failed_natural_language_consequence', () => {
   const wire = join.renderBatch('english', [failed({ message: 'no' })])
-  assert.match(wire, /# reviewer could not complete the charge\./)
+  assert.match(wire, /# inspector could not complete the charge\./)
   assert.match(wire, /# no/)
   assertClean(wire, 'failed')
 })
 
 test('WHAT[PARTICIPANT-HORIZON-004] MISC_join_render_batch_agent_abandoned_natural_language', () => {
-  const wire = join.renderBatch('english', [{ kind: 'abandoned', agentId: 'a1', agentName: 'reviewer', reason: 'operator abort' }])
-  assert.match(wire, /# reviewer did not return from this charge\./)
+  const wire = join.renderBatch('english', [{ kind: 'abandoned', agentId: 'a1', agentName: 'inspector', reason: 'operator abort' }])
+  assert.match(wire, /# inspector did not return from this charge\./)
   assertClean(wire, 'abandoned')
 })
 

@@ -39,7 +39,6 @@
         "src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.fs",
         "src/Wanxiangshu/Persistence/Journal/ObligationJournalSurface.fs",
         "src/Wanxiangshu/Persistence/Journal/PromptFactCodec.fs",
-        "src/Wanxiangshu/Persistence/Journal/ReviewJournalSurface.fs",
         "src/Wanxiangshu/Persistence/Journal/RevisionSurface.fs",
         "src/Wanxiangshu/Persistence/Journal/RuntimePath.fs",
         "src/Wanxiangshu/Persistence/Journal/SharedAgentJournal.fs",
@@ -120,28 +119,88 @@
       "publishes": []
     },
     {
-      "id": "review-assurance-witness-contract",
+      "id": "host-provider-run-binding-cutover",
       "state": "DONE",
       "files": [
-        "src/Wanxiangshu/Composition/Turn/Workflow.fs",
-        "src/Wanxiangshu/Mission/Review/Assurance/Surface.fs",
-        "src/Wanxiangshu/Mission/Review/Barrier/Projection.fs",
-        "src/Wanxiangshu/Mission/Review/Barrier/Reverify.fs",
-        "src/Wanxiangshu/Mission/Review/Barrier/Workflow.fs",
-        "src/Wanxiangshu/Mission/Review/OpenCode/HostGuard.fs",
-        "src/Wanxiangshu/Mission/Review/OpenCode/JudgementInbox.fs",
-        "src/Wanxiangshu/Mission/Review/OpenCode/ReviewHostSurface.fs",
         "src/Wanxiangshu/OpenCode/Host/ProviderRunBinding.fs",
         "src/Wanxiangshu/OpenCode/Host/ProviderRunBindingSurface.fs",
         "src/Wanxiangshu/OpenCode/Host/SharedState.fs"
       ],
       "proofs": [
-        "requirements/review-assurance/tests/consumable-review.test.mjs",
-        "requirements/review-judgement/tests/process-review-judgement.test.mjs"
+        "requirements/host-boundary/tests/host010-run-id-equivalence.test.mjs"
       ],
       "publishes": [
-        "Review.Witness",
-        "Review.CandidateContract"
+        "Host.ProviderRunBinding",
+        "Host.SharedState"
+      ]
+    },
+    {
+      "id": "relay-incumbency-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Mission/Relay/Contract.fs",
+        "src/Wanxiangshu/Mission/Relay/Facts.fs",
+        "src/Wanxiangshu/Mission/Relay/Fold.fs",
+        "src/Wanxiangshu/Mission/Relay/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/relay-incumbency/tests/fold.test.mjs",
+        "requirements/relay-incumbency/tests/authority-update-host.test.mjs"
+      ],
+      "publishes": [
+        "Relay.Incumbency"
+      ]
+    },
+    {
+      "id": "relay-assessment-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Mission/Relay/Assessment/Model.fs",
+        "src/Wanxiangshu/Mission/Relay/Assessment/Surface.fs",
+        "src/Wanxiangshu/Mission/Relay/OpenCode/ReviewTool.fs",
+        "src/Wanxiangshu/Mission/Relay/OpenCode/WorkspaceSnapshot.fs"
+      ],
+      "proofs": [
+        "requirements/relay-assessment/tests/certificate.test.mjs",
+        "requirements/relay-incumbency/tests/authority-update-host.test.mjs"
+      ],
+      "publishes": [
+        "Relay.Assessment",
+        "Relay.ReviewTool",
+        "Relay.WorkspaceSnapshot"
+      ]
+    },
+    {
+      "id": "relay-retirement-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Composition/Turn/Workflow.fs",
+        "src/Wanxiangshu/Mission/Manager/Workflow.fs",
+        "src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs",
+        "src/Wanxiangshu/Mission/Relay/Retirement/Surface.fs"
+      ],
+      "proofs": [
+        "requirements/relay-retirement/tests/nudge.test.mjs",
+        "requirements/change-integration/tests/gate-scope.test.mjs"
+      ],
+      "publishes": [
+        "Relay.Retirement",
+        "Relay.SuicideTool",
+        "Relay.TurnWorkflow"
+      ]
+    },
+    {
+      "id": "relay-context-projection-cutover",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/Mission/Relay/OpenCode/NarrativeTransform.fs",
+        "src/Wanxiangshu/Mission/Relay/ProjectionSurface.fs"
+      ],
+      "proofs": [
+        "requirements/relay-context-projection/tests/projection-cut.test.mjs"
+      ],
+      "publishes": [
+        "Relay.ContextProjection"
       ]
     },
     {
@@ -217,24 +276,6 @@
       ],
       "publishes": [
         "OpenCode.HostSignalBootstrap"
-      ]
-    },
-    {
-      "id": "mission-finality-cutover",
-      "state": "DONE",
-      "files": [
-        "src/Wanxiangshu/Mission/Finality/Blessing.fs",
-        "src/Wanxiangshu/Mission/Finality/Cohort.fs",
-        "src/Wanxiangshu/Mission/Finality/Ports.fs",
-        "src/Wanxiangshu/Mission/Finality/Workflow.fs"
-      ],
-      "proofs": [
-        "requirements/finality/tests/lifecycle.test.mjs",
-        "requirements/finality/tests/blessing-admission.test.mjs"
-      ],
-      "publishes": [
-        "Finality.Contract",
-        "Finality.Witness"
       ]
     },
     {
@@ -441,7 +482,6 @@
         "src/Wanxiangshu/Change/Fold.fs",
         "src/Wanxiangshu/Change/Host/GitAdapter.fs",
         "src/Wanxiangshu/Change/Host/Host.fs",
-        "src/Wanxiangshu/Change/Host/ReviewRunner.fs",
         "src/Wanxiangshu/Change/Host/SessionDirectories.fs",
         "src/Wanxiangshu/Change/Host/Surface.fs",
         "src/Wanxiangshu/Change/Host/Types.fs",
@@ -498,46 +538,10 @@
       ]
     },
     {
-      "id": "mission-finality-keep",
-      "state": "DONE",
-      "files": [
-        "src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs",
-        "src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs",
-        "src/Wanxiangshu/Mission/Finality/Prompt.fs",
-        "src/Wanxiangshu/Mission/Finality/PromptSurface.fs",
-        "src/Wanxiangshu/Mission/Finality/Record.fs",
-        "src/Wanxiangshu/Mission/Finality/Revision.fs",
-        "src/Wanxiangshu/Mission/Finality/Types.fs",
-        "src/Wanxiangshu/Mission/Manager/Background.fs",
-        "src/Wanxiangshu/Mission/Manager/Finality.fs",
-        "src/Wanxiangshu/Mission/Manager/FinalitySurface.fs",
-        "src/Wanxiangshu/Mission/Manager/Idle.fs",
-        "src/Wanxiangshu/Mission/Manager/JobHandoff.fs",
-        "src/Wanxiangshu/Mission/Manager/Life/Admission.fs",
-        "src/Wanxiangshu/Mission/Manager/Life/Facts.fs",
-        "src/Wanxiangshu/Mission/Manager/Life/Projection.fs",
-        "src/Wanxiangshu/Mission/Manager/Life/Prompt.fs",
-        "src/Wanxiangshu/Mission/Manager/Life/Workflow.fs",
-        "src/Wanxiangshu/Mission/Manager/Narrative.fs",
-        "src/Wanxiangshu/Mission/Manager/OpenCode/NarrativeTransform.fs",
-        "src/Wanxiangshu/Mission/Manager/Workflow.fs"
-      ],
-      "proofs": [
-        "requirements/finality/tests/blessing-admission.test.mjs",
-        "requirements/finality/tests/lifecycle.test.mjs",
-        "requirements/finality/tests/manager-finality-disposition.test.mjs"
-      ],
-      "publishes": [
-        "Finality.Contract",
-        "Mission.Manager.Life"
-      ]
-    },
-    {
       "id": "mission-obligation-keep",
       "state": "DONE",
       "files": [
-        "src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs",
-        "src/Wanxiangshu/Mission/Obligation/Todo/FinalityCohort.fs",
+        "src/Wanxiangshu/Mission/Manager/Narrative.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocalitySurface.fs",
@@ -561,37 +565,6 @@
       "publishes": [
         "Obligation.LedgerContract",
         "MagicTodo.Surface"
-      ]
-    },
-    {
-      "id": "mission-review-judgement-keep",
-      "state": "DONE",
-      "files": [
-        "src/Wanxiangshu/Mission/Review/Fact.fs",
-        "src/Wanxiangshu/Mission/Review/Facts.fs",
-        "src/Wanxiangshu/Mission/Review/Judgement/Challenge.fs",
-        "src/Wanxiangshu/Mission/Review/Judgement/Continuation.fs",
-        "src/Wanxiangshu/Mission/Review/Judgement/Evidence.fs",
-        "src/Wanxiangshu/Mission/Review/Judgement/RequestIdentity.fs",
-        "src/Wanxiangshu/Mission/Review/Judgement/Verdict.fs",
-        "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
-        "src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs",
-        "src/Wanxiangshu/Mission/Review/OpenCode/JudgeSurface.fs",
-        "src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs",
-        "src/Wanxiangshu/Mission/Review/OpenCode/TerminalAwait.fs",
-        "src/Wanxiangshu/Mission/Review/Ports.fs",
-        "src/Wanxiangshu/Mission/Review/Prompt.fs",
-        "src/Wanxiangshu/Mission/Review/ReviewFactFold.fs",
-        "src/Wanxiangshu/Mission/Review/ReviewTodoSurface.fs"
-      ],
-      "proofs": [
-        "requirements/review-judgement/tests/process-review-judgement.test.mjs",
-        "requirements/review-judgement/tests/judge-tool-contract.test.mjs",
-        "requirements/review-judgement/tests/verdict-tool.test.mjs"
-      ],
-      "publishes": [
-        "Review.Judgement.Workflow",
-        "Review.JudgeTool"
       ]
     },
     {
@@ -660,22 +633,6 @@
       "publishes": [
         "ExternalInvestigation.McpConfig",
         "ExternalInvestigation.McpConfigSurface"
-      ]
-    },
-    {
-      "id": "finality-review-cohort-keep",
-      "state": "DONE",
-      "files": [
-        "src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs"
-      ],
-      "proofs": [
-        "requirements/finality/tests/finality-cohort-law.test.mjs"
-      ],
-      "publishes": [
-        "FinalityReviewCohort.rosterOf",
-        "FinalityReviewCohort.graduatedReviewer",
-        "FinalityReviewCohort.CohortSlot",
-        "FinalityReviewCohort.ReviewerOutcome"
       ]
     },
     {

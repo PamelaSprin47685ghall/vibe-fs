@@ -57,20 +57,31 @@ test('WHAT[CHGINT-009] HOST_ContinueManagerJob_has_no_detached_pending_waiter', 
   assert.doesNotMatch(source, /awaitCurrentPendingRun\s+agentId\s*\|>\s*ignore/)
 })
 
-test('WHAT[CHGINT-009] conflict resumption continues the existing Manager authority', () => {
+test('WHAT[CHGINT-009] same-road charge advances Relay authority instead of resuming an old Manager', () => {
   const source = readFileSync(new URL('../../../src/Wanxiangshu/Change/Host/Host.fs', import.meta.url), 'utf8')
-  const resume = source.slice(source.indexOf('let resumeManager'), source.indexOf('let terminateChildren'))
+  const start = source.indexOf('member _.ContinueManagerJob')
+  const end = source.indexOf('/// EXEC-019', start)
+  const continuation = source.slice(start, end)
+  const advanceStart = source.indexOf('let advanceAuthorityRevision')
+  const advanceEnd = source.indexOf('let continueManagerJobCore', advanceStart)
+  const advance = source.slice(advanceStart, advanceEnd)
 
-  assert.match(resume, /HostSessionNudge\.sendContinuation/)
-  assert.match(resume, /PromptAuthority\.ContinuationKind\.ManagedDelegationAssignment/)
-  assert.doesNotMatch(resume, /runtime\.Fork/)
+  assert.ok(start >= 0 && end > start)
+  assert.ok(advanceStart >= 0 && advanceEnd > advanceStart)
+  assert.match(continuation, /continueManagerJobCore jobId prompt callerProviderRun callerToolCallId/)
+  assert.match(advance, /trySendGateContinuationPhysical/)
+  assert.match(advance, /PromptAuthority\.ContinuationKind\.ManagedDelegationAssignment/)
+  assert.match(advance, /RelayEvent\.AuthorityRevisionAdvanced/)
+  assert.doesNotMatch(source, /HostSessionNudge\.sendContinuation\b/)
+  assert.doesNotMatch(source, /ResumeManager|resumeManager/)
 })
 
 test('WHAT[CHGINT-009] HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', () => {
   let projection = change.createJob(change.empty(), job('hostfw8', '/tmp/wt-hostfw8'))
   projection = change.recordFact(projection, 'hostfw8', change.fact('CandidateReady', {
     candidateCommit: 'c1',
-    preRebaseReviewBarrierId: 'bar1',
+    workspaceSnapshotId: 'snapshot-1',
+    qualityCertificateId: 'certificate-1',
   }))
   const continued = change.find(projection, 'hostfw8')
   assert.equal(continued.worktreePath, '/tmp/wt-hostfw8')
@@ -101,25 +112,18 @@ test('WHAT[CHGINT-006] HOST_awaitManager_stages_the_worktree_after_a_completed_m
   await change.worktreeDispose(resource.value)
 })
 
-test('WHAT[CHGINT-005] HOST_resumeManager_unknown_job_is_rejected', () => {
+test('WHAT[CHGINT-006] HOST_unknown_road_has_no_durable_job_to_continue', () => {
   assert.equal(change.find(change.empty(), 'hostfw11'), null)
 })
 
-test('WHAT[CHGINT-004] HOST_terminateChildren_tears_down_manager_and_reviewer_children', () => {
-  const children = new Map([
-    ['hostfw13', 'ses_mgr'],
-    ['hostfw13-reviewer-bar1', 'ses_rev'],
-    ['unrelated-agent', 'ses_other'],
-  ])
-  const aborted = []
-  for (const [id, session] of children) {
-    if (id === 'hostfw13' || id.startsWith('hostfw13-reviewer-')) {
-      aborted.push(session)
-      children.delete(id)
-    }
-  }
-  assert.deepEqual(aborted.sort(), ['ses_mgr', 'ses_rev'].sort())
-  assert.equal(children.has('hostfw13'), false)
-  assert.equal(children.has('hostfw13-reviewer-bar1'), false)
-  assert.equal(children.has('unrelated-agent'), true, 'other children survive')
+test('WHAT[CHGINT-004] HOST_terminateRoadResources_has_no_reviewer_specific_child_namespace', () => {
+  const source = readFileSync(new URL('../../../src/Wanxiangshu/Change/Host/Host.fs', import.meta.url), 'utf8')
+  const start = source.indexOf('let terminateRoadResources')
+  const end = source.indexOf('let relayPort', start)
+  const termination = source.slice(start, end)
+
+  assert.ok(start >= 0 && end > start)
+  assert.match(termination, /managerAgentId jobId/)
+  assert.match(termination, /teardownChildren/)
+  assert.doesNotMatch(termination, /reviewer|review-barrier|ReviewBarrier/i)
 })

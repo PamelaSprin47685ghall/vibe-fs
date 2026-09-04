@@ -2,7 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Review
+open Wanxiangshu.Git
 open Wanxiangshu.Persistence.Journal
 
 module PluginHost =
@@ -15,8 +15,6 @@ module PluginHost =
     /// corruption is a load error; a domain fold rejection only disables the journal
     /// capability for this plugin instance.
     val createJournal: input: obj -> Task<Result<AgentJournal option, string>>
-
-    val gitTreePortFromInput: input: obj -> GitTreePort option
 
     val createHost:
         input: obj ->

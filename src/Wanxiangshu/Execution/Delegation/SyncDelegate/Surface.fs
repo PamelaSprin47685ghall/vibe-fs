@@ -587,11 +587,9 @@ module SyncDelegateSurface =
                     { new IRootWorkspaceReader with
                         member _.TryRead() = Some directory },
                     Some journal,
-                    None,
                     Some directory,
                     Dictionary<string, string>(),
                     (fun _ -> None),
-                    HashSet<string>(),
                     Dictionary<string, string>(),
                     None,
                     None,

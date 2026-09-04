@@ -91,13 +91,12 @@ test('WHAT[INTERACTION-AUTHORITY-005] IA_005_every_continuation_kind_is_parseabl
     'InteractionRepair',
     'JoinGuard',
     'ManagerGuard',
-    'ReviewerGuard',
     'BusyAgentNudge',
+    'HumanMessage',
+    'ManagedDelegationAssignment',
     'ProviderRetryAttempt',
     'DegenerationGuard',
-    'ManagerIdleEncouragement',
-    'FinalityRejected',
-    'FinalitySteer',
+    'FissionHandoff',
   ]
 
   for (const kind of kinds) {
@@ -112,7 +111,7 @@ test('WHAT[INTERACTION-AUTHORITY-008] IA_008_resolution_order_is_accepted_then_c
   const root = rootFor('coder', 'msg_u1', 'AgentOwnerRoot')
   let state = register(root)
 
-  const claimed = authority.claimContinuation('pk_claimed', 'ses_a', 'ReviewerGuard', root, 'coder', 'pd-c')
+  const claimed = authority.claimContinuation('pk_claimed', 'ses_a', 'ManagerGuard', root, 'coder', 'pd-c')
   state = authority.registerClaim(claimed, state)
   const accepted = authority.claimContinuation('pk_accepted', 'ses_a', 'BusyAgentNudge', root, 'coder', 'pd-a')
   state = authority.registerClaim(accepted, state)

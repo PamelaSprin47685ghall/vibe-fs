@@ -51,9 +51,6 @@ module JoinResultRenderer =
         val OrchestratorRejectedDirty: string = "tool/join/orchestrator-rejected-dirty"
 
         [<Literal>]
-        val OrchestratorNeedsReview: string = "tool/join/orchestrator-needs-review"
-
-        [<Literal>]
         val OrchestratorIntegrationFailed: string = "tool/join/orchestrator-integration-failed"
 
         [<Literal>]

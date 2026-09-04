@@ -48,6 +48,60 @@ const REQUEST_KIND_SWITCHED = body(
   ['read', 'write', 'return'],
 );
 
+const RELAY_CONTEXT_OPENED = body(
+  'test-model',
+  [
+    SYSTEM,
+    user('[RelayContext]\nauthority_revision=rev-1\nphase=WorkOwned\n[/RelayContext]'),
+    assistant('Assessment evidence.'),
+    user('Round 1'),
+    assistant('review call and result'),
+  ],
+);
+
+const RELAY_CONTEXT_REVISED = body(
+  'test-model',
+  [
+    SYSTEM,
+    user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-1\nphase=PerfectAwaitingRetirement\n[/RelayContext]'),
+    user('Round 1'),
+    assistant('review call and result'),
+  ],
+);
+
+const RELAY_CONTEXT_BEFORE_REVISION = body(
+  'test-model',
+  [
+    SYSTEM,
+    user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-1\nphase=AuditPending\n[/RelayContext]'),
+    user('Round 1'),
+  ],
+);
+
+const RELAY_RETIRED_CONTEXT = body(
+  'test-model',
+  [
+    SYSTEM,
+    user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=none\nphase=Retired\n[/RelayContext]'),
+    user('Round 1'),
+    assistant('review call and result'),
+    {
+      role: 'tool',
+      tool_call_id: 'suicide-call',
+      content: 'retired = true\nquality_candidate_accepted = false',
+    },
+  ],
+);
+
+const RELAY_SUCCESSOR_CUT = body(
+  'test-model',
+  [
+    SYSTEM,
+    user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-2\nphase=AuditPending\n[/RelayContext]'),
+    user('# The previous Manager incumbency is retired. You are the new Manager for the same user Road.'),
+  ],
+);
+
 const decide = (previous, next, boundary = null) =>
   sealDecision({ previousWire: previous === null ? null : wireOf(previous), body: next, boundary });
 
@@ -229,6 +283,147 @@ export const coldBoundaryCases = [
     },
   },
 
+  // ── Relay typed-context opening ─────────────────────────────────────────
+
+  {
+    name: 'RELAY-PROJ opening typed Relay context preserves the prior transcript',
+    fn: () => {
+      assertEq(
+        decide(FIRST, RELAY_CONTEXT_OPENED, at('relay-context-open')).resealed,
+        'relay-context-open',
+      );
+    },
+  },
+
+  {
+    name: 'RELAY-PROJ a Relay context boundary may not rewrite prior messages or tools',
+    fn: () => {
+      const rewritten = body(
+        'test-model',
+        [SYSTEM, user('[RelayContext]\nphase=WorkOwned\n[/RelayContext]'), user('DIFFERENT')],
+      );
+      assertEq(
+        decide(FIRST, rewritten, at('relay-context-open')).broken,
+        'relay-context-open-rewrote-fixed',
+      );
+
+      const retooled = body(
+        'test-model',
+        RELAY_CONTEXT_OPENED.messages,
+        ['write', 'read'],
+      );
+      assertEq(
+        decide(FIRST, retooled, at('relay-context-open')).broken,
+        'relay-context-open-rewrote-fixed',
+      );
+    },
+  },
+
+  {
+    name: 'RELAY-PROJ a phase revision changes only the typed context plus appended evidence',
+    fn: () => {
+      assertEq(
+        decide(RELAY_CONTEXT_BEFORE_REVISION, RELAY_CONTEXT_REVISED, at('relay-context-revision')).resealed,
+        'relay-context-revision',
+      );
+    },
+  },
+
+  {
+    name: 'RELAY-PROJ a phase revision may not masquerade as an incumbency change',
+    fn: () => {
+      const changedIncumbency = body(
+        'test-model',
+        [
+          SYSTEM,
+          user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-2\nphase=WorkOwned\n[/RelayContext]'),
+          user('Round 1'),
+        ],
+      );
+      assertEq(
+        decide(RELAY_CONTEXT_BEFORE_REVISION, changedIncumbency, at('relay-context-revision')).broken,
+        'relay-context-revision-rewrote-fixed',
+      );
+    },
+  },
+
+  {
+    name: 'RELAY-PROJ retirement context requires accepted suicide and removes the active incumbency',
+    fn: () => {
+      const before = body(
+        'test-model',
+        [
+          SYSTEM,
+          user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-1\nphase=RetirementCleanupBlocked\n[/RelayContext]'),
+          user('Round 1'),
+          assistant('review call and result'),
+        ],
+      );
+      assertEq(
+        decide(before, RELAY_RETIRED_CONTEXT, at('relay-retirement-context')).resealed,
+        'relay-retirement-context',
+      );
+
+      const noAcceptedSuicide = body('test-model', RELAY_RETIRED_CONTEXT.messages.slice(0, -1));
+      assertEq(
+        decide(before, noAcceptedSuicide, at('relay-retirement-context')).broken,
+        'relay-retirement-context-rewrote-fixed',
+      );
+    },
+  },
+
+  {
+    name: 'RELAY-PROJ a declared successor cut requires a new incumbency and the successor prompt',
+    fn: () => {
+      assertEq(
+        decide(RELAY_CONTEXT_BEFORE_REVISION, RELAY_SUCCESSOR_CUT, at('relay-successor-cut')).resealed,
+        'relay-successor-cut',
+      );
+      const missingPrompt = body('test-model', RELAY_SUCCESSOR_CUT.messages.slice(0, 2));
+      assertEq(
+        decide(RELAY_CONTEXT_BEFORE_REVISION, missingPrompt, at('relay-successor-cut')).broken,
+        'relay-successor-cut-rewrote-fixed',
+      );
+    },
+  },
+
+  {
+    name: 'RELAY-PROJ a successor cut may only retain an ordered subset of predecessor material',
+    fn: () => {
+      const insertedHistory = body(
+        'test-model',
+        [
+          SYSTEM,
+          user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-2\nphase=AuditPending\n[/RelayContext]'),
+          user('ARBITRARY PREDECESSOR-LIKE USER MESSAGE'),
+          user('# The previous Manager incumbency is retired. You are the new Manager for the same user Road.'),
+        ],
+      );
+      assertEq(
+        decide(RELAY_CONTEXT_BEFORE_REVISION, insertedHistory, at('relay-successor-cut')).broken,
+        'relay-successor-cut-rewrote-fixed',
+      );
+
+      const leakedRetirementResult = body(
+        'test-model',
+        [
+          SYSTEM,
+          user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-2\nphase=AuditPending\n[/RelayContext]'),
+          {
+            role: 'tool',
+            tool_call_id: 'suicide-call',
+            content: 'retired = true\nquality_candidate_accepted = false',
+          },
+          user('# The previous Manager incumbency is retired. You are the new Manager for the same user Road.'),
+        ],
+      );
+      assertEq(
+        decide(RELAY_CONTEXT_BEFORE_REVISION, leakedRetirementResult, at('relay-successor-cut')).broken,
+        'relay-successor-cut-rewrote-fixed',
+      );
+    },
+  },
+
   // ── a declaration that never fires is also fatal ─────────────────────────
 
   {
@@ -316,6 +511,10 @@ export const coldBoundaryCases = [
       assertEq(validateBoundary(at('prefix-probe')).length, 0);
       assertEq(validateBoundary(at('frame-commit')).length, 0);
       assertEq(validateBoundary(at('request-kind-switch')).length, 0);
+      assertEq(validateBoundary(at('relay-context-open')).length, 0);
+      assertEq(validateBoundary(at('relay-context-revision')).length, 0);
+      assertEq(validateBoundary(at('relay-retirement-context')).length, 0);
+      assertEq(validateBoundary(at('relay-successor-cut')).length, 0);
 
       // Every rejected name below is a sniffed exemption from the old matcher or a
       // capacity-driven switch CTX-001/CTX-002 forbid outright. `prefix-reset` is the

@@ -15,9 +15,6 @@ test('WHAT[MANAGED-SESSION-018] shutdown detaches session runtimes before journa
   const observer = read('src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs')
   const scheduler = read('src/Wanxiangshu/Composition/Turn/Scheduler.fs')
   const bootstrap = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
-  const finalityPorts = read('src/Wanxiangshu/Mission/Finality/Ports.fs')
-  const finalityBlessing = read('src/Wanxiangshu/Mission/Finality/Blessing.fs')
-  const finalityHostPort = read('src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs')
 
   assert.match(scope, /abstract DisposeSession: string -> Task/)
   assert.match(scope, /abstract DisposeExecutorRuntime: string -> Task/)
@@ -41,10 +38,6 @@ test('WHAT[MANAGED-SESSION-018] shutdown detaches session runtimes before journa
   assert.match(scheduler, /not accepting \|\| isDurableUnavailable \(\)/)
   assert.match(scheduler, /if isDurableUnavailable \(\) then\s*closeAdmission \(\)/)
   assert.match(bootstrap, /durableUnavailable = Some\(fun \(\) -> journal \|> Option\.exists AgentJournal\.isPoisoned\)/)
-  assert.match(finalityPorts, /AbortReviewer: SessionId -> Task/)
-  assert.match(finalityBlessing, /do! FinalityReviewerPort\.abortAll reviewerPort members/)
-  assert.match(finalityHostPort, /let! _ = scope\.Sessions\.InterruptAttempt reviewerSessionId/)
-  assert.doesNotMatch(finalityHostPort, /AbortReviewer[\s\S]{0,160}InterruptAttempt reviewerSessionId \|> ignore/)
 })
 
 test('WHAT[MANAGED-SESSION-009] provider transform is admitted into plugin shutdown ownership', () => {

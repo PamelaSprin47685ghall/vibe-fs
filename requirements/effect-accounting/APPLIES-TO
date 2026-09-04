@@ -7,8 +7,8 @@
 /src/Wanxiangshu/Change/Runtime.fs
 /src/Wanxiangshu/Execution/Delegation/Facts.fs
 /src/Wanxiangshu/Execution/Delegation/Fact.fs
-/src/Wanxiangshu/Mission/Manager/Life/Facts.fs
-/src/Wanxiangshu/Mission/Manager/Life/Projection.fs
+/src/Wanxiangshu/Mission/Relay/Facts.fs
+/src/Wanxiangshu/Mission/Relay/ProjectionSurface.fs
 /src/Wanxiangshu/Repository/Programming/Js/Transaction.fs
 /src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs
 /src/Wanxiangshu/Persistence/Journal/FactCodec.fs

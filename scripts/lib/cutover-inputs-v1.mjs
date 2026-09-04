@@ -46,7 +46,6 @@ const EXCLUDED_CUTOVER_PATHS = new Set([
   'docs/OWNER-CONTRACT-SLICE-ADJUDICATION-WORKSHEET.json',
   'docs/OWNER-CONTRACT-SLICE-ADJUDICATIONS.json',
 ])
-
 const canonicalPath = (value, reason, violations) => {
   try {
     return assertRepositoryPathV1(value, '$.cutover_path')
@@ -56,7 +55,7 @@ const canonicalPath = (value, reason, violations) => {
   }
 }
 
-const valuesOfMap = (map, key) => map.get(key)
+const valuesOfMap = (map, key) => map instanceof Map ? map.get(key) : map?.[key]
 
 const uniquePaths = (values, duplicateReason, violations) => {
   const paths = []
@@ -232,7 +231,6 @@ export const resolveCutoverInputClosureV1 = (input) => {
       violations: sortedViolations(violations),
     }
   }
-
   for (const readPath of uniquePaths(trackedReadPaths, 'duplicate-tracked-read', violations)) {
     if (!closure.has(readPath) && !outputSet.has(readPath)) violations.push(violation(readPath, 'unclosed-read'))
   }
@@ -366,6 +364,7 @@ export const validateCutoverInputStateV1 = (state) => {
   return { index_rows: indexRows, violations: sortedViolations(violations) }
 }
 
+
 const terminalClassification = (value) => exactKeys(value, ['case', 'payload'])
   && ['private', 'contract-shared', 'contract-bounded', 'runtime-effect', 'adapter-effect', 'composition-terminal'].includes(value.case)
   && exactKeys(value.payload, [])
@@ -426,7 +425,6 @@ export const buildFreshMigrationWorksheetV1 = (candidates) => {
     })),
   }
 }
-
 export const validateMigrationWorksheetV1 = (worksheet) => {
   const schemaViolation = (path) => [{ code: 'migration-worksheet-schema', path, reason: 'unknown-or-missing-key' }]
   if (!exactKeys(worksheet, ['schema_version', 'purpose', 'records']) || worksheet.schema_version !== 1 || worksheet.purpose !== 'm6.3b-migration-only' || !Array.isArray(worksheet.records)) return schemaViolation('$')

@@ -6,6 +6,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Foundation.Identity
@@ -249,6 +250,29 @@ type HostToolArguments internal (raw: obj) =
         | None -> Ok None
         | Some value -> HostArgDecode.nonNegativeIntegerFromValue value
 
+    member _.ExactBoundedIntegers(names: string list, minimum: int, maximum: int) =
+        let validateRange name score =
+            if score < minimum || score > maximum then
+                Error(sprintf "%s must be between %d and %d" name minimum maximum)
+            else
+                Ok(name, score)
+
+        let boundedInteger name =
+            let value = raw?(name)
+            let valid: bool = emitJsExpr value "Number.isInteger($0)"
+
+            if not valid then
+                Error(sprintf "%s must be an integer" name)
+            else
+                value |> unbox<float> |> int |> validateRange name
+
+        if isNull raw then
+            Error "arguments must be an object"
+        elif emitJsExpr raw "Object.keys($0)" |> Set.ofArray <> (names |> Set.ofList) then
+            Error "arguments must contain exactly the required fields"
+        else
+            names |> List.traverseResultM boundedInteger
+
     member _.OptionalBool(name: string) =
         HostIngressCodec.optionalObjectProperty raw name
         |> Option.bind HostArgDecode.tryBoolFromValue
@@ -303,6 +327,9 @@ module ToolHostCodec =
 
     [<Emit("$0.schema.number().describe($1)")>]
     let private rawNumberSchemaDescribed (tool: obj) (description: string) : obj = jsNative
+
+    [<Emit("$0.schema.number().int().min($1).max($2).describe($3)")>]
+    let private rawBoundedIntegerSchema (tool: obj) (minimum: int) (maximum: int) (description: string) : obj = jsNative
 
     [<Emit("$0.schema.boolean()")>]
     let private rawBooleanSchema (tool: obj) : obj = jsNative
@@ -430,6 +457,9 @@ module ToolHostCodec =
 
     let numberSchemaDescribed description (HostToolFactory factory) =
         HostSchema(rawNumberSchemaDescribed factory description)
+
+    let boundedIntegerSchema minimum maximum description (HostToolFactory factory) =
+        HostSchema(rawBoundedIntegerSchema factory minimum maximum description)
 
     let boolSchema (HostToolFactory factory) = HostSchema(rawBooleanSchema factory)
 

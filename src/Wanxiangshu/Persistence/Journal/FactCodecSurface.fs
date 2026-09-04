@@ -9,6 +9,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Change
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Participant.Persona
 
 /// JS-native owner surface for decode-only journal fact compatibility.
@@ -219,7 +220,7 @@ module FactCodecSurface =
                         {| ManagerJobId = ManagerJobId.create (text (payload?ManagerJobId))
                            RebasedCommit = CommitHash.create (text (payload?RebasedCommit))
                            TargetHeadSnapshot = CommitHash.create (text (payload?TargetHeadSnapshot))
-                           PostRebaseReviewBarrierId = ReviewBarrierId.create (text (payload?PostRebaseReviewBarrierId)) |}
+                           WorkspaceSnapshotId = WorkspaceSnapshotId.create (text (payload?WorkspaceSnapshotId)) |}
                 )
             )
         | "Orchestrator", "Published" ->

@@ -4,7 +4,6 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Review
 open Wanxiangshu.Persistence.Journal
 
 /// Lazy journal recovery for persisted ManagerJobs.
@@ -16,21 +15,11 @@ open Wanxiangshu.Persistence.Journal
 /// No recovery prompt is built here. ORCH-006 does not persist the Manager's prompt,
 /// and ORCH-007 decides the resume action from the last durable fact.
 module OrchestratorManagerJob =
-
-    /// Register worktree directories for a job's Manager and its reviewer.
-    ///
-    /// The reviewer's runtime agent id is `<job>-reviewer`, matching
-    /// `OrchestratorHost.runReviewerOnce`. Spelled through `reviewerAgentId` so the
-    /// two cannot drift while both still compile.
-    let reviewerAgentId (jobId: ManagerJobId) =
-        sprintf "%s-reviewer" (ManagerJobId.value jobId)
-
     let recoverJobs
         (journal: AgentJournal)
         (orchestratorId: SessionId)
         (worktrees: Dictionary<string, string>)
         (registerChildDirectory: SessionId -> string -> unit)
-        (registerReviewerTree: string -> GitTreePort -> unit)
         (engine: Orchestrator)
         : Task<unit> =
         task {
@@ -45,14 +34,8 @@ module OrchestratorManagerJob =
             for job in active do
                 let path = WorktreePath.value job.WorktreePath
                 worktrees.[ManagerJobId.value job.ManagerJobId] <- path
-                worktrees.[reviewerAgentId job.ManagerJobId] <- path
 
-            OrchestratorSessionDirectories.registerRestored
-                snapshot
-                orchestratorId
-                worktrees
-                registerChildDirectory
-                registerReviewerTree
+            OrchestratorSessionDirectories.registerRestored snapshot orchestratorId worktrees registerChildDirectory
 
             for job in active do
                 engine.RecoverManagerJob job

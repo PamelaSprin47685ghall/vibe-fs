@@ -18,10 +18,8 @@ open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
+
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
@@ -77,8 +75,6 @@ type PluginSessionScope() =
     member val Companions = Dictionary<string, CompanionHost>()
     // DSL-MUTABLE: resource — lock gate object for companion operations.
     member val CompanionGate = obj ()
-    // DSL-MUTABLE: resource — alias to SharedState verdict session set.
-    member val VerdictSubmissions = SharedState.VerdictSubmissions
     // DSL-MUTABLE: single-flight — per-instance nudge sent set.
     member val NudgeSent = HashSet<string>()
     // DSL-MUTABLE: single-flight — per-instance join guard nudge set.
@@ -132,12 +128,6 @@ type PluginSessionScope() =
         SessionExecutionBinding.drop (SessionId.create sessionId)
         this.SessionDirectories.Remove sessionId |> ignore
         let sid = SessionId.create sessionId
-
-        this.VerdictSubmissions
-        |> Seq.filter (JudgementRequestIdentity.belongsTo sid)
-        |> Seq.toArray
-        |> Array.iter (fun request -> this.VerdictSubmissions.Remove request |> ignore)
-
 
         if preserveIdentity then
             retainedSessionIdentities.Add sessionId |> ignore

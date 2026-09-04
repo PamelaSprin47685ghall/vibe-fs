@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>host-provider-failure-ownership</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>opencode-host-providerfailurepresentation</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="OpenCode/Host/ProviderFailurePresentation.fsi"/>
+    <Compile Include="OpenCode/Host/ProviderFailurePresentation.fs"/>
+  </ItemGroup>
+</Project>

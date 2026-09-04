@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -57,6 +58,7 @@ export const loopDetectorRepositoryInputFiles = (root = defaultRoot) => {
     .split('\0')
     .filter(Boolean)
     .filter(isSourceDocumentPath)
+    .filter((repositoryPath) => existsSync(path.join(repositoryRoot, repositoryPath)))
     .sort(compareCanonicalTextV1)
     .map((repositoryPath) => path.join(repositoryRoot, repositoryPath))
 }

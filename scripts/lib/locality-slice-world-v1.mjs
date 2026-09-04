@@ -765,7 +765,6 @@ export const projectCanonicalLocalityReportV1 = (worldInput) => {
     localities: queryAllCanonicalLocalitiesFromContext(context),
   }
 }
-
 export const projectManifestClaimsV1 = (worldInput, localityId) => {
   const world = buildCanonicalWorldV1(worldInput)
   if (!world.observed.localities.some(({ id }) => id === localityId)) fail('canonical-world-schema', '$.locality_id', `unknown locality ${localityId}`)

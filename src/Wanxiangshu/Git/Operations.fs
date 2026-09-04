@@ -189,7 +189,7 @@ module GitOperations =
     let private continueRebase (runner: Command -> Task<int * string * string>) dir =
         task {
             // Stage any Manager/Coder resolution before continue (ORCH-003).
-            // ResumeManager's finalizeWorktree should already have staged, but a
+            // Predecessor's finalizeWorktree should already have staged, but a
             // missed finalize leaves unmerged paths; add here is idempotent.
             let! addCode, _, addErr = runner (command dir [ "add"; "-A" ])
 

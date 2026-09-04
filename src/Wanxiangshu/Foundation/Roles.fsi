@@ -8,7 +8,6 @@ type Role =
     | Inspector
     | Browser
     | Inquiry
-    | Reviewer
     | DevOps
     | Distiller
     | Blogger

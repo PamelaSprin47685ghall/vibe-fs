@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import { readOwnerProjectInventoryV1 } from '../../../scripts/checks/owner-projects.mjs'
 import { assertOpaque } from '../../verification-system/tests/support/js-contract.mjs'
+import { assertEffectIsInjected, assertPureContract } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
 const temporal = await import('../../../dist/Process/Surface.js')
 const deadline = await import('../../../dist/Process/DeadlineSurface.js')
@@ -93,7 +94,6 @@ test('WHAT[TIME-008] production inventory separates contracts adapter verificati
     'execution-delegation-hostturnobservedsurface',
     'foundation-temporal',
     'git-integrationgate',
-    'mission-review-reviewfactfold',
     'opencode-host-hostsignalbootstrap',
     'process-largegatesurface',
     'process-processrequest',
@@ -172,4 +172,9 @@ test('WHAT[TIME-008] Node capability construction cannot mutate virtual time', a
   assert.equal(virtualFired, 1)
   temporal.nodeTimerDispose(nodeTimer)
   temporal.timerDispose(virtualTimer)
+})
+
+test('WHAT[TIME-008] temporal contracts exclude Node adapters mutable timers and SessionStartedAt projection', () => {
+  assertPureContract('capability-type-only')
+  assertEffectIsInjected('timer')
 })

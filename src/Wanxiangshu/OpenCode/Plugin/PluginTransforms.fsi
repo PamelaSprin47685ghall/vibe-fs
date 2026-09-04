@@ -17,10 +17,10 @@ module PluginTransforms =
         { BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
           BindSessionStartedAt: string option -> Task<DateTimeOffset option>
           ApplyStrengthReplay: string option -> obj -> Task<StrengthReplayPlan list>
+          ApplyRelayProjection: string option -> obj -> Task<unit>
           CaptureXTraceMessages: string option -> obj -> Task<TraceTransformCapture>
           CommitStrengthTrace: string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>
           RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
-          ApplyManagerNarrative: string option -> XTraceProjectionState option -> obj list -> obj -> Task<unit>
           ApplyCompanion: string option -> obj -> obj -> Task<unit>
           ApplyXWire: obj -> Task<PrefixPresentationHorizon>
           FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
@@ -29,8 +29,7 @@ module PluginTransforms =
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           ProjectRequirementGrounding: string option -> obj -> Task<unit>
           InjectBloggerChronicle: string option -> obj -> unit
-          SanitizeMessages: obj -> unit
-          InterruptAfterSubmittedJudgement: string option -> Task<unit> }
+          SanitizeMessages: obj -> unit }
 
     type TransformBranchCapabilities =
         { IsExplicitResume: string option -> obj -> bool
@@ -55,6 +54,6 @@ module PluginTransforms =
         caps: NormalTransformCapabilities -> branches: TransformBranchCapabilities -> (obj -> obj -> Task<unit>)
 
     /// Provider-facing transform composition: order only.
-    /// Strength replay/trace → StrengthReplay; speculation → StrengthSpeculate;
-    /// narrative → ManagerNarrativeTransform; seal → ReviewSeal; replica fast path unchanged.
+    /// Relay cut → Strength replay/trace → Companion/XWire → speculation;
+    /// retired raw history is removed before any downstream context owner.
     val create: boot: PluginBoot.Boot -> host: PluginHostWiring.Host -> (obj -> obj -> Task<unit>)

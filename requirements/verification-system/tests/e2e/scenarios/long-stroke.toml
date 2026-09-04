@@ -20,13 +20,15 @@
 #     ↓
 #   harvest → sole provider-error → FallbackCursorAdvanced eq 1
 #     ↓
-#   first legal suicide → migration Life opened → Host finality REVISE → FinalityRejected
+#   Incumbent #1: audit assigns work on low dimension → exit-required nudge → RetirementCommitted
 #     ↓
-#   repair fork → dual PERFECT → FinalityBlessed → last_words → LifeCompleted
+#   Successor #1: 8×10 independent audit → RetirementCommitted → CandidateReady
 #     ↓
-#   CandidateReady; gitConflictProof (no restart) already diverged target
+#   stale target forces rebase → ConflictDetected (no restart)
 #     ↓
-#   ConflictDetected → conflict-resume (same Manager) → coder-resolve → Published
+#   Successor #2: fresh AuditPending → low-score work assigned → repairs conflict → RetirementCommitted
+#     ↓
+#   Successor #3: fresh independent re-audit 8×10 → RetirementCommitted → RebasedCandidateReady → Published
 #     ↓
 #   orch join / expectSatisfied / oracleLongStroke
 #
@@ -35,45 +37,43 @@
 #   [x] provider transient failure          — [[fault]] provider-error + assertProviderTransientFailure
 #   [x] fallback                            — manager.1→continue.0 + assertFallbackContinuation
 #   [x] join blocked then causally awakened — flow.prompt wake + assertJoinWakePath
-#   [x] reviewer REVISE                     — first unified barrier-reviewer verdict + assertReviewerRevise
+#   [x] non-10 assessment assigns work      — AssessmentCommitted + assertAssessmentAssignsWork
 #   [x] interrupted/aborted child or session— holdChildC1UntilLabor + assertInterruptedJoin
-#   [x] finality temporarily blocked        — FinalityRejected + assertFinalityTemporarilyBlocked
+#   [x] retirement needs successor          — non-10 blocks publication + successor required + assertRetirementNeedsSuccessor
 #   [x] durable recovery/continuation       — same PID FallbackCursorAdvanced + assertDurableRecovery
 #   [x] publish conflict / stale target     — gitConflictProof on manager.0 (no restart) + assertPublishConflict
+#   [x] subagent session reuse              — successor-2 reuses Proof Writer child + assertSubagentReuse
 #   [x] successful reconciliation           — Orchestrator-tagged Published eq 1 + assertSuccessfulReconciliation
-#   [x] later successful finality           — FinalityBlessed + LifeCompleted + assertLaterSuccessfulFinality
+#   [x] later successful retirement         — RetirementCommitted after resources converge + assertRetirementCommitted
 #   [x] simultaneous Inspector batch        — streamed 3× inspect + assertG2InspectorBatchCoalescing
 #
 # Yield / hang risks (estimated):
-#   - FinalityBlessed waitFact: widen via renewOn; journal noise without renew can trip silence
+#   - RetirementCommitted waitFact: waits for recursive resource closure
 #   - ConflictDetected / Published: rebase+barrier lag; timeouts mirror orch-unhappy (60–90s caps)
-#   - AgentOwnerRoot migration Life is opened on first suicide (FinalityTool
-#     ensureMigrationLife), NOT at fork — the lifecycle is proven by LifeCompleted later
 #   - interrupt requires holdChildC1UntilLabor; without hold, drain completes child and skips user_message
-#   - REVISE→PERFECT uses one Reviewer protocol: the first unified barrier verdict is REVISE,
-#     then bindFinalityReviseThenPerfect flips later barrier verdicts to PERFECT; no alternate surface
+#   - non-10 assessment assigns WorkOwned; successor independently re-audits before publication
 #   - blogger pad undersize → unmatched companion requests (fail closed)
 #   - wall <6s target vs orch publish chain — risk of §16 miss until flesh/perf pass
 #
 # Anchors (lean extract, not a paste): orchestrator-unhappy-path (conflict→Published,
-# no restart), manager-unhappy (join wake / REVISE), fallback.toml (sole provider-error).
+# no restart), manager-unhappy (join wake / low assessment), fallback.toml (sole provider-error).
 
 scenario = "long-stroke"
 description = "G4R-3 The Long Stroke: orchestrator shell, one OpenCode world through adversity to clean shutdown"
-pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fallback, REVISE→FinalityRejected→Blessed→LifeCompleted, gitConflictProof→ConflictDetected→Published (no restart)."
+pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fallback, audit-low-score→WorkOwned→Retirement→Successor, gitConflictProof→ConflictDetected→RebasedCandidate→Published (no restart)."
 
 # Event ceilings (fail-closed on dead loops; primary over silence watchdog):
 #   maxJournalEvents — complete 63-step legal stroke after explicit preflow authority, real K2
 #                      StrengthReplica traffic, detached Bookkeeper finalization, and direct
-#                      same-physical dual-PERFECT review. Two complete strict traversals measured
-#                      622–647 envelopes; 700 catches the former unconfirmed-reviewer roster growth
+#                      same-physical successor re-audit. Two complete strict traversals measured
+#                      622–647 envelopes; 700 catches unconfirmed roster growth
 #                      before it can hide behind a widened timeout.
 #   maxSseEvents     — OpenCode SSE excluding server.heartbeat for the same traversals measured
 #                      3118–3351 frames; 3450 preserves a narrow Host-ordering allowance.
 #                      Both pins are machine-checked runaway ceilings, not wall-clock budgets; a
 #                      future legitimate topology change must re-measure the complete stroke first.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-replica-continue", "strength-canary-owner", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g2-inspector-batch", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 700, maxSseEvents = 3450, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-replica-continue", "strength-canary-owner", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g2-inspector-batch", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 600, maxSseEvents = 3000, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "orchestrator", bind = ["title", "orchestrator"] }
 prompt = { agent = "orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -86,19 +86,22 @@ must = [
   "g2-inspector-batch.0",
   "g6-bookkeeper-finalize.0",
   "orch.0",
+  "manager-audit.0",
   "manager.0",
   "manager.1",
   "continue.0",
   "continue.1",
   "manager-resume.0",
+  "manager-exit-required.0",
+  "manager-exit-required.1",
+  "successor.0",
+  "successor.1",
+  "successor.2",
+  "successor.3",
   "coder.0",
   "coder.1",
   "coder.2",
-  "coder-reuse.0",
-  "conflict-resume.0",
   "coder-resolve.0",
-  "barrier-reviewer.0",
-  "barrier-reviewer-reentry.0",
   # orch.2 = join harvest text after Published (orch-unhappy Stroke 6). EXEC-016
   "orch.2",
 ]
@@ -123,7 +126,7 @@ flow = [
 
   # External injections before any wait (register holds / retire hooks / conflict).
   { custom = "holdChildC1UntilLabor" },
-  { custom = "bindFinalityReviseThenPerfect" },
+  { custom = "bindRelaySuccessorSequence" },
   # Arm before orch.2 can possibly occur. The final Orchestrator lifetime contains
   # many continuations/idle edges, so its completion barrier is expectation-scoped:
   # orch.2 provider acceptance freezes the SSE baseline, then Stroke 6 waits for
@@ -140,11 +143,14 @@ flow = [
   { waitFact = { name = "ManagerJobCreated", eq = 1 } },
   { bindChild = { agent = "manager", bind = ["manager"] } },
 
-  # Manager: fork → join; join stays in flight while child held.
+  # Incumbent #1 starts read-only. One low dimension atomically assigns work,
+  # then the same incumbency can fork → join; join stays in flight while child held.
   # Host evidence (StaticTools.knownToolNames + Manager permission matrix) does not
   # advertise builtin todowrite on Manager provider tools — requiring tools=["todowrite"]
   # here fails toolsGate. A/E/G/H assert uses wire evidence.
   # All Manager prompts MUST use session="child" (bindChild); default session is Orchestrator.
+  { wait = "manager-audit.0" },
+  { waitFact = { name = "AssessmentCommitted", eq = 1 }, timeoutMs = 60000 },
   { wait = "manager.0" },
   # The held child request proves the forked run is active before the idle join
   # attempt. Without this causal barrier, join may correctly report NothingToJoin
@@ -162,34 +168,41 @@ flow = [
   { awaitIdle = { after = "coder.3" }, timeoutMs = 60000 },
   { waitFact = { name = "HandleCompleted", gte = 1 }, timeoutMs = 60000 },
   { wait = "manager-resume.0", timeoutMs = 60000 },
-  { waitAny = ["manager-resume.1", "manager-join-guard.0"], timeoutMs = 60000 },
-  { waitAny = ["manager-resume.2", "manager-join-guard.1"], timeoutMs = 60000 },
-  { waitAny = ["manager-resume.3", "manager-join-guard.2"], timeoutMs = 60000 },
-  { waitFact = { name = "FinalityRejected", gte = 1, renewOn = ["ReviewVerdictRecorded", "ReviewAttemptClosed", "BlogObservationCommitted"] }, timeoutMs = 60000 },
 
-  # The same physical Manager continuation repairs, then seeks dual-PERFECT blessing.
-  # Reviewer protocol identity is deliberately not duplicated in the flow; the
-  # durable finality facts are the business barrier.
-  { waitAny = ["manager-resume.4", "manager-join-guard.3"] },
-  { wait = "coder-fix.0", timeoutMs = 60000 },
-  { waitAny = ["manager-resume.5", "manager-join-guard.4"] },
-  { waitAny = ["manager-resume.6", "manager-join-guard.5"] },
-  { wait = "coder-reuse.0", timeoutMs = 60000 },
-  { waitAny = ["manager-resume.7", "manager-join-guard.6"] },
-  { waitAny = ["manager-resume.8", "manager-join-guard.7"] },
-  { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ReviewAttemptClosed", "ConfirmedReviewWitness", "FinalityReviewerEnlisted", "BlogObservationCommitted"] }, timeoutMs = 180000 },
-  { waitAny = ["manager-resume.9", "manager-join-guard.8"], timeoutMs = 30000 },
-  { waitAny = ["manager-resume.10", "manager-join-guard.9"], timeoutMs = 30000 },
-  { waitFact = { name = "LifeCompleted", gte = 1 } },
+  # A WorkOwned incumbent that stops normally receives the typed exit-required
+  # nudge. Record final obligations via todowrite, then cleanly suicide.
+  { wait = "manager-exit-required.0", timeoutMs = 60000 },
+  { wait = "manager-exit-required.1", timeoutMs = 60000 },
+  { waitFact = { name = "RetirementCommitted", gte = 1 }, timeoutMs = 60000 },
+  { waitFact = { name = "SuccessorActivated", gte = 1 }, timeoutMs = 60000 },
+
+  # Successor #1 independently audits the current snapshot at 8×10 and retires.
+  # That quality candidate reaches Change; the stale target forces rebase and the
+  # deliberately conflicting target edit yields the machine ConflictDetected fact.
+  { wait = "successor.0", timeoutMs = 60000 },
+  { wait = "successor.1", timeoutMs = 60000 },
+  { waitFact = { name = "AssessmentCommitted", gte = 2 }, timeoutMs = 60000 },
+  { waitFact = { name = "RetirementCommitted", gte = 2 }, timeoutMs = 60000 },
   { waitFact = { name = "CandidateReady", eq = 1 }, timeoutMs = 60000 },
-
-  # Conflict resume on SAME Manager (no task restart) → resolve → Published
   { waitFact = { name = "ConflictDetected", gte = 1 }, timeoutMs = 60000 },
-  { wait = "conflict-resume.0", timeoutMs = 60000 },
+
+  # Successor #2 is a fresh AuditPending incumbency. Its low assessment assigns
+  # WorkOwned; it reuses the original Proof Writer child to repair the conflict,
+  # then retires. The retired predecessor never regains WorkOwned.
+  { waitFact = { name = "SuccessorActivated", gte = 2 }, timeoutMs = 60000 },
+  { waitFact = { name = "AssessmentCommitted", gte = 3 }, timeoutMs = 60000 },
+  { wait = "successor.1", timeoutMs = 60000 },
   { wait = "coder-resolve.0", timeoutMs = 60000 },
   { wait = "coder-resolve.1", timeoutMs = 60000 },
-  { wait = "conflict-resume.1", timeoutMs = 60000 },
-  { wait = "conflict-resume.2", timeoutMs = 60000 },
+  { wait = "successor.2", timeoutMs = 60000 },
+  { wait = "successor.3", timeoutMs = 60000 },
+  { waitFact = { name = "RetirementCommitted", gte = 3 }, timeoutMs = 60000 },
+
+  # Successor #3 independently re-audits the repaired snapshot at 8×10. A fresh
+  # certificate is required before rebase completion/publish can proceed.
+  { waitFact = { name = "SuccessorActivated", gte = 3 }, timeoutMs = 60000 },
+  { waitFact = { name = "AssessmentCommitted", gte = 4 }, timeoutMs = 60000 },
+  { waitFact = { name = "RetirementCommitted", gte = 4 }, timeoutMs = 60000 },
   { waitFact = { name = "RebasedCandidateReady", gte = 1 }, timeoutMs = 90000 },
   # Bare "Published" false-matches assignment text; pin Orchestrator case tag.
   { waitFact = { name = "\"Orchestrator\",[\"Published\"", eq = 1 }, timeoutMs = 90000 },
@@ -371,7 +384,7 @@ user = "Ship publish_proof.txt to the target branch through the long stroke."
 tools = ["commission", "join"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "commission", args = { calling = "lead", name = "Long Stroke Road", charge = "Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile." } }
+  respond = { type = "tool-call", tool = "commission", args = { calling = "lead", name = "Long Stroke Road", charge = "Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept the assessment obligation then retire so publish can proceed." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
@@ -400,7 +413,7 @@ tools = ["commission", "horizon", "join"]
 # stays blocked while holdChild keeps coder incomplete for user_message wake.
 # tools MUST match the real Manager provider surface (no todowrite — see flow note).
 [[turn]]
-id = "manager-blind-plan"
+id = "manager-t1-commitment"
 internal = true
 user = "# The account is not yet ready to entrust."
 
@@ -408,33 +421,30 @@ user = "# The account is not yet ready to entrust."
   respond = { type = "tool-call", tool = "todowrite", args = { planComplete = true, workingOn = "long-stroke", obligations = [{ name = "long-stroke", horizon = "near", work = "Run the long stroke through publish_proof.txt." }] } }
 
   [[turn.step]]
-  respond = { type = "text", text = "Blind plan obligations recorded." }
+  respond = { type = "text", text = "T1 commitment recorded." }
 
-# Dedicated Magic Todo process reviewer for the first accepted obligation account.
-# Hidden reviewer is not part of the main flow; strict mock still declares its
-# real verdict + terminal text so the process review can conclude durably.
 [[turn]]
-id = "manager-process-review"
-internal = true
-user = "# You are reviewing the ongoing quality, coverage, and truthfulness of a work process."
-tools = ["judge"]
+id = "manager-audit"
+lane = "manager"
+user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept the assessment obligation then retire so publish can proceed."
+tools = ["read", "glob", "grep", "fork", "join", "horizon", "review", "suicide"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Process review confirms the long-stroke obligation account." }
+  runtimeStep = 0
+  respond = { type = "tool-call", tool = "review", prefixText = "The workspace needs implementation work before it can publish: completeness is not yet full because publish_proof.txt has not been established on this Road.", args = { language_algorithms = 10, simplicity = 10, structure = 10, granularity = 10, tests_evidence = 10, logic_reliability_boundaries = 10, caller_ergonomics = 10, completeness = 9 } }
 
 [[turn]]
 id = "manager"
 lane = "manager"
-user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile."
+user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept the assessment obligation then retire so publish can proceed."
 tools = ["fork", "join", "horizon", "suicide"]
 
   [[turn.step]]
+  runtimeStep = 1
   respond = { type = "tool-call", tool = "fork", args = { calling = "coder", name = "Proof Writer", charge = "Write publish_proof.txt." } }
 
   [[turn.step]]
+  runtimeStep = 2
   respond = { type = "tool-call", tool = "join", args = {} }
 
 # A fresh Manager terminal can race with the externally injected manager-resume
@@ -523,34 +533,56 @@ tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
   respond = { type = "tool-call", tool = "join", args = {} }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "suicide", args = { last_words = "materialize the Manager life" } }
+  optional = true
+  respond = { type = "text", text = "The interrupted child has returned; this incumbency now stops normally and awaits the exit protocol." }
 
+[[turn]]
+id = "manager-exit-required"
+internal = true
+user = "# You are still the active Manager. A normal assistant stop does not end an incumbency."
+tools = ["join", "todowrite", "suicide"]
+
+  # A nudge that lands on a clean stop opens at step 1 (assistant dot was inserted).
+  # Record the final obligation account via todowrite, then cleanly suicide at step 2.
   [[turn.step]]
+  runtimeStep = 1
   respond = { type = "tool-call", tool = "todowrite", args = { planComplete = true, workingOn = "long-stroke", obligations = [{ name = "long-stroke", horizon = "near", work = "Run the long stroke through publish_proof.txt." }] } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "suicide", args = { last_words = "first ending" } }
+  runtimeStep = 2
+  respond = { type = "tool-call", tool = "suicide", args = {} }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { calling = "coder", name = "Proof Finisher", charge = "Ensure publish_proof.txt contains exactly: Published by long-stroke canary" } }
-
-  [[turn.step]]
+  runtimeStep = 3
+  optional = true
   respond = { type = "tool-call", tool = "join", args = {} }
 
+[[turn]]
+id = "successor"
+internal = true
+user = "# The previous Manager incumbency is retired. You are the new Manager for the same user Road."
+tools = ["read", "glob", "grep", "fork", "join", "horizon", "review", "suicide"]
+
+  # The causal binder makes delivery #1 and #3 perfect, delivery #2 low.
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { name = "Proof Finisher", charge = "Verify the reused subagent received this second charge and publish_proof.txt is exact." } }
+  runtimeStep = 0
+  respond = { type = "tool-call", tool = "review", prefixText = "Independent audit of this successor snapshot finds every required quality dimension complete and supported by the current workspace evidence.", args = { language_algorithms = 10, simplicity = 10, structure = 10, granularity = 10, tests_evidence = 10, logic_reliability_boundaries = 10, caller_ergonomics = 10, completeness = 10 } }
+
+  # Delivery #1/#3 retires a perfect candidate. Delivery #2 is rebound to fork
+  # the already-known Proof Writer session for conflict repair.
+  [[turn.step]]
+  runtimeStep = 1
+  respond = { type = "tool-call", tool = "fork", args = { name = "Proof Writer", charge = "Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary" } }
 
   [[turn.step]]
+  runtimeStep = 2
   respond = { type = "tool-call", tool = "join", args = {} }
 
+  # Successor #2 only: after the conflict child returns, the low-score incumbent
+  # retires without self-review. Successor #1/#3 leave at step 1.
   [[turn.step]]
-  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager rest in peace." }
+  runtimeStep = 3
+  respond = { type = "tool-call", tool = "suicide", args = {} }
 
 [[turn]]
 id = "coder"
@@ -576,46 +608,6 @@ tools = ["js-coder", "read"]
   respond = { type = "text", text = "Coder finished." }
 
 [[turn]]
-id = "coder-fix"
-lane = "coder"
-user = "# Ensure publish_proof.txt contains exactly: Published by long-stroke canary"
-tools = ["js-coder"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "js-coder", args = { program = "class Js extends JsProgram { async run() { await this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return { written: true }; } }" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Coder repaired proof file." }
-
-[[turn]]
-id = "coder-reuse"
-lane = "coder"
-user = "# Verify the reused subagent received this second charge and publish_proof.txt is exact."
-tools = ["read"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "read", args = { filePath = "publish_proof.txt" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Reused subagent received the second charge and verified the proof file." }
-
-# ORCH-007 conflict resume — same Manager session; do NOT restart original task.
-[[turn]]
-id = "conflict-resume"
-internal = true
-user = "# Conflict resumption: an in-progress rebase hit conflicts."
-tools = ["fork", "join", "horizon", "suicide"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { calling = "coder", name = "Conflict Resolver", charge = "Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "join" }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Conflict resolved; rebase can continue." }
-
-[[turn]]
 id = "coder-resolve"
 lane = "coder"
 user = "# Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary"
@@ -626,40 +618,6 @@ tools = ["write"]
 
   [[turn.step]]
   respond = { type = "text", text = "Conflict file resolved." }
-
-[[turn]]
-id = "barrier-reviewer"
-internal = true
-user = "# Review the current worktree against all authoritative user requirements."
-tools = ["glob", "grep", "read", "judge"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
-
-  # First adversity request terminates at step 0 after REVISE, so this step is never
-  # consumed by that request. The causal binder changes it to the second PERFECT judge
-  # for every later request.
-  [[turn.step]]
-  respond = { type = "text", text = "Reviewer submitted the revision verdict." }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Reviewer confirmed the tree." }
-
-[[turn]]
-id = "barrier-reviewer-reentry"
-internal = true
-user = "Review the current worktree against all authoritative user requirements."
-tools = ["glob", "grep", "read", "judge"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Reviewer confirmed the tree." }
-
 
 [[turn]]
 id = "blogger"
@@ -1127,13 +1085,29 @@ attempts = [1]
 # Sole physical fault: one settled non-retryable provider-error (no AABB here).
 [[fault]]
 turn = "manager"
-step = 1
+step = 2
 delivery = "provider-error"
 status = 400
 retryable = false
 attempts = [1]
 
 [[epoch]]
+turn = "manager"
+step = 1
+reason = "relay-context-open"
+
+[[epoch]]
+turn = "successor"
+step = 0
+reason = "relay-successor-cut"
+
+[[epoch]]
+turn = "successor"
+step = 1
+reason = "relay-context-revision"
+
+[[epoch]]
 turn = "continue"
 step = 0
 reason = "prefix-probe"
+optional = true

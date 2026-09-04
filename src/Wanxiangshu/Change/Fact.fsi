@@ -2,6 +2,7 @@ namespace Wanxiangshu.Change
 
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Relay
 
 module OrchestratorFact =
     val inline ManagerJobCreated:
@@ -20,7 +21,8 @@ module OrchestratorFact =
         payload:
             {| ManagerJobId: ManagerJobId
                CandidateCommit: CommitHash
-               PreRebaseReviewBarrierId: ReviewBarrierId |} ->
+               WorkspaceSnapshotId: WorkspaceSnapshotId
+               QualityCertificateId: QualityCertificateId |} ->
             AgentFact
 
     val inline ConflictDetected:
@@ -28,6 +30,7 @@ module OrchestratorFact =
             {| ManagerJobId: ManagerJobId
                CandidateCommit: CommitHash
                TargetHeadSnapshot: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId
                ConflictFiles: string list
                DiagnosticsDigest: string |} ->
             AgentFact
@@ -37,7 +40,7 @@ module OrchestratorFact =
             {| ManagerJobId: ManagerJobId
                RebasedCommit: CommitHash
                TargetHeadSnapshot: CommitHash
-               PostRebaseReviewBarrierId: ReviewBarrierId |} ->
+               WorkspaceSnapshotId: WorkspaceSnapshotId |} ->
             AgentFact
 
     val inline PublishClaimed:

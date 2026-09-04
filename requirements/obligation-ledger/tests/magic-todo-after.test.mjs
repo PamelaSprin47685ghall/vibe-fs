@@ -11,7 +11,7 @@ const membraneSource = join(
   '../../../src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
 )
 
-test('WHAT[OBLIGATION-LEDGER-020] quality assurance is consolidated to Finality Review without dedicated process reviewers', () => {
+test('WHAT[OBLIGATION-LEDGER-020] quality judgement belongs to successor independent assessment without dedicated process reviewers', () => {
   const source = readFileSync(membraneSource, 'utf8')
   assert.doesNotMatch(source, /NeedsDedicatedEnlist/, 'checkpoints must not create dedicated process reviewers')
   assert.doesNotMatch(source, /NeedsEnsureReview/, 'checkpoints must not derive process review duties')

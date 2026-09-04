@@ -104,9 +104,9 @@ module Events =
         /// NotifyTerminal on the shared port. The run's token guard absorbs the
         /// duplicate when no new run subscribed in between — but the review nudge
         /// installs a fresh run inside that window, and the stale duplicate then
-        /// completes it with the PREVIOUS run's outcome (measured: the challenge
-        /// nudge's run completed before the reviewer answered, so the Orchestrator's
-        /// second await returned early and a confirmed review read as UNPROVEN).
+        /// completes it with the PREVIOUS run's outcome (measured: the nudge's
+        /// run completed before the response arrived, so the Orchestrator's
+        /// second await returned early and an outcome read as UNPROVEN).
         let isCompletedRunDuplicate sessionId (providerRun: ProviderRunIdentity) =
             let key = SessionId.value sessionId
             let runValue = ProviderRunIdentity.value providerRun

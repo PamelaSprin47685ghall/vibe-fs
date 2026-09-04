@@ -96,8 +96,8 @@ module Identity =
 
     /// One tool invocation inside a provider run. `ToolContext.callID`.
     ///
-    /// Distinct from ProviderRunIdentity because REVIEW-004 requires both: two
-    /// PERFECT verdicts must differ in run AND in call. Sharing a type would
+    /// Distinct from ProviderRunIdentity because causal idempotency requires both: two
+    /// distinct tool invocations must differ in run AND in call. Sharing a type would
     /// make that check expressible but meaningless.
     type ToolCallId = private ToolCallId of string
 
@@ -140,19 +140,6 @@ module Identity =
     /// multi-kilobyte string into every diagnostic and every journal line that
     /// mentions an attempt.
     type SystemPromptId = private SystemPromptId of string
-
-    // ── review (docs/what/review.md) ────────────────────────────────────────────────────
-
-    /// One review barrier: the question "is this tree good?" asked once.
-    type ReviewBarrierId = private ReviewBarrierId of string
-
-    /// A Git tree hash. Not a commit — REVIEW-008 invalidates a witness on tree
-    /// change, and two commits can share a tree.
-    type GitTreeHash = private GitTreeHash of string
-
-    /// Digest of the canonical provider input for one run (REVIEW-010). The
-    /// evidence that a second PERFECT actually consumed the first challenge.
-    type SealDigest = private SealDigest of string
 
     // ── blob storage (PERSIST-007) ──────────────────────────────────────────
 
@@ -319,18 +306,6 @@ module Identity =
         let create (value: string) = SystemPromptId value
         let value (SystemPromptId v) = v
 
-    module ReviewBarrierId =
-        let create (value: string) = ReviewBarrierId value
-        let value (ReviewBarrierId v) = v
-
-    module GitTreeHash =
-        let create (value: string) = GitTreeHash value
-        let value (GitTreeHash v) = v
-
-    module SealDigest =
-        let create (value: string) = SealDigest value
-        let value (SealDigest v) = v
-
     module BlobRef =
         let create (value: string) = BlobRef value
         let value (BlobRef v) = v
@@ -400,25 +375,6 @@ module Identity =
         let create (value: string) = CommitHash value
         let value (CommitHash v) = v
 
-    // ── Manager lifecycle (docs/what/glory.md GLORY-010) ──────────────────────────────────
-
-    /// One Manager Life: Birth → Activation → Labor → Finality (GLORY-004.1).
-    /// A new Life id opens on every completed-Life HumanRoot (GLORY-065).
-    type ManagerLifeId = private ManagerLifeId of string
-
-    /// One suicide request: request, reviewer, barrier are all 1:1 (GLORY-045).
-    type FinalityRequestId = private FinalityRequestId of string
-
-    // ── composite identities ────────────────────────────────────────────────
-
-    module ManagerLifeId =
-        let create (value: string) = ManagerLifeId value
-        let value (ManagerLifeId v) = v
-
-    module FinalityRequestId =
-        let create (value: string) = FinalityRequestId value
-        let value (FinalityRequestId v) = v
-
     /// Dedupe key for one failed provider attempt (FALLBACK-003). The same
     /// failure observed twice — a retry signal plus an idle reconcile — must
     /// advance the cursor once.
@@ -431,16 +387,6 @@ module Identity =
           AuthorityRootUserMessageId: AuthorityRootUserMessageId
           ProviderRun: ProviderRunIdentity }
 
-    /// Identity of one PERFECT verdict (REVIEW-004). Extra PERFECT calls inside
-    /// the same provider run do not count and are not journalled, which is
-    /// exactly "same Run, different ToolCall" being representable here.
-    type ReviewAttemptIdentity =
-        { ReviewBarrierId: ReviewBarrierId
-          GitTreeHash: GitTreeHash
-          ReviewerSessionId: SessionId
-          ProviderRun: ProviderRunIdentity
-          ToolCallId: ToolCallId }
-
     module FallbackAttemptIdentity =
         /// Stable string form for set membership in a projection.
         let dedupeKey (identity: FallbackAttemptIdentity) =
@@ -451,24 +397,3 @@ module Identity =
                    AuthorityRootUserMessageId.value identity.AuthorityRootUserMessageId
                    ProviderRunIdentity.value identity.ProviderRun |]
             )
-
-    module ReviewAttemptIdentity =
-        let dedupeKey (identity: ReviewAttemptIdentity) =
-            String.Join(
-                "\u001f",
-                [| ReviewBarrierId.value identity.ReviewBarrierId
-                   GitTreeHash.value identity.GitTreeHash
-                   SessionId.value identity.ReviewerSessionId
-                   ProviderRunIdentity.value identity.ProviderRun
-                   ToolCallId.value identity.ToolCallId |]
-            )
-
-        /// REVIEW-003 conditions 4 and 5: the second PERFECT must come from a
-        /// different provider run AND a different tool call. Same barrier, same
-        /// tree, same reviewer session.
-        let isDistinctAttempt (first: ReviewAttemptIdentity) (second: ReviewAttemptIdentity) =
-            first.ReviewBarrierId = second.ReviewBarrierId
-            && first.GitTreeHash = second.GitTreeHash
-            && first.ReviewerSessionId = second.ReviewerSessionId
-            && first.ProviderRun <> second.ProviderRun
-            && first.ToolCallId <> second.ToolCallId

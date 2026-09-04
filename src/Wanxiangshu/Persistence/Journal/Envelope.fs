@@ -19,10 +19,9 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
-open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 type StreamId =
@@ -201,8 +200,8 @@ module Envelope =
     let private fallbackFactDecoder =
         Decode.Auto.generateDecoderCached<FallbackFactCases> (extra = extra)
 
-    let private reviewFactDecoder =
-        Decode.Auto.generateDecoderCached<ReviewFactCases> (extra = extra)
+    let private relayFactDecoder =
+        Decode.Auto.generateDecoderCached<RelayFactCases> (extra = extra)
 
     let private executionFactDecoder =
         Decode.Auto.generateDecoderCached<ExecutionFactCases> (extra = extra)
@@ -243,9 +242,6 @@ module Envelope =
     let private institutionalLearningFactDecoder =
         Decode.Auto.generateDecoderCached<InstitutionalLearningFactCases> (extra = extra)
 
-    let private managerLifecycleFactDecoder =
-        Decode.Auto.generateDecoderCached<ManagerLifecycleFact> (extra = extra)
-
     let private familyCase decoder wrap =
         Decode.index 1 decoder |> Decode.map wrap
 
@@ -254,7 +250,7 @@ module Envelope =
         |> Decode.andThen (function
             | "Prompt" -> familyCase promptFactDecoder AgentFact.Prompt
             | "Fallback" -> familyCase fallbackFactDecoder AgentFact.Fallback
-            | "Review" -> familyCase reviewFactDecoder AgentFact.Review
+            | "Relay" -> familyCase relayFactDecoder AgentFact.Relay
             | "Execution" -> familyCase executionFactDecoder AgentFact.Execution
             | "Orchestrator" -> familyCase orchestratorFactDecoder AgentFact.Orchestrator
             | "Companion" -> familyCase companionFactDecoder AgentFact.Companion
@@ -273,7 +269,6 @@ module Envelope =
         |> Decode.andThen (function
             | "Runtime" -> Decode.index 1 runtimeFactDecoder |> Decode.map Fact.Runtime
             | "Agent" -> Decode.index 1 agentFactDecoder |> Decode.map Fact.Agent
-            | "ManagerLifecycle" -> Decode.index 1 managerLifecycleFactDecoder |> Decode.map Fact.ManagerLifecycle
             | "MagicTodo" -> Decode.fail "MagicTodo uses its canonical custom envelope decoder"
             | name -> Decode.fail ("Cannot find Fact case " + name))
 

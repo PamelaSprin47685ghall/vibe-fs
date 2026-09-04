@@ -305,15 +305,11 @@ module PromptAuthority =
         | Continuation InteractionRepair -> "InteractionRepair"
         | Continuation JoinGuard -> "JoinGuard"
         | Continuation ManagerGuard -> "ManagerGuard"
-        | Continuation ReviewerGuard -> "ReviewerGuard"
         | Continuation BusyAgentNudge -> "BusyAgentNudge"
         | Continuation HumanMessage -> "HumanMessage"
         | Continuation ManagedDelegationAssignment -> "ManagedDelegationAssignment"
         | Continuation ProviderRetryAttempt -> "ProviderRetryAttempt"
         | Continuation DegenerationGuard -> "DegenerationGuard"
-        | Continuation ManagerIdleEncouragement -> "ManagerIdleEncouragement"
-        | Continuation FinalityRejected -> "FinalityRejected"
-        | Continuation FinalitySteer -> "FinalitySteer"
         | Continuation FissionHandoff -> "FissionHandoff"
         | HostInternal -> "HostInternal"
         | UnknownOrigin -> "UnknownOrigin"
@@ -323,15 +319,11 @@ module PromptAuthority =
         | "InteractionRepair" -> Some InteractionRepair
         | "JoinGuard" -> Some JoinGuard
         | "ManagerGuard" -> Some ManagerGuard
-        | "ReviewerGuard" -> Some ReviewerGuard
         | "BusyAgentNudge" -> Some BusyAgentNudge
         | "HumanMessage" -> Some HumanMessage
         | "ManagedDelegationAssignment" -> Some ManagedDelegationAssignment
         | "ProviderRetryAttempt" -> Some ProviderRetryAttempt
         | "DegenerationGuard" -> Some DegenerationGuard
-        | "ManagerIdleEncouragement" -> Some ManagerIdleEncouragement
-        | "FinalityRejected" -> Some FinalityRejected
-        | "FinalitySteer" -> Some FinalitySteer
         | "FissionHandoff" -> Some FissionHandoff
         | _ -> None
 
@@ -595,38 +587,6 @@ module PromptAuthority =
 
         nextClaimSequence scope projection > 1
 
-    /// GLORY-029: the durable occasion identity of one Manager idle encouragement.
-    ///
-    /// Manager encouragement is intentionally unbounded across fresh terminals.
-    /// Life + condition explain the business context, while ProviderRunIdentity
-    /// is the exact physical terminal occasion that must be idempotent across
-    /// duplicate idle delivery / restart replay.
-    let idlePayloadDigest (lifeId: ManagerLifeId) (conditionKey: string) (terminalProviderRun: ProviderRunIdentity) =
-        String.Join(
-            "\u001f",
-            [| ManagerLifeId.value lifeId
-               conditionKey
-               ProviderRunIdentity.value terminalProviderRun |]
-        )
-
-    /// GLORY-029: has this exact terminal occasion already received its Manager
-    /// encouragement. A new ProviderRun is always a fresh occasion, even when the
-    /// Life and pre/post-T1 condition are unchanged.
-    let idleAlreadyAdmitted
-        (sessionId: SessionId)
-        (logicalRunId: LogicalRunId)
-        (lifeId: ManagerLifeId)
-        (conditionKey: string)
-        (terminalProviderRun: ProviderRunIdentity)
-        (projection: PromptAuthorityProjection)
-        =
-        exactOccasionIsAdmitted
-            sessionId
-            logicalRunId
-            (PromptOrigin.Continuation ContinuationKind.ManagerIdleEncouragement)
-            (idlePayloadDigest lifeId conditionKey terminalProviderRun)
-            projection
-
     /// AGENT-001: Canonical role shares one system prompt, so the prompt
     /// identity is a function of CanonicalRole alone.
     let systemPromptIdFor (role: Role) : SystemPromptId =
@@ -635,7 +595,7 @@ module PromptAuthority =
     /// STRENGTH-004 / PROMPT-008: the request-specific authority is exact, not
     /// inferred by intersecting the ordinary role surface. Inquiry is eligible
     /// even though its ordinary WorkMain surface delegates reads through Inspector;
-    /// Browser/Reviewer are intentionally ineligible despite having readonly tools.
+    /// Browser is intentionally ineligible despite having readonly tools.
     let private strengthReplicaReadonly =
         set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ]
 
@@ -648,7 +608,6 @@ module PromptAuthority =
         | Role.Manager
         | Role.Orchestrator
         | Role.Browser
-        | Role.Reviewer
         | Role.Distiller
         | Role.Blogger -> false
 

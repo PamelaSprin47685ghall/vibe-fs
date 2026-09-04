@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { acceptAuthorityRoot, withExecutablePlugin, withPlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { acceptAuthorityRoot, grantWorkOwned, withExecutablePlugin, withPlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 test('WHAT[ENF-009] FORK_specs_expose_expected_names_and_only_manager_fork_carries_keywords', async () => {
   await withPlugin(async (hooks) => {
@@ -44,6 +44,7 @@ test('WHAT[ENF-010] FORK_orchestrator_missing_authority_is_refused_without_sessi
 test('WHAT[ENF-009] FORK_non_repository_target_rejects_nonempty_warm_start_keywords_before_creation', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'ses-fork', 'manager')
+    await grantWorkOwned(runtime, 'ses-fork')
     const result = await hooks.tool.fork.execute(
       { calling: 'researcher', name: 'Web Road', charge: 'browse', keywords: 'repository clue' },
       { sessionID: 'ses-fork', agent: 'manager' },

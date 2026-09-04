@@ -17,14 +17,14 @@ module MagicTodoSemanticSurface =
 
     val admitObligations:
         sha256: (string -> string) ->
-        lifeId: string ->
+        incumbencyId: string ->
         current: obj array ->
         existing: obj ->
         localized: obj ->
         submitted: obj array ->
             obj
 
-    val todoWriteId: sha256: (string -> string) -> lifeId: string -> toolCallId: string -> string
+    val todoWriteId: sha256: (string -> string) -> incumbencyId: string -> toolCallId: string -> string
 
     val todoWriteIdValue: value: string -> string
 

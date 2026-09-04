@@ -5,6 +5,7 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.EventStore
 
 /// Canonical tagged codec for `Fact.MagicTodo` payload bytes.
@@ -119,7 +120,7 @@ module MagicTodoFactCodec =
                 Encode.object
                     [ "case", Encode.string "TodoWritePrepared"
                       "ManagerSessionId", Encode.string (SessionId.value p.ManagerSessionId)
-                      "ManagerLifeId", Encode.string (ManagerLifeId.value p.ManagerLifeId)
+                      "IncumbencyId", Encode.string (IncumbencyId.value p.IncumbencyId)
                       "TodoWriteId", todoWriteIdEncoder p.TodoWriteId
                       "ToolCallId", Encode.string (ToolCallId.value p.ToolCallId)
                       "ToolPartOrdinal", Encode.int p.ToolPartOrdinal
@@ -134,7 +135,7 @@ module MagicTodoFactCodec =
             | MagicTodoFact.TodoWriteAccepted p ->
                 Encode.object
                     [ "case", Encode.string "TodoWriteAccepted"
-                      "ManagerLifeId", Encode.string (ManagerLifeId.value p.ManagerLifeId)
+                      "IncumbencyId", Encode.string (IncumbencyId.value p.IncumbencyId)
                       "TodoWriteId", todoWriteIdEncoder p.TodoWriteId
                       "ToolCallId", Encode.string (ToolCallId.value p.ToolCallId)
                       "PreparedFactRef", Encode.string (EventId.value p.PreparedFactRef)
@@ -146,14 +147,14 @@ module MagicTodoFactCodec =
                 Encode.object
                     [ "case", Encode.string "LegacyTodoSeedAdopted"
                       "ManagerSessionId", Encode.string (SessionId.value p.ManagerSessionId)
-                      "ManagerLifeId", Encode.string (ManagerLifeId.value p.ManagerLifeId)
+                      "IncumbencyId", Encode.string (IncumbencyId.value p.IncumbencyId)
                       "SeedTodoRef", Encode.string (BlobRef.value p.SeedTodoRef)
                       "SeedTodoDigest", Encode.string (BlobDigest.value p.SeedTodoDigest) ]
             | MagicTodoFact.PrefixRebaseCommittedV2 p ->
                 Encode.object
                     [ "case", Encode.string "PrefixRebaseCommittedV2"
                       "SessionId", Encode.string (SessionId.value p.SessionId)
-                      "ManagerLifeId", encodeOptional (ManagerLifeId.value >> Encode.string) p.ManagerLifeId
+                      "IncumbencyId", encodeOptional (IncumbencyId.value >> Encode.string) p.IncumbencyId
                       "PreviousEpochId", Encode.int64 (PrefixEpochId.value p.PreviousEpochId)
                       "NextEpochId", Encode.int64 (PrefixEpochId.value p.NextEpochId)
                       "EvidenceKind", evidenceKindEncoder p.EvidenceKind
@@ -179,7 +180,7 @@ module MagicTodoFactCodec =
                 | "TodoWritePrepared" ->
                     MagicTodoFact.TodoWritePrepared
                         { ManagerSessionId = SessionId.create (get.Required.Field "ManagerSessionId" Decode.string)
-                          ManagerLifeId = ManagerLifeId.create (get.Required.Field "ManagerLifeId" Decode.string)
+                          IncumbencyId = IncumbencyId.create (get.Required.Field "IncumbencyId" Decode.string)
                           TodoWriteId = get.Required.Field "TodoWriteId" todoWriteIdDecoder
                           ToolCallId = ToolCallId.create (get.Required.Field "ToolCallId" Decode.string)
                           ToolPartOrdinal = get.Required.Field "ToolPartOrdinal" Decode.int
@@ -199,7 +200,7 @@ module MagicTodoFactCodec =
                           SemanticVersion = get.Required.Field "SemanticVersion" Decode.string }
                 | "TodoWriteAccepted" ->
                     MagicTodoFact.TodoWriteAccepted
-                        { ManagerLifeId = ManagerLifeId.create (get.Required.Field "ManagerLifeId" Decode.string)
+                        { IncumbencyId = IncumbencyId.create (get.Required.Field "IncumbencyId" Decode.string)
                           TodoWriteId = get.Required.Field "TodoWriteId" todoWriteIdDecoder
                           ToolCallId = ToolCallId.create (get.Required.Field "ToolCallId" Decode.string)
                           PreparedFactRef = EventId.create (get.Required.Field "PreparedFactRef" Decode.string)
@@ -211,15 +212,15 @@ module MagicTodoFactCodec =
                 | "LegacyTodoSeedAdopted" ->
                     MagicTodoFact.LegacyTodoSeedAdopted
                         { ManagerSessionId = SessionId.create (get.Required.Field "ManagerSessionId" Decode.string)
-                          ManagerLifeId = ManagerLifeId.create (get.Required.Field "ManagerLifeId" Decode.string)
+                          IncumbencyId = IncumbencyId.create (get.Required.Field "IncumbencyId" Decode.string)
                           SeedTodoRef = BlobRef.create (get.Required.Field "SeedTodoRef" Decode.string)
                           SeedTodoDigest = BlobDigest.create (get.Required.Field "SeedTodoDigest" Decode.string) }
                 | "PrefixRebaseCommittedV2" ->
                     MagicTodoFact.PrefixRebaseCommittedV2
                         { SessionId = SessionId.create (get.Required.Field "SessionId" Decode.string)
-                          ManagerLifeId =
-                            get.Optional.Field "ManagerLifeId" Decode.string
-                            |> Option.map ManagerLifeId.create
+                          IncumbencyId =
+                            get.Optional.Field "IncumbencyId" Decode.string
+                            |> Option.map IncumbencyId.create
                           PreviousEpochId = PrefixEpochId.create (get.Required.Field "PreviousEpochId" Decode.int64)
                           NextEpochId = PrefixEpochId.create (get.Required.Field "NextEpochId" Decode.int64)
                           EvidenceKind = get.Required.Field "EvidenceKind" evidenceKindDecoder

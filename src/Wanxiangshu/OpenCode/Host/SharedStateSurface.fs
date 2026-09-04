@@ -5,13 +5,11 @@ namespace Wanxiangshu.OpenCode
 /// singletons and RootWorkspace runtime stay opaque. Every operation
 /// closes over the same module-level singleton, so a mutation made through
 /// one import is visible through another — the behavioral proof that
-/// SessionParents / ReviewGuardNudges / RootWorkspace are live process singletons
+/// SessionParents / RootWorkspace are live singletons
 /// shared across plugin instances (root + worktree), not per-instance copies.
 module SharedStateSurface =
 
-    /// SessionParents: cross-instance parent registry. The worktree plugin's
-    /// VerdictTool reads the entry the root instance registered; a per-instance
-    /// Map would miss it and REVIEW-008 would fail closed.
+    /// SessionParents: cross-instance parent registry.
     let putSessionParent (childId: string) (parentId: string) : unit =
         SharedState.SessionParents.[childId] <- parentId
 
@@ -21,18 +19,6 @@ module SharedStateSurface =
         | false, _ -> null
 
     let clearSessionParents () : unit = SharedState.SessionParents.Clear()
-
-    /// ReviewGuardNudges: cross-instance at-most-once reservation. The key
-    /// must NOT contain RuntimeId (root + worktree would each send a twin
-    /// nudge for the same missing-verdict occasion).
-    let addReviewGuardNudge (key: string) : unit =
-        SharedState.ReviewGuardNudges.Add(key) |> ignore
-
-    let hasReviewGuardNudge (key: string) : bool =
-        SharedState.ReviewGuardNudges.Contains(key)
-
-    let clearReviewGuardNudges () : unit =
-        SharedState.clearReviewGuardNudgesForTests ()
 
     let tryBindRootWorkspace (path: string) : bool =
         (RootWorkspaceProcess.local ()).Binder.TryBind(Option.ofObj path)

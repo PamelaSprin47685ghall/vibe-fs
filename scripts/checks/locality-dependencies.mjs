@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { analyzeLocalityDependencies } from '../lib/locality-dependencies.mjs'
 import { materializeOwnerCompile, planImpactCompile } from '../lib/owner-compile.mjs'
-import { readOwnerProjectInventoryV1 } from './owner-projects.mjs'
+import { parseProject, readOwnerProjectInventoryV1 } from './owner-projects.mjs'
 
 export { readOwnerProjectInventoryV1 } from './owner-projects.mjs'
 
@@ -17,6 +17,8 @@ const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
 const AGGREGATE = join(SOURCE_ROOT, 'Wanxiangshu.fsproj')
 const SCANNER = join(ROOT, 'scripts/checks/locality-symbol-uses.fsx')
 const FABLE_LIBRARY = join(ROOT, 'node_modules/@fable-org/fable-library-js')
+const OWNER_PROJECT = /^Wanxiangshu\.Owner\..+\.fsproj$/
+
 
 const normalizePath = (value) => value.replace(/\\/g, '/')
 const repositoryPath = (value) => normalizePath(relative(ROOT, resolve(value)))
@@ -62,6 +64,20 @@ function fableToolDirectory() {
   for (const assembly of ['Fable.Compiler.dll', 'Fable.AST.dll', 'FSharp.Compiler.Service.dll'])
     if (!existsSync(join(directory, assembly))) throw new Error(`missing Fable ${version} compiler assembly: ${assembly}`)
   return directory
+}
+
+export function readLocalities(sourceRoot = SOURCE_ROOT) {
+  const projects = readdirSync(sourceRoot)
+    .filter((name) => OWNER_PROJECT.test(name))
+    .map((name) => parseProject(join(sourceRoot, name)))
+    .sort((left, right) => left.locality.localeCompare(right.locality))
+  const localityByProject = new Map(projects.map((project) => [project.projectPath, project.locality]))
+  return projects.map((project) => ({
+    id: project.locality,
+    owner: project.owner,
+    sources: project.compile,
+    references: project.references.map((path) => localityByProject.get(path) ?? repositoryPath(path)),
+  }))
 }
 
 export function scanCompilerObservationsV1({ aggregate = AGGREGATE, productionRoot = SOURCE_ROOT } = {}) {

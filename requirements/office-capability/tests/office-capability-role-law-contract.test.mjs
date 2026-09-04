@@ -38,15 +38,13 @@ test('WHAT[OFF-007] manager_has_no_personal_repository_witness', () => {
   assert.match(zh, /不以自己的双手去建立 repository 事实/)
 })
 
-test('WHAT[OFF-011] reviewer_consequence_is_readonly_judgement_not_repair', () => {
-  // Reviewer may inspect (read-only) and judge; it must not repair the work
-  // it judges (AGENT-014).
-  const en = readRole('reviewer', 'en.md')
-  const zh = readRole('reviewer', 'zh-CN.md')
-  assert.match(en, /Inspect the work independently where the judgment requires it/i)
-  assert.match(en, /You do not repair the work you judge/i)
-  assert.match(zh, /当 judgment 需要时，独立检查工作/)
-  assert.match(zh, /你不修复由你判断的工作/)
+test('WHAT[OFF-011] manager_audit_pending_consequence_is_readonly_assessment_not_mutation', () => {
+  // Manager in AuditPending phase has read-only inspection and ReviewAssessment
+  // permissions; it cannot mutate the worktree (OFF-011).
+  const en = readRole('manager', 'en.md')
+  const zh = readRole('manager', 'zh-CN.md')
+  assert.match(en, /do not establish repository facts with your own hands/i)
+  assert.match(zh, /不以自己的双手去建立 repository 事实/)
 })
 
 test('WHAT[OFF-012] orchestrator_commissions_manager_roads_not_phases', () => {

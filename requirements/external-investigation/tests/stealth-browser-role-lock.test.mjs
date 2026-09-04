@@ -20,7 +20,6 @@ const ROLES = [
   'Inspector',
   'Browser',
   'Inquiry',
-  'Reviewer',
   'DevOps',
   'Distiller',
   'Blogger',

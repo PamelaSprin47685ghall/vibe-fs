@@ -28,12 +28,11 @@ const readSrc = (rel) => readFileSync(join(ROOT, rel), 'utf8')
  * is waiting for from the name + arguments + return type alone.
  */
 const VOCABULARY_SURFACES = {
-  'Mission/Manager/Background': ['ensureSettled'],
-  'Mission/Manager/Idle': ['encourageLabor'],
-  'Mission/Manager/JobHandoff': ['completeIfTransferred'],
-  'Mission/Review/Judgement/Continuation': ['ensurePerfectConfirmed', 'ensureVerdictSubmitted'],
-  'Mission/Review/Judgement/Evidence': ['continuationOpen'],
+  'Mission/Manager/Workflow': ['observe', 'observeIdle'],
+  'Participant/Provider/Attempt/Fallback/Ledger': ['recordAuthorizedFailure'],
   'Participant/Provider/Attempt/Fallback/Workflow': ['continueAfterConfirmedFailure'],
+  'Execution/Session/Recovery/Workflow': ['recoverFamilyDirect'],
+  'Change/Program': ['run'],
 }
 
 /** DSL-013 rejected shapes: implementation-action names, not business promises. */
@@ -82,15 +81,12 @@ test('WHAT[STRUCTURED-WORKFLOW-008] SW_015_no_anonymous_middleware_framework_in_
 
 test('WHAT[STRUCTURED-WORKFLOW-007] every vocabulary binds owner_law_relation_and_executable_proof', () => {
   const OBLIGATIONS = [
-    ['ManagerBackground.ensureSettled', 'Mission/Manager/Background.fs', 'Mission.Manager'],
-    ['ManagerIdle.encourageLabor', 'Mission/Manager/Idle.fs', 'Mission.Manager'],
-    ['ReviewerContinuation.ensurePerfectConfirmed', 'Mission/Review/Judgement/Continuation.fs', 'Mission.Review'],
-    ['ReviewBarrierWorkflow.reverify', 'Mission/Review/Barrier/Reverify.fs', 'Mission.Review'],
+    ['ManagerWorkflow.observe', 'Mission/Manager/Workflow.fs', 'Mission.Manager'],
+    ['ManagerWorkflow.observeIdle', 'Mission/Manager/Workflow.fs', 'Mission.Manager'],
     ['FallbackLedger.recordAuthorizedFailure', 'Participant/Provider/Attempt/Fallback/Ledger.fs', 'Participant.Provider'],
     ['ProviderRecoveryWorkflow.continueAfterConfirmedFailure', 'Participant/Provider/Attempt/Fallback/Workflow.fs', 'Participant.Provider'],
-    ['FinalityCohort.reviewUntilFirstRevisionOrAllConfirmed', 'Mission/Finality/Cohort.fs', 'Mission.Finality'],
     ['SessionRecoveryWorkflow.recoverFamilyDirect', 'Execution/Session/Recovery/Workflow.fs', 'Execution.Session'],
-    ['Orchestrator.publishEventually', 'Change/Program.fs', 'Change'],
+    ['OrchestratorProgram.run', 'Change/Program.fs', 'Change'],
   ]
 
   const howPath = join(ROOT, 'requirements/structured-workflow/HOW.md')

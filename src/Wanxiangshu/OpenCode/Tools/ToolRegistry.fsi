@@ -8,7 +8,6 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host.Contract
-open Wanxiangshu.Mission.Review
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Strength
@@ -32,6 +31,9 @@ module ToolRegistry =
         [<Literal>]
         val DeniedUnestablished: string = "tool/registry/denied-unestablished"
 
+        [<Literal>]
+        val DeniedRelayPhase: string = "tool/registry/denied-relay-phase"
+
     /// ENF-006: the authority the execute gate resolves for a tool, so a
     /// consumer can tell an office tool from an internal leaf without guessing
     /// from the tool name.
@@ -53,22 +55,21 @@ module ToolRegistry =
         waitObserver: IWaitObserver ->
         rootWorkspace: IRootWorkspaceReader ->
         journal: AgentJournal option ->
-        gitTreePort: GitTreePort option ->
         workspaceDirectory: string option ->
         sessionParents: Dictionary<string, string> ->
         currentPhysicalUserMessage: (string -> string option) ->
-        verdictSubmissions: HashSet<string> ->
         sessionDirectories: Dictionary<string, string> ->
         onRunStarted: (SessionId -> Role -> string option -> unit) option ->
         parentWorkRecordFor: (string -> Task<string option>) option ->
         childWorkRecordFor: (string -> Task<string option>) option ->
         snapshot: ISessionSnapshotPort option ->
         cancelSignals: (SessionId seq -> unit) option ->
+        beginToolExecution: (string -> unit) ->
+        endToolExecution: (string -> unit) ->
         eventPort: IEventObservationPort option ->
         bloggerHost: IBloggerRuntimeHost option ->
         syncDelegateRuntime: SyncDelegateRuntime option ->
         strengthRuntime: StrengthRuntime option ->
-        finalityReviewerTimeoutMs: int option ->
         casebookToolSpecs: ToolSpec list ->
         jsTransactionPersistence: IJsTransactionPersistence option ->
             ToolRegistration

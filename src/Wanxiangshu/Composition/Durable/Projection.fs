@@ -17,9 +17,8 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -50,8 +49,6 @@ type SessionAgentProjection =
         /// both would make each change look like it moved the other.
         PrefixEpoch: ActivePrefixEpoch option
         Handles: AgentLinkageProjection option
-        ReviewGuard: ReviewGuardProjection option
-        ReviewRequirements: ReviewRequirementProjection option
         Fallback: FallbackProjection option
         PromptAuthority: PromptAuthority.PromptAuthorityProjection option
         /// ENFORCER-044/045/154: committed Blogger enforcement cycles for this
@@ -60,9 +57,8 @@ type SessionAgentProjection =
         Enforcement: EnforcementProjectionState option
         /// C5: open materializations + unified Entry|Squash receipts.
         BloggerCycles: BloggerCycleProjectionState option
-        /// GLORY-011: the Manager lifecycle (open Life, completed Lives).
-        /// Manager-only; other roles never receive a lifecycle fact.
-        ManagerLife: ManagerLifeProjection option
+        /// Relay Road/Incumbency projection for the single current Manager protocol.
+        Relay: RelayState option
         /// HOST-013: permanent auto-injected pairs for this transcript.
         Guidelines: GuidelineProjectionState option
         RequirementGrounding: RequirementGroundingProjectionState option
@@ -120,13 +116,11 @@ module AgentProjection =
           Blog = None
           PrefixEpoch = None
           Handles = None
-          ReviewGuard = None
-          ReviewRequirements = None
           Fallback = None
           PromptAuthority = None
           Enforcement = None
           BloggerCycles = None
-          ManagerLife = None
+          Relay = None
           Guidelines = None
           RequirementGrounding = None
           TipDelivery = None

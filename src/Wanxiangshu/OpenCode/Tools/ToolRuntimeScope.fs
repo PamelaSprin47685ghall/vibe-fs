@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
@@ -14,8 +15,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
@@ -34,19 +34,16 @@ type ToolRuntimeScope
         waitObserver: IWaitObserver,
         rootWorkspace: IRootWorkspaceReader,
         journal: AgentJournal option,
-        gitTreePort: GitTreePort option,
         workspaceDirectory: string option,
         sessionParents: Dictionary<string, string>,
         currentPhysicalUserMessage: string -> string option,
-        verdictSubmissions: HashSet<string>,
         sessionDirectories: Dictionary<string, string>,
         onRunStarted: (SessionId -> Role -> string option -> unit) option,
         parentWorkRecordFor: (string -> Task<string option>) option,
         childWorkRecordFor: (string -> Task<string option>) option,
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
-        ?eventPort: IEventObservationPort,
-        ?finalityReviewerTimeoutMs: int
+        ?eventPort: IEventObservationPort
     ) =
 
     let gate = obj ()
@@ -55,8 +52,8 @@ type ToolRuntimeScope
     let runtimes = Dictionary<string, HostForkRuntime>()
     // DSL-MUTABLE: resource — per-session executor runtime registry
     let executorRuntimes = Dictionary<string, HostForkRuntime>()
-    // DSL-MUTABLE: resource — reviewer tree port registry
-    let treePorts = Dictionary<string, GitTreePort>()
+    // DSL-MUTABLE: retirement admission fence — exact logical incumbency, never the reusable physical session.
+    let retirementFrozen = Dictionary<string, IncumbencyId>()
     // DSL-MUTABLE: resource — per-session orchestrator host registry
     let orchestratorHosts = Dictionary<string, OrchestratorHost>()
     let onCancelSignals = defaultArg cancelSignals ignore
@@ -77,7 +74,6 @@ type ToolRuntimeScope
         journal |> Option.map (DelegationHandoffLedger.port workRecordCapability)
 
     let terminalPort = eventPort
-    let finalityTimeoutMs = finalityReviewerTimeoutMs
     // DSL-MUTABLE: resource — tool runtime dispose latch
     let mutable disposed = false
     // DSL-MUTABLE: resource — async tool-callback admission latch.
@@ -187,21 +183,7 @@ type ToolRuntimeScope
             childWorkRecordFor = (fun childId -> childRecord (SessionId.value childId)),
             ?handoff = reusableHandoff,
             ?sessionSnapshot = snapshot,
-            cancelSignals = onCancelSignals,
-            treeHashFor =
-                (fun agentId ->
-                    // 主会话（无父）的目录从未经 RegisterChildDirectory 注册——
-                    // 兜底主 workspace，否则 Manager 自己 fork 的 Reviewer 永远
-                    // 打不开 barrier（REVIEW-008 fail closed 拒绝 verdict）。
-                    directoryFor agentId
-                    |> Option.orElse workspaceDirectory
-                    |> Option.map (fun path ->
-                        let tree = GitTree.create path
-
-                        try
-                            GitTreeHash.create (tree.GetTreeHash())
-                        with _ ->
-                            GitTreeHash.create "NO_HEAD_TREE"))
+            cancelSignals = onCancelSignals
         )
 
     let getOrCreateRuntime ownerKey =
@@ -375,7 +357,15 @@ type ToolRuntimeScope
         | true, seconds when seconds > 0.0 && not (Double.IsInfinity seconds) -> TimeSpan.FromSeconds seconds
         | _ -> ProcessEstimate.DefaultHardLimit
 
-    member _.FinalityReviewerTimeoutMs = finalityTimeoutMs
+    let relayRoadView (sessionId: string) =
+        let roadId = RoadId.create sessionId
+
+        journal
+        |> Option.bind (fun durable ->
+            AgentProjection.tryFind (SessionId.create sessionId) (AgentJournal.snapshot durable).AgentProjections)
+        |> Option.bind (fun session -> session.Relay)
+        |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay roadId)
+
     member _.Sessions = sessions
     member _.WaitObserver = waitObserver
     member _.RootWorkspace = rootWorkspace
@@ -384,8 +374,7 @@ type ToolRuntimeScope
     member _.EventPort = terminalPort
     member _.WorkspaceDirectory = workspaceDirectory
     member _.ActiveProfileFor(sessionId: SessionId) = activeProfileFor sessionId
-    /// GLORY-003: the run-started callback wired by the plugin bootstrap, exposed
-    /// so the Finality workflow's hidden Reviewer binds the same reconciler.
+    /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member _.RunStarted = onStarted
 
     /// EXEC-011: the administrator's ceiling on any single process.
@@ -418,6 +407,108 @@ type ToolRuntimeScope
 
     member _.RoleFor(ctx: HostToolContext) = roleFor ctx
     member _.EnsureRoleFor(ctx: HostToolContext) = ensureRoleFor ctx
+
+    member _.ManagerPhaseFor(sessionId: string) =
+        let roadView = relayRoadView sessionId
+
+        let managerPhaseOfView (view: RoadView) =
+            match view.ActivePhase with
+            | Some IncumbencyPhase.AuditPending -> ManagerCapabilityPhase.AuditPending
+            | Some IncumbencyPhase.WorkOwned -> ManagerCapabilityPhase.WorkOwned
+            | Some IncumbencyPhase.PerfectAwaitingRetirement -> ManagerCapabilityPhase.PerfectAwaitingRetirement
+            | Some IncumbencyPhase.RetirementCleanupBlocked -> ManagerCapabilityPhase.RetirementCleanupBlocked
+            | None -> ManagerCapabilityPhase.Retired
+
+        roadView
+        |> Option.map managerPhaseOfView
+        |> Option.defaultValue ManagerCapabilityPhase.AuditPending
+
+    member _.TryFreezeRetirement(sessionId: string, incumbentId: IncumbencyId) =
+        lock gate (fun () ->
+            match retirementFrozen.TryGetValue sessionId with
+            | true, current when current = incumbentId -> false
+            | _ ->
+                retirementFrozen.[sessionId] <- incumbentId
+                true)
+
+    member _.UnfreezeRetirement(sessionId: string) =
+        lock gate (fun () -> retirementFrozen.Remove sessionId |> ignore)
+
+    member _.IsRetirementFrozen(sessionId: string) =
+        let activeIncumbency =
+            relayRoadView sessionId |> Option.bind (fun road -> road.ActiveIncumbency)
+
+        lock gate (fun () ->
+            match retirementFrozen.TryGetValue sessionId, activeIncumbency with
+            | (false, _), _ -> false
+            | (true, frozen), Some active when active <> frozen ->
+                retirementFrozen.Remove sessionId |> ignore
+                false
+            | (true, _), _ -> true)
+
+    member _.RetirementBlockersFor(sessionId: string) =
+        let parentOf candidate =
+            match sessionParents.TryGetValue candidate with
+            | true, parent -> Some parent
+            | _ -> None
+
+        let rec belongsToRoot (candidate: string) visited =
+            if candidate = sessionId then
+                true
+            elif Set.contains candidate visited then
+                false
+            else
+                parentOf candidate
+                |> Option.exists (fun parent -> belongsToRoot parent (Set.add candidate visited))
+
+        let runtimeBlockers prefix ownerKey (runtime: HostForkRuntime) =
+            let agents =
+                runtime.SnapshotOutstandingAgentRuns()
+                |> List.map (fun (handle, child) ->
+                    sprintf "%s:%s:agent:%s:%s" prefix ownerKey handle (SessionId.value child))
+
+            if List.isEmpty agents then
+                ignore (runtime.Runtime.DrainAgentWakes 32)
+
+            let ptys =
+                runtime.SnapshotOutstandingPtyRuns()
+                |> List.map (fun pty -> sprintf "%s:%s:pty:%s" prefix ownerKey pty)
+
+            let pending =
+                [ if runtime.PendingRunCount > 0 then
+                      yield sprintf "%s:%s:pending-runs:%d" prefix ownerKey runtime.PendingRunCount
+
+                  if runtime.PendingCompletionCount > 0 then
+                      yield sprintf "%s:%s:pending-completions:%d" prefix ownerKey runtime.PendingCompletionCount ]
+
+            agents @ ptys @ pending
+
+        lock gate (fun () ->
+            let forkBlockers =
+                runtimes
+                |> Seq.collect (fun pair ->
+                    if belongsToRoot pair.Key Set.empty then
+                        runtimeBlockers "fork" pair.Key pair.Value
+                    else
+                        [])
+                |> Seq.toList
+
+            let executorBlockers =
+                executorRuntimes
+                |> Seq.collect (fun pair ->
+                    if belongsToRoot pair.Key Set.empty then
+                        runtimeBlockers "executor" pair.Key pair.Value
+                    else
+                        [])
+                |> Seq.toList
+
+            let toolOwned =
+                if ownedWorkCount > 0 then
+                    [ sprintf "tool-owned-work:%d" ownedWorkCount ]
+                else
+                    []
+
+            (forkBlockers @ executorBlockers @ toolOwned) |> List.distinct |> List.sort)
 
     /// AGENT-013 + PROMPT-008: the managed agent a PTY is opened for.
     member _.ManagedAgentFor(ctx: HostToolContext) = managedAgentFor ctx
@@ -496,7 +587,6 @@ type ToolRuntimeScope
                           OnChildCreated = fun _ role childId -> registerChild sessionId role childId
                           RegisterChildDirectory =
                             fun childId path -> sessionDirectories.[SessionId.value childId] <- path
-                          RegisterReviewerTree = fun reviewerId port -> treePorts.[reviewerId] <- port
                           OnRunStarted = onStarted
                           RepoPath = defaultArg workspaceDirectory "."
                           TargetBranch = ""
@@ -507,29 +597,6 @@ type ToolRuntimeScope
 
                 orchestratorHosts.[sessionId] <- host
                 host)
-
-    member _.TreePortFor(reviewerId: string) =
-        match treePorts.TryGetValue reviewerId with
-        | true, port -> Some port
-        | false, _ -> gitTreePort
-
-    member _.MarkVerdictSubmitted(reviewerId: string, physicalUserMessageId: PhysicalUserMessageId) =
-        lock gate (fun () ->
-            let sessionId = SessionId.create reviewerId
-
-            verdictSubmissions
-            |> Seq.filter (JudgementRequestIdentity.belongsTo sessionId)
-            |> Seq.toArray
-            |> Array.iter (fun existing -> verdictSubmissions.Remove existing |> ignore)
-
-            JudgementRequestIdentity.key sessionId physicalUserMessageId
-            |> verdictSubmissions.Add
-            |> ignore)
-
-    member _.HasVerdictSubmitted(reviewerId: string, physicalUserMessageId: PhysicalUserMessageId) =
-        lock gate (fun () ->
-            JudgementRequestIdentity.key (SessionId.create reviewerId) physicalUserMessageId
-            |> verdictSubmissions.Contains)
 
     member _.RunOwnedWork(start: unit -> Task) : bool =
         let admitted =
@@ -649,7 +716,6 @@ type ToolRuntimeScope
                         Some current
                     | false, _ -> None
 
-                treePorts.Remove sessionId |> ignore
                 owned |> Seq.toList, host)
 
         task {
@@ -678,7 +744,6 @@ type ToolRuntimeScope
                     runtimes.Clear()
                     executorRuntimes.Clear()
                     orchestratorHosts.Clear()
-                    treePorts.Clear()
 
                     ownedForkRuntimes, ownedOrchestrators)
 

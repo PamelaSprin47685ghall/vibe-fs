@@ -31,6 +31,8 @@ module ChangeSurface =
 
     val unwrapFold: result: obj -> obj
 
+    val observeRelayProgram: scenarioName: string -> Task<obj>
+
     val createGit: repo: string -> runner: obj -> obj
 
     val gitIsDirty: git: obj -> path: string -> Task<bool>
@@ -82,7 +84,3 @@ module ChangeSurface =
     val releaseGate: gate: obj -> Task<unit>
 
     val disposeGate: gate: obj -> Task<unit>
-
-    val observeProgramGateScope: scenario: string -> Task<obj>
-
-    val observeMovedTargetRecovery: unit -> Task<obj>

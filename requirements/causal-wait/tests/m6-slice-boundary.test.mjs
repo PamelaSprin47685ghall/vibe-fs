@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readOwnerProjectInventoryV1 } from '../../../scripts/checks/owner-projects.mjs'
+import { assertEffectIsInjected, assertPureContract } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
 const locality = (inventory, id) => {
   const matches = inventory.localities.filter((candidate) => candidate.id === id)
@@ -43,7 +44,6 @@ test('WHAT[CAUSAL-009] production inventory separates contract runtime adapter m
   for (const id of [
     'delegation-runtime-surface',
     'git-integrationgate',
-    'mission-finality-prompt',
     'opencode-host-pluginruntimescope',
   ]) {
     const composition = locality(inventory, id)
@@ -66,4 +66,9 @@ test('WHAT[CAUSAL-009] production inventory separates contract runtime adapter m
     [],
     'proof surface must not provide production capability',
   )
+})
+
+test('WHAT[CAUSAL-009] causal wait contract excludes registry diagnostics mailbox and proof runtime', () => {
+  assertPureContract('capability-type-only')
+  assertEffectIsInjected('console')
 })

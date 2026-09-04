@@ -10,7 +10,6 @@ type Role =
     | Inspector
     | Browser
     | Inquiry
-    | Reviewer
     | DevOps
     | Distiller
     | Blogger
@@ -24,7 +23,6 @@ module Roles =
           Role.DevOps
           Role.Browser
           Role.Inquiry
-          Role.Reviewer
           Role.Orchestrator
           Role.Distiller
           Role.Blogger ]
@@ -39,7 +37,6 @@ module Roles =
         | Role.DevOps -> "devops"
         | Role.Browser -> "browser"
         | Role.Inquiry -> "inquiry"
-        | Role.Reviewer -> "reviewer"
         | Role.Distiller -> "distiller"
         | Role.Blogger -> "blogger"
 
@@ -52,7 +49,6 @@ module Roles =
         | "devops" -> Some Role.DevOps
         | "browser" -> Some Role.Browser
         | "inquiry" -> Some Role.Inquiry
-        | "reviewer" -> Some Role.Reviewer
         | "distiller" -> Some Role.Distiller
         | "blogger" -> Some Role.Blogger
         | _ -> None

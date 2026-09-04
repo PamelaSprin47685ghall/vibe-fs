@@ -9,9 +9,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
-open Wanxiangshu.Mission.Review.Barrier
 
 type JournalChange =
     { Revision: JournalRevision
@@ -48,9 +46,6 @@ type AgentJournal =
         fact: MagicTodoFact ->
             Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>>
 
-    member AppendManagerLifecycle:
-        stream: StreamId -> fact: ManagerLifecycleFact -> Task<Result<ProjectionSet, JournalAppendFailure>>
-
     member AwaitChangeFrom: fromRevision: JournalRevision -> Task<JournalChange>
 
     member AwaitChangeFromOrCancel:
@@ -81,12 +76,6 @@ module AgentJournal =
         journal: AgentJournal ->
             Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>>
 
-    val appendManagerLifecycle:
-        stream: StreamId ->
-        fact: ManagerLifecycleFact ->
-        journal: AgentJournal ->
-            Task<Result<ProjectionSet, JournalAppendFailure>>
-
     val snapshot: journal: AgentJournal -> ProjectionSet
     val revision: journal: AgentJournal -> JournalRevision
     val snapshotWithRevision: journal: AgentJournal -> ProjectionSet * JournalRevision
@@ -102,4 +91,3 @@ module AgentJournal =
     val runtimeId: journal: AgentJournal -> RuntimeId
     val writeBlob: content: string -> journal: AgentJournal -> Task<Result<BlobWriteReceipt, string>>
     val isPoisoned: journal: AgentJournal -> bool
-    val pendingReviewRequirements: journal: AgentJournal option -> sessionId: SessionId -> ReviewRequirementInput list

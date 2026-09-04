@@ -94,7 +94,7 @@ module ManagedAgent =
         if name.IndexOf("inspect", StringComparison.OrdinalIgnoreCase) >= 0 then
             " Use 'inspector'."
         elif name.IndexOf("review", StringComparison.OrdinalIgnoreCase) >= 0 then
-            " Use 'reviewer'."
+            " Use 'manager'."
         elif name.IndexOf("manager", StringComparison.OrdinalIgnoreCase) >= 0 then
             " Use 'manager'."
         elif name.IndexOf("coder", StringComparison.OrdinalIgnoreCase) >= 0 then

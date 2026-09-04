@@ -15,7 +15,6 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 
 /// Local payload writer for EventStore journals.
@@ -149,14 +148,6 @@ module JournalPayloadClosure =
                 pair p.AggregateWorkRecordRef p.AggregateWorkRecordDigest
             | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionConverged p)) ->
                 pair p.AggregateWorkRecordRef p.AggregateWorkRecordDigest
-            | Fact.ManagerLifecycle(ManagerLifecycleFact.LifeOpened p) -> pair p.OpeningTextRef p.OpeningTextDigest
-            | Fact.ManagerLifecycle(ManagerLifecycleFact.FinalityRequested p) -> pair p.LastWordsRef p.LastWordsDigest
-            | Fact.ManagerLifecycle(ManagerLifecycleFact.FinalityRejected p) -> pair p.WorkRecordRef p.WorkRecordDigest
-            | Fact.ManagerLifecycle(ManagerLifecycleFact.FinalitySiblingSteered p) ->
-                pair p.WorkRecordRef p.WorkRecordDigest
-            | Fact.ManagerLifecycle(ManagerLifecycleFact.FinalityBlessed p) ->
-                pair p.WorkRecordBundleRef p.WorkRecordBundleDigest
-            | Fact.ManagerLifecycle(ManagerLifecycleFact.LifeCompleted p) -> pair p.TerminalRef p.TerminalDigest
             | _ -> []
 
         PayloadRefs.canonicalize refs

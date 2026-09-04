@@ -59,7 +59,7 @@ type ICompletionMailbox<'agent, 'pty, 'interrupt, 'wake> =
 ///
 /// Wait observation may describe a suspended CE; it must never decide a branch,
 /// mint a permit, write Journal, recover, dedupe, or influence PromptAuthority /
-/// Finality / Reviewer / Manager decisions.
+/// Retirement / Manager decisions.
 ///
 /// WaitKind / Subject strings exist only for diagnostics render — they are not
 /// Domain vocabulary.

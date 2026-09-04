@@ -92,20 +92,6 @@ module PromptDispatcherSend =
             onAccepted: (PhysicalUserMessageId -> unit) option ->
                 Task<Result<PromptKey, string>>
 
-        member SendManagerIdleEncouragement:
-            port: ISessionHostPort ->
-            sessionId: SessionId ->
-            text: string ->
-            lifeId: ManagerLifeId ->
-            conditionKey: string ->
-            terminalProviderRun: ProviderRunIdentity ->
-            profile: PromptAuthority.AuthorityExecutionProfile ->
-            effectiveAgent: string ->
-            directory: string option ->
-            awaitMode: PromptDispatcher.AwaitMode ->
-            onAccepted: (PhysicalUserMessageId -> unit) option ->
-                Task<Result<PromptKey, string>>
-
         member internal SendIdleContinuation:
             port: ISessionHostPort ->
             sessionId: SessionId ->
@@ -140,20 +126,6 @@ module PromptDispatcherSend =
             requestId: BloggerRequestId ->
             terminalProviderRun: ProviderRunIdentity ->
             repairKind: string ->
-            profile: PromptAuthority.AuthorityExecutionProfile ->
-            effectiveAgent: string ->
-            directory: string option ->
-            awaitMode: PromptDispatcher.AwaitMode ->
-            physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) ->
-                Task<PromptDispatcher.SendAttemptOutcome>
-
-        member internal SendIdleManagerIdleEncouragement:
-            port: ISessionHostPort ->
-            sessionId: SessionId ->
-            text: string ->
-            lifeId: ManagerLifeId ->
-            conditionKey: string ->
-            terminalProviderRun: ProviderRunIdentity ->
             profile: PromptAuthority.AuthorityExecutionProfile ->
             effectiveAgent: string ->
             directory: string option ->

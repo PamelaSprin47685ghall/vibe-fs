@@ -22,7 +22,7 @@ type ToolPermission =
     | Exec
     | Pty
     | Network
-    | Judge
+    | ReviewAssessment
     | Chronicle
     /// CASE-009: conditional Casebook read surface for Coder/Inspector.
     | Fetch
@@ -34,13 +34,25 @@ type ToolPermission =
     | Sphinx
 
 [<RequireQualifiedAccess>]
+type ManagerCapabilityPhase =
+    | AuditPending
+    | WorkOwned
+    | PerfectAwaitingRetirement
+    | RetirementCleanupBlocked
+    | Retired
+
+[<RequireQualifiedAccess>]
 module OfficeCapability =
 
     let permissions (role: Role) : ToolPermission Set =
         match role with
         | Role.Manager ->
             set
-                [ ToolPermission.Fork
+                [ ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.ReviewAssessment
+                  ToolPermission.Fork
                   ToolPermission.Join
                   ToolPermission.Horizon
                   ToolPermission.TodoWrite
@@ -76,12 +88,6 @@ module OfficeCapability =
                   ToolPermission.Network
                   ToolPermission.Fission ]
         | Role.Inquiry -> set [ ToolPermission.Inspect; ToolPermission.Sphinx; ToolPermission.Fission ]
-        | Role.Reviewer ->
-            set
-                [ ToolPermission.Read
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Judge ]
         | Role.DevOps ->
             set
                 [ ToolPermission.Pty
@@ -99,3 +105,44 @@ module OfficeCapability =
 
     let isAllowed (role: Role) (permission: ToolPermission) : bool =
         permissions role |> Set.contains permission
+
+    let private managerPermissions phase =
+        match phase with
+        | ManagerCapabilityPhase.AuditPending ->
+            set
+                [ ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Join
+                  ToolPermission.ReviewAssessment
+                  ToolPermission.Finality ]
+        | ManagerCapabilityPhase.WorkOwned ->
+            set
+                [ ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Fork
+                  ToolPermission.Join
+                  ToolPermission.Horizon
+                  ToolPermission.TodoWrite
+                  ToolPermission.Fission
+                  ToolPermission.Finality ]
+        | ManagerCapabilityPhase.PerfectAwaitingRetirement ->
+            set
+                [ ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Join
+                  ToolPermission.Finality ]
+        | ManagerCapabilityPhase.RetirementCleanupBlocked ->
+            set [ ToolPermission.Read; ToolPermission.Join; ToolPermission.Finality ]
+        | ManagerCapabilityPhase.Retired -> Set.empty
+
+    let permissionsForPhase role phase =
+        match role, phase with
+        | Role.Manager, Some managerPhase -> managerPermissions managerPhase
+        | Role.Manager, None -> managerPermissions ManagerCapabilityPhase.AuditPending
+        | _ -> permissions role
+
+    let isAllowedForPhase role phase permission =
+        permissionsForPhase role phase |> Set.contains permission

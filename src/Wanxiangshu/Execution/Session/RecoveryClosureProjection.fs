@@ -17,7 +17,6 @@ module RecoveryClosureProjection =
         | RecoveryNode.Blogger(_, id)
         | RecoveryNode.Companion(_, id)
         | RecoveryNode.AgentChild(_, id, _)
-        | RecoveryNode.Reviewer(_, id)
         | RecoveryNode.ManagerJob(_, id)
         | RecoveryNode.WorkSession id -> SessionId.value id
 
@@ -46,8 +45,7 @@ module RecoveryClosureProjection =
         (record: HandleRecord)
         =
         ignore (linkedChildIds.Add(SessionId.value record.ChildSessionId))
-        // GLORY-002 / SURFACE-006: the hidden Finality Reviewer is not part
-        // of the parent's recovery family; the Host-owned workflow owns it.
+
         match record.Ownership, record.Lifecycle, HandleId.tryAgent record.Handle with
         | HandleOwnership.HostOwnedHidden, _, _ -> ()
         | _, HandleLifecycle.Retired, _
@@ -149,8 +147,7 @@ module RecoveryClosureProjection =
             function
             | RecoveryNode.Blogger _ -> 0
             | RecoveryNode.Companion _ -> 1
-            | RecoveryNode.AgentChild _
-            | RecoveryNode.Reviewer _ -> 2
+            | RecoveryNode.AgentChild _ -> 2
             | RecoveryNode.ManagerJob _ -> 3
             | RecoveryNode.WorkSession _ -> 4
 

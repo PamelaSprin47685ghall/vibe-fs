@@ -8,7 +8,7 @@ type Orchestrator =
     new:
         observer: IWaitObserver *
         git: GitPort *
-        manager: ManagerPort *
+        relay: RelayPort *
         repoPath: string *
         targetRef: TargetRef *
         ?journal: OrchestratorJournalPort *
@@ -25,8 +25,6 @@ type Orchestrator =
             Task<Result<OrchestratorHandle, OrchestratorVerdict>>
 
     member RecoverManagerJob: record: ManagerJobProjection -> unit
-
-    member ContinueManager: jobId: ManagerJobId * prompt: string -> Task<Result<WorktreePath, string>>
 
     member JoinPublishedBatch:
         maxCount: int * interrupt: Task<JoinInterruptReason> -> Task<JoinWaitOutcome<OrchestratorVerdict>>

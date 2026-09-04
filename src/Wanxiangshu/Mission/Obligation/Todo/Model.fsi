@@ -2,6 +2,7 @@ namespace Wanxiangshu.Mission.Obligation.Todo
 
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Relay
 
 module MagicTodo =
     type TodoWriteId = private TodoWriteId of string
@@ -11,7 +12,7 @@ module MagicTodo =
         val value: TodoWriteId -> string
 
     [<Literal>]
-    val SemanticVersion: string = "magic-todo.v5"
+    val SemanticVersion: string = "magic-todo.v6"
 
     [<RequireQualifiedAccess>]
     type ObligationHorizon =
@@ -46,7 +47,7 @@ module MagicTodo =
         | IdentityCorruption of field: string
         | FirstSuicideWithoutCheckpoint
 
-    val todoWriteId: sha256: (string -> string) -> lifeId: ManagerLifeId -> toolCallId: ToolCallId -> TodoWriteId
+    val todoWriteId: sha256: (string -> string) -> incumbencyId: IncumbencyId -> toolCallId: ToolCallId -> TodoWriteId
     val canonicalObligationListWire: items: ObligationList -> string
     val obligationListDigest: sha256: (string -> string) -> items: ObligationList -> string
     val validateObligations: items: ObligationList -> Result<ObligationList, MagicTodoReject>
@@ -54,7 +55,7 @@ module MagicTodo =
     val admitTodowriteBatch: toolCallIdsInMessage: ToolCallId list -> Result<unit, MagicTodoReject>
 
     type PreparedIdentity =
-        { ManagerLifeId: ManagerLifeId
+        { IncumbencyId: IncumbencyId
           ProviderInputDigest: string
           BaseTodoDigest: string
           ToolPartOrdinal: int }

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Change
 
 open System
+open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
@@ -10,6 +11,7 @@ open Wanxiangshu.Process
 open Wanxiangshu.Git
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Mission.Relay
 
 /// JS-native boundary for change integration. Job projections and git/worktree
 /// resources stay behind opaque handles; answers and failures are plain objects.
@@ -67,7 +69,12 @@ module ChangeSurface =
     let private jobId value = ManagerJobId.create (stringOf value)
     let private sessionId value = SessionId.create (stringOf value)
     let private commit value = CommitHash.create (stringOf value)
-    let private barrier value = ReviewBarrierId.create (stringOf value)
+
+    let private snapshotId value =
+        WorkspaceSnapshotId.create (stringOf value)
+
+    let private certificateId value =
+        QualityCertificateId.create (stringOf value)
 
     let private worktreeIdentityValue value =
         WorktreeIdentity.create (stringOf value)
@@ -93,14 +100,16 @@ module ChangeSurface =
             OrchestratorProjection.recordCandidateReady
                 managerJobId
                 {| CandidateCommit = commit (field payload [ "candidateCommit"; "CandidateCommit" ])
-                   PreRebaseReviewBarrierId =
-                    barrier (field payload [ "preRebaseReviewBarrierId"; "PreRebaseReviewBarrierId" ]) |}
+                   WorkspaceSnapshotId = snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ])
+                   QualityCertificateId =
+                    certificateId (field payload [ "qualityCertificateId"; "QualityCertificateId" ]) |}
                 projection
         | "ConflictDetected" ->
             OrchestratorProjection.recordConflictDetected
                 managerJobId
                 {| CandidateCommit = commit (field payload [ "candidateCommit"; "CandidateCommit" ])
                    TargetHeadSnapshot = commit (field payload [ "targetHeadSnapshot"; "TargetHeadSnapshot" ])
+                   WorkspaceSnapshotId = snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ])
                    ConflictFiles = stringArray (field payload [ "conflictFiles"; "ConflictFiles" ]) |> Array.toList
                    DiagnosticsDigest = stringField payload [ "diagnosticsDigest"; "DiagnosticsDigest" ] |}
                 projection
@@ -109,8 +118,7 @@ module ChangeSurface =
                 managerJobId
                 {| RebasedCommit = commit (field payload [ "rebasedCommit"; "RebasedCommit" ])
                    TargetHeadSnapshot = commit (field payload [ "targetHeadSnapshot"; "TargetHeadSnapshot" ])
-                   PostRebaseReviewBarrierId =
-                    barrier (field payload [ "postRebaseReviewBarrierId"; "PostRebaseReviewBarrierId" ]) |}
+                   WorkspaceSnapshotId = snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]) |}
                 projection
         | "PublishClaimed" ->
             OrchestratorProjection.recordPublishClaimed
@@ -391,6 +399,444 @@ module ChangeSurface =
         else
             field result [ "value" ]
 
+    [<RequireQualifiedAccess>]
+    type private ProgramScenarioSignal =
+        | QualityCandidate of snapshot: string
+        | Retired
+        | Exceptional of reason: string
+
+    [<RequireQualifiedAccess>]
+    type private ProgramScenarioRebase =
+        | Ok of resultingHead: string
+        | Error of reason: string
+
+    [<RequireQualifiedAccess>]
+    type private ProgramScenarioFf =
+        | Ok of landedHead: string
+        | TargetMoved
+
+    type private ProgramScenario =
+        { InitialHead: string
+          InitialTarget: string
+          InitialRebasedTarget: string option
+          Signals: ProgramScenarioSignal list
+          Snapshots: string list
+          TargetReads: string list
+          RebaseResults: ProgramScenarioRebase list
+          ConflictReads: string list list
+          FfResults: ProgramScenarioFf list }
+
+    let private programScenario name =
+        match name with
+        | "fresh" ->
+            { InitialHead = "candidate-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals =
+                [ ProgramScenarioSignal.QualityCandidate "snapshot-1"
+                  ProgramScenarioSignal.QualityCandidate "snapshot-rebased-1" ]
+              Snapshots = [ "snapshot-1"; "snapshot-rebased-1"; "snapshot-rebased-1" ]
+              TargetReads = [ "target-1"; "target-1"; "target-1" ]
+              RebaseResults = [ ProgramScenarioRebase.Ok "rebased-1" ]
+              ConflictReads = [ []; [] ]
+              FfResults = [ ProgramScenarioFf.Ok "rebased-1" ] }
+        | "rebase-conflict" ->
+            { InitialHead = "candidate-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals =
+                [ ProgramScenarioSignal.QualityCandidate "snapshot-1"
+                  ProgramScenarioSignal.Exceptional "scenario-complete" ]
+              Snapshots = [ "snapshot-1"; "snapshot-conflict" ]
+              TargetReads = [ "target-1" ]
+              RebaseResults = [ ProgramScenarioRebase.Error "rebase conflict" ]
+              ConflictReads = [ []; [ "conflict.fs" ] ]
+              FfResults = [] }
+        | "target-moved" ->
+            { InitialHead = "rebased-1"
+              InitialTarget = "target-2"
+              InitialRebasedTarget = Some "target-1"
+              Signals =
+                [ ProgramScenarioSignal.QualityCandidate "snapshot-rebased-1"
+                  ProgramScenarioSignal.Exceptional "scenario-complete" ]
+              Snapshots = [ "snapshot-rebased-1"; "snapshot-rebased-2" ]
+              TargetReads = [ "target-2" ]
+              RebaseResults = [ ProgramScenarioRebase.Ok "rebased-2" ]
+              ConflictReads = [ [] ]
+              FfResults = [] }
+        | "cas-miss" ->
+            { InitialHead = "rebased-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = Some "target-1"
+              Signals =
+                [ ProgramScenarioSignal.QualityCandidate "snapshot-rebased-1"
+                  ProgramScenarioSignal.Exceptional "scenario-complete" ]
+              Snapshots = [ "snapshot-rebased-1"; "snapshot-rebased-2" ]
+              TargetReads = [ "target-1"; "target-1"; "target-2" ]
+              RebaseResults = [ ProgramScenarioRebase.Ok "rebased-2" ]
+              ConflictReads = [ [] ]
+              FfResults = [ ProgramScenarioFf.TargetMoved ] }
+        | "stale-certificate" ->
+            { InitialHead = "candidate-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals =
+                [ ProgramScenarioSignal.QualityCandidate "snapshot-certified"
+                  ProgramScenarioSignal.Exceptional "scenario-complete" ]
+              Snapshots = [ "snapshot-current" ]
+              TargetReads = []
+              RebaseResults = []
+              ConflictReads = []
+              FfResults = [] }
+        | "artifact-conflict" ->
+            { InitialHead = "candidate-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals =
+                [ ProgramScenarioSignal.QualityCandidate "snapshot-1"
+                  ProgramScenarioSignal.Exceptional "scenario-complete" ]
+              Snapshots = [ "snapshot-1" ]
+              TargetReads = [ "target-1" ]
+              RebaseResults = []
+              ConflictReads = [ [ "conflict.fs" ] ]
+              FfResults = [] }
+        | "retired" ->
+            { InitialHead = "candidate-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals =
+                [ ProgramScenarioSignal.Retired
+                  ProgramScenarioSignal.Exceptional "scenario-complete" ]
+              Snapshots = []
+              TargetReads = []
+              RebaseResults = []
+              ConflictReads = []
+              FfResults = [] }
+        | unknown -> invalidArg "scenario" ("unknown Change program scenario: " + unknown)
+
+    let private programFactName fact =
+        match fact with
+        | AgentFact.Orchestrator value ->
+            match value with
+            | OrchestratorFactCases.ManagerJobCreated _ -> "ManagerJobCreated"
+            | OrchestratorFactCases.CandidateReady _ -> "CandidateReady"
+            | OrchestratorFactCases.ConflictDetected _ -> "ConflictDetected"
+            | OrchestratorFactCases.RebasedCandidateReady _ -> "RebasedCandidateReady"
+            | OrchestratorFactCases.PublishClaimed _ -> "PublishClaimed"
+            | OrchestratorFactCases.Published _ -> "Published"
+            | OrchestratorFactCases.JobFailed _ -> "JobFailed"
+            | OrchestratorFactCases.JobAbandoned _ -> "JobAbandoned"
+            | OrchestratorFactCases.WorktreeCreateRequested _ -> "WorktreeCreateRequested"
+            | OrchestratorFactCases.WorktreeCreated _ -> "WorktreeCreated"
+        | _ -> "Other"
+
+    let private scenarioBinding tag =
+        { PhysicalUserMessageId = "physical-" + tag
+          ProviderRunId = "provider-" + tag
+          ToolCallId = "tool-" + tag
+          NarrativeDigest = "narrative-" + tag
+          PayloadDigest = "payload-" + tag
+          RootRequestDigest = "root-" + tag
+          RequirementSetDigest = "requirements-" + tag
+          EvidenceFrontierDigest = "evidence-" + tag }
+
+    let private scenarioCertificate tag snapshot =
+        { Id = QualityCertificateId.create ("certificate-" + tag)
+          AssessmentId = AssessmentId.create ("assessment-" + tag)
+          IncumbencyId = IncumbencyId.create ("incumbency-" + tag)
+          SnapshotId = WorkspaceSnapshotId.create snapshot
+          AuthorityRevision = AuthorityRevision.create ("authority-" + tag)
+          Binding = scenarioBinding tag
+          Valid = true
+          InvalidationReason = None }
+
+    let private scenarioRetirement tag snapshot qualityAccepted =
+        let incumbent = IncumbencyId.create ("incumbency-" + tag)
+        let retirementId = RetirementId.create ("retirement-" + tag)
+
+        { Id = retirementId
+          IncumbencyId = incumbent
+          SnapshotId = WorkspaceSnapshotId.create snapshot
+          BatonId = BatonId.create ("baton-" + tag)
+          Baton =
+            { SchemaVersion = 1
+              RoadId = "surface-road"
+              FromIncumbencyId = IncumbencyId.value incumbent
+              AuthorityRevision = "authority-" + tag
+              SnapshotId = snapshot
+              OpenObligations = []
+              EvidenceRefs = [] }
+          ProjectionCutId = ProjectionCutId.create ("cut-" + tag)
+          ProjectionCut =
+            { RetiredIncumbencyId = IncumbencyId.value incumbent
+              ThroughProviderRunId = "provider-" + tag
+              ThroughToolCallId = "tool-" + tag
+              StaleProviderRunIds = [ "provider-" + tag ] }
+          SuccessorRequested = not qualityAccepted
+          QualityCandidateAccepted = qualityAccepted }
+
+    let private scenarioSignal index signal =
+        match signal with
+        | ProgramScenarioSignal.QualityCandidate snapshot ->
+            let tag = string index
+            let certificate = scenarioCertificate tag snapshot
+            RoadSignal.QualityCandidateAccepted(scenarioRetirement tag snapshot true, certificate)
+        | ProgramScenarioSignal.Retired ->
+            RoadSignal.IncumbencyRetired(scenarioRetirement (string index) "retired-snapshot" false)
+        | ProgramScenarioSignal.Exceptional reason -> RoadSignal.ExceptionalTerminal reason
+
+    let private verdictObject verdict =
+        match verdict with
+        | OrchestratorVerdict.Published(_, head) ->
+            box
+                {| kind = "Published"
+                   detail = CommitHash.value head |}
+        | OrchestratorVerdict.RejectedDirty reason ->
+            box
+                {| kind = "RejectedDirty"
+                   detail = reason |}
+        | OrchestratorVerdict.IntegrationFailed(_, detail) ->
+            box
+                {| kind = "IntegrationFailed"
+                   detail = detail |}
+        | OrchestratorVerdict.Empty -> box {| kind = "Empty"; detail = "" |}
+
+    /// Executes the real OrchestratorProgram against deterministic in-memory
+    /// ports. The surface exposes domain effects, not old review stages, so
+    /// integration requirements can prove invalidation/successor/Git/CAS order.
+    let observeRelayProgram (scenarioName: string) : Task<obj> =
+        task {
+            let scenario = programScenario scenarioName
+            let jobId = ManagerJobId.create "surface-job"
+            let sessionId = SessionId.create "surface-manager-session"
+            let worktreePath = WorktreePath.create "/tmp/wanxiangshu-change-surface"
+            let worktreeIdentity = WorktreeIdentity.create "manager/surface-job"
+            let targetRef = TargetRef.create "refs/heads/main"
+            let signals = Queue<ProgramScenarioSignal>(scenario.Signals)
+            let snapshots = Queue<string>(scenario.Snapshots)
+            let targetReads = Queue<string>(scenario.TargetReads)
+            let rebaseResults = Queue<ProgramScenarioRebase>(scenario.RebaseResults)
+            let conflictReads = Queue<string list>(scenario.ConflictReads)
+            let ffResults = Queue<ProgramScenarioFf>(scenario.FfResults)
+            let facts = ResizeArray<string>()
+            let invalidations = ResizeArray<string>()
+            let successors = ResizeArray<string>()
+            let timeline = ResizeArray<string>()
+            let rebaseGateHeld = ResizeArray<bool>()
+            let ffGateHeld = ResizeArray<bool>()
+            let ffExpectedHeads = ResizeArray<string>()
+            let worktreeHead = ref scenario.InitialHead
+            let targetHead = ref scenario.InitialTarget
+            let gateHeld = ref false
+            let gateAcquireCount = ref 0
+            let gateReleaseCount = ref 0
+            let signalIndex = ref 0
+
+            let nextSignal () =
+                if signals.Count = 0 then
+                    Error "scenario signal queue exhausted"
+                else
+                    signalIndex.Value <- signalIndex.Value + 1
+                    let value = scenarioSignal signalIndex.Value (signals.Dequeue())
+
+                    let label =
+                        match value with
+                        | RoadSignal.QualityCandidateAccepted _ -> "QualityCandidateAccepted"
+                        | RoadSignal.IncumbencyRetired _ -> "IncumbencyRetired"
+                        | RoadSignal.ExceptionalTerminal _ -> "ExceptionalTerminal"
+
+                    timeline.Add("await:" + label)
+                    Ok value
+
+            let git: GitPort =
+                { IsDirty = fun _ -> Task.FromResult false
+                  CreateWorktree = fun _ _ -> Task.FromResult(Ok worktreeIdentity)
+                  FreezeTargetBranch = fun () -> Task.FromResult(Ok targetRef)
+                  Rebase =
+                    fun _ _ ->
+                        task {
+                            rebaseGateHeld.Add gateHeld.Value
+                            timeline.Add "git:rebase"
+
+                            if rebaseResults.Count = 0 then
+                                return Error "scenario rebase queue exhausted"
+                            else
+                                match rebaseResults.Dequeue() with
+                                | ProgramScenarioRebase.Ok head ->
+                                    worktreeHead.Value <- head
+                                    return Ok()
+                                | ProgramScenarioRebase.Error reason -> return Error reason
+                        }
+                  FfMerge =
+                    fun _ _ expected ->
+                        task {
+                            ffGateHeld.Add gateHeld.Value
+                            ffExpectedHeads.Add(CommitHash.value expected)
+                            timeline.Add "git:ff"
+
+                            if ffResults.Count = 0 then
+                                return Error "scenario ff queue exhausted"
+                            else
+                                match ffResults.Dequeue() with
+                                | ProgramScenarioFf.Ok head ->
+                                    targetHead.Value <- head
+                                    return Ok(CommitHash.create head)
+                                | ProgramScenarioFf.TargetMoved ->
+                                    return Error OrchestratorConstants.targetRefMovedError
+                        }
+                  ConflictedFiles =
+                    fun _ ->
+                        if conflictReads.Count = 0 then
+                            Task.FromResult(Error "scenario conflict queue exhausted")
+                        else
+                            Task.FromResult(Ok(conflictReads.Dequeue()))
+                  RemoveWorktree = fun _ -> Task.FromResult(Ok())
+                  HasRebaseHead = fun _ -> Task.FromResult false
+                  ListWorktrees = fun () -> Task.FromResult(Ok [])
+                  ListManagerBranches = fun () -> Task.FromResult(Ok [])
+                  DeleteBranch = fun _ -> Task.FromResult(Ok())
+                  ReadHead = fun _ -> Task.FromResult(Ok(CommitHash.create worktreeHead.Value))
+                  GetTargetHead =
+                    fun _ ->
+                        let value =
+                            if targetReads.Count = 0 then
+                                targetHead.Value
+                            else
+                                targetReads.Dequeue()
+
+                        targetHead.Value <- value
+                        Task.FromResult(Ok(CommitHash.create value)) }
+
+            let worktree = WorktreeResource.Adopt(git, worktreeIdentity, worktreePath)
+
+            let job =
+                { JobId = jobId
+                  ManagerSessionId = sessionId
+                  ManagerAgent = "manager"
+                  TargetRef = targetRef
+                  Worktree = worktree }
+
+            let created =
+                OrchestratorProjection.createJob
+                    {| ManagerJobId = jobId
+                       ManagerSessionId = sessionId
+                       ManagerAgent = "manager"
+                       Byname = "surface-road"
+                       WorktreeIdentity = worktreeIdentity
+                       WorktreePath = worktreePath
+                       TargetRef = targetRef
+                       TargetBranchFrozen = TargetRef.value targetRef |}
+                    Wanxiangshu.Composition.Durable.Fold.empty.AgentProjections.Orchestrator
+
+            let initialOrchestrator =
+                match scenario.InitialRebasedTarget with
+                | None -> created
+                | Some targetSnapshot ->
+                    OrchestratorProjection.recordRebasedCandidateReady
+                        jobId
+                        {| RebasedCommit = CommitHash.create scenario.InitialHead
+                           TargetHeadSnapshot = CommitHash.create targetSnapshot
+                           WorkspaceSnapshotId = WorkspaceSnapshotId.create "snapshot-rebased-1" |}
+                        created
+
+            let initialProjection = Wanxiangshu.Composition.Durable.Fold.empty
+
+            let projection =
+                ref
+                    { initialProjection with
+                        AgentProjections =
+                            { initialProjection.AgentProjections with
+                                Orchestrator = initialOrchestrator } }
+
+            let appendFact _ fact =
+                task {
+                    let name = programFactName fact
+                    facts.Add name
+                    timeline.Add("fact:" + name)
+
+                    match Wanxiangshu.Composition.Durable.Fold.foldAgentFact projection.Value.AgentProjections fact with
+                    | Error rejection -> return Error(sprintf "%A" rejection)
+                    | Ok agents ->
+                        projection.Value <-
+                            { projection.Value with
+                                AgentProjections = agents }
+
+                        return Ok()
+                }
+
+            let relay: RelayPort =
+                { OpenRoad = fun _ -> Task.FromResult(Ok sessionId)
+                  ActivateRoad = fun _ -> Task.FromResult(Ok())
+                  AwaitRoadSignal = fun _ -> Task.FromResult(nextSignal ())
+                  InvalidateCertificate =
+                    fun _ reason ->
+                        invalidations.Add reason
+                        timeline.Add("invalidate:" + reason)
+                        Task.FromResult(Ok())
+                  RequestSuccessor =
+                    fun _ _ reason ->
+                        successors.Add reason
+                        timeline.Add("successor:" + reason)
+                        Task.FromResult(Ok(IncumbencyId.create ("surface-successor-" + string successors.Count)))
+                  CaptureSnapshot =
+                    fun _ ->
+                        if snapshots.Count = 0 then
+                            Task.FromResult(Error "scenario snapshot queue exhausted")
+                        else
+                            Task.FromResult(Ok(WorkspaceSnapshotId.create (snapshots.Dequeue())))
+                  PrepareCandidate =
+                    fun _ ->
+                        if conflictReads.Count > 0 then
+                            if conflictReads.Peek() <> [] then
+                                Task.FromResult(Error "unmerged paths remain in worktree")
+                            else
+                                conflictReads.Dequeue() |> ignore
+                                Task.FromResult(Ok(CommitHash.create worktreeHead.Value))
+                        else
+                            Task.FromResult(Ok(CommitHash.create worktreeHead.Value))
+                  TerminateRoadResources =
+                    fun _ ->
+                        timeline.Add "relay:terminate"
+                        Task.FromResult() }
+
+            let acquireGate () =
+                gateAcquireCount.Value <- gateAcquireCount.Value + 1
+                gateHeld.Value <- true
+                timeline.Add "gate:acquire"
+
+                Task.FromResult
+                    { Release =
+                        fun () ->
+                            task {
+                                gateHeld.Value <- false
+                                gateReleaseCount.Value <- gateReleaseCount.Value + 1
+                                timeline.Add "gate:release"
+                            } }
+
+            let deps =
+                { Git = git
+                  Relay = relay
+                  AppendFact = appendFact
+                  Snapshot = fun () -> projection.Value
+                  AcquirePublishGate = acquireGate }
+
+            let! verdict = OrchestratorProgram.run deps job
+
+            return
+                box
+                    {| verdict = verdictObject verdict
+                       facts = facts.ToArray()
+                       invalidations = invalidations.ToArray()
+                       successors = successors.ToArray()
+                       timeline = timeline.ToArray()
+                       rebaseGateHeld = rebaseGateHeld.ToArray()
+                       ffGateHeld = ffGateHeld.ToArray()
+                       ffExpectedHeads = ffExpectedHeads.ToArray()
+                       gateAcquireCount = gateAcquireCount.Value
+                       gateReleaseCount = gateReleaseCount.Value
+                       gateHeldAfterRun = gateHeld.Value |}
+        }
+
     let private commandObject (command: Command) : obj =
         box
             {| fileName = command.FileName
@@ -549,240 +995,3 @@ module ChangeSurface =
 
     let disposeGate (gate: obj) : Task<unit> =
         task { do! ((gate :?> GateHandle).Gate :> IAsyncDisposable).DisposeAsync() }
-
-    type private GateScopeObservation(beforeAcquire: unit -> unit) =
-        let reviewGateHeld = ResizeArray<bool>()
-        let repairGateHeld = ResizeArray<bool>()
-        let ffMergeGateHeld = ResizeArray<bool>()
-        // DSL-MUTABLE: resource — state of the injected publish-gate lease
-        let mutable gateHeld = false
-        // DSL-MUTABLE: resource — number of publish-gate leases acquired
-        let mutable acquisitionCount = 0
-        // DSL-MUTABLE: resource — number of publish-gate leases released
-        let mutable releaseCount = 0
-
-        member _.GateHeld = gateHeld
-        member _.ReviewGateHeld = reviewGateHeld.ToArray()
-        member _.RepairGateHeld = repairGateHeld.ToArray()
-        member _.FfMergeGateHeld = ffMergeGateHeld.ToArray()
-        member _.AcquireCount = acquisitionCount
-        member _.ReleaseCount = releaseCount
-        member _.ObserveReview() = reviewGateHeld.Add gateHeld
-        member _.ObserveRepair() = repairGateHeld.Add gateHeld
-        member _.ObserveFfMerge() = ffMergeGateHeld.Add gateHeld
-
-        member _.Acquire() : Task<PublishGateLease> =
-            task {
-                if gateHeld then
-                    invalidOp "publish gate acquired while already held"
-
-                beforeAcquire ()
-                gateHeld <- true
-                acquisitionCount <- acquisitionCount + 1
-
-                return
-                    { Release =
-                        fun () ->
-                            task {
-                                if not gateHeld then
-                                    invalidOp "publish gate released while not held"
-
-                                gateHeld <- false
-                                releaseCount <- releaseCount + 1
-                            } }
-            }
-
-    let private observableGit
-        (observation: GateScopeObservation)
-        (targetHead: unit -> CommitHash)
-        (observeRebase: unit -> unit)
-        (observeFf: CommitHash -> unit)
-        : GitPort =
-        let targetRef = TargetRef.create "refs/heads/main"
-        let candidate = CommitHash.create "candidate"
-
-        { IsDirty = fun _ -> Task.FromResult false
-          CreateWorktree = fun _ _ -> Task.FromResult(Ok(WorktreeIdentity.create "manager/change-proof"))
-          FreezeTargetBranch = fun () -> Task.FromResult(Ok targetRef)
-          Rebase =
-            fun _ _ ->
-                observeRebase ()
-                Task.FromResult(Ok())
-          FfMerge =
-            fun _ _ expectedHead ->
-                observation.ObserveFfMerge()
-                observeFf expectedHead
-                Task.FromResult(Ok candidate)
-          ConflictedFiles = fun _ -> Task.FromResult(Ok [ "src/conflict.fs" ])
-          RemoveWorktree = fun _ -> Task.FromResult(Ok())
-          HasRebaseHead = fun _ -> Task.FromResult false
-          ListWorktrees = fun () -> Task.FromResult(Ok [])
-          ListManagerBranches = fun () -> Task.FromResult(Ok [])
-          DeleteBranch = fun _ -> Task.FromResult(Ok())
-          ReadHead = fun _ -> Task.FromResult(Ok candidate)
-          GetTargetHead = fun _ -> Task.FromResult(Ok(targetHead ())) }
-
-    let private observableManager (observation: GateScopeObservation) : ManagerPort =
-        { StartManager = fun _ -> Task.FromResult(Ok(SessionId.create "manager-session"))
-          SendManagerPrompt = fun _ -> Task.FromResult(Ok())
-          AwaitManager = fun _ -> Task.FromResult(Ok())
-          Reverify =
-            fun _ _ _ _ ->
-                observation.ObserveReview()
-                Task.FromResult(Ok())
-          ResumeManager =
-            fun _ _ _ ->
-                observation.ObserveRepair()
-                Task.FromResult(Ok())
-          TerminateChildren = fun _ -> Task.FromResult(()) }
-
-    let private observableJob git jobId =
-        { JobId = jobId
-          ManagerSessionId = SessionId.create "manager-session"
-          ManagerAgent = "manager"
-          TargetRef = TargetRef.create "refs/heads/main"
-          Worktree =
-            WorktreeResource.Adopt(
-                git,
-                WorktreeIdentity.create ("manager/" + ManagerJobId.value jobId),
-                WorktreePath.create ("/tmp/" + ManagerJobId.value jobId)
-            ) }
-
-    let private conflictSnapshot (job: ManagerJob) =
-        let created =
-            OrchestratorProjection.createJob
-                {| ManagerJobId = job.JobId
-                   ManagerSessionId = job.ManagerSessionId
-                   ManagerAgent = job.ManagerAgent
-                   Byname = "Road"
-                   WorktreeIdentity = job.Worktree.Identity
-                   WorktreePath = job.Worktree.Path
-                   TargetRef = job.TargetRef
-                   TargetBranchFrozen = TargetRef.value job.TargetRef |}
-                OrchestratorProjection.empty
-
-        let conflicted =
-            OrchestratorProjection.recordConflictDetected
-                job.JobId
-                {| CandidateCommit = CommitHash.create "candidate-before-conflict"
-                   TargetHeadSnapshot = CommitHash.create "old-target-head"
-                   ConflictFiles = [ "src/conflict.fs" ]
-                   DiagnosticsDigest = "conflict-digest" |}
-                created
-
-        { Fold.empty with
-            AgentProjections =
-                { Fold.empty.AgentProjections with
-                    Orchestrator = conflicted } }
-
-    let private gateScopeSnapshot scenario job =
-        match scenario with
-        | "fresh" -> Fold.empty
-        | "conflict-recovery" -> conflictSnapshot job
-        | unknown -> invalidArg "scenario" ("unknown gate-scope scenario: " + unknown)
-
-    let private verdictKind verdict =
-        match verdict with
-        | OrchestratorVerdict.Published _ -> "Published"
-        | OrchestratorVerdict.RejectedDirty _ -> "RejectedDirty"
-        | OrchestratorVerdict.NeedsReview _ -> "NeedsReview"
-        | OrchestratorVerdict.IntegrationFailed _ -> "IntegrationFailed"
-        | OrchestratorVerdict.Empty -> "Empty"
-
-    let observeProgramGateScope (scenario: string) : Task<obj> =
-        task {
-            let observation = GateScopeObservation(ignore)
-
-            let git =
-                observableGit observation (fun () -> CommitHash.create "target-head") ignore ignore
-
-            let manager = observableManager observation
-            let job = observableJob git (ManagerJobId.create "chgint-010")
-
-            let deps =
-                { Git = git
-                  Manager = manager
-                  AppendFact = fun _ _ -> Task.FromResult(Ok())
-                  Snapshot = fun () -> gateScopeSnapshot scenario job
-                  AcquirePublishGate = observation.Acquire }
-
-            let! verdict = OrchestratorProgram.run deps job
-
-            return
-                box
-                    {| verdict = verdictKind verdict
-                       reviewGateHeld = observation.ReviewGateHeld
-                       repairGateHeld = observation.RepairGateHeld
-                       ffMergeGateHeld = observation.FfMergeGateHeld
-                       gateAcquireCount = observation.AcquireCount
-                       gateReleaseCount = observation.ReleaseCount
-                       gateHeldAfterRun = observation.GateHeld |}
-        }
-
-    type private MovedTargetWorld() =
-        let rebasedTargetSnapshots = ResizeArray<string>()
-        let postRebaseBarrierIds = ResizeArray<string>()
-        let ffExpectedHeads = ResizeArray<string>()
-        let firstTargetHead = CommitHash.create "target-head-1"
-        let advancedTargetHead = CommitHash.create "target-head-2"
-        // DSL-MUTABLE: resource — target ref owned by the external Git world
-        let mutable targetHead = firstTargetHead
-        // DSL-MUTABLE: algorithm-scratch — production rebase observations
-        let mutable rebaseCount = 0
-
-        member _.TargetHead = targetHead
-        member _.RebaseCount = rebaseCount
-        member _.RebasedTargetSnapshots = rebasedTargetSnapshots.ToArray()
-        member _.PostRebaseBarrierIds = postRebaseBarrierIds.ToArray()
-        member _.FfExpectedHeads = ffExpectedHeads.ToArray()
-
-        member _.AdvanceBeforeFirstGateGrant() =
-            if targetHead = firstTargetHead then
-                targetHead <- advancedTargetHead
-
-        member _.ObserveRebase() = rebaseCount <- rebaseCount + 1
-
-        member _.ObserveFf(expectedHead: CommitHash) =
-            ffExpectedHeads.Add(CommitHash.value expectedHead)
-
-        member _.ObserveFact(fact: AgentFact) =
-            match fact with
-            | AgentFact.Orchestrator(OrchestratorFactCases.RebasedCandidateReady payload) ->
-                rebasedTargetSnapshots.Add(CommitHash.value payload.TargetHeadSnapshot)
-                postRebaseBarrierIds.Add(ReviewBarrierId.value payload.PostRebaseReviewBarrierId)
-            | _ -> ()
-
-    let observeMovedTargetRecovery () : Task<obj> =
-        task {
-            let world = MovedTargetWorld()
-            let observation = GateScopeObservation(world.AdvanceBeforeFirstGateGrant)
-
-            let git =
-                observableGit observation (fun () -> world.TargetHead) world.ObserveRebase world.ObserveFf
-
-            let manager = observableManager observation
-            let job = observableJob git (ManagerJobId.create "chgint-013")
-
-            let deps =
-                { Git = git
-                  Manager = manager
-                  AppendFact =
-                    fun _ fact ->
-                        world.ObserveFact fact
-                        Task.FromResult(Ok())
-                  Snapshot = fun () -> Fold.empty
-                  AcquirePublishGate = observation.Acquire }
-
-            let! verdict = OrchestratorProgram.run deps job
-
-            return
-                box
-                    {| verdict = verdictKind verdict
-                       postRebaseBarrierIds = world.PostRebaseBarrierIds
-                       rebasedTargetSnapshots = world.RebasedTargetSnapshots
-                       rebaseCount = world.RebaseCount
-                       ffExpectedHeads = world.FfExpectedHeads
-                       gateAcquireCount = observation.AcquireCount
-                       gateReleaseCount = observation.ReleaseCount
-                       gateHeldAfterRun = observation.GateHeld |}
-        }

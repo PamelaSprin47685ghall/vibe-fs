@@ -21,17 +21,32 @@ const createEvent = (jobId, managerSessionId, worktreeIdentity = `wt_${jobId.sli
     targetBranchFrozen: 'refs/heads/main',
   },
 })
-const candidateEvent = (jobId, candidateCommit = 'c1', barrier = 'bar_1') => ({
+const candidateEvent = (
+  jobId,
+  candidateCommit = 'c1',
+  workspaceSnapshotId = 'snapshot-1',
+  qualityCertificateId = 'certificate-1',
+) => ({
   kind: 'CandidateReady',
-  payload: { jobId, candidateCommit, preRebaseReviewBarrierId: barrier },
+  payload: { jobId, candidateCommit, workspaceSnapshotId, qualityCertificateId },
 })
 const conflictEvent = (jobId, { candidateCommit = 'c1', targetHeadSnapshot = 'h1', conflictFiles = ['publish_proof.txt'] } = {}) => ({
   kind: 'ConflictDetected',
-  payload: { jobId, candidateCommit, targetHeadSnapshot, conflictFiles, diagnosticsDigest: 'conflict-digest' },
+  payload: {
+    jobId,
+    candidateCommit,
+    targetHeadSnapshot,
+    workspaceSnapshotId: 'snapshot-conflict',
+    conflictFiles,
+    diagnosticsDigest: 'conflict-digest',
+  },
 })
-const rebasedEvent = (jobId, { rebasedCommit = 'r1', targetHeadSnapshot = 'h1', barrier = 'bar_2' } = {}) => ({
+const rebasedEvent = (
+  jobId,
+  { rebasedCommit = 'r1', targetHeadSnapshot = 'h1', workspaceSnapshotId = 'snapshot-rebased' } = {},
+) => ({
   kind: 'RebasedCandidateReady',
-  payload: { jobId, rebasedCommit, targetHeadSnapshot, postRebaseReviewBarrierId: barrier },
+  payload: { jobId, rebasedCommit, targetHeadSnapshot, workspaceSnapshotId },
 })
 const publishClaimedEvent = (jobId, expectedHead = 'h1') => ({
   kind: 'PublishClaimed',
@@ -56,8 +71,8 @@ const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
 // ── Theorem 1: independent jobs commute ─────────────────────────────────────
 
 test('WHAT[CHGINT-004] THEOREM_orchestrator_independent_jobs_confluent_across_interleavings', () => {
-  const seqA = [createEvent(JOB_A, 'ses_orch_a'), candidateEvent(JOB_A, 'ca', 'bar_a')]
-  const seqB = [createEvent(JOB_B, 'ses_orch_b'), candidateEvent(JOB_B, 'cb', 'bar_b')]
+  const seqA = [createEvent(JOB_A, 'ses_orch_a'), candidateEvent(JOB_A, 'ca', 'snapshot-a', 'certificate-a')]
+  const seqB = [createEvent(JOB_B, 'ses_orch_b'), candidateEvent(JOB_B, 'cb', 'snapshot-b', 'certificate-b')]
   const foldAB = foldEvents([...seqA, ...seqB])
   const foldBA = foldEvents([...seqB, ...seqA])
 
@@ -100,7 +115,7 @@ test('WHAT[CHGINT-007] THEOREM_publish_claimed_three_branch_order_is_fixed', () 
   assert.equal(classifyClaim('h9').kind, 'ClaimExpired')
 })
 
-test('WHAT[CHGINT-013] THEOREM_stale_target_on_rebased_candidate_discards_witness', () => {
+test('WHAT[CHGINT-013] THEOREM_stale_target_invalidates_the_rebased_binding', () => {
   const folded = foldEvents([createEvent(JOB_A, 'ses_orch_a'), candidateEvent(JOB_A), rebasedEvent(JOB_A)])
   assert.deepEqual(factsOf(folded, JOB_A), ['CandidateReady', 'RebasedCandidateReady'])
   assert.equal(classifyRebased('h1').kind, 'PublishReady')

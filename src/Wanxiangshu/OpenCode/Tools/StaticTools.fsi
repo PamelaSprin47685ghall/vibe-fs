@@ -1,7 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation
-open Wanxiangshu.Mission.Review
+
 
 module StaticTools =
     val toolNames: p: ToolPermission -> string list
@@ -10,12 +10,9 @@ module StaticTools =
     val knownToolNames: string list
     val requestToolMap: allowed: Set<ToolPermission> -> Map<string, bool>
     val permissionObj: role: Role -> obj
-    val reviewerVerdictOfString: value: string -> Result<ReviewGuardVerdict, string>
-    val reviewerVerdictSchemaJson: string
     val managerAgentConfig: prompt: string option -> obj
     val orchestratorAgentConfig: prompt: string option -> obj
     val coderAgentConfig: prompt: string option -> obj
-    val reviewerAgentConfig: prompt: string option -> obj
     val bloggerAgentConfig: prompt: string -> obj
     val distillerAgentConfig: prompt: string -> obj
     val inquiryAgentConfig: prompt: string option -> obj

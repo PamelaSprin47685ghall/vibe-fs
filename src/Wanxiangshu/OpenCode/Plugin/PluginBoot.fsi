@@ -3,7 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Review
+open Wanxiangshu.Git
 open Wanxiangshu.Persistence.Journal
 
 module PluginBoot =
@@ -18,7 +18,6 @@ module PluginBoot =
           Clock: IClockPort
           StrengthFailClosed: string -> unit
           WorkspaceDirectory: string option
-          GitTreePort: GitTreePort option
           FamilyParent: SessionId -> SessionId option }
 
     val create: input: obj -> Task<Boot>

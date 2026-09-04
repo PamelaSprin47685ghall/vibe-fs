@@ -101,6 +101,34 @@ test('WHAT[SEMANTIC-TRACE-002] typed retry observation retains stable identity b
   })
 })
 
+test('WHAT[SEMANTIC-TRACE-003] concurrent same-session captures serialize before allocating durable cursors', async () => {
+  await withJournal(async (handle) => {
+    const capture = (hostMessageId, text) => trace.captureObservedMessages(handle, SESSION, [
+      {
+        hostMessageId,
+        message: {
+          info: { id: `${hostMessageId}-run`, role: 'assistant' },
+          parts: [{ id: `${hostMessageId}-part`, type: 'text', text }],
+        },
+      },
+    ])
+
+    const [first, second] = await Promise.all([
+      capture('concurrent-a', 'first concurrent semantic part'),
+      capture('concurrent-b', 'second concurrent semantic part'),
+    ])
+
+    assert.equal(first.ok, true, first.ok ? '' : first.error)
+    assert.equal(second.ok, true, second.ok ? '' : second.error)
+    const parts = trace.orderedSemanticParts(trace.snapshot(handle, SESSION))
+    assert.equal(parts.length, 2)
+    assert.deepEqual(parts.map((part) => part.provenance).sort(), [
+      'g:0/msg:concurrent-a/host-part:concurrent-a-part',
+      'g:0/msg:concurrent-b/host-part:concurrent-b-part',
+    ])
+  })
+})
+
 test('WHAT[SEMANTIC-TRACE-010] opening capture reports idempotent evidence', async () => {
   await withJournal(async (handle) => {
     const first = await trace.captureOpening(handle, SESSION, 'Review the tree.', ['Ship it.', 'Add tests.'])

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>relay-incumbency</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>mission-relay-core</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Mission/Relay/Contract.fsi"/>
+    <Compile Include="Mission/Relay/Contract.fs"/>
+    <Compile Include="Mission/Relay/Facts.fsi"/>
+    <Compile Include="Mission/Relay/Facts.fs"/>
+    <Compile Include="Mission/Relay/Fold.fsi"/>
+    <Compile Include="Mission/Relay/Fold.fs"/>
+    <Compile Include="Mission/Relay/Surface.fsi"/>
+    <Compile Include="Mission/Relay/Surface.fs"/>
+  </ItemGroup>
+</Project>

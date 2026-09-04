@@ -6,11 +6,11 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoAdmission
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoPrefixEpoch
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Resources
 
@@ -127,7 +127,7 @@ module MagicTodoSemanticSurface =
 
     let checkPreparedReplay (expected: obj) (observed: obj) : obj =
         let identityOf value : PreparedIdentity =
-            { ManagerLifeId = ManagerLifeId.create (text (value?managerLifeId))
+            { IncumbencyId = IncumbencyId.create (text (value?incumbencyId))
               ProviderInputDigest = text (value?providerInputDigest)
               BaseTodoDigest = text (value?baseTodoDigest)
               ToolPartOrdinal = unbox<int> (value?toolPartOrdinal) }
@@ -137,7 +137,7 @@ module MagicTodoSemanticSurface =
 
     let admitObligations
         (sha256: string -> string)
-        (lifeId: string)
+        (incumbencyId: string)
         (current: obj array)
         (existing: obj)
         (localized: obj)
@@ -150,8 +150,16 @@ module MagicTodoSemanticSurface =
             if isNull existing then
                 None
             else
+                let incText =
+                    let v = text (existing?incumbencyId)
+
+                    if not (String.IsNullOrEmpty v) then
+                        v
+                    else
+                        text (existing?managerLifeId)
+
                 let identity =
-                    { ManagerLifeId = ManagerLifeId.create (text (existing?managerLifeId))
+                    { IncumbencyId = IncumbencyId.create incText
                       ProviderInputDigest = text (existing?providerInputDigest)
                       BaseTodoDigest = text (existing?baseTodoDigest)
                       ToolPartOrdinal = unbox<int> (existing?toolPartOrdinal) }
@@ -184,7 +192,7 @@ module MagicTodoSemanticSurface =
         let outcome =
             MagicTodoAdmission.admitObligations
                 sha256
-                (ManagerLifeId.create lifeId)
+                (IncumbencyId.create incumbencyId)
                 currentItems
                 existingPrepared
                 localizedCall
@@ -212,8 +220,8 @@ module MagicTodoSemanticSurface =
                 {| kind = "Rejected"
                    error = rejectCode rejection |}
 
-    let todoWriteId (sha256: string -> string) (lifeId: string) (toolCallId: string) : string =
-        MagicTodo.todoWriteId sha256 (ManagerLifeId.create lifeId) (ToolCallId.create toolCallId)
+    let todoWriteId (sha256: string -> string) (incumbencyId: string) (toolCallId: string) : string =
+        MagicTodo.todoWriteId sha256 (IncumbencyId.create incumbencyId) (ToolCallId.create toolCallId)
         |> TodoWriteId.value
 
     let todoWriteIdValue (value: string) = value
@@ -297,10 +305,18 @@ module MagicTodoSemanticSurface =
         | PrefixEvidenceKind.Probe probeId -> box {| kind = "Probe"; probeId = probeId |}
 
     let buildTodoCheckpointCommit (value: obj) : obj =
+        let incText =
+            let v = text value?incumbencyId
+
+            if not (String.IsNullOrEmpty v) then
+                v
+            else
+                text value?managerLifeId
+
         let commit =
             MagicTodoPrefixEpoch.buildTodoCheckpointCommit
                 (SessionId.create (text value?sessionId))
-                (ManagerLifeId.create (text value?managerLifeId))
+                (IncumbencyId.create incText)
                 (PrefixEpochId.create (int64Value value?previousEpoch))
                 (prefixSnapshotOf value?snapshot)
                 (stringOption value?previousCommitted |> Option.map TodoWriteId.create)
@@ -318,9 +334,12 @@ module MagicTodoSemanticSurface =
                        triggerTodoWriteId = TodoWriteId.value triggerId
                        coveredBeforeTodoWriteId = coveredBefore |> Option.map TodoWriteId.value |> Option.toObj |}
 
+        let incObj = commit.IncumbencyId |> Option.map IncumbencyId.value |> Option.toObj
+
         box
             {| sessionId = SessionId.value commit.SessionId
-               managerLifeId = commit.ManagerLifeId |> Option.map ManagerLifeId.value |> Option.toObj
+               incumbencyId = incObj
+               managerLifeId = incObj
                previousEpoch = PrefixEpochId.value commit.PreviousEpochId
                nextEpoch = PrefixEpochId.value commit.NextEpochId
                evidenceKind = evidence

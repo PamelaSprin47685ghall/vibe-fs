@@ -3,9 +3,7 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/Mission/Obligation/**
-/src/Wanxiangshu/Mission/Manager/Idle.fs
-/src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs
-/src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs
+/src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs
 /src/Wanxiangshu/Context/Companion/Transform.fs
 /src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs
 /resources/provider/lifecycle/magic-todo/**

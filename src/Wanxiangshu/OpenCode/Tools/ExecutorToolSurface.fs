@@ -45,11 +45,9 @@ module ExecutorToolSurface =
                 { new IRootWorkspaceReader with
                     member _.TryRead() = workspaceDirectory },
                 None,
-                None,
                 workspaceDirectory,
                 Dictionary<string, string>(),
                 (fun _ -> None),
-                HashSet<string>(),
                 Dictionary<string, string>(),
                 None,
                 None,

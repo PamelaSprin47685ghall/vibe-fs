@@ -12,7 +12,6 @@ type StrengthOpportunity =
       EffectiveAgent: string
       IsFallbackRetry: bool
       HasPrefixProbe: bool
-      IsReviewerOrFinality: bool
       IsAttachedOrInternalLeaf: bool
       OwnerCancelled: bool
       TargetProviderRunBound: bool

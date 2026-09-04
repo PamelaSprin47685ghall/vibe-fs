@@ -12,7 +12,6 @@ const MANAGED = [
   'devops',
   'browser',
   'inquiry',
-  'reviewer',
   'blogger',
   'distiller',
   'bookkeeper',

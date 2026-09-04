@@ -37,7 +37,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.opencode-host-opencodeport.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.opencode-host-opencodeport-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.strength-policy.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.finality.mission-finality-prompt.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.enforcer-guidance-tip.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.opencode-host-pairprogramming-guidelineprojection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj"/>
@@ -73,13 +72,11 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.opencode-codec-providerwiredecode.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.relay-context-projection.mission-relay-narrative-transform.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.host-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.opencode-host-requirementgrounding-runtime.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.review-assurance.mission-review-barrier-workflow.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.review-assurance.opencode-host-providerrunbinding.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-opencode-judgetool.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-reviewfactfold.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-providerrunbinding.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-capture.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionbindingsurface.fsproj"/>

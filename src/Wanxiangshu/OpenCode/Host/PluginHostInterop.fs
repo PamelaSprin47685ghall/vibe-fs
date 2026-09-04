@@ -22,10 +22,7 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Finality.OpenCode
-open Wanxiangshu.Mission.Manager.OpenCode
 open Wanxiangshu.Mission.Obligation.Todo.OpenCode
-open Wanxiangshu.Mission.Review.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
@@ -41,7 +38,6 @@ open Wanxiangshu.Context.Companion
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Review
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer
@@ -344,7 +340,6 @@ module PluginHostInterop =
         (waitObserver: IWaitObserver)
         (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal option)
-        (gitTreePort: GitTreePort option)
         (workspaceDirectory: string option)
         (scope: PluginRuntimeScope)
         (currentPhysicalUserMessage: string -> string option)
@@ -354,13 +349,14 @@ module PluginHostInterop =
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
-        (finalityReviewerTimeoutMs: int option)
         (casebookToolSpecs: ToolSpec list)
         : ToolRegistration =
         let jsTransactionPersistence =
             workspaceDirectory
             |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace))
             |> Option.map JsToolsTransactionStore.createPersistence
+
+        let quiescence = scope.Sessions.Quiescence :> ISessionQuiescenceGate
 
         let registration =
             ToolRegistry.create
@@ -369,22 +365,21 @@ module PluginHostInterop =
                 waitObserver
                 rootWorkspace
                 journal
-                gitTreePort
                 workspaceDirectory
                 scope.Sessions.SessionParents
                 currentPhysicalUserMessage
-                scope.Sessions.VerdictSubmissions
                 scope.Sessions.SessionDirectories
                 onRunStarted
                 parentWorkRecordFor
                 childWorkRecordFor
                 snapshot
                 cancelSignals
+                (fun sessionId -> quiescence.BeginToolExecution(SessionId.create sessionId))
+                (fun sessionId -> quiescence.EndToolExecution(SessionId.create sessionId))
                 eventPort
                 (Some scope.BloggerRuntimeHost)
                 scope.SyncDelegateRuntime
                 (Some scope.Strength.StrengthRuntime)
-                finalityReviewerTimeoutMs
                 casebookToolSpecs
                 jsTransactionPersistence
 

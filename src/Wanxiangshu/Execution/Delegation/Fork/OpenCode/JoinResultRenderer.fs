@@ -54,9 +54,6 @@ module JoinResultRenderer =
         let OrchestratorRejectedDirty = "tool/join/orchestrator-rejected-dirty"
 
         [<Literal>]
-        let OrchestratorNeedsReview = "tool/join/orchestrator-needs-review"
-
-        [<Literal>]
         let OrchestratorIntegrationFailed = "tool/join/orchestrator-integration-failed"
 
         [<Literal>]
@@ -298,7 +295,6 @@ module JoinResultRenderer =
             match verdict with
             | OrchestratorVerdict.Published _ -> Path.OrchestratorPublished
             | OrchestratorVerdict.RejectedDirty _ -> Path.OrchestratorRejectedDirty
-            | OrchestratorVerdict.NeedsReview _ -> Path.OrchestratorNeedsReview
             | OrchestratorVerdict.IntegrationFailed _ -> Path.OrchestratorIntegrationFailed
             | OrchestratorVerdict.Empty -> Path.OrchestratorEmpty
 

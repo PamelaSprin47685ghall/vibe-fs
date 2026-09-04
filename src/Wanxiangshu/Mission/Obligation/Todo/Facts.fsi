@@ -3,6 +3,7 @@ namespace Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
+open Wanxiangshu.Mission.Relay
 
 module MagicTodoFacts =
     [<RequireQualifiedAccess>]
@@ -12,7 +13,7 @@ module MagicTodoFacts =
 
     type TodoWritePrepared =
         { ManagerSessionId: SessionId
-          ManagerLifeId: ManagerLifeId
+          IncumbencyId: IncumbencyId
           TodoWriteId: TodoWriteId
           ToolCallId: ToolCallId
           ToolPartOrdinal: int
@@ -26,7 +27,7 @@ module MagicTodoFacts =
           SemanticVersion: string }
 
     type TodoWriteAccepted =
-        { ManagerLifeId: ManagerLifeId
+        { IncumbencyId: IncumbencyId
           TodoWriteId: TodoWriteId
           ToolCallId: ToolCallId
           PreparedFactRef: EventId
@@ -37,7 +38,7 @@ module MagicTodoFacts =
 
     type LegacyTodoSeedAdopted =
         { ManagerSessionId: SessionId
-          ManagerLifeId: ManagerLifeId
+          IncumbencyId: IncumbencyId
           SeedTodoRef: BlobRef
           SeedTodoDigest: BlobDigest }
 
@@ -48,7 +49,7 @@ module MagicTodoFacts =
 
     type PrefixRebaseCommittedV2 =
         { SessionId: SessionId
-          ManagerLifeId: ManagerLifeId option
+          IncumbencyId: IncumbencyId option
           PreviousEpochId: PrefixEpochId
           NextEpochId: PrefixEpochId
           EvidenceKind: PrefixEvidenceKind

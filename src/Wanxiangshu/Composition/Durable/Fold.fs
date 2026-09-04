@@ -13,9 +13,8 @@ open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Enforcer.InstitutionalLearning
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
 
@@ -29,13 +28,48 @@ module Fold =
 
     let private reject = FoldRejection.reject
 
+    let private settlePromptAuthority events authorityOpt =
+        let hasRetirement =
+            events
+            |> List.exists (function
+                | RelayEvent.RetirementCommitted _ -> true
+                | _ -> false)
+
+        if hasRetirement then
+            authorityOpt
+            |> Option.map Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.closeCompletedHumanRootManager
+        else
+            authorityOpt
+
+    let private foldRelay (projection: AgentProjectionSet) (fact: RelayFactCases) =
+        match fact with
+        | RelayFactCases.TransactionCommitted payload ->
+            let sessionId = SessionId.create (RoadId.value payload.RoadId)
+            let events = RelayTransaction.events payload.Transaction
+
+            AgentProjection.tryUpdate
+                sessionId
+                (fun session ->
+                    let current =
+                        session.Relay |> Option.defaultValue Wanxiangshu.Mission.Relay.Fold.empty
+
+                    let updatedPromptAuthority = session.PromptAuthority |> settlePromptAuthority events
+
+                    Wanxiangshu.Mission.Relay.Fold.apply current payload.RoadId payload.Transaction
+                    |> Result.map (fun updated ->
+                        { session with
+                            Relay = Some updated
+                            PromptAuthority = updatedPromptAuthority }))
+                projection
+            |> Result.mapError (fun reason -> { Fact = "Relay"; Reason = reason })
+
     let foldAgentFact (projection: AgentProjectionSet) (fact: AgentFact) : Result<AgentProjectionSet, FoldRejection> =
         // DSL-003: one dispatch per bounded-context family; each family folds
         // through its own branch so no fold depends on the whole catalogue.
         match fact with
         | AgentFact.Prompt prompt -> PromptFactFold.fold projection prompt
         | AgentFact.Fallback fallback -> FallbackFactFold.fold projection fallback
-        | AgentFact.Review review -> ReviewFactFold.fold projection review
+        | AgentFact.Relay relay -> foldRelay projection relay
         | AgentFact.Execution execution -> ExecutionFactFold.fold projection execution
         | AgentFact.ChatExecution chatExecution ->
             ChatExecutionFactFold.fold projection.ChatExecutions chatExecution
@@ -84,51 +118,6 @@ module Fold =
                         { projection.AgentProjections with
                             MagicTodo = magicTodo } })
 
-    let private managerLifecycleSessionId fact =
-        match fact with
-        | ManagerLifecycleFact.LifeOpened payload -> payload.SessionId
-        | ManagerLifecycleFact.WorkActivated payload -> payload.SessionId
-        | ManagerLifecycleFact.FinalityRequested payload -> payload.SessionId
-        | ManagerLifecycleFact.FinalityReviewerEnlisted payload -> payload.SessionId
-        | ManagerLifecycleFact.FinalityRejected payload -> payload.SessionId
-        | ManagerLifecycleFact.FinalitySiblingSteered payload -> payload.SessionId
-        | ManagerLifecycleFact.FinalityBlessed payload -> payload.SessionId
-        | ManagerLifecycleFact.FinalityUndecided payload -> payload.SessionId
-        | ManagerLifecycleFact.LifeCompleted payload -> payload.SessionId
-
-    let private updateSessionAuthority session fact =
-        match fact with
-        | ManagerLifecycleFact.LifeCompleted _ ->
-            session.PromptAuthority
-            |> Option.defaultValue PromptAuthorityLedger.empty
-            |> PromptAuthorityLedger.closeCompletedHumanRootManager
-            |> Some
-        | _ -> session.PromptAuthority
-
-    let private foldManagerLifecycle (projection: ProjectionSet) fact =
-        let sessionId = managerLifecycleSessionId fact
-
-        AgentProjection.tryUpdate
-            sessionId
-            (fun session ->
-                let current =
-                    session.ManagerLife |> Option.defaultValue ManagerLifecycleProjection.empty
-
-                ManagerLifecycleProjection.fold current fact
-                |> Result.map (fun updated ->
-                    let authority = updateSessionAuthority session fact
-
-                    { session with
-                        ManagerLife = Some updated
-                        PromptAuthority = authority }))
-            projection.AgentProjections
-        |> Result.map (fun agents ->
-            { projection with
-                AgentProjections = agents })
-        |> Result.mapError (fun _ ->
-            { Fact = "ManagerLifecycle"
-              Reason = "Manager lifecycle fact violates GLORY-012/037 (Life or request identity mismatch)" })
-
     /// Fact-only fold for callers that do not need envelope metadata.
     /// RuntimeStarted needs no envelope field (RuntimeId is in the payload).
     /// MagicTodo requires an EventId and must go through foldEnvelope.
@@ -146,7 +135,6 @@ module Fold =
             |> Result.map (fun agents ->
                 { projection with
                     AgentProjections = agents })
-        | ManagerLifecycle fact -> foldManagerLifecycle projection fact
         | MagicTodo _ -> reject "MagicTodo" "foldFact does not support MagicTodo; use foldEnvelope with an EventId"
 
     let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
@@ -168,12 +156,6 @@ module Fold =
                 { projection with
                     AgentProjections = agents })
         | MagicTodo fact -> foldMagicTodo projection envelope.EventId fact
-        | ManagerLifecycle fact ->
-            // GLORY-010: lifecycle facts fold onto the session's lifecycle
-            // projection. Replays are idempotent inside the projection fold;
-            // every rejection names a line no correct writer produces (fatal).
-            foldManagerLifecycle projection fact
-
 // Historical enumeration intentionally has no Journal-owned API. Boot and
 // live facts both enter through CanonicalIntegrator, which invokes only
 // foldEnvelope for one already-ordered durable event at a time.

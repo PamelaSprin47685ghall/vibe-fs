@@ -29,7 +29,6 @@ const ROLES = [
   'Inspector',
   'Browser',
   'Inquiry',
-  'Reviewer',
   'DevOps',
   'Distiller',
   'Blogger',
@@ -125,7 +124,7 @@ const allowList = (config, name) => {
     'fission',
     'stealth-browser-mcp_*',
     'sphinx_*',
-    'judge',
+    'review',
     'chronicle',
     'fetch',
     'suicide',
@@ -140,13 +139,12 @@ const COGNITIVE_UTILITY_ALLOW = ['assume']
 const cognitiveUtilityAllowFor = (role) => role === 'Blogger' || role === 'Distiller' ? [] : COGNITIVE_UTILITY_ALLOW
 
 const ROLE_ALLOW = {
-  Manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'suicide'],
+  Manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'suicide', 'read', 'glob', 'grep', 'review'],
   Orchestrator: ['commission', 'join', 'horizon'],
   Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
   Inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch', 'fission'],
   Browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*', 'fission'],
   Inquiry: ['inspect', 'sphinx_*', 'fission'],
-  Reviewer: ['read', 'glob', 'grep', 'judge'],
   DevOps: [
     'read',
     'glob',
@@ -302,7 +300,7 @@ test('WHAT[ENF-002] office_capability_permissions_agree_with_the_host_schema_mat
       'establish-behavior': 'Behavior',
       'repair-behavior': 'Behavior',
       'stealth-browser-mcp_*': 'Network',
-      judge: 'Judge',
+      review: 'ReviewAssessment',
       chronicle: 'Chronicle',
       fetch: 'Fetch',
       suicide: 'Finality',

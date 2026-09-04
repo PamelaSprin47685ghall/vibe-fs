@@ -12,20 +12,9 @@ module SharedState =
     /// Cross-instance session parent map.
     val SessionParents: Dictionary<string, string>
 
-    /// Judged physical review request identities across plugin instances.
-    val VerdictSubmissions: HashSet<string>
-
     /// Cross-instance session directory map.
     val SessionDirectories: Dictionary<string, string>
 
-    /// Gate object for review guard nudge reservations.
-    val ReviewGuardNudgeGate: obj
-
-    /// Cross-instance review guard nudge reservation set.
-    val ReviewGuardNudges: HashSet<string>
-
-    /// Unit-test isolation only: production must not wipe cross-instance reservations.
-    val clearReviewGuardNudgesForTests: unit -> unit
 
     /// Gate object for blogger flight ownership.
     val BloggerFlightGate: obj

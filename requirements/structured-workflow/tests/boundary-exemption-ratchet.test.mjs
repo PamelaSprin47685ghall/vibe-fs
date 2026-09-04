@@ -15,12 +15,10 @@
 //    - change-integration HOW must restate the no-fold constraint.
 //    - Production source must not introduce ResumeAtXxx durable log patterns.
 //
-// 3. ManagerFinality handleEnding dispatch ownership (FINALITY-003 ↔ SW-017①):
-//    - Finality.fs must define handleEnding, FinalityEndingOutcome, and
-//      FinalityEndingExecution.
-//    - Tool.fs must call handleEnding and match FinalityEndingOutcome — never
-//      match EndingDisposition cases directly.
-//    - FINALITY-003 WHAT must mention handleEnding and FinalityEndingOutcome.
+// 3. SuicideTool retirement dispatch ownership (SW-006 / RETIRE-001 / RETIRE-003 ↔ SW-017①):
+//    - SuicideTool.fs must define spec, executePrepared, and require ToolPermission.Finality.
+//    - SuicideTool.fs must freeze retirement before check and never issue session-scoped abort.
+//    - relay-retirement WHAT must define RETIRE-001 and RETIRE-003.
 //
 // Source-tree proof: each assertion reads production source or requirements
 // docs and checks for the presence (or absence) of specific strings. If a
@@ -86,36 +84,23 @@ test('WHAT[STRUCTURED-WORKFLOW-003] production_source_has_no_ResumeAtXxx_durable
   assert.doesNotMatch(source, /ResumeAt\w+/, 'Change/Program.fs must not introduce ResumeAtXxx durable log patterns')
 })
 
-// ── 3. ManagerFinality handleEnding dispatch ownership ──────────────────────
+// ── 3. SuicideTool retirement dispatch ownership ────────────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-006] Finality_fs_defines_handleEnding_and_boundary_types', () => {
-  const source = read('src/Wanxiangshu/Mission/Manager/Finality.fs')
-  assert.match(source, /let handleEnding/, 'Finality.fs must define handleEnding')
-  assert.match(source, /type FinalityEndingOutcome/, 'Finality.fs must define FinalityEndingOutcome')
-  assert.match(source, /Refused/, 'FinalityEndingOutcome must have Refused case')
-  assert.match(source, /Result/, 'FinalityEndingOutcome must have Result case')
-  assert.match(source, /type FinalityEndingExecution/, 'Finality.fs must define FinalityEndingExecution capability record')
+test('WHAT[STRUCTURED-WORKFLOW-006] SuicideTool_fs_defines_spec_executePrepared_and_retirement_freeze', () => {
+  const source = read('src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs')
+  assert.match(source, /let spec/, 'SuicideTool.fs must define spec')
+  assert.match(source, /let private executePrepared/, 'SuicideTool.fs must define executePrepared')
+  assert.match(source, /ToolPermission\.Finality/, 'SuicideTool.fs must require ToolPermission.Finality')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-006] Tool_fs_calls_handleEnding_and_matches_FinalityEndingOutcome_only', () => {
-  const source = read('src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs')
-  assert.match(source, /ManagerFinality\.handleEnding/, 'Tool.fs must call ManagerFinality.handleEnding')
-  assert.match(source, /FinalityEndingOutcome\.Refused/, 'Tool.fs must match FinalityEndingOutcome.Refused')
-  assert.match(source, /FinalityEndingOutcome\.Result/, 'Tool.fs must match FinalityEndingOutcome.Result')
-  // Tool.fs must NOT match EndingDisposition cases directly — it should only
-  // see the boundary outcome, never the internal disposition.
-  const toolSource = source
-  assert.doesNotMatch(
-    toolSource.match(/acceptSuicide[\s\S]*?return\s/m)?.[0] ?? '',
-    /match\s+(disposition|EndingDisposition)\s+with/,
-    'Tool.fs acceptSuicide must not match EndingDisposition cases directly',
-  )
+test('WHAT[STRUCTURED-WORKFLOW-006] SuicideTool_fs_freezes_retirement_without_session_abort', () => {
+  const source = read('src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs')
+  assert.doesNotMatch(source, /\.AbortSession\b/, 'SuicideTool must never issue session-scoped abort')
+  assert.match(source, /TryFreezeRetirement/, 'SuicideTool must freeze retirement before check')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-006] FINALITY_003_WHT_documents_handleEnding_and_FinalityEndingOutcome', () => {
-  const what = read('requirements/finality/WHAT.md')
-  assert.match(what, /handleEnding/, 'FINALITY-003 WHAT must mention handleEnding')
-  assert.match(what, /FinalityEndingOutcome/, 'FINALITY-003 WHAT must mention FinalityEndingOutcome')
-  assert.match(what, /不是 program counter/, 'FINALITY-003 WHAT must state EndingDisposition is not a program counter')
-  assert.match(what, /Tool adapter 不 match disposition case/, 'FINALITY-003 WHAT must state Tool adapter does not match disposition cases')
+test('WHAT[STRUCTURED-WORKFLOW-006] RETIREMENT_WHT_documents_retirement_dispatch_and_blockers', () => {
+  const what = read('requirements/relay-retirement/WHAT.md')
+  assert.match(what, /RETIRE-001/, 'relay-retirement WHAT must define RETIRE-001')
+  assert.match(what, /RETIRE-003/, 'relay-retirement WHAT must define RETIRE-003')
 })

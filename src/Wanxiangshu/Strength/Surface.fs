@@ -107,7 +107,7 @@ module StrengthSurface =
         | ToolPermission.Exec -> "Exec"
         | ToolPermission.Pty -> "Pty"
         | ToolPermission.Network -> "Network"
-        | ToolPermission.Judge -> "Judge"
+        | ToolPermission.ReviewAssessment -> "ReviewAssessment"
         | ToolPermission.Chronicle -> "Chronicle"
         | ToolPermission.Fetch -> "Fetch"
         | ToolPermission.Finality -> "Finality"
@@ -410,7 +410,6 @@ module StrengthSurface =
                   EffectiveAgent = textOf value?effectiveAgent
                   IsFallbackRetry = unbox<bool> value?isFallbackRetry
                   HasPrefixProbe = unbox<bool> value?hasPrefixProbe
-                  IsReviewerOrFinality = unbox<bool> value?isReviewerOrFinality
                   IsAttachedOrInternalLeaf = unbox<bool> value?isAttachedOrInternalLeaf
                   OwnerCancelled = unbox<bool> value?ownerCancelled
                   TargetProviderRunBound = unbox<bool> value?targetProviderRunBound
@@ -534,7 +533,6 @@ module StrengthSurface =
             | Role.Coder -> prompts.CoderSystemPrompt
             | Role.DevOps -> prompts.DevopsSystemPrompt
             | Role.Inspector -> prompts.InspectorSystemPrompt
-            | Role.Reviewer -> prompts.ReviewerSystemPrompt
             | Role.Browser -> prompts.BrowserSystemPrompt
             | Role.Inquiry -> prompts.InquirySystemPrompt
             | Role.Orchestrator -> prompts.OrchestratorSystemPrompt

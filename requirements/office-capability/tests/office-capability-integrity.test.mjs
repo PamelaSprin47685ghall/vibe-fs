@@ -86,13 +86,12 @@ test('WHAT[OFF-002] OFF_002_managed_catalog_forkable_offices_are_exactly_the_fiv
 
 test('WHAT[ENF-002] office_permission_surface_matches_the_canonical_roles_matrix', () => {
   const matrix = [
-    ['manager', ['Finality', 'Fission', 'Fork', 'Horizon', 'Join', 'TodoWrite']],
+    ['manager', ['Finality', 'Fission', 'Fork', 'Glob', 'Grep', 'Horizon', 'Join', 'Read', 'ReviewAssessment', 'TodoWrite']],
     ['orchestrator', ['Fork', 'Horizon', 'Join']],
     ['coder', ['BashHoneypot', 'Edit', 'Fetch', 'Fission', 'Glob', 'Grep', 'Inspect', 'Move', 'Read', 'Remove', 'Write']],
     ['inspector', ['Exec', 'Fetch', 'Fission', 'Glob', 'Grep', 'Read']],
     ['browser', ['Fission', 'Glob', 'Grep', 'Network', 'Read']],
     ['inquiry', ['Fission', 'Inspect', 'Sphinx']],
-    ['reviewer', ['Glob', 'Grep', 'Judge', 'Read']],
     ['devops', ['Behavior', 'Exec', 'Glob', 'Grep', 'Horizon', 'Inspect', 'Join', 'Pty', 'Read']],
     ['distiller', []],
     ['blogger', ['Chronicle']],

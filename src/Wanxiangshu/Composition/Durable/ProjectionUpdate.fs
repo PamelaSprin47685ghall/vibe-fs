@@ -6,7 +6,6 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Enforcer.Guidance
@@ -82,41 +81,6 @@ module ProjectionUpdate =
             RequirementGrounding =
                 session.RequirementGrounding
                 |> Option.map RequirementGroundingProjection.applyReanchor }
-
-    let updateReviewGuard sessionId apply projection =
-        updateSession
-            sessionId
-            (fun session ->
-                { session with
-                    ReviewGuard = Some(apply (Option.defaultValue ReviewProjection.empty session.ReviewGuard)) })
-            projection
-
-    let bindTerminalFrontier
-        (sessionId: SessionId)
-        (terminalRef: BlobRef)
-        (terminalDigest: BlobDigest)
-        (projection: AgentProjectionSet)
-        =
-        match AgentProjection.tryFind sessionId projection with
-        | Some { ReviewGuard = Some _
-                 XTrace = Some xTrace } ->
-            updateReviewGuard
-                sessionId
-                (ReviewProjection.recordTerminalFrontier
-                    terminalRef
-                    terminalDigest
-                    (xTrace |> XTraceProjection.headCursor |> XTraceCursor.sequence))
-                projection
-        | _ -> projection
-
-    let updateRequirements sessionId apply projection =
-        updateSession
-            sessionId
-            (fun session ->
-                { session with
-                    ReviewRequirements =
-                        Some(apply (Option.defaultValue ReviewRequirementProjection.empty session.ReviewRequirements)) })
-            projection
 
     let updateOrchestrator apply (projection: AgentProjectionSet) =
         { projection with

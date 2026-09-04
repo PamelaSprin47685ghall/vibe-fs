@@ -95,8 +95,11 @@ test('WHAT[INTERACTION-AUTHORITY-014] JNGD_nudge_contract_fails_closed_without_d
 
 test('WHAT[INTERACTION-AUTHORITY-010] duplicate_idle_continuation_admission_is_not_terminal_failure', () => {
   const nudge = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs'), 'utf8')
-  const manager = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Mission/Manager/Idle.fs'), 'utf8')
+  const manager = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Mission/Manager/Workflow.fs'), 'utf8')
   assert.match(nudge, /IdleContinuationOutcome\.AlreadyAdmitted/)
   assert.doesNotMatch(nudge, /Manager idle encouragement already claimed for this terminal/)
-  assert.match(manager, /IdleContinuationOutcome\.AlreadyAdmitted/)
+  assert.match(nudge, /acceptedPhysical\.Task/)
+  assert.doesNotMatch(nudge, /GateContinuationOutcome\.Sent _, None -> Error "gate nudge was admitted without a PhysicalUserMessageId"/)
+  assert.match(manager, /trySendGateContinuationPhysical/)
+  assert.doesNotMatch(manager, /Mission\.Manager\.Idle/)
 })

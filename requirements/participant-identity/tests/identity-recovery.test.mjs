@@ -121,7 +121,7 @@ const legacyHumanRootLine = (profile) => {
 
 const inheritedProfile = () => {
   const owner = createRoot()
-  const issued = authority.issueInheritedIdentitySeed('reviewer', owner)
+  const issued = authority.issueInheritedIdentitySeed('inspector', owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
   return createRoot('AgentOwnerRoot', issued.value, 'ses-recovery-child', 'msg-recovery-child')
 }

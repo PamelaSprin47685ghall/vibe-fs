@@ -46,7 +46,7 @@
 
 ## DISPATCH-PROTOCOL-012: PhysicalAccepted 后只交接 exact identity
 
-Dispatch 在建立 `PhysicalAccepted` 后只向 `managed-chat-execution` 交接 exact `(SessionId, PhysicalUserMessageId)`、`PromptKey` 与 `interaction-authority` 发布的原子 `AttemptExecutionProfile`；该 profile 必须包含完整版本化 `ParticipantIdentityEvidence`，不得退化为可重新推导的 authority metadata。`managed-chat-execution` 独占 durable execution acceptance、provider start、terminal 与 settlement；dispatch 不复制其 transition law，不获取容量，不建立 execution binding，不解释 provider failure。
+Dispatch 在建立 `PhysicalAccepted` 后只向 `managed-chat-execution` 交接 exact `(SessionId, PhysicalUserMessageId)`、`PromptKey` 与 `interaction-authority` 发布的原子 `AttemptExecutionProfile`；该 profile 必须包含完整版本化 `ParticipantIdentityEvidence`，不得退化为可重新推导的 authority metadata。Turn reconciliation 在 process-local binding 缺字段时必须从同一 durable authority profile 恢复 canonical role/identity；显式 Host 证据优先，但 `Role=None` 不得遮蔽 durable canonical role，否则同一 Manager continuation 会被误路由为 Ordinary。`managed-chat-execution` 独占 durable execution acceptance、provider start、terminal 与 settlement；dispatch 不复制其 transition law，不获取容量，不建立 execution binding，不解释 provider failure。
 
 ## DISPATCH-PROTOCOL-013: Construction 纯 wiring，recovery 晚于 durability activation
 

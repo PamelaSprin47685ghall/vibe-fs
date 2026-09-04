@@ -386,9 +386,8 @@ export const assertPureConfluence = (envelopeSeqA, envelopeSeqB, projectionReade
 }
 
 export const nextCEWiringTargets = [
-  'ManagerWorkflow.tryObserve',
+  'RelayWorkflow.tryObserve',
   'TurnCompletionProgram+FallbackController',
-  'ReviewerWorkflow+ReviewController',
-  'FinalityController',
+  'RetirementAdmission',
   'OrchestratorProgram+SessionRecovery',
 ]

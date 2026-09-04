@@ -35,8 +35,6 @@ type PluginSessionScope =
     member CompanionGate: obj
 
     /// Cross-instance verdict session set alias.
-    member VerdictSubmissions: HashSet<string>
-
     /// Per-instance nudge sent set.
     member NudgeSent: HashSet<string>
 

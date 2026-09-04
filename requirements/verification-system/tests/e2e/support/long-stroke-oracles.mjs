@@ -12,13 +12,13 @@
  *   [x] provider transient failure          — assertProviderTransientFailure
  *   [x] fallback                            — assertFallbackContinuation
  *   [x] join blocked then causally awakened — assertJoinWakePath
- *   [x] reviewer REVISE                     — assertReviewerRevise (+ bindFinalityReviseThenPerfect)
+ *   [x] non-10 assessment assigns work      — assertAssessmentAssignsWork
  *   [x] interrupted/aborted child or session— assertInterruptedJoin (+ holdChildC1UntilLabor)
- *   [x] finality temporarily blocked        — assertFinalityTemporarilyBlocked
+ *   [x] retirement needs successor          — assertRetirementNeedsSuccessor
  *   [x] durable recovery/continuation       — assertDurableRecovery
  *   [x] publish conflict / stale target     — assertPublishConflict
  *   [x] successful reconciliation           — assertSuccessfulReconciliation
- *   [x] later successful finality           — assertLaterSuccessfulFinality
+ *   [x] later successful retirement         — assertRetirementCommitted
  */
 import assert from 'node:assert/strict';
 import {
@@ -167,16 +167,10 @@ export async function assertFallbackContinuation(workDir, label = 'long-stroke')
   );
 }
 
-/** Back-compat alias used by older skeleton comments. */
-export async function assertProviderFallback(workDir, label = 'long-stroke') {
-  await assertProviderTransientFailure(workDir, label);
-  await assertFallbackContinuation(workDir, label);
-}
-
 /**
  * §21: join blocked then causally awakened — HandleCompleted after user_message wake.
  * The join-wake itself only requires the harvest fact; the full agent lifecycle is
- * proven later by FinalityBlessed + LifeCompleted (assertLaterSuccessfulFinality).
+ * proven later by RetirementCommitted (assertRetirementCommitted).
  */
 export async function assertJoinWakePath(workDir, label = 'long-stroke') {
   assert.ok(
@@ -208,19 +202,21 @@ export function assertInterruptedJoin(scenario, label = 'long-stroke') {
   );
 }
 
-/** §21: reviewer REVISE — FinalityRejected from REVISE path. */
-export function assertReviewerRevise(workDir, label = 'long-stroke') {
+/** §21: non-10 assessment assigns work (AssessmentCommitted). */
+export function assertAssessmentAssignsWork(workDir, label = 'long-stroke') {
   assert.ok(
-    countFactCase(workDir, 'FinalityRejected') >= 1,
-    `${label}: FinalityRejected required (reviewer REVISE)`,
+    countFactCase(workDir, 'AssessmentCommitted') >= 1,
+    `${label}: AssessmentCommitted required (relay non-10 assessment assigns work)`,
   );
 }
 
-/** §21: finality temporarily blocked — same durable pin as REVISE rejection. */
-export function assertFinalityTemporarilyBlocked(workDir, label = 'long-stroke') {
+/** §21: retirement needs successor — non-10 assessment blocks publication and requires a successor. */
+export function assertRetirementNeedsSuccessor(workDir, label = 'long-stroke') {
+  const transactions = factPayloads(workDir, 'TransactionCommitted');
+  const hasSuccessorRequest = transactions.some((tx) => JSON.stringify(tx).includes('SuccessorRequested'));
   assert.ok(
-    countFactCase(workDir, 'FinalityRejected') >= 1,
-    `${label}: FinalityRejected required (finality temporarily blocked)`,
+    hasSuccessorRequest,
+    `${label}: SuccessorRequested required (finality temporarily blocked, successor needed)`,
   );
 }
 
@@ -247,10 +243,10 @@ export function assertPublishConflict(workDir, label = 'long-stroke') {
 /** §21 / MANAGED-SESSION-020: subagent reuse — same child session reused across distinct task runs. */
 export function assertSubagentReuse(workDir, label = 'long-stroke') {
   const linked = factPayloads(workDir, 'HandleLinked');
-  const proofFinisherLinks = linked.filter((p) => p.Byname === 'Proof Finisher');
+  const proofFinisherLinks = linked.filter((p) => p.Byname === 'Proof Writer' || p.Byname === 'Proof Finisher');
   assert.ok(
     proofFinisherLinks.length >= 2,
-    `${label}: Proof Finisher must be linked at least twice for subagent reuse (got ${proofFinisherLinks.length})`,
+    `${label}: Proof Writer must be linked at least twice for subagent reuse (got ${proofFinisherLinks.length})`,
   );
   const firstChild = proofFinisherLinks[0].ChildSessionId;
   const secondChild = proofFinisherLinks[1].ChildSessionId;
@@ -274,39 +270,11 @@ export function assertSuccessfulReconciliation(workDir, label = 'long-stroke') {
   );
 }
 
-/** Back-compat composite for publish axis. */
-export async function assertPublishReconcile(workDir, label = 'long-stroke') {
-  assertPublishConflict(workDir, label);
-  assertSubagentReuse(workDir, label);
-  assertSuccessfulReconciliation(workDir, label);
-}
-
-/** §21: later successful finality — FinalityBlessed then LifeCompleted. */
-export function assertLaterSuccessfulFinality(workDir, label = 'long-stroke') {
+/** §21: later successful retirement — RetirementCommitted after resources converge. */
+export function assertRetirementCommitted(workDir, label = 'long-stroke') {
   assert.ok(
-    countFactCase(workDir, 'FinalityBlessed') >= 1,
-    `${label}: FinalityBlessed required after resources converge`,
-  );
-  assert.ok(
-    countFactCase(workDir, 'LifeCompleted') >= 1,
-    `${label}: LifeCompleted required before clean shutdown`,
-  );
-}
-
-/** Back-compat aliases. */
-export async function assertFinalityAdversity(workDir, label = 'long-stroke') {
-  assertReviewerRevise(workDir, label);
-  assertFinalityTemporarilyBlocked(workDir, label);
-  assert.ok(
-    countFactCase(workDir, 'FinalityBlessed') >= 1,
-    `${label}: FinalityBlessed required after resources converge`,
-  );
-}
-
-export async function assertLifeCompleted(workDir, label = 'long-stroke') {
-  assert.ok(
-    countFactCase(workDir, 'LifeCompleted') >= 1,
-    `${label}: LifeCompleted required before clean shutdown`,
+    countFactCase(workDir, 'RetirementCommitted') >= 1,
+    `${label}: RetirementCommitted required after resources converge`,
   );
 }
 
@@ -341,43 +309,75 @@ export async function holdChildC1UntilLabor(scenario) {
 }
 
 /**
- * One Reviewer protocol owns Finality and publish review. The Long Stroke injects
- * exactly one adversity verdict into that protocol: the first barrier judge is
- * REVISE; once that terminal judge call has been consumed, every later barrier
- * request returns two distinct PERFECT judge calls under the same physical prompt.
- * Judge-only terminality intentionally has no trailing provider text continuation.
- * No alternate prompt/tool surface is manufactured for Finality.
+ * Script the repeated fixed successor prompt without inventing a Reviewer identity.
+ * Delivery #1 independently certifies the pre-rebase snapshot. Delivery #2 sees
+ * the machine conflict, deliberately leaves one quality dimension open, and gains
+ * WorkOwned so it can reuse Proof Writer for repair. Delivery #3 independently
+ * certifies the repaired snapshot. Every logical step still crosses the real
+ * review/suicide/fork tools and durable Relay facts.
  */
-export async function bindFinalityReviseThenPerfect(scenario) {
+export async function bindRelaySuccessorSequence(scenario) {
   const runtime = scenario.provider?._scenario;
-  assert.ok(runtime?.scenario?.entries, 'long-stroke: strict scenario entries required for finality bind');
+  assert.ok(runtime?.scenario?.entries, 'long-stroke: strict scenario entries required for Relay successor bind');
 
-  const verdictEntry = runtime.scenario.entries.find(
-    (entry) => entry.turnId === 'barrier-reviewer' && entry.step === 0,
+  const auditEntry = runtime.scenario.entries.find(
+    (entry) => entry.turnId === 'successor' && entry.step === 0,
   );
-  const confirmationEntry = runtime.scenario.entries.find(
-    (entry) => entry.turnId === 'barrier-reviewer' && entry.step === 1,
+  const actionEntry = runtime.scenario.entries.find(
+    (entry) => entry.turnId === 'successor' && entry.step === 1,
   );
-  assert.ok(verdictEntry, 'long-stroke: unified barrier-reviewer verdict entry is required');
-  assert.ok(confirmationEntry, 'long-stroke: unified barrier-reviewer confirmation entry is required');
+  assert.ok(auditEntry, 'long-stroke: successor audit entry is required');
+  assert.ok(actionEntry, 'long-stroke: successor action entry is required');
 
-  const perfectJudge = { type: 'tool-call', tool: 'judge', args: { verdict: 'PERFECT' } };
-  const setVerdict = (verdict) => {
-    verdictEntry.respond = { type: 'tool-call', tool: 'judge', args: { verdict } };
-  };
+  const scores = (completeness) => ({
+    language_algorithms: 10,
+    simplicity: 10,
+    structure: 10,
+    granularity: 10,
+    tests_evidence: 10,
+    logic_reliability_boundaries: 10,
+    caller_ergonomics: 10,
+    completeness,
+  });
+  const perfectAudit = () => ({
+    type: 'tool-call',
+    tool: 'review',
+    prefixText: 'Independent audit of this successor snapshot finds every required quality dimension complete and supported by the current workspace evidence.',
+    args: scores(10),
+  });
+  const repairAudit = () => ({
+    type: 'tool-call',
+    tool: 'review',
+    prefixText: 'Independent audit finds the rebase conflict still requires owned repair work, so completeness remains open on this snapshot.',
+    args: scores(9),
+  });
+  const retire = () => ({ type: 'tool-call', tool: 'suicide', args: {} });
+  const repair = () => ({
+    type: 'tool-call',
+    tool: 'fork',
+    args: {
+      name: 'Proof Writer',
+      charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
+    },
+  });
+  auditEntry.respond = perfectAudit();
+  actionEntry.respond = retire();
 
-  setVerdict('REVISE');
-
-  let firstBarrierVerdictSeen = false;
+  let successorActions = 0;
   const consume = runtime.consume;
   const originalConsume = (body, selection, context) => consume.call(runtime, body, selection, context);
   runtime.consume = (body, selection, context) => {
     originalConsume(body, selection, context);
-    if (!firstBarrierVerdictSeen && selection?.entry?.id === 'barrier-reviewer.0') {
-      firstBarrierVerdictSeen = true;
+    if (selection?.entry?.id === 'successor.1') {
+      successorActions += 1;
       queueMicrotask(() => {
-        setVerdict('PERFECT');
-        confirmationEntry.respond = perfectJudge;
+        if (successorActions === 1) {
+          auditEntry.respond = repairAudit();
+          actionEntry.respond = repair();
+        } else if (successorActions === 2) {
+          auditEntry.respond = perfectAudit();
+          actionEntry.respond = retire();
+        }
       });
     }
   };
@@ -457,9 +457,9 @@ export async function oracleLongStroke(scenario, _ctx) {
   await assertProviderTransientFailure(workDir);
   await assertFallbackContinuation(workDir);
   await assertDurableRecovery(workDir);
-  assertReviewerRevise(workDir);
-  assertFinalityTemporarilyBlocked(workDir);
-  assertLaterSuccessfulFinality(workDir);
+  assertAssessmentAssignsWork(workDir);
+  assertRetirementNeedsSuccessor(workDir);
+  assertRetirementCommitted(workDir);
   assertPublishConflict(workDir);
   assertSubagentReuse(workDir);
   assertSuccessfulReconciliation(workDir);
@@ -497,16 +497,13 @@ export async function oracleLongStroke(scenario, _ctx) {
   assert.equal(
     scenario.provider.matchCount('manager-resume.0'),
     1,
-    'long-stroke determinism: manager-resume.0 must reach the interrupted child join',
+    'long-stroke determinism: manager-resume.0 must be delivered exactly once',
   );
-
-  const originalSuffix = Array.from({ length: 10 }, (_, index) => `manager-resume.${index + 1}`);
   const guardedSuffix = Array.from({ length: 10 }, (_, index) => `manager-join-guard.${index}`);
-  for (let index = 0; index < originalSuffix.length; index += 1) {
-    assert.equal(
-      scenario.provider.matchCount(originalSuffix[index]) + scenario.provider.matchCount(guardedSuffix[index]),
-      1,
-      `long-stroke determinism: Manager suffix step ${index + 1} must select exactly one legal turn`,
+  for (const id of ['successor.0', 'successor.1', 'successor.2', 'successor.3']) {
+    assert.ok(
+      scenario.provider.matchCount(id) >= 1,
+      `long-stroke determinism: ${id} must be delivered across relay incumbencies`,
     );
   }
   const guardedDeliveries = guardedSuffix.reduce(
@@ -537,16 +534,13 @@ export async function oracleLongStroke(scenario, _ctx) {
 export const PLANNED_WAIT_FACTS = Object.freeze({
   handleCompleted: waitFactShape('HandleCompleted', { gte: 1 }),
   fallbackCursor: waitFactShape('FallbackCursorAdvanced', { eq: 1 }),
-  finalityRejected: waitFactShape('FinalityRejected', { gte: 1 }),
-  finalityBlessed: waitFactShape('FinalityBlessed', {
-    gte: 1,
-    renewOn: ['ReviewVerdictRecorded', 'ReviewAttemptClosed', 'ConfirmedReviewWitness', 'FinalityReviewerEnlisted', 'BlogObservationCommitted'],
-  }),
+  assessmentCommitted: waitFactShape('AssessmentCommitted', { gte: 1 }),
+  retirementCommitted: waitFactShape('RetirementCommitted', { gte: 1 }),
+  successorActivated: waitFactShape('SuccessorActivated', { gte: 1 }),
   conflictDetected: waitFactShape('ConflictDetected', { gte: 1 }),
+  rebasedCandidateReady: waitFactShape('RebasedCandidateReady', { gte: 1 }),
   // Orchestrator-tagged Published (bare "Published" false-matches assignment text).
   published: waitFactShape('"Orchestrator",["Published"', { eq: 1 }),
-  confirmedWitness: waitFactShape('ConfirmedReviewWitness', { gte: 1 }),
-  lifeCompleted: waitFactShape('LifeCompleted', { gte: 1 }),
   candidateReady: waitFactShape('CandidateReady', { eq: 1 }),
 });
 
@@ -574,10 +568,10 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
     oracle: 'assertJoinWakePath',
   },
   {
-    id: 'reviewer-revise',
+    id: 'non10-assessment-assigns-work',
     covered: true,
-    injection: 'first unified barrier-reviewer judge(verdict=REVISE) + bindFinalityReviseThenPerfect',
-    oracle: 'assertReviewerRevise',
+    injection: 'manager-audit non-10 completeness=9 review → WorkOwned',
+    oracle: 'assertAssessmentAssignsWork',
   },
   {
     id: 'interrupted-aborted-child-or-session',
@@ -586,10 +580,10 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
     oracle: 'assertInterruptedJoin',
   },
   {
-    id: 'finality-temporarily-blocked',
+    id: 'retirement-needs-successor',
     covered: true,
-    injection: 'REVISE path → waitFact FinalityRejected',
-    oracle: 'assertFinalityTemporarilyBlocked',
+    injection: 'non-10 assessment blocks publication → successor required',
+    oracle: 'assertRetirementNeedsSuccessor',
   },
   {
     id: 'durable-recovery-continuation',
@@ -606,20 +600,20 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
   {
     id: 'subagent-session-reuse',
     covered: true,
-    injection: 'manager-resume reuses Proof Finisher on same child session → coder-reuse',
+    injection: 'successor-2 reuses Proof Writer on same child session',
     oracle: 'assertSubagentReuse',
   },
   {
     id: 'successful-reconciliation',
     covered: true,
-    injection: 'conflict-resume → coder-resolve → Orchestrator Published eq 1',
+    injection: 'conflict resolve → rebase candidate → Orchestrator Published eq 1',
     oracle: 'assertSuccessfulReconciliation',
   },
   {
-    id: 'later-successful-finality',
+    id: 'later-successful-retirement',
     covered: true,
-    injection: 'waitFact FinalityBlessed + LifeCompleted before publish reconcile',
-    oracle: 'assertLaterSuccessfulFinality',
+    injection: 'waitFact RetirementCommitted after resources converge before publish reconcile',
+    oracle: 'assertRetirementCommitted',
   },
 ]);
 
@@ -629,18 +623,13 @@ export const ADVERSITY_ORACLES = Object.freeze({
   assertFallbackContinuation,
   assertJoinWakePath,
   assertInterruptedJoin,
-  assertReviewerRevise,
-  assertFinalityTemporarilyBlocked,
+  assertAssessmentAssignsWork,
+  assertRetirementNeedsSuccessor,
   assertDurableRecovery,
   assertPublishConflict,
   assertSubagentReuse,
   assertSuccessfulReconciliation,
-  assertLaterSuccessfulFinality,
-  // composites / aliases retained for older call sites
-  assertProviderFallback,
-  assertFinalityAdversity,
-  assertPublishReconcile,
-  assertLifeCompleted,
+  assertRetirementCommitted,
 });
 
 export const G2_INSPECTOR_CANARY_PROMPT =
@@ -821,6 +810,6 @@ export function assertG6BookkeeperFinalize(scenario) {
 
 export const CUSTOMS = {
   holdChildC1UntilLabor,
-  bindFinalityReviseThenPerfect,
+  bindRelaySuccessorSequence,
   oracleLongStroke,
 };

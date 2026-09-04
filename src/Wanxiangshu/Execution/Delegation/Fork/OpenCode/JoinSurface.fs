@@ -30,7 +30,6 @@ module JoinSurface =
         | "DevOps" -> Some Role.DevOps
         | "Browser" -> Some Role.Browser
         | "Inquiry" -> Some Role.Inquiry
-        | "Reviewer" -> Some Role.Reviewer
         | "Distiller" -> Some Role.Distiller
         | "Blogger" -> Some Role.Blogger
         | _ -> None
@@ -194,7 +193,6 @@ module JoinSurface =
                 match name with
                 | "Published" -> OrchestratorVerdict.Published(ManagerJobId.create "job", CommitHash.create "head")
                 | "RejectedDirty" -> OrchestratorVerdict.RejectedDirty "dirty"
-                | "NeedsReview" -> OrchestratorVerdict.NeedsReview(ManagerJobId.create "job", "review")
                 | "IntegrationFailed" -> OrchestratorVerdict.IntegrationFailed(ManagerJobId.create "job", "failed")
                 | _ -> OrchestratorVerdict.Empty)
             |> Array.toList

@@ -46,7 +46,6 @@ module HandleFoldSurface =
         | "DevOps" -> Ok Role.DevOps
         | "Manager" -> Ok Role.Manager
         | "Inspector" -> Ok Role.Inspector
-        | "Reviewer" -> Ok Role.Reviewer
         | "Blogger" -> Ok Role.Blogger
         | "Distiller" -> Ok Role.Distiller
         | "Orchestrator" -> Ok Role.Orchestrator

@@ -412,12 +412,11 @@ const labelsForExternalFcsSymbol = (assembly, identity) => {
     && normalizedIdentity === 'microsoft.fsharp.control.fsharpasync.sleep') {
     return labelsForIdentity(identity, 'external-package')
   }
-  if (normalizedAssembly === 'host.runtime' && identityIsOrExtends(normalizedIdentity, 'host')) {
+  if ((normalizedAssembly === 'host.runtime' || normalizedAssembly === 'host') && identityIsOrExtends(normalizedIdentity, 'host')) {
     return labelsForIdentity(identity, 'external-package')
   }
   return null
 }
-
 export const classifyCapabilityObservationV1 = (observation) => {
   if (!validateRawCapabilityObservationV1(observation)) {
     let rawIdentity
@@ -499,6 +498,7 @@ export const classifyCapabilityObservationV1 = (observation) => {
         semanticClasses: known.payload.semantic_classes,
       })
     }
+
     return unknown('unclassified-capability', javascriptObservation.kind, identity)
   }
   if (['fable-emit', 'emit-js-expr'].includes(observation.case)) {
@@ -759,7 +759,6 @@ const memberIdentity = (node) => {
     : node.property?.type === 'Identifier' ? node.property.name : null
   return parent && member ? { root: parent.root, member_path: [...parent.member_path, member] } : null
 }
-
 const emittedResult = (row, observations) => ({
   node_id: row.node_id,
   result: {

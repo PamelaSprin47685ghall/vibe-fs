@@ -20,12 +20,8 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
@@ -135,7 +131,6 @@ module ManagedAgentConfig =
         | Role.DevOps -> StaticTools.devopsAgentConfig (Some prompts.DevopsSystemPrompt)
         | Role.Browser -> StaticTools.browserAgentConfig (Some prompts.BrowserSystemPrompt)
         | Role.Inquiry -> StaticTools.inquiryAgentConfig (Some prompts.InquirySystemPrompt)
-        | Role.Reviewer -> StaticTools.reviewerAgentConfig (Some prompts.ReviewerSystemPrompt)
         | Role.Blogger -> StaticTools.bloggerAgentConfig prompts.BloggerSystemPrompt
         | Role.Distiller -> StaticTools.distillerAgentConfig prompts.DistillerSystemPrompt
 
@@ -173,11 +168,6 @@ module ManagedAgentConfig =
         | None -> ()
         | Some owned -> assignOwnedFields (ensureAgentEntry agents name) owned
 
-    let private parseNonNegativeInt (raw: string) : int option =
-        match System.Int32.TryParse raw with
-        | true, n when n >= 0 -> Some n
-        | _ -> None
-
     let private ensureExperimental (config: obj) : obj =
         if isNull config?experimental then
             let created: obj = createEmpty
@@ -186,20 +176,15 @@ module ManagedAgentConfig =
         else
             config?experimental
 
-    let private applyChatMaxRetries (config: obj) : unit =
-        match System.Environment.GetEnvironmentVariable("WANXIANGSHU_CHAT_MAX_RETRIES") with
-        | null
-        | "" -> ()
-        | raw ->
-            parseNonNegativeInt raw
-            |> Option.iter (fun n -> (ensureExperimental config)?chatMaxRetries <- n)
+    let private disableHostChatRetry (config: obj) : unit =
+        (ensureExperimental config)?chatMaxRetries <- 0
 
     let private applyAgentsOwnedFields (config: obj) (agents: obj) (inventory: ManagedAgentInventory) : unit =
         for name in ManagedAgent.requiredNames do
             applyNamedOwnedFields agents inventory name
 
         config?compaction <- createObj [ "auto" ==> false ]
-        applyChatMaxRetries config
+        disableHostChatRetry config
 
     /// Project Wanxiangshu-owned non-model fields onto Host agent entries.
     /// Creates missing catalog names on the live config object, never writes/overwrites model.

@@ -22,7 +22,6 @@ const PROVIDER_ROLES = [
   'inspector',
   'manager',
   'orchestrator',
-  'reviewer',
 ]
 
 const exists = (rel) => fs.existsSync(path.join(repoRoot, rel))

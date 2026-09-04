@@ -7,7 +7,7 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Review
+open Wanxiangshu.Git
 open Wanxiangshu.Persistence.Journal
 
 module PluginHostInterop =
@@ -73,7 +73,6 @@ module PluginHostInterop =
         waitObserver: IWaitObserver ->
         rootWorkspace: IRootWorkspaceReader ->
         journal: AgentJournal option ->
-        gitTreePort: GitTreePort option ->
         workspaceDirectory: string option ->
         scope: PluginRuntimeScope ->
         currentPhysicalUserMessage: (string -> string option) ->
@@ -83,6 +82,5 @@ module PluginHostInterop =
         snapshot: ISessionSnapshotPort option ->
         cancelSignals: (SessionId seq -> unit) option ->
         eventPort: IEventObservationPort option ->
-        finalityReviewerTimeoutMs: int option ->
         casebookToolSpecs: ToolSpec list ->
             ToolRegistration

@@ -165,7 +165,6 @@ test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_recovery_surface_drives_ordinary_work
     ['src/Wanxiangshu/Composition/Turn/Workflow.fs', 'observe'],
     ['src/Wanxiangshu/Mission/Manager/Workflow.fs', 'observe'],
     ['src/Wanxiangshu/Mission/Manager/Workflow.fs', 'observeIdle'],
-    ['src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs', 'observe'],
   ]
   const missing = []
   for (const [file, name] of entrypoints) {
@@ -186,7 +185,7 @@ test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_change_seam_has_no_recovery_control_t
     'src/Wanxiangshu/Change/Projection.fs',
     'src/Wanxiangshu/Change/Program.fs',
     'src/Wanxiangshu/Change/Surface.fs',
-    'src/Wanxiangshu/Mission/Manager/FinalitySurface.fs',
+    'src/Wanxiangshu/Mission/Relay/Surface.fs',
   ]
   const symbols = [
     /\bJobRecoveryAction\b/,

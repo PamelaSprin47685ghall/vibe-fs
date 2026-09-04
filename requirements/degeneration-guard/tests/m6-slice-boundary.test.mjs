@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import * as loopSensor from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
+import { assertOptionalObservationNoninterference } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
 test('WHAT[DG-013] diagnostic failure cannot alter loop guard arm interrupt consume or continuation', async () => {
   assert.throws(
@@ -32,4 +33,5 @@ test('WHAT[DG-013] diagnostic failure cannot alter loop guard arm interrupt cons
   await new Promise(setImmediate)
   assert.deepEqual(continuations, [['session-1', 'TooRepetitive']])
   assert.deepEqual(diagnostics, ['degeneration-guard', 'degeneration-guard', 'degeneration-guard'])
+  await assertOptionalObservationNoninterference()
 })

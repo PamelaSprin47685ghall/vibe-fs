@@ -22,5 +22,5 @@ test('WHAT[EFFECT-ACCOUNTING-003] PERSIST_009_fork_appends_worktree_request_crea
   assert.ok(requested < created, 'request must be durable before physical creation result')
   assert.ok(created < manager, 'manager job must be durable after the Manager session exists')
   assert.ok(indexOf(source, 'appendFact StreamId.Workspace requestFact') < indexOf(source, 'WorktreeResource.Create'))
-  assert.ok(indexOf(source, 'appendFact StreamId.Workspace createdFact') < indexOf(source, 'manager.StartManager'))
+  assert.ok(indexOf(source, 'appendFact StreamId.Workspace createdFact') < indexOf(source, 'relay.OpenRoad'))
 })

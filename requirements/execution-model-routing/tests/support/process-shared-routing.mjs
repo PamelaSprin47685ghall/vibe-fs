@@ -40,7 +40,7 @@ export const createEnvironment = (initPlugin) => {
 
 export const managedConfig = () => {
   const agent = {}
-  for (const role of ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'reviewer', 'blogger', 'distiller', 'bookkeeper', 'predictor']) {
+  for (const role of ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'blogger', 'distiller', 'bookkeeper', 'predictor']) {
     agent[role] = {}
   }
   return { agent }

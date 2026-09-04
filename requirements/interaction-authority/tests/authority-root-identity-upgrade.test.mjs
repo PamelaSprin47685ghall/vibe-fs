@@ -1,13 +1,9 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import * as journalCodec from '../../../dist/Persistence/Journal/CodecSurface.js'
 import * as factCodec from '../../../dist/Persistence/Journal/FactCodecSurface.js'
-import * as journal from '../../../dist/Persistence/Journal/Surface.js'
-import * as reviewJournal from '../../../dist/Persistence/Journal/ReviewJournalSurface.js'
 
 const legacyHumanRoot = readFileSync(
   new URL('./fixtures/authority-root-v1.json', import.meta.url),
@@ -247,35 +243,4 @@ test('WHAT[INTERACTION-AUTHORITY-003] participant identity is not a second live 
   assert.notEqual(taggedCase, null)
   taggedCase[0] = 'ParticipantIdentityInstalled'
   assertDecodeErrorAcrossReplayRoutes(JSON.stringify(invented), /ParticipantIdentityInstalled/)
-})
-
-test('WHAT[INTERACTION-AUTHORITY-003] ReviewJournalSurface constructs and projects the production root identity', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-authority-v2-'))
-  const opened = await journal.JournalSurface_bootWithWriterId(
-    directory,
-    'writer-authority-v2',
-    'rt-authority-v2',
-    4242,
-    '2026-01-01T00:00:00Z',
-  )
-  assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
-
-  try {
-    const appended = await reviewJournal.appendAuthorityRoot(opened.journal, 'ses-review-authority-v2', 'coder')
-    assert.equal(appended.ok, true, appended.ok ? '' : appended.error)
-    assert.deepEqual(reviewJournal.sessionView(opened.journal, 'ses-review-authority-v2').authorityProfile, {
-      session: 'ses-review-authority-v2',
-      logicalRun: 'run-ses-review-authority-v2',
-      authorityRoot: 'root-ses-review-authority-v2',
-      authorityKind: 'HumanRoot',
-      identitySeed: currentPayload.IdentitySeed,
-      selectedAgent: 'coder',
-      peerAgent: 'coder',
-      role: 'coder',
-      initialTier: 'deep',
-    })
-  } finally {
-    journal.JournalSurface_dispose(opened.journal)
-    rmSync(directory, { recursive: true, force: true })
-  }
 })

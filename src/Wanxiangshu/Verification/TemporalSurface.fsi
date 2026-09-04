@@ -51,15 +51,11 @@ module TemporalSurface =
     /// drains the task, closes further admission, then returns the original error.
     val pluginScopeBackgroundFailureScenario: unit -> Task<obj>
 
-    /// Finality owner proof: blessing cleanup may retain the reviewer session,
-    /// but every admitted physical abort must settle before the caller can leave
-    /// the Finality owner tree.
-    val finalityReviewerAbortDrainScenario: unit -> Task<obj>
-
     // ── pure durable fold ───────────────────────────────────────────────────
 
-    val sessionReuseIdentityScenario: firstAccepted: obj -> secondAccepted: obj -> obj
     val fold: envelopes: obj array -> obj
+
+    val sessionReuseIdentityScenario: firstAccepted: obj -> secondAccepted: obj -> obj
 
     // ── FallbackProjection's typed transition, exposed as opaque state ───────
 

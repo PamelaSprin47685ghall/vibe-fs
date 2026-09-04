@@ -33,9 +33,8 @@ test('WHAT[OBLIGATION-LEDGER-018] hot-path queries use incremental projection fa
   assert.doesNotMatch(projection, /\bAcceptedOrder\b|\bAcceptedIds\b|\bacceptedOrder\b/, 'production projection no longer stores an accepted-history query chain')
 
   for (const path of [
-    'src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs',
-    'src/Wanxiangshu/Mission/Manager/Idle.fs',
-    'src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs',
+    'src/Wanxiangshu/Mission/Manager/Workflow.fs',
+    'src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs',
     'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
   ]) {
     assert.doesNotMatch(read(path), /\.AcceptedOrder\b|acceptedOrder\s+/, `${path} must consume O(1) projection queries`)
@@ -52,23 +51,17 @@ test('WHAT[OBLIGATION-LEDGER-018] recovery contract is fact reentry, not a resum
   assert.match(projection, /foldAccepted/)
 })
 
-test('WHAT[OBLIGATION-LEDGER-018] Manager authority root on blessed life completion is derived from durable LifeOpening facts, not transient PromptAuthority profiles', () => {
-  const workflow = read('src/Wanxiangshu/Mission/Manager/Life/Workflow.fs')
-  const completeFreshBlessedLifeMatch = workflow.match(
-    /let\s+private\s+completeFreshBlessedLife[\s\S]*?BlessedLifeCompletion\.Completed[\s\S]*?\n\s*\}/,
-  )
-  assert.ok(completeFreshBlessedLifeMatch, 'completeFreshBlessedLife function body must be found in Workflow.fs')
-  const completeFreshBlessedLife = completeFreshBlessedLifeMatch[0]
-
+test('WHAT[OBLIGATION-LEDGER-018] Manager authority root on incumbency opening is derived from durable Relay facts, not transient PromptAuthority profiles', () => {
+  const fold = read('src/Wanxiangshu/Mission/Relay/Fold.fs')
   assert.match(
-    completeFreshBlessedLife,
-    /PhysicalUserMessageId\.promoteToAuthorityRoot\s+life\.OpeningUserMessageId/,
-    'AuthorityRoot on BlessedLifeCompletion must be derived from durable life.OpeningUserMessageId',
+    fold,
+    /AuthorityMessageIds = \[ authorityMessageId \]/,
+    'AuthorityMessageIds on Road/Incumbency opening must be derived from durable authority facts',
   )
   assert.doesNotMatch(
-    completeFreshBlessedLife,
+    fold,
     /PromptAuthorityLedger/,
-    'completeFreshBlessedLife must not reconstruct authority root from transient PromptAuthorityLedger profile',
+    'Relay Fold must not reconstruct authority root from transient PromptAuthorityLedger profile',
   )
 })
 

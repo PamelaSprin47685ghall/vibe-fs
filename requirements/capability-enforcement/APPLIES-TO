@@ -26,9 +26,6 @@
 /src/Wanxiangshu/Execution/Session/Recovery/Model.fs
 /src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs
 /src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs
-/src/Wanxiangshu/Mission/Review/Judgement/Witness.fs
-/src/Wanxiangshu/Mission/Finality/Types.fs
-/src/Wanxiangshu/Mission/Finality/Blessing.fs
 /src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs
 /src/Wanxiangshu/Persistence/EventStore/Store.fs
 /src/Wanxiangshu/Persistence/Journal/Writer.fs

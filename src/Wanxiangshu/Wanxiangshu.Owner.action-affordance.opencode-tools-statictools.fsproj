@@ -9,7 +9,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.external-investigation.opencode-host-stealthbrowsermcp.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.review-judgement.mission-review-facts.fsproj"/>
+
     <Compile Include="OpenCode/Tools/StaticTools.fsi"/>
     <Compile Include="OpenCode/Tools/StaticTools.fs"/>
   </ItemGroup>

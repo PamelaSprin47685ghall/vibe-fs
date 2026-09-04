@@ -14,7 +14,6 @@ const EXPECTED = {
   devops: ['devops', 'deep', 'devops', 'Operator'],
   browser: ['browser', 'deep', 'browser', 'Researcher'],
   inquiry: ['inquiry', 'deep', 'inquiry', 'Analyst'],
-  reviewer: ['reviewer', 'deep', 'reviewer', 'Auditor'],
   blogger: ['blogger', 'deep', 'blogger', 'Chronicler'],
   distiller: ['distiller', 'deep', 'distiller', 'Distiller'],
   bookkeeper: ['bookkeeper', 'deep', 'bookkeeper', 'Curator'],
@@ -88,7 +87,7 @@ test('WHAT[PID-003] rejects blank Persona and unsupported catalog version', () =
 test('WHAT[PID-001] rejects independently supplied role, persona, and origin', () => {
   const canonical = expectedView('coder')
   const mismatches = [
-    [{ ...canonical, role: 'reviewer' }, 'RoleMismatch'],
+    [{ ...canonical, role: 'devops' }, 'RoleMismatch'],
     [{ ...canonical, persona: 'Lead' }, 'PersonaMismatch'],
     [{ ...canonical }, 'OriginMismatch'],
   ]
@@ -122,5 +121,5 @@ test('WHAT[PID-008] inherited identity requires the exact current owner Persona 
     rehydrate({ ...inherited.identity, catalogVersion: 2 }, 'manager'),
     'UnsupportedPersonaCatalogVersion',
   )
-  assertError(rehydrate(inherited.identity, 'reviewer'), 'OwnerPersonaMismatch')
+  assertError(rehydrate(inherited.identity, 'orchestrator'), 'OwnerPersonaMismatch')
 })

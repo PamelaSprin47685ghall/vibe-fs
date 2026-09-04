@@ -7,7 +7,7 @@
 /src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs
 /src/Wanxiangshu/Interaction/Dispatch/Send.fs
 /src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinGuard.fs
-/src/Wanxiangshu/Mission/Manager/Life/Facts.fs
+/src/Wanxiangshu/Mission/Relay/Facts.fs
 /src/Wanxiangshu/Composition/Durable/Fold.fs
 /src/Wanxiangshu/OpenCode/Host/ChatAdmission/**
 /src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs

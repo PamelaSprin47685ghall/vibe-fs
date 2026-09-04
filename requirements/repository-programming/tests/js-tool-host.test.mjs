@@ -49,7 +49,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-005] JS003_hook_must_not_recommend_invisible_t
   assert.equal(validateRecommendation('js-coder', ['js-coder', 'read']).ok, true)
   const denied = validateRecommendation('js-coder', ['read'])
   assert.equal(denied.ok, false)
-  assert.equal(denied.error.includes('not provider-visible'), true)
+  assert.equal(denied.error.includes('not provider-visible') || denied.error.includes('不可见'), true)
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-005] JS073_spec_carries_generated_name_and_honest_description', () => {
@@ -87,7 +87,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-016] JS073_spec_executes_program_and_renders_r
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'goodbye world', 'committed via workflow')
     const missing = await execute(registered, {}, { sessionID: 'ses-test', agent: 'coder' })
     assert.equal(missing.includes('error'), true)
-    assert.equal(missing.includes("missing 'program' argument"), true)
+    assert.equal(missing.includes("missing 'program' argument") || missing.includes("缺少 'program' 参数"), true)
   } finally {
     cleanup()
   }

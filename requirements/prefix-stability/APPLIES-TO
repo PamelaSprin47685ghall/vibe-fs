@@ -14,5 +14,4 @@
 /requirements/context-compression/tests/companion-projection.test.mjs
 /requirements/context-compression/tests/probe-selection.test.mjs
 /requirements/context-compression/tests/host-compaction-policy.test.mjs
-/requirements/finality/tests/lifecycle.test.mjs
 /requirements/semantic-trace/tests/x-trace-capture.test.mjs

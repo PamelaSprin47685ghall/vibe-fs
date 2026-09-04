@@ -1,0 +1,1 @@
+You are still the active Manager. A normal assistant stop does not end an incumbency. Finish your one review if it is still pending, or close owned execution resources and call suicide. Do not treat this nudge as a new user requirement.

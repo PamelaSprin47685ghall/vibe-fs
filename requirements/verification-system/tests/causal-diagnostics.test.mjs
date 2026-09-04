@@ -24,9 +24,9 @@ test('WHAT[VERIFICATION-SYSTEM-006] gather reads causal waits file', async () =>
     pid: 1,
     sequence: '3',
     active: [{
-      waitKind: 'provider-verdict',
-      owner: { kind: 'ReviewerWorkflow', identity: [{ k: 'reviewer', v: 'R2' }] },
-      subject: [{ k: 'barrier', v: 'barrier-reviewer.0' }],
+      waitKind: 'provider-assessment',
+      owner: { kind: 'RelayWorkflow', identity: [{ k: 'incumbency', v: 'I2' }] },
+      subject: [{ k: 'road', v: 'road-manager.0' }],
       producer: { tag: 'external', kind: 'provider', identity: [{ k: 'run', v: 'P81' }] },
       escapes: [{ tag: 'processLifetime' }],
       source: 'test',
@@ -35,7 +35,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] gather reads causal waits file', async () =>
     frontiers: [{
       kind: 'ExternalProducerFrontier',
       detail: 'FRONTIER: waiting for external producer external:provider',
-      chain: [{ owner: { kind: 'ReviewerWorkflow', identity: [{ k: 'reviewer', v: 'R2' }] }, waitKind: 'provider-verdict' }],
+      chain: [{ owner: { kind: 'RelayWorkflow', identity: [{ k: 'incumbency', v: 'I2' }] }, waitKind: 'provider-assessment' }],
       frontierProducer: { tag: 'external', kind: 'provider', identity: [{ k: 'run', v: 'P81' }] },
       cycle: [],
     }],
@@ -48,13 +48,13 @@ test('WHAT[VERIFICATION-SYSTEM-006] gather reads causal waits file', async () =>
         requests: [],
         unexpectedRequests: [],
         remainingExpectations: 1,
-        blockedExpectations: [{ id: 'barrier-reviewer.0', lane: 'x', blocking: true }],
+        blockedExpectations: [{ id: 'road-manager.0', lane: 'x', blocking: true }],
       },
     })
     assert.ok(diag.causalWaitSnapshot)
-    assert.equal(diag.causalWaitSnapshot.active[0].waitKind, 'provider-verdict')
+    assert.equal(diag.causalWaitSnapshot.active[0].waitKind, 'provider-assessment')
     assert.ok(Array.isArray(diag.causalFrontier))
-    assert.equal(diag.causalExpectationCorrelation.matched.includes('barrier-reviewer.0'), true)
+    assert.equal(diag.causalExpectationCorrelation.matched.includes('road-manager.0'), true)
   } finally {
     fs.rmSync(workDir, { recursive: true, force: true })
   }
@@ -66,13 +66,13 @@ test('WHAT[VERIFICATION-SYSTEM-006] format puts frontier before e2e events', () 
     causalFrontier: [{
       kind: 'ExternalProducerFrontier',
       detail: 'FRONTIER: waiting for external producer external:provider',
-      chain: [{ owner: { kind: 'ReviewerWorkflow', identity: [{ k: 'reviewer', v: 'R2' }] }, waitKind: 'provider-verdict' }],
+      chain: [{ owner: { kind: 'RelayWorkflow', identity: [{ k: 'incumbency', v: 'I2' }] }, waitKind: 'provider-assessment' }],
       frontierProducer: { tag: 'external', kind: 'provider', identity: [{ k: 'run', v: 'P81' }] },
       cycle: [],
     }],
     causalWaitSnapshot: {
       active: [],
-      history: [{ sequence: '1', kind: 'entered', wait: { waitKind: 'provider-verdict' }, exit: null }],
+      history: [{ sequence: '1', kind: 'entered', wait: { waitKind: 'provider-assessment' }, exit: null }],
     },
   })
   const frontierAt = text.indexOf('════════════ CAUSAL FRONTIER ════════════')

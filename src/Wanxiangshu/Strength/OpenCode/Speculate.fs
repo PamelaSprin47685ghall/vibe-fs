@@ -508,7 +508,6 @@ module StrengthSpeculate =
           EffectiveAgent = effectiveAgent
           IsFallbackRetry = not (String.Equals(authority.SelectedAgent, effectiveAgent, StringComparison.Ordinal))
           HasPrefixProbe = hasPrefixProbe
-          IsReviewerOrFinality = authority.CanonicalRole = Role.Reviewer
           IsAttachedOrInternalLeaf = not isRootWork
           OwnerCancelled = false
           TargetProviderRunBound = true

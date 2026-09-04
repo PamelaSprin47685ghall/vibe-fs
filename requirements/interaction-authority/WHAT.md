@@ -45,7 +45,7 @@
 
 ## INTERACTION-AUTHORITY-010: 自动 continuation 稳定 occasion identity 与精确 admission
 
-自动合成的 repair、nudge、review 提示与重试消息绝不可借机抬升权限。普通 gate nudge 的持久化幂等范围必须绑定 exact terminal occasion；同一 `(SessionId, LogicalRunId, continuation kind, gate kind, ProviderRunIdentity)` 若存在 Pending claim 或 PhysicalAccepted dispatch，则 duplicate observation 被幂等吸收；若 claim 已因明确的 pre-acceptance `SendFailed` Abandoned，则该 occasion 重新可 admission，历史 ClaimSequence 不得冒充“已经提醒”。新的 ProviderRun 是新的 reminder occasion，只要业务 gate 仍未满足就必须重新具备提醒资格。只有 Blogger nudge→AABB 等明确写入规范的升级协议可以拥有有限预算。任何 duplicate admission 都属于 typed 幂等状态而非 transport/protocol failure。
+自动合成的 repair、nudge、review 提示与重试消息绝不可借机抬升权限。普通 gate nudge 的持久化幂等范围必须绑定 exact terminal occasion；同一 `(SessionId, LogicalRunId, continuation kind, gate kind, ProviderRunIdentity)` 若存在 Pending claim 或 PhysicalAccepted dispatch，则 duplicate observation 被幂等吸收；若 claim 已因明确的 pre-acceptance `SendFailed` Abandoned，则该 occasion 重新可 admission，历史 ClaimSequence 不得冒充“已经提醒”。新的 ProviderRun 是新的 reminder occasion，只要业务 gate 仍未满足就必须重新具备提醒资格。需要精确 `PhysicalUserMessageId` 的调用方在 Host 只先返回 transport receipt 时，必须等待该 PromptKey 的 durable `PhysicalAccepted` 因果事实；pending acceptance 既不得伪装成功，也不得被误报为 send failure。只有 Blogger nudge→AABB 等明确写入规范的升级协议可以拥有有限预算。任何 duplicate admission 都属于 typed 幂等状态而非 transport/protocol failure。
 
 ## INTERACTION-AUTHORITY-011: authority 是原子 profile 内的稳定子记录
 

@@ -19,7 +19,7 @@ type ToolPermission =
     | Exec
     | Pty
     | Network
-    | Judge
+    | ReviewAssessment
     | Chronicle
     | Fetch
     | Finality
@@ -27,6 +27,16 @@ type ToolPermission =
     | Sphinx
 
 [<RequireQualifiedAccess>]
+type ManagerCapabilityPhase =
+    | AuditPending
+    | WorkOwned
+    | PerfectAwaitingRetirement
+    | RetirementCleanupBlocked
+    | Retired
+
+[<RequireQualifiedAccess>]
 module OfficeCapability =
     val permissions: role: Role -> ToolPermission Set
     val isAllowed: role: Role -> permission: ToolPermission -> bool
+    val permissionsForPhase: role: Role -> phase: ManagerCapabilityPhase option -> ToolPermission Set
+    val isAllowedForPhase: role: Role -> phase: ManagerCapabilityPhase option -> permission: ToolPermission -> bool

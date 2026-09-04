@@ -13,9 +13,6 @@ type MagicTodoPreparedHandle =
 
 [<RequireQualifiedAccess>]
 module MagicTodoMembraneSurface =
-
-    val openLife: handle: JournalHandle -> sessionId: string -> lifeId: string -> Task<obj>
-
     val prepare:
         handle: JournalHandle ->
         sessionId: string ->
@@ -37,7 +34,11 @@ module MagicTodoMembraneSurface =
 
     val appendFact: handle: JournalHandle -> sessionId: string -> factJson: string -> Task<obj>
 
-    val snapshot: handle: JournalHandle -> lifeId: string -> obj
+    val snapshot: handle: JournalHandle -> incumbencyId: string -> obj
+
+    val openIncumbency: handle: JournalHandle -> sessionId: string -> incumbencyId: string -> Task<obj>
+
+    val openLife: handle: JournalHandle -> sessionId: string -> lifeId: string -> Task<obj>
 
     /// Real Host Before -> controlled builtin executor -> After workflow. Only
     /// successful return from the supplied physical executor reaches After;
@@ -46,7 +47,7 @@ module MagicTodoMembraneSurface =
         handle: JournalHandle ->
         rawMessages: obj array ->
         sessionId: string ->
-        lifeId: string ->
+        incumbencyId: string ->
         callId: string ->
         args: obj ->
         executor: obj ->

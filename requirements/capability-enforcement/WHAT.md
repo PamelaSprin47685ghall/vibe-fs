@@ -58,7 +58,7 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 必须双�
 
 ## ENF-015: authority scope 必须精确绑定 current subject + version/sequence + 必要 digest
 
-Witness、Capability 与 Receipt 的合同必须声明 subject、版本/序列及能区分内容的 digest/hash（若该边界具有内容身份）。Witness 不得直接驱动 append/write/send/execute 等效果；消费者必须先针对当前 subject、当前 version/sequence 与当前 digest 做 fresh admission。Finality 继续复用 `FINALITY-002` 与 `FINALITY-010` 的 current request/barrier/Git tree proof，不另造第二套审查权威。
+Witness、Capability 与 Receipt 的合同必须声明 subject、版本/序列及能区分内容的 digest/hash（若该边界具有内容身份）。Witness 不得直接驱动 append/write/send/execute 等效果；消费者必须先针对当前 subject、当前 version/sequence 与当前 digest 做 fresh admission。Retirement 继续复用 RETIRE 与 Change 门禁的 current request/snapshot/Git tree proof，不另造第二套审查权威。
 
 ## ENF-016: freshness 在消费点重验；stale witness 只能产生新的 admission，不能复活旧能力
 

@@ -18,8 +18,6 @@
     <Compile Include="Mission/Obligation/Todo/Surface.fs"/>
     <Compile Include="Mission/Obligation/Todo/Admission.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Admission.fs"/>
-    <Compile Include="Mission/Obligation/Todo/FinalityCohort.fsi"/>
-    <Compile Include="Mission/Obligation/Todo/FinalityCohort.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fsi"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fs"/>
     <Compile Include="Mission/Obligation/Todo/Projection.fsi"/>

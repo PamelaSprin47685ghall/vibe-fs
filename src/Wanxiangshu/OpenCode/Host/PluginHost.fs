@@ -12,7 +12,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Mission.Review
+open Wanxiangshu.Git
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer
@@ -88,12 +88,6 @@ module PluginHost =
         match workspaceDirectory input with
         | None -> Task.FromResult(Ok None)
         | Some workspace -> createWorkspaceJournal workspace
-
-    let gitTreePortFromInput (input: obj) : GitTreePort option =
-        if isNull input || isNull input?gitTreePort || isNull input?gitTreePort?getTreeHash then
-            None
-        else
-            Some { GetTreeHash = (fun () -> unbox<string> (input?gitTreePort?getTreeHash ())) }
 
     let createHost
         (input: obj)

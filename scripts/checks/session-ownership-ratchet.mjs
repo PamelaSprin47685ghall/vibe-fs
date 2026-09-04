@@ -52,7 +52,6 @@ export const REQUIRED_KINDS = Object.freeze([
   'SyncInspector',
   'SyncCoder',
   'Bookkeeper',
-  'hidden Reviewer',
   'StrengthReplica',
   'fork agent',
   'Distiller child',
@@ -79,8 +78,6 @@ const SPECIAL_PLEADING_RE = /this one is special/i
  */
 export const relatedEvidenceToken = (kind) => {
   switch (kind) {
-    case 'hidden Reviewer':
-      return 'Reviewer'
     case 'fork agent':
       return 'Fork'
     case 'Distiller child':

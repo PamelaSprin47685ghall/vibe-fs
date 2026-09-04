@@ -3,6 +3,7 @@ namespace Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
+open Wanxiangshu.Mission.Relay
 
 module MagicTodoAdmission =
     type AdmissionLocalizedToolCall =
@@ -40,7 +41,7 @@ module MagicTodoAdmission =
 
     val admitObligations:
         sha256: (string -> string) ->
-        lifeId: ManagerLifeId ->
+        incumbencyId: IncumbencyId ->
         settledCurrent: ObligationList ->
         existingPrepared: ExistingPrepared option ->
         localized: AdmissionLocalizedToolCall ->

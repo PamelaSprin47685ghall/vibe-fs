@@ -332,7 +332,6 @@ const importFactsFor = (facts, actualImport) => facts.filter(({ observation }) =
   && observation.payload.generated_artifact_id === actualImport.artifact_id
   && observation.payload.module_specifier === actualImport.import_specifier
   && observation.payload.site.locality_id === actualImport.consumer_locality)
-
 export const validateGeneratedModuleRelationV1 = ({
   relations = [],
   artifacts = [],
@@ -557,7 +556,6 @@ export const validateGeneratedModuleRelationV1 = ({
     }
   }
   if (violations.length > 0) return violations
-
   const referencedTraversalIds = new Set(artifacts.map(({ javascript_traversal_id: traversalId }) => traversalId))
   for (const traversal of traversals) {
     if (traversal.source_kind === 'generated-artifact' && !referencedTraversalIds.has(traversal.id)) {

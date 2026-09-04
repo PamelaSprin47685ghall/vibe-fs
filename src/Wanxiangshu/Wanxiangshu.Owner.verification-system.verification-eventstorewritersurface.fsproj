@@ -18,8 +18,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.strength-persistence-durabilityport.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.finality.mission-finality-prompt.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.finality.mission-manager-life-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
@@ -28,7 +26,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-facts.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.time-capability.process-virtual-timing.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-virtual-timing.fsproj"/>
     <Compile Include="Verification/EventStoreWriterSurface.fsi"/>
     <Compile Include="Verification/EventStoreWriterSurface.fs"/>
     <Compile Include="Verification/TemporalSurface.fsi"/>

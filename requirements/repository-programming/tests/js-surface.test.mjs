@@ -23,7 +23,7 @@ const isSome = (value) => value !== null
 
 const PERMISSION_NAMES = [
   'Fork', 'Join', 'Horizon', 'TodoWrite', 'Fission', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
-  'Remove', 'Inspect', 'Sphinx', 'Behavior', 'Exec', 'Pty', 'Network', 'Judge', 'Chronicle',
+  'Remove', 'Inspect', 'Sphinx', 'Behavior', 'Exec', 'Pty', 'Network', 'ReviewAssessment', 'Chronicle',
   'Finality', 'BashHoneypot',
 ]
 const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, n]))
@@ -68,7 +68,7 @@ const layersOf = (s) =>
   )
 
 test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_generate_none_when_no_filesystem_capability', () => {
-  for (const role of ['Manager', 'Orchestrator', 'Inquiry', 'Distiller', 'Blogger']) {
+  for (const role of ['Orchestrator', 'Inquiry', 'Distiller', 'Blogger']) {
     const perms = caps(...permsOf(rolePermissions(role.toLowerCase())))
     assert.equal(isNone(surface(role, rolePermissions(role.toLowerCase()))), true, `${role} must get no js-* surface`)
     assert.equal(isGeneratedToolName(role, perms, `js-${role.toLowerCase()}`), false)
@@ -76,7 +76,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_generate_none_when_no_filesystem_ca
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_role_projection_is_exactly_roles_permissions_intersection', () => {
-  for (const role of ['Manager', 'Orchestrator', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'Reviewer', 'DevOps', 'Distiller', 'Blogger']) {
+  for (const role of ['Manager', 'Orchestrator', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'DevOps', 'Distiller', 'Blogger']) {
     const fsPerms = fsPermissionsOf(role)
     const result = surface(role, rolePermissions(role.toLowerCase()))
     if (fsPerms.length === 0) {
@@ -185,12 +185,12 @@ test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_member_gate_binds_present_members_o
 test('WHAT[REPOSITORY-PROGRAMMING-003] JS002_same_capabilities_share_mechanics_but_role_shapes_the_ultra_example', () => {
   const shared = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
   const inspector = generate('Inspector', shared, 'en')
-  const reviewer = generate('Reviewer', shared, 'en')
-  assert.equal(inspector.baseClassSource, reviewer.baseClassSource)
-  assert.deepEqual(memberNames(inspector), memberNames(reviewer))
-  assert.notEqual(inspector.description, reviewer.description)
+  const manager = generate('Manager', shared, 'en')
+  assert.equal(inspector.baseClassSource, manager.baseClassSource)
+  assert.deepEqual(memberNames(inspector), memberNames(manager))
+  assert.notEqual(inspector.description, manager.description)
   assert.match(inspector.description, /RetryPolicy/)
-  assert.match(reviewer.description, /staleReferences/)
+  assert.match(manager.description, /staleReferences/)
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_non_fs_permissions_never_produce_members', () => {
@@ -244,7 +244,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-003] JS010_each_filesystem_role_gets_exactly_o
   const markers = {
     Coder: /oldApi → newApi/,
     Inspector: /RetryPolicy/,
-    Reviewer: /staleReferences/,
+    Manager: /staleReferences/,
     DevOps: /candidateTests/,
     Browser: /WidgetOptions/,
   }
@@ -258,15 +258,15 @@ test('WHAT[REPOSITORY-PROGRAMMING-003] JS010_each_filesystem_role_gets_exactly_o
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-005] JS010_description_never_dilutes_the_ultra_example', () => {
-  for (const role of ['Coder', 'Inspector', 'Reviewer', 'DevOps', 'Browser']) {
+  for (const role of ['Coder', 'Inspector', 'Manager', 'DevOps', 'Browser']) {
     const result = surface(role, rolePermissions(role.toLowerCase()))
     const classes = result.description.match(/class Js extends JsProgram/g) ?? []
     assert.equal(classes.length, 1, `${role} description must not dilute the Ultra Example with toy examples`)
     assert.match(result.description, /Semantic branches belong between programs/)
   }
 
-  const reviewer = surface('Reviewer', rolePermissions('reviewer'))
-  assert.doesNotMatch(reviewer.examples[0], /verdict\s*:/i, 'reviewer example gathers evidence, never authors judgment')
+  const manager = surface('Manager', rolePermissions('manager'))
+  assert.doesNotMatch(manager.examples[0], /verdict\s*:/i, 'manager example gathers evidence, never authors judgment')
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_lying_generator_counterexample_is_rejected', () => {

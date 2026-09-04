@@ -17,9 +17,8 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
-open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -30,13 +29,11 @@ type SessionAgentProjection =
       Blog: BlogProjectionState option
       PrefixEpoch: ActivePrefixEpoch option
       Handles: AgentLinkageProjection option
-      ReviewGuard: ReviewGuardProjection option
-      ReviewRequirements: ReviewRequirementProjection option
       Fallback: FallbackProjection option
       PromptAuthority: PromptAuthority.PromptAuthorityProjection option
       Enforcement: EnforcementProjectionState option
       BloggerCycles: BloggerCycleProjectionState option
-      ManagerLife: ManagerLifeProjection option
+      Relay: RelayState option
       Guidelines: GuidelineProjectionState option
       RequirementGrounding: RequirementGroundingProjectionState option
       TipDelivery: TipDeliveryProjectionState option

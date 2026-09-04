@@ -24,11 +24,11 @@ test('WHAT[PROVIDER-PROJECTION-014] LLM_FACING_composition_stays_typed_until_the
   const syncStore = read('src/Wanxiangshu/Execution/Delegation/SyncDelegate/Store.fs')
   const warmStart = read('src/Wanxiangshu/Repository/Investigation/WarmStart/Prompt.fs')
   const joinRenderer = read('src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs')
-  const finality = read('src/Wanxiangshu/Mission/Finality/Prompt.fs')
+  const narrative = read('src/Wanxiangshu/Mission/Manager/Narrative.fs')
 
   assert.match(syncStore, /PrepareProviderPrompt: unit -> Task<LlmFacing\.Document>/)
   assert.match(warmStart, /baseDocument: LlmFacing\.Document/)
   assert.doesNotMatch(warmStart, /basePrompt\.TrimEnd/)
   assert.doesNotMatch(joinRenderer, /String\.concat "\\n\\n"/)
-  assert.doesNotMatch(finality, /SyntheticToml\.comment|header \+ "\\n\\n"/)
+  assert.doesNotMatch(narrative, /SyntheticToml\.comment|header \+ "\\n\\n"/)
 })

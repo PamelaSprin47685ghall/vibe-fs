@@ -62,8 +62,8 @@ test('WHAT[INTERACTION-AUTHORITY-018] IA_018_human_root_closure_clears_active_ru
   assert.equal(reawakened.activeLogicalRun.authorityRoot, second.authorityRoot)
 
   const fold = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Composition/Durable/Fold.fs'), 'utf8')
-  const facts = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Mission/Manager/Life/Facts.fs'), 'utf8')
-  assert.match(fold, /ManagerLifecycleFact\.LifeCompleted _[\s\S]{0,300}closeCompletedHumanRootManager/)
+  const facts = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Mission/Relay/Facts.fs'), 'utf8')
+  assert.match(fold, /closeCompletedHumanRootManager/)
   assert.doesNotMatch(facts, /AuthorityLogicalRunClosed/)
 })
 
