@@ -63,13 +63,13 @@ assert.equal(typeof ADVERSITY_ORACLES.assertProviderTransientFailure, 'function'
 assert.equal(typeof ADVERSITY_ORACLES.assertFallbackContinuation, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertJoinWakePath, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertInterruptedJoin, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertReviewerRevise, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertFinalityTemporarilyBlocked, 'function');
+assert.equal(typeof ADVERSITY_ORACLES.assertAssessmentAssignsWork, 'function');
+assert.equal(typeof ADVERSITY_ORACLES.assertRetirementNeedsSuccessor, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertDurableRecovery, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertPublishConflict, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertSubagentReuse, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertSuccessfulReconciliation, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertLaterSuccessfulFinality, 'function');
+assert.equal(typeof ADVERSITY_ORACLES.assertRetirementCommitted, 'function');
 assert.equal(typeof CUSTOMS.holdChildC1UntilLabor, 'function');
 assert.equal(typeof CUSTOMS.bindRelaySuccessorSequence, 'function');
 assert.equal(typeof CUSTOMS.oracleLongStroke, 'function');

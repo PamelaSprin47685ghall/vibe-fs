@@ -128,7 +128,7 @@ test('WHAT[OBLIGATION-LEDGER-010] fresh admission freezes Base and Submitted wit
   assert.equal(prepared.proposedDigest, todo.obligationListDigest(sha256, submitted))
 })
 
-test('WHAT[OBLIGATION-LEDGER-022] blocks Finality until plan commitment, not merely until any checkpoint', () => {
+test('WHAT[OBLIGATION-LEDGER-022] blocks retirement suicide until plan commitment, not merely until any checkpoint', () => {
   assert.equal(todo.requirePlanCommitmentBeforeFirstSuicide(false).error.code, 'FirstSuicideWithoutCheckpoint')
   assert.equal(ok(todo.requirePlanCommitmentBeforeFirstSuicide(true)), null)
 })

@@ -64,13 +64,13 @@ effectivePlanComplete(k) = OR(planComplete of Accepted T1..Tk)
 
 移除过程性评审，$T_k$ 的 Accepted 立即生效，不派生过程评审义务，亦不阻塞后续 $T_{k+1}$ 的提交与执行。同时严格保留基于 committed Accepted 链的 desired lag-1 cutoff 与 prefix rebase 折叠行为。
 
-## OBLIGATION-LEDGER-014: 移除中间过程评审，终结资格直达 Finality
+## OBLIGATION-LEDGER-014: 移除中间过程评审，质量判断归于后继独立 assessment
 
-各 checkpoint 之间无过程性评审门禁，Manager 可无缝推进工作。质量验收与终结裁决完全由终局评审（Finality Review）在 mission 结束时统一执行。
+各 checkpoint 之间无过程性评审门禁，Manager 可无缝推进工作。实现质量不设终局评审，由后继独立 assessment 判断（relay-assessment ASSESS-006）；本账本只记录义务，不做质量裁决。
 
 ## OBLIGATION-LEDGER-015: canonical 单真相源 vs Host compatibility sink
 
-Journal facts 与 `MagicTodoProjection` 是账本的唯一语义真相源，Host TodoTable 仅为兼容 UI 投影。禁止用 Host 表反推或恢复 canonical obligations。REVISE 不回滚 canonical 账本，亦不得将 Host sink 刷回旧账；若发生状态漂移，仅允许执行无副作用的纯投影修复。
+Journal facts 与 `MagicTodoProjection` 是账本的唯一语义真相源，Host TodoTable 仅为兼容 UI 投影。禁止用 Host 表反推或恢复 canonical obligations。任何评审结论都不回滚 canonical 账本，亦不得将 Host sink 刷回旧账；若发生状态漂移，仅允许执行无副作用的纯投影修复。
 
 ## OBLIGATION-LEDGER-016: T1 commitment 与 Opening 关闭
 
@@ -78,7 +78,7 @@ Journal facts 与 `MagicTodoProjection` 是账本的唯一语义真相源，Host
 
 ## OBLIGATION-LEDGER-017: Manager BlindPlan Opening（无生产 Activation）
 
-Manager 采用 BlindPlan 开启策略。Pre-T1 处于 Planning Table：为后续执行制定计划，允许调查但不得直接执行所规划路径。当权威输入证明当前无待办任务时，`planComplete=true, workingOn="", obligations=[]` 是合法的零债务 T1，随后按 Finality 协议接受终审。生产路径不存在单独的 Activation 阶段机或 prompt 切换。
+Manager 采用 BlindPlan 开启策略。Pre-T1 处于 Planning Table：为后续执行制定计划，允许调查但不得直接执行所规划路径。当权威输入证明当前无待办任务时，`planComplete=true, workingOn="", obligations=[]` 是合法的零债务 T1，随后通过 suicide 进入 retirement。生产路径不存在单独的 Activation 阶段机或 prompt 切换。
 
 ## OBLIGATION-LEDGER-018: 恢复只从 durable facts
 
@@ -88,21 +88,21 @@ Manager 采用 BlindPlan 开启策略。Pre-T1 处于 Planning Table：为后续
 
 新开启的 Life 其 `CurrentObligations` 初始严格为空，绝不从 Host TodoTable 自动继承上一 Life 的遗留条目。升级瞬间的历史开放 Life 仅允许执行一次受控的 legacy seed，且必须在首次 provider request 之前完成。
 
-## OBLIGATION-LEDGER-020: 质量验收统一归于 Finality Review
+## OBLIGATION-LEDGER-020: 质量判断归于后继独立 assessment，不设终局评审
 
-每个 checkpoint 不再创建或注册专职过程 Reviewer，全生命周期的质量保障与双重 PERFECT 裁决统一收口于 Finality Review。
+低分 assessment 的实现质量必须由 successor 独立 assessment 判断，不得自证（relay-assessment ASSESS-006）。本账本只记录义务的认领与结转，不做质量裁决。
 
 ## OBLIGATION-LEDGER-021: desired lag-1 cutoff 仅由 committed Accepted 子链推导
 
 Pre-T1 的 `planComplete=false` checkpoints 属于开放的 Opening，不派生 Prefix rebase。只有 commitment 之后的 Accepted 子链（$E_k=true$）才使 desired lag-1 cutoff 可推导。首个 committed checkpoint（T1）无 prior cutoff，后续 committed checkpoint 使用上一 committed checkpoint 的调用前位置。
 
-## OBLIGATION-LEDGER-022: checkpoint 无过程评审阻塞，tail 直接进入 Finality
+## OBLIGATION-LEDGER-022: checkpoint 无过程评审阻塞，retirement 只等 plan commitment
 
-checkpoint 提交不产生未决过程评审负担，Manager 工作就绪后可直接调用 `suicide` 进入 Finality Review，无需等待或抽干中间过程评审。
+checkpoint 提交不产生未决过程评审负担；首次 suicide 要求 plan commitment，此后 Manager 可直接调用 `suicide` 进入 retirement，无需等待或抽干中间过程评审。
 
-## OBLIGATION-LEDGER-023: MagicTodoManagerGuideline 的 Manager-only 语义
+## OBLIGATION-LEDGER-023: manager-guideline 资源的 Manager-only 语义
 
-账本指引属于 Manager 专有规范，涵盖义务增删规则（当欠则留、挣得则除）、checkpoint 连续性、Pre-T1 planning 维护、T1 不可逆承诺以及渐进细化纪律。该指引独立于全局配对文案，且不得向模型泄露隐藏评审编排机制。
+账本指引（`resources/provider/lifecycle/magic-todo/manager-guideline`）属于 Manager 专有规范，涵盖义务增删规则（当欠则留、挣得则除）、checkpoint 连续性、Pre-T1 planning 维护、T1 不可逆承诺以及渐进细化纪律。该指引独立于全局配对文案，且不得向模型泄露隐藏编排机制。
 
 ## OBLIGATION-LEDGER-024: tool.definition 唯一广告点
 

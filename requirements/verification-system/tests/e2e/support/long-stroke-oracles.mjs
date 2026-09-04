@@ -12,13 +12,13 @@
  *   [x] provider transient failure          — assertProviderTransientFailure
  *   [x] fallback                            — assertFallbackContinuation
  *   [x] join blocked then causally awakened — assertJoinWakePath
- *   [x] reviewer REVISE                     — assertReviewerRevise (+ bindFinalityReviseThenPerfect)
+ *   [x] non-10 assessment assigns work      — assertAssessmentAssignsWork
  *   [x] interrupted/aborted child or session— assertInterruptedJoin (+ holdChildC1UntilLabor)
- *   [x] finality temporarily blocked        — assertFinalityTemporarilyBlocked
+ *   [x] retirement needs successor          — assertRetirementNeedsSuccessor
  *   [x] durable recovery/continuation       — assertDurableRecovery
  *   [x] publish conflict / stale target     — assertPublishConflict
  *   [x] successful reconciliation           — assertSuccessfulReconciliation
- *   [x] later successful finality           — assertLaterSuccessfulFinality
+ *   [x] later successful retirement         — assertRetirementCommitted
  */
 import assert from 'node:assert/strict';
 import {
@@ -170,7 +170,7 @@ export async function assertFallbackContinuation(workDir, label = 'long-stroke')
 /**
  * §21: join blocked then causally awakened — HandleCompleted after user_message wake.
  * The join-wake itself only requires the harvest fact; the full agent lifecycle is
- * proven later by RetirementCommitted (assertLaterSuccessfulFinality).
+ * proven later by RetirementCommitted (assertRetirementCommitted).
  */
 export async function assertJoinWakePath(workDir, label = 'long-stroke') {
   assert.ok(
@@ -202,16 +202,16 @@ export function assertInterruptedJoin(scenario, label = 'long-stroke') {
   );
 }
 
-/** §21: non-10 audit assigns work (replaces legacy reviewer REVISE). */
-export function assertReviewerRevise(workDir, label = 'long-stroke') {
+/** §21: non-10 assessment assigns work (AssessmentCommitted). */
+export function assertAssessmentAssignsWork(workDir, label = 'long-stroke') {
   assert.ok(
     countFactCase(workDir, 'AssessmentCommitted') >= 1,
     `${label}: AssessmentCommitted required (relay non-10 assessment assigns work)`,
   );
 }
 
-/** §21: finality temporarily blocked — non-10 assessment blocks publication and requires a successor. */
-export function assertFinalityTemporarilyBlocked(workDir, label = 'long-stroke') {
+/** §21: retirement needs successor — non-10 assessment blocks publication and requires a successor. */
+export function assertRetirementNeedsSuccessor(workDir, label = 'long-stroke') {
   const transactions = factPayloads(workDir, 'TransactionCommitted');
   const hasSuccessorRequest = transactions.some((tx) => JSON.stringify(tx).includes('SuccessorRequested'));
   assert.ok(
@@ -270,8 +270,8 @@ export function assertSuccessfulReconciliation(workDir, label = 'long-stroke') {
   );
 }
 
-/** §21: later successful finality — RetirementCommitted after resources converge. */
-export function assertLaterSuccessfulFinality(workDir, label = 'long-stroke') {
+/** §21: later successful retirement — RetirementCommitted after resources converge. */
+export function assertRetirementCommitted(workDir, label = 'long-stroke') {
   assert.ok(
     countFactCase(workDir, 'RetirementCommitted') >= 1,
     `${label}: RetirementCommitted required after resources converge`,
@@ -457,9 +457,9 @@ export async function oracleLongStroke(scenario, _ctx) {
   await assertProviderTransientFailure(workDir);
   await assertFallbackContinuation(workDir);
   await assertDurableRecovery(workDir);
-  assertReviewerRevise(workDir);
-  assertFinalityTemporarilyBlocked(workDir);
-  assertLaterSuccessfulFinality(workDir);
+  assertAssessmentAssignsWork(workDir);
+  assertRetirementNeedsSuccessor(workDir);
+  assertRetirementCommitted(workDir);
   assertPublishConflict(workDir);
   assertSubagentReuse(workDir);
   assertSuccessfulReconciliation(workDir);
@@ -559,10 +559,10 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
     oracle: 'assertJoinWakePath',
   },
   {
-    id: 'reviewer-revise',
+    id: 'non10-assessment-assigns-work',
     covered: true,
     injection: 'manager-audit non-10 completeness=9 review → WorkOwned',
-    oracle: 'assertReviewerRevise',
+    oracle: 'assertAssessmentAssignsWork',
   },
   {
     id: 'interrupted-aborted-child-or-session',
@@ -571,10 +571,10 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
     oracle: 'assertInterruptedJoin',
   },
   {
-    id: 'finality-temporarily-blocked',
+    id: 'retirement-needs-successor',
     covered: true,
     injection: 'non-10 assessment blocks publication → successor required',
-    oracle: 'assertFinalityTemporarilyBlocked',
+    oracle: 'assertRetirementNeedsSuccessor',
   },
   {
     id: 'durable-recovery-continuation',
@@ -601,10 +601,10 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
     oracle: 'assertSuccessfulReconciliation',
   },
   {
-    id: 'later-successful-finality',
+    id: 'later-successful-retirement',
     covered: true,
     injection: 'waitFact RetirementCommitted after resources converge before publish reconcile',
-    oracle: 'assertLaterSuccessfulFinality',
+    oracle: 'assertRetirementCommitted',
   },
 ]);
 
@@ -614,13 +614,13 @@ export const ADVERSITY_ORACLES = Object.freeze({
   assertFallbackContinuation,
   assertJoinWakePath,
   assertInterruptedJoin,
-  assertReviewerRevise,
-  assertFinalityTemporarilyBlocked,
+  assertAssessmentAssignsWork,
+  assertRetirementNeedsSuccessor,
   assertDurableRecovery,
   assertPublishConflict,
   assertSubagentReuse,
   assertSuccessfulReconciliation,
-  assertLaterSuccessfulFinality,
+  assertRetirementCommitted,
 });
 
 export const G2_INSPECTOR_CANARY_PROMPT =

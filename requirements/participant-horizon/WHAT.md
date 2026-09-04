@@ -36,19 +36,19 @@ Blogger、Distiller、Bookkeeper 等内部辅助角色严禁出现在模型可�
 
 ## PARTICIPANT-HORIZON-008: 隐藏 review 编排不进 Manager horizon
 
-面向 Manager 的所有固定界面（system prompt、continuation、schema、错误提示、tool description 及 result）严禁暴露 Reviewer 身份、专用 review session、确认屏障（barrier）或双重检查机制。
-唯一例外为终局评审产生的 REVISE 结论与具体改进报告（canonical ProcessReviewLWR），该例外严禁扩大为泄露审查者的存在。
+面向 Manager 的所有固定界面（system prompt、continuation、schema、错误提示、tool description 及 result）严禁暴露第二评审身份、专用评审会话、确认屏障或双重检查机制。
+assessment 结论只以原子物化的质量义务与工作权形式进入账本（relay-assessment ASSESS-004），不携带编排者身份。
 
 ## PARTICIPANT-HORIZON-009: 隐藏 target 只返回 generic unavailable
 
-当模型尝试访问或调度不可见的目标（如 Reviewer）时，系统仅返回通用的不可用拒绝响应，禁止在拒绝文案中提及该目标的存在或说明其为内部专有。
+当模型尝试访问或调度不可见的目标（如 Distiller 等内部角色）时，系统仅返回通用的不可用拒绝响应，禁止在拒绝文案中提及该目标的存在或说明其为内部专有。
 
 ## PARTICIPANT-HORIZON-010: fork/commission 可见集合
 
 - Manager `fork` 仅可见：coder、inspector、devops、browser、inquiry（各一个本名版本）。
 - Orchestrator `commission` 仅可见：manager。
 - `horizon()` 仅返回在场名册的 Byname 或 TerminalName，不暴露底层 id。
-- Reviewer、Blogger、Distiller、Bookkeeper 严禁出现在可 fork 集合中。
+- Blogger、Distiller、Bookkeeper 等内部角色严禁出现在可 fork 集合中。
 
 ## PARTICIPANT-HORIZON-011: `horizon()` 是 pull-only snapshot
 

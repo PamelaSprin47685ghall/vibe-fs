@@ -32,7 +32,7 @@
 
 - `provider-projection`：负责已准入信息的具体编码与渲染；本包负责决定「什么信息有资格被准入」。
 - `office-capability`：定义职位的权能；本包确保内部专用职位不出现在公开选择视界中。
-- `delegation` 与 `finality`：消费本包的隐匿性保证，维护无泄密的委托与终结。
+- `delegation` 与 `relay-retirement`：消费本包的隐匿性保证，维护无泄密的委托与终结。
 
 ## DEPENDS ON
 

@@ -344,21 +344,21 @@ test('WHAT[OBLIGATION-LEDGER-010] T2 accepted account supersedes CurrentObligati
 
 test('WHAT[OBLIGATION-LEDGER-011] next checkpoint updates Current without rollback', async () => {
   await withJournal(async (handle) => {
-    const session = 'ses-magic-todo-revise-feedback'
-    const life = 'life-magic-todo-revise-feedback'
-    const callText = 'call-revise-t1'
+    const session = 'ses-magic-todo-rewrite-feedback'
+    const life = 'life-magic-todo-rewrite-feedback'
+    const callText = 'call-rewrite-t1'
     await openLife(handle, session, life)
     const t1 = await prepare(handle, session, callText, [{ name: 'implementation', work: 'Implement the requested behavior.' }])
     const t1Prepared = assertOk(t1.result)
-    const t1Accepted = await accept(handle, t1Prepared.bridge, t1.digest, sha256Hex('revise-t1-output'))
+    const t1Accepted = await accept(handle, t1Prepared.bridge, t1.digest, sha256Hex('rewrite-t1-output'))
     assert.equal(t1Accepted.ok, true)
     assert.equal(membrane.MagicTodoMembraneSurface_snapshot(handle, life).currentObligations.reference, t1Prepared.prepared.proposedTodoRef)
-    const t2 = await prepare(handle, session, 'call-revise-t2', [
+    const t2 = await prepare(handle, session, 'call-rewrite-t2', [
       { name: 'implementation', work: 'Implement the requested behavior.' },
       { name: 'verification', work: 'Run the required runtime verification and preserve evidence.' },
     ])
     const t2Prepared = assertOk(t2.result)
-    const t2Accepted = await accept(handle, t2Prepared.bridge, t2.digest, sha256Hex('revise-t2-output'))
+    const t2Accepted = await accept(handle, t2Prepared.bridge, t2.digest, sha256Hex('rewrite-t2-output'))
     assert.equal(t2Accepted.ok, true)
     assert.match(t2Accepted.value.enrichedResult, /Keep working/)
     assert.equal(membrane.MagicTodoMembraneSurface_snapshot(handle, life).currentObligations.reference, t2Prepared.prepared.proposedTodoRef)

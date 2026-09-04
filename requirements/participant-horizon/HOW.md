@@ -24,7 +24,7 @@ provider-leak-gate.mjs
 
 2. **Gate B 反向防泄露门禁**：
    - 静态检查器 `provider-leak-gate.mjs` 扫描所有面向模型组装提示词与工具描述的代码，禁止 `SessionId`、`AgentId`、`ManagerJobId`、`PtyId`、`status`、`code` 等标记出现在输出流中。
-   - 对隐藏角色（如 Reviewer、Blogger）的调用在解析层统一按通用不存在处理，避免错误信息泄露内部拓扑。
+   - 对隐藏角色（如 Distiller、Blogger）的调用在解析层统一按通用不存在处理，避免错误信息泄露内部拓扑。
 
 ## 验证与测试落点
 

@@ -408,50 +408,50 @@ flow = [
 ]
 
 [[turn]]
-id = "review-first"
-lane = "reviewer"
+id = "assess-first"
+lane = "manager"
 user = "Review the current worktree"
-tools = ["verdict"]
+tools = ["review"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+  respond = { type = "tool-call", tool = "review", args = { language_algorithms = 10, simplicity = 10, structure = 10, granularity = 10, tests_evidence = 10, logic_reliability_boundaries = 10, caller_ergonomics = 10, completeness = 10 } }
 
 [[turn]]
-id = "review-confirm"
-lane = "reviewer"
+id = "assess-confirm"
+lane = "manager"
 user = "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
-tools = ["verdict"]
+tools = ["review"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+  respond = { type = "tool-call", tool = "review", args = { language_algorithms = 10, simplicity = 10, structure = 10, granularity = 10, tests_evidence = 10, logic_reliability_boundaries = 10, caller_ergonomics = 10, completeness = 9 } }
 `, {
-    reviewer: ['rev-1', 'rev-2'],
+    manager: ['mgr-1', 'mgr-2'],
   });
   try {
-    const tools = [{ type: 'function', function: { name: 'verdict' } }];
+    const tools = [{ type: 'function', function: { name: 'review' } }];
     const first = await postJson(`${provider.url}/v1/chat/completions`, {
       model: 'test-model',
       tools,
       messages: [{ role: 'user', content: 'Review the current worktree for correctness.' }],
-    }, sessionHeaders('rev-1'));
+    }, sessionHeaders('mgr-1'));
     assertTrue(first.ok, 'first review matches');
     const confirm = await postJson(`${provider.url}/v1/chat/completions`, {
       model: 'test-model',
       tools,
       messages: [
         { role: 'user', content: 'Review the current worktree for correctness.' },
-        { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'verdict', arguments: '{}' } }] },
+        { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'review', arguments: '{}' } }] },
         { role: 'tool', tool_call_id: 'c1', content: "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?" },
         { role: 'user', content: "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?" },
       ],
-    }, sessionHeaders('rev-1'));
+    }, sessionHeaders('mgr-1'));
     assertTrue(confirm.ok, 'confirm user matches different edge');
     // Same first-user request shape on another session (post-rebase style) — same template, ok
     const again = await postJson(`${provider.url}/v1/chat/completions`, {
       model: 'test-model',
       tools,
       messages: [{ role: 'user', content: 'Review the current worktree for correctness.' }],
-    }, sessionHeaders('rev-2'));
+    }, sessionHeaders('mgr-2'));
     assertTrue(again.ok, 'identical first-user template is reusable across sessions');
     provider.expectSatisfied();
   } finally {

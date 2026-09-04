@@ -37,14 +37,14 @@
 #   [x] provider transient failure          — [[fault]] provider-error + assertProviderTransientFailure
 #   [x] fallback                            — manager.1→continue.0 + assertFallbackContinuation
 #   [x] join blocked then causally awakened — flow.prompt wake + assertJoinWakePath
-#   [x] reviewer REVISE                     — non-10 assessment assigns work + assertReviewerRevise
+#   [x] non-10 assessment assigns work      — AssessmentCommitted + assertAssessmentAssignsWork
 #   [x] interrupted/aborted child or session— holdChildC1UntilLabor + assertInterruptedJoin
-#   [x] finality temporarily blocked        — non-10 blocks publication + successor required + assertFinalityTemporarilyBlocked
+#   [x] retirement needs successor          — non-10 blocks publication + successor required + assertRetirementNeedsSuccessor
 #   [x] durable recovery/continuation       — same PID FallbackCursorAdvanced + assertDurableRecovery
 #   [x] publish conflict / stale target     — gitConflictProof on manager.0 (no restart) + assertPublishConflict
 #   [x] subagent session reuse              — successor-2 reuses Proof Writer child + assertSubagentReuse
 #   [x] successful reconciliation           — Orchestrator-tagged Published eq 1 + assertSuccessfulReconciliation
-#   [x] later successful finality           — RetirementCommitted after resources converge + assertLaterSuccessfulFinality
+#   [x] later successful retirement         — RetirementCommitted after resources converge + assertRetirementCommitted
 #   [x] simultaneous Inspector batch        — streamed 3× inspect + assertG2InspectorBatchCoalescing
 #
 # Yield / hang risks (estimated):
@@ -65,8 +65,8 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 # Event ceilings (fail-closed on dead loops; primary over silence watchdog):
 #   maxJournalEvents — complete 63-step legal stroke after explicit preflow authority, real K2
 #                      StrengthReplica traffic, detached Bookkeeper finalization, and direct
-#                      same-physical dual-PERFECT review. Two complete strict traversals measured
-#                      622–647 envelopes; 700 catches the former unconfirmed-reviewer roster growth
+#                      same-physical successor re-audit. Two complete strict traversals measured
+#                      622–647 envelopes; 700 catches unconfirmed roster growth
 #                      before it can hide behind a widened timeout.
 #   maxSseEvents     — OpenCode SSE excluding server.heartbeat for the same traversals measured
 #                      3118–3351 frames; 3450 preserves a narrow Host-ordering allowance.
@@ -384,7 +384,7 @@ user = "Ship publish_proof.txt to the target branch through the long stroke."
 tools = ["commission", "join"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "commission", args = { calling = "lead", name = "Long Stroke Road", charge = "Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile." } }
+  respond = { type = "tool-call", tool = "commission", args = { calling = "lead", name = "Long Stroke Road", charge = "Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept the assessment obligation then retire so publish can proceed." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
@@ -413,7 +413,7 @@ tools = ["commission", "horizon", "join"]
 # stays blocked while holdChild keeps coder incomplete for user_message wake.
 # tools MUST match the real Manager provider surface (no todowrite — see flow note).
 [[turn]]
-id = "manager-blind-plan"
+id = "manager-t1-commitment"
 internal = true
 user = "# The account is not yet ready to entrust."
 
@@ -421,12 +421,12 @@ user = "# The account is not yet ready to entrust."
   respond = { type = "tool-call", tool = "todowrite", args = { planComplete = true, workingOn = "long-stroke", obligations = [{ name = "long-stroke", horizon = "near", work = "Run the long stroke through publish_proof.txt." }] } }
 
   [[turn.step]]
-  respond = { type = "text", text = "Blind plan obligations recorded." }
+  respond = { type = "text", text = "T1 commitment recorded." }
 
 [[turn]]
 id = "manager-audit"
 lane = "manager"
-user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile."
+user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept the assessment obligation then retire so publish can proceed."
 tools = ["read", "glob", "grep", "fork", "join", "horizon", "review", "suicide"]
 
   [[turn.step]]
@@ -436,7 +436,7 @@ tools = ["read", "glob", "grep", "fork", "join", "horizon", "review", "suicide"]
 [[turn]]
 id = "manager"
 lane = "manager"
-user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile."
+user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept the assessment obligation then retire so publish can proceed."
 tools = ["fork", "join", "horizon", "suicide"]
 
   [[turn.step]]
