@@ -1741,7 +1741,8 @@
       "state": "DONE",
       "files": [
         "src/Wanxiangshu/Sphinx/EventVocabulary.fs",
-        "src/Wanxiangshu/Sphinx/LegacyIntegrator.fs"
+        "src/Wanxiangshu/Sphinx/LegacyIntegrator.fs",
+        "src/Wanxiangshu/Sphinx/GenericIntegrator.fs"
       ],
       "proofs": [
         "requirements/epistemic-reasoning/tests/durable-event-store.test.mjs",

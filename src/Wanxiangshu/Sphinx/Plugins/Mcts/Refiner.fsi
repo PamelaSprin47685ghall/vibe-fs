@@ -34,16 +34,18 @@ module Refiner =
           Seed: int
           DagSafe: bool }
 
-    /// Sample mean, unbiased sample variance, and coverage radius for one root action.
+    /// Sample mean, unbiased sample variance, and reference radius for one root action.
+    /// ReferenceRadius is an i.i.d.-idealization Hoeffding half-width (M-2): descriptive
+    /// scale only, never a finite-sample coverage claim under adaptive sampling.
     type ActionStats =
         { Action: string
           Visits: int
           Mean: float
           Variance: float
-          Radius: float }
+          ReferenceRadius: float }
 
-    /// Fixed-time coverage metadata: budget, return scale, and declared assumptions.
-    /// Scope is always fixed-time-per-action (M-2); never consume as simultaneous/anytime-valid.
+    /// Descriptive sample metadata: budget, return scale, and declared assumptions.
+    /// Scope is always reference-only-no-finite-sample-coverage (M-2).
     type Coverage =
         { Iterations: int
           Horizon: int

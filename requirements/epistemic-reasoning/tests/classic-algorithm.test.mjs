@@ -69,7 +69,7 @@ test('WHAT[EPI-010] astar-reports-global-frontier-bound-incumbent-and-reopens-be
   assert.ok(Math.abs(result.upperBound - 5) < 1e-12)
 })
 
-test('WHAT[EPI-010] seeded-mcts-returns-coverage-metadata-not-deterministic-truth', async () => {
+test('WHAT[EPI-010] seeded-mcts-returns-descriptive-sample-summary-not-deterministic-truth', async () => {
   const patch = {
     kind: 'mcts-sample',
     root: 'root',
@@ -90,13 +90,15 @@ test('WHAT[EPI-010] seeded-mcts-returns-coverage-metadata-not-deterministic-trut
   assert.equal(second.ok, true)
   assert.deepEqual(second, first)
   assert.ok(Math.abs(first.coverage.delta - 0.05) < 1e-12)
-  assert.ok(Math.abs(first.coverage.level - 0.95) < 1e-12)
+  assert.equal(first.coverage.scope, 'reference-only-no-finite-sample-coverage')
+  assert.ok(!('level' in first.coverage))
   for (const key of Object.keys(first.estimates)) {
     assert.ok(Number.isFinite(first.estimates[key]))
     assert.ok(first.estimates[key] >= 0 && first.estimates[key] <= 1)
   }
-  assert.match(first.guarantee, /coverage|probab/i)
+  assert.match(first.guarantee, /descriptive sample summary/i)
   const guaranteeText = `${first.guarantee} ${Object.keys(first)}`
   assert.ok(!/deterministic truth/i.test(guaranteeText))
   assert.ok(!/singleton/i.test(guaranteeText))
+  assert.ok(!/probabilistic-coverage/i.test(guaranteeText))
 })

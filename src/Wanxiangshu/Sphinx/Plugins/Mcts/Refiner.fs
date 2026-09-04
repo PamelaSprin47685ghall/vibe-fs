@@ -39,11 +39,14 @@ module Refiner =
           Visits: int
           Mean: float
           Variance: float
-          Radius: float }
+          ReferenceRadius: float }
 
-    // M-2: the per-action radius is a fixed-time Hoeffding bound with no union
-    // correction, so Scope pins the only valid reading; DagSafe sharing is
-    // unweighted, so Assumptions records it instead of claiming reweighting.
+    // M-2: the per-action radius is the Hoeffding half-width under an i.i.d.
+    // idealization. UCT subtree policies make per-arm returns adaptively sampled
+    // (neither independent nor identically distributed), so fixed-time Hoeffding
+    // coverage is INVALID here; ReferenceRadius is a descriptive scale only.
+    // DagSafe sharing is unweighted, so Assumptions records it instead of
+    // claiming reweighting.
     type Coverage =
         { Iterations: int
           Horizon: int
@@ -324,8 +327,7 @@ module Refiner =
     type private TrailStep =
         { Key: string list
           Action: string
-          Reward: float
-          Depth: int }
+          Reward: float }
 
     let private emptyStats: EdgeStats =
         { Visits = 0
@@ -396,8 +398,7 @@ module Refiner =
                 let step =
                     { Key = key
                       Action = chosen
-                      Reward = outcome.Reward
-                      Depth = depth }
+                      Reward = outcome.Reward }
 
                 descend stats prng2 outcome.Next childKey (depth + 1) (step :: stepsRev)
 
@@ -480,7 +481,7 @@ module Refiner =
               Visits = current.Visits
               Mean = mean
               Variance = variance
-              Radius = radius }
+              ReferenceRadius = radius }
 
         let visitsOf action =
             finalStats
@@ -508,9 +509,10 @@ module Refiner =
               ReturnWidth = width
               Delta = config.Delta
               DagSafe = config.DagSafe
-              Scope = "fixed-time-per-action"
+              Scope = "reference-only-no-finite-sample-coverage"
               Assumptions =
-                [ "fixed-time-hoeffding-no-union-correction"
+                [ "adaptive-sampling-invalidates-fixed-time-hoeffding"
+                  "radius-is-iid-idealization-reference-only"
                   if config.DagSafe then
                       "dag-transposition-sharing-unweighted"
                   else

@@ -208,28 +208,32 @@ module McpContract =
         match success.Result with
         | InquiryResult.Yield request ->
             "Sphinx inquiry yielded.\n"
+            + $"Handle: {success.Handle}\n"
             + $"Next tool: {nextTool request}\n"
             + $"Revision: {success.State.Revision}{questionLine request}"
         | InquiryResult.Answered answer ->
             "Sphinx inquiry answered.\n"
+            + $"Handle: {success.Handle}\n"
             + $"Revision: {answer.Revision}\n"
             + $"Stop reason: {answer.StopReason}"
         | InquiryResult.Error message ->
             raise (InvalidOperationException $"session success cannot wrap kernel error: {message}")
 
-    let private summarizeActive (state: EpistemicState) : string =
+    let private summarizeActive (handle: string) (state: EpistemicState) : string =
         match state.PendingRequest with
         | Some request ->
             "Sphinx inquiry active.\n"
+            + $"Handle: {handle}\n"
             + $"Next tool: {nextTool request}\n"
             + $"Revision: {state.Revision}{questionLine request}"
         | None -> raise (InvalidOperationException "active session without pending kernel request")
 
-    let summarizeStatus (status: SessionStatus) : string =
+    let summarizeStatus (handle: string) (status: SessionStatus) : string =
         match status with
-        | SessionStatus.Active state -> summarizeActive state
+        | SessionStatus.Active state -> summarizeActive handle state
         | SessionStatus.Answered(answer, _) ->
             "Sphinx inquiry answered.\n"
+            + $"Handle: {handle}\n"
             + $"Revision: {answer.Revision}\n"
             + $"Stop reason: {answer.StopReason}"
 

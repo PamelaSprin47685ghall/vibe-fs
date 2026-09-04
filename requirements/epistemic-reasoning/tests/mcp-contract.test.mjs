@@ -493,6 +493,30 @@ test('WHAT[EPI-013] generic_start_status_cancel_envelope_with_iq_ids_and_stale_s
   assert.equal(gone.isError, true)
 })
 
+test('WHAT[EPI-013] text_outputs_carry_handle_and_inquiry_id_for_text_only_models', async () => {
+  const tools = mcpServer(createStore())._registeredTools
+
+  const started = await tools.start.handler({ question: ROOT_QUESTION })
+  const handle = started.structuredContent.handle
+  assert.match(started.content[0].text, new RegExp(handle))
+  const status = await tools.status.handler({ handle })
+  assert.match(status.content[0].text, new RegExp(handle))
+
+  const generic = await tools.sphinx_inquiry_start.handler({ question: ROOT_QUESTION })
+  const inquiryId = generic.structuredContent.inquiryId
+  assert.match(generic.content[0].text, new RegExp(inquiryId))
+  const gstatus = await tools.sphinx_inquiry_status.handler({ inquiryId })
+  assert.match(gstatus.content[0].text, new RegExp(inquiryId))
+
+  const unknown = await tools.sphinx_inquiry_status.handler({ inquiryId: 'iq_nope' })
+  assert.equal(unknown.isError, true)
+  assert.match(unknown.content[0].text, /iq_nope/)
+
+  const legacyShaped = await tools.sphinx_inquiry_status.handler({ inquiryId: '0702fb48-6517-4875-8fee-33ed6ad2cc38' })
+  assert.equal(legacyShaped.isError, true)
+  assert.match(legacyShaped.content[0].text, /iq_ ids from sphinx_inquiry_start/)
+})
+
 test('WHAT[EPI-013] generic_submit_with_results_advances_revision_and_status_follows', async () => {
   const tools = mcpServer(createStore())._registeredTools
 

@@ -575,3 +575,56 @@ test('WHAT[EPI-030] restart_recovers_same_durable_inquiry', { timeout: 30000 }, 
     await rm(commonDir, { recursive: true, force: true })
   }
 })
+
+test('WHAT[EPI-019] generic_restart_recovers_revision_results_and_conflict', { timeout: 30000 }, async () => {
+  // Generic sphinx_inquiry_* transitions are durable facts: killing the
+  // first process must not lose the revision, the accepted results, or the
+  // expectedRevision gate. The second server resumes at the same revision.
+  const commonDir = await mkdtemp(join(tmpdir(), 'sphinx-generic-'))
+  try {
+    const env = { SPHINX_COMMON_DIR: commonDir }
+    const s1 = spawnSphinx(env)
+    let inquiryId
+    try {
+      await s1.initialize()
+      const startRes = await s1.tool('sphinx_inquiry_start', { question: 'durable generic probe' })
+      inquiryId = startRes.result.structuredContent.inquiryId
+      assert.match(inquiryId, /^iq_/)
+      const submitRes = await s1.tool('sphinx_work_submit', {
+        inquiryId,
+        expectedRevision: 0,
+        results: [{ workId: 'work_restart_1', output: 'first' }],
+      })
+      assert.equal(submitRes.result.structuredContent.revision, 1)
+    } finally {
+      s1.close()
+    }
+
+    const s2 = spawnSphinx(env)
+    try {
+      await s2.initialize()
+      const status = await s2.tool('sphinx_inquiry_status', { inquiryId })
+      assert.equal(status.result.isError, undefined)
+      assert.equal(status.result.structuredContent.inquiryId, inquiryId)
+      assert.equal(status.result.structuredContent.revision, 1)
+      assert.equal(status.result.structuredContent.status, 'active')
+      const exported = await s2.tool('sphinx_inquiry_export', { inquiryId })
+      assert.equal(exported.result.structuredContent.revision, 1)
+      assert.deepEqual(exported.result.structuredContent.results, [{ workId: 'work_restart_1', output: 'first' }])
+      const stale = await s2.tool('sphinx_work_submit', { inquiryId, expectedRevision: 0, results: [] })
+      assert.equal(stale.result.isError, true)
+      assert.match(JSON.stringify(stale.result), /REVISION_CONFLICT/)
+      const resumed = await s2.tool('sphinx_work_submit', {
+        inquiryId,
+        expectedRevision: 1,
+        results: [{ workId: 'work_restart_2' }],
+      })
+      assert.equal(resumed.result.structuredContent.revision, 2)
+      assert.equal(resumed.result.structuredContent.accepted, 1)
+    } finally {
+      s2.close()
+    }
+  } finally {
+    await rm(commonDir, { recursive: true, force: true })
+  }
+})

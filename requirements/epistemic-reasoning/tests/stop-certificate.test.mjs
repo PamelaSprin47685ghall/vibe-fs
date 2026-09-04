@@ -34,7 +34,7 @@ test('WHAT[EPI-029] sequential-error-control-tightens-with-repeated-checks', asy
   assert.ok(late.certificate.sequentialAlpha < early.certificate.sequentialAlpha)
   assert.ok(early.certificate.sequentialError.cumulativeError <= 0.05 + 1e-12)
   assert.ok(late.certificate.sequentialError.cumulativeError <= 0.05 + 1e-12)
-  assert.match(late.certificate.sequentialError.method, /anytime|spending|sequential/i)
+  assert.match(late.certificate.sequentialError.method, /bonferroni/i)
 })
 
 test('WHAT[EPI-029] stable-minority-mode-returns-decision-distribution-not-single-winner', async () => {
@@ -53,6 +53,28 @@ test('WHAT[EPI-029] stable-minority-mode-returns-decision-distribution-not-singl
   const minority = result.decision.modes.find((mode) => mode.decision === 'reject')
   assert.ok(minority)
   assert.ok(Math.abs(minority.mass - 0.32) < 1e-12)
+  assert.deepEqual(result.decision.minorityModes, [{ decision: 'reject', mass: 0.32 }])
+})
+
+test('WHAT[EPI-029] caller-evidence-fires-stop-when-all-checks-pass', async () => {
+  const result = await gecSurface.stopCertificate({
+    testedFramings: ['neutral', 'reverse-wording'],
+    decisionPosterior: { ...posterior },
+    framingStability: { approve: [0.66, 0.7], reject: [0.3, 0.34] },
+    checksSoFar: 1,
+    alpha: 0.05,
+    evidence: 25,
+  })
+  assert.equal(result.ok, true)
+  assert.deepEqual(
+    result.certificate.testedFamily,
+    ['neutral', 'reverse-wording'],
+  )
+  assert.equal(result.certificate.checks.length, 4)
+  for (const check of result.certificate.checks) {
+    assert.equal(check.passed, true)
+  }
+  assert.equal(result.recommendation, 'stop')
 })
 
 test('WHAT[EPI-029] conservative-upper-voc-blocks-stopping-on-point-estimate-alone', async () => {

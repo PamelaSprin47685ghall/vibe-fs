@@ -118,6 +118,75 @@ module SphinxIntegration =
           PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
           ApplyCut = fun current _ -> Ok current }
 
+/// WHAT[EPI-019]: durable restart oracle for generic Sphinx inquiries. It folds
+/// accepted sphinx-generic transitions into per-inquiry cursors; the legacy
+/// Sphinx rule ignores this kind and leaves its own Current unchanged.
+[<RequireQualifiedAccess>]
+module SphinxGenericIntegration =
+    let private genericDecoder =
+        Decode.object (fun get ->
+            (get.Required.Field "inquiry" Decode.string,
+             get.Required.Field "kind" Decode.string,
+             get.Required.Field "revision" Decode.int,
+             get.Optional.Field "expectedRevision" Decode.int |> Option.defaultValue -1,
+             get.Optional.Field "question" Decode.string |> Option.defaultValue "",
+             get.Optional.Field "profile" Decode.string |> Option.defaultValue "",
+             get.Optional.Field "executionMode" Decode.string |> Option.defaultValue "",
+             get.Optional.Field "pluginsJson" Decode.string |> Option.defaultValue "null",
+             get.Optional.Field "budgetJson" Decode.string |> Option.defaultValue "null",
+             get.Optional.Field "resultsJson" Decode.string |> Option.defaultValue "[]"))
+
+    let private toInput
+        (
+            inquiry: string,
+            kind: string,
+            revision: int,
+            expectedRevision: int,
+            question: string,
+            profile: string,
+            executionMode: string,
+            pluginsJson: string,
+            budgetJson: string,
+            resultsJson: string
+        ) : Result<GenericIntegrator.GenericEnvelopeInput, string> =
+        match kind with
+        | "started" ->
+            Ok(
+                GenericIntegrator.GenericStarted(
+                    inquiry,
+                    revision,
+                    question,
+                    profile,
+                    executionMode,
+                    pluginsJson,
+                    budgetJson
+                )
+            )
+        | "submitted" -> Ok(GenericIntegrator.GenericSubmitted(inquiry, revision, expectedRevision, resultsJson))
+        | "cancelled" -> Ok(GenericIntegrator.GenericCancelled(inquiry, revision))
+        | _ -> Error(sprintf "sphinx generic envelope carries an unknown kind: %s" kind)
+
+    let private tryGenericInput (envelope: EventEnvelope) : Result<GenericIntegrator.GenericEnvelopeInput, string> =
+        Decode.fromValue "$" genericDecoder envelope.Payload
+        |> Result.mapError (fun error -> sprintf "Sphinx generic observation decode failed: %s" error)
+        |> Result.bind toInput
+
+    let rule: IntegrationRule =
+        { Name = "SphinxGeneric"
+          Initial = box GenericIntegrator.empty
+          FaultScope = fun _ -> "global"
+          Accepts = fun envelope -> envelope.EventType = SphinxEventTypes.GenericInquiry
+          Integrate =
+            fun current envelope ->
+                match tryGenericInput envelope with
+                | Error error -> Error error
+                | Ok input ->
+                    GenericIntegrator.applyOne (unbox<GenericIntegrator.SphinxGenericCurrent> current) input
+                    |> Result.map box
+                    |> Result.mapError (fun error -> sprintf "Sphinx generic integration rejected: %s" error)
+          PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
+          ApplyCut = fun current _ -> Ok current }
+
 [<RequireQualifiedAccess>]
 module CasebookIntegration =
     let rule: IntegrationRule =
@@ -178,6 +247,7 @@ module CanonicalIntegrator =
             register JournalIntegration.rule
             register StrengthIntegration.rule
             register SphinxIntegration.rule
+            register SphinxGenericIntegration.rule
             register CasebookIntegration.rule
             register JsTransactionIntegration.rule
         }

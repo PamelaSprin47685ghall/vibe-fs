@@ -122,6 +122,47 @@ test('WHAT[EPI-023] ate-interpretation-declares-causal-assumptions-and-permutati
   assert.ok(pValue >= 0 && pValue <= 1)
 })
 
+test('WHAT[EPI-023] treatment-details-configure-wording-polarity-and-order', async () => {
+  const result = await gecSurface.splitBallot({
+    rootSnapshot: 'snap-split-d',
+    seed: 31,
+    subjects: ['s1', 's2', 's3', 's4'],
+    treatments: ['wording-a', 'wording-b'],
+    treatmentDetails: {
+      'wording-b': { wording: 'reversed text', polarity: -1, openFirst: false },
+    },
+    candidates: ['c1', 'c2'],
+  })
+  assert.equal(result.ok, true)
+  const reversed = result.assignments.filter((item) => item.treatment === 'wording-b')
+  assert.equal(reversed.length, 2)
+  for (const item of reversed) {
+    assert.equal(item.wording, 'reversed text')
+    assert.equal(item.polarity, -1)
+    assert.equal(item.openFirst, false)
+  }
+  const plain = result.assignments.filter((item) => item.treatment === 'wording-a')
+  assert.equal(plain.length, 2)
+  for (const item of plain) {
+    assert.equal(item.wording, 'wording-a')
+    assert.equal(item.polarity, 1)
+    assert.equal(item.openFirst, true)
+  }
+})
+
+test('WHAT[EPI-023] invalid-treatment-polarity-fails-closed', async () => {
+  const result = await gecSurface.splitBallot({
+    rootSnapshot: 'snap-split-e',
+    seed: 33,
+    subjects: ['s1', 's2'],
+    treatments: ['wording-a', 'wording-b'],
+    treatmentDetails: { 'wording-b': { polarity: 0 } },
+    candidates: ['c1', 'c2'],
+  })
+  assert.equal(result.ok, false)
+  assert.match(result.error.code, /invalid-polarity/i)
+})
+
 test('WHAT[EPI-023] missing-root-snapshot-fails-closed-before-randomization', async () => {
   const result = await gecSurface.splitBallot({
     seed: 5,

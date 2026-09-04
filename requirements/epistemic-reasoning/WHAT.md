@@ -50,7 +50,7 @@ Evidence 的内部标识至少由规范化的 semantic key 与 dependency key �
 在各自假设成立时，插件必须退化为对应标准算法：
 1. **Graph A***：有限、确定、非负成本图与非负 admissible heuristic 下按最小 `g+h` 展开；发现更优 `g` 时重开。证书下界是 open frontier 的全局最小 `f`，上界是全局 incumbent，不把单节点 `g+h` 误报为全局下界；
 2. **Bayes**：满足 EPI-009 时 exact sum-product 输出与 brute-force normalized product 一致；
-3. **Graph-MCTS**：有限动作、有限 horizon 或折扣回报、bounded reward 与 generative kernel 下执行选择、扩展、模拟、回溯并按 semantic node 共享统计。采样证书只能声明带 `δ` 的概率覆盖与收敛性质，不得声明确定性 singleton。
+3. **Graph-MCTS**：有限动作、有限 horizon 或折扣回报、bounded reward 与 generative kernel 下执行选择、扩展、模拟、回溯并按 semantic node 共享统计。采样证书只给描述性样本统计与收敛条件；iid 理想化半径在自适应采样下没有有限样本覆盖，不得包装成 fixed-time 覆盖，不得声明确定性 singleton。
 缓存、visit、heuristic 与模型自述分数严禁伪装为外部世界证据。Bellman 是决策固定点面，不得作为第四 refiner 或互斥 `SolverMode`。
 
 ## EPI-011: 依赖感知的等价约简与 Wire 判重限制
@@ -77,7 +77,7 @@ MCP initialize 的 `serverInfo.name` 固定为 `sphinx`，`serverInfo.version` �
 
 ## EPI-016: 单一证书空间与分型精化保证
 
-同一 NodeId 的 ValueCertificate 可同时持有 exact、lower/upper envelope、sample summary、ordinal constraints、latent posterior、residual 与 witness/derivation event references。系统不得存在互斥 SolverMode 或 parallel Bayesian/Search/MonteCarlo state。价值偏序 `≼V` 与信息精化预序 `⊑I` 必须分开：exact/bound plugin 可声明确定性 concretization inclusion；sample plugin 必须声明 coverage level、assumptions 与随机误差，不能用确定性 inclusion；witness 增长不参与反对称性判断。
+同一 NodeId 的 ValueCertificate 可同时持有 exact、lower/upper envelope、sample summary、ordinal constraints、latent posterior、residual 与 witness/derivation event references。系统不得存在互斥 SolverMode 或 parallel Bayesian/Search/MonteCarlo state。价值偏序 `≼V` 与信息精化预序 `⊑I` 必须分开：exact/bound plugin 可声明确定性 concretization inclusion；sample plugin 必须声明 level、assumptions、scope 与随机误差，不能用确定性 inclusion；自适应采样下的 scope 不得宣称 fixed-time 覆盖，只可标注 descriptive-reference；witness 增长不参与反对称性判断。
 
 ## EPI-017: 探究协议是可回放实验
 
@@ -89,7 +89,7 @@ MCP initialize 的 `serverInfo.name` 固定为 `sphinx`，`serverInfo.version` �
 
 ## EPI-019: Inquiry 以 canonical EventStore 为唯一 durable truth
 
-Sphinx 业务事实只能追加到 DURABLE-EVENTS 的 canonical EventStore；禁止 SQLite、feature-private NDJSON、第二 history fold 或 durable snapshot。append 成功后才可推进 Current/响应成功。进程重启后 inquiry 由 Integrator Current 恢复；丢弃任意 process-local projection cache 不改变结果。`expectedRevision` 不匹配必须在写入前返回 typed conflict；`workId + attempt` 的同一 canonical observation 幂等，冲突 payload 必须拒绝。
+Sphinx 业务事实只能追加到 DURABLE-EVENTS 的 canonical EventStore；禁止 SQLite、feature-private NDJSON、第二 history fold 或 durable snapshot。append 成功后才可推进 Current/响应成功。进程重启后 legacy inquiry 由 Integrator Current 恢复，generic inquiry 由同流因果链重放恢复；丢弃任意 process-local projection cache 不改变结果。`expectedRevision` 不匹配必须在写入前返回 typed conflict；`workId + attempt` 的同一 canonical observation 幂等，冲突 payload 必须拒绝。
 
 ## EPI-020: Plugin manifest、依赖与 schema lock 不可漂移
 

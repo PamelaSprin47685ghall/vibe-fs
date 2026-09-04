@@ -30,9 +30,19 @@ module GecInquiry =
     val faultCode: fault: InquiryFault -> string
     val faultMessage: fault: InquiryFault -> string
 
+    val BuildStart:
+        question: string * profile: string * plugins: obj * executionMode: string * budget: obj -> GecInquiryEntry
+
+    val DecideSubmit:
+        entry: GecInquiryEntry * expectedRevision: int * results: obj list -> Result<GecInquiryEntry, InquiryFault>
+
+    val DecideCancel: entry: GecInquiryEntry -> Result<GecInquiryEntry, InquiryFault>
+
     [<Sealed>]
     type Registry =
         new: unit -> Registry
+
+        member Restore: entry: GecInquiryEntry -> unit
 
         member Start:
             question: string * profile: string * plugins: obj * executionMode: string * budget: obj -> GecInquiryEntry
