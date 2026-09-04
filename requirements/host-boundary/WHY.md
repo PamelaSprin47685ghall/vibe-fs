@@ -24,7 +24,7 @@
 - Host envelope、message codec与loop codec拥有不同consumer cohort；共享解析只下沉到无状态envelope contract，不能用一个宽adapter公开全部codec、subscription与diagnostics。
 - Node runtime只是机制标签。纯`node:path/posix`表示不得被误判为authority；console、environment、process control及mutable registry按实际capability facts判定。
 - fatal incident vocabulary与capability type属于纯contract；console report、process kill/exit属于唯一adapter。composition负责mandatory injection及settlement ordering，普通runtime不能直接到达physical implementation。
-- Host signal订阅必须把“使用公开local hook”与“持有legacy listener资源”表达为互斥状态；只有composition可把typed订阅失败解释为fatal，物理adapter不得同时拥有失败解释与进程效果。
+- Host signal订阅必须把“使用公开local hook”与“持有legacy listener资源”表达为互斥状态；OpenCode SDK `client`是class capability而非JSON record，无legacy `events`成员时必须落入local hook，不能因prototype拒绝真实Host。只有composition可把typed订阅失败解释为fatal，物理adapter不得同时拥有失败解释与进程效果。
 - raw Host value只由封闭string/bool/array/plain-record reader解释；malformed值不得通过truthiness、`string value`或擦除后的`unbox`取得领域意义，任一公开hook对malformed envelope必须确定性fail-closed且不抛异常。
 - root workspace 只接受 process-local runtime 的首次 `Some path`；`None`不占用槽位，后续候选不能改写已绑定值。只有Host composition取得binder，所有读取经注入的reader完成。
 

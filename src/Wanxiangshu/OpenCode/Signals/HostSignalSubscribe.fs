@@ -30,6 +30,9 @@ module HostSignalSubscribe =
     [<Emit("(() => { try { if ($0 === null || typeof $0 !== 'object' || Array.isArray($0)) return false; const p = Object.getPrototypeOf($0); return p === Object.prototype || p === null; } catch { return false; } })()")>]
     let private isPlainRecord (value: obj) : bool = jsNative
 
+    [<Emit("(() => { try { return $0 !== null && typeof $0 === 'object' && !Array.isArray($0) && Object.prototype.toString.call($0) === '[object Object]'; } catch { return false; } })()")>]
+    let private isOrdinaryObjectCapability (value: obj) : bool = jsNative
+
     [<Emit("(() => { try { const message = $0?.message; return typeof message === 'string' ? message : String($0); } catch { return 'unknown JavaScript exception'; } })()")>]
     let private exceptionDiagnostic (value: obj) : string = jsNative
 
@@ -72,6 +75,11 @@ module HostSignalSubscribe =
         elif isPlainRecord value then Ok(Some value)
         else Error HostSignalSubscriptionError.InvalidInput
 
+    let private optionalClientCapability value =
+        if isNull value then Ok None
+        elif isOrdinaryObjectCapability value then Ok(Some value)
+        else Error HostSignalSubscriptionError.InvalidInput
+
     let private readClientEvents client =
         try
             Ok client?events
@@ -102,7 +110,7 @@ module HostSignalSubscribe =
             | Some events -> Ok(Some events)
             | None ->
                 readInputClient input
-                |> Result.bind optionalPlainRecord
+                |> Result.bind optionalClientCapability
                 |> Result.bind clientEvents)
 
     let private listenTarget input =
