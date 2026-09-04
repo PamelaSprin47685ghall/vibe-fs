@@ -107,10 +107,10 @@ test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_join_guard_fold_absorbs_duplicate_comp
 })
 
 test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_manager_lifecycle_activation_and_life_completed_exactly_once', () => {
-  const source = readFileSync(join(ROOT, 'src/Wanxiangshu/Mission/Manager/Life/Projection.fs'), 'utf8')
-  assert.match(source, /WorkActivated/)
-  assert.match(source, /LifeCompleted/)
-  assert.match(source, /CompletedLives/)
+  const source = readFileSync(join(ROOT, 'src/Wanxiangshu/Mission/Relay/Fold.fs'), 'utf8')
+  assert.match(source, /RetirementCommitted/)
+  assert.match(source, /RetiredProviderRunIds/)
+  assert.match(source, /RetiredIncumbencies/)
 })
 
 test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_owner_advance_and_blogger_residue_permutations_confluent', () => {

@@ -784,7 +784,16 @@ module ChangeSurface =
                             Task.FromResult(Error "scenario snapshot queue exhausted")
                         else
                             Task.FromResult(Ok(WorkspaceSnapshotId.create (snapshots.Dequeue())))
-                  PrepareCandidate = fun _ -> Task.FromResult(Ok(CommitHash.create worktreeHead.Value))
+                  PrepareCandidate =
+                    fun _ ->
+                        if conflictReads.Count > 0 then
+                            if conflictReads.Peek() <> [] then
+                                Task.FromResult(Error "unmerged paths remain in worktree")
+                            else
+                                conflictReads.Dequeue() |> ignore
+                                Task.FromResult(Ok(CommitHash.create worktreeHead.Value))
+                        else
+                            Task.FromResult(Ok(CommitHash.create worktreeHead.Value))
                   TerminateRoadResources =
                     fun _ ->
                         timeline.Add "relay:terminate"

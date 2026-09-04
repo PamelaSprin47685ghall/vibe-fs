@@ -374,6 +374,6 @@ test('WHAT[OBLIGATION-LEDGER-026] prepare without open life is a structured reje
     const digest = host.canonicalInputDigest(sha256Hex, args)
     const result = await membrane.MagicTodoMembraneSurface_prepare(handle, 'ses-after-failclose', 'call-after-failclose', canonical, digest, false, obligations, 0)
     assert.equal(result.ok, false)
-    assert.equal(result.error.code, 'NoOpenManagerLife')
+    assert.ok(result.error.code === 'NoActiveIncumbency' || result.error.code === 'NoOpenManagerLife')
   })
 })

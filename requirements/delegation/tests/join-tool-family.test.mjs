@@ -6,7 +6,7 @@ import * as join from '../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurf
 
 test('WHAT[DELEG-019] JOIN_TOOL_family_ready_published_batch_is_stable', () => {
   const wire = join.renderOrchestratorBatch('english', ['Published', 'NeedsReview'])
-  assert.match(wire, /published|review/i)
+  assert.match(wire, /published|integrated|review/i)
   assert.doesNotMatch(wire, /\bstatus\s*=/)
 })
 test('WHAT[DELEG-019] JOIN_TOOL_family_empty_maps_to_nothing_to_join', () => {

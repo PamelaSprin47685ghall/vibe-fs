@@ -31,7 +31,6 @@ test('WHAT[STRUCTURED-WORKFLOW-001] SW_001_workflow_entrypoints_are_the_exported
   const entrypoints = [
     ['src/Wanxiangshu/Mission/Manager/Workflow.fs', 'observe'],
     ['src/Wanxiangshu/Mission/Manager/Workflow.fs', 'observeIdle'],
-    ['src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs', 'observe'],
     ['src/Wanxiangshu/Composition/Turn/Workflow.fs', 'observe'],
   ]
   const missing = []
@@ -50,7 +49,6 @@ test('WHAT[STRUCTURED-WORKFLOW-003] SW_002_workflow_modules_export_no_program_co
   // let bindings in the workflow modules.
   const workflowFiles = [
     'src/Wanxiangshu/Mission/Manager/Workflow.fs',
-    'src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs',
     'src/Wanxiangshu/Composition/Turn/Workflow.fs',
   ]
   const programCounter = /\b(?:let|type)\s+\w*(?:Stage|Phase|NextAction|CurrentStage|RunState)\b/

@@ -6,6 +6,7 @@ import test from 'node:test'
 
 import {
   acceptAuthorityRoot,
+  grantWorkOwned,
   withExecutablePlugin,
 } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
@@ -61,6 +62,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] forced root fission rejects origin
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'fission-root-origin'
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
+    await grantWorkOwned(runtime, sessionID)
 
     const result = await hooks.tool.fission.execute(
       { prompts: 'only one lane' },

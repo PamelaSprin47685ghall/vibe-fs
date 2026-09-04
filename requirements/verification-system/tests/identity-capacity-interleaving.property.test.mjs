@@ -4,7 +4,7 @@ import test from 'node:test'
 import { runInterleaving, validPermutations } from './support/identity-capacity-interleaving.mjs'
 
 const parentAgents = ['manager', 'devops']
-const childAgents = ['coder', 'reviewer']
+const childAgents = ['coder', 'inspector']
 const capacities = [2, 3]
 const replayModes = [false, true]
 const duplicateDeliveryModes = [false, true]

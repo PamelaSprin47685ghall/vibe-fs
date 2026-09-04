@@ -14,12 +14,12 @@ test('WHAT[DELEG-005] JOIN_V2_completed_agent_is_natural_language_plus_work_reco
   assert.ok(!LEGACY_DTO.test(wire))
 })
 test('WHAT[DELEG-013] JOIN_V2_failed_agent_is_natural_language', () => {
-  const wire = join.renderBatch('english', [{ kind: 'failed', agentId: 'a2', agentName: 'reviewer', role: 'Reviewer', runId: 'run-a2', code: 'E', message: 'failed' }])
+  const wire = join.renderBatch('english', [{ kind: 'failed', agentId: 'a2', agentName: 'inspector', role: 'Inspector', runId: 'run-a2', code: 'E', message: 'failed' }])
   assert.match(wire, /could not complete/)
   assert.ok(!LEGACY_DTO.test(wire))
 })
 test('WHAT[DELEG-014] JOIN_V2_abandoned_agent_is_natural_language', () => {
-  const wire = join.renderBatch('english', [{ kind: 'abandoned', agentId: 'a2', agentName: 'reviewer', reason: 'abandoned' }])
+  const wire = join.renderBatch('english', [{ kind: 'abandoned', agentId: 'a2', agentName: 'inspector', reason: 'abandoned' }])
   assert.match(wire, /did not return/)
   assert.ok(!LEGACY_DTO.test(wire))
 })

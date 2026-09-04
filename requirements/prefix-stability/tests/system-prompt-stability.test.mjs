@@ -15,7 +15,7 @@ import { installDefaultResources } from '../../../dist/OpenCode/Host/ManagedAgen
 installDefaultResources()
 
 const OWNER = 'ses_owner_prompt'
-const roles = ['Manager', 'Coder', 'Inspector', 'Reviewer', 'Browser', 'Inquiry', 'Distiller', 'Blogger']
+const roles = ['Manager', 'Coder', 'Inspector', 'DevOps', 'Browser', 'Inquiry', 'Distiller', 'Blogger']
 const profile = (role, tier = 'Fast', kind = 'WorkMain') => planner.plan({ role, tier, kind })
 
 // ── PROMPT-019: resources are distinct from their role identity ───────────
@@ -59,22 +59,22 @@ test('WHAT[PREFIX-STABILITY-007] PROMPT_019_effective_agent_preserved_across_tie
     assert.equal(attempt.participantIdentity.selectedTier, 'deep')
   }
   assert.equal(profile('Manager', 'Fast').systemPromptId, profile('Manager', 'Deep').systemPromptId)
-  assert.equal(profile('Reviewer', 'Fast').systemPromptId, profile('Reviewer', 'Deep').systemPromptId)
+  assert.equal(profile('DevOps', 'Fast').systemPromptId, profile('DevOps', 'Deep').systemPromptId)
 })
 
 test('WHAT[PREFIX-STABILITY-007] PROMPT_019_role_identity_does_not_inherit_attempt_cursor_or_replica_metadata', () => {
   const manager = profile('Manager', 'Fast')
-  const reviewer = profile('Reviewer', 'Fast')
+  const devops = profile('DevOps', 'Fast')
 
   // Authority owns prompt IDs; the derived attempt profile owns request kind and
   // capabilities. Neither surface accepts a cursor or a replica id as an identity
   // input, so changing those lifecycle facts cannot change the role identity.
   assert.equal(manager.systemPromptId, authority.systemPromptIdForRole('Manager'))
-  assert.equal(reviewer.systemPromptId, authority.systemPromptIdForRole('Reviewer'))
+  assert.equal(devops.systemPromptId, authority.systemPromptIdForRole('DevOps'))
   assert.equal('cursor' in manager, false)
   assert.equal('replicaId' in manager, false)
   assert.match(manager.requestKind, /^work-?main$/i)
-  assert.match(reviewer.requestKind, /^work-?main$/i)
+  assert.match(devops.requestKind, /^work-?main$/i)
 })
 
 test('WHAT[PREFIX-STABILITY-007] PROMPT_019_role_and_tier_capabilities_remain_explicit', () => {

@@ -118,26 +118,30 @@ test('WHAT[DURABLE-EVENTS-021] an uncut historical Journal fault suppresses only
   const eventsDir = path.join(dir, 'wanxiang', 'events')
   mkdirSync(eventsDir, { recursive: true })
 
-  const lifeOpened = ({ session, life, message, seq, id }) =>
+  const incumbencyOpened = ({ session, inc, seq, id }) =>
     canonicalEventLine({
       event_id: id,
-      stream_id: `journal/session/${session}`,
       event_type: 'JournalEnvelope',
       parents: [],
       payload: {
         EventId: ['EventId', id],
         Fact: [
-          'ManagerLifecycle',
+          'Agent',
           [
-            'LifeOpened',
-            {
-              LifeId: ['ManagerLifeId', life],
-              OpeningCursorSequence: '1',
-              OpeningTextDigest: ['BlobDigest', `digest-${life}`],
-              OpeningTextRef: ['BlobRef', `blobs/${life}`],
-              OpeningUserMessageId: ['PhysicalUserMessageId', message],
-              SessionId: ['SessionId', session],
-            },
+            'Relay',
+            [
+              'TransactionCommitted',
+              {
+                RoadId: ['RoadId', session],
+                Transaction: [
+                  'RelayTransaction',
+                  [
+                    ['RoadOpened', ['RoadId', session], ['AuthorityRevision', 'rev-1'], ['PhysicalUserMessageId', 'user-root']],
+                    ['IncumbencyOpened', ['IncumbencyId', inc], ['WorkspaceSnapshotId', 'snapshot-root'], 'ExistingWorld'],
+                  ],
+                ],
+              },
+            ],
           ],
         ],
         LocalSeq: ['LocalSeq', String(seq)],
@@ -149,14 +153,14 @@ test('WHAT[DURABLE-EVENTS-021] an uncut historical Journal fault suppresses only
         Stream: ['Session', ['SessionId', session]],
       },
       payload_refs: [],
+      stream_id: `journal/session/${session}`,
     })
 
   const historical = [
-    lifeOpened({ session: 'ses_fault_a', life: 'life_a1', message: 'msg_a1', seq: 1, id: '1'.repeat(40) }),
-    // A second open Life is deliberately invalid. This fixture models old current-layout
-    // history that predates the invariant which writes ProjectionCutTail in the same live append.
-    lifeOpened({ session: 'ses_fault_a', life: 'life_a2', message: 'msg_a2', seq: 2, id: '2'.repeat(40) }),
-    lifeOpened({ session: 'ses_healthy_b', life: 'life_b1', message: 'msg_b1', seq: 3, id: '3'.repeat(40) }),
+    incumbencyOpened({ session: 'ses_fault_a', inc: 'inc_a1', seq: 1, id: '1'.repeat(40) }),
+    // A second open on the same road while active is deliberately invalid.
+    incumbencyOpened({ session: 'ses_fault_a', inc: 'inc_a2', seq: 2, id: '2'.repeat(40) }),
+    incumbencyOpened({ session: 'ses_healthy_b', inc: 'inc_b1', seq: 3, id: '3'.repeat(40) }),
   ]
 
   writeFileSync(path.join(eventsDir, 'historical.ndjson'), historical.join(''))

@@ -60,13 +60,13 @@ const LANGUAGE = 'English'
 
 test('WHAT[COGNITIVE-ENVIRONMENT-001] CE_prompt_015_one_system_prompt_per_role', () => {
   const prompts = promptResources.allForLanguage(LANGUAGE)
-  assert.equal(prompts.length, 10, 'exactly one canonical system prompt per public office')
+  assert.equal(prompts.length, 9, 'exactly one canonical system prompt per public office (Reviewer merged into Manager under Relay)')
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-005] CE_prompt_015_no_tier_split_duplicates', () => {
   const prompts = promptResources.allForLanguage(LANGUAGE)
   const unique = new Set(prompts)
-  assert.equal(unique.size, 10, 'no two offices share a prompt; no tier-split duplicates')
+  assert.equal(unique.size, 9, 'no two offices share a prompt; no tier-split duplicates')
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-003] CE_prompt_015_canonical_composition_common_law_role_law_office_library', () => {

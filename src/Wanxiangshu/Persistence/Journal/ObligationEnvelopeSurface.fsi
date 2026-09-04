@@ -14,3 +14,5 @@ module ObligationEnvelopeSurface =
 
     /// Fold one MagicTodo envelope and return a JS result object.
     val foldMagicEnvelope: sessionId: string -> providerRun: string -> typed: string -> obj
+
+    val foldLifecycleSequence: sessionId: string -> events: obj array -> obj

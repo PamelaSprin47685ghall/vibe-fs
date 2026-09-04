@@ -158,7 +158,7 @@ test('WHAT[PID-008] inherited identity rejects a different authority root', () =
 
 test('WHAT[PID-008] durable inherited seed round-trips without re-resolution', () => {
   const owner = rootProfile()
-  const seed = inheritedSeed('reviewer', owner)
+  const seed = inheritedSeed('inspector', owner)
   const claimed = authority.claimAgentOwnerRoot('pk_child', 'ses_child', 'digest-child', seed)
   assert.equal(claimed.ok, true, claimed.ok ? '' : claimed.error)
 

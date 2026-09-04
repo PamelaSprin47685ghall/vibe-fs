@@ -88,7 +88,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_missing_source_returns_error',
     context('ses-mv-missing'),
   )
   assert.doesNotMatch(result, /\berror\s*=/)
-  assert.match(result, /No such file or directory/)
+  assert.match(result, /No such file or directory|没有那个文件或目录/)
   cleanup()
 })
 
@@ -96,9 +96,9 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_requires_source_and_destinatio
   const { dir, cleanup } = sandbox()
   const mv = createMv(toolModule())
   const missingBoth = await execute(mv, {}, context('ses-mv-req'))
-  assert.match(missingBoth, /source and destination are required/)
+  assert.match(missingBoth, /source and destination are required|必须提供 source 与 destination/)
   const missingDestination = await execute(mv, { source: join(dir, 'a.txt') }, context('ses-mv-req2'))
-  assert.match(missingDestination, /source and destination are required/)
+  assert.match(missingDestination, /source and destination are required|必须提供 source 与 destination/)
   cleanup()
 })
 
@@ -129,7 +129,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_refuses_a_non_empty_directory'
   writeFileSync(join(path, 'inner.txt'), 'payload')
   const result = await execute(createRm(toolModule()), { path }, context('ses-rm-nonempty'))
   assert.doesNotMatch(result, /\berror\s*=/)
-  assert.match(result, /directory not empty/)
+  assert.match(result, /directory not empty|目录非空/)
   assert.equal(isDirectory(path), true)
   assert.equal(existsSync(join(path, 'inner.txt')), true)
   cleanup()
@@ -138,14 +138,14 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_refuses_a_non_empty_directory'
 test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_missing_path_returns_error', async () => {
   const { dir, cleanup } = sandbox()
   const result = await execute(createRm(toolModule()), { path: join(dir, 'nope.txt') }, context('ses-rm-missing'))
-  assert.match(result, /No such file or directory/)
+  assert.match(result, /No such file or directory|没有那个文件或目录/)
   cleanup()
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_requires_a_path', async () => {
   const { dir, cleanup } = sandbox()
   const result = await execute(createRm(toolModule()), {}, context('ses-rm-req'))
-  assert.match(result, /path is required/)
+  assert.match(result, /path is required|必须提供 path/)
   cleanup()
 })
 

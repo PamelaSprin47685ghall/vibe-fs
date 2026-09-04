@@ -843,3 +843,157 @@ module TemporalSurface =
 
     let fallbackRead (current: obj) : obj =
         (current :?> FallbackHandle).State |> fallbackToJs
+
+    let sessionReuseIdentityScenario (firstAccepted: obj) (secondAccepted: obj) : obj =
+        let firstFact = Fact.Agent(agentFactOfJs firstAccepted)
+        let secondFact = Fact.Agent(agentFactOfJs secondAccepted)
+        let firstPayload = firstAccepted?payload
+        let sessionId = sessionIdOf (firstPayload?SessionId)
+        let roadId = Wanxiangshu.Mission.Relay.RoadId.create (SessionId.value sessionId)
+
+        let incId =
+            Wanxiangshu.Mission.Relay.IncumbencyId.create ("inc-" + SessionId.value sessionId)
+
+        let snapId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.create "snap-1"
+        let authRev = Wanxiangshu.Mission.Relay.AuthorityRevision.create "rev-1"
+
+        let physUser =
+            PhysicalUserMessageId.create (text (firstPayload?AuthorityRootUserMessageId))
+
+        let openEvents =
+            [ Wanxiangshu.Mission.Relay.RelayEvent.RoadOpened(roadId, authRev, physUser)
+              Wanxiangshu.Mission.Relay.RelayEvent.IncumbencyOpened(
+                  incId,
+                  snapId,
+                  Wanxiangshu.Mission.Relay.BatonSource.ExistingWorld
+              ) ]
+
+        let openTx =
+            Wanxiangshu.Mission.Relay.RelayTransaction.create openEvents
+            |> Result.defaultWith (fun _ -> failwith "openTx")
+
+        let lifeOpened =
+            Fact.Agent(
+                AgentFact.Relay(
+                    Wanxiangshu.Mission.Relay.RelayFactCases.TransactionCommitted
+                        {| RoadId = roadId
+                           Transaction = openTx |}
+                )
+            )
+
+        let retId =
+            Wanxiangshu.Mission.Relay.RetirementId.create ("ret-" + SessionId.value sessionId)
+
+        let batonId =
+            Wanxiangshu.Mission.Relay.BatonId.create ("baton-" + SessionId.value sessionId)
+
+        let cutId =
+            Wanxiangshu.Mission.Relay.ProjectionCutId.create ("cut-" + SessionId.value sessionId)
+
+        let envelopeRelay: Wanxiangshu.Mission.Relay.BatonEnvelope =
+            { SchemaVersion = 1
+              RoadId = Wanxiangshu.Mission.Relay.RoadId.value roadId
+              FromIncumbencyId = Wanxiangshu.Mission.Relay.IncumbencyId.value incId
+              AuthorityRevision = "rev-1"
+              SnapshotId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.value snapId
+              OpenObligations = []
+              EvidenceRefs = [] }
+
+        let cutRelay: Wanxiangshu.Mission.Relay.ProjectionCut =
+            { RetiredIncumbencyId = Wanxiangshu.Mission.Relay.IncumbencyId.value incId
+              ThroughProviderRunId = "run-terminal"
+              ThroughToolCallId = "tool-terminal"
+              StaleProviderRunIds = [] }
+
+        let summary: Wanxiangshu.Mission.Relay.RetirementSummary =
+            { Id = retId
+              IncumbencyId = incId
+              SnapshotId = snapId
+              BatonId = batonId
+              Baton = envelopeRelay
+              ProjectionCutId = cutId
+              ProjectionCut = cutRelay
+              SuccessorRequested = false
+              QualityCandidateAccepted = true }
+
+        let closeEvents =
+            [ Wanxiangshu.Mission.Relay.RelayEvent.RetirementCommitted summary ]
+
+        let closeTx =
+            Wanxiangshu.Mission.Relay.RelayTransaction.create closeEvents
+            |> Result.defaultWith (fun _ -> failwith "closeTx")
+
+        let lifeCompleted =
+            Fact.Agent(
+                AgentFact.Relay(
+                    Wanxiangshu.Mission.Relay.RelayFactCases.TransactionCommitted
+                        {| RoadId = roadId
+                           Transaction = closeTx |}
+                )
+            )
+
+        let envelope sequence fact =
+            { RuntimeId = RuntimeId.create "runtime-session-reuse"
+              LocalSeq = LocalSeq.create sequence
+              ObservedAt = DateTimeOffset.Parse "2026-08-30T00:00:00Z"
+              EventId = EventId.create (sprintf "session-reuse-%d" sequence)
+              Stream = StreamId.Session sessionId
+              ProviderRun = None
+              Fact = fact }
+
+        let canonicalRoundTrip (value: Envelope) =
+            EventStoreJournalCodec.encode [] (JournalPayloadClosure.ofFact value.Fact) value
+            |> EventStoreJournalCodec.tryDecode
+            |> Result.defaultWith (fun error -> failwith $"TemporalSurface: session reuse codec failed: {error}")
+
+        let firstEnvelope = envelope 1L firstFact
+
+        let afterFirst =
+            Fold.foldEnvelope Fold.empty firstEnvelope
+            |> Result.defaultWith (fun rejection ->
+                failwith $"TemporalSurface: first root rejected: {rejection.Reason}")
+
+        let preCloseSecond = Fold.foldEnvelope afterFirst (envelope 2L secondFact)
+
+        let sequence =
+            [ firstEnvelope
+              envelope 2L lifeOpened
+              envelope 3L lifeCompleted
+              envelope 4L secondFact ]
+
+        let foldSequence facts =
+            facts
+            |> List.fold
+                (fun current value -> current |> Result.bind (fun projection -> Fold.foldEnvelope projection value))
+                (Ok Fold.empty)
+
+        let online =
+            foldSequence sequence
+            |> Result.defaultWith (fun rejection ->
+                failwith $"TemporalSurface: online sequence rejected: {rejection.Reason}")
+
+        let afterLife =
+            sequence
+            |> List.take 3
+            |> foldSequence
+            |> Result.defaultWith (fun rejection ->
+                failwith $"TemporalSurface: LifeCompleted rejected: {rejection.Reason}")
+
+        let replayed =
+            sequence
+            |> List.map canonicalRoundTrip
+            |> foldSequence
+            |> Result.defaultWith (fun rejection -> failwith $"TemporalSurface: replay rejected: {rejection.Reason}")
+
+        box
+            {| preCloseSecond =
+                match preCloseSecond with
+                | Ok _ -> box {| ok = true; error = null |}
+                | Error rejection ->
+                    box
+                        {| ok = false
+                           error = rejectionToJs rejection |}
+               afterFirst = projectionToJs afterFirst
+               afterLife = projectionToJs afterLife
+               online = projectionToJs online
+               replayed = projectionToJs replayed |}

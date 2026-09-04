@@ -20,7 +20,6 @@ const NAMES = [
   'devops',
   'browser',
   'inquiry',
-  'reviewer',
   'blogger',
   'distiller',
   'bookkeeper',
@@ -39,7 +38,7 @@ test('WHAT[ENF-010] MACFG_validate_rejects_null_config_and_legacy_agent', () => 
 test('WHAT[ENF-011] MACFG_validate_accepts_empty_agent_map_and_projects_full_catalog', () => {
   const empty = okOf(validate({}))
   assert.equal(empty.ok, true, empty.ok ? '' : empty.error)
-  assert.equal(empty.bindingNames.length, 11)
+  assert.equal(empty.bindingNames.length, 10)
   const blankMap = okOf(validate({ agent: {} }))
   assert.equal(blankMap.ok, true, blankMap.ok ? '' : blankMap.error)
 })
@@ -58,7 +57,7 @@ test('WHAT[ENF-011] MACFG_validate_accepts_missing_equal_and_arbitrary_model_fie
 
   const result = okOf(validate(cfg))
   assert.equal(result.ok, true, result.ok ? '' : result.error)
-  assert.equal(result.bindingNames.length, 11, 'bookkeeper is presence-checked but has no Role binding')
+  assert.equal(result.bindingNames.length, 10, 'bookkeeper is presence-checked but has no Role binding')
 })
 
 test('WHAT[ENF-011] MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model', () => {
@@ -94,15 +93,11 @@ test('WHAT[ENF-011] MACFG_applyOwnedFields_skips_null_config_and_projects_missin
 })
 
 test('WHAT[ENF-011] MACFG_applyOwnedFields_honors_chat_max_retries_env', () => {
-  process.env.WANXIANGSHU_CHAT_MAX_RETRIES = '7'
-  try {
-    const cfg = fullConfig()
-    const result = configure(cfg)
-    assert.equal(result.ok, true, result.ok ? '' : result.error)
-    assert.equal(cfg.experimental.chatMaxRetries, 7)
-  } finally {
-    delete process.env.WANXIANGSHU_CHAT_MAX_RETRIES
-  }
+  // HOSTFAIL-001 / AGENTS.md §13.2: Wanxiangshu plugin forces chatMaxRetries to zero unconditionally
+  const cfg = fullConfig()
+  const result = configure(cfg)
+  assert.equal(result.ok, true, result.ok ? '' : result.error)
+  assert.equal(cfg.experimental.chatMaxRetries, 0)
 })
 
 test('WHAT[ENF-011] MACFG_configureFromHostConfig_returns_role_inventory_without_model_authority', () => {
@@ -118,7 +113,7 @@ test('WHAT[ENF-011] MACFG_configureFromHostConfig_projects_missing_catalog_witho
   const cfg = {}
   const result = configure(cfg)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
-  assert.equal(result.bindingNames.length, 11)
+  assert.equal(result.bindingNames.length, 10)
   for (const name of NAMES) {
     const entry = cfg.agent[name]
     assert.ok(entry.mode !== undefined, `${name} must be projected`)

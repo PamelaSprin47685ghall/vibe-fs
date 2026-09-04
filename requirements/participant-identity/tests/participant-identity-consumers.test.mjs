@@ -68,17 +68,17 @@ const personaVersion = (identity) => ({
 test('WHAT[PID-005] provider planning selects the system prompt and tool set from profile Role', () => {
   const fastCoder = attemptPlan('coder', 'fast')
   const deepCoder = attemptPlan('coder', 'deep')
-  const reviewer = attemptPlan('reviewer', 'fast')
+  const devops = attemptPlan('devops', 'fast')
 
   assert.equal(fastCoder.systemPromptId, fastCoder.participantIdentity.canonicalRole)
   assert.equal(deepCoder.systemPromptId, fastCoder.systemPromptId)
   assert.deepEqual(deepCoder.toolCapabilities, fastCoder.toolCapabilities)
-  assert.equal(reviewer.systemPromptId, reviewer.participantIdentity.canonicalRole)
+  assert.equal(devops.systemPromptId, devops.participantIdentity.canonicalRole)
   assert.equal(Authority.systemPromptIdForRole(fastCoder.participantIdentity.canonicalRole), fastCoder.systemPromptId)
-  assert.equal(Authority.systemPromptIdForRole(reviewer.participantIdentity.canonicalRole), reviewer.systemPromptId)
-  assert.notDeepEqual(reviewer.toolCapabilities, fastCoder.toolCapabilities)
+  assert.equal(Authority.systemPromptIdForRole(devops.participantIdentity.canonicalRole), devops.systemPromptId)
+  assert.notDeepEqual(devops.toolCapabilities, fastCoder.toolCapabilities)
   assert.equal(fastCoder.toolCapabilities.includes('Write'), true)
-  assert.equal(reviewer.toolCapabilities.includes('Judge'), true)
+  assert.equal(devops.toolCapabilities.includes('Exec'), true)
 })
 
 test('WHAT[PID-002] ProviderAttempt carries its ParticipantIdentity as one nested value', () => {
@@ -138,12 +138,12 @@ test('WHAT[PID-004] terminal dispatch preserves the exact IdentitySeed', () => {
 
 test('WHAT[PID-008] child identity inherits the parent Persona and version across role and tier', () => {
   const parent = rootProfile('coder', 'ses_identity_parent')
-  const child = inheritedSeed('reviewer', parent)
+  const child = inheritedSeed('inspector', parent)
 
-  assert.equal(child.participantIdentity.selectedAgent, 'reviewer')
+  assert.equal(child.participantIdentity.selectedAgent, 'inspector')
   assert.equal(child.participantIdentity.selectedTier, 'deep')
   assert.equal(child.participantIdentity.selectedTier, parent.participantIdentity.selectedTier)
-  assert.equal(child.participantIdentity.canonicalRole, 'reviewer')
+  assert.equal(child.participantIdentity.canonicalRole, 'inspector')
   assert.deepEqual(personaVersion(child.participantIdentity), personaVersion(parent.participantIdentity))
   assert.equal(child.ownerSession, parent.session)
   assert.equal(child.ownerLogicalRun, parent.logicalRun)

@@ -9,3 +9,8 @@ open System.Threading.Tasks
 module ObligationJournalSurface =
     val appendMagicTodo: handle: JournalHandle -> sessionId: string -> providerRun: obj -> factJson: string -> Task<obj>
     val snapshotMagicTodo: handle: JournalHandle -> incumbencyId: string -> obj
+    val openIncumbency: handle: JournalHandle -> sessionId: string -> incumbencyId: string -> Task<obj>
+    val grantWorkOwned: handle: JournalHandle -> sessionId: string -> incumbencyId: string -> Task<obj>
+
+    val appendManagerLifecycle:
+        handle: JournalHandle -> sessionId: string -> action: string -> payload: obj -> Task<obj>

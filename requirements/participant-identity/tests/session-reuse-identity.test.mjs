@@ -31,12 +31,12 @@ const managerSeed = rootSeed({
   persona: 'Lead',
 })
 
-const reviewerSeed = rootSeed({
-  selectedAgent: 'reviewer',
-  peerAgent: 'reviewer',
-  canonicalRole: 'reviewer',
+const coderSeed = rootSeed({
+  selectedAgent: 'coder',
+  peerAgent: 'coder',
+  canonicalRole: 'coder',
   selectedTier: 'deep',
-  persona: 'Auditor',
+  persona: 'Coder',
 })
 
 const createRoot = (physical, seed) => {
@@ -84,7 +84,7 @@ const current = (projection) => projection.sessions[session].activeLogicalRun
 test('WHAT[PID-009] reuses SessionId with a fresh closed-run identity', () => {
   const first = createRoot('msg-run-a', managerSeed)
   const firstSnapshot = structuredClone(first)
-  const second = createRoot('msg-run-b', reviewerSeed)
+  const second = createRoot('msg-run-b', coderSeed)
 
   assert.notEqual(second.logicalRun, first.logicalRun)
   assert.notEqual(second.authorityRoot, first.authorityRoot)
@@ -106,7 +106,7 @@ test('WHAT[PID-009] reuses SessionId with a fresh closed-run identity', () => {
     assert.match(wrongClose.error, /logical-run close mismatch/)
   }
 
-  const oldInheritedSeed = authority.issueInheritedIdentitySeed('reviewer', first)
+  const oldInheritedSeed = authority.issueInheritedIdentitySeed('inspector', first)
   assert.equal(oldInheritedSeed.ok, true, oldInheritedSeed.ok ? '' : oldInheritedSeed.error)
 
   const closedFirst = authority.closeAuthority(

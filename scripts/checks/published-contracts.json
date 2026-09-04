@@ -6040,6 +6040,8 @@
       "symbols": [
         "Wanxiangshu.Persistence.Journal.ObligationJournalSurface.appendMagicTodo",
         "Wanxiangshu.Persistence.Journal.ObligationJournalSurface.appendManagerLifecycle",
+        "Wanxiangshu.Persistence.Journal.ObligationJournalSurface.grantWorkOwned",
+        "Wanxiangshu.Persistence.Journal.ObligationJournalSurface.openIncumbency",
         "Wanxiangshu.Persistence.Journal.ObligationJournalSurface.snapshotMagicTodo"
       ],
       "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."

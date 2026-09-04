@@ -30,7 +30,7 @@ module LeakyPrompt =
 
 test('WHAT[PROVIDER-LANGUAGE-009] Gate E scan roots cover Gate 0 owners', () => {
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('Nudge.fs') || p.endsWith('RuntimeNudge.fs')))
-  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('Challenge.fs') || p.endsWith('ReviewChallenge.fs')))
+  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('ReviewTool.fs') || p.endsWith('Challenge.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('HorizonTool.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('JoinResultRenderer.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('Surface.fs') || p.endsWith('MagicTodoSurface.fs')))

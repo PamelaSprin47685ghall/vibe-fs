@@ -95,7 +95,7 @@ test('WHAT[INTERACTION-AUTHORITY-007] unknown origin is rejected while active', 
 test('WHAT[INTERACTION-AUTHORITY-009] explicit agent cannot infer HumanRoot while active', () => {
   assert.deepEqual(
     decide(
-      message({ explicitAgent: 'reviewer' }),
+      message({ explicitAgent: 'inspector' }),
       snapshot({ activeAgent: 'coder', activeKind: 'HumanRoot' }),
     ),
     { case: 'Reject', reason: 'UnknownOriginWhileActive' },

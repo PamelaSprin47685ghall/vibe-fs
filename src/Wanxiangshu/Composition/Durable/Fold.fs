@@ -28,10 +28,24 @@ module Fold =
 
     let private reject = FoldRejection.reject
 
+    let private settlePromptAuthority events authorityOpt =
+        let hasRetirement =
+            events
+            |> List.exists (function
+                | RelayEvent.RetirementCommitted _ -> true
+                | _ -> false)
+
+        if hasRetirement then
+            authorityOpt
+            |> Option.map Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.closeCompletedHumanRootManager
+        else
+            authorityOpt
+
     let private foldRelay (projection: AgentProjectionSet) (fact: RelayFactCases) =
         match fact with
         | RelayFactCases.TransactionCommitted payload ->
             let sessionId = SessionId.create (RoadId.value payload.RoadId)
+            let events = RelayTransaction.events payload.Transaction
 
             AgentProjection.tryUpdate
                 sessionId
@@ -39,8 +53,13 @@ module Fold =
                     let current =
                         session.Relay |> Option.defaultValue Wanxiangshu.Mission.Relay.Fold.empty
 
+                    let updatedPromptAuthority = session.PromptAuthority |> settlePromptAuthority events
+
                     Wanxiangshu.Mission.Relay.Fold.apply current payload.RoadId payload.Transaction
-                    |> Result.map (fun updated -> { session with Relay = Some updated }))
+                    |> Result.map (fun updated ->
+                        { session with
+                            Relay = Some updated
+                            PromptAuthority = updatedPromptAuthority }))
                 projection
             |> Result.mapError (fun reason -> { Fact = "Relay"; Reason = reason })
 

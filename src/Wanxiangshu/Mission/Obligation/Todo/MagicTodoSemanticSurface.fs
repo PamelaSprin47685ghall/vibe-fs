@@ -150,8 +150,16 @@ module MagicTodoSemanticSurface =
             if isNull existing then
                 None
             else
+                let incText =
+                    let v = text (existing?incumbencyId)
+
+                    if not (String.IsNullOrEmpty v) then
+                        v
+                    else
+                        text (existing?managerLifeId)
+
                 let identity =
-                    { IncumbencyId = IncumbencyId.create (text (existing?incumbencyId))
+                    { IncumbencyId = IncumbencyId.create incText
                       ProviderInputDigest = text (existing?providerInputDigest)
                       BaseTodoDigest = text (existing?baseTodoDigest)
                       ToolPartOrdinal = unbox<int> (existing?toolPartOrdinal) }
@@ -297,10 +305,18 @@ module MagicTodoSemanticSurface =
         | PrefixEvidenceKind.Probe probeId -> box {| kind = "Probe"; probeId = probeId |}
 
     let buildTodoCheckpointCommit (value: obj) : obj =
+        let incText =
+            let v = text value?incumbencyId
+
+            if not (String.IsNullOrEmpty v) then
+                v
+            else
+                text value?managerLifeId
+
         let commit =
             MagicTodoPrefixEpoch.buildTodoCheckpointCommit
                 (SessionId.create (text value?sessionId))
-                (IncumbencyId.create (text value?incumbencyId))
+                (IncumbencyId.create incText)
                 (PrefixEpochId.create (int64Value value?previousEpoch))
                 (prefixSnapshotOf value?snapshot)
                 (stringOption value?previousCommitted |> Option.map TodoWriteId.create)
@@ -318,9 +334,12 @@ module MagicTodoSemanticSurface =
                        triggerTodoWriteId = TodoWriteId.value triggerId
                        coveredBeforeTodoWriteId = coveredBefore |> Option.map TodoWriteId.value |> Option.toObj |}
 
+        let incObj = commit.IncumbencyId |> Option.map IncumbencyId.value |> Option.toObj
+
         box
             {| sessionId = SessionId.value commit.SessionId
-               incumbencyId = commit.IncumbencyId |> Option.map IncumbencyId.value |> Option.toObj
+               incumbencyId = incObj
+               managerLifeId = incObj
                previousEpoch = PrefixEpochId.value commit.PreviousEpochId
                nextEpoch = PrefixEpochId.value commit.NextEpochId
                evidenceKind = evidence

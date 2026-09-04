@@ -15,7 +15,7 @@ const write = todo.todoWriteId(sha256, life, call)
 const fact = (caseName, payload) => JSON.stringify({ case: caseName, ...payload })
 const prepared = fact('TodoWritePrepared', {
   ManagerSessionId: managerSession,
-  ManagerLifeId: life,
+  IncumbencyId: life,
   TodoWriteId: write,
   ToolCallId: call,
   ToolPartOrdinal: 1,
@@ -30,7 +30,7 @@ const prepared = fact('TodoWritePrepared', {
 })
 
 const accepted = (preparedFactRef) => fact('TodoWriteAccepted', {
-  ManagerLifeId: life,
+  IncumbencyId: life,
   TodoWriteId: write,
   ToolCallId: call,
   PreparedFactRef: preparedFactRef,

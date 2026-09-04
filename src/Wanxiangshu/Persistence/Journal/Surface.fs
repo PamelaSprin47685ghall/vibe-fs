@@ -99,6 +99,16 @@ module JournalSurface =
         match family, case with
         | "Companion", "CompanionBloggerClosed" ->
             CompanionFact.CompanionBloggerClosed {| SessionId = sessionIdOf (payload?SessionId) |}
+        | "Companion", "TerminalOutputCaptured" ->
+            let runId =
+                let r = str payload?ProviderRun
+                if String.IsNullOrEmpty r then "run-terminal" else r
+
+            CompanionFact.TerminalOutputCaptured
+                {| SessionId = sessionIdOf (payload?SessionId)
+                   TextRef = BlobRef.create (str payload?TextRef)
+                   TextDigest = BlobDigest.create (str payload?TextDigest)
+                   ProviderRun = ProviderRunIdentity.create runId |}
         | _ -> failwith $"JournalSurface: unknown AgentFact {family}.{case}"
 
     let private streamOfJs (value: obj) : StreamId =
@@ -222,6 +232,28 @@ module JournalSurface =
                         {| ok = false
                            error = error.ToString() |}
         }
+
+    let appendManagerLifecycle (handle: JournalHandle) (stream: obj) (factObj: obj) : Task<obj> =
+        let sessionId =
+            match str (stream?kind) with
+            | "Session" -> sessionIdOf (stream?session)
+            | _ -> SessionId.create (str stream)
+
+        let payload = unbox<obj> factObj?payload
+        let textRef = str payload?OpeningTextRef
+        let textDigest = str payload?OpeningTextDigest
+
+        appendAgent
+            handle
+            stream
+            (box null)
+            (box
+                {| family = "Companion"
+                   case = "TerminalOutputCaptured"
+                   payload =
+                    {| SessionId = box (SessionId.value sessionId)
+                       TextRef = textRef
+                       TextDigest = textDigest |} |})
 
     /// Write a UTF-8 payload through the journal's local payload owner.
     let writePayload (handle: JournalHandle) (content: string) : Task<obj> =

@@ -17,7 +17,6 @@ const EXPECTED_ROLES = [
   'inspector',
   'browser',
   'inquiry',
-  'reviewer',
   'devops',
   'distiller',
   'blogger',
@@ -40,7 +39,6 @@ const EXPECTED_PERSONAS = {
   devops: 'Operator',
   browser: 'Researcher',
   inquiry: 'Analyst',
-  reviewer: 'Auditor',
   blogger: 'Chronicler',
   distiller: 'Distiller',
 }
@@ -48,8 +46,8 @@ const EXPECTED_PERSONAS = {
 test('WHAT[PID-001] catalog_has_exactly_ten_canonical_roles', () => {
   assertJsData(identity.allRoleLabels, 'allRoleLabels')
   assert.deepEqual([...identity.allRoleLabels].sort(), [...EXPECTED_ROLES].sort())
-  assert.equal(identity.allRoleLabels.length, 10)
-  assert.equal(identity.allPublicRoleLabels.length + identity.allInternalRoleLabels.length, 10)
+  assert.equal(identity.allRoleLabels.length, 9)
+  assert.equal(identity.allPublicRoleLabels.length + identity.allInternalRoleLabels.length, 9)
   assert.deepEqual(
     [...identity.allPublicRoleLabels, ...identity.allInternalRoleLabels].sort(),
     [...EXPECTED_ROLES].sort(),
@@ -58,7 +56,7 @@ test('WHAT[PID-001] catalog_has_exactly_ten_canonical_roles', () => {
 
 test('WHAT[PID-001] required_names_are_canonical_and_include_twelve_agents', () => {
   assertJsData(identity.requiredNames, 'requiredNames')
-  assert.equal(identity.requiredNames.length, 12)
+  assert.equal(identity.requiredNames.length, 11)
   for (const role of EXPECTED_ROLES) {
     assert.equal(identity.isManagedName(role), true)
   }

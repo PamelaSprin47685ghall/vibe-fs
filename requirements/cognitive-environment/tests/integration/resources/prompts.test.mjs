@@ -14,7 +14,6 @@ const PROMPT_FIELDS = [
   'CoderSystemPrompt',
   'DevopsSystemPrompt',
   'InspectorSystemPrompt',
-  'ReviewerSystemPrompt',
   'BrowserSystemPrompt',
   'InquirySystemPrompt',
   'OrchestratorSystemPrompt',
@@ -24,11 +23,12 @@ const PROMPT_FIELDS = [
 
 const promptEntries = (catalog) => PROMPT_FIELDS.map((field) => [field, catalog[field]])
 
-const assertTenNonEmpty = (catalog, label) => {
+const assertNineNonEmpty = (catalog, label) => {
   for (const field of PROMPT_FIELDS) {
     assert.equal(typeof catalog[field], 'string', `${label}: ${field}`)
     assert.ok(catalog[field].trim().length > 0, `${label}: ${field} non-empty`)
   }
+  assert.equal(catalog.ReviewerSystemPrompt, undefined)
   assert.equal(catalog.StudentSystemPrompt, undefined)
   assert.equal(catalog.TeacherSystemPrompt, undefined)
 }
@@ -44,12 +44,12 @@ const inOrder = (text, needles) => {
 }
 
 const ROLE_PATHS = [
-  'role/manager', 'role/coder', 'role/devops', 'role/inspector', 'role/reviewer',
+  'role/manager', 'role/coder', 'role/devops', 'role/inspector',
   'role/browser', 'role/inquiry', 'role/orchestrator', 'role/distiller', 'role/blogger', 'role/bookkeeper',
 ]
 const SHARED_PATHS = [
   'world/common-law', 'library/ingress', 'library/closing', 'library/kolmogorov',
-  'library/scarcity', 'library/reviewer/quality-ledger',
+  'library/scarcity',
 ]
 
 // Tool-shaped inventory remains forbidden. Conceptual words such as Fission
@@ -66,8 +66,8 @@ test('WHAT[DISTRIBUTION-002] PROMPT_resources_load_from_package_independent_of_c
   const previous = process.cwd()
   try {
     process.chdir('/')
-    assertTenNonEmpty(promptResources.load(), 'PromptResources')
-    assertTenNonEmpty(promptResources.runtimeLoad().Prompts, 'RuntimeResources')
+    assertNineNonEmpty(promptResources.load(), 'PromptResources')
+    assertNineNonEmpty(promptResources.runtimeLoad().Prompts, 'RuntimeResources')
   } finally {
     process.chdir(previous)
   }
@@ -77,7 +77,6 @@ test('WHAT[COGNITIVE-ENVIRONMENT-003] PROMPT_composition_common_law_role_law_the
   const prompts = promptResources.load()
   inOrder(prompts.ManagerSystemPrompt, ['# # Common Law', '# # Management', '# # Office Library', '# # The Kolmogorov Book', '# # The Book of Scarcity'])
   inOrder(prompts.CoderSystemPrompt, ['# # Common Law', '# # Mutation', '# # Office Library', '# # The Kolmogorov Book'])
-  inOrder(prompts.ReviewerSystemPrompt, ['# # Common Law', '# # Judgment', '# # Office Library', '# # The Kolmogorov Book', "# # The Examiner's Ledger"])
   inOrder(prompts.InspectorSystemPrompt, ['# # Common Law', '# # Evidence', '# # Office Library', '# # The Book of Scarcity'])
   inOrder(prompts.DevopsSystemPrompt, ['# # Common Law', '# # The Engine Room', '# # Office Library', '# # The Book of Scarcity'])
 
@@ -117,7 +116,7 @@ test('WHAT[PROVIDER-LANGUAGE-006] PROMPT_017_world_role_library_all_have_en_zh_p
 test('WHAT[PROVIDER-LANGUAGE-006] PROMPT_017_zh_cn_is_authored_chinese_not_an_english_copy', () => {
   const en = promptResources.loadForLanguage(english)
   const zh = promptResources.loadForLanguage(simplifiedChinese)
-  assertTenNonEmpty(zh, 'zh-CN')
+  assertNineNonEmpty(zh, 'zh-CN')
 
   for (const field of PROMPT_FIELDS) {
     assert.notEqual(zh[field], en[field], field)

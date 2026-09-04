@@ -12,6 +12,7 @@ import {
 import { permissions } from '../../../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import {
   acceptAuthorityRoot,
+  grantWorkOwned,
   withExecutablePlugin,
   withPlugin,
 } from '../../../../verification-system/tests/support/plugin-fixture.mjs'
@@ -21,33 +22,32 @@ const TOOL_NAMES = [
   'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
   'bash-honeypot', 'assume', 'inspect', 'establish-behavior', 'repair-behavior',
   'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
-  'run', 'query-shell', 'stealth-browser-mcp', 'sphinx', 'judge',
+  'run', 'query-shell', 'stealth-browser-mcp', 'sphinx', 'review',
   'chronicle', 'fetch',
 ]
 
 const PLUGIN_TOOL_NAMES = [
   'fork', 'commission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
-  'join', 'horizon', 'fission', 'judge', 'suicide', 'run', 'query-shell', 'inspect',
+  'join', 'horizon', 'fission', 'review', 'suicide', 'run', 'query-shell', 'inspect',
   'establish-behavior', 'repair-behavior', 'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
   'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
-  'js-browser', 'js-coder', 'js-devops', 'js-inspector', 'js-reviewer',
+  'js-browser', 'js-coder', 'js-devops', 'js-inspector', 'js-manager',
 ]
 
 const HOST_OWNED_TOOL_NAMES = [
   'todowrite', 'read', 'write', 'edit', 'glob', 'grep', 'skill', 'stealth-browser-mcp', 'sphinx',
 ]
 
-const ROLE_NAMES = ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'reviewer', 'blogger', 'distiller']
+const ROLE_NAMES = ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'blogger', 'distiller']
 const COGNITIVE_TOOLS = ['enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret']
 const ALLOWED = {
   orchestrator: ['commission', 'join', 'horizon', 'assume', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'assume', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'read', 'glob', 'grep', 'review', 'assume', ...COGNITIVE_TOOLS],
   coder: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', ...COGNITIVE_TOOLS],
   inspector: ['fission', 'read', 'glob', 'grep', 'query-shell', 'fetch', 'assume', ...COGNITIVE_TOOLS],
   devops: ['join', 'horizon', 'read', 'glob', 'grep', 'inspect', 'run', 'establish-behavior', 'repair-behavior', 'assume', ...COGNITIVE_TOOLS],
   browser: ['fission', 'read', 'glob', 'grep', 'stealth-browser-mcp', 'assume', ...COGNITIVE_TOOLS],
   inquiry: ['fission', 'inspect', 'sphinx', 'assume', ...COGNITIVE_TOOLS],
-  reviewer: ['read', 'glob', 'grep', 'judge', 'assume', ...COGNITIVE_TOOLS],
   blogger: ['chronicle'],
   distiller: [],
 }
@@ -257,6 +257,7 @@ test('WHAT[ENF-010] MANAGER_legacy_agent_configuration_is_rejected_after_owned_p
 test('WHAT[ENF-009] MANAGER_non_repository_fork_keywords_are_rejected_before_child_creation', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'ses-manager-contract', 'manager')
+    await grantWorkOwned(runtime, 'ses-manager-contract')
     const result = await hooks.tool.fork.execute(
       { calling: 'researcher', name: 'Web Road', charge: 'browse', keywords: 'repository clue' },
       { sessionID: 'ses-manager-contract', agent: 'manager' },

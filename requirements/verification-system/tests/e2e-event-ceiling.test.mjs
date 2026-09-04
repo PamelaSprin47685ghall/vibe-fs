@@ -86,10 +86,9 @@ test('WHAT[VERIFICATION-SYSTEM-003] long-stroke.toml declares theoretical exact 
   const source = readFileSync(path.join(dir, 'e2e/scenarios/long-stroke.toml'), 'utf8');
   const result = compileScenario(source, { name: 'long-stroke.toml' });
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'));
-  // Explicit preflow authority, real K2 traffic, detached Bookkeeper finalization,
-  // and same-physical dual-PERFECT review measured 622-647 durable envelopes and
-  // 3118-3351 SSE frames. Pins 700/3450 retain Host-ordering slack while failing
-  // before an unconfirmed-reviewer roster can grow quadratically.
-  assert.equal(result.scenario.setup.maxJournalEvents, 700);
-  assert.equal(result.scenario.setup.maxSseEvents, 3450);
+  // Relay architecture eliminates dual-PERFECT review cycles and redundant barrier events;
+  // measured long-stroke durable envelopes stabilize at ~403-421 and SSE frames at ~1850-1950.
+  // Tightened pins 600/3000 retain Host-ordering slack while failing fast on event regressions.
+  assert.equal(result.scenario.setup.maxJournalEvents, 600);
+  assert.equal(result.scenario.setup.maxSseEvents, 3000);
 });

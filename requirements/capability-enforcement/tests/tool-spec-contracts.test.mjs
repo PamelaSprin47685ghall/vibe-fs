@@ -77,18 +77,16 @@ test('WHAT[ENF-002] TOOLSPEC_cognitive_utility_and_fission_tools_admission', () 
   assert.equal(rolePredicate('fission', 'coder'), true)
   assert.equal(rolePredicate('fission', 'inspector'), true)
   assert.equal(rolePredicate('fission', 'inquiry'), true)
-  assert.equal(rolePredicate('fission', 'reviewer'), false)
+  assert.equal(rolePredicate('fission', 'devops'), false)
 })
 
 test('WHAT[ENF-009] TOOLSPEC_review_and_finality_tools_have_owner_defined_admission', () => {
-  // judge: Reviewer only
-  assert.equal(rolePredicate('judge', 'reviewer'), true)
-  assert.equal(rolePredicate('judge', 'coder'), false)
-  assert.equal(rolePredicate('judge', 'manager'), false)
+  // review: Manager only (Relay)
+  assert.equal(rolePredicate('review', 'manager'), true)
+  assert.equal(rolePredicate('review', 'coder'), false)
 
   // suicide: Manager only
   assert.equal(rolePredicate('suicide', 'manager'), true)
-  assert.equal(rolePredicate('suicide', 'reviewer'), false)
   assert.equal(rolePredicate('suicide', 'coder'), false)
 })
 

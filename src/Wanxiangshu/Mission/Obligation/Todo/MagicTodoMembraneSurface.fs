@@ -82,8 +82,11 @@ module MagicTodoMembraneSurface =
                digest = BlobDigest.value digest |}
 
     let private preparedView (bridge: MagicTodoMembrane.PreparedBridge) : obj =
+        let incId = IncumbencyId.value bridge.Prepared.IncumbencyId
+
         box
-            {| incumbencyId = IncumbencyId.value bridge.Prepared.IncumbencyId
+            {| incumbencyId = incId
+               managerLifeId = incId
                todoWriteId = TodoWriteId.value bridge.Prepared.TodoWriteId
                toolCallId = ToolCallId.value bridge.Prepared.ToolCallId
                planCompleteDeclared = bridge.Prepared.PlanCompleteDeclared
@@ -225,6 +228,12 @@ module MagicTodoMembraneSurface =
     let snapshot (handle: JournalHandle) (incumbencyId: string) : obj =
         ObligationJournalSurface.snapshotMagicTodo handle incumbencyId
 
+    let openIncumbency (handle: JournalHandle) (sessionId: string) (incumbencyId: string) : Task<obj> =
+        ObligationJournalSurface.openIncumbency handle sessionId incumbencyId
+
+    let openLife (handle: JournalHandle) (sessionId: string) (lifeId: string) : Task<obj> =
+        openIncumbency handle sessionId lifeId
+
     /// Real Host Before -> controlled builtin executor -> After workflow. Only
     /// successful return from the supplied physical executor reaches After;
     /// no PhysicalSuccessEvidence value crosses this boundary.
@@ -250,8 +259,11 @@ module MagicTodoMembraneSurface =
             let hostOutput: obj = emitJsExpr (executor, beforeOutput?args) "$0($1)"
             do! hooks.After input hostOutput
 
+            let snap = ObligationJournalSurface.snapshotMagicTodo handle incumbencyId
+
             return
                 box
                     {| output = hostOutput
-                       incumbency = ObligationJournalSurface.snapshotMagicTodo handle incumbencyId |}
+                       incumbency = snap
+                       life = snap |}
         }

@@ -55,6 +55,8 @@ module TemporalSurface =
 
     val fold: envelopes: obj array -> obj
 
+    val sessionReuseIdentityScenario: firstAccepted: obj -> secondAccepted: obj -> obj
+
     // ── FallbackProjection's typed transition, exposed as opaque state ───────
 
     val fallbackForAuthority: logicalRun: string -> authorityRoot: string -> obj

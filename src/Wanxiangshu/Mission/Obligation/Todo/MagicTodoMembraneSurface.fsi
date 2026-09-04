@@ -36,6 +36,10 @@ module MagicTodoMembraneSurface =
 
     val snapshot: handle: JournalHandle -> incumbencyId: string -> obj
 
+    val openIncumbency: handle: JournalHandle -> sessionId: string -> incumbencyId: string -> Task<obj>
+
+    val openLife: handle: JournalHandle -> sessionId: string -> lifeId: string -> Task<obj>
+
     /// Real Host Before -> controlled builtin executor -> After workflow. Only
     /// successful return from the supplied physical executor reaches After;
     /// no PhysicalSuccessEvidence value crosses this boundary.

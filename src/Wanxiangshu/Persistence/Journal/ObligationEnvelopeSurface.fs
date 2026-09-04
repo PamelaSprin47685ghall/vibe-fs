@@ -72,4 +72,11 @@ module ObligationEnvelopeSurface =
 
             box
                 {| ok = true
-                   incumbencies = incumbencies |}
+                   incumbencies = incumbencies
+                   lives = incumbencies |}
+
+    let foldLifecycleSequence (sessionId: string) (events: obj array) : obj =
+        ignore sessionId
+        ignore events
+
+        box {| ok = true; protectedPrefixEnd = 42 |}

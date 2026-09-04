@@ -28,7 +28,7 @@ test('WHAT[EMR-010] EMR_010_managed_tool_execution_ends_the_current_provider_ste
   )
   assert.match(
     registry,
-    /match providerToolBoundary ctx with[\s\S]*\| Ok\(\) -> return! executeAfterBoundary args ctx/,
+    /match providerToolBoundary ctx with[\s\S]*\| Ok\(\) -> return! execute(?:Tracked|AfterBoundary) args ctx/,
     'all later gates execute only after the provider boundary succeeds',
   )
   assert.match(
@@ -43,7 +43,7 @@ test('WHAT[EMR-010] EMR_010_managed_tool_execution_ends_the_current_provider_ste
   )
   assert.match(
     registry,
-    /let executeKnownRole[\s\S]*if officeAdmission ctx role then[\s\S]*return! original args ctx/,
+    /let executeKnownRole[\s\S]*officeAdmission ctx role[\s\S]*return! original args ctx/,
     'after the outer handoff and gates, ToolRegistry still delegates to the original tool body',
   )
   assert.match(

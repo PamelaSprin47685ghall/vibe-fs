@@ -1047,7 +1047,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
   }
 }"""
 
-    let private reviewerUltra =
+    let private managerUltra =
         """class Js extends JsProgram {
   async run() {
     const stale = await this.grep(/\boldApi\b/, "src/**/*.{js,ts}");
@@ -1114,7 +1114,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
             match roleName.Trim().ToLowerInvariant() with
             | "coder" -> Some(set [ JsCapability.Read; JsCapability.Grep; JsCapability.Edit ], prose.UltraCoder)
             | "inspector" -> Some(set [ JsCapability.Read; JsCapability.Grep ], inspectorUltra)
-            | "reviewer" -> Some(set [ JsCapability.Read; JsCapability.Grep ], reviewerUltra)
+            | "manager" -> Some(set [ JsCapability.Read; JsCapability.Grep ], managerUltra)
             | "devops" -> Some(set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ], devOpsUltra)
             | "browser" -> Some(set [ JsCapability.Read; JsCapability.Grep ], browserUltra)
             | _ -> None

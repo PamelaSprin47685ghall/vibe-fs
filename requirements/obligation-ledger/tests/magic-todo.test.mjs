@@ -88,6 +88,7 @@ test('WHAT[OBLIGATION-LEDGER-012] replays an identical obligation checkpoint eve
   const current = [obligation('implementation', 'Implement the requested behavior.')]
   const write = todo.todoWriteId(sha256, life, firstCall)
   const existing = {
+    incumbencyId: life,
     managerLifeId: life,
     providerInputDigest: 'provider-input',
     baseTodoDigest: todo.obligationListDigest(sha256, current),

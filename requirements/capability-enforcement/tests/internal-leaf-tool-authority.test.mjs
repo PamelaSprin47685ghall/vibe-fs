@@ -14,7 +14,7 @@ import test from 'node:test'
 import { admissionAuthority, privateAttachmentAdmits, rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import { allRoleLabels } from '../../../dist/Foundation/RolesSurface.js'
 
-const OFFICE_TOOLS = ['inspect', 'fetch', 'judge', 'join', 'chronicle', 'run', 'fork']
+const OFFICE_TOOLS = ['inspect', 'fetch', 'review', 'join', 'chronicle', 'run', 'fork']
 
 test('WHAT[ENF-006] internal_leaf_tool_declares_attachment_authority_not_a_public_office', () => {
   assert.equal(admissionAuthority('js-bookkeeper'), 'private-attachment')
