@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 
-import { validateCapabilityPartitionV1 } from '../../../scripts/lib/capability-observations-v1.mjs'
+import {
+  extractObservedCapabilityFactsV1,
+  validateCapabilityPartitionV1,
+} from '../../../scripts/lib/capability-observations-v1.mjs'
 import {
   buildLocalitySliceReportV1,
   buildLocalitySliceSummaryV1,
@@ -51,6 +54,49 @@ const reportWorld = () => ({
   normative: structuredClone(EMPTY_AUTHORIZATION_PROJECTION_V2),
 })
 
+const unknownCensusWorld = () => {
+  const world = reportWorld()
+  world.observed.localities = Array.from({ length: 7 }, (_, index) => ({
+    id: `locality-${index}`,
+    owner: `owner-${index}`,
+    kind: 'runtime',
+    project_path: `src/Locality${index}.fsproj`,
+    sources: [sourcePair(`Locality${index}`)],
+  }))
+  world.observed.project_references = []
+  world.observed.actual_source_edges = []
+  const observations = world.observed.localities.map((locality, index) => ({
+    case: 'fsharp-node',
+    payload: {
+      node_kind: 'future-expression',
+      semantic_identity: 'Future.expression',
+      site: {
+        locality_id: locality.id,
+        source_path: locality.sources[0].implementation_path,
+        semantic_declaration_anchor: `Locality${index}.future`,
+        same_anchor_occurrence_ordinal: 0,
+      },
+    },
+  }))
+  observations.push({
+    case: 'fcs-external-symbol-use',
+    payload: {
+      assembly: 'Future.Library',
+      fully_qualified_symbol: 'Future.Library.run',
+      site: {
+        locality_id: 'locality-0',
+        source_path: 'src/Locality0.fs',
+        semantic_declaration_anchor: 'Locality0.external',
+        same_anchor_occurrence_ordinal: 0,
+      },
+    },
+  })
+  const extraction = extractObservedCapabilityFactsV1(observations)
+  world.observed.capability_extraction = extraction.coverage
+  world.observed.capability_facts = extraction.facts
+  return world
+}
+
 test('WHAT[STRUCTURED-WORKFLOW-013] report-only locality scan exposes every fresh canonical query without granting authority', () => {
   const world = reportWorld()
   const report = buildLocalitySliceReportV1({
@@ -91,6 +137,53 @@ test('WHAT[STRUCTURED-WORKFLOW-013] report-only locality scan exposes every fres
     reasons,
   })))
   assert.deepEqual(JSON.parse(serializeLocalitySliceSummaryV1({ world, findings: report.findings })), summary)
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-014] report-only Unknown census is a bounded deterministic projection of canonical facts', () => {
+  const world = unknownCensusWorld()
+  const reorderedWorld = structuredClone(world)
+  reorderedWorld.observed.capability_facts.reverse()
+  reorderedWorld.observed.capability_facts.push(structuredClone(reorderedWorld.observed.capability_facts[0]))
+
+  const full = buildLocalitySliceReportV1({ world })
+  const summary = buildLocalitySliceSummaryV1({ world: reorderedWorld })
+  assert.deepEqual(summary.unknown_capability_census, full.unknown_capability_census)
+
+  const census = summary.unknown_capability_census
+  assert.equal(census.census_kind, 'm6.3b-report-only-unknown-capability-census')
+  assert.equal(census.unknown_fact_count, 8)
+  assert.equal(census.group_count, 2)
+  assert.equal(census.sample_limit, 5)
+  assert.equal(census.groups.reduce((count, group) => count + group.fact_count, 0), 8)
+  assert.deepEqual(census.groups.map(({ observation_case: observationCase }) => observationCase), [
+    'fcs-external-symbol-use',
+    'fsharp-node',
+  ])
+  const fsharp = census.groups[1]
+  assert.equal(fsharp.unknown_class, 'unsupported-ast')
+  assert.equal(fsharp.syntax_kind, 'future-expression')
+  assert.equal(fsharp.raw_identity, 'Future.expression')
+  assert.equal(fsharp.fact_count, 7)
+  assert.equal(fsharp.affected_locality_count, 7)
+  assert.equal(fsharp.affected_source_count, 7)
+  assert.deepEqual(fsharp.representative_localities, [
+    'locality-0',
+    'locality-1',
+    'locality-2',
+    'locality-3',
+    'locality-4',
+  ])
+  assert.deepEqual(fsharp.representative_sources, [
+    'src/Locality0.fs',
+    'src/Locality1.fs',
+    'src/Locality2.fs',
+    'src/Locality3.fs',
+    'src/Locality4.fs',
+  ])
+  assert.match(fsharp.affected_locality_digest, /^sha256:[0-9a-f]{64}$/)
+  assert.match(fsharp.affected_source_digest, /^sha256:[0-9a-f]{64}$/)
+  assert.match(census.groups_digest, /^sha256:[0-9a-f]{64}$/)
+  assert.deepEqual(world.normative, EMPTY_AUTHORIZATION_PROJECTION_V2)
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-013] production report composes one injected compiler world and keeps model findings nonfatal', async () => {

@@ -192,7 +192,10 @@ export const scanProductionLocalitySliceReportV1 = async ({
     world,
     findings: [...dependencyAnalysis.violations, ...extraction.violations],
   })
-  completed('canonical-world', { findingCount: report.finding_count ?? report.findings.length })
+  completed('canonical-world', {
+    findingCount: report.finding_count ?? report.findings.length,
+    unknownCapabilityGroupCount: report.unknown_capability_census.group_count,
+  })
   return {
     report,
     diagnostics: extraction.diagnostics,
