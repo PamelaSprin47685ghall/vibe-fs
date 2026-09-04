@@ -299,7 +299,7 @@ type private ForkRuntimeBackendState
             let agentList =
                 agents
                 |> Map.toList
-                    |> List.map (fun (agentId, run) -> ChildRunProjection.toRecord mailbox.IsCancelled agentId run)
+                |> List.map (fun (agentId, run) -> ChildRunProjection.toRecord mailbox.IsCancelled agentId run)
 
             let ptyList = ptys |> Map.toList |> List.map snd
             (agentList, ptyList))

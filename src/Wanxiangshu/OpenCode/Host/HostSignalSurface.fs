@@ -11,7 +11,8 @@ open Wanxiangshu.Execution.Session.ChatExecution
 module HostSignalSurface =
     let unwrapEnvelope (raw: obj) = HostEventEnvelope.unwrap raw
 
-    let envelopeEventType (raw: obj) = raw |> HostEventEnvelope.unwrap |> HostEventEnvelope.eventTypeOf
+    let envelopeEventType (raw: obj) =
+        raw |> HostEventEnvelope.unwrap |> HostEventEnvelope.eventTypeOf
 
     let envelopeSessionId (raw: obj) =
         raw

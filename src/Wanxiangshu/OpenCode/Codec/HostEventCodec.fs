@@ -248,8 +248,7 @@ module HostEventCodec =
         let raw = HostEventEnvelope.unwrap rawInput
         let info = messageInfo raw
 
-        let sessionId =
-            HostEventEnvelope.tryMessageSessionId raw
+        let sessionId = HostEventEnvelope.tryMessageSessionId raw
 
         match
             not (isNull raw)
@@ -304,8 +303,7 @@ module HostEventCodec =
         let raw = HostEventEnvelope.unwrap rawInput
         let info = messageInfo raw
 
-        let sessionId =
-            HostEventEnvelope.tryMessageSessionId raw
+        let sessionId = HostEventEnvelope.tryMessageSessionId raw
 
         match
             not (isNull raw)
@@ -329,10 +327,10 @@ module HostEventCodec =
         let raw = HostEventEnvelope.unwrap rawInput
         let info = messageInfo raw
 
-        let isMessageUpdated = not (isNull raw) && HostEventEnvelope.eventTypeOf raw = "message.updated"
+        let isMessageUpdated =
+            not (isNull raw) && HostEventEnvelope.eventTypeOf raw = "message.updated"
 
-        let sessionId =
-            HostEventEnvelope.tryMessageSessionId raw
+        let sessionId = HostEventEnvelope.tryMessageSessionId raw
 
         match isMessageUpdated, providerStepTerminalInfo info, sessionId, physicalParentId info, providerRunId info with
         | true, true, Some sessionId, Some physical, Some providerRun -> Some(sessionId, physical, providerRun)

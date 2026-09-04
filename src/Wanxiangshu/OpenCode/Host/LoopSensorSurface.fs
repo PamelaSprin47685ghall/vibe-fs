@@ -111,7 +111,8 @@ module LoopSensorSurface =
         let continueCallback = property options "continue"
         let diagnostic = property options "diagnostic"
 
-        SensorHandle(LoopSensor(ownedOf owned, abortOf abort, continueOf continueCallback, diagnosticOf diagnostic)) :> obj
+        SensorHandle(LoopSensor(ownedOf owned, abortOf abort, continueOf continueCallback, diagnosticOf diagnostic))
+        :> obj
 
     let observe (sensor: obj) (raw: obj) : unit =
         (sensor :?> SensorHandle).Sensor.Observe raw

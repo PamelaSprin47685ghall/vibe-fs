@@ -7,7 +7,8 @@ type IRootWorkspaceBinder =
     abstract TryBind: workspaceDirectory: string option -> bool
 
 module RootWorkspaceDirectory =
-    let private valid path = not (System.String.IsNullOrWhiteSpace path)
+    let private valid path =
+        not (System.String.IsNullOrWhiteSpace path)
 
     let select
         (pathExists: string -> bool)

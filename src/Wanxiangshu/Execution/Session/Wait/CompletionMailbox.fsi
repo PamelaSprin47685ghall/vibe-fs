@@ -21,5 +21,4 @@ type CompletionMailbox =
     member IsCancelled: bool
 
 module CompletionMailboxRuntime =
-    val create:
-        gate: obj -> ICompletionMailbox<AgentHandleId, PtyJoinItem, JoinInterruptReason, MailboxWakeReason>
+    val create: gate: obj -> ICompletionMailbox<AgentHandleId, PtyJoinItem, JoinInterruptReason, MailboxWakeReason>

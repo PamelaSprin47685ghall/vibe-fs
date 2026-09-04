@@ -16,8 +16,7 @@ module internal SyncDelegateWorkflow =
     /// runs against the store + dependencies without touching runtime fields.
     type Dependencies =
         { Attached: IAttachedSessionPort
-          AwaitWorkRecord:
-              DiagnosticWait -> Task<Result<string, string>> -> Task<Result<string, string>>
+          AwaitWorkRecord: DiagnosticWait -> Task<Result<string, string>> -> Task<Result<string, string>>
           AwaitInvocation:
               DiagnosticWait
                   -> Task<Result<SyncDelegateInvocationResult, string>>

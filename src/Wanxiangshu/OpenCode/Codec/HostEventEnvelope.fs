@@ -57,7 +57,8 @@ module HostEventEnvelope =
         if isNull info then
             None
         else
-            primitiveNonWhitespaceString (field info "sessionID") |> Option.map SessionId.create
+            primitiveNonWhitespaceString (field info "sessionID")
+            |> Option.map SessionId.create
 
     let tryMessageSessionId (rawInput: obj) : SessionId option =
         let raw = unwrap rawInput
