@@ -1612,3 +1612,9 @@ exact symbol ACL 的废止已经由老板裁决，不再作为执行前待决事
 - Fatal按现有caller-owner settlement law迁sealed incident与mandatory port；`NoOwnedEffect`只允许真实pre-effect失败。重复规则只覆盖现有“same incident exact-once”；不新增different-incident优先级。partial initialization只按既有law先逆序settle已取得资源，再fatal，不定义新的业务结果。
 - Process spool采用runtime-owned bracketed lifetime，消除当前Git consumer遗失临时文件的明确资源bug；LargeGate仍归`output-distillation`并保留现有`world_lock → Large`语义，只拆pure capability、mutable runtime与composition injection，不迁owner或重定义admission。
 - Delegation terminal无需新裁决：`IA-018`、`DELEG-025`、`MANAGED-SESSION-008/017`唯一推出`HandleCompleted` envelope为`ChildLogicalRunTerminal` source witness，envelope `EventId`为`FactId`，并绑定exact owner/child logical run、Authority Root、provider run与closed outcome；`HandleRetired`仅为consumption tombstone。rootless physical failure不得反查current active run或发布logical closure。
+
+### 2026-09-04 — upstream `a92d6278b` integration与M6.3b B7-C0 Unknown census
+
+- upstream已合并M6.3a PR `23370fea9`，其tree与本地`f3ee0fb39`精确相等；新upstream另含SelfPrediction与Sphinx。新累计分支从`a92d6278b`建立，只重放`f3ee0fb39`之后的M6.3a repair与M6.3b节点，避免把已squash的旧历史再次提交。重放零冲突，fast gate为738 production files、187 localities、823 WHAT/4,117 tests，全绿。
+- B7-C0增加report-only `unknown_capability_census`：只在canonical world验证后按observation case、closed Unknown class、syntax kind与raw identity分组；组内fact总数必须等于canonical `unknown_count`。完整affected locality/source集合只进入distinct count与domain-separated digest，各组最多输出5个canonical representative。
+- census不进入world、worksheet、manifest、cutover或授权输入；fact permutation与完全相同的duplicate observation不改变group/digest，full与summary投影一致。production-bound proof 15/15；`node scripts/check.mjs`为823 WHAT/4,118 tests且全绿；未刷新worksheet与fresh production report。
