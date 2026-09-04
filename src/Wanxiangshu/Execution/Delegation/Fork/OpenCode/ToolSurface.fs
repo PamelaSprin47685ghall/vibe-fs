@@ -18,6 +18,7 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Session.OpenCode
+open Wanxiangshu.Execution.Session.Wait
 
 /// Opaque JS-native harness for the real Manager fork tool path.
 /// Production semantics stay in ForkTool/HostForkRuntime; this surface only
@@ -403,6 +404,9 @@ module ForkToolSurface =
             let scope =
                 new ToolRuntimeScope(
                     sessions,
+                    CausalWaitRuntime().Observer,
+                    { new IRootWorkspaceReader with
+                        member _.TryRead() = Some directory },
                     Some journal,
                     None,
                     Some directory,

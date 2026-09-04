@@ -95,6 +95,15 @@ module EventCodecSurface =
                 {| ok = false
                    error = invalidToJs error |}
 
+    /// Decode raw UTF-8 bytes to text without parsing an EventEnvelope.
+    let decodeUtf8Text (bytes: byte[]) : obj =
+        match CanonicalEventCodec.tryDecodeUtf8Text bytes with
+        | Ok text -> box {| ok = true; text = text |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = invalidToJs error |}
+
     /// Decode raw UTF-8 bytes before parsing; malformed byte sequences fail closed.
     let decodeUtf8 (bytes: byte[]) : obj =
         match CanonicalEventCodec.tryDecodeUtf8 bytes with

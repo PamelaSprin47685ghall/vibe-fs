@@ -6,10 +6,12 @@ type CausalWaitRegistry =
     interface IWaitObserver
     interface IWaitSnapshotReader
 
-module CausalWaitHub =
-    val reader: IWaitSnapshotReader
-    val observer: IWaitObserver
-    val snapshot: unit -> DiagnosticWaitSnapshot
-    val frontiers: unit -> CausalFrontier list
-    val setWorkspace: directory: string option -> unit
-    val writeToWorkspace: unit -> unit
+type CausalWaitRuntime =
+    new: ?historyCapacity: int -> CausalWaitRuntime
+    member BindDiagnosticTarget: target: IWaitDiagnosticSink -> bool
+    member Observer: IWaitObserver
+    member SnapshotReader: IWaitSnapshotReader
+    member HistoryCapacity: int
+
+module CausalWaitProcess =
+    val local: unit -> CausalWaitRuntime

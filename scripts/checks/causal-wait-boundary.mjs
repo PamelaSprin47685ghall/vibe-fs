@@ -20,6 +20,7 @@ import { maskFSharpTrivia } from '../lib/fsharp-source.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const WAIT_OWNER = 'Execution/Session/Wait/'
+const DIAGNOSTIC_COMPOSITION_ROOT = 'OpenCode/Plugin/PluginHostWiring.fs'
 const DIAGNOSTIC_LOCATOR = 'causal-waits.json'
 const normalize = (path) => path.replace(/\\/g, '/')
 
@@ -87,17 +88,16 @@ export function analyzeObservationBoundary(files) {
 
     if (relativePath.startsWith(WAIT_OWNER)) continue
 
-    const capability = firstToken(SNAPSHOT_READ_CAPABILITIES, executable)
+    const withoutDiagnosticInjection = relativePath === DIAGNOSTIC_COMPOSITION_ROOT
+      ? executable.replace(/\bCausalWaitBridge\.target\b/g, '')
+      : executable
+    const capability = firstToken(SNAPSHOT_READ_CAPABILITIES, withoutDiagnosticInjection)
     if (capability !== undefined) {
       violations.push(readViolation(relativePath, capability))
       continue
     }
 
-    const hubWithoutWriterUses = executable.replace(
-      /\bCausalWaitHub\.(?:observer|setWorkspace)\b/g,
-      '',
-    )
-    if (/\bCausalWaitHub\b/.test(hubWithoutWriterUses)) {
+    if (/\bCausalWaitHub\b/.test(withoutDiagnosticInjection)) {
       violations.push(readViolation(relativePath, 'CausalWaitHub'))
       continue
     }
@@ -146,13 +146,10 @@ const SELF_TEST_LEGAL = [
       '',
     ].join('\n'),
   },
+  { rel: 'Change/Job.fs', text: 'let observer: IWaitObserver = injectedObserver\n' },
   {
-    rel: 'Change/Job.fs',
-    text: 'let observer = CausalWaitHub.observer\n',
-  },
-  {
-    rel: 'OpenCode/Plugin/PluginHostWiring.fs',
-    text: 'CausalWaitHub.setWorkspace workspace\n',
+    rel: DIAGNOSTIC_COMPOSITION_ROOT,
+    text: 'runtime.BindDiagnosticTarget(CausalWaitBridge.target workspace) |> ignore\n',
   },
 ]
 
@@ -209,6 +206,18 @@ export function runObservationBoundarySelfTest() {
     'Interaction/Dispatch/FutureDecision.fs',
     'open Wanxiangshu.Execution.Session.Wait.CausalWaitHub\nlet leaked = snapshot ()\n',
     readViolation('Interaction/Dispatch/FutureDecision.fs', 'CausalWaitHub'),
+  )
+  expectSingle(
+    'known-bad: global observer hub outside owner',
+    'Change/Job.fs',
+    'let observer = CausalWaitHub.observer\n',
+    readViolation('Change/Job.fs', 'CausalWaitHub'),
+  )
+  expectSingle(
+    'known-bad: diagnostic adapter outside composition root',
+    'Change/Job.fs',
+    'let sink = CausalWaitBridge.target workspace\n',
+    readViolation('Change/Job.fs', 'CausalWaitBridge'),
   )
   expectSingle(
     'known-bad: diagnostic locator outside owner',

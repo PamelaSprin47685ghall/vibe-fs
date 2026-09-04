@@ -15,6 +15,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-root-workspace-contract.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fold.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj" />

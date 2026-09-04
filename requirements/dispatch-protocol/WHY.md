@@ -19,6 +19,7 @@
 - **Receipt ≠ Physical Message**：传输回执仅代表已入队（Submitted），唯有宿主真实的物理消息证据才能解决 Claim（PhysicalAccepted）。
 - **Dispatch ≠ Execution**：dispatch 只证明合成 prompt 的传输与物理落地。物理消息落地后的 durable acceptance、provider start、terminal 与 exact settlement 由 `managed-chat-execution` 独占；混合两者会使传输重放意外触发 provider 执行。
 - **Activation 先于 Recovery**：构造期间读 journal 或启动调和会在 durable substrate 尚未可用时制造第二启动顺序；恢复只能在 durability activation 后由事实事件驱动。
+- **Raw identity 必须先闭合再进入领域**：Host `chat.message` 是无类型 JavaScript envelope。若 decoder 以 truthiness、字符串化、字段优先级或内容归一化猜身份，一个 malformed carrier 就能制造、碰撞或错绑 `SessionId`，使后续 durable acceptance 建立在错误物理世界上。
 
 ## DEPENDS ON
 

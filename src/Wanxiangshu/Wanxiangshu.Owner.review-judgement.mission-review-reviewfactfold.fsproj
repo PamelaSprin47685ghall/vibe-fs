@@ -25,7 +25,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>
     <Compile Include="Mission/Review/ReviewFactFold.fsi"/>
     <Compile Include="Mission/Review/ReviewFactFold.fs"/>
     <Compile Include="Mission/Review/Ports.fsi"/>

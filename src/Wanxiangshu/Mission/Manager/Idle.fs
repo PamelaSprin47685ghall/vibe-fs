@@ -140,6 +140,7 @@ module ManagerIdle =
         (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (nudgeSent: HashSet<string>)
         (processKey: string)
@@ -155,6 +156,7 @@ module ManagerIdle =
                     quiescence
                     permit
                     sessionPort
+                    rootWorkspace
                     turn.SessionId
                     (idleEncouragement turn.SessionId kind)
                     turn.Directory
@@ -183,6 +185,7 @@ module ManagerIdle =
 
     let private processQuiescent
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (nudgeSent: HashSet<string>)
@@ -203,6 +206,7 @@ module ManagerIdle =
                 quiescence
                 permit
                 sessionPort
+                rootWorkspace
                 eventPort
                 nudgeSent
                 processKey
@@ -215,6 +219,7 @@ module ManagerIdle =
 
     let encourageLabor
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (nudgeSent: HashSet<string>)
@@ -231,5 +236,17 @@ module ManagerIdle =
 
         match context.Quiescence with
         | Some permit when not (nudgeSent.Contains processKey) ->
-            processQuiescent sessionPort eventPort journal nudgeSent quiescence turn life permit kind kindKey processKey
+            processQuiescent
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
+                nudgeSent
+                quiescence
+                turn
+                life
+                permit
+                kind
+                kindKey
+                processKey
         | _ -> AsyncSupport.completedTask ()

@@ -18,7 +18,8 @@ type LoopSensor =
     new:
         isOwned: (SessionId -> bool) *
         abortSession: (SessionId -> Task<Result<unit, string>>) *
-        continueSession: (SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>>) ->
+        continueSession: (SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>>) *
+        emitDiagnostic: (string -> (string * string) list -> unit) ->
             LoopSensor
 
     member Observe: raw: obj -> unit
@@ -35,4 +36,5 @@ module LoopSensor =
         sessionParents: Dictionary<string, string> ->
         abortSession: (SessionId -> Task<Result<unit, string>>) ->
         continueSession: (SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>>) ->
+        emitDiagnostic: (string -> (string * string) list -> unit) ->
             LoopSensor

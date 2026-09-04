@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>loop-event-codec</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-event-envelope.fsproj"/>
+    <Compile Include="OpenCode/Codec/LoopEventCodec.fsi"/>
+    <Compile Include="OpenCode/Codec/LoopEventCodec.fs"/>
+  </ItemGroup>
+</Project>

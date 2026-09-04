@@ -221,6 +221,8 @@ module PluginHooks =
                         toolHooks
                             toolModule
                             sessionPort
+                            host.CausalWaitObserver
+                            host.RootWorkspace
                             journal
                             gitTreePort
                             (workspaceDirectory)

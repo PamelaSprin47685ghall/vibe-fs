@@ -33,7 +33,6 @@ type ExactProviderStartObservation =
       PhysicalUserMessageId: PhysicalUserMessageId
       ProviderRun: ProviderRunIdentity }
 
-/// The only module that unwraps raw host `obj` events.
 /// Outputs typed `HostSignal` for the coarse signals:
 ///   - session.status idle / session.idle
 ///   - session.status retry
@@ -41,49 +40,6 @@ type ExactProviderStartObservation =
 ///   - session.error as a non-durable failure wakeup
 /// All other raw payloads return None.
 module HostEventCodec =
-
-    let private attachDirectoryIfMissing (rawInput: obj) (payload: obj) : obj =
-        if not (isNull rawInput?directory) && isNull payload?directory then
-            payload?directory <- rawInput?directory
-
-        payload
-
-    let unwrap (rawInput: obj) : obj =
-        if isNull rawInput then
-            rawInput
-        elif not (isNull rawInput?event) then
-            rawInput?event
-        elif not (isNull rawInput?payload) then
-            attachDirectoryIfMissing rawInput rawInput?payload
-        elif not (isNull rawInput?data) && not (isNull rawInput?data?``type``) then
-            rawInput?data
-        else
-            rawInput
-
-    let eventTypeOf (raw: obj) : string =
-        if isNull raw || isNull raw?``type`` then
-            ""
-        else
-            (unbox<string> raw?``type``).ToLowerInvariant()
-
-    let private tryReadSessionIdFromPayload (raw: obj) : SessionId option =
-        let properties = raw?properties
-
-        if not (isNull properties) && not (isNull properties?sessionID) then
-            Some(SessionId.create (unbox<string> properties?sessionID))
-        elif not (isNull properties) && not (isNull properties?sessionId) then
-            Some(SessionId.create (unbox<string> properties?sessionId))
-        elif not (isNull raw?sessionID) then
-            Some(SessionId.create (unbox<string> raw?sessionID))
-        elif not (isNull raw?sessionId) then
-            Some(SessionId.create (unbox<string> raw?sessionId))
-        else
-            None
-
-    let private tryReadSessionId (raw: obj) : SessionId option =
-        if isNull raw then None else tryReadSessionIdFromPayload raw
-
-    let trySessionId (raw: obj) = tryReadSessionId raw
 
     let private retrySignal (sessionId: SessionId) (raw: obj) : RetrySignal option =
         let properties = if isNull raw then null else raw?properties
@@ -128,7 +84,7 @@ module HostEventCodec =
             Some(unbox<string> status?``type``)
 
     let private decodeSessionStatus (raw: obj) : HostSignal option =
-        match tryReadSessionId raw, statusTypeOf raw with
+        match HostEventEnvelope.trySessionId raw, statusTypeOf raw with
         | None, _ -> None
         | Some sessionId, Some "idle" -> Some(SessionIdle sessionId)
         | Some sessionId, Some "retry" -> retrySignal sessionId raw |> Option.map ProviderRetry
@@ -157,7 +113,7 @@ module HostEventCodec =
         fromInfo |> Option.orElse fromProperties
 
     let private decodeSessionDeleted (raw: obj) : HostSignal option =
-        match tryReadSessionId raw with
+        match HostEventEnvelope.trySessionId raw with
         | Some sessionId -> Some(SessionDeleted(sessionId, parentSessionIdOf raw))
         | None -> None
 
@@ -233,20 +189,20 @@ module HostEventCodec =
         | ExecutionFailure.PersistenceFailure _ -> Some(ProviderFailure observation)
 
     let private decodeSessionError (raw: obj) : HostSignal option =
-        match tryReadSessionId raw with
+        match HostEventEnvelope.trySessionId raw with
         | Some sessionId -> decodeSessionErrorFor sessionId raw
         | None -> None
 
     let private decodeHostSignal (raw: obj) : HostSignal option =
-        match eventTypeOf raw with
+        match HostEventEnvelope.eventTypeOf raw with
         | "session.status" -> decodeSessionStatus raw
-        | "session.idle" -> tryReadSessionId raw |> Option.map SessionIdle
+        | "session.idle" -> HostEventEnvelope.trySessionId raw |> Option.map SessionIdle
         | "session.deleted" -> decodeSessionDeleted raw
         | "session.error" -> decodeSessionError raw
         | _ -> None
 
     let tryDecode (rawInput: obj) : HostSignal option =
-        let raw = unwrap rawInput
+        let raw = HostEventEnvelope.unwrap rawInput
 
         if isNull raw then None else decodeHostSignal raw
 
@@ -271,17 +227,6 @@ module HostEventCodec =
         let failed = not (isNull info) && not (isNull info?error)
         assistant && (failed || completed)
 
-    let private messageInfoSessionId (info: obj) =
-        nonEmptyFieldText info "sessionID" |> Option.map SessionId.create
-
-    /// Session owning a message lifecycle event (`message.updated`): the id sits
-    /// on properties.info for this family, not on the payload root.
-    let tryMessageSessionId (rawInput: obj) : SessionId option =
-        let raw = unwrap rawInput
-
-        tryReadSessionId raw
-        |> Option.orElseWith (fun () -> messageInfoSessionId (messageInfo raw))
-
     let private physicalParentId (info: obj) =
         nonEmptyFieldText info "parentID" |> Option.map PhysicalUserMessageId.create
 
@@ -300,15 +245,14 @@ module HostEventCodec =
         | _ -> None
 
     let tryDecodeExactProviderStart (rawInput: obj) : ExactProviderStartObservation option =
-        let raw = unwrap rawInput
+        let raw = HostEventEnvelope.unwrap rawInput
         let info = messageInfo raw
 
-        let sessionId =
-            tryReadSessionId raw |> Option.orElseWith (fun () -> messageInfoSessionId info)
+        let sessionId = HostEventEnvelope.tryMessageSessionId raw
 
         match
             not (isNull raw)
-            && eventTypeOf raw = "message.updated"
+            && HostEventEnvelope.eventTypeOf raw = "message.updated"
             && fieldText info "role" = "assistant"
             && hasStartedState info,
             sessionId,
@@ -356,15 +300,14 @@ module HostEventCodec =
         | None -> failureOf info?error |> failureTerminalOutcome
 
     let tryDecodeExactProviderTerminal (rawInput: obj) : ExactProviderTerminalObservation option =
-        let raw = unwrap rawInput
+        let raw = HostEventEnvelope.unwrap rawInput
         let info = messageInfo raw
 
-        let sessionId =
-            tryReadSessionId raw |> Option.orElseWith (fun () -> messageInfoSessionId info)
+        let sessionId = HostEventEnvelope.tryMessageSessionId raw
 
         match
             not (isNull raw)
-            && eventTypeOf raw = "message.updated"
+            && HostEventEnvelope.eventTypeOf raw = "message.updated"
             && fieldText info "role" = "assistant",
             sessionId,
             physicalParentId info,
@@ -381,12 +324,13 @@ module HostEventCodec =
         | _ -> None
 
     let tryDecodeProviderStepEnd (rawInput: obj) : (SessionId * PhysicalUserMessageId * ProviderRunIdentity) option =
-        let raw = unwrap rawInput
+        let raw = HostEventEnvelope.unwrap rawInput
         let info = messageInfo raw
-        let isMessageUpdated = not (isNull raw) && eventTypeOf raw = "message.updated"
 
-        let sessionId =
-            tryReadSessionId raw |> Option.orElseWith (fun () -> messageInfoSessionId info)
+        let isMessageUpdated =
+            not (isNull raw) && HostEventEnvelope.eventTypeOf raw = "message.updated"
+
+        let sessionId = HostEventEnvelope.tryMessageSessionId raw
 
         match isMessageUpdated, providerStepTerminalInfo info, sessionId, physicalParentId info, providerRunId info with
         | true, true, Some sessionId, Some physical, Some providerRun -> Some(sessionId, physical, providerRun)

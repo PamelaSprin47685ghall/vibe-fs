@@ -204,14 +204,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member _.LoopSensor =
         match loopSensor with
         | Some sensor -> sensor
-        | None ->
-            // Tests / journal-only scopes never stream deltas. A no-op sensor keeps
-            // completion paths callable without inventing an abort port.
-            let empty =
-                LoopSensor((fun _ -> false), (fun _ -> Task.FromResult(Ok())), (fun _ _ _ -> Task.FromResult(Ok())))
-
-            loopSensor <- Some empty
-            empty
+        | None -> invalidOp "LoopSensor must be attached by Host composition before use"
 
     /// Current-process join admission only; no cross-process tool recovery.
     member this.RequireFamilyRecovery(root: SessionId) : Task<FamilyRecovery> = recovery.RequireFamilyRecovery root

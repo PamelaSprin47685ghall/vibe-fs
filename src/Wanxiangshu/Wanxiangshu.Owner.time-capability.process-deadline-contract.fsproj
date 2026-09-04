@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>time-capability</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>process-deadline-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Process/Deadline.fsi"/>
+    <Compile Include="Process/Deadline.fs"/>
+  </ItemGroup>
+</Project>

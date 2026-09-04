@@ -24,6 +24,7 @@ module ManagerIdle =
 
     val encourageLabor:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         nudgeSent: HashSet<string> ->

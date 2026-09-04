@@ -99,11 +99,20 @@ module LoopSensorSurface =
                 return resultOf result
             }
 
+    let private diagnosticOf (value: obj) : string -> (string * string) list -> unit =
+        if not (isFunction value) then
+            invalidArg "options" "LoopSensorSurface.create requires a diagnostic callback"
+
+        fun operation fields -> apply2 value (box operation) (box fields) |> ignore
+
     let create (options: obj) : obj =
         let owned = property options "owned"
         let abort = property options "abort"
         let continueCallback = property options "continue"
-        SensorHandle(LoopSensor(ownedOf owned, abortOf abort, continueOf continueCallback)) :> obj
+        let diagnostic = property options "diagnostic"
+
+        SensorHandle(LoopSensor(ownedOf owned, abortOf abort, continueOf continueCallback, diagnosticOf diagnostic))
+        :> obj
 
     let observe (sensor: obj) (raw: obj) : unit =
         (sensor :?> SensorHandle).Sensor.Observe raw

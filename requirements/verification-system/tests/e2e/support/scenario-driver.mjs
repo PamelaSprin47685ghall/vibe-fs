@@ -376,6 +376,23 @@ async function runFlow(scenario, doc, ctx) {
       }
       return;
     }
+    if (step.waitAny) {
+      scenario.watchdog?.setWindow(step.timeoutMs ?? null);
+      let matched;
+      try {
+        matched = await scenario.provider.waitForAnyExpectation(step.waitAny, step.timeoutMs);
+      } finally {
+        scenario.watchdog?.setWindow(null);
+      }
+      if (step.watchdog !== false) {
+        scenario.watchdog?.advance({
+          reason: matched,
+          lane: step.lane || matched,
+          blocking: step.blocking !== false,
+        });
+      }
+      return;
+    }
     if (step.waitFact) {
       await awaitFactBarrier(scenario, step);
       return;

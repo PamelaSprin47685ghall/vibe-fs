@@ -19,26 +19,6 @@ module LoopEventCodec =
           Field: string option
           Delta: string }
 
-    let private trySessionIdProperties (properties: obj) : SessionId option =
-        if isNull properties then
-            None
-        elif not (isNull properties?sessionID) then
-            Some(SessionId.create (unbox<string> properties?sessionID))
-        elif not (isNull properties?sessionId) then
-            Some(SessionId.create (unbox<string> properties?sessionId))
-        else
-            None
-
-    let private trySessionIdFromProperties (raw: obj) : SessionId option =
-        if isNull raw then
-            None
-        else
-            trySessionIdProperties raw?properties
-
-    let private trySessionId (raw: obj) : SessionId option =
-        HostEventCodec.trySessionId raw
-        |> Option.orElse (trySessionIdFromProperties raw)
-
     let private stringField (value: obj) : string option =
         if isNull value || String.IsNullOrEmpty(string value) then
             None
@@ -80,18 +60,18 @@ module LoopEventCodec =
             decodeTextDeltaProperties sessionId properties
 
     let isLoopTextDelta (rawInput: obj) : bool =
-        let raw = HostEventCodec.unwrap rawInput
+        let raw = HostEventEnvelope.unwrap rawInput
 
-        match HostEventCodec.eventTypeOf raw with
+        match HostEventEnvelope.eventTypeOf raw with
         | "message.part.delta" -> true
         | _ -> false
 
     /// Only `message.part.delta` with textual fields (`field = "text"` or missing field,
     /// or reasoning/thinking stream fields). Non-textual deltas (e.g. tool) are ignored.
     let tryDecodeTextDelta (rawInput: obj) : TextDelta option =
-        let raw = HostEventCodec.unwrap rawInput
+        let raw = HostEventEnvelope.unwrap rawInput
 
-        match isNull raw, HostEventCodec.eventTypeOf raw, trySessionId raw with
+        match isNull raw, HostEventEnvelope.eventTypeOf raw, HostEventEnvelope.trySessionId raw with
         | true, _, _ -> None
         | _, eventType, _ when eventType <> "message.part.delta" -> None
         | _, _, None -> None

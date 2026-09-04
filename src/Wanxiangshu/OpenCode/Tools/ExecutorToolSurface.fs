@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation.Identity
 
 /// JS-native semantic surface for the provider execution verb (PROC-011 /
@@ -40,6 +41,9 @@ module ExecutorToolSurface =
         let scope =
             new ToolRuntimeScope(
                 sessions,
+                CausalWaitRuntime().Observer,
+                { new IRootWorkspaceReader with
+                    member _.TryRead() = workspaceDirectory },
                 None,
                 None,
                 workspaceDirectory,

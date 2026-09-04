@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
@@ -35,6 +36,7 @@ module FinalityHostPort =
                         childId
                         range
                         providerRun),
+                CompletionMailboxRuntime.create,
                 ?journal = scope.Journal,
                 onChildCreated =
                     (fun _ _ childId ->
@@ -103,6 +105,7 @@ module FinalityHostPort =
                     match!
                         HostSessionNudge.sendContinuation
                             scope.Sessions
+                            scope.RootWorkspace
                             memberInfo.ReviewerSessionId
                             (openingAssignment ())
                             PromptAuthority.ContinuationKind.ReviewerGuard
@@ -124,6 +127,7 @@ module FinalityHostPort =
             =
             HostSessionNudge.trySendGateContinuationPhysical
                 scope.Sessions
+                scope.RootWorkspace
                 reviewerSessionId
                 (ProviderProse.documentFor reviewerSessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
                 PromptAuthority.ContinuationKind.ReviewerGuard
@@ -142,6 +146,7 @@ module FinalityHostPort =
                 match!
                     HostSessionNudge.sendContinuation
                         scope.Sessions
+                        scope.RootWorkspace
                         targetSessionId
                         prompt
                         PromptAuthority.ContinuationKind.FinalitySteer

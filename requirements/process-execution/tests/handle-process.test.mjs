@@ -40,7 +40,7 @@ test('WHAT[PROC-004] EXEC_oneshot_completion_wait_is_bounded_by_management_deadl
   )
 
   assert.match(oneshot, /CompletionTimeoutMs\s*=\s*600_000/, 'named completion deadline')
-  assert.match(oneshot, /PtyTiming\.raceExit/, 'completion races a timer, not bare Task')
+  assert.match(oneshot, /NodeTiming\.raceExit/, 'completion races a timer, not bare Task')
   assert.doesNotMatch(
     oneshot,
     /let! output = completion\.Task\s*$/m,

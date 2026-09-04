@@ -11,6 +11,8 @@
 5. **公开边界上的 typed membrane**。插件仅通过宿主公开的 Hook 与 SDK 集成，严禁修改宿主源码，也不把 private Host state、未公开 callback ordering 或 UI 展示行为当作系统承诺。所有 Hook 先把公开 evidence 收敛为 `execution-failure-policy` 的封闭失败类型；fatal 必须在 exact capacity/message settlement 后发生。
 6. **真实 canary 而非模拟承诺**。Host 物理能力必须由针对受支持真实 Host build、经公开 Hook/SDK 运行的 canary 证明；mock、源码形状检查与 UI 观察都不能替代物理证据。
 7. **Contract/Runtime 分离与无泄漏编译闭包**。业务契约若因引用粗粒度 Host 模块而连带编译 Sphinx MCP 适配器、诊断状态、消息就地修改或进程静止门禁，会导致编译依赖爆炸与边界侵蚀。无状态的 Session/Signal Contract 必须与具体的 Adapter 和 Runtime 严格解耦，契约闭包仅消费契约，禁止反向污染。
+8. **动态值必须在膜上按JavaScript类型收敛**。Fable的`unbox`不会替JavaScript执行运行时检查；truthy字符串、数字、对象与伪数组若穿过膜，会把Host噪声变成compaction、synthetic、abort或领域identity，甚至在hook内抛异常。
+9. **进程级 workspace effect 必须由显式 capability 承载**。公开可写的 root workspace atom 允许任意 consumer 改写后续 Host 路径选择，也把 first-bind 规则藏在调用顺序中。该 effect 必须收进 Host runtime；composition 只注入只读 capability，普通 consumer 不得取得 binder。
 
 ## 核心不变量
 
@@ -22,6 +24,9 @@
 - Host envelope、message codec与loop codec拥有不同consumer cohort；共享解析只下沉到无状态envelope contract，不能用一个宽adapter公开全部codec、subscription与diagnostics。
 - Node runtime只是机制标签。纯`node:path/posix`表示不得被误判为authority；console、environment、process control及mutable registry按实际capability facts判定。
 - fatal incident vocabulary与capability type属于纯contract；console report、process kill/exit属于唯一adapter。composition负责mandatory injection及settlement ordering，普通runtime不能直接到达physical implementation。
+- Host signal订阅必须把“使用公开local hook”与“持有legacy listener资源”表达为互斥状态；OpenCode SDK `client`是class capability而非JSON record，无legacy `events`成员时必须落入local hook，不能因prototype拒绝真实Host。只有composition可把typed订阅失败解释为fatal，物理adapter不得同时拥有失败解释与进程效果。
+- raw Host value只由封闭string/bool/array/plain-record reader解释；malformed值不得通过truthiness、`string value`或擦除后的`unbox`取得领域意义，任一公开hook对malformed envelope必须确定性fail-closed且不抛异常。
+- root workspace 只接受 process-local runtime 的首次 `Some path`；`None`不占用槽位，后续候选不能改写已绑定值。只有Host composition取得binder，所有读取经注入的reader完成。
 
 ## 违反边界的后果（RED）
 
@@ -30,3 +35,4 @@
 - 上下文压缩开关失效却继续运行，导致物理历史丢失而无法感知。
 - 模糊匹配工具调用与消息 ID，引发跨会话的数据错配与假绿测试。
 - 契约工程泄漏运行时或外部适配器依赖，导致领域层编译闭包膨胀并产生隐式耦合。
+- 任意业务consumer直接读写公开workspace atom，可绕过first-bind并把另一插件实例重定向到错误目录。

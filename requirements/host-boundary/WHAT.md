@@ -104,10 +104,13 @@ Host 只通过 `ReliabilityDiagnostics.CausalDiagnosticRecord` 发布结构化�
 
 Host 边界严格切分为 Contract、Runtime 与 Adapter 架构 locality：
 - `Host.Session.Contract`（`host-session-contract`）：仅包含会话静止 capability 与纯 `SessionSnapshot` 词汇、端口、定位 decision，不依赖 SDK/HTTP 投影、具体 Host 运行时、进程控制、诊断或 Sphinx MCP。
-- `Host.Signal.Contract`（`host-signal-contract`）：包含 `HostDigest` sha256 词汇、`McpLaunch` 物理启动描述与共享终端词汇（`EventContract`、`Message`/`MessagePart`、`OpencodeTypes`/`OpencodeModel`），无状态且零副作用；`HostSignal` 词汇与编解码器词汇表（`HostEventCodec`、`LoopEventCodec`、`HostMessageCodec`、`ToolHostCodec`、`CanonicalJson`）中，`CanonicalJson` 归 `dispatch-protocol.foundation-identity`，`HostSignal` 与剩余 codec 归 `Host.Signal.Adapter`。
+- `Host.Signal.Contract`（`host-signal-contract`）：包含 `HostDigest` sha256 词汇、`McpLaunch` 物理启动描述与共享终端词汇（`EventContract`、`Message`/`MessagePart`、`OpencodeTypes`/`OpencodeModel`），无状态且零副作用。
+- `Host.Event.Envelope`（`host-event-envelope`）：只发布 raw Host envelope unwrap、event type、session identity 与 message-session identity 的唯一无状态公式；不得修改输入对象。
+- `Host.Message.Codec`（`host-message-codec`）：只发布 raw Host message part → `MessagePart` 的无状态 decode；其 bounded audience 只包含实际 message consumer。
+- `Host.Loop.Event.Codec`（`loop-event-codec`）：只发布 loop text-delta decode/query，并单向依赖 `Host.Event.Envelope`；不得获得完整 provider failure/terminal codec。
 - `Host.Fatal.Effect`（`host-fatal-effect`）：进程级 fatal fuse（`Foundation/FatalProcess`）的窄物理效果边界，零依赖 contract，供诊断 runtime 与 journal spine 各自引用。
 - `Host.Diagnostics.Runtime`（`host-diagnostics-runtime`）：封闭 Hook 策略元数据与因果诊断单向消费 Contract，不得反向侵入应用契约闭包。
-- `Host.Signal.Adapter`（`host-signal-adapter`）：宿主信号词汇 `HostSignal`、编解码器（`HostEventCodec`/`LoopEventCodec`/`HostMessageCodec`/`ToolHostCodec`）、信号路由（`HostSignalAdapter`）、物理订阅与事件总线适配器（`SharedTerminalBus`/`Events`），仅作为 Adapter 实现契约；共享终端词汇 `EventContract`/`Message`/`OpencodeTypes` 已在 `Host.Signal.Contract`。
+- `Host.Signal.Adapter`（`host-signal-adapter`）：宿主信号词汇 `HostSignal`、完整 provider failure/terminal `HostEventCodec`、`ToolHostCodec`、信号路由（`HostSignalAdapter`）、物理订阅与事件总线适配器（`SharedTerminalBus`/`Events`）；它消费三个窄 codec contract，不再向 message/loop consumer输出自身完整闭包。
 - `Host.Session.Runtime`（`host-session-runtime`）：SDK/HTTP 快照投影、进程级静止门禁状态机（`SessionQuiescenceGate`、`QuiescenceSurface`）、消息就地变更与宿主上下文投影，禁止被普通业务契约直接引用。
 - `Sphinx.Host.Adapter`（`sphinx-host-adapter`）：外部 Sphinx MCP 启动配置与环境适配器，隔离于核心契约之外。
 
@@ -119,8 +122,16 @@ Host 边界严格切分为 Contract、Runtime 与 Adapter 架构 locality：
 
 ## HOST-BOUNDARY-028: signal subscription 与optional diagnostic 必须分型
 
-Host signal subscription必须返回closed typed error与`LocalEventHook | EventsListen of Subscription` mode，不得以`option + string`表达非法组合。adapter只报告typed failure；composition是该失败的唯一fatal解释者。Loop diagnostic经必填窄`emitDiagnostic` capability注入；其失败只能产生非权威诊断outcome，不得改变arm、interrupt、consume或continuation结果。
+Host signal subscription必须返回closed `HostSignalSubscriptionError`与`LocalEventHook | EventsListen of HostSignalSubscription` mode，不得以`option + string`表达非法组合。顶层input与显式非null `events` carrier必须是plain record；`client`是opaque OpenCode SDK object capability，可为plain record或class instance，缺少legacy `events`成员时必须返回`LocalEventHook`。primitive、array、boxed scalar、Date与坏direct events/client-events一律`InvalidInput`，且坏direct events不得借合法client旁路。顶层/client carrier getter或Proxy抛错收敛为`InvalidInput`；`events.listen`读取或调用抛错收敛为`EventsListenFailed`，Surface promise必须resolve typed error而非reject。`EventsListen`必须携带唯一opaque disposable owner；缺失或非函数`listen`、缺失或非函数disposer均返回对应typed failure，禁止延迟到dispose时才爆炸；合法disposer自身抛出的异常必须原样传播给资源owner。未提供legacy events capability时只返回`LocalEventHook`，不得制造disposer。callback等JavaScript decode failure只在Surface膜上fail closed，不污染production DU。adapter只报告typed failure且不得到达Diagnostic或Temporal；`HostSignalBootstrap` composition是`signal-subscribe-failed`的唯一fatal解释者。Loop diagnostic经必填窄`emitDiagnostic` capability注入；其失败只能产生非权威诊断outcome，不得改变arm、interrupt、consume或continuation结果。
 
 ## HOST-BOUNDARY-029: fatal process 是唯一注入的physical adapter
 
 `FatalProcessPort` contract只含immutable incident vocabulary与capability type，不得含value、factory或Node import。唯一fatal adapter拥有该路径的`console.error`、`process.kill`与`process.exit`；所有caller由composition获得mandatory capability，普通contract/runtime/adapter不得直接引用physical implementation。fatal前置settlement由caller owner提供typed evidence；同一incident只允许一次report与一次kill。
+
+## HOST-BOUNDARY-030: raw Host membrane 只接受精确 JavaScript 类型
+
+布尔marker只接受primitive `true | false`；字符串、数字、对象、boxed value均不得借truthiness成为compaction、synthetic或abort。parts只接受真实Array，其他值安全投影为空且hook不得抛异常。session event与`session.get`响应中的SessionId、parentID、agent只接受原始非空白primitive string，禁止`string value`制造领域值。所有dynamic reader必须在Fable边界执行显式JavaScript type predicate；正确性不得依赖`unbox`、异常捕获或下游字符串函数偶然拒绝。
+
+## HOST-BOUNDARY-031: Root workspace first-bind effect隔离
+
+Root workspace 是process-local Host资源定位结果，不是公开可变状态。private Host runtime只在当前值为`None`且候选为非空白`Some path`时完成首次绑定；`None`、空串与纯空白均不占用绑定，首次绑定后的任意候选不得改写结果。Host composition是binder的唯一production consumer；其余production路径只能消费显式注入的只读capability。不得从Git推导workspace family root，不得按consumer自行重算或直接读取全局atom。

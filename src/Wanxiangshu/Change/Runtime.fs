@@ -57,6 +57,7 @@ module private OrchestratorRuntimeDecisions =
 /// job, and a fact means a live Manager whose session is known.
 type Orchestrator
     (
+        observer: IWaitObserver,
         git: GitPort,
         manager: ManagerPort,
         repoPath: string,
@@ -65,7 +66,7 @@ type Orchestrator
         ?lockRepoPath: string
     ) =
 
-    let mailbox = VerdictMailbox()
+    let mailbox = VerdictMailbox(observer)
     let journalPort = journal
 
     let gatePath =

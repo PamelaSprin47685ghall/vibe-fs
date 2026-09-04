@@ -9,6 +9,24 @@ open Wanxiangshu.Execution.Session.ChatExecution
 /// JS-native host signal boundary. Raw host payloads enter once; snapshots of
 /// coarse wake signals leave, with no transport union representation exposed.
 module HostSignalSurface =
+    let unwrapEnvelope (raw: obj) = HostEventEnvelope.unwrap raw
+
+    let envelopeEventType (raw: obj) =
+        raw |> HostEventEnvelope.unwrap |> HostEventEnvelope.eventTypeOf
+
+    let envelopeSessionId (raw: obj) =
+        raw
+        |> HostEventEnvelope.unwrap
+        |> HostEventEnvelope.trySessionId
+        |> Option.map SessionId.value
+        |> Option.defaultValue null
+
+    let envelopeMessageSessionId (raw: obj) =
+        raw
+        |> HostEventEnvelope.tryMessageSessionId
+        |> Option.map SessionId.value
+        |> Option.defaultValue null
+
     let private failureLabel =
         function
         | ExecutionFailure.LocalInvariant -> "LocalInvariant"

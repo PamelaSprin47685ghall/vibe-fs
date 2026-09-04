@@ -50,7 +50,6 @@ open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
@@ -98,7 +97,7 @@ module Distillation =
 
     let private awaitJournalAdvanceOrDeadline (changed: Task<JournalChange>) (remainingMs: int) : Task<bool> =
         emitJsExpr
-            (changed, PtyTiming.timerTask remainingMs)
+            (changed, NodeTiming.timerTask remainingMs)
             "Promise.race([$0.then(function(){return!0}),$1.then(function(){return!1})])"
 
     type private AwaitStep =

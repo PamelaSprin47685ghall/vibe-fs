@@ -1,8 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
-/// JS-native boundary for HOST-BOUNDARY-010 / HOST-012 shared cross-instance
-/// state. The physical Map/Set/atom singletons in SharedState stay opaque;
-/// only narrow put/get/clear/root operations cross the edge.
+/// JS-native boundary for HOST-BOUNDARY-010 shared cross-instance state and
+/// HOST-BOUNDARY-031 root workspace first-binding.
 module SharedStateSurface =
 
     /// SessionParents: cross-instance parent registry.
@@ -19,9 +18,10 @@ module SharedStateSurface =
 
     val clearReviewGuardNudges: unit -> unit
 
-    /// RootWorkspace: mutable atom set by whichever plugin instance boots first.
-    val setRootWorkspace: path: string -> unit
-
-    val clearRootWorkspace: unit -> unit
+    val tryBindRootWorkspace: path: string -> bool
 
     val tryGetRootWorkspace: unit -> string
+
+    val firstBoundRootWorkspace: candidates: string array -> string
+
+    val selectContinuationDirectory: candidate: string -> candidateExists: bool -> rootWorkspace: string -> string

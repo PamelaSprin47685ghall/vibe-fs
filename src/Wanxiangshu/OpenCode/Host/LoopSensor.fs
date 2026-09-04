@@ -24,7 +24,8 @@ type LoopSensor
     (
         isOwned: SessionId -> bool,
         abortSession: SessionId -> Task<Result<unit, string>>,
-        continueSession: SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>>
+        continueSession: SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>>,
+        emitDiagnostic: string -> (string * string) list -> unit
     ) =
 
     let gate = obj ()
@@ -42,6 +43,12 @@ type LoopSensor
         | DegenerationKind.TooRepetitive -> "too-repetitive"
         | DegenerationKind.TooRandom -> "too-random"
 
+    let observeDiagnostic operation fields =
+        try
+            emitDiagnostic operation fields
+        with _ ->
+            ()
+
     let reportPhysicalOutcome operation sessionId kind outcome =
         let baseFields =
             [ "session_id", SessionId.value sessionId
@@ -49,9 +56,9 @@ type LoopSensor
               "operation", operation ]
 
         match outcome with
-        | Ok() -> Diagnostic.emit "degeneration-guard" (baseFields @ [ "result", "ok" ])
+        | Ok() -> observeDiagnostic "degeneration-guard" (baseFields @ [ "result", "ok" ])
         | Error reason ->
-            Diagnostic.emit "degeneration-guard" (baseFields @ [ "result", "failed"; "provider_error", reason ])
+            observeDiagnostic "degeneration-guard" (baseFields @ [ "result", "failed"; "provider_error", reason ])
 
     let runAndReport operation physicalCall sessionId kind directory : Task =
         task {
@@ -96,7 +103,7 @@ type LoopSensor
 
     member private this.Interrupt(sessionId: SessionId, kind: DegenerationKind, evaluation: LoopDetector.Evaluation) =
         if this.TryArm(sessionId, kind) then
-            Diagnostic.emit
+            observeDiagnostic
                 "degeneration-guard"
                 [ "session_id", SessionId.value sessionId
                   "side", kindName kind
@@ -203,5 +210,6 @@ module LoopSensor =
         (sessionParents: Dictionary<string, string>)
         (abortSession: SessionId -> Task<Result<unit, string>>)
         (continueSession: SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>>)
+        (emitDiagnostic: string -> (string * string) list -> unit)
         =
-        LoopSensor(interruptiblePredicate ownedSessions sessionParents, abortSession, continueSession)
+        LoopSensor(interruptiblePredicate ownedSessions sessionParents, abortSession, continueSession, emitDiagnostic)

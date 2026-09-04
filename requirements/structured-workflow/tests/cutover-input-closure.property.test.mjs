@@ -15,14 +15,14 @@ test('WHAT[STRUCTURED-WORKFLOW-016] one staged input mutation yields the exact c
     fc.integer({ min: 0, max: 19 }),
     (names, rawIndex) => {
       const paths = names.map((name) => `src/${name}`).sort()
-      const closure = resolveCutoverInputClosureV1({
+      const closureInput = {
         entry_paths: paths,
         imports_by_path: new Map(paths.map((path) => [path, []])),
         selector_outputs_by_entry: new Map(),
         tracked_read_paths: paths,
         build_output_paths: [],
-      })
-      assert.deepEqual(closure.violations, [])
+      }
+      assert.deepEqual(resolveCutoverInputClosureV1(closureInput).violations, [])
       const indexEntries = paths.map((path, index) => ({
         path,
         mode: '100644',
@@ -35,13 +35,11 @@ test('WHAT[STRUCTURED-WORKFLOW-016] one staged input mutation yields the exact c
       const working = new Map(bytes)
       working.set(paths[index], Buffer.from(`${paths[index]}:changed`))
       const result = validateCutoverInputStateV1({
-        closure,
+        closure_input: closureInput,
         index_entries: indexEntries,
         object_format: 'sha1',
         index_blob_bytes_by_path: bytes,
         working_tree_bytes_by_path: working,
-        excluded_paths: [],
-        build_output_paths: [],
       })
       assert.deepEqual(result.violations, [{
         code: 'cutover-input-closure-incomplete',

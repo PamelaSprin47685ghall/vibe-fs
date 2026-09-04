@@ -11,6 +11,7 @@ open Wanxiangshu.Persistence.Journal
 [<RequireQualifiedAccess>]
 module DispatchSurface =
     val internal sessionPort: port: obj -> ISessionHostPort
+    val internal rootWorkspaceReader: directory: obj -> IRootWorkspaceReader
 
     /// JS-safe controlled Host child listing for adapter proofs. The F# Result
     /// and OpenCodeChildInfo representations stay on this registered surface.
@@ -27,6 +28,7 @@ module DispatchSurface =
     val fatal: reason: string -> Outcome.SendOutcome
 
     val decodePhysicalUserMessageId: input: obj -> output: obj -> obj
+    val decodeIngress: input: obj -> output: obj -> obj
 
     /// Seed the durable AgentOwnerRoot needed by a continuation owner. This is
     /// the same PromptFact writer used by production ingress; the returned value

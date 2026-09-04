@@ -188,9 +188,14 @@ module FissionHostSurface =
             let turn = dummyTurn owner
             let quiescence = SessionQuiescenceGate()
 
+            let rootWorkspace =
+                { new IRootWorkspaceReader with
+                    member _.TryRead() = None }
+
             let! handled =
                 FissionHost.observeLaneTurn
                     sessionPort
+                    rootWorkspace
                     eventPort
                     None
                     (HashSet<string>())
@@ -208,6 +213,7 @@ module FissionHostSurface =
             do!
                 OrdinaryTurnWorkflow.observe
                     sessionPort
+                    rootWorkspace
                     eventPort
                     None
                     (PluginBloggerScope() :> IBloggerRuntimeHost)
@@ -221,7 +227,14 @@ module FissionHostSurface =
                 { context with
                     Delivery = ReconciledTurnDelivery.IdleRevisit }
 
-            do! OrdinaryTurnWorkflow.observeIdle (SessionQuiescenceGate()) sessionPort eventPort None idleContext
+            do!
+                OrdinaryTurnWorkflow.observeIdle
+                    (SessionQuiescenceGate())
+                    sessionPort
+                    rootWorkspace
+                    eventPort
+                    None
+                    idleContext
 
             return
                 box

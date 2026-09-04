@@ -7,18 +7,19 @@ import {
   addReviewGuardNudge,
   hasReviewGuardNudge,
   clearReviewGuardNudges,
-  setRootWorkspace,
-  clearRootWorkspace,
+  tryBindRootWorkspace,
   tryGetRootWorkspace,
+  firstBoundRootWorkspace,
+  selectContinuationDirectory,
 } from '../../../dist/OpenCode/Host/SharedStateSurface.js'
+import * as sharedStateSurface from '../../../dist/OpenCode/Host/SharedStateSurface.js'
 
 // HOST-BOUNDARY-010 / HOST-012: SessionParents / VerdictSessions /
 // SessionDirectories / ReviewGuardNudges are module-level shared singletons
 // (OpenCode/Host/SharedState.fs). All plugin instances — root and worktree —
 // read/write the same state through the SharedStateSurface boundary; the
-// physical Map/Set/atom singletons stay opaque behind narrow put/get/clear
-// operations. RootWorkspace is a mutable atom set by whichever plugin instance
-// boots first. The behavioral proof: a mutation made through one import is
+// physical Map/Set singletons stay opaque behind narrow put/get/clear
+// operations. The behavioral proof: a mutation made through one import is
 // visible through a fresh dynamic import — a per-instance copy (the HOST-012
 // failure mode) would not retain the entry.
 
@@ -49,12 +50,29 @@ test('WHAT[HOST-BOUNDARY-010] SHARED_dictionaries_are_live_singletons_shared_acr
   clearReviewGuardNudges()
 })
 
-test('WHAT[HOST-BOUNDARY-010] SHARED_root_workspace_atom_round_trips_and_restores', () => {
-  // RootWorkspace is a mutable atom: the worktree plugin pins its blogger
-  // companion here so the system prompt survives the manager worktree release
-  // at publish. Round-trip set → read → clear → read must hold.
-  setRootWorkspace('/tmp/shared-root-workspace')
-  assert.equal(tryGetRootWorkspace(), '/tmp/shared-root-workspace')
-  clearRootWorkspace()
+test('WHAT[HOST-BOUNDARY-031] SHARED_root_workspace_is_first_bound_behind_typed_capabilities', async () => {
   assert.equal(tryGetRootWorkspace(), null)
+  assert.equal(tryBindRootWorkspace(null), false, 'None must not occupy the first-bind slot')
+  assert.equal(tryBindRootWorkspace(''), false, 'blank must not occupy the first-bind slot')
+  assert.equal(tryBindRootWorkspace('  '), false, 'whitespace must not occupy the first-bind slot')
+  assert.equal(tryGetRootWorkspace(), null)
+
+  const attempts = await Promise.all(
+    ['/tmp/first-root-workspace', '/tmp/concurrent-root-workspace']
+      .map(candidate => Promise.resolve().then(() => ({ candidate, bound: tryBindRootWorkspace(candidate) }))),
+  )
+  const winners = attempts.filter(attempt => attempt.bound)
+  assert.equal(winners.length, 1, 'concurrent contenders must produce one winner')
+  assert.equal(tryGetRootWorkspace(), winners[0].candidate)
+
+  assert.equal(tryBindRootWorkspace('/tmp/second-root-workspace'), false)
+  assert.equal(tryGetRootWorkspace(), winners[0].candidate, 'a later plugin cannot overwrite the root')
+
+  assert.equal(firstBoundRootWorkspace([null, '', '  ', '/tmp/later']), '/tmp/later')
+  assert.equal(selectContinuationDirectory('/tmp/live', true, '/tmp/root'), '/tmp/live')
+  assert.equal(selectContinuationDirectory('/tmp/deleted', false, '/tmp/root'), '/tmp/root')
+  assert.equal(selectContinuationDirectory('/tmp/deleted', false, null), null)
+
+  assert.equal('setRootWorkspace' in sharedStateSurface, false)
+  assert.equal('clearRootWorkspace' in sharedStateSurface, false)
 })

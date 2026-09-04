@@ -418,6 +418,35 @@ user = "go"
   },
 
   {
+    name: 'VERIFY-003 waitAny accepts two exact declared alternatives',
+    fn: () => {
+      accepts(`scenario = "p"
+flow = [ { prompt = { text = "go" } }, { waitAny = ["a.0", "a.1"] } ]
+
+[[turn]]
+id = "a"
+user = "go"
+
+  [[turn.step]]
+  respond = { type = "text", text = "first" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "second" }
+`);
+    },
+  },
+
+  {
+    name: 'VERIFY-003 waitAny rejects malformed and dangling alternatives',
+    fn: () => {
+      rejects(minimal().replace('flow = [ { prompt = { text = "go" } } ]', 'flow = [ { prompt = { text = "go" } }, { waitAny = "a.0" } ]'), 'waitAny must be an array');
+      rejects(minimal().replace('flow = [ { prompt = { text = "go" } } ]', 'flow = [ { prompt = { text = "go" } }, { waitAny = ["a.0"] } ]'), 'waitAny requires at least two');
+      rejects(minimal().replace('flow = [ { prompt = { text = "go" } } ]', 'flow = [ { prompt = { text = "go" } }, { waitAny = ["a.0", "a.0"] } ]'), 'waitAny alternatives must be unique');
+      rejects(minimal().replace('flow = [ { prompt = { text = "go" } } ]', 'flow = [ { prompt = { text = "go" } }, { waitAny = ["a.0", "ghost"] } ]'), "waitAny references 'ghost'");
+    },
+  },
+
+  {
     name: 'VERIFY-003 must and wait may name a turn or a step',
     fn: () => {
       // Both granularities are useful: a turn id for "this exchange happened", a step

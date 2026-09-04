@@ -13,6 +13,8 @@
 
 ### Sensor-owned interruption + continuation
 
+`LoopEventCodec`在独立`loop-event-codec` contract中只消费`host-event-envelope`；`execution-session-loopdetector`因此不再获得完整Host signal、provider terminal或diagnostics实现。`LoopSensor`的诊断能力是Host composition必填注入的窄callback；sensor在自身边界吸收callback异常，诊断成败不改变arm、interrupt、consume或continuation。
+
 1. `LoopSensor.Observe` 只消费 Host text/reasoning delta，并为每个 eligible session 持有 fresh detector。
 2. 首次异常把 `DegenerationKind` 写入进程内 armed map，然后调用 `InterruptAttempt`；后续 delta 因 armed 状态被忽略。
 3. Host 原有 reconciliation 在 `TurnAborted` 分类点调用 sensor 的 consume operation。该 operation 原子取走 anomaly，并由 sensor 自己调用注入的 continuation port；因此 continuation 的时间位置与旧 abort classification 点一致。

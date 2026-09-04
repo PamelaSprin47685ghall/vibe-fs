@@ -303,11 +303,6 @@
       "justification": "Signed JS-native projection over the durable session-association contract; parser/boxing helpers stay private and the surface grants no additional foreign semantic contract."
     },
     {
-      "path": "src/Wanxiangshu/Execution/Session/Wait/Bridge.fs",
-      "owner": "causal-wait",
-      "justification": "Signed diagnostics-only filesystem bridge over causal-wait snapshots; Node fs/path imports and serialization helpers stay private and it grants no business control authority."
-    },
-    {
       "path": "src/Wanxiangshu/Execution/Session/Wait/Surface.fs",
       "owner": "causal-wait",
       "justification": "Signed JS-native facade over causal-wait contracts; registry/lease wrappers and JS invocation helpers remain private and the surface grants no additional semantic contract."
@@ -705,7 +700,7 @@
     {
       "path": "src/Wanxiangshu/OpenCode/Signals/HostSignalSubscribe.fs",
       "owner": "host-boundary",
-      "justification": "Signed physical Host signal subscription capability with typed health/disposal result; dynamic listener invocation remains hidden."
+      "justification": "Signed physical Host signal subscription capability with closed error/mode vocabulary and an opaque owned disposer; dynamic listener invocation remains hidden."
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/HostSignalSubscribeSurface.fs",
@@ -961,7 +956,12 @@
     {
       "path": "src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs",
       "owner": "host-boundary",
-      "justification": "Signed JS-native boundary for HOST-BOUNDARY-010 / HOST-012 shared cross-instance state; the physical Map/Set/atom singletons in SharedState remain signature-hidden and only narrow put/get/clear/root operations cross the edge."
+      "justification": "Signed JS-native boundary for HOST-BOUNDARY-010 / HOST-012 / HOST-BOUNDARY-031 process-local Host resources; the physical SharedState collections and RootWorkspace runtime cell remain signature-hidden behind their typed capabilities."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/RootWorkspaceRuntime.fs",
+      "owner": "host-boundary",
+      "justification": "Signed process-local implementation of the RootWorkspace first-bind capability; the private cell has no setter, clear, Git discovery or foreign consumer surface."
     },
     {
       "path": "src/Wanxiangshu/Repository/Knowledge/Casebook/SessionDraft.fs",
@@ -1847,6 +1847,21 @@
     },
     {
       "owner": "host-boundary",
+      "locality": "host-event-envelope",
+      "justification": "Raw Host envelope projection is one signed immutable contract locality over opaque session identity."
+    },
+    {
+      "owner": "host-boundary",
+      "locality": "host-message-codec",
+      "justification": "Raw Host message-part decoding is one signed stateless contract locality over canonical Host message vocabulary."
+    },
+    {
+      "owner": "host-boundary",
+      "locality": "loop-event-codec",
+      "justification": "Loop text-delta decoding is one signed stateless contract locality over the immutable Host envelope projection."
+    },
+    {
+      "owner": "host-boundary",
       "locality": "host-signal-adapter",
       "justification": "Host signal adapter, signal router, listener subscription and terminal event bus form one adapter locality over host signal and diagnostics runtimes."
     },
@@ -2263,7 +2278,32 @@
     {
       "owner": "time-capability",
       "locality": "foundation-temporal",
-      "justification": "Clock/deadline capabilities, session-start projection and registered Node/virtual timing adapters form one signed locality depending only on graduated bounded-task primitives; DeadlineSurface is signed representation support."
+      "justification": "DeadlineSurface and the registered temporal representation Surface form one composition locality; formulas and factories remain in their narrower provider localities."
+    },
+    {
+      "owner": "time-capability",
+      "locality": "foundation-temporal-contract",
+      "justification": "Clock, timer and deadline-handle capability types form a zero-dependency bounded contract with no physical value or factory."
+    },
+    {
+      "owner": "time-capability",
+      "locality": "process-deadline-contract",
+      "justification": "The immutable Deadline value and its pure calculations form a zero-dependency bounded contract."
+    },
+    {
+      "owner": "time-capability",
+      "locality": "execution-session-sessionstartedatprojection",
+      "justification": "The bind-once SessionStartedAt projection forms a zero-dependency bounded contract independent of timing implementations."
+    },
+    {
+      "owner": "time-capability",
+      "locality": "process-node-timing-adapter",
+      "justification": "The Node clock and timer physical implementations form one adapter locality independent of virtual verification state."
+    },
+    {
+      "owner": "time-capability",
+      "locality": "process-virtual-timing",
+      "justification": "Virtual clock and timer factories form one verification runtime locality unavailable to ordinary production consumers."
     },
     {
       "owner": "provider-projection",
@@ -2292,8 +2332,38 @@
     },
     {
       "owner": "causal-wait",
-      "locality": "execution-session-wait-causalwait",
-      "justification": "Causal wait vocabulary, mailbox/observer capabilities and await mechanisms depend only on graduated completion, identity, task and timing boundaries; diagnostics bridge and JS facade are explicitly signed support."
+      "locality": "execution-session-wait-contract",
+      "justification": "Causal wait identity, frontier and reader/writer capability vocabulary form a zero-dependency contract."
+    },
+    {
+      "owner": "causal-wait",
+      "locality": "execution-session-wait-runtime",
+      "justification": "The process-local registry and causal await implementation depend only on the causal-wait and temporal capability contracts."
+    },
+    {
+      "owner": "causal-wait",
+      "locality": "execution-session-wait-diagnostic-adapter",
+      "justification": "The Node filesystem diagnostic sink is isolated behind the causal-wait diagnostic capability."
+    },
+    {
+      "owner": "causal-wait",
+      "locality": "execution-session-wait-completion-mailbox",
+      "justification": "CompletionMailbox owns its process-local physical wake resource independently of causal-wait observation."
+    },
+    {
+      "owner": "causal-wait",
+      "locality": "execution-session-wait-proof-surface",
+      "justification": "The JS proof Surface composes owner capabilities for verification and has no production consumer."
+    },
+    {
+      "owner": "host-boundary",
+      "locality": "host-root-workspace-contract",
+      "justification": "RootWorkspace first-bind and read capability types plus the pure live-directory selector form a zero-dependency Host contract."
+    },
+    {
+      "owner": "host-boundary",
+      "locality": "host-root-workspace-runtime",
+      "justification": "The process-local first-bind cell is private to this Host runtime and only exposes the contract binder and reader capabilities."
     },
     {
       "owner": "obligation-ledger",
@@ -4201,9 +4271,13 @@
       "contract": "Session.Quiescence",
       "kind": "published-contract",
       "consumers": [
+        "action-affordance",
+        "capability-enforcement",
         "change-integration",
         "delegation",
-        "finality"
+        "finality",
+        "host-boundary",
+        "managed-session-lifecycle"
       ],
       "symbols": [
         "Wanxiangshu.Execution.Session.Wait.CausalOwner.create",
@@ -4211,46 +4285,12 @@
         "Wanxiangshu.Execution.Session.Wait.CausalProducerRef.WorkflowProducer",
         "Wanxiangshu.Execution.Session.Wait.DiagnosticWait",
         "Wanxiangshu.Execution.Session.Wait.DiagnosticWaitModule.create",
-        "Wanxiangshu.Execution.Session.Wait.WaitEscape",
-        "Wanxiangshu.Execution.Session.Wait.WaitEscape.CancelledBy",
-        "Wanxiangshu.Execution.Session.Wait.WaitEscape.DeadlineAt",
-        "Wanxiangshu.Execution.Session.Wait.WaitEscape.OpenEndedExternal",
-        "Wanxiangshu.Execution.Session.Wait.WaitEscape.ProcessLifetime",
-        "Wanxiangshu.Execution.Session.Wait.WaitEscape.SessionLifetime"
-      ],
-      "justification": "Session.Quiescence publishes exactly these symbols to the listed owners; every unlisted sibling remains private to causal-wait."
-    },
-    {
-      "path": "src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs",
-      "owner": "causal-wait",
-      "node": "execution-quiescence",
-      "contract": "Session.Quiescence",
-      "kind": "published-contract",
-      "consumers": [
-        "change-integration",
-        "delegation",
-        "host-boundary",
-        "time-capability"
-      ],
-      "symbols": [
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.Cancel",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.DrainAgentWakes",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.DrainPtyCompletions",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.IsCancelled",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PendingCount",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PendingPtyCount",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PublishPtyCompletion",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PulseAgentHandle",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PulseWake",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.WaitForSignal",
-        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.WaitForWake",
+        "Wanxiangshu.Execution.Session.Wait.IWaitObserver",
         "Wanxiangshu.Execution.Session.Wait.JoinBatch.Max",
         "Wanxiangshu.Execution.Session.Wait.JoinBatch.MaxJoinBatch",
         "Wanxiangshu.Execution.Session.Wait.JoinInterrupt",
         "Wanxiangshu.Execution.Session.Wait.JoinInterrupt.Signal",
         "Wanxiangshu.Execution.Session.Wait.JoinInterrupt.Wait",
-        "Wanxiangshu.Execution.Session.Wait.JoinInterruptModule.create",
         "Wanxiangshu.Execution.Session.Wait.JoinInterruptReason",
         "Wanxiangshu.Execution.Session.Wait.JoinInterruptReason.DeadlineExpired",
         "Wanxiangshu.Execution.Session.Wait.JoinInterruptReason.OperatorAbort",
@@ -4265,7 +4305,34 @@
         "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch.ofHeadTail",
         "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch.toList",
         "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch.tryOfList",
-        "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch`1"
+        "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch`1",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.CancelledBy",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.DeadlineAt",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.OpenEndedExternal",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.ProcessLifetime",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.SessionLifetime"
+      ],
+      "symbol_roots": [
+        "Wanxiangshu.Execution.Session.Wait.ICompletionMailbox"
+      ],
+      "justification": "Session.Quiescence publishes exactly these symbols to the listed owners; every unlisted sibling remains private to causal-wait."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs",
+      "owner": "causal-wait",
+      "node": "execution-quiescence",
+      "contract": "Session.Quiescence",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "delegation",
+        "finality",
+        "host-boundary",
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailboxRuntime.create"
       ],
       "justification": "Session.Quiescence publishes exactly these symbols to the listed owners; every unlisted sibling remains private to causal-wait."
     },
@@ -4276,16 +4343,33 @@
       "contract": "Session.Quiescence",
       "kind": "physical-port",
       "consumers": [
+        "action-affordance",
         "change-integration",
         "delegation",
         "finality",
         "host-boundary"
       ],
       "symbols": [
-        "Wanxiangshu.Execution.Session.Wait.CausalWaitHub.observer",
-        "Wanxiangshu.Execution.Session.Wait.CausalWaitHub.setWorkspace"
+        "Wanxiangshu.Execution.Session.Wait.CausalWaitProcess.local",
+        "Wanxiangshu.Execution.Session.Wait.CausalWaitRuntime",
+        "Wanxiangshu.Execution.Session.Wait.CausalWaitRuntime.BindDiagnosticTarget",
+        "Wanxiangshu.Execution.Session.Wait.CausalWaitRuntime.Observer"
       ],
       "justification": "The listed owners consume this exact process-local causal-wait port; it carries no durable business state."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Wait/Bridge.fs",
+      "owner": "causal-wait",
+      "node": "execution-quiescence",
+      "contract": "Session.Quiescence",
+      "kind": "physical-port",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.Wait.CausalWaitBridge.target"
+      ],
+      "justification": "Host composition consumes the exact Node diagnostic sink factory; no business workflow receives filesystem authority."
     },
     {
       "path": "src/Wanxiangshu/Git/Gateway.fs",
@@ -5426,7 +5510,6 @@
         "Wanxiangshu.OpenCode.SharedState.BloggerFlights",
         "Wanxiangshu.OpenCode.SharedState.BloggerMaterializationAdmission",
         "Wanxiangshu.OpenCode.SharedState.ReviewGuardNudges",
-        "Wanxiangshu.OpenCode.SharedState.RootWorkspace",
         "Wanxiangshu.OpenCode.SharedState.SessionDirectories",
         "Wanxiangshu.OpenCode.SharedState.SessionParents",
         "Wanxiangshu.OpenCode.SharedState.VerdictSubmissions",
@@ -9209,7 +9292,7 @@
       "justification": "time-capability.Contract publishes exactly these symbols to 'durable-events'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9218,13 +9301,13 @@
         "change-integration"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.raceExit",
-        "Wanxiangshu.Process.PtyTiming.timerTask"
+        "Wanxiangshu.Process.NodeTiming.raceExit",
+        "Wanxiangshu.Process.NodeTiming.timerTask"
       ],
       "justification": "time-capability.Contract publishes exactly these symbols to 'change-integration'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9233,14 +9316,14 @@
         "delegation"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.nodeClockPort",
-        "Wanxiangshu.Process.PtyTiming.raceExit",
-        "Wanxiangshu.Process.PtyTiming.timerTask"
+        "Wanxiangshu.Process.NodeTiming.nodeClockPort",
+        "Wanxiangshu.Process.NodeTiming.raceExit",
+        "Wanxiangshu.Process.NodeTiming.timerTask"
       ],
       "justification": "time-capability.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9249,12 +9332,12 @@
         "review-judgement"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.raceExit"
+        "Wanxiangshu.Process.NodeTiming.raceExit"
       ],
       "justification": "time-capability.Contract publishes exactly these symbols to 'review-judgement'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9263,13 +9346,13 @@
         "host-boundary"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.nodeClockPort",
-        "Wanxiangshu.Process.PtyTiming.nodeTimerPort"
+        "Wanxiangshu.Process.NodeTiming.nodeClockPort",
+        "Wanxiangshu.Process.NodeTiming.nodeTimerPort"
       ],
       "justification": "time-capability.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9278,12 +9361,12 @@
         "output-distillation"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.timerTask"
+        "Wanxiangshu.Process.NodeTiming.timerTask"
       ],
       "justification": "time-capability.Contract publishes exactly these symbols to 'output-distillation'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9292,13 +9375,13 @@
         "process-execution"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.raceExit",
-        "Wanxiangshu.Process.PtyTiming.timerTask"
+        "Wanxiangshu.Process.NodeTiming.raceExit",
+        "Wanxiangshu.Process.NodeTiming.timerTask"
       ],
       "justification": "time-capability.Contract publishes exactly these symbols to 'process-execution'; every unlisted sibling remains private to time-capability."
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/VirtualTiming.fs",
       "owner": "time-capability",
       "node": "time-capability-frontier-keep",
       "contract": "time-capability.Contract",
@@ -9307,8 +9390,8 @@
         "verification-system"
       ],
       "symbols": [
-        "Wanxiangshu.Process.PtyTiming.createVirtualClockPort",
-        "Wanxiangshu.Process.PtyTiming.createVirtualTimerPort",
+        "Wanxiangshu.Process.VirtualTiming.createVirtualClockPort",
+        "Wanxiangshu.Process.VirtualTiming.createVirtualTimerPort",
         "Wanxiangshu.Process.VirtualClockPort",
         "Wanxiangshu.Process.VirtualClockPort.AdvanceMs",
         "Wanxiangshu.Process.VirtualClockPort.Port",
@@ -15419,7 +15502,7 @@
       "justification": "The Foundation canonical JSON encoder publishes one Unicode code-point identity formula to the exact production consumers; every unlisted sibling remains private to dispatch-protocol."
     },
     {
-      "path": "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs",
+      "path": "src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs",
       "owner": "host-boundary",
       "node": "host-boundary-frontier-keep",
       "contract": "host-boundary.Contract",
@@ -15428,14 +15511,14 @@
         "delegation"
       ],
       "symbols": [
-        "Wanxiangshu.OpenCode.HostEventCodec.eventTypeOf",
-        "Wanxiangshu.OpenCode.HostEventCodec.trySessionId",
-        "Wanxiangshu.OpenCode.HostEventCodec.unwrap"
+        "Wanxiangshu.OpenCode.HostEventEnvelope.eventTypeOf",
+        "Wanxiangshu.OpenCode.HostEventEnvelope.trySessionId",
+        "Wanxiangshu.OpenCode.HostEventEnvelope.unwrap"
       ],
       "justification": "host-boundary.Contract publishes exactly these symbols to 'delegation'; every unlisted sibling remains private to host-boundary."
     },
     {
-      "path": "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs",
+      "path": "src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs",
       "owner": "host-boundary",
       "node": "host-boundary-frontier-keep",
       "contract": "host-boundary.Contract",
@@ -15444,9 +15527,9 @@
         "participant-horizon"
       ],
       "symbols": [
-        "Wanxiangshu.OpenCode.HostEventCodec.eventTypeOf",
-        "Wanxiangshu.OpenCode.HostEventCodec.tryMessageSessionId",
-        "Wanxiangshu.OpenCode.HostEventCodec.unwrap"
+        "Wanxiangshu.OpenCode.HostEventEnvelope.eventTypeOf",
+        "Wanxiangshu.OpenCode.HostEventEnvelope.tryMessageSessionId",
+        "Wanxiangshu.OpenCode.HostEventEnvelope.unwrap"
       ],
       "justification": "host-boundary.Contract publishes exactly these symbols to 'participant-horizon'; every unlisted sibling remains private to host-boundary."
     },
@@ -17032,6 +17115,32 @@
         "Wanxiangshu.OpenCode.ProviderSystemTransform.create"
       ],
       "justification": "host-boundary.Contract publishes exactly these symbols to 'provider-language'; every unlisted sibling remains private to host-boundary."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/RootWorkspace.fs",
+      "owner": "host-boundary",
+      "node": "host-root-workspace-effect-isolation",
+      "contract": "Host.RootWorkspace.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "delegation",
+        "dispatch-protocol",
+        "finality",
+        "interaction-authority",
+        "intra-participant-parallelism",
+        "managed-session-lifecycle",
+        "provider-attempt-recovery",
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.IRootWorkspaceBinder",
+        "Wanxiangshu.OpenCode.IRootWorkspaceBinder.TryBind",
+        "Wanxiangshu.OpenCode.IRootWorkspaceReader",
+        "Wanxiangshu.OpenCode.IRootWorkspaceReader.TryRead",
+        "Wanxiangshu.OpenCode.RootWorkspaceDirectory.select"
+      ],
+      "justification": "Host.RootWorkspace.Contract publishes only typed first-bind/read capabilities and the pure fallback selector; the process-local cell and acquisition remain runtime-private."
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/SessionContract.fs",
@@ -19561,12 +19670,6 @@
             "Wanxiangshu.OpenCode.PluginRuntimeScope.RunBackground",
             "Wanxiangshu.OpenCode.PluginRuntimeScope.Sessions",
             "Wanxiangshu.OpenCode.PluginRuntimeScope.Strength"
-          ]
-        },
-        {
-          "path": "src/Wanxiangshu/OpenCode/Host/SharedState.fs",
-          "symbols": [
-            "Wanxiangshu.OpenCode.SharedState.RootWorkspace"
           ]
         }
       ],

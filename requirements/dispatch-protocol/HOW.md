@@ -25,6 +25,7 @@
 
 5. **Host physical identity 解码**：
    `PromptIngressCodec` 只读取 Host 1.18.18 契约中的 `input.messageID` 与 `output.message.id`。空白 carrier 视为缺失；两个非空 carrier 必须保持原始字节完全一致。缺失、冲突、仅有非契约字段时均不生成 `PhysicalUserMessageId`。
+   `SessionId` carrier先逐字段解码为`Absent | Invalid | Valid opaque-string`，再跨四个正式source汇总：存在`Invalid`或多个不同`Valid`即拒绝，全部`Valid`原始字节相同才建立identity。嵌套`session`只接受plain JSON record的own data property；agent与PromptKey复用相同汇总器，禁止字段优先级掩盖冲突。测试从注册的dispatch production Surface穿越Fable边界，并以source × alias × value-kind × multiplicity生成完整partition。
 
 ## 验证与测试落点
 
@@ -44,3 +45,4 @@
 | DISPATCH-PROTOCOL-012 | `requirements/dispatch-protocol/tests/send-format.test.mjs::WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_identity_to_managed_execution` |
 | DISPATCH-PROTOCOL-013 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs::WHAT[DISPATCH-PROTOCOL-013] DP_013_construction_waits_for_durability_activation_before_explicit_recovery` |
 | DISPATCH-PROTOCOL-014 | `requirements/dispatch-protocol/tests/m6-fatal-boundary.test.mjs::WHAT[DISPATCH-PROTOCOL-014] dispatch fatal preserves exact claim truth and one injected fuse` |
+| DISPATCH-PROTOCOL-015 | `requirements/dispatch-protocol/tests/ingress-wire-algebra.test.mjs::WHAT[DISPATCH-PROTOCOL-015] ingress identity carrier algebra is exact conflict closed and byte preserving`；`requirements/dispatch-protocol/tests/ingress-wire-algebra.property.test.mjs::WHAT[DISPATCH-PROTOCOL-015] ingress identity property rejects every malformed or ambiguous carrier world` |

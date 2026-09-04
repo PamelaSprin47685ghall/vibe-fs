@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -24,6 +25,8 @@ open Wanxiangshu.Persistence.Journal
 type ToolRuntimeScope =
     new:
         sessions: ISessionHostPort *
+        waitObserver: IWaitObserver *
+        rootWorkspace: IRootWorkspaceReader *
         journal: AgentJournal option *
         gitTreePort: GitTreePort option *
         workspaceDirectory: string option *
@@ -45,6 +48,8 @@ type ToolRuntimeScope =
 
     member FinalityReviewerTimeoutMs: int option
     member Sessions: ISessionHostPort
+    member WaitObserver: IWaitObserver
+    member RootWorkspace: IRootWorkspaceReader
     member Journal: AgentJournal option
     member Snapshot: ISessionSnapshotPort option
     member EventPort: IEventObservationPort option

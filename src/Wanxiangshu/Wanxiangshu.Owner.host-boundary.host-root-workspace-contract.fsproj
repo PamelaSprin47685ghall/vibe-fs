@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>host-root-workspace-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="OpenCode/Host/RootWorkspace.fsi"/>
+    <Compile Include="OpenCode/Host/RootWorkspace.fs"/>
+  </ItemGroup>
+</Project>

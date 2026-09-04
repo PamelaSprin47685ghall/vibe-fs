@@ -9,6 +9,7 @@ import {
 import {
   capabilityDispositionViolatesContractV1,
   javascriptTraversalIdV1,
+  validateCanonicalCapabilityFactV1,
 } from './capability-observations-v1.mjs'
 
 export class GeneratedArtifactV1Error extends TypeError {
@@ -142,21 +143,232 @@ const countBy = (rows, identity) => {
 
 const bytesAt = (map, key) => map instanceof Map ? map.get(key) : map?.[key]
 
+const exactKeys = (value, keys) => {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+  const actual = Object.keys(value).sort(compareCanonicalTextV1)
+  const expected = [...keys].sort(compareCanonicalTextV1)
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index])
+}
+
+const nonEmptyText = (value) => typeof value === 'string' && value.length > 0
+const digestValid = (value) => typeof value === 'string' && /^sha256:[0-9a-f]{64}$/.test(value)
+
+const repositoryPathValid = (value, jsonPath) => {
+  try {
+    assertRepositoryPathV1(value, jsonPath)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const entryPointValid = (value, jsonPath) => exactKeys(value, ['path', 'entry'])
+  && repositoryPathValid(value.path, `${jsonPath}.path`)
+  && nonEmptyText(value.entry)
+
+const linkageValid = (value, jsonPath) => exactKeys(value, [
+  'import_specifier',
+  'package_import_target',
+  'generator_path',
+  'generator_entry',
+  'input_selector_path',
+  'input_selector_entry',
+  'build_path',
+  'build_entry',
+])
+  && [value.import_specifier, value.package_import_target, value.generator_entry, value.input_selector_entry, value.build_entry].every(nonEmptyText)
+  && [value.generator_path, value.input_selector_path, value.build_path]
+    .every((entryPath) => repositoryPathValid(entryPath, jsonPath))
+
+const sortedUniqueTexts = (values) => Array.isArray(values)
+  && values.every(nonEmptyText)
+  && values.every((value, index) => index === 0 || compareCanonicalTextV1(values[index - 1], value) < 0)
+
+const sortedUniqueEntries = (values, jsonPath) => Array.isArray(values)
+  && values.every((value, index) => entryPointValid(value, `${jsonPath}[${index}]`))
+  && values.every((value, index) => index === 0
+    || compareCanonicalTextV1(`${values[index - 1].path}\0${values[index - 1].entry}`, `${value.path}\0${value.entry}`) < 0)
+
+const entryReachabilityIdentity = ({ from_entry: fromEntry, to_entry: toEntry }) =>
+  `${fromEntry.path}\0${fromEntry.entry}\0${toEntry.path}\0${toEntry.entry}`
+
+const entryReachabilityValid = (value, jsonPath) => exactKeys(value, ['from_entry', 'to_entry'])
+  && entryPointValid(value.from_entry, `${jsonPath}.from_entry`)
+  && entryPointValid(value.to_entry, `${jsonPath}.to_entry`)
+
+const sortedUniqueEntryReachability = (values, jsonPath) => Array.isArray(values)
+  && values.every((value, index) => entryReachabilityValid(value, `${jsonPath}[${index}]`))
+  && values.every((value, index) => index === 0
+    || compareCanonicalTextV1(entryReachabilityIdentity(values[index - 1]), entryReachabilityIdentity(value)) < 0)
+
+const generatedRelationValid = (value) => exactKeys(value, [
+  'id',
+  'kind',
+  'consumer_locality',
+  'import_specifier',
+  'generated_owner',
+  'package_import_target',
+  'generator',
+  'build_invocation',
+  'input_selector',
+  'runtime_surface_module',
+  'laws',
+  'determinism_proof',
+  'justification',
+])
+  && value.kind === 'compile-contract-support'
+  && [
+    value.id,
+    value.consumer_locality,
+    value.import_specifier,
+    value.generated_owner,
+    value.package_import_target,
+    value.runtime_surface_module,
+    value.justification,
+  ].every(nonEmptyText)
+  && entryPointValid(value.generator, '$.relations.generator')
+  && entryPointValid(value.build_invocation, '$.relations.build_invocation')
+  && entryPointValid(value.input_selector, '$.relations.input_selector')
+  && sortedUniqueTexts(value.laws)
+  && exactKeys(value.determinism_proof, ['path', 'title', 'what_id'])
+  && repositoryPathValid(value.determinism_proof.path, '$.relations.determinism_proof.path')
+  && [value.determinism_proof.title, value.determinism_proof.what_id].every(nonEmptyText)
+
+const generatedArtifactValid = (value) => exactKeys(value, [
+  'id',
+  'artifact_path',
+  'artifact_digest',
+  'selected_inputs_digest',
+  'linkage',
+  'javascript_traversal_id',
+])
+  && [value.id, value.javascript_traversal_id].every(nonEmptyText)
+  && repositoryPathValid(value.artifact_path, '$.artifacts.artifact_path')
+  && [value.artifact_digest, value.selected_inputs_digest].every(digestValid)
+  && linkageValid(value.linkage, '$.artifacts.linkage')
+
+const nonNegativeInteger = (value) => Number.isSafeInteger(value) && value >= 0
+
+const javascriptTraversalValid = (value) => exactKeys(value, [
+  'id',
+  'source_kind',
+  'source_id',
+  'ast_node_count',
+  'visited_node_count',
+  'no_capability_node_count',
+  'capability_emitting_node_count',
+  'unknown_node_count',
+  'ast_node_set_digest',
+  'visit_partition_digest',
+])
+  && [value.id, value.source_id].every(nonEmptyText)
+  && ['fable-emit', 'emit-js-expr', 'generated-artifact'].includes(value.source_kind)
+  && [
+    value.ast_node_count,
+    value.visited_node_count,
+    value.no_capability_node_count,
+    value.capability_emitting_node_count,
+    value.unknown_node_count,
+  ].every(nonNegativeInteger)
+  && value.ast_node_count > 0
+  && value.ast_node_count === value.visited_node_count
+  && value.visited_node_count === value.no_capability_node_count
+    + value.capability_emitting_node_count
+    + value.unknown_node_count
+  && [value.ast_node_set_digest, value.visit_partition_digest].every(digestValid)
+
+const traversalObservationSetValid = (value) => exactKeys(value, ['traversal_id', 'emitted_observation_ids'])
+  && nonEmptyText(value.traversal_id)
+  && sortedUniqueTexts(value.emitted_observation_ids)
+
+const semanticKey = ({ consumer_locality: consumerLocality, import_specifier: importSpecifier }) =>
+  `${consumerLocality}\0${importSpecifier}`
+
+const actualImportValid = (value) => exactKeys(value, ['consumer_locality', 'import_specifier', 'package_import_target', 'artifact_id', 'imported_members'])
+  && [value.consumer_locality, value.import_specifier, value.package_import_target, value.artifact_id].every(nonEmptyText)
+  && sortedUniqueTexts(value.imported_members)
+
+const executionLineageValid = (value) => exactKeys(value, ['consumer_locality', 'import_specifier', 'artifact_id', 'entry_reachability'])
+  && [value.consumer_locality, value.import_specifier, value.artifact_id].every(nonEmptyText)
+  && sortedUniqueEntryReachability(value.entry_reachability, '$.execution_lineage.entry_reachability')
+
+const runtimeSurfaceValid = (value) => exactKeys(value, ['module', 'owner', 'laws', 'exported_members'])
+  && [value.module, value.owner].every(nonEmptyText)
+  && sortedUniqueTexts(value.laws)
+  && sortedUniqueTexts(value.exported_members)
+
+const proofObservationValid = (value) => exactKeys(value, [
+  'consumer_locality',
+  'import_specifier',
+  'owner',
+  'path',
+  'title',
+  'what_id',
+  'reached_entries',
+  'used_surface_modules',
+])
+  && [value.consumer_locality, value.import_specifier, value.owner, value.title, value.what_id].every(nonEmptyText)
+  && repositoryPathValid(value.path, '$.proof_observations.path')
+  && sortedUniqueEntries(value.reached_entries, '$.proof_observations.reached_entries')
+  && sortedUniqueTexts(value.used_surface_modules)
+
+const exactCanonical = (left, right) => encodeCanonicalJsonV1(left) === encodeCanonicalJsonV1(right)
+
+const relationEntryReachability = (relation) => [
+  { from_entry: relation.build_invocation, to_entry: relation.generator },
+  { from_entry: relation.generator, to_entry: relation.input_selector },
+].map((entry) => structuredClone(entry)).sort((left, right) => compareCanonicalTextV1(
+  entryReachabilityIdentity(left),
+  entryReachabilityIdentity(right),
+))
+
+const artifactIdFromFact = (fact) => {
+  if (fact.observation.case === 'javascript-capability') return fact.observation.payload.generated_artifact_id
+  if (fact.observation.case === 'fable-import') return fact.observation.payload.generated_artifact_id
+  return null
+}
+
+const importFactsFor = (facts, actualImport) => facts.filter(({ observation }) => observation.case === 'fable-import'
+  && observation.payload.generated_artifact_id === actualImport.artifact_id
+  && observation.payload.module_specifier === actualImport.import_specifier
+  && observation.payload.site.locality_id === actualImport.consumer_locality)
+
 export const validateGeneratedModuleRelationV1 = ({
   relations = [],
   artifacts = [],
   actual_imports: actualImports = [],
   traversals = [],
-  artifact_references: artifactReferences = [],
   artifact_bytes_by_path: artifactBytesByPath = new Map(),
   selected_input_rows_by_artifact: selectedInputRowsByArtifact = new Map(),
   capability_facts: capabilityFacts = [],
-  deterministic_relation_ids: deterministicRelationIds = [],
+  traversal_observation_sets: traversalObservationSets = [],
+  execution_lineage: executionLineage = [],
+  runtime_surfaces: runtimeSurfaces = [],
+  proof_observations: proofObservations = [],
 }) => {
   const violations = []
+  if (![relations, artifacts, actualImports, traversals, capabilityFacts, traversalObservationSets, executionLineage, runtimeSurfaces, proofObservations].every(Array.isArray)
+    || !relations.every(generatedRelationValid)
+    || !artifacts.every(generatedArtifactValid)
+    || !actualImports.every(actualImportValid)
+    || !traversals.every(javascriptTraversalValid)
+    || !traversalObservationSets.every(traversalObservationSetValid)
+    || !executionLineage.every(executionLineageValid)
+    || !runtimeSurfaces.every(runtimeSurfaceValid)
+    || !proofObservations.every(proofObservationValid)
+    || !capabilityFacts.every(validateCanonicalCapabilityFactV1)) {
+    return [violation('generated-module-observed-evidence-invalid')]
+  }
   const relationsById = countBy(relations, (row) => row.id)
   const artifactsById = countBy(artifacts, (row) => row.id)
   const traversalsById = countBy(traversals, (row) => row.id)
+  const traversalObservationSetsById = countBy(traversalObservationSets, (row) => row.traversal_id)
+  const capabilityFactsById = countBy(capabilityFacts, (row) => row.fact_id)
+  const relationsBySemanticKey = countBy(relations, semanticKey)
+  const importsBySemanticKey = countBy(actualImports, semanticKey)
+  const lineagesBySemanticKey = countBy(executionLineage, semanticKey)
+  const proofsBySemanticKey = countBy(proofObservations, semanticKey)
+  const runtimeSurfacesByModule = countBy(runtimeSurfaces, (row) => row.module)
 
   for (const [relationId, rows] of relationsById) {
     if (rows.length > 1) violations.push(violation('duplicate-generated-module-relation', { relation_id: relationId }))
@@ -167,31 +379,57 @@ export const validateGeneratedModuleRelationV1 = ({
   for (const [traversalId, rows] of traversalsById) {
     if (rows.length > 1) violations.push(violation('javascript-traversal-duplicate', { traversal_id: traversalId }))
   }
+  for (const [traversalId, rows] of traversalObservationSetsById) {
+    if (rows.length > 1) violations.push(violation('javascript-traversal-observation-set-duplicate', { traversal_id: traversalId }))
+  }
+  for (const [factId, rows] of capabilityFactsById) {
+    if (rows.length > 1) violations.push(violation('generated-module-observed-evidence-duplicate', { fact_id: factId }))
+  }
+  for (const rows of relationsBySemanticKey.values()) {
+    if (new Set(rows.map(({ id }) => id)).size > 1) {
+      violations.push(violation('duplicate-generated-module-semantic-key', { consumer_locality: rows[0].consumer_locality, import_specifier: rows[0].import_specifier }))
+    }
+  }
+  for (const rows of importsBySemanticKey.values()) {
+    if (rows.length > 1) violations.push(violation('generated-module-observed-evidence-duplicate', { consumer_locality: rows[0].consumer_locality, import_specifier: rows[0].import_specifier }))
+  }
+  for (const rows of lineagesBySemanticKey.values()) {
+    if (rows.length > 1) violations.push(violation('generated-module-lineage-duplicate', { consumer_locality: rows[0].consumer_locality, import_specifier: rows[0].import_specifier }))
+  }
+  for (const rows of proofsBySemanticKey.values()) {
+    if (rows.length > 1) violations.push(violation('generated-module-proof-duplicate', { consumer_locality: rows[0].consumer_locality, import_specifier: rows[0].import_specifier }))
+  }
+  for (const rows of runtimeSurfacesByModule.values()) {
+    if (rows.length > 1) violations.push(violation('generated-module-runtime-surface-duplicate', { runtime_surface_module: rows[0].module }))
+  }
+  for (const traversal of traversals) {
+    if (traversal.unknown_node_count > 0) {
+      violations.push(violation('javascript-ast-node-unknown', { traversal_id: traversal.id }))
+    }
+  }
   if (violations.length > 0) return violations
 
   const relationForConsumer = countBy(relations, (row) => row.consumer_locality)
-  const importsForConsumer = countBy(actualImports, (row) => row.consumer_locality)
   for (const actualImport of actualImports) {
-    const candidates = relationForConsumer.get(actualImport.consumer_locality) ?? []
-    if (candidates.length === 0) {
+    const relation = relationsBySemanticKey.get(semanticKey(actualImport))?.[0]
+    if (!relation) {
+      const candidates = relationForConsumer.get(actualImport.consumer_locality) ?? []
+      if (candidates.length > 0) {
+        violations.push(violation('generated-module-specifier-mismatch', { consumer_locality: actualImport.consumer_locality, import_specifier: actualImport.import_specifier }))
+        continue
+      }
       violations.push(violation('missing-generated-module-relation', { consumer_locality: actualImport.consumer_locality, import_specifier: actualImport.import_specifier }))
       continue
     }
-    const specifier = candidates.find((row) => row.import_specifier === actualImport.import_specifier)
-    if (!specifier) {
-      violations.push(violation('generated-module-specifier-mismatch', { consumer_locality: actualImport.consumer_locality, import_specifier: actualImport.import_specifier }))
-      continue
-    }
-    if (specifier.package_import_target !== actualImport.package_import_target) {
-      violations.push(violation('generated-module-target-mismatch', { relation_id: specifier.id, package_import_target: actualImport.package_import_target }))
+    if (relation.package_import_target !== actualImport.package_import_target) {
+      violations.push(violation('generated-module-target-mismatch', { relation_id: relation.id, package_import_target: actualImport.package_import_target }))
     }
   }
+  if (violations.length > 0) return violations
   for (const relation of relations) {
-    const consumerImports = importsForConsumer.get(relation.consumer_locality) ?? []
-    if (consumerImports.length === 0) {
+    if (!importsBySemanticKey.has(semanticKey(relation))) {
       violations.push(violation('stale-generated-module-relation', { relation_id: relation.id }))
     }
-    if (!deterministicRelationIds.includes(relation.id)) violations.push(violation('generated-module-nondeterministic', { relation_id: relation.id }))
   }
   if (violations.length > 0) return violations
 
@@ -203,6 +441,123 @@ export const validateGeneratedModuleRelationV1 = ({
     if (!importedArtifactIds.has(artifact.id)) violations.push(violation('generated-artifact-stale', { artifact_id: artifact.id }))
   }
   if (violations.length > 0) return violations
+
+  for (const actualImport of actualImports) {
+    const importFacts = importFactsFor(capabilityFacts, actualImport)
+    if (importFacts.length === 0) {
+      violations.push(violation('generated-artifact-reference-missing', { artifact_id: actualImport.artifact_id }))
+      continue
+    }
+    const selectors = [...new Set(importFacts.map(({ observation }) => observation.payload.selector))].sort(compareCanonicalTextV1)
+    if (!exactCanonical(selectors, actualImport.imported_members)) {
+      violations.push(violation('generated-module-member-mismatch', {
+        consumer_locality: actualImport.consumer_locality,
+        import_specifier: actualImport.import_specifier,
+      }))
+    }
+  }
+  if (violations.length > 0) return violations
+  const actualImportsByArtifact = countBy(actualImports, (row) => row.artifact_id)
+  for (const fact of capabilityFacts) {
+    const artifactId = artifactIdFromFact(fact)
+    if (artifactId !== null && !artifactsById.has(artifactId)) {
+      violations.push(violation('generated-artifact-reference-stale', { artifact_id: artifactId }))
+      continue
+    }
+    if (fact.observation.case === 'fable-import') {
+      const hasObservedImport = (actualImportsByArtifact.get(artifactId) ?? []).some((actualImport) =>
+        actualImport.consumer_locality === fact.observation.payload.site.locality_id
+        && actualImport.import_specifier === fact.observation.payload.module_specifier)
+      if (!hasObservedImport) violations.push(violation('generated-artifact-reference-stale', { artifact_id: artifactId }))
+    }
+  }
+  if (violations.length > 0) return violations
+
+  for (const relation of relations) {
+    const key = semanticKey(relation)
+    const actualImport = importsBySemanticKey.get(key)[0]
+    const rows = lineagesBySemanticKey.get(key) ?? []
+    if (rows.length === 0) {
+      violations.push(violation('generated-module-lineage-missing', { relation_id: relation.id }))
+      continue
+    }
+    const lineage = rows[0]
+    if (lineage.artifact_id !== actualImport.artifact_id
+      || !exactCanonical(lineage.entry_reachability, relationEntryReachability(relation))) {
+      violations.push(violation('generated-module-lineage-mismatch', { relation_id: relation.id }))
+    }
+  }
+  for (const lineage of executionLineage) {
+    if (!relationsBySemanticKey.has(semanticKey(lineage))) {
+      violations.push(violation('generated-module-lineage-stale', {
+        consumer_locality: lineage.consumer_locality,
+        import_specifier: lineage.import_specifier,
+      }))
+    }
+  }
+  if (violations.length > 0) return violations
+
+  for (const relation of relations) {
+    const key = semanticKey(relation)
+    const proofRows = proofsBySemanticKey.get(key) ?? []
+    if (proofRows.length === 0) {
+      violations.push(violation('generated-module-nondeterministic', { relation_id: relation.id }))
+      continue
+    }
+    const proof = proofRows[0]
+    if (proof.owner !== relation.generated_owner) {
+      violations.push(violation('generated-module-determinism-proof-owner-mismatch', { relation_id: relation.id }))
+      continue
+    }
+    if (relation.laws.length !== 1 || relation.laws[0] !== relation.determinism_proof.what_id) {
+      violations.push(violation('generated-module-determinism-proof-law-mismatch', { relation_id: relation.id }))
+      continue
+    }
+    if (!exactCanonical({ path: proof.path, title: proof.title, what_id: proof.what_id }, relation.determinism_proof)) {
+      violations.push(violation('generated-module-determinism-proof-mismatch', { relation_id: relation.id }))
+      continue
+    }
+    const surfaceRows = runtimeSurfacesByModule.get(relation.runtime_surface_module) ?? []
+    if (surfaceRows.length === 0) {
+      violations.push(violation('generated-module-runtime-surface-missing', { relation_id: relation.id, runtime_surface_module: relation.runtime_surface_module }))
+      continue
+    }
+    const surface = surfaceRows[0]
+    if (surface.owner !== relation.generated_owner) {
+      violations.push(violation('generated-module-determinism-proof-owner-mismatch', { relation_id: relation.id }))
+      continue
+    }
+    if (!exactCanonical(surface.laws, relation.laws)) {
+      violations.push(violation('generated-module-determinism-proof-law-mismatch', { relation_id: relation.id }))
+      continue
+    }
+    const importedMembers = importsBySemanticKey.get(key)[0].imported_members
+    if (!importedMembers.every((member) => surface.exported_members.includes(member))) {
+      violations.push(violation('generated-module-member-mismatch', { consumer_locality: relation.consumer_locality, import_specifier: relation.import_specifier }))
+      continue
+    }
+    const expectedEntries = [relation.generator]
+    if (!exactCanonical(proof.reached_entries, expectedEntries)
+      || !exactCanonical(proof.used_surface_modules, [relation.runtime_surface_module])) {
+      violations.push(violation('generated-module-runtime-surface-callback-mismatch', { relation_id: relation.id }))
+    }
+  }
+  for (const proof of proofObservations) {
+    if (!relationsBySemanticKey.has(semanticKey(proof))) {
+      violations.push(violation('generated-module-proof-stale', {
+        consumer_locality: proof.consumer_locality,
+        import_specifier: proof.import_specifier,
+      }))
+    }
+  }
+  const relationSurfaceModules = new Set(relations.map(({ runtime_surface_module: module }) => module))
+  for (const surface of runtimeSurfaces) {
+    if (!relationSurfaceModules.has(surface.module)) {
+      violations.push(violation('generated-module-runtime-surface-stale', { runtime_surface_module: surface.module }))
+    }
+  }
+  if (violations.length > 0) return violations
+
   const referencedTraversalIds = new Set(artifacts.map(({ javascript_traversal_id: traversalId }) => traversalId))
   for (const traversal of traversals) {
     if (traversal.source_kind === 'generated-artifact' && !referencedTraversalIds.has(traversal.id)) {
@@ -231,13 +586,49 @@ export const validateGeneratedModuleRelationV1 = ({
     }
     const traversalRows = traversalsById.get(artifact.javascript_traversal_id) ?? []
     if (traversalRows.length === 0) violations.push(violation('javascript-traversal-missing', { artifact_id: artifact.id, traversal_id: artifact.javascript_traversal_id }))
-    else if (traversalRows[0].source_kind !== 'generated-artifact' || traversalRows[0].source_id !== artifact.id) {
+    else if (artifact.javascript_traversal_id !== javascriptTraversalIdV1('generated-artifact', artifact.id)
+      || traversalRows[0].id !== javascriptTraversalIdV1(traversalRows[0].source_kind, traversalRows[0].source_id)
+      || traversalRows[0].source_kind !== 'generated-artifact'
+      || traversalRows[0].source_id !== artifact.id) {
       violations.push(violation('javascript-traversal-source-mismatch', { artifact_id: artifact.id, traversal_id: artifact.javascript_traversal_id }))
     }
-    if (!artifactReferences.some((reference) => reference.artifact_id === artifact.id)) {
-      violations.push(violation('generated-artifact-reference-missing', { artifact_id: artifact.id }))
+  }
+  if (violations.length > 0) return violations
+
+  const generatedTraversalIds = new Set(artifacts.map(({ javascript_traversal_id: traversalId }) => traversalId))
+  for (const traversalId of generatedTraversalIds) {
+    if (!traversalObservationSetsById.has(traversalId)) {
+      violations.push(violation('javascript-traversal-observation-set-missing', { traversal_id: traversalId }))
     }
-    if (capabilityFacts.some((fact) => fact.artifact_id === artifact.id && capabilityDispositionViolatesContractV1(fact.disposition))) {
+  }
+  for (const row of traversalObservationSets) {
+    if (!generatedTraversalIds.has(row.traversal_id)) {
+      violations.push(violation('javascript-traversal-observation-set-stale', { traversal_id: row.traversal_id }))
+    }
+  }
+  if (violations.length > 0) return violations
+
+  for (const artifact of artifacts) {
+    const traversal = traversalsById.get(artifact.javascript_traversal_id)[0]
+    const emittedObservationIds = traversalObservationSetsById.get(traversal.id)[0].emitted_observation_ids
+    const factObservationIds = capabilityFacts
+      .filter(({ observation }) => observation.case === 'javascript-capability'
+        && observation.payload.source_kind === 'generated-artifact'
+        && observation.payload.source_id === artifact.id
+        && observation.payload.generated_artifact_id === artifact.id)
+      .map(({ observation_id: observationId }) => observationId)
+      .sort(compareCanonicalTextV1)
+    if ((traversal.capability_emitting_node_count === 0) !== (emittedObservationIds.length === 0)
+      || !exactCanonical(emittedObservationIds, factObservationIds)) {
+      violations.push(violation('javascript-traversal-source-mismatch', { artifact_id: artifact.id, traversal_id: traversal.id }))
+    }
+  }
+  if (violations.length > 0) return violations
+
+  for (const relation of relations) {
+    const actualImport = importsBySemanticKey.get(semanticKey(relation))[0]
+    if (capabilityFacts.some((fact) => artifactIdFromFact(fact) === actualImport.artifact_id && capabilityDispositionViolatesContractV1(fact.disposition))) {
+      const artifact = artifactsById.get(actualImport.artifact_id)[0]
       violations.push(violation('generated-module-physical-authority', { artifact_id: artifact.id, relation_id: relation.id }))
     }
   }

@@ -22,6 +22,7 @@ module ProviderRecoveryWorkflow =
 
     val continueAfterConfirmedFailure:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         scope: IBloggerRuntimeHost ->

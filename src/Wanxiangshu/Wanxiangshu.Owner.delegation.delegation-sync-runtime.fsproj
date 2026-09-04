@@ -5,7 +5,7 @@
     <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-causalwait.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>

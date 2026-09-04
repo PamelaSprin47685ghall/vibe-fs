@@ -1067,7 +1067,8 @@
         "src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fs"
       ],
       "proofs": [
-        "requirements/degeneration-guard/tests/loop-detector-memory.test.mjs"
+        "requirements/degeneration-guard/tests/loop-detector-memory.test.mjs",
+        "requirements/degeneration-guard/tests/m6-slice-boundary.test.mjs"
       ],
       "publishes": [
         "degeneration-guard.Contract"
@@ -1165,11 +1166,13 @@
         "src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibrationSurface.fs",
         "src/Wanxiangshu/Execution/Session/SessionStartedAtLedger.fs",
         "src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs",
-        "src/Wanxiangshu/Process/PtyTiming.fs",
+        "src/Wanxiangshu/Process/NodeTiming.fs",
+        "src/Wanxiangshu/Process/VirtualTiming.fs",
         "src/Wanxiangshu/Process/Surface.fs"
       ],
       "proofs": [
-        "requirements/time-capability/tests/ambient-time-forbidden.test.mjs"
+        "requirements/time-capability/tests/ambient-time-forbidden.test.mjs",
+        "requirements/time-capability/tests/m6-slice-boundary.test.mjs"
       ],
       "publishes": [
         "time-capability.Contract"
@@ -1584,6 +1587,7 @@
         "src/Wanxiangshu/Foundation/CanonicalJson.fs",
         "src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs",
         "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs",
+        "src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs",
         "src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs",
         "src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs",
         "src/Wanxiangshu/OpenCode/Codec/OpencodeTypes.fs",
@@ -1642,10 +1646,26 @@
       ],
       "proofs": [
         "requirements/host-boundary/tests/chat-hook-settlement.test.mjs",
-        "requirements/host-boundary/tests/host-session-contract-closure.test.mjs"
+        "requirements/host-boundary/tests/host-session-contract-closure.test.mjs",
+        "requirements/host-boundary/tests/m6-slice-boundary.test.mjs"
       ],
       "publishes": [
         "host-boundary.Contract"
+      ]
+    },
+    {
+      "id": "host-root-workspace-effect-isolation",
+      "state": "DONE",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/RootWorkspace.fs",
+        "src/Wanxiangshu/OpenCode/Host/RootWorkspaceRuntime.fs"
+      ],
+      "proofs": [
+        "requirements/host-boundary/tests/m6-slice-boundary.test.mjs",
+        "requirements/host-boundary/tests/shared-state.test.mjs"
+      ],
+      "publishes": [
+        "Host.RootWorkspace.Contract"
       ]
     },
     {

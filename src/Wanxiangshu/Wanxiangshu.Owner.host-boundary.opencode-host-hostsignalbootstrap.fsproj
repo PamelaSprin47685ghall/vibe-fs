@@ -9,7 +9,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-statictools.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-continuation.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-causalwait.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-completion-mailbox.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-contract.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-diagnostic-adapter.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptresources.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj"/>
@@ -42,6 +42,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.opencode-host-pairprogramming-guidelineprojection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-root-workspace-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-signal-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-fissionhostsurface.fsproj"/>
@@ -86,7 +87,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-prediction-predictor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-turnevidence.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.execution-session-sessionstartedatledger.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj"/>
     <Compile Include="OpenCode/Host/HostSignalBootstrap.fsi"/>
     <Compile Include="OpenCode/Host/HostSignalBootstrap.fs"/>

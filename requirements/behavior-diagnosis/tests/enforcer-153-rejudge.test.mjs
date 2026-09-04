@@ -95,7 +95,7 @@ test('WHAT[BD-017] ENFORCER_153_hot_path_aabb_preserves_target_terminal_identity
   assert.match(enforcerSrc, /aabbRepair ctx sessionKey currentCtx live true \("nudge semantic failure;/)
   assert.match(
     interactionRepairSrc,
-    /\| BloggerRecoveryProbe\.InvalidTerminalRepairState\.AabbRepairIssued _ ->\s+consumeThenSendBloggerAabb\s+host\s+quiescence\s+context\s+sessionPort\s+eventPort\s+durable\s+requestId\s+requestKind\s+false\s+"blogger invalid terminal after AABB"/,
+    /\| BloggerRecoveryProbe\.InvalidTerminalRepairState\.AabbRepairIssued _ ->\s+consumeThenSendBloggerAabb\s+host\s+quiescence\s+context\s+sessionPort\s+rootWorkspace\s+eventPort\s+durable\s+requestId\s+requestKind\s+false\s+"blogger invalid terminal after AABB"/,
   )
   assert.match(
     interactionRepairSrc,

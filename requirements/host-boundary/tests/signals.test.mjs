@@ -110,74 +110,163 @@ test('WHAT[HOST-BOUNDARY-001] MISC_signals_router_loop_delta_bypasses_adapt', ()
   assert.notEqual(HostSignalSurface.tryAdapt(['x'], errorRaw('x')), null)
 })
 
-// ── HOST-BOUNDARY-003: signal subscribe lifecycle ────────────────────────
+// ── HOST-BOUNDARY-028: signal subscription membrane ─────────────────────
 //
 // HostSignalSubscribeSurface.trySubscribe is the JS-native owner surface.
-// It returns { ok: true, source, dispose } on success or
+// It returns { ok: true, mode, dispose } on success or
 // { ok: false, error } on failure — no Fable Result representation.
 
-const trySubscribe = async (input = {}) => HostSignalSubscribeSurface.trySubscribe(input, () => {}, null)
+const trySubscribe = async (input = {}) => HostSignalSubscribeSurface.trySubscribe(input, () => {})
 
-test('WHAT[HOST-BOUNDARY-003] MISC_signals_listen_subscription_lifecycle', async () => {
+test('WHAT[HOST-BOUNDARY-028] MISC_signals_subscription_mode_is_closed', async () => {
+  const local = await trySubscribe({})
+  assert.deepEqual(local, { ok: true, mode: 'LocalEventHook', dispose: null })
+
   let disposed = false
   const result = await HostSignalSubscribeSurface.trySubscribe(
     { events: { listen: () => () => { disposed = true } } },
     () => {},
-    null,
   )
-  assert.equal(result.ok, true)
-  assert.equal(result.source, 'events.listen')
+  assert.equal(result.mode, 'EventsListen')
+  assert.equal(typeof result.dispose, 'function')
   result.dispose()
   assert.equal(disposed, true)
 })
 
-test('WHAT[HOST-BOUNDARY-003] MISC_signals_listen_error_paths', async () => {
+test('WHAT[HOST-BOUNDARY-028] MISC_signals_listener_capability_fails_closed', async () => {
   const noListen = await trySubscribe({ events: {} })
-  assert.equal(noListen.ok, false)
-  assert.match(noListen.error, /events\.listen unavailable/)
+  assert.deepEqual(noListen, { ok: false, error: 'OPENCODE-SIGNAL-SUBSCRIBE: events.listen unavailable' })
 
-  const nullSubscription = await trySubscribe({ events: { listen: () => null } })
-  assert.equal(nullSubscription.ok, false)
-  assert.match(nullSubscription.error, /no subscription/)
+  for (const listen of [null, 7, {}, 'listen']) {
+    assert.deepEqual(await trySubscribe({ events: { listen } }), noListen)
+  }
 
-  const throwingListen = await trySubscribe({ events: { listen: () => { throw new Error('listener boom') } } })
-  assert.equal(throwingListen.ok, false)
-  assert.match(throwingListen.error, /listener boom/)
+  const clientListen = () => () => {}
+  assert.deepEqual(
+    await trySubscribe({ events: 7, client: { events: { listen: clientListen } } }),
+    { ok: false, error: 'OPENCODE-SIGNAL-SUBSCRIBE: invalid input' },
+  )
 })
 
-test('WHAT[HOST-BOUNDARY-003] MISC_signals_invalid_callback_fails_closed', async () => {
+test('WHAT[HOST-BOUNDARY-028] MISC_signals_disposer_capability_fails_closed', async () => {
+  const expected = { ok: false, error: 'OPENCODE-SIGNAL-SUBSCRIBE: events.listen returned invalid disposer' }
+
+  for (const disposer of [null, 7, {}, 'dispose', Promise.resolve()]) {
+    assert.deepEqual(await trySubscribe({ events: { listen: () => disposer } }), expected)
+  }
+})
+
+test('WHAT[HOST-BOUNDARY-028] MISC_signals_input_carriers_fail_closed', async () => {
+  const expected = { ok: false, error: 'OPENCODE-SIGNAL-SUBSCRIBE: invalid input' }
+
+  for (const input of [null, 7, 'input', [], new String('input'), new Date(0)]) {
+    assert.deepEqual(await trySubscribe(input), expected)
+  }
+
+  for (const input of [
+    { events: [] },
+    { events: 'events' },
+    { client: 7 },
+    { client: [] },
+    { client: new String('client') },
+    { client: new Date(0) },
+    { client: { events: [] } },
+  ]) {
+    assert.deepEqual(await trySubscribe(input), expected)
+  }
+
+  assert.deepEqual(await trySubscribe({ events: null, client: null }), { ok: true, mode: 'LocalEventHook', dispose: null })
+})
+
+test('WHAT[HOST-BOUNDARY-028] MISC_signals_listener_throw_is_typed', async () => {
+  const result = await trySubscribe({ events: { listen: () => { throw new Error('listener boom') } } })
+  assert.deepEqual(result, { ok: false, error: 'OPENCODE-SIGNAL-SUBSCRIBE: events.listen failed: listener boom' })
+
+  for (const thrown of [null, 7, 'wire boom']) {
+    const adjacent = await trySubscribe({ events: { listen: () => { throw thrown } } })
+    assert.equal(adjacent.ok, false)
+    assert.match(adjacent.error, /^OPENCODE-SIGNAL-SUBSCRIBE: events\.listen failed:/)
+  }
+})
+
+test('WHAT[HOST-BOUNDARY-028] MISC_signals_throwing_accessors_resolve_typed_failure', async () => {
+  const topLevelEvents = {}
+  Object.defineProperty(topLevelEvents, 'events', { get: () => { throw new Error('events getter boom') } })
+  assert.deepEqual(await trySubscribe(topLevelEvents), { ok: false, error: 'OPENCODE-SIGNAL-SUBSCRIBE: invalid input' })
+
+  const topLevelClient = {}
+  Object.defineProperty(topLevelClient, 'client', { get: () => { throw new Error('client getter boom') } })
+  assert.deepEqual(await trySubscribe(topLevelClient), { ok: false, error: 'OPENCODE-SIGNAL-SUBSCRIBE: invalid input' })
+
+  const client = {}
+  Object.defineProperty(client, 'events', { get: () => { throw new Error('client events getter boom') } })
+  assert.deepEqual(await trySubscribe({ client }), { ok: false, error: 'OPENCODE-SIGNAL-SUBSCRIBE: invalid input' })
+
+  const events = {}
+  Object.defineProperty(events, 'listen', { get: () => { throw new Error('listen getter boom') } })
+  assert.deepEqual(
+    await trySubscribe({ events }),
+    { ok: false, error: 'OPENCODE-SIGNAL-SUBSCRIBE: events.listen failed: listen getter boom' },
+  )
+
+  const proxy = new Proxy({}, { get: () => { throw new Error('proxy boom') } })
+  assert.deepEqual(await trySubscribe(proxy), { ok: false, error: 'OPENCODE-SIGNAL-SUBSCRIBE: invalid input' })
+})
+
+test('WHAT[HOST-BOUNDARY-028] MISC_signals_disposer_throw_reaches_resource_owner', async () => {
+  const result = await trySubscribe({ events: { listen: () => () => { throw new Error('dispose boom') } } })
+  assert.equal(result.mode, 'EventsListen')
+  assert.throws(() => result.dispose(), /dispose boom/)
+})
+
+test('WHAT[HOST-BOUNDARY-028] MISC_signals_invalid_callback_fails_closed_at_surface', async () => {
   const result = await HostSignalSubscribeSurface.trySubscribe(
     { events: { listen: () => () => {} } },
-    null,
     null,
   )
   assert.equal(result.ok, false)
   assert.match(result.error, /callback unavailable/)
 })
 
-test('WHAT[HOST-BOUNDARY-003] MISC_signals_default_input_resolves_to_local_event_hook', async () => {
+test('WHAT[HOST-BOUNDARY-028] MISC_signals_default_input_resolves_to_local_event_hook', async () => {
   const result = await trySubscribe({})
-  assert.equal(result.ok, true)
-  assert.equal(result.source, 'local-event-hook')
+  assert.deepEqual(result, { ok: true, mode: 'LocalEventHook', dispose: null })
 })
 
-test('WHAT[HOST-BOUNDARY-003] MISC_signals_client_events_listen_fallback', async () => {
+test('WHAT[HOST-BOUNDARY-028] MISC_signals_opencode_class_client_without_legacy_events_uses_local_hook', async () => {
+  class OpenCodeClient {
+    constructor(events) { this.events = events }
+  }
+
+  assert.deepEqual(
+    await trySubscribe({ client: new OpenCodeClient(undefined) }),
+    { ok: true, mode: 'LocalEventHook', dispose: null },
+  )
+
+  let disposed = false
+  const legacy = await HostSignalSubscribeSurface.trySubscribe(
+    { client: new OpenCodeClient({ listen: () => () => { disposed = true } }) },
+    () => {},
+  )
+  assert.equal(legacy.mode, 'EventsListen')
+  legacy.dispose()
+  assert.equal(disposed, true)
+})
+
+test('WHAT[HOST-BOUNDARY-028] MISC_signals_client_events_listen_fallback', async () => {
   let called = false
   const result = await HostSignalSubscribeSurface.trySubscribe(
     { client: { events: { listen: () => () => { called = true } } } },
     () => {},
-    null,
   )
-  assert.equal(result.ok, true)
-  assert.equal(result.source, 'events.listen')
+  assert.equal(result.mode, 'EventsListen')
   result.dispose()
   assert.equal(called, true)
 })
 
-test('WHAT[HOST-BOUNDARY-003] MISC_signals_server_url_ignored_in_favor_of_local_hook', async () => {
+test('WHAT[HOST-BOUNDARY-028] MISC_signals_server_url_ignored_in_favor_of_local_hook', async () => {
   const result = await trySubscribe({ serverUrl: 'http://localhost:4096' })
-  assert.equal(result.ok, true)
-  assert.equal(result.source, 'local-event-hook')
+  assert.deepEqual(result, { ok: true, mode: 'LocalEventHook', dispose: null })
 })
 
 // ── Mutation sensitivity ─────────────────────────────────────────────────

@@ -11,7 +11,9 @@
     <PackageReference Include="Fable.Core" Version="5.0.0"/>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Provider.fsi"/>
     <Compile Include="Provider.fs"/>
+    <Compile Include="Consumer.fsi"/>
     <Compile Include="Consumer.fs"/>
   </ItemGroup>
 </Project>

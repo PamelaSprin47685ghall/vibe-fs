@@ -1,8 +1,59 @@
 namespace Wanxiangshu.Execution.Session.Wait
 
-open Wanxiangshu.Foundation
-
 open System
+open System.Threading.Tasks
+
+module JoinBatch =
+    let Max = 32
+    let MaxJoinBatch = Max
+
+type NonEmptyBatch<'item> = private NonEmptyBatch of head: 'item * tail: 'item list
+
+module NonEmptyBatch =
+    let ofHeadTail (head: 'item) (tail: 'item list) = NonEmptyBatch(head, tail)
+
+    let tryOfList =
+        function
+        | [] -> None
+        | head :: tail -> Some(NonEmptyBatch(head, tail))
+
+    let toList (NonEmptyBatch(head, tail)) = head :: tail
+
+    let length (NonEmptyBatch(_, tail)) = 1 + List.length tail
+
+    let map (f: 'a -> 'b) (NonEmptyBatch(head, tail)) = NonEmptyBatch(f head, List.map f tail)
+
+[<RequireQualifiedAccess>]
+type JoinInterruptReason =
+    | OperatorAbort
+    | UserMessageArrived
+    | DeadlineExpired
+
+type JoinWaitOutcome<'item> =
+    | ResultsAvailable of NonEmptyBatch<'item>
+    | Interrupted of JoinInterruptReason
+
+type MailboxWakeReason =
+    | CompletionMayBeAvailable
+    | LocalInterrupt of JoinInterruptReason
+    | MailboxCancelled
+
+type JoinInterrupt =
+    { Wait: Task<JoinInterruptReason>
+      Signal: JoinInterruptReason -> unit }
+
+type ICompletionMailbox<'agent, 'pty, 'interrupt, 'wake> =
+    abstract PulseAgent: 'agent -> unit
+    abstract PublishPty: 'pty -> unit
+    abstract PulseWake: unit -> unit
+    abstract WaitForWake: unit -> Task<'wake>
+    abstract WaitForSignal: Task<'interrupt> -> Task<'wake>
+    abstract DrainAgents: int -> 'agent list
+    abstract DrainPtys: int -> 'pty list
+    abstract Cancel: unit -> bool
+    abstract PendingCount: int
+    abstract PendingPtyCount: int
+    abstract IsCancelled: bool
 
 /// DSL-012: process-local, non-authoritative causal wait observations.
 ///
@@ -74,6 +125,11 @@ type IWaitObserver =
 /// Diagnostics surfaces may read; Application must not hold this interface.
 type IWaitSnapshotReader =
     abstract Snapshot: unit -> DiagnosticWaitSnapshot
+
+/// Physical diagnostic target. Composition injects one target into the
+/// process-local runtime; business workflows never receive this capability.
+type IWaitDiagnosticSink =
+    abstract Publish: DiagnosticWaitSnapshot -> unit
 
 module CausalOwner =
 

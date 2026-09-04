@@ -4,6 +4,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host.Contract
@@ -49,6 +50,8 @@ module ToolRegistry =
     val create:
         toolModule: obj ->
         sessionPort: ISessionHostPort ->
+        waitObserver: IWaitObserver ->
+        rootWorkspace: IRootWorkspaceReader ->
         journal: AgentJournal option ->
         gitTreePort: GitTreePort option ->
         workspaceDirectory: string option ->

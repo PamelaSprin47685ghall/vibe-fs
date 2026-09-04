@@ -80,34 +80,34 @@ test('WHAT[HOST-BOUNDARY-016] EXEC_events_sticky_terminal_bounded', () => {
   assert.ok(replayed.length > 0, 'sticky replay must not be empty')
 })
 
-// ── HOST-BOUNDARY-003: signal subscribe ──────────────────────────────────
+// ── HOST-BOUNDARY-028: signal subscribe ─────────────────────────────────
 //
 // HostSignalSubscribeSurface is the JS-native boundary. It returns a plain
-// object: { ok: true, source, dispose } on success, { ok: false, error } on
+// object: { ok: true, mode, dispose } on success, { ok: false, error } on
 // failure — never the Fable Result { tag, fields } representation.
 
-test('WHAT[HOST-BOUNDARY-003] HOST_signal_subscribe_defaults_to_local_event_hook', async () => {
-  const result = await HostSignalSubscribeSurface.trySubscribe({ serverUrl: 'http://localhost:4096', client: null }, () => {}, null)
+test('WHAT[HOST-BOUNDARY-028] HOST_signal_subscribe_defaults_to_local_event_hook', async () => {
+  const result = await HostSignalSubscribeSurface.trySubscribe({ serverUrl: 'http://localhost:4096', client: null }, () => {})
   assert.equal(result.ok, true)
-  assert.equal(result.source, 'local-event-hook')
+  assert.equal(result.mode, 'LocalEventHook')
 })
 
-test('WHAT[HOST-BOUNDARY-003] HOST_signal_subscribe_embedded_uses_legacy_listen_when_present', async () => {
-  const result = await HostSignalSubscribeSurface.trySubscribe({ events: { listen: () => () => {} } }, () => {}, null)
+test('WHAT[HOST-BOUNDARY-028] HOST_signal_subscribe_embedded_uses_legacy_listen_when_present', async () => {
+  const result = await HostSignalSubscribeSurface.trySubscribe({ events: { listen: () => () => {} } }, () => {})
   assert.equal(result.ok, true)
-  assert.equal(result.source, 'events.listen')
+  assert.equal(result.mode, 'EventsListen')
 })
 
-test('WHAT[HOST-BOUNDARY-003] HOST_signal_subscribe_bad_listener_fails_closed', async () => {
-  const result = await HostSignalSubscribeSurface.trySubscribe({ events: { listen: () => null } }, () => {}, null)
+test('WHAT[HOST-BOUNDARY-028] HOST_signal_subscribe_bad_listener_fails_closed', async () => {
+  const result = await HostSignalSubscribeSurface.trySubscribe({ events: { listen: () => null } }, () => {})
   assert.equal(result.ok, false)
-  assert.match(result.error, /no subscription/)
+  assert.match(result.error, /invalid disposer/)
 })
 
-test('WHAT[HOST-BOUNDARY-003] HOST_signal_subscribe_client_events_listen_supported', async () => {
-  const result = await HostSignalSubscribeSurface.trySubscribe({ client: { events: { listen: () => () => {} } } }, () => {}, null)
+test('WHAT[HOST-BOUNDARY-028] HOST_signal_subscribe_client_events_listen_supported', async () => {
+  const result = await HostSignalSubscribeSurface.trySubscribe({ client: { events: { listen: () => () => {} } } }, () => {})
   assert.equal(result.ok, true)
-  assert.equal(result.source, 'events.listen')
+  assert.equal(result.mode, 'EventsListen')
 })
 
 // ── Mutation sensitivity ─────────────────────────────────────────────────

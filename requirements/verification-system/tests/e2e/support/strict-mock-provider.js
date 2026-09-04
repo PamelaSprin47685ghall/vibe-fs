@@ -158,6 +158,9 @@ export class StrictMockProvider {
   waitForExpectation(id, timeoutMs) {
     return this._signals.waitForExpectation(id, timeoutMs);
   }
+  waitForAnyExpectation(ids, timeoutMs) {
+    return this._signals.waitForAnyExpectation(ids, timeoutMs);
+  }
   waitForExpectationAttempt(id, attempts, timeoutMs) {
     return this._signals.waitForExpectationAttempt(id, attempts, timeoutMs);
   }

@@ -74,6 +74,11 @@ module DispatchSurface =
     let internal sessionPort (port: obj) : Wanxiangshu.OpenCode.ISessionHostPort =
         PlainSessionPort(port) :> Wanxiangshu.OpenCode.ISessionHostPort
 
+    let internal rootWorkspaceReader (directory: obj) : Wanxiangshu.OpenCode.IRootWorkspaceReader =
+        { new Wanxiangshu.OpenCode.IRootWorkspaceReader with
+            member _.TryRead() =
+                if isNull directory then None else Some(string directory) }
+
     /// JS-safe controlled Host child listing for adapter proofs. The F# Result
     /// and OpenCodeChildInfo representations stay on this registered surface.
     let acceptedChild
@@ -106,6 +111,21 @@ module DispatchSurface =
         |> Option.map PhysicalUserMessageId.value
         |> Option.map box
         |> Option.toObj
+
+    let decodeIngress (input: obj) (output: obj) : obj =
+        let decoded = PromptIngressCodec.decode input output
+
+        box
+            {| sessionId = decoded.SessionId |> Option.map SessionId.value |> Option.toObj
+               physicalUserMessageId =
+                decoded.PhysicalUserMessageId
+                |> Option.map PhysicalUserMessageId.value
+                |> Option.toObj
+               explicitAgent = decoded.ExplicitAgent |> Option.toObj
+               promptKey = decoded.PromptKey |> Option.map PromptKey.value |> Option.toObj
+               isHostCompaction = decoded.IsHostCompaction
+               isHostSynthetic = decoded.IsHostSynthetic
+               text = decoded.Text |> Option.toObj |}
 
     let private appendResult result =
         match result with

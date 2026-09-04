@@ -636,8 +636,10 @@
     <Compile Include="Process/Deadline.fs"/>
     <Compile Include="Process/DeadlineSurface.fsi"/>
     <Compile Include="Process/DeadlineSurface.fs"/>
-    <Compile Include="Process/PtyTiming.fsi"/>
-    <Compile Include="Process/PtyTiming.fs"/>
+    <Compile Include="Process/NodeTiming.fsi"/>
+    <Compile Include="Process/NodeTiming.fs"/>
+    <Compile Include="Process/VirtualTiming.fsi"/>
+    <Compile Include="Process/VirtualTiming.fs"/>
     <Compile Include="Execution/Session/Wait/CompletionMailbox.fsi"/>
     <Compile Include="Execution/Session/Wait/CompletionMailbox.fs"/>
     <Compile Include="Execution/Delegation/Fork/RuntimeContract.fsi"/>
@@ -840,6 +842,8 @@
     <Compile Include="OpenCode/Host/EventsSurface.fs"/>
     <Compile Include="OpenCode/Signals/HostSignal.fsi"/>
     <Compile Include="OpenCode/Signals/HostSignal.fs"/>
+    <Compile Include="OpenCode/Codec/HostEventEnvelope.fsi"/>
+    <Compile Include="OpenCode/Codec/HostEventEnvelope.fs"/>
     <Compile Include="OpenCode/Codec/HostEventCodec.fsi"/>
     <Compile Include="OpenCode/Codec/HostEventCodec.fs"/>
     <Compile Include="OpenCode/Codec/LoopEventCodec.fsi"/>
@@ -1057,6 +1061,10 @@
     <Compile Include="Execution/Session/Recovery/Surface.fs"/>
     <Compile Include="Execution/Delegation/Join.fsi"/>
     <Compile Include="Execution/Delegation/Join.fs"/>
+    <Compile Include="OpenCode/Host/RootWorkspace.fsi"/>
+    <Compile Include="OpenCode/Host/RootWorkspace.fs"/>
+    <Compile Include="OpenCode/Host/RootWorkspaceRuntime.fsi"/>
+    <Compile Include="OpenCode/Host/RootWorkspaceRuntime.fs"/>
     <Compile Include="OpenCode/Host/SharedState.fsi"/>
     <Compile Include="OpenCode/Host/SharedState.fs"/>
     <Compile Include="OpenCode/Host/SharedStateSurface.fsi"/>
@@ -1195,6 +1203,8 @@
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fs"/>
     <Compile Include="Execution/Delegation/Handle/OpenCode/JoinWake.fsi"/>
     <Compile Include="Execution/Delegation/Handle/OpenCode/JoinWake.fs"/>
+    <Compile Include="OpenCode/Codec/ToolHostCodec.fsi"/>
+    <Compile Include="OpenCode/Codec/ToolHostCodec.fs"/>
     <Compile Include="OpenCode/Host/HostSignalBootstrap.fsi"/>
     <Compile Include="OpenCode/Host/HostSignalBootstrap.fs"/>
     <Compile Include="OpenCode/Tools/DistillationRuntime.fsi"/>
@@ -1215,8 +1225,6 @@
     <Compile Include="Change/Host/ReviewRunner.fs"/>
     <Compile Include="Change/Host/Host.fsi"/>
     <Compile Include="Change/Host/Host.fs"/>
-    <Compile Include="OpenCode/Codec/ToolHostCodec.fsi"/>
-    <Compile Include="OpenCode/Codec/ToolHostCodec.fs"/>
     <Compile Include="OpenCode/Codec/ToolHostSurface.fsi"/>
     <Compile Include="OpenCode/Codec/ToolHostSurface.fs"/>
     <Compile Include="Execution/Delegation/OpenCode/DelegatedToolEstimate.fsi"/>

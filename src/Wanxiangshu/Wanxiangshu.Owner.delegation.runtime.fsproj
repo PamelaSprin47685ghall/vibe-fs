@@ -6,7 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-causalwait.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-completion-mailbox.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-contract.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-host-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj"/>
@@ -44,7 +44,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.repository-investigation.opencode-tools-inspectortool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-capture.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecoverySurface.fsi"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecoverySurface.fs"/>

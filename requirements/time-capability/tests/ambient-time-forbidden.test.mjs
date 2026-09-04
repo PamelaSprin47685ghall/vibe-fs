@@ -29,7 +29,7 @@ test('WHAT[TIME-004] domain_application_session_contain_no_raw_time_tokens', () 
 test('WHAT[TIME-004] collector_reads_the_whole_production_tree_before_allowlisting_adapters', () => {
   assert.deepEqual([...RAW_TIME_SCAN_ROOTS], ['.'])
   const entries = collectRawTimeScanEntries(PRODUCTION_ROOT, RAW_TIME_SCAN_ROOTS)
-  assert.ok(entries.some((entry) => entry.file === 'Process/PtyTiming.fs'))
+  assert.ok(entries.some((entry) => entry.file === 'Process/NodeTiming.fs'))
   assert.ok(entries.some((entry) => entry.file === 'Change/Program.fs'))
 })
 
@@ -41,7 +41,7 @@ test('WHAT[TIME-004] exact_mutation_is_detected_without_a_directory_allowlist_es
     'let c = DateTime.UtcNow',
     'let d = Date.now()',
     'do setTimeout (fun () -> ()) 1',
-    'do! PtyTiming.timerTask 100',
+    'do! NodeTiming.timerTask 100',
   ].join('\n')
 
   assert.match(source, /DateTimeOffset\.UtcNow/)

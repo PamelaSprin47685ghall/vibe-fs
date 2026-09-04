@@ -26,6 +26,7 @@ module ManagerBackground =
     /// defer; otherwise report Settled for this observation.
     val ensureSettled:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         joinGuardNudges: HashSet<string> ->

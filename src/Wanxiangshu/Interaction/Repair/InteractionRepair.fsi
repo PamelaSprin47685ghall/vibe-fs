@@ -12,6 +12,7 @@ module InteractionRepairWorkflow =
         quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
             Task
@@ -20,6 +21,7 @@ module InteractionRepairWorkflow =
         quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
             Task
@@ -28,6 +30,7 @@ module InteractionRepairWorkflow =
         quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
             Task

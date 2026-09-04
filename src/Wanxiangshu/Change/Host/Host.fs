@@ -52,6 +52,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             orchestratorId,
             deps.Sessions,
             childWorkRecordForRun,
+            CompletionMailboxRuntime.create,
             ?journal = deps.Journal,
             onChildCreated = onChildCreated,
             onChildCreatedDir =
@@ -129,7 +130,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let awaitPendingSource (agentId: string) (source: Task<AgentCompletionOutcome>) =
         task {
             let! completedFirst =
-                Wanxiangshu.Process.PtyTiming.raceExit (source :> Task) Distillation.AwaitAgentTimeoutMs
+                Wanxiangshu.Process.NodeTiming.raceExit (source :> Task) Distillation.AwaitAgentTimeoutMs
 
             if not completedFirst then
                 return Error(sprintf "await agent timed out: %s" agentId)
@@ -195,7 +196,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 "OrchestratorHost.awaitManager"
 
         taskResult {
-            do! CausalAwait.awaitTask CausalWaitHub.observer descriptor (awaitChild agentId)
+            do! CausalAwait.awaitTask deps.WaitObserver descriptor (awaitChild agentId)
             return! finalizeRegisteredWorktree agentId
         }
 
@@ -258,7 +259,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                                 (conflictTimeoutBody grepOut)
                         )
                 else
-                    do! Wanxiangshu.Process.PtyTiming.timerTask 50 |> TaskResultCE.ofTask
+                    do! Wanxiangshu.Process.NodeTiming.timerTask 50 |> TaskResultCE.ofTask
                     return! loop ()
             }
 
@@ -289,6 +290,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let! _ =
                 HostSessionNudge.sendContinuation
                     deps.Sessions
+                    deps.RootWorkspace
                     record.ManagerSessionId
                     prompt
                     PromptAuthority.ContinuationKind.ManagedDelegationAssignment
@@ -351,6 +353,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             =
             HostSessionNudge.trySendGateContinuationPhysical
                 deps.Sessions
+                deps.RootWorkspace
                 reviewerSessionId
                 (ProviderProse.documentFor reviewerSessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
                 PromptAuthority.ContinuationKind.ReviewerGuard
@@ -445,7 +448,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
             do!
                 CausalAwait.awaitTask
-                    CausalWaitHub.observer
+                    deps.WaitObserver
                     sweepDescriptor
                     (OrchestratorSweep.sweepLocked sweepLockPath gitPort (fun () ->
                         deps.Journal
@@ -457,6 +460,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
             let value =
                 Orchestrator(
+                    deps.WaitObserver,
                     gitPort,
                     managerPort,
                     deps.RepoPath,
@@ -553,7 +557,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 return WorktreePath.value handle.WorktreePath
             }
 
-        CausalAwait.awaitTask CausalWaitHub.observer descriptor pending
+        CausalAwait.awaitTask deps.WaitObserver descriptor pending
 
     /// GLORY-068: `commission(existing_job_id, charge)` — continue the SAME
     /// Manager job (same worktree, same session) with an appended requirement.

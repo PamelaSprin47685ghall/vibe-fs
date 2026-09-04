@@ -28,6 +28,7 @@ module TurnWorkflow =
     /// Ordinary. Ordinary falls through when Manager does not claim the turn.
     let observe
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (recoveryScope: IBloggerRuntimeHost)
@@ -54,7 +55,7 @@ module TurnWorkflow =
                 return ()
 
             let observeIdleOrdinary current =
-                OrdinaryTurnWorkflow.observeIdle quiescence sessionPort eventPort journal current
+                OrdinaryTurnWorkflow.observeIdle quiescence sessionPort rootWorkspace eventPort journal current
 
             let observeIdleDelivery () : Task =
                 task {
@@ -63,6 +64,7 @@ module TurnWorkflow =
                         do!
                             ManagerWorkflow.observeIdle
                                 sessionPort
+                                rootWorkspace
                                 eventPort
                                 journal
                                 nudgeSent
@@ -90,6 +92,7 @@ module TurnWorkflow =
             let observeOrdinary current =
                 OrdinaryTurnWorkflow.observe
                     sessionPort
+                    rootWorkspace
                     eventPort
                     journal
                     recoveryScope
@@ -120,6 +123,7 @@ module TurnWorkflow =
                         do!
                             ManagerWorkflow.observe
                                 sessionPort
+                                rootWorkspace
                                 eventPort
                                 journal
                                 nudgeSent

@@ -1,4 +1,4 @@
-// CAUSAL-008 — diagnostic bridge is process-local, overwritable and git-excluded.
+// CAUSAL-008/009 — diagnostic bridge is process-local, first-bound and git-excluded.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -54,25 +54,28 @@ test('WHAT[CAUSAL-008] CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json', (
   }
 })
 
-test('WHAT[CAUSAL-008] CAUSAL_BRIDGE_hub_refreshes_file_on_enter', () => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-hub-'))
-  causal.hubSetWorkspace(workspace)
+test('WHAT[CAUSAL-009] CAUSAL_BRIDGE_first_binding_is_stable_and_refreshes_on_lifecycle', () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-runtime-'))
+  const redirect = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-redirect-'))
+  const registry = causal.createRegistry()
+  assert.equal(causal.bindDiagnosticWorkspace(registry, workspace), true)
+  assert.equal(causal.bindDiagnosticWorkspace(registry, redirect), false)
   const wait = mkWait(
     'manager-job',
     'OrchestratorWorkflow',
     { job: 'OJ7', manager: 'M4' },
     causal.workflowProducer(causal.owner('ManagerWorkflow', { session: 'M4' })),
   )
-  const lease = causal.hubEnter(wait)
+  const lease = causal.enter(registry, wait)
   try {
     const filePath = path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json')
     assert.equal(fs.existsSync(filePath), true)
     assert.ok(readDiagnostic(workspace).active.some((value) => value.waitKind === 'manager-job'))
-    causal.hubWriteToWorkspace()
-    assert.equal(fs.existsSync(filePath), true)
+    assert.equal(fs.existsSync(path.join(redirect, '.wanxiangshu', 'diagnostics', 'causal-waits.json')), false)
   } finally {
     causal.dispose(lease)
-    causal.hubSetWorkspace(null)
+    assert.equal(readDiagnostic(workspace).active.length, 0)
     fs.rmSync(workspace, { recursive: true, force: true })
+    fs.rmSync(redirect, { recursive: true, force: true })
   }
 })

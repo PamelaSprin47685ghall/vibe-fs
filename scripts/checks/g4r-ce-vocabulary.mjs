@@ -74,7 +74,7 @@ export const RAW_TIME_ALLOWLIST = Object.freeze([
   'Process/ProcessRunner.fs',
   'Process/Pty.fs',
   'Process/PtySupervisor.fs',
-  'Process/PtyTiming.fs',
+  'Process/NodeTiming.fs',
   'Repository/Investigation/Semble/Stdio.fs',
   'Repository/Programming/Js/OpenCode/BookkeeperTool.fs',
   'Repository/Programming/Js/OpenCode/ToolHost.fs',

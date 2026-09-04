@@ -926,7 +926,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Persistence/EventStore/CodecSurface.js',
     owner: 'durable-events',
-    laws: ['DURABLE-EVENTS-003', 'DURABLE-EVENTS-005'],
+    laws: ['DURABLE-EVENTS-003', 'DURABLE-EVENTS-005', 'DURABLE-EVENTS-023'],
     source: 'src/Wanxiangshu/Persistence/EventStore/CodecSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -1224,8 +1224,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Codec/ToolHostSurface.js',
     owner: 'provider-projection',
-    laws: ['PROVIDER-PROJECTION-003', 'PROVIDER-PROJECTION-005', 'PROVIDER-PROJECTION-008', 'PROVIDER-PROJECTION-009', 'HOST-BOUNDARY-009'],
-    lawOwners: { 'HOST-BOUNDARY-009': 'host-boundary' },
+    laws: ['PROVIDER-PROJECTION-003', 'PROVIDER-PROJECTION-005', 'PROVIDER-PROJECTION-008', 'PROVIDER-PROJECTION-009', 'HOST-BOUNDARY-009', 'HOST-BOUNDARY-030'],
+    lawOwners: { 'HOST-BOUNDARY-009': 'host-boundary', 'HOST-BOUNDARY-030': 'host-boundary' },
     source: 'src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1382,7 +1382,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Execution/Session/Wait/Surface.js',
     owner: 'causal-wait',
-    laws: ['CAUSAL-001', 'CAUSAL-002', 'CAUSAL-003', 'CAUSAL-004', 'CAUSAL-005', 'CAUSAL-006', 'CAUSAL-007', 'CAUSAL-008'],
+    laws: ['CAUSAL-001', 'CAUSAL-002', 'CAUSAL-003', 'CAUSAL-004', 'CAUSAL-005', 'CAUSAL-006', 'CAUSAL-007', 'CAUSAL-008', 'CAUSAL-009', 'PROC-008'],
+    lawOwners: { 'PROC-008': 'process-execution' },
     source: 'src/Wanxiangshu/Execution/Session/Wait/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1399,7 +1400,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Process/Surface.js',
     owner: 'time-capability',
-    laws: ['TIME-001', 'TIME-002', 'TIME-003', 'TIME-005', 'TIME-006', 'TIME-007'],
+    laws: ['TIME-001', 'TIME-002', 'TIME-003', 'TIME-005', 'TIME-006', 'TIME-007', 'TIME-008'],
     source: 'src/Wanxiangshu/Process/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1431,7 +1432,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Host/SharedStateSurface.js',
     owner: 'host-boundary',
-    laws: ['HOST-BOUNDARY-010'],
+    laws: ['HOST-BOUNDARY-010', 'HOST-BOUNDARY-031'],
     source: 'src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1472,7 +1473,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Host/HostSignalSurface.js',
     owner: 'host-boundary',
-    laws: ['HOST-BOUNDARY-001', 'HOST-BOUNDARY-002', 'HOST-BOUNDARY-003'],
+    laws: ['HOST-BOUNDARY-001', 'HOST-BOUNDARY-002', 'HOST-BOUNDARY-003', 'HOST-BOUNDARY-027', 'HOST-BOUNDARY-030'],
     source: 'src/Wanxiangshu/OpenCode/Host/HostSignalSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -1480,7 +1481,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Host/HostSignalSubscribeSurface.js',
     owner: 'host-boundary',
-    laws: ['HOST-BOUNDARY-003'],
+    laws: ['HOST-BOUNDARY-003', 'HOST-BOUNDARY-028'],
     source: 'src/Wanxiangshu/OpenCode/Host/HostSignalSubscribeSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1634,7 +1635,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Interaction/Dispatch/DispatchSurface.js',
     owner: 'dispatch-protocol',
-    laws: ['DISPATCH-PROTOCOL-002', 'DISPATCH-PROTOCOL-004', 'DISPATCH-PROTOCOL-005', 'DISPATCH-PROTOCOL-007', 'DISPATCH-PROTOCOL-009', 'EFFECT-ACCOUNTING-008'],
+    laws: ['DISPATCH-PROTOCOL-002', 'DISPATCH-PROTOCOL-004', 'DISPATCH-PROTOCOL-005', 'DISPATCH-PROTOCOL-007', 'DISPATCH-PROTOCOL-009', 'DISPATCH-PROTOCOL-015', 'EFFECT-ACCOUNTING-008'],
     lawOwners: { 'EFFECT-ACCOUNTING-008': 'effect-accounting' },
     source: 'src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs',
     representation: 'opaque-capability',
@@ -1845,7 +1846,7 @@ export const SURFACE_CONSUMERS = {
   'Execution/Session/ChatExecution/StatusSurface.js': ['host-boundary', 'managed-chat-execution'],
   'Execution/Session/ChatExecution/Surface.js': ['managed-chat-execution', 'verification-system'],
   'Execution/Session/Recovery/Surface.js': ['managed-session-lifecycle'],
-  'Execution/Session/Wait/Surface.js': ['time-capability'],
+  'Execution/Session/Wait/Surface.js': ['process-execution', 'time-capability'],
   'Foundation/RolesSurface.js': ['capability-enforcement', 'cognitive-environment', 'participant-identity', 'repository-programming', 'session-ontology'],
   'Git/Hook/Surface.js': ['durable-convergence'],
   'Host/Contract/CompactionPolicySurface.js': ['host-boundary'],

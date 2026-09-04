@@ -23,7 +23,7 @@ open Wanxiangshu.Process
 /// Orchestrator join routes to ManagerJob verdict mailbox by authority role.
 /// P0-RECOVERY-JOIN-001: FamilyReady permit → Join.joinAvailable (no bare Join, no AST).
 /// EXEC-017: tool abort → JoinInterrupt.Signal only (≠ runtime.Cancel).
-/// DevOps join: 10s timeout budget (PtyTiming.timerTask 10000). Orch/Manager join remains untimed.
+/// DevOps join: 10s timeout budget (NodeTiming.timerTask 10000). Orch/Manager join remains untimed.
 module JoinTool =
 
     [<Literal>]
@@ -84,7 +84,7 @@ module JoinTool =
 
             let! outcome =
                 CausalAwait.awaitTask
-                    CausalWaitHub.observer
+                    scope.WaitObserver
                     joinDescriptor
                     (scope
                         .OrchestratorHostFor(context.SessionId)
@@ -95,7 +95,7 @@ module JoinTool =
 
     let private devopsOrPlainWait (isDevOps: bool) (attemptWait: Task<JoinInterruptReason>) =
         if isDevOps then
-            let timerTask = PtyTiming.timerTask DevOpsJoinTimeoutMs
+            let timerTask = NodeTiming.timerTask DevOpsJoinTimeoutMs
 
             emitJsExpr
                 (attemptWait, emitJsExpr timerTask "$0.then(function(){return'DeadlineExpired';})")
@@ -215,7 +215,7 @@ module JoinTool =
                 |> Option.map (fun binding -> binding.GroupId, binding.LaneIndex)
 
             let joinTask = joinTaskForMembership runtime permit waitTask fissionMembership
-            let! joined = CausalAwait.awaitTask CausalWaitHub.observer joinDescriptor joinTask
+            let! joined = CausalAwait.awaitTask scope.WaitObserver joinDescriptor joinTask
             let root = scope.LogicalOwnerFor sessionId
 
             return

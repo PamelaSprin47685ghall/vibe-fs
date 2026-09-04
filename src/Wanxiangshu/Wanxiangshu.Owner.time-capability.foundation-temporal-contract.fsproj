@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>time-capability</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>foundation-temporal-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Foundation/Temporal.fsi"/>
+    <Compile Include="Foundation/Temporal.fs"/>
+  </ItemGroup>
+</Project>

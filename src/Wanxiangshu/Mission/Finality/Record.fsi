@@ -2,6 +2,7 @@ namespace Wanxiangshu.Mission.Finality
 
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Review
@@ -35,4 +36,7 @@ module RecordWorkflow =
             Task<Result<string, string>>
 
     val awaitCanonicalCohortRecords:
-        journal: AgentJournal -> members: EnlistedMember list -> Task<Result<(int * string) list, string>>
+        observer: IWaitObserver ->
+        journal: AgentJournal ->
+        members: EnlistedMember list ->
+            Task<Result<(int * string) list, string>>

@@ -69,6 +69,11 @@ module internal SyncDelegatePhysicalIdentity =
 type SyncDelegateRuntime
     (
         sessions: ISessionHostPort,
+        awaitWorkRecord: DiagnosticWait -> Task<Result<string, string>> -> Task<Result<string, string>>,
+        awaitInvocation:
+            DiagnosticWait
+                -> Task<Result<SyncDelegateInvocationResult, string>>
+                -> Task<Result<SyncDelegateInvocationResult, string>>,
         dispatcher: PromptDispatcher.Runtime,
         journal: AgentJournal,
         attached: IAttachedSessionPort,
@@ -270,6 +275,8 @@ type SyncDelegateRuntime
 
     let deps: SyncDelegateWorkflow.Dependencies =
         { Attached = attached
+          AwaitWorkRecord = awaitWorkRecord
+          AwaitInvocation = awaitInvocation
           ObserveChild = observeChild
           CreateChild = createChild
           BindChild = bindChild

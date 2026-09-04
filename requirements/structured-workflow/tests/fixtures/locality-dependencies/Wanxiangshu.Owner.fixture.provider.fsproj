@@ -5,6 +5,7 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Provider.fsi"/>
     <Compile Include="Provider.fs"/>
   </ItemGroup>
 </Project>

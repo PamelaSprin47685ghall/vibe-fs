@@ -494,13 +494,29 @@ export async function oracleLongStroke(scenario, _ctx) {
     1,
     'long-stroke determinism: the confirmed failure advances to exactly one fallback step',
   );
-  for (const id of ['manager-resume.0', 'manager-resume.1', 'manager-resume.2', 'manager-resume.3', 'manager-resume.4', 'manager-resume.5', 'manager-resume.6', 'manager-resume.7', 'manager-resume.8']) {
+  assert.equal(
+    scenario.provider.matchCount('manager-resume.0'),
+    1,
+    'long-stroke determinism: manager-resume.0 must reach the interrupted child join',
+  );
+
+  const originalSuffix = Array.from({ length: 10 }, (_, index) => `manager-resume.${index + 1}`);
+  const guardedSuffix = Array.from({ length: 10 }, (_, index) => `manager-join-guard.${index}`);
+  for (let index = 0; index < originalSuffix.length; index += 1) {
     assert.equal(
-      scenario.provider.matchCount(id),
+      scenario.provider.matchCount(originalSuffix[index]) + scenario.provider.matchCount(guardedSuffix[index]),
       1,
-      `long-stroke determinism: ${id} must be delivered exactly once on the same Manager lane`,
+      `long-stroke determinism: Manager suffix step ${index + 1} must select exactly one legal turn`,
     );
   }
+  const guardedDeliveries = guardedSuffix.reduce(
+    (total, id) => total + scenario.provider.matchCount(id),
+    0,
+  );
+  assert.ok(
+    guardedDeliveries === 0 || guardedDeliveries === guardedSuffix.length,
+    'long-stroke determinism: the Manager suffix cannot switch turn identity after selection',
+  );
 
   const managerIdleClaims = factPayloads(workDir, 'PluginPromptClaimed')
     .filter((payload) => payload?.ContinuationKind === 'ManagerIdleEncouragement');

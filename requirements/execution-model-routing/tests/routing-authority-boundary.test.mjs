@@ -87,7 +87,7 @@ test('WHAT[EMR-007] EMR_007_exact_terminal_identity_releases_capacity_not_coarse
   const ordinary = await source('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
 
   assert.match(codec, /tryDecodePhysicalExecutionEnd/)
-  assert.match(codec, /isMessageUpdated = not \(isNull raw\) && eventTypeOf raw = "message\.updated"/)
+  assert.match(codec, /isMessageUpdated\s*=\s*not \(isNull raw\) && HostEventEnvelope\.eventTypeOf raw = "message\.updated"/)
   assert.match(codec, /info\?parentID/)
   assert.match(recovery, /let release \(key: ChatExecutionKey\) =[\s\S]*ModelRouting\.releasePhysicalExecution key\.SessionId key\.PhysicalUserMessageId/)
   assert.match(recovery, /PhysicalReconciliationRequest\.ReleaseTerminalResource\(key, _, _\) -> release key/)

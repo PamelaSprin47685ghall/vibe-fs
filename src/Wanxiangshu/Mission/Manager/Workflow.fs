@@ -44,6 +44,7 @@ module ManagerWorkflow =
 
     let observeIdle
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (nudgeSent: HashSet<string>)
@@ -55,11 +56,12 @@ module ManagerWorkflow =
 
         match currentLife journal turn.SessionId with
         | Some life when mayEncourageLabor journal hasLivePty turn.Role turn.SessionId ->
-            ManagerIdle.encourageLabor sessionPort eventPort journal nudgeSent quiescence context life
+            ManagerIdle.encourageLabor sessionPort rootWorkspace eventPort journal nudgeSent quiescence context life
         | _ -> AsyncSupport.completedTask ()
 
     let private handleBackgroundSettlement
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (nudgeSent: HashSet<string>)
@@ -72,10 +74,11 @@ module ManagerWorkflow =
         match settled with
         | ManagerBackground.BackgroundSettlement.Deferred -> AsyncSupport.completedTask ()
         | ManagerBackground.BackgroundSettlement.Settled ->
-            observeIdle sessionPort eventPort journal nudgeSent hasLivePty quiescence context
+            observeIdle sessionPort rootWorkspace eventPort journal nudgeSent hasLivePty quiescence context
 
     let private handleCompletedManager
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (nudgeSent: HashSet<string>)
@@ -92,6 +95,7 @@ module ManagerWorkflow =
                 let! settled =
                     ManagerBackground.ensureSettled
                         sessionPort
+                        rootWorkspace
                         eventPort
                         journal
                         joinGuardNudges
@@ -102,6 +106,7 @@ module ManagerWorkflow =
                 return!
                     handleBackgroundSettlement
                         sessionPort
+                        rootWorkspace
                         eventPort
                         journal
                         nudgeSent
@@ -121,6 +126,7 @@ module ManagerWorkflow =
 
     let private observeActiveManager
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (nudgeSent: HashSet<string>)
@@ -140,6 +146,7 @@ module ManagerWorkflow =
                 let handleCompleted () =
                     handleCompletedManager
                         sessionPort
+                        rootWorkspace
                         eventPort
                         journal
                         nudgeSent
@@ -159,6 +166,7 @@ module ManagerWorkflow =
     /// workflow rather than returned as a handled-bool program counter.
     let observe
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (nudgeSent: HashSet<string>)
@@ -173,6 +181,7 @@ module ManagerWorkflow =
         else
             observeActiveManager
                 sessionPort
+                rootWorkspace
                 eventPort
                 journal
                 nudgeSent

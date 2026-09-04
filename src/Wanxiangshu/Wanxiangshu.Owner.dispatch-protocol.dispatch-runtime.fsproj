@@ -12,6 +12,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.opencode-host-opencodeport.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>

@@ -341,6 +341,8 @@ module PluginHostInterop =
     let toolHooks
         (toolModule: obj)
         (sessionPort: ISessionHostPort)
+        (waitObserver: IWaitObserver)
+        (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal option)
         (gitTreePort: GitTreePort option)
         (workspaceDirectory: string option)
@@ -364,6 +366,8 @@ module PluginHostInterop =
             ToolRegistry.create
                 toolModule
                 sessionPort
+                waitObserver
+                rootWorkspace
                 journal
                 gitTreePort
                 workspaceDirectory

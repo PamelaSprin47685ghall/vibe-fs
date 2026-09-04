@@ -276,12 +276,18 @@ export const maximumWeightedDistinctCount = ${envelope.maximum.toFixed(14)}
 export const corpusTokens = ${envelope.corpusTokens}
 `
 
-export const writeLoopDetectorEnvelopeArtifact = async (root = defaultRoot) => {
-  const envelope = await deriveLoopDetectorEnvelope(root)
+const materializeLoopDetectorArtifact = (target, bytes) => {
+  mkdirSync(path.dirname(target), { recursive: true })
+  writeFileSync(target, bytes)
+}
+
+export const writeLoopDetectorEnvelopeArtifact = async (root = defaultRoot, {
+  writeArtifact = materializeLoopDetectorArtifact,
+  ...deriveDependencies
+} = {}) => {
+  const envelope = await deriveLoopDetectorEnvelope(root, deriveDependencies)
   const artifactBytes = Buffer.from(artifactSource(envelope), 'utf8')
-  const targetDirectory = path.join(root, 'dist/Execution/Session')
-  mkdirSync(targetDirectory, { recursive: true })
-  writeFileSync(path.join(targetDirectory, 'LoopDetectorEnvelope.js'), artifactBytes)
+  writeArtifact(path.join(root, 'dist/Execution/Session/LoopDetectorEnvelope.js'), artifactBytes)
   return {
     ...envelope,
     generatedArtifact: buildGeneratedArtifactRowV1({

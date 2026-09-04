@@ -10,6 +10,7 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session.Attachment
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
@@ -548,6 +549,7 @@ module SyncDelegateSurface =
             let sessions = sessionPort :> ISessionHostPort
             let attached = new AttachedSessionRuntime()
             let gate = new SessionQuiescenceGate()
+            let waitObserver = CausalWaitRuntime().Observer
 
             let workRecordFor (sessionId: SessionId) (range: XTraceRange) (providerRun: ProviderRunIdentity) =
                 LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
@@ -566,6 +568,8 @@ module SyncDelegateSurface =
             let runtime =
                 new SyncDelegateRuntime(
                     sessions,
+                    CausalAwait.awaitTask waitObserver,
+                    CausalAwait.awaitTask waitObserver,
                     dispatcher,
                     journal,
                     (attached :> IAttachedSessionPort),
@@ -579,6 +583,9 @@ module SyncDelegateSurface =
             let scope =
                 new ToolRuntimeScope(
                     sessions,
+                    waitObserver,
+                    { new IRootWorkspaceReader with
+                        member _.TryRead() = Some directory },
                     Some journal,
                     None,
                     Some directory,

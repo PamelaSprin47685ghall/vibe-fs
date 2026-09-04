@@ -5,14 +5,15 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 
 /// JS-native boundary for causal-wait diagnostics. Descriptors and snapshots are
 /// plain objects; registry and lease values are opaque process-local capabilities.
 module CausalWaitSurface =
 
-    type private RegistryHandle(registry: CausalWaitRegistry) =
-        member _.Registry = registry
+    type private RuntimeHandle(runtime: CausalWaitRuntime) =
+        member _.Runtime = runtime
 
     type private LeaseHandle(lease: IWaitLease) =
         member _.Lease = lease
@@ -22,6 +23,9 @@ module CausalWaitSurface =
 
     type private SnapshotReaderHandle(reader: IWaitSnapshotReader) =
         member _.Snapshot() = reader.Snapshot()
+
+    type private MailboxHandle(mailbox: CompletionMailbox) =
+        member _.Mailbox = mailbox
 
     [<Emit("$0($1)")>]
     let private call1 (fn: obj) (value: obj) : obj = jsNative
@@ -204,7 +208,7 @@ module CausalWaitSurface =
             else
                 Some(int (string historyCapacity))
 
-        RegistryHandle(CausalWaitRegistry(?historyCapacity = capacity)) :> obj
+        RuntimeHandle(CausalWaitRuntime(?historyCapacity = capacity)) :> obj
 
     let createWait (descriptor: obj) : obj = descriptor
 
@@ -229,12 +233,12 @@ module CausalWaitSurface =
         | _ -> box {| kind = kind |}
 
     let observerCapability (registry: obj) : obj =
-        let handle = registry :?> RegistryHandle
-        ObserverHandle(handle.Registry :> IWaitObserver) :> obj
+        let handle = registry :?> RuntimeHandle
+        ObserverHandle(handle.Runtime.Observer) :> obj
 
     let snapshotReaderCapability (registry: obj) : obj =
-        let handle = registry :?> RegistryHandle
-        SnapshotReaderHandle(handle.Registry :> IWaitSnapshotReader) :> obj
+        let handle = registry :?> RuntimeHandle
+        SnapshotReaderHandle(handle.Runtime.SnapshotReader) :> obj
 
     let private requireObserver (value: obj) =
         match value with
@@ -264,7 +268,7 @@ module CausalWaitSurface =
         readerSnapshot (snapshotReaderCapability registry)
 
     let historyCapacity (registry: obj) : int =
-        (registry :?> RegistryHandle).Registry.HistoryCapacity
+        (registry :?> RuntimeHandle).Runtime.HistoryCapacity
 
     let ownerKey (value: obj) : string = CausalOwner.key (ownerOf value)
 
@@ -292,9 +296,9 @@ module CausalWaitSurface =
         CausalFrontier.ofSnapshot typed |> List.map frontierObject |> List.toArray
 
     let awaitTask (registry: obj) (descriptor: obj) (pending: obj) : Task<obj> =
-        let handle = registry :?> RegistryHandle
+        let handle = registry :?> RuntimeHandle
         let task: Task<obj> = unbox (asPromise pending)
-        CausalAwait.awaitTask (handle.Registry :> IWaitObserver) (waitOf descriptor) task
+        CausalAwait.awaitTask handle.Runtime.Observer (waitOf descriptor) task
 
     let untilSignalOrDeadline
         (registry: obj)
@@ -303,7 +307,7 @@ module CausalWaitSurface =
         (tryRead: obj)
         (awaitSignal: obj)
         : Task<obj> =
-        let handle = registry :?> RegistryHandle
+        let handle = registry :?> RuntimeHandle
         let deadlineHandle = unbox<IDeadlineHandle> deadline
 
         let read () =
@@ -314,12 +318,7 @@ module CausalWaitSurface =
 
         task {
             let! result =
-                CausalAwait.untilSignalOrDeadline
-                    (handle.Registry :> IWaitObserver)
-                    (waitOf descriptor)
-                    deadlineHandle
-                    read
-                    signal
+                CausalAwait.untilSignalOrDeadline handle.Runtime.Observer (waitOf descriptor) deadlineHandle read signal
 
             match result with
             | Ok value -> return box {| ok = true; value = value |}
@@ -327,17 +326,59 @@ module CausalWaitSurface =
         }
 
     let writeSnapshot (workspace: string) (registry: obj) : unit =
-        let handle = registry :?> RegistryHandle
-        CausalWaitBridge.writeSnapshot workspace (handle.Registry :> IWaitSnapshotReader)
+        let handle = registry :?> RuntimeHandle
+        CausalWaitBridge.writeSnapshot workspace (handle.Runtime.SnapshotReader.Snapshot())
 
-    let hubSetWorkspace (workspace: obj) : unit =
-        let value = if isNullish workspace then None else Some(string workspace)
-        CausalWaitHub.setWorkspace value
+    let bindDiagnosticWorkspace (registry: obj) (workspace: string) : bool =
+        let handle = registry :?> RuntimeHandle
+        handle.Runtime.BindDiagnosticTarget(CausalWaitBridge.target workspace)
 
-    let hubEnter (descriptor: obj) : obj =
-        LeaseHandle(CausalWaitHub.observer.Enter(waitOf descriptor)) :> obj
+    let private completionViewItem =
+        function
+        | PtyExited value ->
+            box
+                {| kind = "PtyExited"
+                   ptyId = value.PtyId
+                   outcome = value.Outcome
+                   closed = value.Closed |}
+        | PtyFailed value ->
+            box
+                {| kind = "PtyFailed"
+                   ptyId = value.PtyId
+                   outcome = value.Outcome
+                   closed = value.Closed
+                   code = value.Code
+                   message = value.Message |}
+        | PtyAborted value ->
+            box
+                {| kind = "PtyAborted"
+                   ptyId = value.PtyId
+                   outcome = value.Outcome
+                   closed = value.Closed
+                   code = value.Code
+                   message = value.Message |}
 
-    let hubSnapshot () : obj =
-        snapshotObject (CausalWaitHub.snapshot ())
+    let completionMailboxCreate () : obj =
+        MailboxHandle(CompletionMailbox(obj ())) :> obj
 
-    let hubWriteToWorkspace () : unit = CausalWaitHub.writeToWorkspace ()
+    let completionMailboxPublishPty (mailbox: obj) (item: obj) : unit =
+        (mailbox :?> MailboxHandle)
+            .Mailbox.PublishPtyCompletion(unbox<PtyJoinItem> item)
+
+    let completionMailboxDrainPty (mailbox: obj) (maxCount: int) : obj array =
+        (mailbox :?> MailboxHandle).Mailbox.DrainPtyCompletions maxCount
+        |> List.map completionViewItem
+        |> List.toArray
+
+    let completionMailboxPendingCount (mailbox: obj) : int =
+        (mailbox :?> MailboxHandle).Mailbox.PendingCount
+
+    let ptyExited (id: string) (outcome: string) : obj =
+        box (
+            PtyExited
+                { PtyId = id
+                  Outcome = outcome
+                  Closed = true }
+        )
+
+    let maxJoinBatch = JoinBatch.MaxJoinBatch

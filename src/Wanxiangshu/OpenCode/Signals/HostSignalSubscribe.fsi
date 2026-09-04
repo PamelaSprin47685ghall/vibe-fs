@@ -1,19 +1,26 @@
 namespace Wanxiangshu.OpenCode
 
+open System
 open System.Threading.Tasks
-open Wanxiangshu.Foundation
 
 module HostSignalSubscribe =
-    type SignalHealth =
-        { IsConnected: bool
-          ReconnectAttempts: int }
+    [<RequireQualifiedAccess>]
+    type HostSignalSubscriptionError =
+        | InvalidInput
+        | EventsListenUnavailable
+        | EventsListenReturnedInvalidDisposer
+        | EventsListenFailed of diagnostic: string
 
+    [<Sealed>]
     type HostSignalSubscription =
-        { Health: unit -> SignalHealth
-          Dispose: unit -> unit }
+        interface IDisposable
+
+    [<RequireQualifiedAccess>]
+    type HostSignalSubscriptionMode =
+        | LocalEventHook
+        | EventsListen of HostSignalSubscription
 
     val trySubscribe:
         input: obj ->
         onSignalEvent: (obj -> unit) ->
-        _timerPort: ITimerPort option ->
-            Task<Result<HostSignalSubscription option * string, string>>
+            Task<Result<HostSignalSubscriptionMode, HostSignalSubscriptionError>>

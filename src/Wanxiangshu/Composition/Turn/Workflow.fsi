@@ -19,6 +19,7 @@ module TurnWorkflow =
     /// Ordinary. Ordinary falls through when Manager does not claim the turn.
     val observe:
         sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
         recoveryScope: IBloggerRuntimeHost ->

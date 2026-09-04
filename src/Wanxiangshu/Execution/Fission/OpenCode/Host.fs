@@ -932,6 +932,7 @@ module FissionHost =
 
     let private observeOpenLaneCompletion
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
@@ -949,6 +950,7 @@ module FissionHost =
                 let! _ =
                     HostJoinGuard.nudge
                         sessionPort
+                        rootWorkspace
                         journal
                         joinGuardNudges
                         (fun () -> quiescence.TryConsume idlePermit)
@@ -967,6 +969,7 @@ module FissionHost =
 
     let private observeCompletedLane
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
@@ -983,6 +986,7 @@ module FissionHost =
         | FissionGroupTerminal.Open ->
             observeOpenLaneCompletion
                 sessionPort
+                rootWorkspace
                 eventPort
                 journal
                 joinGuardNudges
@@ -1050,6 +1054,7 @@ module FissionHost =
 
     let private observeOpenLaneOutcome
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
@@ -1067,6 +1072,7 @@ module FissionHost =
         | FissionLaneSettlementDecision.MaterializeLane ->
             observeCompletedLane
                 sessionPort
+                rootWorkspace
                 eventPort
                 journal
                 joinGuardNudges
@@ -1079,6 +1085,7 @@ module FissionHost =
 
     let private observeLaneOutcome
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
@@ -1098,6 +1105,7 @@ module FissionHost =
         | FissionGroupTerminal.Open, None ->
             observeOpenLaneOutcome
                 sessionPort
+                rootWorkspace
                 eventPort
                 journal
                 joinGuardNudges
@@ -1111,6 +1119,7 @@ module FissionHost =
 
     let private observeDurableLaneTurn
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
@@ -1129,6 +1138,7 @@ module FissionHost =
         | Some(group, laneIndex) ->
             observeLaneOutcome
                 sessionPort
+                rootWorkspace
                 eventPort
                 journal
                 joinGuardNudges
@@ -1145,6 +1155,7 @@ module FissionHost =
     /// turns return false so ordinary repair/recovery behavior still runs.
     let observeLaneTurn
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
@@ -1173,6 +1184,7 @@ module FissionHost =
                 return!
                     observeDurableLaneTurn
                         sessionPort
+                        rootWorkspace
                         eventPort
                         journal
                         joinGuardNudges

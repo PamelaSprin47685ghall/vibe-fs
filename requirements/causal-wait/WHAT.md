@@ -38,4 +38,4 @@
 
 ## CAUSAL-009: wait vocabulary、runtime、diagnostic与mailbox必须分层
 
-wait identity、frontier、reader/writer capability type形成pure contract；registry/await runtime只拥有process-local waiter；Node diagnostic adapter只实现窄observation port；CompletionMailbox runtime独立拥有其physical wake resource；proof Surface不得成为production provider。consumer只能取得composition注入的最窄capability，禁止contract closure包含registry、TaskCompletionSource、Node import、diagnostic implementation或mailbox implementation。
+wait identity、frontier、reader/writer capability及join interrupt/outcome/wake/batch vocabulary形成pure contract；registry/await runtime只拥有process-local waiter；Node diagnostic adapter只实现窄observation port；CompletionMailbox runtime独立拥有其physical wake resource；proof Surface不得成为production provider。production consumer只能取得composition注入的最窄capability，禁止通过global observer/service locator取能力；process-local diagnostic target只能first-bind，后续plugin instance不得重定向。Delegation runtime只能消费pure wait contract与composition注入的typed await/mailbox capability，不能直接构造或引用CausalWait physical runtime。禁止contract closure包含registry、TaskCompletionSource、Node import、diagnostic implementation或mailbox implementation。

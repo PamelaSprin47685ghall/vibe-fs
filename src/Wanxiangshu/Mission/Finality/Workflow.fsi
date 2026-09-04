@@ -2,6 +2,7 @@ namespace Wanxiangshu.Mission.Finality
 
 open System.Threading.Tasks
 open Wanxiangshu.Change
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Persistence.Journal
@@ -10,6 +11,7 @@ open Wanxiangshu.Persistence.Journal
 module FinalityWorkflow =
 
     val start:
+        observer: IWaitObserver ->
         reviewerPort: FinalityReviewerPort ->
         treePort: FinalityTreePort ->
         journal: AgentJournal option ->

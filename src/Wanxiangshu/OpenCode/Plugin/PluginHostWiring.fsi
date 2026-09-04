@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Strength.Persistence
 
@@ -17,6 +18,8 @@ module PluginHostWiring =
           SharedTerminalKey: string option
           SharedTerminalPort: Events.HostEventPort option
           GitTreePort: GitTreePort option
-          StrengthDurability: StrengthDurabilityPort option }
+          StrengthDurability: StrengthDurabilityPort option
+          RootWorkspace: IRootWorkspaceReader
+          CausalWaitObserver: IWaitObserver }
 
     val create: boot: PluginBoot.Boot -> Task<Host>

@@ -18,6 +18,7 @@ open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
@@ -108,6 +109,7 @@ module FinalityWorkflow =
         | None -> fromRace
 
     let private reviewMembers
+        (observer: IWaitObserver)
         (reviewerPort: FinalityReviewerPort)
         (treePort: FinalityTreePort)
         (durable: AgentJournal)
@@ -148,6 +150,7 @@ module FinalityWorkflow =
             | Ok CohortJudgement.AllConfirmed ->
                 return!
                     BlessingWorkflow.blessIfTreeUnchanged
+                        observer
                         reviewerPort
                         treePort
                         durable
@@ -159,6 +162,7 @@ module FinalityWorkflow =
         }
 
     let private enlistAndReview
+        (observer: IWaitObserver)
         (reviewerPort: FinalityReviewerPort)
         (treePort: FinalityTreePort)
         (durable: AgentJournal)
@@ -175,6 +179,7 @@ module FinalityWorkflow =
             | Ok members ->
                 return!
                     reviewMembers
+                        observer
                         reviewerPort
                         treePort
                         durable
@@ -186,6 +191,7 @@ module FinalityWorkflow =
         }
 
     let private executeDurable
+        (observer: IWaitObserver)
         (reviewerPort: FinalityReviewerPort)
         (treePort: FinalityTreePort)
         (durable: AgentJournal)
@@ -231,10 +237,21 @@ module FinalityWorkflow =
                     existingRequest
 
             return!
-                enlistAndReview reviewerPort treePort durable managerSessionId life request lifeId requestId requestTree
+                enlistAndReview
+                    observer
+                    reviewerPort
+                    treePort
+                    durable
+                    managerSessionId
+                    life
+                    request
+                    lifeId
+                    requestId
+                    requestTree
         }
 
     let start
+        (observer: IWaitObserver)
         (reviewerPort: FinalityReviewerPort)
         (treePort: FinalityTreePort)
         (journal: AgentJournal option)
@@ -251,6 +268,7 @@ module FinalityWorkflow =
         | None -> task { return invalidOp "Finality requires an AgentJournal" }
         | Some durable ->
             executeDurable
+                observer
                 reviewerPort
                 treePort
                 durable

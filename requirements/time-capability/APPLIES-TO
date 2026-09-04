@@ -5,7 +5,8 @@
 /src/Wanxiangshu/Foundation/Temporal.fs
 /src/Wanxiangshu/Process/Deadline.fs
 /src/Wanxiangshu/Process/DeadlineSurface.fs
-/src/Wanxiangshu/Process/PtyTiming.fs
+/src/Wanxiangshu/Process/NodeTiming.fs
+/src/Wanxiangshu/Process/VirtualTiming.fs
 /src/Wanxiangshu/Execution/Session/SessionStartedAtLedger.fs
 /src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs
 /src/Wanxiangshu/Verification/TemporalSurface.fs

@@ -91,12 +91,10 @@ must = [
   "continue.0",
   "continue.1",
   "manager-resume.0",
-  "manager-resume.10",
   "coder.0",
   "coder.1",
   "coder.2",
   "coder-reuse.0",
-  "manager-resume.1",
   "conflict-resume.0",
   "coder-resolve.0",
   "barrier-reviewer.0",
@@ -164,24 +162,24 @@ flow = [
   { awaitIdle = { after = "coder.3" }, timeoutMs = 60000 },
   { waitFact = { name = "HandleCompleted", gte = 1 }, timeoutMs = 60000 },
   { wait = "manager-resume.0", timeoutMs = 60000 },
-  { wait = "manager-resume.1", timeoutMs = 60000 },
-  { wait = "manager-resume.2", timeoutMs = 60000 },
-  { wait = "manager-resume.3", timeoutMs = 60000 },
+  { waitAny = ["manager-resume.1", "manager-join-guard.0"], timeoutMs = 60000 },
+  { waitAny = ["manager-resume.2", "manager-join-guard.1"], timeoutMs = 60000 },
+  { waitAny = ["manager-resume.3", "manager-join-guard.2"], timeoutMs = 60000 },
   { waitFact = { name = "FinalityRejected", gte = 1, renewOn = ["ReviewVerdictRecorded", "ReviewAttemptClosed", "BlogObservationCommitted"] }, timeoutMs = 60000 },
 
   # The same physical Manager continuation repairs, then seeks dual-PERFECT blessing.
   # Reviewer protocol identity is deliberately not duplicated in the flow; the
   # durable finality facts are the business barrier.
-  { wait = "manager-resume.4" },
+  { waitAny = ["manager-resume.4", "manager-join-guard.3"] },
   { wait = "coder-fix.0", timeoutMs = 60000 },
-  { wait = "manager-resume.5" },
-  { wait = "manager-resume.6" },
+  { waitAny = ["manager-resume.5", "manager-join-guard.4"] },
+  { waitAny = ["manager-resume.6", "manager-join-guard.5"] },
   { wait = "coder-reuse.0", timeoutMs = 60000 },
-  { wait = "manager-resume.7" },
-  { wait = "manager-resume.8" },
+  { waitAny = ["manager-resume.7", "manager-join-guard.6"] },
+  { waitAny = ["manager-resume.8", "manager-join-guard.7"] },
   { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ReviewAttemptClosed", "ConfirmedReviewWitness", "FinalityReviewerEnlisted", "BlogObservationCommitted"] }, timeoutMs = 180000 },
-  { wait = "manager-resume.9", timeoutMs = 30000 },
-  { wait = "manager-resume.10", timeoutMs = 30000 },
+  { waitAny = ["manager-resume.9", "manager-join-guard.8"], timeoutMs = 30000 },
+  { waitAny = ["manager-resume.10", "manager-join-guard.9"], timeoutMs = 30000 },
   { waitFact = { name = "LifeCompleted", gte = 1 } },
   { waitFact = { name = "CandidateReady", eq = 1 }, timeoutMs = 60000 },
 
@@ -438,6 +436,58 @@ tools = ["fork", "join", "horizon", "suicide"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join", args = {} }
+
+# A fresh Manager terminal can race with the externally injected manager-resume
+# continuation while its child is still outstanding. INTERACTION-AUTHORITY-014
+# then requires this exact JoinGuard on the same Manager session. It is separate
+# from manager.1, which remains the sole provider-fault owner above.
+[[turn]]
+id = "manager-join-guard"
+internal = true
+optional = true
+user = "# Work remains away."
+tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
+forbiddenTools = ["commission"]
+
+  [[turn.step]]
+  runtimeStep = 1
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "materialize the Manager life" } }
+
+  [[turn.step]]
+  runtimeStep = 2
+  respond = { type = "tool-call", tool = "todowrite", args = { planComplete = true, workingOn = "long-stroke", obligations = [{ name = "long-stroke", horizon = "near", work = "Run the long stroke through publish_proof.txt." }] } }
+
+  [[turn.step]]
+  runtimeStep = 3
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "first ending" } }
+
+  [[turn.step]]
+  runtimeStep = 4
+  respond = { type = "tool-call", tool = "fork", args = { calling = "coder", name = "Proof Finisher", charge = "Ensure publish_proof.txt contains exactly: Published by long-stroke canary" } }
+
+  [[turn.step]]
+  runtimeStep = 5
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 6
+  respond = { type = "tool-call", tool = "fork", args = { name = "Proof Finisher", charge = "Verify the reused subagent received this second charge and publish_proof.txt is exact." } }
+
+  [[turn.step]]
+  runtimeStep = 7
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 8
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+
+  [[turn.step]]
+  runtimeStep = 9
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+
+  [[turn.step]]
+  runtimeStep = 10
+  respond = { type = "text", text = "Manager rest in peace." }
 
 [[turn]]
 id = "continue"

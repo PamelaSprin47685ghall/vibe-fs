@@ -329,7 +329,7 @@ module PluginTransforms =
                     // emits TerminalOutcome.Completed for this child.
                     wired.RegisterOwned(SessionId.value bloggerId)
                     wired.BindActiveRun bloggerId Role.Blogger None))
-                SharedState.RootWorkspace
+                (host.RootWorkspace.TryRead())
                 (fun projectionSessionIdOpt outObj ->
                     ExplicitResumeSuppression.isCurrentMaterial outObj
                     || ExplicitResumeSuppression.isExplicitResumeBinding projectionSessionIdOpt outObj)

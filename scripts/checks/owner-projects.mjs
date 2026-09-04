@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 import { buildTraceGraph } from '../lib/requirement-trace.mjs'
 import { validatedSemanticEvidenceContracts } from '../lib/semantic-evidence.mjs'
+import { compareCanonicalTextV1 } from '../lib/canonical-json-v1.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
@@ -19,6 +20,8 @@ const LOCALITY_KINDS = new Set(['contract', 'runtime', 'adapter', 'composition']
 const norm = (value) => value.replace(/\\/g, '/')
 const repoPath = (value) => norm(relative(ROOT, value))
 const sorted = (values) => [...values].sort()
+const canonicalSorted = (values, identity = (value) => value) =>
+  [...values].sort((left, right) => compareCanonicalTextV1(identity(left), identity(right)))
 
 export function parseProject(projectPath) {
   const text = readFileSync(projectPath, 'utf8')
@@ -32,6 +35,89 @@ export function parseProject(projectPath) {
   const references = [...text.matchAll(/<ProjectReference\s+Include="([^"]+\.fsproj)"\s*\/?\s*>/g)]
     .map((match) => resolve(dirname(projectPath), match[1]))
   return { projectPath, text, owner, locality, kind, compile, signatures, references }
+}
+
+export function readOwnerProjectInventoryV1({ sourceRoot = SOURCE_ROOT, aggregate = join(sourceRoot, 'Wanxiangshu.fsproj') } = {}) {
+  if (!existsSync(aggregate)) throw new Error(`${repoPath(aggregate)}: missing aggregate project`)
+  const projectPaths = readdirSync(sourceRoot)
+    .filter((name) => OWNER_PROJECT.test(name))
+    .map((name) => join(sourceRoot, name))
+  const projects = new Map(projectPaths.map((projectPath) => [projectPath, parseProject(projectPath)]))
+  const localityIds = new Set()
+  const sourceLocality = new Map()
+
+  for (const project of projects.values()) {
+    if (!project.owner || !project.locality || !LOCALITY_KINDS.has(project.kind)) {
+      throw new Error(`${repoPath(project.projectPath)}: invalid owner locality metadata`)
+    }
+    if (localityIds.has(project.locality)) throw new Error(`duplicate locality id: ${project.locality}`)
+    localityIds.add(project.locality)
+    if (project.compile.length === 0) throw new Error(`${project.locality}: locality must compile at least one source`)
+    if (new Set(project.compile).size !== project.compile.length) throw new Error(`${project.locality}: duplicate implementation source`)
+    if (new Set(project.signatures).size !== project.signatures.length) throw new Error(`${project.locality}: duplicate signature source`)
+    if (new Set(project.references).size !== project.references.length) throw new Error(`${project.locality}: duplicate ProjectReference`)
+
+    const signatures = new Set(project.signatures)
+    for (const implementationPath of project.compile) {
+      const signaturePath = implementationPath.replace(/\.fs$/, '.fsi')
+      if (!signatures.has(signaturePath)) throw new Error(`${implementationPath}: missing sibling signature in ${project.locality}`)
+      if (!existsSync(join(ROOT, implementationPath))) throw new Error(`${implementationPath}: missing implementation source`)
+      if (!existsSync(join(ROOT, signaturePath))) throw new Error(`${signaturePath}: missing signature source`)
+      const previous = sourceLocality.get(implementationPath)
+      if (previous) throw new Error(`${implementationPath}: compiled by multiple localities (${previous}, ${project.locality})`)
+      sourceLocality.set(implementationPath, project.locality)
+    }
+    for (const signaturePath of project.signatures) {
+      const implementationPath = signaturePath.slice(0, -1)
+      if (!project.compile.includes(implementationPath)) throw new Error(`${signaturePath}: missing sibling implementation in ${project.locality}`)
+    }
+  }
+
+  const localities = canonicalSorted(projects.values(), (project) => project.locality).map((project) => {
+    const references = canonicalSorted(project.references.map((reference) => {
+      const provider = projects.get(reference)
+      if (!provider) throw new Error(`${project.locality}: unknown locality reference ${repoPath(reference)}`)
+      if (provider.locality === project.locality) throw new Error(`${project.locality}: self ProjectReference`)
+      return provider.locality
+    }))
+    return {
+      id: project.locality,
+      owner: project.owner,
+      kind: project.kind,
+      projectPath: repoPath(project.projectPath),
+      sources: canonicalSorted(project.compile).map((implementationPath) => ({
+        implementationPath,
+        signaturePath: implementationPath.replace(/\.fs$/, '.fsi'),
+      })),
+      references,
+    }
+  })
+  const byLocality = new Map(localities.map((locality) => [locality.id, locality]))
+  const visiting = new Set()
+  const visited = new Set()
+  const visit = (localityId) => {
+    if (visited.has(localityId)) return
+    if (visiting.has(localityId)) throw new Error(`owner project graph contains SCC/cycle including ${localityId}`)
+    visiting.add(localityId)
+    for (const reference of byLocality.get(localityId).references) visit(reference)
+    visiting.delete(localityId)
+    visited.add(localityId)
+  }
+  for (const locality of localities) visit(locality.id)
+
+  return {
+    aggregatePath: repoPath(aggregate),
+    productionFiles: canonicalSorted(localities.flatMap((locality) => locality.sources.map(({ implementationPath }) => implementationPath))),
+    signatureFiles: canonicalSorted(localities.flatMap((locality) => locality.sources.map(({ signaturePath }) => signaturePath))),
+    localities,
+    projectReferences: canonicalSorted(
+      localities.flatMap((locality) => locality.references.map((providerLocality) => ({
+        consumerLocality: locality.id,
+        providerLocality,
+      }))),
+      ({ consumerLocality, providerLocality }) => `${consumerLocality}\0${providerLocality}`,
+    ),
+  }
 }
 
 function cycleOf(projects) {

@@ -28,7 +28,10 @@ module CausalWaitSurface =
         registry: obj -> descriptor: obj -> deadline: obj -> tryRead: obj -> awaitSignal: obj -> Task<obj>
 
     val writeSnapshot: workspace: string -> registry: obj -> unit
-    val hubSetWorkspace: workspace: obj -> unit
-    val hubEnter: descriptor: obj -> obj
-    val hubSnapshot: unit -> obj
-    val hubWriteToWorkspace: unit -> unit
+    val bindDiagnosticWorkspace: registry: obj -> workspace: string -> bool
+    val completionMailboxCreate: unit -> obj
+    val completionMailboxPublishPty: mailbox: obj -> item: obj -> unit
+    val completionMailboxDrainPty: mailbox: obj -> maxCount: int -> obj array
+    val completionMailboxPendingCount: mailbox: obj -> int
+    val ptyExited: id: string -> outcome: string -> obj
+    val maxJoinBatch: int

@@ -6,73 +6,7 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Process
 open Wanxiangshu.Execution.Session
-
-/// EXEC-018: single-join batch ceiling. One source of truth for runtime + wire.
-/// Lives in a module: F# namespaces cannot contain values (FS201).
-module JoinBatch =
-    /// Not [<Literal>]: Fable inlines Literal and drops the JS export.
-    let Max = 32
-    /// Facade / domain.mjs export alias (JoinBatch_MaxJoinBatch).
-    let MaxJoinBatch = Max
-
-/// EXEC-004 / EXEC-018: non-empty batch of join results.
-type NonEmptyBatch<'item> = private NonEmptyBatch of head: 'item * tail: 'item list
-
-module NonEmptyBatch =
-    let ofHeadTail (head: 'item) (tail: 'item list) = NonEmptyBatch(head, tail)
-
-    let tryOfList =
-        function
-        | [] -> None
-        | head :: tail -> Some(NonEmptyBatch(head, tail))
-
-    let toList (NonEmptyBatch(head, tail)) = head :: tail
-
-    let length (NonEmptyBatch(_, tail)) = 1 + List.length tail
-
-    let map (f: 'a -> 'b) (NonEmptyBatch(head, tail)) = NonEmptyBatch(f head, List.map f tail)
-
-/// EXEC-017 / EXEC-018: why a join wait ended without results. Typed local
-/// interruption only. A queued external user message CAN interrupt wait via
-/// UserMessageArrived; it does not cancel mailbox/runtime/child.
-/// Drain-before-interrupt remains: completions already available still win.
-[<RequireQualifiedAccess>]
-type JoinInterruptReason =
-    /// The current tool call was aborted locally (Esc / tool-call abort).
-    | OperatorAbort
-    /// An external user message arrived for this session while join waited.
-    | UserMessageArrived
-    /// The DevOps join budget elapsed without a completion.
-    | DeadlineExpired
-
-/// EXEC-017 / EXEC-018: join wait finishes with results or a typed local
-/// interrupt. Interrupted is not a ForkError.
-type JoinWaitOutcome<'item> =
-    | ResultsAvailable of NonEmptyBatch<'item>
-    | Interrupted of JoinInterruptReason
-
-/// Wake reason for CompletionMailbox.WaitForSignal (EXEC-018).
-type MailboxWakeReason =
-    | CompletionMayBeAvailable
-    | LocalInterrupt of JoinInterruptReason
-    | MailboxCancelled
-
-/// Local interrupt for one join tool-call (EXEC-017).
-/// tool-call abort → Signal OperatorAbort only; never runtime.Cancel /
-/// mailbox.Cancel.
-type JoinInterrupt =
-    { Wait: Task<JoinInterruptReason>
-      Signal: JoinInterruptReason -> unit }
-
-module JoinInterrupt =
-    let create () : JoinInterrupt =
-        let tcs =
-            TaskCompletionSource<JoinInterruptReason>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-        { Wait = tcs.Task
-          Signal = fun reason -> AsyncSupport.trySetResult tcs reason |> ignore }
 
 /// Dual-channel completion mailbox (GREEN-5 / ARCH-002).
 /// Agent channel: wake-only (HandleMayHaveChanged) — Journal is agent fact source.
@@ -200,3 +134,20 @@ type CompletionMailbox(gate: obj) =
     member _.PendingPtyCount = lock gate (fun () -> ptyCompletions.Count)
     member _.PendingAgentWakeCount = lock gate (fun () -> agentWakes.Count)
     member _.IsCancelled = lock gate (fun () -> cancelled)
+
+    interface ICompletionMailbox<AgentHandleId, PtyJoinItem, JoinInterruptReason, MailboxWakeReason> with
+        member this.PulseAgent handle = this.PulseAgentHandle handle
+        member this.PublishPty item = this.PublishPtyCompletion item
+        member this.PulseWake() = this.PulseWake()
+        member this.WaitForWake() = this.WaitForWake()
+        member this.WaitForSignal interrupt = this.WaitForSignal interrupt
+        member this.DrainAgents maxCount = this.DrainAgentWakes maxCount
+        member this.DrainPtys maxCount = this.DrainPtyCompletions maxCount
+        member this.Cancel() = this.Cancel()
+        member this.PendingCount = this.PendingCount
+        member this.PendingPtyCount = this.PendingPtyCount
+        member this.IsCancelled = this.IsCancelled
+
+module CompletionMailboxRuntime =
+    let create (gate: obj) : ICompletionMailbox<AgentHandleId, PtyJoinItem, JoinInterruptReason, MailboxWakeReason> =
+        CompletionMailbox(gate)

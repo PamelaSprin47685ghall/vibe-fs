@@ -54,10 +54,8 @@ module HostSessionNudge =
     /// root workspace gives a stable, deterministic set of root instructions,
     /// which differs from the previous worktree version by design; the
     /// scenario's prefix-probe boundary carries that transition.
-    let private liveDirectory (directory: string option) =
-        directory
-        |> Option.filter (fun path -> System.IO.Directory.Exists path)
-        |> Option.orElse SharedState.RootWorkspace
+    let private liveDirectory (rootWorkspace: IRootWorkspaceReader) (directory: string option) =
+        RootWorkspaceDirectory.select System.IO.Directory.Exists rootWorkspace directory
 
     let private isFissionReplaced (journal: AgentJournal option) (sessionId: SessionId) : bool =
         FissionRuntime.isSilentInterrupt sessionId
@@ -68,6 +66,7 @@ module HostSessionNudge =
 
     let sendContinuationResult
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (kind: PromptAuthority.ContinuationKind)
@@ -93,7 +92,7 @@ module HostSessionNudge =
                         kind
                         profile
                         agent
-                        (liveDirectory directory)
+                        (liveDirectory rootWorkspace directory)
                         awaitMode
                         onAccepted
         }
@@ -105,6 +104,7 @@ module HostSessionNudge =
     /// failed left a Claimed fact with nothing following it and no log line.
     let sendContinuation
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (kind: PromptAuthority.ContinuationKind)
@@ -113,6 +113,7 @@ module HostSessionNudge =
         : Task<Result<PromptKey, string>> =
         sendContinuationResult
             sessionPort
+            rootWorkspace
             sessionId
             prompt
             kind
@@ -130,6 +131,7 @@ module HostSessionNudge =
 
     let private sendGateContinuationWithProfile
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (continuation: PromptAuthority.ContinuationKind)
@@ -157,7 +159,7 @@ module HostSessionNudge =
                 terminalProviderRun
                 profile
                 agent
-                (liveDirectory directory)
+                (liveDirectory rootWorkspace directory)
                 PromptDispatcher.AwaitMode.Await
                 onAccepted
             |> TaskValue.map (function
@@ -168,6 +170,7 @@ module HostSessionNudge =
     /// Durable dedupe is exact `(gate kind, ProviderRunIdentity)` only.
     let trySendGateContinuation
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (continuation: PromptAuthority.ContinuationKind)
@@ -185,6 +188,7 @@ module HostSessionNudge =
                 return!
                     sendGateContinuationWithProfile
                         sessionPort
+                        rootWorkspace
                         sessionId
                         prompt
                         continuation
@@ -199,6 +203,7 @@ module HostSessionNudge =
 
     let private sendGateContinuationPhysicalWithProfile
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (continuation: PromptAuthority.ContinuationKind)
@@ -230,6 +235,7 @@ module HostSessionNudge =
                 let! outcome =
                     sendGateContinuationWithProfile
                         sessionPort
+                        rootWorkspace
                         sessionId
                         prompt
                         continuation
@@ -246,6 +252,7 @@ module HostSessionNudge =
 
     let trySendGateContinuationPhysical
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (continuation: PromptAuthority.ContinuationKind)
@@ -263,6 +270,7 @@ module HostSessionNudge =
                 return!
                     sendGateContinuationPhysicalWithProfile
                         sessionPort
+                        rootWorkspace
                         sessionId
                         prompt
                         continuation
@@ -281,6 +289,7 @@ module HostSessionNudge =
 
     let private sendInteractionRepairWithProfile
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (directory: string option)
@@ -311,7 +320,7 @@ module HostSessionNudge =
                 repairKind
                 profile
                 agent
-                (liveDirectory directory)
+                (liveDirectory rootWorkspace directory)
                 PromptDispatcher.AwaitMode.Await
                 None
             |> TaskValue.map interactionRepairOutcomeOfResult
@@ -326,6 +335,7 @@ module HostSessionNudge =
     /// before a crash is still spent after it.
     let trySendInteractionRepair
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (directory: string option)
@@ -344,6 +354,7 @@ module HostSessionNudge =
                 return!
                     sendInteractionRepairWithProfile
                         sessionPort
+                        rootWorkspace
                         sessionId
                         prompt
                         directory
@@ -405,6 +416,7 @@ module HostSessionNudge =
         (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (directory: string option)
@@ -431,7 +443,7 @@ module HostSessionNudge =
                 terminalProviderRun
                 profile
                 agent
-                (liveDirectory directory)
+                (liveDirectory rootWorkspace directory)
                 PromptDispatcher.AwaitMode.Await
                 (fun () -> quiescence.TryConsume permit)
             |> TaskValue.map (gateIdleOutcome (fun () -> quiescence.TryRelease permit))
@@ -440,6 +452,7 @@ module HostSessionNudge =
         (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (directory: string option)
@@ -460,6 +473,7 @@ module HostSessionNudge =
                         quiescence
                         permit
                         sessionPort
+                        rootWorkspace
                         sessionId
                         prompt
                         directory
@@ -475,6 +489,7 @@ module HostSessionNudge =
         (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
         (releaseAdmission: unit -> Result<unit, QuiescencePermitFailure>)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (directory: string option)
@@ -502,7 +517,7 @@ module HostSessionNudge =
                 terminalProviderRun
                 profile
                 agent
-                (liveDirectory directory)
+                (liveDirectory rootWorkspace directory)
                 awaitMode
                 physicalAdmission
             |> TaskValue.map (gateIdleOutcome releaseAdmission)
@@ -511,6 +526,7 @@ module HostSessionNudge =
         (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
         (releaseAdmission: unit -> Result<unit, QuiescencePermitFailure>)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (continuation: PromptAuthority.ContinuationKind)
@@ -531,6 +547,7 @@ module HostSessionNudge =
                         physicalAdmission
                         releaseAdmission
                         sessionPort
+                        rootWorkspace
                         sessionId
                         prompt
                         directory
@@ -550,6 +567,7 @@ module HostSessionNudge =
         (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (continuation: PromptAuthority.ContinuationKind)
@@ -563,6 +581,7 @@ module HostSessionNudge =
             (fun () -> quiescence.TryConsume permit)
             (fun () -> quiescence.TryRelease permit)
             sessionPort
+            rootWorkspace
             sessionId
             prompt
             continuation
@@ -579,6 +598,7 @@ module HostSessionNudge =
         (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (directory: string option)
@@ -590,6 +610,7 @@ module HostSessionNudge =
             quiescence
             permit
             sessionPort
+            rootWorkspace
             sessionId
             prompt
             PromptAuthority.ContinuationKind.InteractionRepair
@@ -606,6 +627,7 @@ module HostSessionNudge =
         (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (directory: string option)
@@ -632,7 +654,7 @@ module HostSessionNudge =
                 repairKind
                 profile
                 agent
-                (liveDirectory directory)
+                (liveDirectory rootWorkspace directory)
                 PromptDispatcher.AwaitMode.Await
                 (fun () -> quiescence.TryConsume permit)
             |> TaskValue.map (gateIdleOutcome (fun () -> quiescence.TryRelease permit))
@@ -641,6 +663,7 @@ module HostSessionNudge =
         (quiescence: ISessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (sessionId: SessionId)
         (prompt: string)
         (directory: string option)
@@ -661,6 +684,7 @@ module HostSessionNudge =
                         quiescence
                         permit
                         sessionPort
+                        rootWorkspace
                         sessionId
                         prompt
                         directory

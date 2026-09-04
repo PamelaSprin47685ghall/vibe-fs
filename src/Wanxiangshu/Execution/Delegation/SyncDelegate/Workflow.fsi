@@ -13,6 +13,11 @@ open Wanxiangshu.OpenCode
 module internal SyncDelegateWorkflow =
     type Dependencies =
         { Attached: IAttachedSessionPort
+          AwaitWorkRecord: DiagnosticWait -> Task<Result<string, string>> -> Task<Result<string, string>>
+          AwaitInvocation:
+              DiagnosticWait
+                  -> Task<Result<SyncDelegateInvocationResult, string>>
+                  -> Task<Result<SyncDelegateInvocationResult, string>>
           ObserveChild:
               SessionId -> ReuseScopeId -> SyncDelegateRole -> string -> Task<Result<AttachedChildObservation, string>>
           CreateChild:

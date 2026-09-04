@@ -71,7 +71,9 @@ module PluginHostWiring =
           SharedTerminalKey: string option
           SharedTerminalPort: Events.HostEventPort option
           GitTreePort: Wanxiangshu.Mission.Review.GitTreePort option
-          StrengthDurability: StrengthDurabilityPort option }
+          StrengthDurability: StrengthDurabilityPort option
+          RootWorkspace: IRootWorkspaceReader
+          CausalWaitObserver: IWaitObserver }
 
     let create (boot: PluginBoot.Boot) : Task<Host> =
         task {
@@ -104,10 +106,15 @@ module PluginHostWiring =
                             |> Option.map StrengthDurability.create
                         | _ -> None
 
+                    let causalWait = CausalWaitProcess.local ()
+                    let rootWorkspace = RootWorkspaceProcess.local ()
+
                     // Keep the causal wait bridge on the root workspace.
-                    if SharedState.RootWorkspace.IsNone then
-                        SharedState.RootWorkspace <- workspaceDirectory
-                        CausalWaitHub.setWorkspace workspaceDirectory
+                    rootWorkspace.Binder.TryBind workspaceDirectory |> ignore
+
+                    rootWorkspace.Reader.TryRead()
+                    |> Option.iter (fun workspace ->
+                        causalWait.BindDiagnosticTarget(CausalWaitBridge.target workspace) |> ignore)
 
                     CasebookLifecycle.setEnabled workspaceDirectory
 
@@ -119,6 +126,7 @@ module PluginHostWiring =
                             boot.Journal
                             strengthDurability
                             scope
+                            rootWorkspace.Reader
                             input
                             BookkeeperRuntime.tryConsumePromptAuthorization
                             (fun terminal ->
@@ -140,7 +148,9 @@ module PluginHostWiring =
                           SharedTerminalKey = terminalKey
                           SharedTerminalPort = sharedTerminalPort
                           GitTreePort = boot.GitTreePort
-                          StrengthDurability = strengthDurability }
+                          StrengthDurability = strengthDurability
+                          RootWorkspace = rootWorkspace.Reader
+                          CausalWaitObserver = causalWait.Observer }
                 }
 
             match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent) with

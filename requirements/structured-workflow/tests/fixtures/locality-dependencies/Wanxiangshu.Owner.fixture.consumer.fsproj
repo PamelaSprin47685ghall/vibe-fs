@@ -5,6 +5,7 @@
     <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Consumer.fsi"/>
     <Compile Include="Consumer.fs"/>
   </ItemGroup>
 </Project>

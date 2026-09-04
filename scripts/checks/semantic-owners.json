@@ -1,5 +1,5 @@
 {
-  "total": 698,
+  "total": 699,
   "owners": [
     "action-affordance",
     "attention-regulation",
@@ -1549,6 +1549,10 @@
       "owner": "host-boundary"
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs",
+      "owner": "host-boundary"
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs",
       "owner": "host-boundary"
     },
@@ -1907,6 +1911,14 @@
     {
       "path": "src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs",
       "owner": "session-ontology"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/RootWorkspace.fs",
+      "owner": "host-boundary"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/RootWorkspaceRuntime.fs",
+      "owner": "host-boundary"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/SharedState.fs",
@@ -2445,7 +2457,11 @@
       "owner": "process-execution"
     },
     {
-      "path": "src/Wanxiangshu/Process/PtyTiming.fs",
+      "path": "src/Wanxiangshu/Process/NodeTiming.fs",
+      "owner": "time-capability"
+    },
+    {
+      "path": "src/Wanxiangshu/Process/VirtualTiming.fs",
       "owner": "time-capability"
     },
     {

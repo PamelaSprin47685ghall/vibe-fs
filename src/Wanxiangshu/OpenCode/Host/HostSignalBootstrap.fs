@@ -56,29 +56,6 @@ module HostSignalBootstrap =
           ChatMessageHook: obj
           ObserveEvent: obj -> Task<unit> }
 
-    let private hostText (value: obj) =
-        if isNull value then
-            None
-        else
-            string value |> Some |> Option.filter (String.IsNullOrWhiteSpace >> not)
-
-    let private sessionIdValue (properties: obj) =
-        if isNull properties then null else properties?sessionID
-
-    let private parentIdValue (info: obj) =
-        if isNull info then null else info?parentID
-
-    let private infoValue (properties: obj) =
-        if isNull properties then null else properties?info
-
-    let private agentValue (properties: obj) (info: obj) =
-        if not (isNull info) && not (isNull info?agent) then
-            info?agent
-        elif not (isNull properties) && not (isNull properties?agent) then
-            properties?agent
-        else
-            null
-
     let private observeSessionIdentity (sessionId: SessionId) (hasParent: bool) (agent: string option) =
         if hasParent then
             SessionExecutionBinding.observeHostAuxiliaryChild sessionId
@@ -88,18 +65,10 @@ module HostSignalBootstrap =
         |> Option.iter (SessionExecutionBinding.observeUserFacingAgent sessionId)
 
     let private observeSessionEvent (raw: obj) =
-        let event = HostEventCodec.unwrap raw
-        let eventType = HostEventCodec.eventTypeOf event
-
-        if eventType = "session.created" || eventType = "session.updated" then
-            let properties = event?properties
-            let info = infoValue properties
-            let hasParent = (hostText (parentIdValue info)).IsSome
-            let agentOpt = hostText (agentValue properties info)
-
-            hostText (sessionIdValue properties)
-            |> Option.map SessionId.create
-            |> Option.iter (fun sessionId -> observeSessionIdentity sessionId hasParent agentOpt)
+        raw
+        |> HostIngressCodec.sessionObservation
+        |> Option.iter (fun observation ->
+            observeSessionIdentity observation.SessionId observation.HasParent observation.Agent)
 
     let wire
         (sessionPort: ISessionHostPort)
@@ -108,6 +77,7 @@ module HostSignalBootstrap =
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
         (scope: PluginRuntimeScope)
+        (rootWorkspace: IRootWorkspaceReader)
         (input: obj)
         /// Exact process-local private-agent attachment; it cannot establish a public authority profile.
         (tryConsumeHostInternalPrompt: SessionId -> string option -> string option -> bool)
@@ -146,14 +116,15 @@ module HostSignalBootstrap =
 
             // Host visibility catch-up still owns a Node timer backstop. Provider
             // recovery itself is causal and no longer uses a wall-clock deadline.
-            let recoveryTimerPort = PtyTiming.nodeTimerPort ()
+            let recoveryTimerPort = NodeTiming.nodeTimerPort ()
 
             // HOST-BOUNDARY-008: projection catch-up wakes on the session's
             // message.updated signal; recoveryTimerPort supplies the backstop.
             let messageVisibility = MessageVisibilityHub(recoveryTimerPort)
             scope.AttachMessageVisibility messageVisibility
 
-            let reviewerContinuationPort = HostReviewGuard.continuationPort sessionPort journal
+            let reviewerContinuationPort =
+                HostReviewGuard.continuationPort sessionPort rootWorkspace journal
 
             let resolveProjection (sessionId: SessionId) : AgentProjectionSet option =
                 match journal with
@@ -163,7 +134,14 @@ module HostSignalBootstrap =
             let binding = TurnBinding.Store()
 
             let onTurn =
-                HostTurnObserver.observe sessionPort eventPort journal strengthDurability scope reviewerContinuationPort
+                HostTurnObserver.observe
+                    sessionPort
+                    rootWorkspace
+                    eventPort
+                    journal
+                    strengthDurability
+                    scope
+                    reviewerContinuationPort
 
             let onSnapshot = HostCompactionObserver.observe scope journal
 
@@ -269,6 +247,7 @@ module HostSignalBootstrap =
                             let! outcome =
                                 HostSessionNudge.sendContinuationResult
                                     sessionPort
+                                    rootWorkspace
                                     sessionId
                                     prompt
                                     PromptAuthority.ContinuationKind.DegenerationGuard
@@ -279,6 +258,7 @@ module HostSignalBootstrap =
 
                             return outcome |> Result.map ignore
                         })
+                    Diagnostic.emit
 
             do scope.AttachLoopSensor loopSensor
 
@@ -428,21 +408,17 @@ module HostSignalBootstrap =
                             })
                 )
 
-            let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.Observe None
+            let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.Observe
 
             let subscription: IDisposable option =
                 match subscriptionResult with
-                | Error err ->
-                    Diagnostic.fatal "signal-subscribe-failed" [ "result", err ]
-                    raise (InvalidOperationException err)
+                | Error error ->
+                    let evidence = sprintf "%A" error
+                    Diagnostic.fatal "signal-subscribe-failed" [ "result", evidence ]
+                    raise (InvalidOperationException evidence)
 
-                | Ok(sub, _source) ->
-                    // TrackSubscription only needs IDisposable; Health stays on the
-                    // subscription record for future recovery consumers.
-                    sub
-                    |> Option.map (fun s ->
-                        { new IDisposable with
-                            member _.Dispose() = s.Dispose() })
+                | Ok HostSignalSubscribe.HostSignalSubscriptionMode.LocalEventHook -> None
+                | Ok(HostSignalSubscribe.HostSignalSubscriptionMode.EventsListen active) -> Some(active :> IDisposable)
 
             do scope.TrackSubscription subscription
 
@@ -665,14 +641,7 @@ module HostSignalBootstrap =
 
             let client = if isNull input then null else input?client
 
-            let sessionAgentOfResponse (rawBody: obj) : string option =
-                if isNull rawBody || isNull rawBody?agent then
-                    None
-                else
-                    string rawBody?agent
-                    |> Some
-                    |> Option.filter (String.IsNullOrWhiteSpace >> not)
-                    |> Option.map (fun s -> s.Trim())
+            let sessionAgentOfResponse (rawBody: obj) : string option = HostIngressCodec.sessionAgent rawBody
 
             let executeSessionGet (sessObj: obj) (getFn: obj) (sId: string) : Task<string option> =
                 task {
@@ -683,9 +652,7 @@ module HostSignalBootstrap =
                               "headers", box (createObj []) ]
 
                     let! res = unbox<Task<obj>> (getFn?call (sessObj, payload))
-                    let body = if isNull res then null else res?data
-                    let rawBody = if isNull body then res else body
-                    return sessionAgentOfResponse rawBody
+                    return sessionAgentOfResponse res
                 }
 
             let canQuerySession =

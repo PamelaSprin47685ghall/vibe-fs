@@ -6,6 +6,7 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session.Attachment
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch
@@ -18,6 +19,11 @@ module internal SyncDelegatePhysicalIdentity =
 type SyncDelegateRuntime =
     new:
         sessions: ISessionHostPort *
+        awaitWorkRecord: (DiagnosticWait -> Task<Result<string, string>> -> Task<Result<string, string>>) *
+        awaitInvocation:
+            (DiagnosticWait
+                -> Task<Result<SyncDelegateInvocationResult, string>>
+                -> Task<Result<SyncDelegateInvocationResult, string>>) *
         dispatcher: PromptDispatcher.Runtime *
         journal: AgentJournal *
         attached: IAttachedSessionPort *

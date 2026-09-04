@@ -426,7 +426,7 @@ module TemporalSurface =
     // ── deterministic timer/clock capabilities ─────────────────────────────
 
     let createVirtualTimer () : obj =
-        TimerHandle(PtyTiming.createVirtualTimerPort ()) :> obj
+        TimerHandle(VirtualTiming.createVirtualTimerPort ()) :> obj
 
     let timerDelay (timer: obj) (milliseconds: int) : obj =
         let handle = (timer :?> TimerHandle).Port.Port.Delay milliseconds
@@ -447,7 +447,7 @@ module TemporalSurface =
         (timer :?> TimerHandle).Port.Port.Dispose()
 
     let createVirtualClock () : obj =
-        ClockHandle(PtyTiming.createVirtualClockPort ()) :> obj
+        ClockHandle(VirtualTiming.createVirtualClockPort ()) :> obj
 
     let clockNowIso (clock: obj) : string =
         (clock :?> ClockHandle).Port.Port.UtcNow().ToString("o")

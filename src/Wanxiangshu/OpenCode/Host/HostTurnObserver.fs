@@ -169,6 +169,7 @@ module HostTurnObserver =
 
     let private observeApplicationTurn
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (scope: PluginRuntimeScope)
@@ -187,6 +188,7 @@ module HostTurnObserver =
                         scope.Sessions.Quiescence
                         context
                         sessionPort
+                        rootWorkspace
                         eventPort
                         journal
             else
@@ -195,6 +197,7 @@ module HostTurnObserver =
                 do!
                     TurnWorkflow.observe
                         sessionPort
+                        rootWorkspace
                         eventPort
                         journal
                         scope.BloggerRuntimeHost
@@ -210,6 +213,7 @@ module HostTurnObserver =
 
     let private observeFamilyReady
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (scope: PluginRuntimeScope)
@@ -226,6 +230,7 @@ module HostTurnObserver =
             let! fissionHandled =
                 FissionHost.observeLaneTurn
                     sessionPort
+                    rootWorkspace
                     eventPort
                     journal
                     scope.Sessions.JoinGuardNudges
@@ -238,6 +243,7 @@ module HostTurnObserver =
                 do!
                     observeApplicationTurn
                         sessionPort
+                        rootWorkspace
                         eventPort
                         journal
                         scope
@@ -248,6 +254,7 @@ module HostTurnObserver =
 
     let private observeAfterStrength
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (scope: PluginRuntimeScope)
@@ -263,11 +270,20 @@ module HostTurnObserver =
             | FamilyRecovery.FamilyWaiting _
             | FamilyRecovery.FamilyReady _ ->
                 return!
-                    observeFamilyReady sessionPort eventPort journal scope reviewerContinuationPort abortCause context
+                    observeFamilyReady
+                        sessionPort
+                        rootWorkspace
+                        eventPort
+                        journal
+                        scope
+                        reviewerContinuationPort
+                        abortCause
+                        context
         }
 
     let private observeBusinessTurn
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
@@ -318,11 +334,20 @@ module HostTurnObserver =
                 do! observeStrengthDurability strengthDurability scope turn
 
                 return!
-                    observeAfterStrength sessionPort eventPort journal scope reviewerContinuationPort abortCause context
+                    observeAfterStrength
+                        sessionPort
+                        rootWorkspace
+                        eventPort
+                        journal
+                        scope
+                        reviewerContinuationPort
+                        abortCause
+                        context
         }
 
     let observe
         (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
@@ -339,4 +364,12 @@ module HostTurnObserver =
             // or interaction-repair effects from this physical material.
             Task.FromResult(()) :> Task
         else
-            observeBusinessTurn sessionPort eventPort journal strengthDurability scope reviewerContinuationPort context
+            observeBusinessTurn
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
+                strengthDurability
+                scope
+                reviewerContinuationPort
+                context

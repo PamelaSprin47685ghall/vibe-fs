@@ -9,6 +9,44 @@ const violation = (path, reason, code = 'cutover-input-closure-incomplete') => (
 const sortedViolations = (violations) => violations.sort((left, right) =>
   compareCanonicalTextV1(`${left.path}\0${left.reason}`, `${right.path}\0${right.reason}`))
 
+const isPlainRecord = (value) => {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
+const exactKeys = (value, keys) => {
+  if (!isPlainRecord(value)) return false
+  const actual = Object.keys(value).sort(compareCanonicalTextV1)
+  const expected = [...keys].sort(compareCanonicalTextV1)
+  return actual.length === expected.length
+    && actual.every((key, index) => key === expected[index])
+    && actual.every((key) => Object.hasOwn(Object.getOwnPropertyDescriptor(value, key) ?? {}, 'value'))
+}
+
+const CLOSURE_INPUT_KEYS = [
+  'entry_paths',
+  'imports_by_path',
+  'selector_outputs_by_entry',
+  'tracked_read_paths',
+  'build_output_paths',
+]
+
+const CUTOVER_STATE_KEYS = [
+  'closure_input',
+  'index_entries',
+  'object_format',
+  'index_blob_bytes_by_path',
+  'working_tree_bytes_by_path',
+]
+
+const INDEX_ENTRY_KEYS = ['path', 'mode', 'stage', 'blob_oid', 'object_type']
+
+const EXCLUDED_CUTOVER_PATHS = new Set([
+  'docs/OWNER-CONTRACT-SLICE-ADJUDICATION-WORKSHEET.json',
+  'docs/OWNER-CONTRACT-SLICE-ADJUDICATIONS.json',
+])
+
 const canonicalPath = (value, reason, violations) => {
   try {
     return assertRepositoryPathV1(value, '$.cutover_path')
@@ -18,7 +56,7 @@ const canonicalPath = (value, reason, violations) => {
   }
 }
 
-const valuesOfMap = (map, key) => map instanceof Map ? map.get(key) : map?.[key]
+const valuesOfMap = (map, key) => map.get(key)
 
 const uniquePaths = (values, duplicateReason, violations) => {
   const paths = []
@@ -35,23 +73,109 @@ const uniquePaths = (values, duplicateReason, violations) => {
   return paths.sort(compareCanonicalTextV1)
 }
 
-export const resolveCutoverInputClosureV1 = ({
-  entry_paths: entryPaths,
-  imports_by_path: importsByPath,
-  selector_outputs_by_entry: selectorOutputsByEntry,
-  tracked_read_paths: trackedReadPaths,
-  build_output_paths: buildOutputPaths,
-}) => {
+const validateImportScanRows = (importsByPath, violations) => {
+  for (const [importer, imports] of importsByPath) {
+    const importerPath = canonicalPath(importer, 'invalid-import-scan-path', violations)
+    if (importerPath === null) continue
+    if (!Array.isArray(imports)) {
+      violations.push(violation(importerPath, 'invalid-import-scan-row'))
+      continue
+    }
+    const seen = new Set()
+    for (const imported of imports) {
+      if (!exactKeys(imported, ['path', 'kind'])) {
+        violations.push(violation(importerPath, 'invalid-import-scan-row'))
+        continue
+      }
+      const importedPath = canonicalPath(imported.path, 'invalid-import-path', violations)
+      if (importedPath === null) continue
+      if (!['static-local', 'dynamic-local'].includes(imported.kind)) {
+        violations.push(violation(importedPath, 'unknown-import-kind'))
+        continue
+      }
+      const identity = `${importedPath}\0${String(imported.kind)}`
+      if (seen.has(identity)) violations.push(violation(importerPath, 'duplicate-import-scan-row'))
+      else seen.add(identity)
+    }
+  }
+}
+
+export const resolveCutoverInputClosureV1 = (input) => {
   const violations = []
+
+  if (!exactKeys(input, CLOSURE_INPUT_KEYS)) {
+    return {
+      paths: [],
+      selected_input_paths: [],
+      build_output_paths: [],
+      violations: [violation('$', 'invalid-closure-input-schema')],
+    }
+  }
+
+  const {
+    entry_paths: entryPaths,
+    imports_by_path: importsByPath,
+    selector_outputs_by_entry: selectorOutputsByEntry,
+    tracked_read_paths: trackedReadPaths,
+    build_output_paths: buildOutputPaths,
+  } = input
+
+  for (const [valid, path, reason] of [
+    [Array.isArray(entryPaths), '$.entry_paths', 'invalid-entry-paths'],
+    [importsByPath instanceof Map, '$.imports_by_path', 'invalid-import-scan-map'],
+    [selectorOutputsByEntry instanceof Map, '$.selector_outputs_by_entry', 'invalid-selector-output-map'],
+    [Array.isArray(trackedReadPaths), '$.tracked_read_paths', 'invalid-tracked-read-paths'],
+    [Array.isArray(buildOutputPaths), '$.build_output_paths', 'invalid-build-output-paths'],
+  ]) {
+    if (!valid) violations.push(violation(path, reason))
+  }
+
+  if (violations.length > 0) {
+    return {
+      paths: [],
+      selected_input_paths: [],
+      build_output_paths: [],
+      violations: sortedViolations(violations),
+    }
+  }
+
   const entries = uniquePaths(entryPaths, 'duplicate-entry-path', violations)
   const outputs = uniquePaths(buildOutputPaths, 'duplicate-build-output-path', violations)
+  validateImportScanRows(importsByPath, violations)
+  if (violations.length > 0) {
+    return {
+      paths: entries,
+      selected_input_paths: [],
+      build_output_paths: outputs,
+      violations: sortedViolations(violations),
+    }
+  }
   const outputSet = new Set(outputs)
+  const selectedInputSet = new Set()
   const closure = new Set(entries)
   const pending = [...entries]
 
   while (pending.length > 0) {
     const importer = pending.shift()
-    for (const imported of valuesOfMap(importsByPath, importer) ?? []) {
+    if (!importsByPath.has(importer)) {
+      violations.push(violation(importer, 'missing-import-scan-row'))
+      continue
+    }
+    const imports = valuesOfMap(importsByPath, importer)
+    if (!Array.isArray(imports)) {
+      violations.push(violation(importer, 'invalid-import-scan-row'))
+      continue
+    }
+    for (const imported of imports) {
+      if (imported === null
+        || typeof imported !== 'object'
+        || Array.isArray(imported)
+        || Object.keys(imported).length !== 2
+        || !Object.hasOwn(imported, 'path')
+        || !Object.hasOwn(imported, 'kind')) {
+        violations.push(violation(importer, 'invalid-import-scan-row'))
+        continue
+      }
       const importedPath = canonicalPath(imported?.path, 'invalid-import-path', violations)
       if (importedPath === null) continue
       if (imported?.kind === 'dynamic-local') {
@@ -69,15 +193,44 @@ export const resolveCutoverInputClosureV1 = ({
     }
   }
 
-  const selectorEntries = selectorOutputsByEntry instanceof Map
-    ? [...selectorOutputsByEntry.entries()]
-    : Object.entries(selectorOutputsByEntry ?? {})
+  const selectorEntries = [...selectorOutputsByEntry.entries()]
+  let selectorInvalid = false
   for (const [selector, selected] of selectorEntries) {
+    if (typeof selector !== 'string' || !/^[^#]+#[^#]+$/.test(selector)) {
+      violations.push(violation(String(selector), 'invalid-selector-entry'))
+      selectorInvalid = true
+      continue
+    }
+    if (!Array.isArray(selected)) {
+      violations.push(violation(selector, 'invalid-selector-output'))
+      selectorInvalid = true
+      continue
+    }
+    const violationCount = violations.length
     const selectedPaths = uniquePaths(selected, 'duplicate-selector-output', violations)
-    for (const selectedPath of selectedPaths) closure.add(selectedPath)
-    const selectorPath = String(selector).split('#')[0]
+    if (violations.length !== violationCount) selectorInvalid = true
+    for (const selectedPath of selectedPaths) {
+      if (outputSet.has(selectedPath)) {
+        violations.push(violation(selectedPath, 'selected-input-build-output-overlap'))
+        selectorInvalid = true
+      } else {
+        selectedInputSet.add(selectedPath)
+        closure.add(selectedPath)
+      }
+    }
+    const selectorPath = selector.split('#')[0]
     const canonicalSelectorPath = canonicalPath(selectorPath, 'invalid-selector-entry', violations)
+    if (canonicalSelectorPath === null) selectorInvalid = true
     if (canonicalSelectorPath !== null && !closure.has(canonicalSelectorPath)) violations.push(violation(canonicalSelectorPath, 'selector-entry-outside-closure'))
+  }
+
+  if (selectorInvalid) {
+    return {
+      paths: [...closure].sort(compareCanonicalTextV1),
+      selected_input_paths: [...selectedInputSet].sort(compareCanonicalTextV1),
+      build_output_paths: outputs,
+      violations: sortedViolations(violations),
+    }
   }
 
   for (const readPath of uniquePaths(trackedReadPaths, 'duplicate-tracked-read', violations)) {
@@ -86,6 +239,7 @@ export const resolveCutoverInputClosureV1 = ({
 
   return {
     paths: [...closure].sort(compareCanonicalTextV1),
+    selected_input_paths: [...selectedInputSet].sort(compareCanonicalTextV1),
     build_output_paths: outputs,
     violations: sortedViolations(violations),
   }
@@ -98,32 +252,84 @@ const sameBytes = (left, right) => {
   return Buffer.from(left).equals(Buffer.from(right))
 }
 
-export const canonicalInputIndexDigestV1 = (rows) => canonicalDigestV1('cutover-input-index/v1\0', rows)
+export const canonicalInputIndexDigestV1 = (rows) => {
+  if (!Array.isArray(rows)
+    || !rows.every((row) => exactKeys(row, ['path', 'mode', 'blob_oid']))
+    || !rows.every((row) => ['100644', '100755'].includes(row.mode))
+    || !rows.every((row) => /^[0-9a-f]{40}$|^[0-9a-f]{64}$/.test(row.blob_oid))
+    || !rows.every((row, index) => index === 0 || compareCanonicalTextV1(rows[index - 1].path, row.path) < 0)) {
+    throw new TypeError('canonical input index requires a closed canonical row array')
+  }
+  return canonicalDigestV1('cutover-input-index/v1\0', rows)
+}
 
-export const validateCutoverInputStateV1 = ({
-  closure,
-  index_entries: indexEntries,
-  object_format: objectFormat,
-  index_blob_bytes_by_path: indexBlobBytesByPath,
-  working_tree_bytes_by_path: workingTreeBytesByPath,
-  excluded_paths: excludedPaths,
-  build_output_paths: buildOutputPaths,
-}) => {
+export const validateCutoverInputStateV1 = (state) => {
+  if (!exactKeys(state, CUTOVER_STATE_KEYS)) {
+    return { index_rows: [], violations: [violation('$', 'invalid-cutover-state-schema')] }
+  }
+
+  const {
+    closure_input: closureInput,
+    index_entries: indexEntries,
+    object_format: objectFormat,
+    index_blob_bytes_by_path: indexBlobBytesByPath,
+    working_tree_bytes_by_path: workingTreeBytesByPath,
+  } = state
+
+  const closure = resolveCutoverInputClosureV1(closureInput)
   if (closure?.violations?.length > 0) return { index_rows: [], violations: closure.violations }
   const violations = []
-  const exclusions = new Set(uniquePaths(excludedPaths, 'duplicate-excluded-path', violations))
-  const outputs = new Set(uniquePaths(buildOutputPaths, 'duplicate-build-output-path', violations))
+  if (!Array.isArray(indexEntries)) violations.push(violation('$.index_entries', 'invalid-index-entries'))
+  if (!(indexBlobBytesByPath instanceof Map)) violations.push(violation('$.index_blob_bytes_by_path', 'invalid-index-blob-bytes-map'))
+  if (!(workingTreeBytesByPath instanceof Map)) violations.push(violation('$.working_tree_bytes_by_path', 'invalid-working-tree-bytes-map'))
+  if (violations.length > 0) return { index_rows: [], violations: sortedViolations(violations) }
+
+  const outputs = new Set(closure.build_output_paths)
   if (!['sha1', 'sha256'].includes(objectFormat)) violations.push(violation('$object-format', 'unsupported-object-format'))
+  if (violations.length > 0) return { index_rows: [], violations: sortedViolations(violations) }
   const oidPattern = objectFormat === 'sha256' ? /^[0-9a-f]{64}$/ : /^[0-9a-f]{40}$/
   const stageZero = new Map()
-  for (const entry of indexEntries ?? []) {
+  for (let index = 0; index < indexEntries.length; index += 1) {
+    const entry = indexEntries[index]
+    if (!exactKeys(entry, INDEX_ENTRY_KEYS)) {
+      violations.push(violation(`$.index_entries[${index}]`, 'invalid-index-entry-schema'))
+      continue
+    }
     const entryPath = canonicalPath(entry?.path, 'invalid-index-path', violations)
-    if (entryPath === null || entry?.stage !== 0) continue
+    if (entryPath === null) continue
+    if (entry.stage !== 0) {
+      violations.push(violation(entryPath, 'unmerged-index-entry'))
+      continue
+    }
     if (stageZero.has(entryPath)) violations.push(violation(entryPath, 'duplicate-stage-zero-entry'))
     else stageZero.set(entryPath, entry)
   }
 
+  if (violations.length > 0) return { index_rows: [], violations: sortedViolations(violations) }
+
+  for (const [path, bytes] of indexBlobBytesByPath) {
+    const entryPath = canonicalPath(path, 'invalid-index-blob-bytes-path', violations)
+    if (entryPath === null) continue
+    if (!stageZero.has(entryPath)) violations.push(violation(entryPath, 'unexpected-index-blob-bytes'))
+    if (!(Buffer.isBuffer(bytes) || bytes instanceof Uint8Array)) violations.push(violation(entryPath, 'invalid-index-blob-bytes'))
+  }
+  for (const [path, bytes] of workingTreeBytesByPath) {
+    const entryPath = canonicalPath(path, 'invalid-working-tree-bytes-path', violations)
+    if (entryPath === null) continue
+    if (!stageZero.has(entryPath)) violations.push(violation(entryPath, 'unexpected-working-tree-bytes'))
+    if (!(Buffer.isBuffer(bytes) || bytes instanceof Uint8Array)) violations.push(violation(entryPath, 'invalid-working-tree-bytes'))
+  }
+  for (const entryPath of stageZero.keys()) {
+    if (!indexBlobBytesByPath.has(entryPath)) violations.push(violation(entryPath, 'missing-index-blob-bytes'))
+    if (!workingTreeBytesByPath.has(entryPath)) violations.push(violation(entryPath, 'missing-working-tree-bytes'))
+  }
+  if (violations.length > 0) return { index_rows: [], violations: sortedViolations(violations) }
+
   for (const closurePath of closure?.paths ?? []) {
+    if (EXCLUDED_CUTOVER_PATHS.has(closurePath)) {
+      violations.push(violation(closurePath, 'excluded-path-in-closure'))
+      continue
+    }
     if (outputs.has(closurePath)) continue
     const entry = stageZero.get(closurePath)
     if (!entry) {
@@ -146,11 +352,11 @@ export const validateCutoverInputStateV1 = ({
 
   const indexRows = []
   for (const [entryPath, entry] of [...stageZero].sort(([left], [right]) => compareCanonicalTextV1(left, right))) {
-    if (exclusions.has(entryPath)) continue
-    if (!['100644', '100755', '120000'].includes(entry.mode) || entry.object_type !== 'blob' || !oidPattern.test(entry.blob_oid)) {
+    if (!['100644', '100755'].includes(entry.mode) || entry.object_type !== 'blob' || !oidPattern.test(entry.blob_oid)) {
       violations.push(violation(entryPath, 'invalid-stage-zero-entry'))
       continue
     }
+    if (EXCLUDED_CUTOVER_PATHS.has(entryPath)) continue
     if (!sameBytes(bytesAt(indexBlobBytesByPath, entryPath), bytesAt(workingTreeBytesByPath, entryPath))) {
       violations.push(violation(entryPath, 'working-tree-index-mismatch'))
       continue
@@ -158,13 +364,6 @@ export const validateCutoverInputStateV1 = ({
     indexRows.push({ path: entryPath, mode: entry.mode, blob_oid: entry.blob_oid })
   }
   return { index_rows: indexRows, violations: sortedViolations(violations) }
-}
-
-const exactKeys = (value, keys) => {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
-  const actual = Object.keys(value).sort(compareCanonicalTextV1)
-  const expected = [...keys].sort(compareCanonicalTextV1)
-  return actual.length === expected.length && actual.every((key, index) => key === expected[index])
 }
 
 const terminalClassification = (value) => exactKeys(value, ['case', 'payload'])
@@ -195,6 +394,38 @@ const proofValid = (value) => {
 const canonicalProofs = (proofs) => Array.isArray(proofs)
   && proofs.every(proofValid)
   && proofs.every((proof, index) => index === 0 || compareCanonicalTextV1(proofIdentity(proofs[index - 1]), proofIdentity(proof)) < 0)
+
+export const buildFreshMigrationWorksheetV1 = (candidates) => {
+  if (!Array.isArray(candidates)) throw new TypeError('migration worksheet candidates must be an array')
+  const localityIds = candidates.map((candidate, index) => {
+    if (!exactKeys(candidate, ['locality_id', 'reasons'])
+      || typeof candidate.locality_id !== 'string'
+      || candidate.locality_id.length === 0
+      || !canonicalTexts(candidate.reasons)
+      || !candidate.reasons.includes('TerminalClassificationRequired')) {
+      throw new TypeError(`migration worksheet candidate ${index} is invalid`)
+    }
+    return candidate.locality_id
+  }).sort(compareCanonicalTextV1)
+  for (let index = 1; index < localityIds.length; index += 1) {
+    if (localityIds[index - 1] === localityIds[index]) {
+      throw new TypeError(`duplicate migration worksheet locality: ${localityIds[index]}`)
+    }
+  }
+  return {
+    schema_version: 1,
+    purpose: 'm6.3b-migration-only',
+    records: localityIds.map((localityId) => ({
+      locality_id: localityId,
+      status: 'undecided',
+      draft_reason: null,
+      draft_target_classification: null,
+      draft_migration_path: null,
+      draft_what_ids: [],
+      draft_proofs: [],
+    })),
+  }
+}
 
 export const validateMigrationWorksheetV1 = (worksheet) => {
   const schemaViolation = (path) => [{ code: 'migration-worksheet-schema', path, reason: 'unknown-or-missing-key' }]
