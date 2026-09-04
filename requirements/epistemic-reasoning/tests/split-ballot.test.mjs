@@ -122,6 +122,82 @@ test('WHAT[EPI-023] ate-interpretation-declares-causal-assumptions-and-permutati
   assert.ok(pValue >= 0 && pValue <= 1)
 })
 
+test('WHAT[EPI-023] treatment-details-configure-wording-polarity-and-order', async () => {
+  const result = await gecSurface.splitBallot({
+    rootSnapshot: 'snap-split-d',
+    seed: 31,
+    subjects: ['s1', 's2', 's3', 's4'],
+    treatments: ['wording-a', 'wording-b'],
+    treatmentDetails: {
+      'wording-b': { wording: 'reversed text', polarity: -1, openFirst: false },
+    },
+    candidates: ['c1', 'c2'],
+  })
+  assert.equal(result.ok, true)
+  const reversed = result.assignments.filter((item) => item.treatment === 'wording-b')
+  assert.equal(reversed.length, 2)
+  for (const item of reversed) {
+    assert.equal(item.wording, 'reversed text')
+    assert.equal(item.polarity, -1)
+    assert.equal(item.openFirst, false)
+  }
+  const plain = result.assignments.filter((item) => item.treatment === 'wording-a')
+  assert.equal(plain.length, 2)
+  for (const item of plain) {
+    assert.equal(item.wording, 'wording-a')
+    assert.equal(item.polarity, 1)
+    assert.equal(item.openFirst, true)
+  }
+})
+
+test('WHAT[EPI-023] invalid-treatment-polarity-fails-closed', async () => {
+  const result = await gecSurface.splitBallot({
+    rootSnapshot: 'snap-split-e',
+    seed: 33,
+    subjects: ['s1', 's2'],
+    treatments: ['wording-a', 'wording-b'],
+    treatmentDetails: { 'wording-b': { polarity: 0 } },
+    candidates: ['c1', 'c2'],
+  })
+  assert.equal(result.ok, false)
+  assert.match(result.error.code, /invalid-polarity/i)
+})
+
+test('WHAT[EPI-023] carryover-permutation-null-is-seeded-deterministic-and-capped', async () => {
+  const input = (seed, permutations) => ({
+    responses: subjects8.map((subject, index) => ({ subject, response: index < 4 ? 4.0 : 1.0 })),
+    priorExposure: Object.fromEntries(subjects8.map((subject, index) => [subject, index < 4 ? 'arm-a' : 'arm-b'])),
+    currentTreatment: Object.fromEntries(subjects8.map((subject) => [subject, 'arm-c'])),
+    focalCurrent: 'arm-c',
+    control: 'arm-b',
+    treatment: 'arm-a',
+    permutations,
+    seed,
+  })
+  const first = await gecSurface.carryover(input(7, 64))
+  const second = await gecSurface.carryover(input(7, 64))
+  assert.equal(first.ok, true)
+  assert.deepEqual(second, first)
+  assert.equal(first.estimand, 'carryover-difference-in-means')
+  assert.equal(first.uncertainty.kind, 'permutation-null')
+  assert.equal(first.uncertainty.nullPermutations, 64)
+  assert.ok(first.uncertainty.pValue >= 0 && first.uncertainty.pValue <= 1)
+
+  const other = await gecSurface.carryover(input(99, 64))
+  const otherAgain = await gecSurface.carryover(input(99, 64))
+  assert.equal(other.ok, true)
+  assert.deepEqual(otherAgain, other)
+  // The seed reaches the permutation null: distinct seeds draw distinct
+  // nulls (a seed-ignoring null would report one shared p-value).
+  assert.ok(Math.abs(first.uncertainty.pValue - 0.06153846153846154) < 1e-12)
+  assert.ok(Math.abs(other.uncertainty.pValue - 0.015384615384615385) < 1e-12)
+  assert.notEqual(other.uncertainty.pValue, first.uncertainty.pValue)
+
+  const capped = await gecSurface.carryover(input(7, 4096))
+  assert.equal(capped.ok, true)
+  assert.equal(capped.uncertainty.nullPermutations, 1024)
+})
+
 test('WHAT[EPI-023] missing-root-snapshot-fails-closed-before-randomization', async () => {
   const result = await gecSurface.splitBallot({
     seed: 5,

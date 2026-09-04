@@ -84,3 +84,19 @@ test('WHAT[EPI-026] async_convergence_stays_conjecture_without_gap_fairness_and_
   assert.equal(partial.fixedPoint, null);
   assert.ok(partial.residual && Number.isFinite(partial.residual.bound), 'bounded residual must still be reported');
 });
+
+test('WHAT[EPI-026] declared_misspecification_downgrades_async_closure_even_when_other_flags_pass', async () => {
+  const surface = gecSurface;
+  const misspecified = await surface.replay({
+    events: events(),
+    closure: {
+      domain: { kind: 'lattice', monotone: true, continuous: true },
+      operator: latticeCase.operator,
+      maxIterations: 8,
+      async: { finiteDecisionSet: true, strictGap: true, vanishingUncertainty: true, fairScheduling: true, orderAware: true, correctSpecification: false },
+    },
+  });
+  assert.equal(misspecified.ok, true);
+  assert.equal(misspecified.converged, false, 'a declared misspecification must downgrade async convergence');
+  assert.ok(misspecified.residual && Number.isFinite(misspecified.residual.bound), 'bounded residual must still be reported');
+});

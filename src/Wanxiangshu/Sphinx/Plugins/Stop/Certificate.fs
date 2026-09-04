@@ -68,6 +68,8 @@ module Certificate =
           TestedFamily: string list
           Scope: string
           Guarantee: string
+          RequiredCoverage: float
+          MinorityThreshold: float
           SequentialAlpha: float
           CumulativeError: float
           SequentialMethod: string
@@ -301,9 +303,11 @@ module Certificate =
           TestedFamily = input.TestedFramings
           Scope = "tested-framing-family:" + String.concat "," input.TestedFramings
           Guarantee = "decision-stability-bounded-within-tested-framing-family"
+          RequiredCoverage = input.RequiredCoverage
+          MinorityThreshold = input.MinorityThreshold
           SequentialAlpha = sequentialAlpha
           CumulativeError = cumulativeError
-          SequentialMethod = "alpha-spending-sequential"
+          SequentialMethod = "bonferroni-fixed-split"
           Voc = voc
           Assumptions = certificateAssumptions voc }
 

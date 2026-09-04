@@ -217,7 +217,7 @@ module McpServer =
             logSuccess McpContract.toolStart handle status revision startedMs
             successResult (McpContract.summarizeSuccess success) (McpContract.successPayload success)
         | StartOutcome.Rejected message ->
-            let view = McpContract.questionRequiredView message
+            let view = McpContract.startQuestionRequiredView message
             logError McpContract.toolStart view startedMs
             errorResult McpContract.toolStart view
 
@@ -268,7 +268,7 @@ module McpServer =
                 | SessionStatus.Answered _ -> "answered"
 
             logSuccess McpContract.toolStatus handle statusName revision startedMs
-            successResult (McpContract.summarizeStatus status) (McpContract.statusPayload handle status))
+            successResult (McpContract.summarizeStatus handle status) (McpContract.statusPayload handle status))
 
     let private cancelHandler (store: SessionStore) (args: obj) : obj =
         let startedMs = nowMs ()
@@ -314,12 +314,28 @@ module McpServer =
               Revision = None
               ExpectedTool = None }
 
+    let private genericStartedText (entry: GecInquiry.GecInquiryEntry) : string =
+        sprintf "Sphinx generic inquiry started.\nInquiryId: %s\nRevision: %d" entry.InquiryId entry.InquiryRevision
+
+    let private genericSubmitText (entry: GecInquiry.GecInquiryEntry) (accepted: int) : string =
+        sprintf
+            "Sphinx generic work submitted.\nInquiryId: %s\nRevision: %d\nAccepted: %d"
+            entry.InquiryId
+            entry.InquiryRevision
+            accepted
+
+    let private genericActiveText (verb: string) (entry: GecInquiry.GecInquiryEntry) : string =
+        sprintf "Sphinx generic inquiry %s.\nInquiryId: %s\nRevision: %d" verb entry.InquiryId entry.InquiryRevision
+
+    let private genericCancelledText (entry: GecInquiry.GecInquiryEntry) : string =
+        sprintf "Sphinx generic inquiry cancelled.\nInquiryId: %s\nRevision: %d" entry.InquiryId entry.InquiryRevision
+
     let private inquiryStartHandler (registry: GecInquiry.Registry) (args: obj) : obj =
         let startedMs = nowMs ()
         let question = textField args "question"
 
         if System.String.IsNullOrWhiteSpace question then
-            let view = McpContract.questionRequiredView "question is required"
+            let view = McpContract.genericStartQuestionRequiredView "question required"
             logError GecInquiry.toolGenericStart view startedMs
             errorResult GecInquiry.toolGenericStart view
         else
@@ -333,7 +349,7 @@ module McpServer =
                 )
 
             logSuccess GecInquiry.toolGenericStart entry.InquiryId "active" entry.InquiryRevision startedMs
-            successResult "Sphinx generic inquiry started." (GecInquiry.entryView entry)
+            successResult (genericStartedText entry) (GecInquiry.entryView entry)
 
     let private inquirySubmitHandler (registry: GecInquiry.Registry) (args: obj) : obj =
         let startedMs = nowMs ()
@@ -353,7 +369,7 @@ module McpServer =
         match registry.Submit(inquiryId, expected, results) with
         | Ok(entry: GecInquiry.GecInquiryEntry) ->
             logSuccess GecInquiry.toolGenericSubmit entry.InquiryId "active" entry.InquiryRevision startedMs
-            successResult "Sphinx generic work submitted." (GecInquiry.submitView entry results.Length)
+            successResult (genericSubmitText entry results.Length) (GecInquiry.submitView entry results.Length)
         | Error(fault: GecInquiry.InquiryFault) ->
             let view: McpContract.ErrorView = inquiryFaultView fault
             logError GecInquiry.toolGenericSubmit view startedMs
@@ -366,7 +382,7 @@ module McpServer =
 
     let private cancelledOrActiveResult
         (tool: string)
-        (activeText: string)
+        (verb: string)
         (view: GecInquiry.GecInquiryEntry -> obj)
         (entry: GecInquiry.GecInquiryEntry)
         (startedMs: float)
@@ -375,7 +391,7 @@ module McpServer =
             inquiryLookupError tool startedMs (GecInquiry.InquiryFault.InquiryCancelled entry.InquiryId)
         else
             logSuccess tool entry.InquiryId "active" entry.InquiryRevision startedMs
-            successResult activeText (view entry)
+            successResult (genericActiveText verb entry) (view entry)
 
     let private inquiryStatusHandler (registry: GecInquiry.Registry) (args: obj) : obj =
         let startedMs = nowMs ()
@@ -383,12 +399,7 @@ module McpServer =
 
         match registry.TryFind inquiryId with
         | Some(entry: GecInquiry.GecInquiryEntry) ->
-            cancelledOrActiveResult
-                GecInquiry.toolGenericStatus
-                "Sphinx generic inquiry active."
-                GecInquiry.entryView
-                entry
-                startedMs
+            cancelledOrActiveResult GecInquiry.toolGenericStatus "active" GecInquiry.entryView entry startedMs
         | None ->
             inquiryLookupError GecInquiry.toolGenericStatus startedMs (GecInquiry.InquiryFault.UnknownInquiry inquiryId)
 
@@ -398,12 +409,7 @@ module McpServer =
 
         match registry.TryFind inquiryId with
         | Some(entry: GecInquiry.GecInquiryEntry) ->
-            cancelledOrActiveResult
-                GecInquiry.toolGenericExport
-                "Sphinx generic inquiry exported."
-                GecInquiry.exportView
-                entry
-                startedMs
+            cancelledOrActiveResult GecInquiry.toolGenericExport "exported" GecInquiry.exportView entry startedMs
         | None ->
             inquiryLookupError GecInquiry.toolGenericExport startedMs (GecInquiry.InquiryFault.UnknownInquiry inquiryId)
 
@@ -414,11 +420,243 @@ module McpServer =
         match registry.Cancel inquiryId with
         | Ok(entry: GecInquiry.GecInquiryEntry) ->
             logSuccess GecInquiry.toolGenericCancel entry.InquiryId "cancelled" entry.InquiryRevision startedMs
-            successResult "Sphinx generic inquiry cancelled." (GecInquiry.cancelView entry)
+            successResult (genericCancelledText entry) (GecInquiry.cancelView entry)
         | Error(fault: GecInquiry.InquiryFault) ->
             let view: McpContract.ErrorView = inquiryFaultView fault
             logError GecInquiry.toolGenericCancel view startedMs
             errorResult GecInquiry.toolGenericCancel view
+
+    let private appendOutcomeReason (appendError: AppendError) : string =
+        match appendError with
+        | AppendError.StorageInvalid invalid -> sprintf "durable storage rejected the observation: %A" invalid
+        | AppendError.SemanticCut cut -> sprintf "durable semantic cut by rule %s: %s" cut.Rule cut.Reason
+        | AppendError.AppendFailed reason -> reason
+
+    // WHAT[EPI-019]: generic durable-append failure. Memory is never advanced
+    // before the envelope lands, so the caller retries the identical call.
+    let private genericAppendFailedView (tool: string) (inquiryId: string) (reason: string) : McpContract.ErrorView =
+        { Code = "durable-append-failed"
+          Message =
+            sprintf
+                "generic inquiry %s was not made durable (%s); memory is unchanged, retry the same call"
+                inquiryId
+                reason
+          Recoverable = true
+          Retryable = false
+          NextAction = "Retry the same call; nothing advanced."
+          Handle = Some inquiryId
+          Revision = None
+          ExpectedTool = None }
+
+    let private appendGenericEnvelope
+        (events: IEventStore)
+        (tool: string)
+        (envelope: EventEnvelope)
+        (inquiryId: string)
+        (startedMs: float)
+        : Task<Result<unit, McpContract.ErrorView>> =
+        task {
+            match! events.Append [ envelope ] with
+            | Ok _ -> return Ok()
+            | Error appendError ->
+                let view = genericAppendFailedView tool inquiryId (appendOutcomeReason appendError)
+                logError tool view startedMs
+                return Error view
+        }
+
+    let private startEntryDurable
+        (registry: GecInquiry.Registry)
+        (events: IEventStore)
+        (args: obj)
+        (question: string)
+        (startedMs: float)
+        : Task<obj> =
+        task {
+            let entry: GecInquiry.GecInquiryEntry =
+                GecInquiry.BuildStart(
+                    question,
+                    textField args "profile",
+                    nullIfMissing (optField args "plugins"),
+                    textField args "executionMode",
+                    nullIfMissing (optField args "budget")
+                )
+
+            let! appended =
+                appendGenericEnvelope
+                    events
+                    GecInquiry.toolGenericStart
+                    (GenericDurability.encodeStarted entry)
+                    entry.InquiryId
+                    startedMs
+
+            match appended with
+            | Error view -> return errorResult GecInquiry.toolGenericStart view
+            | Ok() ->
+                registry.Restore entry
+                logSuccess GecInquiry.toolGenericStart entry.InquiryId "active" entry.InquiryRevision startedMs
+                return successResult (genericStartedText entry) (GecInquiry.entryView entry)
+        }
+
+    let private inquiryStartDurableHandler
+        (registry: GecInquiry.Registry)
+        (events: IEventStore)
+        (args: obj)
+        : Task<obj> =
+        task {
+            let startedMs = nowMs ()
+            let question = textField args "question"
+
+            if System.String.IsNullOrWhiteSpace question then
+                let view = McpContract.genericStartQuestionRequiredView "question required"
+                logError GecInquiry.toolGenericStart view startedMs
+                return errorResult GecInquiry.toolGenericStart view
+            else
+                return! startEntryDurable registry events args question startedMs
+        }
+
+    let private storeGenericSubmit
+        (registry: GecInquiry.Registry)
+        (events: IEventStore)
+        (entry: GecInquiry.GecInquiryEntry)
+        (expected: int)
+        (results: obj list)
+        (startedMs: float)
+        : Task<obj> =
+        task {
+            let! appended =
+                appendGenericEnvelope
+                    events
+                    GecInquiry.toolGenericSubmit
+                    (GenericDurability.encodeSubmitted entry expected results)
+                    entry.InquiryId
+                    startedMs
+
+            match appended with
+            | Error view -> return errorResult GecInquiry.toolGenericSubmit view
+            | Ok() ->
+                registry.Restore entry
+                logSuccess GecInquiry.toolGenericSubmit entry.InquiryId "active" entry.InquiryRevision startedMs
+
+                return
+                    successResult (genericSubmitText entry results.Length) (GecInquiry.submitView entry results.Length)
+        }
+
+    let private submitDecidedDurable
+        (registry: GecInquiry.Registry)
+        (events: IEventStore)
+        (entry: GecInquiry.GecInquiryEntry)
+        (expected: int)
+        (results: obj list)
+        (startedMs: float)
+        : Task<obj> =
+        task {
+            match GecInquiry.DecideSubmit(entry, expected, results) with
+            | Error fault ->
+                let view: McpContract.ErrorView = inquiryFaultView fault
+                logError GecInquiry.toolGenericSubmit view startedMs
+                return errorResult GecInquiry.toolGenericSubmit view
+            | Ok next -> return! storeGenericSubmit registry events next expected results startedMs
+        }
+
+    let private inquirySubmitDurableHandler
+        (registry: GecInquiry.Registry)
+        (events: IEventStore)
+        (args: obj)
+        : Task<obj> =
+        task {
+            let startedMs = nowMs ()
+            let inquiryId = textField args "inquiryId"
+            let expectedRaw: obj = optField args "expectedRevision"
+
+            let expected: int = if isNullish expectedRaw then -1 else unbox<int> expectedRaw
+
+            let resultsRaw: obj = optField args "results"
+
+            let results: obj list =
+                if isNullish resultsRaw then
+                    []
+                else
+                    unbox<obj array> resultsRaw |> Array.toList
+
+            match registry.TryFind inquiryId with
+            | None ->
+                return
+                    inquiryLookupError
+                        GecInquiry.toolGenericSubmit
+                        startedMs
+                        (GecInquiry.InquiryFault.UnknownInquiry inquiryId)
+            | Some(entry: GecInquiry.GecInquiryEntry) ->
+                return! submitDecidedDurable registry events entry expected results startedMs
+        }
+
+    let private storeGenericCancel
+        (registry: GecInquiry.Registry)
+        (events: IEventStore)
+        (entry: GecInquiry.GecInquiryEntry)
+        (startedMs: float)
+        : Task<obj> =
+        task {
+            let! appended =
+                appendGenericEnvelope
+                    events
+                    GecInquiry.toolGenericCancel
+                    (GenericDurability.encodeCancelled entry)
+                    entry.InquiryId
+                    startedMs
+
+            match appended with
+            | Error view -> return errorResult GecInquiry.toolGenericCancel view
+            | Ok() ->
+                registry.Restore entry
+                logSuccess GecInquiry.toolGenericCancel entry.InquiryId "cancelled" entry.InquiryRevision startedMs
+                return successResult (genericCancelledText entry) (GecInquiry.cancelView entry)
+        }
+
+    let private cancelDecidedDurable
+        (registry: GecInquiry.Registry)
+        (events: IEventStore)
+        (entry: GecInquiry.GecInquiryEntry)
+        (startedMs: float)
+        : Task<obj> =
+        task {
+            match GecInquiry.DecideCancel entry with
+            | Error fault ->
+                let view: McpContract.ErrorView = inquiryFaultView fault
+                logError GecInquiry.toolGenericCancel view startedMs
+                return errorResult GecInquiry.toolGenericCancel view
+            | Ok next -> return! storeGenericCancel registry events next startedMs
+        }
+
+    let private inquiryCancelDurableHandler
+        (registry: GecInquiry.Registry)
+        (events: IEventStore)
+        (args: obj)
+        : Task<obj> =
+        task {
+            let startedMs = nowMs ()
+            let inquiryId = textField args "inquiryId"
+
+            match registry.TryFind inquiryId with
+            | None ->
+                return
+                    inquiryLookupError
+                        GecInquiry.toolGenericCancel
+                        startedMs
+                        (GecInquiry.InquiryFault.UnknownInquiry inquiryId)
+            | Some(entry: GecInquiry.GecInquiryEntry) -> return! cancelDecidedDurable registry events entry startedMs
+        }
+
+    let private sphinxGenericCurrentKey = "SphinxGeneric"
+
+    let private restoreGenericOrThrow (current: obj) : GecInquiry.Registry =
+        match GenericDurability.restore (unbox<GenericIntegrator.SphinxGenericCurrent> current) with
+        | Ok registry -> registry
+        | Error message -> failwith message
+
+    let private bootGenericOrThrow (events: IEventStore) : GecInquiry.Registry =
+        match events.TryCurrent sphinxGenericCurrentKey with
+        | None -> GecInquiry.Registry()
+        | Some current -> restoreGenericOrThrow current
 
     // WHAT[EPI-030]: SPHINX_COMMON_DIR selects the durable workspace. Missing
     // or blank keeps the legacy in-memory server with no store contact.
@@ -475,12 +713,6 @@ module McpServer =
           Handle = Some handle
           Revision = Some revision
           ExpectedTool = None }
-
-    let private appendOutcomeReason (appendError: AppendError) : string =
-        match appendError with
-        | AppendError.StorageInvalid invalid -> sprintf "durable storage rejected the observation: %A" invalid
-        | AppendError.SemanticCut cut -> sprintf "durable semantic cut by rule %s: %s" cut.Rule cut.Reason
-        | AppendError.AppendFailed reason -> reason
 
     let private appendLegacyObservation
         (events: IEventStore)
@@ -678,7 +910,10 @@ module McpServer =
                 (createObj [ "name" ==> SphinxMcp.serverName; "version" ==> PackageMetadata.version () ])
                 (createObj [ "instructions" ==> serverInstructions ])
 
-        let inquiries = GecInquiry.Registry()
+        let inquiries =
+            match durable with
+            | None -> GecInquiry.Registry()
+            | Some events -> bootGenericOrThrow events
 
         let registerDurable
             (tool: string)
@@ -703,7 +938,7 @@ module McpServer =
         registerDurable
             McpContract.toolAssess
             "Assess question semantics"
-            "Answer the pending SemanticAssessmentRequest. forms maps QuestionForm (Why/How/What/Who/Where/When/Which/Polar/Other) to belief mass; facets, targets and intents are optional."
+            "Answer the pending SemanticAssessmentRequest. forms maps QuestionForm (Why/How/What/Who/Where/When/Which/Polar/Other) to belief mass; facets, targets and intents are optional. An empty forms map abstains (no belief mass) and still advances the inquiry."
             (createObj
                 [ "handle" ==> zString "Opaque inquiry handle returned by start"
                   "forms" ==> zNumberRecord "QuestionForm → belief mass"
@@ -783,8 +1018,7 @@ module McpServer =
             (resumeLegacyHandler sessions)
             (resumeLegacyDurableHandler sessions)
 
-        register
-            server
+        registerDurable
             GecInquiry.toolGenericStart
             "Start generic inquiry"
             "Start one schema-only generic inquiry and return its iq_ handle at revision 0. The host records revisions only; it never returns refiner, stop or answer verdicts."
@@ -795,9 +1029,9 @@ module McpServer =
                   "executionMode" ==> zOptional (zString "Execution mode")
                   "budget" ==> zOptional (zRecord "Budget by currency") ])
             (inquiryStartHandler inquiries)
+            (inquiryStartDurableHandler inquiries)
 
-        register
-            server
+        registerDurable
             GecInquiry.toolGenericSubmit
             "Submit generic work results"
             "Submit worker results at an expected revision. A stale expectedRevision fails with REVISION_CONFLICT and advances nothing."
@@ -806,6 +1040,7 @@ module McpServer =
                   "expectedRevision" ==> zNumber ()
                   "results" ==> zAnyArray "Work results applied at the next revision" ])
             (inquirySubmitHandler inquiries)
+            (inquirySubmitDurableHandler inquiries)
 
         register
             server
@@ -823,13 +1058,13 @@ module McpServer =
             (createObj [ "inquiryId" ==> zString "Generic inquiry id returned by sphinx_inquiry_start" ])
             (inquiryExportHandler inquiries)
 
-        register
-            server
+        registerDurable
             GecInquiry.toolGenericCancel
             "Cancel generic inquiry"
             "Cancel one generic inquiry. Later status calls for the same id fail."
             (createObj [ "inquiryId" ==> zString "Generic inquiry id returned by sphinx_inquiry_start" ])
             (inquiryCancelHandler inquiries)
+            (inquiryCancelDurableHandler inquiries)
 
         server
 

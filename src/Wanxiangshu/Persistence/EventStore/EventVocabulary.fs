@@ -36,6 +36,7 @@ module AuthoritativeEventTypes =
               SphinxEventTypes.PluginSetBound
               SphinxEventTypes.ObservationAccepted
               SphinxEventTypes.AnswerCommitted
-              SphinxEventTypes.LegacyObservation ]
+              SphinxEventTypes.LegacyObservation
+              SphinxEventTypes.GenericInquiry ]
 
     let isKnown eventType = Set.contains eventType builtins

@@ -140,6 +140,8 @@
     <Compile Include="Sphinx/LegacyDurability.fs"/>
     <Compile Include="Sphinx/LegacyIntegrator.fsi"/>
     <Compile Include="Sphinx/LegacyIntegrator.fs"/>
+    <Compile Include="Sphinx/GenericIntegrator.fsi"/>
+    <Compile Include="Sphinx/GenericIntegrator.fs"/>
     <Compile Include="Sphinx/GecStore.fsi"/>
     <Compile Include="Sphinx/GecStore.fs"/>
     <Compile Include="Sphinx/GecSurface.fsi"/>
@@ -1359,6 +1361,8 @@
     <Compile Include="OpenCode/Host/WorkspaceEventStore.fs"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fsi"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fs"/>
+    <Compile Include="Sphinx/GenericDurability.fsi"/>
+    <Compile Include="Sphinx/GenericDurability.fs"/>
     <Compile Include="Sphinx/McpServer.fsi"/>
     <Compile Include="Sphinx/McpServer.fs"/>
     <Compile Include="Sphinx/Surface.fsi"/>

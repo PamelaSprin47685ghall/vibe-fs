@@ -558,6 +558,11 @@
       "justification": "Signed codec from accepted legacy observations to canonical sphinx-legacy envelopes plus a runner-side replay helper; appends only after kernel acceptance and never reads history."
     },
     {
+      "path": "src/Wanxiangshu/Sphinx/GenericDurability.fs",
+      "owner": "epistemic-reasoning",
+      "justification": "Signed codec from accepted generic inquiry transitions to canonical sphinx-generic envelopes plus causal-chain boot replay into a fresh registry; appends before memory advance and never interprets plugin payloads."
+    },
+    {
       "path": "src/Wanxiangshu/Sphinx/GecStore.fs",
       "owner": "epistemic-reasoning",
       "justification": "Signed pure Sphinx store codec, pre-write conflict checks, canonical fold and research-export bundle builder over canonical EventStore envelopes; no IO and no private substrate."
@@ -15109,6 +15114,24 @@
         "Wanxiangshu.Sphinx.LegacyIntegrator.applyOne"
       ],
       "justification": "epistemic-reasoning.Contract publishes exactly this pure single-envelope fold to 'durable-convergence'; the canonical Sphinx business rule consumes nothing else."
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GenericIntegrator.fs",
+      "owner": "epistemic-reasoning",
+      "node": "epistemic-reasoning-sphinx-gec",
+      "contract": "epistemic-reasoning.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-convergence"
+      ],
+      "symbols": [
+        "Wanxiangshu.Sphinx.GenericIntegrator.GenericCursor",
+        "Wanxiangshu.Sphinx.GenericIntegrator.SphinxGenericCurrent",
+        "Wanxiangshu.Sphinx.GenericIntegrator.GenericEnvelopeInput",
+        "Wanxiangshu.Sphinx.GenericIntegrator.empty",
+        "Wanxiangshu.Sphinx.GenericIntegrator.applyOne"
+      ],
+      "justification": "epistemic-reasoning.Contract publishes exactly this pure single-envelope fold to 'durable-convergence'; the canonical Sphinx generic business rule consumes nothing else."
     },
     {
       "path": "src/Wanxiangshu/Persistence/EventStore/Port.fs",

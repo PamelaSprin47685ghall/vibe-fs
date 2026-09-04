@@ -33,10 +33,12 @@ module McpContract =
           ExpectedTool: string option }
 
     val errorObject: view: ErrorView -> obj
-    val questionRequiredView: message: string -> ErrorView
+    val questionRequiredView: message: string -> guidance: string -> ErrorView
+    val startQuestionRequiredView: message: string -> ErrorView
+    val genericStartQuestionRequiredView: message: string -> ErrorView
     val invalidObservationView: handle: string option -> message: string -> ErrorView
     val failureView: failure: SessionFailureView -> ErrorView
     val summarizeSuccess: success: SessionSuccess -> string
-    val summarizeStatus: status: SessionStatus -> string
+    val summarizeStatus: handle: string -> status: SessionStatus -> string
     val summarizeCancel: unit -> string
     val summarizeError: view: ErrorView -> string

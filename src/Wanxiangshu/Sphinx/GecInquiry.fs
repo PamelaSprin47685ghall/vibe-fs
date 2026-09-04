@@ -4,12 +4,14 @@ open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// WHAT[EPI-013]: schema-only generic inquiry registry backing the five
+/// WHAT[EPI-013,EPI-019]: schema-only generic inquiry registry backing the five
 /// sphinx_inquiry_start / sphinx_work_submit / sphinx_inquiry_status /
-/// sphinx_inquiry_export / sphinx_inquiry_cancel MCP tools. In-memory only:
-/// generic inquiries carry no durability requirement. The host stays
-/// schema-only — this registry records revisions, liveness, budgets and
-/// submitted results and never produces refiner, stop or answer verdicts.
+/// sphinx_inquiry_export / sphinx_inquiry_cancel MCP tools. Accepted
+/// transitions are durable facts: GenericDurability appends one envelope per
+/// transition and replays them at boot, so the registry is a replaceable
+/// projection, never the truth. The host stays schema-only — this registry
+/// records revisions, liveness, budgets and submitted results and never
+/// produces refiner, stop or answer verdicts.
 module GecInquiry =
 
     let toolGenericStart = "sphinx_inquiry_start"
@@ -20,6 +22,7 @@ module GecInquiry =
 
     let codeRevisionConflict = "REVISION_CONFLICT"
     let codeUnknownInquiry = "UNKNOWN_HANDLE"
+    let codeInquiryCancelled = "inquiry-cancelled"
 
     type GecInquiryEntry =
         { InquiryId: string
@@ -42,12 +45,20 @@ module GecInquiry =
         match fault with
         | InquiryFault.RevisionConflict _ -> codeRevisionConflict
         | InquiryFault.UnknownInquiry _ -> codeUnknownInquiry
-        | InquiryFault.InquiryCancelled _ -> codeUnknownInquiry
+        | InquiryFault.InquiryCancelled _ -> codeInquiryCancelled
+
+    let private unknownInquiryHint (inquiryId: string) : string =
+        if inquiryId.StartsWith "iq_" then
+            sprintf "unknown inquiry: %s" inquiryId
+        else
+            sprintf
+                "unknown inquiry: %s (generic tools need iq_ ids from sphinx_inquiry_start, not legacy handles)"
+                inquiryId
 
     let faultMessage (fault: InquiryFault) : string =
         match fault with
-        | InquiryFault.UnknownInquiry _ -> "unknown inquiry"
-        | InquiryFault.InquiryCancelled _ -> "inquiry is cancelled"
+        | InquiryFault.UnknownInquiry inquiryId -> unknownInquiryHint inquiryId
+        | InquiryFault.InquiryCancelled inquiryId -> sprintf "inquiry is cancelled: %s" inquiryId
         | InquiryFault.RevisionConflict(_, current) -> sprintf "stale expectedRevision: current revision is %d" current
 
     module private InquiryIdGen =
@@ -91,26 +102,38 @@ module GecInquiry =
         else
             Ok { entry with InquiryCancelled = true }
 
+    let BuildStart
+        (question: string, profile: string, plugins: obj, executionMode: string, budget: obj)
+        : GecInquiryEntry =
+        { InquiryId = InquiryIdGen.next ()
+          InquiryQuestion = question
+          InquiryProfile = profile
+          InquiryPlugins = plugins
+          InquiryExecutionMode = executionMode
+          InquiryBudget = budget
+          InquiryRevision = 0
+          InquiryCancelled = false
+          InquiryResults = [] }
+
+    let DecideSubmit
+        (entry: GecInquiryEntry, expectedRevision: int, results: obj list)
+        : Result<GecInquiryEntry, InquiryFault> =
+        submitEntry entry expectedRevision results
+
+    let DecideCancel (entry: GecInquiryEntry) : Result<GecInquiryEntry, InquiryFault> = cancelEntry entry
+
     [<Sealed>]
     type Registry() =
         // DSL-MUTABLE: resource — generic inquiry table by iq_ id.
         let table = Dictionary<string, GecInquiryEntry>()
 
-        member _.Start
+        member _.Restore(entry: GecInquiryEntry) : unit = table[entry.InquiryId] <- entry
+
+        member this.Start
             (question: string, profile: string, plugins: obj, executionMode: string, budget: obj)
             : GecInquiryEntry =
-            let entry: GecInquiryEntry =
-                { InquiryId = InquiryIdGen.next ()
-                  InquiryQuestion = question
-                  InquiryProfile = profile
-                  InquiryPlugins = plugins
-                  InquiryExecutionMode = executionMode
-                  InquiryBudget = budget
-                  InquiryRevision = 0
-                  InquiryCancelled = false
-                  InquiryResults = [] }
-
-            table[entry.InquiryId] <- entry
+            let entry = BuildStart(question, profile, plugins, executionMode, budget)
+            this.Restore entry
             entry
 
         member _.TryFind(inquiryId: string) : GecInquiryEntry option =
@@ -118,29 +141,24 @@ module GecInquiry =
             | true, (entry: GecInquiryEntry) -> Some entry
             | false, _ -> None
 
+        member private this.Update
+            (inquiryId: string, decide: GecInquiryEntry -> Result<GecInquiryEntry, InquiryFault>)
+            : Result<GecInquiryEntry, InquiryFault> =
+            match this.TryFind inquiryId with
+            | None -> Error(InquiryFault.UnknownInquiry inquiryId)
+            | Some(entry: GecInquiryEntry) ->
+                decide entry
+                |> Result.map (fun (next: GecInquiryEntry) ->
+                    table[inquiryId] <- next
+                    next)
+
         member this.Submit
             (inquiryId: string, expectedRevision: int, results: obj list)
             : Result<GecInquiryEntry, InquiryFault> =
-            let decided: Result<GecInquiryEntry, InquiryFault> =
-                match this.TryFind inquiryId with
-                | None -> Error(InquiryFault.UnknownInquiry inquiryId)
-                | Some(entry: GecInquiryEntry) -> submitEntry entry expectedRevision results
-
-            decided
-            |> Result.map (fun (next: GecInquiryEntry) ->
-                table[inquiryId] <- next
-                next)
+            this.Update(inquiryId, (fun entry -> DecideSubmit(entry, expectedRevision, results)))
 
         member this.Cancel(inquiryId: string) : Result<GecInquiryEntry, InquiryFault> =
-            let decided: Result<GecInquiryEntry, InquiryFault> =
-                match this.TryFind inquiryId with
-                | None -> Error(InquiryFault.UnknownInquiry inquiryId)
-                | Some(entry: GecInquiryEntry) -> cancelEntry entry
-
-            decided
-            |> Result.map (fun (next: GecInquiryEntry) ->
-                table[inquiryId] <- next
-                next)
+            this.Update(inquiryId, DecideCancel)
 
     let private statusName (entry: GecInquiryEntry) : string =
         if entry.InquiryCancelled then "cancelled" else "active"

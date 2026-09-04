@@ -174,23 +174,21 @@ module GecRefine =
 
             if isNullish entry then None else Some entry)
 
-    let private boundSideEntry (bound: obj) (side: string) : obj option =
+    let private boundObjectEntry (bound: obj) (side: string) : obj =
         let isObject: bool = emitJsExpr bound "typeof $0 === 'object'"
-        let entry = if isObject then fieldOf bound side else bound
+        if isObject then fieldOf bound side else bound
 
-        if isNullish entry then None else Some entry
-
-    let private boundSideFallback (certificate: obj) (side: string) : obj option =
+    let private boundFallback (certificate: obj) (side: string) : obj option =
         let bound = fieldOf certificate "bound"
 
-        if isNullish bound then None
-        elif isJsArray bound then None
-        else boundSideEntry bound side
+        if isNullish bound || isJsArray bound then None
+        elif isNullish (boundObjectEntry bound side) then None
+        else Some(boundObjectEntry bound side)
 
     let private boundSide (certificate: obj) (direct: string list) (side: string) : obj option =
         match singlePayload certificate direct with
         | Some entry -> Some entry
-        | None -> boundSideFallback certificate side
+        | None -> boundFallback certificate side
 
     let private splitOrdinalSource (source: obj) : obj list =
         let items = unbox<obj array> source |> Array.toList
@@ -440,9 +438,8 @@ module GecRefine =
             (fun result patch ->
                 result
                 |> Result.bind (fun current ->
-                    match Certificate.apply current patch with
-                    | Ok next -> Ok next
-                    | Error fault -> Error(CertFault.Upstream(fault.Code, fault.Message))))
+                    Certificate.apply current patch
+                    |> Result.mapError (fun fault -> CertFault.Upstream(fault.Code, fault.Message))))
             (Ok seed)
 
     let private envelopePayload (entry: JsonEnvelope option) : obj =
@@ -515,20 +512,22 @@ module GecRefine =
                derivations = certificate.DerivationEvents |> List.map EventId.value |> List.toArray |> box
                revision = float certificate.Revision |}
 
+    let private applyRefinement
+        (decoded: DecodedCertificate)
+        (request: CertificatePatchRequest)
+        : Result<ValueCertificate, CertFault> =
+        rebuildBase decoded
+        |> Result.bind (fun rebuilt ->
+            Certificate.apply rebuilt request
+            |> Result.mapError (fun fault -> CertFault.Upstream(fault.Code, fault.Message))
+            |> Result.map (fun advanced ->
+                { advanced with
+                    Revision = decoded.Revision + 1L }))
+
     let private refineSlot (certificate: obj) (patch: obj) : obj =
         let outcome =
             decodeCertificate certificate
-            |> Result.bind (fun decoded ->
-                decodePatch patch
-                |> Result.bind (fun request ->
-                    rebuildBase decoded
-                    |> Result.bind (fun rebuilt ->
-                        match Certificate.apply rebuilt request with
-                        | Ok advanced ->
-                            Ok
-                                { advanced with
-                                    Revision = decoded.Revision + 1L }
-                        | Error fault -> Error(CertFault.Upstream(fault.Code, fault.Message)))))
+            |> Result.bind (fun decoded -> decodePatch patch |> Result.bind (applyRefinement decoded))
 
         match outcome with
         | Ok advanced -> okResult [ "certificate", certificateView advanced ]
@@ -559,7 +558,11 @@ module GecRefine =
                   Qualified = true })
 
         match BayesExact.infer hypotheses factors with
-        | Ok posterior -> okResult [ "posterior", mapView posterior.Probabilities ]
+        | Ok posterior ->
+            okResult
+                [ "posterior", mapView posterior.Probabilities
+                  "usedFactors", posterior.UsedFactors |> List.toArray |> box
+                  "logPartition", box posterior.LogPartition ]
         | Error fault -> typedError (BayesExact.code fault) (BayesExact.message fault)
 
     let private astarOutcomeView (outcome: AStarRefiner.Outcome) : obj =
@@ -570,7 +573,8 @@ module GecRefine =
                   "cost", box proof.Cost
                   "expanded", proof.Expanded |> List.toArray |> box
                   "lowerBound", box proof.LowerBound
-                  "upperBound", box proof.UpperBound ]
+                  "upperBound", box proof.UpperBound
+                  "assumptions", proof.Assumptions |> Set.toArray |> box ]
         | AStarRefiner.Outcome.Unreachable _ ->
             typedError "unreachable" "astar exhausted the frontier without reaching the goal"
 
@@ -594,15 +598,10 @@ module GecRefine =
         | Ok outcome -> astarOutcomeView outcome
 
     let rec private walkPath (children: Map<string, string list>) (visited: Set<string>) (node: string) : int =
-        if Set.contains node visited then
-            0
-        else
-            walkChildDepths children visited node
-
-    and private walkChildDepths (children: Map<string, string list>) (visited: Set<string>) (node: string) : int =
-        match Map.tryFind node children with
-        | None -> 0
-        | Some moves ->
+        match Set.contains node visited, Map.tryFind node children with
+        | true, _ -> 0
+        | false, None -> 0
+        | false, Some moves ->
             moves
             |> List.filter (fun move -> not (Set.contains move visited))
             |> List.fold (fun best move -> max best (1 + walkPath children (Set.add node visited) move)) 0
@@ -621,10 +620,12 @@ module GecRefine =
         let seed = floatField patch "seed" |> Option.map int |> Option.defaultValue 0
         let delta = floatField patch "delta" |> Option.defaultValue 0.05
 
-        let rewardHi =
+        // The kernel fills unlisted moves with 0.0, so the declared range
+        // must cover that default as well as every supplied reward.
+        let rewardLo, rewardHi =
             match rewards |> Map.toList |> List.map snd with
-            | [] -> 0.0
-            | values -> values |> List.max
+            | [] -> 0.0, 0.0
+            | values -> 0.0 :: values |> List.min, 0.0 :: values |> List.max
 
         let actions =
             if Map.containsKey root children then
@@ -653,7 +654,7 @@ module GecRefine =
               Transitions = transitions
               Horizon = longestPath children root
               Discount = 1.0
-              RewardLo = 0.0
+              RewardLo = rewardLo
               RewardHi = rewardHi }
 
         let config: MctsRefiner.SearchConfig =
@@ -666,8 +667,6 @@ module GecRefine =
         match MctsRefiner.run model config with
         | Error fault -> typedError (MctsRefiner.code fault) (MctsRefiner.message fault)
         | Ok result ->
-            let level = 1.0 - result.Coverage.Delta
-
             okResult
                 [ "estimates",
                   result.ActionStats
@@ -676,7 +675,7 @@ module GecRefine =
                   "coverage",
                   box
                       {| delta = result.Coverage.Delta
-                         level = level
+                         scope = result.Coverage.Scope
                          iterations = result.Coverage.Iterations
                          horizon = result.Coverage.Horizon
                          discount = result.Coverage.Discount
@@ -686,8 +685,7 @@ module GecRefine =
                   "guarantee",
                   box (
                       sprintf
-                          "probabilistic-coverage at level %.6f over %d seeded iterations (seed %d)"
-                          level
+                          "descriptive sample summary over %d seeded iterations (seed %d); per-action radii are iid-idealization references with no finite-sample coverage under adaptive sampling; a legacy prior field is accepted but ignored (no PUCT in this refiner)"
                           iterations
                           seed
                   )
