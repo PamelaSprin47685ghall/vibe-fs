@@ -37,6 +37,6 @@ module McpContract =
     val invalidObservationView: handle: string option -> message: string -> ErrorView
     val failureView: failure: SessionFailureView -> ErrorView
     val summarizeSuccess: success: SessionSuccess -> string
-    val summarizeStatus: status: SessionStatus -> string
+    val summarizeStatus: handle: string -> status: SessionStatus -> string
     val summarizeCancel: unit -> string
     val summarizeError: view: ErrorView -> string

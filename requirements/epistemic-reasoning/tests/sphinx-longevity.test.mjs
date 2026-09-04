@@ -148,6 +148,107 @@ test('WHAT[EPI-017] soak_replay_and_hash_stay_stable_across_repeated_waves', asy
   assert.equal(hashes.size, WAVES, 'distinct wave payloads must diverge to distinct hashes')
 })
 
+test('WHAT[EPI-016] soak_multi_plugin_waves_stay_deterministic_and_honestly_labeled', async () => {
+  const recommendations = new Set()
+  for (let wave = 0; wave < WAVES; wave += 1) {
+    const input = waveInput(wave)
+    const assigned = gecSurface.splitBallot({
+      ...input,
+      treatmentDetails: { 'wording-b': { wording: 'reversed text', polarity: -1, openFirst: false } },
+    })
+    assert.equal(assigned.ok, true)
+    const next = xorshift(input.seed ^ 0x9e3779b9)
+    const ballots = assigned.assignments.map((item) => {
+      const prefersFirst = (item.treatment === 'wording-b') !== (next() < 0.3)
+      return prefersFirst ? ['c1', 'c2', 'c3'] : ['c3', 'c2', 'c1']
+    })
+    const bordaInput = { candidates: [...CANDIDATES], ballots }
+    const bordaFirst = gecSurface.borda(bordaInput)
+    assert.equal(bordaFirst.ok, true)
+    assert.deepEqual(gecSurface.borda(bordaInput), bordaFirst, `wave ${wave} borda must be deterministic`)
+    assert.deepEqual(bordaFirst.guarantees, ['ballot-order-invariance', 'candidate-label-equivariance'])
+
+    const pairs = [
+      ['c1', 'c2'],
+      ['c1', 'c3'],
+      ['c2', 'c3'],
+    ].map(([first, second]) => {
+      let firstWins = 0
+      let secondWins = 0
+      for (const ballot of ballots) {
+        if (ballot.indexOf(first) < ballot.indexOf(second)) firstWins += 1
+        else secondWins += 1
+      }
+      return { a: first, b: second, winsA: firstWins, winsB: secondWins }
+    })
+    const btlInput = {
+      candidates: [...CANDIDATES],
+      comparisons: pairs,
+      regularization: 0.5,
+    }
+    const btlFirst = gecSurface.bradleyTerry(btlInput)
+    assert.equal(btlFirst.ok, true)
+    assert.deepEqual(gecSurface.bradleyTerry(btlInput), btlFirst, `wave ${wave} btl must be deterministic`)
+    for (const strength of Object.values(btlFirst.strengths)) assert.ok(Number.isFinite(strength))
+
+    const total = Object.values(bordaFirst.meanScores).reduce((sum, value) => sum + value, 0)
+    const forecast = Object.fromEntries(
+      Object.entries(bordaFirst.meanScores).map(([candidate, value]) => [candidate, value / total]),
+    )
+    const predictionInput = {
+      workId: `work_soak${String(wave).padStart(4, '0')}`,
+      predicted: forecast,
+      outcome: bordaFirst.ranking[0],
+      epsilon: 0.01,
+      committedBeforeStimulus: true,
+      heldOut: false,
+    }
+    const scored = gecSurface.selfPrediction(predictionInput)
+    assert.equal(scored.ok, true)
+    assert.deepEqual(gecSurface.selfPrediction(predictionInput), scored, `wave ${wave} scoring must be deterministic`)
+    assert.ok(Number.isFinite(scored.logScore))
+    assert.ok(Number.isFinite(scored.brierScore))
+    assert.equal(scored.calibrationUpdateAllowed, false)
+
+    const stopInput = {
+      testedFramings: ['wording-a', 'wording-b'],
+      decisionPosterior: { approve: 0.68, reject: 0.32 },
+      framingStability: { approve: [0.66, 0.7], reject: [0.3, 0.34] },
+      minorityStable: true,
+      checksSoFar: 2,
+      alpha: 0.05,
+      evidence: 30 + wave * 2,
+    }
+    const stopped = gecSurface.stopCertificate(stopInput)
+    assert.equal(stopped.ok, true)
+    assert.deepEqual(gecSurface.stopCertificate(stopInput), stopped, `wave ${wave} stop must be deterministic`)
+    assert.match(stopped.certificate.sequentialError.method, /bonferroni/i)
+    assert.ok(['stop', 'continue'].includes(stopped.recommendation))
+    recommendations.add(stopped.recommendation)
+
+    const patch = {
+      kind: 'mcts-sample',
+      root: 'root',
+      children: { root: ['weak', 'strong'], weak: ['weak-terminal'], strong: ['strong-terminal'] },
+      terminalReward: { 'weak-terminal': 0.1, 'strong-terminal': 0.95 },
+      prior: { weak: 0.5, strong: 0.5 },
+      iterations: 40,
+      seed: input.seed,
+      delta: 0.05,
+    }
+    const sampled = await gecSurface.refineCertificate({}, patch)
+    assert.equal(sampled.ok, true)
+    assert.deepEqual(await gecSurface.refineCertificate({}, patch), sampled, `wave ${wave} mcts must be deterministic`)
+    assert.equal(sampled.coverage.scope, 'reference-only-no-finite-sample-coverage')
+    assert.match(sampled.guarantee, /descriptive sample summary/i)
+  }
+  assert.deepEqual(
+    [...recommendations].sort(),
+    ['continue', 'stop'],
+    'evidence crossing the bonferroni threshold mid-soak must flip the verdict',
+  )
+})
+
 test('WHAT[EPI-028] soak_export_bundles_replay_to_identical_hashes_every_wave', async () => {
   for (let wave = 0; wave < WAVES; wave += 1) {
     const events = waveEvents(wave, 'wording-a')

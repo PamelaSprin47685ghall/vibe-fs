@@ -73,16 +73,62 @@ module GecElicit =
 
     let private okResult (fields: (string * obj) list) : obj = ("ok", box true) :: fields |> createObj
 
-    let private treatmentOf (name: string) : Protocol.Treatment =
-        { Name = name
-          Wording = name
-          Polarity = 1
-          OpenFirst = true }
+    let private treatmentDetailsOf (input: obj) (name: string) : obj =
+        fieldOf (fieldOf input "treatmentDetails") name
 
-    let private assignmentView (envelope: Protocol.SubjectEnvelope) : obj =
+    let private treatmentPolarityOf (details: obj) : Result<int, string> =
+        match floatField details "polarity" with
+        | None -> Ok 1
+        | Some value when value = 1.0 -> Ok 1
+        | Some value when value = -1.0 -> Ok -1
+        | Some _ -> Error "treatment polarity must be 1 or -1"
+
+    let private treatmentOf (input: obj) (name: string) : Result<Protocol.Treatment, string> =
+        let details = treatmentDetailsOf input name
+
+        let wording =
+            let text = textOf (fieldOf details "wording")
+            if String.IsNullOrWhiteSpace text then name else text
+
+        treatmentPolarityOf details
+        |> Result.map (fun polarity ->
+            ({ Name = name
+               Wording = wording
+               Polarity = polarity
+               OpenFirst = boolField details "openFirst" true }
+            : Protocol.Treatment))
+
+    let private assignmentWordingOf
+        (envelope: Protocol.SubjectEnvelope)
+        (treatments: Protocol.Treatment list)
+        : string =
+        treatments
+        |> List.tryFind (fun treatment -> treatment.Name = envelope.Treatment)
+        |> Option.map (fun treatment -> treatment.Wording)
+        |> Option.defaultValue envelope.Treatment
+
+    let private assignmentPolarityOf (envelope: Protocol.SubjectEnvelope) (treatments: Protocol.Treatment list) : int =
+        treatments
+        |> List.tryFind (fun treatment -> treatment.Name = envelope.Treatment)
+        |> Option.map (fun treatment -> treatment.Polarity)
+        |> Option.defaultValue 1
+
+    let private assignmentOpenFirstOf
+        (envelope: Protocol.SubjectEnvelope)
+        (treatments: Protocol.Treatment list)
+        : bool =
+        treatments
+        |> List.tryFind (fun treatment -> treatment.Name = envelope.Treatment)
+        |> Option.map (fun treatment -> treatment.OpenFirst)
+        |> Option.defaultValue true
+
+    let private assignmentView (treatments: Protocol.Treatment list) (envelope: Protocol.SubjectEnvelope) : obj =
         box
             {| subject = envelope.Subject
                treatment = envelope.Treatment
+               wording = assignmentWordingOf envelope treatments
+               polarity = assignmentPolarityOf envelope treatments
+               openFirst = assignmentOpenFirstOf envelope treatments
                blindToken = envelope.BlindToken
                labelPermutation = envelope.LabelPermutation |> List.toArray |> box
                orderPermutation = envelope.OrderPermutation |> List.toArray |> box |}
@@ -155,9 +201,17 @@ module GecElicit =
         | [ treatment; control ] -> splitContrast seed allocation treatment control outcomesRaw assignments
         | _ -> typedError "invalid-contrast" "contrast needs a treatment and a control arm"
 
-    let private splitOutcome (input: obj) (seed: int) (allocation: Protocol.Allocation) : obj =
+    let private splitOutcome
+        (input: obj)
+        (seed: int)
+        (allocation: Protocol.Allocation)
+        (treatments: Protocol.Treatment list)
+        : obj =
         let assignments =
-            allocation.Envelopes |> List.map assignmentView |> List.toArray |> box
+            allocation.Envelopes
+            |> List.map (assignmentView treatments)
+            |> List.toArray
+            |> box
 
         let outcomesRaw = fieldOf input "outcomes"
         let contrastRaw = fieldOf input "contrast"
@@ -167,19 +221,34 @@ module GecElicit =
         else
             renderContrast seed allocation outcomesRaw assignments contrastRaw
 
-    let private allocateBallot (input: obj) (seed: int) (snapshot: string) : obj =
+    let private buildTreatments (input: obj) : Result<Protocol.Treatment list, string> =
+        stringArrayOf (fieldOf input "treatments")
+        |> List.map (treatmentOf input)
+        |> List.fold
+            (fun acc entry ->
+                acc
+                |> Result.bind (fun built -> entry |> Result.map (fun treatment -> treatment :: built)))
+            (Ok [])
+        |> Result.map List.rev
+
+    let private runAllocation (input: obj) (seed: int) (snapshot: string) (treatments: Protocol.Treatment list) : obj =
         let request: Protocol.AllocationInput =
             { Seed = seed
               RootSnapshotHash = snapshot
               Subjects = stringArrayOf (fieldOf input "subjects")
-              Treatments = stringArrayOf (fieldOf input "treatments") |> List.map treatmentOf
+              Treatments = treatments
               Candidates = stringArrayOf (fieldOf input "candidates") }
 
         match Protocol.allocate request with
         | Error fault ->
             let code = Protocol.allocationErrorCode fault
             typedError code code
-        | Ok(allocation: Protocol.Allocation) -> splitOutcome input seed allocation
+        | Ok(allocation: Protocol.Allocation) -> splitOutcome input seed allocation treatments
+
+    let private allocateBallot (input: obj) (seed: int) (snapshot: string) : obj =
+        match buildTreatments input with
+        | Error message -> typedError "invalid-polarity" message
+        | Ok treatments -> runAllocation input seed snapshot treatments
 
     let splitBallot (input: obj) : obj =
         let primary = textOf (fieldOf input "rootSnapshot")
@@ -259,6 +328,15 @@ module GecElicit =
             maxRangeWidth (rangeWidths stability)
 
     let private stopView (decisions: Certificate.DecisionMass list) (certificate: Certificate.StopCertificate) : obj =
+        let minorityView =
+            Certificate.answerModes certificate.Answer
+            |> List.map (fun mode ->
+                box
+                    {| decision = mode.Decision
+                       mass = mode.Probability |})
+            |> List.toArray
+            |> box
+
         let decision =
             if Certificate.answerKind certificate.Answer = "single-winner" then
                 box
@@ -276,7 +354,8 @@ module GecElicit =
                                 {| decision = mode.Decision
                                    mass = mode.Probability |})
                         |> List.toArray
-                        |> box |}
+                        |> box
+                       minorityModes = minorityView |}
 
         let voc =
             match certificate.Voc with
@@ -298,7 +377,15 @@ module GecElicit =
                      sequentialError =
                       box
                           {| cumulativeError = certificate.CumulativeError
-                             method = certificate.SequentialMethod |} |}
+                             method = certificate.SequentialMethod |}
+                     checks =
+                      certificate.Checks
+                      |> List.map (fun check ->
+                          box
+                              {| check = check.Check
+                                 passed = check.Passed |})
+                      |> List.toArray
+                      |> box |}
               "decision", decision
               "voc", voc
               "recommendation", box (Certificate.verdictName certificate.Verdict) ]
@@ -333,7 +420,7 @@ module GecElicit =
             { Decisions = decisions
               TestedFramings = framings
               ReversalBound = reversalBoundOf (fieldOf input "framingStability")
-              Evidence = 0.0
+              Evidence = floatField input "evidence" |> Option.defaultValue 0.0
               ErrorBudget = alpha
               ChecksPerformed = checks
               RequiredCoverage = 0.5

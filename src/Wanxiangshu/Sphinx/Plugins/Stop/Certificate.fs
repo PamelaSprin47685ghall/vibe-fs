@@ -303,7 +303,7 @@ module Certificate =
           Guarantee = "decision-stability-bounded-within-tested-framing-family"
           SequentialAlpha = sequentialAlpha
           CumulativeError = cumulativeError
-          SequentialMethod = "alpha-spending-sequential"
+          SequentialMethod = "bonferroni-fixed-split"
           Voc = voc
           Assumptions = certificateAssumptions voc }
 

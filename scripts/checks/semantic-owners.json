@@ -1,5 +1,5 @@
 {
-  "total": 696,
+  "total": 698,
   "owners": [
     "action-affordance",
     "attention-regulation",
@@ -2770,6 +2770,14 @@
     },
     {
       "path": "src/Wanxiangshu/Sphinx/LegacyDurability.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GenericIntegrator.fs",
+      "owner": "epistemic-reasoning"
+    },
+    {
+      "path": "src/Wanxiangshu/Sphinx/GenericDurability.fs",
       "owner": "epistemic-reasoning"
     },
     {

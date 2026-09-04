@@ -666,8 +666,6 @@ module GecRefine =
         match MctsRefiner.run model config with
         | Error fault -> typedError (MctsRefiner.code fault) (MctsRefiner.message fault)
         | Ok result ->
-            let level = 1.0 - result.Coverage.Delta
-
             okResult
                 [ "estimates",
                   result.ActionStats
@@ -676,7 +674,7 @@ module GecRefine =
                   "coverage",
                   box
                       {| delta = result.Coverage.Delta
-                         level = level
+                         scope = result.Coverage.Scope
                          iterations = result.Coverage.Iterations
                          horizon = result.Coverage.Horizon
                          discount = result.Coverage.Discount
@@ -686,8 +684,7 @@ module GecRefine =
                   "guarantee",
                   box (
                       sprintf
-                          "probabilistic-coverage at level %.6f over %d seeded iterations (seed %d)"
-                          level
+                          "descriptive sample summary over %d seeded iterations (seed %d); per-action radii are iid-idealization references with no finite-sample coverage under adaptive sampling"
                           iterations
                           seed
                   )
