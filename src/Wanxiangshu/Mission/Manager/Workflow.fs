@@ -21,14 +21,25 @@ module ManagerWorkflow =
     [<Literal>]
     let private exitRequiredPath = "runtime/relay-exit-required"
 
-    let private roadId (sessionId: SessionId) = RoadId.create (SessionId.value sessionId)
+    let private roadId (sessionId: SessionId) =
+        RoadId.create (SessionId.value sessionId)
 
     let private relayState (journal: AgentJournal) (sessionId: SessionId) =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
         |> Option.bind (fun session -> session.Relay)
 
     let private currentView (journal: AgentJournal) (sessionId: SessionId) =
-        relayState journal sessionId |> Option.bind (fun state -> Fold.view state (roadId sessionId))
+        relayState journal sessionId
+        |> Option.bind (fun state -> Fold.view state (roadId sessionId))
+
+    let private isRetiredObservation
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        =
+        journal
+        |> Option.bind (fun durable -> currentView durable sessionId)
+        |> Option.exists (fun road -> Set.contains (ProviderRunIdentity.value providerRun) road.RetiredProviderRunIds)
 
     let private initialIncumbency (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) =
         let session = SessionId.value sessionId
@@ -46,7 +57,10 @@ module ManagerWorkflow =
         | None, None -> Error "Manager Relay nudge requires a workspace directory"
         | None, Some directory ->
             let road = roadId turn.SessionId
-            let authority = AuthorityRevision.create (PhysicalUserMessageId.value turn.PhysicalUserMessageId)
+
+            let authority =
+                AuthorityRevision.create (PhysicalUserMessageId.value turn.PhysicalUserMessageId)
+
             let snapshot = WorkspaceSnapshot.capture directory
             let incumbent = initialIncumbency turn.SessionId turn.PhysicalUserMessageId
 
@@ -78,11 +92,7 @@ module ManagerWorkflow =
 
                 task {
                     match!
-                        AgentJournal.appendAgent
-                            (StreamId.Session turn.SessionId)
-                            (Some turn.ProviderRun)
-                            fact
-                            journal
+                        AgentJournal.appendAgent (StreamId.Session turn.SessionId) (Some turn.ProviderRun) fact journal
                     with
                     | Ok _ -> return Ok()
                     | Error failure -> return Error(JournalAppendFailure.describe failure)
@@ -165,8 +175,15 @@ module ManagerWorkflow =
         : Task =
         ignore joinGuardNudges
 
-        match context.Failure, context.Turn.Outcome with
-        | Some _, _ -> observeOrdinary context
-        | None, ReconcileProgram.TurnCompleted ->
+        match
+            isRetiredObservation journal context.Turn.SessionId context.Turn.ProviderRun,
+            context.Failure,
+            context.Turn.Outcome
+        with
+        | true, _, _ -> Task.FromResult()
+        | false, Some _, _ -> observeOrdinary context
+        | false, None, ReconcileProgram.TurnInProgress
+        | false, None, ReconcileProgram.TurnNeedsContinuation _ -> Task.FromResult()
+        | false, None, ReconcileProgram.TurnCompleted ->
             observeIdle sessionPort eventPort journal nudgeSent hasLivePty quiescence context
-        | None, _ -> observeOrdinary context
+        | false, None, _ -> observeOrdinary context

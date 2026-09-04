@@ -80,4 +80,3 @@ module RuntimeSurface =
         providerRun: string ->
         projection: obj ->
             bool
-

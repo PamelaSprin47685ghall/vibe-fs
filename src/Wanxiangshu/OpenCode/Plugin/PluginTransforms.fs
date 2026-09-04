@@ -243,7 +243,12 @@ module PluginTransforms =
           BindSessionStartedAt =
             SessionStartedAtLedger.bindSessionStartedAt journal clock terminateSession Diagnostic.emit
           ApplyStrengthReplay = StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailFuse
-          ApplyRelayProjection = RelayNarrativeTransform.apply journal
+          ApplyRelayProjection =
+            RelayNarrativeTransform.apply journal (fun sid ->
+                task {
+                    let! _ = sessionPort.InterruptAttempt sid
+                    return ()
+                })
           CaptureXTraceMessages =
             fun projectionSessionIdOpt outObj ->
                 task {

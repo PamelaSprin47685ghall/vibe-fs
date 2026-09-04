@@ -45,6 +45,7 @@ module RecoveryClosureProjection =
         (record: HandleRecord)
         =
         ignore (linkedChildIds.Add(SessionId.value record.ChildSessionId))
+
         match record.Ownership, record.Lifecycle, HandleId.tryAgent record.Handle with
         | HandleOwnership.HostOwnedHidden, _, _ -> ()
         | _, HandleLifecycle.Retired, _

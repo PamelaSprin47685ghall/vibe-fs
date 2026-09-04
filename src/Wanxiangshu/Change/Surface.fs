@@ -69,8 +69,12 @@ module ChangeSurface =
     let private jobId value = ManagerJobId.create (stringOf value)
     let private sessionId value = SessionId.create (stringOf value)
     let private commit value = CommitHash.create (stringOf value)
-    let private snapshotId value = WorkspaceSnapshotId.create (stringOf value)
-    let private certificateId value = QualityCertificateId.create (stringOf value)
+
+    let private snapshotId value =
+        WorkspaceSnapshotId.create (stringOf value)
+
+    let private certificateId value =
+        QualityCertificateId.create (stringOf value)
 
     let private worktreeIdentityValue value =
         WorktreeIdentity.create (stringOf value)
@@ -96,8 +100,7 @@ module ChangeSurface =
             OrchestratorProjection.recordCandidateReady
                 managerJobId
                 {| CandidateCommit = commit (field payload [ "candidateCommit"; "CandidateCommit" ])
-                   WorkspaceSnapshotId =
-                    snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ])
+                   WorkspaceSnapshotId = snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ])
                    QualityCertificateId =
                     certificateId (field payload [ "qualityCertificateId"; "QualityCertificateId" ]) |}
                 projection
@@ -106,8 +109,7 @@ module ChangeSurface =
                 managerJobId
                 {| CandidateCommit = commit (field payload [ "candidateCommit"; "CandidateCommit" ])
                    TargetHeadSnapshot = commit (field payload [ "targetHeadSnapshot"; "TargetHeadSnapshot" ])
-                   WorkspaceSnapshotId =
-                    snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ])
+                   WorkspaceSnapshotId = snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ])
                    ConflictFiles = stringArray (field payload [ "conflictFiles"; "ConflictFiles" ]) |> Array.toList
                    DiagnosticsDigest = stringField payload [ "diagnosticsDigest"; "DiagnosticsDigest" ] |}
                 projection
@@ -116,8 +118,7 @@ module ChangeSurface =
                 managerJobId
                 {| RebasedCommit = commit (field payload [ "rebasedCommit"; "RebasedCommit" ])
                    TargetHeadSnapshot = commit (field payload [ "targetHeadSnapshot"; "TargetHeadSnapshot" ])
-                   WorkspaceSnapshotId =
-                    snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]) |}
+                   WorkspaceSnapshotId = snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]) |}
                 projection
         | "PublishClaimed" ->
             OrchestratorProjection.recordPublishClaimed
@@ -503,7 +504,9 @@ module ChangeSurface =
             { InitialHead = "candidate-1"
               InitialTarget = "target-1"
               InitialRebasedTarget = None
-              Signals = [ ProgramScenarioSignal.Retired; ProgramScenarioSignal.Exceptional "scenario-complete" ]
+              Signals =
+                [ ProgramScenarioSignal.Retired
+                  ProgramScenarioSignal.Exceptional "scenario-complete" ]
               Snapshots = []
               TargetReads = []
               RebaseResults = []
@@ -584,9 +587,18 @@ module ChangeSurface =
 
     let private verdictObject verdict =
         match verdict with
-        | OrchestratorVerdict.Published(_, head) -> box {| kind = "Published"; detail = CommitHash.value head |}
-        | OrchestratorVerdict.RejectedDirty reason -> box {| kind = "RejectedDirty"; detail = reason |}
-        | OrchestratorVerdict.IntegrationFailed(_, detail) -> box {| kind = "IntegrationFailed"; detail = detail |}
+        | OrchestratorVerdict.Published(_, head) ->
+            box
+                {| kind = "Published"
+                   detail = CommitHash.value head |}
+        | OrchestratorVerdict.RejectedDirty reason ->
+            box
+                {| kind = "RejectedDirty"
+                   detail = reason |}
+        | OrchestratorVerdict.IntegrationFailed(_, detail) ->
+            box
+                {| kind = "IntegrationFailed"
+                   detail = detail |}
         | OrchestratorVerdict.Empty -> box {| kind = "Empty"; detail = "" |}
 
     /// Executes the real OrchestratorProgram against deterministic in-memory
@@ -687,7 +699,10 @@ module ChangeSurface =
                   GetTargetHead =
                     fun _ ->
                         let value =
-                            if targetReads.Count = 0 then targetHead.Value else targetReads.Dequeue()
+                            if targetReads.Count = 0 then
+                                targetHead.Value
+                            else
+                                targetReads.Dequeue()
 
                         targetHead.Value <- value
                         Task.FromResult(Ok(CommitHash.create value)) }
@@ -739,14 +754,13 @@ module ChangeSurface =
                     facts.Add name
                     timeline.Add("fact:" + name)
 
-                    match
-                        Wanxiangshu.Composition.Durable.Fold.foldAgentFact
-                            projection.Value.AgentProjections
-                            fact
-                    with
+                    match Wanxiangshu.Composition.Durable.Fold.foldAgentFact projection.Value.AgentProjections fact with
                     | Error rejection -> return Error(sprintf "%A" rejection)
                     | Ok agents ->
-                        projection.Value <- { projection.Value with AgentProjections = agents }
+                        projection.Value <-
+                            { projection.Value with
+                                AgentProjections = agents }
+
                         return Ok()
                 }
 

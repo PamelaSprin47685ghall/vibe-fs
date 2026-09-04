@@ -17,7 +17,11 @@ module ProjectionSurface =
 
     let private optionalStringProperty value name =
         let candidate = property value name
-        if isNull candidate then None else Some(unbox<string> candidate)
+
+        if isNull candidate then
+            None
+        else
+            Some(unbox<string> candidate)
 
     let private intProperty value name =
         let candidate = property value name
@@ -25,7 +29,13 @@ module ProjectionSurface =
 
     let private stringArrayProperty value name =
         let candidate = property value name
-        let isArray: bool = if isNull candidate then false else emitJsExpr candidate "Array.isArray($0)"
+
+        let isArray: bool =
+            if isNull candidate then
+                false
+            else
+                emitJsExpr candidate "Array.isArray($0)"
+
         if isArray then unbox<string array> candidate else [||]
 
     let private nullableString value =
@@ -35,7 +45,10 @@ module ProjectionSurface =
 
     let baton (input: obj) =
         let risks = stringArrayProperty input "risks" |> Array.truncate maxRisks
-        let evidenceRefs = stringArrayProperty input "evidenceRefs" |> Array.truncate maxEvidenceRefs
+
+        let evidenceRefs =
+            stringArrayProperty input "evidenceRefs" |> Array.truncate maxEvidenceRefs
+
         let fromIncumbency = optionalStringProperty input "fromIncumbency" |> nullableString
 
         let payload =
@@ -79,18 +92,14 @@ module ProjectionSurface =
                 let staleRun = not (String.IsNullOrEmpty run) && Set.contains run stale
                 authorityMessage || (not predecessorEpoch && not staleRun))
 
-        box {| audit = messages; provider = provider |}
+        box
+            {| audit = messages
+               provider = provider |}
 
-    let successorContext
-        (rootRequest: string)
-        (authorityRevision: string)
-        (snapshotId: string)
-        (baton: string)
-        =
+    let successorContext (rootRequest: string) (authorityRevision: string) (snapshotId: string) (baton: string) =
         box
             {| rootRequest = rootRequest
                authorityRevision = authorityRevision
                snapshotId = snapshotId
                baton = baton
                prompt = "此前已有其他同事负责用户的需求。现在由你接手，先独立评审当前完成情况和质量。" |}
-

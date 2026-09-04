@@ -123,7 +123,8 @@ module Surface =
               SuccessorRequested = not qualityCandidateAccepted
               QualityCandidateAccepted = qualityCandidateAccepted }
 
-        Decision.retire state (RoadId.create road) (IncumbencyId.create incumbent) summary |> result
+        Decision.retire state (RoadId.create road) (IncumbencyId.create incumbent) summary
+        |> result
 
     let activateSuccessor state road predecessor incumbent snapshot authority =
         Decision.activateSuccessor
@@ -157,10 +158,7 @@ module Surface =
         | None -> null
         | Some roadView ->
             box
-                {| activeIncumbency =
-                    roadView.ActiveIncumbency
-                    |> Option.map IncumbencyId.value
-                    |> nullableString
+                {| activeIncumbency = roadView.ActiveIncumbency |> Option.map IncumbencyId.value |> nullableString
                    phase = roadView.ActivePhase |> Option.map phaseName |> nullableString
                    source = roadView.ActiveSource |> Option.map sourceName |> nullableString
                    retired = roadView.RetiredIncumbencies |> List.map IncumbencyId.value |> List.toArray |}
@@ -168,8 +166,7 @@ module Surface =
     let obligations state road =
         match Fold.view state (RoadId.create road) with
         | None -> [||]
-        | Some roadView ->
-            roadView.OpenObligations |> List.map ScoreDimension.fieldName |> List.toArray
+        | Some roadView -> roadView.OpenObligations |> List.map ScoreDimension.fieldName |> List.toArray
 
     let authority state road =
         match Fold.view state (RoadId.create road) with
@@ -177,10 +174,7 @@ module Surface =
         | Some roadView ->
             box
                 {| roadRevision = AuthorityRevision.value roadView.AuthorityRevision
-                   revisionHistory =
-                    roadView.AuthorityRevisions
-                    |> List.map AuthorityRevision.value
-                    |> List.toArray
+                   revisionHistory = roadView.AuthorityRevisions |> List.map AuthorityRevision.value |> List.toArray
                    activeRevision =
                     roadView.ActiveAuthorityRevision
                     |> Option.map AuthorityRevision.value
@@ -222,4 +216,3 @@ module Surface =
                        qualityCandidateAccepted = retirement.QualityCandidateAccepted |}
             | None -> null
         | None -> null
-

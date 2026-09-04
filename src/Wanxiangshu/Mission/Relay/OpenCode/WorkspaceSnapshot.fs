@@ -40,4 +40,3 @@ module WorkspaceSnapshot =
 
     let capture directory =
         canonical directory |> HostDigest.sha256Hex |> WorkspaceSnapshotId.create
-

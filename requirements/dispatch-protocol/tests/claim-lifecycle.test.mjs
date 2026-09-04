@@ -169,8 +169,8 @@ test('WHAT[DISPATCH-PROTOCOL-005] DP_005_prompt_key_is_deterministic_and_moves_w
 
   const variants = {
     session: { ...base, session: 'ses_b' },
-    origin: { ...base, origin: promptOrigin('ReviewerGuard') },
-    agent: { ...base, agent: 'reviewer' },
+    origin: { ...base, origin: promptOrigin('DegenerationGuard') },
+    agent: { ...base, agent: 'devops' },
     payload: { ...base, payload: 'pd-2' },
     sequence: { ...base, sequence: 2 },
   }
@@ -202,7 +202,7 @@ test('WHAT[DISPATCH-PROTOCOL-006] DP_006_claim_sequence_advances_on_registration
   const scope = authority.claimScopeDigest(
     SESSION,
     root.logicalRun,
-    promptOrigin('ReviewerGuard'),
+    promptOrigin('DegenerationGuard'),
     'pd-same',
   )
 
@@ -210,7 +210,7 @@ test('WHAT[DISPATCH-PROTOCOL-006] DP_006_claim_sequence_advances_on_registration
   assert.equal(authority.nextClaimSequence(scope, projection), 1)
 
   const claimAt = (n) =>
-    authority.claimContinuation(`pk_${n}`, SESSION, 'ReviewerGuard', root, 'coder', 'pd-same')
+    authority.claimContinuation(`pk_${n}`, SESSION, 'DegenerationGuard', root, 'coder', 'pd-same')
 
   projection = authority.registerClaim(claimAt(1), projection)
   assert.equal(authority.nextClaimSequence(scope, projection), 2)

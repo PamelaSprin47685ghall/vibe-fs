@@ -56,8 +56,7 @@ module MagicTodoProjection =
     val empty: MagicTodoProjectionState
     val emptyIncumbency: incumbencyId: IncumbencyId -> IncumbencyMagicTodoState
 
-    val tryIncumbency:
-        incumbencyId: IncumbencyId -> state: MagicTodoProjectionState -> IncumbencyMagicTodoState option
+    val tryIncumbency: incumbencyId: IncumbencyId -> state: MagicTodoProjectionState -> IncumbencyMagicTodoState option
 
     val ensureIncumbency:
         incumbencyId: IncumbencyId ->

@@ -126,15 +126,22 @@ module MagicTodoProjectionSurface =
                 {| incumbencyId = IncumbencyId.value incumbency.IncumbencyId
                    currentObligations = refView incumbency.CurrentObligationsRef
                    firstAcceptedCheckpoint =
-                    incumbency.FirstAcceptedCheckpoint |> Option.map TodoWriteId.value |> optionString
+                    incumbency.FirstAcceptedCheckpoint
+                    |> Option.map TodoWriteId.value
+                    |> optionString
                    latestAcceptedCheckpoint =
-                    incumbency.LatestAcceptedCheckpoint |> Option.map TodoWriteId.value |> optionString
-                   firstPlanCommitment =
-                    incumbency.FirstPlanCommitment |> Option.map TodoWriteId.value |> optionString
+                    incumbency.LatestAcceptedCheckpoint
+                    |> Option.map TodoWriteId.value
+                    |> optionString
+                   firstPlanCommitment = incumbency.FirstPlanCommitment |> Option.map TodoWriteId.value |> optionString
                    latestCommittedCheckpoint =
-                    incumbency.LatestCommittedCheckpoint |> Option.map TodoWriteId.value |> optionString
+                    incumbency.LatestCommittedCheckpoint
+                    |> Option.map TodoWriteId.value
+                    |> optionString
                    previousCommittedCheckpoint =
-                    incumbency.PreviousCommittedCheckpoint |> Option.map TodoWriteId.value |> optionString
+                    incumbency.PreviousCommittedCheckpoint
+                    |> Option.map TodoWriteId.value
+                    |> optionString
                    checkpoints = checkpoints
                    legacySeed = refView incumbency.LegacySeed |}
 

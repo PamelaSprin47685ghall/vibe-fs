@@ -18,7 +18,7 @@ AuditPending 只能读取 root authority、requirements、workspace snapshot 和
 
 ## RELAY-005: retired incumbent 永不恢复
 
-IncumbencyRetired 一旦 committed，任何 replay、provider recovery、rebase、冲突、CAS miss 或 Host crash 都不得把该 IncumbencyId 重新变为 active。需要继续工作时只能创建新的 IncumbencyId。
+IncumbencyRetired 一旦 committed，任何 replay、provider recovery、rebase、冲突、CAS miss 或 Host crash 都不得把该 IncumbencyId 重新变为 active。每次 retirement cut 宣告的 stale provider-run identity 必须在 Road fold 中累积；这些 run 的迟到 tool/terminal 观测即使跨过一个或多个 `SuccessorActivated` 仍只能被吸收，不得进入 ordinary interaction repair 或再发 continuation。successor 只为自己的新 provider run 恢复 Manager 路由资格，绝不能把前任 stale run 重新解释成当前任。需要继续工作时只能创建新的 IncumbencyId。
 
 ## RELAY-006: successor 依赖完整退休边界
 
@@ -26,7 +26,7 @@ SuccessorActivated 只能发生在 predecessor retirement、机器生成 baton �
 
 ## RELAY-007: normal stop 不是任期终态
 
-正常 assistant terminal、空回复或自然语言完成声明均不结束任期。只要 authority 仍有效且 provider capacity 可用，系统按新的 causal frontier 去重调度退出 nudge；provider failure 走独立 failure algebra。
+正常 assistant terminal、空回复或自然语言完成声明均不结束任期。只要 authority 仍有效且 provider capacity 可用，系统按新的 causal frontier 去重调度退出 nudge；provider failure 走独立 failure algebra。`TurnInProgress` / `TurnNeedsContinuation` 这类 tool-call 中间观测不是 normal terminal frontier：首次 observation 不得抢在 tool body durable effect 前触发 generic interaction repair；只有后续 fresh idle 仍证明该 turn 未继续时，既有 idle repair 才可介入。
 
 ## RELAY-008: authority 或证书绑定域变化显式失效证书
 

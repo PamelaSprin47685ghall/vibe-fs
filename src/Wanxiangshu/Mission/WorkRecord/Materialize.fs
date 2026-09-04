@@ -215,8 +215,7 @@ module LifecycleWorkRecordProjection =
             match XTraceProjection.openingEvidence xTrace with
             | None -> return None
             | Some opening ->
-                return!
-                    materializeOpeningEvidence durable session includeOpening coverageOverride xTrace opening
+                return! materializeOpeningEvidence durable session includeOpening coverageOverride xTrace opening
         }
 
     let lifecycleWorkRecordFromSnapshot

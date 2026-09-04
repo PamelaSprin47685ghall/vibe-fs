@@ -342,10 +342,16 @@ module SuicideTool =
             scope.UnfreezeRetirement context.SessionId
             raise (InvalidOperationException error)
 
+    // No session-scoped physical cut here. AbortSession names a session, not the
+    // retired run; the Host applies it after an unobservable delay, so on a reused
+    // session it lands inside the successor's run and kills it mid-tool. Retired
+    // output is contained by the durable cut (StaleProviderRunIds) plus Retired
+    // tool denial; the retired run's further provider requests are refused in
+    // the transform hook by exact gate identity, so the run ends there.
     let private executePrepared (scope: ToolRuntimeScope) (context: HostToolContext) prepared =
         task {
             try
-                scope.TryFreezeRetirement context.SessionId |> ignore
+                scope.TryFreezeRetirement(context.SessionId, prepared.Incumbent) |> ignore
                 let! outcome = runFrozen scope context prepared
                 return finishOutcome scope context outcome
             with ex ->

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Context.Trace
 
 open System
+open System.Collections.Generic
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
@@ -888,6 +889,55 @@ module XTraceCapture =
                 return Error(XTraceCaptureError.StorageFailed ex.Message)
         }
 
+    let private captureTailGate = obj ()
+    // DSL-MUTABLE: subscription — one physical XTrace append tail per reusable Host session.
+    let private captureTails = Dictionary<string, Task>()
+
+    let private awaitCaptureTail (tail: Task) =
+        task {
+            try
+                do! tail
+            with _ ->
+                ()
+        }
+
+    let private releaseCaptureTail key (completion: TaskCompletionSource<unit>) (completionTask: Task) =
+        AsyncSupport.trySetResult completion () |> ignore
+
+        lock captureTailGate (fun () ->
+            match captureTails.TryGetValue key with
+            | true, current when obj.ReferenceEquals(current, completionTask) -> captureTails.Remove key |> ignore
+            | _ -> ())
+
+    let private serializeCapture (sessionId: SessionId) (capture: unit -> Task<'T>) : Task<'T> =
+        task {
+            let key = SessionId.value sessionId
+
+            let completion =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let completionTask = completion.Task :> Task
+
+            let prior =
+                lock captureTailGate (fun () ->
+                    let current =
+                        match captureTails.TryGetValue key with
+                        | true, tail -> Some tail
+                        | false, _ -> None
+
+                    captureTails[key] <- completionTask
+                    current)
+
+            match prior with
+            | Some tail -> do! awaitCaptureTail tail
+            | None -> ()
+
+            try
+                return! capture ()
+            finally
+                releaseCaptureTail key completion completionTask
+        }
+
     let private captureUnitWithReceipt
         (journal: AgentJournal option)
         (sessionId: SessionId)
@@ -897,7 +947,10 @@ module XTraceCapture =
         task {
             match journal with
             | None -> return Ok(withoutJournalReceipt ())
-            | Some durable -> return! captureDurableUnitWithReceipt durable sessionId identity capture
+            | Some durable ->
+                return!
+                    serializeCapture sessionId (fun () ->
+                        captureDurableUnitWithReceipt durable sessionId identity capture)
         }
 
     /// Typed Opening capture. The receipt states whether the append changed the
@@ -1029,7 +1082,9 @@ module XTraceCapture =
                     Ok
                         { Receipt = withoutJournalReceipt ()
                           Current = None }
-            | Some durable -> return! captureObservedDurable journal durable sessionId observations
+            | Some durable ->
+                return!
+                    serializeCapture sessionId (fun () -> captureObservedDurable journal durable sessionId observations)
         }
 
     /// Existing decoded-view entry derives from the typed observation membrane;
@@ -1088,5 +1143,7 @@ module XTraceCapture =
             | None -> return Ok(withoutJournalReceipt ())
             | Some durable ->
                 return!
-                    protectObservedCapture (fun () -> captureSessionMessagesDurable journal durable sessionId messages)
+                    serializeCapture sessionId (fun () ->
+                        protectObservedCapture (fun () ->
+                            captureSessionMessagesDurable journal durable sessionId messages))
         }

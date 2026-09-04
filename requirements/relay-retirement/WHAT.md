@@ -14,7 +14,7 @@ suicide 只检查当前 IncumbencyId 直接或递归拥有的 live child、backg
 
 ## RETIRE-004: retirement 必须 freeze-before-check
 
-admission 先冻结，再读取 exact recursive ownership projection。冻结前已 accepted 的资源必须阻塞；冻结后的创建因 stale fence 被拒绝。若有 blocker，只恢复 cleanup capability，不恢复新工作 admission。
+admission 先冻结，再读取 exact recursive ownership projection。冻结前已 accepted 的资源必须阻塞；冻结后的创建因 stale fence 被拒绝。freeze fence 绑定精确 `IncumbencyId`，不得只绑定可复用的物理 `SessionId`；前任退休后 successor 即使复用同一 SessionId，也不得继承前任 fence。若有 blocker，只恢复当前任 cleanup capability，不恢复新工作 admission。
 
 ## RETIRE-005: normal stop nudge 按 causal frontier 去重且无固定次数上限
 
@@ -27,4 +27,8 @@ provider/network failure 先由 ExecutionFailurePolicy 结算；只有恢复出�
 ## RETIRE-007: retirement、baton 与 cut 是不可分割的可恢复提交
 
 成功 retirement 必须在同一 durable transaction 中记录离场 snapshot、IncumbencyRetired、BatonPrepared、ProjectionCutRecorded 以及 SuccessorRequested 或 QualityCandidateAccepted。崩溃恢复不得看到永久的“已退休但无 baton/cut”状态。
+
+## RETIRE-008: retirement 不做 session 级物理 abort
+
+suicide 提交 durable retirement 后不得调用 session 级 `InterruptAttempt`/`AbortSession`。这类 abort 只能命名 session，不能命名 retired run；Host 在不可观测的延迟后才真正执行，而 successor 复用同一物理 SessionId，迟到的 kill 会落进后任 run 的 tool body 中间并杀死它。已退休 run 的后续 provider 请求在 transform 钩子按 exact 身份拒绝：每个 provider 请求都经过 transform，退休 run 的延续请求在那里被拦下，run 自然结束；后继 prompt 与后继 run 持有正式 gate 身份，不受影响。已退休输出的 containment 只靠 durable cut（`StaleProviderRunIds` 吸收迟到 parts）与 Retired phase tool denial。
 

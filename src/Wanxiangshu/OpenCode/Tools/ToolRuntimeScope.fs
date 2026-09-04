@@ -49,8 +49,8 @@ type ToolRuntimeScope
     let runtimes = Dictionary<string, HostForkRuntime>()
     // DSL-MUTABLE: resource — per-session executor runtime registry
     let executorRuntimes = Dictionary<string, HostForkRuntime>()
-    // DSL-MUTABLE: retirement admission fence — once frozen, this Manager may only clean up/join/suicide.
-    let retirementFrozen = HashSet<string>()
+    // DSL-MUTABLE: retirement admission fence — exact logical incumbency, never the reusable physical session.
+    let retirementFrozen = Dictionary<string, IncumbencyId>()
     // DSL-MUTABLE: resource — per-session orchestrator host registry
     let orchestratorHosts = Dictionary<string, OrchestratorHost>()
     let onCancelSignals = defaultArg cancelSignals ignore
@@ -353,6 +353,15 @@ type ToolRuntimeScope
         | true, seconds when seconds > 0.0 && not (Double.IsInfinity seconds) -> TimeSpan.FromSeconds seconds
         | _ -> ProcessEstimate.DefaultHardLimit
 
+    let relayRoadView (sessionId: string) =
+        let roadId = RoadId.create sessionId
+
+        journal
+        |> Option.bind (fun durable ->
+            AgentProjection.tryFind (SessionId.create sessionId) (AgentJournal.snapshot durable).AgentProjections)
+        |> Option.bind (fun session -> session.Relay)
+        |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay roadId)
+
     member _.Sessions = sessions
     member _.Journal = journal
     member _.Snapshot = snapshot
@@ -394,16 +403,7 @@ type ToolRuntimeScope
     member _.EnsureRoleFor(ctx: HostToolContext) = ensureRoleFor ctx
 
     member _.ManagerPhaseFor(sessionId: string) =
-        let roadId = RoadId.create sessionId
-
-        let roadView =
-            journal
-            |> Option.bind (fun durable ->
-                AgentProjection.tryFind
-                    (SessionId.create sessionId)
-                    (AgentJournal.snapshot durable).AgentProjections)
-            |> Option.bind (fun session -> session.Relay)
-            |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay roadId)
+        let roadView = relayRoadView sessionId
 
         let managerPhaseOfView (view: RoadView) =
             match view.ActivePhase with
@@ -413,16 +413,32 @@ type ToolRuntimeScope
             | Some IncumbencyPhase.RetirementCleanupBlocked -> ManagerCapabilityPhase.RetirementCleanupBlocked
             | None -> ManagerCapabilityPhase.Retired
 
-        roadView |> Option.map managerPhaseOfView |> Option.defaultValue ManagerCapabilityPhase.AuditPending
+        roadView
+        |> Option.map managerPhaseOfView
+        |> Option.defaultValue ManagerCapabilityPhase.AuditPending
 
-    member _.TryFreezeRetirement(sessionId: string) =
-        lock gate (fun () -> retirementFrozen.Add sessionId)
+    member _.TryFreezeRetirement(sessionId: string, incumbentId: IncumbencyId) =
+        lock gate (fun () ->
+            match retirementFrozen.TryGetValue sessionId with
+            | true, current when current = incumbentId -> false
+            | _ ->
+                retirementFrozen.[sessionId] <- incumbentId
+                true)
 
     member _.UnfreezeRetirement(sessionId: string) =
         lock gate (fun () -> retirementFrozen.Remove sessionId |> ignore)
 
     member _.IsRetirementFrozen(sessionId: string) =
-        lock gate (fun () -> retirementFrozen.Contains sessionId)
+        let activeIncumbency =
+            relayRoadView sessionId |> Option.bind (fun road -> road.ActiveIncumbency)
+
+        lock gate (fun () ->
+            match retirementFrozen.TryGetValue sessionId, activeIncumbency with
+            | (false, _), _ -> false
+            | (true, frozen), Some active when active <> frozen ->
+                retirementFrozen.Remove sessionId |> ignore
+                false
+            | (true, _), _ -> true)
 
     member _.RetirementBlockersFor(sessionId: string) =
         let parentOf candidate =
@@ -444,6 +460,9 @@ type ToolRuntimeScope
                 runtime.SnapshotOutstandingAgentRuns()
                 |> List.map (fun (handle, child) ->
                     sprintf "%s:%s:agent:%s:%s" prefix ownerKey handle (SessionId.value child))
+
+            if List.isEmpty agents then
+                ignore (runtime.Runtime.DrainAgentWakes 32)
 
             let ptys =
                 runtime.SnapshotOutstandingPtyRuns()

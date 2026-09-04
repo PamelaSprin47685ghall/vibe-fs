@@ -197,13 +197,7 @@ module ToolHostCodec =
     let private rawNumberSchemaDescribed (tool: obj) (description: string) : obj = jsNative
 
     [<Emit("$0.schema.number().int().min($1).max($2).describe($3)")>]
-    let private rawBoundedIntegerSchema
-        (tool: obj)
-        (minimum: int)
-        (maximum: int)
-        (description: string)
-        : obj =
-        jsNative
+    let private rawBoundedIntegerSchema (tool: obj) (minimum: int) (maximum: int) (description: string) : obj = jsNative
 
     [<Emit("$0.schema.boolean()")>]
     let private rawBooleanSchema (tool: obj) : obj = jsNative

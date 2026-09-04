@@ -38,6 +38,12 @@ module RetirementId =
     let create value = RetirementId value
     let value (RetirementId value) = value
 
+/// The single gate-kind vocabulary for the successor handoff prompt, shared by
+/// the Change sender and the projection cut so the two never drift apart.
+module RelaySuccessorGate =
+    let gateKind (retirementId: RetirementId) =
+        "relay-successor:" + RetirementId.value retirementId
+
 module BatonId =
     let create value = BatonId value
     let value (BatonId value) = value
@@ -156,4 +162,3 @@ type RetirementSummary =
       ProjectionCut: ProjectionCut
       SuccessorRequested: bool
       QualityCandidateAccepted: bool }
-

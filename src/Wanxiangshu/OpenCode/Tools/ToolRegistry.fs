@@ -134,6 +134,8 @@ module ToolRegistry =
         (childWorkRecordFor: (string -> Task<string option>) option)
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
+        (beginToolExecution: string -> unit)
+        (endToolExecution: string -> unit)
         (eventPort: IEventObservationPort option)
         (bloggerHost: IBloggerRuntimeHost option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
@@ -227,10 +229,7 @@ module ToolRegistry =
                 denied ctx Path.DeniedRole (Map [ "tool", spec.Name; "role", sprintf "%A" role ])
 
             let denyRelayPhase (ctx: HostToolContext) phase =
-                denied
-                    ctx
-                    Path.DeniedRelayPhase
-                    (Map [ "tool", spec.Name; "phase", sprintf "%A" phase ])
+                denied ctx Path.DeniedRelayPhase (Map [ "tool", spec.Name; "phase", sprintf "%A" phase ])
 
             let executeManager args (ctx: HostToolContext) =
                 task {
@@ -238,13 +237,13 @@ module ToolRegistry =
                     let frozen = runtime.IsRetirementFrozen ctx.SessionId
 
                     match managerPermission with
-                    | Some permission
-                        when frozen
-                             && permission <> ToolPermission.Join
-                             && permission <> ToolPermission.Finality ->
+                    | Some permission when
+                        frozen
+                        && permission <> ToolPermission.Join
+                        && permission <> ToolPermission.Finality
+                        ->
                         return denyRelayPhase ctx ManagerCapabilityPhase.RetirementCleanupBlocked
-                    | Some permission
-                        when not (OfficeCapability.isAllowedForPhase Role.Manager (Some phase) permission) ->
+                    | Some permission when not (OfficeCapability.isAllowedForPhase Role.Manager (Some phase) permission) ->
                         return denyRelayPhase ctx phase
                     | _ -> return! original args ctx
                 }
@@ -313,11 +312,27 @@ module ToolRegistry =
                         return! executeEstablished args ctx
                 }
 
+            let executeTrackedSession args (ctx: HostToolContext) =
+                task {
+                    beginToolExecution ctx.SessionId
+
+                    try
+                        return! executeAfterBoundary args ctx
+                    finally
+                        endToolExecution ctx.SessionId
+                }
+
+            let executeTracked args (ctx: HostToolContext) =
+                if String.IsNullOrWhiteSpace ctx.SessionId then
+                    executeAfterBoundary args ctx
+                else
+                    executeTrackedSession args ctx
+
             fun args (ctx: HostToolContext) ->
                 task {
                     match providerToolBoundary ctx with
                     | Error error -> return raise (InvalidOperationException error)
-                    | Ok() -> return! executeAfterBoundary args ctx
+                    | Ok() -> return! executeTracked args ctx
                 }
 
         let specs =

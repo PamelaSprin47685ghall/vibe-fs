@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import test from 'node:test'
 import * as projection from '../../../dist/Mission/Relay/ProjectionSurface.js'
 
@@ -20,6 +22,20 @@ test('WHAT[PROJ-001] audit projection retains every physical message across the 
 
 test('WHAT[PROJ-002] projection cut covers the suicide request and result parts', () => {
   assert.deepEqual(cutResult().provider.map((message) => message.id), ['u1', 'system-new', 'a2'])
+})
+
+test('WHAT[PROJ-002] wire cut drops the retired tail until the next user turn', () => {
+  const source = readFileSync(
+    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Mission/Relay/OpenCode/NarrativeTransform.fs'),
+    'utf8',
+  )
+
+  const tail = source.match(/let private inPostRetirementTail([\s\S]*?)\n    let private cutMessages/)
+  assert.ok(tail, 'RelayNarrativeTransform tail predicate must stay inspectable')
+  assert.match(tail[1], /\| None -> false/)
+  assert.match(tail[1], /Some\(toolIndex, None\) -> index > toolIndex/)
+  assert.match(tail[1], /Some\(toolIndex, Some userIndex\) -> index > toolIndex && index < userIndex/)
+  assert.match(source, /postRetirementTailRange cut messages/)
 })
 
 test('WHAT[PROJ-005] successor provider view keeps one continuous session narrative', () => {

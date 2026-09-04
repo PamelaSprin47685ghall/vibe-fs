@@ -354,6 +354,8 @@ module PluginHostInterop =
             |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace))
             |> Option.map JsToolsTransactionStore.createPersistence
 
+        let quiescence = scope.Sessions.Quiescence :> ISessionQuiescenceGate
+
         let registration =
             ToolRegistry.create
                 toolModule
@@ -368,6 +370,8 @@ module PluginHostInterop =
                 childWorkRecordFor
                 snapshot
                 cancelSignals
+                (fun sessionId -> quiescence.BeginToolExecution(SessionId.create sessionId))
+                (fun sessionId -> quiescence.EndToolExecution(SessionId.create sessionId))
                 eventPort
                 (Some scope.BloggerRuntimeHost)
                 scope.SyncDelegateRuntime

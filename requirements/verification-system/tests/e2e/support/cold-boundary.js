@@ -7,6 +7,8 @@
  *
  *   COMPANION-009  epoch switch — new SealRoot, one explicit prefix rebase
  *   FALLBACK-004   fallback side switch — EffectiveAgent moves, so the model does
+ *   RELAY-PROJ    Relay typed context — open, phase revision, retirement, and
+ *                 successor cut each have their own kind
  *
  * Sniffing is forbidden, and package K1 measured why. The deleted `epochCold`
  * exemption read "tools and the leading system message unchanged" and then admitted
@@ -35,6 +37,10 @@ export const BOUNDARY_KINDS = [
   'prefix-probe',
   'frame-commit',
   'request-kind-switch',
+  'relay-context-open',
+  'relay-context-revision',
+  'relay-retirement-context',
+  'relay-successor-cut',
 ];
 
 // ── declaration lookup ──────────────────────────────────────────────────────
@@ -103,6 +109,146 @@ const withModelOf = (previousWire, nextWire) => ({
  * prefix; the declaration admits the whole recovery request.
  */
 const probeKeepsFixedParts = (previousWire, nextWire) => isDeepStrictEqual(previousWire.tools, nextWire.tools);
+
+// ── Relay typed provider context ────────────────────────────────────────────
+//
+// The Relay projection prepends a synthetic `[RelayContext]` user message once
+// durable Road state exists, revises it as incumbency and phase advance, marks
+// it retired with the accepted suicide result, and replaces it for the
+// successor. Each shape is a distinct boundary kind so a revision cannot
+// masquerade as a cut and a cut cannot smuggle rewritten history.
+
+const messageIsRelayContext = (message) =>
+  message?.role === 'user'
+  && (message?.parts ?? []).some((part) => part?.kind === 'text' && String(part?.text ?? '').includes('[RelayContext]'));
+
+const relayContexts = (wire) => (wire.messages ?? []).filter(messageIsRelayContext);
+
+const relayContextText = (message) =>
+  (message?.parts ?? []).filter((part) => part?.kind === 'text').map((part) => String(part?.text ?? '')).join('\n');
+
+const relayContextField = (message, key) => {
+  const line = relayContextText(message).split('\n').find((entry) => entry.startsWith(`${key}=`));
+  return line === undefined ? null : line.slice(key.length + 1);
+};
+
+const sameProviderPlan = (previousWire, nextWire) =>
+  previousWire.modelId === nextWire.modelId && isDeepStrictEqual(previousWire.tools, nextWire.tools);
+
+const withoutRelayContexts = (wire) => ({
+  ...wire,
+  messages: (wire.messages ?? []).filter((message) => !messageIsRelayContext(message)),
+});
+
+const preservesPriorMessagesAsSubsequence = (previousWire, nextWire) => {
+  let cursor = 0;
+  for (const message of nextWire.messages ?? []) {
+    if (cursor < (previousWire.messages ?? []).length
+        && isDeepStrictEqual(message, previousWire.messages[cursor])) {
+      cursor += 1;
+    }
+  }
+  return cursor === (previousWire.messages ?? []).length;
+};
+
+const messagesAreOrderedSubsequence = (subset, superset) => {
+  let cursor = 0;
+  for (const message of superset) {
+    if (cursor < subset.length && isDeepStrictEqual(message, subset[cursor])) {
+      cursor += 1;
+    }
+  }
+  return cursor === subset.length;
+};
+
+/**
+ * Relay opens its typed provider context only after the first durable Road state
+ * exists. The next request therefore prepends a synthetic `[RelayContext]` message
+ * and may interleave materialized assessment/tool evidence around the already-seen
+ * transcript. This boundary is deliberately narrower than an epoch reset: the
+ * provider plan is byte-stable and every prior message must remain, in order.
+ */
+const relayContextOpened = (previousWire, nextWire) =>
+  sameProviderPlan(previousWire, nextWire)
+  && (nextWire.messages ?? []).some(messageIsRelayContext)
+  && !(previousWire.messages ?? []).some(messageIsRelayContext)
+  && preservesPriorMessagesAsSubsequence(previousWire, nextWire);
+
+const relayContextRevised = (previousWire, nextWire) => {
+  const previousContexts = relayContexts(previousWire);
+  const nextContexts = relayContexts(nextWire);
+  if (previousContexts.length !== 1 || nextContexts.length !== 1) return false;
+  const previousIncumbency = relayContextField(previousContexts[0], 'incumbency_id');
+  const nextIncumbency = relayContextField(nextContexts[0], 'incumbency_id');
+  return sameProviderPlan(previousWire, nextWire)
+    && previousIncumbency !== null
+    && previousIncumbency === nextIncumbency
+    && relayContextText(previousContexts[0]) !== relayContextText(nextContexts[0])
+    && preservesPriorMessagesAsSubsequence(withoutRelayContexts(previousWire), withoutRelayContexts(nextWire));
+};
+
+const hasAcceptedSuicideResult = (wire) =>
+  (wire.messages ?? []).some((message) =>
+    message?.role === 'tool'
+    && message?.parts?.some(
+      (part) => part?.kind === 'tool-result'
+        && String(part?.result ?? '').includes('retired = true'),
+    ));
+
+const relayRetirementContext = (previousWire, nextWire) => {
+  const previousContexts = relayContexts(previousWire);
+  const nextContexts = relayContexts(nextWire);
+  if (previousContexts.length !== 1 || nextContexts.length !== 1) return false;
+  const previousIncumbency = relayContextField(previousContexts[0], 'incumbency_id');
+  const nextIncumbency = relayContextField(nextContexts[0], 'incumbency_id');
+  const nextPhase = relayContextField(nextContexts[0], 'phase');
+  return sameProviderPlan(previousWire, nextWire)
+    && previousIncumbency !== null
+    && previousIncumbency !== 'none'
+    && nextIncumbency === 'none'
+    && nextPhase === 'Retired'
+    && hasAcceptedSuicideResult(nextWire)
+    && preservesPriorMessagesAsSubsequence(withoutRelayContexts(previousWire), withoutRelayContexts(nextWire));
+};
+
+const messageIsRelaySuccessorPrompt = (message) =>
+  message?.role === 'user'
+  && message?.parts?.some((part) => {
+    if (part?.kind !== 'text') return false;
+    const text = String(part?.text ?? '').replace(/^#\s*/, '');
+    return text.startsWith('The previous Manager incumbency is retired. You are the new Manager');
+  });
+
+const hasRelaySuccessorPrompt = (wire) => (wire.messages ?? []).some(messageIsRelaySuccessorPrompt);
+
+const isSanitizerAssistantDot = (message) =>
+  message?.role === 'assistant'
+  && (message?.parts ?? []).length === 1
+  && message.parts[0]?.kind === 'text'
+  && message.parts[0]?.text === '.';
+
+const relaySuccessorCut = (previousWire, nextWire) => {
+  const nextContexts = relayContexts(nextWire);
+  if (nextContexts.length !== 1) return false;
+  const nextIncumbency = relayContextField(nextContexts[0], 'incumbency_id');
+  const nextPhase = relayContextField(nextContexts[0], 'phase');
+  const priorMessages = (previousWire.messages ?? []).filter(
+    (message) => !messageIsRelayContext(message) && !isSanitizerAssistantDot(message),
+  );
+  const carriedMessages = (nextWire.messages ?? []).filter(
+    (message) =>
+      !messageIsRelayContext(message)
+      && !messageIsRelaySuccessorPrompt(message)
+      && !isSanitizerAssistantDot(message),
+  );
+  return sameProviderPlan(previousWire, nextWire)
+    && nextIncumbency !== null
+    && nextIncumbency !== 'none'
+    && nextPhase === 'AuditPending'
+    && hasRelaySuccessorPrompt(nextWire)
+    && !hasAcceptedSuicideResult(nextWire)
+    && messagesAreOrderedSubsequence(carriedMessages, priorMessages);
+};
 
 /**
  * Decide one chat request against the session's seal.
@@ -193,6 +339,29 @@ export function sealDecision({ previousWire, body, boundary }) {
       return requestKindKeepsPrefix(previousWire, nextWire)
         ? { resealed: 'request-kind-switch' }
         : { broken: 'request-kind-switch-rewrote-prefix' };
+
+    // RELAY-PROJ: the first durable Road makes the bounded synthetic Relay
+    // context visible. Unlike a generic epoch switch, this may not delete or
+    // rewrite anything the provider already saw.
+    case 'relay-context-open':
+      return relayContextOpened(previousWire, nextWire)
+        ? { resealed: 'relay-context-open' }
+        : { broken: 'relay-context-open-rewrote-fixed' };
+
+    case 'relay-context-revision':
+      return relayContextRevised(previousWire, nextWire)
+        ? { resealed: 'relay-context-revision' }
+        : { broken: 'relay-context-revision-rewrote-fixed' };
+
+    case 'relay-retirement-context':
+      return relayRetirementContext(previousWire, nextWire)
+        ? { resealed: 'relay-retirement-context' }
+        : { broken: 'relay-retirement-context-rewrote-fixed' };
+
+    case 'relay-successor-cut':
+      return relaySuccessorCut(previousWire, nextWire)
+        ? { resealed: 'relay-successor-cut' }
+        : { broken: 'relay-successor-cut-rewrote-fixed' };
 
     default:
       throw new Error(`unknown cold boundary kind '${boundary.kind}'`);

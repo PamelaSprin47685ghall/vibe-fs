@@ -22,6 +22,7 @@ type private RoadState =
       AuthorityMessageIds: PhysicalUserMessageId list
       Active: ActiveIncumbency option
       Retired: IncumbencyId list
+      RetiredProviderRunIds: Set<string>
       OpenObligations: ScoreDimension list
       ExitRequiredNudgeFrontiers: Set<string>
       Certificate: QualityCertificate option
@@ -41,6 +42,7 @@ type RoadView =
       AcceptedAssessmentTransport: (string * string) option
       ExitRequiredNudgeFrontiers: Set<string>
       RetiredIncumbencies: IncumbencyId list
+      RetiredProviderRunIds: Set<string>
       OpenObligations: ScoreDimension list
       Certificate: QualityCertificate option
       LatestRetirement: RetirementSummary option }
@@ -48,23 +50,19 @@ type RoadView =
 module private Internal =
     let private key roadId = RoadId.value roadId
     let road roadId (RelayState roads) = Map.tryFind (key roadId) roads
-    let update roadId roadState (RelayState roads) = RelayState(Map.add (key roadId) roadState roads)
+
+    let update roadId roadState (RelayState roads) =
+        RelayState(Map.add (key roadId) roadState roads)
 
     let certificateId assessmentId =
         QualityCertificateId.create ("certificate:" + AssessmentId.value assessmentId)
 
-    let require error = function
+    let require error =
+        function
         | Some value -> Ok value
         | None -> Error error
 
-    let private newCertificate
-        perfect
-        assessmentId
-        (active: ActiveIncumbency)
-        snapshotId
-        authorityRevision
-        binding
-        =
+    let private newCertificate perfect assessmentId (active: ActiveIncumbency) snapshotId authorityRevision binding =
         if perfect then
             Some
                 { Id = certificateId assessmentId
@@ -79,7 +77,10 @@ module private Internal =
             None
 
     let private phaseAfterAssessment perfect =
-        if perfect then IncumbencyPhase.PerfectAwaitingRetirement else IncumbencyPhase.WorkOwned
+        if perfect then
+            IncumbencyPhase.PerfectAwaitingRetirement
+        else
+            IncumbencyPhase.WorkOwned
 
     let private acceptAssessment
         roadId
@@ -93,7 +94,9 @@ module private Internal =
         scores
         =
         let perfect = ScoreVector.allPerfect scores
-        let certificate = newCertificate perfect assessmentId active snapshotId authorityRevision binding
+
+        let certificate =
+            newCertificate perfect assessmentId active snapshotId authorityRevision binding
 
         let updatedActive =
             { active with
@@ -123,9 +126,10 @@ module private Internal =
         scores
         =
         match active.Assessment with
-        | Some accepted
-            when accepted.Binding.ToolCallId = binding.ToolCallId
-                 && accepted.Binding.PayloadDigest = binding.PayloadDigest ->
+        | Some accepted when
+            accepted.Binding.ToolCallId = binding.ToolCallId
+            && accepted.Binding.PayloadDigest = binding.PayloadDigest
+            ->
             Ok state
         | Some accepted when accepted.Binding.ToolCallId = binding.ToolCallId -> Error "AssessmentReplayConflict"
         | Some _ -> Error "AssessmentAlreadySubmitted"
@@ -135,7 +139,10 @@ module private Internal =
         | None -> acceptAssessment roadId state current active assessmentId binding snapshotId authorityRevision scores
 
     let private authorityReplay exactReplay state =
-        if exactReplay then Ok state else Error "AuthorityRevisionReplayConflict"
+        if exactReplay then
+            Ok state
+        else
+            Error "AuthorityRevisionReplayConflict"
 
     let private invalidateForAuthorityRevision next (certificate: QualityCertificate) =
         if certificate.Valid then
@@ -191,18 +198,22 @@ module private Internal =
 
     let private retire roadId state (current: RoadState) (retirement: RetirementSummary) =
         match current.Active, current.LatestRetirement with
-        | None, Some accepted
-            when accepted.Id = retirement.Id
-                 && accepted.IncumbencyId = retirement.IncumbencyId ->
+        | None, Some accepted when accepted.Id = retirement.Id && accepted.IncumbencyId = retirement.IncumbencyId ->
             Ok state
         | None, Some accepted when accepted.Id = retirement.Id -> Error "RetirementReplayConflict"
         | None, _ -> Error "NoActiveIncumbency"
         | Some active, _ when active.Id <> retirement.IncumbencyId -> Error "IncumbencyNotActive"
         | Some _, _ when List.contains retirement.IncumbencyId current.Retired -> Error "IncumbencyAlreadyRetired"
         | Some _, _ ->
+            let staleProviderRuns =
+                retirement.ProjectionCut.ThroughProviderRunId
+                :: retirement.ProjectionCut.StaleProviderRunIds
+                |> Set.ofList
+
             { current with
                 Active = None
                 Retired = current.Retired @ [ retirement.IncumbencyId ]
+                RetiredProviderRunIds = Set.union current.RetiredProviderRunIds staleProviderRuns
                 LatestRetirement = Some retirement }
             |> fun updated -> update roadId updated state
             |> Ok
@@ -220,11 +231,12 @@ module private Internal =
         | None, _ -> Error "PredecessorRetirementNotCommitted"
         | Some retirement, _ when retirement.Id <> predecessor -> Error "PredecessorRetirementNotCommitted"
         | Some retirement, _ when not retirement.SuccessorRequested -> Error "SuccessorNotRequested"
-        | Some _, Some active
-            when active.Id = incumbentId
-                 && active.Source = BatonSource.Retirement predecessor
-                 && active.SnapshotId = snapshotId
-                 && active.AuthorityRevision = authorityRevision ->
+        | Some _, Some active when
+            active.Id = incumbentId
+            && active.Source = BatonSource.Retirement predecessor
+            && active.SnapshotId = snapshotId
+            && active.AuthorityRevision = authorityRevision
+            ->
             Ok state
         | Some _, Some _ -> Error "ActiveIncumbencyAlreadyExists"
         | Some _, None when current.Retired |> List.contains incumbentId -> Error "RetiredIncumbencyCannotReactivate"
@@ -254,6 +266,7 @@ module private Internal =
               AuthorityMessageIds = [ authorityMessageId ]
               Active = None
               Retired = []
+              RetiredProviderRunIds = Set.empty
               OpenObligations = []
               ExitRequiredNudgeFrontiers = Set.empty
               Certificate = None
@@ -293,7 +306,12 @@ module private Internal =
                             Valid = false
                             InvalidationReason = Some reason }
 
-                    update roadId { current with Certificate = Some invalidated } state |> Ok
+                    update
+                        roadId
+                        { current with
+                            Certificate = Some invalidated }
+                        state
+                    |> Ok
                 | Some certificate when certificate.Id = certificateId -> Ok state
                 | _ -> Error "QualityCertificateNotFound"
         }
@@ -308,7 +326,10 @@ module private Internal =
                     update
                         roadId
                         { current with
-                            Active = Some { active with Phase = IncumbencyPhase.RetirementCleanupBlocked } }
+                            Active =
+                                Some
+                                    { active with
+                                        Phase = IncumbencyPhase.RetirementCleanupBlocked } }
                         state
                     |> Ok
                 | Some _ -> Error "IncumbencyNotActive"
@@ -343,7 +364,10 @@ module private Internal =
                     update
                         roadId
                         { current with
-                            LatestRetirement = Some { retirement with SuccessorRequested = true } }
+                            LatestRetirement =
+                                Some
+                                    { retirement with
+                                        SuccessorRequested = true } }
                         state
                     |> Ok
                 | _ -> Error "PredecessorRetirementNotCommitted"
@@ -365,12 +389,13 @@ module private Internal =
             result {
                 let! current = road roadId state |> require "RoadNotOpen"
                 let! active = current.Active |> require "NoActiveIncumbency"
-                return! advanceAuthority roadId state current active incumbentId expected next authorityMessageId snapshotId
+
+                return!
+                    advanceAuthority roadId state current active incumbentId expected next authorityMessageId snapshotId
             }
         | RelayEvent.QualityCertificateInvalidated(certificateId, reason) ->
             invalidateCertificate roadId state certificateId reason
-        | RelayEvent.RetirementCleanupBlocked(incumbencyId, _) ->
-            blockRetirementCleanup roadId state incumbencyId
+        | RelayEvent.RetirementCleanupBlocked(incumbencyId, _) -> blockRetirementCleanup roadId state incumbencyId
         | RelayEvent.ExitRequiredNudgeScheduled(incumbencyId, causalFrontier) ->
             scheduleExitNudge roadId state incumbencyId causalFrontier
         | RelayEvent.RetirementCommitted retirement ->
@@ -378,8 +403,7 @@ module private Internal =
                 let! current = road roadId state |> require "RoadNotOpen"
                 return! retire roadId state current retirement
             }
-        | RelayEvent.SuccessorRequested(predecessor, _) ->
-            requestSuccessor roadId state predecessor
+        | RelayEvent.SuccessorRequested(predecessor, _) -> requestSuccessor roadId state predecessor
         | RelayEvent.SuccessorActivated(predecessor, incumbentId, snapshotId, authorityRevision) ->
             result {
                 let! current = road roadId state |> require "RoadNotOpen"
@@ -416,6 +440,7 @@ module Fold =
                     |> Option.map (fun assessment -> assessment.Binding.ToolCallId, assessment.Binding.PayloadDigest))
               ExitRequiredNudgeFrontiers = road.ExitRequiredNudgeFrontiers
               RetiredIncumbencies = road.Retired
+              RetiredProviderRunIds = road.RetiredProviderRunIds
               OpenObligations = road.OpenObligations
               Certificate = road.Certificate
               LatestRetirement = road.LatestRetirement })
@@ -452,13 +477,7 @@ module Decision =
             commit
                 state
                 roadId
-                [ RelayEvent.AssessmentCommitted(
-                      assessmentId,
-                      binding,
-                      snapshotId,
-                      authorityRevision,
-                      scores
-                  ) ]
+                [ RelayEvent.AssessmentCommitted(assessmentId, binding, snapshotId, authorityRevision, scores) ]
         | Some _ -> Error "IncumbencyNotActive"
 
     let invalidateCertificate state roadId reason =
@@ -477,4 +496,3 @@ module Decision =
 
     let activateSuccessor state roadId predecessor incumbentId snapshotId authorityRevision =
         commit state roadId [ RelayEvent.SuccessorActivated(predecessor, incumbentId, snapshotId, authorityRevision) ]
-

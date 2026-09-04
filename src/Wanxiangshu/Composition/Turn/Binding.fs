@@ -184,23 +184,27 @@ module TurnBinding =
                     |> Option.bind (fun authority ->
                         fromProjection sessionId authority userMessageBindings continuations)
 
+                let mergeProjectedBinding (binding: ActiveRunBinding) (projected: ActiveRunBinding) =
+                    { binding with
+                        AuthorityRootUserMessageId =
+                            binding.AuthorityRootUserMessageId
+                            |> Option.orElse projected.AuthorityRootUserMessageId
+                        PhysicalUserMessageId =
+                            binding.PhysicalUserMessageId |> Option.orElse projected.PhysicalUserMessageId
+                        ContinuationMessageIds = binding.ContinuationMessageIds + continuations
+                        Role = binding.Role |> Option.orElse projected.Role }
+
                 let mergeBindings (explicitBinding: ActiveRunBinding option) (projected: ActiveRunBinding option) =
                     match explicitBinding, projected with
-                    | Some binding, Some p when Option.isNone binding.AuthorityRootUserMessageId ->
-                        Some
-                            { binding with
-                                AuthorityRootUserMessageId = p.AuthorityRootUserMessageId
-                                PhysicalUserMessageId =
-                                    (binding.PhysicalUserMessageId |> Option.orElse p.PhysicalUserMessageId)
-                                ContinuationMessageIds = binding.ContinuationMessageIds + continuations }
-                    | Some binding, _ ->
+                    | Some binding, Some projected -> Some(mergeProjectedBinding binding projected)
+                    | Some binding, None ->
                         Some
                             { binding with
                                 ContinuationMessageIds = binding.ContinuationMessageIds + continuations }
-                    | None, Some p ->
+                    | None, Some projected ->
                         Some
-                            { p with
-                                ContinuationMessageIds = p.ContinuationMessageIds + continuations }
+                            { projected with
+                                ContinuationMessageIds = projected.ContinuationMessageIds + continuations }
                     | None, None -> None
 
                 match projection with

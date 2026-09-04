@@ -10,7 +10,7 @@ module Surface =
         snapshot: string ->
         authority: string ->
         sourceName: string ->
-        obj
+            obj
 
     val assess:
         state: RelayState ->
@@ -27,7 +27,7 @@ module Surface =
         logicReliabilityBoundaries: int ->
         callerErgonomics: int ->
         completeness: int ->
-        obj
+            obj
 
     val invalidateCertificate: state: RelayState -> road: string -> reason: string -> obj
 
@@ -39,7 +39,7 @@ module Surface =
         next: string ->
         authorityMessageId: string ->
         snapshot: string ->
-        obj
+            obj
 
     val retire:
         state: RelayState ->
@@ -50,7 +50,7 @@ module Surface =
         baton: string ->
         cut: string ->
         qualityCandidateAccepted: bool ->
-        obj
+            obj
 
     val activateSuccessor:
         state: RelayState ->
@@ -59,11 +59,10 @@ module Surface =
         incumbent: string ->
         snapshot: string ->
         authority: string ->
-        obj
+            obj
 
     val view: state: RelayState -> road: string -> obj
     val obligations: state: RelayState -> road: string -> string array
     val authority: state: RelayState -> road: string -> obj
     val certificate: state: RelayState -> road: string -> obj
     val retirement: state: RelayState -> road: string -> obj
-

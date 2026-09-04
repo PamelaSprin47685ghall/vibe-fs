@@ -380,17 +380,26 @@ module OrchestratorProgram =
                 publishCertified deps job certificate candidate target
             | _ -> recordInitialCandidate candidate target rebased
 
-        let afterPreparedCandidate candidate =
+        let onPreparedCandidate candidate =
             targetHead deps job |> continueResult (admitPreparedCandidate candidate)
 
         let handleConflictFiles currentSnapshot files =
             match files with
-            | [] -> prepareCandidateResult deps job |> continueResult afterPreparedCandidate
+            | [] -> prepareCandidateResult deps job |> continueResult onPreparedCandidate
             | _ -> handleObservedConflict currentSnapshot files
 
-        let inspectCurrentArtifact currentSnapshot =
+        let onPrepareFailure currentSnapshot _ =
             conflictedFilesResult deps job
             |> continueResult (handleConflictFiles currentSnapshot)
+
+        let inspectCurrentArtifact currentSnapshot =
+            task {
+                let! outcome = prepareCandidateResult deps job
+
+                match outcome with
+                | Ok candidate -> return! onPreparedCandidate candidate
+                | Error error -> return! onPrepareFailure currentSnapshot error
+            }
 
         let handleSnapshotAdmission (matches, currentSnapshot) =
             if matches then

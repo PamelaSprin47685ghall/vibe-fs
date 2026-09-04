@@ -119,7 +119,7 @@ import { createHash } from 'node:crypto';
 import { canonicalJson } from '../../../../../dist/OpenCode/Codec/CanonicalJsonSurface.js';
 import { compileScenario } from '../../e2e/support/scenario-schema.js';
 import { faultBody } from '../../e2e/support/delivery-plan.js';
-import { kindOf, turnFragments } from '../../e2e/support/runtime-key.js';
+import { kindOf, stepOf, turnFragments } from '../../e2e/support/runtime-key.js';
 import { ScenarioRuntime } from '../../e2e/support/scenario-runtime.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -289,6 +289,9 @@ export function deriveRequests(scenario) {
     const requestKindSwitch = group.entries.some(
       (entry) => boundaryAt(scenario, entry)?.kind === 'request-kind-switch',
     );
+    const relayContextOpen = group.entries.some(
+      (entry) => boundaryAt(scenario, entry)?.kind === 'relay-context-open',
+    );
     const tools = continued && previousTools !== null && !requestKindSwitch ? previousTools : declaredTools;
     previousTools = tools;
 
@@ -307,11 +310,17 @@ export function deriveRequests(scenario) {
     const messages =
       requestKindSwitch && previousMessages !== null
         ? [...previousMessages, user(text)]
+        : relayContextOpen && previousMessages !== null
+          ? [
+              previousMessages[0],
+              user('[RelayContext]\nauthority_revision=derived\nphase=WorkOwned\n[/RelayContext]'),
+              ...previousMessages.slice(1),
+            ]
         : first.kind === 'title'
           ? [user(TITLE_MARKER), user(text)]
           : [systemMessage(model), user(text)];
 
-    let derivedStep = 0;
+    let derivedStep = stepOf({ messages });
     for (const entry of entries) {
       // `runtimeStep` may deliberately pin a sparse measured Host cursor. Fill
       // only the missing assistant positions so the derived request reaches the

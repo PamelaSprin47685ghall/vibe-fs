@@ -61,6 +61,8 @@ module ToolRegistry =
         childWorkRecordFor: (string -> Task<string option>) option ->
         snapshot: ISessionSnapshotPort option ->
         cancelSignals: (SessionId seq -> unit) option ->
+        beginToolExecution: (string -> unit) ->
+        endToolExecution: (string -> unit) ->
         eventPort: IEventObservationPort option ->
         bloggerHost: IBloggerRuntimeHost option ->
         syncDelegateRuntime: SyncDelegateRuntime option ->

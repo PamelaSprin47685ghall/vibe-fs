@@ -84,4 +84,3 @@ module ChangeSurface =
     val releaseGate: gate: obj -> Task<unit>
 
     val disposeGate: gate: obj -> Task<unit>
-

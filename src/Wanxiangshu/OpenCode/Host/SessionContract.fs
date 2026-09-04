@@ -28,6 +28,8 @@ type QuiescencePermitFailure =
 /// HOST-004: process-local side-effect admission capability.
 type ISessionQuiescenceGate =
     abstract BeginProviderAttempt: sessionId: SessionId -> unit
+    abstract BeginToolExecution: sessionId: SessionId -> unit
+    abstract EndToolExecution: sessionId: SessionId -> unit
     abstract ObservePhysicalUserMessage: sessionId: SessionId * physicalUserMessageId: PhysicalUserMessageId -> unit
     abstract ObserveIdle: sessionId: SessionId -> QuiescencePermit
     abstract TryConsume: permit: QuiescencePermit -> Result<unit, QuiescencePermitFailure>

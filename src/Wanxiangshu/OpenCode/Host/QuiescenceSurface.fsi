@@ -5,6 +5,8 @@ open Wanxiangshu.Foundation
 module QuiescenceSurface =
     val create: unit -> SessionQuiescenceGate
     val beginAttempt: gate: ISessionQuiescenceGate -> sessionId: string -> unit
+    val beginTool: gate: ISessionQuiescenceGate -> sessionId: string -> unit
+    val endTool: gate: ISessionQuiescenceGate -> sessionId: string -> unit
 
     val observePhysicalMessage:
         gate: ISessionQuiescenceGate -> sessionId: string -> physicalUserMessageId: string -> unit

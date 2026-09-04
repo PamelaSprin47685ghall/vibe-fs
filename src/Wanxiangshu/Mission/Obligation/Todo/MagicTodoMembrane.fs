@@ -307,7 +307,10 @@ module MagicTodoMembrane =
                 |> Option.defaultValue (MagicTodoProjection.emptyIncumbency incumbencyId)
 
             let! currentObligations = readCurrentObligations journal incumbency
-            let writeId = MagicTodo.todoWriteId HostDigest.sha256Hex incumbencyId locality.ToolCallId
+
+            let writeId =
+                MagicTodo.todoWriteId HostDigest.sha256Hex incumbencyId locality.ToolCallId
+
             let prior = existingPrepared incumbencyId writeId incumbency
 
             let admission =
@@ -404,9 +407,7 @@ module MagicTodoMembrane =
             let projection = AgentJournal.snapshot journal
 
             let incumbency =
-                Map.tryFind
-                    (IncumbencyId.value bridge.IncumbencyId)
-                    projection.AgentProjections.MagicTodo.ByIncumbency
+                Map.tryFind (IncumbencyId.value bridge.IncumbencyId) projection.AgentProjections.MagicTodo.ByIncumbency
                 |> Option.defaultValue (MagicTodoProjection.emptyIncumbency bridge.IncumbencyId)
 
             let isT1Commitment =

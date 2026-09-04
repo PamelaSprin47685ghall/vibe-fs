@@ -6,7 +6,7 @@
 
 ## PROJ-002: cut 覆盖 suicide request 与 tool result
 
-accepted retirement 的 cut frontier 必须覆盖前任最后 assistant part、suicide tool call、其 tool result 及同 causal batch 的内部 ack；不能用最近 N 条、时间戳或文本搜索 suicide 推断。
+accepted retirement 的 cut frontier 必须覆盖前任最后 assistant part、suicide tool call、其 tool result 及同 causal batch 的内部 ack；不能用最近 N 条、时间戳或文本搜索 suicide 推断。retirement tool 之后、下一个 user turn 之前的非 authority 消息是 retired run 自己的 racing tail（closing、phantom join），一律丢弃；尚无后继 user turn 时整个尾巴都丢。user turn 本身永不过 cut。cut 只认位置与 role，不认文本、不猜 run、不等物理 arrival。
 
 ## PROJ-003: successor 上下文只注入当前权威事实
 

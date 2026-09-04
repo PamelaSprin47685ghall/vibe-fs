@@ -15,6 +15,12 @@ module QuiescenceSurface =
     let beginAttempt (gate: ISessionQuiescenceGate) (sessionId: string) : unit =
         gate.BeginProviderAttempt(SessionId.create sessionId)
 
+    let beginTool (gate: ISessionQuiescenceGate) (sessionId: string) : unit =
+        gate.BeginToolExecution(SessionId.create sessionId)
+
+    let endTool (gate: ISessionQuiescenceGate) (sessionId: string) : unit =
+        gate.EndToolExecution(SessionId.create sessionId)
+
     let observePhysicalMessage
         (gate: ISessionQuiescenceGate)
         (sessionId: string)

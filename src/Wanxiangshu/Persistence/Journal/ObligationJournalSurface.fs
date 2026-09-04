@@ -66,6 +66,7 @@ module ObligationJournalSurface =
 
     let snapshotMagicTodo (handle: JournalHandle) (incumbencyId: string) : obj =
         let projection = AgentJournal.snapshot handle.Journal
+
         MagicTodoProjectionSurface.incumbencyView
             projection.AgentProjections.MagicTodo
             (Wanxiangshu.Mission.Relay.IncumbencyId.create incumbencyId)

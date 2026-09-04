@@ -71,7 +71,7 @@ assert.equal(typeof ADVERSITY_ORACLES.assertSubagentReuse, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertSuccessfulReconciliation, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertLaterSuccessfulFinality, 'function');
 assert.equal(typeof CUSTOMS.holdChildC1UntilLabor, 'function');
-assert.equal(typeof CUSTOMS.bindFinalityReviseThenPerfect, 'function');
+assert.equal(typeof CUSTOMS.bindRelaySuccessorSequence, 'function');
 assert.equal(typeof CUSTOMS.oracleLongStroke, 'function');
 assert.ok(
   ADVERSITY_CHECKLIST.every((row) => row.covered === true && row.oracle && row.injection),

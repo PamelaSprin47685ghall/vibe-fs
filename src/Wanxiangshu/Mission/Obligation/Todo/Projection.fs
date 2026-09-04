@@ -85,10 +85,7 @@ module MagicTodoProjection =
           Checkpoints = Map.empty
           LegacySeed = None }
 
-    let tryIncumbency
-        (incumbencyId: IncumbencyId)
-        (state: MagicTodoProjectionState)
-        : IncumbencyMagicTodoState option =
+    let tryIncumbency (incumbencyId: IncumbencyId) (state: MagicTodoProjectionState) : IncumbencyMagicTodoState option =
         Map.tryFind (incumbencyKey incumbencyId) state.ByIncumbency
 
     let ensureIncumbency
@@ -106,8 +103,7 @@ module MagicTodoProjection =
 
     let private putIncumbency (incumbency: IncumbencyMagicTodoState) (state: MagicTodoProjectionState) =
         { state with
-            ByIncumbency =
-                Map.add (incumbencyKey incumbency.IncumbencyId) incumbency state.ByIncumbency }
+            ByIncumbency = Map.add (incumbencyKey incumbency.IncumbencyId) incumbency state.ByIncumbency }
 
     let isPlanCommitted (incumbency: IncumbencyMagicTodoState) : bool = incumbency.FirstPlanCommitment.IsSome
 
@@ -267,8 +263,7 @@ module MagicTodoProjection =
             Error(MagicTodoFoldRejection.IdentityCorruption "InputDigest")
         | Some cp when cp.SemanticVersion <> payload.SemanticVersion ->
             Error(MagicTodoFoldRejection.IdentityCorruption "SemanticVersion")
-        | Some({ Lifecycle = CheckpointLifecycle.Prepared } as cp) ->
-            Ok(acceptCheckpoint payload cp incumbency state)
+        | Some({ Lifecycle = CheckpointLifecycle.Prepared } as cp) -> Ok(acceptCheckpoint payload cp incumbency state)
         | Some cp -> requireAcceptedReplay cp payload state
 
     let foldLegacySeed
@@ -281,8 +276,7 @@ module MagicTodoProjection =
         | Some(seedRef, seedDigest) when seedRef = payload.SeedTodoRef && seedDigest = payload.SeedTodoDigest ->
             Ok state
         | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "LegacyTodoSeed")
-        | None when not (Map.isEmpty incumbency.Checkpoints) ->
-            Error MagicTodoFoldRejection.LegacySeedAfterCheckpoint
+        | None when not (Map.isEmpty incumbency.Checkpoints) -> Error MagicTodoFoldRejection.LegacySeedAfterCheckpoint
         | None ->
             Ok(
                 putIncumbency

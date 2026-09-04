@@ -72,7 +72,7 @@ type ToolRuntimeScope =
     member RoleFor: ctx: HostToolContext -> Role option
     member EnsureRoleFor: ctx: HostToolContext -> Task<Role option>
     member ManagerPhaseFor: sessionId: string -> ManagerCapabilityPhase
-    member TryFreezeRetirement: sessionId: string -> bool
+    member TryFreezeRetirement: sessionId: string * incumbentId: IncumbencyId -> bool
     member UnfreezeRetirement: sessionId: string -> unit
     member IsRetirementFrozen: sessionId: string -> bool
     member RetirementBlockersFor: sessionId: string -> string list

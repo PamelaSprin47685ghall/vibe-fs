@@ -36,14 +36,13 @@ module Fold =
             AgentProjection.tryUpdate
                 sessionId
                 (fun session ->
-                    let current = session.Relay |> Option.defaultValue Wanxiangshu.Mission.Relay.Fold.empty
+                    let current =
+                        session.Relay |> Option.defaultValue Wanxiangshu.Mission.Relay.Fold.empty
 
                     Wanxiangshu.Mission.Relay.Fold.apply current payload.RoadId payload.Transaction
                     |> Result.map (fun updated -> { session with Relay = Some updated }))
                 projection
-            |> Result.mapError (fun reason ->
-                { Fact = "Relay"
-                  Reason = reason })
+            |> Result.mapError (fun reason -> { Fact = "Relay"; Reason = reason })
 
     let foldAgentFact (projection: AgentProjectionSet) (fact: AgentFact) : Result<AgentProjectionSet, FoldRejection> =
         // DSL-003: one dispatch per bounded-context family; each family folds

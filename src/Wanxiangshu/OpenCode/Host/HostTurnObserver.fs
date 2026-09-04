@@ -226,14 +226,7 @@ module HostTurnObserver =
                     turn
 
             if not isFissionOwner && not fissionHandled then
-                do!
-                    observeApplicationTurn
-                        sessionPort
-                        eventPort
-                        journal
-                        scope
-                        abortCause
-                        context
+                do! observeApplicationTurn sessionPort eventPort journal scope abortCause context
         }
 
     let private observeAfterStrength
@@ -251,8 +244,7 @@ module HostTurnObserver =
             | FamilyRecovery.FamilyBlocked _ -> return ()
             | FamilyRecovery.FamilyWaiting _
             | FamilyRecovery.FamilyReady _ ->
-                return!
-                    observeFamilyReady sessionPort eventPort journal scope abortCause context
+                return! observeFamilyReady sessionPort eventPort journal scope abortCause context
         }
 
     let private observeBusinessTurn
@@ -305,8 +297,7 @@ module HostTurnObserver =
                 // consumed a durable Candidate.
                 do! observeStrengthDurability strengthDurability scope turn
 
-                return!
-                    observeAfterStrength sessionPort eventPort journal scope abortCause context
+                return! observeAfterStrength sessionPort eventPort journal scope abortCause context
         }
 
     let observe

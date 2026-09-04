@@ -24,4 +24,3 @@ module Surface =
                     |> ScoreVector.lowDimensions
                     |> List.map ScoreDimension.fieldName
                     |> List.toArray |}
-

@@ -303,7 +303,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             PromptAuthority.ContinuationKind.ManagerGuard
             (Some(WorktreePath.value record.WorktreePath))
             deps.Journal
-            ("relay-successor:" + RetirementId.value retirement.Id)
+            (RelaySuccessorGate.gateKind retirement.Id)
             terminalRun
 
     let requireOpenRoad (journal: AgentJournal) (record: ManagerJobProjection) =

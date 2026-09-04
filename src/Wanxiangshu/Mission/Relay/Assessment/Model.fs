@@ -10,7 +10,9 @@ module Model =
 
     let private expectedFields = ScoreDimension.all |> List.map ScoreDimension.fieldName
 
-    let private keys (value: obj) : string array = emitJsExpr value "Object.keys($0 ?? {})"
+    let private keys (value: obj) : string array =
+        emitJsExpr value "Object.keys($0 ?? {})"
+
     let private property (value: obj) (name: string) : obj = emitJsExpr (value, name) "$0[$1]"
 
     let private integer (value: obj) : int option =
@@ -36,4 +38,3 @@ module Model =
             Error "review arguments must contain exactly the eight required score fields"
         else
             readScores value |> Result.bind ScoreVector.tryCreate
-

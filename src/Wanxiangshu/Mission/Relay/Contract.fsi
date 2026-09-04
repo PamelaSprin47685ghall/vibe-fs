@@ -38,6 +38,11 @@ module RetirementId =
     val create: string -> RetirementId
     val value: RetirementId -> string
 
+/// The single gate-kind vocabulary for the successor handoff prompt, shared by
+/// the Change sender and the projection cut so the two never drift apart.
+module RelaySuccessorGate =
+    val gateKind: retirementId: RetirementId -> string
+
 module BatonId =
     val create: string -> BatonId
     val value: BatonId -> string
@@ -127,4 +132,3 @@ type RetirementSummary =
       ProjectionCut: ProjectionCut
       SuccessorRequested: bool
       QualityCandidateAccepted: bool }
-

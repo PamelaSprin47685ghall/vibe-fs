@@ -58,6 +58,8 @@ type SessionQuiescenceGate() as this =
     // next provider transform starts; replay of the same message is inert.
     // DSL-MUTABLE: resource — all exact physical user ingress ids seen per session
     let mutable physicalMessages = Map.empty<string, Set<string>>
+    // DSL-MUTABLE: resource — active Host tool bodies by session; physical quiescence only.
+    let mutable activeToolCounts = Map.empty<string, int>
 
     let nextSerial key =
         Map.tryFind key serials
@@ -68,7 +70,8 @@ type SessionQuiescenceGate() as this =
         match permit with
         | :? QuiescencePermitToken as opaque when obj.ReferenceEquals(opaque.Owner, owner) ->
             let key = SessionId.value opaque.SessionId
-            Some(struct (key, opaque.Serial, Map.tryFind key activities))
+            let activeTools = Map.tryFind key activeToolCounts |> Option.defaultValue 0
+            Some(struct (key, opaque.Serial, Map.tryFind key activities, activeTools))
         | _ -> None
 
     let tryCurrentPermit key =
@@ -82,28 +85,42 @@ type SessionQuiescenceGate() as this =
     let decideConsume evidence =
         match evidence with
         | None -> Error QuiescencePermitFailure.WrongOwner
-        | Some(struct (key, serial, Some(Activity.Idle current))) when current = serial ->
+        | Some(struct (_, serial, Some(Activity.Idle current), activeTools)) when current = serial && activeTools > 0 ->
+            Error QuiescencePermitFailure.NoFreshIdle
+        | Some(struct (key, serial, Some(Activity.Idle current), _)) when current = serial ->
             Ok(struct (key, Activity.IdleConsumed serial))
-        | Some(struct (_, serial, Some(Activity.IdleConsumed current))) when current = serial ->
+        | Some(struct (_, serial, Some(Activity.IdleConsumed current), _)) when current = serial ->
             Error QuiescencePermitFailure.AlreadyConsumed
-        | Some(struct (_, _, Some(Activity.Revoked _))) -> Error QuiescencePermitFailure.Revoked
-        | Some(struct (_, serial, Some(Activity.ProviderAttempt current)))
-        | Some(struct (_, serial, Some(Activity.Idle current)))
-        | Some(struct (_, serial, Some(Activity.IdleConsumed current))) when current > serial ->
+        | Some(struct (_, _, Some(Activity.Revoked _), _)) -> Error QuiescencePermitFailure.Revoked
+        | Some(struct (_, serial, Some(Activity.ProviderAttempt current), _))
+        | Some(struct (_, serial, Some(Activity.Idle current), _))
+        | Some(struct (_, serial, Some(Activity.IdleConsumed current), _)) when current > serial ->
             Error QuiescencePermitFailure.Superseded
         | Some _ -> Error QuiescencePermitFailure.NoFreshIdle
 
     let decideRelease evidence =
         match evidence with
         | None -> Error QuiescencePermitFailure.WrongOwner
-        | Some(struct (key, serial, Some(Activity.IdleConsumed current))) when current = serial ->
+        | Some(struct (key, serial, Some(Activity.IdleConsumed current), _)) when current = serial ->
             Ok(struct (key, Activity.Idle serial))
-        | Some(struct (_, _, Some(Activity.Revoked _))) -> Error QuiescencePermitFailure.Revoked
-        | Some(struct (_, serial, Some(Activity.ProviderAttempt current)))
-        | Some(struct (_, serial, Some(Activity.Idle current)))
-        | Some(struct (_, serial, Some(Activity.IdleConsumed current))) when current > serial ->
+        | Some(struct (_, _, Some(Activity.Revoked _), _)) -> Error QuiescencePermitFailure.Revoked
+        | Some(struct (_, serial, Some(Activity.ProviderAttempt current), _))
+        | Some(struct (_, serial, Some(Activity.Idle current), _))
+        | Some(struct (_, serial, Some(Activity.IdleConsumed current), _)) when current > serial ->
             Error QuiescencePermitFailure.Superseded
         | Some _ -> Error QuiescencePermitFailure.NoFreshIdle
+
+    let incrementToolCount key =
+        activeToolCounts
+        |> Map.tryFind key
+        |> Option.defaultValue 0
+        |> fun current -> activeToolCounts <- Map.add key (current + 1) activeToolCounts
+
+    let decrementToolCount key =
+        match Map.tryFind key activeToolCounts with
+        | Some current when current > 1 -> activeToolCounts <- Map.add key (current - 1) activeToolCounts
+        | Some _ -> activeToolCounts <- Map.remove key activeToolCounts
+        | None -> ()
 
     /// 每次 provider request 开始构建（`experimental.chat.messages.transform`
     /// 最早同步位置）时调用：旧 idle permit 立即失效，而不是等 request 跑半天
@@ -116,6 +133,12 @@ type SessionQuiescenceGate() as this =
             currentPermits.Remove key |> ignore
             serials <- Map.add key serial serials
             activities <- Map.add key (Activity.ProviderAttempt serial) activities)
+
+    member _.BeginToolExecution(sessionId: SessionId) : unit =
+        lock gate (fun () -> incrementToolCount (SessionId.value sessionId))
+
+    member _.EndToolExecution(sessionId: SessionId) : unit =
+        lock gate (fun () -> decrementToolCount (SessionId.value sessionId))
 
     /// A physical user message is stronger evidence than the preceding idle:
     /// once new material has been admitted, an idle-derived continuation for the
@@ -212,10 +235,13 @@ type SessionQuiescenceGate() as this =
             currentPermits.Remove key |> ignore
             serials <- Map.add key (nextSerial key) serials
             activities <- Map.remove key activities
-            physicalMessages <- Map.remove key physicalMessages)
+            physicalMessages <- Map.remove key physicalMessages
+            activeToolCounts <- Map.remove key activeToolCounts)
 
     interface ISessionQuiescenceGate with
         member _.BeginProviderAttempt(sessionId) = this.BeginProviderAttempt(sessionId)
+        member _.BeginToolExecution(sessionId) = this.BeginToolExecution(sessionId)
+        member _.EndToolExecution(sessionId) = this.EndToolExecution(sessionId)
 
         member _.ObservePhysicalUserMessage(sessionId, physicalUserMessageId) =
             this.ObservePhysicalUserMessage(sessionId, physicalUserMessageId)

@@ -70,4 +70,6 @@ module ObligationEnvelopeSurface =
                             |> Map.toArray
                             |> Array.map (fun (_, checkpoint) -> BlobDigest.value checkpoint.ProposedTodoDigest) |})
 
-            box {| ok = true; incumbencies = incumbencies |}
+            box
+                {| ok = true
+                   incumbencies = incumbencies |}

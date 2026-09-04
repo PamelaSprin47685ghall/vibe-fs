@@ -35,11 +35,7 @@ module OrchestratorManagerJob =
                 let path = WorktreePath.value job.WorktreePath
                 worktrees.[ManagerJobId.value job.ManagerJobId] <- path
 
-            OrchestratorSessionDirectories.registerRestored
-                snapshot
-                orchestratorId
-                worktrees
-                registerChildDirectory
+            OrchestratorSessionDirectories.registerRestored snapshot orchestratorId worktrees registerChildDirectory
 
             for job in active do
                 engine.RecoverManagerJob job

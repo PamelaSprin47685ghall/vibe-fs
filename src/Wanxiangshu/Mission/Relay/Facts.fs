@@ -6,10 +6,13 @@ open Wanxiangshu.Foundation.Identity
 type RelayEvent =
     | RoadOpened of RoadId * AuthorityRevision * PhysicalUserMessageId
     | IncumbencyOpened of IncumbencyId * WorkspaceSnapshotId * BatonSource
-    | AssessmentCommitted of
-        AssessmentId * AssessmentBinding * WorkspaceSnapshotId * AuthorityRevision * ScoreVector
+    | AssessmentCommitted of AssessmentId * AssessmentBinding * WorkspaceSnapshotId * AuthorityRevision * ScoreVector
     | AuthorityRevisionAdvanced of
-        IncumbencyId * expected: AuthorityRevision * next: AuthorityRevision * PhysicalUserMessageId * WorkspaceSnapshotId
+        IncumbencyId *
+        expected: AuthorityRevision *
+        next: AuthorityRevision *
+        PhysicalUserMessageId *
+        WorkspaceSnapshotId
     | QualityCertificateInvalidated of QualityCertificateId * reason: string
     | RetirementCleanupBlocked of IncumbencyId * blockerDigest: string
     | ExitRequiredNudgeScheduled of IncumbencyId * causalFrontier: string
@@ -32,4 +35,3 @@ type RelayFactCases =
     | TransactionCommitted of
         {| RoadId: RoadId
            Transaction: RelayTransaction |}
-

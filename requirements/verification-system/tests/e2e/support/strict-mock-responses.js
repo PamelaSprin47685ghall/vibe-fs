@@ -82,6 +82,20 @@ function toolArgs(exp, parsed, strict, state) {
   return args;
 }
 
+function withPrefixText(chunks, text) {
+  if (typeof text !== 'string' || text.length === 0 || chunks.length === 0) return chunks;
+  const first = chunks[0];
+  const choice = first?.choices?.[0];
+  if (!choice?.delta) return chunks;
+  return [
+    {
+      ...first,
+      choices: [{ ...choice, delta: { ...choice.delta, content: text } }],
+    },
+    ...chunks.slice(1),
+  ];
+}
+
 function toolCallChunks(id, exp, parsed, strict, promptTokens, state) {
   const args = toolArgs(exp, parsed, strict, state);
   const argsText = exp.respond.malformedArgs
@@ -91,9 +105,12 @@ function toolCallChunks(id, exp, parsed, strict, promptTokens, state) {
   if (exp.respond.toolCallAsText) {
     return buildTextChunks(id, `call tool ${exp.respond.tool} with args ${argsText}`, promptTokens);
   }
-  if (exp.respond.fragmentArgs) return fragmentedToolCallChunks(id, exp, argsText, promptTokens);
-  if (exp.respond.duplicateToolCallId) return duplicateToolCallChunks(id, exp, argsText, promptTokens);
-  return buildToolCallChunks(id, exp.respond.tool, argsText, promptTokens);
+  const chunks = exp.respond.fragmentArgs
+    ? fragmentedToolCallChunks(id, exp, argsText, promptTokens)
+    : exp.respond.duplicateToolCallId
+      ? duplicateToolCallChunks(id, exp, argsText, promptTokens)
+      : buildToolCallChunks(id, exp.respond.tool, argsText, promptTokens);
+  return withPrefixText(chunks, exp.respond.prefixText);
 }
 
 function multiToolCallChunks(id, exp, parsed, strict, promptTokens, state) {
@@ -101,9 +118,11 @@ function multiToolCallChunks(id, exp, parsed, strict, promptTokens, state) {
     const callExp = { ...exp, respond: { ...exp.respond, ...call, type: 'tool-call' } };
     return { name: call.tool, argsStr: JSON.stringify(toolArgs(callExp, parsed, strict, state)) };
   });
-  if (!exp.respond.streamCalls) return buildToolCallsChunks(id, calls, promptTokens);
+  if (!exp.respond.streamCalls) {
+    return withPrefixText(buildToolCallsChunks(id, calls, promptTokens), exp.respond.prefixText);
+  }
 
-  return [
+  return withPrefixText([
     { id, object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta: { role: 'assistant', content: null }, finish_reason: null }] },
     ...calls.map((call, index) => ({
       id,
@@ -124,7 +143,7 @@ function multiToolCallChunks(id, exp, parsed, strict, promptTokens, state) {
       }],
     })),
     finishedToolCallChunk(id, promptTokens),
-  ];
+  ], exp.respond.prefixText);
 }
 
 function fragmentedToolCallChunks(id, exp, argsText, promptTokens) {

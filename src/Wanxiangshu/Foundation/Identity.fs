@@ -397,4 +397,3 @@ module Identity =
                    AuthorityRootUserMessageId.value identity.AuthorityRootUserMessageId
                    ProviderRunIdentity.value identity.ProviderRun |]
             )
-

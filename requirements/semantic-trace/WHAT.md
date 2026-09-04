@@ -12,7 +12,7 @@ Stable historical insertion 的资格是 trace-owned typed decision：必须同�
 
 ## SEMANTIC-TRACE-003: cursor 严格单调、独立于 Host 坐标
 
-XTraceCursor 在会话生命周期内严格单调递增，独立于宿主内部的转录数组索引与语义轮次编号。相同或回退的游标追加请求必须直接拒绝。宿主上下文压缩（compaction）与重锚发生后，已记录的游标与覆盖范围作为持久事实完整保留，绝不随之重置。
+XTraceCursor 在会话生命周期内严格单调递增，独立于宿主内部的转录数组索引与语义轮次编号。相同或回退的游标追加请求必须直接拒绝。同一 SessionId 的并发 capture writer 必须在分配下一 durable cursor 前串行化；不得让两个 batch 从同一个旧 head 各自生成重叠 cursor，再依赖 fold 拒绝其中一支。该串行化只拥有物理 append 排序，不得充当业务进度或恢复资格。宿主上下文压缩（compaction）与重锚发生后，已记录的游标与覆盖范围作为持久事实完整保留，绝不随之重置。
 
 ## SEMANTIC-TRACE-004: provenance 按 provider run 分段
 

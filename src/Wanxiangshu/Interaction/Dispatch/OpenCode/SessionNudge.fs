@@ -211,13 +211,25 @@ module HostSessionNudge =
         : Task<Result<PhysicalUserMessageId, string>> =
         let rt = PromptDispatcher.forJournal durable
 
-        let physicalResult outcome acceptedPhysical =
-            match outcome, acceptedPhysical with
-            | GateContinuationOutcome.Sent _, Some physical -> Ok physical
-            | GateContinuationOutcome.Sent _, None -> Error "gate nudge was admitted without a PhysicalUserMessageId"
-            | GateContinuationOutcome.AlreadyAdmitted, _ -> Error "gate nudge is pending physical acceptance"
-            | GateContinuationOutcome.Retired, _ -> Error "gate nudge target is retired"
-            | GateContinuationOutcome.Failed error, _ -> Error error
+        let acceptedPhysical =
+            TaskCompletionSource<PhysicalUserMessageId>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        let acceptedAfterSend () =
+            match rt.GateNudgeAcceptedPhysical profile continuation gateKind terminalProviderRun with
+            | Some physical -> Task.FromResult(Ok physical)
+            | None ->
+                task {
+                    let! physical = acceptedPhysical.Task
+                    return Ok physical
+                }
+
+        let physicalResult outcome =
+            match outcome with
+            | GateContinuationOutcome.Sent _ -> acceptedAfterSend ()
+            | GateContinuationOutcome.AlreadyAdmitted ->
+                Task.FromResult(Error "gate nudge is pending physical acceptance")
+            | GateContinuationOutcome.Retired -> Task.FromResult(Error "gate nudge target is retired")
+            | GateContinuationOutcome.Failed error -> Task.FromResult(Error error)
 
         match rt.GateNudgeAcceptedPhysical profile continuation gateKind terminalProviderRun with
         | Some physical -> Task.FromResult(Ok physical)
@@ -225,8 +237,6 @@ module HostSessionNudge =
             Task.FromResult(Error "gate nudge is pending physical acceptance")
         | None ->
             task {
-                let acceptedPhysical = ref None
-
                 let! outcome =
                     sendGateContinuationWithProfile
                         sessionPort
@@ -237,11 +247,11 @@ module HostSessionNudge =
                         journal
                         gateKind
                         terminalProviderRun
-                        (Some(fun physical -> acceptedPhysical.Value <- Some physical))
+                        (Some(fun physical -> AsyncSupport.trySetResult acceptedPhysical physical |> ignore))
                         durable
                         profile
 
-                return physicalResult outcome acceptedPhysical.Value
+                return! physicalResult outcome
             }
 
     let trySendGateContinuationPhysical

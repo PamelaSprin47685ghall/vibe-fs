@@ -21,4 +21,3 @@ module ProviderFailurePresentation =
         | "RateLimit" -> claimed episodeId
         | "ProviderCapacityExhausted" -> final episodeId
         | _ -> box {| mode = "Default" |}
-
