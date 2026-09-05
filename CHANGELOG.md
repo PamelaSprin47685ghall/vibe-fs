@@ -1,6 +1,6 @@
 # Changelog — 版本历史
 
-## Unreleased
+## 0.9.0
 
 - JS capability-projected 编辑面升级为渐进式双层协议：
   - 新增默认 `edit(path, changes)`，用 `{ find, put, all? }` 覆盖精确替换、插入、删除、全匹配与同文件批量修改；所有 change 基于同一不可变快照规划并至多暂存一个 Rewrite，既有 `rewrite(path, newText)` 继续作为完整文件计算与结构重组的无上限逃生舱。

@@ -334,13 +334,20 @@ $$\begin{aligned}
 <div class="feature-tier tier-essential">
 <h3>快深同构性（Fast/Deep Isomorphism on Algebraic Types）</h3>
 <p>在 F# 核心类型系统中，执行绑定（Execution Binding）由岗位与档位正交组合而成：</p>
-<pre><code>type CanonicalRole =
-    | Orchestrator | Manager | Coder | Inspector | DevOps
-    | Browser | Inquiry | Reviewer | Blogger | Distiller
+<pre><code>type Role =
+    | Manager
+    | Orchestrator
+    | Coder
+    | Inspector
+    | Browser
+    | Inquiry
+    | DevOps
+    | Distiller
+    | Blogger
 
 type AgentTier = Fast | Deep
 
-type EffectiveAgent = CanonicalRole * AgentTier
+type EffectiveAgent = Role * AgentTier
 </code></pre>
 <p>无论 $\text{AgentTier}$ 处于 <code>Fast</code> 还是 <code>Deep</code>，其对应的系统提示词身份 $\text{systemPromptIdFor}(\text{Role})$ 与工具能力集 $\text{toolCapabilitiesFor}(\text{Role})$ 完全恒等。换算力只改变单步推理深度，绝不改变岗位的权利宪章与责任边界。</p>
 </div>
