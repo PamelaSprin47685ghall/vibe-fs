@@ -4,7 +4,7 @@ process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-const { run: executeRun } = await import('../../../dist/OpenCode/Tools/ExecutorToolSurface.js')
+const { run: executeRun, formatSpooledOutcome } = await import('../../../dist/OpenCode/Tools/ExecutorToolSurface.js')
 
 const chain = (kind, extra = {}) => ({
   kind,
@@ -46,4 +46,20 @@ test('WHAT[DISTILL-013] RUN_spooled_output_runs_distillation_without_chunk_stati
   // No journal → the one bounded-tail Distiller fails closed; the account degrades to
   // a partial report carried as instructions, never a thrown exception.
   assert.match(text, /Condensation|Most recent raw output/i)
+})
+
+test('WHAT[DISTILL-005] RUN_spooled_outcome_formats_summary_as_toml_comment', () => {
+  const summary = '输出内容太长，以下是蒸馏后的内容\n\n### 提炼证据\n\n* 修改文件: a.txt'
+  const text = formatSpooledOutcome(0, summary)
+  assert.ok(text.startsWith('# 输出内容太长，以下是蒸馏后的内容\n#\n# ### 提炼证据'))
+  assert.match(text, /exit_code = 0/)
+  assert.equal(text.includes('Recent work'), false)
+  assert.equal(text.includes('assistant:'), false)
+})
+
+test('WHAT[DISTILL-006] RUN_spooled_outcome_preserves_condensation_failure_as_toml_comment', () => {
+  const failure = 'Condensation failed: error\n\nMost recent raw output:\nfoo'
+  const text = formatSpooledOutcome(1, failure)
+  assert.match(text, /# Condensation failed: error/)
+  assert.match(text, /exit_code = 1/)
 })

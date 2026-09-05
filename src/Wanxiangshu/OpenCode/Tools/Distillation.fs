@@ -71,6 +71,9 @@ module Distillation =
         [<Literal>]
         let CondensationFailed = "tool/distill/condensation-failed"
 
+        [<Literal>]
+        let DistilledHeader = "tool/distill/distilled-header"
+
     type IDistillationRuntime = DistillationRuntime.IDistillationRuntime
 
     let asDistillationRuntime = DistillationRuntime.asDistillationRuntime
@@ -82,9 +85,60 @@ module Distillation =
     let private agentId (processId: string) =
         sprintf "exec-%s" (HostDigest.sha256Hex processId)
 
+    let private extractLlmOutput (raw: string) : string =
+        let withoutThink =
+            System.Text.RegularExpressions.Regex
+                .Replace(
+                    raw,
+                    @"<(think|thought|reasoning)>[\s\S]*?</\1>",
+                    "",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                )
+                .Trim()
+
+        let recentIdx =
+            withoutThink.IndexOf("Recent work", StringComparison.OrdinalIgnoreCase)
+
+        let gap =
+            if recentIdx >= 0 then
+                withoutThink
+                    .Substring(recentIdx + "Recent work".Length)
+                    .TrimStart('\r', '\n', ' ')
+            else
+                withoutThink
+
+        let assistantMatch =
+            System.Text.RegularExpressions.Regex.Match(
+                gap,
+                @"\bassistant:\s*",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase
+            )
+
+        let clean =
+            if assistantMatch.Success then
+                let afterAssistant =
+                    gap.Substring(assistantMatch.Index + assistantMatch.Length).Trim()
+
+                System.Text.RegularExpressions.Regex
+                    .Replace(
+                        afterAssistant,
+                        @"^\s*assistant:\s*",
+                        "",
+                        System.Text.RegularExpressions.RegexOptions.Multiline
+                    )
+                    .Trim()
+            else
+                gap.Trim()
+
+        if String.IsNullOrWhiteSpace clean then
+            withoutThink.Trim()
+        else
+            clean
+
     let private completionText (completion: RunCompletion) =
         match completion.Outcome with
-        | AgentCompleted payload when not (String.IsNullOrWhiteSpace payload.WorkRecord) -> payload.WorkRecord
+        | AgentCompleted payload when not (String.IsNullOrWhiteSpace payload.WorkRecord) ->
+            extractLlmOutput payload.WorkRecord
         | AgentCompleted _ -> raise (InvalidOperationException "DISTILL_EMPTY_WORK_RECORD")
         | AgentFailed payload -> raise (InvalidOperationException payload.Message)
         | AgentAbandoned(_, reason) -> raise (InvalidOperationException reason)
@@ -237,6 +291,15 @@ module Distillation =
 
         renderTruncationBoundary lang tail failed
 
+    let private autoDetectLanguage (lang: ProviderLanguage) (content: string) =
+        let hasChinese =
+            System.Text.RegularExpressions.Regex.IsMatch(content, @"[\u4e00-\u9fa5]")
+
+        if hasChinese then
+            ProviderLanguage.SimplifiedChinese
+        else
+            lang
+
     let private finishDistillation
         (runtime: IDistillationRuntime)
         (lang: ProviderLanguage)
@@ -244,7 +307,11 @@ module Distillation =
         (outcome: Result<string, DistillerFailure>)
         =
         match outcome with
-        | Ok account -> renderTruncationBoundary lang tail account
+        | Ok account ->
+            let effectiveLang = autoDetectLanguage lang account
+            let header = ProviderProse.render effectiveLang Path.DistilledHeader Map.empty
+            let bounded = renderTruncationBoundary effectiveLang tail account
+            header + "\n\n" + bounded
         | Error failure ->
             failure.OwnedAgentId |> Option.iter runtime.CancelAgent
             renderFailure lang tail failure.Message

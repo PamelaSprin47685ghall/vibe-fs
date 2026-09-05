@@ -21,6 +21,9 @@ module Distillation =
         [<Literal>]
         val CondensationFailed: string = "tool/distill/condensation-failed"
 
+        [<Literal>]
+        val DistilledHeader: string = "tool/distill/distilled-header"
+
     type IDistillationRuntime = DistillationRuntime.IDistillationRuntime
 
     val asDistillationRuntime:

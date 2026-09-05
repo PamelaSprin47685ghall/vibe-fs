@@ -20,3 +20,5 @@ module ExecutorToolSurface =
     /// and `context` are plain Host objects, and `recovery` is the owner-owned
     /// recovery mode used by tests/canaries ("blocked", "waiting", or "ready").
     val run: toolModule: obj -> sessions: obj -> args: obj -> context: obj -> recovery: string -> Task<string>
+
+    val formatSpooledOutcome: exitCode: int -> summary: string -> string

@@ -81,3 +81,5 @@ module ExecutorTool =
     val queryShellAdmission: ToolAdmission
     val runSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
     val queryShellSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
+
+    val internal formatSpooledOutcome: exitCode: int -> summary: string -> string

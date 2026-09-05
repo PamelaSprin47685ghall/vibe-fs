@@ -209,11 +209,14 @@ module ExecutorTool =
         | Some journal -> Distillation.asDistillationRuntime (scope.ExecutorRuntimeFor context) journal requirePermit
         | None -> Distillation.ofForkRuntime (ForkRuntime())
 
-    let private spooledInstructions (summary: string) =
+    let internal spooledInstructions (summary: string) =
         if System.String.IsNullOrWhiteSpace summary then
             []
         else
             [ summary ]
+
+    let internal formatSpooledOutcome (exitCode: int) (summary: string) =
+        ToolHostCodec.tomlObjectWithInstructions (spooledInstructions summary) [ "exit_code", TInt exitCode ]
 
     let private condenseWithAuthority
         (scope: ToolRuntimeScope)
@@ -234,7 +237,7 @@ module ExecutorTool =
             | Ok _ ->
                 let runtime = distillationRuntime scope context requirePermit
                 let! summary = Distillation.distillSpool runtime spoolPath language
-                return tomlObjectWithInstructions (spooledInstructions summary) [ "exit_code", TInt exitCode ]
+                return formatSpooledOutcome exitCode summary
         }
 
     let private condenseOrBlock

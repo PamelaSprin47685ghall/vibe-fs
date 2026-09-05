@@ -99,3 +99,6 @@ module ExecutorToolSurface =
         let hostArgs = HostToolArguments args
         let hostContext = ToolHostCodec.decodeContext context
         spec.Execute hostArgs hostContext
+
+    let formatSpooledOutcome (exitCode: int) (summary: string) : string =
+        ExecutorTool.formatSpooledOutcome exitCode summary

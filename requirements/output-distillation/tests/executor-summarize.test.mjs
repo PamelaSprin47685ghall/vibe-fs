@@ -151,3 +151,34 @@ test('WHAT[DISTILL-013] DISTILLATION_prompt_has_no_chunk_or_reduce_instrumentati
   const prompt = distillFragmentPrompt('en')
   assert.ok(!/chunk index|level-\d|reduce fan-in|success percentage/i.test(prompt))
 })
+
+test('WHAT[DISTILL-005] EXEC_distill_spool_extracts_llm_output_without_thinking_and_without_recent_work_header', async () => {
+  const { dir, spoolPath } = writeSpool([Buffer.from('small tail')])
+  const rawWorkRecord = [
+    'Recent work',
+    '<think>',
+    'internal chain of thought to be discarded',
+    '</think>',
+    'assistant: ### 提炼证据',
+    '',
+    '* 修改文件: a.txt',
+    '',
+    '### 收尾报告',
+    '完成。',
+  ].join('\n')
+
+  const { runtime } = fakeRuntime({
+    awaitAgent: (agentId) => ({ ok: true, runId: `run-${agentId}`, workRecord: rawWorkRecord }),
+  })
+
+  try {
+    const summary = await distillSpool(runtime, spoolPath, 'zh-CN')
+    assert.equal(summary.includes('Recent work'), false, 'must not leak Recent work header')
+    assert.equal(summary.includes('internal chain of thought'), false, 'must strip thinking/monologue')
+    assert.equal(summary.includes('assistant:'), false, 'must strip assistant role prefix')
+    assert.match(summary, /### 提炼证据/)
+    assert.match(summary, /### 收尾报告/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
