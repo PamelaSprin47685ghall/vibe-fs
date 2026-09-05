@@ -377,3 +377,41 @@ test('WHAT[OBLIGATION-LEDGER-026] prepare without open life is a structured reje
     assert.ok(result.error.code === 'NoActiveIncumbency' || result.error.code === 'NoOpenManagerLife')
   })
 })
+
+test('WHAT[OBLIGATION-LEDGER-026] host before/after hook rejects without active incumbency as typed tool rejection, not infrastructure fatal', async () => {
+  await withJournal(async (handle) => {
+    const session = 'ses-fresh-manager-todowrite'
+    const call = 'call-fresh-manager-todowrite'
+    const obligations = [{ name: 'diagnose', horizon: 'near', work: 'Fix the todowrite snapshot race.' }]
+    const args = { planComplete: false, workingOn: 'diagnose', obligations }
+    const messages = [
+      {
+        info: { id: 'msg-user-root-fresh', role: 'user' },
+        parts: [{ type: 'text', text: 'You are off today.' }],
+      },
+      {
+        info: { id: 'msg-asst-run-fresh', role: 'assistant' },
+        parts: [{
+          type: 'tool',
+          id: 'part-fresh-todo',
+          callID: call,
+          tool: 'todowrite',
+          state: { status: 'pending', input: args },
+        }],
+      },
+    ]
+
+    await assert.rejects(
+      () => membrane.MagicTodoMembraneSurface_executeHostSuccess(
+        handle,
+        messages,
+        session,
+        'inc-any',
+        call,
+        args,
+        () => ({ title: '1 todos', output: 'ok', metadata: {} }),
+      ),
+      /todowrite requires an active incumbency/,
+    )
+  })
+})
