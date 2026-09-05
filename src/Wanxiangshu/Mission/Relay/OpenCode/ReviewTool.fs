@@ -22,10 +22,10 @@ module ReviewTool =
         let Received = "tool/review/received"
 
         [<Literal>]
-        let Rejected = "tool/review/rejected"
+        let WorkAssigned = "tool/review/work-assigned"
 
         [<Literal>]
-        let EmptyNarrative = "tool/review/empty-narrative"
+        let Rejected = "tool/review/rejected"
 
         [<Literal>]
         let AbsentToolCall = "tool/review/absent-tool-call"
@@ -108,12 +108,7 @@ module ReviewTool =
         | Error error -> Task.FromResult(Error error)
 
     let private narrativeOf texts =
-        let narrative = texts |> List.rev |> String.concat "\n" |> (fun text -> text.Trim())
-
-        if String.IsNullOrWhiteSpace narrative then
-            Error(providerText Path.EmptyNarrative Map.empty)
-        else
-            Ok narrative
+        texts |> List.rev |> String.concat "\n" |> (fun text -> text.Trim()) |> Ok
 
     let private publicNarrativeBefore (toolCallId: ToolCallId) (message: SessionMessage) =
         let expected = ToolCallId.value toolCallId
@@ -373,8 +368,14 @@ module ReviewTool =
             |> Option.map phaseName
             |> Option.defaultValue "Unknown"
 
+        let instructionPath =
+            if ScoreVector.allPerfect prepared.Bound.Scores then
+                Path.Received
+            else
+                Path.WorkAssigned
+
         ToolHostCodec.tomlObjectWithInstructions
-            [ providerText Path.Received Map.empty ]
+            [ providerText instructionPath Map.empty ]
             [ "recorded", ToolHostCodec.TBool true
               "phase", ToolHostCodec.TString phase
               "all_perfect", ToolHostCodec.TBool(ScoreVector.allPerfect prepared.Bound.Scores) ]

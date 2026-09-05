@@ -1,0 +1,1 @@
+Assessment recorded. Because you assessed the current delivery quality as not reaching 10/10 (scores below 10 exist), you must now carry this mission and advance the work until all dimensions reach 10/10. Use todowrite to maintain an honest ledger and drive the required work.
