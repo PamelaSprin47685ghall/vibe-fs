@@ -8,9 +8,9 @@ Road 是根用户需求的持续执行道路，Incumbency 是一位当前任 Man
 
 所有任期均从 AuditPending 开始。第一任只在 BatonSource 为 ExistingWorld，后续任为 Retirement；不得存在 Planning Table、T1、Entrusted Road 或“第一任先实现、Reviewer 后检查”的流程特判。
 
-## RELAY-003: 每任起步只读 audit
+## RELAY-003: 每任起步全权就绪，评审前有能力无任务
 
-AuditPending 只能读取 root authority、requirements、workspace snapshot 和证据，可提交唯一 assessment 或直接 suicide。低分 assessment durable 提交后才获得工作写能力；全满分后保持只读并等待退休。
+所有任期自积极建立起即具备 Manager 角色的全部管理权能。当前任在提交评审前已经具备完整权限（包括维护任务账本、规划与委派），只是尚未承接具体执行任务（有能力无任务完全合法）。任期开始时不预知评审后是否由自己继续扛起；若提交低分 assessment，则原位承接具体执行任务与质量义务；若全满分或权威输入确认无任务，可直接提交零工作承诺或申请退休。
 
 ## RELAY-004: 非满分 assessor 原位取得实现责任
 

@@ -157,14 +157,47 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     // ── RelayPort ───────────────────────────────────────────────────────────
 
     let openRoad (start: RoadStart) : Task<Result<SessionId, string>> =
-        forkChild
-            (managerAgentId start.JobId)
-            Role.Manager
-            start.ManagerAgent
-            start.Worktree
-            start.RootRequest
-            true
-            start.ExpectedToolCalls
+        taskResult {
+            let! sessionId =
+                forkChild
+                    (managerAgentId start.JobId)
+                    Role.Manager
+                    start.ManagerAgent
+                    start.Worktree
+                    start.RootRequest
+                    true
+                    start.ExpectedToolCalls
+
+            match deps.Journal with
+            | None -> return sessionId
+            | Some journal ->
+                let roadId = RoadId.create (SessionId.value sessionId)
+                let rootUserMsg = SessionId.value sessionId
+                let authorityRevision = AuthorityRevision.create rootUserMsg
+                let authorityMessageId = PhysicalUserMessageId.create rootUserMsg
+                let incumbent =
+                    HostDigest.sha256Hex ("incumbency-v1\n" + SessionId.value sessionId + "\n" + rootUserMsg)
+                    |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
+                let snapshot = WorkspaceSnapshot.capture (WorktreePath.value start.Worktree)
+
+                let! transaction =
+                    RelayTransaction.create
+                        [ RelayEvent.RoadOpened(roadId, authorityRevision, authorityMessageId)
+                          RelayEvent.IncumbencyOpened(incumbent, snapshot, BatonSource.ExistingWorld) ]
+
+                let fact =
+                    AgentFact.Relay(
+                        RelayFactCases.TransactionCommitted
+                            {| RoadId = roadId
+                               Transaction = transaction |}
+                    )
+
+                let! _ =
+                    AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal
+                    |> TaskResult.mapError JournalAppendFailure.describe
+
+                return sessionId
+        }
 
     let activateRoad (jobId: ManagerJobId) : Task<Result<unit, string>> =
         runtime.SendDeferredFirstPrompt(managerAgentId jobId)

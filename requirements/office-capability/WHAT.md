@@ -45,9 +45,9 @@ Inspector 仅通过因果只读手段对仓库既有状态取证。Inspector 严
 
 DevOps 拥有进程与终端执行权，负责产生行为证据。对源代码的修改必须通过委派由 Coder 完成，DevOps 自身不直接进行自由的 write 或 edit 操作。
 
-## OFF-011: Manager AuditPending consequence = 只读 + review assessment；non-consequence = 修改工作树/执行性变更
+## OFF-011: Manager consequence = 完整管理权能；non-consequence = 亲自修改工作树
 
-Manager 在 AuditPending 阶段仅具备只读检查与基于八维标准的评审权能（ReviewAssessment），严禁执行工作区修改、代码编写或提交发布，直至完成八维评审并进入 WorkOwned 接管责任。
+Manager 在任何活跃任期阶段（包括评审前与接责后）均具备完整管理与记账权能（Read, Glob, Grep, ReviewAssessment, Fork, Join, Horizon, TodoWrite, Fission, Finality）。Manager 拥有权能并不等同于已有执行任务，有能力无任务完全合法。Manager 严禁以自己的双手亲自执行工作区源码修改或代码编写（建立 repository 事实必须委派 Coder/DevOps/Inspector）。
 
 ## OFF-012: Orchestrator consequence = commission manager；不 commission 其它 office
 

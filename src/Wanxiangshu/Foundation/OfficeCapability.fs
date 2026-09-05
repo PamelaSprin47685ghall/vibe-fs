@@ -108,25 +108,9 @@ module OfficeCapability =
 
     let private managerPermissions phase =
         match phase with
-        | ManagerCapabilityPhase.AuditPending ->
-            set
-                [ ToolPermission.Read
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Join
-                  ToolPermission.ReviewAssessment
-                  ToolPermission.Finality ]
+        | ManagerCapabilityPhase.AuditPending
         | ManagerCapabilityPhase.WorkOwned ->
-            set
-                [ ToolPermission.Read
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Fork
-                  ToolPermission.Join
-                  ToolPermission.Horizon
-                  ToolPermission.TodoWrite
-                  ToolPermission.Fission
-                  ToolPermission.Finality ]
+            permissions Role.Manager
         | ManagerCapabilityPhase.PerfectAwaitingRetirement ->
             set
                 [ ToolPermission.Read

@@ -23,9 +23,13 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.Relay.OpenCode
 open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
@@ -237,6 +241,78 @@ module PluginTransforms =
                         )
             }
 
+        let tryCaptureSnapshot dirOpt =
+            dirOpt
+            |> Option.filter (String.IsNullOrWhiteSpace >> not)
+            |> Option.bind (fun dir ->
+                try Some (WorkspaceSnapshot.capture dir) with _ -> None)
+            |> Option.defaultValue (WorkspaceSnapshotId.create "snapshot-root")
+
+        let buildOpeningEvents roadId sessionIdText rootUserMsg dirOpt =
+            let authorityRevision = AuthorityRevision.create rootUserMsg
+            let authorityMessageId = PhysicalUserMessageId.create rootUserMsg
+            let incumbent =
+                HostDigest.sha256Hex ("incumbency-v1\n" + sessionIdText + "\n" + rootUserMsg)
+                |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
+            let snapshotId = tryCaptureSnapshot dirOpt
+            [ RelayEvent.RoadOpened(roadId, authorityRevision, authorityMessageId)
+              RelayEvent.IncumbencyOpened(incumbent, snapshotId, BatonSource.ExistingWorld) ]
+
+        let commitOpeningTransaction (durable: AgentJournal) sessionId providerRunIdOpt roadId events =
+            task {
+                match RelayTransaction.create events with
+                | Error _ -> return ()
+                | Ok tx ->
+                    let fact =
+                        AgentFact.Relay(
+                            RelayFactCases.TransactionCommitted
+                                {| RoadId = roadId
+                                   Transaction = tx |}
+                        )
+                    let! _ = AgentJournal.appendAgent (StreamId.Session sessionId) providerRunIdOpt fact durable
+                    return ()
+            }
+
+        let decideOpeningAction sessionIdTextOpt =
+            sessionIdTextOpt
+            |> Option.filter (String.IsNullOrWhiteSpace >> not)
+            |> Option.bind (fun sessionIdText ->
+                journal
+                |> Option.bind (fun durable ->
+                    let sessionId = SessionId.create sessionIdText
+                    let snapshot = AgentJournal.snapshot durable
+                    let roadId = RoadId.create sessionIdText
+
+                    let roadView =
+                        AgentProjection.tryFind sessionId snapshot.AgentProjections
+                        |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
+                        |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
+
+                    let profileOpt = PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
+                    let isManager = profileOpt |> Option.exists (fun p -> p.CanonicalRole = Role.Manager)
+
+                    if roadView.IsNone && isManager then
+                        let rootUserMsg =
+                            profileOpt
+                            |> Option.map (fun p -> AuthorityRootUserMessageId.value p.AuthorityRootUserMessageId)
+                            |> Option.defaultValue sessionIdText
+
+                        let events = buildOpeningEvents roadId sessionIdText rootUserMsg workspaceDirectory
+                        Some(durable, sessionId, roadId, events)
+                    else
+                        None))
+
+        let ensureManagerRoadOpened
+            (sessionIdTextOpt: string option)
+            (providerRunIdOpt: ProviderRunIdentity option)
+            : Task<unit> =
+            task {
+                match decideOpeningAction sessionIdTextOpt with
+                | None -> return ()
+                | Some(durable, sessionId, roadId, events) ->
+                    do! commitOpeningTransaction durable sessionId providerRunIdOpt roadId events
+            }
+
         { BeginPhysicalProviderAttempt =
             SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
                 scope.Sessions.Quiescence.BeginProviderAttempt
@@ -244,11 +320,17 @@ module PluginTransforms =
             SessionStartedAtLedger.bindSessionStartedAt journal clock terminateSession Diagnostic.emit
           ApplyStrengthReplay = StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailFuse
           ApplyRelayProjection =
-            RelayNarrativeTransform.apply journal (fun sid ->
+            fun sidOpt outObj ->
                 task {
-                    let! _ = sessionPort.InterruptAttempt sid
-                    return ()
-                })
+                    do! ensureManagerRoadOpened sidOpt None
+
+                    do!
+                        RelayNarrativeTransform.apply journal (fun sid ->
+                            task {
+                                let! _ = sessionPort.InterruptAttempt sid
+                                return ()
+                            }) sidOpt outObj
+                }
           CaptureXTraceMessages =
             fun projectionSessionIdOpt outObj ->
                 task {
