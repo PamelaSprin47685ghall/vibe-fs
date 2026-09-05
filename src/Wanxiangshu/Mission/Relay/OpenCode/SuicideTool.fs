@@ -22,6 +22,9 @@ module SuicideTool =
         let Blocked = "tool/suicide/relay-blocked"
 
         [<Literal>]
+        let AssessmentRequired = "tool/suicide/assessment-required"
+
+        [<Literal>]
         let Retired = "tool/suicide/relay-retired"
 
         [<Literal>]
@@ -180,6 +183,12 @@ module SuicideTool =
                   |> List.mapi (fun index blocker -> string index, ToolHostCodec.TString blocker)
               ) ]
 
+    let private assessmentRequiredResult () =
+        ToolHostCodec.tomlObjectWithInstructions
+            [ text Path.AssessmentRequired ]
+            [ "retired", ToolHostCodec.TBool false
+              "assessment_required", ToolHostCodec.TBool true ]
+
     let private retiredResult qualityAccepted successorRequested retirementId =
         ToolHostCodec.tomlObjectWithInstructions
             [ text Path.Retired ]
@@ -324,9 +333,17 @@ module SuicideTool =
                 |> Task.FromResult))
 
     let private runFrozen (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedRetirement) =
+        let hasAssessment =
+            prepared.View
+            |> Option.bind (fun road -> road.AcceptedAssessmentTransport)
+            |> Option.isSome
+
         let blockers = scope.RetirementBlockersFor context.SessionId
 
-        if List.isEmpty blockers then
+        if not hasAssessment then
+            scope.UnfreezeRetirement context.SessionId
+            Task.FromResult(Ok(assessmentRequiredResult ()))
+        elif List.isEmpty blockers then
             runRetirement prepared
         else
             runBlocked prepared blockers
