@@ -40,6 +40,8 @@ import {
   G2_INSPECTOR_CANARY_PROMPT,
   G6_CANONICAL_A,
   G6_CANONICAL_Q,
+  HUMANROOT_SUCCESSION_CANARY_PROMPT,
+  assertHumanRootManagerSuccession,
   retireCompanionForDeletion,
   assertG2InspectorBatchCoalescing,
   assertG2InspectorPrefixLaw,
@@ -170,6 +172,39 @@ const preFlowCanaries = async (scenario) => {
   assert.ok(deleted.ok, `G6 owner session.deleted failed: ${JSON.stringify(deleted.data)}`);
   await waitCaptured(scenario);
   assertG6BookkeeperFinalize(scenario);
+
+  // HumanRoot manager succession canary (sole serve, before orchestrator main flow).
+  // Direct HumanRoot Manager — the main spine uses AgentOwnerRoot and cannot expose
+  // the erroneous HumanRoot closure. First review one below 10 then suicide;
+  // successor must arrive as a physically observed provider request (not merely
+  // SuccessorActivated) with NEW incumbency + AuditPending and the same authority.
+  const humanrootCreated = await scenario.client.createSession({ agent: 'manager' });
+  const humanrootSessionId = getSessionId(humanrootCreated);
+  assert.ok(humanrootSessionId, `humanroot-manager session creation failed: ${JSON.stringify(humanrootCreated)}`);
+  if (!scenario.sessionIds.includes(humanrootSessionId)) scenario.sessionIds.push(humanrootSessionId);
+  bindLaneSession(scenario.provider, humanrootSessionId, 'humanroot-manager');
+
+  const humanrootPrompt = await scenario.client.request('POST', `/session/${humanrootSessionId}/prompt_async`, {
+    body: {
+      parts: [{ type: 'text', text: HUMANROOT_SUCCESSION_CANARY_PROMPT }],
+      agent: 'manager',
+    },
+  });
+  assert.ok(humanrootPrompt.ok, `humanroot-manager prompt failed: ${JSON.stringify(humanrootPrompt.data)}`);
+
+  for (const id of ['humanroot-manager.0', 'humanroot-manager.1', 'humanroot-successor.0', 'humanroot-successor.1']) {
+    await scenario.provider.waitForExpectation(id, WAIT_FACT_WINDOW_MS);
+  }
+  await assertHumanRootManagerSuccession(scenario, humanrootSessionId);
+
+  const linkedBlogger = factPayloads(scenario.host.workDir, 'CompanionBloggerLinked')
+    .filter((payload) => {
+      const text = JSON.stringify(payload ?? {});
+      return text.includes(humanrootSessionId);
+    });
+  if (linkedBlogger.length > 0) {
+    await retireCompanionForDeletion(scenario, humanrootSessionId);
+  }
 };
 
 const awaitManagerJoinRunning = async (scenario, ctx) => {

@@ -2,10 +2,11 @@
 
 ## 生产落点
 
-- `src/Wanxiangshu/Mission/Relay/Retirement/ResourceClosure.fs(.fsi)`：递归资源 blocker projection。
-- `src/Wanxiangshu/Mission/Relay/Retirement/Admission.fs(.fsi)`：freeze-before-check 与 atomic retirement transaction。
-- `src/Wanxiangshu/Mission/Relay/Retirement/Nudge.fs(.fsi)`：normal-terminal causal-frontier decision。
-- `src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs(.fsi)`：exact tool binding 的薄 adapter。
+- `src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs(.fsi)`：exact tool binding、freeze-before-check 与 atomic retirement transaction。
+- `src/Wanxiangshu/Mission/Manager/Workflow.fs(.fsi)`：normal-terminal causal-frontier decision。
+- `src/Wanxiangshu/Mission/Relay/OpenCode/NarrativeTransform.fs(.fsi)`：退休请求拦截与 durable context cut。
+- `src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs`：旧 attempt interrupt 完成后派发正式 successor continuation。
+- `src/Wanxiangshu/Composition/Durable/Fold.fs`：区分单任退休与 HumanRoot Manager Road 完成。
 
 ## 依赖关系
 

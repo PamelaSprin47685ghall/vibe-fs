@@ -738,21 +738,6 @@ module RuntimeSurface =
                        value = null
                        error = error |}
 
-    let closeCompletedHumanRootManager (projection: obj) : obj =
-        match projectionValidation projection with
-        | Error error -> box {| ok = false; error = error |}
-        | Ok() ->
-            let typed = projectionOf projection
-
-            match typed.ActiveLogicalRun with
-            | Some profile when profile.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot ->
-                match
-                    PromptAuthorityRun.closeAuthority profile.LogicalRunId profile.AuthorityRootUserMessageId typed
-                with
-                | Ok closed -> projectionToJs closed
-                | Error _ -> projectionToJs typed
-            | _ -> projectionToJs typed
-
     let closeCompletedAgentOwnerChildWork (logicalRun: string) (authorityRoot: string) (projection: obj) : obj =
         match projectionValidation projection with
         | Error error -> box {| ok = false; error = error |}

@@ -41,11 +41,7 @@ module PromptAuthorityLedger =
                 PromptAuthorityRun.registerAuthority profile projection
                 |> Result.mapError PromptAuthorityRun.describeRegistrationRejection)
 
-    /// The named Logical Run reached a durable terminal boundary.
-    /// FINALITY-022 / INTERACTION-AUTHORITY-018: a completed HumanRoot Manager
-    /// Life releases only the active HumanRoot authority. AgentOwnerRoot sessions
-    /// may continue owner-directed post-Life work (for example publish-conflict
-    /// resumption), so their authority lifetime is not derived from LifeCompleted.
+    /// Road completion closes HumanRoot authority; AgentOwnerRoot closure belongs to its owner.
     let closeCompletedHumanRootManager
         (projection: PromptAuthority.PromptAuthorityProjection)
         : PromptAuthority.PromptAuthorityProjection =

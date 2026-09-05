@@ -5,7 +5,9 @@
 - `src/Wanxiangshu/Mission/Relay/Contract.fs(.fsi)`：Road/Incumbency/phase/port vocabulary。
 - `src/Wanxiangshu/Mission/Relay/Facts.fs(.fsi)`：单 append transaction envelope。
 - `src/Wanxiangshu/Mission/Relay/Fold.fs(.fsi)`：纯 fold，拒绝双 active、retired resurrection、第二 assessment 与 cut 前 successor。
-- `src/Wanxiangshu/Mission/Relay/Workflow.fs(.fsi)`：唯一任期推进 owner。
+- `src/Wanxiangshu/Mission/Manager/Workflow.fs(.fsi)`：任期观测与退出 nudge。
+- `src/Wanxiangshu/Composition/Durable/Fold.fs`：仅质量候选退休关闭 HumanRoot Manager authority；需要 successor 的退休保留 active LogicalRun。
+- `src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs`：retired transform 中断后激活并派发后继；正式 managed chat admission 决定物理接纳。
 
 ## 依赖关系
 
@@ -23,7 +25,7 @@ DEPENDS ON:
 | RELAY-003 | `requirements/relay-incumbency/tests/fold.test.mjs::WHAT[RELAY-003] successor incumbency starts AuditPending after committed retirement` |
 | RELAY-004 | `requirements/relay-incumbency/tests/fold.test.mjs::WHAT[RELAY-004] low-score assessor takes work ownership in place without a new incumbency` |
 | RELAY-005 | `requirements/relay-incumbency/tests/fold.test.mjs::WHAT[RELAY-005] retired incumbent cannot be activated again`；`requirements/relay-incumbency/tests/fold.test.mjs::WHAT[RELAY-005] retired incumbent cannot receive an authority update`；`requirements/relay-incumbency/tests/retired-host-routing.test.mjs::WHAT[RELAY-005] stale retired provider runs stay absorbed across successor activation` |
-| RELAY-006 | `requirements/relay-incumbency/tests/fold.test.mjs::WHAT[RELAY-006] successor requires committed retirement baton and cut` |
+| RELAY-006 | `requirements/relay-incumbency/tests/fold.test.mjs::WHAT[RELAY-006] successor requires committed retirement baton and cut`；`requirements/relay-incumbency/tests/successor-admission.test.mjs::WHAT[RELAY-006] successor-managed admission retains exact LogicalRun across successor-needed retirement` |
 | RELAY-007 | `requirements/relay-retirement/tests/nudge.test.mjs::WHAT[RELAY-007] silent normal terminal schedules an exit nudge instead of ending the incumbency`；`requirements/relay-incumbency/tests/retired-host-routing.test.mjs::WHAT[RELAY-007] manager tool-call intermediate observations wait for idle before ordinary repair` |
 | RELAY-008 | `requirements/relay-incumbency/tests/fold.test.mjs::WHAT[RELAY-008] authority update invalidates a perfect certificate without restoring work ownership`；`requirements/relay-assessment/tests/certificate.test.mjs::WHAT[RELAY-008] certificate invalidation is explicit and never reactivates its assessor` |
 | RELAY-009 | `requirements/relay-incumbency/tests/fold.test.mjs::WHAT[RELAY-009] active authority update advances revision and snapshot exactly once`；`requirements/relay-incumbency/tests/authority-update-host.test.mjs::WHAT[RELAY-009] same-road charge uses exact physical authority admission before durable revision`；`requirements/relay-incumbency/tests/authority-update-host.test.mjs::WHAT[RELAY-009] commission forwards exact caller run and tool identities to authority update` |

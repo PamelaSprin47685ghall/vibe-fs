@@ -53,7 +53,6 @@ module RuntimeSurface =
             string
 
     val closeAuthority: logicalRun: string -> authorityRoot: string -> projection: obj -> obj
-    val closeCompletedHumanRootManager: projection: obj -> obj
     val closeCompletedAgentOwnerChildWork: logicalRun: string -> authorityRoot: string -> projection: obj -> obj
     val resolveKnownOrigin: physical: string -> promptKey: string -> hostCompaction: bool -> projection: obj -> string
     val stableLogicalRunId: hash: (string -> string) -> runtime: string -> session: string -> physical: string -> string

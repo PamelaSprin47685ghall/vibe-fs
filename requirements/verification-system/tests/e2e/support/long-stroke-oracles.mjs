@@ -450,7 +450,7 @@ export function assertNativeReadProbeTimeline(scenario) {
  * Composite oracle for flow `{ custom = "oracleLongStroke" }`.
  * Asserts every §21 adversity class the lean orch-shell flow barriers on.
  */
-export async function oracleLongStroke(scenario, _ctx) {
+export async function oracleLongStroke(scenario, ctx) {
   const workDir = scenario.host.workDir;
   assertJoinWakePath(workDir);
   assertInterruptedJoin(scenario);
@@ -464,6 +464,29 @@ export async function oracleLongStroke(scenario, _ctx) {
   assertSubagentReuse(workDir);
   assertSuccessfulReconciliation(workDir);
   assertNativeReadProbeTimeline(scenario);
+
+  // HumanRoot preflow baseline (2/2/1) is already proven exact before the main
+  // spine; global gte checks above would pass on preflow alone. Preserve their
+  // main-spine meaning by requiring the main Manager road itself to own a
+  // successor request and a quality acceptance, not merely the global journal.
+  const mainManagerId = ctx?.childId ?? null;
+  if (typeof mainManagerId === 'string' && mainManagerId.length > 0) {
+    const mainTransactions = factPayloads(workDir, 'TransactionCommitted')
+      .filter((payload) => JSON.stringify(payload ?? {}).includes(mainManagerId));
+    assert.ok(
+      mainTransactions.length >= 5,
+      `long-stroke: main Manager road must own its Relay transactions (got ${mainTransactions.length})`,
+    );
+    const mainJson = mainTransactions.map((payload) => JSON.stringify(payload ?? {}));
+    assert.ok(
+      mainJson.some((text) => text.includes('SuccessorRequested')),
+      'long-stroke: main Manager road must request a successor (not merely the preflow canary)',
+    );
+    assert.ok(
+      mainJson.some((text) => text.includes('QualityCandidateAccepted') && text.includes('true')),
+      'long-stroke: main Manager road must accept a quality candidate (not merely the preflow canary)',
+    );
+  }
 
   assert.ok(
     journalEventLines(workDir).length >= 1,
@@ -806,6 +829,245 @@ export function assertG6BookkeeperFinalize(scenario) {
     captured >= 1 || named >= 1,
     `G6: InspectorCaseCaptured missing (countFact=${captured} named=${named})`,
   );
+}
+
+export const HUMANROOT_SUCCESSION_CANARY_PROMPT =
+  'HUMANROOT_SUCCESSION_CANARY: run the HumanRoot manager succession check.';
+
+export const HUMANROOT_CANARY_DELTAS = Object.freeze({
+  assessments: 2,
+  retirements: 2,
+  successorActivations: 1,
+});
+
+const relayContextBlocks = (request) => {
+  const out = [];
+  for (const message of request?.messages ?? []) {
+    const content = message?.content;
+    const text = Array.isArray(content)
+      ? content.map((part) => (typeof part === 'string' ? part : part?.text ?? '')).join('\n')
+      : String(content ?? '');
+    if (!text.includes('[RelayContext]')) continue;
+    out.push(text);
+  }
+  return out;
+};
+
+const parseRelayContext = (text) => {
+  const field = (name) => {
+    const match = text.match(new RegExp(`^${name}=(.*)$`, 'm'));
+    return match ? match[1].trim() : null;
+  };
+  return {
+    authorityRevision: field('authority_revision'),
+    incumbencyId: field('incumbency_id'),
+    phase: field('phase'),
+  };
+};
+
+const canaryRequestsFor = (scenario, sessionId) =>
+  (scenario.provider?.requests ?? []).filter((request) => {
+    if ((request?.sessionID ?? request?.sessionId ?? null) !== sessionId) return false;
+    const messages = Array.isArray(request?.messages) ? request.messages : [];
+    return !messages.slice(0, 4).some(
+      (message) => typeof message?.content === 'string' && message.content.startsWith('Generate a title for this conversation:'),
+    );
+  });
+
+const assistantToolCallIds = (requests, tool) => {
+  const ids = [];
+  for (const request of requests) {
+    for (const message of request?.messages ?? []) {
+      if (message?.role !== 'assistant' || !Array.isArray(message?.tool_calls)) continue;
+      for (const call of message.tool_calls) {
+        if ((call?.function?.name ?? call?.name) === tool && typeof call?.id === 'string') {
+          ids.push(call.id);
+        }
+      }
+    }
+  }
+  return ids;
+};
+
+/**
+ * HumanRoot manager succession canary oracle (preFlow, sole serve).
+ *
+ * Proves the production fix for the 2026-09-05 Manager-suicide stall
+ * (`prompt_async failed: Continuation managed intent requires an active logical
+ * run`): Road/Incumbency retirement is NOT LogicalRun completion when
+ * RetirementSummary.SuccessorRequested=true. The physically observed successor
+ * provider request — not the outgoing prompt attempt nor the SuccessorActivated
+ * fact alone — must carry a NEW incumbency_id + AuditPending with the same
+ * original authority request. A SuccessorActivated fact without a matching
+ * provider request is the exact bug shape and fails here as missing managed
+ * admission.
+ *
+ * Surfaces only: strict provider wire (managed admission), durable journal facts,
+ * and causal session idle. No wall delays, no retries, no time-budget growth.
+ */
+export async function assertHumanRootManagerSuccession(scenario, sessionId, label = 'humanroot-succession') {
+  assert.ok(typeof sessionId === 'string' && sessionId.length > 0, `${label}: canary session id required`);
+  const workDir = scenario.host.workDir;
+
+  await awaitNamedFact(workDir, waitFactShape('AssessmentCommitted', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
+  await awaitNamedFact(workDir, waitFactShape('RetirementCommitted', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
+  await awaitNamedFact(workDir, waitFactShape('SuccessorActivated', { eq: 1 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
+
+  for (const id of ['humanroot-manager.0', 'humanroot-manager.1', 'humanroot-successor.0', 'humanroot-successor.1']) {
+    assert.equal(
+      scenario.provider.matchCount(id),
+      1,
+      `${label}: ${id} must be delivered exactly once as a physically observed provider request (missing managed admission, not merely SuccessorActivated)`,
+    );
+  }
+
+  const requests = canaryRequestsFor(scenario, sessionId);
+  assert.equal(
+    requests.length,
+    4,
+    `${label}: expected exactly 4 chat requests on the canary session (got ${requests.length})`,
+  );
+
+  const initialContexts = relayContextBlocks(requests[0]);
+  assert.equal(
+    initialContexts.length,
+    1,
+    `${label}: eager Road opening carries one RelayContext on the first HumanRoot request (got ${initialContexts.length})`,
+  );
+  const initial = parseRelayContext(initialContexts[0]);
+  assert.equal(initial.phase, 'AuditPending', `${label}: first incumbency must start AuditPending (got ${initial.phase})`);
+  assert.ok(initial.incumbencyId && initial.incumbencyId !== 'none', `${label}: initial incumbency_id missing`);
+  assert.ok(initial.authorityRevision && initial.authorityRevision.length > 0, `${label}: initial authority_revision missing`);
+
+  const predecessorContexts = relayContextBlocks(requests[1]);
+  assert.equal(
+    predecessorContexts.length,
+    1,
+    `${label}: predecessor suicide request must carry exactly one RelayContext (got ${predecessorContexts.length})`,
+  );
+  const predecessor = parseRelayContext(predecessorContexts[0]);
+  assert.equal(predecessor.phase, 'WorkOwned', `${label}: low assessment must move predecessor to WorkOwned`);
+  assert.equal(
+    predecessor.incumbencyId,
+    initial.incumbencyId,
+    `${label}: predecessor stays on its incumbency across review then suicide`,
+  );
+  assert.equal(
+    predecessor.authorityRevision,
+    initial.authorityRevision,
+    `${label}: predecessor keeps its authority revision across its incumbency`,
+  );
+
+  const successorFirstContexts = relayContextBlocks(requests[2]);
+  assert.equal(
+    successorFirstContexts.length,
+    1,
+    `${label}: successor audit request must carry exactly one RelayContext (missing managed admission if absent)`,
+  );
+  const successorFirst = parseRelayContext(successorFirstContexts[0]);
+  assert.notEqual(
+    successorFirst.incumbencyId,
+    predecessor.incumbencyId,
+    `${label}: successor must carry a NEW incumbency_id (got same ${successorFirst.incumbencyId})`,
+  );
+  assert.equal(
+    successorFirst.phase,
+    'AuditPending',
+    `${label}: fresh successor incumbency must start AuditPending (got ${successorFirst.phase})`,
+  );
+  assert.equal(
+    successorFirst.authorityRevision,
+    initial.authorityRevision,
+    `${label}: successor must keep the same original authority request (authority_revision ${initial.authorityRevision} vs ${successorFirst.authorityRevision})`,
+  );
+
+  const successorSecondContexts = relayContextBlocks(requests[3]);
+  assert.equal(
+    successorSecondContexts.length,
+    1,
+    `${label}: successor retire request must carry exactly one RelayContext`,
+  );
+  const successorSecond = parseRelayContext(successorSecondContexts[0]);
+  assert.equal(
+    successorSecond.incumbencyId,
+    successorFirst.incumbencyId,
+    `${label}: successor retire must stay on the successor incumbency (not a third incumbency)`,
+  );
+  assert.equal(
+    successorSecond.authorityRevision,
+    initial.authorityRevision,
+    `${label}: successor retire must keep the same original authority request`,
+  );
+
+  const wireText = (request) => JSON.stringify(request?.messages ?? []);
+  assert.ok(
+    wireText(requests[2]).includes(HUMANROOT_SUCCESSION_CANARY_PROMPT),
+    `${label}: successor request must still carry the original HumanRoot authority request text (projection cut must preserve authority)`,
+  );
+  assert.ok(
+    wireText(requests[3]).includes(HUMANROOT_SUCCESSION_CANARY_PROMPT),
+    `${label}: successor retire request must still carry the original HumanRoot authority request text`,
+  );
+
+  const predecessorReviewIds = assistantToolCallIds([requests[1]], 'review');
+  assert.equal(
+    predecessorReviewIds.length,
+    1,
+    `${label}: predecessor suicide prompt must carry exactly the predecessor review call (got ${predecessorReviewIds.length})`,
+  );
+  for (const request of [requests[2], requests[3]]) {
+    assert.equal(
+      request.messages.some((message) =>
+        message.tool_call_id === predecessorReviewIds[0]
+        || message.tool_calls?.some((call) => call.id === predecessorReviewIds[0])),
+      false,
+      `${label}: successor must exclude the predecessor review call/result; baton evidence references remain legal`,
+    );
+  }
+
+  const canaryRetirements = factPayloads(workDir, 'RetirementCommitted')
+    .filter((payload) => {
+      const road = payload?.Baton?.RoadId ?? payload?.Baton?.roadId ?? null;
+      const roadStr = typeof road === 'string' ? road : road?.value ?? null;
+      return roadStr === sessionId;
+    });
+  assert.equal(
+    canaryRetirements.length,
+    2,
+    `${label}: canary road must own exactly two retirements (got ${canaryRetirements.length})`,
+  );
+  assert.ok(
+    canaryRetirements.some((payload) => payload?.SuccessorRequested === true && payload?.QualityCandidateAccepted === false),
+    `${label}: predecessor retirement must request a successor without accepting a candidate`,
+  );
+  assert.ok(
+    canaryRetirements.some((payload) => payload?.SuccessorRequested === false && payload?.QualityCandidateAccepted === true),
+    `${label}: successor retirement must accept the quality candidate without requesting a further successor`,
+  );
+
+  assert.equal(
+    countFactCase(workDir, 'AssessmentCommitted'),
+    HUMANROOT_CANARY_DELTAS.assessments,
+    `${label}: preflow must contribute exactly ${HUMANROOT_CANARY_DELTAS.assessments} AssessmentCommitted before the main spine`,
+  );
+  assert.equal(
+    countFactCase(workDir, 'RetirementCommitted'),
+    HUMANROOT_CANARY_DELTAS.retirements,
+    `${label}: preflow must contribute exactly ${HUMANROOT_CANARY_DELTAS.retirements} RetirementCommitted before the main spine`,
+  );
+  assert.equal(
+    countFactCase(workDir, 'SuccessorActivated'),
+    HUMANROOT_CANARY_DELTAS.successorActivations,
+    `${label}: preflow must contribute exactly ${HUMANROOT_CANARY_DELTAS.successorActivations} SuccessorActivated before the main spine`,
+  );
+  assert.equal(
+    countFactCase(workDir, 'ManagerJobCreated'),
+    0,
+    `${label}: direct HumanRoot canary must not mint a ManagerJob (main spine owns the single ManagerJobCreated)`,
+  );
+
+  const settled = await awaitSessionSettled(scenario, sessionId, WAIT_FACT_WINDOW_MS);
+  assert.equal(settled, true, `${label}: canary session must settle to idle via causal host events`);
 }
 
 export const CUSTOMS = {

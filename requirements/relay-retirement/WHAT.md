@@ -28,6 +28,6 @@ provider/network failure 先由 ExecutionFailurePolicy 结算；只有恢复出�
 
 成功 retirement 必须在同一 durable transaction 中记录离场 snapshot、IncumbencyRetired、BatonPrepared、ProjectionCutRecorded 以及 SuccessorRequested 或 QualityCandidateAccepted。崩溃恢复不得看到永久的“已退休但无 baton/cut”状态。
 
-## RETIRE-008: retirement 不做 session 级物理 abort
+## RETIRE-008: 退休工具返回与后继派发之间建立物理中断边界
 
-suicide 提交 durable retirement 后不得调用 session 级 `InterruptAttempt`/`AbortSession`。这类 abort 只能命名 session，不能命名 retired run；Host 在不可观测的延迟后才真正执行，而 successor 复用同一物理 SessionId，迟到的 kill 会落进后任 run 的 tool body 中间并杀死它。已退休 run 的后续 provider 请求在 transform 钩子按 exact 身份拒绝：每个 provider 请求都经过 transform，退休 run 的延续请求在那里被拦下，run 自然结束；后继 prompt 与后继 run 持有正式 gate 身份，不受影响。已退休输出的 containment 只靠 durable cut（`StaleProviderRunIds` 吸收迟到 parts）与 Retired phase tool denial。
+suicide 工具体只提交 durable retirement 并返回结果，不调用 session 级 `InterruptAttempt`/`AbortSession`。退休 run 的后续 provider 请求在 transform 钩子按退休边界与正式 successor gate 身份拦截；先等待旧 attempt 的 Host interrupt 完成，再派发后继，旧 transform 的消息清空。successor 复用同一物理 SessionId，因此禁止在其派发后补发针对前任的 session abort。已退休输出由 durable cut（`StaleProviderRunIds` 吸收迟到 parts）与 Retired phase tool denial 隔离；接任不能复活前任，也不能结束承载 Road 的 active authority。

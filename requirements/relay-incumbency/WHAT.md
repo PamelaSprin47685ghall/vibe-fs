@@ -22,7 +22,7 @@ IncumbencyRetired 一旦 committed，任何 replay、provider recovery、rebase�
 
 ## RELAY-006: successor 依赖完整退休边界
 
-SuccessorActivated 只能发生在 predecessor retirement、机器生成 baton 与 projection cut 均 durable 之后。物理 SessionId 可以复用，但逻辑 IncumbencyId 与 provider context 必须重开。
+SuccessorActivated 只能发生在 predecessor retirement、机器生成 baton 与 projection cut 均 durable 之后。物理 SessionId 可以复用，但逻辑 IncumbencyId 与 provider context 必须重开。需要 successor 的退休不得关闭承载 Road 的 ActiveLogicalRun；后继 continuation 必须通过正式 managed chat admission，继承同一 LogicalRun、AuthorityRoot 与 identity evidence。SuccessorActivated 或 transport receipt 单独出现不构成后继已执行的证据。
 
 ## RELAY-007: normal stop 不是任期终态
 

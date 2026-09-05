@@ -29,13 +29,13 @@ module Fold =
     let private reject = FoldRejection.reject
 
     let private settlePromptAuthority events authorityOpt =
-        let hasRetirement =
+        let completesRoad =
             events
             |> List.exists (function
-                | RelayEvent.RetirementCommitted _ -> true
+                | RelayEvent.RetirementCommitted retirement -> retirement.QualityCandidateAccepted
                 | _ -> false)
 
-        if hasRetirement then
+        if completesRoad then
             authorityOpt
             |> Option.map Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.closeCompletedHumanRootManager
         else

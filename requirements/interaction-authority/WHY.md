@@ -16,11 +16,12 @@
 
 - **PhysicalUserMessage ≠ AuthorityTurn**：物理层消息必须经由显式、受控的提升函数在物理落地证明后才能升级为 AuthorityRoot；若破坏，任意中间件即可劫持会话权限。
 - **Continuation 严格受限**：Continuation 必须继承既有 Root 权威，禁止新建 RunId、修改 SelectedAgent 或重置 Fallback 预算；若破坏，自动修复会无限死循环。
+- **任期退出不等于授权结束**：Manager 的非满分退休只移交 Incumbency，不终结承载整条 Road 的 LogicalRun。提前清空 active authority 会使后继被正式 admission 拒绝；读取历史 profile 不能修复已经关闭的授权。
 - **Admission ≠ Outcome**：repair claim 只证明一次自动修复已获准进入物理执行，不证明该修复已经返回、更不证明它失败。若把“已 claim”直接解释成“已耗尽”，同一 repair 在飞行期间的合法 idle/reconcile 竞态会把仍在生成的有效结果提前判死。
 - **Root acceptance 与 identity installation 是同一 durable fact**：`AuthorityRootAccepted` 必须携带 participant-identity owner 准备的完整 evidence；拆成两个 append 会在 crash cut 留下无 root、无 closure source 的孤儿 identity。
 - **原子 Profile 不可拼装**：执行 profile 必须携带 accepted root 内的版本化 identity evidence，禁止从历史消息、Session cache、物理 parent 或 agent 名称动态拼凑。
 - **证据保管不等于身份所有权**：本包持久化并精确暴露 identity evidence，以便重放与审计；stable SelectedAgent、Role、Persona 与 provenance/version 的解析、不可变性及替换规则仍只属于 `participant-identity`。当前 EffectiveAgent/provider/model/lease 只属于 execution binding。
-- **物理 Session 不等于 logical run**：authority profile 与 identity evidence 都以 exact logical run 为作用域；每种 HumanRoot/AgentOwnerRoot lifecycle 必须先收敛为 exact durable `AuthorityLogicalRunClosed`，SessionId 才可复用。idle/timeout 与物理 topology 不是 closure。
+- **物理 Session 不等于 logical run**：authority profile 与 identity evidence 都以 exact logical run 为作用域；每种 HumanRoot/AgentOwnerRoot lifecycle 必须先收敛为 exact durable closure，SessionId 才可承载新授权。idle/timeout 与物理 topology 不是 closure。
 
 ## DEPENDS ON
 
