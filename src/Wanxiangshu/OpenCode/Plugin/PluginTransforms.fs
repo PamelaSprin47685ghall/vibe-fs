@@ -328,7 +328,7 @@ module PluginTransforms =
                     ProviderRunIdentity.create retirement.ProjectionCut.ThroughProviderRunId
 
                 let! _ =
-                    HostSessionNudge.trySendGateContinuationPhysical
+                    HostSessionNudge.trySendGateContinuation
                         sessionPort
                         host.RootWorkspace
                         sessionId
@@ -377,12 +377,12 @@ module PluginTransforms =
             fun sidOpt outObj ->
                 task {
                     do! ensureManagerRoadOpened sidOpt None
-                    do! maybeDeliverSuccessor sidOpt
 
                     do!
                         RelayNarrativeTransform.apply journal (fun sid ->
                             task {
                                 let! _ = sessionPort.InterruptAttempt sid
+                                do! maybeDeliverSuccessor (Some(SessionId.value sid))
                                 return ()
                             }) sidOpt outObj
                 }

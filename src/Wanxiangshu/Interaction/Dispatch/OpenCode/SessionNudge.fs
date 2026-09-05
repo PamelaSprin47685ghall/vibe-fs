@@ -26,7 +26,9 @@ module HostSessionNudge =
     let tryActiveProfile (journal: AgentJournal option) (sessionId: SessionId) =
         journal
         |> Option.bind (fun j ->
-            PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot j).AgentProjections)
+            let projections = (AgentJournal.snapshot j).AgentProjections
+            PromptAuthorityLedger.activeProfile sessionId projections
+            |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections))
 
     /// Look up the agent the current cursor selects.
     ///
