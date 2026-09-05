@@ -69,7 +69,8 @@ type InjectedSessionPort
     (
         underlyingPort: IOpenCodePort option,
         eventPort: IEventObservationPort,
-        ?familyParent: SessionId -> SessionId option
+        ?familyParent: SessionId -> SessionId option,
+        ?isLifecycleTerminated: SessionId -> bool
     ) =
     // DSL-MUTABLE: resource — active terminal listener registry per session
     let activeListeners = Dictionary<SessionId, HashSet<Guid>>()
@@ -362,8 +363,9 @@ type InjectedSessionPort
             else
                 sendRoutedPrompt sessionId text opts
 
-        member _.InterruptAttempt(sessionId) =
-            if not (managedChild sessionId) then
+        member _.InterruptAttempt sessionId =
+            let terminated = isLifecycleTerminated |> Option.exists (fun check -> check sessionId)
+            if not (managedChild sessionId) && not terminated then
                 Task.FromResult(
                     Error "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user"
                 )

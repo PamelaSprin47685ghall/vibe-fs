@@ -16,8 +16,10 @@ open Wanxiangshu.Execution.Delegation.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session.OpenCode
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Obligation.Todo.OpenCode
 open Wanxiangshu.Persistence.EventStore
@@ -148,7 +150,18 @@ module PluginHostWiring =
                           CausalWaitObserver = causalWait.Observer }
                 }
 
-            match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent) with
+            let isLifecycleTerminated (sessionId: SessionId) =
+                match boot.Journal with
+                | None -> false
+                | Some durable ->
+                    let snapshot = AgentJournal.snapshot durable
+                    AgentProjection.tryFind sessionId snapshot.AgentProjections
+                    |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
+                    |> Option.bind (fun (r: RelayState) -> Fold.view r (RoadId.create (SessionId.value sessionId)))
+                    |> Option.bind (fun road -> road.LatestRetirement)
+                    |> Option.isSome
+
+            match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent) (Some isLifecycleTerminated) with
             | Error err -> return raise (InvalidOperationException err)
             | Ok(eventPort, sessionPort, snapshotOpt, terminalKey, sharedTerminalPort) ->
                 return! completeHost eventPort sessionPort snapshotOpt terminalKey sharedTerminalPort

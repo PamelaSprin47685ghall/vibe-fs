@@ -195,6 +195,7 @@ module RelayNarrativeTransform =
             match road.LatestRetirement with
             | Some retirement when not (successorGateAdmitted journal sessionId retirement) ->
                 do! interruptAttempt sessionId
+                HostMessageProjection.replaceMessagesInPlace outObj []
             | _ ->
                 let authorityMessageIds =
                     road.AuthorityMessageIds |> List.map PhysicalUserMessageId.value |> Set.ofList

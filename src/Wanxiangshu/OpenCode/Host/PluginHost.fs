@@ -93,6 +93,7 @@ module PluginHost =
         (input: obj)
         (portOpt: IOpenCodePort option)
         (familyParent: (SessionId -> SessionId option) option)
+        (isLifecycleTerminated: (SessionId -> bool) option)
         : Result<
               IEventObservationPort *
               ISessionHostPort *
@@ -115,7 +116,7 @@ module PluginHost =
         let eventPort = hostEventPort :> IEventObservationPort
 
         let sessionPort =
-            InjectedSessionPort(portOpt, eventPort, ?familyParent = familyParent) :> ISessionHostPort
+            InjectedSessionPort(portOpt, eventPort, ?familyParent = familyParent, ?isLifecycleTerminated = isLifecycleTerminated) :> ISessionHostPort
 
         let snapshotPort = SessionSnapshotPort.create input
         Ok(eventPort, sessionPort, snapshotPort, terminalKey, Some hostEventPort)

@@ -62,7 +62,7 @@ Agent 子会话的 handle 即为其运行时的 Agent ID，重启后必须保证
 
 ## MANAGED-SESSION-016: Attempt Interrupt 与 Logical Cancel 权限分离
 
-内部控制机制仅有权请求中断子会话当前的物理尝试（attempt interrupt），无权触发逻辑会话取消或级联销毁，且绝对禁止主动中断根会话。
+内部控制机制仅有权请求中断子会话当前的物理尝试（attempt interrupt），无权触发逻辑会话取消或级联销毁。在会话正常生命周期内部，禁止任何自动化机制主动中断用户根会话；但 suicide 属于生命周期终止，当当前任期已 committed 退休时，打断已退役 run 残余尝试受退役事实授权，不受根会话内部中断限制。
 
 ## MANAGED-SESSION-017: 内部 Interrupt 必须闭合 Successor 与 Parent Wake
 

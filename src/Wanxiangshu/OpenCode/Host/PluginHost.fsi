@@ -20,6 +20,7 @@ module PluginHost =
         input: obj ->
         portOpt: IOpenCodePort option ->
         familyParent: (SessionId -> SessionId option) option ->
+        isLifecycleTerminated: (SessionId -> bool) option ->
             Result<
                 IEventObservationPort *
                 ISessionHostPort *

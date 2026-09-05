@@ -313,6 +313,60 @@ module PluginTransforms =
                     do! commitOpeningTransaction durable sessionId providerRunIdOpt roadId events
             }
 
+        let buildSuccessorEvents roadId retirementId snapshot authorityRevision =
+            let successorIncumbent =
+                HostDigest.sha256Hex ("successor-v1\n" + RetirementId.value retirementId)
+                |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
+            [ RelayEvent.SuccessorRequested(retirementId, "IndependentAssessmentRequired")
+              RelayEvent.SuccessorActivated(retirementId, successorIncumbent, snapshot, authorityRevision) ]
+
+        let deliverSuccessorPrompt (durable: AgentJournal) sessionId retirement =
+            task {
+                let successorPromptText =
+                    ProviderProse.documentFor sessionId "runtime/relay-successor" Map.empty
+                let terminalRun =
+                    ProviderRunIdentity.create retirement.ProjectionCut.ThroughProviderRunId
+
+                let! _ =
+                    HostSessionNudge.trySendGateContinuationPhysical
+                        sessionPort
+                        host.RootWorkspace
+                        sessionId
+                        successorPromptText
+                        PromptAuthority.ContinuationKind.ManagerGuard
+                        workspaceDirectory
+                        (Some durable)
+                        (RelaySuccessorGate.gateKind retirement.Id)
+                        terminalRun
+                return ()
+            }
+
+        let maybeDeliverSuccessor sessionIdTextOpt =
+            task {
+                let contextOpt =
+                    match sessionIdTextOpt, journal with
+                    | Some sidText, Some durable when not (String.IsNullOrWhiteSpace sidText) ->
+                        let sessionId = SessionId.create sidText
+                        let roadId = RoadId.create sidText
+                        let snapshot = AgentJournal.snapshot durable
+                        AgentProjection.tryFind sessionId snapshot.AgentProjections
+                        |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
+                        |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
+                        |> Option.bind (fun road ->
+                            road.LatestRetirement
+                            |> Option.filter (fun ret -> ret.SuccessorRequested && road.ActiveIncumbency.IsNone)
+                            |> Option.map (fun ret -> durable, sessionId, roadId, road.AuthorityRevision, ret))
+                    | _ -> None
+
+                match contextOpt with
+                | Some(durable, sessionId, roadId, authorityRevision, retirement) ->
+                    let snapshot = tryCaptureSnapshot workspaceDirectory
+                    let events = buildSuccessorEvents roadId retirement.Id snapshot authorityRevision
+                    do! commitOpeningTransaction durable sessionId None roadId events
+                    do! deliverSuccessorPrompt durable sessionId retirement
+                | None -> return ()
+            }
+
         { BeginPhysicalProviderAttempt =
             SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
                 scope.Sessions.Quiescence.BeginProviderAttempt
@@ -323,6 +377,7 @@ module PluginTransforms =
             fun sidOpt outObj ->
                 task {
                     do! ensureManagerRoadOpened sidOpt None
+                    do! maybeDeliverSuccessor sidOpt
 
                     do!
                         RelayNarrativeTransform.apply journal (fun sid ->
