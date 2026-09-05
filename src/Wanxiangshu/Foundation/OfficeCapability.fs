@@ -48,15 +48,12 @@ module OfficeCapability =
         match role with
         | Role.Manager ->
             set
-                [ ToolPermission.Read
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.ReviewAssessment
-                  ToolPermission.Fork
+                [ ToolPermission.Fork
                   ToolPermission.Join
                   ToolPermission.Horizon
                   ToolPermission.TodoWrite
                   ToolPermission.Fission
+                  ToolPermission.ReviewAssessment
                   ToolPermission.Finality ]
         | Role.Orchestrator -> set [ ToolPermission.Fork; ToolPermission.Join; ToolPermission.Horizon ]
         | Role.Coder ->
@@ -113,13 +110,10 @@ module OfficeCapability =
             permissions Role.Manager
         | ManagerCapabilityPhase.PerfectAwaitingRetirement ->
             set
-                [ ToolPermission.Read
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Join
+                [ ToolPermission.Join
                   ToolPermission.Finality ]
         | ManagerCapabilityPhase.RetirementCleanupBlocked ->
-            set [ ToolPermission.Read; ToolPermission.Join; ToolPermission.Finality ]
+            set [ ToolPermission.Join; ToolPermission.Finality ]
         | ManagerCapabilityPhase.Retired -> Set.empty
 
     let permissionsForPhase role phase =

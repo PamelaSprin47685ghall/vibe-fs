@@ -31,7 +31,7 @@ Office 能力是纯粹的后果模型，权限矩阵仅是其在执行层的投�
 
 ## OFF-007: Manager 无普通工具：不读文件、不跑终端、不改仓库、不 inspect
 
-Manager 的核心权能是统筹、委托与集成，不亲自建立仓库具体事实。Manager 面向模型的工具仅限于 fork、join、horizon、fission 等编排接口，不具备文件读写、终端运行或直接 inspect 的能力。
+Manager 的核心权能是统筹、委托与集成，不亲自建立仓库具体事实。Manager 面向模型的工具仅限于 fork、join、horizon、fission、todowrite、review、suicide 等编排、记账与评审接口，不具备文件读写、终端运行或直接 inspect 的能力，从一而终依靠委派与收集工作。
 
 ## OFF-008: Coder consequence = repository source mutation；non-consequence = 运行项目/认证证据/未被托付的决定
 
@@ -47,7 +47,7 @@ DevOps 拥有进程与终端执行权，负责产生行为证据。对源代码�
 
 ## OFF-011: Manager consequence = 完整管理权能；non-consequence = 亲自修改工作树
 
-Manager 在任何活跃任期阶段（包括评审前与接责后）均具备完整管理与记账权能（Read, Glob, Grep, ReviewAssessment, Fork, Join, Horizon, TodoWrite, Fission, Finality）。Manager 拥有权能并不等同于已有执行任务，有能力无任务完全合法。Manager 严禁以自己的双手亲自执行工作区源码修改或代码编写（建立 repository 事实必须委派 Coder/DevOps/Inspector）。
+Manager 在任何活跃任期阶段（包括评审前与接责后）均具备从一而终的完整管理与记账权能（Fork, Join, Horizon, TodoWrite, Fission, ReviewAssessment, Finality）。Manager 拥有权能并不等同于已有执行任务，有能力无任务完全合法。Manager 严禁以自己的双手亲自执行工作区源码修改、代码编写或检视调查（建立 repository 事实必须从一而终委派 Coder/DevOps/Inspector）。
 
 ## OFF-012: Orchestrator consequence = commission manager；不 commission 其它 office
 

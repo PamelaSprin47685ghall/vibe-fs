@@ -31,7 +31,7 @@ const PLUGIN_TOOL_NAMES = [
   'join', 'horizon', 'fission', 'review', 'suicide', 'run', 'query-shell', 'inspect',
   'establish-behavior', 'repair-behavior', 'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
   'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
-  'js-browser', 'js-coder', 'js-devops', 'js-inspector', 'js-manager',
+  'js-browser', 'js-coder', 'js-devops', 'js-inspector',
 ]
 
 const HOST_OWNED_TOOL_NAMES = [
@@ -42,7 +42,7 @@ const ROLE_NAMES = ['orchestrator', 'manager', 'coder', 'inspector', 'devops', '
 const COGNITIVE_TOOLS = ['enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret']
 const ALLOWED = {
   orchestrator: ['commission', 'join', 'horizon', 'assume', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'read', 'glob', 'grep', 'review', 'assume', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'review', 'assume', ...COGNITIVE_TOOLS],
   coder: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', ...COGNITIVE_TOOLS],
   inspector: ['fission', 'read', 'glob', 'grep', 'query-shell', 'fetch', 'assume', ...COGNITIVE_TOOLS],
   devops: ['join', 'horizon', 'read', 'glob', 'grep', 'inspect', 'run', 'establish-behavior', 'repair-behavior', 'assume', ...COGNITIVE_TOOLS],

@@ -484,7 +484,7 @@ user = "# The account is not yet ready to entrust."
 id = "manager-audit"
 lane = "manager"
 user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept the assessment obligation then retire so publish can proceed."
-tools = ["read", "glob", "grep", "fork", "join", "horizon", "review", "suicide"]
+tools = ["fork", "join", "horizon", "review", "suicide"]
 
   [[turn.step]]
   runtimeStep = 0
@@ -618,7 +618,7 @@ tools = ["join", "todowrite", "suicide"]
 id = "successor"
 internal = true
 user = "# The previous Manager incumbency is retired. You are the new Manager for the same user Road."
-tools = ["read", "glob", "grep", "fork", "join", "horizon", "review", "suicide"]
+tools = ["fork", "join", "horizon", "review", "suicide"]
 
   # The causal binder makes delivery #1 and #3 perfect, delivery #2 low.
   [[turn.step]]
