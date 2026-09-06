@@ -259,29 +259,31 @@ module PluginHostInterop =
     let internal interpretHookFailure outcome =
         let decision = policyDecision outcome
 
-        match decision.Retry, decision.Fallback, decision.Breaker with
-        | RetryDecision.NoRetry, FallbackDecision.NoFallback, BreakerDecision.NoBreakerTransition -> ()
-        | RetryDecision.NoRetry, FallbackDecision.NoFallback, BreakerDecision.RecordProviderTransientFailure
-        | RetryDecision.NoRetry, FallbackDecision.NoFallback, BreakerDecision.RecordProviderPermanentFailure
-        | RetryDecision.NoRetry, FallbackDecision.AdvanceFallback _, _
-        | RetryDecision.RetryFreshAttempt _, FallbackDecision.NoFallback, _
-        | RetryDecision.RetryFreshAttempt _, FallbackDecision.AdvanceFallback _, _ ->
+        match decision.Resolution, decision.Breaker with
+        | (ExecutionFailureResolution.PreserveCurrentFact | ExecutionFailureResolution.AwaitAcceptanceReconciliation _ | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _ | ExecutionFailureResolution.TerminalizeProviderStarted _),
+          BreakerDecision.NoBreakerTransition -> ()
+        | ExecutionFailureResolution.RetryFreshAttempt _, _
+        | ExecutionFailureResolution.AdvanceFallback _, _
+        | _, BreakerDecision.RecordProviderTransientFailure
+        | _, BreakerDecision.RecordProviderPermanentFailure ->
             invalidOp "hook membrane cannot own provider retry, fallback, or breaker transitions"
 
         let decisionStillRequiresSettlement =
-            match decision.CapacitySettlement, decision.MessageDisposition with
-            | CapacitySettlement.NoCapacitySettlement, MessageDisposition.KeepCurrentFact
-            | CapacitySettlement.NoCapacitySettlement, MessageDisposition.AwaitAcceptanceReconciliation _
-            | CapacitySettlement.RetainExactFence _, MessageDisposition.KeepCurrentFact
-            | CapacitySettlement.RetainExactFence _, MessageDisposition.AwaitAcceptanceReconciliation _ -> false
-            | CapacitySettlement.NoCapacitySettlement, MessageDisposition.TerminalizeAcceptedPreProvider _
-            | CapacitySettlement.NoCapacitySettlement, MessageDisposition.TerminalizeProviderStarted _
-            | CapacitySettlement.RetainExactFence _, MessageDisposition.TerminalizeAcceptedPreProvider _
-            | CapacitySettlement.RetainExactFence _, MessageDisposition.TerminalizeProviderStarted _
-            | CapacitySettlement.ReleaseExactFence _, MessageDisposition.KeepCurrentFact
-            | CapacitySettlement.ReleaseExactFence _, MessageDisposition.TerminalizeAcceptedPreProvider _
-            | CapacitySettlement.ReleaseExactFence _, MessageDisposition.TerminalizeProviderStarted _
-            | CapacitySettlement.ReleaseExactFence _, MessageDisposition.AwaitAcceptanceReconciliation _ -> true
+            match decision.CapacitySettlement, decision.Resolution with
+            | CapacitySettlement.NoCapacitySettlement, ExecutionFailureResolution.PreserveCurrentFact
+            | CapacitySettlement.NoCapacitySettlement, ExecutionFailureResolution.AwaitAcceptanceReconciliation _
+            | CapacitySettlement.RetainExactFence _, ExecutionFailureResolution.PreserveCurrentFact
+            | CapacitySettlement.RetainExactFence _, ExecutionFailureResolution.AwaitAcceptanceReconciliation _ -> false
+            | CapacitySettlement.NoCapacitySettlement, ExecutionFailureResolution.TerminalizeAcceptedPreProvider _
+            | CapacitySettlement.NoCapacitySettlement, ExecutionFailureResolution.TerminalizeProviderStarted _
+            | CapacitySettlement.RetainExactFence _, ExecutionFailureResolution.TerminalizeAcceptedPreProvider _
+            | CapacitySettlement.RetainExactFence _, ExecutionFailureResolution.TerminalizeProviderStarted _
+            | CapacitySettlement.ReleaseExactFence _, ExecutionFailureResolution.PreserveCurrentFact
+            | CapacitySettlement.ReleaseExactFence _, ExecutionFailureResolution.TerminalizeAcceptedPreProvider _
+            | CapacitySettlement.ReleaseExactFence _, ExecutionFailureResolution.TerminalizeProviderStarted _
+            | CapacitySettlement.ReleaseExactFence _, ExecutionFailureResolution.AwaitAcceptanceReconciliation _
+            | _, ExecutionFailureResolution.RetryFreshAttempt _
+            | _, ExecutionFailureResolution.AdvanceFallback _ -> true
 
         match decision.Fatality, outcome.Settlement, decisionStillRequiresSettlement with
         | FatalityDecision.NoFatality, _, _ -> HookFailurePolicy.RethrowUnchanged

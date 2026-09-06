@@ -42,6 +42,7 @@ module ModelRoutingSurface =
     val endProviderStep:
         runtime: obj -> sessionId: string -> physicalUserMessageId: string -> providerRun: string -> unit
 
+    val takeProviderRunTarget: runtime: obj -> providerRun: string -> obj
     val suppressProviderStep: runtime: obj -> sessionId: string -> physicalUserMessageId: string -> unit
     val snapshotOccupied: runtime: obj -> obj array
     val capacitySnapshot: runtime: obj -> obj

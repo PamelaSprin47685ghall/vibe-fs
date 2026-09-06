@@ -516,7 +516,7 @@ module CursorSurface =
         match outcome with
         | ConfirmedFailureOutcome.RecoveryAdvanced _ -> "Advanced"
         | ConfirmedFailureOutcome.RecoveryExhausted -> "Exhausted"
-        | ConfirmedFailureOutcome.AlreadyRecorded -> "AlreadyRecorded"
+        | ConfirmedFailureOutcome.EpisodeSuperseded -> "EpisodeSuperseded"
         | ConfirmedFailureOutcome.NoActiveRun -> "NoActiveRun"
 
     /// Record one confirmed provider failure through the production ledger using
@@ -561,10 +561,15 @@ module CursorSurface =
                                   FallbackBudget = available
                                   Breaker = ProviderBreakerState.Closed } }
 
-                    match decision.Fallback with
-                    | FallbackDecision.AdvanceFallback authorization ->
+                    match decision.Resolution with
+                    | ExecutionFailureResolution.RetryFreshAttempt authorization
+                    | ExecutionFailureResolution.AdvanceFallback authorization ->
                         FallbackLedger.recordAuthorizedFailure handle.Journal sessionId authorization reason
-                    | FallbackDecision.NoFallback -> Task.FromResult(Ok ConfirmedFailureOutcome.AlreadyRecorded)
+                    | ExecutionFailureResolution.PreserveCurrentFact
+                    | ExecutionFailureResolution.AwaitAcceptanceReconciliation _
+                    | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _
+                    | ExecutionFailureResolution.TerminalizeProviderStarted _ ->
+                        Task.FromResult(Ok ConfirmedFailureOutcome.RecoveryExhausted)
 
             return
                 match result with

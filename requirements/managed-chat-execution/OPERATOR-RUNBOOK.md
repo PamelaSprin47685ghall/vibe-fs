@@ -17,11 +17,11 @@ All imports below are compiled, registered `dist` surfaces. Use exact `(sessionI
 | Live admission | `ModelRoutingSurface.admissionSnapshot(routingRuntime, sessionId, physicalUserMessageId)` | active capacity, pending admissions, exact provider binding count |
 | Capacity, queue, fences | `OpenCode/Host/ModelRoutingSurface.js`: `sharedCapacitySnapshot()`; isolated runtime: `capacitySnapshot(runtime)` | ledger/tokens/custodies/executions/waiters/owners/lineage, token-state and active counts, duplicate/stale/conflict counters |
 | Capacity consistency | `ModelRoutingSurface.reconcileCapacityEvidence(snapshot)` | immutable `NoOp` or typed `FailClosed` reasons; never repairs the snapshot |
-| Failure policy | `Execution/Failure/Surface.js`: `decide(typedFailureInput)` | typed retry, fallback, breaker, capacity settlement, message disposition and fatality decision |
+| Failure policy | `Execution/Failure/Surface.js`: `decide(typedFailureInput)` | one exclusive resolution plus orthogonal breaker, capacity settlement, and fatality decisions |
 | Causal record | `OpenCode/Host/ReliabilityDiagnosticsSurface.js`: `projectRecord(record)` | immutable redacted record; unknown schema fields fail |
 | Reliability summary | `ReliabilityDiagnosticsSurface.queryReliability(counters, canonicalExecutions, capacitySnapshot, recoveryOwnershipSnapshot)` | canonical lifecycle, queue/fence and typed recovery ownership counts; read-only |
 | Recovery representation | `Execution/Session/ChatExecution/RecoveryRuntimeSurface.js`: `recoverScenarios([scenario])` | typed decisions and append-only owner-port invocation trace; proof representation only |
-| Supported Host contract | `requirements/host-boundary/fixtures/opencode-chat-admission-1.18.18.json` | exact OpenCode/plugin `1.18.18`, public hooks/order and terminal evidence |
+| Supported Host contract | `requirements/host-boundary/fixtures/opencode-chat-admission-1.18.29.json` | exact OpenCode/plugin `1.18.29`, public hooks/order and terminal evidence |
 
 Re-observe the installed public Host contract:
 

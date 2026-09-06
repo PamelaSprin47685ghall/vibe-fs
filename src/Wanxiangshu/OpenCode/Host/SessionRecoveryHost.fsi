@@ -8,8 +8,7 @@ open Wanxiangshu.Persistence.Journal
 /// Optional Host capability bound to exact already-accepted physical material.
 /// Absence is not permission to create a replacement PromptClaim or resend text.
 type ExactAcceptedMessageRecoveryPort =
-    { ResumeAccepted: PreProviderResumeRequest -> Task<bool>
-      RequeueAuthorized: ProviderRequeueRequest -> Task<bool> }
+    { ResumeAccepted: PreProviderResumeRequest -> Task<bool> }
 
 type SessionRecoveryHost =
     new:

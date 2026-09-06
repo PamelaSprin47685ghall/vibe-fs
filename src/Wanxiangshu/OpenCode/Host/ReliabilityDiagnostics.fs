@@ -44,8 +44,7 @@ type CausalDiagnosticRecord =
       ProviderRequestKind: ProviderRequestKind option
       Transition: DiagnosticStateTransition
       FailureClass: ExecutionFailure option
-      RetryDecision: RetryDecision option
-      FallbackDecision: FallbackDecision option
+      Resolution: ExecutionFailureResolution option
       CapacityState: DiagnosticCapacityState option
       CapacityFence: string option
       Hook: string option

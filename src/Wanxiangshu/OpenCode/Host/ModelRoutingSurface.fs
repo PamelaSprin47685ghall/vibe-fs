@@ -596,6 +596,11 @@ module ModelRoutingSurface =
         (runtimeOf runtime)
             .EndProviderStep(sessionId, physicalUserMessageId, providerRun)
 
+    let takeProviderRunTarget (runtime: obj) (providerRun: string) : obj =
+        (runtimeOf runtime).TakeProviderRunTarget(providerRun)
+        |> Option.map targetObject
+        |> Option.defaultValue null
+
     let suppressProviderStep (runtime: obj) (sessionId: string) (physicalUserMessageId: string) : unit =
         (runtimeOf runtime).SuppressProviderStep(sessionId, physicalUserMessageId)
 

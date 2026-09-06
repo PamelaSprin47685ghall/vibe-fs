@@ -11,7 +11,7 @@ import { captureEvidence, replayEvidence, serializeEvidence } from './support/in
 
 const fact = fs.readFileSync(new URL('./fixtures/chat-execution-v1.json', import.meta.url), 'utf8')
 const hostContract = JSON.parse(fs.readFileSync(
-  new URL('../../host-boundary/fixtures/opencode-chat-admission-1.18.18.json', import.meta.url),
+  new URL('../../host-boundary/fixtures/opencode-chat-admission-1.18.29.json', import.meta.url),
   'utf8',
 ))
 const agent028 = JSON.parse(fs.readFileSync(
@@ -31,8 +31,8 @@ const input = {
     operation: 'AcceptedPersisted', logicalRunId: 'run-chat-fixture', sessionId: 'ses-chat-fixture',
     authorityRootUserMessageId: 'msg-chat-root', physicalUserMessageId: 'msg-chat-fixture', promptKey: null,
     providerRunIdentity: null, effectiveAgent: 'coder', role: 'coder', providerRequestKind: 'work-main',
-    transition: { from: null, to: 'Accepted' }, failureClass: null, retryDecision: null,
-    fallbackDecision: null, capacityState: 'Released', capacityFence: null, hook: 'chat.message',
+    transition: { from: null, to: 'Accepted' }, failureClass: null, resolution: null,
+    capacityState: 'Released', capacityFence: null, hook: 'chat.message',
     policyClass: 'Workflow', recoveryDecision: 'ResumeAdmission', persistenceCommitment: 'Committed',
   }],
   hostContract,

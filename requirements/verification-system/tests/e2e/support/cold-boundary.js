@@ -20,11 +20,11 @@
  *
  * ── the fallback boundary is narrower than the old exemption claimed ─────────
  *
- * `modelSideCold` allowed the system prompt to change whenever the model id did.
- * Measured against production: AGENT-001 gives `fast-ROLE` and `deep-ROLE` ONE system
- * prompt, byte-identical (verified for coder/manager/reviewer/devops/inspector). So a
- * fallback switch changes the model field and nothing else — the message prefix stays
- * append-only.
+ * `modelSideCold` allowed arbitrary system rewrites whenever the model id changed.
+ * OpenCode 1.18.29 injects one exact model banner into the system message, so a real
+ * provider fallback changes that banner by construction. The seal normalizes only
+ * that Host-owned sentence; every other system byte and every conversation part
+ * remains protected.
  *
  * That makes `FallbackSide` a far tighter admission than a prefix rebase: messages
  * must still satisfy the ordinary seal, and only the model may move. A scenario that
@@ -81,8 +81,10 @@ export function boundaryFor(boundaries, entry) {
  * that break is expected while the transcript must still be intact, so the two
  * questions have to be separable.
  */
-const messagesStillAppendOnly = (previousWire, nextWire) =>
-  isAppendOnlyPrefix(withModelOf(previousWire, nextWire), nextWire);
+const messagesStillAppendOnly = (previousWire, nextWire) => {
+  const normalizedNext = withoutHostModelBanner(nextWire);
+  return isAppendOnlyPrefix(withModelOf(withoutHostModelBanner(previousWire), normalizedNext), normalizedNext);
+};
 
 /** SyncDelegate Returned→Completion keeps model/system/messages and replaces only tools. */
 const requestKindKeepsPrefix = (previousWire, nextWire) =>
@@ -94,6 +96,19 @@ const withModelOf = (previousWire, nextWire) => ({
   providerId: nextWire.providerId,
   modelId: nextWire.modelId,
   variant: nextWire.variant,
+});
+
+const MODEL_BANNER = /You are powered by the model named [^\n]*?\. The exact model ID is [^\n]+/g;
+
+const withoutHostModelBanner = (wire) => ({
+  ...wire,
+  messages: (wire.messages ?? []).map((message) => ({
+    ...message,
+    parts: (message.parts ?? []).map((part) =>
+      part?.kind === 'text' && typeof part.text === 'string'
+        ? { ...part, text: part.text.replace(MODEL_BANNER, '<host-model>') }
+        : part),
+  })),
 });
 
 /**
@@ -114,8 +129,9 @@ const probeKeepsFixedParts = (previousWire, nextWire) => isDeepStrictEqual(previ
 //
 // Every manager iteration restarts from the same workspace with no transferred
 // payload or synthetic context: a Continue retirement is followed by another ordinary
-// iteration under the same system/provider plan. This layer checks structure
-// only: the plan and system are equal, the next wire carries system/user
+// iteration under the same tools/authority plan; a preceding provider fallback may
+// change only OpenCode's exact model banner. This layer checks structure only: the
+// normalized system is equal, the next wire carries system/user
 // messages alone, its user list is nonempty, its root user equals the previous
 // root, and every next user is an exact ordered subsequence of the previous
 // users — so a novel wake or synthetic user cannot smuggle in, while a dropped
@@ -123,14 +139,15 @@ const probeKeepsFixedParts = (previousWire, nextWire) => isDeepStrictEqual(previ
 // authority-revision retention is proved by the unit projection tests and the
 // long-stroke root-only oracle, not here.
 
-const sameProviderPlan = (previousWire, nextWire) =>
-  previousWire.modelId === nextWire.modelId && isDeepStrictEqual(previousWire.tools, nextWire.tools);
+const sameProviderPlan = (previousWire, nextWire) => isDeepStrictEqual(previousWire.tools, nextWire.tools);
 
 const managerLoopKeepsAuthority = (previousWire, nextWire) => {
   if (!sameProviderPlan(previousWire, nextWire)) return false;
   const systemOf = (wire) => (wire.messages ?? []).filter((message) => message?.role === 'system');
   const usersOf = (wire) => (wire.messages ?? []).filter((message) => message?.role === 'user');
-  if (!isDeepStrictEqual(systemOf(previousWire), systemOf(nextWire))) return false;
+  if (!isDeepStrictEqual(systemOf(withoutHostModelBanner(previousWire)), systemOf(withoutHostModelBanner(nextWire)))) {
+    return false;
+  }
   if ((nextWire.messages ?? []).some((message) => message?.role !== 'system' && message?.role !== 'user')) {
     return false;
   }

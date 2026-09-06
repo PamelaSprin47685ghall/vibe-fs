@@ -363,7 +363,11 @@ async function runFlow(scenario, doc, ctx) {
       // renews the window; only a blocking advance does.
       scenario.watchdog?.setWindow(step.timeoutMs ?? null);
       try {
-        await scenario.provider.waitForExpectation(step.wait, step.timeoutMs);
+        if ((step.attempts ?? 1) === 1) {
+          await scenario.provider.waitForExpectation(step.wait, step.timeoutMs);
+        } else {
+          await scenario.provider.waitForExpectationAttempt(step.wait, step.attempts, step.timeoutMs);
+        }
       } finally {
         scenario.watchdog?.setWindow(null);
       }
@@ -823,6 +827,7 @@ export async function runCanary(scriptName, { customs, preFlow } = {}) {
       project: doc.setup?.project || { files: {} },
       strict: doc.setup?.strict !== false,
       extraEnv: doc.setup?.env || {},
+      routingSource: doc.routingSource,
       acceptanceGate: doc.setup?.acceptanceGate,
       // Opt-in Phase 0 real-host A/E/G/H wrapper (long-stroke only).
       magicTodoHostCanary: doc.setup?.magicTodoHostCanary === true,

@@ -22,8 +22,7 @@ const causalRecord = {
   providerRequestKind: 'work-main',
   transition: { from: 'ProviderStarted', to: 'Terminal' },
   failureClass: 'ProviderPermanent',
-  retryDecision: 'NoRetry',
-  fallbackDecision: 'NoFallback',
+  resolution: 'TerminalizeProviderStarted',
   capacityState: 'Released',
   capacityFence: null,
   hook: 'chat.message',
@@ -41,8 +40,7 @@ test('WHAT[HOST-BOUNDARY-025] causal diagnostic schema preserves exact available
     ...causalRecord,
     providerRunIdentity: null,
     failureClass: null,
-    retryDecision: null,
-    fallbackDecision: null,
+    resolution: null,
     recoveryDecision: null,
   })
   assert.equal(unavailable.providerRunIdentity, null)

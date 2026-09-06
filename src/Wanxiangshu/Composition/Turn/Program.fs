@@ -205,17 +205,15 @@ module ReconcileProgram =
             | ReconcileEvidence.Unknown None
             | ReconcileEvidence.SessionCleared -> false
 
-        let failedTerminalRequiresWitness =
-            match wake, evidence with
-            | (ReconcileWake.FailureWake _ | ReconcileWake.RetryWake),
-              ReconcileEvidence.Terminal { Outcome = TurnFailed _
-                                           PublishTurn = Some _ } -> true
+        let isFailedTerminal =
+            match evidence with
+            | ReconcileEvidence.Terminal { Outcome = TurnFailed _ } -> true
             | _ -> false
 
         match hasFailureWitness, evidence with
         | true, (ReconcileEvidence.Provisional _ | ReconcileEvidence.Unknown _ | ReconcileEvidence.Terminal _) ->
             ReconcileDecision.Publish
-        | false, ReconcileEvidence.Terminal _ when failedTerminalRequiresWitness -> ReconcileDecision.StopPass
+        | false, ReconcileEvidence.Terminal _ when isFailedTerminal -> ReconcileDecision.StopPass
         | false, ReconcileEvidence.Terminal _ -> ReconcileDecision.Publish
         | false, (ReconcileEvidence.SnapshotError _ | ReconcileEvidence.NoTurn) -> ReconcileDecision.StopPass
         | false, ReconcileEvidence.Provisional _ -> provisionalDecision wake

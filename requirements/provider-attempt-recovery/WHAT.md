@@ -8,21 +8,23 @@ Fallback 是 Logical Run 的生命周期状态，而非 Session 的永久属性�
 
 FallbackOffset 仅存在 `Fork0 | Fork1 | Fork2 | Fork3` 四个合法取值。反序列化遇到非法字节必须返回解码错误并拒绝损坏的 envelope，严禁抛出未捕获异常或将解码失败伪造为提交未知。
 
-## PAR-003: 唯一写入口与同一失败只推进一次
+## PAR-003: 唯一写入口、同一失败只推进一次且恢复可重放
 
-FallbackLedger 是唯一允许提交 `FallbackCursorAdvanced` 与 `FallbackExhausted` 的写入口。同一已确认失败（基于 SessionId、LogicalRunId、AuthorityRootUserMessageId 与 ProviderRun 唯一去重）最多推进 cursor 一次；重复观察直接幂等吸收，不写新事实、不推进游标。
+FallbackLedger 是唯一允许提交 `FallbackCursorAdvanced` 与 `FallbackExhausted` 的写入口。同一已确认失败（基于 SessionId、LogicalRunId、AuthorityRootUserMessageId 与 ProviderRun 唯一去重）最多推进 cursor 一次；若它仍是最新失败，重复观察不写事实、不推进游标，但必须重放相同 `RecoveryAdvanced` 或 `RecoveryExhausted` 结论，使 workflow 重入同一 durable prompt claim。更旧的失败返回 `EpisodeSuperseded`，不得启动恢复。exact recovery gate 以 `ProviderRecoveryDecisionId + source ProviderRunIdentity` 标识；相同失败最多一次物理发送，不同 failed ProviderRun 即使 agent/text 相同也必须取得不同 claim 并发送。
 
-## PAR-004: 推进不变量与首次失败永久摘要上下文替换
+## PAR-004: 推进不变量与成功归一化
 
-不再使用 AA'BB' 重试法。任意一次已确认失败将使连续失败计数加 1，并永久标记当前 provider 为失败（在进程生命周期内所有 `wanxiangshu.mjs` 指定的该 provider 容量均视为 0）。首次失败立即永久替换为 blogger 摘要上下文重试（开启新 prefix epoch，同一 epoch 内保持前缀不可变）。成功写入 `FallbackSucceeded` 事实并将连续失败计数归零。
+任意一次已确认失败将 Offset 沿模 4 环前进一格且使连续失败计数加 1。A/A′/B/B′ 只描述 participant/context recovery 槽，不代表物理 provider 池：失败物理 provider 由 `ModelRouting` 独立永久 poison，后续新 ProviderRun 从剩余候选选择；cursor 不得反向复活该 provider。主业务请求成功写入 `FallbackSucceeded` 事实并将连续失败计数归零，同时关闭当前 primed recovery 子槽（归一化至同侧普通槽，偶数普通槽保持不变），确保后续失败能直接获取恢复机会。
 
-## PAR-005: 理论容量耗尽判定与有限自动恢复预算
+失败恢复的 request kind 只能从匹配 `SessionId + PhysicalUserMessageId` 的 durable `ChatExecutionState.ProviderStarted.RequestKind` 读取；同一物理请求的 tool continuation 继承这一冻结种类，当前 `ProviderRunIdentity` 另由 recovery authorization 精确约束。通用 parent↔child session association 与 active role 都不能推断请求种类；只有已证明的 `BloggerMain | BloggerSquash` 才能用 association 查找记账 main session。manager、coder 等普通 child 即使存在 association 也必须保持其 durable `WorkMain`。
 
-重试在候选池中切换至其它具备非零容量的 provider（使用已替换的摘要上下文）。当该角色在 `wanxiangshu.mjs` 中的所有 candidate provider 理论容量全部腾出后仍均为 0 时，或者连续失败达到自动恢复预算上限时，判定为容量耗尽并写入 `FallbackExhausted`，停止自动发出物理请求。
+## PAR-005: 有限自动恢复预算
 
-## PAR-006: 失败轮换与容量归零维度分离
+A/A′/B/B′ participant/context 槽循环在结构上无界，但自动恢复预算严格有界（默认为 12 次连续失败）。连续失败达到预算时写入 `FallbackExhausted` 并停止自动发出物理请求，后续恢复必须依赖新 Authority Root 或用户显式动作。
 
-失败轮换不依赖模 4 侧序号，而是依据 `wanxiangshu.mjs` 中的可用 provider 候选列表。每当一个 provider 发生物理失败，其容量在当前进程生命周期内归零，由调度器自动转向下一可用 provider。
+## PAR-006: 侧序列与预算的维度分离
+
+Offset 每次失败前进一格（映射至 A/A′/B/B′ participant/context 槽循环，与物理 provider 健康表正交）。第 12 次连续失败落在 Offset=3 并前进至 0，此时立即判定为 final 耗尽，严禁自动发起第 13 次请求。
 
 ## PAR-007: Fold 拒绝条件
 

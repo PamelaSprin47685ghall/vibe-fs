@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import fc from 'fast-check'
 
 import * as policy from '../../../dist/Execution/Failure/Surface.js'
 import * as recovery from '../../../dist/Execution/Session/ChatExecution/RecoveryRuntimeSurface.js'
@@ -10,243 +11,216 @@ const executionKey = {
   physicalUserMessageId: 'msg-failure-property',
 }
 const capacityFence = { reference: 'fence-failure-property' }
-const providerBase = {
+
+const baseProvider = {
   logicalRun: 'logical-failure-property',
   providerRun: 'provider-failure-property',
   requestKind: 'WorkMain',
-  retryBudget: 'Available',
-  fallbackBudget: 'Available',
   breaker: 'Closed',
 }
 
-const providerCases = [
-  {
-    label: 'transient/available/available',
-    failure: 'ProviderTransient',
-    retryBudget: 'Available',
-    fallbackBudget: 'Available',
-    retry: 'RetryFreshAttempt',
-    fallback: 'NoFallback',
-    breaker: 'RecordProviderTransientFailure',
-    messageDisposition: 'KeepCurrentFact',
-    recovery: {
-      decision: 'RequeueEligible',
-      effects: ['RequeueEligible:RetryFreshAttempt'],
-    },
-  },
-  {
-    label: 'transient/available/exhausted',
-    failure: 'ProviderTransient',
-    retryBudget: 'Available',
-    fallbackBudget: 'Exhausted',
-    retry: 'RetryFreshAttempt',
-    fallback: 'NoFallback',
-    breaker: 'RecordProviderTransientFailure',
-    messageDisposition: 'KeepCurrentFact',
-    recovery: {
-      decision: 'RequeueEligible',
-      effects: ['RequeueEligible:RetryFreshAttempt'],
-    },
-  },
-  {
-    label: 'transient/exhausted/available',
-    failure: 'ProviderTransient',
-    retryBudget: 'Exhausted',
-    fallbackBudget: 'Available',
-    retry: 'NoRetry',
-    fallback: 'AdvanceFallback',
-    breaker: 'RecordProviderTransientFailure',
-    messageDisposition: 'KeepCurrentFact',
-    recovery: {
-      decision: 'RequeueEligible',
-      effects: ['RequeueEligible:AdvanceFallback'],
-    },
-  },
-  {
-    label: 'transient/exhausted/exhausted',
-    failure: 'ProviderTransient',
-    retryBudget: 'Exhausted',
-    fallbackBudget: 'Exhausted',
-    retry: 'NoRetry',
-    fallback: 'NoFallback',
-    breaker: 'RecordProviderTransientFailure',
-    messageDisposition: 'TerminalizeProviderStarted',
-    recovery: { decision: 'Finalize', effects: ['Finalize:Failed'] },
-  },
-  {
-    label: 'permanent/available/available',
-    failure: 'ProviderPermanent',
-    retryBudget: 'Available',
-    fallbackBudget: 'Available',
-    retry: 'NoRetry',
-    fallback: 'AdvanceFallback',
-    breaker: 'RecordProviderPermanentFailure',
-    messageDisposition: 'KeepCurrentFact',
-    recovery: {
-      decision: 'RequeueEligible',
-      effects: ['RequeueEligible:AdvanceFallback'],
-    },
-  },
-  {
-    label: 'permanent/exhausted/available',
-    failure: 'ProviderPermanent',
-    retryBudget: 'Exhausted',
-    fallbackBudget: 'Available',
-    retry: 'NoRetry',
-    fallback: 'AdvanceFallback',
-    breaker: 'RecordProviderPermanentFailure',
-    messageDisposition: 'KeepCurrentFact',
-    recovery: {
-      decision: 'RequeueEligible',
-      effects: ['RequeueEligible:AdvanceFallback'],
-    },
-  },
-  {
-    label: 'permanent/available/exhausted',
-    failure: 'ProviderPermanent',
-    retryBudget: 'Available',
-    fallbackBudget: 'Exhausted',
-    retry: 'NoRetry',
-    fallback: 'NoFallback',
-    breaker: 'RecordProviderPermanentFailure',
-    messageDisposition: 'TerminalizeProviderStarted',
-    recovery: { decision: 'Finalize', effects: ['Finalize:Failed'] },
-  },
-  {
-    label: 'permanent/exhausted/exhausted',
-    failure: 'ProviderPermanent',
-    retryBudget: 'Exhausted',
-    fallbackBudget: 'Exhausted',
-    retry: 'NoRetry',
-    fallback: 'NoFallback',
-    breaker: 'RecordProviderPermanentFailure',
-    messageDisposition: 'TerminalizeProviderStarted',
-    recovery: { decision: 'Finalize', effects: ['Finalize:Failed'] },
-  },
-]
+const arbitraryFailure = fc.constantFrom(
+  'LocalInvariant',
+  'ProtocolRejection',
+  'AuthorizationDenied',
+  'UserCancelled',
+  'Superseded',
+  'CapacityQueueFull',
+  'ProviderTransient',
+  'ProviderPermanent',
+  'AcceptanceUnknown',
+  'StreamInterruptedAfterFirstToken',
+  { kind: 'PersistenceFailure', commitment: 'NotCommitted' },
+  { kind: 'PersistenceFailure', commitment: 'Committed' },
+  { kind: 'PersistenceFailure', commitment: 'Unknown' },
+)
 
-const fixedRecoveryCases = [
-  {
-    persistence: 'NotCommitted',
-    observation: 'ExactTerminal',
-    expected: { decision: 'Finalize', effects: ['Finalize:Failed'] },
-  },
-  {
-    persistence: 'NotCommitted',
-    observation: 'LateOldExecution',
-    expected: { decision: 'Ignore', effects: [] },
-  },
-  ...['ExactAbsent', 'ExactTerminal', 'LateOldExecution'].map((observation) => ({
-    persistence: 'Committed',
-    observation,
-    expected: { decision: 'Ignore', effects: [] },
-  })),
-  ...['ExactAbsent', 'ExactTerminal', 'LateOldExecution'].map((observation) => ({
-    persistence: 'Unknown',
-    observation,
-    expected: {
-      decision: 'MarkManualIntervention',
-      effects: ['MarkManualIntervention:PersistenceOutcomeUnknown'],
-    },
-  })),
-]
+const arbitraryPhase = fc.constantFrom(
+  'NoAcceptedFact',
+  'AcceptedBeforeProvider',
+  'ProviderStarted',
+  'Terminal',
+)
 
-const decide = ({ failure, retryBudget, fallbackBudget }) =>
-  policy.decide({
-    failure,
-    phase: 'ProviderStarted',
-    executionKey,
-    capacityFence,
-    provider: { ...providerBase, retryBudget, fallbackBudget },
-  })
+const arbitraryBudget = fc.constantFrom('Available', 'Exhausted')
+const arbitraryBreaker = fc.constantFrom('Closed', 'Open')
+const arbitraryRequestKind = fc.constantFrom(
+  'WorkMain',
+  'BloggerMain',
+  'BloggerSquash',
+  'InteractionRepair',
+  'StrengthReplica',
+)
 
-const assertAuthorization = (action, providerCase) => {
-  assert.equal(action.logicalRun, providerBase.logicalRun, providerCase.label)
-  assert.equal(action.providerRun, providerBase.providerRun, providerCase.label)
-  assert.equal(action.requestKind, providerBase.requestKind, providerCase.label)
-  assert.equal(typeof action.decisionId, 'string', providerCase.label)
-  assert.notEqual(action.decisionId, '', providerCase.label)
-}
+const arbitraryCapacityFence = fc.constantFrom(null, capacityFence)
 
-const assertPolicyOutcome = (providerCase, decision) => {
-  assert.equal(decision.retry.kind, providerCase.retry, providerCase.label)
-  assert.equal(decision.fallback.kind, providerCase.fallback, providerCase.label)
-  assert.equal(decision.breaker.kind, providerCase.breaker, providerCase.label)
-  assert.deepEqual(
-    decision.capacitySettlement,
-    { kind: 'ReleaseExactFence', fenceReference: capacityFence.reference },
-    providerCase.label,
-  )
-  assert.equal(
-    decision.messageDisposition.kind,
-    providerCase.messageDisposition,
-    providerCase.label,
-  )
-  assert.equal(decision.fatality.kind, 'NoFatality', providerCase.label)
+const arbitraryExecutionFailureInput = fc.record({
+  failure: arbitraryFailure,
+  phase: arbitraryPhase,
+  executionKey: fc.constant(executionKey),
+  capacityFence: arbitraryCapacityFence,
+  provider: fc.record({
+    logicalRun: fc.constant(baseProvider.logicalRun),
+    providerRun: fc.string({ minLength: 1, maxLength: 32 }).map((suffix) => `provider-${suffix}`),
+    requestKind: arbitraryRequestKind,
+    retryBudget: arbitraryBudget,
+    fallbackBudget: arbitraryBudget,
+    breaker: arbitraryBreaker,
+  }),
+})
 
-  if (providerCase.retry === 'RetryFreshAttempt') {
-    assertAuthorization(decision.retry, providerCase)
-  }
-  if (providerCase.fallback === 'AdvanceFallback') {
-    assertAuthorization(decision.fallback, providerCase)
-  }
-  if (providerCase.messageDisposition === 'TerminalizeProviderStarted') {
-    assert.equal(decision.messageDisposition.disposition, 'Failed', providerCase.label)
-    assert.deepEqual(decision.messageDisposition.executionKey, executionKey, providerCase.label)
-  }
-}
+const isRecoveryResolution = (resolution) =>
+  resolution === 'RetryFreshAttempt' || resolution === 'AdvanceFallback'
 
-const interpret = (providerCase, persistence, observation) =>
-  recovery.interpretFailurePolicy(
-    providerCase.failure,
-    providerCase.retryBudget,
-    providerCase.fallbackBudget,
-    persistence,
-    observation,
-  )
-
-const exerciseHookPromise = async (mode, label) => {
-  if (mode === 'Fulfilled') {
-    const wrapped = hooks.policyAwareHook(`policy-matrix-${label}`, () => label)
-    const promise = wrapped('args', 'context')
-    assert.equal(typeof promise.then, 'function')
-    assert.equal(await promise, label)
-    return
-  }
-
-  const rejection = hooks.providerInputRejection(label)
-  const wrapped = hooks.policyAwareHook(`policy-matrix-${label}`, () => Promise.reject(rejection))
-  const promise = wrapped('args', 'context')
-  assert.equal(typeof promise.then, 'function')
-  await assert.rejects(() => promise, (error) => error === rejection)
-}
+const isTerminalResolution = (resolution) =>
+  resolution === 'TerminalizeAcceptedPreProvider' || resolution === 'TerminalizeProviderStarted'
 
 test('WHAT[EXECFAIL-003] finite provider budget matrix fixes policy and recovery outcomes', async () => {
-  for (const providerCase of providerCases) {
-    const decision = decide(providerCase)
-    assertPolicyOutcome(providerCase, decision)
-    assert.deepEqual(decide(providerCase), decision, `${providerCase.label}: unstable policy decision`)
+  // Dense model property: temporal invariants over arbitrary failure, phase, budgets, breaker, capacity
+  fc.assert(
+    fc.property(arbitraryExecutionFailureInput, (input) => {
+      const decision = policy.decide(input)
 
-    assert.deepEqual(
-      await interpret(providerCase, 'NotCommitted', 'ExactAbsent'),
-      providerCase.recovery,
-      providerCase.label,
-    )
-    assert.deepEqual(
-      await interpret(providerCase, 'NotCommitted', 'ExactAbsent'),
-      providerCase.recovery,
-      `${providerCase.label}: duplicate evidence changed fixed outcome`,
-    )
+      // Invariant 1: Exactly one resolution axis
+      assert.equal(typeof decision.resolution, 'string')
+      assert.ok([
+        'PreserveCurrentFact',
+        'AwaitAcceptanceReconciliation',
+        'RetryFreshAttempt',
+        'AdvanceFallback',
+        'TerminalizeAcceptedPreProvider',
+        'TerminalizeProviderStarted',
+      ].includes(decision.resolution))
 
-    for (const recoveryCase of fixedRecoveryCases) {
-      assert.deepEqual(
-        await interpret(providerCase, recoveryCase.persistence, recoveryCase.observation),
-        recoveryCase.expected,
-        `${providerCase.label}/${recoveryCase.persistence}/${recoveryCase.observation}`,
-      )
-    }
+      // Invariant 2: Recover implies no terminal; authorization present iff recovery
+      if (isRecoveryResolution(decision.resolution)) {
+        assert.equal(decision.terminalDisposition, null)
+        assert.ok(decision.authorization)
+        assert.equal(decision.authorization.logicalRun, input.provider.logicalRun)
+        assert.equal(decision.authorization.providerRun, input.provider.providerRun)
+        assert.equal(decision.authorization.requestKind, input.provider.requestKind)
+        assert.equal(typeof decision.authorization.decisionId, 'string')
+        assert.notEqual(decision.authorization.decisionId, '')
+      }
 
-    await exerciseHookPromise('Fulfilled', providerCase.label)
-    await exerciseHookPromise('TypedProtocolRejection', providerCase.label)
+      // Invariant 3: Terminal implies no recover; terminalDisposition present iff terminal
+      if (isTerminalResolution(decision.resolution)) {
+        assert.equal(decision.authorization, null)
+        assert.ok(['Completed', 'Cancelled', 'Rejected', 'Failed'].includes(decision.terminalDisposition))
+        assert.deepEqual(decision.executionKey, executionKey)
+      }
+
+      // Invariant 4: Cancellation/protocol/local invariant/non-provider failure never recover
+      const isProviderFailure =
+        input.failure === 'ProviderTransient' || input.failure === 'ProviderPermanent'
+      if (!isProviderFailure || input.phase !== 'ProviderStarted' || input.provider.requestKind === 'StrengthReplica') {
+        assert.ok(!isRecoveryResolution(decision.resolution), `${input.failure}/${input.phase} must not recover`)
+      }
+
+      // Invariant 5: LocalInvariant / ProtocolRejection / UserCancelled / Superseded invariant rules
+      if (input.failure === 'LocalInvariant' || input.failure === 'ProtocolRejection' || input.failure === 'AuthorizationDenied') {
+        if (input.phase === 'AcceptedBeforeProvider') {
+          assert.equal(decision.resolution, 'TerminalizeAcceptedPreProvider')
+        } else if (input.phase === 'ProviderStarted') {
+          assert.equal(decision.resolution, 'TerminalizeProviderStarted')
+        }
+      }
+
+      // Invariant 6: Every provider-started confirmed failure produces recovery or terminal, never neither
+      if (
+        input.phase === 'ProviderStarted' &&
+        (input.failure === 'ProviderTransient' || input.failure === 'ProviderPermanent')
+      ) {
+        assert.ok(
+          isRecoveryResolution(decision.resolution) || isTerminalResolution(decision.resolution),
+          'provider-started failure must produce recovery or terminal',
+        )
+      }
+
+      // Invariant 7: Duplicate observation is deterministic and produces identical authorization decisionId
+      const replay = policy.decide(input)
+      assert.deepEqual(replay, decision)
+    }),
+    { seed: 0x45584543, numRuns: 200 },
+  )
+
+  // Property 2: Distinct provider runs create distinct authorization decisionId
+  fc.assert(
+    fc.property(
+      fc.tuple(
+        fc.string({ minLength: 1, maxLength: 16 }),
+        fc.string({ minLength: 1, maxLength: 16 }),
+      ).filter(([a, b]) => a !== b),
+      ([runA, runB]) => {
+        const decisionA = policy.decide({
+          failure: 'ProviderPermanent',
+          phase: 'ProviderStarted',
+          executionKey,
+          capacityFence,
+          provider: {
+            ...baseProvider,
+            providerRun: `provider-${runA}`,
+            retryBudget: 'Exhausted',
+            fallbackBudget: 'Available',
+          },
+        })
+        const decisionB = policy.decide({
+          failure: 'ProviderPermanent',
+          phase: 'ProviderStarted',
+          executionKey,
+          capacityFence,
+          provider: {
+            ...baseProvider,
+            providerRun: `provider-${runB}`,
+            retryBudget: 'Exhausted',
+            fallbackBudget: 'Available',
+          },
+        })
+
+        assert.equal(decisionA.resolution, 'AdvanceFallback')
+        assert.equal(decisionB.resolution, 'AdvanceFallback')
+        assert.notEqual(decisionA.authorization.decisionId, decisionB.authorization.decisionId)
+      },
+    ),
+    { seed: 0x52554e49, numRuns: 100 },
+  )
+
+  // Recovery runtime interpretation: provider recovery is owned by ProviderRecoveryWorkflow,
+  // so chat recovery produces Ignore with ProviderRecoveryOwned and zero effects.
+  const transientOutcome = await recovery.interpretFailurePolicy(
+    'ProviderTransient',
+    'Available',
+    'Available',
+    'NotCommitted',
+    'ExactAbsent',
+  )
+  assert.deepEqual(transientOutcome, { decision: 'Ignore', effects: [] })
+
+  const fallbackOutcome = await recovery.interpretFailurePolicy(
+    'ProviderPermanent',
+    'Exhausted',
+    'Available',
+    'NotCommitted',
+    'ExactAbsent',
+  )
+  assert.deepEqual(fallbackOutcome, { decision: 'Ignore', effects: [] })
+
+  const terminalOutcome = await recovery.interpretFailurePolicy(
+    'ProviderPermanent',
+    'Exhausted',
+    'Exhausted',
+    'NotCommitted',
+    'ExactAbsent',
+  )
+  assert.deepEqual(terminalOutcome, { decision: 'Finalize', effects: ['Finalize:Failed'] })
+
+  // Exercise hook promises
+  for (const label of ['transient', 'permanent', 'exhausted']) {
+    const wrapped = hooks.policyAwareHook(`policy-matrix-${label}`, () => label)
+    assert.equal(await wrapped('args', 'context'), label)
+
+    const rejection = hooks.providerInputRejection(label)
+    const failing = hooks.policyAwareHook(`policy-matrix-${label}`, () => Promise.reject(rejection))
+    await assert.rejects(() => failing('args', 'context'), (error) => error === rejection)
   }
 })

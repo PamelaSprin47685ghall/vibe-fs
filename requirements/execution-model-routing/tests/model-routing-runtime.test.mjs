@@ -16,6 +16,7 @@ const {
   bindCapacityCompanion,
   enterProviderStep,
   endProviderStep,
+  takeProviderRunTarget,
   suppressProviderStep,
   snapshotOccupied,
   capacitySnapshot,
@@ -105,6 +106,23 @@ test('WHAT[EMR-006] EMR_006_retarget_clears_superseded_inflight_step_before_new_
     physicalUserMessageId: 'msg-b',
     effectiveAgent: 'inspector',
   })
+})
+
+test('WHAT[EMR-006] provider failure can consume only its exact current run target', async () => {
+  let scheduled = 0
+  const runtime = createRuntime(() => target(`provider-${++scheduled}/model`))
+
+  await acquireTarget(runtime, 'session', 'msg-a', 'manager')
+  await enterProviderStep(runtime, 'session', 'msg-a', [])
+  endProviderStep(runtime, 'session', 'msg-a', 'run-a')
+
+  const current = await acquireTarget(runtime, 'session', 'msg-b', 'manager')
+  await enterProviderStep(runtime, 'session', 'msg-b', ['run-a'])
+  endProviderStep(runtime, 'session', 'msg-b', 'run-b')
+
+  assert.equal(takeProviderRunTarget(runtime, 'run-a'), null, 'superseded run cannot poison the current target')
+  assert.equal(takeProviderRunTarget(runtime, 'run-b').model, current.model)
+  assert.equal(takeProviderRunTarget(runtime, 'run-b'), null, 'the exact witness is single-consumption')
 })
 
 test('WHAT[EMR-006] EMR_006_same_physical_message_cannot_change_effective_agent', async () => {

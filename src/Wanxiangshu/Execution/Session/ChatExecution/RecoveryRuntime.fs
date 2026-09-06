@@ -13,13 +13,11 @@ type ChatExecutionRecoveryLifecycleEvent =
     | SessionAborted of ChatExecutionKey
     | SessionDeleted of ChatExecutionKey
     | SessionCancelled of ChatExecutionKey
-    | TypedFailureDecision of ChatExecutionKey * ExecutionFailureDecision
     | CapacityProjectionReplayed
 
 type ChatExecutionRecoveryActionPorts =
     { ReconcilePhysical: PhysicalReconciliationRequest -> Task
       ResumePreProvider: PreProviderResumeRequest -> Task
-      RequeueEligible: ProviderRequeueRequest -> Task
       Finalize: TerminalFinalizationRequest -> Task
       MarkManualIntervention: ManualInterventionRequest -> Task }
 
@@ -31,7 +29,6 @@ module ChatExecutionRecoveryRuntime =
         | ChatExecutionRecoveryDecision.Ignore _ -> Task.FromResult(()) :> Task
         | ChatExecutionRecoveryDecision.ReconcilePhysical request -> ports.ReconcilePhysical request
         | ChatExecutionRecoveryDecision.ResumePreProvider request -> ports.ResumePreProvider request
-        | ChatExecutionRecoveryDecision.RequeueEligible request -> ports.RequeueEligible request
         | ChatExecutionRecoveryDecision.Finalize request -> ports.Finalize request
         | ChatExecutionRecoveryDecision.MarkManualIntervention request -> ports.MarkManualIntervention request
 

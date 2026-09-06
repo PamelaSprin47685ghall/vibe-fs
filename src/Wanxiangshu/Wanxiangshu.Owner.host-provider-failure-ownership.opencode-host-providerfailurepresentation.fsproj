@@ -5,6 +5,7 @@
     <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
     <Compile Include="OpenCode/Host/ProviderFailurePresentation.fsi"/>
     <Compile Include="OpenCode/Host/ProviderFailurePresentation.fs"/>
   </ItemGroup>

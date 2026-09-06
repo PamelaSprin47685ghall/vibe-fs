@@ -12,8 +12,7 @@ open Wanxiangshu.Persistence.Journal
 /// Optional Host capability bound to exact already-accepted physical material.
 /// Absence is not permission to create a replacement PromptClaim or resend text.
 type ExactAcceptedMessageRecoveryPort =
-    { ResumeAccepted: PreProviderResumeRequest -> Task<bool>
-      RequeueAuthorized: ProviderRequeueRequest -> Task<bool> }
+    { ResumeAccepted: PreProviderResumeRequest -> Task<bool> }
 
 type SessionRecoveryHost
     (
@@ -36,8 +35,7 @@ type SessionRecoveryHost
         | ChatExecutionRecoveryLifecycleEvent.ExactAssistantTerminal(started, _) -> Some(keyOfStarted started)
         | ChatExecutionRecoveryLifecycleEvent.SessionAborted key
         | ChatExecutionRecoveryLifecycleEvent.SessionDeleted key
-        | ChatExecutionRecoveryLifecycleEvent.SessionCancelled key
-        | ChatExecutionRecoveryLifecycleEvent.TypedFailureDecision(key, _) -> Some key
+        | ChatExecutionRecoveryLifecycleEvent.SessionCancelled key -> Some key
         | _ -> None
 
     let statesFor (event: ChatExecutionRecoveryLifecycleEvent) =
@@ -108,8 +106,6 @@ type SessionRecoveryHost
 
     let failureEvidence (event: ChatExecutionRecoveryLifecycleEvent) (state: ChatExecutionState) =
         match event with
-        | ChatExecutionRecoveryLifecycleEvent.TypedFailureDecision(_, decision) ->
-            RecoveryPolicyEvidence.FailureDecision decision
         | _ when lifecycleCancellation event -> cancellationFailureEvidence state
         | _ -> RecoveryPolicyEvidence.NoFailureDecision
 
@@ -225,28 +221,12 @@ type SessionRecoveryHost
         }
         :> Task
 
-    let requeue (request: ProviderRequeueRequest) =
-        let publish =
-            function
-            | true -> ()
-            | false -> scope.PublishAuthorizedChatRequeue request
-
-        task {
-            match acceptedMessageRecovery with
-            | Some port ->
-                let! requeued = port.RequeueAuthorized request
-                publish requeued
-            | None -> scope.PublishAuthorizedChatRequeue request
-        }
-        :> Task
-
     let finalize (request: TerminalFinalizationRequest) =
         persistTerminal request.ExecutionKey request.TerminalEvidence request.TerminalDisposition
 
     let actions =
         { ReconcilePhysical = reconcile
           ResumePreProvider = resume
-          RequeueEligible = requeue
           Finalize = finalize
           MarkManualIntervention =
             fun request ->

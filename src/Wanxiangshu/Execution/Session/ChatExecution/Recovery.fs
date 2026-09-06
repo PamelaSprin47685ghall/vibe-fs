@@ -39,11 +39,6 @@ type PhysicalReconciliationRequest =
     | PersistProviderStartedAndTerminal of ProviderStartedEvidence * ChatExecutionTerminalDisposition
     | ReleaseTerminalResource of ChatExecutionKey * ChatExecutionTerminalEvidence * ChatExecutionTerminalDisposition
 
-[<RequireQualifiedAccess>]
-type ProviderRequeueRequest =
-    | RetryFreshAttempt of ProviderStartedEvidence * ProviderRecoveryAuthorization
-    | AdvanceFallback of ProviderStartedEvidence * ProviderRecoveryAuthorization
-
 type TerminalFinalizationRequest =
     { ExecutionKey: ChatExecutionKey
       TerminalEvidence: ChatExecutionTerminalEvidence
@@ -68,6 +63,7 @@ type IgnoreReason =
     | DurableTerminalAlreadySettled
     | ProviderStillAlive
     | RecoveryAlreadyCommitted
+    | ProviderRecoveryOwned
     | StalePhysicalEvidence
     | StalePolicyEvidence
 
@@ -76,7 +72,6 @@ type ChatExecutionRecoveryDecision =
     | Ignore of ChatExecutionKey * IgnoreReason
     | ReconcilePhysical of PhysicalReconciliationRequest
     | ResumePreProvider of PreProviderResumeRequest
-    | RequeueEligible of ProviderRequeueRequest
     | Finalize of TerminalFinalizationRequest
     | MarkManualIntervention of ManualInterventionRequest
 
@@ -175,28 +170,21 @@ module ChatExecutionRecovery =
             && authorization.ProviderRun = started.ProviderRun
             && authorization.RequestKind = started.RequestKind
 
-        match decision.Retry, decision.Fallback, decision.MessageDisposition with
-        | RetryDecision.RetryFreshAttempt authorization, FallbackDecision.NoFallback, _ when
-            authorizationMatches authorization
-            ->
-            ChatExecutionRecoveryDecision.RequeueEligible(
-                ProviderRequeueRequest.RetryFreshAttempt(started, authorization)
-            )
-        | RetryDecision.NoRetry, FallbackDecision.AdvanceFallback authorization, _ when
-            authorizationMatches authorization
-            ->
-            ChatExecutionRecoveryDecision.RequeueEligible(
-                ProviderRequeueRequest.AdvanceFallback(started, authorization)
-            )
-        | RetryDecision.NoRetry,
-          FallbackDecision.NoFallback,
-          MessageDisposition.TerminalizeProviderStarted(key, disposition) when key = evidence.ExecutionState.Key ->
+        match decision.Resolution with
+        | ExecutionFailureResolution.RetryFreshAttempt authorization when authorizationMatches authorization ->
+            ChatExecutionRecoveryDecision.Ignore(evidence.ExecutionState.Key, IgnoreReason.ProviderRecoveryOwned)
+        | ExecutionFailureResolution.AdvanceFallback authorization when authorizationMatches authorization ->
+            ChatExecutionRecoveryDecision.Ignore(evidence.ExecutionState.Key, IgnoreReason.ProviderRecoveryOwned)
+        | ExecutionFailureResolution.TerminalizeProviderStarted(key, disposition) when key = evidence.ExecutionState.Key ->
             finalize started disposition
-        | RetryDecision.RetryFreshAttempt _, _, _
-        | _, FallbackDecision.AdvanceFallback _, _
-        | _, _, MessageDisposition.TerminalizeProviderStarted _ ->
+        | ExecutionFailureResolution.RetryFreshAttempt _
+        | ExecutionFailureResolution.AdvanceFallback _
+        | ExecutionFailureResolution.TerminalizeProviderStarted _ ->
             ChatExecutionRecoveryDecision.Ignore(evidence.ExecutionState.Key, IgnoreReason.StalePolicyEvidence)
-        | _ -> manual ManualInterventionReason.NoAuthorizedProviderDisposition evidence
+        | ExecutionFailureResolution.PreserveCurrentFact
+        | ExecutionFailureResolution.AwaitAcceptanceReconciliation _
+        | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _ ->
+            manual ManualInterventionReason.NoAuthorizedProviderDisposition evidence
 
     let private providerAbsentDecision (evidence: ChatExecutionRecoveryEvidence) (started: ProviderStartedEvidence) =
         match evidence.FailureDecisionEvidence with

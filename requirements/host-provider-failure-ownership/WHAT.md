@@ -8,9 +8,9 @@ plugin 成功启用后必须无条件把 `experimental.chatMaxRetries` 设为 0�
 
 Host 不为同一 ProviderRunIdentity 发起第二次 provider request。后续压缩、fallback、换 channel/provider/family 只能由 ExecutionFailurePolicy 授权新的 provider run。
 
-## HOSTFAIL-003: 可恢复 provider error 保留事实但抑制默认重复提示
+## HOSTFAIL-003: 恢复期不发射额外呈现且不声称越界 UI 抑制
 
-被 Wanxiangshu 确认认领且有继续恢复动作的 provider/network failure 必须保留真实 session.error/durable evidence，同时在默认 Desktop/CLI presentation consumer 之前带 typed claimed metadata，使默认 toast/sound/notification/CLI error 不重复展示。
+校正 HOSTFAIL 虚假声明：外部 server-plugin 的 `event` 钩子仅在 EventV2Bridge 发布之后被动观测，无法在物理上拦截或抑制上游已发布的 `session.error` 或 Desktop/CLI 原始界面提示。严禁声称具有不存在的 UI 拦截能力。Wanxiangshu 能且只能保证：在内部 provider recovery 处于活跃恢复期时，自身发射零额外 final presentation；仅在所有恢复尝试确定性耗尽时，才发射恰好一次由 Wanxiangshu 拥有的 typed terminal presentation。
 
 ## HOSTFAIL-004: 非认领错误保持 Host 默认 fail-loud
 
@@ -22,8 +22,8 @@ ExecutionFailurePolicy 是 retry/fallback/capacity settlement 的唯一决策 ow
 
 ## HOSTFAIL-006: capacity exhaustion 只产生一个 final presentation
 
-全部 provider/channel/family capacity 归零时写 typed exceptional terminal，停止 nudge/successor provider admission，并向用户显示一份 Wanxiangshu-owned final summary；不得同时再弹 Host 原始中间错误。
+全部 provider/channel/family capacity 归零或恢复预算耗尽时写 typed exceptional terminal，停止后续 provider admission，并由 Wanxiangshu 产生恰好一次最终终态呈现（final presentation）；恢复中间状态保持静默，绝不重复生成中间终态呈现。
 
 ## HOSTFAIL-007: OpenCode Host 版本漂移 fail closed
 
-兼容基线固定 OpenCode 1.18.18。gate 必须验证 chatMaxRetries consumer 与 session.error presentation producer→SDK→Desktop/CLI 链路；版本或 owner 漂移时失败并要求重新审计，不允许静默跳过。
+兼容基线固定 OpenCode 1.18.29。gate 必须验证 chatMaxRetries consumer 与 session.error presentation producer→SDK→Desktop/CLI 链路；版本或 owner 漂移时失败并要求重新审计，不允许静默跳过。

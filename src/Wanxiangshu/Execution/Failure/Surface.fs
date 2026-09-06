@@ -110,7 +110,7 @@ module Surface =
           FallbackBudget = budgetOf "provider.fallbackBudget" value?fallbackBudget
           Breaker = breakerOf value?breaker }
 
-    let private inputOf (value: obj) =
+    let internal inputOf (value: obj) =
         if isNull value then
             invalidArg "input" "missing execution failure policy input"
 
@@ -133,23 +133,12 @@ module Surface =
         | ProviderRequestKind.InteractionRepair -> "InteractionRepair"
         | ProviderRequestKind.StrengthReplica -> "StrengthReplica"
 
-    let private authorizationView kind (authorization: ProviderRecoveryAuthorization) =
+    let private authorizationView (authorization: ProviderRecoveryAuthorization) =
         box
-            {| kind = kind
-               decisionId = authorization.DecisionId.Value
+            {| decisionId = authorization.DecisionId.Value
                logicalRun = LogicalRunId.value authorization.LogicalRun
                providerRun = ProviderRunIdentity.value authorization.ProviderRun
                requestKind = requestKindLabel authorization.RequestKind |}
-
-    let private retryView =
-        function
-        | RetryDecision.NoRetry -> box {| kind = "NoRetry" |}
-        | RetryDecision.RetryFreshAttempt authorization -> authorizationView "RetryFreshAttempt" authorization
-
-    let private fallbackView =
-        function
-        | FallbackDecision.NoFallback -> box {| kind = "NoFallback" |}
-        | FallbackDecision.AdvanceFallback authorization -> authorizationView "AdvanceFallback" authorization
 
     let private breakerView =
         function
@@ -178,24 +167,6 @@ module Surface =
         | ChatExecutionTerminalDisposition.Rejected -> "Rejected"
         | ChatExecutionTerminalDisposition.Failed -> "Failed"
 
-    let private messageView =
-        function
-        | MessageDisposition.KeepCurrentFact -> box {| kind = "KeepCurrentFact" |}
-        | MessageDisposition.TerminalizeAcceptedPreProvider(key, disposition) ->
-            box
-                {| kind = "TerminalizeAcceptedPreProvider"
-                   executionKey = keyView key
-                   disposition = terminalDispositionLabel disposition |}
-        | MessageDisposition.TerminalizeProviderStarted(key, disposition) ->
-            box
-                {| kind = "TerminalizeProviderStarted"
-                   executionKey = keyView key
-                   disposition = terminalDispositionLabel disposition |}
-        | MessageDisposition.AwaitAcceptanceReconciliation key ->
-            box
-                {| kind = "AwaitAcceptanceReconciliation"
-                   executionKey = keyView key |}
-
     let private fatalityView =
         function
         | FatalityDecision.NoFatality -> box {| kind = "NoFatality" |}
@@ -204,10 +175,24 @@ module Surface =
     let decide (value: obj) : obj =
         let decision = value |> inputOf |> ExecutionFailurePolicy.decide
 
+        let resolutionLabel, authorization, terminalDisposition, executionKey =
+            match decision.Resolution with
+            | ExecutionFailureResolution.PreserveCurrentFact -> "PreserveCurrentFact", null, null, null
+            | ExecutionFailureResolution.AwaitAcceptanceReconciliation key ->
+                "AwaitAcceptanceReconciliation", null, null, keyView key
+            | ExecutionFailureResolution.RetryFreshAttempt auth ->
+                "RetryFreshAttempt", authorizationView auth, null, null
+            | ExecutionFailureResolution.AdvanceFallback auth -> "AdvanceFallback", authorizationView auth, null, null
+            | ExecutionFailureResolution.TerminalizeAcceptedPreProvider(key, disposition) ->
+                "TerminalizeAcceptedPreProvider", null, terminalDispositionLabel disposition, keyView key
+            | ExecutionFailureResolution.TerminalizeProviderStarted(key, disposition) ->
+                "TerminalizeProviderStarted", null, terminalDispositionLabel disposition, keyView key
+
         box
-            {| retry = retryView decision.Retry
-               fallback = fallbackView decision.Fallback
+            {| resolution = resolutionLabel
+               authorization = authorization
+               terminalDisposition = terminalDisposition
+               executionKey = executionKey
                breaker = breakerView decision.Breaker
                capacitySettlement = capacityView decision.CapacitySettlement
-               messageDisposition = messageView decision.MessageDisposition
                fatality = fatalityView decision.Fatality |}

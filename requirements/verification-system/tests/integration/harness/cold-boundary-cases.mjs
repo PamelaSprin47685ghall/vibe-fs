@@ -50,7 +50,7 @@ const REQUEST_KIND_SWITCHED = body(
 
 // MANAGER-LOOP: the retired iteration ends with narrative and tool traffic,
 // plus a non-authority nudge the projection drops; the next iteration
-// restarts under the same system/provider plan with its root user kept and every
+// restarts under the same tools/authority plan with its root user kept and every
 // user a subsequence of the previous users. Structural only: typed
 // authority-revision retention is proved by the unit projection tests and the
 // long-stroke root-only oracle.
@@ -261,6 +261,18 @@ export const coldBoundaryCases = [
         'manager-loop',
         'dropping a non-authority old nudge is accepted',
       );
+
+      const beforeFallback = body('test-model', [
+        hostSystem('test-model'),
+        user('Round 1'),
+        assistant('assessment evidence'),
+      ]);
+      const afterFallback = body('test-model-b', [hostSystem('test-model-b'), user('Round 1')]);
+      assertEq(
+        decide(beforeFallback, afterFallback, at('manager-loop')).resealed,
+        'manager-loop',
+        'an exact Host model banner change cannot masquerade as a history rewrite',
+      );
     },
   },
 
@@ -319,12 +331,6 @@ export const coldBoundaryCases = [
       const retooled = body('test-model', MANAGER_NEXT.messages, ['write', 'read']);
       assertEq(
         decide(MANAGER_RETIRED, retooled, at('manager-loop')).broken,
-        'manager-loop-rewrote-fixed',
-      );
-
-      const remodelled = body('test-model-b', MANAGER_NEXT.messages);
-      assertEq(
-        decide(MANAGER_RETIRED, remodelled, at('manager-loop')).broken,
         'manager-loop-rewrote-fixed',
       );
 

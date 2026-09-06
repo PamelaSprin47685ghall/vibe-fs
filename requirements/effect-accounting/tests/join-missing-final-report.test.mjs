@@ -68,3 +68,24 @@ test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_real_Failed_still_claims_run', async
     message: 'provider timeout',
   })
 })
+
+test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_first_proven_terminal_is_single_assignment', async () => {
+  const failedFirst = makeRun('agent-failed-first', 'ses_failed_first_child', 'ses_failed_first_parent')
+  await lifecycle.complete(failedFirst, { kind: 'Failed', message: 'providers exhausted' })
+  await lifecycle.complete(failedFirst, { kind: 'Completed', terminalText: 'late success' })
+  assert.deepEqual(await lifecycle.completion(failedFirst), {
+    status: 'failed',
+    agentId: 'agent-failed-first',
+    code: 'ERROR',
+    message: 'providers exhausted',
+  })
+
+  const completedFirst = makeRun('agent-completed-first', 'ses_completed_first_child', 'ses_completed_first_parent')
+  await lifecycle.complete(completedFirst, { kind: 'Completed', terminalText: 'owned success' })
+  await lifecycle.complete(completedFirst, { kind: 'Failed', message: 'late stale failure' })
+  assert.deepEqual(await lifecycle.completion(completedFirst), {
+    status: 'completed',
+    agentId: 'agent-completed-first',
+    workRecord: '',
+  })
+})

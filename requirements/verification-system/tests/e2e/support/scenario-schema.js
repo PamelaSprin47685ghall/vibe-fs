@@ -87,6 +87,7 @@ const collectionShapeProblems = (raw) => {
  */
 const FLOW_VERBS = new Set([
   'wait',
+  'attempts',
   'waitAny',
   'waitFact',
   'armIdle',
@@ -123,6 +124,16 @@ const unknownFlowVerbs = (flow) =>
       .filter((verb) => !FLOW_VERBS.has(verb))
       .map((verb) => `flow[${index}]: unknown verb '${verb}'; a misspelled verb is silently ignored`),
   );
+
+const waitAttemptsProblems = (flow) =>
+  (flow ?? []).flatMap((flowStep, index) => {
+    if (flowStep?.attempts === undefined) return [];
+    if (flowStep.wait === undefined) return [`flow[${index}] attempts is only valid with wait`];
+    if (!Number.isInteger(flowStep.attempts) || flowStep.attempts < 1) {
+      return [`flow[${index}] attempts must be a positive integer`];
+    }
+    return [];
+  });
 
 const waitAnyProblems = (flow) =>
   (flow ?? []).flatMap((flowStep, index) => {
@@ -876,6 +887,7 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
 
   const validationProblems = [
     ...unknownFlowVerbs(raw.flow),
+    ...waitAttemptsProblems(raw.flow),
     ...waitAnyProblems(raw.flow),
     ...bindChildProblems(raw.flow),
     ...awaitIdleProblems(raw.flow),
@@ -908,6 +920,7 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
       // the same object so a driver compiles ONCE — reading the file twice was how the JSON
       // era ended up with `readScript` and `loadScripts` disagreeing about the same file.
       setup: raw.setup ?? {},
+      routingSource: raw.routingSource,
       session: raw.session,
       prompt: raw.prompt,
       pass: raw.pass,

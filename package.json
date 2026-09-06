@@ -68,22 +68,22 @@
     "@opencode-ai/plugin": ">=1.17.4"
   },
   "dependencies": {
-    "@fable-org/fable-library-js": "^2.5.1",
+    "@fable-org/fable-library-js": "2.6.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "bun-pty": "^0.4.10",
     "gpt-tokenizer": "^4.0.0",
     "jq-wasm": "3.0.0-jq-1.8.2",
     "proper-lockfile": "^4.1.2",
-    "zod": "^4.4.3"
+    "zod": "4.5.4"
   },
   "overrides": {
     "bun-pty": "$bun-pty"
   },
   "devDependencies": {
-    "@opencode-ai/plugin": "1.18.18",
+    "@opencode-ai/plugin": "1.18.29",
     "acorn": "^8.18.0",
     "fast-check": "4.9.0",
-    "opencode-ai": "1.18.18",
+    "opencode-ai": "1.18.29",
     "smol-toml": "1.8.0",
     "wireit": "^0.14.13"
   }

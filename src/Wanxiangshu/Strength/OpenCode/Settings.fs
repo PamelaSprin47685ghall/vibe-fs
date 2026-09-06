@@ -9,7 +9,7 @@ open Wanxiangshu.Strength
 module StrengthSettings =
 
     let HostCanaryFingerprint =
-        "opencode-ai@1.18.18|@opencode-ai/plugin@>=1.17.4|strength-host-canary-v1"
+        "opencode-ai@1.18.29|@opencode-ai/plugin@>=1.17.4|strength-host-canary-v1"
 
     let private env name =
         match Environment.GetEnvironmentVariable name with

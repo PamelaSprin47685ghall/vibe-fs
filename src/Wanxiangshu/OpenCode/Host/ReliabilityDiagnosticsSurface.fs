@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Execution.Failure
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
@@ -82,17 +83,26 @@ module ReliabilityDiagnosticsSurface =
         | "PersistenceFailure" -> ExecutionFailure.PersistenceFailure commitment
         | failure -> invalidArg "failureClass" $"unknown known failure class '{failure}'"
 
-    let private retryOf authorization value =
-        match requiredText "retryDecision" value with
-        | "NoRetry" -> RetryDecision.NoRetry
-        | "RetryFreshAttempt" -> RetryDecision.RetryFreshAttempt(authorization ())
-        | decision -> invalidArg "retryDecision" $"unknown retry decision '{decision}'"
-
-    let private fallbackOf authorization value =
-        match requiredText "fallbackDecision" value with
-        | "NoFallback" -> FallbackDecision.NoFallback
-        | "AdvanceFallback" -> FallbackDecision.AdvanceFallback(authorization ())
-        | decision -> invalidArg "fallbackDecision" $"unknown fallback decision '{decision}'"
+    let private resolutionOf authorization executionKey value =
+        match requiredText "resolution" value with
+        | "PreserveCurrentFact" -> ExecutionFailureResolution.PreserveCurrentFact
+        | "AwaitAcceptanceReconciliation" ->
+            match executionKey () with
+            | Some key -> ExecutionFailureResolution.AwaitAcceptanceReconciliation key
+            | None -> invalidArg "resolution" "AwaitAcceptanceReconciliation requires execution key"
+        | "RetryFreshAttempt" -> ExecutionFailureResolution.RetryFreshAttempt(authorization ())
+        | "AdvanceFallback" -> ExecutionFailureResolution.AdvanceFallback(authorization ())
+        | "TerminalizeAcceptedPreProvider" ->
+            match executionKey () with
+            | Some key ->
+                ExecutionFailureResolution.TerminalizeAcceptedPreProvider(key, ChatExecutionTerminalDisposition.Failed)
+            | None -> invalidArg "resolution" "TerminalizeAcceptedPreProvider requires execution key"
+        | "TerminalizeProviderStarted" ->
+            match executionKey () with
+            | Some key ->
+                ExecutionFailureResolution.TerminalizeProviderStarted(key, ChatExecutionTerminalDisposition.Failed)
+            | None -> invalidArg "resolution" "TerminalizeProviderStarted requires execution key"
+        | resolution -> invalidArg "resolution" $"unknown failure resolution '{resolution}'"
 
     let private capacityStateOf value =
         match requiredText "capacityState" value with
@@ -147,8 +157,7 @@ module ReliabilityDiagnosticsSurface =
                   "providerRequestKind"
                   "transition"
                   "failureClass"
-                  "retryDecision"
-                  "fallbackDecision"
+                  "resolution"
                   "capacityState"
                   "recoveryDecision"
                   "capacityFence"
@@ -161,6 +170,21 @@ module ReliabilityDiagnosticsSurface =
         |> Option.iter (fun field -> invalidArg field $"unknown causal diagnostic field '{field}'")
 
         let operation = requiredText "operation" value?operation
+
+        let sessionIdOpt =
+            optionalText "sessionId" value?sessionId |> Option.map SessionId.create
+
+        let physicalUserMessageIdOpt =
+            optionalText "physicalUserMessageId" value?physicalUserMessageId
+            |> Option.map PhysicalUserMessageId.create
+
+        let executionKey () : ChatExecutionKey option =
+            match sessionIdOpt, physicalUserMessageIdOpt with
+            | Some sid, Some pid ->
+                Some
+                    { SessionId = sid
+                      PhysicalUserMessageId = pid }
+            | _ -> None
 
         if not (ReliabilityDiagnostics.validateOperation operation) then
             invalidArg "operation" "operation must be one non-empty line"
@@ -206,7 +230,7 @@ module ReliabilityDiagnosticsSurface =
                 )
             | _ ->
                 invalidArg
-                    "retryDecision"
+                    "resolution"
                     "provider recovery decision requires logicalRunId, providerRunIdentity, and providerRequestKind"
 
         { Operation = operation
@@ -243,16 +267,11 @@ module ReliabilityDiagnosticsSurface =
                         (persistenceCommitment |> Option.defaultValue PersistenceCommitment.Unknown)
                         value?failureClass
                 )
-          RetryDecision =
-            if isNull value?retryDecision then
+          Resolution =
+            if isNull value?resolution then
                 None
             else
-                Some(retryOf authorization value?retryDecision)
-          FallbackDecision =
-            if isNull value?fallbackDecision then
-                None
-            else
-                Some(fallbackOf authorization value?fallbackDecision)
+                Some(resolutionOf authorization executionKey value?resolution)
           CapacityState =
             if isNull value?capacityState then
                 None
@@ -294,15 +313,14 @@ module ReliabilityDiagnosticsSurface =
         | ExecutionFailure.PersistenceFailure _ -> "PersistenceFailure"
         | failure -> string failure
 
-    let private retryLabel =
+    let private resolutionLabel =
         function
-        | RetryDecision.NoRetry -> "NoRetry"
-        | RetryDecision.RetryFreshAttempt _ -> "RetryFreshAttempt"
-
-    let private fallbackLabel =
-        function
-        | FallbackDecision.NoFallback -> "NoFallback"
-        | FallbackDecision.AdvanceFallback _ -> "AdvanceFallback"
+        | ExecutionFailureResolution.PreserveCurrentFact -> "PreserveCurrentFact"
+        | ExecutionFailureResolution.AwaitAcceptanceReconciliation _ -> "AwaitAcceptanceReconciliation"
+        | ExecutionFailureResolution.RetryFreshAttempt _ -> "RetryFreshAttempt"
+        | ExecutionFailureResolution.AdvanceFallback _ -> "AdvanceFallback"
+        | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _ -> "TerminalizeAcceptedPreProvider"
+        | ExecutionFailureResolution.TerminalizeProviderStarted _ -> "TerminalizeProviderStarted"
 
     let private lifecycleLabel =
         function
@@ -328,8 +346,7 @@ module ReliabilityDiagnosticsSurface =
                 {| ``from`` = optionObject lifecycleLabel record.Transition.From
                    ``to`` = lifecycleLabel record.Transition.To |}
                failureClass = optionObject failureLabel record.FailureClass
-               retryDecision = optionObject retryLabel record.RetryDecision
-               fallbackDecision = optionObject fallbackLabel record.FallbackDecision
+               resolution = optionObject resolutionLabel record.Resolution
                capacityState = optionObject string record.CapacityState
                capacityFence = optionObject redactText record.CapacityFence
                hook = optionObject redactText record.Hook

@@ -32,7 +32,7 @@ Runtime 仅负责加载 scheduler、校验 ABI、维护进程共享的 token led
 
 ## EMR-006: managed lease 只在一个物理 execution 内稳定；session continuation 重新调度但可偏好上一 target
 
-物理执行租约与 `(SessionId, PhysicalUserMessageId)` 绑定。同 physical id 的重试沿用原 target；同一 SessionId 出现新 physical id 时原子替代旧租约，并将上一 target 作为 `previous` 传入调度器供其优先续用。租约不以 SessionId 为单位跨物理执行永久绑定。
+物理执行租约与 `(SessionId, PhysicalUserMessageId)` 绑定。同 physical id 的重试沿用原 target；同一 SessionId 出现新 physical id 时原子替代旧租约，并将上一 target 作为 `previous` 传入调度器供其优先续用。provider step 结束时必须把实际 lease target 与 exact `ProviderRunIdentity` 绑定；failure settlement 只可原子消费该 witness，禁止从 mutable session-last target 猜测失败 provider。每个 session 最多保留 latest run witness，新 run 自动废除旧 witness。租约不以 SessionId 为单位跨物理执行永久绑定。
 
 ## EMR-007: physical execution identity / end evidence 释放 occupancy；session/业务 lifecycle 不拥有槽
 

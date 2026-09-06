@@ -64,15 +64,12 @@ type PluginRecoveryScope =
 
     member PublishPendingChatResume: request: PreProviderResumeRequest -> unit
 
-    member PublishAuthorizedChatRequeue: request: ProviderRequeueRequest -> unit
-
     member PublishManualChatIntervention: request: ManualInterventionRequest -> unit
 
     /// Returns the currently published recovery ownership requests.
     member PendingChatRecoveryOwnership:
         unit ->
             {| Resumes: PreProviderResumeRequest[]
-               Requeues: ProviderRequeueRequest[]
                ManualInterventions: ManualInterventionRequest[] |}
 
     /// Session deletion drops arming and attempt plans for this session.

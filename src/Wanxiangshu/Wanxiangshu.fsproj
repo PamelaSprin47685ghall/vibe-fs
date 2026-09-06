@@ -36,8 +36,6 @@
     <Compile Include="Mission/Relay/Retirement/Surface.fs"/>
     <Compile Include="Mission/Relay/ProjectionSurface.fsi"/>
     <Compile Include="Mission/Relay/ProjectionSurface.fs"/>
-    <Compile Include="OpenCode/Host/ProviderFailurePresentation.fsi"/>
-    <Compile Include="OpenCode/Host/ProviderFailurePresentation.fs"/>
     <Compile Include="Foundation/CanonicalJson.fsi"/>
     <Compile Include="Foundation/CanonicalJson.fs"/>
     <Compile Include="OpenCode/Host/Message.fsi"/>
@@ -882,6 +880,8 @@
     <Compile Include="OpenCode/Host/SessionsSurface.fs"/>
     <Compile Include="OpenCode/Host/HostMessageProjection.fsi"/>
     <Compile Include="OpenCode/Host/HostMessageProjection.fs"/>
+    <Compile Include="OpenCode/Host/ProviderFailurePresentation.fsi"/>
+    <Compile Include="OpenCode/Host/ProviderFailurePresentation.fs"/>
     <Compile Include="Repository/Investigation/Semble/SearchCodec.fsi"/>
     <Compile Include="Repository/Investigation/Semble/SearchCodec.fs"/>
     <Compile Include="Repository/Investigation/Semble/Stdio.fsi"/>

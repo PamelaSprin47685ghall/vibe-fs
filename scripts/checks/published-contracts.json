@@ -2008,7 +2008,7 @@
     {
       "owner": "execution-failure-policy",
       "locality": "execution-failure-model",
-      "justification": "Execution failure evidence, retry/fallback/breaker/capacity/message decisions and provider-failure mapping form a signed policy locality whose only compile dependencies are graduated identity, managed-chat evidence and provider request-kind contracts."
+      "justification": "Execution failure evidence, its exclusive recovery-or-terminal resolution, orthogonal breaker/capacity/fatality decisions, and provider-failure mapping form a signed policy locality whose only compile dependencies are graduated identity, managed-chat evidence and provider request-kind contracts."
     },
     {
       "owner": "managed-chat-execution",
@@ -4714,6 +4714,7 @@
         "context-compression",
         "host-boundary",
         "managed-chat-execution",
+        "provider-attempt-recovery",
         "session-ontology"
       ],
       "symbols": [
@@ -4726,8 +4727,10 @@
         "Wanxiangshu.OpenCode.ModelRouting.endProviderStep",
         "Wanxiangshu.OpenCode.ModelRouting.enterProviderStep",
         "Wanxiangshu.OpenCode.ModelRouting.executionAdmissionTarget",
+        "Wanxiangshu.OpenCode.ModelRouting.hasTheoreticalCapacity",
         "Wanxiangshu.OpenCode.ModelRouting.hasRuntime",
         "Wanxiangshu.OpenCode.ModelRouting.initialize",
+        "Wanxiangshu.OpenCode.ModelRouting.markProviderFailed",
         "Wanxiangshu.OpenCode.ModelRouting.observePhysicalResource",
         "Wanxiangshu.OpenCode.ModelRouting.projectHostModel",
         "Wanxiangshu.OpenCode.ModelRouting.releaseExecution",
@@ -4735,6 +4738,7 @@
         "Wanxiangshu.OpenCode.ModelRouting.releasePhysicalExecution",
         "Wanxiangshu.OpenCode.ModelRouting.sameTarget",
         "Wanxiangshu.OpenCode.ModelRouting.suppressProviderStep",
+        "Wanxiangshu.OpenCode.ModelRouting.takeProviderRunTarget",
         "Wanxiangshu.OpenCode.ModelRouting.toOpenCodeModel",
         "Wanxiangshu.OpenCode.ModelRouting.tryLease",
         "Wanxiangshu.OpenCode.ModelRouting.tryReserveManaged"
@@ -5430,7 +5434,7 @@
       ],
       "symbols": [
         "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.AlreadyRecorded",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.EpisodeSuperseded",
         "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.NoActiveRun",
         "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.RecoveryAdvanced",
         "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.RecoveryExhausted",
@@ -8239,19 +8243,19 @@
         "Wanxiangshu.Execution.Failure.ExecutionFailure.Superseded",
         "Wanxiangshu.Execution.Failure.ExecutionFailure.UserCancelled",
         "Wanxiangshu.Execution.Failure.ExecutionFailureDecision",
-        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.Fallback",
-        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.MessageDisposition",
-        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.Retry",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.Resolution",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.AdvanceFallback",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.AwaitAcceptanceReconciliation",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.PreserveCurrentFact",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.RetryFreshAttempt",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.TerminalizeAcceptedPreProvider",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.TerminalizeProviderStarted",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.Capacity",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.ExecutionKey",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.Failure",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.Lifecycle",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.Provider",
-        "Wanxiangshu.Execution.Failure.FallbackDecision",
-        "Wanxiangshu.Execution.Failure.FallbackDecision.AdvanceFallback",
-        "Wanxiangshu.Execution.Failure.FallbackDecision.NoFallback",
-        "Wanxiangshu.Execution.Failure.MessageDisposition",
-        "Wanxiangshu.Execution.Failure.MessageDisposition.TerminalizeProviderStarted",
         "Wanxiangshu.Execution.Failure.PersistenceCommitment",
         "Wanxiangshu.Execution.Failure.PersistenceCommitment.Committed",
         "Wanxiangshu.Execution.Failure.PersistenceCommitment.NotCommitted",
@@ -8270,10 +8274,7 @@
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.LogicalRun",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.ProviderRun",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.RequestKind",
-        "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.RetryBudget",
-        "Wanxiangshu.Execution.Failure.RetryDecision",
-        "Wanxiangshu.Execution.Failure.RetryDecision.NoRetry",
-        "Wanxiangshu.Execution.Failure.RetryDecision.RetryFreshAttempt"
+        "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.RetryBudget"
       ],
       "justification": "execution-failure-policy.Contract publishes exactly these symbols to 'managed-chat-execution'; every unlisted sibling remains private to execution-failure-policy."
     },
@@ -8331,26 +8332,23 @@
         "Wanxiangshu.Execution.Failure.ExecutionFailure.UserCancelled",
         "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.Breaker",
         "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.CapacitySettlement",
-        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.Fallback",
         "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.Fatality",
-        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.MessageDisposition",
-        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.Retry",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.Resolution",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.AdvanceFallback",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.AwaitAcceptanceReconciliation",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.PreserveCurrentFact",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.RetryFreshAttempt",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.TerminalizeAcceptedPreProvider",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.TerminalizeProviderStarted",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.Capacity",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.ExecutionKey",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.Failure",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.Lifecycle",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.Provider",
-        "Wanxiangshu.Execution.Failure.FallbackDecision",
-        "Wanxiangshu.Execution.Failure.FallbackDecision.AdvanceFallback",
-        "Wanxiangshu.Execution.Failure.FallbackDecision.NoFallback",
         "Wanxiangshu.Execution.Failure.FatalityDecision",
         "Wanxiangshu.Execution.Failure.FatalityDecision.FatalAfterSettlement",
         "Wanxiangshu.Execution.Failure.FatalityDecision.NoFatality",
-        "Wanxiangshu.Execution.Failure.MessageDisposition",
-        "Wanxiangshu.Execution.Failure.MessageDisposition.AwaitAcceptanceReconciliation",
-        "Wanxiangshu.Execution.Failure.MessageDisposition.KeepCurrentFact",
-        "Wanxiangshu.Execution.Failure.MessageDisposition.TerminalizeAcceptedPreProvider",
-        "Wanxiangshu.Execution.Failure.MessageDisposition.TerminalizeProviderStarted",
         "Wanxiangshu.Execution.Failure.PersistenceCommitment",
         "Wanxiangshu.Execution.Failure.PersistenceCommitment.Committed",
         "Wanxiangshu.Execution.Failure.PersistenceCommitment.NotCommitted",
@@ -8368,10 +8366,7 @@
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.LogicalRun",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.ProviderRun",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.RequestKind",
-        "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.RetryBudget",
-        "Wanxiangshu.Execution.Failure.RetryDecision",
-        "Wanxiangshu.Execution.Failure.RetryDecision.NoRetry",
-        "Wanxiangshu.Execution.Failure.RetryDecision.RetryFreshAttempt"
+        "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.RetryBudget"
       ],
       "justification": "execution-failure-policy.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to execution-failure-policy."
     },
@@ -8422,15 +8417,15 @@
         "Wanxiangshu.Execution.Failure.ExecutionFailure",
         "Wanxiangshu.Execution.Failure.ExecutionFailure.ProviderTransient",
         "Wanxiangshu.Execution.Failure.ExecutionFailureDecision",
-        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.Fallback",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.Resolution",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.AdvanceFallback",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.RetryFreshAttempt",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.Capacity",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.ExecutionKey",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.Failure",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.Lifecycle",
         "Wanxiangshu.Execution.Failure.ExecutionFailureInput.Provider",
-        "Wanxiangshu.Execution.Failure.FallbackDecision",
-        "Wanxiangshu.Execution.Failure.FallbackDecision.AdvanceFallback",
-        "Wanxiangshu.Execution.Failure.FallbackDecision.NoFallback",
         "Wanxiangshu.Execution.Failure.ProviderBreakerState",
         "Wanxiangshu.Execution.Failure.ProviderBreakerState.Closed",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryAuthorization",
@@ -13108,10 +13103,7 @@
         "Wanxiangshu.Execution.Session.ChatExecution.ManualInterventionRequest",
         "Wanxiangshu.Execution.Session.ChatExecution.ManualInterventionRequest.ExecutionState",
         "Wanxiangshu.Execution.Session.ChatExecution.PreProviderResumeRequest",
-        "Wanxiangshu.Execution.Session.ChatExecution.PreProviderResumeRequest.ExecutionKey",
-        "Wanxiangshu.Execution.Session.ChatExecution.ProviderRequeueRequest",
-        "Wanxiangshu.Execution.Session.ChatExecution.ProviderRequeueRequest.AdvanceFallback",
-        "Wanxiangshu.Execution.Session.ChatExecution.ProviderRequeueRequest.RetryFreshAttempt"
+        "Wanxiangshu.Execution.Session.ChatExecution.PreProviderResumeRequest.ExecutionKey"
       ],
       "justification": "managed-chat-execution.Contract publishes exactly these symbols to 'host-boundary'; every unlisted sibling remains private to managed-chat-execution."
     },
@@ -15854,7 +15846,6 @@
       ],
       "symbols": [
         "Wanxiangshu.OpenCode.PluginRecoveryScope",
-        "Wanxiangshu.OpenCode.PluginRecoveryScope.PublishAuthorizedChatRequeue",
         "Wanxiangshu.OpenCode.PluginRecoveryScope.PublishManualChatIntervention",
         "Wanxiangshu.OpenCode.PluginRecoveryScope.PublishPendingChatResume"
       ],
@@ -17678,6 +17669,31 @@
         "Wanxiangshu.Execution.Session.PtyJoinItem.PtyFailed"
       ],
       "justification": "delegation.Contract publishes exactly these symbols to 'time-capability'; every unlisted sibling remains private to delegation."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Failure/Model.fs",
+      "owner": "execution-failure-policy",
+      "node": "execution-failure-policy-frontier-keep",
+      "contract": "execution-failure-policy.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-provider-failure-ownership"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.Breaker",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.CapacitySettlement",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.Fatality",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureDecision.Resolution",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.AdvanceFallback",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.AwaitAcceptanceReconciliation",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.PreserveCurrentFact",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.RetryFreshAttempt",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.TerminalizeAcceptedPreProvider",
+        "Wanxiangshu.Execution.Failure.ExecutionFailureResolution.TerminalizeProviderStarted"
+      ],
+      "justification": "execution-failure-policy.Contract publishes exactly these symbols to 'host-provider-failure-ownership'; every unlisted sibling remains private to execution-failure-policy."
     }
   ],
   "physical_adapters": [

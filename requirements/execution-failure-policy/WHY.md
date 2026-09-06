@@ -7,14 +7,15 @@
 ## 核心不变量
 
 - 失败代数封闭且穷尽；persistence commit result 明确区分 `NotCommitted | Committed | Unknown`，新增失败语义必须新增类型分支与证明，不能落入 wildcard。
-- 同一输入只产生一个涵盖 retry、fallback、breaker、capacity settlement、message disposition 与 fatality 的纯策略输出。
+- 唯一公共裁决轴：`ExecutionFailureResolution` 是互斥和类型，每个失败回合严格收敛为一个继续分支（`RetryFreshAttempt` 或 `AdvanceFallback`）或一个终结分支（`TerminalizeAcceptedPreProvider`、`TerminalizeProviderStarted`、`AwaitAcceptanceReconciliation`、`PreserveCurrentFact`），绝无既不重试也不终态或两者并存的非法积状态。
+- 决策引擎由小型直接 F# CE 执行，各规则分支仅通过 `return` 一个确定 resolution 结束，无 AST、自由单子或第二解释器。熔断、容量结算与致命性是单次求值的正交不可变事实。
 - 只有已确认的 provider 失败类别可以授权 retry 或 fallback；acceptance unknown、stream interrupted、capacity pressure 与 persistence failure 都不能伪装成 provider failure。
 - pre-provider terminal 必须先 durable commit、再释放其 exact fence；其他 phase 使用各自合法顺序，fatal 始终是最后一步。
 - correctness 只依赖 durable facts、typed evidence 与显式失败事件，不依赖错误文案或墙钟。
 
 ## 边界
 
-- `managed-chat-execution` 唯一拥有 `(SessionId, PhysicalUserMessageId)` 消息事实及其 durable 状态迁移；本包只输出 typed message disposition command。
+- `managed-chat-execution` 唯一拥有 `(SessionId, PhysicalUserMessageId)` 消息事实及其 durable 状态迁移；本包只输出携带 exact key 与 typed disposition 的互斥 terminal resolution。
 - `execution-model-routing` 唯一拥有 opaque fenced capacity、typed queue 与 execution binding。
 - `provider-attempt-recovery` 唯一执行由本策略授权的 provider retry/fallback，并保持 logical participant run identity。
 - `host-boundary` 只负责把公开 Hook/SDK 观测译为失败代数，并执行 typed hook membrane。

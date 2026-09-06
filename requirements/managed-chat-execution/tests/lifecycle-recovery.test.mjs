@@ -22,7 +22,6 @@ test('WHAT[CHATEXEC-008] recovery begins from durable activation and re-enters o
     'SessionAborted',
     'SessionDeleted',
     'SessionCancelled',
-    'TypedFailureDecision',
     'CapacityProjectionReplayed',
   ])
 })
@@ -32,7 +31,7 @@ test('WHAT[CHATEXEC-012] lifecycle recovery interprets every typed decision thro
     ['ProviderAlive', 'Ignore', []],
     ['AcceptedProviderAlive', 'ReconcilePhysical', ['ReconcilePhysical:PersistProviderStarted']],
     ['CrashAfterAcceptance', 'ResumePreProvider', ['ResumePreProvider']],
-    ['RetryEligible', 'RequeueEligible', ['RequeueEligible:RetryFreshAttempt']],
+    ['RetryEligible', 'Ignore', []],
     ['ProviderTerminalCompleted', 'Finalize', ['Finalize:Completed']],
     ['MissingReceipt', 'MarkManualIntervention', ['MarkManualIntervention:MissingExternalReceipt']],
   ]
@@ -53,7 +52,6 @@ test('WHAT[CHATEXEC-012] only causal lifecycle signals enter the shared recovery
     'SessionAborted',
     'SessionDeleted',
     'SessionCancelled',
-    'TypedFailureDecision',
     'CapacityProjectionReplayed',
   ])
 })

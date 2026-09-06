@@ -11,7 +11,7 @@ import { captureEvidence, serializeEvidence } from './support/incident-evidence.
 
 const fact = fs.readFileSync(new URL('./fixtures/chat-execution-v1.json', import.meta.url), 'utf8')
 const hostContract = JSON.parse(fs.readFileSync(
-  new URL('../../host-boundary/fixtures/opencode-chat-admission-1.18.18.json', import.meta.url),
+  new URL('../../host-boundary/fixtures/opencode-chat-admission-1.18.29.json', import.meta.url),
   'utf8',
 ))
 const capacitySnapshot = {
@@ -33,8 +33,7 @@ const causalRecord = {
   providerRequestKind: 'work-main',
   transition: { from: null, to: 'Accepted' },
   failureClass: 'PersistenceFailure',
-  retryDecision: 'NoRetry',
-  fallbackDecision: 'NoFallback',
+  resolution: 'PreserveCurrentFact',
   capacityState: 'Released',
   capacityFence: null,
   hook: 'chat.message',

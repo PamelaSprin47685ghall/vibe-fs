@@ -92,10 +92,22 @@ test('WHAT[STRUCTURED-WORKFLOW-004] RECONCILE_PROGRAM_003: decideStep produces o
   assert.equal(name(evidence.unknown(), wake.abort()), 'StopPass')
   assert.equal(name(evidence.unknown(), wake.idle('ses-a', 1)), 'Publish')
 
-  // Terminal → Publish.
+  // Successful/aborted terminal observations publish directly. A failed
+  // provider terminal must wait for the matching typed physical witness.
   assert.equal(name(evidence.terminal('TurnCompleted')), 'Publish')
   assert.equal(name(evidence.terminal('TurnAborted')), 'Publish')
-  assert.equal(name(evidence.terminal('TurnFailed')), 'Publish')
+  assert.equal(name(evidence.terminal('TurnFailed')), 'StopPass')
+
+  const failedPhysical = 'msg-structured-failure'
+  assert.equal(
+    reconcileSurface.decisionName(
+      reconcileSurface.decideStep(
+        reconcileSurface.failureWakeFor(failedPhysical),
+        reconcileSurface.evidenceTerminalFor(failedPhysical, 'TurnFailed'),
+      ),
+    ),
+    'Publish',
+  )
 
   // Session cleared → StopPass.
   assert.equal(name(evidence.sessionCleared()), 'StopPass')

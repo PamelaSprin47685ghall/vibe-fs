@@ -68,7 +68,7 @@ type ExecutionFailureInput =
 
 [<Sealed>]
 type ProviderRecoveryDecisionId =
-    member internal Value: string
+    member Value: string
     static member internal Create: value: string -> ProviderRecoveryDecisionId
 
 [<Sealed>]
@@ -86,16 +86,6 @@ type ProviderRecoveryAuthorization =
             ProviderRecoveryAuthorization
 
 [<RequireQualifiedAccess>]
-type RetryDecision =
-    | NoRetry
-    | RetryFreshAttempt of ProviderRecoveryAuthorization
-
-[<RequireQualifiedAccess>]
-type FallbackDecision =
-    | NoFallback
-    | AdvanceFallback of ProviderRecoveryAuthorization
-
-[<RequireQualifiedAccess>]
 type BreakerDecision =
     | NoBreakerTransition
     | RecordProviderTransientFailure
@@ -108,11 +98,13 @@ type CapacitySettlement =
     | ReleaseExactFence of ExactCapacityFenceReference
 
 [<RequireQualifiedAccess>]
-type MessageDisposition =
-    | KeepCurrentFact
+type ExecutionFailureResolution =
+    | PreserveCurrentFact
+    | AwaitAcceptanceReconciliation of ChatExecutionKey
+    | RetryFreshAttempt of ProviderRecoveryAuthorization
+    | AdvanceFallback of ProviderRecoveryAuthorization
     | TerminalizeAcceptedPreProvider of ChatExecutionKey * ChatExecutionTerminalDisposition
     | TerminalizeProviderStarted of ChatExecutionKey * ChatExecutionTerminalDisposition
-    | AwaitAcceptanceReconciliation of ChatExecutionKey
 
 [<RequireQualifiedAccess>]
 type FatalityDecision =
@@ -120,9 +112,7 @@ type FatalityDecision =
     | FatalAfterSettlement
 
 type ExecutionFailureDecision =
-    { Retry: RetryDecision
-      Fallback: FallbackDecision
+    { Resolution: ExecutionFailureResolution
       Breaker: BreakerDecision
       CapacitySettlement: CapacitySettlement
-      MessageDisposition: MessageDisposition
       Fatality: FatalityDecision }

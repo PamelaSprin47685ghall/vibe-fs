@@ -10,7 +10,7 @@ open Wanxiangshu.Persistence.Journal
 type ConfirmedFailureOutcome =
     | RecoveryAdvanced of RecoveryOpportunity
     | RecoveryExhausted
-    | AlreadyRecorded
+    | EpisodeSuperseded
     | NoActiveRun
 
 module FallbackLedger =

@@ -18,7 +18,7 @@
 
 ## HOST-BOUNDARY-005: Reconciler 单飞快照观测与事件驱动收敛
 
-调和器对每个会话严格保证单飞执行（single-flight），接收到粗粒度信号时执行单次完整快照读取。在无新信号或明确投影边缘时，严禁通过墙钟轮询重复读取快照。Provider failure 的 exact assistant `message.updated` 即使尚无 retry owner 的 terminal disposition，也必须用自身 exact physical identity 发出 typed failure wake；同一 physical 随后的 idle/retry wake 或无 identity 的 coarse failure 不得覆盖它，新 physical 或显式 abort 才能替换它。无 current physical binding 的 coarse failure 不得读取快照或发布 terminal turn，只能等待 exact projection evidence。Exact failure 不得伪装成 managed-chat terminal，也不得因 coarse `session.error` 缺席或 disposition 缺失被丢弃。
+调和器对每个会话严格保证单飞执行（single-flight），接收到粗粒度信号时执行单次完整快照读取。在无新信号或明确投影边缘时，严禁通过墙钟轮询重复读取快照。Provider failure 的 exact assistant `message.updated` 即使尚无 retry owner 的 terminal disposition，也必须用自身 exact physical identity 发出 typed failure wake；`TurnFailed` 只有在该 exact typed witness 匹配时才能发布，先到达的 idle/retry 只能等待，不得把裸错误 terminalize；同一 physical 随后的 idle/retry wake 或无 identity 的 coarse failure 不得覆盖它，新 physical 或显式 abort 才能替换它。无 current physical binding 的 coarse failure 不得读取快照或发布 terminal turn，只能等待 exact projection evidence。Exact failure 不得伪装成 managed-chat terminal，也不得因 coarse `session.error` 缺席或 disposition 缺失被丢弃。
 
 ## HOST-BOUNDARY-006: Raw Part 与 ToolParts 状态投影一致性
 

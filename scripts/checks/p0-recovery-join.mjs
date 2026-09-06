@@ -451,7 +451,7 @@ export const RULES = [
     fileHint: 'ConfirmedFailurePort.fs',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
     pattern:
-      /type\s+ConfirmedFailureOutcome\s*=\s*\r?\n\s*\|\s*RecoveryAdvanced\s+of\s+RecoveryOpportunity\s*\r?\n\s*\|\s*RecoveryExhausted\s*\r?\n\s*\|\s*AlreadyRecorded\s*\r?\n\s*\|\s*NoActiveRun\s*\r?\n(?:\s*\r?\n|\s*\/\/\/[^\n]*\r?\n)*\s*type\s+ConfirmedFailurePort\s*=[^\n]*Task\s*<\s*Result\s*<\s*ConfirmedFailureOutcome\s*,\s*string\s*>\s*>/,
+      /type\s+ConfirmedFailureOutcome\s*=\s*\r?\n\s*\|\s*RecoveryAdvanced\s+of\s+RecoveryOpportunity\s*\r?\n\s*\|\s*RecoveryExhausted\s*\r?\n\s*\|\s*EpisodeSuperseded\s*\r?\n\s*\|\s*NoActiveRun\s*\r?\n(?:\s*\r?\n|\s*\/\/\/[^\n]*\r?\n)*\s*type\s+ConfirmedFailurePort\s*=[^\n]*Task\s*<\s*Result\s*<\s*ConfirmedFailureOutcome\s*,\s*string\s*>\s*>/,
     label: 'ConfirmedFailurePort must own the exact typed four-case ConfirmedFailureOutcome contract',
     positive: true,
   },
@@ -460,23 +460,19 @@ export const RULES = [
     fileHint: 'Workflow.fs',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
     pattern:
-      /\bmatch\s+\w+\s+with\b[\s\S]{0,1200}\bConfirmedFailureOutcome\.RecoveryExhausted\b[\s\S]{0,500}\bConfirmedFailureOutcome\.AlreadyRecorded\b[\s\S]{0,500}\bConfirmedFailureOutcome\.NoActiveRun\b[\s\S]{0,500}\bConfirmedFailureOutcome\.RecoveryAdvanced\b/,
+      /\bmatch\s+\w+\s+with\b[\s\S]{0,1200}\bConfirmedFailureOutcome\.RecoveryExhausted\b[\s\S]{0,500}\bConfirmedFailureOutcome\.EpisodeSuperseded\b[\s\S]{0,500}\bConfirmedFailureOutcome\.NoActiveRun\b[\s\S]{0,500}\bConfirmedFailureOutcome\.RecoveryAdvanced\b/,
     label: 'Fallback Workflow must exhaustively handle every ConfirmedFailureOutcome case',
     positive: true,
   },
   {
-    // The Blogger-main / durably-proven-WorkMain owner resolution and the
-    // policy-licensed append live in one chain: admitPolicyAuthorizedFailure
-    // resolves the exact owner together with its current durable state and
-    // fails closed to NoActiveRun, and the only ledger append binds that
-    // resolved `ownerSessionId` together with the
-    // typed `ProviderRecoveryAuthorization` issued by ExecutionFailurePolicy
-    // (PAR-019). A raw budget int no longer authorizes an advance.
+    // Exact physical ChatExecution evidence owns request kind. Only a proven
+    // Blogger kind crosses the association boundary; WorkMain stays on the
+    // failed session. The policy-licensed append consumes that resolved owner.
     id: 'workflow-main-session-failure-owner',
     fileHint: 'Workflow.fs',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
     pattern:
-      /\bFallbackLedger\.recordAuthorizedFailure\s+durable\s+ownerSessionId\s+authorization\s+error\b[\s\S]{0,3000}\blet\s+ownerSessionId\s*=\s*\r?\n\s*mainSessionOfBloggerProjection\s+projection\s+turn\.SessionId\s*\r?\n\s*\|>\s*Option\.orElseWith\s*\(fun\s*\(\)\s*->\s*\r?\n\s*FallbackEvidence\.tryCurrentState\s+turn\.SessionId\s+projection\s*\r?\n\s*\|>\s*Option\.map\s*\(fun\s+_\s*->\s*turn\.SessionId\)\)[\s\S]{0,200}\blet\s+ownerState\s*=\s*\r?\n\s*ownerSessionId\s*\r?\n\s*\|>\s*Option\.bind\s*\(fun\s+owner\s*->\s*\r?\n\s*FallbackEvidence\.tryCurrentState\s+owner\s+projection\s*\r?\n\s*\|>\s*Option\.map\s*\(fun\s+current\s*->\s*owner\s*,\s*current\)\)[\s\S]{0,160}\bmatch\s+ownerState\s+with\s*\r?\n\s*\|\s*None\s*->(?:(?!FallbackLedger)[\s\S]){0,200}?\bConfirmedFailureOutcome\.NoActiveRun\b[\s\S]{0,300}?\|\s*Some\s*\(\s*owner\s*,\s*current\s*\)\s*->[\s\S]{0,200}?\badmitCurrentFailure\s+durable\s+owner\s+turn\s+failure\s+requestKind\s+error\s+current\b/,
+      /(?=[\s\S]*\blet\s+private\s+recoveryOwnerSession\b[\s\S]{0,1000}ProviderRequestKind\.BloggerMain[\s\S]{0,300}SessionAssociationProjection\.tryMainSessionOf\s+failedSessionId[\s\S]{0,500}ProviderRequestKind\.WorkMain[\s\S]{0,200}Some\s+failedSessionId)(?=[\s\S]*\blet\s+private\s+requestKindFor\b[\s\S]{0,500}ChatExecutionProjection\.byKey[\s\S]{0,400}ProviderStarted[\s\S]{0,200}RequestKind)(?=[\s\S]*\bFallbackLedger\.recordAuthorizedFailure\s+durable\s+ownerSessionId\s+authorization\s+error\b)/,
     label: 'Fallback Workflow must append only to a resolved Blogger main or durably proven WorkMain owner',
     positive: true,
   },

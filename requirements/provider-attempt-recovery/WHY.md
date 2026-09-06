@@ -7,10 +7,12 @@
 ## 核心不变量与张力
 
 - **确认失败 vs 进程失忆**：attempt 失败是业务层已由快照确认的失败（与 `crash-reconciliation` 的进程失忆完全区分），必须通过单一 ledger 推进 cursor。
-- **无界侧循环 vs 有界自动预算**：A/A/B/B 侧循环本身无界，但自动恢复预算严格有界（达到预算后停止自动请求，需等待新 Authority Root 或显式动作）。
+- **无界槽循环 vs 有界自动预算**：A/A′/B/B′ participant/context 槽循环本身无界，但自动恢复预算严格有界（达到预算后停止自动请求，需等待新 Authority Root 或显式动作）。
 - **换执行者 vs 不换身份**：Fallback 仅改变下一次物理执行的 EffectiveAgent；同一 durable logical participant run 的 `ParticipantIdentity`、Persona、语言、system prompt、CanonicalRole 与 Authority identity 全程不变。
-- **失败分类 vs 恢复许可**：本包不解析异常或错误文案。只有 `execution-failure-policy` 已分类并授权的 `ProviderTransient | ProviderPermanent` 才能进入 retry/fallback；其他失败类别必须在各自 owner 结算。
+- **失败分类 vs 唯一恢复解释器**：本包（具体由 `Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderRecoveryWorkflow` 独占拥有）是 provider-started retry 与 fallback 的唯一解释器。`execution-failure-policy` 是失败分类与授权的唯一 owner，本包只消费其授权，不解析异常或错误文案。managed-chat 崩溃或资源恢复绝不启动 provider 工作或发布空的 requeue 请求。
 - **durable 领域证据 vs resume address**：Fallback cursor 只积分已提交的 root、失败与成功事实，回答当前失败预算与下一物理执行者；它不保存 callback、continuation、待执行动作或 process-local arming。崩溃后恢复 cursor 不得自行恢复流程，仍须重新取得 typed failure licence 与本次 attempt 的 opportunity。
+- **恢复 Prompt 身份与精确防重**：Provider 恢复 prompt 的 identity 精确携带 `ProviderRecoveryDecisionId` 与源 `ProviderRunIdentity`，对外可见文本保持完全一致。同一失败事件的重复回放只重入同一持久 claim，绝不发出第二次物理请求；新的失败 provider run 建立新 claim 并发送新的物理请求。
+- **provider 健康 vs recovery 槽**：`ModelRouting` 永久 poison 已失败物理 provider；Fallback cursor 只推进 participant/context 槽与预算。两者正交，cursor 不得复活失败 provider，provider 健康表也不得篡改 logical participant identity。
 
 ## 违反边界的失败意义
 

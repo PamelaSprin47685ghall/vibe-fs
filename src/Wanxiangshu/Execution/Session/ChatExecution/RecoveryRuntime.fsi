@@ -12,13 +12,11 @@ type ChatExecutionRecoveryLifecycleEvent =
     | SessionAborted of ChatExecutionKey
     | SessionDeleted of ChatExecutionKey
     | SessionCancelled of ChatExecutionKey
-    | TypedFailureDecision of ChatExecutionKey * ExecutionFailureDecision
     | CapacityProjectionReplayed
 
 type ChatExecutionRecoveryActionPorts =
     { ReconcilePhysical: PhysicalReconciliationRequest -> Task
       ResumePreProvider: PreProviderResumeRequest -> Task
-      RequeueEligible: ProviderRequeueRequest -> Task
       Finalize: TerminalFinalizationRequest -> Task
       MarkManualIntervention: ManualInterventionRequest -> Task }
 

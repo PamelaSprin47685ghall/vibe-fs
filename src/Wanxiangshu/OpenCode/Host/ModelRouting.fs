@@ -267,6 +267,9 @@ module ModelRouting =
         let activeBySession = Dictionary<string, ExecutionLease>()
         // DSL-MUTABLE: resource — last physical target map per session
         let lastPhysicalTargetBySession = Dictionary<string, ModelRoutingTarget>()
+        // DSL-MUTABLE: resource — one exact provider-run witness per live session
+        let targetByProviderRun = Dictionary<string, struct (string * ModelRoutingTarget)>()
+        let latestProviderRunBySession = Dictionary<string, string>()
         let admissionQueue = ExecutionAdmissionQueue(gate, transitionCounters)
         let admissionOwner = ExecutionCapacityOwner(transitionCounters)
         // DSL-MUTABLE: resource — process-local scheduler poison
@@ -295,6 +298,34 @@ module ModelRouting =
         let previousTarget sessionId =
             match lastPhysicalTargetBySession.TryGetValue sessionId with
             | true, target -> Some target
+            | false, _ -> None
+
+        let retireProviderRunTarget sessionId =
+            match latestProviderRunBySession.TryGetValue sessionId with
+            | true, providerRun ->
+                latestProviderRunBySession.Remove sessionId |> ignore
+                targetByProviderRun.Remove providerRun |> ignore
+            | false, _ -> ()
+
+        let rememberProviderRunTarget sessionId physicalUserMessageId providerRun =
+            match activeBySession.TryGetValue sessionId with
+            | true, lease when lease.PhysicalUserMessageId = Some physicalUserMessageId ->
+                retireProviderRunTarget sessionId
+                targetByProviderRun.[providerRun] <- struct (sessionId, lease.Target)
+                latestProviderRunBySession.[sessionId] <- providerRun
+            | _ -> ()
+
+        let forgetLatestProviderRunIfCurrent sessionId providerRun =
+            match latestProviderRunBySession.TryGetValue sessionId with
+            | true, latest when latest = providerRun -> latestProviderRunBySession.Remove sessionId |> ignore
+            | _ -> ()
+
+        let takeProviderRunTarget providerRun =
+            match targetByProviderRun.TryGetValue providerRun with
+            | true, struct (sessionId, target) ->
+                targetByProviderRun.Remove providerRun |> ignore
+                forgetLatestProviderRunIfCurrent sessionId providerRun
+                Some target
             | false, _ -> None
 
         let ensureHealthy () = fatalError |> Option.iter raise
@@ -384,6 +415,7 @@ module ModelRouting =
 
         let retireCurrentExecution sessionId =
             let changed = activeBySession.Remove sessionId
+            retireProviderRunTarget sessionId
             capacity.ReleaseSession sessionId |> ignore
 
             if admissionQueue.ContainsSession sessionId then
@@ -832,7 +864,9 @@ module ModelRouting =
             | Some _ when String.IsNullOrWhiteSpace providerRun -> ()
             | Some(normSessionId, normPhysicalUserMessageId) ->
                 lock gate (fun () ->
-                    capacity.EndStep(normSessionId, normPhysicalUserMessageId, providerRun.Trim())
+                    let normalizedProviderRun = providerRun.Trim()
+                    rememberProviderRunTarget normSessionId normPhysicalUserMessageId normalizedProviderRun
+                    capacity.EndStep(normSessionId, normPhysicalUserMessageId, normalizedProviderRun)
                     drainIfHealthy ())
 
         member _.SuppressProviderStep(sessionId: string, physicalUserMessageId: string) =
@@ -850,6 +884,9 @@ module ModelRouting =
 
         member _.LastPhysicalTarget(sessionId: string) : ModelRoutingTarget option =
             lock gate (fun () -> previousTarget sessionId)
+
+        member _.TakeProviderRunTarget(providerRun: string) : ModelRoutingTarget option =
+            lock gate (fun () -> takeProviderRunTarget providerRun)
 
         member _.MarkProviderFailed(provider: string) =
             if not (isNull markFailedFn) && isFunction markFailedFn then
@@ -895,6 +932,9 @@ module ModelRouting =
 
     let internal lastPhysicalTarget (sessionId: string) : ModelRoutingTarget option =
         current().LastPhysicalTarget sessionId
+
+    let internal takeProviderRunTarget (providerRun: ProviderRunIdentity) : ModelRoutingTarget option =
+        current().TakeProviderRunTarget(ProviderRunIdentity.value providerRun)
 
     let internal markProviderFailed (provider: string) : unit = current().MarkProviderFailed provider
 

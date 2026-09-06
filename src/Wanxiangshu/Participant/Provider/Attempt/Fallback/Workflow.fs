@@ -8,6 +8,7 @@ open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -62,6 +63,7 @@ module ProviderRecoveryWorkflow =
         | Materialize of string
         | Send of string
         | Bind of string
+        | Retired
 
     let private recoveryMaterialState
         (projection: ProjectionSet)
@@ -132,18 +134,31 @@ module ProviderRecoveryWorkflow =
         | None -> Task.FromResult(()) :> Task
         | Some bloggerSessionId -> awaitLinkedProducer host durable mainSessionId bloggerSessionId
 
-    let private mainSessionOfBloggerProjection (projection: ProjectionSet) (bloggerSessionId: SessionId) =
-        SessionAssociationProjection.tryMainSessionOf bloggerSessionId projection.AgentProjections.Associations
-
     let private mainSessionOfBlogger (durable: AgentJournal) (bloggerSessionId: SessionId) =
-        mainSessionOfBloggerProjection (AgentJournal.snapshot durable) bloggerSessionId
+        SessionAssociationProjection.tryMainSessionOf
+            bloggerSessionId
+            (AgentJournal.snapshot durable).AgentProjections.Associations
 
-    let private requestKindFor (durable: AgentJournal) (scope: IBloggerRuntimeHost) (sessionId: SessionId) =
-        match mainSessionOfBlogger durable sessionId, scope.TryPeekCurrentRequest(SessionId.value sessionId) with
-        | Some _, Some(BloggerRequestContext.Squash _) -> Some ProviderRequestKind.BloggerSquash
-        | Some _, Some(BloggerRequestContext.Main _) -> Some ProviderRequestKind.BloggerMain
-        | Some _, None -> None
-        | None, _ -> Some ProviderRequestKind.WorkMain
+    let private recoveryOwnerSession
+        (projection: ProjectionSet)
+        (failedSessionId: SessionId)
+        (requestKind: ProviderRequestKind)
+        =
+        match requestKind with
+        | ProviderRequestKind.BloggerMain
+        | ProviderRequestKind.BloggerSquash ->
+            SessionAssociationProjection.tryMainSessionOf failedSessionId projection.AgentProjections.Associations
+        | ProviderRequestKind.WorkMain
+        | ProviderRequestKind.InteractionRepair -> Some failedSessionId
+        | ProviderRequestKind.StrengthReplica -> None
+
+    let private requestKindFor (durable: AgentJournal) (turn: ReconciledTurn) =
+        (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+        |> ChatExecutionProjection.byKey
+            { SessionId = turn.SessionId
+              PhysicalUserMessageId = turn.PhysicalUserMessageId }
+        |> Option.bind (fun execution -> execution.ProviderStarted)
+        |> Option.map (fun started -> started.RequestKind)
 
     let private recoverySquashContext (durable: AgentJournal) (mainSessionId: SessionId) (bloggerSessionId: SessionId) =
         let session =
@@ -172,33 +187,72 @@ module ProviderRecoveryWorkflow =
             (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
         |> ignore
 
-    let private sendContinuation
+    let private recoveryGateKind (authorization: ProviderRecoveryAuthorization) =
+        "provider-recovery:" + authorization.DecisionId.Value
+
+    let private recoveryAlreadyAdmitted
+        (durable: AgentJournal)
+        (turn: ReconciledTurn)
+        (authorization: ProviderRecoveryAuthorization)
+        =
+        match HostSessionNudge.tryActiveProfile (Some durable) turn.SessionId with
+        | None -> false
+        | Some profile ->
+            (PromptDispatcher.forJournal durable).GateNudgeAlreadyAdmitted
+                profile
+                PromptAuthority.ContinuationKind.ProviderRetryAttempt
+                (recoveryGateKind authorization)
+                authorization.ProviderRun
+
+    let private sendRecoveryContinuation
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (turn: ReconciledTurn)
-        (journal: AgentJournal option)
+        (durable: AgentJournal)
+        (authorization: ProviderRecoveryAuthorization)
         (prompt: string)
         =
-        HostSessionNudge.sendContinuationResult
+        HostSessionNudge.trySendGateContinuation
             sessionPort
             rootWorkspace
             turn.SessionId
             prompt
             PromptAuthority.ContinuationKind.ProviderRetryAttempt
             turn.Directory
-            journal
-            PromptDispatcher.AwaitMode.Detached
-            None
+            (Some durable)
+            (recoveryGateKind authorization)
+            authorization.ProviderRun
 
     let private handleContinuation
         (eventPort: IEventObservationPort)
         (turn: ReconciledTurn)
         (error: string)
-        (continuation: Result<PromptKey, string>)
+        (continuation: HostSessionNudge.GateContinuationOutcome)
         =
         match continuation with
-        | Ok _ -> ()
-        | Error _ -> notifyFailure eventPort turn error
+        | HostSessionNudge.GateContinuationOutcome.Sent _
+        | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted
+        | HostSessionNudge.GateContinuationOutcome.Retired -> ()
+        | HostSessionNudge.GateContinuationOutcome.Failed _ -> notifyFailure eventPort turn error
+
+    let private bloggerPromptKey =
+        function
+        | HostSessionNudge.GateContinuationOutcome.Sent key -> Ok(Some key)
+        | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted -> Ok None
+        | HostSessionNudge.GateContinuationOutcome.Retired -> Error BloggerContinuationFailure.Retired
+        | HostSessionNudge.GateContinuationOutcome.Failed error -> Error(BloggerContinuationFailure.Send error)
+
+    let private bindBloggerPrompt
+        (scope: IBloggerRuntimeHost)
+        (durable: AgentJournal)
+        (ctx: BloggerRequestContext)
+        promptKey
+        =
+        match promptKey with
+        | None -> Task.FromResult(Ok())
+        | Some key ->
+            BloggerCoordinator.bindContinuationContext scope durable ctx key
+            |> TaskResult.mapError BloggerContinuationFailure.Bind
 
     let rec private sendStagedBloggerContinuation
         (sessionPort: ISessionHostPort)
@@ -207,6 +261,7 @@ module ProviderRecoveryWorkflow =
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (authorization: ProviderRecoveryAuthorization)
         (ctx: BloggerRequestContext)
         (prompt: string)
         (failureReason: string)
@@ -219,12 +274,10 @@ module ProviderRecoveryWorkflow =
                         |> TaskResult.mapError BloggerContinuationFailure.Materialize
 
                     let! promptKey =
-                        sendContinuation sessionPort rootWorkspace turn (Some durable) prompt
-                        |> TaskResult.mapError BloggerContinuationFailure.Send
+                        sendRecoveryContinuation sessionPort rootWorkspace turn durable authorization prompt
+                        |> TaskValue.map bloggerPromptKey
 
-                    do!
-                        BloggerCoordinator.bindContinuationContext scope durable ctx promptKey
-                        |> TaskResult.mapError BloggerContinuationFailure.Bind
+                    do! bindBloggerPrompt scope durable ctx promptKey
                 }
 
             return! settleBloggerContinuationFailure eventPort durable scope turn ctx failureReason outcome
@@ -249,6 +302,8 @@ module ProviderRecoveryWorkflow =
             | Error(BloggerContinuationFailure.Bind reason) ->
                 do! BloggerCoordinator.abandonContinuationContext scope durable ctx reason
                 notifyFailure eventPort turn reason
+            | Error BloggerContinuationFailure.Retired ->
+                do! BloggerCoordinator.abandonContinuationContext scope durable ctx "recovery target retired"
         }
 
     let private replaceFailedBloggerRequest
@@ -258,6 +313,7 @@ module ProviderRecoveryWorkflow =
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (authorization: ProviderRecoveryAuthorization)
         (failed: BloggerRequestContext)
         (next: BloggerRequestContext)
         (prompt: string)
@@ -274,6 +330,7 @@ module ProviderRecoveryWorkflow =
                     durable
                     scope
                     turn
+                    authorization
                     next
                     prompt
                     failureReason
@@ -286,6 +343,7 @@ module ProviderRecoveryWorkflow =
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (authorization: ProviderRecoveryAuthorization)
         (mainSessionId: SessionId)
         (continuationPrompt: string)
         (error: string)
@@ -302,6 +360,7 @@ module ProviderRecoveryWorkflow =
                 durable
                 scope
                 turn
+                authorization
                 failed
                 squashCtx
                 (squashPrompt mainSessionId)
@@ -314,6 +373,7 @@ module ProviderRecoveryWorkflow =
                 durable
                 scope
                 turn
+                authorization
                 failed
                 failed
                 continuationPrompt
@@ -330,6 +390,7 @@ module ProviderRecoveryWorkflow =
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (authorization: ProviderRecoveryAuthorization)
         (mainSessionId: SessionId)
         (continuationPrompt: string)
         (error: string)
@@ -347,6 +408,7 @@ module ProviderRecoveryWorkflow =
                         durable
                         scope
                         turn
+                        authorization
                         failed
                         main
                         continuationPrompt
@@ -360,6 +422,7 @@ module ProviderRecoveryWorkflow =
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (authorization: ProviderRecoveryAuthorization)
         (mainSessionId: SessionId)
         (continuationPrompt: string)
         (error: string)
@@ -379,6 +442,7 @@ module ProviderRecoveryWorkflow =
                 durable
                 scope
                 turn
+                authorization
                 mainSessionId
                 continuationPrompt
                 error
@@ -394,6 +458,7 @@ module ProviderRecoveryWorkflow =
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (authorization: ProviderRecoveryAuthorization)
         (mainSessionId: SessionId)
         (continuationPrompt: string)
         (error: string)
@@ -414,6 +479,7 @@ module ProviderRecoveryWorkflow =
                         durable
                         scope
                         turn
+                        authorization
                         mainSessionId
                         continuationPrompt
                         error
@@ -429,6 +495,7 @@ module ProviderRecoveryWorkflow =
                         durable
                         scope
                         turn
+                        authorization
                         mainSessionId
                         continuationPrompt
                         error
@@ -444,6 +511,7 @@ module ProviderRecoveryWorkflow =
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (authorization: ProviderRecoveryAuthorization)
         (continuationPrompt: string)
         (error: string)
         (opportunity: RecoveryOpportunity)
@@ -452,7 +520,9 @@ module ProviderRecoveryWorkflow =
             if opportunity = RecoveryOpportunity.RecoveryAttempt then
                 do! awaitRecoveryMaterial scope durable turn.SessionId
 
-            let! continuation = sendContinuation sessionPort rootWorkspace turn (Some durable) continuationPrompt
+            let! continuation =
+                sendRecoveryContinuation sessionPort rootWorkspace turn durable authorization continuationPrompt
+
             handleContinuation eventPort turn error continuation
         }
 
@@ -463,12 +533,22 @@ module ProviderRecoveryWorkflow =
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (authorization: ProviderRecoveryAuthorization)
         (continuationPrompt: string)
         (error: string)
         (opportunity: RecoveryOpportunity)
         : Task =
-        match mainSessionOfBlogger durable turn.SessionId with
-        | Some mainSessionId ->
+        let linkedMainSession =
+            match authorization.RequestKind with
+            | ProviderRequestKind.BloggerMain
+            | ProviderRequestKind.BloggerSquash -> mainSessionOfBlogger durable turn.SessionId
+            | ProviderRequestKind.WorkMain
+            | ProviderRequestKind.InteractionRepair
+            | ProviderRequestKind.StrengthReplica -> None
+
+        match recoveryAlreadyAdmitted durable turn authorization, authorization.RequestKind, linkedMainSession with
+        | true, _, _ -> Task.FromResult(()) :> Task
+        | false, (ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash), Some mainSessionId ->
             continueBlogger
                 sessionPort
                 rootWorkspace
@@ -476,12 +556,29 @@ module ProviderRecoveryWorkflow =
                 durable
                 scope
                 turn
+                authorization
                 mainSessionId
                 continuationPrompt
                 error
                 opportunity
-        | None ->
-            continueWorkMain sessionPort rootWorkspace eventPort durable scope turn continuationPrompt error opportunity
+        | false, (ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash), None ->
+            notifyFailure eventPort turn "Confirmed Blogger provider failure has no linked main session"
+            Task.FromResult(()) :> Task
+        | false, (ProviderRequestKind.WorkMain | ProviderRequestKind.InteractionRepair), _ ->
+            continueWorkMain
+                sessionPort
+                rootWorkspace
+                eventPort
+                durable
+                scope
+                turn
+                authorization
+                continuationPrompt
+                error
+                opportunity
+        | false, ProviderRequestKind.StrengthReplica, _ ->
+            notifyFailure eventPort turn "Strength replica provider failure cannot authorize automatic recovery"
+            Task.FromResult(()) :> Task
 
     let private settleFailureAdmission
         (sessionPort: ISessionHostPort)
@@ -490,6 +587,7 @@ module ProviderRecoveryWorkflow =
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (authorization: ProviderRecoveryAuthorization)
         (continuationPrompt: string)
         (error: string)
         admission
@@ -501,7 +599,7 @@ module ProviderRecoveryWorkflow =
         | Ok ConfirmedFailureOutcome.RecoveryExhausted ->
             notifyFailure eventPort turn error
             Task.FromResult(()) :> Task
-        | Ok ConfirmedFailureOutcome.AlreadyRecorded -> Task.FromResult(()) :> Task
+        | Ok ConfirmedFailureOutcome.EpisodeSuperseded -> Task.FromResult(()) :> Task
         | Ok ConfirmedFailureOutcome.NoActiveRun ->
             notifyFailure eventPort turn "Confirmed provider failure has no active fallback run"
             Task.FromResult(()) :> Task
@@ -513,6 +611,7 @@ module ProviderRecoveryWorkflow =
                 durable
                 scope
                 turn
+                authorization
                 continuationPrompt
                 error
                 opportunity
@@ -544,43 +643,27 @@ module ProviderRecoveryWorkflow =
                   FallbackBudget = fallbackBudgetOf current
                   Breaker = ProviderBreakerState.Closed } }
 
-    [<RequireQualifiedAccess>]
-    type private PolicyFallbackDecision =
-        | Exhausted
-        | Authorized of ProviderRecoveryAuthorization
-
-    let private policyFallbackDecision
+    let private recoveryAuthorization
         (turn: ReconciledTurn)
         (failure: ExecutionFailure)
         (current: FallbackProjection)
         (requestKind: ProviderRequestKind)
         =
-        match (recoveryDecision turn failure current requestKind).Fallback with
-        | FallbackDecision.NoFallback -> PolicyFallbackDecision.Exhausted
-        | FallbackDecision.AdvanceFallback authorization -> PolicyFallbackDecision.Authorized authorization
-
-    let private outcomeAfterRepeatedAdmission (durable: AgentJournal) (sessionId: SessionId) =
-        match FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot durable) with
-        | Some latest when fallbackBudgetOf latest = ProviderRecoveryBudget.Exhausted ->
-            Ok ConfirmedFailureOutcome.RecoveryExhausted
-        | _ -> Ok ConfirmedFailureOutcome.AlreadyRecorded
-
-    let private reconcileFailureAdmission (durable: AgentJournal) (sessionId: SessionId) admission =
-        match admission with
-        | Ok ConfirmedFailureOutcome.AlreadyRecorded -> outcomeAfterRepeatedAdmission durable sessionId
-        | _ -> admission
+        match (recoveryDecision turn failure current requestKind).Resolution with
+        | ExecutionFailureResolution.RetryFreshAttempt authorization
+        | ExecutionFailureResolution.AdvanceFallback authorization -> Some authorization
+        | ExecutionFailureResolution.PreserveCurrentFact
+        | ExecutionFailureResolution.AwaitAcceptanceReconciliation _
+        | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _
+        | ExecutionFailureResolution.TerminalizeProviderStarted _ -> None
 
     let private admitAuthorizedFailure
         (durable: AgentJournal)
         (ownerSessionId: SessionId)
-        (turn: ReconciledTurn)
         (authorization: ProviderRecoveryAuthorization)
         (error: string)
         =
-        task {
-            let! admission = FallbackLedger.recordAuthorizedFailure durable ownerSessionId authorization error
-            return reconcileFailureAdmission durable ownerSessionId admission
-        }
+        FallbackLedger.recordAuthorizedFailure durable ownerSessionId authorization error
 
     let private admitCurrentFailure
         (durable: AgentJournal)
@@ -591,10 +674,9 @@ module ProviderRecoveryWorkflow =
         (error: string)
         (current: FallbackProjection)
         =
-        match policyFallbackDecision turn failure current requestKind with
-        | PolicyFallbackDecision.Exhausted -> Task.FromResult(Ok ConfirmedFailureOutcome.RecoveryExhausted)
-        | PolicyFallbackDecision.Authorized authorization ->
-            admitAuthorizedFailure durable ownerSessionId turn authorization error
+        match recoveryAuthorization turn failure current requestKind with
+        | None -> Task.FromResult(Ok ConfirmedFailureOutcome.RecoveryExhausted)
+        | Some authorization -> admitAuthorizedFailure durable ownerSessionId authorization error
 
     let admitPolicyAuthorizedFailure
         (durable: AgentJournal)
@@ -605,11 +687,7 @@ module ProviderRecoveryWorkflow =
         : Task<Result<ConfirmedFailureOutcome, string>> =
         let projection = AgentJournal.snapshot durable
 
-        let ownerSessionId =
-            mainSessionOfBloggerProjection projection turn.SessionId
-            |> Option.orElseWith (fun () ->
-                FallbackEvidence.tryCurrentState turn.SessionId projection
-                |> Option.map (fun _ -> turn.SessionId))
+        let ownerSessionId = recoveryOwnerSession projection turn.SessionId requestKind
 
         let ownerState =
             ownerSessionId
@@ -621,24 +699,29 @@ module ProviderRecoveryWorkflow =
         | None -> Task.FromResult(Ok ConfirmedFailureOutcome.NoActiveRun)
         | Some(owner, current) -> admitCurrentFailure durable owner turn failure requestKind error current
 
-    let private executeFallbackDecision
+    let private executeRecoveryResolution
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (ownerSessionId: SessionId)
         (continuationPrompt: string)
         (error: string)
         (decision: ExecutionFailureDecision)
         : Task =
-        match decision.Fallback with
-        | FallbackDecision.NoFallback ->
+        match decision.Resolution with
+        | ExecutionFailureResolution.PreserveCurrentFact
+        | ExecutionFailureResolution.AwaitAcceptanceReconciliation _ -> Task.FromResult(()) :> Task
+        | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _
+        | ExecutionFailureResolution.TerminalizeProviderStarted _ ->
             notifyFailure eventPort turn error
             Task.FromResult(()) :> Task
-        | FallbackDecision.AdvanceFallback authorization ->
+        | ExecutionFailureResolution.RetryFreshAttempt authorization
+        | ExecutionFailureResolution.AdvanceFallback authorization ->
             task {
-                let! admission = FallbackLedger.recordAuthorizedFailure durable turn.SessionId authorization error
+                let! admission = FallbackLedger.recordAuthorizedFailure durable ownerSessionId authorization error
 
                 return!
                     settleFailureAdmission
@@ -648,6 +731,7 @@ module ProviderRecoveryWorkflow =
                         durable
                         scope
                         turn
+                        authorization
                         continuationPrompt
                         error
                         admission
@@ -660,6 +744,7 @@ module ProviderRecoveryWorkflow =
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (ownerSessionId: SessionId)
         (failure: ExecutionFailure)
         (continuationPrompt: string)
         (error: string)
@@ -667,7 +752,16 @@ module ProviderRecoveryWorkflow =
         (requestKind: ProviderRequestKind)
         =
         recoveryDecision turn failure current requestKind
-        |> executeFallbackDecision sessionPort rootWorkspace eventPort durable scope turn continuationPrompt error
+        |> executeRecoveryResolution
+            sessionPort
+            rootWorkspace
+            eventPort
+            durable
+            scope
+            turn
+            ownerSessionId
+            continuationPrompt
+            error
 
     let private providerOfTarget (target: Wanxiangshu.OpenCode.ModelRoutingTarget) : string =
         let slash = target.Model.IndexOf '/'
@@ -689,7 +783,7 @@ module ProviderRecoveryWorkflow =
         (error: string)
         : Task =
         task {
-            match ModelRouting.lastPhysicalTarget (SessionId.value turn.SessionId) with
+            match ModelRouting.takeProviderRunTarget turn.ProviderRun with
             | Some target -> ModelRouting.markProviderFailed (providerOfTarget target)
             | None -> ()
 
@@ -703,29 +797,34 @@ module ProviderRecoveryWorkflow =
                 |> Option.map (fun profile -> Roles.roleLabel profile.CanonicalRole)
                 |> Option.defaultValue ""
 
-            if roleName <> "" && not (ModelRouting.hasTheoreticalCapacity roleName) then
-                notifyFailure eventPort turn "All candidate providers exhausted (zero capacity)"
-            else
-                match
-                    FallbackEvidence.tryCurrentState turn.SessionId projections,
-                    requestKindFor durable scope turn.SessionId
-                with
-                | None, _
-                | _, None -> notifyFailure eventPort turn error
-                | Some current, Some requestKind ->
-                    return!
-                        executeAuthorizedRecovery
-                            sessionPort
-                            rootWorkspace
-                            eventPort
-                            durable
-                            scope
-                            turn
-                            failure
-                            continuationPrompt
-                            error
-                            current
-                            requestKind
+            let hasCapacity = roleName = "" || ModelRouting.hasTheoreticalCapacity roleName
+
+            let recoveryContext =
+                requestKindFor durable turn
+                |> Option.bind (fun requestKind ->
+                    recoveryOwnerSession projections turn.SessionId requestKind
+                    |> Option.bind (fun ownerSessionId ->
+                        FallbackEvidence.tryCurrentState ownerSessionId projections
+                        |> Option.map (fun current -> ownerSessionId, requestKind, current)))
+
+            match hasCapacity, recoveryContext with
+            | false, _ -> notifyFailure eventPort turn "All candidate providers exhausted (zero capacity)"
+            | true, None -> notifyFailure eventPort turn error
+            | true, Some(ownerSessionId, requestKind, current) ->
+                return!
+                    executeAuthorizedRecovery
+                        sessionPort
+                        rootWorkspace
+                        eventPort
+                        durable
+                        scope
+                        turn
+                        ownerSessionId
+                        failure
+                        continuationPrompt
+                        error
+                        current
+                        requestKind
         }
 
     /// FALLBACK-003 + FALLBACK-004: a settled failed turn.

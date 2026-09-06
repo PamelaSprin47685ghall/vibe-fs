@@ -1,23 +1,47 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Execution.Failure
+
 module ProviderFailurePresentation =
-    let private claimed (episodeId: string) =
-        box
-            {| mode = "Claimed"
-               owner = "Wanxiangshu"
-               episodeId = episodeId |}
+    [<RequireQualifiedAccess>]
+    type Presentation =
+        | Recovery of episodeId: string
+        | Final of episodeId: string
+        | Ignore
 
-    let private final (episodeId: string) =
-        box
-            {| mode = "Final"
-               owner = "Wanxiangshu"
-               episodeId = episodeId |}
+    let classify (decision: ExecutionFailureDecision) (episodeId: string) : Presentation =
+        match decision.Resolution with
+        | ExecutionFailureResolution.RetryFreshAttempt _
+        | ExecutionFailureResolution.AdvanceFallback _ -> Presentation.Recovery episodeId
+        | ExecutionFailureResolution.TerminalizeProviderStarted _ -> Presentation.Final episodeId
+        | ExecutionFailureResolution.PreserveCurrentFact
+        | ExecutionFailureResolution.AwaitAcceptanceReconciliation _
+        | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _ -> Presentation.Ignore
 
-    let classify (failureClass: string) (episodeId: string) =
-        match failureClass with
-        | "NetworkReset"
-        | "UpstreamCapacity"
-        | "Upstream5xx"
-        | "RateLimit" -> claimed episodeId
-        | "ProviderCapacityExhausted" -> final episodeId
-        | _ -> box {| mode = "Default" |}
+    let toPlain (presentation: Presentation) : obj =
+        match presentation with
+        | Presentation.Recovery episodeId ->
+            box
+                {| mode = "Recovery"
+                   owner = "Wanxiangshu"
+                   episodeId = episodeId
+                   hasFinalPresentation = false |}
+        | Presentation.Final episodeId ->
+            box
+                {| mode = "Final"
+                   owner = "Wanxiangshu"
+                   episodeId = episodeId
+                   hasFinalPresentation = true |}
+        | Presentation.Ignore ->
+            box
+                {| mode = "Ignore"
+                   hasFinalPresentation = false |}
+
+    let classifyPlain (decision: ExecutionFailureDecision) (episodeId: string) : obj =
+        classify decision episodeId |> toPlain
+
+    let classifyPolicyInput (value: obj) (episodeId: string) : obj =
+        value
+        |> Surface.inputOf
+        |> ExecutionFailurePolicy.decide
+        |> fun decision -> classifyPlain decision episodeId

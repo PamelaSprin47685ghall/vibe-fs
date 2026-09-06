@@ -167,6 +167,7 @@ export async function setupScenarioParallel(opts, tmpDir) {
       providerUrl: `${providerUrl}/v1`,
       pluginPaths,
       contextLimit: opts.contextLimit,
+      routingSource: opts.routingSource,
       extraEnv: {
         // The Host env denylist drops `WANXIANG*` so plugin configuration is always explicit
         // rather than inherited by accident. That also drops the diagnostics flag, so it is

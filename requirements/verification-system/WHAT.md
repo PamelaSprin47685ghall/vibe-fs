@@ -24,6 +24,8 @@
 
 语义命题必须按 Pure → Temporal → Adapter → Long Stroke 逐级进行证明，严禁跨级跳跃。严禁将普通的语义分支在无充分理由的情况下直接升级为昂贵的 E2E 物理测试；严禁使用重试直至通过（repeat-until-pass）掩盖不确定性。若某项验证声称必须在物理 Long Stroke 中进行，必须明确声明其所依赖的不可模拟的底层物理契约，无法声明者必须降级至底层证据层进行证明。
 
+provider recovery 的 Pure/Temporal 层必须用 fast-check 对 production Fable Surface 证明互斥 resolution、terminal 吸收、stale evidence 无效与 duplicate effect 幂等。唯一 Long Stroke 再证明不可模拟的真实 Host 边界：同一 logical run 上 `provider failure → recovery provider failure → success`，两个 failed ProviderRun 各有一个不同 durable recovery claim、各最多一次 physical acceptance，第二个 recovery 成功前无 exhaustion/重复 return，最终 join 只返回一次。
+
 ## VERIFICATION-SYSTEM-004: verifier 必须可红
 
 所有门禁（gate）、验证器（verifier）及测试断言必须具备真实有效的失败能力（可红性）。每个静态门禁必须拥有配套的回归测试，通过受控的反例输入证明门禁能够准确识别违约并退出非零状态。严禁为了通过测试而主动弱化或削弱断言条件。

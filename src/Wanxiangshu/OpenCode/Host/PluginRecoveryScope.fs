@@ -126,8 +126,6 @@ type PluginRecoveryScope(journal: AgentJournal option) =
 
     /// DSL-cross-callback-proof: physical resource — crash-zero typed recovery-request ownership projection.
     let pendingChatResumes = Dictionary<ChatExecutionKey, PreProviderResumeRequest>()
-    /// DSL-cross-callback-proof: physical resource — crash-zero typed recovery-request ownership projection.
-    let authorizedChatRequeues = Dictionary<ChatExecutionKey, ProviderRequeueRequest>()
 
     /// DSL-cross-callback-proof: physical resource — crash-zero typed recovery-request ownership projection.
     let manualChatInterventions =
@@ -270,22 +268,11 @@ type PluginRecoveryScope(journal: AgentJournal option) =
     member _.PublishPendingChatResume(request: PreProviderResumeRequest) =
         pendingChatResumes.[request.ExecutionKey] <- request
 
-    member _.PublishAuthorizedChatRequeue(request: ProviderRequeueRequest) =
-        let key =
-            match request with
-            | ProviderRequeueRequest.RetryFreshAttempt(started, _)
-            | ProviderRequeueRequest.AdvanceFallback(started, _) ->
-                { SessionId = started.Accepted.SessionId
-                  PhysicalUserMessageId = started.Accepted.PhysicalUserMessageId }
-
-        authorizedChatRequeues.[key] <- request
-
     member _.PublishManualChatIntervention(request: ManualInterventionRequest) =
         manualChatInterventions.[request.ExecutionState.Key] <- request
 
     member _.PendingChatRecoveryOwnership() =
         {| Resumes = pendingChatResumes.Values |> Seq.toArray
-           Requeues = authorizedChatRequeues.Values |> Seq.toArray
            ManualInterventions = manualChatInterventions.Values |> Seq.toArray |}
 
     /// Session deletion drops arming and attempt plans for this session.
@@ -300,7 +287,6 @@ type PluginRecoveryScope(journal: AgentJournal option) =
             |> Array.iter (fun key -> requests.Remove key |> ignore)
 
         clearExecutionRequests pendingChatResumes
-        clearExecutionRequests authorizedChatRequeues
         clearExecutionRequests manualChatInterventions
 
     /// Drops attempt plans whose key prefix matches (used for a session and

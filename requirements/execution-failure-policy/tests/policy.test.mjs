@@ -28,7 +28,6 @@ const baseInput = {
 }
 
 const decide = (change = {}) => policy.decide({ ...baseInput, ...change })
-const kind = (value) => value.kind
 
 const failures = [
   'LocalInvariant',
@@ -58,64 +57,56 @@ const providerCases = [
     label: 'transient retry',
     failure: 'ProviderTransient',
     facts: provider,
-    retry: 'RetryFreshAttempt',
-    fallback: 'NoFallback',
+    resolution: 'RetryFreshAttempt',
     breaker: 'RecordProviderTransientFailure',
   },
   {
     label: 'transient fallback after retry exhaustion',
     failure: 'ProviderTransient',
     facts: { ...provider, retryBudget: 'Exhausted' },
-    retry: 'NoRetry',
-    fallback: 'AdvanceFallback',
+    resolution: 'AdvanceFallback',
     breaker: 'RecordProviderTransientFailure',
   },
   {
     label: 'transient fallback around an open breaker',
     failure: 'ProviderTransient',
     facts: { ...provider, breaker: 'Open' },
-    retry: 'NoRetry',
-    fallback: 'AdvanceFallback',
+    resolution: 'AdvanceFallback',
     breaker: 'RecordProviderTransientFailure',
   },
   {
     label: 'transient terminal after all budgets are exhausted',
     failure: 'ProviderTransient',
     facts: { ...provider, retryBudget: 'Exhausted', fallbackBudget: 'Exhausted' },
-    retry: 'NoRetry',
-    fallback: 'NoFallback',
+    resolution: 'TerminalizeProviderStarted',
     breaker: 'RecordProviderTransientFailure',
   },
   {
     label: 'permanent failure advances fallback without retry',
     failure: 'ProviderPermanent',
     facts: provider,
-    retry: 'NoRetry',
-    fallback: 'AdvanceFallback',
+    resolution: 'AdvanceFallback',
     breaker: 'RecordProviderPermanentFailure',
   },
   {
     label: 'permanent terminal after fallback exhaustion',
     failure: 'ProviderPermanent',
     facts: { ...provider, fallbackBudget: 'Exhausted' },
-    retry: 'NoRetry',
-    fallback: 'NoFallback',
+    resolution: 'TerminalizeProviderStarted',
     breaker: 'RecordProviderPermanentFailure',
   },
   ...['BloggerMain', 'BloggerSquash', 'InteractionRepair'].map((requestKind) => ({
     label: `${requestKind} remains provider-recoverable`,
     failure: 'ProviderTransient',
     facts: { ...provider, requestKind },
-    retry: 'RetryFreshAttempt',
-    fallback: 'NoFallback',
+    resolution: 'RetryFreshAttempt',
     breaker: 'RecordProviderTransientFailure',
   })),
   {
     label: 'StrengthReplica cannot consume owner recovery',
     failure: 'ProviderTransient',
     facts: { ...provider, requestKind: 'StrengthReplica' },
-    retry: 'NoRetry',
-    fallback: 'NoFallback',
+    resolution: 'TerminalizeProviderStarted',
     breaker: 'RecordProviderTransientFailure',
   },
 ]
@@ -126,18 +117,22 @@ test('WHAT[EXECFAIL-001] observes every closed failure and persistence commitmen
   for (const failure of failures) {
     const decision = policy.decide({ ...baseInput, failure })
     assert.equal(typeof decision, 'object')
-    assert.equal(Object.keys(decision).length, 6)
+    assert.equal(typeof decision.resolution, 'string')
+    assert.ok('breaker' in decision)
+    assert.ok('capacitySettlement' in decision)
+    assert.ok('fatality' in decision)
   }
 })
 
-test('WHAT[EXECFAIL-002] every phase and failure yields exactly six closed decision dimensions', () => {
+test('WHAT[EXECFAIL-002] every phase and failure yields exactly one resolution and orthogonal dimensions', () => {
   const dimensions = [
+    'authorization',
     'breaker',
     'capacitySettlement',
-    'fallback',
+    'executionKey',
     'fatality',
-    'messageDisposition',
-    'retry',
+    'resolution',
+    'terminalDisposition',
   ]
 
   for (const phase of phases) {
@@ -145,9 +140,10 @@ test('WHAT[EXECFAIL-002] every phase and failure yields exactly six closed decis
       for (const failure of failures) {
         const decision = decide({ phase, capacityFence, failure })
         assert.deepEqual(Object.keys(decision).sort(), dimensions)
-        for (const dimension of dimensions) {
-          assert.equal(typeof decision[dimension].kind, 'string')
-        }
+        assert.equal(typeof decision.resolution, 'string')
+        assert.equal(typeof decision.breaker.kind, 'string')
+        assert.equal(typeof decision.capacitySettlement.kind, 'string')
+        assert.equal(typeof decision.fatality.kind, 'string')
       }
     }
   }
@@ -156,40 +152,39 @@ test('WHAT[EXECFAIL-002] every phase and failure yields exactly six closed decis
 test('WHAT[EXECFAIL-003] rejects illegal retry and breaker policy mutations', () => {
   for (const failure of nonProviderFailures) {
     const decision = decide({ failure })
-    assert.equal(kind(decision.retry), 'NoRetry')
-    assert.equal(kind(decision.fallback), 'NoFallback')
-    assert.equal(kind(decision.breaker), 'NoBreakerTransition')
+    assert.notEqual(decision.resolution, 'RetryFreshAttempt')
+    assert.notEqual(decision.resolution, 'AdvanceFallback')
+    assert.equal(decision.breaker.kind, 'NoBreakerTransition')
   }
 
   for (const scenario of providerCases) {
     const decision = decide({ failure: scenario.failure, provider: scenario.facts })
-    assert.equal(kind(decision.retry), scenario.retry, scenario.label)
-    assert.equal(kind(decision.fallback), scenario.fallback, scenario.label)
-    assert.equal(kind(decision.breaker), scenario.breaker, scenario.label)
+    assert.equal(decision.resolution, scenario.resolution, scenario.label)
+    assert.equal(decision.breaker.kind, scenario.breaker, scenario.label)
 
-    for (const authorization of [decision.retry, decision.fallback]) {
-      if (authorization.kind !== 'NoRetry' && authorization.kind !== 'NoFallback') {
-        assert.equal(authorization.providerRun, scenario.facts.providerRun)
-        assert.equal(authorization.logicalRun, scenario.facts.logicalRun)
-        assert.equal(authorization.requestKind, scenario.facts.requestKind)
-        assert.equal(typeof authorization.decisionId, 'string')
-        assert.notEqual(authorization.decisionId, '')
-      }
+    if (decision.resolution === 'RetryFreshAttempt' || decision.resolution === 'AdvanceFallback') {
+      const authorization = decision.authorization
+      assert.ok(authorization)
+      assert.equal(authorization.providerRun, scenario.facts.providerRun)
+      assert.equal(authorization.logicalRun, scenario.facts.logicalRun)
+      assert.equal(authorization.requestKind, scenario.facts.requestKind)
+      assert.equal(typeof authorization.decisionId, 'string')
+      assert.notEqual(authorization.decisionId, '')
     }
   }
 
-  const first = decide({ failure: 'ProviderPermanent' }).fallback
-  const duplicate = decide({ failure: 'ProviderPermanent' }).fallback
+  const first = decide({ failure: 'ProviderPermanent' }).authorization
+  const duplicate = decide({ failure: 'ProviderPermanent' }).authorization
   const freshAttempt = decide({
     failure: 'ProviderPermanent',
     provider: { ...provider, providerRun: 'provider-failure-policy-2' },
-  }).fallback
+  }).authorization
   assert.equal(first.decisionId, duplicate.decisionId)
   assert.notEqual(first.decisionId, freshAttempt.decisionId)
 
   const wrongPhase = decide({ failure: 'ProviderTransient', phase: 'AcceptedBeforeProvider' })
-  assert.equal(kind(wrongPhase.retry), 'NoRetry')
-  assert.equal(kind(wrongPhase.fallback), 'NoFallback')
+  assert.notEqual(wrongPhase.resolution, 'RetryFreshAttempt')
+  assert.notEqual(wrongPhase.resolution, 'AdvanceFallback')
 })
 
 test('WHAT[EXECFAIL-004] capacity settlement preserves the exact opaque fence reference', () => {
@@ -210,57 +205,54 @@ test('WHAT[EXECFAIL-004] capacity settlement preserves the exact opaque fence re
   })
 })
 
-test('WHAT[EXECFAIL-005] message disposition carries the exact execution key and typed terminal', () => {
+test('WHAT[EXECFAIL-005] terminal resolution carries the exact execution key and typed disposition', () => {
   const expected = [
-    ['NoAcceptedFact', 'KeepCurrentFact'],
+    ['NoAcceptedFact', 'PreserveCurrentFact'],
     ['AcceptedBeforeProvider', 'TerminalizeAcceptedPreProvider'],
     ['ProviderStarted', 'TerminalizeProviderStarted'],
-    ['Terminal', 'KeepCurrentFact'],
+    ['Terminal', 'PreserveCurrentFact'],
   ]
 
   for (const [phase, expectedKind] of expected) {
-    const disposition = decide({ phase, failure: 'AuthorizationDenied' }).messageDisposition
-    assert.equal(kind(disposition), expectedKind)
+    const decision = decide({ phase, failure: 'AuthorizationDenied' })
+    assert.equal(decision.resolution, expectedKind)
     if (expectedKind.startsWith('Terminalize')) {
-      assert.deepEqual(disposition.executionKey, executionKey)
-      assert.equal(disposition.disposition, 'Rejected')
+      assert.deepEqual(decision.executionKey, executionKey)
+      assert.equal(decision.terminalDisposition, 'Rejected')
     }
   }
 
-  assert.equal(kind(decide({ failure: 'UserCancelled' }).messageDisposition), 'TerminalizeProviderStarted')
-  assert.equal(decide({ failure: 'UserCancelled' }).messageDisposition.disposition, 'Cancelled')
-  assert.equal(decide({ failure: 'Superseded' }).messageDisposition.disposition, 'Cancelled')
+  assert.equal(decide({ failure: 'UserCancelled' }).resolution, 'TerminalizeProviderStarted')
+  assert.equal(decide({ failure: 'UserCancelled' }).terminalDisposition, 'Cancelled')
+  assert.equal(decide({ failure: 'Superseded' }).terminalDisposition, 'Cancelled')
   assert.equal(
-    decide({ failure: 'StreamInterruptedAfterFirstToken' }).messageDisposition.disposition,
+    decide({ failure: 'StreamInterruptedAfterFirstToken' }).terminalDisposition,
     'Failed',
   )
 })
 
 test('WHAT[EXECFAIL-006] LocalInvariant requests fatality only after typed settlement commands', () => {
   const decision = decide({ failure: 'LocalInvariant', phase: 'AcceptedBeforeProvider' })
-  assert.equal(kind(decision.retry), 'NoRetry')
-  assert.equal(kind(decision.fallback), 'NoFallback')
-  assert.equal(kind(decision.breaker), 'NoBreakerTransition')
-  assert.equal(kind(decision.messageDisposition), 'TerminalizeAcceptedPreProvider')
-  assert.equal(kind(decision.capacitySettlement), 'ReleaseExactFence')
-  assert.equal(kind(decision.fatality), 'FatalAfterSettlement')
+  assert.equal(decision.resolution, 'TerminalizeAcceptedPreProvider')
+  assert.equal(decision.breaker.kind, 'NoBreakerTransition')
+  assert.deepEqual(decision.capacitySettlement, {
+    kind: 'ReleaseExactFence',
+    fenceReference: capacityFence.reference,
+  })
+  assert.equal(decision.fatality.kind, 'FatalAfterSettlement')
 })
 
 test('WHAT[EXECFAIL-007] persistence commitment remains explicit and uncertainty reconciles without repeated effect', () => {
   const notCommitted = decide({
     failure: { kind: 'PersistenceFailure', commitment: 'NotCommitted' },
   })
-  assert.deepEqual(notCommitted, {
-    retry: { kind: 'NoRetry' },
-    fallback: { kind: 'NoFallback' },
-    breaker: { kind: 'NoBreakerTransition' },
-    capacitySettlement: {
-      kind: 'RetainExactFence',
-      fenceReference: capacityFence.reference,
-    },
-    messageDisposition: { kind: 'KeepCurrentFact' },
-    fatality: { kind: 'NoFatality' },
+  assert.equal(notCommitted.resolution, 'PreserveCurrentFact')
+  assert.equal(notCommitted.breaker.kind, 'NoBreakerTransition')
+  assert.deepEqual(notCommitted.capacitySettlement, {
+    kind: 'RetainExactFence',
+    fenceReference: capacityFence.reference,
   })
+  assert.equal(notCommitted.fatality.kind, 'NoFatality')
 
   for (const phase of phases) {
     for (const capacityFence of capacityCases) {
@@ -269,15 +261,13 @@ test('WHAT[EXECFAIL-007] persistence commitment remains explicit and uncertainty
         capacityFence,
         failure: { kind: 'PersistenceFailure', commitment: 'NotCommitted' },
       })
-      assert.equal(kind(decision.retry), 'NoRetry')
-      assert.equal(kind(decision.fallback), 'NoFallback')
-      assert.equal(kind(decision.breaker), 'NoBreakerTransition')
+      assert.equal(decision.resolution, 'PreserveCurrentFact')
+      assert.equal(decision.breaker.kind, 'NoBreakerTransition')
       assert.equal(
-        kind(decision.capacitySettlement),
+        decision.capacitySettlement.kind,
         capacityFence === null ? 'NoCapacitySettlement' : 'RetainExactFence',
       )
-      assert.equal(kind(decision.messageDisposition), 'KeepCurrentFact')
-      assert.equal(kind(decision.fatality), 'NoFatality')
+      assert.equal(decision.fatality.kind, 'NoFatality')
     }
   }
 
@@ -286,20 +276,18 @@ test('WHAT[EXECFAIL-007] persistence commitment remains explicit and uncertainty
     { kind: 'PersistenceFailure', commitment: 'Unknown' },
   ]) {
     const decision = decide({ failure })
-    assert.equal(kind(decision.retry), 'NoRetry')
-    assert.equal(kind(decision.fallback), 'NoFallback')
-    assert.equal(kind(decision.capacitySettlement), 'RetainExactFence')
-    assert.deepEqual(decision.messageDisposition, {
-      kind: 'AwaitAcceptanceReconciliation',
-      executionKey,
-    })
+    assert.equal(decision.resolution, 'AwaitAcceptanceReconciliation')
+    assert.equal(decision.breaker.kind, 'NoBreakerTransition')
+    assert.equal(decision.capacitySettlement.kind, 'RetainExactFence')
+    assert.deepEqual(decision.executionKey, executionKey)
   }
 
   const committed = decide({
     failure: { kind: 'PersistenceFailure', commitment: 'Committed' },
   })
-  assert.equal(kind(committed.capacitySettlement), 'ReleaseExactFence')
-  assert.equal(kind(committed.fatality), 'FatalAfterSettlement')
+  assert.equal(committed.resolution, 'PreserveCurrentFact')
+  assert.equal(committed.capacitySettlement.kind, 'ReleaseExactFence')
+  assert.equal(committed.fatality.kind, 'FatalAfterSettlement')
 })
 
 test('WHAT[EXECFAIL-008] policy is deterministic and ignores diagnostic or temporal decoration', () => {

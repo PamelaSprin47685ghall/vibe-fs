@@ -12,7 +12,7 @@ open Wanxiangshu.Persistence.Journal
 type ConfirmedFailureOutcome =
     | RecoveryAdvanced of RecoveryOpportunity
     | RecoveryExhausted
-    | AlreadyRecorded
+    | EpisodeSuperseded
     | NoActiveRun
 
 /// FALLBACK-003 single writer: policy-authorized provider failure → durable
@@ -23,6 +23,19 @@ module FallbackLedger =
         match decodeError with
         | AgentPairCursor.FallbackOffsetDecodeError.InvalidFallbackOffset value ->
             $"Fallback advance rejected: corrupt offset byte {value} (FALLBACK-002)"
+
+    let private replayLatestFailure budget (identity: FallbackAttemptIdentity) (current: FallbackProjection) =
+        let exactLatest =
+            current.RecentFailureKeys
+            |> List.tryHead
+            |> Option.contains (FallbackAttemptIdentity.dedupeKey identity)
+
+        match exactLatest, FallbackProjection.mayContinue budget current with
+        | true, true ->
+            RecoverySlot.opportunity RecoverySlot.afterFailureAdvance current.Cursor.Offset
+            |> ConfirmedFailureOutcome.RecoveryAdvanced
+        | true, false -> ConfirmedFailureOutcome.RecoveryExhausted
+        | false, _ -> ConfirmedFailureOutcome.EpisodeSuperseded
 
     let private appendExhausted
         (journal: AgentJournal)
@@ -125,8 +138,9 @@ module FallbackLedger =
                         next.ConsecutiveFailureCount
                         current
                 with
-                | Error FallbackAdvanceRejection.AlreadyObserved
-                | Error FallbackAdvanceRejection.AlreadyExhausted -> return Ok ConfirmedFailureOutcome.AlreadyRecorded
+                | Error FallbackAdvanceRejection.AlreadyObserved ->
+                    return Ok(replayLatestFailure AgentPairCursor.DefaultAutoRecoveryBudget identity current)
+                | Error FallbackAdvanceRejection.AlreadyExhausted -> return Ok ConfirmedFailureOutcome.RecoveryExhausted
                 | Error FallbackAdvanceRejection.DifferentRun
                 | Error FallbackAdvanceRejection.NoCursor -> return Ok ConfirmedFailureOutcome.NoActiveRun
                 | Error FallbackAdvanceRejection.InvalidTransition ->

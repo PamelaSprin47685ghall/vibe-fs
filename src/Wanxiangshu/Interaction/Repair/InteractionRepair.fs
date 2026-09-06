@@ -181,6 +181,7 @@ module InteractionRepairWorkflow =
 
     type private BloggerAabbFailureDecision =
         | SendAabb
+        | IgnoreSuperseded
         | ExhaustProtocol
         | FailProtocol of string
 
@@ -196,11 +197,7 @@ module InteractionRepairWorkflow =
         // retroactively steal that first send.
         | Ok ConfirmedFailureOutcome.RecoveryExhausted when guaranteedFirstAabb -> SendAabb
         | Ok ConfirmedFailureOutcome.RecoveryExhausted -> ExhaustProtocol
-        | Ok ConfirmedFailureOutcome.AlreadyRecorded ->
-            // A racing observer may have advanced this exact terminal before
-            // the request-scoped AABB claim became visible. The claim itself
-            // dedupes the physical send.
-            SendAabb
+        | Ok ConfirmedFailureOutcome.EpisodeSuperseded -> IgnoreSuperseded
         | Ok(ConfirmedFailureOutcome.RecoveryAdvanced _) -> SendAabb
 
     let private sendBloggerAabbAfterPermitConsumed
@@ -249,6 +246,7 @@ module InteractionRepairWorkflow =
 
             match decideBloggerAabbFailure guaranteedFirstAabb confirmedFailure with
             | SendAabb -> do! sendAabb ()
+            | IgnoreSuperseded -> ()
             | ExhaustProtocol ->
                 do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
             | FailProtocol error -> notifyBloggerProtocolFailure eventPort turn error

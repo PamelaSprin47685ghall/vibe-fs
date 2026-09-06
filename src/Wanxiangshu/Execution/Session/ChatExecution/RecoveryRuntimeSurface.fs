@@ -216,10 +216,6 @@ module RecoveryRuntimeSurface =
             | PhysicalReconciliationRequest.ReleaseTerminalResource _ ->
                 record "ReconcilePhysical:ReleaseTerminalResource"
           ResumePreProvider = fun _ -> record "ResumePreProvider"
-          RequeueEligible =
-            function
-            | ProviderRequeueRequest.RetryFreshAttempt _ -> record "RequeueEligible:RetryFreshAttempt"
-            | ProviderRequeueRequest.AdvanceFallback _ -> record "RequeueEligible:AdvanceFallback"
           Finalize = fun request -> record $"Finalize:{dispositionName request.TerminalDisposition}"
           MarkManualIntervention = fun request -> record $"MarkManualIntervention:{request.InterventionReason}" }
 
@@ -228,7 +224,6 @@ module RecoveryRuntimeSurface =
         | ChatExecutionRecoveryDecision.Ignore _ -> "Ignore"
         | ChatExecutionRecoveryDecision.ReconcilePhysical _ -> "ReconcilePhysical"
         | ChatExecutionRecoveryDecision.ResumePreProvider _ -> "ResumePreProvider"
-        | ChatExecutionRecoveryDecision.RequeueEligible _ -> "RequeueEligible"
         | ChatExecutionRecoveryDecision.Finalize _ -> "Finalize"
         | ChatExecutionRecoveryDecision.MarkManualIntervention _ -> "MarkManualIntervention"
 
@@ -418,5 +413,4 @@ module RecoveryRuntimeSurface =
            "SessionAborted"
            "SessionDeleted"
            "SessionCancelled"
-           "TypedFailureDecision"
            "CapacityProjectionReplayed" |]

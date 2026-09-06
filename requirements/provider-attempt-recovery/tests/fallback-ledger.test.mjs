@@ -65,8 +65,8 @@ test('WHAT[PAR-003] PAR_FALLBACK_003_same_failure_observed_twice_advances_once',
     )
     assert.deepEqual(first, { ok: true, outcome: 'Advanced' })
 
-    // A second observe of the same provider run (idle + retry race) must not
-    // advance twice: the same failure is only counted once (FALLBACK-003).
+    // A second observe replays the same recovery authorization. The exact
+    // prompt gate dedupes its physical send; the failure count stays one.
     const second = await cursorOwner.recordConfirmedFailure(
       journal,
       cursor.defaultBudget,
@@ -74,12 +74,45 @@ test('WHAT[PAR-003] PAR_FALLBACK_003_same_failure_observed_twice_advances_once',
       'msg_asst_1',
       'provider_error',
     )
-    assert.deepEqual(second, { ok: true, outcome: 'AlreadyRecorded' })
+    assert.deepEqual(second, { ok: true, outcome: 'Advanced' })
 
     const state = cursorOwner.snapshot(journal, SESSION)
     assert.deepEqual(
       { offset: state.offset, failures: state.failures, exhausted: state.exhausted },
       { offset: 1, failures: 1, exhausted: false },
+    )
+  } finally {
+    dispose(created.journal)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[PAR-003] an older failed run is absorbed after its successor advances', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-ledger-superseded-'))
+  const created = await bootWithWriterId(directory, 'writer-ledger-superseded', 'rt_ledger_superseded', 1, '2026-01-01T00:00:00Z')
+  assert.equal(created.ok, true, created.ok ? '' : created.error)
+
+  try {
+    const journal = created.journal
+    await acceptHumanRoot(journal, 'msg_u_superseded')
+
+    assert.deepEqual(
+      await cursorOwner.recordConfirmedFailure(journal, cursor.defaultBudget, SESSION, 'run-1', 'provider_error'),
+      { ok: true, outcome: 'Advanced' },
+    )
+    assert.deepEqual(
+      await cursorOwner.recordConfirmedFailure(journal, cursor.defaultBudget, SESSION, 'run-2', 'provider_error'),
+      { ok: true, outcome: 'Advanced' },
+    )
+    assert.deepEqual(
+      await cursorOwner.recordConfirmedFailure(journal, cursor.defaultBudget, SESSION, 'run-1', 'provider_error'),
+      { ok: true, outcome: 'EpisodeSuperseded' },
+    )
+
+    const state = cursorOwner.snapshot(journal, SESSION)
+    assert.deepEqual(
+      { offset: state.offset, failures: state.failures, exhausted: state.exhausted },
+      { offset: 2, failures: 2, exhausted: false },
     )
   } finally {
     dispose(created.journal)
@@ -117,8 +150,8 @@ test('WHAT[PAR-005] PAR_FALLBACK_005_twelfth_failure_admission_is_recovery_exhau
     const state = cursorOwner.snapshot(journal, SESSION)
     assert.equal(state.exhausted, true, 'FallbackExhausted must be durable')
 
-    // Post-exhaustion observes are absorbed: no second FallbackExhausted, no
-    // cursor mutation (FALLBACK-007 fold rejection AlreadyExhausted).
+    // Post-exhaustion observes replay the terminal decision: no second
+    // FallbackExhausted and no cursor mutation.
     const thirteenth = await cursorOwner.recordConfirmedFailure(
       journal,
       cursor.defaultBudget,
@@ -126,7 +159,7 @@ test('WHAT[PAR-005] PAR_FALLBACK_005_twelfth_failure_admission_is_recovery_exhau
       'run-13',
       'provider_error',
     )
-    assert.deepEqual(thirteenth, { ok: true, outcome: 'AlreadyRecorded' })
+    assert.deepEqual(thirteenth, { ok: true, outcome: 'Exhausted' })
   } finally {
     dispose(created.journal)
     rmSync(directory, { recursive: true, force: true })
@@ -171,8 +204,8 @@ test('WHAT[PAR-014] PAR_014_a_continuation_has_a_unique_accounted_and_budgeted_o
     )
     assert.deepEqual(first, { ok: true, outcome: 'Advanced' })
 
-    // 同一失败第二次 observe → AlreadyRecorded:不产生第二个 continuation,
-    // 也不触发第二次 cursor 推进(FALLBACK-003 去重,第一个 observe 保持 owner)。
+    // 同一失败第二次 observe 重放同一 authorization；durable prompt gate
+    // 拒绝第二次物理发送，cursor 仍只推进一次。
     const second = await cursorOwner.recordConfirmedFailure(
       journal,
       cursor.defaultBudget,
@@ -180,7 +213,7 @@ test('WHAT[PAR-014] PAR_014_a_continuation_has_a_unique_accounted_and_budgeted_o
       'msg_asst_seq_1',
       'provider_error',
     )
-    assert.deepEqual(second, { ok: true, outcome: 'AlreadyRecorded' })
+    assert.deepEqual(second, { ok: true, outcome: 'Advanced' })
 
     const state = cursorOwner.snapshot(journal, SESSION)
     // continuation 本身不得触发第二次推进:一次记账恰好一次 Advance,offset 1 / failures 1。

@@ -39,11 +39,6 @@ type PhysicalReconciliationRequest =
     | PersistProviderStartedAndTerminal of ProviderStartedEvidence * ChatExecutionTerminalDisposition
     | ReleaseTerminalResource of ChatExecutionKey * ChatExecutionTerminalEvidence * ChatExecutionTerminalDisposition
 
-[<RequireQualifiedAccess>]
-type ProviderRequeueRequest =
-    | RetryFreshAttempt of ProviderStartedEvidence * ProviderRecoveryAuthorization
-    | AdvanceFallback of ProviderStartedEvidence * ProviderRecoveryAuthorization
-
 type TerminalFinalizationRequest =
     { ExecutionKey: ChatExecutionKey
       TerminalEvidence: ChatExecutionTerminalEvidence
@@ -68,6 +63,7 @@ type IgnoreReason =
     | DurableTerminalAlreadySettled
     | ProviderStillAlive
     | RecoveryAlreadyCommitted
+    | ProviderRecoveryOwned
     | StalePhysicalEvidence
     | StalePolicyEvidence
 
@@ -76,7 +72,6 @@ type ChatExecutionRecoveryDecision =
     | Ignore of ChatExecutionKey * IgnoreReason
     | ReconcilePhysical of PhysicalReconciliationRequest
     | ResumePreProvider of PreProviderResumeRequest
-    | RequeueEligible of ProviderRequeueRequest
     | Finalize of TerminalFinalizationRequest
     | MarkManualIntervention of ManualInterventionRequest
 

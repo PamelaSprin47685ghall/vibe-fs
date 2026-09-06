@@ -58,6 +58,18 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_clear_without_flight_is_idempot
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
 })
 
+test('WHAT[PAR-017] Blogger retry replaces exact physical ownership before the next binding', () => {
+  const scope = parkedTransform.scope()
+  const failed = ctx.main({ requestId: 'request-failed', toml: 'failed' })
+  const replacement = ctx.main({ requestId: 'request-replacement', toml: 'replacement' })
+
+  assert.equal(parkedTransform.claimCurrentRequest(scope, KEY, failed), 'Claimed')
+  assert.equal(parkedTransform.releaseCurrentRequest(scope, KEY, 'request-failed'), 'Released')
+  assert.equal(parkedTransform.claimCurrentRequest(scope, KEY, replacement), 'Claimed')
+  assert.equal(parkedTransform.releaseCurrentRequest(scope, KEY, 'request-failed'), 'Conflict:request-replacement')
+  assert.equal(parkedTransform.peekCurrentRequest(scope, KEY)?.toml, 'replacement')
+})
+
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_squash_commit_clears_flight', () => {
   // Squash commit path uses the same physical clear as cycle commit.
   const scope = parkedTransform.scope()

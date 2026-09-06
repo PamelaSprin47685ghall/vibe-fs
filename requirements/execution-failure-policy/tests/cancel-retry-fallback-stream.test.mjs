@@ -29,8 +29,6 @@ const input = (failure, change = {}) => ({
   ...change,
 })
 const decide = (failure, change) => policy.decide(input(failure, change))
-const ownerActions = (decision) => [decision.retry, decision.fallback]
-  .filter((action) => action.kind !== 'NoRetry' && action.kind !== 'NoFallback')
 
 const terminal = ({ finish, error, providerRun = provider.providerRun } = {}) => ({
   type: 'message.updated',
@@ -57,20 +55,21 @@ const transactionEvidence = (suffix) => ({
 })
 
 const assertNoRecovery = (decision) => {
-  assert.equal(decision.retry.kind, 'NoRetry')
-  assert.equal(decision.fallback.kind, 'NoFallback')
-  assert.equal(ownerActions(decision).length, 0)
+  assert.equal(decision.authorization, null)
+  assert.notEqual(decision.resolution, 'RetryFreshAttempt')
+  assert.notEqual(decision.resolution, 'AdvanceFallback')
 }
 
 const assertSingleRecovery = (decision, expected) => {
-  assert.equal(ownerActions(decision).length, 1)
-  assert.equal(ownerActions(decision)[0].kind, expected)
+  assert.equal(decision.resolution, expected)
+  assert.ok(decision.authorization)
 }
 
 test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by registered owners', async () => {
   const cancelled = decide('UserCancelled')
   assertNoRecovery(cancelled)
-  assert.equal(cancelled.messageDisposition.disposition, 'Cancelled')
+  assert.equal(cancelled.resolution, 'TerminalizeProviderStarted')
+  assert.equal(cancelled.terminalDisposition, 'Cancelled')
   assert.deepEqual(cancelled.capacitySettlement, {
     kind: 'ReleaseExactFence',
     fenceReference: capacityFence.reference,
@@ -98,7 +97,7 @@ test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by r
 
   const transient = decide('ProviderTransient')
   assertSingleRecovery(transient, 'RetryFreshAttempt')
-  assert.equal(transient.messageDisposition.kind, 'KeepCurrentFact')
+  assert.equal(transient.terminalDisposition, null)
   assert.equal(transient.fatality.kind, 'NoFatality')
   assert.deepEqual(hostSignals.tryDecodeExactProviderTerminal(terminal({ error: { name: 'TimeoutError' } })), {
     sessionId: executionKey.sessionId,
@@ -116,7 +115,7 @@ test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by r
       'NotCommitted',
       'ExactAbsent',
     ),
-    { decision: 'RequeueEligible', effects: ['RequeueEligible:RetryFreshAttempt'] },
+    { decision: 'Ignore', effects: [] },
   )
 
   const permanentFallback = decide('ProviderPermanent')
@@ -133,7 +132,8 @@ test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by r
     provider: { ...provider, fallbackBudget: 'Exhausted' },
   })
   assertNoRecovery(permanentTerminal)
-  assert.equal(permanentTerminal.messageDisposition.disposition, 'Failed')
+  assert.equal(permanentTerminal.resolution, 'TerminalizeProviderStarted')
+  assert.equal(permanentTerminal.terminalDisposition, 'Failed')
   assert.deepEqual(
     await recovery.interpretFailurePolicy(
       'ProviderPermanent',
@@ -160,8 +160,9 @@ test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by r
 
   const superseded = decide('Superseded')
   assertNoRecovery(superseded)
-  assert.equal(superseded.messageDisposition.disposition, 'Cancelled')
-  assert.deepEqual(superseded.messageDisposition.executionKey, executionKey)
+  assert.equal(superseded.resolution, 'TerminalizeProviderStarted')
+  assert.equal(superseded.terminalDisposition, 'Cancelled')
+  assert.deepEqual(superseded.executionKey, executionKey)
   assert.equal(superseded.capacitySettlement.fenceReference, capacityFence.reference)
   const newer = decide('Superseded', {
     executionKey: { sessionId: executionKey.sessionId, physicalUserMessageId: 'msg-newer' },
@@ -179,7 +180,8 @@ test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by r
 
   const interrupted = decide('StreamInterruptedAfterFirstToken')
   assertNoRecovery(interrupted)
-  assert.equal(interrupted.messageDisposition.disposition, 'Failed')
+  assert.equal(interrupted.resolution, 'TerminalizeProviderStarted')
+  assert.equal(interrupted.terminalDisposition, 'Failed')
   assert.deepEqual(hostSignals.tryDecodeExactProviderTerminal(terminal({ error: { name: 'StreamInterruptedError' } })), {
     sessionId: executionKey.sessionId,
     physicalUserMessageId: executionKey.physicalUserMessageId,
@@ -201,7 +203,8 @@ test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by r
 
   const queueFull = decide('CapacityQueueFull', { phase: 'AcceptedBeforeProvider' })
   assertNoRecovery(queueFull)
-  assert.equal(queueFull.messageDisposition.disposition, 'Failed')
+  assert.equal(queueFull.resolution, 'TerminalizeAcceptedPreProvider')
+  assert.equal(queueFull.terminalDisposition, 'Failed')
   const fullAdmission = await transaction.transactionScenario(
     transactionEvidence('queue-full'),
     'AcquireQueueFull',
@@ -215,7 +218,8 @@ test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by r
 
   const invariant = decide('LocalInvariant')
   assertNoRecovery(invariant)
-  assert.equal(invariant.messageDisposition.disposition, 'Failed')
+  assert.equal(invariant.resolution, 'TerminalizeProviderStarted')
+  assert.equal(invariant.terminalDisposition, 'Failed')
   assert.equal(invariant.capacitySettlement.kind, 'ReleaseExactFence')
   assert.equal(invariant.fatality.kind, 'FatalAfterSettlement')
   assert.deepEqual(

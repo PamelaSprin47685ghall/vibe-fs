@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "supportedVersionRange": "1.18.18",
+  "supportedVersionRange": "1.18.29",
   "observedVersions": {
-    "opencode": "1.18.18",
-    "plugin": "1.18.18"
+    "opencode": "1.18.29",
+    "plugin": "1.18.29"
   },
   "observedResult": "supported",
   "missingCapability": null,

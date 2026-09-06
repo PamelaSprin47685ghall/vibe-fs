@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import fc from 'fast-check'
 import * as ReconcileSurface from '../../../dist/Composition/Turn/ReconcileSurface.js'
 
 const idleWake = ReconcileSurface.idleWake('s1', 1n)
@@ -118,7 +119,7 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_only_idle_can_publish_a_nonterminal_current_a
 test('WHAT[HOST-BOUNDARY-005] mutation_canary_terminal_evidence_still_publishes', () => {
   const decision = ReconcileSurface.decideStep(
     ReconcileSurface.failureWake(),
-    ReconcileSurface.evidenceTerminal('TurnFailed'),
+    ReconcileSurface.evidenceTerminal('TurnCompleted'),
   )
   assert.equal(ReconcileSurface.decisionName(decision), 'Publish')
 })
@@ -141,5 +142,33 @@ test('WHAT[HOST-BOUNDARY-005] terminal provider failure publishes only with matc
   assert.equal(
     ReconcileSurface.decisionName(ReconcileSurface.decideStep(ReconcileSurface.retryWake(), terminal)),
     'StopPass',
+  )
+  assert.equal(
+    ReconcileSurface.decisionName(ReconcileSurface.decideStep(idleWake, terminal)),
+    'StopPass',
+    'idle observed before session.error must not publish a provider failure without its typed witness',
+  )
+})
+
+test('WHAT[HOST-BOUNDARY-005] exact failure witness dominates every same-run coarse wake ordering', () => {
+  const physical = 'msg-failure-property'
+  const terminal = ReconcileSurface.evidenceTerminalFor(physical, 'TurnFailed')
+  const coarseWake = fc.constantFrom(ReconcileSurface.retryWake(), ReconcileSurface.idleWake('ses-failure-property'))
+
+  fc.assert(
+    fc.property(fc.array(coarseWake, { maxLength: 40 }), (incomingWakes) => {
+      assert.equal(
+        ReconcileSurface.decisionName(ReconcileSurface.decideStep(ReconcileSurface.failureWakeFor(physical), terminal)),
+        'Publish',
+      )
+      for (const wake of incomingWakes) {
+        assert.equal(
+          ReconcileSurface.mergeWakeKind(physical, ReconcileSurface.failureWakeFor(physical), wake),
+          'FailureWake',
+        )
+        assert.equal(ReconcileSurface.decisionName(ReconcileSurface.decideStep(wake, terminal)), 'StopPass')
+      }
+    }),
+    { seed: 0x484f5354, numRuns: 100 },
   )
 })

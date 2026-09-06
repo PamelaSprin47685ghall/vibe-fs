@@ -325,18 +325,6 @@ module RecoverySurface =
                 {| kind = "ResumePreProvider"
                    request = "ResumeAcceptedAdmission"
                    disposition = null |}
-        | ChatExecutionRecoveryDecision.RequeueEligible request ->
-            match request with
-            | ProviderRequeueRequest.RetryFreshAttempt _ ->
-                box
-                    {| kind = "RequeueEligible"
-                       request = "RetryFreshAttempt"
-                       disposition = null |}
-            | ProviderRequeueRequest.AdvanceFallback _ ->
-                box
-                    {| kind = "RequeueEligible"
-                       request = "AdvanceFallback"
-                       disposition = null |}
         | ChatExecutionRecoveryDecision.Finalize request ->
             box
                 {| kind = "Finalize"

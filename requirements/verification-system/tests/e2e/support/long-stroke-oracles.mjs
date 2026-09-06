@@ -155,23 +155,57 @@ export async function awaitNamedFact(workDir, waitFact, { timeoutMs = WAIT_FACT_
 
 // ── §21 adversity oracles (one named assert per Exit Criteria class) ─────────
 
-/** §21: provider transient failure — sole settled provider-error advances cursor once. */
+/** §21: consecutive provider failures advance two exact recovery episodes. */
 export async function assertProviderTransientFailure(workDir, label = 'long-stroke') {
   const facts = factPayloads(workDir, 'FallbackCursorAdvanced');
   assert.equal(
     facts.length,
-    1,
-    `${label}: one settled provider-error must advance FallbackCursorAdvanced exactly once (got ${facts.length})`,
+    2,
+    `${label}: two settled provider-errors must advance distinct recovery episodes (got ${facts.length})`,
   );
 }
 
-/** §21: fallback — same Logical Run continuation; cursor count stays 1. */
+/** §21: fallback — same Logical Run continuation; both failed ProviderRuns are accounted. */
 export async function assertFallbackContinuation(workDir, label = 'long-stroke') {
   assert.equal(
     countFactCase(workDir, 'FallbackCursorAdvanced'),
-    1,
-    `${label}: FallbackCursorAdvanced count must be 1 after fallback continuation`,
+    2,
+    `${label}: FallbackCursorAdvanced count must be 2 after consecutive recovery`,
   );
+}
+
+function assertConsecutiveRecoveryEpisodes(scenario, ctx, lines) {
+  const claims = factPayloads(lines, 'PluginPromptClaimed').filter(
+    (payload) => payload?.ContinuationKind === 'ProviderRetryAttempt',
+  );
+  assert.equal(claims.length, 2, 'long-stroke: each failed ProviderRun must claim one recovery continuation');
+
+  const payloadDigests = claims.map((payload) => payload?.PayloadDigest);
+  assert.ok(payloadDigests.every((digest) => typeof digest === 'string' && digest.startsWith('provider-recovery:')));
+  assert.equal(new Set(payloadDigests).size, 2, 'long-stroke: distinct failed ProviderRuns must have distinct recovery identities');
+
+  const promptKeys = claims.map((payload) => JSON.stringify(payload?.PromptKey));
+  assert.equal(new Set(promptKeys).size, 2, 'long-stroke: each recovery episode must own a distinct durable prompt claim');
+
+  const physical = factPayloads(lines, 'PluginPromptPhysicalAccepted');
+  for (const promptKey of promptKeys) {
+    assert.equal(
+      physical.filter((payload) => JSON.stringify(payload?.PromptKey) === promptKey).length,
+      1,
+      'long-stroke: each recovery claim must cross physical acceptance exactly once',
+    );
+  }
+
+  assert.equal(
+    factPayloads(lines, 'FallbackExhausted').length,
+    0,
+    'long-stroke: no terminal exhaustion may race either admitted recovery',
+  );
+
+  const rawProviderErrors = (scenario.events?.allEvents ?? []).filter(
+    (event) => event?.type === 'session.error' && event?.properties?.sessionID === ctx.childId,
+  );
+  assert.equal(rawProviderErrors.length, 2, 'long-stroke: the Host must expose exactly the two injected raw provider failures');
 }
 
 /**
@@ -328,11 +362,11 @@ export async function holdChildC1UntilLabor(scenario) {
  * Script the reusable manager-loop iterations without inventing a Reviewer identity.
  * ONE reusable turn family per authority (manager-loop.*, humanroot-loop.*) is
  * delivered several times with the same lane/authority/steps; the binder varies
- * the review scores and fork/suicide actions by causal delivery count:
+ * the review scores and resume/suicide actions by causal delivery count:
  * initial-low→work, candidate-perfect→finish, conflict-low→repair,
  * repaired-perfect→finish, rebased-perfect→finish. HumanRoot:
  * low→Continue, perfect→Accepted.
- * Every logical step still crosses the real review/suicide/fork tools and durable
+ * Every logical step still crosses the real review/suicide/resume tools and durable
  * IncumbencyOpened/RetirementCommitted facts. Iterations are never distinguished
  * by prompt text.
  */
@@ -382,9 +416,9 @@ export async function bindManagerLoopSequence(scenario) {
     args: scores('PERFECT'),
   });
   const retire = () => ({ type: 'tool-call', tool: 'suicide', args: {} });
-  const repairFork = () => ({
+  const repairResume = () => ({
     type: 'tool-call',
-    tool: 'fork',
+    tool: 'resume',
     args: {
       name: 'Proof Writer',
       charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
@@ -402,7 +436,7 @@ export async function bindManagerLoopSequence(scenario) {
       else if (attempt === 3) entry.respond = repairAudit();
     } else if (entry?.id === 'manager-loop.1') {
       if (attempt === 2 || attempt === 4 || attempt === 5) entry.respond = retire();
-      else if (attempt === 3) entry.respond = repairFork();
+      else if (attempt === 3) entry.respond = repairResume();
     } else if (entry?.id === 'humanroot-loop.0' && attempt === 2) {
       entry.respond = humanPerfect();
     }
@@ -479,6 +513,7 @@ export function assertNativeReadProbeTimeline(scenario) {
  */
 export async function oracleLongStroke(scenario, ctx) {
   const workDir = scenario.host.workDir;
+  const journalLines = journalEventLines(workDir);
   assertJoinWakePath(workDir);
   assertInterruptedJoin(scenario);
   await assertProviderTransientFailure(workDir);
@@ -564,8 +599,16 @@ export async function oracleLongStroke(scenario, ctx) {
   );
   assert.equal(
     scenario.provider.matchCount('continue.0'),
+    2,
+    'long-stroke determinism: the first recovery fails and the second physical delivery succeeds',
+  );
+  assertConsecutiveRecoveryEpisodes(scenario, ctx, journalLines);
+
+  const managerJoinResults = publicToolResults(scenario.provider?.requests, 'join');
+  assert.equal(
+    managerJoinResults.filter((text) => text.startsWith('# Something nearer has arrived.\n')).length,
     1,
-    'long-stroke determinism: the confirmed failure advances to exactly one fallback step',
+    'long-stroke: provider recovery must not manufacture another interrupted or terminal join result',
   );
   assert.equal(
     scenario.provider.matchCount('manager-resume.0'),
@@ -600,7 +643,7 @@ export async function oracleLongStroke(scenario, ctx) {
 /** waitFact presets mirroring long-stroke.toml flow barriers. */
 export const PLANNED_WAIT_FACTS = Object.freeze({
   handleCompleted: waitFactShape('HandleCompleted', { gte: 1 }),
-  fallbackCursor: waitFactShape('FallbackCursorAdvanced', { eq: 1 }),
+  fallbackCursor: waitFactShape('FallbackCursorAdvanced', { eq: 2 }),
   assessmentCommitted: waitFactShape('AssessmentCommitted', { gte: 1 }),
   retirementCommitted: waitFactShape('RetirementCommitted', { gte: 1 }),
   incumbencyOpened: waitFactShape('IncumbencyOpened', { gte: 1 }),
@@ -927,20 +970,22 @@ const hasAssistantOrToolMessages = (request) =>
     message?.role === 'assistant' || message?.role === 'tool' || message?.role === 'toolResult',
   );
 
+const normalizeHostModelBanner = (text) => text.replace(
+  /You are powered by the model named [^\n]*?\. The exact model ID is [^\n]+/g,
+  '<host-model>',
+);
+
 const providerPlanOf = (request) => ({
-  model: typeof request?.model === 'string'
-    ? request.model
-    : (request?.model?.modelID ?? request?.model?.id ?? null),
   tools: (Array.isArray(request?.tools) ? request.tools : [])
     .map((tool) => tool?.function?.name ?? tool?.name)
     .filter((name) => typeof name === 'string')
     .sort(),
-  system: messageTextsByRole(request, 'system'),
+  system: messageTextsByRole(request, 'system').map(normalizeHostModelBanner),
 });
 
 /**
  * Assert every fresh iteration preserves the provider-visible authority:
- * same system/provider plan, same typed authority user sequence in order,
+ * same normalized system/tools plan, same typed authority user sequence in order,
  * carrying only the current iteration with the internal wake stripped.
  * Compares message structure only.
  */
@@ -957,7 +1002,7 @@ export function assertManagerLoopAuthorityPreserved(scenario, sessionId) {
     assert.deepEqual(
       providerPlanOf(request),
       baselinePlan,
-      `manager-loop: iteration #${index + 1} must keep the same system/provider plan as the initial iteration`,
+      `manager-loop: iteration #${index + 1} must keep the same normalized system/tools plan as the initial iteration`,
     );
     assert.deepEqual(
       messageTextsByRole(request, 'user'),

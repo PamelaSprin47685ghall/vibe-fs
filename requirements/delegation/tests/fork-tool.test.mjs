@@ -207,7 +207,7 @@ test('WHAT[DELEG-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_p
   }
 })
 
-test('WHAT[DELEG-026] FORK_TOOL_transport_receipt_without_physical_acceptance_keeps_run_active', async () => {
+test('WHAT[DELEG-026] FORK_TOOL_transport_receipt_without_physical_acceptance_is_explicitly_uncertain', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-receipt-pending-'))
   const owner = 'manager-receipt-pending'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -225,8 +225,9 @@ test('WHAT[DELEG-026] FORK_TOOL_transport_receipt_without_physical_acceptance_ke
     )
 
     assert.doesNotMatch(result, /could not complete the charge|could not be placed|无法托付/i)
-    assert.doesNotMatch(result, /uncertain|不确定|may already have been accepted/i)
-    assert.match(result, /carries this charge now|现已接下这项托付/i)
+    assert.match(result, /uncertain|不确定/i)
+    assert.match(result, /may already have been accepted|可能已/i)
+    assert.doesNotMatch(result, /carries this charge now|现已接下这项托付/i)
     assert.equal(forkTool.childCount(runtime), 1)
     assert.equal(forkTool.promptCount(runtime), 1)
     assert.equal(

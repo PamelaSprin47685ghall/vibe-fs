@@ -18,7 +18,7 @@
 #     ↓
 #   external user_message wakes join (interrupted / reason=user_message)
 #     ↓
-#   harvest → sole provider-error → FallbackCursorAdvanced eq 1
+#   harvest → provider-error → recovery provider-error → FallbackCursorAdvanced eq 2 → success
 #     ↓
 #   Iteration #1: audit assigns work on low dimension → current-action nudge → RetirementCommitted(Continue) → IncumbencyOpened
 #     ↓
@@ -56,20 +56,38 @@
 #   - wall <6s target vs orch publish chain — risk of §16 miss until flesh/perf pass
 #
 # Anchors (lean extract, not a paste): orchestrator-unhappy-path (conflict→Published,
-# no restart), manager-unhappy (join wake / low assessment), fallback.toml (sole provider-error).
+# no restart), manager-unhappy (join wake / low assessment), fallback.toml (consecutive provider failures).
 
 scenario = "long-stroke"
 description = "G4R-3 The Long Stroke: orchestrator shell, one OpenCode world through adversity to clean shutdown"
 pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fallback, audit-low-score→Continue→IncumbencyOpened→Accepted, gitConflictProof→ConflictDetected→RebasedCandidate→Published (no restart)."
 
+routingSource = '''
+const candidates = ['test/test-model', 'opencode/test-model', 'backup/test-model']
+const failed = new Set()
+const providerOf = (model) => model.slice(0, model.indexOf('/'))
+export const markProviderFailed = (provider) => failed.add(provider)
+export const hasTheoreticalCapacity = () => true
+
+export default function route(role, running, previous) {
+  if (!new Set(['manager', 'orchestrator', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) {
+    throw new Error('unexpected managed role: ' + role)
+  }
+  if (role !== 'manager') return previous ?? { model: candidates[0], reasoning: 'none' }
+  if (previous != null && !failed.has(providerOf(previous.model))) return previous
+  const model = candidates.find((candidate) => !failed.has(providerOf(candidate)))
+  return { model: model ?? candidates.at(-1), reasoning: 'none' }
+}
+'''
+
 # Event ceilings (fail-closed on dead loops; primary over silence watchdog):
 #   maxJournalEvents — complete 63-step legal stroke after explicit preflow authority, real K2
 #                      StrengthReplica traffic, detached Bookkeeper finalization, and direct
-#                      same-physical iteration re-audit. Two complete strict traversals measured
-#                      622–647 envelopes; 700 catches unconfirmed roster growth
+#                      same-physical iteration re-audit. The consecutive-recovery traversal measured
+#                      420 envelopes; 630 catches unconfirmed roster growth
 #                      before it can hide behind a widened timeout.
 #   maxSseEvents     — OpenCode SSE excluding server.heartbeat for the same traversals measured
-#                      3118–3351 frames; 3450 preserves a narrow Host-ordering allowance.
+#                      2068 frames; 3100 preserves a narrow Host-ordering allowance.
 #                      Both pins are machine-checked runaway ceilings, not wall-clock budgets; a
 #                      future legitimate topology change must re-measure the complete stroke first.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
@@ -164,8 +182,8 @@ flow = [
   # while the fork tool is still starting the child provider request.
   { wait = "coder.0", timeoutMs = 60000 },
   { wait = "manager-loop.2", timeoutMs = 60000 },
-  { wait = "continue.0", timeoutMs = 60000 },
-  { waitFact = { name = "FallbackCursorAdvanced", eq = 1 }, timeoutMs = 60000 },
+  { wait = "continue.0", attempts = 2, timeoutMs = 60000 },
+  { waitFact = { name = "FallbackCursorAdvanced", eq = 2 }, timeoutMs = 60000 },
   # EXEC-017 stimulus must target an ACTIVE join attempt. Provider expectation only
   # proves the model returned a join call; wait for the real Host ToolPart running
   # event before injecting the external user message, or the wake is correctly dropped.
@@ -483,12 +501,12 @@ user = "# The account is not yet ready to entrust."
 # count (initial-low→work, candidate-perfect→finish, conflict-low→repair,
 # repaired-perfect→finish, rebased-perfect→finish). Provider-visible user stays the original authority
 # because the wake is stripped. Iterations are not distinguished by prompt text.
-# tools cover the full Manager surface (review for audits, fork/join for work).
+# tools cover the Manager surface used here (review for audits, fork/resume/join for work).
 [[turn]]
 id = "manager-loop"
 lane = "manager"
 user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept the assessment obligation then retire so publish can proceed."
-tools = ["fork", "join", "horizon", "review", "suicide"]
+tools = ["fork", "resume", "join", "horizon", "review", "suicide"]
 
   [[turn.step]]
   runtimeStep = 0
@@ -1114,10 +1132,20 @@ status = 500
 retryable = true
 attempts = [1]
 
-# Sole physical fault: one settled non-retryable provider-error (no AABB here).
+# First Wanxiangshu-owned provider failure.
 [[fault]]
 turn = "manager-loop"
 step = 2
+delivery = "provider-error"
+status = 400
+retryable = false
+attempts = [1]
+
+# The first recovery attempt fails too. The exact failed ProviderRun earns a
+# distinct durable recovery gate; delivery 2 of the same continuation succeeds.
+[[fault]]
+turn = "continue"
+step = 0
 delivery = "provider-error"
 status = 400
 retryable = false

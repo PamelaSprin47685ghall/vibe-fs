@@ -58,16 +58,6 @@ test('WHAT[CONTEXT-COMPRESSION-021] CTX_021_future_X_material_waiter_is_deleted_
 
   const coordinator = source('src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs')
   assert.doesNotMatch(coordinator, /tryStartSquash|OfferRecoveryMaterial/)
-
-  const workflow = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
-  assert.match(
-    workflow,
-    /let private recoveryDecision[\s\S]*ExecutionFailurePolicy\.decide[\s\S]*let private executeFallbackDecision[\s\S]*FallbackDecision\.AdvanceFallback authorization[\s\S]*FallbackLedger\.recordAuthorizedFailure durable turn\.SessionId authorization error[\s\S]*let private executeAuthorizedRecovery[\s\S]*recoveryDecision turn failure current requestKind[\s\S]*executeFallbackDecision/,
-    'confirmed failure must cross ExecutionFailurePolicy before the fallback ledger records its exact authorization',
-  )
-  assert.doesNotMatch(workflow, /FallbackLedger\.recordConfirmedFailure/)
-  assert.match(workflow, /RecoverySlot\.nextBloggerRequest/)
-  assert.match(workflow, /replaceFailedBloggerRequest/)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-022] CTX_022_all_production_main_rebuilds_share_BloggerMainContext', () => {
@@ -97,19 +87,6 @@ test('WHAT[CONTEXT-COMPRESSION-022] CTX_022_all_production_main_rebuilds_share_B
   ]) {
     assert.doesNotMatch(text, /BloggerDelta\.nextChunk/, `${name} must not own a second next-main formula`)
   }
-})
-
-test('WHAT[PAR-017] PAR_017_blogger_retry_abandons_then_materializes_then_binds_new_prompt', () => {
-  const workflow = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
-
-  assert.match(
-    workflow,
-    /let private replaceFailedBloggerRequest[\s\S]*abandonContinuationContext[\s\S]*sendStagedBloggerContinuation/,
-  )
-  assert.match(
-    workflow,
-    /sendStagedBloggerContinuation[\s\S]*taskResult[\s\S]*materializeContinuationContext[\s\S]*sendContinuation[\s\S]*bindContinuationContext/,
-  )
 })
 
 test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_all_materialization_owners_share_admission_and_nonoverwrite_flight', () => {

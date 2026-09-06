@@ -6,7 +6,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const fixture = JSON.parse(fs.readFileSync(path.join(here, '../fixtures/opencode-chat-admission-1.18.18.json'), 'utf8'))
+const fixture = JSON.parse(fs.readFileSync(path.join(here, '../fixtures/opencode-chat-admission-1.18.29.json'), 'utf8'))
 const driftFixture = JSON.parse(fs.readFileSync(path.join(here, '../fixtures/opencode-chat-admission-drift.json'), 'utf8'))
 const runner = path.join(here, 'support/run-opencode-chat-admission-canary.mjs')
 

@@ -87,14 +87,13 @@ test('WHAT[VERIFICATION-SYSTEM-003] long-stroke.toml declares theoretical exact 
   const source = readFileSync(path.join(dir, 'e2e/scenarios/long-stroke.toml'), 'utf8');
   const result = compileScenario(source, { name: 'long-stroke.toml' });
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'));
-  // Relay architecture eliminates dual-PERFECT review cycles and redundant barrier events;
-  // measured long-stroke durable envelopes stabilize at ~403-421 and SSE frames at ~1850-1950.
-  // Tightened pins 600/3000 retain Host-ordering slack while failing fast on event regressions.
+  // The consecutive-recovery traversal measured 420 durable envelopes and 2068 SSE frames.
+  // Pins 630/3100 retain Host-ordering slack while failing fast on event regressions.
   assert.equal(result.scenario.setup.maxJournalEvents, 630);
   assert.equal(result.scenario.setup.maxSseEvents, 3100);
 });
 
-test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke uses one reusable Manager loop without moving its sole fault', () => {
+test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke keeps one Manager loop and two exact consecutive failures', () => {
   const dir = path.dirname(fileURLToPath(import.meta.url));
   const source = readFileSync(path.join(dir, 'e2e/scenarios/long-stroke.toml'), 'utf8');
   const result = compileScenario(source, { name: 'long-stroke.toml' });
@@ -110,10 +109,10 @@ test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke uses one reusable Manager loop w
   assert.deepEqual(
     result.scenario.faults.filter((fault) => fault.kind === 'provider-error' && fault.status === 400)
       .map((fault) => fault.entryId),
-    ['manager-loop.2'],
+    ['manager-loop.2', 'continue.0'],
   );
 
-  const loopTools = ['fork', 'join', 'horizon', 'review', 'suicide'];
+  const loopTools = ['fork', 'resume', 'join', 'horizon', 'review', 'suicide'];
   const managerTools = ['fork', 'join', 'horizon', 'fission', 'todowrite', 'suicide'];
   const request = (turn, step) => ({
     messages: [
