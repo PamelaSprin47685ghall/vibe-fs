@@ -260,13 +260,12 @@ export const FORBIDDEN = [
     gate: 'behaviour-bool',
     // Domain evidence DUs / pure queries ending in Pending|Spent|Phase are allowlisted.
     // Physical/algorithm names that merely contain a suffix (EstimatedRunningSeconds,
-    // RecoveryStageProbe type alias, Already* fold rejections, Pending* durable fields)
-    // are allowlisted. Relay incumbency/capability phases are durable domain evidence
-    // and pure capability vocabulary, not stored execution positions. Residual pattern still catches true stage latches
-    // (HasPendingCompletion, CompactionProbePending, isRunning-style counters).
+    // Already* fold rejections, Pending* durable fields) are allowlisted.
+    // Protocol phases (IncumbencyPhase, ManagerCapabilityPhase, RecoveryStageProbe)
+    // must be registered in NARROW_PHASE_EXEMPTIONS rather than globally ignored.
     // Verb-named functions (`let clearStalePending agentId =`) are skipped in scanText.
     pattern:
-      /\b(?!PerfectPending\b|isPerfectPending\b|StillPending\b|ConflictPending\b|recoveryBudgetSpent\b|tryTakePending\b|failPending\b|takePending\b|abortPending\b|hasPendingActivation\b|EstimatedRunningSeconds\b|RecoveryStageProbe\b|AlreadyOutstanding\b|AlreadyCounted\b|AlreadyCompleted\b|AlreadyAbandoned\b|AlreadyObserved\b|AlreadyExhausted\b|AlreadyInProgress\b|AlreadyLinkedToOther\b|OpeningAlreadyCaptured\b|TerminalAlreadyCaptured\b|LifeAlreadyOpen\b|FinalityAlreadyActive\b|CompactionAlreadyReanchored\b|PendingConfirmation\b|PendingChallenge\b|PendingClaimUnknown\b|PendingClaims\b|PendingOffer\b|PendingReviewSeals\b|PendingRuns\b|PendingSeal\b|PendingRunCount\b|NoPendingSeal\b|IncumbencyPhase\b|ManagerCapabilityPhase\b|ActivePhase\b|AuditPending\b|DeniedRelayPhase\b|denyRelayPhase\b|permissionsForPhase\b|isAllowedForPhase\b|managerPhase\b|AssessmentNotAllowedInCurrentPhase\b)[a-zA-Z]+(?:Stage|Phase|Next|Running|Pending|Spent|Already|Should)\b|\b(HasPendingCompletion|LastCompletionStatus|bloggerTask|bloggerFailed)\b/,
+      /\b(?!PerfectPending\b|isPerfectPending\b|StillPending\b|ConflictPending\b|recoveryBudgetSpent\b|tryTakePending\b|failPending\b|takePending\b|abortPending\b|hasPendingActivation\b|EstimatedRunningSeconds\b|AlreadyOutstanding\b|AlreadyCounted\b|AlreadyCompleted\b|AlreadyAbandoned\b|AlreadyObserved\b|AlreadyExhausted\b|AlreadyInProgress\b|AlreadyLinkedToOther\b|OpeningAlreadyCaptured\b|TerminalAlreadyCaptured\b|LifeAlreadyOpen\b|FinalityAlreadyActive\b|CompactionAlreadyReanchored\b|PendingConfirmation\b|PendingChallenge\b|PendingClaimUnknown\b|PendingClaims\b|PendingOffer\b|PendingReviewSeals\b|PendingRuns\b|PendingSeal\b|PendingRunCount\b|NoPendingSeal\b|ActivePhase\b|AuditPending\b|DeniedRelayPhase\b|denyRelayPhase\b|permissionsForPhase\b|isAllowedForPhase\b|managerPhase\b|AssessmentNotAllowedInCurrentPhase\b)[a-zA-Z]+(?:Stage|Phase|Next|Running|Pending|Spent|Already|Should)\b|\b(HasPendingCompletion|LastCompletionStatus|bloggerTask|bloggerFailed)\b/,
     label: 'behaviour bool or stage field',
     skipIf: isProcessPhysicalPath,
   },
@@ -295,19 +294,69 @@ export const FORBIDDEN = [
   },
 ]
 
-// PR 9 item 6 exemptions — each entry names the FILE:DU whose case set may
-// legitimately repeat another DU's, with the reason the pair is not a
-// duplicate knowledge representation:
-//   ChildRecovery.fs:ChildResolution    pure Decision layer (no payloads),
-//                                       1:1 to ChildRecoveryResult after effects
-//   ManagedAgent.fs:ManagedAgentParseError  Infrastructure boundary; one-way
-//                                       from AgentNameRejection (ManagedAgent.fs:66)
-//   MagicTodo.fs:ProcessReviewVerdict   pure Decision façade; 1:1 ofGuard map
-//                                       from ReviewGuardVerdict (Fact.fs)
+/**
+ * Narrow exemptions for protocol phases and stage probes.
+ * Rather than global word allowlists, each symbol is constrained to its
+ * declaring owner and authorized consumer files.
+ */
+export const NARROW_PHASE_EXEMPTIONS = new Map([
+  [
+    'RecoveryStageProbe',
+    {
+      owner: 'blogger-enforcer',
+      allowedFiles: new Set([
+        'src/Wanxiangshu/Enforcer/Continuation.fs',
+      ]),
+      migrationNote: 'R04: stage probe alias pending PR-03 Blogger repair convergence',
+    },
+  ],
+  [
+    'IncumbencyPhase',
+    {
+      owner: 'relay-mission',
+      allowedFiles: new Set([
+        'src/Wanxiangshu/Mission/Relay/Contract.fs',
+        'src/Wanxiangshu/Mission/Relay/Fold.fs',
+        'src/Wanxiangshu/Mission/Relay/Surface.fs',
+        'src/Wanxiangshu/Mission/Manager/Workflow.fs',
+        'src/Wanxiangshu/Change/Host/Host.fs',
+        'src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs',
+      ]),
+      migrationNote: 'R07/R08: relay incumbency phase pending PR-04 Manager clean break',
+    },
+  ],
+  [
+    'ManagerCapabilityPhase',
+    {
+      owner: 'office-capability',
+      allowedFiles: new Set([
+        'src/Wanxiangshu/Foundation/OfficeCapability.fs',
+        'src/Wanxiangshu/Mission/Relay/Fold.fs',
+        'src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs',
+        'src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs',
+      ]),
+      migrationNote: 'R07: capability phase mapping pending PR-04 Manager clean break',
+    },
+  ],
+])
+
+/**
+ * Duplicate DU case-set exemptions (exact file paths, never basename).
+ * Each entry maps `file:DU` to a reason or migration note.
+ */
 export const DUP_CASES_EXEMPT = new Set([
+  // Exact paths:
+  'src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs:ChildResolution',
+  'src/Wanxiangshu/OpenCode/Tools/ManagedAgent.fs:ManagedAgentParseError',
+  'src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs:BloggerToolRecovery',
+  'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs:InvalidTerminalRepairState',
+  'src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs:DrainWindow',
+  'src/Wanxiangshu/Execution/Failure/Model.fs:ProviderBreakerState',
+  'src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs:GateContinuationOutcome',
+  'src/Wanxiangshu/Interaction/Repair/Port.fs:InteractionRepairSendOutcome',
+  // Relative test fixture keys:
   'ChildRecovery.fs:ChildResolution',
   'ManagedAgent.fs:ManagedAgentParseError',
-  // 1:1 Decision façade over ReviewGuardVerdict via ProcessReviewVerdict.ofGuard
   'MagicTodo.fs:ProcessReviewVerdict',
   'Model.fs:ProcessReviewVerdict',
 ])
@@ -1063,6 +1112,15 @@ export const scanText = (text, file = '<synthetic>', compilerEvidence = undefine
       ) {
         continue
       }
+      if (gate === 'behaviour-bool') {
+        let authorized = false
+        for (const [phaseName, def] of NARROW_PHASE_EXEMPTIONS) {
+          if (new RegExp(`\\b${phaseName}\\b`).test(code)) {
+            if (def.allowedFiles.has(norm(String(file)))) authorized = true
+          }
+        }
+        if (authorized) continue
+      }
       if (pattern.test(code)) {
         violations.push({ gate, file, line: i + 1, text: line.trim() })
       }
@@ -1175,14 +1233,25 @@ export const scanFiles = (entries, compilerEvidence = undefined) => {
   const caseRe = /^\s*\| ([A-Z]\w+)/
   const byCaseSet = new Map()
   for (const entry of entries) {
-    const file = entry.file
+    const file = norm(String(entry.file))
     const base = norm(String(file)).split('/').pop() ?? ''
     const linesArr = entry.text.split('\n')
     let cur = null
+    const flushCur = () => {
+      if (cur && cur.cases.length > 0) {
+        const key = [...cur.cases].sort().join('|')
+        if (key) {
+          if (!byCaseSet.has(key)) byCaseSet.set(key, [])
+          byCaseSet.get(key).push(cur)
+        }
+      }
+      cur = null
+    }
     for (let i = 0; i < linesArr.length; i++) {
       const code2 = linesArr[i].replace(/\/\/.*/g, '')
       const dm = duRe.exec(code2)
       if (dm) {
+        flushCur()
         cur = { file, base, name: dm[1], cases: [], line: i + 1 }
         for (const c of code2.matchAll(/\| ([A-Z]\w+)/g)) cur.cases.push(c[1])
         continue
@@ -1192,22 +1261,11 @@ export const scanFiles = (entries, compilerEvidence = undefined) => {
         if (cm) {
           cur.cases.push(cm[1])
         } else if (code2.trim() && !/^\s*[{}]/.test(code2) && !code2.includes('of ') && code2.trim() !== '|') {
-          const key = [...cur.cases].sort().join('|')
-          if (key) {
-            if (!byCaseSet.has(key)) byCaseSet.set(key, [])
-            byCaseSet.get(key).push(cur)
-          }
-          cur = null
+          flushCur()
         }
       }
     }
-    if (cur) {
-      const key = [...cur.cases].sort().join('|')
-      if (key) {
-        if (!byCaseSet.has(key)) byCaseSet.set(key, [])
-        byCaseSet.get(key).push(cur)
-      }
-    }
+    flushCur()
   }
   for (const group of byCaseSet.values()) {
     if (group.length < 2) continue
@@ -1216,10 +1274,19 @@ export const scanFiles = (entries, compilerEvidence = undefined) => {
         const a = group[i]
         const b = group[j]
         if (a.cases.length < 2) continue
-        const keyA = `${a.base}:${a.name}`
-        const keyB = `${b.base}:${b.name}`
-        if (DUP_CASES_EXEMPT.has(keyA) || DUP_CASES_EXEMPT.has(keyB)) continue
-        if (a === b) continue
+        const fullKeyA = `${a.file}:${a.name}`
+        const fullKeyB = `${b.file}:${b.name}`
+        const baseKeyA = `${a.base}:${a.name}`
+        const baseKeyB = `${b.base}:${b.name}`
+        if (
+          DUP_CASES_EXEMPT.has(fullKeyA) ||
+          DUP_CASES_EXEMPT.has(fullKeyB) ||
+          DUP_CASES_EXEMPT.has(baseKeyA) ||
+          DUP_CASES_EXEMPT.has(baseKeyB)
+        ) {
+          continue
+        }
+        if (a.file === b.file) continue
         const [first, second] =
           `${a.file}:${a.name}` < `${b.file}:${b.name}` ? [a, b] : [b, a]
         violations.push({
@@ -1243,6 +1310,23 @@ export const groupByGate = (violations) => {
   return byGate
 }
 
+/**
+ * Split findings into lexical vs compiler-resolved tiers.
+ */
+export const scanTiers = (entries, compilerEvidence = undefined) => {
+  const violations = scanFiles(entries, compilerEvidence)
+  const hasCompilerEvidence = Boolean(
+    compilerEvidence && (compilerEvidence.symbolUses?.length || compilerEvidence.applicationUses?.length),
+  )
+  return {
+    violations,
+    hasCompilerEvidence,
+    tier: hasCompilerEvidence ? 'compiler-resolved' : 'lexical-only',
+    lexicalViolations: violations.filter((v) => v.gate !== 'program-counter'),
+    compilerViolations: violations.filter((v) => v.gate === 'program-counter'),
+  }
+}
+
 /** Exit decision: { ok, reason }. threshold < 0 means zero-tolerance. */
 export const evaluateThreshold = (violationCount, threshold) => {
   if (violationCount === 0) return { ok: true, reason: 'clean' }
@@ -1262,7 +1346,8 @@ const runCli = () => {
     file,
     text: readFileSync(file, 'utf8'),
   }))
-  const violations = scanFiles(entries, undefined)
+  const tierResult = scanTiers(entries, undefined)
+  const violations = tierResult.violations
   const byGate = groupByGate(violations)
   const write = threshold >= 0 ? console.log : console.error
 
@@ -1288,7 +1373,11 @@ const runCli = () => {
   }
 
   if (violations.length === 0) {
-    write(`dsl-ownership: OK — ${productionFiles.length} Program/Domain files`)
+    if (!tierResult.hasCompilerEvidence) {
+      write(`dsl-ownership: uncovered (lexical-only) — ${productionFiles.length} Program/Domain files, zero lexical violations (compiler tier uncovered)`)
+    } else {
+      write(`dsl-ownership: OK — ${productionFiles.length} Program/Domain files (compiler tier resolved)`)
+    }
     process.exit(0)
   }
 

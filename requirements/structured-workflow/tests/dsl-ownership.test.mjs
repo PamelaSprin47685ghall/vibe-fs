@@ -11,9 +11,11 @@ import {
   HOST_BOUNDARY_OPEN_PATHS,
   DSL_CLASSES,
   LARGE_DU_THRESHOLD,
+  NARROW_PHASE_EXEMPTIONS,
   evaluateThreshold,
   isHostBoundaryOpenPath,
   scanFiles,
+  scanTiers,
   scanLargeDus,
   scanText,
 } from '../../../scripts/checks/dsl-ownership.mjs'
@@ -755,6 +757,51 @@ test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_single_file_duplicate_case_set
     },
   ])
   assert.ok(!hits.some((v) => v.gate === 'dup-cases'))
+})
+
+// ── R19: Duplicate DU check catches unregistered Blogger duplicate DU ───────
+
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_unregistered_blogger_repair_du_is_flagged', () => {
+  const hits = scanFiles([
+    {
+      file: 'src/Wanxiangshu/Synthetic/BloggerState.fs',
+      text: ['module Sample', 'type BloggerToolRecovery =', '    | NoRecovery', '    | InteractionNudgeIssued of string', '    | AabbRepairIssued of string'].join('\n'),
+    },
+    {
+      file: 'src/Wanxiangshu/Synthetic/BloggerProbe.fs',
+      text: ['module Sample', 'type InvalidTerminalRepairState =', '    | NoRecovery', '    | InteractionNudgeIssued of string', '    | AabbRepairIssued of string'].join('\n'),
+    },
+  ])
+  const dups = hits.filter((h) => h.gate === 'dup-cases')
+  assert.ok(dups.length >= 1, 'unregistered duplicate Blogger repair DU must be flagged')
+})
+
+// ── R19: Narrow phase exemptions enforce file boundaries ────────────────────
+
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_narrow_phase_exemption_rejects_unauthorized_file', () => {
+  const source = [
+    'module Sample',
+    'type MyPhase = | RecoveryStageProbe | Other',
+  ].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/Unauthorized/Module.fs')
+  assert.ok(
+    hits.some((h) => h.gate === 'behaviour-bool'),
+    'RecoveryStageProbe in unauthorized file must fire behaviour-bool',
+  )
+})
+
+// ── R19: scanTiers reports lexical-only vs compiler-resolved ────────────────
+
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_scanTiers_reports_uncovered_tier_without_compiler_evidence', () => {
+  const entries = [{ file: 'src/Wanxiangshu/Domain/Alpha.fs', text: 'module Alpha' }]
+  const lexicalRes = scanTiers(entries, undefined)
+  assert.equal(lexicalRes.tier, 'lexical-only')
+  assert.equal(lexicalRes.hasCompilerEvidence, false)
+
+  const compilerEvidence = { symbolUses: [{ consumerPath: 'src/Wanxiangshu/Domain/Alpha.fs' }] }
+  const resolvedRes = scanTiers(entries, compilerEvidence)
+  assert.equal(resolvedRes.tier, 'compiler-resolved')
+  assert.equal(resolvedRes.hasCompilerEvidence, true)
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-005] DSL_OWNERSHIP_infrastructure_declared_mutable_is_accepted', () => {

@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   EXEMPTION_CATEGORIES,
+  REGISTERED_DECLARATIONS,
+  auditFiles,
   evaluateViolations,
   scanText,
   scanFiles,
@@ -237,4 +239,76 @@ test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_session_quiescence_gate_st
   ].join('\n')
   const hits = scanText(source, 'src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs')
   assert.deepEqual(hits, [], 'SessionQuiescenceGate must stay green — typed permit, not registry presence')
+})
+
+// ── R18: Bare physical annotation fails open without category or registration ──
+
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_bare_physical_without_category_is_RED', () => {
+  const source = [
+    'module Sample',
+    '/// DSL-cross-callback-proof: physical',
+    '// DSL-MUTABLE: resource',
+    'let unexemptedQueue = Dictionary<string, string>()',
+    'type Scope() =',
+    '    member _.TryTakeContinuation(sessionId: string) =',
+    '        match unexemptedQueue.TryGetValue(sessionId) with',
+    '        | true, value -> unexemptedQueue.Remove(sessionId) |> ignore; Some value',
+    '        | _ -> None',
+  ].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/New/UnregisteredScope.fs')
+  const { regressions, ok } = evaluateViolations(hits)
+  assert.equal(ok, false, 'bare physical without category or registration must be RED')
+  assert.equal(hits.length, 1)
+  assert.equal(hits[0].name, 'unexemptedQueue')
+})
+
+// ── R18: Registered narrow declaration symbol is exempted ───────────────────
+
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_registered_declaration_symbol_is_exempted', () => {
+  assert.ok(REGISTERED_DECLARATIONS.size > 0, 'REGISTERED_DECLARATIONS must contain registered declaration symbols')
+  const [firstKey, firstEntry] = [...REGISTERED_DECLARATIONS.entries()][0]
+  assert.ok(firstEntry.owner, 'registered entry must have owner')
+  assert.ok(firstEntry.issuer, 'registered entry must have issuer')
+  assert.ok(firstEntry.key, 'registered entry must have key')
+  assert.ok(firstEntry.rules, 'registered entry must have rules')
+  assert.ok(firstEntry.testAnchor, 'registered entry must have testAnchor')
+})
+
+// ── R03/R05/R09/R14 cross-file shapes as permanent negative fixtures ────────
+
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_R03_arm_recovery_shape_is_RED', () => {
+  const source = readFixture('cross-callback-pc-r03-arm-recovery.fs')
+  const hits = scanText(source, 'src/Wanxiangshu/Participant/Provider/Attempt/R03ArmRecovery.fs')
+  const { regressions, ok } = evaluateViolations(hits)
+  assert.equal(ok, false, 'R03 arm recovery shape must be RED')
+  assert.ok(regressions.some((v) => v.name === 'recoveryArmingMap' && v.pattern === 'trytake-continuation'))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_R05_drain_window_shape_is_RED', () => {
+  const source = readFixture('cross-callback-pc-r05-drain-window.fs')
+  const hits = scanText(source, 'src/Wanxiangshu/Context/Companion/Blogger/Runtime/R05DrainWindow.fs')
+  const { regressions, ok } = evaluateViolations(hits)
+  assert.equal(ok, false, 'R05 drain window presence latch shape must be RED')
+  assert.ok(regressions.some((v) => v.name === 'drainWindows' && v.pattern === 'armed-presence-probe'))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_R09_loop_sensor_shape_is_RED', () => {
+  const source = readFixture('cross-callback-pc-r09-loop-sensor.fs')
+  const hits = scanText(source, 'src/Wanxiangshu/OpenCode/Host/R09LoopSensor.fs')
+  const { regressions, ok } = evaluateViolations(hits)
+  assert.equal(ok, false, 'R09 session-only loop sensor anomaly armed shape must be RED')
+  assert.ok(regressions.some((v) => v.name === 'armedAnomalies' && v.pattern === 'clear-presence-probe'))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_R14_counterfactual_shape_is_RED', () => {
+  const source = readFixture('cross-callback-pc-r14-counterfactual.fs')
+  const hits = scanText(source, 'src/Wanxiangshu/Strength/OpenCode/R14Counterfactual.fs')
+  const { regressions, ok } = evaluateViolations(hits)
+  assert.equal(ok, false, 'R14 multi-phase observation shape without unified fold must be RED')
+  assert.ok(regressions.some((v) => v.name === 'observedFirsts' && v.pattern === 'trytake-continuation'))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_auditFiles_counts_exemptions_and_coverage_gaps', () => {
+  const res = auditFiles([{ file: 'src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs', text: readFixture('cross-callback-pc-r03-arm-recovery.fs') }])
+  assert.ok(res.coverageGaps > 0, 'coverage gaps must be counted from Map/ref cells')
 })

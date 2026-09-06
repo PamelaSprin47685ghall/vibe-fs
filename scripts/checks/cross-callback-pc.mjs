@@ -22,7 +22,9 @@
  * Whitelist: ``` /// DSL-cross-callback-proof: physical <category> ``` annotation
  * on the declaration line's preceding doc block proves the cell is an opaque
  * physical capability/outcome. <category> should be one of EXEMPTION_CATEGORIES.
- * Backward compat: bare `physical` without category is still accepted.
+ * Bare `physical` without category is NOT an auto-pass; cells without a valid
+ * category must be narrowly registered in REGISTERED_DECLARATIONS with owner,
+ * issuer, key, rules, and test-anchor.
  *
  * Exemption categories (physical capabilities that are NOT program counters):
  *  pty, timer, waiter, single-flight, quiescence-permit, process-handle,
@@ -64,17 +66,70 @@ export const EXEMPTION_CATEGORIES = new Set([
 ])
 
 /**
+ * Narrow declaration-symbol exemptions.
+ * For declarations that lack a category annotation or require explicit
+ * registration of owner, issuer, key identity, and test anchor.
+ * Path or basename alone is never an authorization.
+ */
+export const REGISTERED_DECLARATIONS = new Map([
+  [
+    'src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs:pendingAttemptPlans',
+    {
+      owner: 'managed-chat-execution',
+      issuer: 'PluginRecoveryScope.RecordPendingAttemptPlan',
+      key: 'SessionId * PhysicalUserMessageId',
+      rules: 'single-flight admission; consume on provider run bind',
+      allowedConsumers: ['PluginRecoveryScope.TryBindPendingAttemptPlan', 'PluginRecoveryScope.ClearPendingAttemptPlan'],
+      testAnchor: 'requirements/structured-workflow/tests/direct-ce-contract.test.mjs',
+    },
+  ],
+  [
+    'src/Wanxiangshu/Context/Companion/Blogger/OpenCode/PluginScope.fs:pendingOffer',
+    {
+      owner: 'blogger-companion',
+      issuer: 'BloggerPluginScope.SetPendingOffer',
+      key: 'SessionId',
+      rules: 'single-slot inbound buffer owned by Blogger convergence; consumed by TryTakePendingOffer',
+      allowedConsumers: ['BloggerPluginScope.TryTakePendingOffer', 'BloggerPluginScope.ClearSession'],
+      testAnchor: 'requirements/structured-workflow/tests/cross-callback-pc.test.mjs',
+    },
+  ],
+  [
+    'src/Wanxiangshu/Execution/Delegation/SyncDelegate/Store.fs:deletedInspectorsByOwnerScope',
+    {
+      owner: 'sync-delegate-execution',
+      issuer: 'Store.stageDeletedChild',
+      key: 'SessionId (owner scope)',
+      rules: 'retired child identity retained only for draft/session cleanup',
+      allowedConsumers: ['Store.commitDeletedChild', 'Store.clearOwnerScope'],
+      testAnchor: 'requirements/structured-workflow/tests/cross-callback-pc.test.mjs',
+    },
+  ],
+  [
+    'src/Wanxiangshu/Process/PtyManager.fs:ptyHandles',
+    {
+      owner: 'process-execution',
+      issuer: 'PtyManager.CreateHandle',
+      key: 'SessionId',
+      rules: 'PTY process handle registry; consumed by TryTakeHandle',
+      allowedConsumers: ['PtyManager.TryTakeHandle'],
+      testAnchor: 'requirements/structured-workflow/tests/cross-callback-pc.test.mjs',
+    },
+  ],
+])
+
+/**
  * Pattern 1: TryTake continuation consumption.
  * Matches method names like TryTakeRecoveryPermit, TryTakeAttemptPlan,
  * TryTakePair, TryTake that return option (one-shot consumption).
  */
-const TRYTAKE_PATTERN = /\bmember\s+(?:_\.|this\.)\s*(TryTake\w*)\s*[<(]/
+const TRYTAKE_PATTERN = /\b(?:member\s+(?:_\.|this\.)\s*|let\s+(?:private\s+)?)(TryTake\w*|tryTake\w*)\s*[<(]/
 
 /**
  * Pattern 2: Armed presence probe.
  * Matches method names like IsArmed, HasArmed, HasArmedSession, TryArm.
  */
-const ARMED_PROBE_PATTERN = /\bmember\s+(?:_\.|this\.)\s*(?:IsArmed|HasArmed\w*|TryArm)\s*[<(]/
+const ARMED_PROBE_PATTERN = /\b(?:member\s+(?:_\.|this\.)\s*|let\s+(?:private\s+)?)(?:IsArmed\w*|HasArmed\w*|TryArm\w*|IsDrainOpen\w*|HasDrainOpen\w*|IsOpen\w*)\s*[<(]/
 
 /**
  * Pattern 3: DU await state.
@@ -89,30 +144,31 @@ const DU_AWAIT_CASE_PATTERN = /^\s*\|\s*(Await\w+|Armed\w*|Pending\w*)\s+of\b/
  * that clear registry presence and whose return value or side-effect drives
  * the next business effect decision (e.g. IsArmed → ClearArmed → bool → branch).
  */
-const CLEAR_PRESENCE_PATTERN = /\bmember\s+(?:_\.|this\.)\s*(Clear\w*|Drop\w*)\s*[<(]/
+const CLEAR_PRESENCE_PATTERN = /\b(?:member\s+(?:_\.|this\.)\s*|let\s+(?:private\s+)?)(Clear(?!Session\b)\w*|Drop(?!Session\b)\w*|Consume\w*)\s*[<(]/
 
 /**
- * Registry declaration: Dictionary or HashSet with DSL-MUTABLE annotation.
+ * Registry declaration: Dictionary, HashSet, mutable Map.empty, or ref cell.
  */
 const REGISTRY_DECLARATION =
-  /^\s*let\s+(\w+)\s*=\s*(?:new\s+)?(?:Concurrent)?(?:Dictionary|HashSet)</
+  /^\s*let\s+(?:mutable\s+)?(\w+)\s*=\s*(?:ref\b|(?:new\s+)?(?:Concurrent)?(?:Dictionary|HashSet)<|(?:Map|ResizeArray)\.empty)/
 
 /**
- * Proof annotation: must appear in the doc block preceding the declaration.
+ * Categorized proof annotation: must appear in the doc block preceding the declaration.
  */
-const PROOF_ANNOTATION = /DSL-cross-callback-proof:\s*physical/
+const CATEGORIZED_PROOF_ANNOTATION = /DSL-cross-callback-proof:\s*physical\s+([a-z-]+)/
 
 /**
- * Check if the preceding doc block (1-5 lines before) contains the proof annotation.
+ * Check if the preceding doc block (1-5 lines before) contains a valid categorized proof annotation.
  */
-const hasProofAnnotation = (lines, index) => {
+const getCategorizedProof = (lines, index) => {
   for (let j = index - 1; j >= Math.max(0, index - 5); j--) {
     const line = lines[j]
-    if (PROOF_ANNOTATION.test(line)) return true
+    const m = CATEGORIZED_PROOF_ANNOTATION.exec(line)
+    if (m && EXEMPTION_CATEGORIES.has(m[1])) return m[1]
     // Stop at non-comment, non-blank lines
     if (line.trim() !== '' && !/^\s*\/\//.test(line) && !/^\s*\[</.test(line)) break
   }
-  return false
+  return null
 }
 
 const memberBlocks = (lines) => {
@@ -154,7 +210,7 @@ export const scanText = (text, file = '<synthetic>') => {
   for (let i = 0; i < lines.length; i++) {
     const m = REGISTRY_DECLARATION.exec(lines[i])
     if (m) {
-      registries.push({ name: m[1], line: i, hasProof: hasProofAnnotation(lines, i) })
+      registries.push({ name: m[1], line: i, category: getCategorizedProof(lines, i) })
     }
   }
 
@@ -181,17 +237,21 @@ export const scanText = (text, file = '<synthetic>') => {
   // Check each registry for pattern matches
   for (const reg of registries) {
     const fileNorm = norm(String(file))
+    const regKey = `${fileNorm}:${reg.name}`
+    const isRegistered = REGISTERED_DECLARATIONS.has(regKey)
 
-    // If proof annotation exists, this physical cell is positively classified.
-    if (reg.hasProof) continue
+    // If a valid categorized proof annotation or narrow registered declaration exists,
+    // this physical cell is positively classified. Bare 'physical' without category or
+    // registration is NOT an auto-pass.
+    if (reg.category || isRegistered) continue
 
-    // A member pattern only implicates the registry it actually reads/consumes.
+    // A member or helper pattern only implicates the registry it actually reads/consumes.
     const hasTryTake = members.some((block) => TRYTAKE_PATTERN.test(block) && referencesRegistry(block, reg.name))
     const hasArmedProbe = members.some((block) => ARMED_PROBE_PATTERN.test(block) && referencesRegistry(block, reg.name))
     const hasClearPresence = members.some((block) => CLEAR_PRESENCE_PATTERN.test(block) && referencesRegistry(block, reg.name))
     // Check for DU await state: registry value type is an await DU
     const declLine = lines[reg.line]
-    const valueMatch = /Dictionary<[^,]+,\s*(\w+)>/.exec(declLine)
+    const valueMatch = /(?:Dictionary|Map)<[^,]+,\s*(\w+)>/.exec(declLine)
     const hasDuAwait = valueMatch && awaitDuNames.has(valueMatch[1])
 
     // Determine which pattern matched
@@ -215,6 +275,70 @@ export const scanText = (text, file = '<synthetic>') => {
   return violations
 }
 
+/**
+ * Scan text and return full audit metadata: violations, exempted candidates, and coverage gaps.
+ */
+export const auditText = (text, file = '<synthetic>') => {
+  const lines = text.split('\n')
+  const violations = []
+  const exempted = []
+  let coverageGaps = 0
+  const members = memberBlocks(lines)
+
+  const registries = []
+  for (let i = 0; i < lines.length; i++) {
+    const m = REGISTRY_DECLARATION.exec(lines[i])
+    if (m) {
+      registries.push({ name: m[1], line: i, category: getCategorizedProof(lines, i) })
+    }
+    // Mutable Map/ref cells outside Dictionary/HashSet count towards honest coverage gap tracking
+    if (/^\s*let\s+(?:mutable\s+)?\w+\s*=\s*(?:ref\b|Map\.empty)/.test(lines[i])) {
+      coverageGaps++
+    }
+  }
+
+  const awaitDuNames = new Set()
+  let currentType = null
+  for (let i = 0; i < lines.length; i++) {
+    const typeDecl = /^\s*(?:type|and)\s+(?:private\s+)?(\w+)\s*=/.exec(lines[i])
+    if (typeDecl) {
+      currentType = typeDecl[1]
+      continue
+    }
+    if (currentType && DU_AWAIT_CASE_PATTERN.test(lines[i])) {
+      awaitDuNames.add(currentType)
+    }
+  }
+
+  for (const reg of registries) {
+    const fileNorm = norm(String(file))
+    const regKey = `${fileNorm}:${reg.name}`
+    const isRegistered = REGISTERED_DECLARATIONS.has(regKey)
+
+    const hasTryTake = members.some((block) => TRYTAKE_PATTERN.test(block) && referencesRegistry(block, reg.name))
+    const hasArmedProbe = members.some((block) => ARMED_PROBE_PATTERN.test(block) && referencesRegistry(block, reg.name))
+    const hasClearPresence = members.some((block) => CLEAR_PRESENCE_PATTERN.test(block) && referencesRegistry(block, reg.name))
+    const declLine = lines[reg.line]
+    const valueMatch = /(?:Dictionary|Map)<[^,]+,\s*(\w+)>/.exec(declLine)
+    const hasDuAwait = valueMatch && awaitDuNames.has(valueMatch[1])
+
+    let pattern = null
+    if (hasTryTake) pattern = 'trytake-continuation'
+    else if (hasArmedProbe) pattern = 'armed-presence-probe'
+    else if (hasClearPresence) pattern = 'clear-presence-probe'
+    else if (hasDuAwait) pattern = 'du-await-state'
+
+    if (!pattern) continue
+
+    if (reg.category || isRegistered) {
+      exempted.push({ file: fileNorm, line: reg.line + 1, name: reg.name, pattern, exemption: reg.category ? `categorized:${reg.category}` : 'registered' })
+    } else {
+      violations.push({ file: fileNorm, line: reg.line + 1, name: reg.name, pattern, text: lines[reg.line].trim() })
+    }
+  }
+  return { violations, exempted, coverageGaps }
+}
+
 /** @param {{ file: string, text: string }[]} entries */
 export const scanFiles = (entries) => {
   const violations = []
@@ -222,6 +346,20 @@ export const scanFiles = (entries) => {
     violations.push(...scanText(entry.text, entry.file))
   }
   return violations
+}
+
+/** Full audit over multiple files. */
+export const auditFiles = (entries) => {
+  const violations = []
+  const exempted = []
+  let coverageGaps = 0
+  for (const entry of entries) {
+    const res = auditText(entry.text, entry.file)
+    violations.push(...res.violations)
+    exempted.push(...res.exempted)
+    coverageGaps += res.coverageGaps
+  }
+  return { violations, exempted, coverageGaps }
 }
 
 /** Every unproved detection is a regression. */
@@ -236,7 +374,7 @@ const runCli = () => {
     file,
     text: readFileSync(file, 'utf8'),
   }))
-  const violations = scanFiles(entries)
+  const { violations, exempted, coverageGaps } = auditFiles(entries)
   const { regressions } = evaluateViolations(violations)
 
   if (regressions.length > 0) {
@@ -244,12 +382,12 @@ const runCli = () => {
     for (const v of regressions) {
       console.error(`  [RED] ${v.file}:${v.line}  ${v.name} (${v.pattern})`)
       console.error(`    ${v.text}`)
-      console.error(`    Add /// DSL-cross-callback-proof: physical or refactor to owning CE`)
+      console.error(`    Add /// DSL-cross-callback-proof: physical <category> or register declaration in REGISTERED_DECLARATIONS`)
     }
     process.exit(1)
   }
 
-  console.log(`cross-callback-pc: OK — ${productionFiles.length} files, zero cross-callback PC`)
+  console.log(`cross-callback-pc: OK — ${productionFiles.length} files, zero unexempted candidates (${exempted.length} exempted, ${coverageGaps} coverage gaps)`)
   process.exit(0)
 }
 
