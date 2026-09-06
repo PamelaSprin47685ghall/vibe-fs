@@ -12,7 +12,7 @@ module StaticTools =
     /// One permission may expand to several provider verb names (Pty, Behavior, Exec).
     let toolNames (p: ToolPermission) : string list =
         match p with
-        | ToolPermission.Fork -> [ "fork" ]
+        | ToolPermission.Fork -> [ "fork"; "resume" ]
         | ToolPermission.Join -> [ "join" ]
         | ToolPermission.Horizon -> [ "horizon" ]
         | ToolPermission.TodoWrite -> [ "todowrite" ]
@@ -66,6 +66,7 @@ module StaticTools =
     /// filters and contract tests see concrete denies (not only "*").
     let knownToolNames =
         [ "fork"
+          "resume"
           "commission"
           "open-terminal"
           "send-terminal"
@@ -149,6 +150,7 @@ module StaticTools =
         match name, role with
         | "commission", Role.Manager -> "deny"
         | "fork", Role.Orchestrator -> "deny"
+        | "resume", Role.Orchestrator -> "deny"
         | "commission", Role.Orchestrator -> "allow"
         | "open-terminal", Role.DevOps
         | "send-terminal", Role.DevOps

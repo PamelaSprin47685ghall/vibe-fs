@@ -60,6 +60,7 @@ test('WHAT[ACTION-AFFORDANCE-002] gate_c_tool_description_anchor_catalog_require
     'inspect',
     'query-shell',
     'repair-behavior',
+    'resume',
     'run',
   ]
   for (const tool of highRisk) {

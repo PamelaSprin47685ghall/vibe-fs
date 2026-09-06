@@ -104,7 +104,7 @@ test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_lea
 
     await forkTool.captureOwnerDeltaPart(runtime, owner, 'PARENT-FRESH-DELTA-MARKER', 'parent-run-2')
 
-    const second = forkTool.executeManagerFork(
+    const second = forkTool.executeManagerResume(
       runtime,
       toolModule,
       owner,
@@ -141,6 +141,39 @@ test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_lea
       'CompletedAwaitingJoin',
       'completion remains a separately consumable join fact',
     )
+  } finally {
+    forkTool.disposeRuntime(runtime)
+  }
+})
+
+test('WHAT[DELEG-003] FORK_TOOL_requires_calling_and_resume_rejects_calling', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-split-'))
+  const owner = 'manager-fork-split'
+  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+  try {
+    const blankCalling = await forkTool.executeManagerFork(
+      runtime,
+      toolModule,
+      owner,
+      '',
+      'Ada',
+      'FORK-NEEDS-CALLING',
+    )
+    assert.match(blankCalling, /calling is required|必须携带 calling/i)
+    assert.equal(forkTool.childCount(runtime), 0, 'blank calling must not place any child')
+
+    const rejectedCalling = await forkTool.executeManagerResume(
+      runtime,
+      toolModule,
+      owner,
+      'coder',
+      'Ada',
+      'RESUME-REJECTS-CALLING',
+    )
+    assert.match(rejectedCalling, /never calls a new one|从不叫起新人/i)
+    assert.match(rejectedCalling, /use fork|用 fork/i)
+    assert.equal(forkTool.childCount(runtime), 0, 'resume must not place any child')
   } finally {
     forkTool.disposeRuntime(runtime)
   }

@@ -456,6 +456,32 @@ module ForkToolSurface =
             return! spec.Execute args (managerContext harness owner)
         }
 
+    let executeManagerResume
+        (value: obj)
+        (toolModule: obj)
+        (owner: string)
+        (calling: string)
+        (byname: string)
+        (charge: string)
+        : Task<string> =
+        task {
+            let harness = unbox<ForkHarness> value
+            let spec = ForkTool.resumeSpec (ToolHostCodec.factory toolModule) harness.Scope
+
+            let args =
+                HostToolArguments(
+                    box
+                        {| calling = if String.IsNullOrWhiteSpace calling then null else calling
+                           name = byname
+                           charge = charge
+                           keywords = null
+                           attach = null
+                           expected_tool_calls = null |}
+                )
+
+            return! spec.Execute args (managerContext harness owner)
+        }
+
     let captureOwnerOpening (value: obj) (owner: string) (text: string) : Task =
         task {
             let harness = unbox<ForkHarness> value

@@ -9,6 +9,7 @@ const inspector = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Tools/
 const coder = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Tools/CoderTool.fs', import.meta.url), 'utf8')
 test('WHAT[DELEG-019] TOOL_CONTRACT_fork_has_manager_and_orchestrator_specs', () => {
   assert.match(fork, /managerSpec/)
+  assert.match(fork, /resumeSpec/)
   assert.match(fork, /orchestratorSpec/)
 })
 test('WHAT[DELEG-019] TOOL_CONTRACT_inspector_and_coder_are_owner_specs', () => {

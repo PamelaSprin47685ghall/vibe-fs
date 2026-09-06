@@ -10,10 +10,13 @@ import test from 'node:test'
 import { rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 
 test('WHAT[ENF-002] TOOLSPEC_delegation_tools_have_owner_defined_admission', () => {
-  // fork: Manager only
+  // fork & resume: Manager only
   assert.equal(rolePredicate('fork', 'manager'), true)
   assert.equal(rolePredicate('fork', 'coder'), false)
   assert.equal(rolePredicate('fork', 'orchestrator'), false)
+  assert.equal(rolePredicate('resume', 'manager'), true)
+  assert.equal(rolePredicate('resume', 'coder'), false)
+  assert.equal(rolePredicate('resume', 'orchestrator'), false)
 
   // commission: Orchestrator only
   assert.equal(rolePredicate('commission', 'orchestrator'), true)

@@ -17,8 +17,8 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Investigation.WarmStart
 
-/// Manager fork / Orchestrator commission. Each public tool has its own typed
-/// request and schema; PTY is intentionally absent.
+/// Manager fork & resume / Orchestrator commission. One typed request backs
+/// every public tool; each tool exposes its own schema; PTY is absent.
 module ForkTool =
 
     [<RequireQualifiedAccess>]
@@ -57,6 +57,9 @@ module ForkTool =
 
             [<Literal>]
             let ChargeRequired = "tool/fork/charge-required"
+
+            [<Literal>]
+            let CallingRequired = "tool/fork/calling-required"
 
             [<Literal>]
             let UnknownCalling = "tool/fork/unknown-calling"
@@ -138,6 +141,14 @@ module ForkTool =
             [<Literal>]
             let RoadCannotTakeCharge = "tool/commission/road-cannot-take-charge"
 
+        [<RequireQualifiedAccess>]
+        module Resume =
+            [<Literal>]
+            let Description = "tool/resume/description"
+
+            [<Literal>]
+            let CallingNotAllowed = "tool/resume/calling-not-allowed"
+
     let private lang (ctx: HostToolContext) =
         ProviderLanguageBinding.forSessionText ctx.SessionId
 
@@ -202,9 +213,6 @@ module ForkTool =
             |> Option.bind (fun wanted ->
                 bindings
                 |> List.tryPick (fun (identity, managed) -> if identity = wanted then Some managed else None))
-
-    let private hasCalling (request: Request) =
-        not (String.IsNullOrWhiteSpace request.Calling)
 
     let private hasKeywords (request: Request) =
         not (String.IsNullOrWhiteSpace request.Keywords)
@@ -563,23 +571,6 @@ module ForkTool =
         | None -> Task.FromResult(consequence (prose language Path.Fork.PersonUnknown))
         | Some handle -> executeManagerReusePerson scope runtime context request language handles handle
 
-    let private executeManagerWithRuntime
-        (scope: ToolRuntimeScope)
-        (runtime: HostForkRuntime)
-        (request: Request)
-        (context: HostToolContext)
-        language
-        =
-        let handles = agentHandles scope context
-
-        let existingByname =
-            handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
-
-        if hasCalling request then
-            executeManagerNewCalling scope runtime context request language handles existingByname
-        else
-            executeManagerExistingPerson scope runtime context request language handles existingByname
-
     let private executeManagerAfterGuards
         (scope: ToolRuntimeScope)
         (request: Request)
@@ -588,7 +579,45 @@ module ForkTool =
         =
         match scope.RuntimeFor context with
         | Error _ -> Task.FromResult(consequence (prose language Path.Fork.ChargeContextUnavailable))
-        | Ok runtime -> executeManagerWithRuntime scope runtime request context language
+        | Ok runtime ->
+            let handles = agentHandles scope context
+
+            let existingByname =
+                handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
+
+            executeManagerNewCalling scope runtime context request language handles existingByname
+
+    let private executeManagerResumeAfterGuards
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (context: HostToolContext)
+        language
+        =
+        match scope.RuntimeFor context with
+        | Error _ -> Task.FromResult(consequence (prose language Path.Fork.ChargeContextUnavailable))
+        | Ok runtime ->
+            let handles = agentHandles scope context
+
+            let existingByname =
+                handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
+
+            executeManagerExistingPerson scope runtime context request language handles existingByname
+
+    let private executeManagerResume (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
+        task {
+            let language = lang context
+
+            if String.IsNullOrWhiteSpace request.Name then
+                return consequence (prose language Path.Fork.NameRequired)
+            elif String.IsNullOrWhiteSpace request.Charge then
+                return consequence (prose language Path.Fork.ChargeRequired)
+            elif isSelfAttachment request then
+                return consequence (prose language Path.Fork.AttachSelf)
+            elif not (String.IsNullOrWhiteSpace request.Calling) then
+                return consequence (prose language Path.Resume.CallingNotAllowed)
+            else
+                return! executeManagerResumeAfterGuards scope request context language
+        }
 
     let private executeManager (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
@@ -600,6 +629,8 @@ module ForkTool =
                 return consequence (prose language Path.Fork.ChargeRequired)
             elif isSelfAttachment request then
                 return consequence (prose language Path.Fork.AttachSelf)
+            elif String.IsNullOrWhiteSpace request.Calling then
+                return consequence (prose language Path.Fork.CallingRequired)
             else
                 return! executeManagerAfterGuards scope request context language
         }
@@ -692,7 +723,7 @@ module ForkTool =
         =
         let existingByname = orchestratorExistingByname scope request
 
-        if hasCalling request then
+        if not (String.IsNullOrWhiteSpace request.Calling) then
             commissionNewCalling scope context request language existingByname
         else
             commissionExistingByname scope context request language existingByname
@@ -724,7 +755,7 @@ module ForkTool =
           Description = prose language Path.Fork.Description
           Arguments =
             [ "calling",
-              ToolHostCodec.optionalEnumSchemaDescribed
+              ToolHostCodec.enumSchemaDescribed
                   (callingNames managerCallingBindings)
                   (prose language Path.Fork.ArgCalling)
                   factory
@@ -742,6 +773,28 @@ module ForkTool =
                     match decode language args with
                     | Error message -> return consequence message
                     | Ok request -> return! executeManager scope request context
+                } }
+
+    let resumeSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+        let language = ProviderLanguageBinding.readGlobalPreference ()
+
+        { Name = "resume"
+          Description = prose language Path.Resume.Description
+          Arguments =
+            [ "name", ToolHostCodec.stringSchemaDescribed (prose language Path.Fork.ArgName) factory
+              "charge", ToolHostCodec.stringSchemaDescribed (prose language Path.Fork.ArgCharge) factory
+              "keywords", ToolHostCodec.optionalStringSchemaDescribed (prose language Path.Fork.ArgKeywords) factory
+              "attach", ToolHostCodec.optionalStringSchemaDescribed (prose language Path.Fork.ArgAttach) factory
+              "expected_tool_calls", DelegatedToolEstimate.schema language factory ]
+          Admission = managerAdmission
+          Execute =
+            fun args context ->
+                task {
+                    let language = lang context
+
+                    match decode language args with
+                    | Error message -> return consequence message
+                    | Ok request -> return! executeManagerResume scope request context
                 } }
 
     let orchestratorSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

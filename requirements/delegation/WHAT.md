@@ -8,9 +8,9 @@
 
 属于同一 Office 的不同 calling 别名（如 fast 与 deep 档位）仅在 persona 风格与推理深度上存在差异，不改变该 Office 的权能与权限。
 
-## DELEG-003: 独立 road 与 same-road continuation 硬区分
+## DELEG-003: 独立 road 与 same-road continuation 硬区分，各占独立工具
 
-委托区分新独立道路与既有道路续做。明确指定 calling 时创建新独立道路；缺省 calling 且指定已有 Byname 时，沿用既有道路进行续做。同一目标的后续阶段、纠正、重试均属同一道路，不因工作量大或阶段演进而另建新道路。
+委托区分新独立道路与既有道路续做，两者是不同的工具契约：`fork` 必填 calling 创建新独立道路；`resume` 必填 name 续做既有道路，复用该 person 的完整历史与已绑定 persona/depth，传入 calling 是类型化拒绝。同一目标的后续阶段、纠正、重试均属同一道路，不因工作量大或阶段演进而另建新道路。
 
 ## DELEG-004: 不同 contract 必须不同名
 
@@ -90,9 +90,9 @@ fork 携带的 attachment 仅将指定同伴的历史工作记录作为只读数
 
 ## DELEG-024: reusable delegation 由 logical route 上的一次 direct-CE invocation 定义
 
-复用既有 participant 发起新工作时，每次调用都是宿主 F# CE 中的一次独立 invocation，不建立 durable `Stage/Phase/ActiveWorkUnit` 或第二状态机。invocation 属于稳定 logical route：fork continuation 由 Byname 标识，SyncDelegate 由 caller scope + dedicated role 标识；物理 `SessionId` 只是本次执行目标，不拥有 handoff 连续性。
+复用既有 participant 发起新工作时，每次调用都是宿主 F# CE 中的一次独立 invocation，不建立 durable `Stage/Phase/ActiveWorkUnit` 或第二状态机。invocation 属于稳定 logical route：resume continuation 由 Byname 标识，SyncDelegate 由 caller scope + dedicated role 标识；物理 `SessionId` 只是本次执行目标，不拥有 handoff 连续性。
 
-work unit 的输入窗口为该 route 上“上一已完成 work unit 的 parent frontier”到本次 admission 时 parent XTrace head 的 delta LifecycleWorkRecord；route 首次 work unit 使用当前 parent LifecycleWorkRecord（含 Opening）作为初始背景。prompt = 本次新 charge + 该 parent record。**同步**委托（`inspect`、`establish-behavior`、`repair-behavior`）必须等待本 work unit 自己的完成，并只返回 callee 在本 work unit XTrace 范围内的 bounded delta LifecycleWorkRecord；**异步** `fork`（包括 same-road continuation）只负责原子 admission + dispatch，成功即返回“该 Byname 已承接本次 charge”的放置后果，绝不等待 callee completion、绝不直接返回 WorkRecord。fork completion 的唯一 pull 边界是 `join` / `horizon`。
+work unit 的输入窗口为该 route 上“上一已完成 work unit 的 parent frontier”到本次 admission 时 parent XTrace head 的 delta LifecycleWorkRecord；route 首次 work unit 使用当前 parent LifecycleWorkRecord（含 Opening）作为初始背景。prompt = 本次新 charge + 该 parent record。**同步**委托（`inspect`、`establish-behavior`、`repair-behavior`）必须等待本 work unit 自己的完成，并只返回 callee 在本 work unit XTrace 范围内的 bounded delta LifecycleWorkRecord；**异步** `fork` 与 `resume`（后者即 same-road continuation）只负责原子 admission + dispatch，成功即返回“该 Byname 已承接本次 charge”的放置后果，绝不等待 callee completion、绝不直接返回 WorkRecord。fork completion 的唯一 pull 边界是 `join` / `horizon`。
 
 ## DELEG-025: work unit completion 由 causal identity 决定，不由订阅时刻决定
 

@@ -43,5 +43,5 @@ Entrust the desired consequence, relevant constraints, and the evidence or
 boundary that matters.
 Do not prescribe another office's hidden tools.
 
-For a new person, pass calling + name + charge.
-To continue someone already known here, omit calling and use the same name.
+fork calls a new person: pass calling + name + charge.
+To continue a person already known in this mission, use resume with the same name.

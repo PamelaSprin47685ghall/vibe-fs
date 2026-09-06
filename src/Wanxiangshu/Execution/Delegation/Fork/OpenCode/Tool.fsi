@@ -2,8 +2,8 @@ namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
 open Wanxiangshu.OpenCode
 
-/// Manager fork / Orchestrator commission. Each public tool has its own typed
-/// request and schema; PTY is intentionally absent.
+/// Manager fork & resume / Orchestrator commission. One typed request backs
+/// every public tool; each tool exposes its own schema; PTY is absent.
 module ForkTool =
 
     [<RequireQualifiedAccess>]
@@ -42,6 +42,9 @@ module ForkTool =
 
             [<Literal>]
             val ChargeRequired: string = "tool/fork/charge-required"
+
+            [<Literal>]
+            val CallingRequired: string = "tool/fork/calling-required"
 
             [<Literal>]
             val UnknownCalling: string = "tool/fork/unknown-calling"
@@ -123,6 +126,14 @@ module ForkTool =
             [<Literal>]
             val RoadCannotTakeCharge: string = "tool/commission/road-cannot-take-charge"
 
+        [<RequireQualifiedAccess>]
+        module Resume =
+            [<Literal>]
+            val Description: string = "tool/resume/description"
+
+            [<Literal>]
+            val CallingNotAllowed: string = "tool/resume/calling-not-allowed"
+
     type Request =
         { Calling: string
           Name: string
@@ -134,4 +145,5 @@ module ForkTool =
     val managerAdmission: ToolAdmission
     val orchestratorAdmission: ToolAdmission
     val managerSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
+    val resumeSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
     val orchestratorSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec

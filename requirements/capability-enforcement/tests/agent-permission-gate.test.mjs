@@ -113,6 +113,7 @@ const allowList = (config, name) => {
     'establish-behavior',
     'repair-behavior',
     'fork',
+    'resume',
     'commission',
     'open-terminal',
     'send-terminal',
@@ -139,7 +140,7 @@ const COGNITIVE_UTILITY_ALLOW = ['assume']
 const cognitiveUtilityAllowFor = (role) => role === 'Blogger' || role === 'Distiller' ? [] : COGNITIVE_UTILITY_ALLOW
 
 const ROLE_ALLOW = {
-  Manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'suicide', 'review'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'fission', 'suicide', 'review'],
   Orchestrator: ['commission', 'join', 'horizon'],
   Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
   Inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch', 'fission'],
@@ -276,6 +277,7 @@ test('WHAT[ENF-002] office_capability_permissions_agree_with_the_host_schema_mat
   const permissionOf = (toolName) =>
     ({
       fork: 'Fork',
+      resume: 'Fork',
       commission: 'Fork',
       'open-terminal': 'Pty',
       'send-terminal': 'Pty',

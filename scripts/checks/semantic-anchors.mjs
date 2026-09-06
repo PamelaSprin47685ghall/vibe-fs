@@ -377,9 +377,26 @@ export const TOOL_DESCRIPTION_ANCHORS = Object.freeze({
       zh: /区别在 persona 与 reasoning depth，不改变该 Office 的 authority/,
     },
     {
-      id: 'create-and-continue',
-      en: /calling \+ name \+ charge[\s\S]{0,80}same name/i,
-      zh: /calling \+ name \+ charge[\s\S]{0,80}同一个 name/,
+      id: 'create-new-person',
+      en: /calling \+ name \+ charge[\s\S]{0,120}resume/i,
+      zh: /calling \+ name \+ charge[\s\S]{0,120}resume/,
+    },
+  ]),
+  resume: Object.freeze([
+    {
+      id: 'continue-known-person',
+      en: /continue a person already known in this mission/i,
+      zh: /继续当前 mission 中已经认识的人/,
+    },
+    {
+      id: 'no-new-person',
+      en: /does not call a new person[\s\S]{0,80}fork/i,
+      zh: /不叫起新人[\s\S]{0,80}fork/,
+    },
+    {
+      id: 'reuses-history',
+      en: /reuses everything already bound[\s\S]{0,140}history/i,
+      zh: /复用该 person 已绑定的一切[\s\S]{0,140}全部历史/,
     },
   ]),
   'establish-behavior': Object.freeze([

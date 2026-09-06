@@ -18,7 +18,7 @@ import {
 } from '../../../../verification-system/tests/support/plugin-fixture.mjs'
 
 const TOOL_NAMES = [
-  'fork', 'commission', 'join', 'horizon', 'todowrite', 'fission',
+  'fork', 'resume', 'commission', 'join', 'horizon', 'todowrite', 'fission',
   'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
   'bash-honeypot', 'assume', 'inspect', 'establish-behavior', 'repair-behavior',
   'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
@@ -27,7 +27,7 @@ const TOOL_NAMES = [
 ]
 
 const PLUGIN_TOOL_NAMES = [
-  'fork', 'commission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
+  'fork', 'resume', 'commission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
   'join', 'horizon', 'fission', 'review', 'suicide', 'run', 'query-shell', 'inspect',
   'establish-behavior', 'repair-behavior', 'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
   'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
@@ -42,7 +42,7 @@ const ROLE_NAMES = ['orchestrator', 'manager', 'coder', 'inspector', 'devops', '
 const COGNITIVE_TOOLS = ['enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret']
 const ALLOWED = {
   orchestrator: ['commission', 'join', 'horizon', 'assume', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'review', 'assume', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'fission', 'review', 'assume', ...COGNITIVE_TOOLS],
   coder: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', ...COGNITIVE_TOOLS],
   inspector: ['fission', 'read', 'glob', 'grep', 'query-shell', 'fetch', 'assume', ...COGNITIVE_TOOLS],
   devops: ['join', 'horizon', 'read', 'glob', 'grep', 'inspect', 'run', 'establish-behavior', 'repair-behavior', 'assume', ...COGNITIVE_TOOLS],
@@ -87,6 +87,7 @@ test('WHAT[ENF-010] MANAGER_host_schemas_are_present_for_every_declared_argument
   await withPlugin(async (hooks) => {
     const expected = {
       fork: ['calling', 'name', 'charge', 'keywords', 'attach', 'expected_tool_calls'],
+      resume: ['name', 'charge', 'keywords', 'attach', 'expected_tool_calls'],
       commission: ['calling', 'name', 'charge', 'expected_tool_calls'],
       chronicle: ['entry', 'tip'],
       'bash-honeypot': [],

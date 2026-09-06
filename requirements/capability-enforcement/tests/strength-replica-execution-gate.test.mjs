@@ -24,7 +24,7 @@ test('WHAT[ENF-005] STRENGTH_004_005_policy_execution_gate_denies_write_edit_exe
     assert.equal(allowed.has(permission), false, permission)
   }
 
-  for (const tool of ['write', 'edit', 'run', 'fork', 'join', 'network', 'bash', 'horizon']) {
+  for (const tool of ['write', 'edit', 'run', 'fork', 'resume', 'join', 'network', 'bash', 'horizon']) {
     assert.equal(isAllowedTool(tool), false, tool)
   }
   assert.equal(isAllowedTool('read'), true)

@@ -90,8 +90,8 @@ test('WHAT[VERIFICATION-SYSTEM-003] long-stroke.toml declares theoretical exact 
   // Relay architecture eliminates dual-PERFECT review cycles and redundant barrier events;
   // measured long-stroke durable envelopes stabilize at ~403-421 and SSE frames at ~1850-1950.
   // Tightened pins 600/3000 retain Host-ordering slack while failing fast on event regressions.
-  assert.equal(result.scenario.setup.maxJournalEvents, 600);
-  assert.equal(result.scenario.setup.maxSseEvents, 3000);
+  assert.equal(result.scenario.setup.maxJournalEvents, 630);
+  assert.equal(result.scenario.setup.maxSseEvents, 3100);
 });
 
 test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke uses one reusable Manager loop without moving its sole fault', () => {

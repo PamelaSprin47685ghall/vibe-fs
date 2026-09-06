@@ -36,5 +36,5 @@ Analyst / Inquirer
 请交托你需要的后果、真正相关的 constraints，以及重要的 evidence 或 boundary。
 不要替另一个 Office 指定它隐藏的 tools。
 
-创建新人时传 calling + name + charge。
-继续这里已经认识的人时，省略 calling，并使用同一个 name。
+fork 叫起新人：传 calling + name + charge。
+继续当前 mission 中已经认识的人时，用 resume 并使用同一个 name。

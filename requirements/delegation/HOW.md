@@ -8,7 +8,7 @@ DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`com
 
 系统定义三类委托途径，由角色权能门禁严格限制：
 
-1. **异步见证委托（`fork`）**：由 Manager 在使命内部调用，创建具有独立 Byname 的子执行者，支持附加历史背景（attachment）与建议性工具调用估算。
+1. **异步见证委托（`fork` / `resume`）**：由 Manager 在使命内部调用。`fork` 必填 calling 创建具有独立 Byname 的新子执行者；`resume` 按 Byname 续做既有子执行者并复用其历史，传入 calling 被类型化拒绝。两者均支持附加历史背景（attachment）与建议性工具调用估算。
 2. **独立道路委托（`commission`）**：由 Orchestrator 调用，负责开启或续做独立集成道路，支持多道路并行推进。
 3. **同步委托（`inspect` / `establish-behavior` / `repair-behavior`）**：由业务角色在单轮内发起阻塞式子任务，经由 `SyncDelegate` 管道调度，完成取证或局部修复。
 
@@ -27,7 +27,7 @@ DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`com
 
 - 业务控制流只存在于 F# CE：`prepareHandoff → dispatch → await own completion → checkpointCompletedHandoff`。禁止 `Stage/Phase/ActiveWorkUnit`、显式 transition API 等第二运行时或 durable program counter。
 - durable truth 只记录已经发生的事实：某个 logical route 的一次已完成 handoff 确实让 callee 看到了 parent XTrace 截止到哪个 cursor。projection 仅把这些 completion facts 积分成 `latestDeliveredThrough(route)`；它不拥有执行位置。
-- 新调用从 `latestDeliveredThrough(route)` 到当前 parent XTrace head 物化 delta；route 首次调用取完整 parent LWR。logical route = fork Byname 或 caller scope 下的 dedicated SyncDelegate role，绝不以 physical child `SessionId` 作为连续性身份。
+- 新调用从 `latestDeliveredThrough(route)` 到当前 parent XTrace head 物化 delta；route 首次调用取完整 parent LWR。logical route = fork/resume Byname 或 caller scope 下的 dedicated SyncDelegate role，绝不以 physical child `SessionId` 作为连续性身份。
 - invocation-local 的 child start cursor、expected Authority Root、waiter/subscription 属于物理 correlation resource，可跨 callback 保存；它们不得 durable 化为 workflow stage。
 - Host sticky terminal 可以继续服务 late observer/recovery；delegation CE 只接受与本次 dispatch 的 causal identity 匹配的 completion/failure。run-scoped `Completed/Failed/Aborted` 都保留 Authority Root；不能把“订阅之后”当作身份。
 - 首 prompt 的 Host acceptance 若为 unknown，`PromptAuthority` 的 durable Pending claim 是唯一恢复所有者：fork run 保持 Active、terminal observer 保持绑定、不得合成 `HandleCompleted`、不得自动重发。调用面返回明确的“可能已接受”后果，阻止调用方用第二个 child 猜测性补偿。
@@ -50,7 +50,7 @@ Join 机制从所有者的完成信箱中按稳定排序逐项 CAS 消费可用�
 |---|---|
 | DELEG-001 | `requirements/delegation/tests/delegation-structure-contract.test.mjs::WHAT[DELEG-001] manager_role_law_entrusts_by_consequence_not_persona` |
 | DELEG-002 | `requirements/delegation/tests/delegation-structure-contract.test.mjs::WHAT[DELEG-002] calling_names_differ_in_persona_depth_not_authority` |
-| DELEG-003 | `requirements/delegation/tests/fork-tool.test.mjs::WHAT[DELEG-003] FORK_road_with_calling_is_independent_and_omitted_calling_continues_byname` |
+| DELEG-003 | `requirements/delegation/tests/fork-tool.test.mjs::WHAT[DELEG-003] FORK_road_with_calling_is_independent_and_omitted_calling_continues_byname`；`requirements/delegation/tests/fork-tool.test.mjs::WHAT[DELEG-003] FORK_TOOL_requires_calling_and_resume_rejects_calling` |
 | DELEG-004 | `requirements/delegation/tests/delegation-structure-contract.test.mjs::WHAT[DELEG-004] commission_and_fork_are_distinct_contracts_not_witness` |
 | DELEG-005 | `requirements/delegation/tests/join-v2-wire.test.mjs::WHAT[DELEG-005] JOIN_V2_rendered_wire_is_parseable_without_legacy_fields` |
 | DELEG-006 | `requirements/delegation/tests/fork-tool.test.mjs::WHAT[DELEG-006] FORK_continuation_reuses_bound_managed_agent_and_does_not_rebind_tier` |

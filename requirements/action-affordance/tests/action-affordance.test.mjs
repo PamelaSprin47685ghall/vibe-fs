@@ -31,6 +31,7 @@ const HIGH_RISK_TOOLS = Object.freeze([
   'inspect',
   'query-shell',
   'repair-behavior',
+  'resume',
   'run',
 ])
 

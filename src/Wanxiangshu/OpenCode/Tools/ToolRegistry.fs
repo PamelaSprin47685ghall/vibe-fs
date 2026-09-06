@@ -49,6 +49,7 @@ module ToolRegistry =
 
     let private staticAdmissions (bloggerHost: IBloggerRuntimeHost option) : (string * ToolAdmission) list =
         [ "fork", ForkTool.managerAdmission
+          "resume", ForkTool.managerAdmission
           "commission", ForkTool.orchestratorAdmission
           "open-terminal", PtyTool.admission
           "send-terminal", PtyTool.admission
@@ -189,6 +190,7 @@ module ToolRegistry =
 
         let baseSpecs =
             [ yield ForkTool.managerSpec factory runtime
+              yield ForkTool.resumeSpec factory runtime
               yield! PtyTool.specs factory runtime
               yield ForkTool.orchestratorSpec factory runtime
               yield JoinTool.spec runtime
@@ -220,6 +222,7 @@ module ToolRegistry =
             let managerPermission =
                 match spec.Name with
                 | "fork" -> Some ToolPermission.Fork
+                | "resume" -> Some ToolPermission.Fork
                 | "join" -> Some ToolPermission.Join
                 | "horizon" -> Some ToolPermission.Horizon
                 | "fission" -> Some ToolPermission.Fission
