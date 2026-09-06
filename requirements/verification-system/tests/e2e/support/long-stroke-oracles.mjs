@@ -354,32 +354,32 @@ export async function bindManagerLoopSequence(scenario) {
   assert.ok(humanAudit, 'long-stroke: humanroot-loop audit entry is required');
 
   const scores = (completeness) => ({
-    language_algorithms: 10,
-    simplicity: 10,
-    structure: 10,
-    granularity: 10,
-    tests_evidence: 10,
-    logic_reliability_boundaries: 10,
-    caller_ergonomics: 10,
+    language_algorithms: 'PERFECT',
+    simplicity: 'PERFECT',
+    structure: 'PERFECT',
+    granularity: 'PERFECT',
+    tests_evidence: 'PERFECT',
+    logic_reliability_boundaries: 'PERFECT',
+    caller_ergonomics: 'PERFECT',
     completeness,
   });
   const candidatePerfect = () => ({
     type: 'tool-call',
     tool: 'review',
     prefixText: 'Independent audit of this iteration snapshot finds every required quality dimension complete and supported by the current workspace evidence.',
-    args: scores(10),
+    args: scores('PERFECT'),
   });
   const repairAudit = () => ({
     type: 'tool-call',
     tool: 'review',
     prefixText: 'Independent audit finds the rebase conflict still requires owned repair work, so completeness remains open on this snapshot.',
-    args: scores(9),
+    args: scores('REVISE'),
   });
   const humanPerfect = () => ({
     type: 'tool-call',
     tool: 'review',
     prefixText: 'HumanRoot loop next iteration independently audits the current snapshot as complete.',
-    args: scores(10),
+    args: scores('PERFECT'),
   });
   const retire = () => ({ type: 'tool-call', tool: 'suicide', args: {} });
   const repairFork = () => ({

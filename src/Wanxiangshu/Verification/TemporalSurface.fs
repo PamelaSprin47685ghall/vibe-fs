@@ -871,7 +871,9 @@ module TemporalSurface =
               EvidenceFrontierDigest = "digest-evidence" }
 
         let perfectScores =
-            Wanxiangshu.Mission.Relay.ScoreVector.tryCreate [ 10; 10; 10; 10; 10; 10; 10; 10 ]
+            Wanxiangshu.Mission.Relay.ScoreVector.tryCreate (
+                List.replicate 8 Wanxiangshu.Mission.Relay.ScoreGrade.Perfect
+            )
             |> Result.defaultWith (fun _ -> failwith "perfectScores")
 
         let openTx =

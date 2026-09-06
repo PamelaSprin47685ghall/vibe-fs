@@ -56,14 +56,25 @@ module ScoreDimension =
     val all: ScoreDimension list
     val fieldName: ScoreDimension -> string
 
+type ScoreGrade =
+    | Perfect
+    | Revise
+    | NotApplicable
+
+module ScoreGrade =
+    val all: ScoreGrade list
+    val format: ScoreGrade -> string
+    val tryParse: string -> Result<ScoreGrade, string>
+
 type ScoreVector
 
 module ScoreVector =
-    val tryCreate: int list -> Result<ScoreVector, string>
-    val values: ScoreVector -> int list
+    val tryCreate: ScoreGrade list -> Result<ScoreVector, string>
+    val tryCreateStrings: string list -> Result<ScoreVector, string>
+    val values: ScoreVector -> ScoreGrade list
     val allPerfect: ScoreVector -> bool
     val lowDimensions: ScoreVector -> ScoreDimension list
-    val score: ScoreDimension -> ScoreVector -> int
+    val score: ScoreDimension -> ScoreVector -> ScoreGrade
 
 type AssessmentBinding =
     { PhysicalUserMessageId: string

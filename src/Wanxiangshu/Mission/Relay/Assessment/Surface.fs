@@ -8,7 +8,9 @@ module Surface =
 
     let private scoreObject scores =
         ScoreDimension.all
-        |> List.map (fun dimension -> ScoreDimension.fieldName dimension ==> ScoreVector.score dimension scores)
+        |> List.map (fun dimension ->
+            ScoreDimension.fieldName dimension
+            ==> ScoreGrade.format (ScoreVector.score dimension scores))
         |> createObj
 
     let parse (value: obj) =

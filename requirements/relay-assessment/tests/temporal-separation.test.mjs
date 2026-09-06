@@ -16,7 +16,7 @@ test('WHAT[ASSESS-008] iteration phase separates assess work and finish before a
     'assessment-repair',
     'snapshot-1',
     'authority-1',
-    9, 10, 10, 10, 10, 10, 10, 10,
+    'REVISE', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT',
   )
   assert.equal(repaired.ok, true)
   assert.equal(relay.view(repaired.state, 'road-1').phase, 'WorkOwned')
@@ -36,7 +36,7 @@ test('WHAT[ASSESS-008] iteration phase separates assess work and finish before a
     'assessment-finish',
     'snapshot-1',
     'authority-1',
-    ...Array(8).fill(10),
+    ...Array(8).fill('PERFECT'),
   )
   assert.equal(finished.ok, true)
   assert.equal(relay.view(finished.state, 'road-1').phase, 'PerfectAwaitingRetirement')

@@ -13,7 +13,7 @@ test('WHAT[RELAY-009] active authority update advances revision and snapshot exa
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    9, 10, 10, 10, 10, 10, 10, 10,
+    'REVISE', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT',
   )
   assert.equal(workOwned.ok, true)
 
@@ -68,7 +68,7 @@ test('WHAT[RELAY-008] authority update invalidates a perfect certificate without
     'assessment-perfect',
     'snapshot-1',
     'authority-1',
-    ...Array(8).fill(10),
+    ...Array(8).fill('PERFECT'),
   )
   assert.equal(perfect.ok, true)
   assert.equal(relay.certificate(perfect.state, 'road-1').valid, true)

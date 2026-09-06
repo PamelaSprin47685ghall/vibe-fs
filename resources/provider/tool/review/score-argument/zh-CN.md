@@ -1,1 +1,1 @@
-{{field}} 质量评分；0 到 10 的整数
+{{field}} 质量评分；PERFECT、REVISE 或 N/A

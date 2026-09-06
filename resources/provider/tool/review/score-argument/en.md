@@ -1,1 +1,1 @@
-{{field}} quality score; integer 0 through 10
+{{field}} quality rating; PERFECT, REVISE, or N/A

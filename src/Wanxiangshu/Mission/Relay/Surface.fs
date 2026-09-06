@@ -36,7 +36,7 @@ module Surface =
         completeness
         =
         match
-            ScoreVector.tryCreate
+            ScoreVector.tryCreateStrings
                 [ languageAlgorithms
                   simplicity
                   structure
@@ -49,7 +49,7 @@ module Surface =
         | Error error -> box {| ok = false; error = error |}
         | Ok scores ->
             let payloadDigest =
-                scores |> ScoreVector.values |> List.map string |> String.concat ","
+                scores |> ScoreVector.values |> List.map ScoreGrade.format |> String.concat ","
 
             let binding =
                 { PhysicalUserMessageId = authority

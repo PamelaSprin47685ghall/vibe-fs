@@ -26,7 +26,7 @@ test('WHAT[RETIRE-007] Continue retirement commits a closed Continue outcome wit
     { ok: false, error: 'AssessmentRequired' },
   )
 
-  const state = openAssessed([9, 10, 10, 10, 10, 10, 10, 10])
+  const state = openAssessed(['REVISE', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT'])
   const retired = relay.retireContinue(state, 'road-1', 'inc-1', 'ret-1', 'run-1', 'tool-1', 'snapshot-1')
   assert.equal(retired.ok, true)
   assert.deepEqual(relay.retirement(retired.state, 'road-1'), {
@@ -43,7 +43,7 @@ test('WHAT[RETIRE-007] Continue retirement commits a closed Continue outcome wit
 })
 
 test('WHAT[RETIRE-007] Accepted retirement commits a closed Accepted outcome with certificate binding', () => {
-  const state = openAssessed(Array(8).fill(10))
+  const state = openAssessed(Array(8).fill('PERFECT'))
   const retired = relay.retireAccepted(
     state,
     'road-1',
@@ -69,7 +69,7 @@ test('WHAT[RETIRE-007] Accepted retirement commits a closed Accepted outcome wit
 })
 
 test('WHAT[RETIRE-007] Accepted with a stale different snapshot fails', () => {
-  const state = openAssessed(Array(8).fill(10))
+  const state = openAssessed(Array(8).fill('PERFECT'))
   const stale = relay.retireAccepted(
     state,
     'road-1',
@@ -84,7 +84,7 @@ test('WHAT[RETIRE-007] Accepted with a stale different snapshot fails', () => {
 })
 
 test('WHAT[RETIRE-007] blocked perfect iteration retries Accepted after blockers clear', () => {
-  const state = openAssessed(Array(8).fill(10))
+  const state = openAssessed(Array(8).fill('PERFECT'))
   const blocked = relay.blockCleanup(state, 'road-1', 'inc-1', 'blocker-digest-1')
   assert.equal(blocked.ok, true)
   assert.equal(relay.view(blocked.state, 'road-1').phase, 'RetirementCleanupBlocked')

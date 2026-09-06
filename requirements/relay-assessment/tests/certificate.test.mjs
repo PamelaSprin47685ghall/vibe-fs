@@ -4,7 +4,7 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
 const open = (state) => relay.openIncumbency(state, 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
 
-test('WHAT[ASSESS-005] all-ten assessment creates an exact-bound certificate and downgrades the phase', () => {
+test('WHAT[ASSESS-005] no-revise assessment creates an exact-bound certificate and downgrades the phase', () => {
   const opened = open(relay.empty())
   const assessed = relay.assess(
     opened.state,
@@ -13,7 +13,7 @@ test('WHAT[ASSESS-005] all-ten assessment creates an exact-bound certificate and
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    ...Array(8).fill(10),
+    ...Array(8).fill('PERFECT'),
   )
   assert.equal(assessed.ok, true)
   assert.equal(relay.view(assessed.state, 'road-1').phase, 'PerfectAwaitingRetirement')
@@ -34,7 +34,7 @@ test('WHAT[ASSESS-006] assessed iteration cannot submit a second review after wo
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    ...Array(8).fill(10),
+    ...Array(8).fill('PERFECT'),
   )
   assert.equal(assessed.ok, true)
   assert.deepEqual(
@@ -45,7 +45,7 @@ test('WHAT[ASSESS-006] assessed iteration cannot submit a second review after wo
       'assessment-2',
       'snapshot-1',
       'authority-1',
-      ...Array(8).fill(10),
+      ...Array(8).fill('PERFECT'),
     ),
     { ok: false, error: 'AssessmentAlreadySubmitted' },
   )
@@ -60,7 +60,7 @@ test('WHAT[RELAY-008] certificate invalidation is explicit and never reactivates
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    ...Array(8).fill(10),
+    ...Array(8).fill('PERFECT'),
   )
   const invalidated = relay.invalidateCertificate(assessed.state, 'road-1', 'WorkspaceChanged')
   assert.equal(invalidated.ok, true)

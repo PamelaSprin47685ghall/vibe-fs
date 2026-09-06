@@ -123,7 +123,15 @@ module ObligationJournalSurface =
                   EvidenceFrontierDigest = "digest-evidence" }
 
             let scores =
-                Wanxiangshu.Mission.Relay.ScoreVector.tryCreate [ 10; 10; 10; 10; 10; 10; 10; 9 ]
+                Wanxiangshu.Mission.Relay.ScoreVector.tryCreate
+                    [ Wanxiangshu.Mission.Relay.ScoreGrade.Perfect
+                      Wanxiangshu.Mission.Relay.ScoreGrade.Perfect
+                      Wanxiangshu.Mission.Relay.ScoreGrade.Perfect
+                      Wanxiangshu.Mission.Relay.ScoreGrade.Perfect
+                      Wanxiangshu.Mission.Relay.ScoreGrade.Perfect
+                      Wanxiangshu.Mission.Relay.ScoreGrade.Perfect
+                      Wanxiangshu.Mission.Relay.ScoreGrade.Perfect
+                      Wanxiangshu.Mission.Relay.ScoreGrade.Revise ]
                 |> Result.defaultWith (fun _ -> failwith "scores")
 
             let events =
@@ -184,7 +192,9 @@ module ObligationJournalSurface =
                       EvidenceFrontierDigest = "digest-evidence" }
 
                 let scores =
-                    Wanxiangshu.Mission.Relay.ScoreVector.tryCreate [ 10; 10; 10; 10; 10; 10; 10; 10 ]
+                    Wanxiangshu.Mission.Relay.ScoreVector.tryCreate (
+                        List.replicate 8 Wanxiangshu.Mission.Relay.ScoreGrade.Perfect
+                    )
                     |> Result.defaultWith (fun _ -> failwith "scores")
 
                 let certificateId =

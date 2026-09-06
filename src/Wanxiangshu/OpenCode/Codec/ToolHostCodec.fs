@@ -250,28 +250,7 @@ type HostToolArguments internal (raw: obj) =
         | None -> Ok None
         | Some value -> HostArgDecode.nonNegativeIntegerFromValue value
 
-    member _.ExactBoundedIntegers(names: string list, minimum: int, maximum: int) =
-        let validateRange name score =
-            if score < minimum || score > maximum then
-                Error(sprintf "%s must be between %d and %d" name minimum maximum)
-            else
-                Ok(name, score)
-
-        let boundedInteger name =
-            let value = raw?(name)
-            let valid: bool = emitJsExpr value "Number.isInteger($0)"
-
-            if not valid then
-                Error(sprintf "%s must be an integer" name)
-            else
-                value |> unbox<float> |> int |> validateRange name
-
-        if isNull raw then
-            Error "arguments must be an object"
-        elif emitJsExpr raw "Object.keys($0)" |> Set.ofArray <> (names |> Set.ofList) then
-            Error "arguments must contain exactly the required fields"
-        else
-            names |> List.traverseResultM boundedInteger
+    member _.Raw: obj = raw
 
     member _.OptionalBool(name: string) =
         HostIngressCodec.optionalObjectProperty raw name

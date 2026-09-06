@@ -1,1 +1,1 @@
-Provide all eight scores as integers from 0 through 10, then retry.
+Provide valid ratings (PERFECT, REVISE, or N/A) for all eight dimensions, then retry.

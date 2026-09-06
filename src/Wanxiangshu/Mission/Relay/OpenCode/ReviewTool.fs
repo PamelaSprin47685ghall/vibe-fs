@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Relay.Assessment
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
@@ -231,13 +232,8 @@ module ReviewTool =
           AssessmentId: AssessmentId }
 
     let private boundInvocation (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
-        args.ExactBoundedIntegers(fields, 0, 10)
+        Model.tryParse args.Raw
         |> Result.mapError (fun _ -> InvalidScores)
-        |> Result.bind (fun scoredFields ->
-            scoredFields
-            |> List.map snd
-            |> ScoreVector.tryCreate
-            |> Result.mapError (fun _ -> InvalidScores))
         |> Result.bind (fun scores ->
             match
                 context.ToolCallId,
@@ -385,10 +381,16 @@ module ReviewTool =
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         let score field =
-            ToolHostCodec.boundedIntegerSchema 0 10 (providerText Path.ScoreArgument (Map [ "field", field ])) factory
+            ToolHostCodec.enumSchemaDescribed
+                [ "PERFECT"; "REVISE"; "N/A" ]
+                (providerText Path.ScoreArgument (Map [ "field", field ]))
+                factory
+
+        let scoreArguments = fields |> List.map (fun field -> field, score field)
+        let noteArgument = "note", ToolHostCodec.optionalStringSchema factory
 
         { Name = "review"
           Description = providerText Path.Description Map.empty
-          Arguments = fields |> List.map (fun field -> field, score field)
+          Arguments = scoreArguments @ [ noteArgument ]
           Admission = admission
           Execute = execute scope }

@@ -13,14 +13,14 @@ module Surface =
         assessment: string ->
         snapshot: string ->
         authority: string ->
-        languageAlgorithms: int ->
-        simplicity: int ->
-        structure: int ->
-        granularity: int ->
-        testsEvidence: int ->
-        logicReliabilityBoundaries: int ->
-        callerErgonomics: int ->
-        completeness: int ->
+        languageAlgorithms: string ->
+        simplicity: string ->
+        structure: string ->
+        granularity: string ->
+        testsEvidence: string ->
+        logicReliabilityBoundaries: string ->
+        callerErgonomics: string ->
+        completeness: string ->
             obj
 
     val invalidateCertificate: state: RelayState -> road: string -> reason: string -> obj

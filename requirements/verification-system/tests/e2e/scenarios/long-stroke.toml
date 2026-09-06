@@ -417,7 +417,7 @@ tools = ["review", "suicide"]
 
   [[turn.step]]
   runtimeStep = 0
-  respond = { type = "tool-call", tool = "review", prefixText = "HumanRoot canary first audit finds one material issue remains.", args = { language_algorithms = 10, simplicity = 10, structure = 10, granularity = 10, tests_evidence = 10, logic_reliability_boundaries = 10, caller_ergonomics = 10, completeness = 9 } }
+  respond = { type = "tool-call", tool = "review", prefixText = "HumanRoot canary first audit finds one material issue remains.", args = { language_algorithms = "PERFECT", simplicity = "PERFECT", structure = "PERFECT", granularity = "PERFECT", tests_evidence = "PERFECT", logic_reliability_boundaries = "PERFECT", caller_ergonomics = "PERFECT", completeness = "REVISE" } }
 
   [[turn.step]]
   runtimeStep = 1
@@ -492,7 +492,7 @@ tools = ["fork", "join", "horizon", "review", "suicide"]
 
   [[turn.step]]
   runtimeStep = 0
-  respond = { type = "tool-call", tool = "review", prefixText = "The workspace needs implementation work before it can publish: completeness is not yet full because publish_proof.txt has not been established in the current delivery.", args = { language_algorithms = 10, simplicity = 10, structure = 10, granularity = 10, tests_evidence = 10, logic_reliability_boundaries = 10, caller_ergonomics = 10, completeness = 9 } }
+  respond = { type = "tool-call", tool = "review", prefixText = "The workspace needs implementation work before it can publish: completeness is not yet full because publish_proof.txt has not been established in the current delivery.", args = { language_algorithms = "PERFECT", simplicity = "PERFECT", structure = "PERFECT", granularity = "PERFECT", tests_evidence = "PERFECT", logic_reliability_boundaries = "PERFECT", caller_ergonomics = "PERFECT", completeness = "REVISE" } }
 
   [[turn.step]]
   runtimeStep = 1

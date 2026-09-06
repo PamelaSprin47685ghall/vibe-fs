@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Mission.Relay
 
+open FsToolkit.ErrorHandling
+
 type RoadId = private RoadId of string
 type IncumbencyId = private IncumbencyId of string
 type WorkspaceSnapshotId = private WorkspaceSnapshotId of string
@@ -75,25 +77,50 @@ module ScoreDimension =
         | ScoreDimension.CallerErgonomics -> "caller_ergonomics"
         | ScoreDimension.Completeness -> "completeness"
 
-type ScoreVector = private ScoreVector of Map<ScoreDimension, int>
+type ScoreGrade =
+    | Perfect
+    | Revise
+    | NotApplicable
+
+module ScoreGrade =
+    let all = [ ScoreGrade.Perfect; ScoreGrade.Revise; ScoreGrade.NotApplicable ]
+
+    let format =
+        function
+        | ScoreGrade.Perfect -> "PERFECT"
+        | ScoreGrade.Revise -> "REVISE"
+        | ScoreGrade.NotApplicable -> "N/A"
+
+    let tryParse (value: string) =
+        match value with
+        | "PERFECT" -> Ok ScoreGrade.Perfect
+        | "REVISE" -> Ok ScoreGrade.Revise
+        | "N/A" -> Ok ScoreGrade.NotApplicable
+        | other -> Error("invalid score grade: " + other)
+
+type ScoreVector = private ScoreVector of Map<ScoreDimension, ScoreGrade>
 
 module ScoreVector =
     let tryCreate scores =
         if List.length scores <> List.length ScoreDimension.all then
             Error "ScoreVector requires exactly eight scores."
-        elif scores |> List.exists (fun score -> score < 0 || score > 10) then
-            Error "Every score must be an integer from 0 through 10."
         else
             List.zip ScoreDimension.all scores |> Map.ofList |> ScoreVector |> Ok
+
+    let tryCreateStrings (scores: string list) =
+        scores |> List.traverseResultM ScoreGrade.tryParse |> Result.bind tryCreate
 
     let values (ScoreVector scores) =
         ScoreDimension.all |> List.map (fun dimension -> scores.[dimension])
 
     let score dimension (ScoreVector scores) = scores.[dimension]
-    let allPerfect vector = values vector |> List.forall ((=) 10)
+
+    let allPerfect vector =
+        values vector |> List.forall (fun grade -> grade <> ScoreGrade.Revise)
 
     let lowDimensions vector =
-        ScoreDimension.all |> List.filter (fun dimension -> score dimension vector < 10)
+        ScoreDimension.all
+        |> List.filter (fun dimension -> score dimension vector = ScoreGrade.Revise)
 
 type AssessmentBinding =
     { PhysicalUserMessageId: string

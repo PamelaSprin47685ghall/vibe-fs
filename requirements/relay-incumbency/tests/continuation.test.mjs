@@ -14,7 +14,7 @@ test('WHAT[RELAY-005] retired iteration never reactivates and stale runs stay ab
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    9, 10, 10, 10, 10, 10, 10, 10,
+    'REVISE', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT',
   )
   assert.equal(assessed.ok, true)
   const retired = relay.retireContinue(assessed.state, 'road-1', 'inc-1', 'ret-1', 'run-1', 'tool-1', 'snapshot-1')
@@ -44,7 +44,7 @@ test('WHAT[RELAY-006] Continue keeps the road open for a next iteration', () => 
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    9, 10, 10, 10, 10, 10, 10, 10,
+    'REVISE', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT',
   )
   assert.equal(assessed.ok, true)
   const retired = relay.retireContinue(assessed.state, 'road-1', 'inc-1', 'ret-1', 'run-1', 'tool-1', 'snapshot-2')
@@ -76,7 +76,7 @@ test('WHAT[RELAY-006] Accepted blocks reopening while valid, invalidation reopen
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    ...Array(8).fill(10),
+    ...Array(8).fill('PERFECT'),
   )
   assert.equal(assessed.ok, true)
   const retired = relay.retireAccepted(

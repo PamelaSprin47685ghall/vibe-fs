@@ -21,7 +21,7 @@ type HostToolArguments =
     member Texts: name: string -> string list
     member OptionalNumber: name: string -> float option
     member OptionalNonNegativeInteger: name: string -> Result<int option, unit>
-    member ExactBoundedIntegers: names: string list * minimum: int * maximum: int -> Result<(string * int) list, string>
+    member Raw: obj
     member OptionalBool: name: string -> bool option
 
 type HostToolContext =

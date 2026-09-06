@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
-const scores = [10, 8, 10, 7, 10, 10, 9, 10]
+const scores = ['PERFECT', 'REVISE', 'PERFECT', 'REVISE', 'PERFECT', 'PERFECT', 'REVISE', 'PERFECT']
 
 const open = (state, snapshot = 'snapshot-1') =>
   relay.openIncumbency(state, 'road-1', 'inc-1', snapshot, 'authority-1')
@@ -30,7 +30,7 @@ test('WHAT[ASSESS-002] second assessment in one iteration is rejected without ov
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    ...Array(8).fill(10),
+    ...Array(8).fill('PERFECT'),
   )
   assert.deepEqual(conflicted, { ok: false, error: 'AssessmentReplayConflict' })
 
@@ -41,7 +41,7 @@ test('WHAT[ASSESS-002] second assessment in one iteration is rejected without ov
     'assessment-2',
     'snapshot-1',
     'authority-1',
-    ...Array(8).fill(10),
+    ...Array(8).fill('PERFECT'),
   )
   assert.deepEqual(second, { ok: false, error: 'AssessmentAlreadySubmitted' })
 })
@@ -67,7 +67,7 @@ test('WHAT[ASSESS-002] cross-iteration replay of another iteration assessment is
   assert.deepEqual(replayed, { ok: false, error: 'AssessmentReplayConflict' })
 })
 
-test('WHAT[ASSESS-004] low-score assessment atomically records obligations and grants work ownership', () => {
+test('WHAT[ASSESS-004] revise assessment atomically records obligations and grants work ownership', () => {
   const opened = open(relay.empty())
   const assessed = relay.assess(opened.state, 'road-1', 'inc-1', 'assessment-1', 'snapshot-1', 'authority-1', ...scores)
   assert.equal(assessed.ok, true)
@@ -100,7 +100,7 @@ test('WHAT[ASSESS-007] stale snapshot does not consume the one semantic assessme
     'assessment-stale',
     'snapshot-old',
     'authority-1',
-    ...Array(8).fill(10),
+    ...Array(8).fill('PERFECT'),
   )
   assert.deepEqual(stale, { ok: false, error: 'AuditSnapshotStale' })
   const valid = relay.assess(
@@ -110,7 +110,7 @@ test('WHAT[ASSESS-007] stale snapshot does not consume the one semantic assessme
     'assessment-valid',
     'snapshot-2',
     'authority-1',
-    ...Array(8).fill(10),
+    ...Array(8).fill('PERFECT'),
   )
   assert.equal(valid.ok, true)
 })

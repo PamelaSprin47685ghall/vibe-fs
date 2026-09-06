@@ -27,7 +27,7 @@ test('WHAT[RELAY-002] every iteration opens on the same AuditPending algebra', (
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    9, 10, 10, 10, 10, 10, 10, 10,
+    'REVISE', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT',
   )
   assert.equal(assessed.ok, true)
   const retired = relay.retireContinue(
@@ -68,7 +68,7 @@ test('WHAT[RELAY-004] low-score assessor takes work ownership in place without a
     'assessment-1',
     'snapshot-1',
     'authority-1',
-    9, 10, 10, 10, 10, 10, 10, 10,
+    'REVISE', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT',
   )
   assert.equal(assessed.ok, true)
   assert.deepEqual(relay.view(assessed.state, 'road-1'), {

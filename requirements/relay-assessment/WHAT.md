@@ -2,7 +2,7 @@
 
 ## ASSESS-001: review schema 恰有八个必填 0..10 整数
 
-`review` 工具只接受 `language_algorithms`、`simplicity`、`structure`、`granularity`、`tests_evidence`、`logic_reliability_boundaries`、`caller_ergonomics`、`completeness`。每项必须是 JSON integer 且范围 0..10；禁止缺省、额外字段、浮点、字符串数字、null、总 verdict 与平均分。
+`review` 工具接受 `language_algorithms`、`simplicity`、`structure`、`granularity`、`tests_evidence`、`logic_reliability_boundaries`、`caller_ergonomics`、`completeness` 八个必填维度评分与可选 `note` 参数。每个维度评分必须为 `"PERFECT"`、`"REVISE"` 或 `"N/A"` 三个枚举量之一；禁止缺省维度、未知字段、整数、浮点、null、总 verdict 与平均分。额外 `note` 参数必须是字符串，仅用来写文本，不返回，不做其他用途。
 
 ## ASSESS-002: 每任至多一个 accepted assessment，精确重放须全一致
 
@@ -12,13 +12,13 @@
 
 accepted assessment event 必须携带 RoadId、IncumbencyId、WorkspaceSnapshotId 与 AuthorityRevision；其中 AssessmentBinding 绑定 PhysicalUserMessageId、ProviderRunIdentity、ToolCallId 与同一 assistant message 中 tool call 之前的公开评审文本 digest。隐藏 reasoning 与 tool call 后文本不得进入证据。
 
-## ASSESS-004: 任一低分直接定义修复义务并授予工作权
+## ASSESS-004: 任一 REVISE 维度直接定义修复义务并授予工作权
 
-已提交 ScoreVector 中每个低于 10 的 dimension 都定义一项修复义务，10 分维度不定义；这些义务由唯一 ScoreVector 直接查询，不再物化第二份状态。WorkOwned phase 在同一次 AssessmentCommitted fold transition 中进入。当前任务账本的推进是负责人接责后的执行行为，不是评审本身。
+只有 REVISE 算不通过，但任何维度只要有 REVISE 就不通过。已提交 ScoreVector 中每个为 REVISE 的 dimension 都定义一项修复义务，PERFECT 与 N/A 维度不定义；这些义务由唯一 ScoreVector 直接查询，不再物化第二份状态。WorkOwned phase 在同一次 AssessmentCommitted fold transition 中进入。当前任务账本的推进是负责人接责后的执行行为，不是评审本身。
 
-## ASSESS-005: 八项全 10 生成精确绑定证书并立即降权
+## ASSESS-005: 八项无 REVISE 生成精确绑定证书并立即降权
 
-全 10 assessment 生成 QualityCertificate，绑定 assessment、snapshot、authority、root request digest、requirement set digest、narrative digest、evidence frontier 与 target horizon。证书生成后当前迭代不得再取得 workspace mutation capability，只可读、清理资源和 suicide。Accepted 退休后证书有效期间不得开启新迭代；后续显式证书失效后允许以普通 opening 开启下一个 AuditPending 迭代，由其独立 assessment 重新判断质量。
+无任何 REVISE 维度的 assessment（全 PERFECT 或 N/A 算通过）生成 QualityCertificate，绑定 assessment、snapshot、authority、root request digest、requirement set digest、narrative digest、evidence frontier 与 target horizon。证书生成后当前迭代不得再取得 workspace mutation capability，只可读、清理资源和 suicide。Accepted 退休后证书有效期间不得开启新迭代；后续显式证书失效后允许以普通 opening 开启下一个 AuditPending 迭代，由其独立 assessment 重新判断质量。
 
 ## ASSESS-006: 同任修改后不存在复评入口
 
