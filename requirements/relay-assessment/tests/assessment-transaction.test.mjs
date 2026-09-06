@@ -4,10 +4,35 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
 const scores = [10, 8, 10, 7, 10, 10, 9, 10]
 
-test('WHAT[ASSESS-002] second assessment in one incumbency is rejected without overwriting the first', () => {
-  const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1', 'ExistingWorld')
+const open = (state, snapshot = 'snapshot-1') =>
+  relay.openIncumbency(state, 'road-1', 'inc-1', snapshot, 'authority-1')
+
+test('WHAT[ASSESS-002] second assessment in one iteration is rejected without overwriting the first', () => {
+  const opened = open(relay.empty())
   const assessed = relay.assess(opened.state, 'road-1', 'inc-1', 'assessment-1', 'snapshot-1', 'authority-1', ...scores)
   assert.equal(assessed.ok, true)
+
+  const replayed = relay.assess(
+    assessed.state,
+    'road-1',
+    'inc-1',
+    'assessment-1',
+    'snapshot-1',
+    'authority-1',
+    ...scores,
+  )
+  assert.equal(replayed.ok, true)
+
+  const conflicted = relay.assess(
+    assessed.state,
+    'road-1',
+    'inc-1',
+    'assessment-1',
+    'snapshot-1',
+    'authority-1',
+    ...Array(8).fill(10),
+  )
+  assert.deepEqual(conflicted, { ok: false, error: 'AssessmentReplayConflict' })
 
   const second = relay.assess(
     assessed.state,
@@ -21,25 +46,41 @@ test('WHAT[ASSESS-002] second assessment in one incumbency is rejected without o
   assert.deepEqual(second, { ok: false, error: 'AssessmentAlreadySubmitted' })
 })
 
+test('WHAT[ASSESS-002] cross-iteration replay of another iteration assessment is rejected', () => {
+  const opened = open(relay.empty())
+  const assessed = relay.assess(opened.state, 'road-1', 'inc-1', 'assessment-1', 'snapshot-1', 'authority-1', ...scores)
+  assert.equal(assessed.ok, true)
+  const retired = relay.retireContinue(assessed.state, 'road-1', 'inc-1', 'ret-1', 'run-1', 'tool-1', 'snapshot-1')
+  assert.equal(retired.ok, true)
+  const next = relay.openIncumbency(retired.state, 'road-1', 'inc-2', 'snapshot-2', 'authority-1')
+  assert.equal(next.ok, true)
+
+  const replayed = relay.assess(
+    next.state,
+    'road-1',
+    'inc-2',
+    'assessment-1',
+    'snapshot-2',
+    'authority-1',
+    ...scores,
+  )
+  assert.deepEqual(replayed, { ok: false, error: 'AssessmentReplayConflict' })
+})
+
 test('WHAT[ASSESS-004] low-score assessment atomically records obligations and grants work ownership', () => {
-  const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1', 'ExistingWorld')
+  const opened = open(relay.empty())
   const assessed = relay.assess(opened.state, 'road-1', 'inc-1', 'assessment-1', 'snapshot-1', 'authority-1', ...scores)
   assert.equal(assessed.ok, true)
   assert.deepEqual(relay.view(assessed.state, 'road-1'), {
     activeIncumbency: 'inc-1',
     phase: 'WorkOwned',
-    source: 'ExistingWorld',
     retired: [],
   })
-  assert.deepEqual(relay.obligations(assessed.state, 'road-1'), [
-    'simplicity',
-    'granularity',
-    'caller_ergonomics',
-  ])
+  assert.equal(relay.certificate(assessed.state, 'road-1'), null)
 })
 
-test('WHAT[ASSESS-003] assessment binds exact execution identity and rejects mismatched authority or incumbency', () => {
-  const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1', 'ExistingWorld')
+test('WHAT[ASSESS-003] assessment binds exact execution identity and rejects mismatched authority or iteration', () => {
+  const opened = open(relay.empty())
   assert.deepEqual(
     relay.assess(opened.state, 'road-1', 'inc-1', 'assessment-1', 'snapshot-1', 'authority-X', ...scores),
     { ok: false, error: 'AuthorityRevisionStale' },
@@ -51,7 +92,7 @@ test('WHAT[ASSESS-003] assessment binds exact execution identity and rejects mis
 })
 
 test('WHAT[ASSESS-007] stale snapshot does not consume the one semantic assessment slot', () => {
-  const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-2', 'authority-1', 'ExistingWorld')
+  const opened = open(relay.empty(), 'snapshot-2')
   const stale = relay.assess(
     opened.state,
     'road-1',

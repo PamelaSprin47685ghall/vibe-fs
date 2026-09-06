@@ -31,6 +31,7 @@ test('WHAT[OBLIGATION-LEDGER-004] Manager Role Law distinguishes planning relati
     assert.match(text, /Entrusted Road|受托之路/i)
     assert.match(text, /planning|计划|规划/i)
     assert.match(text, /mission|obligation|使命|义务/i)
+    assert.match(text, /counterfactual|反事实/i, `${path}: must distinguish mapping cognition from mission debt by consequence`)
     assert.doesNotMatch(text, /\btodowrite\b|planComplete/i, `${path}: lifecycle/tool timing must not leak into Role Law`)
   }
 })

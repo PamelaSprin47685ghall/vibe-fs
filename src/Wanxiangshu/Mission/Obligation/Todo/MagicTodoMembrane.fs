@@ -500,8 +500,7 @@ module MagicTodoHostHooks =
             Some(sprintf "todowrite obligation.name must be non-empty at index %d" ordinal)
         | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.DuplicateObligationName name) ->
             Some(sprintf "todowrite duplicate obligation name '%s'" name)
-        | MagicTodoMembrane.PrepareRejection.NoActiveIncumbency ->
-            Some "todowrite requires an active incumbency"
+        | MagicTodoMembrane.PrepareRejection.NoActiveIncumbency -> Some "todowrite requires an active incumbency"
         | _ -> None
 
     let private isTodoTool (input: obj) (field: string) =

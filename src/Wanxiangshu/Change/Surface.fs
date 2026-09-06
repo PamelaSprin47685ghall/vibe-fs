@@ -550,40 +550,12 @@ module ChangeSurface =
           Valid = true
           InvalidationReason = None }
 
-    let private scenarioRetirement tag snapshot qualityAccepted =
-        let incumbent = IncumbencyId.create ("incumbency-" + tag)
-        let retirementId = RetirementId.create ("retirement-" + tag)
-
-        { Id = retirementId
-          IncumbencyId = incumbent
-          SnapshotId = WorkspaceSnapshotId.create snapshot
-          BatonId = BatonId.create ("baton-" + tag)
-          Baton =
-            { SchemaVersion = 1
-              RoadId = "surface-road"
-              FromIncumbencyId = IncumbencyId.value incumbent
-              AuthorityRevision = "authority-" + tag
-              SnapshotId = snapshot
-              OpenObligations = []
-              EvidenceRefs = [] }
-          ProjectionCutId = ProjectionCutId.create ("cut-" + tag)
-          ProjectionCut =
-            { RetiredIncumbencyId = IncumbencyId.value incumbent
-              ThroughProviderRunId = "provider-" + tag
-              ThroughToolCallId = "tool-" + tag
-              StaleProviderRunIds = [ "provider-" + tag ] }
-          SuccessorRequested = not qualityAccepted
-          QualityCandidateAccepted = qualityAccepted }
-
     let private scenarioSignal index signal =
         match signal with
         | ProgramScenarioSignal.QualityCandidate snapshot ->
-            let tag = string index
-            let certificate = scenarioCertificate tag snapshot
-            RoadSignal.QualityCandidateAccepted(scenarioRetirement tag snapshot true, certificate)
-        | ProgramScenarioSignal.Retired ->
-            RoadSignal.IncumbencyRetired(scenarioRetirement (string index) "retired-snapshot" false)
-        | ProgramScenarioSignal.Exceptional reason -> RoadSignal.ExceptionalTerminal reason
+            ManagerLoopSignal.Candidate(scenarioCertificate (string index) snapshot)
+        | ProgramScenarioSignal.Retired -> ManagerLoopSignal.Continue
+        | ProgramScenarioSignal.Exceptional reason -> ManagerLoopSignal.ExceptionalTerminal reason
 
     let private verdictObject verdict =
         match verdict with
@@ -603,7 +575,7 @@ module ChangeSurface =
 
     /// Executes the real OrchestratorProgram against deterministic in-memory
     /// ports. The surface exposes domain effects, not old review stages, so
-    /// integration requirements can prove invalidation/successor/Git/CAS order.
+    /// integration requirements can prove invalidation/loop-continuation/Git/CAS order.
     let observeRelayProgram (scenarioName: string) : Task<obj> =
         task {
             let scenario = programScenario scenarioName
@@ -620,7 +592,7 @@ module ChangeSurface =
             let ffResults = Queue<ProgramScenarioFf>(scenario.FfResults)
             let facts = ResizeArray<string>()
             let invalidations = ResizeArray<string>()
-            let successors = ResizeArray<string>()
+            let continuations = ResizeArray<string>()
             let timeline = ResizeArray<string>()
             let rebaseGateHeld = ResizeArray<bool>()
             let ffGateHeld = ResizeArray<bool>()
@@ -641,9 +613,9 @@ module ChangeSurface =
 
                     let label =
                         match value with
-                        | RoadSignal.QualityCandidateAccepted _ -> "QualityCandidateAccepted"
-                        | RoadSignal.IncumbencyRetired _ -> "IncumbencyRetired"
-                        | RoadSignal.ExceptionalTerminal _ -> "ExceptionalTerminal"
+                        | ManagerLoopSignal.Candidate _ -> "Candidate"
+                        | ManagerLoopSignal.Continue -> "Continue"
+                        | ManagerLoopSignal.ExceptionalTerminal _ -> "ExceptionalTerminal"
 
                     timeline.Add("await:" + label)
                     Ok value
@@ -765,19 +737,22 @@ module ChangeSurface =
                 }
 
             let relay: RelayPort =
-                { OpenRoad = fun _ -> Task.FromResult(Ok sessionId)
-                  ActivateRoad = fun _ -> Task.FromResult(Ok())
-                  AwaitRoadSignal = fun _ -> Task.FromResult(nextSignal ())
+                { CreateManagerSession = fun _ -> Task.FromResult(Ok sessionId)
+                  ActivateManager = fun _ -> Task.FromResult(Ok())
+                  AwaitLoopSignal = fun _ -> Task.FromResult(nextSignal ())
                   InvalidateCertificate =
                     fun _ reason ->
                         invalidations.Add reason
                         timeline.Add("invalidate:" + reason)
                         Task.FromResult(Ok())
-                  RequestSuccessor =
-                    fun _ _ reason ->
-                        successors.Add reason
-                        timeline.Add("successor:" + reason)
-                        Task.FromResult(Ok(IncumbencyId.create ("surface-successor-" + string successors.Count)))
+                  ContinueLoop =
+                    fun _ ->
+                        let nextId =
+                            IncumbencyId.create ("surface-loop-" + string (continuations.Count + 1))
+
+                        continuations.Add(IncumbencyId.value nextId)
+                        timeline.Add("continue:" + IncumbencyId.value nextId)
+                        Task.FromResult(Ok nextId)
                   CaptureSnapshot =
                     fun _ ->
                         if snapshots.Count = 0 then
@@ -827,7 +802,7 @@ module ChangeSurface =
                     {| verdict = verdictObject verdict
                        facts = facts.ToArray()
                        invalidations = invalidations.ToArray()
-                       successors = successors.ToArray()
+                       continuations = continuations.ToArray()
                        timeline = timeline.ToArray()
                        rebaseGateHeld = rebaseGateHeld.ToArray()
                        ffGateHeld = ffGateHeld.ToArray()

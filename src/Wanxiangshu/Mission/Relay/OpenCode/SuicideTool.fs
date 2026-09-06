@@ -2,6 +2,7 @@ namespace Wanxiangshu.Mission.Relay.OpenCode
 
 open System
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
@@ -16,16 +17,16 @@ module SuicideTool =
     [<RequireQualifiedAccess>]
     module Path =
         [<Literal>]
-        let Description = "tool/suicide/relay-description"
+        let Description = "tool/suicide/description"
 
         [<Literal>]
-        let Blocked = "tool/suicide/relay-blocked"
+        let Blocked = "tool/suicide/blocked"
 
         [<Literal>]
         let AssessmentRequired = "tool/suicide/assessment-required"
 
         [<Literal>]
-        let Retired = "tool/suicide/relay-retired"
+        let Retired = "tool/suicide/finished"
 
         [<Literal>]
         let NonManagerRole = "tool/suicide/non-manager-role"
@@ -34,7 +35,13 @@ module SuicideTool =
         let NoAuthority = "tool/suicide/no-authority"
 
         [<Literal>]
-        let NoRetirementProjection = "tool/suicide/no-retirement-projection"
+        let NoRetirementProjection = "tool/suicide/finish-not-recorded"
+
+        [<Literal>]
+        let BindingUnavailable = "tool/suicide/binding-unavailable"
+
+        [<Literal>]
+        let FinishFailed = "tool/suicide/finish-failed"
 
     let private text path =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path Map.empty
@@ -46,63 +53,30 @@ module SuicideTool =
     let private currentView state roadId =
         state |> Option.bind (fun relay -> Fold.view relay roadId)
 
-    let private incumbentFor sessionText rootAuthorityUserMessageId view =
-        view
-        |> Option.bind (fun road -> road.ActiveIncumbency)
-        |> Option.defaultWith (fun () ->
-            HostDigest.sha256Hex ("incumbency-v1\n" + sessionText + "\n" + rootAuthorityUserMessageId)
-            |> fun digest -> IncumbencyId.create ("incumbency:" + digest))
-
     let private deterministicId prefix payload create =
         HostDigest.sha256Hex (prefix + "\n" + payload)
         |> fun digest -> create (prefix + ":" + digest)
 
-    let private evidenceRefs view =
-        match view |> Option.bind (fun road -> road.Certificate) with
-        | Some certificate ->
-            [ "narrative:" + certificate.Binding.NarrativeDigest
-              "requirements:" + certificate.Binding.RequirementSetDigest
-              "evidence:" + certificate.Binding.EvidenceFrontierDigest ]
-        | None ->
-            view
-            |> Option.bind (fun road -> road.AcceptedAssessmentTransport)
-            |> Option.map (fun (callId, payloadDigest) -> [ "tool-call:" + callId; "payload:" + payloadDigest ])
-            |> Option.defaultValue []
-
-    let private baton roadId incumbent authority snapshot view =
-        { SchemaVersion = 1
-          RoadId = RoadId.value roadId
-          FromIncumbencyId = IncumbencyId.value incumbent
-          AuthorityRevision = AuthorityRevision.value authority
-          SnapshotId = WorkspaceSnapshotId.value snapshot
-          OpenObligations =
-            view
-            |> Option.map (fun road -> road.OpenObligations |> List.map ScoreDimension.fieldName)
-            |> Option.defaultValue []
-          EvidenceRefs = evidenceRefs view }
-
-    let private qualityCandidate view incumbent snapshot authority =
-        view
-        |> Option.bind (fun road -> road.Certificate)
+    let private qualityCandidate (view: RoadView) incumbent snapshot authority =
+        view.Certificate
         |> Option.filter (fun certificate ->
             certificate.Valid
             && certificate.IncumbencyId = incumbent
             && certificate.SnapshotId = snapshot
             && certificate.AuthorityRevision = authority)
 
-    let private retirementTransaction
-        state
-        roadId
-        incumbent
-        providerRun
-        toolCallId
-        snapshot
-        authority
-        authorityMessageId
-        =
-        let view = currentView state roadId
+    let private retirementTransaction roadId incumbent providerRun toolCallId snapshot authority (view: RoadView) =
         let candidate = qualityCandidate view incumbent snapshot authority
-        let qualityAccepted = candidate |> Option.isSome
+
+        let outcome =
+            match candidate with
+            | Some certificate -> RetirementOutcome.Accepted certificate.Id
+            | None -> RetirementOutcome.Continue
+
+        let outcomeTag, certificatePart =
+            match outcome with
+            | RetirementOutcome.Continue -> "continue", ""
+            | RetirementOutcome.Accepted certificateId -> "accepted", QualityCertificateId.value certificateId
 
         let payload =
             String.concat
@@ -110,57 +84,37 @@ module SuicideTool =
                 [ RoadId.value roadId
                   IncumbencyId.value incumbent
                   WorkspaceSnapshotId.value snapshot
+                  AuthorityRevision.value authority
                   ProviderRunIdentity.value providerRun
-                  ToolCallId.value toolCallId ]
+                  ToolCallId.value toolCallId
+                  outcomeTag
+                  certificatePart ]
 
         let retirementId = deterministicId "retirement-v1" payload RetirementId.create
-        let batonId = deterministicId "baton-v1" payload BatonId.create
-        let cutId = deterministicId "projection-cut-v1" payload ProjectionCutId.create
-        let envelope = baton roadId incumbent authority snapshot view
 
         let cut =
-            { RetiredIncumbencyId = IncumbencyId.value incumbent
-              ThroughProviderRunId = ProviderRunIdentity.value providerRun
-              ThroughToolCallId = ToolCallId.value toolCallId
-              StaleProviderRunIds = [ ProviderRunIdentity.value providerRun ] }
+            { ProviderRunId = ProviderRunIdentity.value providerRun
+              ToolCallId = ToolCallId.value toolCallId }
 
-        let summary =
+        let summary: RetirementSummary =
             { Id = retirementId
               IncumbencyId = incumbent
               SnapshotId = snapshot
-              BatonId = batonId
-              Baton = envelope
-              ProjectionCutId = cutId
+              AuthorityRevision = authority
               ProjectionCut = cut
-              SuccessorRequested = not qualityAccepted
-              QualityCandidateAccepted = qualityAccepted }
-
-        let opening =
-            match view with
-            | Some _ -> []
-            | None ->
-                [ RelayEvent.RoadOpened(roadId, authority, authorityMessageId)
-                  RelayEvent.IncumbencyOpened(incumbent, snapshot, BatonSource.ExistingWorld) ]
+              Outcome = outcome }
 
         let invalidation =
-            view
-            |> Option.bind (fun road -> road.Certificate)
+            view.Certificate
             |> Option.filter (fun certificate -> certificate.Valid && candidate.IsNone)
             |> Option.map (fun certificate ->
                 RelayEvent.QualityCertificateInvalidated(certificate.Id, "RetirementBindingChanged"))
             |> Option.toList
 
-        RelayTransaction.create (opening @ invalidation @ [ RelayEvent.RetirementCommitted summary ])
+        RelayTransaction.create (invalidation @ [ RelayEvent.RetirementCommitted summary ])
 
-    let private blockedTransaction state roadId incumbent snapshot authority authorityMessageId blockerDigest =
-        let opening =
-            match currentView state roadId with
-            | Some _ -> []
-            | None ->
-                [ RelayEvent.RoadOpened(roadId, authority, authorityMessageId)
-                  RelayEvent.IncumbencyOpened(incumbent, snapshot, BatonSource.ExistingWorld) ]
-
-        RelayTransaction.create (opening @ [ RelayEvent.RetirementCleanupBlocked(incumbent, blockerDigest) ])
+    let private blockedTransaction incumbent blockerDigest =
+        RelayTransaction.create [ RelayEvent.RetirementCleanupBlocked(incumbent, blockerDigest) ]
 
     let private append journal sessionId providerRun roadId transaction =
         let fact =
@@ -175,7 +129,7 @@ module SuicideTool =
     let private blockedResult blockers =
         ToolHostCodec.tomlObjectWithInstructions
             [ text Path.Blocked ]
-            [ "retired", ToolHostCodec.TBool false
+            [ "finished", ToolHostCodec.TBool false
               "blocker_count", ToolHostCodec.TInt(List.length blockers)
               "blockers",
               ToolHostCodec.TTable(
@@ -186,40 +140,20 @@ module SuicideTool =
     let private assessmentRequiredResult () =
         ToolHostCodec.tomlObjectWithInstructions
             [ text Path.AssessmentRequired ]
-            [ "retired", ToolHostCodec.TBool false
+            [ "finished", ToolHostCodec.TBool false
               "assessment_required", ToolHostCodec.TBool true ]
 
-    let private retiredResult qualityAccepted successorRequested retirementId =
-        ToolHostCodec.tomlObjectWithInstructions
-            [ text Path.Retired ]
-            [ "retired", ToolHostCodec.TBool true
-              "quality_candidate_accepted", ToolHostCodec.TBool qualityAccepted
-              "successor_requested", ToolHostCodec.TBool successorRequested
-              "retirement_id", ToolHostCodec.TString(RetirementId.value retirementId) ]
+    let private retiredResult () =
+        ToolHostCodec.tomlObjectWithInstructions [ text Path.Retired ] [ "finished", ToolHostCodec.TBool true ]
 
     let private requireSome error =
         function
         | Some value -> Ok value
         | None -> Error error
 
-    let private bindTaskResult binder pending =
-        task {
-            let! outcome = pending
-
-            match outcome with
-            | Ok value -> return! binder value
-            | Error error -> return Error error
-        }
-
-    let private bindResultTask binder result =
-        match result with
-        | Ok value -> binder value
-        | Error error -> Task.FromResult(Error error)
-
     type private BoundRetirement =
         { ToolCallId: ToolCallId
           ProviderRun: ProviderRunIdentity
-          PhysicalUserMessageId: string
           Directory: string
           Journal: AgentJournal }
 
@@ -228,11 +162,26 @@ module SuicideTool =
           SessionId: SessionId
           RoadId: RoadId
           Snapshot: WorkspaceSnapshotId
-          State: RelayState option
-          View: RoadView option
+          View: RoadView
           Authority: AuthorityRevision
-          AuthorityMessageId: PhysicalUserMessageId
           Incumbent: IncumbencyId }
+
+    type private FreezeTarget =
+        { Bound: BoundRetirement
+          SessionId: SessionId
+          RoadId: RoadId
+          Incumbent: IncumbencyId }
+
+    let private requireView roadId state =
+        currentView state roadId |> requireSome (text Path.BindingUnavailable)
+
+    let private requireActiveIncumbency (road: RoadView) =
+        road.ActiveIncumbency |> requireSome (text Path.BindingUnavailable)
+
+    let private requireSameIncumbency (target: FreezeTarget) (road: RoadView) =
+        road.ActiveIncumbency
+        |> Option.filter ((=) target.Incumbent)
+        |> requireSome (text Path.BindingUnavailable)
 
     let private bindInvocation (scope: ToolRuntimeScope) (context: HostToolContext) =
         match
@@ -243,53 +192,40 @@ module SuicideTool =
             scope.WorkspaceDirectory,
             scope.Journal
         with
-        | Some Role.Manager, Some toolCallId, Some providerRun, Some physicalUserMessageId, Some directory, Some journal when
+        | Some Role.Manager, Some toolCallId, Some providerRun, Some _, Some directory, Some journal when
             not (String.IsNullOrWhiteSpace context.SessionId)
             ->
             Ok
                 { ToolCallId = toolCallId
                   ProviderRun = providerRun
-                  PhysicalUserMessageId = physicalUserMessageId
                   Directory = directory
                   Journal = journal }
-        | Some Role.Manager, _, _, _, _, _ ->
-            Error "suicide requires exact session/run/tool/authority/workspace/journal binding"
+        | Some Role.Manager, _, _, _, _, _ -> Error(text Path.BindingUnavailable)
         | Some _, _, _, _, _, _ -> Error(text Path.NonManagerRole)
         | None, _, _, _, _, _ -> Error(text Path.NoAuthority)
 
-    let private prepareRetirement (scope: ToolRuntimeScope) (context: HostToolContext) (bound: BoundRetirement) =
+    let private prepareTarget (context: HostToolContext) (bound: BoundRetirement) =
         let sessionId = SessionId.create context.SessionId
         let roadId = RoadId.create context.SessionId
-        let snapshot = WorkspaceSnapshot.capture bound.Directory
         let state = currentState bound.Journal sessionId
-        let view = currentView state roadId
 
-        let rootAuthorityUserMessageId =
-            scope.ActiveProfileFor sessionId
-            |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
-            |> Option.defaultValue bound.PhysicalUserMessageId
+        result {
+            let! road = requireView roadId state
+            let! incumbent = requireActiveIncumbency road
 
-        let authority =
-            view
-            |> Option.map (fun road -> road.AuthorityRevision)
-            |> Option.defaultValue (AuthorityRevision.create rootAuthorityUserMessageId)
-
-        { Bound = bound
-          SessionId = sessionId
-          RoadId = roadId
-          Snapshot = snapshot
-          State = state
-          View = view
-          Authority = authority
-          AuthorityMessageId = PhysicalUserMessageId.create rootAuthorityUserMessageId
-          Incumbent = incumbentFor context.SessionId rootAuthorityUserMessageId view }
+            return
+                { Bound = bound
+                  SessionId = sessionId
+                  RoadId = roadId
+                  Incumbent = incumbent }
+        }
 
     let private appendPrepared (prepared: PreparedRetirement) transaction =
         task {
             let! outcome =
                 append prepared.Bound.Journal prepared.SessionId prepared.Bound.ProviderRun prepared.RoadId transaction
 
-            return outcome |> Result.mapError JournalAppendFailure.describe
+            return outcome |> Result.mapError (fun _ -> text Path.FinishFailed)
         }
 
     let private retirementFromProjection (prepared: PreparedRetirement) projection =
@@ -302,41 +238,35 @@ module SuicideTool =
     let private runBlocked (prepared: PreparedRetirement) blockers =
         let blockerDigest = HostDigest.sha256Hex (String.concat "\n" blockers)
 
-        blockedTransaction
-            prepared.State
-            prepared.RoadId
-            prepared.Incumbent
-            prepared.Snapshot
-            prepared.Authority
-            prepared.AuthorityMessageId
-            blockerDigest
-        |> bindResultTask (fun transaction ->
-            appendPrepared prepared transaction
-            |> bindTaskResult (fun _ -> Task.FromResult(Ok(blockedResult blockers))))
+        taskResult {
+            let! transaction =
+                blockedTransaction prepared.Incumbent blockerDigest
+                |> Result.mapError (fun _ -> text Path.FinishFailed)
+
+            let! _ = appendPrepared prepared transaction
+            return blockedResult blockers
+        }
 
     let private runRetirement (prepared: PreparedRetirement) =
-        retirementTransaction
-            prepared.State
-            prepared.RoadId
-            prepared.Incumbent
-            prepared.Bound.ProviderRun
-            prepared.Bound.ToolCallId
-            prepared.Snapshot
-            prepared.Authority
-            prepared.AuthorityMessageId
-        |> bindResultTask (fun transaction ->
-            appendPrepared prepared transaction
-            |> bindTaskResult (fun projection ->
-                retirementFromProjection prepared projection
-                |> Result.map (fun retirement ->
-                    retiredResult retirement.QualityCandidateAccepted retirement.SuccessorRequested retirement.Id)
-                |> Task.FromResult))
+        taskResult {
+            let! transaction =
+                retirementTransaction
+                    prepared.RoadId
+                    prepared.Incumbent
+                    prepared.Bound.ProviderRun
+                    prepared.Bound.ToolCallId
+                    prepared.Snapshot
+                    prepared.Authority
+                    prepared.View
+                |> Result.mapError (fun _ -> text Path.FinishFailed)
+
+            let! projection = appendPrepared prepared transaction
+            let! _ = retirementFromProjection prepared projection
+            return retiredResult ()
+        }
 
     let private runFrozen (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedRetirement) =
-        let hasAssessment =
-            prepared.View
-            |> Option.bind (fun road -> road.AcceptedAssessmentTransport)
-            |> Option.isSome
+        let hasAssessment = prepared.View.AcceptedAssessmentTransport |> Option.isSome
 
         let blockers = scope.RetirementBlockersFor context.SessionId
 
@@ -361,15 +291,43 @@ module SuicideTool =
 
     // No session-scoped physical cut here. AbortSession names a session, not the
     // retired run; the Host applies it after an unobservable delay, so on a reused
-    // session it lands inside the successor's run and kills it mid-tool. Retired
-    // output is contained by the durable cut (StaleProviderRunIds) plus Retired
+    // session it lands inside the next loop iteration and kills it mid-tool. Retired
+    // output is contained by the durable cut (ProjectionCut.ProviderRunId) plus Retired
     // tool denial; the retired run's further provider requests are refused in
-    // the transform hook by exact gate identity, so the run ends there.
-    let private executePrepared (scope: ToolRuntimeScope) (context: HostToolContext) prepared =
+    // the transform hook by exact manager-loop gate identity, so the run ends there.
+    let private refreshAfterFreeze (context: HostToolContext) (target: FreezeTarget) =
+        try
+            result {
+                let snapshot = WorkspaceSnapshot.capture target.Bound.Directory
+                let state = currentState target.Bound.Journal target.SessionId
+                let! road = requireView target.RoadId state
+                let! incumbent = requireSameIncumbency target road
+
+                return
+                    { Bound = target.Bound
+                      SessionId = target.SessionId
+                      RoadId = target.RoadId
+                      Snapshot = snapshot
+                      View = road
+                      Authority = road.AuthorityRevision
+                      Incumbent = incumbent }
+            }
+        with _ ->
+            Error(text Path.FinishFailed)
+
+    let private refreshedOrRaise (scope: ToolRuntimeScope) (context: HostToolContext) refreshResult =
+        match refreshResult with
+        | Ok refreshed -> refreshed
+        | Error error ->
+            scope.UnfreezeRetirement context.SessionId
+            raise (InvalidOperationException error)
+
+    let private executePrepared (scope: ToolRuntimeScope) (context: HostToolContext) (target: FreezeTarget) =
         task {
             try
-                scope.TryFreezeRetirement(context.SessionId, prepared.Incumbent) |> ignore
-                let! outcome = runFrozen scope context prepared
+                scope.TryFreezeRetirement(context.SessionId, target.Incumbent) |> ignore
+                let refreshed = refreshAfterFreeze context target |> refreshedOrRaise scope context
+                let! outcome = runFrozen scope context refreshed
                 return finishOutcome scope context outcome
             with ex ->
                 unfreezeUnlessRetired scope context
@@ -377,8 +335,8 @@ module SuicideTool =
         }
 
     let private execute (scope: ToolRuntimeScope) (_: HostToolArguments) (context: HostToolContext) =
-        match bindInvocation scope context |> Result.map (prepareRetirement scope context) with
-        | Ok prepared -> executePrepared scope context prepared
+        match bindInvocation scope context |> Result.bind (prepareTarget context) with
+        | Ok target -> executePrepared scope context target
         | Error error -> task { return raise (InvalidOperationException error) }
 
     let admission =

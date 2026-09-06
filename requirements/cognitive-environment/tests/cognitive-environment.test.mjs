@@ -232,6 +232,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-012] CE_012_relay_assessment_prompt_carries_led
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/library/relay/quality-ledger/${locale}.md`)
     assert.match(text, /Ledger|judgment|acceptance/i, 'Relay assessment prompt carries Ledger guidance')
+    assert.match(text, /independent|独立/, `${locale}: assessment prompt must teach independent judgement`)
     assert.doesNotMatch(
       text,
       /\bbarrier\b|\b2N\b|\bwitness\b|\bcohort\b|confirmation rounds|dedicated session|双 PERFECT|双完美/i,

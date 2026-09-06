@@ -1,8 +1,6 @@
 // INTERACTION-AUTHORITY proof — JoinGuard admission and bounded repair family.
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import test from 'node:test'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 
@@ -82,24 +80,4 @@ test('WHAT[INTERACTION-AUTHORITY-019] gate_nudge_is_exact_terminal_idempotent_an
     true,
     'physical acceptance permanently admits the exact terminal occasion',
   )
-})
-
-test('WHAT[INTERACTION-AUTHORITY-014] JNGD_nudge_contract_fails_closed_without_durable_authority', () => {
-  const source = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinGuard.fs'), 'utf8')
-  const nudge = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs'), 'utf8')
-  assert.match(source, /Join guard nudge requires an AgentJournal/)
-  assert.match(nudge, /No active authority profile/)
-  assert.match(source, /ContinuationKind\.JoinGuard/)
-  assert.match(source, /AlreadyOutstanding/)
-})
-
-test('WHAT[INTERACTION-AUTHORITY-010] duplicate_idle_continuation_admission_is_not_terminal_failure', () => {
-  const nudge = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs'), 'utf8')
-  const manager = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Mission/Manager/Workflow.fs'), 'utf8')
-  assert.match(nudge, /IdleContinuationOutcome\.AlreadyAdmitted/)
-  assert.doesNotMatch(nudge, /Manager idle encouragement already claimed for this terminal/)
-  assert.match(nudge, /acceptedPhysical\.Task/)
-  assert.doesNotMatch(nudge, /GateContinuationOutcome\.Sent _, None -> Error "gate nudge was admitted without a PhysicalUserMessageId"/)
-  assert.match(manager, /trySendGateContinuationPhysical/)
-  assert.doesNotMatch(manager, /Mission\.Manager\.Idle/)
 })

@@ -10,24 +10,14 @@ module Surface =
         | Ok state -> box {| ok = true; state = state |}
         | Error error -> box {| ok = false; error = error |}
 
-    let private source value =
-        match value with
-        | "ExistingWorld" -> Ok BatonSource.ExistingWorld
-        | "Retirement" -> Ok(BatonSource.Retirement(RetirementId.create "external-predecessor"))
-        | _ -> Error "UnknownBatonSource"
-
-    let openIncumbency state road incumbent snapshot authority sourceName =
-        match source sourceName with
-        | Error error -> box {| ok = false; error = error |}
-        | Ok batonSource ->
-            Decision.openIncumbency
-                state
-                (RoadId.create road)
-                (IncumbencyId.create incumbent)
-                (WorkspaceSnapshotId.create snapshot)
-                (AuthorityRevision.create authority)
-                batonSource
-            |> result
+    let openIncumbency state road incumbent snapshot authority =
+        Decision.openIncumbency
+            state
+            (RoadId.create road)
+            (IncumbencyId.create incumbent)
+            (WorkspaceSnapshotId.create snapshot)
+            (AuthorityRevision.create authority)
+        |> result
 
     let assess
         state
@@ -96,45 +86,70 @@ module Surface =
             (WorkspaceSnapshotId.create snapshot)
         |> result
 
-    let retire state road incumbent retirement snapshot baton cut qualityCandidateAccepted =
-        let envelope =
-            { SchemaVersion = 1
-              RoadId = road
-              FromIncumbencyId = incumbent
-              AuthorityRevision = "surface-authority"
-              SnapshotId = snapshot
-              OpenObligations = []
-              EvidenceRefs = [] }
-
-        let projectionCut =
-            { RetiredIncumbencyId = incumbent
-              ThroughProviderRunId = "surface-run"
-              ThroughToolCallId = "surface-tool"
-              StaleProviderRunIds = [ "surface-run" ] }
-
-        let summary =
-            { Id = RetirementId.create retirement
-              IncumbencyId = IncumbencyId.create incumbent
-              SnapshotId = WorkspaceSnapshotId.create snapshot
-              BatonId = BatonId.create baton
-              Baton = envelope
-              ProjectionCutId = ProjectionCutId.create cut
-              ProjectionCut = projectionCut
-              SuccessorRequested = not qualityCandidateAccepted
-              QualityCandidateAccepted = qualityCandidateAccepted }
-
-        Decision.retire state (RoadId.create road) (IncumbencyId.create incumbent) summary
+    let blockCleanup state road incumbent blockerDigest =
+        Decision.blockCleanup state (RoadId.create road) (IncumbencyId.create incumbent) blockerDigest
         |> result
 
-    let activateSuccessor state road predecessor incumbent snapshot authority =
-        Decision.activateSuccessor
-            state
-            (RoadId.create road)
-            (RetirementId.create predecessor)
-            (IncumbencyId.create incumbent)
-            (WorkspaceSnapshotId.create snapshot)
-            (AuthorityRevision.create authority)
-        |> result
+    let private normalize (value: string) = if isNull value then "" else value
+
+    let private activeRetirementContext state road incumbent =
+        match Fold.view state (RoadId.create road) with
+        | None -> Error "RoadNotOpen"
+        | Some view ->
+            match view.ActiveIncumbency, view.ActiveAuthorityRevision with
+            | Some activeId, Some authorityRevision when activeId = IncumbencyId.create incumbent ->
+                Ok authorityRevision
+            | _ -> Error "IncumbencyNotActive"
+
+    let retireContinue state road incumbent retirement providerRun toolCall snapshot =
+        match normalize snapshot with
+        | "" ->
+            box
+                {| ok = false
+                   error = "RetirementSnapshotStale" |}
+        | snapshotValue ->
+            match activeRetirementContext state road incumbent with
+            | Error error -> box {| ok = false; error = error |}
+            | Ok authorityRevision ->
+                let summary =
+                    { Id = RetirementId.create retirement
+                      IncumbencyId = IncumbencyId.create incumbent
+                      SnapshotId = WorkspaceSnapshotId.create snapshotValue
+                      AuthorityRevision = authorityRevision
+                      ProjectionCut =
+                        { ProviderRunId = normalize providerRun
+                          ToolCallId = normalize toolCall }
+                      Outcome = RetirementOutcome.Continue }
+
+                Decision.retire state (RoadId.create road) (IncumbencyId.create incumbent) summary
+                |> result
+
+    let retireAccepted state road incumbent retirement providerRun toolCall certificateId snapshot =
+        match normalize certificateId, normalize snapshot with
+        | "", _ ->
+            box
+                {| ok = false
+                   error = "MissingQualityCertificate" |}
+        | _, "" ->
+            box
+                {| ok = false
+                   error = "RetirementSnapshotStale" |}
+        | certificate, snapshotValue ->
+            match activeRetirementContext state road incumbent with
+            | Error error -> box {| ok = false; error = error |}
+            | Ok authorityRevision ->
+                let summary =
+                    { Id = RetirementId.create retirement
+                      IncumbencyId = IncumbencyId.create incumbent
+                      SnapshotId = WorkspaceSnapshotId.create snapshotValue
+                      AuthorityRevision = authorityRevision
+                      ProjectionCut =
+                        { ProviderRunId = normalize providerRun
+                          ToolCallId = normalize toolCall }
+                      Outcome = RetirementOutcome.Accepted(QualityCertificateId.create certificate) }
+
+                Decision.retire state (RoadId.create road) (IncumbencyId.create incumbent) summary
+                |> result
 
     let private phaseName phase =
         match phase with
@@ -142,11 +157,6 @@ module Surface =
         | IncumbencyPhase.WorkOwned -> "WorkOwned"
         | IncumbencyPhase.PerfectAwaitingRetirement -> "PerfectAwaitingRetirement"
         | IncumbencyPhase.RetirementCleanupBlocked -> "RetirementCleanupBlocked"
-
-    let private sourceName source =
-        match source with
-        | BatonSource.ExistingWorld -> "ExistingWorld"
-        | BatonSource.Retirement _ -> "Retirement"
 
     let private nullableString value =
         match value with
@@ -160,13 +170,7 @@ module Surface =
             box
                 {| activeIncumbency = roadView.ActiveIncumbency |> Option.map IncumbencyId.value |> nullableString
                    phase = roadView.ActivePhase |> Option.map phaseName |> nullableString
-                   source = roadView.ActiveSource |> Option.map sourceName |> nullableString
                    retired = roadView.RetiredIncumbencies |> List.map IncumbencyId.value |> List.toArray |}
-
-    let obligations state road =
-        match Fold.view state (RoadId.create road) with
-        | None -> [||]
-        | Some roadView -> roadView.OpenObligations |> List.map ScoreDimension.fieldName |> List.toArray
 
     let authority state road =
         match Fold.view state (RoadId.create road) with
@@ -201,6 +205,16 @@ module Surface =
             | None -> null
         | None -> null
 
+    let private outcomeName outcome =
+        match outcome with
+        | RetirementOutcome.Continue -> "Continue"
+        | RetirementOutcome.Accepted _ -> "Accepted"
+
+    let private outcomeCertificate outcome =
+        match outcome with
+        | RetirementOutcome.Continue -> null
+        | RetirementOutcome.Accepted certificateId -> box (QualityCertificateId.value certificateId)
+
     let retirement state road =
         match Fold.view state (RoadId.create road) with
         | Some roadView ->
@@ -209,10 +223,11 @@ module Surface =
                 box
                     {| retirementId = RetirementId.value retirement.Id
                        incumbentId = IncumbencyId.value retirement.IncumbencyId
+                       outcome = outcomeName retirement.Outcome
+                       providerRunId = retirement.ProjectionCut.ProviderRunId
+                       toolCallId = retirement.ProjectionCut.ToolCallId
+                       certificateId = outcomeCertificate retirement.Outcome
                        snapshotId = WorkspaceSnapshotId.value retirement.SnapshotId
-                       batonId = BatonId.value retirement.BatonId
-                       projectionCutId = ProjectionCutId.value retirement.ProjectionCutId
-                       successorRequested = retirement.SuccessorRequested
-                       qualityCandidateAccepted = retirement.QualityCandidateAccepted |}
+                       authorityRevision = AuthorityRevision.value retirement.AuthorityRevision |}
             | None -> null
         | None -> null

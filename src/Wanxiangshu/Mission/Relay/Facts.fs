@@ -1,12 +1,19 @@
 namespace Wanxiangshu.Mission.Relay
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 
 [<RequireQualifiedAccess>]
 type RelayEvent =
     | RoadOpened of RoadId * AuthorityRevision * PhysicalUserMessageId
-    | IncumbencyOpened of IncumbencyId * WorkspaceSnapshotId * BatonSource
-    | AssessmentCommitted of AssessmentId * AssessmentBinding * WorkspaceSnapshotId * AuthorityRevision * ScoreVector
+    | IncumbencyOpened of IncumbencyId * WorkspaceSnapshotId
+    | AssessmentCommitted of
+        AssessmentId *
+        IncumbencyId *
+        AssessmentBinding *
+        WorkspaceSnapshotId *
+        AuthorityRevision *
+        ScoreVector
     | AuthorityRevisionAdvanced of
         IncumbencyId *
         expected: AuthorityRevision *
@@ -15,10 +22,7 @@ type RelayEvent =
         WorkspaceSnapshotId
     | QualityCertificateInvalidated of QualityCertificateId * reason: string
     | RetirementCleanupBlocked of IncumbencyId * blockerDigest: string
-    | ExitRequiredNudgeScheduled of IncumbencyId * causalFrontier: string
     | RetirementCommitted of RetirementSummary
-    | SuccessorRequested of predecessor: RetirementId * reason: string
-    | SuccessorActivated of predecessor: RetirementId * IncumbencyId * WorkspaceSnapshotId * AuthorityRevision
 
 type RelayTransaction = private RelayTransaction of RelayEvent list
 
@@ -29,6 +33,65 @@ module RelayTransaction =
         | _ -> Ok(RelayTransaction events)
 
     let events (RelayTransaction events) = events
+
+type IncumbencyOpening =
+    { RoadId: RoadId
+      IncumbencyId: IncumbencyId
+      AuthorityRevision: AuthorityRevision
+      Transaction: RelayTransaction }
+
+module IncumbencyOpening =
+    let private buildTransaction events =
+        match RelayTransaction.create events with
+        | Ok transaction -> transaction
+        | Error error -> failwith error
+
+    let initial
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (snapshotId: WorkspaceSnapshotId)
+        =
+        let roadId = RoadId.create (SessionId.value sessionId)
+
+        let authorityRevision =
+            AuthorityRevision.create (PhysicalUserMessageId.value physicalUserMessageId)
+
+        let incumbencyId =
+            HostDigest.sha256Hex (
+                "incumbency-v1\n"
+                + SessionId.value sessionId
+                + "\n"
+                + PhysicalUserMessageId.value physicalUserMessageId
+            )
+            |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
+
+        let transaction =
+            buildTransaction
+                [ RelayEvent.RoadOpened(roadId, authorityRevision, physicalUserMessageId)
+                  RelayEvent.IncumbencyOpened(incumbencyId, snapshotId) ]
+
+        { RoadId = roadId
+          IncumbencyId = incumbencyId
+          AuthorityRevision = authorityRevision
+          Transaction = transaction }
+
+    let next
+        (roadId: RoadId)
+        (retirementId: RetirementId)
+        (authorityRevision: AuthorityRevision)
+        (snapshotId: WorkspaceSnapshotId)
+        =
+        let incumbencyId =
+            HostDigest.sha256Hex ("manager-loop-v1\n" + RetirementId.value retirementId)
+            |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
+
+        let transaction =
+            buildTransaction [ RelayEvent.IncumbencyOpened(incumbencyId, snapshotId) ]
+
+        { RoadId = roadId
+          IncumbencyId = incumbencyId
+          AuthorityRevision = authorityRevision
+          Transaction = transaction }
 
 [<RequireQualifiedAccess>]
 type RelayFactCases =

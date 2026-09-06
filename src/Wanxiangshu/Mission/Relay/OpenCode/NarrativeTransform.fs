@@ -13,6 +13,12 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Persistence.Journal
 
+[<RequireQualifiedAccess>]
+type RelayProjectionDisposition =
+    | Unchanged
+    | CurrentIteration
+    | RetiredAttemptStopped
+
 module RelayNarrativeTransform =
     let private relayRoad (journal: AgentJournal) (sessionId: SessionId) =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
@@ -22,13 +28,20 @@ module RelayNarrativeTransform =
     let private messageId message =
         ProviderWireDecode.hostMessageId message
 
+    let private isAuthorityMessage authorityMessageIds message =
+        messageId message
+        |> Option.exists (fun value -> Set.contains value authorityMessageIds)
+
+    let private partCallsTool callId =
+        function
+        | WireToolCall(toolCallId, _, _)
+        | WireToolResult(toolCallId, _) -> ToolCallId.value toolCallId = callId
+        | _ -> false
+
     let private messageContainsToolCall callId message =
         ProviderWireDecode.rawPartsOf message
         |> List.choose ProviderWireDecode.decodePart
-        |> List.exists (function
-            | WireToolCall(toolCallId, _, _)
-            | WireToolResult(toolCallId, _) -> ToolCallId.value toolCallId = callId
-            | _ -> false)
+        |> List.exists (partCallsTool callId)
 
     let private readField (value: obj) (name: string) : obj =
         if isNull value then
@@ -36,172 +49,171 @@ module RelayNarrativeTransform =
         else
             emitJsExpr (value, name) "$0[$1]"
 
+    let private messageRole message =
+        readField (readField message "info") "role"
+        |> Option.ofObj
+        |> Option.orElseWith (fun () -> readField message "role" |> Option.ofObj)
+        |> Option.map (fun value -> unbox<string> value)
+
     let private messageRoleIsUser message =
-        let fromInfo = readField (readField message "info") "role"
+        messageRole message
+        |> Option.exists (fun role -> role.ToLowerInvariant() = "user")
 
-        let chosen =
-            if isNull fromInfo then
-                readField message "role"
-            else
-                fromInfo
+    /// The retired run's own closing tail races the loop wake send, so every
+    /// non-authority message after the retirement tool is dropped through the
+    /// first non-authority user continuation used only to wake the loop.
+    /// Without a later wake turn the whole tail goes. Typed authority turns
+    /// always survive the cut, so the drop converges whether or not the tail
+    /// already arrived. The cut only recognises position and role, never text.
+    /// The retired epoch itself ends at the retirement tool call: the caller
+    /// has already required both exact cut positions, so the known toolIndex
+    /// arrives without a second search.
+    let private isLoopWakeCandidate toolIndex authorityMessageIds (index, message) =
+        index > toolIndex
+        && messageRoleIsUser message
+        && not (isAuthorityMessage authorityMessageIds message)
 
-        if isNull chosen then
-            false
-        else
-            (unbox<string> chosen).ToLowerInvariant() = "user"
-
-    /// The retired run's own closing tail races the successor prompt send, so
-    /// every non-authority message after the retirement tool is dropped until
-    /// the next user turn opens. Without a later user turn the whole tail goes.
-    /// User turns themselves — prompts, nudges, continuations — always survive
-    /// the cut, so the drop converges whether or not the tail already arrived.
-    let private postRetirementTailRange cut messages =
-        match messages |> List.tryFindIndex (messageContainsToolCall cut.ThroughToolCallId) with
-        | None -> None
-        | Some toolIndex ->
-            let userIndex =
-                messages
-                |> List.mapi (fun index message -> index, message)
-                |> List.tryFind (fun (index, message) -> index > toolIndex && messageRoleIsUser message)
-                |> Option.map fst
-
-            Some(toolIndex, userIndex)
-
-    let private inPostRetirementTail tailRange index =
-        match tailRange with
-        | None -> false
-        | Some(toolIndex, None) -> index > toolIndex
-        | Some(toolIndex, Some userIndex) -> index > toolIndex && index < userIndex
-
-    /// The successor gate occasion for this retirement is admitted when its
-    /// prompt was claimed or accepted. Every legitimate send claims first, so
-    /// an unadmitted occasion means this request continues the retired run
-    /// itself rather than delivering its successor.
-    let private successorGateAdmitted (journal: AgentJournal) (sessionId: SessionId) (retirement: RetirementSummary) =
-        let snapshot = AgentJournal.snapshot journal
-        let gateKind = RelaySuccessorGate.gateKind retirement.Id
-
-        let terminalRun =
-            ProviderRunIdentity.create retirement.ProjectionCut.ThroughProviderRunId
-
-        match PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections with
-        | None -> false
-        | Some profile ->
-            let runtime = PromptDispatcher.forJournal journal
-            runtime.GateNudgeAlreadyAdmitted profile PromptAuthority.ContinuationKind.ManagerGuard gateKind terminalRun
-
-    let private cutMessages authorityMessageIds (cut: ProjectionCut) messages =
-        match
-            messages
-            |> List.tryFindIndex (fun message -> messageId message = Some cut.ThroughProviderRunId)
-        with
-        | None -> Error("relay projection cut provider run is absent: " + cut.ThroughProviderRunId)
-        | Some cutIndex ->
-            let stale = cut.StaleProviderRunIds |> Set.ofList
-            let tailRange = postRetirementTailRange cut messages
-
+    let private postRetirementTailRange toolIndex authorityMessageIds messages =
+        let wakeIndex =
             messages
             |> List.mapi (fun index message -> index, message)
-            |> List.choose (fun (index, message) ->
-                let id = messageId message
+            |> List.tryFind (isLoopWakeCandidate toolIndex authorityMessageIds)
+            |> Option.map fst
 
-                let keepAuthority =
-                    id |> Option.exists (fun value -> Set.contains value authorityMessageIds)
+        Some(toolIndex, wakeIndex)
 
-                let oldEpoch = index <= cutIndex && not keepAuthority
-                let staleRun = id |> Option.exists (fun value -> Set.contains value stale)
-                let retirementTool = messageContainsToolCall cut.ThroughToolCallId message
+    let private inPostRetirementTail tailRange index =
+        tailRange
+        |> Option.exists (fun (toolIndex, wakeIndex) ->
+            index > toolIndex && wakeIndex |> Option.forall (fun wake -> index <= wake))
 
-                let postRetirementTail = inPostRetirementTail tailRange index
+    /// The manager-loop gate occasion for this retirement is admitted when its
+    /// prompt was claimed or accepted. Every legitimate send claims first, so
+    /// an unadmitted occasion means this request continues the retired run
+    /// itself rather than delivering the next iteration.
+    let private managerLoopGateAdmitted (journal: AgentJournal) (sessionId: SessionId) (retirement: RetirementSummary) =
+        let gateKind = ManagerLoopGate.gateKind retirement.Id
+        let terminalRun = ProviderRunIdentity.create retirement.ProjectionCut.ProviderRunId
 
-                if keepAuthority then
-                    Some message
-                elif
-                    oldEpoch
-                    || staleRun
-                    || retirementTool
-                    || (postRetirementTail && not keepAuthority)
-                then
-                    None
-                else
-                    Some message)
-            |> Ok
+        PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
+        |> Option.exists (fun profile ->
+            (PromptDispatcher.forJournal journal).GateNudgeAlreadyAdmitted
+                profile
+                PromptAuthority.ContinuationKind.ManagerGuard
+                gateKind
+                terminalRun)
 
-    let private phaseName =
-        function
-        | IncumbencyPhase.AuditPending -> "AuditPending"
-        | IncumbencyPhase.WorkOwned -> "WorkOwned"
-        | IncumbencyPhase.PerfectAwaitingRetirement -> "PerfectAwaitingRetirement"
-        | IncumbencyPhase.RetirementCleanupBlocked -> "RetirementCleanupBlocked"
+    let private isRetiredRunMessage retiredRunIds message =
+        messageId message
+        |> Option.exists (fun value -> Set.contains value retiredRunIds)
 
-    let private batonText (road: RoadView) =
-        let latest =
-            road.LatestRetirement |> Option.map (fun retirement -> retirement.Baton)
+    let private isRetirementToolMessage (cut: ProjectionCut) message =
+        messageContainsToolCall cut.ToolCallId message
 
-        let values =
-            [ "authority_revision=" + AuthorityRevision.value road.AuthorityRevision
-              "incumbency_id="
-              + (road.ActiveIncumbency
-                 |> Option.map IncumbencyId.value
-                 |> Option.defaultValue "none")
-              "phase="
-              + (road.ActivePhase |> Option.map phaseName |> Option.defaultValue "Retired")
-              "open_quality_obligations="
-              + (latest
-                 |> Option.map (fun baton -> String.concat "," baton.OpenObligations)
-                 |> Option.defaultValue "")
-              "evidence_refs="
-              + (latest
-                 |> Option.map (fun baton -> String.concat "," baton.EvidenceRefs)
-                 |> Option.defaultValue "") ]
+    let private isRetiredEpoch toolIndex index keepAuthority = index <= toolIndex && not keepAuthority
 
-        String.concat "\n" ([ "[RelayContext]" ] @ values @ [ "[/RelayContext]" ])
+    let private isCutDrop (cut: ProjectionCut) toolIndex tailRange retiredRunIds index message keepAuthority =
+        isRetiredEpoch toolIndex index keepAuthority
+        || isRetiredRunMessage retiredRunIds message
+        || isRetirementToolMessage cut message
+        || inPostRetirementTail tailRange index
 
-    let private syntheticContext (sessionId: SessionId) road =
-        let identity =
-            road.ActiveIncumbency
-            |> Option.map IncumbencyId.value
-            |> Option.defaultValue "retired"
+    let private shouldKeepMessage authorityMessageIds cut toolIndex tailRange retiredRunIds (index, message) =
+        let keepAuthority = isAuthorityMessage authorityMessageIds message
 
-        createObj
-            [ "info",
-              box (
-                  createObj
-                      [ "id", box ("relay-context:" + identity)
-                        "sessionID", box (SessionId.value sessionId)
-                        "role", box "user" ]
-              )
-              "role", box "user"
-              "parts", box [| createObj [ "type", box "text"; "text", box (batonText road) ] |] ]
+        keepAuthority
+        || not (isCutDrop cut toolIndex tailRange retiredRunIds index message keepAuthority)
 
-    let private projectMessages authorityMessageIds road outObj =
+    let private keepCutMessage authorityMessageIds cut toolIndex tailRange retiredRunIds (index, message) =
+        if shouldKeepMessage authorityMessageIds cut toolIndex tailRange retiredRunIds (index, message) then
+            Some message
+        else
+            None
+
+    let private cutProviderRunPresent (cut: ProjectionCut) messages =
+        messages
+        |> List.exists (fun message -> messageId message = Some cut.ProviderRunId)
+
+    let private cutToolIndex (cut: ProjectionCut) messages =
+        messages |> List.tryFindIndex (messageContainsToolCall cut.ToolCallId)
+
+    let private requireCutPresent (cut: ProjectionCut) messages =
+        if cutProviderRunPresent cut messages then
+            Ok()
+        else
+            Error("relay projection cut provider run is absent: " + cut.ProviderRunId)
+
+    let private requireCutToolIndex (cut: ProjectionCut) messages =
+        requireCutPresent cut messages
+        |> Result.bind (fun () ->
+            cutToolIndex cut messages
+            |> Option.map (fun toolIndex -> Ok toolIndex: Result<int, string>)
+            |> Option.defaultWith (fun () -> Error("relay projection cut tool call is absent: " + cut.ToolCallId)))
+
+    let private applyCut authorityMessageIds (cut: ProjectionCut) retiredRunIds messages toolIndex =
+        let tailRange = postRetirementTailRange toolIndex authorityMessageIds messages
+
+        messages
+        |> List.mapi (fun index message -> index, message)
+        |> List.choose (keepCutMessage authorityMessageIds cut toolIndex tailRange retiredRunIds)
+
+    let private cutMessages authorityMessageIds (cut: ProjectionCut) (retiredRunIds: Set<string>) messages =
+        requireCutToolIndex cut messages
+        |> Result.map (applyCut authorityMessageIds cut retiredRunIds messages)
+
+    let private activeRetirement (road: RoadView) =
+        road.LatestRetirement |> Option.filter (fun _ -> road.ActiveIncumbency.IsSome)
+
+    let private projectMessages authorityMessageIds (road: RoadView) messages =
+        // The cut applies whenever a retirement is followed by an active
+        // iteration, regardless of outcome: Continue opens the next iteration
+        // automatically, while an Accepted retirement only gains one when
+        // Change explicitly opens it after invalidating the certificate.
+        activeRetirement road
+        |> Option.map (fun retirement ->
+            cutMessages authorityMessageIds retirement.ProjectionCut road.RetiredProviderRunIds messages)
+        |> Option.defaultWith (fun () -> Ok messages)
+
+    let private authorityIdSet (road: RoadView) =
+        road.AuthorityMessageIds |> List.map PhysicalUserMessageId.value |> Set.ofList
+
+    let private dispositionAfterProjection (road: RoadView) =
+        activeRetirement road
+        |> Option.map (fun _ -> RelayProjectionDisposition.CurrentIteration)
+        |> Option.defaultValue RelayProjectionDisposition.Unchanged
+
+    let private isUnadmittedContinuation journal sessionId (road: RoadView) (retirement: RetirementSummary) =
+        road.ActiveIncumbency.IsNone
+        || not (managerLoopGateAdmitted journal sessionId retirement)
+
+    let private staleRetirement journal sessionId (road: RoadView) =
+        road.LatestRetirement
+        |> Option.filter (isUnadmittedContinuation journal sessionId road)
+
+    let private projectActive (road: RoadView) outObj =
+        let authorityMessageIds = authorityIdSet road
         let messages = ProviderWireDecode.messagesFromTransformOutput outObj
 
-        let projected =
-            match road.ActiveSource, road.LatestRetirement with
-            | Some(BatonSource.Retirement predecessor), Some retirement when retirement.Id = predecessor ->
-                cutMessages authorityMessageIds retirement.ProjectionCut messages
-            | _ -> Ok messages
+        let current =
+            projectMessages authorityMessageIds road messages
+            |> Result.defaultWith (fun error -> raise (InvalidOperationException error))
 
-        match projected with
-        | Error error -> raise (InvalidOperationException error)
-        | Ok current -> current
+        HostMessageProjection.replaceMessagesInPlace outObj current
+        dispositionAfterProjection road
 
     let private project journal (interruptAttempt: SessionId -> Task<unit>) sessionId road outObj =
         task {
-            // A committed retirement with no admitted successor prompt means this
-            // request continues the retired run itself: interrupt the attempt in the
-            // transform hook so the run is pinched off before emitting any network request.
-            match road.LatestRetirement with
-            | Some retirement when not (successorGateAdmitted journal sessionId retirement) ->
+            // A retirement with no active admitted loop prompt means this request
+            // continues the retired run itself. Interrupt it before any network
+            // request. The callback opens only Continue; Accepted remains closed.
+            // Once a later iteration and its gate are both present, projection
+            // proceeds from the durable cut.
+            match staleRetirement journal sessionId road with
+            | Some _ ->
                 do! interruptAttempt sessionId
                 HostMessageProjection.replaceMessagesInPlace outObj []
-            | _ ->
-                let authorityMessageIds =
-                    road.AuthorityMessageIds |> List.map PhysicalUserMessageId.value |> Set.ofList
-
-                let current = projectMessages authorityMessageIds road outObj
-                HostMessageProjection.replaceMessagesInPlace outObj (syntheticContext sessionId road :: current)
+                return RelayProjectionDisposition.RetiredAttemptStopped
+            | None -> return projectActive road outObj
         }
 
     let apply
@@ -209,7 +221,7 @@ module RelayNarrativeTransform =
         (interruptAttempt: SessionId -> Task<unit>)
         (sessionId: string option)
         (outObj: obj)
-        : Task<unit> =
+        : Task<RelayProjectionDisposition> =
         task {
             let resolved =
                 journal
@@ -221,6 +233,7 @@ module RelayNarrativeTransform =
                         relayRoad durable sid |> Option.map (fun road -> durable, sid, road)))
 
             match resolved with
-            | Some(durable, currentSessionId, road) -> do! project durable interruptAttempt currentSessionId road outObj
-            | None -> ()
+            | Some(durable, currentSessionId, road) ->
+                return! project durable interruptAttempt currentSessionId road outObj
+            | None -> return RelayProjectionDisposition.Unchanged
         }

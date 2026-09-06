@@ -17,8 +17,8 @@ Public product contracts exercised here (formal docs win on conflict):
 - **Join user-message wake (EXEC-017)** — blocked Manager `join` exits with
   `status="interrupted"`, `reason="user_message"` (not `operator_abort`).
 - **Provider transient failure + fallback** — sole provider-error then continuation.
-- **Relay assessment & retirement** — Incumbent audit low-score assignments, clean retirement with resource closure, successor independent re-audit and qualification.
-- **Publish conflict / reconciliation** — stale target via `gitConflictProof` triggers certificate invalidation, fresh successor resolves conflict and retires, then Published on the rebased candidate.
+- **Manager loop assessment & retirement** — each iteration independently audits the same authority, low scores assign current repair, and retirement closes live resources before the system continues or accepts.
+- **Publish conflict / reconciliation** — stale target via `gitConflictProof` invalidates the certificate; another ordinary iteration resolves the conflict and retires, then the rebased candidate is Published.
 - **§21 adversity checklist** — see `support/long-stroke-oracles.mjs` (`ADVERSITY_CHECKLIST`).
 
 ### Strict mock causal hold

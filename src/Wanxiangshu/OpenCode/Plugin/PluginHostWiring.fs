@@ -155,6 +155,7 @@ module PluginHostWiring =
                 | None -> false
                 | Some durable ->
                     let snapshot = AgentJournal.snapshot durable
+
                     AgentProjection.tryFind sessionId snapshot.AgentProjections
                     |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
                     |> Option.bind (fun (r: RelayState) -> Fold.view r (RoadId.create (SessionId.value sessionId)))

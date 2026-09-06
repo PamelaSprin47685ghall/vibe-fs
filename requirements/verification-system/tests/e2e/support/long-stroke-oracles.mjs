@@ -8,13 +8,20 @@
  * Observation surfaces (allowed): waitFact / journal / public tool results.
  * Forbidden: internal program-counter choreography; Host reboot (`restart=true`).
  *
+ * Pure manager loop: every iteration starts from the same typed authority user
+ * messages and current workspace for independent assessment. A Continue
+ * retirement is followed by another ordinary IncumbencyOpened event and a
+ * physically observed provider request on the same SessionId/LogicalRun;
+ * Accepted exits. The internal wake is stripped from the provider projection,
+ * which carries the authoritative user messages with the current iteration.
+ *
  * §21 checklist (mirrors long-stroke.toml comments + ADVERSITY_CHECKLIST export):
  *   [x] provider transient failure          — assertProviderTransientFailure
  *   [x] fallback                            — assertFallbackContinuation
  *   [x] join blocked then causally awakened — assertJoinWakePath
  *   [x] non-10 assessment assigns work      — assertAssessmentAssignsWork
  *   [x] interrupted/aborted child or session— assertInterruptedJoin (+ holdChildC1UntilLabor)
- *   [x] retirement needs successor          — assertRetirementNeedsSuccessor
+ *   [x] retirement needs next iteration    — assertRetirementNeedsIteration (Continue → fresh IncumbencyOpened)
  *   [x] durable recovery/continuation       — assertDurableRecovery
  *   [x] publish conflict / stale target     — assertPublishConflict
  *   [x] successful reconciliation           — assertSuccessfulReconciliation
@@ -206,17 +213,26 @@ export function assertInterruptedJoin(scenario, label = 'long-stroke') {
 export function assertAssessmentAssignsWork(workDir, label = 'long-stroke') {
   assert.ok(
     countFactCase(workDir, 'AssessmentCommitted') >= 1,
-    `${label}: AssessmentCommitted required (relay non-10 assessment assigns work)`,
+    `${label}: AssessmentCommitted required (non-10 assessment assigns work)`,
   );
 }
 
-/** §21: retirement needs successor — non-10 assessment blocks publication and requires a successor. */
-export function assertRetirementNeedsSuccessor(workDir, label = 'long-stroke') {
-  const transactions = factPayloads(workDir, 'TransactionCommitted');
-  const hasSuccessorRequest = transactions.some((tx) => JSON.stringify(tx).includes('SuccessorRequested'));
+/**
+ * §21: retirement needs next iteration — a non-10 assessment blocks publication
+ * and the incumbency retires with Outcome Continue, followed by a fresh
+ * IncumbencyOpened on the same authority. Detected via stringified case names
+ * (Continue vs Accepted) so no Fable DU field layout is pinned.
+ */
+export function assertRetirementNeedsIteration(workDir, label = 'long-stroke') {
+  const retirements = factPayloads(workDir, 'RetirementCommitted');
+  const hasContinue = retirements.some((summary) => JSON.stringify(summary ?? {}).includes('Continue'));
   assert.ok(
-    hasSuccessorRequest,
-    `${label}: SuccessorRequested required (finality temporarily blocked, successor needed)`,
+    hasContinue,
+    `${label}: RetirementCommitted with Outcome Continue required (finality temporarily blocked, next iteration needed)`,
+  );
+  assert.ok(
+    countFactCase(workDir, 'IncumbencyOpened') >= 2,
+    `${label}: fresh IncumbencyOpened required after the Continue retirement (same authority, new iteration)`,
   );
 }
 
@@ -309,25 +325,33 @@ export async function holdChildC1UntilLabor(scenario) {
 }
 
 /**
- * Script the repeated fixed successor prompt without inventing a Reviewer identity.
- * Delivery #1 independently certifies the pre-rebase snapshot. Delivery #2 sees
- * the machine conflict, deliberately leaves one quality dimension open, and gains
- * WorkOwned so it can reuse Proof Writer for repair. Delivery #3 independently
- * certifies the repaired snapshot. Every logical step still crosses the real
- * review/suicide/fork tools and durable Relay facts.
+ * Script the reusable manager-loop iterations without inventing a Reviewer identity.
+ * ONE reusable turn family per authority (manager-loop.*, humanroot-loop.*) is
+ * delivered several times with the same lane/authority/steps; the binder varies
+ * the review scores and fork/suicide actions by causal delivery count:
+ * initial-low→work, candidate-perfect→finish, conflict-low→repair,
+ * repaired-perfect→finish, rebased-perfect→finish. HumanRoot:
+ * low→Continue, perfect→Accepted.
+ * Every logical step still crosses the real review/suicide/fork tools and durable
+ * IncumbencyOpened/RetirementCommitted facts. Iterations are never distinguished
+ * by prompt text.
  */
-export async function bindRelaySuccessorSequence(scenario) {
+export async function bindManagerLoopSequence(scenario) {
   const runtime = scenario.provider?._scenario;
-  assert.ok(runtime?.scenario?.entries, 'long-stroke: strict scenario entries required for Relay successor bind');
+  assert.ok(runtime?.scenario?.entries, 'long-stroke: strict scenario entries required for loop iteration bind');
 
-  const auditEntry = runtime.scenario.entries.find(
-    (entry) => entry.turnId === 'successor' && entry.step === 0,
+  const loopAudit = runtime.scenario.entries.find(
+    (entry) => entry.turnId === 'manager-loop' && entry.step === 0,
   );
-  const actionEntry = runtime.scenario.entries.find(
-    (entry) => entry.turnId === 'successor' && entry.step === 1,
+  const loopAction = runtime.scenario.entries.find(
+    (entry) => entry.turnId === 'manager-loop' && entry.step === 1,
   );
-  assert.ok(auditEntry, 'long-stroke: successor audit entry is required');
-  assert.ok(actionEntry, 'long-stroke: successor action entry is required');
+  assert.ok(loopAudit, 'long-stroke: manager-loop audit entry is required');
+  assert.ok(loopAction, 'long-stroke: manager-loop action entry is required');
+  const humanAudit = runtime.scenario.entries.find(
+    (entry) => entry.turnId === 'humanroot-loop' && entry.step === 0,
+  );
+  assert.ok(humanAudit, 'long-stroke: humanroot-loop audit entry is required');
 
   const scores = (completeness) => ({
     language_algorithms: 10,
@@ -339,10 +363,10 @@ export async function bindRelaySuccessorSequence(scenario) {
     caller_ergonomics: 10,
     completeness,
   });
-  const perfectAudit = () => ({
+  const candidatePerfect = () => ({
     type: 'tool-call',
     tool: 'review',
-    prefixText: 'Independent audit of this successor snapshot finds every required quality dimension complete and supported by the current workspace evidence.',
+    prefixText: 'Independent audit of this iteration snapshot finds every required quality dimension complete and supported by the current workspace evidence.',
     args: scores(10),
   });
   const repairAudit = () => ({
@@ -351,8 +375,14 @@ export async function bindRelaySuccessorSequence(scenario) {
     prefixText: 'Independent audit finds the rebase conflict still requires owned repair work, so completeness remains open on this snapshot.',
     args: scores(9),
   });
+  const humanPerfect = () => ({
+    type: 'tool-call',
+    tool: 'review',
+    prefixText: 'HumanRoot loop next iteration independently audits the current snapshot as complete.',
+    args: scores(10),
+  });
   const retire = () => ({ type: 'tool-call', tool: 'suicide', args: {} });
-  const repair = () => ({
+  const repairFork = () => ({
     type: 'tool-call',
     tool: 'fork',
     args: {
@@ -360,26 +390,23 @@ export async function bindRelaySuccessorSequence(scenario) {
       charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
     },
   });
-  auditEntry.respond = perfectAudit();
-  actionEntry.respond = retire();
-
-  let successorActions = 0;
+  // Initial deliveries stay as declared (low audit + work fork; HumanRoot low).
+  // Later responses are selected by this declaration's causal delivery count,
+  // never by prompt text or a distinct iteration route.
   const consume = runtime.consume;
   const originalConsume = (body, selection, context) => consume.call(runtime, body, selection, context);
   runtime.consume = (body, selection, context) => {
-    originalConsume(body, selection, context);
-    if (selection?.entry?.id === 'successor.1') {
-      successorActions += 1;
-      queueMicrotask(() => {
-        if (successorActions === 1) {
-          auditEntry.respond = repairAudit();
-          actionEntry.respond = repair();
-        } else if (successorActions === 2) {
-          auditEntry.respond = perfectAudit();
-          actionEntry.respond = retire();
-        }
-      });
+    const { entry, attempt } = selection ?? {};
+    if (entry?.id === 'manager-loop.0') {
+      if (attempt === 2 || attempt === 4 || attempt === 5) entry.respond = candidatePerfect();
+      else if (attempt === 3) entry.respond = repairAudit();
+    } else if (entry?.id === 'manager-loop.1') {
+      if (attempt === 2 || attempt === 4 || attempt === 5) entry.respond = retire();
+      else if (attempt === 3) entry.respond = repairFork();
+    } else if (entry?.id === 'humanroot-loop.0' && attempt === 2) {
+      entry.respond = humanPerfect();
     }
+    originalConsume(body, selection, context);
   };
 }
 
@@ -458,35 +485,48 @@ export async function oracleLongStroke(scenario, ctx) {
   await assertFallbackContinuation(workDir);
   await assertDurableRecovery(workDir);
   assertAssessmentAssignsWork(workDir);
-  assertRetirementNeedsSuccessor(workDir);
+  assertRetirementNeedsIteration(workDir);
   assertRetirementCommitted(workDir);
   assertPublishConflict(workDir);
   assertSubagentReuse(workDir);
   assertSuccessfulReconciliation(workDir);
   assertNativeReadProbeTimeline(scenario);
 
-  // HumanRoot preflow baseline (2/2/1) is already proven exact before the main
-  // spine; global gte checks above would pass on preflow alone. Preserve their
-  // main-spine meaning by requiring the main Manager road itself to own a
-  // successor request and a quality acceptance, not merely the global journal.
-  const mainManagerId = ctx?.childId ?? null;
-  if (typeof mainManagerId === 'string' && mainManagerId.length > 0) {
-    const mainTransactions = factPayloads(workDir, 'TransactionCommitted')
-      .filter((payload) => JSON.stringify(payload ?? {}).includes(mainManagerId));
-    assert.ok(
-      mainTransactions.length >= 5,
-      `long-stroke: main Manager road must own its Relay transactions (got ${mainTransactions.length})`,
+  // HumanRoot preflow baseline (2 assessments / 2 retirements / 2 openings) is
+  // already proven exact before the main spine; global gte checks above would
+  // pass on preflow alone. Preserve their main-spine meaning by requiring the
+  // current loop itself to own every expected iteration and outcome, not merely
+  // the global journal.
+  const currentLoopId = ctx?.childId ?? null;
+  if (typeof currentLoopId === 'string' && currentLoopId.length > 0) {
+    const loopTransactions = factPayloads(workDir, 'TransactionCommitted')
+      .filter((payload) => payload?.RoadId?.[1] === currentLoopId);
+    const loopCases = loopTransactions.flatMap((payload) => payload?.Transaction?.[1] ?? []);
+    const retirements = loopCases
+      .filter((event) => event?.[0] === 'RetirementCommitted')
+      .map((event) => event[1]);
+    assert.equal(
+      loopCases.filter((event) => event?.[0] === 'IncumbencyOpened').length,
+      5,
+      'long-stroke: current loop must durably open all five iterations',
     );
-    const mainJson = mainTransactions.map((payload) => JSON.stringify(payload ?? {}));
-    assert.ok(
-      mainJson.some((text) => text.includes('SuccessorRequested')),
-      'long-stroke: main Manager road must request a successor (not merely the preflow canary)',
+    assert.equal(retirements.length, 5, 'long-stroke: every current-loop iteration must retire');
+    assert.equal(
+      retirements.filter(isContinueOutcome).length,
+      2,
+      'long-stroke: work and conflict repair must retire with Continue',
     );
-    assert.ok(
-      mainJson.some((text) => text.includes('QualityCandidateAccepted') && text.includes('true')),
-      'long-stroke: main Manager road must accept a quality candidate (not merely the preflow canary)',
+    assert.equal(
+      retirements.filter(isAcceptedOutcome).length,
+      3,
+      'long-stroke: candidate, repaired, and rebased snapshots must retire with Accepted certificates',
     );
   }
+
+  // Pure-loop removals: an event-only fake continuation (IncumbencyOpened without
+  // a physically observed provider request) must not satisfy managed admission.
+  // The delivery counts below prove every new iteration crossed the provider.
+  assertManagerLoopAuthorityPreserved(scenario, ctx?.childId ?? null);
 
   assert.ok(
     journalEventLines(workDir).length >= 1,
@@ -498,19 +538,29 @@ export async function oracleLongStroke(scenario, ctx) {
     'long-stroke: orch-shell requires exactly one ManagerJobCreated',
   );
   assert.equal(
-    scenario.provider.matchCount('manager.0'),
+    scenario.provider.matchCount('manager-loop.0'),
+    5,
+    'long-stroke determinism: reusable manager-loop audit must be delivered 5× (low, perfect, repair-low, repaired-perfect, rebased-perfect)',
+  );
+  assert.equal(
+    scenario.provider.matchCount('manager-loop.1'),
+    5,
+    'long-stroke determinism: reusable manager-loop action must be delivered 5× (work, finish, repair, finish, finish)',
+  );
+  assert.equal(
+    scenario.provider.matchCount('manager-loop.2'),
+    2,
+    'long-stroke determinism: reusable manager-loop join must be delivered 2× (initial work + repair, first faults)',
+  );
+  assert.equal(
+    scenario.provider.matchCount('manager-loop.3'),
     1,
-    'long-stroke determinism: the initial Manager step is delivered once',
+    'long-stroke determinism: reusable manager-loop close must be delivered once (repair suicide)',
   );
   assert.equal(
     scenario.provider.matchCount('continue.1'),
     1,
     'long-stroke determinism: the interrupted join closes the superseded provider turn exactly once',
-  );
-  assert.equal(
-    scenario.provider.matchCount('manager.1'),
-    1,
-    'long-stroke determinism: the active Manager join owns the sole non-retryable provider fault',
   );
   assert.equal(
     scenario.provider.matchCount('continue.0'),
@@ -523,12 +573,6 @@ export async function oracleLongStroke(scenario, ctx) {
     'long-stroke determinism: manager-resume.0 must be delivered exactly once',
   );
   const guardedSuffix = Array.from({ length: 10 }, (_, index) => `manager-join-guard.${index}`);
-  for (const id of ['successor.0', 'successor.1', 'successor.2', 'successor.3']) {
-    assert.ok(
-      scenario.provider.matchCount(id) >= 1,
-      `long-stroke determinism: ${id} must be delivered across relay incumbencies`,
-    );
-  }
   const guardedDeliveries = guardedSuffix.reduce(
     (total, id) => total + scenario.provider.matchCount(id),
     0,
@@ -559,7 +603,7 @@ export const PLANNED_WAIT_FACTS = Object.freeze({
   fallbackCursor: waitFactShape('FallbackCursorAdvanced', { eq: 1 }),
   assessmentCommitted: waitFactShape('AssessmentCommitted', { gte: 1 }),
   retirementCommitted: waitFactShape('RetirementCommitted', { gte: 1 }),
-  successorActivated: waitFactShape('SuccessorActivated', { gte: 1 }),
+  incumbencyOpened: waitFactShape('IncumbencyOpened', { gte: 1 }),
   conflictDetected: waitFactShape('ConflictDetected', { gte: 1 }),
   rebasedCandidateReady: waitFactShape('RebasedCandidateReady', { gte: 1 }),
   // Orchestrator-tagged Published (bare "Published" false-matches assignment text).
@@ -593,7 +637,7 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
   {
     id: 'non10-assessment-assigns-work',
     covered: true,
-    injection: 'manager-audit non-10 completeness=9 review → WorkOwned',
+    injection: 'manager-audit non-10 completeness=9 review → work assigned',
     oracle: 'assertAssessmentAssignsWork',
   },
   {
@@ -603,10 +647,10 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
     oracle: 'assertInterruptedJoin',
   },
   {
-    id: 'retirement-needs-successor',
+    id: 'retirement-needs-iteration',
     covered: true,
-    injection: 'non-10 assessment blocks publication → successor required',
-    oracle: 'assertRetirementNeedsSuccessor',
+    injection: 'non-10 assessment blocks publication → Continue retirement → fresh IncumbencyOpened',
+    oracle: 'assertRetirementNeedsIteration',
   },
   {
     id: 'durable-recovery-continuation',
@@ -623,7 +667,7 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
   {
     id: 'subagent-session-reuse',
     covered: true,
-    injection: 'successor-2 reuses Proof Writer on same child session',
+    injection: 'iteration-3 reuses Proof Writer on same child session',
     oracle: 'assertSubagentReuse',
   },
   {
@@ -647,7 +691,7 @@ export const ADVERSITY_ORACLES = Object.freeze({
   assertJoinWakePath,
   assertInterruptedJoin,
   assertAssessmentAssignsWork,
-  assertRetirementNeedsSuccessor,
+  assertRetirementNeedsIteration,
   assertDurableRecovery,
   assertPublishConflict,
   assertSubagentReuse,
@@ -831,39 +875,97 @@ export function assertG6BookkeeperFinalize(scenario) {
   );
 }
 
-export const HUMANROOT_SUCCESSION_CANARY_PROMPT =
-  'HUMANROOT_SUCCESSION_CANARY: run the HumanRoot manager succession check.';
+export const HUMANROOT_MANAGER_LOOP_CANARY_PROMPT =
+  'HUMANROOT_MANAGER_LOOP_CANARY: run the independent HumanRoot manager assessment check.';
 
 export const HUMANROOT_CANARY_DELTAS = Object.freeze({
   assessments: 2,
   retirements: 2,
-  successorActivations: 1,
+  incumbencyOpenings: 2,
 });
 
-const relayContextBlocks = (request) => {
-  const out = [];
-  for (const message of request?.messages ?? []) {
-    const content = message?.content;
-    const text = Array.isArray(content)
-      ? content.map((part) => (typeof part === 'string' ? part : part?.text ?? '')).join('\n')
-      : String(content ?? '');
-    if (!text.includes('[RelayContext]')) continue;
-    out.push(text);
-  }
-  return out;
+// ── pure-loop helpers ─────────────────
+//
+// RetirementOutcome is detected via stringified case names (Continue vs
+// Accepted) so no Fable DU field layout is pinned. Incumbency identity is
+// collected as every distinct `incumbency:`-prefixed string inside
+// IncumbencyOpened payloads, tolerating tuple-vs-record JSON shapes.
+const isContinueOutcome = (summary) => summary?.Outcome === 'Continue';
+
+const isAcceptedOutcome = (summary) =>
+  Array.isArray(summary?.Outcome)
+  && summary.Outcome[0] === 'Accepted'
+  && Array.isArray(summary.Outcome[1])
+  && summary.Outcome[1][0] === 'QualityCertificateId';
+
+const incumbencyIdsIn = (payloads) => {
+  const ids = new Set();
+  const walk = (value) => {
+    if (typeof value === 'string') {
+      for (const match of value.matchAll(/incumbency:[0-9a-f]+/g)) ids.add(match[0]);
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item);
+      return;
+    }
+    if (value && typeof value === 'object') {
+      for (const child of Object.values(value)) walk(child);
+    }
+  };
+  for (const payload of payloads ?? []) walk(payload);
+  return [...ids];
 };
 
-const parseRelayContext = (text) => {
-  const field = (name) => {
-    const match = text.match(new RegExp(`^${name}=(.*)$`, 'm'));
-    return match ? match[1].trim() : null;
-  };
-  return {
-    authorityRevision: field('authority_revision'),
-    incumbencyId: field('incumbency_id'),
-    phase: field('phase'),
-  };
-};
+const messageTextsByRole = (request, role) =>
+  (request?.messages ?? [])
+    .filter((message) => message?.role === role)
+    .map((message) => contentText(message?.content));
+
+const hasAssistantOrToolMessages = (request) =>
+  (request?.messages ?? []).some((message) =>
+    message?.role === 'assistant' || message?.role === 'tool' || message?.role === 'toolResult',
+  );
+
+const providerPlanOf = (request) => ({
+  model: typeof request?.model === 'string'
+    ? request.model
+    : (request?.model?.modelID ?? request?.model?.id ?? null),
+  tools: (Array.isArray(request?.tools) ? request.tools : [])
+    .map((tool) => tool?.function?.name ?? tool?.name)
+    .filter((name) => typeof name === 'string')
+    .sort(),
+  system: messageTextsByRole(request, 'system'),
+});
+
+/**
+ * Assert every fresh iteration preserves the provider-visible authority:
+ * same system/provider plan, same typed authority user sequence in order,
+ * carrying only the current iteration with the internal wake stripped.
+ * Compares message structure only.
+ */
+export function assertManagerLoopAuthorityPreserved(scenario, sessionId) {
+  assert.ok(typeof sessionId === 'string' && sessionId.length > 0, 'manager-loop: session id required');
+  const requests = canaryRequestsFor(scenario, sessionId);
+  assert.ok(requests.length >= 2, `manager-loop: expected initial + next iteration requests (got ${requests.length})`);
+  const firsts = requests.filter((request) => !hasAssistantOrToolMessages(request));
+  assert.ok(firsts.length >= 2, `manager-loop: expected at least two iteration-first requests carrying only the current iteration (got ${firsts.length})`);
+  const baselinePlan = providerPlanOf(firsts[0]);
+  const baselineUsers = messageTextsByRole(firsts[0], 'user');
+  assert.ok(baselineUsers.length >= 1, 'manager-loop: initial iteration must carry typed authority user messages');
+  for (const [index, request] of firsts.entries()) {
+    assert.deepEqual(
+      providerPlanOf(request),
+      baselinePlan,
+      `manager-loop: iteration #${index + 1} must keep the same system/provider plan as the initial iteration`,
+    );
+    assert.deepEqual(
+      messageTextsByRole(request, 'user'),
+      baselineUsers,
+      `manager-loop: iteration #${index + 1} must carry the same typed authority user sequence as the initial iteration`,
+    );
+  }
+}
 
 const canaryRequestsFor = (scenario, sessionId) =>
   (scenario.provider?.requests ?? []).filter((request) => {
@@ -890,36 +992,40 @@ const assistantToolCallIds = (requests, tool) => {
 };
 
 /**
- * HumanRoot manager succession canary oracle (preFlow, sole serve).
+ * HumanRoot manager loop canary oracle (preFlow, sole serve).
  *
- * Proves the production fix for the 2026-09-05 Manager-suicide stall
- * (`prompt_async failed: Continuation managed intent requires an active logical
- * run`): Road/Incumbency retirement is NOT LogicalRun completion when
- * RetirementSummary.SuccessorRequested=true. The physically observed successor
- * provider request — not the outgoing prompt attempt nor the SuccessorActivated
- * fact alone — must carry a NEW incumbency_id + AuditPending with the same
- * original authority request. A SuccessorActivated fact without a matching
- * provider request is the exact bug shape and fails here as missing managed
- * admission.
+ * Pure manager loop: a Continue retirement is followed by another ordinary
+ * IncumbencyOpened event and a physically observed provider request on the same
+ * SessionId/LogicalRun with the same typed authority user messages; Accepted
+ * exits. An IncumbencyOpened fact without a matching provider request is the
+ * exact event-only fake shape and fails here as missing managed admission.
+ * Message-structure and durable-event behavior only, carrying the authoritative
+ * user messages with the current iteration for independent assessment.
  *
  * Surfaces only: strict provider wire (managed admission), durable journal facts,
  * and causal session idle. No wall delays, no retries, no time-budget growth.
  */
-export async function assertHumanRootManagerSuccession(scenario, sessionId, label = 'humanroot-succession') {
+export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'humanroot-loop') {
   assert.ok(typeof sessionId === 'string' && sessionId.length > 0, `${label}: canary session id required`);
   const workDir = scenario.host.workDir;
 
   await awaitNamedFact(workDir, waitFactShape('AssessmentCommitted', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
   await awaitNamedFact(workDir, waitFactShape('RetirementCommitted', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
-  await awaitNamedFact(workDir, waitFactShape('SuccessorActivated', { eq: 1 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
+  await awaitNamedFact(workDir, waitFactShape('IncumbencyOpened', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
 
-  for (const id of ['humanroot-manager.0', 'humanroot-manager.1', 'humanroot-successor.0', 'humanroot-successor.1']) {
-    assert.equal(
-      scenario.provider.matchCount(id),
-      1,
-      `${label}: ${id} must be delivered exactly once as a physically observed provider request (missing managed admission, not merely SuccessorActivated)`,
-    );
-  }
+  // ONE reusable humanroot-loop family: each step delivered twice (initial +
+  // next iteration). An IncumbencyOpened fact alone is an event-only fake;
+  // physically observed deliveries under the same LogicalRun prove the loop.
+  assert.equal(
+    scenario.provider.matchCount('humanroot-loop.0'),
+    2,
+    `${label}: reusable humanroot-loop audit must be delivered twice (low then perfect)`,
+  );
+  assert.equal(
+    scenario.provider.matchCount('humanroot-loop.1'),
+    2,
+    `${label}: reusable humanroot-loop close must be delivered twice (Continue then Accepted)`,
+  );
 
   const requests = canaryRequestsFor(scenario, sessionId);
   assert.equal(
@@ -927,124 +1033,69 @@ export async function assertHumanRootManagerSuccession(scenario, sessionId, labe
     4,
     `${label}: expected exactly 4 chat requests on the canary session (got ${requests.length})`,
   );
+  // Same physical SessionId on every request: continuations extend the
+  // LogicalRun, they never create a new one. A new session here would be a
+  // cold-boundary violation, not a loop iteration.
+  for (const request of requests) {
+    assert.equal(
+      request?.sessionID ?? request?.sessionId ?? null,
+      sessionId,
+      `${label}: every iteration must stay on the same physical SessionId/LogicalRun`,
+    );
+  }
 
-  const initialContexts = relayContextBlocks(requests[0]);
+  // Pure-loop authority: the next iteration carries the same system/provider
+  // plan and the same typed authority user sequence as the initial iteration.
+  // Each iteration-first carries only the current iteration, with the internal
+  // wake stripped (next first has no assistant/tool at all). ONE reusable
+  // humanroot-loop family covers both iterations, so iterations are never
+  // distinguished by prompt text; the assertion below is on provider-visible
+  // message structure only.
+  assertManagerLoopAuthorityPreserved(scenario, sessionId);
   assert.equal(
-    initialContexts.length,
+    hasAssistantOrToolMessages(requests[2]),
+    false,
+    `${label}: next iteration-first must carry only the current iteration with the wake stripped`,
+  );
+
+  const firstIterationReviewIds = assistantToolCallIds([requests[1]], 'review');
+  assert.equal(
+    firstIterationReviewIds.length,
     1,
-    `${label}: eager Road opening carries one RelayContext on the first HumanRoot request (got ${initialContexts.length})`,
-  );
-  const initial = parseRelayContext(initialContexts[0]);
-  assert.equal(initial.phase, 'AuditPending', `${label}: first incumbency must start AuditPending (got ${initial.phase})`);
-  assert.ok(initial.incumbencyId && initial.incumbencyId !== 'none', `${label}: initial incumbency_id missing`);
-  assert.ok(initial.authorityRevision && initial.authorityRevision.length > 0, `${label}: initial authority_revision missing`);
-
-  const predecessorContexts = relayContextBlocks(requests[1]);
-  assert.equal(
-    predecessorContexts.length,
-    1,
-    `${label}: predecessor suicide request must carry exactly one RelayContext (got ${predecessorContexts.length})`,
-  );
-  const predecessor = parseRelayContext(predecessorContexts[0]);
-  assert.equal(predecessor.phase, 'WorkOwned', `${label}: low assessment must move predecessor to WorkOwned`);
-  assert.equal(
-    predecessor.incumbencyId,
-    initial.incumbencyId,
-    `${label}: predecessor stays on its incumbency across review then suicide`,
-  );
-  assert.equal(
-    predecessor.authorityRevision,
-    initial.authorityRevision,
-    `${label}: predecessor keeps its authority revision across its incumbency`,
-  );
-
-  const successorFirstContexts = relayContextBlocks(requests[2]);
-  assert.equal(
-    successorFirstContexts.length,
-    1,
-    `${label}: successor audit request must carry exactly one RelayContext (missing managed admission if absent)`,
-  );
-  const successorFirst = parseRelayContext(successorFirstContexts[0]);
-  assert.notEqual(
-    successorFirst.incumbencyId,
-    predecessor.incumbencyId,
-    `${label}: successor must carry a NEW incumbency_id (got same ${successorFirst.incumbencyId})`,
-  );
-  assert.equal(
-    successorFirst.phase,
-    'AuditPending',
-    `${label}: fresh successor incumbency must start AuditPending (got ${successorFirst.phase})`,
-  );
-  assert.equal(
-    successorFirst.authorityRevision,
-    initial.authorityRevision,
-    `${label}: successor must keep the same original authority request (authority_revision ${initial.authorityRevision} vs ${successorFirst.authorityRevision})`,
-  );
-
-  const successorSecondContexts = relayContextBlocks(requests[3]);
-  assert.equal(
-    successorSecondContexts.length,
-    1,
-    `${label}: successor retire request must carry exactly one RelayContext`,
-  );
-  const successorSecond = parseRelayContext(successorSecondContexts[0]);
-  assert.equal(
-    successorSecond.incumbencyId,
-    successorFirst.incumbencyId,
-    `${label}: successor retire must stay on the successor incumbency (not a third incumbency)`,
-  );
-  assert.equal(
-    successorSecond.authorityRevision,
-    initial.authorityRevision,
-    `${label}: successor retire must keep the same original authority request`,
-  );
-
-  const wireText = (request) => JSON.stringify(request?.messages ?? []);
-  assert.ok(
-    wireText(requests[2]).includes(HUMANROOT_SUCCESSION_CANARY_PROMPT),
-    `${label}: successor request must still carry the original HumanRoot authority request text (projection cut must preserve authority)`,
-  );
-  assert.ok(
-    wireText(requests[3]).includes(HUMANROOT_SUCCESSION_CANARY_PROMPT),
-    `${label}: successor retire request must still carry the original HumanRoot authority request text`,
-  );
-
-  const predecessorReviewIds = assistantToolCallIds([requests[1]], 'review');
-  assert.equal(
-    predecessorReviewIds.length,
-    1,
-    `${label}: predecessor suicide prompt must carry exactly the predecessor review call (got ${predecessorReviewIds.length})`,
+    `${label}: first-iteration close must carry exactly the first-iteration review call (got ${firstIterationReviewIds.length})`,
   );
   for (const request of [requests[2], requests[3]]) {
     assert.equal(
       request.messages.some((message) =>
-        message.tool_call_id === predecessorReviewIds[0]
-        || message.tool_calls?.some((call) => call.id === predecessorReviewIds[0])),
+        message.tool_call_id === firstIterationReviewIds[0]
+        || message.tool_calls?.some((call) => call.id === firstIterationReviewIds[0])),
       false,
-      `${label}: successor must exclude the predecessor review call/result; baton evidence references remain legal`,
+      `${label}: next iteration must exclude the first-iteration review call/result`,
     );
   }
 
-  const canaryRetirements = factPayloads(workDir, 'RetirementCommitted')
-    .filter((payload) => {
-      const road = payload?.Baton?.RoadId ?? payload?.Baton?.roadId ?? null;
-      const roadStr = typeof road === 'string' ? road : road?.value ?? null;
-      return roadStr === sessionId;
-    });
+  // Durable loop behavior: two openings (initial + one after Continue), one
+  // Continue retirement followed by one Accepted; positive counts prove the loop.
+  const openings = factPayloads(workDir, 'IncumbencyOpened');
+  assert.equal(openings.length, 2, `${label}: canary road must open exactly two iterations (got ${openings.length})`);
+  const openedIds = incumbencyIdsIn(openings);
+  assert.equal(openedIds.length, 2, `${label}: iterations must carry distinct incumbencies (got ${JSON.stringify(openedIds)})`);
+  const canaryRetirements = factPayloads(workDir, 'RetirementCommitted');
   assert.equal(
     canaryRetirements.length,
     2,
     `${label}: canary road must own exactly two retirements (got ${canaryRetirements.length})`,
   );
-  assert.ok(
-    canaryRetirements.some((payload) => payload?.SuccessorRequested === true && payload?.QualityCandidateAccepted === false),
-    `${label}: predecessor retirement must request a successor without accepting a candidate`,
+  assert.equal(
+    canaryRetirements.filter(isContinueOutcome).length,
+    1,
+    `${label}: first-iteration retirement must be Outcome Continue`,
   );
-  assert.ok(
-    canaryRetirements.some((payload) => payload?.SuccessorRequested === false && payload?.QualityCandidateAccepted === true),
-    `${label}: successor retirement must accept the quality candidate without requesting a further successor`,
+  assert.equal(
+    canaryRetirements.filter(isAcceptedOutcome).length,
+    1,
+    `${label}: next retirement must be Outcome Accepted with a certificate`,
   );
-
   assert.equal(
     countFactCase(workDir, 'AssessmentCommitted'),
     HUMANROOT_CANARY_DELTAS.assessments,
@@ -1056,9 +1107,9 @@ export async function assertHumanRootManagerSuccession(scenario, sessionId, labe
     `${label}: preflow must contribute exactly ${HUMANROOT_CANARY_DELTAS.retirements} RetirementCommitted before the main spine`,
   );
   assert.equal(
-    countFactCase(workDir, 'SuccessorActivated'),
-    HUMANROOT_CANARY_DELTAS.successorActivations,
-    `${label}: preflow must contribute exactly ${HUMANROOT_CANARY_DELTAS.successorActivations} SuccessorActivated before the main spine`,
+    countFactCase(workDir, 'IncumbencyOpened'),
+    HUMANROOT_CANARY_DELTAS.incumbencyOpenings,
+    `${label}: preflow must contribute exactly ${HUMANROOT_CANARY_DELTAS.incumbencyOpenings} IncumbencyOpened before the main spine`,
   );
   assert.equal(
     countFactCase(workDir, 'ManagerJobCreated'),
@@ -1072,6 +1123,6 @@ export async function assertHumanRootManagerSuccession(scenario, sessionId, labe
 
 export const CUSTOMS = {
   holdChildC1UntilLabor,
-  bindRelaySuccessorSequence,
+  bindManagerLoopSequence,
   oracleLongStroke,
 };

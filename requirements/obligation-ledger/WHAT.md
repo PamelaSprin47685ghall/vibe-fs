@@ -64,9 +64,9 @@ effectivePlanComplete(k) = OR(planComplete of Accepted T1..Tk)
 
 移除过程性评审，$T_k$ 的 Accepted 立即生效，不派生过程评审义务，亦不阻塞后续 $T_{k+1}$ 的提交与执行。同时严格保留基于 committed Accepted 链的 desired lag-1 cutoff 与 prefix rebase 折叠行为。
 
-## OBLIGATION-LEDGER-014: 移除中间过程评审，质量判断归于后继独立 assessment
+## OBLIGATION-LEDGER-014: 移除中间过程评审，质量判断归于独立 assessment
 
-各 checkpoint 之间无过程性评审门禁，Manager 可无缝推进工作。实现质量不设终局评审，由后继独立 assessment 判断（relay-assessment ASSESS-006）；本账本只记录义务，不做质量裁决。
+各 checkpoint 之间无过程性评审门禁，Manager 可无缝推进工作。实现质量不设终局评审，由独立 assessment 按公开准则与事实证据判断（relay-assessment ASSESS-006）；本账本只记录义务，不做质量裁决。
 
 ## OBLIGATION-LEDGER-015: canonical 单真相源 vs Host compatibility sink
 
@@ -78,7 +78,7 @@ Journal facts 与 `MagicTodoProjection` 是账本的唯一语义真相源，Host
 
 ## OBLIGATION-LEDGER-017: Manager BlindPlan Opening（无生产 Activation）
 
-Manager 采用 BlindPlan 开启策略。Pre-T1 处于 Planning Table：为后续执行制定计划，允许调查但不得直接执行所规划路径。当权威输入证明当前无待办任务时，`planComplete=true, workingOn="", obligations=[]` 是合法的零债务 T1，随后通过 suicide 进入 retirement。生产路径不存在单独的 Activation 阶段机或 prompt 切换。
+Manager 采用 BlindPlan 开启策略。Pre-T1 处于 Planning Table：为当前任务建立可闭环的义务映射，允许调查但不得直接执行所规划路径；这份规划由同一 Manager 亲自扛起并承诺，不是为另一位执行者准备道路。当权威输入证明当前无待办任务时，`planComplete=true, workingOn="", obligations=[]` 是合法的零债务 T1，随后通过 suicide 进入 retirement。生产路径不存在单独的 Activation 阶段机或 prompt 切换。
 
 ## OBLIGATION-LEDGER-018: 恢复只从 durable facts
 
@@ -88,9 +88,9 @@ Manager 采用 BlindPlan 开启策略。Pre-T1 处于 Planning Table：为后续
 
 新开启的 Life 其 `CurrentObligations` 初始严格为空，绝不从 Host TodoTable 自动继承上一 Life 的遗留条目。升级瞬间的历史开放 Life 仅允许执行一次受控的 legacy seed，且必须在首次 provider request 之前完成。
 
-## OBLIGATION-LEDGER-020: 质量判断归于后继独立 assessment，不设终局评审
+## OBLIGATION-LEDGER-020: 质量判断归于独立 assessment，不设终局评审
 
-低分 assessment 的实现质量必须由 successor 独立 assessment 判断，不得自证（relay-assessment ASSESS-006）。本账本只记录义务的认领与结转，不做质量裁决。
+实现质量由独立 assessment 按公开准则与事实证据判断，不得自证（relay-assessment ASSESS-006）。本账本只记录义务的认领与结转，不做质量裁决。
 
 ## OBLIGATION-LEDGER-021: desired lag-1 cutoff 仅由 committed Accepted 子链推导
 

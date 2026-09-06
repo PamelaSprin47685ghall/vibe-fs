@@ -139,7 +139,7 @@ const COGNITIVE_UTILITY_ALLOW = ['assume']
 const cognitiveUtilityAllowFor = (role) => role === 'Blogger' || role === 'Distiller' ? [] : COGNITIVE_UTILITY_ALLOW
 
 const ROLE_ALLOW = {
-  Manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'suicide', 'read', 'glob', 'grep', 'review'],
+  Manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'suicide', 'review'],
   Orchestrator: ['commission', 'join', 'horizon'],
   Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
   Inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch', 'fission'],

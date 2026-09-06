@@ -106,12 +106,12 @@ module PluginTransforms =
         { BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
           BindSessionStartedAt: string option -> Task<DateTimeOffset option>
           ApplyStrengthReplay: string option -> obj -> Task<StrengthReplayPlan list>
-          ApplyRelayProjection: string option -> obj -> Task<unit>
+          ApplyRelayProjection: string option -> obj -> Task<RelayProjectionDisposition>
           CaptureXTraceMessages: string option -> obj -> Task<TraceTransformCapture>
           CommitStrengthTrace: string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>
           RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
-          ApplyCompanion: string option -> obj -> obj -> Task<unit>
-          ApplyXWire: obj -> Task<PrefixPresentationHorizon>
+          ApplyCompanion: RelayProjectionDisposition -> string option -> obj -> obj -> Task<unit>
+          ApplyXWire: RelayProjectionDisposition -> obj -> Task<PrefixPresentationHorizon>
           FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
           ApplyStrengthSpeculate: obj -> Task<unit>
@@ -241,36 +241,35 @@ module PluginTransforms =
                         )
             }
 
-        let tryCaptureSnapshot dirOpt =
-            dirOpt
-            |> Option.filter (String.IsNullOrWhiteSpace >> not)
-            |> Option.bind (fun dir ->
-                try Some (WorkspaceSnapshot.capture dir) with _ -> None)
-            |> Option.defaultValue (WorkspaceSnapshotId.create "snapshot-root")
+        let captureSnapshot dirOpt =
+            match dirOpt |> Option.filter (String.IsNullOrWhiteSpace >> not) with
+            | Some dir -> WorkspaceSnapshot.capture dir
+            | None -> invalidOp "MANAGER-LOOP-001: workspace directory unavailable for snapshot capture"
 
-        let buildOpeningEvents roadId sessionIdText rootUserMsg dirOpt =
-            let authorityRevision = AuthorityRevision.create rootUserMsg
-            let authorityMessageId = PhysicalUserMessageId.create rootUserMsg
-            let incumbent =
-                HostDigest.sha256Hex ("incumbency-v1\n" + sessionIdText + "\n" + rootUserMsg)
-                |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
-            let snapshotId = tryCaptureSnapshot dirOpt
-            [ RelayEvent.RoadOpened(roadId, authorityRevision, authorityMessageId)
-              RelayEvent.IncumbencyOpened(incumbent, snapshotId, BatonSource.ExistingWorld) ]
-
-        let commitOpeningTransaction (durable: AgentJournal) sessionId providerRunIdOpt roadId events =
+        let commitOpeningTransaction
+            (durable: AgentJournal)
+            sessionId
+            providerRunIdOpt
+            roadId
+            (transaction: RelayTransaction)
+            =
             task {
-                match RelayTransaction.create events with
-                | Error _ -> return ()
-                | Ok tx ->
-                    let fact =
-                        AgentFact.Relay(
-                            RelayFactCases.TransactionCommitted
-                                {| RoadId = roadId
-                                   Transaction = tx |}
+                let fact =
+                    AgentFact.Relay(
+                        RelayFactCases.TransactionCommitted
+                            {| RoadId = roadId
+                               Transaction = transaction |}
+                    )
+
+                match! AgentJournal.appendAgent (StreamId.Session sessionId) providerRunIdOpt fact durable with
+                | Ok _ -> return ()
+                | Error failure ->
+                    return
+                        invalidOp (
+                            sprintf
+                                "MANAGER-LOOP-002: opening commit failed: %s"
+                                (JournalAppendFailure.describe failure)
                         )
-                    let! _ = AgentJournal.appendAgent (StreamId.Session sessionId) providerRunIdOpt fact durable
-                    return ()
             }
 
         let decideOpeningAction sessionIdTextOpt =
@@ -288,19 +287,22 @@ module PluginTransforms =
                         |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
                         |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
 
-                    let profileOpt = PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
-                    let isManager = profileOpt |> Option.exists (fun p -> p.CanonicalRole = Role.Manager)
+                    let profileOpt =
+                        PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
 
-                    if roadView.IsNone && isManager then
+                    match roadView, profileOpt with
+                    | None, Some profile when profile.CanonicalRole = Role.Manager ->
                         let rootUserMsg =
-                            profileOpt
-                            |> Option.map (fun p -> AuthorityRootUserMessageId.value p.AuthorityRootUserMessageId)
-                            |> Option.defaultValue sessionIdText
+                            AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
 
-                        let events = buildOpeningEvents roadId sessionIdText rootUserMsg workspaceDirectory
-                        Some(durable, sessionId, roadId, events)
-                    else
-                        None))
+                        let opening =
+                            IncumbencyOpening.initial
+                                sessionId
+                                (PhysicalUserMessageId.create rootUserMsg)
+                                (captureSnapshot workspaceDirectory)
+
+                        Some(durable, sessionId, opening.RoadId, opening.Transaction)
+                    | _ -> None))
 
         let ensureManagerRoadOpened
             (sessionIdTextOpt: string option)
@@ -309,61 +311,90 @@ module PluginTransforms =
             task {
                 match decideOpeningAction sessionIdTextOpt with
                 | None -> return ()
-                | Some(durable, sessionId, roadId, events) ->
-                    do! commitOpeningTransaction durable sessionId providerRunIdOpt roadId events
+                | Some(durable, sessionId, roadId, transaction) ->
+                    do! commitOpeningTransaction durable sessionId providerRunIdOpt roadId transaction
             }
 
-        let buildSuccessorEvents roadId retirementId snapshot authorityRevision =
-            let successorIncumbent =
-                HostDigest.sha256Hex ("successor-v1\n" + RetirementId.value retirementId)
-                |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
-            [ RelayEvent.SuccessorRequested(retirementId, "IndependentAssessmentRequired")
-              RelayEvent.SuccessorActivated(retirementId, successorIncumbent, snapshot, authorityRevision) ]
-
-        let deliverSuccessorPrompt (durable: AgentJournal) sessionId retirement =
+        let deliverLoopPrompt (durable: AgentJournal) sessionId retirement =
             task {
-                let successorPromptText =
-                    ProviderProse.documentFor sessionId "runtime/relay-successor" Map.empty
-                let terminalRun =
-                    ProviderRunIdentity.create retirement.ProjectionCut.ThroughProviderRunId
+                let loopPromptText =
+                    ProviderProse.documentFor sessionId "runtime/manager-assess" Map.empty
 
-                let! _ =
+                let terminalRun = ProviderRunIdentity.create retirement.ProjectionCut.ProviderRunId
+
+                match!
                     HostSessionNudge.trySendGateContinuation
                         sessionPort
                         host.RootWorkspace
                         sessionId
-                        successorPromptText
+                        loopPromptText
                         PromptAuthority.ContinuationKind.ManagerGuard
                         workspaceDirectory
                         (Some durable)
-                        (RelaySuccessorGate.gateKind retirement.Id)
+                        (ManagerLoopGate.gateKind retirement.Id)
                         terminalRun
-                return ()
+                with
+                | HostSessionNudge.GateContinuationOutcome.Sent _
+                | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted -> return ()
+                | HostSessionNudge.GateContinuationOutcome.Retired ->
+                    return
+                        invalidOp (
+                            sprintf
+                                "MANAGER-LOOP-003: loop gate retired for retirement %s"
+                                (RetirementId.value retirement.Id)
+                        )
+                | HostSessionNudge.GateContinuationOutcome.Failed error ->
+                    return invalidOp (sprintf "MANAGER-LOOP-003: loop gate nudge failed: %s" error)
             }
 
-        let maybeDeliverSuccessor sessionIdTextOpt =
-            task {
-                let contextOpt =
-                    match sessionIdTextOpt, journal with
-                    | Some sidText, Some durable when not (String.IsNullOrWhiteSpace sidText) ->
-                        let sessionId = SessionId.create sidText
-                        let roadId = RoadId.create sidText
-                        let snapshot = AgentJournal.snapshot durable
-                        AgentProjection.tryFind sessionId snapshot.AgentProjections
-                        |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
-                        |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
-                        |> Option.bind (fun road ->
-                            road.LatestRetirement
-                            |> Option.filter (fun ret -> ret.SuccessorRequested && road.ActiveIncumbency.IsNone)
-                            |> Option.map (fun ret -> durable, sessionId, roadId, road.AuthorityRevision, ret))
-                    | _ -> None
+        let isContinueRetirement (retirement: RetirementSummary) =
+            match retirement.Outcome with
+            | RetirementOutcome.Continue -> true
+            | RetirementOutcome.Accepted _ -> false
 
-                match contextOpt with
-                | Some(durable, sessionId, roadId, authorityRevision, retirement) ->
-                    let snapshot = tryCaptureSnapshot workspaceDirectory
-                    let events = buildSuccessorEvents roadId retirement.Id snapshot authorityRevision
-                    do! commitOpeningTransaction durable sessionId None roadId events
-                    do! deliverSuccessorPrompt durable sessionId retirement
+        let isHumanRootSession sessionId agentProjections =
+            PromptAuthorityLedger.activeProfile sessionId agentProjections
+            |> Option.exists (fun profile -> profile.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot)
+
+        let loopContextFor (durable: AgentJournal) sidText =
+            let sessionId = SessionId.create sidText
+            let roadId = RoadId.create sidText
+            let snapshot = AgentJournal.snapshot durable
+
+            let roadOpt =
+                AgentProjection.tryFind sessionId snapshot.AgentProjections
+                |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
+                |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
+
+            match roadOpt, isHumanRootSession sessionId snapshot.AgentProjections with
+            | Some road, true ->
+                road.LatestRetirement
+                |> Option.filter isContinueRetirement
+                |> Option.map (fun retirement ->
+                    durable, sessionId, roadId, road.AuthorityRevision, retirement, road.ActiveIncumbency.IsNone)
+            | _ -> None
+
+        let decideLoopContext sessionIdTextOpt =
+            match sessionIdTextOpt, journal with
+            | Some sidText, Some durable when not (String.IsNullOrWhiteSpace sidText) -> loopContextFor durable sidText
+            | _ -> None
+
+        let ensureLoopOpening durable sessionId roadId authorityRevision retirement needsOpening =
+            task {
+                match needsOpening with
+                | true ->
+                    let snapshot = captureSnapshot workspaceDirectory
+                    let opening = IncumbencyOpening.next roadId retirement.Id authorityRevision snapshot
+                    do! commitOpeningTransaction durable sessionId None opening.RoadId opening.Transaction
+                | false -> return ()
+            }
+
+        let maybeDeliverLoop sessionIdTextOpt =
+            task {
+                match decideLoopContext sessionIdTextOpt with
+                | Some(durable, sessionId, roadId, authorityRevision, retirement, needsOpening) ->
+                    do! ensureLoopOpening durable sessionId roadId authorityRevision retirement needsOpening
+                    do! deliverLoopPrompt durable sessionId retirement
                 | None -> return ()
             }
 
@@ -378,13 +409,27 @@ module PluginTransforms =
                 task {
                     do! ensureManagerRoadOpened sidOpt None
 
-                    do!
-                        RelayNarrativeTransform.apply journal (fun sid ->
-                            task {
-                                let! _ = sessionPort.InterruptAttempt sid
-                                do! maybeDeliverSuccessor (Some(SessionId.value sid))
-                                return ()
-                            }) sidOpt outObj
+                    let physicalUserMessageId =
+                        outObj
+                        |> ProviderWireDecode.messagesFromTransformOutput
+                        |> ProviderWireCapture.lastUserMessageId
+
+                    return!
+                        RelayNarrativeTransform.apply
+                            journal
+                            (fun sid ->
+                                task {
+                                    physicalUserMessageId
+                                    |> Option.iter (fun physical ->
+                                        ModelRouting.suppressProviderStep sid physical
+                                        ModelRouting.releasePhysicalExecution sid physical |> ignore)
+
+                                    let! _ = sessionPort.InterruptAttempt sid
+                                    do! maybeDeliverLoop (Some(SessionId.value sid))
+                                    return ()
+                                })
+                            sidOpt
+                            outObj
                 }
           CaptureXTraceMessages =
             fun projectionSessionIdOpt outObj ->
@@ -444,22 +489,37 @@ module PluginTransforms =
                 if found then
                     traceState |> Option.iter companion.RefreshXTrace
           ApplyCompanion =
-            CompanionTransform.applyCompanionForOrdinaryMaterial
-                scope.Sessions.Companions
-                scope.Sessions.CompanionGate
-                scope
-                sessionPort
-                journal
-                (Some(fun bloggerId ->
-                    // Register ownership + ActiveRun so idle→reconcile
-                    // emits TerminalOutcome.Completed for this child.
-                    wired.RegisterOwned(SessionId.value bloggerId)
-                    wired.BindActiveRun bloggerId Role.Blogger None))
-                (host.RootWorkspace.TryRead())
-                (fun projectionSessionIdOpt outObj ->
-                    ExplicitResumeSuppression.isCurrentMaterial outObj
-                    || ExplicitResumeSuppression.isExplicitResumeBinding projectionSessionIdOpt outObj)
-          ApplyXWire = XWire.applyTransform snapshotOpt journal scope
+            let apply =
+                CompanionTransform.applyCompanionForOrdinaryMaterial
+                    scope.Sessions.Companions
+                    scope.Sessions.CompanionGate
+                    scope
+                    sessionPort
+                    journal
+
+                    (Some(fun bloggerId ->
+                        // Register ownership + ActiveRun so idle→reconcile
+                        // emits TerminalOutcome.Completed for this child.
+                        wired.RegisterOwned(SessionId.value bloggerId)
+                        wired.BindActiveRun bloggerId Role.Blogger None))
+
+                    (host.RootWorkspace.TryRead())
+
+                    (fun projectionSessionIdOpt outObj ->
+                        ExplicitResumeSuppression.isCurrentMaterial outObj
+                        || ExplicitResumeSuppression.isExplicitResumeBinding projectionSessionIdOpt outObj)
+
+            fun relayProjection projectionSessionIdOpt inObj outObj ->
+                match relayProjection with
+                | RelayProjectionDisposition.CurrentIteration -> Task.FromResult()
+                | _ -> apply projectionSessionIdOpt inObj outObj
+          ApplyXWire =
+            let apply = XWire.applyTransform snapshotOpt journal scope
+
+            fun relayProjection outObj ->
+                match relayProjection with
+                | RelayProjectionDisposition.CurrentIteration -> Task.FromResult PrefixPresentationHorizon.TentativeCold
+                | _ -> apply outObj
           FreezeProviderAttemptPlan = freezeProviderAttemptPlan
           ApplyEnforcerContinuation =
             fun projectionSessionIdOpt outObj ->
@@ -535,10 +595,13 @@ module PluginTransforms =
             // 2. SessionStartedAtLedger.tryBindOrAbort
             let! sessionStartedAt = caps.BindSessionStartedAt projectionSessionIdOpt
 
-            // 3. Relay projection cut + bounded baton injection. This MUST run
+            // 3. Relay projection cut + manager-loop opening. This MUST run
             // before every trace/compaction owner so retired raw history cannot
             // be reintroduced later in the composition.
-            do! caps.ApplyRelayProjection projectionSessionIdOpt outObj
+            let! relayProjection = caps.ApplyRelayProjection projectionSessionIdOpt outObj
+
+            if relayProjection = RelayProjectionDisposition.RetiredAttemptStopped then
+                return ()
 
             // 4. StrengthReplay.applyBeforeXTrace
             let! strengthReplayPlans = caps.ApplyStrengthReplay projectionSessionIdOpt outObj
@@ -553,12 +616,12 @@ module PluginTransforms =
             caps.RefreshCompanionXTrace projectionSessionIdOpt traceCapture.Current
 
             // 8. applyCompanionForOrdinaryMaterial
-            do! caps.ApplyCompanion projectionSessionIdOpt inObj outObj
+            do! caps.ApplyCompanion relayProjection projectionSessionIdOpt inObj outObj
 
             // 9. XWire.applyTransform. A selected prefix probe creates a
             // tentative cold horizon for this physical request; downstream
             // historical auxiliaries must not replay the old horizon into it.
-            let! prefixHorizon = caps.ApplyXWire outObj
+            let! prefixHorizon = caps.ApplyXWire relayProjection outObj
 
             // 10. SessionExecutionBinding.freezeProviderAttemptPlanForTransform
             // The transform sees the accepted user message only. Freeze the

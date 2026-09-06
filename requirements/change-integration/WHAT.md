@@ -2,7 +2,7 @@
 
 ## CHGINT-001: 独立道路进共享 ref 走 publish lifecycle
 
-独立 worktree 中的变更候选进入共享目标 ref 时，必须经历完整发布生命周期：Relay 在精确 snapshot/authority 上产出有效 `QualityCertificate` → Change 做确定性 artifact admission → 如需 rebase 则先失效旧证书、执行 rebase 并请求普通 successor → successor 在新 snapshot 上重新独立 assessment → 获取短门禁执行 CAS → ff-only 发布 → 记录 durable facts。严禁模型满分直接越过 Git/CAS。
+独立 worktree 中的变更候选进入共享目标 ref 时，必须经历完整发布生命周期：Relay 在精确 snapshot/authority 上产出有效 `QualityCertificate` → Change 做确定性 artifact admission → 如需 rebase 则先以 durable `InvalidateCertificate` 记录原因、执行 rebase 并以无参数 `ContinueLoop` 继续沿同一 `ManagerJob` 循环 → 下一 `surface-loop-N` incumbency 在新 snapshot 上重新独立 assessment → 获取短门禁执行 CAS → ff-only 发布 → 记录 durable facts。失效原因只存在于 durable invalidation 事实中，`ContinueLoop` 不携带 reason 参数。严禁模型满分直接越过 Git/CAS。
 
 ## CHGINT-002: Clean Gate——工作区必须干净才受理
 
@@ -14,11 +14,11 @@
 
 ## CHGINT-004: 共享 ref mutation 是唯一短 critical section
 
-Integration Gate 仅在推进共享 ref 物理指针的短暂 CAS 窗口内持有。严禁在 Relay assessment、Manager work、rebase、冲突处理或 successor 等待期间持有该门禁。
+Integration Gate 仅在推进共享 ref 物理指针的短暂 CAS 窗口内持有。严禁在 Relay assessment、Manager work、rebase、冲突处理或 loop-continuation 等待期间持有该门禁。
 
-## CHGINT-005: conflict 是机器事实，处理者只能是普通 successor
+## CHGINT-005: conflict 是机器事实，处理者只能是同一循环的下一 loop incumbency
 
-检测到 unmerged entries 或 rebase conflict 时，Change 必须记录 typed `ConflictDetected` 与精确 `WorkspaceSnapshotId`，失效旧 certificate，并在门禁外请求普通 Relay successor。不得 `ResumeManager`、不得恢复 retired predecessor、不得另起 Reviewer；后续质量判断只能来自 successor 的普通 assessment。
+检测到 unmerged entries 或 rebase conflict 时，Change 必须记录 typed `ConflictDetected` 与精确 `WorkspaceSnapshotId`，失效旧 certificate，并在门禁外以无参数 `ContinueLoop` 继续沿同一 `ManagerJob` 循环。不得 `ResumeManager`、不得恢复 retired iteration、不得另起 Reviewer；后续质量判断只能来自下一 loop incumbency 的普通 assessment。失效原因只记录在 durable invalidation 事实中，不作为 `ContinueLoop` 参数重复。
 
 ## CHGINT-006: restart 后从 durable facts + 外部现实重证 outstanding obligation
 
@@ -41,7 +41,7 @@ Integration Gate 仅在推进共享 ref 物理指针的短暂 CAS 窗口内持�
 
 ## CHGINT-010: 长 incumbent/rebase/conflict 工作不占全局门
 
-Relay incumbent 工作、assessment、certificate invalidation、rebase、conflict resolution 与 successor audit 全部在全局门禁之外；只有 target 重读 + ff-only mutation 处于门内。
+Relay incumbent 工作、assessment、certificate invalidation、rebase、conflict resolution 与 loop-continuation audit 全部在全局门禁之外；只有 target 重读 + ff-only mutation 处于门内。
 
 ## CHGINT-011: 墙内机械不进 provider horizon
 
@@ -49,12 +49,12 @@ Relay incumbent 工作、assessment、certificate invalidation、rebase、confli
 
 ## CHGINT-012: 恢复禁止扫盘反推、禁跳步
 
-恢复流程严禁新建 worktree 替换既有 Road 状态、严禁以磁盘残留替代 durable facts、严禁从旧 stage/program-counter 猜下一步。恢复可以继续等待当前 active incumbent，或在 durable retirement 后创建 successor；绝不能为“身份连续”复活 retired incumbent。
+恢复流程严禁新建 worktree 替换既有 Road 状态、严禁以磁盘残留替代 durable facts、严禁从旧 stage/program-counter 猜下一步。恢复可以继续等待当前 active incumbent，或在 durable retirement 后以无参数 `ContinueLoop` 开启下一 loop incumbency；绝不能为“身份连续”复活 retired incumbent。
 
 ## CHGINT-013: target 变化/CAS miss 后旧 certificate 作废
 
-在 gate 前重读或 CAS 本身发现目标分支已推进时，旧 `QualityCertificate` 立即失效；Change 释放门禁、基于最新 head 重新 rebase/capture snapshot，并请求普通 successor。旧证书绝不能在新 target/base 上复用。
+在 gate 前重读或 CAS 本身发现目标分支已推进时，旧 `QualityCertificate` 立即失效；Change 释放门禁、基于最新 head 重新 rebase/capture snapshot，并以无参数 `ContinueLoop` 继续沿同一循环请求下一独立 assessment。失效原因保留在 durable invalidation 事实中，不进入 `ContinueLoop` 参数。旧证书绝不能在新 target/base 上复用。
 
 ## CHGINT-014: stale certificate 与 Git machine facts 永远不能被模型满分覆盖
 
-certificate snapshot 与当前 workspace 不一致、存在 unmerged entries、target/base 已变化或 ff-only CAS 条件不成立时，必须在进入共享 ref mutation 前 fail closed / invalidation + successor。`8×10` 只产生质量候选，不能把这些机器事实翻译成“仍然 perfect，所以继续发布”。
+certificate snapshot 与当前 workspace 不一致、存在 unmerged entries、target/base 已变化或 ff-only CAS 条件不成立时，必须在进入共享 ref mutation 前 fail closed / invalidation + loop continuation。`8×10` 只产生质量候选，不能把这些机器事实翻译成“仍然 perfect，所以继续发布”。

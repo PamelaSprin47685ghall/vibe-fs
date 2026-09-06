@@ -10,7 +10,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.Journal
 
-/// One Road owns one stable worktree. Human quality decisions come only from
+/// One manager session owns one stable worktree. Human quality decisions come only from
 /// Relay incumbencies; Change owns deterministic Git admission, rebase and CAS.
 module OrchestratorProgram =
 
@@ -57,9 +57,9 @@ module OrchestratorProgram =
         deps.Relay.InvalidateCertificate job.JobId reason
         |> mapTaskError (fun error -> failed job (sprintf "Certificate invalidation failed: %s" error))
 
-    let private successor (deps: OrchestratorProgramDeps) (job: ManagerJob) reason =
-        deps.Relay.RequestSuccessor job.JobId job.Worktree.Path reason
-        |> mapTaskError (fun error -> failed job (sprintf "Successor activation failed: %s" error))
+    let private continueLoop (deps: OrchestratorProgramDeps) (job: ManagerJob) =
+        deps.Relay.ContinueLoop job.JobId
+        |> mapTaskError (fun error -> failed job (sprintf "Manager loop continuation failed: %s" error))
 
     let private recordCandidate
         (deps: OrchestratorProgramDeps)
@@ -232,7 +232,7 @@ module OrchestratorProgram =
     let private requestAfterBindingChange (deps: OrchestratorProgramDeps) (job: ManagerJob) reason =
         taskResult {
             do! invalidate deps job reason
-            let! _ = successor deps job reason
+            let! _ = continueLoop deps job
             return ()
         }
 
@@ -248,17 +248,20 @@ module OrchestratorProgram =
         deps.Relay.PrepareCandidate job.JobId
         |> mapTaskError (fun error -> failed job (sprintf "Candidate admission failed: %s" error))
 
-    let rec private runRoad (deps: OrchestratorProgramDeps) (job: ManagerJob) : Task<OrchestratorVerdict> =
+    let rec private runManagerLoop (deps: OrchestratorProgramDeps) (job: ManagerJob) : Task<OrchestratorVerdict> =
         task {
-            match! deps.Relay.AwaitRoadSignal job.JobId with
-            | Error error -> return failed job (sprintf "Relay signal failed: %s" error)
-            | Ok(RoadSignal.ExceptionalTerminal reason) -> return failed job reason
-            | Ok(RoadSignal.IncumbencyRetired _) ->
-                return!
-                    successor deps job "IndependentAssessmentRequired"
-                    |> continueResult (fun _ -> runRoad deps job)
-            | Ok(RoadSignal.QualityCandidateAccepted(_, certificate)) ->
-                return! handleQualityCandidate deps job certificate
+            match! deps.Relay.AwaitLoopSignal job.JobId with
+            | Error error -> return failed job (sprintf "Manager loop signal failed: %s" error)
+            | Ok ManagerLoopSignal.Continue -> return! continueManagerLoop deps job
+            | Ok(ManagerLoopSignal.Candidate certificate) -> return! handleQualityCandidate deps job certificate
+            | Ok(ManagerLoopSignal.ExceptionalTerminal reason) -> return failed job reason
+        }
+
+    and private continueManagerLoop (deps: OrchestratorProgramDeps) (job: ManagerJob) : Task<OrchestratorVerdict> =
+        task {
+            match! continueLoop deps job with
+            | Ok _ -> return! runManagerLoop deps job
+            | Error verdict -> return verdict
         }
 
     and private handleRebase
@@ -269,11 +272,7 @@ module OrchestratorProgram =
         (target: CommitHash)
         reason
         : Task<OrchestratorVerdict> =
-        let afterRebaseSuccessor _ = runRoad deps job
-
-        let afterRebasedRecord _ =
-            successor deps job "PostRebaseIndependentAssessment"
-            |> continueResult afterRebaseSuccessor
+        let afterRebasedRecord _ = continueManagerLoop deps job
 
         let afterRebaseSnapshot snapshot =
             recordRebased deps job target snapshot |> continueResult afterRebasedRecord
@@ -282,10 +281,7 @@ module OrchestratorProgram =
             captureSnapshotResult deps job "Post-rebase snapshot failed"
             |> continueResult afterRebaseSnapshot
 
-        let afterConflictSuccessor _ = runRoad deps job
-
-        let afterConflictRecord _ =
-            successor deps job "RebaseConflict" |> continueResult afterConflictSuccessor
+        let afterConflictRecord _ = continueManagerLoop deps job
 
         let afterConflictSnapshot files snapshot =
             recordConflict deps job candidate target snapshot files
@@ -335,13 +331,13 @@ module OrchestratorProgram =
         (job: ManagerJob)
         (certificate: QualityCertificate)
         : Task<OrchestratorVerdict> =
-        let resumeRoad () = runRoad deps job
+        let resumeLoop () = runManagerLoop deps job
 
         let bindingChanged () =
             requestAfterBindingChange deps job "WorkspaceChangedAfterAssessment"
-            |> continueUnit resumeRoad
+            |> continueUnit resumeLoop
 
-        let afterConflictBindingChange () = runRoad deps job
+        let afterConflictBindingChange () = runManagerLoop deps job
 
         let afterConflictRecord () =
             requestAfterBindingChange deps job "ArtifactAdmissionUnmerged"
@@ -415,7 +411,7 @@ module OrchestratorProgram =
             match! publishUnderGate deps job expectedHead with
             | Error verdict -> return verdict
             | Ok(Landed commit) -> return! settleLanded deps job commit
-            | Ok TargetMoved -> return! runRoad deps job
+            | Ok TargetMoved -> return! runManagerLoop deps job
         }
 
     let private resumePublishReality
@@ -431,7 +427,7 @@ module OrchestratorProgram =
             Task.FromResult(failed job "GetTargetHead failed during publish recovery")
         | PublishClaimReality.AlreadyFastForwarded -> backfillPublished deps job rebasedCommit current
         | PublishClaimReality.PublishReady -> resumePublishReady deps job expectedHead
-        | PublishClaimReality.ClaimExpired -> runRoad deps job
+        | PublishClaimReality.ClaimExpired -> runManagerLoop deps job
 
     let private reenterPublishClaim
         (deps: OrchestratorProgramDeps)
@@ -463,7 +459,7 @@ module OrchestratorProgram =
         match currentRecord deps job with
         | Some { Terminal = Some _ } -> cleanUp deps job
         | Some { PublishClaimed = Some claim } -> reenterPublishClaim deps job claim
-        | _ -> runRoad deps job
+        | _ -> runManagerLoop deps job
 
     let run (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         task {

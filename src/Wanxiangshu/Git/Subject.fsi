@@ -16,3 +16,4 @@ module GitSubject =
     val lsFilesStageZ: directory: string -> string
     val hashObjectNoFilters: directory: string -> path: string -> string
     val revParseHeadTree: directory: string -> string
+    val tryRevParseHeadTree: directory: string -> string option

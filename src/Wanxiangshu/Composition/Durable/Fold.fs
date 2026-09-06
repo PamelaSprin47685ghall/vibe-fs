@@ -32,7 +32,10 @@ module Fold =
         let completesRoad =
             events
             |> List.exists (function
-                | RelayEvent.RetirementCommitted retirement -> retirement.QualityCandidateAccepted
+                | RelayEvent.RetirementCommitted retirement ->
+                    match retirement.Outcome with
+                    | RetirementOutcome.Accepted _ -> true
+                    | RetirementOutcome.Continue -> false
                 | _ -> false)
 
         if completesRoad then

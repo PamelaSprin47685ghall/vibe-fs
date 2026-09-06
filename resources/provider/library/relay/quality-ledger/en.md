@@ -297,6 +297,19 @@ The absence of a counterexample is not automatically proof.
 
 Evidence should earn confidence in proportion to what it can distinguish.
 
+## On Independence
+
+Judge the work as you find it.
+
+Do not soften a judgment to be kind.
+Do not harden one to seem strict.
+Do not inflate a score to reward effort, nor deflate one to perform rigor.
+
+Each assessment stands on its own: the evidence before it and the obligation
+behind it. Record what the evidence establishes about the work that was
+actually required — no more, no less. An honest score is itself part of the
+judgment.
+
 ## On Simplicity and Thoroughness
 
 Thoroughness does not mean investigating everything.

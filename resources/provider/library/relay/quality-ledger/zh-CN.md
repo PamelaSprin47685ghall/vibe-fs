@@ -245,6 +245,16 @@ Evidence 有 strength、scope 与 age。
 
 Evidence 应按照它实际能够区分什么，成比例地赢得 confidence。
 
+## 关于独立判断
+
+如实判断摆在面前的工作。
+
+不要为了宽容而放软判断。
+不要为了显得严格而加重判断。
+不要为了奖励 effort 而抬高分数，也不要为了表演 rigor 而压低分数。
+
+每一次 assessment 都独立成立：依据摆在面前的 evidence 与身后的 obligation。如实记录 evidence 对“真正被要求完成的工作”建立了什么——不多，也不少。诚实的分数本身就是 judgment 的一部分。
+
 ## 关于 Simplicity 与 Thoroughness
 
 Thoroughness 不意味着调查一切。

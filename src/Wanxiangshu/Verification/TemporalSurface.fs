@@ -849,34 +849,49 @@ module TemporalSurface =
         let secondFact = Fact.Agent(agentFactOfJs secondAccepted)
         let firstPayload = firstAccepted?payload
         let sessionId = sessionIdOf (firstPayload?SessionId)
-        let roadId = Wanxiangshu.Mission.Relay.RoadId.create (SessionId.value sessionId)
-
-        let incId =
-            Wanxiangshu.Mission.Relay.IncumbencyId.create ("inc-" + SessionId.value sessionId)
-
-        let snapId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.create "snap-1"
-        let authRev = Wanxiangshu.Mission.Relay.AuthorityRevision.create "rev-1"
 
         let physUser =
             PhysicalUserMessageId.create (text (firstPayload?AuthorityRootUserMessageId))
 
-        let openEvents =
-            [ Wanxiangshu.Mission.Relay.RelayEvent.RoadOpened(roadId, authRev, physUser)
-              Wanxiangshu.Mission.Relay.RelayEvent.IncumbencyOpened(
-                  incId,
-                  snapId,
-                  Wanxiangshu.Mission.Relay.BatonSource.ExistingWorld
-              ) ]
+        let snapId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.create "snap-1"
+
+        let opening =
+            Wanxiangshu.Mission.Relay.IncumbencyOpening.initial sessionId physUser snapId
+
+        let assessId = Wanxiangshu.Mission.Relay.AssessmentId.create "assess-session-reuse"
+
+        let binding: Wanxiangshu.Mission.Relay.AssessmentBinding =
+            { PhysicalUserMessageId = PhysicalUserMessageId.value physUser
+              ProviderRunId = "run-terminal"
+              ToolCallId = "tool-terminal"
+              NarrativeDigest = "digest-narrative"
+              PayloadDigest = "digest-payload"
+              RootRequestDigest = "digest-root"
+              RequirementSetDigest = "digest-requirements"
+              EvidenceFrontierDigest = "digest-evidence" }
+
+        let perfectScores =
+            Wanxiangshu.Mission.Relay.ScoreVector.tryCreate [ 10; 10; 10; 10; 10; 10; 10; 10 ]
+            |> Result.defaultWith (fun _ -> failwith "perfectScores")
 
         let openTx =
-            Wanxiangshu.Mission.Relay.RelayTransaction.create openEvents
+            Wanxiangshu.Mission.Relay.RelayTransaction.events opening.Transaction
+            @ [ Wanxiangshu.Mission.Relay.RelayEvent.AssessmentCommitted(
+                    assessId,
+                    opening.IncumbencyId,
+                    binding,
+                    snapId,
+                    opening.AuthorityRevision,
+                    perfectScores
+                ) ]
+            |> Wanxiangshu.Mission.Relay.RelayTransaction.create
             |> Result.defaultWith (fun _ -> failwith "openTx")
 
         let lifeOpened =
             Fact.Agent(
                 AgentFact.Relay(
                     Wanxiangshu.Mission.Relay.RelayFactCases.TransactionCommitted
-                        {| RoadId = roadId
+                        {| RoadId = opening.RoadId
                            Transaction = openTx |}
                 )
             )
@@ -884,37 +899,22 @@ module TemporalSurface =
         let retId =
             Wanxiangshu.Mission.Relay.RetirementId.create ("ret-" + SessionId.value sessionId)
 
-        let batonId =
-            Wanxiangshu.Mission.Relay.BatonId.create ("baton-" + SessionId.value sessionId)
-
-        let cutId =
-            Wanxiangshu.Mission.Relay.ProjectionCutId.create ("cut-" + SessionId.value sessionId)
-
-        let envelopeRelay: Wanxiangshu.Mission.Relay.BatonEnvelope =
-            { SchemaVersion = 1
-              RoadId = Wanxiangshu.Mission.Relay.RoadId.value roadId
-              FromIncumbencyId = Wanxiangshu.Mission.Relay.IncumbencyId.value incId
-              AuthorityRevision = "rev-1"
-              SnapshotId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.value snapId
-              OpenObligations = []
-              EvidenceRefs = [] }
+        let certificateId =
+            Wanxiangshu.Mission.Relay.QualityCertificateId.create (
+                "certificate:" + Wanxiangshu.Mission.Relay.AssessmentId.value assessId
+            )
 
         let cutRelay: Wanxiangshu.Mission.Relay.ProjectionCut =
-            { RetiredIncumbencyId = Wanxiangshu.Mission.Relay.IncumbencyId.value incId
-              ThroughProviderRunId = "run-terminal"
-              ThroughToolCallId = "tool-terminal"
-              StaleProviderRunIds = [] }
+            { ProviderRunId = "run-terminal"
+              ToolCallId = "tool-terminal" }
 
         let summary: Wanxiangshu.Mission.Relay.RetirementSummary =
             { Id = retId
-              IncumbencyId = incId
+              IncumbencyId = opening.IncumbencyId
               SnapshotId = snapId
-              BatonId = batonId
-              Baton = envelopeRelay
-              ProjectionCutId = cutId
+              AuthorityRevision = opening.AuthorityRevision
               ProjectionCut = cutRelay
-              SuccessorRequested = false
-              QualityCandidateAccepted = true }
+              Outcome = Wanxiangshu.Mission.Relay.RetirementOutcome.Accepted certificateId }
 
         let closeEvents =
             [ Wanxiangshu.Mission.Relay.RelayEvent.RetirementCommitted summary ]
@@ -927,7 +927,7 @@ module TemporalSurface =
             Fact.Agent(
                 AgentFact.Relay(
                     Wanxiangshu.Mission.Relay.RelayFactCases.TransactionCommitted
-                        {| RoadId = roadId
+                        {| RoadId = opening.RoadId
                            Transaction = closeTx |}
                 )
             )

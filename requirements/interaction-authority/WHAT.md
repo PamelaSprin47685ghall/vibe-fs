@@ -43,11 +43,9 @@
 
 来源判定中的纯计算函数绝不推断返回新的 `HumanRoot`。`HumanRoot` 只能在激活 Profile 缺席且携带合法显式 agent 时由 Ingress 边界授予；活跃 Run 中携带同一合法 agent 的外部用户消息只能成为绑定既有 Profile 的 `HumanMessage` continuation，缺失或漂移 agent 的未知消息必须拒绝，绝不可抬升为 Root。continuation 接纳后，Host 当前物理 user-message binding 必须推进到该消息，供 reconciler/provider-start 观察 exact 新 execution；既有 Authority Root identity 不变。
 
-## INTERACTION-AUTHORITY-010: 自动 continuation 稳定 occasion identity 与精确 admission
+## INTERACTION-AUTHORITY-010: 自动 repair 稳定 exact occasion identity
 
-自动合成的 repair、nudge、review 提示与重试消息绝不可借机抬升权限。普通 gate nudge 的持久化幂等范围必须绑定 exact terminal occasion；同一 `(SessionId, LogicalRunId, continuation kind, gate kind, ProviderRunIdentity)` 若存在 Pending claim 或 PhysicalAccepted dispatch，则 duplicate observation 被幂等吸收；若 claim 已因明确的 pre-acceptance `SendFailed` Abandoned，则该 occasion 重新可 admission，历史 ClaimSequence 不得冒充“已经提醒”。新的 ProviderRun 是新的 reminder occasion，只要业务 gate 仍未满足就必须重新具备提醒资格。需要精确 `PhysicalUserMessageId` 的调用方在 Host 只先返回 transport receipt 时，必须等待该 PromptKey 的 durable `PhysicalAccepted` 因果事实；pending acceptance 既不得伪装成功，也不得被误报为 send failure。只有 Blogger nudge→AABB 等明确写入规范的升级协议可以拥有有限预算。任何 duplicate admission 都属于 typed 幂等状态而非 transport/protocol failure。
-
-transport receipt 只是物理进度（Submitted），不是意图身份：chat.message 的来源判定可能抢在 receipt 落盘前冻结，后续准入比较必须忽略 receipt，只比较不可变 claim 身份，否则后继会被误判为意图变更。
+自动合成的 repair 绝不可借机抬升权限。其持久化 identity 必须绑定 exact `(SessionId, LogicalRunId, request, ProviderRunIdentity, terminal kind)`；同一 occasion 的 duplicate observation 幂等吸收，任一字段变化都是新的 repair occasion。transport receipt 只是物理进度，不参与不可变 repair identity。普通 gate nudge 的飞行态与 fresh-terminal re-arm 只由 INTERACTION-AUTHORITY-019 定义。
 
 ## INTERACTION-AUTHORITY-011: authority 是原子 profile 内的稳定子记录
 

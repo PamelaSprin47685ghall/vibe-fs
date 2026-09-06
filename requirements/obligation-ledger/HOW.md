@@ -25,7 +25,7 @@ DEPENDS ON: durable-events, effect-accounting, semantic-trace
 ## 4. 边界（DOES NOT OWN）
 
 - 八维评审与质量义务物化 → `relay-assessment`
-- 退休、接棒与 projection 切段 → `relay-retirement`、`relay-context-projection`
+- 退休与 projection 切段 → `relay-retirement`、`relay-context-projection`
 - 任期同一性与单 active 任期 → `relay-incumbency`
 - 原始语义追踪与 XTrace cursor → `semantic-trace`
 - 物理执行结果分类与记账 → `effect-accounting`
@@ -54,7 +54,7 @@ DEPENDS ON: durable-events, effect-accounting, semantic-trace
 | OBLIGATION-LEDGER-017 | `requirements/obligation-ledger/tests/opening-floor.test.mjs::WHAT[OBLIGATION-LEDGER-017] Pre-T1 BlindPlan does not enlarge the structural Opening floor`；`requirements/obligation-ledger/tests/opening-floor.test.mjs::WHAT[OBLIGATION-LEDGER-017] Pre-T1: no CurrentLife → no floor`；`requirements/obligation-ledger/tests/opening-floor.test.mjs::WHAT[OBLIGATION-LEDGER-017] static: BloggerCoordinator + CompanionTransform zero ProtectedPrefixEnd refs` |
 | OBLIGATION-LEDGER-018 | `requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs::WHAT[OBLIGATION-LEDGER-018] business sequencing is a direct F# CE, not a second runtime`；`requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs::WHAT[OBLIGATION-LEDGER-018] hot-path queries use incremental projection facts, never AcceptedOrder replay`；`requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs::WHAT[OBLIGATION-LEDGER-018] recovery contract is fact reentry, not a resumable workflow position`；`requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs::WHAT[OBLIGATION-LEDGER-018] Manager authority root on incumbency opening is derived from durable Relay facts, not transient PromptAuthority profiles`；`requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs::WHAT[OBLIGATION-LEDGER-018] ObligationLedgerWorkflow is isolated from foreign domain dependencies` |
 | OBLIGATION-LEDGER-019 | `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs::WHAT[OBLIGATION-LEDGER-019] rejects a legacy seed after the first Magic provider request` |
-| OBLIGATION-LEDGER-020 | `requirements/obligation-ledger/tests/magic-todo-after.test.mjs::WHAT[OBLIGATION-LEDGER-020] quality judgement belongs to successor independent assessment without dedicated process reviewers` |
+| OBLIGATION-LEDGER-020 | `requirements/obligation-ledger/tests/magic-todo-after.test.mjs::WHAT[OBLIGATION-LEDGER-020] quality judgement belongs to independent assessment without dedicated process reviewers` |
 | OBLIGATION-LEDGER-021 | `requirements/obligation-ledger/tests/prefix-epoch-cutoff.test.mjs::WHAT[OBLIGATION-LEDGER-021] committed cutoff is supplied by one previous locator, never by scanning Accepted history`；`requirements/obligation-ledger/tests/prefix-epoch-cutoff.test.mjs::WHAT[OBLIGATION-LEDGER-021] TodoCheckpoint evidence binds trigger plus O(1) previous committed locator` |
 | OBLIGATION-LEDGER-022 | `requirements/obligation-ledger/tests/magic-todo.test.mjs::WHAT[OBLIGATION-LEDGER-022] blocks retirement suicide until plan commitment, not merely until any checkpoint` |
 | OBLIGATION-LEDGER-023 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs::WHAT[OBLIGATION-LEDGER-023] manager guideline freezes ledger discipline as Manager-only content` |

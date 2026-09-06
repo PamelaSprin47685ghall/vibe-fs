@@ -25,7 +25,7 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 
-/// Host wiring for one Change Road. One physical Manager session can host many
+/// Host wiring for one Change manager session. One physical Manager session can host many
 /// logical Relay incumbencies; Change never creates a second audit session.
 type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     // DSL-MUTABLE: resource — manager worktree path registry
@@ -156,50 +156,17 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     // ── RelayPort ───────────────────────────────────────────────────────────
 
-    let openRoad (start: RoadStart) : Task<Result<SessionId, string>> =
-        taskResult {
-            let! sessionId =
-                forkChild
-                    (managerAgentId start.JobId)
-                    Role.Manager
-                    start.ManagerAgent
-                    start.Worktree
-                    start.RootRequest
-                    true
-                    start.ExpectedToolCalls
+    let createManagerSession (start: ManagerStart) : Task<Result<SessionId, string>> =
+        forkChild
+            (managerAgentId start.JobId)
+            Role.Manager
+            start.ManagerAgent
+            start.Worktree
+            start.RootRequest
+            true
+            start.ExpectedToolCalls
 
-            match deps.Journal with
-            | None -> return sessionId
-            | Some journal ->
-                let roadId = RoadId.create (SessionId.value sessionId)
-                let rootUserMsg = SessionId.value sessionId
-                let authorityRevision = AuthorityRevision.create rootUserMsg
-                let authorityMessageId = PhysicalUserMessageId.create rootUserMsg
-                let incumbent =
-                    HostDigest.sha256Hex ("incumbency-v1\n" + SessionId.value sessionId + "\n" + rootUserMsg)
-                    |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
-                let snapshot = WorkspaceSnapshot.capture (WorktreePath.value start.Worktree)
-
-                let! transaction =
-                    RelayTransaction.create
-                        [ RelayEvent.RoadOpened(roadId, authorityRevision, authorityMessageId)
-                          RelayEvent.IncumbencyOpened(incumbent, snapshot, BatonSource.ExistingWorld) ]
-
-                let fact =
-                    AgentFact.Relay(
-                        RelayFactCases.TransactionCommitted
-                            {| RoadId = roadId
-                               Transaction = transaction |}
-                    )
-
-                let! _ =
-                    AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal
-                    |> TaskResult.mapError JournalAppendFailure.describe
-
-                return sessionId
-        }
-
-    let activateRoad (jobId: ManagerJobId) : Task<Result<unit, string>> =
+    let activateManager (jobId: ManagerJobId) : Task<Result<unit, string>> =
         runtime.SendDeferredFirstPrompt(managerAgentId jobId)
 
 
@@ -216,20 +183,33 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         |> Option.bind (fun session -> session.Relay)
         |> Option.bind (fun relay -> Fold.view relay (roadIdOf record))
 
-    let roadSignalOfRetirement (road: RoadView) (retirement: RetirementSummary) =
-        match road.Certificate with
-        | Some certificate when retirement.QualityCandidateAccepted && certificate.Valid ->
-            RoadSignal.QualityCandidateAccepted(retirement, certificate)
-        | _ -> RoadSignal.IncumbencyRetired retirement
+    let loopSignalOfRetirement (road: RoadView) (retirement: RetirementSummary) =
+        match retirement.Outcome, road.Certificate with
+        | RetirementOutcome.Continue, _ -> ManagerLoopSignal.Continue
+        | RetirementOutcome.Accepted certificateId, Some certificate when
+            certificate.Id = certificateId && certificate.Valid
+            ->
+            ManagerLoopSignal.Candidate certificate
+        | RetirementOutcome.Accepted certificateId, Some certificate when
+            certificate.Id = certificateId && not certificate.Valid
+            ->
+            ManagerLoopSignal.Continue
+        | RetirementOutcome.Accepted certificateId, _ ->
+            ManagerLoopSignal.ExceptionalTerminal(
+                sprintf
+                    "Accepted retirement %s without matching valid certificate %s"
+                    (RetirementId.value retirement.Id)
+                    (QualityCertificateId.value certificateId)
+            )
 
-    let roadSignalOfRoad (road: RoadView) =
+    let loopSignalOfRoad (road: RoadView) =
         if road.ActiveIncumbency.IsSome then
             None
         else
-            road.LatestRetirement |> Option.map (roadSignalOfRetirement road)
+            road.LatestRetirement |> Option.map (loopSignalOfRetirement road)
 
     let signalOfProjection projection record =
-        relayView projection record |> Option.bind roadSignalOfRoad
+        relayView projection record |> Option.bind loopSignalOfRoad
 
     let requireJournalAndJob (journal: AgentJournal option) (jobId: ManagerJobId) (journalError: string) =
         match journal, requireJobRecord jobId with
@@ -237,25 +217,71 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         | _, Error error -> Error error
         | Some journal, Ok record -> Ok(journal, record)
 
-    let rec awaitRoadSignalFromJournal
+    let loopPrompt (sessionId: SessionId) =
+        ProviderProse.documentFor sessionId "runtime/manager-assess" Map.empty
+
+    let ensureLoopDispatch (record: ManagerJobProjection) (retirement: RetirementSummary) : Task<Result<unit, string>> =
+        task {
+            let prompt = loopPrompt record.ManagerSessionId
+            let terminalRun = ProviderRunIdentity.create retirement.ProjectionCut.ProviderRunId
+
+            let! outcome =
+                HostSessionNudge.trySendGateContinuation
+                    deps.Sessions
+                    deps.RootWorkspace
+                    record.ManagerSessionId
+                    prompt
+                    PromptAuthority.ContinuationKind.ManagerGuard
+                    (Some(WorktreePath.value record.WorktreePath))
+                    deps.Journal
+                    (ManagerLoopGate.gateKind retirement.Id)
+                    terminalRun
+
+            match outcome with
+            | HostSessionNudge.GateContinuationOutcome.Sent _
+            | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted -> return Ok()
+            | HostSessionNudge.GateContinuationOutcome.Retired -> return Error "manager loop gate retired"
+            | HostSessionNudge.GateContinuationOutcome.Failed error -> return Error error
+        }
+
+    let activeRetirementForDispatch projection record =
+        relayView projection record
+        |> Option.bind (fun road ->
+            match road.ActiveIncumbency, road.LatestRetirement with
+            | Some _, Some retirement -> Some retirement
+            | _ -> None)
+
+    let dispatchActiveRetirement record projection =
+        match activeRetirementForDispatch projection record with
+        | None -> Task.FromResult(Ok())
+        | Some retirement -> ensureLoopDispatch record retirement
+
+    let rec awaitLoopSignalFromJournal
         (jobId: ManagerJobId)
         (journal: AgentJournal)
         (record: ManagerJobProjection)
-        : Task<Result<RoadSignal, string>> =
+        : Task<Result<ManagerLoopSignal, string>> =
         task {
             let projection, revision = AgentJournal.snapshotWithRevision journal
 
             match signalOfProjection projection record with
             | Some signal -> return Ok signal
-            | None ->
-                let! _ = AgentJournal.awaitChangeFrom revision journal
-                return! awaitRoadSignal jobId
+            | None -> return! awaitDispatchedWait jobId journal record projection revision
         }
 
-    and awaitRoadSignal (jobId: ManagerJobId) : Task<Result<RoadSignal, string>> =
-        match requireJournalAndJob deps.Journal jobId "Relay Road requires a durable journal" with
+    and awaitDispatchedWait jobId journal record projection revision =
+        task {
+            match! dispatchActiveRetirement record projection with
+            | Error error -> return Error error
+            | Ok() ->
+                let! _ = AgentJournal.awaitChangeFrom revision journal
+                return! awaitLoopSignal jobId
+        }
+
+    and awaitLoopSignal (jobId: ManagerJobId) : Task<Result<ManagerLoopSignal, string>> =
+        match requireJournalAndJob deps.Journal jobId "Manager session requires a durable journal" with
         | Error error -> Task.FromResult(Error error)
-        | Ok(journal, record) -> awaitRoadSignalFromJournal jobId journal record
+        | Ok(journal, record) -> awaitLoopSignalFromJournal jobId journal record
 
     let appendRelay (journal: AgentJournal) (record: ManagerJobProjection) (transaction: RelayTransaction) =
         AgentJournal.appendAgent
@@ -320,94 +346,50 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         |> Result.bind (fun record -> tryCaptureSnapshot record.WorktreePath)
         |> Task.FromResult
 
-    let deterministicSuccessor (retirementId: RetirementId) =
-        HostDigest.sha256Hex ("successor-v1\n" + RetirementId.value retirementId)
-        |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
-
-    let successorPrompt (sessionId: SessionId) =
-        ProviderProse.documentFor sessionId "runtime/relay-successor" Map.empty
-
-    let sendSuccessor (record: ManagerJobProjection) (retirement: RetirementSummary) =
-        let terminalRun =
-            ProviderRunIdentity.create retirement.ProjectionCut.ThroughProviderRunId
-
-        HostSessionNudge.trySendGateContinuationPhysical
-            deps.Sessions
-            deps.RootWorkspace
-            record.ManagerSessionId
-            (successorPrompt record.ManagerSessionId)
-            PromptAuthority.ContinuationKind.ManagerGuard
-            (Some(WorktreePath.value record.WorktreePath))
-            deps.Journal
-            (RelaySuccessorGate.gateKind retirement.Id)
-            terminalRun
-
     let requireOpenRoad (journal: AgentJournal) (record: ManagerJobProjection) =
         let projection = AgentJournal.snapshot journal
 
-        relayView projection record |> Result.requireSome "Relay Road is not open"
+        relayView projection record |> Result.requireSome "Manager session is not open"
 
     let requireCommittedRetirement (road: RoadView) =
         road.LatestRetirement
-        |> Result.requireSome "Successor requires a committed predecessor retirement"
+        |> Result.requireSome "Manager loop continuation requires a committed retirement"
 
-    let buildSuccessorTransaction
-        (retirementId: RetirementId)
-        (incumbent: IncumbencyId)
-        (snapshot: WorkspaceSnapshotId)
-        (authority: AuthorityRevision)
-        reason
-        =
-        RelayTransaction.create
-            [ RelayEvent.SuccessorRequested(retirementId, reason)
-              RelayEvent.SuccessorActivated(retirementId, incumbent, snapshot, authority) ]
-
-    let activateSuccessorIfAbsent
+    let activateNextIfAbsent
         (journal: AgentJournal)
         (record: ManagerJobProjection)
         (road: RoadView)
         (retirement: RetirementSummary)
-        (incumbent: IncumbencyId)
-        (worktree: WorktreePath)
-        reason
-        : Task<Result<unit, string>> =
-        if road.ActiveIncumbency.IsSome then
-            Task.FromResult(Ok())
-        else
+        : Task<Result<IncumbencyId, string>> =
+        match road.ActiveIncumbency with
+        | Some active -> Task.FromResult(Ok active)
+        | None ->
             taskResult {
-                let snapshot = WorkspaceSnapshot.capture (WorktreePath.value worktree)
+                let! snapshot = tryCaptureSnapshot record.WorktreePath |> Task.FromResult
 
-                let! transaction =
-                    buildSuccessorTransaction retirement.Id incumbent snapshot road.AuthorityRevision reason
+                let opening =
+                    IncumbencyOpening.next (roadIdOf record) retirement.Id road.AuthorityRevision snapshot
 
-                let! _ = appendRelayResult journal record transaction
-                return ()
+                let! _ = appendRelayResult journal record opening.Transaction
+                return opening.IncumbencyId
             }
 
-    let deliverActivatedSuccessor
-        (record: ManagerJobProjection)
-        (retirement: RetirementSummary)
-        (incumbent: IncumbencyId)
-        : Task<Result<IncumbencyId, string>> =
-        taskResult {
-            let! _ = sendSuccessor record retirement
-            return incumbent
-        }
-
-    let requestSuccessor (jobId: ManagerJobId) (worktree: WorktreePath) reason : Task<Result<IncumbencyId, string>> =
+    let continueLoop (jobId: ManagerJobId) : Task<Result<IncumbencyId, string>> =
         taskResult {
             let! journal, record =
-                requireJournalAndJob deps.Journal jobId "Successor activation requires a durable journal"
+                requireJournalAndJob deps.Journal jobId "Manager loop continuation requires a durable journal"
 
             let! road = requireOpenRoad journal record
             let! retirement = requireCommittedRetirement road
 
-            let incumbent =
-                road.ActiveIncumbency
-                |> Option.defaultValue (deterministicSuccessor retirement.Id)
-
-            do! activateSuccessorIfAbsent journal record road retirement incumbent worktree reason
-            return! deliverActivatedSuccessor record retirement incumbent
+            match retirement.Outcome, road.Certificate with
+            | RetirementOutcome.Continue, _ -> return! activateNextIfAbsent journal record road retirement
+            | RetirementOutcome.Accepted certificateId, Some certificate when
+                certificate.Id = certificateId && not certificate.Valid
+                ->
+                return! activateNextIfAbsent journal record road retirement
+            | RetirementOutcome.Accepted _, _ ->
+                return! Error "Manager loop continuation requires an invalidated Accepted certificate"
         }
 
     let finalizeRegisteredWorktree (agentId: string) =
@@ -440,11 +422,11 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         }
 
     let relayPort: RelayPort =
-        { OpenRoad = openRoad
-          ActivateRoad = activateRoad
-          AwaitRoadSignal = awaitRoadSignal
+        { CreateManagerSession = createManagerSession
+          ActivateManager = activateManager
+          AwaitLoopSignal = awaitLoopSignal
           InvalidateCertificate = invalidateCertificate
-          RequestSuccessor = requestSuccessor
+          ContinueLoop = continueLoop
           CaptureSnapshot = captureSnapshot
           PrepareCandidate = prepareCandidate
           TerminateRoadResources = terminateRoadResources }
@@ -607,7 +589,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         match road.ActiveIncumbency, road.ActivePhase with
         | Some active, Some IncumbencyPhase.WorkOwned -> Ok active
         | Some _, Some phase -> Error(sprintf "Relay incumbency cannot take new charge in phase %A" phase)
-        | _ -> Error "Relay Road has no active incumbent"
+        | _ -> Error "Manager session has no active incumbent"
 
     let advanceAuthorityRevision
         (journal: AgentJournal)

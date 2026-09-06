@@ -1,3 +1,5 @@
 # relay-assessment — WHY
 
-旧 judgement 用 PERFECT/REVISE 总 verdict，并要求同一 Reviewer 的双 PERFECT + challenge。它既不能表达八个质量维度，也把“发现缺陷”与“承担修复”分离。新的 assessment 必须把独立评审变成一次 typed、可重放、可绑定快照的责任移交。
+一次评审必须同时回答三个问题：当前交付在八个质量维度上各得几分，发现的缺陷由谁负责，以及这份判断在未来如何被重放与验证。把总 verdict 与修复责任分开，系统就必须再安排一次仲裁来决定“谁来修”；允许同一任期反复提交评审，第一次判断的权威性就荡然无存。
+
+Assessment 把独立评审变成一次 typed、可重放、可绑定快照的责任移交。每任 exactly once：评审前迭代只见独立只读的评估请求，不见任何修复指派；评审被接纳的那一刻，分数本身决定下一步是原位修复还是关闭资源退场。评估文本、执行身份、快照与 authority 修订全部进入 binding，隐藏 reasoning 永不进入证据。质量账本（Quality Ledger）只记录已接纳的判断，当前任务账本（Planning Table）只在修复被指派后才由负责人推进。

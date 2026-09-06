@@ -47,7 +47,7 @@ test('WHAT[RETIRE-003] live recursive resources are the only business blockers',
   )
 })
 
-test('WHAT[RETIRE-004] freeze fence rejects retirement races without crossing the successor incumbency boundary', () => {
+test('WHAT[RETIRE-004] freeze fence rejects retirement races without crossing the next iteration boundary', () => {
   const frozen = retirement.freeze('inc-1', 41)
   assert.deepEqual(retirement.admitResource(frozen, 41), { ok: false, error: 'IncumbencyAdmissionsFrozen' })
   assert.deepEqual(retirement.admitResource(frozen, 40), { ok: false, error: 'StaleIncumbencyAdmissionFence' })

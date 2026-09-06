@@ -88,12 +88,12 @@
 | Package | 一句话 WHY |
 |---|---|
 | `obligation-ledger` | 长期 mission 必须持续维护当前仍欠世界什么，而不是用 phase/status 伪装工作进度。 |
-| `relay-incumbency` | 每一任都从只读 audit 开始；低分即接责，退休永不恢复，同一 Road 至多一个 active 任期。 |
-| `relay-assessment` | 每任期至多一次八维整数评审；低分原子生成义务，全满分生成快照绑定证书。 |
-| `relay-retirement` | suicide 是唯一正常出口；只有递归 live 资源能阻塞退休，静默停止持续事件驱动 nudge。 |
-| `relay-context-projection` | 审计保留全量历史，provider 只见切段后事实；接力棒确定性、有界、脱敏。 |
+| `relay-incumbency` | 每一轮都在共享工作区上从权威用户消息重新开始并独立评估；同一 Road 至多一个 active 迭代，退休永不恢复，审计从只读开始。 |
+| `relay-assessment` | 每迭代至多一次八维整数评审并以 provider run、tool call、工作区快照与权威版本绑定退休观察、防陈旧重放；评审后指派的修复由本轮承担，全满分生成快照绑定证书。 |
+| `relay-retirement` | 退出是唯一正常出口；只有递归 live 资源能阻塞退休，推进提醒去重归 durable `PromptAuthority` 门控，Continue 由系统开启下一轮，Accepted 提供证书绑定的候选接受、发布成功则退出，若 Change 准入因快照/rebase/CAS 现实变化使证书失效则以另一轮普通独立迭代继续。 |
+| `relay-context-projection` | 审计保留全量历史，provider 消息上下文只含权威消息与本轮消息，并在共享工作区上执行；切段确定性、有界、脱敏，不注入合成上下文。 |
 
-旧 `review-judgement` / `review-assurance` / `finality` 已按接力语义 clean break：评审并入 `relay-assessment`，终结并入 `relay-retirement`，上下文切段并入 `relay-context-projection`。
+旧 `review-judgement` / `review-assurance` / `finality` 已按 Manager 循环语义 clean break：评审并入 `relay-assessment`，终结并入 `relay-retirement`，上下文切段并入 `relay-context-projection`。
 
 ## 10. Feedback
 

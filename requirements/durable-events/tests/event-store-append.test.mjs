@@ -136,8 +136,13 @@ test('WHAT[DURABLE-EVENTS-021] an uncut historical Journal fault suppresses only
                 Transaction: [
                   'RelayTransaction',
                   [
-                    ['RoadOpened', ['RoadId', session], ['AuthorityRevision', 'rev-1'], ['PhysicalUserMessageId', 'user-root']],
-                    ['IncumbencyOpened', ['IncumbencyId', inc], ['WorkspaceSnapshotId', 'snapshot-root'], 'ExistingWorld'],
+                    [
+                      'RoadOpened',
+                      ['RoadId', session],
+                      ['AuthorityRevision', `rev-${session}`],
+                      ['PhysicalUserMessageId', `user-${session}`],
+                    ],
+                    ['IncumbencyOpened', ['IncumbencyId', inc], ['WorkspaceSnapshotId', 'snapshot-root']],
                   ],
                 ],
               },

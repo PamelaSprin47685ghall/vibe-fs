@@ -1,23 +1,19 @@
 namespace Wanxiangshu.Mission.Manager
 
-open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 
-/// Manager terminal business story: handoff → background → idle labor.
+/// Manager current-action guidance: schedule only the immediate completion nudge
+/// for the active iteration.
 module ManagerWorkflow =
 
     val observeIdle:
         sessionPort: ISessionHostPort ->
         rootWorkspace: IRootWorkspaceReader ->
-        eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
-        nudgeSent: HashSet<string> ->
-        hasLivePty: (string -> bool) ->
-        quiescence: ISessionQuiescenceGate ->
         context: ReconciledTurnContext ->
             Task
 
@@ -27,12 +23,7 @@ module ManagerWorkflow =
     val observe:
         sessionPort: ISessionHostPort ->
         rootWorkspace: IRootWorkspaceReader ->
-        eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
-        nudgeSent: HashSet<string> ->
-        joinGuardNudges: HashSet<string> ->
-        hasLivePty: (string -> bool) ->
-        quiescence: ISessionQuiescenceGate ->
         observeOrdinary: (ReconciledTurnContext -> Task) ->
         context: ReconciledTurnContext ->
             Task

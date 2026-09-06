@@ -7,8 +7,6 @@ type AuthorityRevision
 type AssessmentId
 type QualityCertificateId
 type RetirementId
-type BatonId
-type ProjectionCutId
 
 module RoadId =
     val create: string -> RoadId
@@ -38,23 +36,10 @@ module RetirementId =
     val create: string -> RetirementId
     val value: RetirementId -> string
 
-/// The single gate-kind vocabulary for the successor handoff prompt, shared by
+/// The single gate-kind vocabulary for the manager loop prompt, shared by
 /// the Change sender and the projection cut so the two never drift apart.
-module RelaySuccessorGate =
+module ManagerLoopGate =
     val gateKind: retirementId: RetirementId -> string
-
-module BatonId =
-    val create: string -> BatonId
-    val value: BatonId -> string
-
-module ProjectionCutId =
-    val create: string -> ProjectionCutId
-    val value: ProjectionCutId -> string
-
-[<RequireQualifiedAccess>]
-type BatonSource =
-    | ExistingWorld
-    | Retirement of RetirementId
 
 [<RequireQualifiedAccess>]
 type ScoreDimension =
@@ -107,28 +92,19 @@ type QualityCertificate =
       Valid: bool
       InvalidationReason: string option }
 
-type BatonEnvelope =
-    { SchemaVersion: int
-      RoadId: string
-      FromIncumbencyId: string
-      AuthorityRevision: string
-      SnapshotId: string
-      OpenObligations: string list
-      EvidenceRefs: string list }
+[<RequireQualifiedAccess>]
+type RetirementOutcome =
+    | Continue
+    | Accepted of QualityCertificateId
 
 type ProjectionCut =
-    { RetiredIncumbencyId: string
-      ThroughProviderRunId: string
-      ThroughToolCallId: string
-      StaleProviderRunIds: string list }
+    { ProviderRunId: string
+      ToolCallId: string }
 
 type RetirementSummary =
     { Id: RetirementId
       IncumbencyId: IncumbencyId
       SnapshotId: WorkspaceSnapshotId
-      BatonId: BatonId
-      Baton: BatonEnvelope
-      ProjectionCutId: ProjectionCutId
+      AuthorityRevision: AuthorityRevision
       ProjectionCut: ProjectionCut
-      SuccessorRequested: bool
-      QualityCandidateAccepted: bool }
+      Outcome: RetirementOutcome }

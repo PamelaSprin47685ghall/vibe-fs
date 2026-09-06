@@ -1,11 +1,10 @@
 namespace Wanxiangshu.Mission.Relay
 
 module ProjectionSurface =
-    val maxRisks: int
-    val maxEvidenceRefs: int
-    val baton: obj -> obj
-
     val applyCut:
-        messages: obj array -> cutSequence: int -> staleRunIds: string array -> authorityMessageIds: string array -> obj
-
-    val successorContext: rootRequest: string -> authorityRevision: string -> snapshotId: string -> baton: string -> obj
+        messages: obj array ->
+        providerRunId: string ->
+        toolCallId: string ->
+        retiredRunIds: string array ->
+        authorityMessageIds: string array ->
+            obj

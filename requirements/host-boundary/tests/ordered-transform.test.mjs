@@ -18,13 +18,16 @@ test('WHAT[HOST-BOUNDARY-019] PluginTransforms declares NormalTransformCapabilit
   assert.match(text, /type\s+NormalTransformCapabilities\s*=/)
   assert.match(text, /BeginPhysicalProviderAttempt:\s*string option -> obj -> Task<unit>/)
   assert.match(text, /BindSessionStartedAt:\s*string option -> Task<DateTimeOffset option>/)
-  assert.match(text, /ApplyRelayProjection:\s*string option -> obj -> Task<unit>/)
+  assert.match(text, /ApplyRelayProjection:\s*string option -> obj -> Task<RelayProjectionDisposition>/)
   assert.match(text, /ApplyStrengthReplay:\s*string option -> obj -> Task<StrengthReplayPlan list>/)
   assert.match(text, /CaptureXTraceMessages:\s*string option -> obj -> Task<TraceTransformCapture>/)
   assert.match(text, /CommitStrengthTrace:\s*string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>/)
   assert.match(text, /RefreshCompanionXTrace:\s*string option -> XTraceProjectionState option -> unit/)
-  assert.match(text, /ApplyCompanion:\s*string option -> obj -> obj -> Task<unit>/)
-  assert.match(text, /ApplyXWire:\s*obj -> Task<PrefixPresentationHorizon>/)
+  assert.match(
+    text,
+    /ApplyCompanion:\s*RelayProjectionDisposition -> string option -> obj -> obj -> Task<unit>/,
+  )
+  assert.match(text, /ApplyXWire:\s*RelayProjectionDisposition -> obj -> Task<PrefixPresentationHorizon>/)
   assert.match(text, /FreezeProviderAttemptPlan:\s*string option -> obj -> Task<unit>/)
   assert.match(text, /ApplyEnforcerContinuation:\s*string option -> obj -> Task<unit>/)
   assert.match(text, /ApplyStrengthSpeculate:\s*obj -> Task<unit>/)
@@ -43,7 +46,8 @@ test('WHAT[HOST-BOUNDARY-019] tentative prefix probe horizon suppresses historic
   const end = text.indexOf('let createWithCaps', start)
   const body = text.slice(start, end)
 
-  assert.match(body, /let!\s+prefixHorizon\s*=\s*caps\.ApplyXWire\s+outObj/)
+  assert.match(body, /let!\s+prefixHorizon\s*=\s*caps\.ApplyXWire\s+relayProjection\s+outObj/)
+
   assert.match(body, /if\s+prefixHorizon\s*=\s*PrefixPresentationHorizon\.Current\s+then/)
 
   const guardAt = body.indexOf('if prefixHorizon = PrefixPresentationHorizon.Current then')

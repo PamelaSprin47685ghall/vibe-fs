@@ -670,7 +670,7 @@ type ToolRuntimeScope
         }
         :> Task
 
-    /// MANAGED-SESSION-017: a successor-less internal stop is a synchronous
+    /// MANAGED-SESSION-017: an internal stop is a synchronous
     /// logical termination CE. Failed delivery is what completes the durable
     /// fork handle and wakes the parent; no future TurnAborted callback carries
     /// workflow continuation state.

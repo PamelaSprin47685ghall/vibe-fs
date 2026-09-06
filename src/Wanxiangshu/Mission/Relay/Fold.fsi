@@ -10,14 +10,11 @@ type RoadView =
       AuthorityMessageIds: PhysicalUserMessageId list
       ActiveIncumbency: IncumbencyId option
       ActivePhase: IncumbencyPhase option
-      ActiveSource: BatonSource option
       ActiveSnapshotId: WorkspaceSnapshotId option
       ActiveAuthorityRevision: AuthorityRevision option
       AcceptedAssessmentTransport: (string * string) option
-      ExitRequiredNudgeFrontiers: Set<string>
       RetiredIncumbencies: IncumbencyId list
       RetiredProviderRunIds: Set<string>
-      OpenObligations: ScoreDimension list
       Certificate: QualityCertificate option
       LatestRetirement: RetirementSummary option }
 
@@ -33,7 +30,6 @@ module Decision =
         incumbentId: IncumbencyId ->
         snapshotId: WorkspaceSnapshotId ->
         authorityRevision: AuthorityRevision ->
-        source: BatonSource ->
             Result<RelayState, string>
 
     val assess:
@@ -59,18 +55,16 @@ module Decision =
 
     val invalidateCertificate: state: RelayState -> roadId: RoadId -> reason: string -> Result<RelayState, string>
 
+    val blockCleanup:
+        state: RelayState ->
+        roadId: RoadId ->
+        incumbentId: IncumbencyId ->
+        blockerDigest: string ->
+            Result<RelayState, string>
+
     val retire:
         state: RelayState ->
         roadId: RoadId ->
         incumbentId: IncumbencyId ->
         retirement: RetirementSummary ->
-            Result<RelayState, string>
-
-    val activateSuccessor:
-        state: RelayState ->
-        roadId: RoadId ->
-        predecessor: RetirementId ->
-        incumbentId: IncumbencyId ->
-        snapshotId: WorkspaceSnapshotId ->
-        authorityRevision: AuthorityRevision ->
             Result<RelayState, string>

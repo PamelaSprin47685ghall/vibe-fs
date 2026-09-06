@@ -40,7 +40,7 @@ module ToolRegistry =
         let DeniedUnestablished = "tool/registry/denied-unestablished"
 
         [<Literal>]
-        let DeniedRelayPhase = "tool/registry/denied-relay-phase"
+        let DeniedTaskState = "tool/registry/denied-task-state"
 
     let private lang (ctx: HostToolContext) =
         let sessionText = ctx.SessionId
@@ -233,8 +233,10 @@ module ToolRegistry =
             let denyRole (ctx: HostToolContext) (role: Role) =
                 denied ctx Path.DeniedRole (Map [ "tool", spec.Name; "role", sprintf "%A" role ])
 
-            let denyRelayPhase (ctx: HostToolContext) phase =
-                denied ctx Path.DeniedRelayPhase (Map [ "tool", spec.Name; "phase", sprintf "%A" phase ])
+            // The current capability decides; the denial stays action-focused
+            // and never echoes internal loop state.
+            let denyTaskState (ctx: HostToolContext) =
+                denied ctx Path.DeniedTaskState (Map [ "tool", spec.Name ])
 
             let executeManager args (ctx: HostToolContext) =
                 task {
@@ -247,9 +249,9 @@ module ToolRegistry =
                         && permission <> ToolPermission.Join
                         && permission <> ToolPermission.Finality
                         ->
-                        return denyRelayPhase ctx ManagerCapabilityPhase.RetirementCleanupBlocked
+                        return denyTaskState ctx
                     | Some permission when not (OfficeCapability.isAllowedForPhase Role.Manager (Some phase) permission) ->
-                        return denyRelayPhase ctx phase
+                        return denyTaskState ctx
                     | _ -> return! original args ctx
                 }
 

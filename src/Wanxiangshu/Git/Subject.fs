@@ -36,6 +36,9 @@ module GitSubject =
 
     let private utf8 = createObj [ "encoding", box "utf8" ]
 
+    let private quietUtf8 =
+        createObj [ "encoding", box "utf8"; "stdio", box [| "ignore"; "pipe"; "pipe" |] ]
+
     /// Run git with `-C directory` then `arguments`.
     let execIn (directory: string) (arguments: string array) : string =
         execFileSync Executable (Array.append [| "-C"; directory |] arguments) utf8
@@ -67,3 +70,11 @@ module GitSubject =
 
     let revParseHeadTree (directory: string) : string =
         (execIn directory [| "rev-parse"; "HEAD^{tree}" |]).Trim()
+
+    let tryRevParseHeadTree (directory: string) : string option =
+        try
+            execFileSync Executable [| "-C"; directory; "rev-parse"; "HEAD^{tree}" |] quietUtf8
+            |> _.Trim()
+            |> Some
+        with _ ->
+            None

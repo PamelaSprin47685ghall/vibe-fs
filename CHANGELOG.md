@@ -1,5 +1,12 @@
 # Changelog — 版本历史
 
+## Unreleased — Manager 循环 clean cutover
+
+- Manager baton/successor 模型按 clean cutover 退役，无别名与兼容路径：删除 `BatonSource`、`BatonId`、`ProjectionCutId`、`BatonEnvelope`、`ActiveSource` 与存储态 `OpenObligations`，删除 `SuccessorRequested` / `SuccessorActivated` 与 `Decision.activateSuccessor`；`Decision.openIncumbency` 不再接受 source 参数，初始开启唯一经真实权威接受后的 Plugin `BeginPhysicalProviderAttempt`，Change Host 不再伪造 `PhysicalUserMessageId`。
+- 新循环语义：每一轮 Manager 都在共享工作区上从权威用户消息重新开始并独立评估，评审后指派的修复由本轮承担，完成后清理资源并退出；是否开启下一轮只由系统裁决 `RetirementOutcome = Continue | Accepted of QualityCertificateId`，`Accepted` 提供证书绑定的候选接受、发布成功则退出，若 Change 准入因快照/rebase/CAS 现实变化使证书失效则以另一轮普通独立迭代继续。`ProjectionCut = { ProviderRunId; ToolCallId }` 精确绑定已退休 provider run 与结束工具调用；`RetirementSummary = { Id; IncumbencyId; ProjectionCut; SnapshotId; AuthorityRevision; Outcome }`（其中 `SnapshotId: WorkspaceSnapshotId`）以工作区快照与权威版本绑定退休观察，拒绝陈旧 `Accepted`/`Continue` 重放。
+- 上下文切段：新 active 迭代只保留类型化权威消息与本轮消息，移除所有前轮消息与仅用于唤醒循环的首个非权威用户延续，并跳过 XWire/Companion 历史投影；两种 retirement 都在 transform 边界清空退休 run 的后续请求并精确归还其 provider-step admission，`Continue` 随后自动激活下一轮，`Accepted` 只终止旧 attempt。发布成功即退出；若 Change 准入因快照/rebase/CAS 现实变化使证书失效，则以另一轮普通独立迭代继续。审计保留全量历史，证书、CAS 发布与退休资源围栏保持不变；推进提醒去重归 durable `PromptAuthority` 门控，`ExitRequiredNudgeScheduled` 重复 Relay 状态已删除。
+- 配套改名：`RelaySuccessorGate` → `ManagerLoopGate`（kind 前缀 `manager-loop:`），`RequestSuccessor` → `ContinueLoop : ManagerJobId -> Task<Result<IncumbencyId,string>>`（去掉 reason 与冗余 WorktreePath），`runtime/relay-successor` 与 `runtime/relay-exit-required` 由 `runtime/manager-assess`、`runtime/manager-work`、`runtime/manager-finish` 取代，无 `runtime/manager-loop` 资源，循环唤醒与 `AuditPending` 提醒均复用规范 `runtime/manager-assess`；公开文档不再教授接力棒或合成交接，`requirements/GAP.md` 移除已过时的后继准入 GAP-033。
+
 ## 0.9.0
 
 - JS capability-projected 编辑面升级为渐进式双层协议：

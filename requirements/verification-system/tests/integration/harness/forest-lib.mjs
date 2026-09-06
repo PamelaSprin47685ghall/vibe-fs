@@ -275,7 +275,8 @@ export function deriveRequests(scenario) {
     // Derived from the declaration, not from a counter shared with other scenarios, so the
     // same scenario always yields the same ids no matter which order the forest is walked.
     // A cold-boundary turn continues the previous turn's session (see `hasBoundary`).
-    const continued = hasBoundary(scenario, group.entries) && previousSessionId !== null;
+    const managerLoop = group.entries.some((entry) => boundaryAt(scenario, entry)?.kind === 'manager-loop');
+    const continued = !managerLoop && hasBoundary(scenario, group.entries) && previousSessionId !== null;
     const sessionId = continued ? previousSessionId : `ses_${String(groupIndex).padStart(2, '0')}_${first.turnId}`;
     previousSessionId = sessionId;
     if (first.lane !== undefined) bindings.push([first.lane, sessionId]);
@@ -289,10 +290,9 @@ export function deriveRequests(scenario) {
     const requestKindSwitch = group.entries.some(
       (entry) => boundaryAt(scenario, entry)?.kind === 'request-kind-switch',
     );
-    const relayContextOpen = group.entries.some(
-      (entry) => boundaryAt(scenario, entry)?.kind === 'relay-context-open',
-    );
-    const tools = continued && previousTools !== null && !requestKindSwitch ? previousTools : declaredTools;
+    const tools = continued && previousTools !== null && !requestKindSwitch && !managerLoop
+      ? previousTools
+      : declaredTools;
     previousTools = tools;
 
     // The conversation this session accumulates. Growing it in place is what keeps every
@@ -307,15 +307,13 @@ export function deriveRequests(scenario) {
     // rewrote the fixed parts. Title requests keep their marker shape (the seal does
     // not compare them).
     const model = 'forest-lib-model';
+    // A `manager-loop` iteration needs no synthetic shape: it restarts from its
+    // own declared authority text below, which the scenario author keeps
+    // byte-identical across iterations. Retired-iteration traffic stays in
+    // `previousMessages` and never enters the fresh request.
     const messages =
       requestKindSwitch && previousMessages !== null
         ? [...previousMessages, user(text)]
-        : relayContextOpen && previousMessages !== null
-          ? [
-              previousMessages[0],
-              user('[RelayContext]\nauthority_revision=derived\nphase=WorkOwned\n[/RelayContext]'),
-              ...previousMessages.slice(1),
-            ]
         : first.kind === 'title'
           ? [user(TITLE_MARKER), user(text)]
           : [systemMessage(model), user(text)];
@@ -328,6 +326,18 @@ export function deriveRequests(scenario) {
       while (derivedStep < entry.step) {
         messages.push(assistant(`derived sparse cursor ${derivedStep} of ${entry.turnId}`));
         derivedStep += 1;
+      }
+      if (managerLoop && entry === entries[0]) {
+        requests.push({
+          expectedEntryId: entry.id,
+          sessionId,
+          body: {
+            sessionID: sessionId,
+            model,
+            tools,
+            messages: [...messages, assistant('retired iteration'), user(text)],
+          },
+        });
       }
       for (let delivery = 0; delivery < deliveryCount(scenario, entry); delivery += 1) {
         requests.push({

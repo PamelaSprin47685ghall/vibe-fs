@@ -2,13 +2,16 @@
  * cold-boundary.js — explicit declared exceptions to the prefix seal.
  *
  * ARCH-004 keeps the provider-visible prefix byte-stable so KV-cache hits. VERIFY-003
- * §"冷边界显式声明" names the only two legitimate exceptions and requires the scenario
- * to say WHERE each happens:
+ * §"冷边界显式声明" names an explicit finite set of legitimate exceptions and requires
+ * the scenario to say WHERE each happens:
  *
  *   COMPANION-009  epoch switch — new SealRoot, one explicit prefix rebase
  *   FALLBACK-004   fallback side switch — EffectiveAgent moves, so the model does
- *   RELAY-PROJ    Relay typed context — open, phase revision, retirement, and
- *                 successor cut each have their own kind
+ *   CTX-010        prefix probe — attempt-local head, fixed tool set
+ *   ENFORCER-030   frame commit — Blogger frame list grows, fixed system/tools
+ *   SyncDelegate   request-kind switch — per-request tool map swap, same transcript
+ *   MANAGER-LOOP   manager iteration — same system/plan, root authority kept while
+ *                  retired-iteration traffic and the wake are removed
  *
  * Sniffing is forbidden, and package K1 measured why. The deleted `epochCold`
  * exemption read "tools and the leading system message unchanged" and then admitted
@@ -37,10 +40,7 @@ export const BOUNDARY_KINDS = [
   'prefix-probe',
   'frame-commit',
   'request-kind-switch',
-  'relay-context-open',
-  'relay-context-revision',
-  'relay-retirement-context',
-  'relay-successor-cut',
+  'manager-loop',
 ];
 
 // ── declaration lookup ──────────────────────────────────────────────────────
@@ -110,144 +110,39 @@ const withModelOf = (previousWire, nextWire) => ({
  */
 const probeKeepsFixedParts = (previousWire, nextWire) => isDeepStrictEqual(previousWire.tools, nextWire.tools);
 
-// ── Relay typed provider context ────────────────────────────────────────────
+// ── pure manager loop ───────────────────────────────────────────────────────
 //
-// The Relay projection prepends a synthetic `[RelayContext]` user message once
-// durable Road state exists, revises it as incumbency and phase advance, marks
-// it retired with the accepted suicide result, and replaces it for the
-// successor. Each shape is a distinct boundary kind so a revision cannot
-// masquerade as a cut and a cut cannot smuggle rewritten history.
-
-const messageIsRelayContext = (message) =>
-  message?.role === 'user'
-  && (message?.parts ?? []).some((part) => part?.kind === 'text' && String(part?.text ?? '').includes('[RelayContext]'));
-
-const relayContexts = (wire) => (wire.messages ?? []).filter(messageIsRelayContext);
-
-const relayContextText = (message) =>
-  (message?.parts ?? []).filter((part) => part?.kind === 'text').map((part) => String(part?.text ?? '')).join('\n');
-
-const relayContextField = (message, key) => {
-  const line = relayContextText(message).split('\n').find((entry) => entry.startsWith(`${key}=`));
-  return line === undefined ? null : line.slice(key.length + 1);
-};
+// Every manager iteration restarts from the same workspace with no transferred
+// payload or synthetic context: a Continue retirement is followed by another ordinary
+// iteration under the same system/provider plan. This layer checks structure
+// only: the plan and system are equal, the next wire carries system/user
+// messages alone, its user list is nonempty, its root user equals the previous
+// root, and every next user is an exact ordered subsequence of the previous
+// users — so a novel wake or synthetic user cannot smuggle in, while a dropped
+// non-authority nudge the projection omits stays accepted. Full typed
+// authority-revision retention is proved by the unit projection tests and the
+// long-stroke root-only oracle, not here.
 
 const sameProviderPlan = (previousWire, nextWire) =>
   previousWire.modelId === nextWire.modelId && isDeepStrictEqual(previousWire.tools, nextWire.tools);
 
-const withoutRelayContexts = (wire) => ({
-  ...wire,
-  messages: (wire.messages ?? []).filter((message) => !messageIsRelayContext(message)),
-});
-
-const preservesPriorMessagesAsSubsequence = (previousWire, nextWire) => {
-  let cursor = 0;
-  for (const message of nextWire.messages ?? []) {
-    if (cursor < (previousWire.messages ?? []).length
-        && isDeepStrictEqual(message, previousWire.messages[cursor])) {
-      cursor += 1;
-    }
+const managerLoopKeepsAuthority = (previousWire, nextWire) => {
+  if (!sameProviderPlan(previousWire, nextWire)) return false;
+  const systemOf = (wire) => (wire.messages ?? []).filter((message) => message?.role === 'system');
+  const usersOf = (wire) => (wire.messages ?? []).filter((message) => message?.role === 'user');
+  if (!isDeepStrictEqual(systemOf(previousWire), systemOf(nextWire))) return false;
+  if ((nextWire.messages ?? []).some((message) => message?.role !== 'system' && message?.role !== 'user')) {
+    return false;
   }
-  return cursor === (previousWire.messages ?? []).length;
-};
-
-const messagesAreOrderedSubsequence = (subset, superset) => {
+  const previousUsers = usersOf(previousWire);
+  const nextUsers = usersOf(nextWire);
+  if (nextUsers.length === 0 || previousUsers.length === 0) return false;
+  if (!isDeepStrictEqual(nextUsers[0], previousUsers[0])) return false;
   let cursor = 0;
-  for (const message of superset) {
-    if (cursor < subset.length && isDeepStrictEqual(message, subset[cursor])) {
-      cursor += 1;
-    }
+  for (const message of previousUsers) {
+    if (cursor < nextUsers.length && isDeepStrictEqual(message, nextUsers[cursor])) cursor += 1;
   }
-  return cursor === subset.length;
-};
-
-/**
- * Relay opens its typed provider context only after the first durable Road state
- * exists. The next request therefore prepends a synthetic `[RelayContext]` message
- * and may interleave materialized assessment/tool evidence around the already-seen
- * transcript. This boundary is deliberately narrower than an epoch reset: the
- * provider plan is byte-stable and every prior message must remain, in order.
- */
-const relayContextOpened = (previousWire, nextWire) =>
-  sameProviderPlan(previousWire, nextWire)
-  && (nextWire.messages ?? []).some(messageIsRelayContext)
-  && !(previousWire.messages ?? []).some(messageIsRelayContext)
-  && preservesPriorMessagesAsSubsequence(previousWire, nextWire);
-
-const relayContextRevised = (previousWire, nextWire) => {
-  const previousContexts = relayContexts(previousWire);
-  const nextContexts = relayContexts(nextWire);
-  if (previousContexts.length !== 1 || nextContexts.length !== 1) return false;
-  const previousIncumbency = relayContextField(previousContexts[0], 'incumbency_id');
-  const nextIncumbency = relayContextField(nextContexts[0], 'incumbency_id');
-  return sameProviderPlan(previousWire, nextWire)
-    && previousIncumbency !== null
-    && previousIncumbency === nextIncumbency
-    && relayContextText(previousContexts[0]) !== relayContextText(nextContexts[0])
-    && preservesPriorMessagesAsSubsequence(withoutRelayContexts(previousWire), withoutRelayContexts(nextWire));
-};
-
-const hasAcceptedSuicideResult = (wire) =>
-  (wire.messages ?? []).some((message) =>
-    message?.role === 'tool'
-    && message?.parts?.some(
-      (part) => part?.kind === 'tool-result'
-        && String(part?.result ?? '').includes('retired = true'),
-    ));
-
-const relayRetirementContext = (previousWire, nextWire) => {
-  const previousContexts = relayContexts(previousWire);
-  const nextContexts = relayContexts(nextWire);
-  if (previousContexts.length !== 1 || nextContexts.length !== 1) return false;
-  const previousIncumbency = relayContextField(previousContexts[0], 'incumbency_id');
-  const nextIncumbency = relayContextField(nextContexts[0], 'incumbency_id');
-  const nextPhase = relayContextField(nextContexts[0], 'phase');
-  return sameProviderPlan(previousWire, nextWire)
-    && previousIncumbency !== null
-    && previousIncumbency !== 'none'
-    && nextIncumbency === 'none'
-    && nextPhase === 'Retired'
-    && hasAcceptedSuicideResult(nextWire)
-    && preservesPriorMessagesAsSubsequence(withoutRelayContexts(previousWire), withoutRelayContexts(nextWire));
-};
-
-const messageIsRelaySuccessorPrompt = (message) =>
-  message?.role === 'user'
-  && message?.parts?.some((part) => {
-    if (part?.kind !== 'text') return false;
-    const text = String(part?.text ?? '').replace(/^#\s*/, '');
-    return text.startsWith('The previous Manager incumbency is retired. You are the new Manager');
-  });
-
-const hasRelaySuccessorPrompt = (wire) => (wire.messages ?? []).some(messageIsRelaySuccessorPrompt);
-
-const isSanitizerAssistantDot = (message) =>
-  message?.role === 'assistant'
-  && (message?.parts ?? []).length === 1
-  && message.parts[0]?.kind === 'text'
-  && message.parts[0]?.text === '.';
-
-const relaySuccessorCut = (previousWire, nextWire) => {
-  const nextContexts = relayContexts(nextWire);
-  if (nextContexts.length !== 1) return false;
-  const nextIncumbency = relayContextField(nextContexts[0], 'incumbency_id');
-  const nextPhase = relayContextField(nextContexts[0], 'phase');
-  const priorMessages = (previousWire.messages ?? []).filter(
-    (message) => !messageIsRelayContext(message) && !isSanitizerAssistantDot(message),
-  );
-  const carriedMessages = (nextWire.messages ?? []).filter(
-    (message) =>
-      !messageIsRelayContext(message)
-      && !messageIsRelaySuccessorPrompt(message)
-      && !isSanitizerAssistantDot(message),
-  );
-  return sameProviderPlan(previousWire, nextWire)
-    && nextIncumbency !== null
-    && nextIncumbency !== 'none'
-    && nextPhase === 'AuditPending'
-    && hasRelaySuccessorPrompt(nextWire)
-    && !hasAcceptedSuicideResult(nextWire)
-    && messagesAreOrderedSubsequence(carriedMessages, priorMessages);
+  return cursor === nextUsers.length;
 };
 
 /**
@@ -266,10 +161,12 @@ const relaySuccessorCut = (previousWire, nextWire) => {
  */
 export function sealDecision({ previousWire, body, boundary }) {
   if (previousWire === null || previousWire === undefined) {
-    // `frame-commit` and `prefix-probe` share the multi-delivery shape: the first
-    // request establishes the seal (nothing to break), later ones break it.
+    // `prefix-probe`, `frame-commit`, and `manager-loop` share the multi-delivery
+    // shape: the first request establishes the seal (nothing to break), later ones
+    // break it. A `manager-loop` boundary sits on a reusable step-0 entry, so its
+    // initial delivery has no previous wire and must be held.
     if (boundary !== null && boundary !== undefined
-        && (boundary.kind === 'prefix-probe' || boundary.kind === 'frame-commit')) {
+        && (boundary.kind === 'prefix-probe' || boundary.kind === 'frame-commit' || boundary.kind === 'manager-loop')) {
       return { held: true };
     }
     return boundary === null || boundary === undefined
@@ -292,8 +189,10 @@ export function sealDecision({ previousWire, body, boundary }) {
     // all" is checked at scenario end by `ScenarioRuntime.unfiredBoundaries`.
     // `frame-commit` shares this shape: the Blogger session's first request
     // establishes the seal (nothing to break), later requests break it as frames
-    // accumulate.
-    return boundary.kind === 'prefix-probe' || boundary.kind === 'frame-commit'
+    // accumulate. `manager-loop` shares it too: a reusable step-0 entry may see
+    // append-only retries that stay held, with only the next iteration's restart
+    // breaking the seal.
+    return boundary.kind === 'prefix-probe' || boundary.kind === 'frame-commit' || boundary.kind === 'manager-loop'
       ? { held: true }
       : { broken: 'boundary-not-reached', kind: boundary.kind };
   }
@@ -340,28 +239,15 @@ export function sealDecision({ previousWire, body, boundary }) {
         ? { resealed: 'request-kind-switch' }
         : { broken: 'request-kind-switch-rewrote-prefix' };
 
-    // RELAY-PROJ: the first durable Road makes the bounded synthetic Relay
-    // context visible. Unlike a generic epoch switch, this may not delete or
-    // rewrite anything the provider already saw.
-    case 'relay-context-open':
-      return relayContextOpened(previousWire, nextWire)
-        ? { resealed: 'relay-context-open' }
-        : { broken: 'relay-context-open-rewrote-fixed' };
-
-    case 'relay-context-revision':
-      return relayContextRevised(previousWire, nextWire)
-        ? { resealed: 'relay-context-revision' }
-        : { broken: 'relay-context-revision-rewrote-fixed' };
-
-    case 'relay-retirement-context':
-      return relayRetirementContext(previousWire, nextWire)
-        ? { resealed: 'relay-retirement-context' }
-        : { broken: 'relay-retirement-context-rewrote-fixed' };
-
-    case 'relay-successor-cut':
-      return relaySuccessorCut(previousWire, nextWire)
-        ? { resealed: 'relay-successor-cut' }
-        : { broken: 'relay-successor-cut-rewrote-fixed' };
+    // MANAGER-LOOP: a Continue retirement is followed by another ordinary
+    // iteration under the same system/provider plan. The root user is kept and
+    // every next user is a subsequence of the previous users; retired-iteration
+    // assistant/tool traffic and a novel wake are absent. Anything else is a
+    // rewrite of the fixed parts.
+    case 'manager-loop':
+      return managerLoopKeepsAuthority(previousWire, nextWire)
+        ? { resealed: 'manager-loop' }
+        : { broken: 'manager-loop-rewrote-fixed' };
 
     default:
       throw new Error(`unknown cold boundary kind '${boundary.kind}'`);

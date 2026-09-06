@@ -144,8 +144,8 @@
         "src/Wanxiangshu/Mission/Relay/Surface.fs"
       ],
       "proofs": [
-        "requirements/relay-incumbency/tests/fold.test.mjs",
-        "requirements/relay-incumbency/tests/authority-update-host.test.mjs"
+        "requirements/relay-incumbency/tests/loop.test.mjs",
+        "requirements/relay-incumbency/tests/continuation.test.mjs"
       ],
       "publishes": [
         "Relay.Incumbency"
@@ -162,7 +162,7 @@
       ],
       "proofs": [
         "requirements/relay-assessment/tests/certificate.test.mjs",
-        "requirements/relay-incumbency/tests/authority-update-host.test.mjs"
+        "requirements/relay-incumbency/tests/continuation.test.mjs"
       ],
       "publishes": [
         "Relay.Assessment",
@@ -180,8 +180,10 @@
         "src/Wanxiangshu/Mission/Relay/Retirement/Surface.fs"
       ],
       "proofs": [
-        "requirements/relay-retirement/tests/nudge.test.mjs",
-        "requirements/change-integration/tests/gate-scope.test.mjs"
+        "requirements/interaction-authority/tests/join-guard.test.mjs",
+        "requirements/change-integration/tests/gate-scope.test.mjs",
+        "requirements/verification-system/tests/e2e/scenarios/long-stroke.toml",
+        "requirements/verification-system/tests/e2e/support/long-stroke-oracles.mjs"
       ],
       "publishes": [
         "Relay.Retirement",
@@ -197,7 +199,7 @@
         "src/Wanxiangshu/Mission/Relay/ProjectionSurface.fs"
       ],
       "proofs": [
-        "requirements/relay-context-projection/tests/projection-cut.test.mjs"
+        "requirements/relay-context-projection/tests/loop-projection.test.mjs"
       ],
       "publishes": [
         "Relay.ContextProjection"

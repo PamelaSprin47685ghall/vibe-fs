@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
+const open = (state) => relay.openIncumbency(state, 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
+
 test('WHAT[ASSESS-005] all-ten assessment creates an exact-bound certificate and downgrades the phase', () => {
-  const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1', 'ExistingWorld')
+  const opened = open(relay.empty())
   const assessed = relay.assess(
     opened.state,
     'road-1',
@@ -23,8 +25,8 @@ test('WHAT[ASSESS-005] all-ten assessment creates an exact-bound certificate and
   })
 })
 
-test('WHAT[ASSESS-006] assessed incumbency cannot submit a second review after work begins', () => {
-  const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1', 'ExistingWorld')
+test('WHAT[ASSESS-006] assessed iteration cannot submit a second review after work begins', () => {
+  const opened = open(relay.empty())
   const assessed = relay.assess(
     opened.state,
     'road-1',
@@ -50,7 +52,7 @@ test('WHAT[ASSESS-006] assessed incumbency cannot submit a second review after w
 })
 
 test('WHAT[RELAY-008] certificate invalidation is explicit and never reactivates its assessor', () => {
-  const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1', 'ExistingWorld')
+  const opened = open(relay.empty())
   const assessed = relay.assess(
     opened.state,
     'road-1',

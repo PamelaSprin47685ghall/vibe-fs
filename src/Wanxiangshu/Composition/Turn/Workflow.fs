@@ -55,16 +55,7 @@ module TurnWorkflow =
                 task {
                     match turn.Role, turn.Observation, turn.Outcome with
                     | Some Role.Manager, None, ReconcileProgram.TurnCompleted ->
-                        do!
-                            ManagerWorkflow.observeIdle
-                                sessionPort
-                                rootWorkspace
-                                eventPort
-                                journal
-                                nudgeSent
-                                hasLivePty
-                                quiescence
-                                context
+                        do! ManagerWorkflow.observeIdle sessionPort rootWorkspace journal context
                     | _ -> do! observeIdleOrdinary context
                 }
 
@@ -89,18 +80,7 @@ module TurnWorkflow =
 
                     match turn.Role, turn.Observation, turn.Outcome with
                     | Some Role.Manager, _, _ ->
-                        do!
-                            ManagerWorkflow.observe
-                                sessionPort
-                                rootWorkspace
-                                eventPort
-                                journal
-                                nudgeSent
-                                joinGuardNudges
-                                hasLivePty
-                                quiescence
-                                observeOrdinary
-                                context
+                        do! ManagerWorkflow.observe sessionPort rootWorkspace journal observeOrdinary context
                     | _ -> do! observeOrdinary context
                 }
 

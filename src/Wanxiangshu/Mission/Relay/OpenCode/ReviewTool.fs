@@ -2,6 +2,7 @@ namespace Wanxiangshu.Mission.Relay.OpenCode
 
 open System
 open System.Threading.Tasks
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
@@ -19,93 +20,53 @@ module ReviewTool =
         let Description = "tool/review/description"
 
         [<Literal>]
-        let Received = "tool/review/received"
+        let Finish = "runtime/manager-finish"
 
         [<Literal>]
-        let WorkAssigned = "tool/review/work-assigned"
+        let Work = "runtime/manager-work"
 
         [<Literal>]
-        let Rejected = "tool/review/rejected"
+        let BindingUnavailable = "tool/review/binding-unavailable"
 
         [<Literal>]
-        let AbsentToolCall = "tool/review/absent-tool-call"
+        let MissingRequest = "tool/review/missing-request"
 
         [<Literal>]
-        let MissingUserRoot = "tool/review/missing-user-root"
+        let InvalidScores = "tool/review/invalid-scores"
 
         [<Literal>]
-        let WrongToolName = "tool/review/wrong-tool-name"
-
-        [<Literal>]
-        let RunMismatch = "tool/review/run-mismatch"
-
-        [<Literal>]
-        let AmbiguousToolCall = "tool/review/ambiguous-tool-call"
-
-        [<Literal>]
-        let MissingProviderMessage = "tool/review/missing-provider-message"
-
-        [<Literal>]
-        let NoSnapshotPort = "tool/review/no-snapshot-port"
-
-        [<Literal>]
-        let TranscriptLoadFailed = "tool/review/transcript-load-failed"
-
-        [<Literal>]
-        let NoActiveIncumbency = "tool/review/no-active-incumbency"
-
-        [<Literal>]
-        let IncumbencyChanged = "tool/review/incumbency-changed"
-
-        [<Literal>]
-        let MissingToolCallId = "tool/review/missing-tool-call-id"
-
-        [<Literal>]
-        let MissingProviderRun = "tool/review/missing-provider-run"
-
-        [<Literal>]
-        let MissingUserRootContext = "tool/review/missing-user-root-context"
-
-        [<Literal>]
-        let MissingWorkspace = "tool/review/missing-workspace"
-
-        [<Literal>]
-        let MissingJournal = "tool/review/missing-journal"
-
-        [<Literal>]
-        let MissingAuthorityRoot = "tool/review/missing-authority-root"
+        let RecordFailed = "tool/review/record-failed"
 
         [<Literal>]
         let ScoreArgument = "tool/review/score-argument"
+
+    type private ReviewFailure =
+        | BindingUnavailable
+        | MissingRequest
+        | InvalidScores
+        | RecordFailed
+
+    let private failurePath =
+        function
+        | BindingUnavailable -> Path.BindingUnavailable
+        | MissingRequest -> Path.MissingRequest
+        | InvalidScores -> Path.InvalidScores
+        | RecordFailed -> Path.RecordFailed
 
     let private fields = ScoreDimension.all |> List.map ScoreDimension.fieldName
 
     let private providerText (path: string) substitutions =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path substitutions
 
-    let private rejected reason =
+    let private rejectedResult failure =
         ToolHostCodec.tomlObjectWithInstructions
-            [ providerText Path.Rejected (Map [ "reason", reason ]) ]
+            [ providerText (failurePath failure) Map.empty ]
             [ "recorded", ToolHostCodec.TBool false ]
 
     let private requireSome error =
         function
         | Some value -> Ok value
         | None -> Error error
-
-    let private bindTaskResult binder pending =
-        task {
-            let! outcome = pending
-
-            match outcome with
-            | Ok value -> return! binder value
-            | Error error -> return Error error
-        }
-
-    let private bindResultTask binder result =
-        match result with
-        | Ok value -> binder value
-        | Error error -> Task.FromResult(Error error)
 
     let private narrativeOf texts =
         texts |> List.rev |> String.concat "\n" |> (fun text -> text.Trim()) |> Ok
@@ -125,7 +86,7 @@ module ReviewTool =
 
         let rec loop index texts =
             if index >= message.Parts.Length then
-                Error(providerText Path.AbsentToolCall Map.empty)
+                Error BindingUnavailable
             else
                 nextPart index texts message.Parts.[index]
                 |> Result.bind (function
@@ -144,31 +105,31 @@ module ReviewTool =
 
     let private requireRootText text =
         if String.IsNullOrWhiteSpace text then
-            Error(providerText Path.MissingUserRoot Map.empty)
+            Error MissingRequest
         else
             Ok text
 
     let private rootText (physicalUserMessageId: string) (messages: SessionMessage list) =
         match messages |> List.tryFind (fun message -> message.Id = physicalUserMessageId) with
-        | None -> Error(providerText Path.MissingUserRoot Map.empty)
+        | None -> Error MissingRequest
         | Some message -> message |> messageText |> requireRootText
 
     let private validateLocation providerRun (location: SessionSnapshot.ToolCallLocation) =
         if location.ToolName <> "review" then
-            Error(providerText Path.WrongToolName Map.empty)
+            Error BindingUnavailable
         elif location.ProviderRun <> providerRun then
-            Error(providerText Path.RunMismatch Map.empty)
+            Error BindingUnavailable
         else
             Ok location
 
     let private bindingFromMessages physicalUserMessageId rootAuthorityUserMessageId toolCallId providerRun messages =
         SessionSnapshot.locateToolCall toolCallId messages
-        |> Result.mapError (fun _ -> providerText Path.AmbiguousToolCall Map.empty)
+        |> Result.mapError (fun _ -> BindingUnavailable)
         |> Result.bind (validateLocation providerRun)
         |> Result.bind (fun location ->
             messages
             |> List.tryFind (fun message -> message.Id = ProviderRunIdentity.value providerRun)
-            |> requireSome (providerText Path.MissingProviderMessage Map.empty)
+            |> requireSome BindingUnavailable
             |> Result.bind (fun message ->
                 rootText rootAuthorityUserMessageId messages
                 |> Result.bind (fun root ->
@@ -210,16 +171,16 @@ module ReviewTool =
         (rootAuthorityUserMessageId: string)
         (toolCallId: ToolCallId)
         (providerRun: ProviderRunIdentity)
-        : Task<Result<AssessmentBinding, string>> =
+        : Task<Result<AssessmentBinding, ReviewFailure>> =
         match scope.Snapshot with
-        | None -> Task.FromResult(Error(providerText Path.NoSnapshotPort Map.empty))
+        | None -> Task.FromResult(Error BindingUnavailable)
         | Some snapshot ->
             task {
                 let! loaded = snapshot.GetMessages(SessionId.create context.SessionId)
 
                 return
                     loaded
-                    |> Result.mapError (fun error -> providerText Path.TranscriptLoadFailed (Map [ "detail", error ]))
+                    |> Result.mapError (fun _ -> BindingUnavailable)
                     |> Result.bind (
                         bindingFromMessages physicalUserMessageId rootAuthorityUserMessageId toolCallId providerRun
                     )
@@ -230,8 +191,7 @@ module ReviewTool =
         |> Option.bind (fun session -> session.Relay)
 
     let private assessmentTransaction
-        (state: RelayState option)
-        (roadId: RoadId)
+        (view: RoadView)
         (incumbencyId: IncumbencyId)
         (assessmentId: AssessmentId)
         (binding: AssessmentBinding)
@@ -240,33 +200,16 @@ module ReviewTool =
         (scores: ScoreVector)
         =
         let assessment =
-            RelayEvent.AssessmentCommitted(assessmentId, binding, snapshotId, authorityRevision, scores)
+            RelayEvent.AssessmentCommitted(assessmentId, incumbencyId, binding, snapshotId, authorityRevision, scores)
 
-        let existingEvents (view: RoadView) =
-            match view.ActiveIncumbency, view.ActiveSnapshotId, view.ActiveAuthorityRevision with
-            | None, _, _ -> Error(providerText Path.NoActiveIncumbency Map.empty)
-            | Some active, _, _ when active <> incumbencyId -> Error(providerText Path.IncumbencyChanged Map.empty)
-            | _, Some expected, _ when expected <> snapshotId -> Error "AuditSnapshotStale"
-            | _, _, Some expected when expected <> authorityRevision -> Error "AuthorityRevisionStale"
-            | _ -> Ok [ assessment ]
-
-        let eventsResult =
-            match
-                state
-                |> Option.bind (fun current -> Wanxiangshu.Mission.Relay.Fold.view current roadId)
-            with
-            | None ->
-                Ok
-                    [ RelayEvent.RoadOpened(
-                          roadId,
-                          authorityRevision,
-                          PhysicalUserMessageId.create (AuthorityRevision.value authorityRevision)
-                      )
-                      RelayEvent.IncumbencyOpened(incumbencyId, snapshotId, BatonSource.ExistingWorld)
-                      assessment ]
-            | Some view -> existingEvents view
-
-        eventsResult |> Result.bind RelayTransaction.create
+        match view.ActiveIncumbency, view.ActiveSnapshotId, view.ActiveAuthorityRevision with
+        | None, _, _ -> Error BindingUnavailable
+        | Some active, _, _ when active <> incumbencyId -> Error BindingUnavailable
+        | _, Some expected, _ when expected <> snapshotId -> Error RecordFailed
+        | _, _, Some expected when expected <> authorityRevision -> Error RecordFailed
+        | _ ->
+            RelayTransaction.create [ assessment ]
+            |> Result.mapError (fun _ -> RecordFailed)
 
     type private BoundReviewInvocation =
         { Scores: ScoreVector
@@ -281,7 +224,7 @@ module ReviewTool =
           SessionId: SessionId
           RoadId: RoadId
           SnapshotId: WorkspaceSnapshotId
-          State: RelayState option
+          View: RoadView
           RootAuthorityUserMessageId: string
           AuthorityRevision: AuthorityRevision
           IncumbencyId: IncumbencyId
@@ -289,7 +232,12 @@ module ReviewTool =
 
     let private boundInvocation (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         args.ExactBoundedIntegers(fields, 0, 10)
-        |> Result.bind (fun scoredFields -> scoredFields |> List.map snd |> ScoreVector.tryCreate)
+        |> Result.mapError (fun _ -> InvalidScores)
+        |> Result.bind (fun scoredFields ->
+            scoredFields
+            |> List.map snd
+            |> ScoreVector.tryCreate
+            |> Result.mapError (fun _ -> InvalidScores))
         |> Result.bind (fun scores ->
             match
                 context.ToolCallId,
@@ -298,11 +246,11 @@ module ReviewTool =
                 scope.WorkspaceDirectory,
                 scope.Journal
             with
-            | None, _, _, _, _ -> Error(providerText Path.MissingToolCallId Map.empty)
-            | _, None, _, _, _ -> Error(providerText Path.MissingProviderRun Map.empty)
-            | _, _, None, _, _ -> Error(providerText Path.MissingUserRootContext Map.empty)
-            | _, _, _, None, _ -> Error(providerText Path.MissingWorkspace Map.empty)
-            | _, _, _, _, None -> Error(providerText Path.MissingJournal Map.empty)
+            | None, _, _, _, _ -> Error BindingUnavailable
+            | _, None, _, _, _ -> Error BindingUnavailable
+            | _, _, None, _, _ -> Error MissingRequest
+            | _, _, _, None, _ -> Error BindingUnavailable
+            | _, _, _, _, None -> Error BindingUnavailable
             | Some toolCallId, Some providerRun, Some physicalUserMessageId, Some directory, Some journal ->
                 Ok
                     { Scores = scores
@@ -315,70 +263,61 @@ module ReviewTool =
     let private prepareAssessment (scope: ToolRuntimeScope) (context: HostToolContext) (bound: BoundReviewInvocation) =
         let sessionId = SessionId.create context.SessionId
         let roadId = RoadId.create context.SessionId
-        let snapshotId = WorkspaceSnapshot.capture bound.Directory
-        let state = currentRelayState bound.Journal sessionId
 
-        let view =
-            state
-            |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay roadId)
+        try
+            let snapshotId = WorkspaceSnapshot.capture bound.Directory
+            let state = currentRelayState bound.Journal sessionId
 
-        scope.ActiveProfileFor sessionId
-        |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
-        |> requireSome (providerText Path.MissingAuthorityRoot Map.empty)
-        |> Result.map (fun rootAuthorityUserMessageId ->
-            let authorityRevision =
-                view
-                |> Option.map (fun road -> road.AuthorityRevision)
-                |> Option.defaultValue (AuthorityRevision.create rootAuthorityUserMessageId)
+            let activeView =
+                state
+                |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay roadId)
+                |> requireSome BindingUnavailable
+                |> Result.bind (fun road ->
+                    road.ActiveIncumbency
+                    |> requireSome BindingUnavailable
+                    |> Result.map (fun incumbencyId -> road, incumbencyId))
 
-            let incumbencyId =
-                view
-                |> Option.bind (fun road -> road.ActiveIncumbency)
-                |> Option.defaultWith (fun () ->
-                    HostDigest.sha256Hex ("incumbency-v1\n" + context.SessionId + "\n" + rootAuthorityUserMessageId)
-                    |> fun digest -> IncumbencyId.create ("incumbency:" + digest))
+            activeView
+            |> Result.bind (fun (road, incumbencyId) ->
+                scope.ActiveProfileFor sessionId
+                |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
+                |> requireSome BindingUnavailable
+                |> Result.map (fun rootAuthorityUserMessageId ->
+                    let assessmentId =
+                        HostDigest.sha256Hex (
+                            String.concat
+                                "\n"
+                                [ "assessment-v2"
+                                  context.SessionId
+                                  IncumbencyId.value incumbencyId
+                                  WorkspaceSnapshotId.value snapshotId
+                                  AuthorityRevision.value road.AuthorityRevision
+                                  ToolCallId.value bound.ToolCallId ]
+                        )
+                        |> fun digest -> AssessmentId.create ("assessment:" + digest)
 
-            let assessmentId =
-                HostDigest.sha256Hex ("assessment-v1\n" + context.SessionId + "\n" + ToolCallId.value bound.ToolCallId)
-                |> fun digest -> AssessmentId.create ("assessment:" + digest)
+                    { Bound = bound
+                      SessionId = sessionId
+                      RoadId = roadId
+                      SnapshotId = snapshotId
+                      View = road
+                      RootAuthorityUserMessageId = rootAuthorityUserMessageId
+                      AuthorityRevision = road.AuthorityRevision
+                      IncumbencyId = incumbencyId
+                      AssessmentId = assessmentId }))
+        with _ ->
+            Error BindingUnavailable
 
-            { Bound = bound
-              SessionId = sessionId
-              RoadId = roadId
-              SnapshotId = snapshotId
-              State = state
-              RootAuthorityUserMessageId = rootAuthorityUserMessageId
-              AuthorityRevision = authorityRevision
-              IncumbencyId = incumbencyId
-              AssessmentId = assessmentId })
-
-    let private phaseName =
-        function
-        | IncumbencyPhase.AuditPending -> "AuditPending"
-        | IncumbencyPhase.WorkOwned -> "WorkOwned"
-        | IncumbencyPhase.PerfectAwaitingRetirement -> "PerfectAwaitingRetirement"
-        | IncumbencyPhase.RetirementCleanupBlocked -> "RetirementCleanupBlocked"
-
-    let private acceptedResult (prepared: PreparedAssessment) projection =
-        let phase =
-            AgentProjection.tryFind prepared.SessionId projection.AgentProjections
-            |> Option.bind (fun session -> session.Relay)
-            |> Option.bind (fun state -> Wanxiangshu.Mission.Relay.Fold.view state prepared.RoadId)
-            |> Option.bind (fun view -> view.ActivePhase)
-            |> Option.map phaseName
-            |> Option.defaultValue "Unknown"
-
+    let private acceptedResult (prepared: PreparedAssessment) =
         let instructionPath =
             if ScoreVector.allPerfect prepared.Bound.Scores then
-                Path.Received
+                Path.Finish
             else
-                Path.WorkAssigned
+                Path.Work
 
         ToolHostCodec.tomlObjectWithInstructions
             [ providerText instructionPath Map.empty ]
-            [ "recorded", ToolHostCodec.TBool true
-              "phase", ToolHostCodec.TString phase
-              "all_perfect", ToolHostCodec.TBool(ScoreVector.allPerfect prepared.Bound.Scores) ]
+            [ "recorded", ToolHostCodec.TBool true ]
 
     let private appendAssessment (prepared: PreparedAssessment) transaction =
         let fact =
@@ -396,44 +335,48 @@ module ReviewTool =
                     fact
                     prepared.Bound.Journal
 
-            return outcome |> Result.mapError JournalAppendFailure.describe
+            return outcome |> Result.mapError (fun _ -> RecordFailed)
         }
 
     let private runPrepared (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedAssessment) =
-        captureBinding
-            scope
-            context
-            prepared.Bound.PhysicalUserMessageId
-            prepared.RootAuthorityUserMessageId
-            prepared.Bound.ToolCallId
-            prepared.Bound.ProviderRun
-        |> bindTaskResult (fun binding ->
-            assessmentTransaction
-                prepared.State
-                prepared.RoadId
-                prepared.IncumbencyId
-                prepared.AssessmentId
-                binding
-                prepared.SnapshotId
-                prepared.AuthorityRevision
-                prepared.Bound.Scores
-            |> bindResultTask (fun transaction ->
-                appendAssessment prepared transaction
-                |> bindTaskResult (fun projection -> Task.FromResult(Ok(acceptedResult prepared projection)))))
+        taskResult {
+            let! binding =
+                captureBinding
+                    scope
+                    context
+                    prepared.Bound.PhysicalUserMessageId
+                    prepared.RootAuthorityUserMessageId
+                    prepared.Bound.ToolCallId
+                    prepared.Bound.ProviderRun
+
+            let! transaction =
+                assessmentTransaction
+                    prepared.View
+                    prepared.IncumbencyId
+                    prepared.AssessmentId
+                    binding
+                    prepared.SnapshotId
+                    prepared.AuthorityRevision
+                    prepared.Bound.Scores
+
+            let! _ = appendAssessment prepared transaction
+            return acceptedResult prepared
+        }
 
     let private renderExecution =
         function
         | Ok value -> value
-        | Error error -> rejected error
+        | Error failure -> rejectedResult failure
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            let pending =
-                boundInvocation scope args context
-                |> Result.bind (prepareAssessment scope context)
-                |> bindResultTask (runPrepared scope context)
+            let! outcome =
+                taskResult {
+                    let! bound = boundInvocation scope args context
+                    let! prepared = prepareAssessment scope context bound
+                    return! runPrepared scope context prepared
+                }
 
-            let! outcome = pending
             return renderExecution outcome
         }
 

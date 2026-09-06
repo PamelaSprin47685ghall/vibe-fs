@@ -109,7 +109,7 @@ grounding 由 `requirement-grounding` package 拥有。
 | [relay-incumbency](relay-incumbency/WHAT.md) | 每一任从只读 audit 开始；低分即接责，退休永不恢复，单 active 任期。 |
 | [relay-assessment](relay-assessment/WHAT.md) | 每任期至多一次八维整数评审；低分原子生成义务，全满分生成证书。 |
 | [relay-retirement](relay-retirement/WHAT.md) | suicide 是唯一正常出口；只有递归 live 资源阻塞退休。 |
-| [relay-context-projection](relay-context-projection/WHAT.md) | 审计全量保留，provider 切段；接力棒确定性有界脱敏。 |
+| [relay-context-projection](relay-context-projection/WHAT.md) | 审计全量保留；provider 只投影 typed authority 与当前独立迭代。 |
 
 旧 `review-judgement` / `review-assurance` / `finality` 已 clean break 到上述 relay 包。
 

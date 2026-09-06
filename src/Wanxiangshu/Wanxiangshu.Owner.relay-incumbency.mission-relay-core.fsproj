@@ -5,6 +5,9 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="Mission/Relay/Contract.fsi"/>
     <Compile Include="Mission/Relay/Contract.fs"/>
     <Compile Include="Mission/Relay/Facts.fsi"/>

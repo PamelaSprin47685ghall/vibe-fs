@@ -58,9 +58,9 @@ Office Library 遵循三轴分类：
 
 瞬时任务与运行时事件通过会话消息通道传递，严禁借由提示词路径伪造激活或篡改长期的 Role 自我模型。
 
-## COGNITIVE-ENVIRONMENT-012: Relay 评审指引不灌输隐藏流程机制
+## COGNITIVE-ENVIRONMENT-012: 独立评审指引不灌输隐藏流程机制
 
-Manager 在接力接任时的评审提示由 Role Law、Relay 评审指引（Examiner's Ledger）与上下文组合而成。评审依据公开的八维准则与事实证据展开；双重确认、多 Reviewer 循环、隐藏 barrier 等内部流程机制严禁写入模型提示词。
+Manager 独立 assessment 的评审提示由 Role Law、Quality Ledger（八维评审指引）与上下文组合而成。评审依据公开的八维准则与事实证据独立展开，一次判断只对当前工作负责；assessment 必须诚实打分，不得为影响后续而策略性调整分数；双重确认、多 Reviewer 循环、隐藏 barrier 等内部流程机制严禁写入模型提示词。
 
 ## COGNITIVE-ENVIRONMENT-013: Pair Hint 是 canonical craft payload
 

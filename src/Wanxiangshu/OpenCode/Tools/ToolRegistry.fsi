@@ -32,7 +32,7 @@ module ToolRegistry =
         val DeniedUnestablished: string = "tool/registry/denied-unestablished"
 
         [<Literal>]
-        val DeniedRelayPhase: string = "tool/registry/denied-relay-phase"
+        val DeniedTaskState: string = "tool/registry/denied-task-state"
 
     /// ENF-006: the authority the execute gate resolves for a tool, so a
     /// consumer can tell an office tool from an internal leaf without guessing

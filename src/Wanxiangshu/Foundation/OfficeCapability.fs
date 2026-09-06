@@ -106,14 +106,9 @@ module OfficeCapability =
     let private managerPermissions phase =
         match phase with
         | ManagerCapabilityPhase.AuditPending
-        | ManagerCapabilityPhase.WorkOwned ->
-            permissions Role.Manager
-        | ManagerCapabilityPhase.PerfectAwaitingRetirement ->
-            set
-                [ ToolPermission.Join
-                  ToolPermission.Finality ]
-        | ManagerCapabilityPhase.RetirementCleanupBlocked ->
-            set [ ToolPermission.Join; ToolPermission.Finality ]
+        | ManagerCapabilityPhase.WorkOwned -> permissions Role.Manager
+        | ManagerCapabilityPhase.PerfectAwaitingRetirement -> set [ ToolPermission.Join; ToolPermission.Finality ]
+        | ManagerCapabilityPhase.RetirementCleanupBlocked -> set [ ToolPermission.Join; ToolPermission.Finality ]
         | ManagerCapabilityPhase.Retired -> Set.empty
 
     let permissionsForPhase role phase =

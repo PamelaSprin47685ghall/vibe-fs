@@ -48,59 +48,26 @@ const REQUEST_KIND_SWITCHED = body(
   ['read', 'write', 'return'],
 );
 
-const RELAY_CONTEXT_OPENED = body(
-  'test-model',
-  [
-    SYSTEM,
-    user('[RelayContext]\nauthority_revision=rev-1\nphase=WorkOwned\n[/RelayContext]'),
-    assistant('Assessment evidence.'),
-    user('Round 1'),
-    assistant('review call and result'),
-  ],
-);
-
-const RELAY_CONTEXT_REVISED = body(
-  'test-model',
-  [
-    SYSTEM,
-    user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-1\nphase=PerfectAwaitingRetirement\n[/RelayContext]'),
-    user('Round 1'),
-    assistant('review call and result'),
-  ],
-);
-
-const RELAY_CONTEXT_BEFORE_REVISION = body(
-  'test-model',
-  [
-    SYSTEM,
-    user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-1\nphase=AuditPending\n[/RelayContext]'),
-    user('Round 1'),
-  ],
-);
-
-const RELAY_RETIRED_CONTEXT = body(
-  'test-model',
-  [
-    SYSTEM,
-    user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=none\nphase=Retired\n[/RelayContext]'),
-    user('Round 1'),
-    assistant('review call and result'),
-    {
-      role: 'tool',
-      tool_call_id: 'suicide-call',
-      content: 'retired = true\nquality_candidate_accepted = false',
-    },
-  ],
-);
-
-const RELAY_SUCCESSOR_CUT = body(
-  'test-model',
-  [
-    SYSTEM,
-    user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-2\nphase=AuditPending\n[/RelayContext]'),
-    user('# The previous Manager incumbency is retired. You are the new Manager for the same user Road.'),
-  ],
-);
+// MANAGER-LOOP: the retired iteration ends with narrative and tool traffic,
+// plus a non-authority nudge the projection drops; the next iteration
+// restarts under the same system/provider plan with its root user kept and every
+// user a subsequence of the previous users. Structural only: typed
+// authority-revision retention is proved by the unit projection tests and the
+// long-stroke root-only oracle.
+const MANAGER_RETIRED = body('test-model', [
+  SYSTEM,
+  user('Round 1'),
+  assistant('assessment evidence'),
+  { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
+]);
+const MANAGER_NEXT = body('test-model', [SYSTEM, user('Round 1')]);
+const MANAGER_RETIRED_WITH_NUDGE = body('test-model', [
+  SYSTEM,
+  user('Round 1'),
+  assistant('assessment evidence'),
+  { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
+  user('work nudge'),
+]);
 
 const decide = (previous, next, boundary = null) =>
   sealDecision({ previousWire: previous === null ? null : wireOf(previous), body: next, boundary });
@@ -283,143 +250,105 @@ export const coldBoundaryCases = [
     },
   },
 
-  // ── Relay typed-context opening ─────────────────────────────────────────
+  // ── pure manager loop ───────────────────────────────────────────────────
 
   {
-    name: 'RELAY-PROJ opening typed Relay context preserves the prior transcript',
+    name: 'MANAGER-LOOP a new iteration reseals with the same authority and no retired traffic',
     fn: () => {
+      assertEq(decide(MANAGER_RETIRED, MANAGER_NEXT, at('manager-loop')).resealed, 'manager-loop');
       assertEq(
-        decide(FIRST, RELAY_CONTEXT_OPENED, at('relay-context-open')).resealed,
-        'relay-context-open',
+        decide(MANAGER_RETIRED_WITH_NUDGE, MANAGER_NEXT, at('manager-loop')).resealed,
+        'manager-loop',
+        'dropping a non-authority old nudge is accepted',
       );
     },
   },
 
   {
-    name: 'RELAY-PROJ a Relay context boundary may not rewrite prior messages or tools',
+    name: 'MANAGER-LOOP a new iteration fails when retired data leaks',
     fn: () => {
-      const rewritten = body(
-        'test-model',
-        [SYSTEM, user('[RelayContext]\nphase=WorkOwned\n[/RelayContext]'), user('DIFFERENT')],
-      );
+      const leakedAssistant = body('test-model', [SYSTEM, user('Round 1'), assistant('assessment evidence')]);
       assertEq(
-        decide(FIRST, rewritten, at('relay-context-open')).broken,
-        'relay-context-open-rewrote-fixed',
+        decide(MANAGER_RETIRED, leakedAssistant, at('manager-loop')).broken,
+        'manager-loop-rewrote-fixed',
       );
 
-      const retooled = body(
-        'test-model',
-        RELAY_CONTEXT_OPENED.messages,
-        ['write', 'read'],
-      );
+      const leakedTool = body('test-model', [
+        SYSTEM,
+        user('Round 1'),
+        { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
+      ]);
       assertEq(
-        decide(FIRST, retooled, at('relay-context-open')).broken,
-        'relay-context-open-rewrote-fixed',
+        decide(MANAGER_RETIRED, leakedTool, at('manager-loop')).broken,
+        'manager-loop-rewrote-fixed',
+      );
+
+      const wakePrompt = body('test-model', [SYSTEM, user('Round 1'), user('continue the Road')]);
+      assertEq(
+        decide(MANAGER_RETIRED, wakePrompt, at('manager-loop')).broken,
+        'manager-loop-rewrote-fixed',
       );
     },
   },
 
   {
-    name: 'RELAY-PROJ a phase revision changes only the typed context plus appended evidence',
+    name: 'MANAGER-LOOP a new iteration fails when authority or plan changes',
     fn: () => {
+      const rewritten = body('test-model', [SYSTEM, user('DIFFERENT')]);
       assertEq(
-        decide(RELAY_CONTEXT_BEFORE_REVISION, RELAY_CONTEXT_REVISED, at('relay-context-revision')).resealed,
-        'relay-context-revision',
+        decide(MANAGER_RETIRED, rewritten, at('manager-loop')).broken,
+        'manager-loop-rewrote-fixed',
+      );
+
+      const dropped = body('test-model', [SYSTEM]);
+      assertEq(
+        decide(MANAGER_RETIRED, dropped, at('manager-loop')).broken,
+        'manager-loop-rewrote-fixed',
+      );
+
+      const rewrittenRoot = body('test-model', [
+        SYSTEM,
+        user('DIFFERENT'),
+        user('Round 1'),
+      ]);
+      assertEq(
+        decide(MANAGER_RETIRED, rewrittenRoot, at('manager-loop')).broken,
+        'manager-loop-rewrote-fixed',
+      );
+
+      const retooled = body('test-model', MANAGER_NEXT.messages, ['write', 'read']);
+      assertEq(
+        decide(MANAGER_RETIRED, retooled, at('manager-loop')).broken,
+        'manager-loop-rewrote-fixed',
+      );
+
+      const remodelled = body('test-model-b', MANAGER_NEXT.messages);
+      assertEq(
+        decide(MANAGER_RETIRED, remodelled, at('manager-loop')).broken,
+        'manager-loop-rewrote-fixed',
+      );
+
+      const resystemed = body('test-model', [{ role: 'system', content: 'Other.' }, user('Round 1')]);
+      assertEq(
+        decide(MANAGER_RETIRED, resystemed, at('manager-loop')).broken,
+        'manager-loop-rewrote-fixed',
       );
     },
   },
 
   {
-    name: 'RELAY-PROJ a phase revision may not masquerade as an incumbency change',
+    name: 'MANAGER-LOOP a reusable step-0 entry establishes the seal then reseals',
     fn: () => {
-      const changedIncumbency = body(
-        'test-model',
-        [
-          SYSTEM,
-          user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-2\nphase=WorkOwned\n[/RelayContext]'),
-          user('Round 1'),
-        ],
+      assertEq(decide(null, MANAGER_NEXT, at('manager-loop')).held, true, 'initial delivery establishes the seal');
+      assertEq(
+        decide(MANAGER_NEXT, MANAGER_NEXT, at('manager-loop')).held,
+        true,
+        'an append-only retry on the same entry stays held',
       );
       assertEq(
-        decide(RELAY_CONTEXT_BEFORE_REVISION, changedIncumbency, at('relay-context-revision')).broken,
-        'relay-context-revision-rewrote-fixed',
-      );
-    },
-  },
-
-  {
-    name: 'RELAY-PROJ retirement context requires accepted suicide and removes the active incumbency',
-    fn: () => {
-      const before = body(
-        'test-model',
-        [
-          SYSTEM,
-          user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-1\nphase=RetirementCleanupBlocked\n[/RelayContext]'),
-          user('Round 1'),
-          assistant('review call and result'),
-        ],
-      );
-      assertEq(
-        decide(before, RELAY_RETIRED_CONTEXT, at('relay-retirement-context')).resealed,
-        'relay-retirement-context',
-      );
-
-      const noAcceptedSuicide = body('test-model', RELAY_RETIRED_CONTEXT.messages.slice(0, -1));
-      assertEq(
-        decide(before, noAcceptedSuicide, at('relay-retirement-context')).broken,
-        'relay-retirement-context-rewrote-fixed',
-      );
-    },
-  },
-
-  {
-    name: 'RELAY-PROJ a declared successor cut requires a new incumbency and the successor prompt',
-    fn: () => {
-      assertEq(
-        decide(RELAY_CONTEXT_BEFORE_REVISION, RELAY_SUCCESSOR_CUT, at('relay-successor-cut')).resealed,
-        'relay-successor-cut',
-      );
-      const missingPrompt = body('test-model', RELAY_SUCCESSOR_CUT.messages.slice(0, 2));
-      assertEq(
-        decide(RELAY_CONTEXT_BEFORE_REVISION, missingPrompt, at('relay-successor-cut')).broken,
-        'relay-successor-cut-rewrote-fixed',
-      );
-    },
-  },
-
-  {
-    name: 'RELAY-PROJ a successor cut may only retain an ordered subset of predecessor material',
-    fn: () => {
-      const insertedHistory = body(
-        'test-model',
-        [
-          SYSTEM,
-          user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-2\nphase=AuditPending\n[/RelayContext]'),
-          user('ARBITRARY PREDECESSOR-LIKE USER MESSAGE'),
-          user('# The previous Manager incumbency is retired. You are the new Manager for the same user Road.'),
-        ],
-      );
-      assertEq(
-        decide(RELAY_CONTEXT_BEFORE_REVISION, insertedHistory, at('relay-successor-cut')).broken,
-        'relay-successor-cut-rewrote-fixed',
-      );
-
-      const leakedRetirementResult = body(
-        'test-model',
-        [
-          SYSTEM,
-          user('[RelayContext]\nauthority_revision=rev-1\nincumbency_id=inc-2\nphase=AuditPending\n[/RelayContext]'),
-          {
-            role: 'tool',
-            tool_call_id: 'suicide-call',
-            content: 'retired = true\nquality_candidate_accepted = false',
-          },
-          user('# The previous Manager incumbency is retired. You are the new Manager for the same user Road.'),
-        ],
-      );
-      assertEq(
-        decide(RELAY_CONTEXT_BEFORE_REVISION, leakedRetirementResult, at('relay-successor-cut')).broken,
-        'relay-successor-cut-rewrote-fixed',
+        decide(MANAGER_NEXT, APPENDED, at('manager-loop')).held,
+        true,
+        'an append-only continuation stays held until the restart breaks it',
       );
     },
   },
@@ -432,6 +361,9 @@ export const coldBoundaryCases = [
       // Same reasoning as an empty `attempts` list: the author believes a cold
       // boundary is covered, and the scenario silently stopped exercising it. Treating
       // it as harmless is how a scenario decays into an assertion about nothing.
+      // `manager-loop` is absent here on purpose: a reusable step-0 entry
+      // legitimately mixes held retries with one breaking restart, so held is
+      // legal for it (see the case above) and never `boundary-not-reached`.
       for (const kind of ['epoch-switch', 'fallback-side']) {
         const decision = decide(FIRST, APPENDED, at(kind));
         assertEq(decision.broken, 'boundary-not-reached', `${kind} declared but seal held`);
@@ -511,20 +443,13 @@ export const coldBoundaryCases = [
       assertEq(validateBoundary(at('prefix-probe')).length, 0);
       assertEq(validateBoundary(at('frame-commit')).length, 0);
       assertEq(validateBoundary(at('request-kind-switch')).length, 0);
-      assertEq(validateBoundary(at('relay-context-open')).length, 0);
-      assertEq(validateBoundary(at('relay-context-revision')).length, 0);
-      assertEq(validateBoundary(at('relay-retirement-context')).length, 0);
-      assertEq(validateBoundary(at('relay-successor-cut')).length, 0);
+      assertEq(validateBoundary(at('manager-loop')).length, 0);
 
-      // Every rejected name below is a sniffed exemption from the old matcher or a
-      // capacity-driven switch CTX-001/CTX-002 forbid outright. `prefix-reset` is the
-      // old matcher's unvalidated exemption; `prefix-probe` differs by structurally
-      // verifying that the fixed parts survive.
-      for (const kind of ['epochCold', 'modelSideCold', 'context-overflow', 'compaction', 'prefix-reset']) {
-        const problems = validateBoundary({ ...at('epoch-switch'), kind });
-        assertEq(problems.length, 1, `'${kind}' must be rejected`);
-        assertTrue(problems[0].includes('unknown cold boundary kind'), problems[0]);
-      }
+      // An unlisted kind is rejected without naming ban-test-style examples:
+      // positive behavior above is the proof.
+      const problems = validateBoundary({ ...at('epoch-switch'), kind: 'not-a-boundary' });
+      assertEq(problems.length, 1, 'an unknown kind must be rejected');
+      assertTrue(problems[0].includes('unknown cold boundary kind'), problems[0]);
     },
   },
 

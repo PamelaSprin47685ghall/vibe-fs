@@ -7,8 +7,6 @@ type AuthorityRevision = private AuthorityRevision of string
 type AssessmentId = private AssessmentId of string
 type QualityCertificateId = private QualityCertificateId of string
 type RetirementId = private RetirementId of string
-type BatonId = private BatonId of string
-type ProjectionCutId = private ProjectionCutId of string
 
 module RoadId =
     let create value = RoadId value
@@ -38,24 +36,11 @@ module RetirementId =
     let create value = RetirementId value
     let value (RetirementId value) = value
 
-/// The single gate-kind vocabulary for the successor handoff prompt, shared by
+/// The single gate-kind vocabulary for the manager loop prompt, shared by
 /// the Change sender and the projection cut so the two never drift apart.
-module RelaySuccessorGate =
+module ManagerLoopGate =
     let gateKind (retirementId: RetirementId) =
-        "relay-successor:" + RetirementId.value retirementId
-
-module BatonId =
-    let create value = BatonId value
-    let value (BatonId value) = value
-
-module ProjectionCutId =
-    let create value = ProjectionCutId value
-    let value (ProjectionCutId value) = value
-
-[<RequireQualifiedAccess>]
-type BatonSource =
-    | ExistingWorld
-    | Retirement of RetirementId
+        "manager-loop:" + RetirementId.value retirementId
 
 [<RequireQualifiedAccess>]
 type ScoreDimension =
@@ -137,28 +122,19 @@ type QualityCertificate =
       Valid: bool
       InvalidationReason: string option }
 
-type BatonEnvelope =
-    { SchemaVersion: int
-      RoadId: string
-      FromIncumbencyId: string
-      AuthorityRevision: string
-      SnapshotId: string
-      OpenObligations: string list
-      EvidenceRefs: string list }
+[<RequireQualifiedAccess>]
+type RetirementOutcome =
+    | Continue
+    | Accepted of QualityCertificateId
 
 type ProjectionCut =
-    { RetiredIncumbencyId: string
-      ThroughProviderRunId: string
-      ThroughToolCallId: string
-      StaleProviderRunIds: string list }
+    { ProviderRunId: string
+      ToolCallId: string }
 
 type RetirementSummary =
     { Id: RetirementId
       IncumbencyId: IncumbencyId
       SnapshotId: WorkspaceSnapshotId
-      BatonId: BatonId
-      Baton: BatonEnvelope
-      ProjectionCutId: ProjectionCutId
+      AuthorityRevision: AuthorityRevision
       ProjectionCut: ProjectionCut
-      SuccessorRequested: bool
-      QualityCandidateAccepted: bool }
+      Outcome: RetirementOutcome }

@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
+open Wanxiangshu.Mission.Relay.OpenCode
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Replica
 
@@ -17,12 +18,12 @@ module PluginTransforms =
         { BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
           BindSessionStartedAt: string option -> Task<DateTimeOffset option>
           ApplyStrengthReplay: string option -> obj -> Task<StrengthReplayPlan list>
-          ApplyRelayProjection: string option -> obj -> Task<unit>
+          ApplyRelayProjection: string option -> obj -> Task<RelayProjectionDisposition>
           CaptureXTraceMessages: string option -> obj -> Task<TraceTransformCapture>
           CommitStrengthTrace: string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>
           RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
-          ApplyCompanion: string option -> obj -> obj -> Task<unit>
-          ApplyXWire: obj -> Task<PrefixPresentationHorizon>
+          ApplyCompanion: RelayProjectionDisposition -> string option -> obj -> obj -> Task<unit>
+          ApplyXWire: RelayProjectionDisposition -> obj -> Task<PrefixPresentationHorizon>
           FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
           ApplyStrengthSpeculate: obj -> Task<unit>

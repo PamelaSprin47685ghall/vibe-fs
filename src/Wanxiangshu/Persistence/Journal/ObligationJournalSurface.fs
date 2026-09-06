@@ -81,11 +81,7 @@ module ObligationJournalSurface =
 
             let events =
                 [ Wanxiangshu.Mission.Relay.RelayEvent.RoadOpened(roadId, authRev, physUser)
-                  Wanxiangshu.Mission.Relay.RelayEvent.IncumbencyOpened(
-                      incId,
-                      snapId,
-                      Wanxiangshu.Mission.Relay.BatonSource.ExistingWorld
-                  ) ]
+                  Wanxiangshu.Mission.Relay.RelayEvent.IncumbencyOpened(incId, snapId) ]
 
             match Wanxiangshu.Mission.Relay.RelayTransaction.create events with
             | Error err -> return box {| ok = false; error = err |}
@@ -132,12 +128,15 @@ module ObligationJournalSurface =
 
             let events =
                 [ Wanxiangshu.Mission.Relay.RelayEvent.RoadOpened(roadId, authRev, physUser)
-                  Wanxiangshu.Mission.Relay.RelayEvent.IncumbencyOpened(
+                  Wanxiangshu.Mission.Relay.RelayEvent.IncumbencyOpened(incId, snapId)
+                  Wanxiangshu.Mission.Relay.RelayEvent.AssessmentCommitted(
+                      assessId,
                       incId,
+                      binding,
                       snapId,
-                      Wanxiangshu.Mission.Relay.BatonSource.ExistingWorld
-                  )
-                  Wanxiangshu.Mission.Relay.RelayEvent.AssessmentCommitted(assessId, binding, snapId, authRev, scores) ]
+                      authRev,
+                      scores
+                  ) ]
 
             match Wanxiangshu.Mission.Relay.RelayTransaction.create events with
             | Error err -> return box {| ok = false; error = err |}
@@ -166,38 +165,55 @@ module ObligationJournalSurface =
             task {
                 let roadId = Wanxiangshu.Mission.Relay.RoadId.create sessionId
                 let incId = Wanxiangshu.Mission.Relay.IncumbencyId.create sessionId
-                let retId = Wanxiangshu.Mission.Relay.RetirementId.create ("ret-" + sessionId)
                 let snapId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.create "snapshot-root"
-                let batonId = Wanxiangshu.Mission.Relay.BatonId.create ("baton-" + sessionId)
-                let cutId = Wanxiangshu.Mission.Relay.ProjectionCutId.create ("cut-" + sessionId)
+                let authRev = Wanxiangshu.Mission.Relay.AuthorityRevision.create "rev-1"
 
-                let envelope: Wanxiangshu.Mission.Relay.BatonEnvelope =
-                    { SchemaVersion = 1
-                      RoadId = Wanxiangshu.Mission.Relay.RoadId.value roadId
-                      FromIncumbencyId = Wanxiangshu.Mission.Relay.IncumbencyId.value incId
-                      AuthorityRevision = "rev-1"
-                      SnapshotId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.value snapId
-                      OpenObligations = []
-                      EvidenceRefs = [] }
+                let assessId =
+                    Wanxiangshu.Mission.Relay.AssessmentId.create ("assess-terminal-" + sessionId)
+
+                let retId = Wanxiangshu.Mission.Relay.RetirementId.create ("ret-" + sessionId)
+
+                let binding: Wanxiangshu.Mission.Relay.AssessmentBinding =
+                    { PhysicalUserMessageId = "user-root"
+                      ProviderRunId = "run-terminal"
+                      ToolCallId = "tool-terminal"
+                      NarrativeDigest = "digest-narrative"
+                      PayloadDigest = "digest-payload"
+                      RootRequestDigest = "digest-root"
+                      RequirementSetDigest = "digest-req"
+                      EvidenceFrontierDigest = "digest-evidence" }
+
+                let scores =
+                    Wanxiangshu.Mission.Relay.ScoreVector.tryCreate [ 10; 10; 10; 10; 10; 10; 10; 10 ]
+                    |> Result.defaultWith (fun _ -> failwith "scores")
+
+                let certificateId =
+                    Wanxiangshu.Mission.Relay.QualityCertificateId.create (
+                        "certificate:" + Wanxiangshu.Mission.Relay.AssessmentId.value assessId
+                    )
 
                 let cut: Wanxiangshu.Mission.Relay.ProjectionCut =
-                    { RetiredIncumbencyId = Wanxiangshu.Mission.Relay.IncumbencyId.value incId
-                      ThroughProviderRunId = "run-terminal"
-                      ThroughToolCallId = "tool-terminal"
-                      StaleProviderRunIds = [] }
+                    { ProviderRunId = "run-terminal"
+                      ToolCallId = "tool-terminal" }
 
                 let summary: Wanxiangshu.Mission.Relay.RetirementSummary =
                     { Id = retId
                       IncumbencyId = incId
                       SnapshotId = snapId
-                      BatonId = batonId
-                      Baton = envelope
-                      ProjectionCutId = cutId
+                      AuthorityRevision = authRev
                       ProjectionCut = cut
-                      SuccessorRequested = false
-                      QualityCandidateAccepted = true }
+                      Outcome = Wanxiangshu.Mission.Relay.RetirementOutcome.Accepted certificateId }
 
-                let events = [ Wanxiangshu.Mission.Relay.RelayEvent.RetirementCommitted summary ]
+                let events =
+                    [ Wanxiangshu.Mission.Relay.RelayEvent.AssessmentCommitted(
+                          assessId,
+                          incId,
+                          binding,
+                          snapId,
+                          authRev,
+                          scores
+                      )
+                      Wanxiangshu.Mission.Relay.RelayEvent.RetirementCommitted summary ]
 
                 match Wanxiangshu.Mission.Relay.RelayTransaction.create events with
                 | Error err -> return box {| ok = false; error = err |}

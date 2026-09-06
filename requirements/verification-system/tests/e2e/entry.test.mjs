@@ -40,8 +40,8 @@ import {
   G2_INSPECTOR_CANARY_PROMPT,
   G6_CANONICAL_A,
   G6_CANONICAL_Q,
-  HUMANROOT_SUCCESSION_CANARY_PROMPT,
-  assertHumanRootManagerSuccession,
+  HUMANROOT_MANAGER_LOOP_CANARY_PROMPT,
+  assertHumanRootManagerLoop,
   retireCompanionForDeletion,
   assertG2InspectorBatchCoalescing,
   assertG2InspectorPrefixLaw,
@@ -66,14 +66,14 @@ assert.equal(typeof ADVERSITY_ORACLES.assertFallbackContinuation, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertJoinWakePath, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertInterruptedJoin, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertAssessmentAssignsWork, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertRetirementNeedsSuccessor, 'function');
+assert.equal(typeof ADVERSITY_ORACLES.assertRetirementNeedsIteration, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertDurableRecovery, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertPublishConflict, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertSubagentReuse, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertSuccessfulReconciliation, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertRetirementCommitted, 'function');
 assert.equal(typeof CUSTOMS.holdChildC1UntilLabor, 'function');
-assert.equal(typeof CUSTOMS.bindRelaySuccessorSequence, 'function');
+assert.equal(typeof CUSTOMS.bindManagerLoopSequence, 'function');
 assert.equal(typeof CUSTOMS.oracleLongStroke, 'function');
 assert.ok(
   ADVERSITY_CHECKLIST.every((row) => row.covered === true && row.oracle && row.injection),
@@ -118,6 +118,7 @@ const waitCaptured = async (scenario) => {
 };
 
 const preFlowCanaries = async (scenario) => {
+  await CUSTOMS.bindManagerLoopSequence(scenario);
   await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'coder');
 
   assert.equal(
@@ -173,11 +174,13 @@ const preFlowCanaries = async (scenario) => {
   await waitCaptured(scenario);
   assertG6BookkeeperFinalize(scenario);
 
-  // HumanRoot manager succession canary (sole serve, before orchestrator main flow).
-  // Direct HumanRoot Manager — the main spine uses AgentOwnerRoot and cannot expose
-  // the erroneous HumanRoot closure. First review one below 10 then suicide;
-  // successor must arrive as a physically observed provider request (not merely
-  // SuccessorActivated) with NEW incumbency + AuditPending and the same authority.
+  // HumanRoot manager loop canary (sole serve, before orchestrator main flow).
+  // Direct HumanRoot Manager — the main spine uses AgentOwnerRoot. First iteration
+  // reviews one dimension low then retires with Outcome Continue; the next
+  // iteration must arrive as another ordinary IncumbencyOpened event plus a
+  // physically observed provider request (not merely the fact) on the same
+  // SessionId/LogicalRun with the same typed authority user messages, then reviews
+  // 8×10 and retires with Outcome Accepted.
   const humanrootCreated = await scenario.client.createSession({ agent: 'manager' });
   const humanrootSessionId = getSessionId(humanrootCreated);
   assert.ok(humanrootSessionId, `humanroot-manager session creation failed: ${JSON.stringify(humanrootCreated)}`);
@@ -186,16 +189,18 @@ const preFlowCanaries = async (scenario) => {
 
   const humanrootPrompt = await scenario.client.request('POST', `/session/${humanrootSessionId}/prompt_async`, {
     body: {
-      parts: [{ type: 'text', text: HUMANROOT_SUCCESSION_CANARY_PROMPT }],
+      parts: [{ type: 'text', text: HUMANROOT_MANAGER_LOOP_CANARY_PROMPT }],
       agent: 'manager',
     },
   });
   assert.ok(humanrootPrompt.ok, `humanroot-manager prompt failed: ${JSON.stringify(humanrootPrompt.data)}`);
 
-  for (const id of ['humanroot-manager.0', 'humanroot-manager.1', 'humanroot-successor.0', 'humanroot-successor.1']) {
-    await scenario.provider.waitForExpectation(id, WAIT_FACT_WINDOW_MS);
+  // ONE reusable humanroot-loop family: each step delivered twice (initial +
+  // next iteration). Barrier the second delivery, not distinct trigger ids.
+  for (const id of ['humanroot-loop.0', 'humanroot-loop.1']) {
+    await scenario.provider.waitForExpectationAttempt(id, 2, WAIT_FACT_WINDOW_MS);
   }
-  await assertHumanRootManagerSuccession(scenario, humanrootSessionId);
+  await assertHumanRootManagerLoop(scenario, humanrootSessionId);
 
   const linkedBlogger = factPayloads(scenario.host.workDir, 'CompanionBloggerLinked')
     .filter((payload) => {

@@ -9,11 +9,10 @@ module WorkspaceSnapshot =
     let private nulEntries (text: string) =
         text.Split([| '\u0000' |], StringSplitOptions.RemoveEmptyEntries)
 
-    let private headTree directory =
-        try
-            GitSubject.revParseHeadTree directory
-        with _ ->
-            "NO_HEAD_TREE"
+    let private headState directory =
+        match GitSubject.tryRevParseHeadTree directory with
+        | Some headTree -> headTree, GitSubject.diffHeadBinary directory
+        | None -> "NO_HEAD_TREE", "NO_HEAD_DIFF"
 
     let private untrackedEntries directory =
         GitSubject.lsFilesUntrackedZ directory
@@ -30,12 +29,14 @@ module WorkspaceSnapshot =
     /// - ls-files --stage records index stage 0/1/2/3 identities.
     /// - untracked files are represented by exact git blob hashes, not decoded text.
     let canonical directory =
+        let headTree, headDiff = headState directory
+
         String.concat
             "\u001d"
-            [ "head=" + headTree directory
+            [ "head=" + headTree
               "status=" + GitSubject.statusPorcelainV2Z directory
               "index=" + GitSubject.lsFilesStageZ directory
-              "diff=" + GitSubject.diffHeadBinary directory
+              "diff=" + headDiff
               "untracked=" + untrackedEntries directory ]
 
     let capture directory =

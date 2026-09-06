@@ -104,7 +104,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_carries_resolved_participant_i
   })
 })
 
-test('WHAT[INTERACTION-AUTHORITY-003] IA_003_closed_root_replacement_clears_run_scoped_state', () => {
+test('WHAT[INTERACTION-AUTHORITY-018] IA_018_exact_closure_releases_run_scoped_authority_before_root_reuse', () => {
   const first = rootFor()
   let state = register(first)
   const claim = continuation('pk_1', first)

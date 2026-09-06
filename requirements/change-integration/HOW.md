@@ -4,10 +4,10 @@
 
 ### Relay + deterministic artifact admission 发布循环
 
-1. **等待 Relay outcome**：`OrchestratorProgram` 只消费 `IncumbencyRetired` / `QualityCandidateAccepted` / exceptional terminal。无有效证书的 retirement 只请求普通 successor。
+1. **等待 Relay outcome**：`OrchestratorProgram` 只消费 `ManagerLoopSignal.Candidate` / `ManagerLoopSignal.Continue` / `ManagerLoopSignal.ExceptionalTerminal`。`observeRelayProgram` 的 signal 时间线记为 `await:Candidate` / `await:Continue` / `await:ExceptionalTerminal`。无有效证书的 retirement 即 `Continue` 信号，只以无参数 `ContinueLoop` 继续沿同一 `ManagerJob` 循环。
 2. **确定性 artifact admission**：有效证书先与当前 `WorkspaceSnapshotId` 对齐，再检查 unmerged entries、candidate 与 target head。任何 binding change 都先 `InvalidateCertificate`。
-3. **rebase / conflict 都回普通 successor**：rebase 成功记录 `RebasedCandidateReady` 后请求 `PostRebaseIndependentAssessment`；冲突记录 `ConflictDetected` 后请求 `RebaseConflict` / `ArtifactAdmissionUnmerged` successor。没有 ResumeManager/Reviewer 分支。
-4. **短门禁 CAS 发布**：只有已经在当前 target head 上有新证书的 rebased candidate 才进入 `IntegrationGate`。门内重读 target、写 `PublishClaimed` 并 ff-only；CAS miss 释放门禁后 invalidation→rebase→successor。
+3. **rebase / conflict 都回同一循环的下一 loop continuation**：rebase 成功记录 `RebasedCandidateReady` 后以无参数 `ContinueLoop` 继续，`continuations` 按调用顺序记为确定性 `surface-loop-N`（首个 continuation 即 `surface-loop-1`），时间线记为 `continue:surface-loop-N`；冲突记录 `ConflictDetected` 后同样以无参数 `ContinueLoop` 继续。原因（`InitialRebaseRequired` / `TargetAdvanced` / `PublishCasMissed` / `WorkspaceChangedAfterAssessment` / `ArtifactAdmissionUnmerged`）只保留在 `invalidations` 侧的 durable 事实中，不作为 continuation 参数。没有 ResumeManager/Reviewer 分支。
+4. **短门禁 CAS 发布**：只有已经在当前 target head 上有新证书的 rebased candidate 才进入 `IntegrationGate`。门内重读 target、写 `PublishClaimed` 并 ff-only；CAS miss 释放门禁后按 `invalidate:PublishCasMissed` → `git:rebase` → `continue:surface-loop-N` 顺序继续。
 
 ### 门禁与工作树资源管理
 
@@ -22,13 +22,13 @@
 | CHGINT-002 | `requirements/change-integration/tests/git-operations.test.mjs::WHAT[CHGINT-002] GIT_is_dirty_true_only_on_nonempty_porcelain` |
 | CHGINT-003 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-003] ORCH_007_each_durable_fact_has_one_projection_slot` |
 | CHGINT-004 | `requirements/change-integration/tests/integration-gate.test.mjs::WHAT[CHGINT-004] GATE_acquire_and_release_round_trips` |
-| CHGINT-005 | `requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-005] rebase conflict records machine fact and requests ordinary successor`；`requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-005] artifact conflict requests ordinary successor outside the gate` |
+| CHGINT-005 | `requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-005] rebase conflict records machine fact and continues the loop outside the gate`；`requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-005] artifact conflict continues the loop outside the gate` |
 | CHGINT-006 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-006] ORCH_007_projection_keeps_independent_facts_instead_of_latest_stage` |
 | CHGINT-007 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-007] ORCH_007_the_three_publish_claim_branches_are_evaluated_in_the_clause_order` |
 | CHGINT-008 | `requirements/change-integration/tests/git-operations.test.mjs::WHAT[CHGINT-008] GIT_ff_merge_happy_path_advances_to_candidate` |
-| CHGINT-009 | `requirements/change-integration/tests/host.test.mjs::WHAT[CHGINT-009] same-road charge advances Relay authority instead of resuming an old Manager`；`requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-009] ORCH_006_the_worktree_is_located_by_identity_and_the_path_is_only_diagnostic` |
+| CHGINT-009 | `requirements/change-integration/tests/host.test.mjs::WHAT[CHGINT-009] manager loop keeps the durable job worktree`；`requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-009] ORCH_006_the_worktree_is_located_by_identity_and_the_path_is_only_diagnostic` |
 | CHGINT-010 | `requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-010] rebase work holds the gate only for the ff mutation`；`requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-010] conflict resolution never acquires the publish gate` |
 | CHGINT-011 | `requirements/change-integration/tests/host.test.mjs::WHAT[CHGINT-011] HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result` |
 | CHGINT-012 | `requirements/change-integration/tests/runtime.test.mjs::WHAT[CHGINT-012] nonterminal durable evidence preserves the Road worktree across recovery` |
-| CHGINT-013 | `requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-013] CAS miss invalidates certificate rebases and requests successor after releasing the gate`；`requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs::WHAT[CHGINT-013] THEOREM_stale_target_invalidates_the_rebased_binding` |
+| CHGINT-013 | `requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-013] CAS miss invalidates certificate rebases and continues the loop after releasing the gate`；`requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs::WHAT[CHGINT-013] THEOREM_stale_target_invalidates_the_rebased_binding` |
 | CHGINT-014 | `requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-014] stale certificate never reaches publish gate`；`requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-014] Git conflict facts override model-perfect publication` |

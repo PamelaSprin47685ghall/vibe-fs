@@ -2,12 +2,8 @@ namespace Wanxiangshu.Mission.Relay
 
 open System
 open Fable.Core.JsInterop
-open Wanxiangshu.Host
 
 module ProjectionSurface =
-    let maxRisks = 16
-    let maxEvidenceRefs = 24
-
     let private property (value: obj) (name: string) : obj =
         if isNull value then null else value?(name)
 
@@ -15,19 +11,7 @@ module ProjectionSurface =
         let candidate = property value name
         if isNull candidate then "" else unbox<string> candidate
 
-    let private optionalStringProperty value name =
-        let candidate = property value name
-
-        if isNull candidate then
-            None
-        else
-            Some(unbox<string> candidate)
-
-    let private intProperty value name =
-        let candidate = property value name
-        if isNull candidate then 0 else unbox<int> candidate
-
-    let private stringArrayProperty value name =
+    let private arrayProperty value name =
         let candidate = property value name
 
         let isArray: bool =
@@ -36,70 +20,141 @@ module ProjectionSurface =
             else
                 emitJsExpr candidate "Array.isArray($0)"
 
-        if isArray then unbox<string array> candidate else [||]
+        if isArray then unbox<obj array> candidate else [||]
 
-    let private nullableString value =
-        match value with
-        | None -> null
-        | Some text -> box text
+    let private messageId (message: obj) =
+        let info = property message "info"
+        let fromInfo = if isNull info then "" else stringProperty info "id"
 
-    let baton (input: obj) =
-        let risks = stringArrayProperty input "risks" |> Array.truncate maxRisks
+        if not (String.IsNullOrEmpty fromInfo) then
+            fromInfo
+        else
+            stringProperty message "id"
 
-        let evidenceRefs =
-            stringArrayProperty input "evidenceRefs" |> Array.truncate maxEvidenceRefs
+    let private messageRun (message: obj) = stringProperty message "run"
 
-        let fromIncumbency = optionalStringProperty input "fromIncumbency" |> nullableString
+    let private messageRole (message: obj) =
+        let info = property message "info"
+        let fromInfo = if isNull info then "" else stringProperty info "role"
+        let direct = stringProperty message "role"
 
-        let payload =
-            createObj
-                [ "schemaVersion" ==> 1
-                  "roadId" ==> stringProperty input "roadId"
-                  "fromIncumbency" ==> fromIncumbency
-                  "source" ==> stringProperty input "source"
-                  "authorityRevision" ==> stringProperty input "authorityRevision"
-                  "snapshotId" ==> stringProperty input "snapshotId"
-                  "risks" ==> risks
-                  "evidenceRefs" ==> evidenceRefs ]
+        let role =
+            if not (String.IsNullOrEmpty fromInfo) then
+                fromInfo
+            else
+                direct
 
-        let canonical: string = emitJsExpr payload "JSON.stringify($0)"
+        role.ToLowerInvariant()
 
-        box
-            {| source = stringProperty input "source"
-               fromIncumbency = fromIncumbency
-               risks = risks
-               evidenceRefs = evidenceRefs
-               canonical = canonical
-               digest = HostDigest.sha256Hex canonical |}
+    /// The wake turn is the first non-authority role=user message after the
+    /// retirement tool call, mirroring production.
+    let private isWakeCandidate (message: obj) = messageRole message = "user"
 
+    let private partCallIds (part: obj) =
+        [ stringProperty part "callID"
+          stringProperty part "callId"
+          stringProperty part "toolCallId"
+          stringProperty part "id" ]
+        |> List.filter (fun text -> not (String.IsNullOrEmpty text))
+
+    let private messageContainsToolCall (message: obj) (toolCallId: string) =
+        if String.IsNullOrEmpty toolCallId then
+            false
+        else
+            let parts = arrayProperty message "parts"
+
+            if parts.Length > 0 then
+                parts |> Array.exists (fun part -> partCallIds part |> List.contains toolCallId)
+            else
+                messageId message = toolCallId || messageRun message = toolCallId
+
+    /// Audit history is never rewritten: the provider view is a projection of
+    /// the same physical messages. After a Continue retirement with the next
+    /// iteration active, the provider keeps exactly the typed authority
+    /// messages plus the current-iteration tail. Every prior-iteration message,
+    /// every retired-run part (including late arrivals), the retirement tool
+    /// call itself, and the first non-authority user continuation used only to
+    /// wake the loop are excluded. The retired epoch ends at the retirement
+    /// tool call; both exact cut positions are required, otherwise only typed
+    /// authority messages pass.
     let applyCut
         (messages: obj array)
-        (cutSequence: int)
-        (staleRunIds: string array)
+        (providerRunId: string)
+        (toolCallId: string)
+        (retiredRunIds: string array)
         (authorityMessageIds: string array)
         =
-        let stale = Set.ofArray staleRunIds
         let authority = Set.ofArray authorityMessageIds
 
-        let provider =
+        let retired =
+            let baseSet = Set.ofArray retiredRunIds
+
+            if String.IsNullOrEmpty providerRunId then
+                baseSet
+            else
+                Set.add providerRunId baseSet
+
+        let cutIndex =
+            if String.IsNullOrEmpty providerRunId then
+                None
+            else
+                messages
+                |> Array.tryFindIndex (fun message ->
+                    let id = messageId message
+                    let run = messageRun message
+
+                    (not (String.IsNullOrEmpty id) && id = providerRunId)
+                    || (not (String.IsNullOrEmpty run) && run = providerRunId))
+
+        let toolIndex =
             messages
-            |> Array.filter (fun message ->
-                let id = stringProperty message "id"
-                let sequence = intProperty message "sequence"
-                let run = stringProperty message "run"
-                let authorityMessage = Set.contains id authority
-                let predecessorEpoch = sequence <= cutSequence && not authorityMessage
-                let staleRun = not (String.IsNullOrEmpty run) && Set.contains run stale
-                authorityMessage || (not predecessorEpoch && not staleRun))
+            |> Array.tryFindIndex (fun message -> messageContainsToolCall message toolCallId)
+
+        let provider =
+            match cutIndex, toolIndex with
+            | Some _, Some tool ->
+                let wakeIndex =
+                    messages
+                    |> Array.mapi (fun index message -> index, message)
+                    |> Array.tryFind (fun (index, message) ->
+                        index > tool
+                        && isWakeCandidate message
+                        && not (Set.contains (messageId message) authority))
+                    |> Option.map fst
+
+                let inWakeTail index =
+                    match wakeIndex with
+                    | None -> index > tool
+                    | Some wake -> index > tool && index <= wake
+
+                messages
+                |> Array.mapi (fun index message -> index, message)
+                |> Array.choose (fun (index, message) ->
+                    let id = messageId message
+                    let run = messageRun message
+                    let keepAuthority = Set.contains id authority
+
+                    let retiredEpoch = index <= tool && not keepAuthority
+
+                    let retiredRun =
+                        (not (String.IsNullOrEmpty id) && Set.contains id retired)
+                        || (not (String.IsNullOrEmpty run) && Set.contains run retired)
+
+                    let retirementTool = messageContainsToolCall message toolCallId
+                    let wakeTail = inWakeTail index
+
+                    if keepAuthority then
+                        Some message
+                    elif retiredEpoch || retiredRun || retirementTool || (wakeTail && not keepAuthority) then
+                        None
+                    else
+                        Some message)
+            | _ ->
+                // Fail closed: without both exact cut positions only typed
+                // authority messages may reach the provider.
+                messages
+                |> Array.filter (fun message -> Set.contains (messageId message) authority)
 
         box
             {| audit = messages
                provider = provider |}
-
-    let successorContext (rootRequest: string) (authorityRevision: string) (snapshotId: string) (baton: string) =
-        box
-            {| rootRequest = rootRequest
-               authorityRevision = authorityRevision
-               snapshotId = snapshotId
-               baton = baton
-               prompt = "此前已有其他同事负责用户的需求。现在由你接手，先独立评审当前完成情况和质量。" |}

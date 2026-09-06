@@ -4,13 +4,7 @@ module Surface =
     val empty: unit -> RelayState
 
     val openIncumbency:
-        state: RelayState ->
-        road: string ->
-        incumbent: string ->
-        snapshot: string ->
-        authority: string ->
-        sourceName: string ->
-            obj
+        state: RelayState -> road: string -> incumbent: string -> snapshot: string -> authority: string -> obj
 
     val assess:
         state: RelayState ->
@@ -41,28 +35,30 @@ module Surface =
         snapshot: string ->
             obj
 
-    val retire:
+    val blockCleanup: state: RelayState -> road: string -> incumbent: string -> blockerDigest: string -> obj
+
+    val retireContinue:
         state: RelayState ->
         road: string ->
         incumbent: string ->
         retirement: string ->
+        providerRun: string ->
+        toolCall: string ->
         snapshot: string ->
-        baton: string ->
-        cut: string ->
-        qualityCandidateAccepted: bool ->
             obj
 
-    val activateSuccessor:
+    val retireAccepted:
         state: RelayState ->
         road: string ->
-        predecessor: string ->
         incumbent: string ->
+        retirement: string ->
+        providerRun: string ->
+        toolCall: string ->
+        certificateId: string ->
         snapshot: string ->
-        authority: string ->
             obj
 
     val view: state: RelayState -> road: string -> obj
-    val obligations: state: RelayState -> road: string -> string array
     val authority: state: RelayState -> road: string -> obj
     val certificate: state: RelayState -> road: string -> obj
     val retirement: state: RelayState -> road: string -> obj

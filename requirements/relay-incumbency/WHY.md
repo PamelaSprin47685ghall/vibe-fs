@@ -1,7 +1,7 @@
 # relay-incumbency — WHY
 
-旧 Manager/Reviewer 双角色把质量判断、实现责任、离场和恢复拆成互相回调的状态机：Reviewer 只能挑错，旧 Manager 被复活修复，Finality 再用第二轮判断阻塞退出。结果是逻辑身份与物理 session 混淆，崩溃恢复必须猜“该叫谁回来”，同一质量事实被多个 owner 解释。
+一条用户道路是一段需要持续推进的真实工作：需求会演化，工作区会变化，质量判断必须反复接受独立检验。把这段工作交给来来去去的物理 session 去解释，崩溃恢复就只能猜“该叫谁回来”，同一质量事实也会被多个身份各自解读一次。
 
-Relay 把一条用户道路上的生产身份收敛成唯一当前任 Manager。每任从只读 audit 开始，做一次独立 assessment；发现问题的人原位接责，离场只受真实资源 closure 约束。退役事实不可逆，后续变化只创建普通下一任，不复活前任。
+Relay 把一条道路上的生产身份收敛成一次只存在一个的当前迭代。每一次迭代都从相同的权威起点出发：当前的用户需求原文与当前的工作区快照。迭代之间不传递私有上下文，不复活前任，不为“第一任”或“后继”设立不同的状态机。每一任都做一次独立的 assessment；发现问题的人原位接责，确认无问题的工作以证书收尾，离场只受真实资源 closure 约束。
 
-Road 的需求本身也会继续演化。追加要求不能只是给当前物理 session 多发一句 prompt：那样 durable Relay 仍认为旧需求有效，证书和后续 projection 也无法知道 authority 已改变。追加要求必须推进 Road 的 `AuthorityRevision`；若已有 active incumbent，还要把新 revision 与新的 workspace snapshot 一起绑定到该任，保留精确 authority message 作为后续接力可见的权威历史。
+Road 的需求本身也会继续演化。追加要求不能只是给当前物理 session 多发一句 prompt：那样 durable 状态仍认为旧需求有效，证书与后续 projection 也无法知道 authority 已改变。追加要求必须推进 Road 的 `AuthorityRevision`；若已有 active 迭代，还要把新 revision 与新的 workspace snapshot 一起绑定到该迭代，保留精确 authority message 作为后续迭代可见的权威历史。

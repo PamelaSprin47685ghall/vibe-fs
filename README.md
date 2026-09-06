@@ -111,7 +111,7 @@ Distiller、Blogger 等由编排路径调用，不作为单独“安装角色”
 | 角色 | 典型工具面 | 说明 |
 |------|------------|------|
 | Orchestrator | `fork-manager`, `join`, `horizon` | 顶层编排 |
-| Manager | `fork-manager`, `join`, `horizon`, `todowrite`, `review`, `suicide`, `fission` | 接力评审、任务分解与责任推进 |
+| Manager | `fork-manager`, `join`, `horizon`, `todowrite`, `review`, `suicide`, `fission` | 独立评估、任务分解与责任推进；单次可见任务为评估、按指派修复、退出，循环 Continue/Accepted 裁决由系统执行 |
 | Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspect`, `fetch`, `fission` | 源码修改 |
 | Inspector | `read`, `glob`, `grep`, `query-shell`, `fetch`, `fission` | 只读调查 |
 | DevOps | `fork-pty`, `executor`, `inspect`, `behavior` 等 | 进程与环境 |

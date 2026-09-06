@@ -9,10 +9,10 @@
 ## 核心不变量
 
 1. **质量与机器准入分权**：Relay `QualityCertificate` 只证明某任在精确 snapshot/authority 上给出独立满分；Git 冲突、rebase、target head 与 ff-only CAS 继续由 Change 机器事实裁决，模型满分不能越过机器准入。
-2. **发布生命周期完整性**：任何 rebase、target move、CAS miss、workspace mutation 都会改变证书绑定域，必须显式失效旧 certificate，并经过普通 successor 的新独立 assessment 后才可再次发布。
+2. **发布生命周期完整性**：任何 rebase、target move、CAS miss、workspace mutation 都会改变证书绑定域，必须显式失效旧 certificate，并以无参数 `ContinueLoop` 在同一 `ManagerJob`/worktree 上开启另一轮普通独立 assessment 后才可再次发布。失效原因只记录在 durable invalidation 事实中，不进入 `ContinueLoop` 参数。
 3. **唯一短临界区（Integration Gate）**：全局门禁只覆盖共享 ref 的最终重读与 ff-only CAS，严格禁止在 incumbent 工作、assessment、rebase 或冲突修复期间持有。
 4. **干净工作区准入（Clean Gate）**：编排器受理请求前工作区必须处于 clean 状态，严禁隐式 stash 或猜测用户意图。
-5. **Road/worktree 连续，incumbent 可轮换**：冲突或 binding change 保留同一 `ManagerJobId` 与 worktree，但旧 incumbent 绝不被 Resume；修复责任通过普通 Relay successor 接棒。
+5. **Road/worktree 连续，incumbent 可轮换**：冲突或 binding change 保留同一 `ManagerJobId` 与 worktree，但任何 retired iteration 绝不被 Resume；修复责任由同一 `ManagerJob`/worktree 上的下一轮普通独立 loop incumbency 承担。
 6. **基于事实的重放恢复**：崩溃恢复仅依赖不可变持久事实、Relay projection 与目标分支当前现实，严禁文件系统猜测和隐藏程序计数器。
 
 ## 破坏后果

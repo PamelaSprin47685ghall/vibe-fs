@@ -116,7 +116,13 @@ module PluginHost =
         let eventPort = hostEventPort :> IEventObservationPort
 
         let sessionPort =
-            InjectedSessionPort(portOpt, eventPort, ?familyParent = familyParent, ?isLifecycleTerminated = isLifecycleTerminated) :> ISessionHostPort
+            InjectedSessionPort(
+                portOpt,
+                eventPort,
+                ?familyParent = familyParent,
+                ?isLifecycleTerminated = isLifecycleTerminated
+            )
+            :> ISessionHostPort
 
         let snapshotPort = SessionSnapshotPort.create input
         Ok(eventPort, sessionPort, snapshotPort, terminalKey, Some hostEventPort)

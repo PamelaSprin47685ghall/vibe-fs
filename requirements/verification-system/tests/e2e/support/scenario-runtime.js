@@ -189,14 +189,14 @@ export class ScenarioRuntime {
   /**
    * Declarations that never admitted a break.
    *
-   * `prefix-probe` declarations permit but do not require every delivery to break
-   * (probe and ordinary slots alternate), so the "declared but never fired" check
-   * cannot live in `sealDecision` for them — it lives here, at scenario end.
+   * `prefix-probe` and reusable `manager-loop` declarations permit append-only
+   * deliveries, so the "declared but never fired" check cannot live in
+   * `sealDecision` for them — it lives here, at scenario end.
    */
   unfiredBoundaries() {
     return (this.scenario.boundaries ?? []).filter(
       (boundary) =>
-        boundary.kind === 'prefix-probe'
+        (boundary.kind === 'prefix-probe' || boundary.kind === 'manager-loop')
         && boundary.optional !== true
         && !this.firedBoundaries.has(boundary.entryId),
     );

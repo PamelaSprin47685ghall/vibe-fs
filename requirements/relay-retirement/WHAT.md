@@ -14,20 +14,20 @@ suicide 只检查当前 IncumbencyId 直接或递归拥有的 live child、backg
 
 ## RETIRE-004: retirement 必须 freeze-before-check
 
-admission 先冻结，再读取 exact recursive ownership projection。冻结前已 accepted 的资源必须阻塞；冻结后的创建因 stale fence 被拒绝。freeze fence 绑定精确 `IncumbencyId`，不得只绑定可复用的物理 `SessionId`；前任退休后 successor 即使复用同一 SessionId，也不得继承前任 fence。若有 blocker，只恢复当前任 cleanup capability，不恢复新工作 admission。
+admission 先冻结，再读取 exact recursive ownership projection。冻结前已 accepted 的资源必须阻塞；冻结后的创建因 stale fence 被拒绝。freeze fence 绑定精确 `IncumbencyId`，不得只绑定可复用的物理 `SessionId`；前任退休后下一迭代即使复用同一 SessionId，也不得继承前任 fence。若有 blocker，只恢复当前迭代 cleanup capability，不恢复新工作 admission。
 
-## RETIRE-005: normal stop nudge 按 causal frontier 去重且无固定次数上限
+## RETIRE-005: 已删除——normal-stop nudge 归属 interaction-authority
 
-每个新的正常 assistant terminal frontier 在仍 active 且没有 accepted suicide 时最多产生一个 outstanding nudge；同一 frontier replay 幂等。新的 terminal 可继续产生下一 nudge，不使用 timer、sleep 或固定 retry 次数。
+此编号永久空缺。manager guard 的 admission、飞行态与 fresh-terminal re-arm 只由 INTERACTION-AUTHORITY-019 定义。
 
-## RETIRE-006: provider failure 与 authority terminal 不进入 nudge 代数
+## RETIRE-006: 已删除——provider failure 归属 execution-failure-policy
 
-provider/network failure 先由 ExecutionFailurePolicy 结算；只有恢复出新 provider admission 且 incumbency 仍 active 才继续协议。authority revoked、session deleted、fatal fuse 与 capacity exhaustion 停止 nudge。
+此编号永久空缺。provider/network failure、capacity settlement 与 fresh-attempt authorization 只由 execution-failure-policy 和 managed-chat-execution 定义。
 
-## RETIRE-007: retirement、baton 与 cut 是不可分割的可恢复提交
+## RETIRE-007: retirement 提交闭合 outcome 与 cut
 
-成功 retirement 必须在同一 durable transaction 中记录离场 snapshot、IncumbencyRetired、BatonPrepared、ProjectionCutRecorded 以及 SuccessorRequested 或 QualityCandidateAccepted。崩溃恢复不得看到永久的“已退休但无 baton/cut”状态。
+成功 retirement 在同一 durable transaction 中记录 `IncumbencyRetired` 与 `RetirementCommitted({ Id; IncumbencyId; SnapshotId; AuthorityRevision; ProjectionCut = { ProviderRunId; ToolCallId }; Outcome })`，其中快照与 authority 修订是 load-bearing retirement binding。`Outcome = Continue` 表示工作待续：同一 LogicalRun 保持开放，下一迭代就位后继续；Continue 的 retirement 快照取退休时当前快照，允许与 assessment 时快照不同并前向携带给下一迭代。`Outcome = Accepted certificateId` 要求快照等于 assessment/证书快照：证书须有效且属于当前迭代并绑定该快照，不同快照的 Accepted 一律拒绝。两者 authority 都必须等于当前。CleanupBlocked 的 perfect 迭代在 blockers 清除后可重试 Accepted。证书有效期间不激活任何新迭代，后续显式 `QualityCertificateInvalidated` 使该证书失效后允许普通新迭代。崩溃恢复不得看到永久的“已退休但无 outcome/cut”状态；ManagerLoopSignal 由匹配 Outcome 派生（Accepted 证书→Candidate，Continue→Continue）。
 
-## RETIRE-008: 退休工具返回与后继派发之间建立物理中断边界
+## RETIRE-008: 退休工具返回与下一迭代派发之间建立物理中断边界
 
-suicide 工具体只提交 durable retirement 并返回结果，不调用 session 级 `InterruptAttempt`/`AbortSession`。退休 run 的后续 provider 请求在 transform 钩子按退休边界与正式 successor gate 身份拦截；先等待旧 attempt 的 Host interrupt 完成，再派发后继，旧 transform 的消息清空。successor 复用同一物理 SessionId，因此禁止在其派发后补发针对前任的 session abort。已退休输出由 durable cut（`StaleProviderRunIds` 吸收迟到 parts）与 Retired phase tool denial 隔离；接任不能复活前任，也不能结束承载 Road 的 active authority。
+suicide 工具体只提交 durable retirement 并返回结果，不调用 session 级 `InterruptAttempt`/`AbortSession`。两种 retirement 后，退休 run 的后续 provider 请求都在 transform 钩子按退休边界与正式 manager-loop gate 身份拦截：清空旧 transform 消息，释放该请求已取得的 exact provider-step admission，再等待旧 attempt 的 Host interrupt 完成。Continue 随后自动派发下一迭代；Accepted 只终止旧 attempt，永不由 Narrative 自动派发。下一迭代复用同一物理 SessionId，因此禁止在其派发后补发针对已退休迭代的 session abort。显式证书失效后，Change ContinueLoop 可派发普通新迭代，该新迭代同样使用 LatestRetirement cut。已退休输出由 durable cut（`RetiredProviderRunIds` 吸收迟到 parts）与 Retired phase tool denial 隔离；新迭代不能复活已退休迭代，也不能结束承载 Road 的 active authority。

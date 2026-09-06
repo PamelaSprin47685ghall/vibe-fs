@@ -94,14 +94,14 @@ test('WHAT[VERIFICATION-SYSTEM-003] long-stroke.toml declares theoretical exact 
   assert.equal(result.scenario.setup.maxSseEvents, 3000);
 });
 
-test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke selects one exact Manager suffix without moving its sole fault', () => {
+test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke uses one reusable Manager loop without moving its sole fault', () => {
   const dir = path.dirname(fileURLToPath(import.meta.url));
   const source = readFileSync(path.join(dir, 'e2e/scenarios/long-stroke.toml'), 'utf8');
   const result = compileScenario(source, { name: 'long-stroke.toml' });
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'));
 
   const byId = new Map(result.scenario.entries.map((entry) => [entry.id, entry]));
-  const ordinary = byId.get('manager.1');
+  const ordinary = byId.get('manager-loop.2');
 
   assert.deepEqual(
     { optional: ordinary?.optional, lane: ordinary?.lane, step: ordinary?.step },
@@ -110,9 +110,10 @@ test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke selects one exact Manager suffix
   assert.deepEqual(
     result.scenario.faults.filter((fault) => fault.kind === 'provider-error' && fault.status === 400)
       .map((fault) => fault.entryId),
-    ['manager.1'],
+    ['manager-loop.2'],
   );
 
+  const loopTools = ['fork', 'join', 'horizon', 'review', 'suicide'];
   const managerTools = ['fork', 'join', 'horizon', 'fission', 'todowrite', 'suicide'];
   const request = (turn, step) => ({
     messages: [
@@ -133,18 +134,18 @@ test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke selects one exact Manager suffix
     'manager-join-guard.0',
   );
 
-  // Relay flow has no waitAny suffix gating: each successor incumbency is an
-  // exact must step, and the optional join-guard race turn stays out of must.
+  // Every action in the reusable loop family is an exact must step; the
+  // optional join-guard race turn stays out of must.
   assert.equal(result.scenario.flow.filter((step) => step.waitAny).length, 0);
   for (let index = 0; index <= 3; index += 1) {
-    const id = `successor.${index}`;
+    const id = `manager-loop.${index}`;
     assert.ok(result.scenario.must.includes(id), `${id} must be an exact must step`);
-    assert.deepEqual(byId.get(id)?.tools, ['read', 'glob', 'grep', 'fork', 'join', 'horizon', 'review', 'suicide']);
-    assert.equal(byId.get(id)?.internal, true);
+    assert.deepEqual(byId.get(id)?.tools, loopTools);
+    assert.equal(byId.get(id)?.internal, false);
   }
 
-  assert.ok(result.scenario.must.includes('manager.1'));
   assert.ok(result.scenario.must.includes('manager-resume.0'));
+  assert.ok(result.scenario.must.includes('manager-current-action.1'));
   assert.ok(!result.scenario.must.some((id) => /^manager-resume\.(?:[1-9]|10)$/.test(id)));
   assert.ok(!result.scenario.must.some((id) => id.startsWith('manager-join-guard.')));
 });

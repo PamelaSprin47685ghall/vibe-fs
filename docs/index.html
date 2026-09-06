@@ -244,8 +244,8 @@ li{margin-bottom:5px}
 <line x1="510" y1="225" x2="560" y2="155" stroke="#1B365D" stroke-width="1.2" marker-end="url(#arr)"/>
 
 <rect x="560" y="105" width="175" height="70" rx="8" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
-<text x="647" y="132" text-anchor="middle" font-size="13" font-weight="600" fill="#92400e">接力独立评审</text>
-<text x="647" y="150" text-anchor="middle" font-size="11" fill="#b45309">八维评分与自杀交棒</text>
+<text x="647" y="132" text-anchor="middle" font-size="13" font-weight="600" fill="#92400e">循环独立评估</text>
+<text x="647" y="150" text-anchor="middle" font-size="11" fill="#b45309">八维评分与系统裁决</text>
 <text x="647" y="166" text-anchor="middle" font-size="10" fill="#6b6a64">终局交付闭环</text>
 </svg>
 </div>
@@ -388,7 +388,7 @@ type EffectiveAgent = Role * AgentTier
 <thead><tr><th>关注维度</th><th>单体大模型助手机制</th><th>单体常见故障模式</th><th>万象术多智能体工程解法</th></tr></thead>
 <tbody>
 <tr><td><strong>未尽事项管理</strong></td><td>散落于长对话自然语言上下文中</td><td>多轮交互后前置需求被静默遗忘</td><td>严格维护不可逆承诺的 Living Obligations 账本</td></tr>
-<tr><td><strong>质量检验与验收</strong></td><td>自写代码、自跑测试、自我宣布完成</td><td>迎合模型自圆其说，放过隐蔽缺陷</td><td>新任 Manager 独立执行八维接力评审，低分接管修复，满分交棒</td></tr>
+<tr><td><strong>质量检验与验收</strong></td><td>自写代码、自跑测试、自我宣布完成</td><td>迎合模型自圆其说，放过隐蔽缺陷</td><td>每轮 Manager 在共享工作区上从权威输入独立评估，评审后指派修复或由系统给出候选 Accepted 并提交发布，发布成功则退出，证书失效则继续</td></tr>
 <tr><td><strong>失败与异常恢复</strong></td><td>原样重试相同提示词或盲目补发命令</td><td>副作用重复发生（如重复发外部请求、重复扣款）</td><td>区分已知失败与未知状态，物理世界核对优先</td></tr>
 <tr><td><strong>长时记忆保持</strong></td><td>依赖粗暴的滚动窗口或全量无损摘要</td><td>关键约束在摘要过程中发生语义漂移</td><td>只追加事实流、侧车伴随记录与任务起点锚隔离</td></tr>
 <tr><td><strong>执行与因果推进</strong></td><td>依赖固定休眠等待（sleep-based）</td><td>在快机器上浪费吞吐，在慢机器上争用崩塌</td><td>纯粹因果就绪前沿（Ready Frontier）事件驱动</td></tr>
@@ -409,7 +409,7 @@ $$\text{SNR}(t) = \frac{\mathcal{I}_{\text{contract}}}{\mathcal{I}_{\text{contra
 <tr><td><strong>幽灵写入 (Phantom Writes)</strong></td><td>改动多文件途中崩溃，留下半残工作区</td><td>基于可编程文件系统 SDK 执行全有或全无原子提交</td></tr>
 <tr><td><strong>时钟玄学 (Clock Tyranny)</strong></td><td>依赖 <code>sleep(5000)</code> 猜测编译与网络结果</td><td>彻底开除时间轮询，完全由具名因果信号驱动</td></tr>
 <tr><td><strong>位置悬空 (PC Amnesia)</strong></td><td>在对话中记录“我正在做第 3 步”，重启后失忆</td><td>零持久化程序计数器，重启完全由不可变事件折叠推导</td></tr>
-<tr><td><strong>伪造通过 (Fake Perfection)</strong></td><td>生成长篇总结自我感动宣布“完美完成”</td><td>接力式 Manager 独立八维评审与满分交棒（Relay Manager Assessment）</td></tr>
+<tr><td><strong>伪造通过 (Fake Perfection)</strong></td><td>生成长篇总结自我感动宣布“完美完成”</td><td>循环 Manager 独立八维评估与满分证书（Manager Loop Assessment）</td></tr>
 <tr><td><strong>重试雪崩 (Retry Cascade)</strong></td><td>失败后原样反复发 prompt 烧穿额度</td><td>模 4 游标轮换（A/A'/B/B'）与 12 次连续失败硬熔断</td></tr>
 <tr><td><strong>权限漂移 (Role Bleed)</strong></td><td>换深模型时突然自称“全能助手”越权操作</td><td>权限与角色强绑定，算力档位与主权彻底解耦</td></tr>
 </tbody>
@@ -794,11 +794,11 @@ $$U(\text{stop}) = -\text{CurrentAnswerLoss}, \qquad U(a) = U(\text{stop}) + \De
 </div>
 
 <div class="hero-note">
-<b>接力评审与责任移交的铁律：</b>每一任新 Manager 起步处于只读评审态，对眼前快照独立进行八维盘点。工具有且只有八个 0-10 整数参数；任一项低于 10 分，问题原子物化为当前任的未尽义务，发现问题的人立即成为实现负责人。八项全 10 满分则失去写权限，清理资源并自杀交棒。
+<b>循环评估的铁律：</b>每一轮 Manager 都在共享工作区上从权威用户消息重新开始，起步处于只读评审态，对眼前快照独立进行八维盘点。工具有且只有八个 0-10 整数参数；评审后指派的修复由本轮承担，完成后清理资源并退出。八项全 10 满分则提供证书绑定的候选接受，发布成功则退出；若 Change 准入因快照/rebase/CAS 现实变化使证书失效，系统以另一轮普通独立迭代继续。是否开启下一轮（Continue）还是给出候选接受（Accepted），只由系统裁决；Manager 可见的始终是单次任务：评估、按指派修复、退出。
 </div>
 
 <h3>八维评审代数（Eight-Dimension Assessment Algebra）</h3>
-<p>在接口层面，当前任 Manager 的评审动作被严格收敛为一次性的八维评分工具：</p>
+<p>在接口层面，每一轮 Manager 的评审动作被严格收敛为一次性的八维评分工具：</p>
 <pre><code>type ScoreVector = {
     LanguageAlgorithms: int        // 0..10
     Simplicity: int                // 0..10
@@ -810,13 +810,13 @@ $$U(\text{stop}) = -\text{CurrentAnswerLoss}, \qquad U(a) = U(\text{stop}) + \De
     Completeness: int              // 0..10
 }
 </code></pre>
-<p>该工具在契约上<strong>绝不接受自由 verdict 或模糊文本，评分低于 10 的维度原子转化为当前任义务</strong>。同一任绝不二次评审自己的修改，后续质量裁决必然交由下一任独立完成。</p>
+<p>该工具在契约上<strong>绝不接受自由 verdict 或模糊文本，评分低于 10 的维度原子转化为本轮义务</strong>。本轮绝不二次评审自己的修改，后续评估由系统开启的新一轮独立完成；每次评估以 provider run、tool call、工作区快照与权威版本共同绑定退休观察、防陈旧 Accepted/Continue 重放，全满分评估签发快照绑定质量证书。</p>
 
 <div class="feature-tier tier-luxury">
-<h3>提示词接力组合（Relay Context Protocol）</h3>
-<p>新任 Manager 的认知环境由根需求、当前快照与前任接力棒正交拼装而成：</p>
-$$\text{SystemPrompt} = \text{RootAuthority} \oplus \text{SnapshotSummary} \oplus \text{Baton}(\text{Predecessor})$$
-<p>前任消息与原始对话经过因果截断（Projection Cut）完全隔离，新任以绝对客观的新人视角独立接盘，彻底杜绝了模型因上下文疲劳而产生的情绪迎合与妥协盲区。</p>
+<h3>每轮独立上下文（Manager Loop Projection）</h3>
+<p>每一轮 Manager 的消息上下文只含权威用户消息与本轮消息，并在共享工作区上执行：保留类型化权威消息与本轮消息，移除所有前轮消息与仅用于唤醒循环的首个非权威用户延续，不注入任何合成上下文。工作区是共享执行状态，不作为序列化消息进入上下文。</p>
+$$\text{View} = \text{AuthorityMessages} \oplus \text{CurrentIteration}$$
+<p>审计保留全量历史，provider 消息只见切段后事实；切段确定性、有界、脱敏，每一轮都以独立视角重新评估，彻底杜绝了模型因上下文疲劳而产生的情绪迎合与妥协盲区。</p>
 </div>
 
 <div class="page-nav" id="nav-p2-5"></div>
@@ -1197,7 +1197,7 @@ $$\text{EligibleForFinality} \iff \text{ObligationsAccounted}(\mathcal{L}) \;\la
 <ol>
 <li><strong>账本结清（$\text{ObligationsAccounted}$）</strong>：所有承诺的使命债务已真实履行，全部细化义务均有定位证据；</li>
 <li><strong>工作树一致（$\text{TreeConsistent}$）</strong>：当前工作树的 Git Hash 与证书绑定快照绝对一致，中途无未受审的静默改动；</li>
-<li><strong>独立证书（$\text{IndependentCertificate}$）</strong>：由独立接力新任在当前快照上给出八项满分评价并干净退休签发质量证书。</li>
+<li><strong>独立证书（$\text{IndependentCertificate}$）</strong>：由独立一轮在当前快照上给出八项满分评价，提供证书绑定的候选接受并提交 CAS 发布；发布成功则退出，若 Change 准入因快照/rebase/CAS 现实变化使证书失效，系统以另一轮普通独立迭代继续。</li>
 </ol>
 
 <div class="page-nav" id="nav-p4-1"></div>
@@ -1240,7 +1240,7 @@ $$\text{EligibleForFinality} \iff \text{ObligationsAccounted}(\mathcal{L}) \;\la
 <h3>todo lag-1 稳定前缀与终局质量门</h3>
 <p>项目经理与质量验收之间实行<strong>终局裁决制</strong>，同时保持基于 committed Accepted 链的 <strong>lag-1 前缀折叠代数</strong>：</p>
 $$T_k \text{ (Accepted)} \xrightarrow{\quad\text{提交}\quad} \text{立即生效当前账目} \;\land\; \text{折叠 } T_{k-1} \text{ 前缀}$$
-<p>当清单 $T_k$ 提交时，当前账目立即无阻塞生效，过程性工作流无需等待中间评审；质量检验由独立接力任期执行八维评审并由机器门禁确定性收口。</p>
+<p>当清单 $T_k$ 提交时，当前账目立即无阻塞生效，过程性工作流无需等待中间评审；质量检验由系统开启的独立一轮执行八维评审并由机器门禁确定性收口，Continue 开启下一轮，Accepted 提供证书绑定的候选接受并提交 CAS 发布，发布成功则退出，若 Change 准入因快照/rebase/CAS 现实变化使证书失效则以另一轮普通独立迭代继续。</p>
 
 <div class="feature-tier tier-enhanced">
 <h3>焦点（`workingOn`）容错与透视衰减</h3>
@@ -1273,25 +1273,25 @@ $$T_k \text{ (Accepted)} \xrightarrow{\quad\text{提交}\quad} \text{立即生�
 <div class="diagram">
 <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg">
 <rect x="20" y="50" width="130" height="60" rx="8" fill="#faf9f5" stroke="#e8e6dc" stroke-width="1.5"/>
-<text x="85" y="76" text-anchor="middle" font-size="12" font-weight="600" fill="#1B365D">前任实现推进</text>
-<text x="85" y="94" text-anchor="middle" font-size="11" fill="#6b6a64">清理资源并自杀交棒</text>
+<text x="85" y="76" text-anchor="middle" font-size="12" font-weight="600" fill="#1B365D">本轮修复推进</text>
+<text x="85" y="94" text-anchor="middle" font-size="11" fill="#6b6a64">清理资源并退出</text>
 
 <line x1="150" y1="80" x2="210" y2="80" stroke="#1B365D" stroke-width="1.5"/>
-<text x="180" y="72" text-anchor="middle" font-size="10" fill="#047857">suicide</text>
+<text x="180" y="72" text-anchor="middle" font-size="10" fill="#047857">exit</text>
 
 <rect x="210" y="45" width="160" height="70" rx="8" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
-<text x="290" y="72" text-anchor="middle" font-size="12" font-weight="600" fill="#92400e">新任八维独立评审</text>
+<text x="290" y="72" text-anchor="middle" font-size="12" font-weight="600" fill="#92400e">独立八维评估</text>
 <text x="290" y="90" text-anchor="middle" font-size="10" fill="#b45309">"review 八项打分"</text>
-<text x="290" y="104" text-anchor="middle" font-size="9" fill="#6b6a64">低分原子赋责 / 全10证书</text>
+<text x="290" y="104" text-anchor="middle" font-size="9" fill="#6b6a64">低分指派修复 / 满分证书</text>
 
 <line x1="370" y1="80" x2="430" y2="80" stroke="#1B365D" stroke-width="1.5"/>
 
 <rect x="430" y="50" width="130" height="60" rx="8" fill="#faf9f5" stroke="#e8e6dc" stroke-width="1.5"/>
-<text x="495" y="76" text-anchor="middle" font-size="12" font-weight="600" fill="#1B365D">满分交棒离场</text>
+<text x="495" y="76" text-anchor="middle" font-size="12" font-weight="600" fill="#1B365D">接受后离场</text>
 <text x="495" y="94" text-anchor="middle" font-size="11" fill="#6b6a64">清理后台任务与子代理</text>
 
 <line x1="560" y1="80" x2="610" y2="80" stroke="#1B365D" stroke-width="1.5"/>
-<text x="585" y="72" text-anchor="middle" font-size="10" fill="#047857">suicide</text>
+<text x="585" y="72" text-anchor="middle" font-size="10" fill="#047857">exit</text>
 
 <rect x="610" y="50" width="80" height="60" rx="8" fill="#EEF2F7" stroke="#1B365D" stroke-width="1.5"/>
 <text x="650" y="76" text-anchor="middle" font-size="12" font-weight="600" fill="#1B365D">机器门禁</text>
@@ -1299,22 +1299,26 @@ $$T_k \text{ (Accepted)} \xrightarrow{\quad\text{提交}\quad} \text{立即生�
 </svg>
 </div>
 
-<h3>接力式流程控制流（Relay Manager Control Flow）</h3>
-<p>在新任评审中，评审与自杀交棒通过代数状态机由 CE 驱动，严禁让同一任既当裁判又当工人：</p>
-<pre><code>// 接力式 Manager 执行八维独立评审
-let! assessment = manager.Review(scores)
-match assessment.Outcome with
-| WorkAssigned obligations ->
-    // 低分原子赋责，发现问题即由该任负责修复
-    do! manager.ExecuteAndVerify(obligations)
-    do! manager.CleanupResources()
-    do! manager.Suicide()
-| PerfectCandidate cert ->
-    // 八项全 10 满分，当前任不再改动代码，清理资源后自杀交棒
-    do! manager.CleanupResources()
-    do! manager.Suicide()
-</code></pre>
-<p>自杀交棒由 CE 代码栈直接调度的物理事件完成，彻底免除了角色分裂和传话损耗。</p>
+<h3>循环流程控制（Manager Loop Control Flow）</h3>
+<p>每一轮内，评估、指派修复与退出由普通递归 taskResult 循环驱动；同一轮的评估与指派修复闭合，Continue 开启下一轮，Accepted 提供证书绑定的候选接受，发布成功则退出，证书失效则以另一轮普通独立迭代继续：</p>
+<pre><code>// Manager 循环：普通递归 taskResult，无自定义 builder
+let rec managerLoop ctx = taskResult {
+    // 每一轮在共享工作区上从权威输入独立评估
+    let! assessment = assess ctx
+    match assessment.Outcome with
+    | Continue obligations ->
+        // 评审后指派的修复由本轮承担
+        do! repair obligations
+        do! closeResources ctx
+        return! managerLoop (next ctx)
+    | Accepted cert ->
+        // 全满分：提供证书绑定的候选接受；发布成功则退出，证书因快照/rebase/CAS 现实变化失效则继续循环
+        do! closeResources ctx
+        let! published = publishCertificate cert
+        if published.Invalidated then return! managerLoop (next ctx)
+        else return ()
+}</code></pre>
+<p>发布成功后的退出由循环的普通返回完成；只有递归 live 资源能阻塞退休，推进提醒去重归 durable PromptAuthority 门控，静默停止后不再有事件驱动唤醒，审计以 provider run、tool call、工作区快照与权威版本共同绑定退休观察、防陈旧 Accepted/Continue 重放。若 Change 准入使已签发证书失效，系统以另一轮普通独立迭代继续，顶层 HumanRoot 的 Accepted 关闭仍以发布成功为准。</p>
 
 <div class="feature-tier tier-essential">
 <h3>审查尝试五元组（ReviewAttemptIdentity）</h3>
@@ -1839,11 +1843,11 @@ $$\forall \text{Fact} \in \text{DomainUniverse}, \quad \big| \text{Owner}(\text{
 <div class="key-points">
 <div class="key-point"><strong>1. 绝不相信内存等于持久事实：</strong>先追加不可变日志介质，确认成功后再推移内存状态。</div>
 <div class="key-point"><strong>2. 绝不相信模糊的成功：</strong>无明确 Exit Code、无因果见证、无错误流核验的操作一律判定为未完成。</div>
-<div class="key-point"><strong>3. 绝不伪造终局完成：</strong>工人无自审权，未获独立新任八维全满分证书与机器门禁检验绝不算完成。</div>
+<div class="key-point"><strong>3. 绝不伪造终局完成：</strong>工人无自审权，未获独立一轮八维全满分证书与机器门禁检验绝不算完成。</div>
 <div class="key-point"><strong>4. 绝不使用隐式时钟轮询：</strong>开除一切 <code>sleep</code> 机制，业务等待完全由真实因果事件与信号唤醒。</div>
 <div class="key-point"><strong>5. 绝不在恢复时跳步重做：</strong>崩溃重启严禁自动补发在途未决命令，必须先物理取证现实。</div>
 <div class="key-point"><strong>6. 绝不让思考冒充取证：</strong>研究员的模型生成与解释永远只是提议（Proposal），必须实地取证。</div>
-<div class="key-point"><strong>7. 发现问题即负责修复：</strong>评审由独立新任完成；一旦打出低分，发现问题的人就是实现负责人，同一任绝不自评。</div>
+<div class="key-point"><strong>7. 发现问题即负责修复：</strong>评审由独立一轮完成；一旦打出低分，指派的修复由本轮承担，本轮绝不自评第二遍。</div>
 <div class="key-point"><strong>8. 绝不在失败后盲目补发：</strong>未知状态先查物理指纹，重试必须建立在确证未发生的证据之上。</div>
 <div class="key-point"><strong>9. 绝不让机器拓扑穿透视界：</strong>内部 SessionId、Worktree 路径、机器 JobId 绝不泄漏至模型提示词。</div>
 <div class="key-point"><strong>10. 绝不保留过渡性妥协代码：</strong>严禁为了让旧测试变绿而保留过渡 facade 或 mock，代码库中不留尸体。</div>

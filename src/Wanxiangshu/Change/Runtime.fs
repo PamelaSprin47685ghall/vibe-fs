@@ -229,19 +229,19 @@ type Orchestrator
                 |> Option.defaultWith (fun () -> Ok() |> Task.FromResult)
                 |> OrchestratorRuntimeDecisions.releaseWorktreeOnError worktree
 
-            let openRoad (worktree: WorktreeResource) =
+            let createManagerSession (worktree: WorktreeResource) =
                 taskResult {
                     // The Manager session is created before the job fact because
                     // ORCH-006 persists its SessionId. Its first prompt remains
                     // deferred until ManagerJobCreated is durable.
                     let! managerSessionId =
-                        relay.OpenRoad
+                        relay.CreateManagerSession
                             { JobId = jobId
                               ManagerAgent = managerAgent
                               Worktree = path
                               RootRequest = prompt
                               ExpectedToolCalls = expectedToolCalls }
-                        |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to open Relay Road")
+                        |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to create manager session")
 
                     let fact =
                         OrchestratorFact.ManagerJobCreated
@@ -282,7 +282,7 @@ type Orchestrator
                                         journalPort |> Option.iter (fun _ -> worktree.MarkDurable())
 
                                         return!
-                                            openRoad worktree
+                                            createManagerSession worktree
                                             |> OrchestratorRuntimeDecisions.releaseWorktreeUnlessJournaled
                                                 journalPort
                                                 worktree
@@ -298,10 +298,8 @@ type Orchestrator
                             let! job = outcome
 
                             do!
-                                relay.ActivateRoad jobId
-                                |> OrchestratorRuntimeDecisions.mapTaskError (
-                                    integration "Failed to activate Relay Road"
-                                )
+                                relay.ActivateManager jobId
+                                |> OrchestratorRuntimeDecisions.mapTaskError (integration "Failed to activate manager")
 
                             startPublication job
                             return job.Handle

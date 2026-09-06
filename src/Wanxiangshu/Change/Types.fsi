@@ -32,7 +32,7 @@ type GitPort =
       ReadHead: WorktreePath -> Task<Result<CommitHash, string>>
       GetTargetHead: TargetRef -> Task<Result<CommitHash, string>> }
 
-type RoadStart =
+type ManagerStart =
     { JobId: ManagerJobId
       ManagerAgent: string
       Worktree: WorktreePath
@@ -40,17 +40,17 @@ type RoadStart =
       ExpectedToolCalls: int option }
 
 [<RequireQualifiedAccess>]
-type RoadSignal =
-    | IncumbencyRetired of RetirementSummary
-    | QualityCandidateAccepted of RetirementSummary * QualityCertificate
+type ManagerLoopSignal =
+    | Continue
+    | Candidate of QualityCertificate
     | ExceptionalTerminal of string
 
 type RelayPort =
-    { OpenRoad: RoadStart -> Task<Result<SessionId, string>>
-      ActivateRoad: ManagerJobId -> Task<Result<unit, string>>
-      AwaitRoadSignal: ManagerJobId -> Task<Result<RoadSignal, string>>
+    { CreateManagerSession: ManagerStart -> Task<Result<SessionId, string>>
+      ActivateManager: ManagerJobId -> Task<Result<unit, string>>
+      AwaitLoopSignal: ManagerJobId -> Task<Result<ManagerLoopSignal, string>>
       InvalidateCertificate: ManagerJobId -> string -> Task<Result<unit, string>>
-      RequestSuccessor: ManagerJobId -> WorktreePath -> string -> Task<Result<IncumbencyId, string>>
+      ContinueLoop: ManagerJobId -> Task<Result<IncumbencyId, string>>
       CaptureSnapshot: ManagerJobId -> Task<Result<WorkspaceSnapshotId, string>>
       PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
       TerminateRoadResources: ManagerJobId -> Task<unit> }

@@ -2565,13 +2565,16 @@
         "Wanxiangshu.Mission.Relay.RetirementId",
         "Wanxiangshu.Mission.Relay.RetirementId.create",
         "Wanxiangshu.Mission.Relay.RetirementId.value",
-        "Wanxiangshu.Mission.Relay.BatonSource",
+        "Wanxiangshu.Mission.Relay.ManagerLoopGate",
+        "Wanxiangshu.Mission.Relay.ManagerLoopGate.gateKind",
         "Wanxiangshu.Mission.Relay.ScoreDimension",
         "Wanxiangshu.Mission.Relay.ScoreVector",
         "Wanxiangshu.Mission.Relay.AssessmentBinding",
         "Wanxiangshu.Mission.Relay.IncumbencyPhase",
         "Wanxiangshu.Mission.Relay.QualityCertificate",
-        "Wanxiangshu.Mission.Relay.BatonEnvelope",
+        "Wanxiangshu.Mission.Relay.RetirementOutcome",
+        "Wanxiangshu.Mission.Relay.RetirementOutcome.Continue",
+        "Wanxiangshu.Mission.Relay.RetirementOutcome.Accepted",
         "Wanxiangshu.Mission.Relay.ProjectionCut",
         "Wanxiangshu.Mission.Relay.RetirementSummary"
       ],
@@ -2594,6 +2597,9 @@
         "Wanxiangshu.Mission.Relay.RelayTransaction",
         "Wanxiangshu.Mission.Relay.RelayTransaction.create",
         "Wanxiangshu.Mission.Relay.RelayTransaction.events",
+        "Wanxiangshu.Mission.Relay.IncumbencyOpening",
+        "Wanxiangshu.Mission.Relay.IncumbencyOpening.initial",
+        "Wanxiangshu.Mission.Relay.IncumbencyOpening.next",
         "Wanxiangshu.Mission.Relay.RelayFactCases"
       ],
       "justification": "Relay.Incumbency publishes the single durable Relay transaction vocabulary used by Change, the durable spine, assessment and retirement composition; no legacy Review fact family is retained."
@@ -4352,7 +4358,8 @@
         "Wanxiangshu.Git.GitSubject.execIn",
         "Wanxiangshu.Git.GitSubject.lsFilesUntracked",
         "Wanxiangshu.Git.GitSubject.revParseGitCommonDir",
-        "Wanxiangshu.Git.GitSubject.revParseHeadTree"
+        "Wanxiangshu.Git.GitSubject.revParseHeadTree",
+        "Wanxiangshu.Git.GitSubject.tryRevParseHeadTree"
       ],
       "justification": "Git.Gateway publishes exactly these symbols to the listed owners; every unlisted sibling remains private to change-integration."
     },
@@ -7136,6 +7143,7 @@
         "participant-horizon",
         "prefix-stability",
         "provider-projection",
+        "relay-incumbency",
         "requirement-grounding",
         "semantic-trace",
         "session-ontology",
@@ -18351,7 +18359,7 @@
           "path": "src/Wanxiangshu/Git/Subject.fs",
           "symbols": [
             "Wanxiangshu.Git.GitSubject.diffHeadBinary",
-            "Wanxiangshu.Git.GitSubject.revParseHeadTree"
+            "Wanxiangshu.Git.GitSubject.tryRevParseHeadTree"
           ]
         },
         {

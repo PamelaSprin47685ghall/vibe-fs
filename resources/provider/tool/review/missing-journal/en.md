@@ -1,1 +1,0 @@
-durable journal is unavailable

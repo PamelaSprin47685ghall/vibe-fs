@@ -5,8 +5,14 @@ open Wanxiangshu.Foundation.Identity
 [<RequireQualifiedAccess>]
 type RelayEvent =
     | RoadOpened of RoadId * AuthorityRevision * PhysicalUserMessageId
-    | IncumbencyOpened of IncumbencyId * WorkspaceSnapshotId * BatonSource
-    | AssessmentCommitted of AssessmentId * AssessmentBinding * WorkspaceSnapshotId * AuthorityRevision * ScoreVector
+    | IncumbencyOpened of IncumbencyId * WorkspaceSnapshotId
+    | AssessmentCommitted of
+        AssessmentId *
+        IncumbencyId *
+        AssessmentBinding *
+        WorkspaceSnapshotId *
+        AuthorityRevision *
+        ScoreVector
     | AuthorityRevisionAdvanced of
         IncumbencyId *
         expected: AuthorityRevision *
@@ -15,16 +21,33 @@ type RelayEvent =
         WorkspaceSnapshotId
     | QualityCertificateInvalidated of QualityCertificateId * reason: string
     | RetirementCleanupBlocked of IncumbencyId * blockerDigest: string
-    | ExitRequiredNudgeScheduled of IncumbencyId * causalFrontier: string
     | RetirementCommitted of RetirementSummary
-    | SuccessorRequested of predecessor: RetirementId * reason: string
-    | SuccessorActivated of predecessor: RetirementId * IncumbencyId * WorkspaceSnapshotId * AuthorityRevision
 
 type RelayTransaction
 
 module RelayTransaction =
     val create: RelayEvent list -> Result<RelayTransaction, string>
     val events: RelayTransaction -> RelayEvent list
+
+type IncumbencyOpening =
+    { RoadId: RoadId
+      IncumbencyId: IncumbencyId
+      AuthorityRevision: AuthorityRevision
+      Transaction: RelayTransaction }
+
+module IncumbencyOpening =
+    val initial:
+        sessionId: SessionId ->
+        physicalUserMessageId: PhysicalUserMessageId ->
+        snapshotId: WorkspaceSnapshotId ->
+            IncumbencyOpening
+
+    val next:
+        roadId: RoadId ->
+        retirementId: RetirementId ->
+        authorityRevision: AuthorityRevision ->
+        snapshotId: WorkspaceSnapshotId ->
+            IncumbencyOpening
 
 [<RequireQualifiedAccess>]
 type RelayFactCases =

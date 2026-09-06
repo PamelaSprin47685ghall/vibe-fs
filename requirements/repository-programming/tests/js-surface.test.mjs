@@ -244,7 +244,6 @@ test('WHAT[REPOSITORY-PROGRAMMING-003] JS010_each_filesystem_role_gets_exactly_o
   const markers = {
     Coder: /oldApi → newApi/,
     Inspector: /RetryPolicy/,
-    Manager: /staleReferences/,
     DevOps: /candidateTests/,
     Browser: /WidgetOptions/,
   }
@@ -258,15 +257,12 @@ test('WHAT[REPOSITORY-PROGRAMMING-003] JS010_each_filesystem_role_gets_exactly_o
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-005] JS010_description_never_dilutes_the_ultra_example', () => {
-  for (const role of ['Coder', 'Inspector', 'Manager', 'DevOps', 'Browser']) {
+  for (const role of ['Coder', 'Inspector', 'DevOps', 'Browser']) {
     const result = surface(role, rolePermissions(role.toLowerCase()))
     const classes = result.description.match(/class Js extends JsProgram/g) ?? []
     assert.equal(classes.length, 1, `${role} description must not dilute the Ultra Example with toy examples`)
     assert.match(result.description, /Semantic branches belong between programs/)
   }
-
-  const manager = surface('Manager', rolePermissions('manager'))
-  assert.doesNotMatch(manager.examples[0], /verdict\s*:/i, 'manager example gathers evidence, never authors judgment')
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_lying_generator_counterexample_is_rejected', () => {

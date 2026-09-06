@@ -263,8 +263,7 @@ module PromptDispatcher =
         // chat.message resolve can race its persist, so equality ignores it.
         member private this.ExactPromptClaimMatches(evidence: ChatAdmissionIntent.PendingPromptEvidence) =
             match Map.tryFind evidence.PromptKey (this.ProjectionFor evidence.Key.SessionId).PendingClaims with
-            | Some claim ->
-                { claim with Receipt = None } = { evidence.Claim with Receipt = None }
+            | Some claim -> { claim with Receipt = None } = { evidence.Claim with Receipt = None }
             | None -> false
 
         member private this.AcceptExternalManagedRoot
