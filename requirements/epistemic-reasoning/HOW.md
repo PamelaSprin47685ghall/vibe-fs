@@ -53,7 +53,7 @@ MCP 层返回 structuredContent 携带 nextTool 提示
 ### 5. MCP 交互映射 (MCP Affordance Translation)
 
 - MCP 服务端将内核的挂起请求严格映射为对应的阶段工具，并输出 `nextTool` 引导字段。
-- 服务端身份由 `PackageMetadata` 从 `package.json` 读取，杜绝基于当前目录探测带来的环境漂移。
+- 服务端身份（`serverName`/`serverVersion`）由 `McpServer` 自身从包根 `package.json` 读取（`import.meta.url` 固定上溯），杜绝基于当前目录探测带来的环境漂移；Sphinx 树不依赖 distribution 子系统。
 
 ### 6. Sphinx-GEC 组合面 (GEC Composition Surface)
 

@@ -6,7 +6,6 @@ open Thoth.Json
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Resources
 open Wanxiangshu.Sphinx.Core
 
 open Fable.Core
@@ -85,6 +84,41 @@ module McpServer =
 
     [<Emit("import.meta.url")>]
     let private moduleUrl () : string = jsNative
+
+    // Published package version from the manifest at the package root.
+    // MCP serverInfo version fact; resolved from this compiled module's own
+    // location (import.meta.url), never from caller cwd.
+    [<Import("existsSync", "node:fs")>]
+    let private existsSync (path: string) : bool = jsNative
+
+    [<Import("readFileSync", "node:fs")>]
+    let private readFileSync (path: string, encoding: string) : string = jsNative
+
+    [<Import("dirname", "node:path")>]
+    let private dirname (path: string) : string = jsNative
+
+    [<Import("join", "node:path")>]
+    let private pathJoin (a: string, b: string) : string = jsNative
+
+    [<Emit("JSON.parse($0)")>]
+    let private parseJson (text: string) : obj = jsNative
+
+    let private serverVersion () : string =
+        // dist/Sphinx/McpServer.js is two levels below the package root.
+        let moduleDir = dirname (fileURLToPath (moduleUrl ()))
+        let packageRoot = pathJoin (pathJoin (moduleDir, ".."), "..")
+        let manifest = pathJoin (packageRoot, "package.json")
+
+        if not (existsSync manifest) then
+            raise (InvalidOperationException(sprintf "package manifest missing: %s" manifest))
+
+        let parsed = parseJson (readFileSync (manifest, "utf8"))
+        let version: string = parsed?version
+
+        if String.IsNullOrWhiteSpace version then
+            raise (InvalidOperationException(sprintf "package manifest version missing: %s" manifest))
+
+        version
 
     [<Emit("process.argv[1] || ''")>]
     let private entryArgument () : string = jsNative
@@ -907,7 +941,7 @@ module McpServer =
         let server =
             construct
                 mcpServerConstructor
-                (createObj [ "name" ==> SphinxMcp.serverName; "version" ==> PackageMetadata.version () ])
+                (createObj [ "name" ==> SphinxMcp.serverName; "version" ==> serverVersion () ])
                 (createObj [ "instructions" ==> serverInstructions ])
 
         let inquiries =
@@ -1081,9 +1115,6 @@ module McpServer =
         let server = createDurable sessions events
         let transport = constructEmpty stdioTransportConstructor
         connect server transport
-
-    [<Emit("JSON.parse($0)")>]
-    let private parseJson (text: string) : obj = jsNative
 
     let private storedRawObject (raw: obj) (handle: string) (tool: string) (argsJson: string) : Result<obj, string> =
         if String.IsNullOrWhiteSpace handle then

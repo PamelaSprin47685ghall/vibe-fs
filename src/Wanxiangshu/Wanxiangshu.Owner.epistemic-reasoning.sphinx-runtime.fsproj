@@ -5,7 +5,6 @@
     <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.distribution.assemblyinfo.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-mcp.fsproj"/>
     <Compile Include="Sphinx/Types.fsi"/>
     <Compile Include="Sphinx/Types.fs"/>
