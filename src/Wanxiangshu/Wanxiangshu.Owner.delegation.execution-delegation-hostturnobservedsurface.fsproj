@@ -24,6 +24,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-processeventlog.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-surface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.strength-persistence-durabilityport.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.opencode-host-opencodeport.fsproj"/>
@@ -50,6 +51,8 @@
     <Compile Include="Execution/Delegation/Join.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinGuard.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinGuard.fs"/>
+    <Compile Include="Interaction/Dispatch/JoinGuardSurface.fsi"/>
+    <Compile Include="Interaction/Dispatch/JoinGuardSurface.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fs"/>
     <Compile Include="Execution/Delegation/Handle/OpenCode/JoinWake.fsi"/>

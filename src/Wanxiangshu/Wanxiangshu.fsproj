@@ -1410,10 +1410,10 @@
     <Compile Include="Foundation/OutcomeSurface.fs"/>
     <Compile Include="Interaction/Dispatch/DispatchSurface.fsi"/>
     <Compile Include="Interaction/Dispatch/DispatchSurface.fs"/>
-    <Compile Include="OpenCode/Host/PluginHooksSurface.fsi"/>
-    <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
     <Compile Include="Interaction/Dispatch/JoinGuardSurface.fsi"/>
     <Compile Include="Interaction/Dispatch/JoinGuardSurface.fs"/>
+    <Compile Include="OpenCode/Host/PluginHooksSurface.fsi"/>
+    <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
     <Compile Include="Interaction/Dispatch/RecoverySurface.fsi"/>
     <Compile Include="Interaction/Dispatch/RecoverySurface.fs"/>
     <Compile Include="Verification/EventStoreWriterSurface.fsi"/>

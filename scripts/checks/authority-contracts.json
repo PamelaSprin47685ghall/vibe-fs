@@ -403,7 +403,7 @@
       "symbol": "ReservationCapability",
       "anchor": "type private ReservationCapability() =",
       "classification": "Vocabulary",
-      "owner": "dispatch-protocol",
+      "owner": "delegation",
       "what": "ENF-014",
       "issuers": [],
       "whatOwners": {

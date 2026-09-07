@@ -9,7 +9,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 
-open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Repair
@@ -42,11 +41,22 @@ module HostSessionNudge =
         RootWorkspaceDirectory.select System.IO.Directory.Exists rootWorkspace directory
 
     let private isFissionReplaced (journal: AgentJournal option) (sessionId: SessionId) : bool =
-        FissionRuntime.isSilentInterrupt sessionId
-        || (journal
-            |> Option.exists (fun durable ->
-                FissionProjection.tryActiveForOwner sessionId (AgentJournal.snapshot durable).AgentProjections.Fission
-                |> Option.isSome))
+        // Durable-only: FissionAdmitted is committed (Admission.admitReserved /
+        // commitLanesCreated) strictly before markSilentInterrupt, and every
+        // terminal fact (Converged/Failed) removes the owner from ActiveByOwner
+        // while Host clears the runtime flag alongside — so the process-local
+        // silent-interrupt flag is never the sole signal on a path that reaches
+        // here. The Host-level replaced-owner flow (observeReplacedOwner) uses a
+        // DummySessionPort and never reaches these entry points; the flag's real
+        // consumer (Host.routeAttemptAborted during InterruptAttempt) is untouched.
+        // FissionProjection arrives transitively via composition-durable-projection
+        // (AgentProjections.Fission); no direct fission shard reference is needed.
+        journal
+        |> Option.exists (fun durable ->
+            Wanxiangshu.Execution.Fission.FissionProjection.tryActiveForOwner
+                sessionId
+                (AgentJournal.snapshot durable).AgentProjections.Fission
+            |> Option.isSome)
 
     let sendContinuationResult
         (sessionPort: ISessionHostPort)
