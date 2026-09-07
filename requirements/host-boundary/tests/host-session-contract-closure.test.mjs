@@ -188,16 +188,22 @@ test('WHAT[HOST-BOUNDARY-026] host boundary projects declare explicit locality k
 
   const hostSignalBootstrap = projectMetadata.find((p) => p.name === 'Wanxiangshu.Owner.host-boundary.opencode-host-hostsignalbootstrap.fsproj')
   assert.ok(hostSignalBootstrap, 'opencode-host-hostsignalbootstrap.fsproj must exist')
-  assert.ok(
-    hostSignalBootstrap.references.some((r) => r.includes('execution-delegation-ledger')),
-    'opencode-host-hostsignalbootstrap must reference the persistence-backed delegation ledger',
-  )
-  // Physical truth: bootstrap consumes SyncDelegateHostObservation (hostturnobservedsurface) and the
-  // delegation ledger; SyncDelegateRuntime Host integration lives in delegation-host-adapter while
+  // Physical truth: the plugin composition chain (PluginHooks/PluginSessionWiring) consumes the
+  // delegation ledger and now lives in opencode-plugin.plugin-composition (asserted below);
+  // bootstrap still consumes SyncDelegateHostObservation (hostturnobservedsurface).
+  // SyncDelegateRuntime Host integration lives in delegation-host-adapter while
   // Wait/Store/Prompt/Workflow stay in delegation-sync-runtime (see AGENTS delegation split).
   assert.ok(
     hostSignalBootstrap.references.some((r) => r.includes('execution-delegation-hostturnobservedsurface')),
     'opencode-host-hostsignalbootstrap must reference the delegation host-turn-observed surface',
+  )
+  // The plugin composition chain (PluginHooks/PluginSessionWiring) consumes the delegation
+  // ledger and moved to the opencode-plugin owner; the consuming composition must reference it.
+  const pluginComposition = projectMetadata.find((p) => p.name === 'Wanxiangshu.Owner.opencode-plugin.plugin-composition.fsproj')
+  assert.ok(pluginComposition, 'opencode-plugin.plugin-composition.fsproj must exist')
+  assert.ok(
+    pluginComposition.references.some((r) => r.includes('execution-delegation-ledger')),
+    'opencode-plugin.plugin-composition must reference the persistence-backed delegation ledger',
   )
   assert.ok(
     !hostSignalBootstrap.references.some((r) => r.includes('delegation-host-adapter')),
