@@ -180,7 +180,7 @@ const factLabelFromEvent = (text) => {
     const label = digFactLabel(envelope?.Fact);
     if (label) return label;
     const match = text.match(
-      /"(?:Plugin|Prompt|Fallback|Review|Execution|Orchestrator|Companion|Context|Host|Runtime|Life|Handle|Pair)[A-Za-z0-9]+"/,
+      /"(?:Plugin|Prompt|ProviderFailure|Review|Execution|Orchestrator|Companion|Context|Host|Runtime|Life|Handle|Pair)[A-Za-z0-9]+"/,
     );
     return match?.[0]?.slice(1, -1) ?? 'UnknownFact';
   } catch {

@@ -1,5 +1,7 @@
-// The fork owner persists effect identity before physical work and the job fact
-// after the Manager session exists. Verify the source-owned ordering directly.
+// Static ownership lint (not proof of runtime effect): the fork owner persists
+// effect identity before physical work and the job fact after the Manager
+// session exists. This pins the source-owned append-before-effect ordering;
+// runtime behavior is proved by the compiled Change fold surfaces.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'

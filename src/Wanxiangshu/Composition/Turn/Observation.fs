@@ -20,7 +20,7 @@ type ReconciledTurn =
         /// HOST-010/HOST-011: one assistant message is one provider request is
         /// one turn, so the run identity IS the assistant message id. Naming the
         /// field `AssistantMessageId` invited a second identity for the same
-        /// thing — and FALLBACK-003 deduplicates failed attempts by this value.
+        /// thing — and PAR-003 deduplicates failed attempts by this value.
         ProviderRun: ProviderRunIdentity
         Role: Role option
         /// The worktree this run executed in, when it has one. A Manager child runs

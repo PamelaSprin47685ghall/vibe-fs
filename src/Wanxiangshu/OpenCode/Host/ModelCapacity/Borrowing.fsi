@@ -8,18 +8,17 @@ type internal BorrowingCapacity<'target> =
         ledger: CapacityLedger<'target> * providerOf: ('target -> string) * sameTarget: ('target -> 'target -> bool) ->
             BorrowingCapacity<'target>
 
-    member BindChild: parentSessionId: string * childSessionId: string -> unit
-    member BindCompanion: ownerSessionId: string * bloggerSessionId: string -> unit
-    member DropLineage: sessionId: string -> unit
-
     member RouteFresh:
         sessionId: string *
         oldPhysicalUserMessageId: string option *
         newPhysicalUserMessageId: string *
+        lenderSessionId: string option *
         route: ('target array -> 'target option) ->
             'target option
 
-    member ReserveFresh: sessionId: string * route: ('target array -> 'target option) -> 'target option
+    member ReserveFresh:
+        sessionId: string * lenderSessionId: string option * route: ('target array -> 'target option) -> 'target option
+
     member AdoptReservation: sessionId: string * physicalUserMessageId: string * target: 'target -> unit
     member ReleaseSession: sessionId: string -> CapacityTransitionOutcome
     member ReleasePhysical: sessionId: string * physicalUserMessageId: string -> CapacityTransitionOutcome

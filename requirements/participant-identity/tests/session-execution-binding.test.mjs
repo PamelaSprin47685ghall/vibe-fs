@@ -1,6 +1,7 @@
-// PID-008 / PROMPT-006: external user messages own EffectiveAgent selection;
-// model execution is leased by the scheduler and the binding surface only
-// exposes the semantic result of that ownership protocol.
+// PID-008 / PROMPT-006: external user messages own participant proof for a
+// fixed participant+Role; model execution is leased by the scheduler for that
+// Role, and the binding surface only exposes the semantic result of that
+// ownership protocol. No PeerAgent, EffectiveAgent, or cursor selection exists.
 
 import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
@@ -26,36 +27,45 @@ const binding = await import('../../../dist/OpenCode/Host/SessionBindingSurface.
 const routing = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
 await routing.initialize()
 
-const modelFor = (_agent) => ({ providerID: 'test', modelID: 'deep', variant: 'high' })
+const modelFor = (_participant) => ({ providerID: 'test', modelID: 'deep', variant: 'high' })
 
-const assertPrepared = (result, agent) => {
+const assertPrepared = (result, participant) => {
   assert.equal(result.ok, true, result.error)
-  assert.equal(result.value.agent, agent)
+  assert.equal(result.value.agent, participant)
   assert.equal(result.value.modelProvided, false, 'dispatch remains model-free')
 }
 
-const acquireLease = async (sessionId, physicalUserMessageId, agent) => {
-  const outcome = await routing.acquireSharedExecutionAdmission(
-    sessionId,
-    physicalUserMessageId,
-    agent,
-  )
-  assert.equal(outcome.kind, 'Acquired')
-  const target = routing.sharedExecutionAdmissionTarget(outcome.lease)
-  return {
-    lease: outcome.lease,
-    exact: {
-      sessionId,
-      physicalUserMessageId,
-      effectiveAgent: agent,
-      target,
-    },
+const assertNoLegacyRoutingFields = (value, label) => {
+  const text = JSON.stringify(value)
+  for (const token of ['PeerAgent', 'peerAgent', 'eerAgent', 'EffectiveAgent', 'effectiveAgent', 'ffectiveAgent', 'cursor', 'Cursor']) {
+    assert.equal(text.includes(token), false, `${label} must not contain ${token}: ${text}`)
   }
 }
 
-const admitPhysicalExecution = async (sessionId, agent) => {
+const acquireLease = async (sessionId, physicalUserMessageId, role, participant) => {
+  const outcome = await routing.acquireSharedExecutionAdmission(
+    sessionId,
+    physicalUserMessageId,
+    role,
+    participant,
+    null,
+  )
+  assert.equal(outcome.kind, 'Acquired')
+  const target = routing.sharedExecutionAdmissionTarget(outcome.lease)
+  const exact = {
+    sessionId,
+    physicalUserMessageId,
+    role,
+    participant,
+    target,
+  }
+  assertNoLegacyRoutingFields(exact, 'admission identity')
+  return { lease: outcome.lease, exact }
+}
+
+const admitPhysicalExecution = async (sessionId, role, participant) => {
   const physicalId = `msg-binding-${sessionId}`
-  const admission = await acquireLease(sessionId, physicalId, agent)
+  const admission = await acquireLease(sessionId, physicalId, role, participant)
   const target = admission.exact.target
   assert.equal(target.model, 'test/deep')
   assert.equal(target.reasoning, 'high')
@@ -63,7 +73,7 @@ const admitPhysicalExecution = async (sessionId, agent) => {
     routing.releaseSharedExecutionAdmissionBeforeProvider(admission.lease, admission.exact),
     { kind: 'Applied' },
   )
-  return target
+  return { target, exact: admission.exact }
 }
 
 after(async () => {
@@ -72,7 +82,7 @@ after(async () => {
   await rm(home, { recursive: true, force: true })
 })
 
-test('WHAT[PID-008] root_requires_external_agent_proof_then_model_is_scheduler_owned', async () => {
+test('WHAT[PID-008] root_requires_external_participant_proof_then_model_is_scheduler_owned', async () => {
   const root = 'ses_binding_root'
   const model = modelFor('coder')
 
@@ -82,43 +92,49 @@ test('WHAT[PID-008] root_requires_external_agent_proof_then_model_is_scheduler_o
 
   binding.observeUserFacingAgent(root, 'coder')
   assertPrepared(binding.prepareUserFacing(root, 'coder', false, model), 'coder')
-  await admitPhysicalExecution(root, 'coder')
+  const first = await admitPhysicalExecution(root, 'coder', 'coder')
 
   const temporary = binding.prepareUserFacing(root, 'coder', true, modelFor('coder'))
   assertPrepared(temporary, 'coder')
-  await admitPhysicalExecution(`${root}-override`, 'coder')
+  const second = await admitPhysicalExecution(`${root}-override`, 'coder', 'coder')
+
+  // Fresh physical retries keep the same fixed participant+Role even as the
+  // scheduler hands out a new routing target admission.
+  assert.equal(second.exact.participant, first.exact.participant)
+  assert.equal(second.exact.role, first.exact.role)
+  assert.deepEqual(second.target, first.target)
 
   // A preserve request cannot use a foreign override as a new base.
   assertPrepared(binding.prepareUserFacing(root, 'coder', false, model), 'coder')
-  await admitPhysicalExecution(`${root}-restored`, 'coder')
+  await admitPhysicalExecution(`${root}-restored`, 'coder', 'coder')
 
-  const foreign = binding.prepareUserFacing(root, 'reviewer', true, modelFor('reviewer'))
+  const foreign = binding.prepareUserFacing(root, 'inspector', true, modelFor('inspector'))
   assert.equal(foreign.ok, false)
-  assert.match(foreign.error, /not the peer|override/i)
+  assert.match(foreign.error, /must equal authority participant/i)
 
-  binding.observeUserFacingAgent(root, 'reviewer')
-  assertPrepared(binding.prepareUserFacing(root, 'reviewer', false, modelFor('reviewer')), 'reviewer')
-  await admitPhysicalExecution(`${root}-switched`, 'reviewer')
+  binding.observeUserFacingAgent(root, 'inspector')
+  assertPrepared(binding.prepareUserFacing(root, 'inspector', false, modelFor('inspector')), 'inspector')
+  await admitPhysicalExecution(`${root}-switched`, 'inspector', 'inspector')
 
   binding.drop(root)
 })
 
-test('WHAT[PID-008] parented_session_uses_stable_agent_lease_and_authorized_peer_only', async () => {
+test('WHAT[PID-008] parented_session_uses_stable_participant_lease_and_authorized_peer_only', async () => {
   const parent = 'ses_parent'
   const child = 'ses_child'
   const created = binding.bindChild(parent, child, 'distiller')
   assert.equal(created.ok, true, created.error)
 
   assertPrepared(binding.prepareManaged(child, 'distiller', false, modelFor('distiller')), 'distiller')
-  await admitPhysicalExecution(child, 'distiller')
+  await admitPhysicalExecution(child, 'distiller', 'distiller')
 
   const peer = binding.prepareManaged(child, 'distiller', true, modelFor('distiller'))
   assertPrepared(peer, 'distiller')
-  await admitPhysicalExecution(`${child}-peer`, 'distiller')
+  await admitPhysicalExecution(`${child}-peer`, 'distiller', 'distiller')
 
   const foreign = binding.prepareManaged(child, 'coder', true, modelFor('coder'))
   assert.equal(foreign.ok, false)
-  assert.match(foreign.error, /not the peer|override/i)
+  assert.match(foreign.error, /must equal authority participant/i)
 
   binding.drop(child)
 })
@@ -130,7 +146,7 @@ test('WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease', asyn
 
   const physicalId = 'msg-variant-exact'
   const expected = modelFor('distiller')
-  const admission = await acquireLease(child, physicalId, 'distiller')
+  const admission = await acquireLease(child, physicalId, 'distiller', 'distiller')
   const target = admission.exact.target
   assert.deepEqual(target, { model: 'test/deep', reasoning: 'high' })
   assert.deepEqual(routing.commitSharedExecutionAdmission(admission.lease, admission.exact), { kind: 'Applied' })

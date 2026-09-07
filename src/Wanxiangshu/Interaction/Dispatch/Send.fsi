@@ -45,7 +45,6 @@ module PromptDispatcherSend =
             text: string ->
             continuation: PromptAuthority.ContinuationKind ->
             profile: PromptAuthority.AuthorityExecutionProfile ->
-            effectiveAgent: string ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
             onAccepted: (PhysicalUserMessageId -> unit) option ->
@@ -59,7 +58,6 @@ module PromptDispatcherSend =
             gateKind: string ->
             terminalProviderRun: ProviderRunIdentity ->
             profile: PromptAuthority.AuthorityExecutionProfile ->
-            effectiveAgent: string ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
             onAccepted: (PhysicalUserMessageId -> unit) option ->
@@ -71,7 +69,6 @@ module PromptDispatcherSend =
             text: string ->
             continuation: PromptAuthority.ContinuationKind ->
             profile: PromptAuthority.AuthorityExecutionProfile ->
-            effectiveAgent: string ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
             onAccepted: (PhysicalUserMessageId -> unit) option ->
@@ -86,7 +83,6 @@ module PromptDispatcherSend =
             terminalProviderRun: ProviderRunIdentity ->
             repairKind: string ->
             profile: PromptAuthority.AuthorityExecutionProfile ->
-            effectiveAgent: string ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
             onAccepted: (PhysicalUserMessageId -> unit) option ->
@@ -98,7 +94,6 @@ module PromptDispatcherSend =
             text: string ->
             continuation: PromptAuthority.ContinuationKind ->
             profile: PromptAuthority.AuthorityExecutionProfile ->
-            effectiveAgent: string ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
             onAccepted: (PhysicalUserMessageId -> unit) option ->
@@ -113,7 +108,6 @@ module PromptDispatcherSend =
             gateKind: string ->
             terminalProviderRun: ProviderRunIdentity ->
             profile: PromptAuthority.AuthorityExecutionProfile ->
-            effectiveAgent: string ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
             physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) ->
@@ -127,7 +121,6 @@ module PromptDispatcherSend =
             terminalProviderRun: ProviderRunIdentity ->
             repairKind: string ->
             profile: PromptAuthority.AuthorityExecutionProfile ->
-            effectiveAgent: string ->
             directory: string option ->
             awaitMode: PromptDispatcher.AwaitMode ->
             physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) ->

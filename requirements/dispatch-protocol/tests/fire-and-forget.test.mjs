@@ -29,19 +29,18 @@ const personas = {
   manager: 'Lead',
   devops: 'Operator',
 }
-const rootSelection = (agent) => {
-  const canonicalRole = agent === 'predictor' ? 'inspector' : agent
+const rootSelection = (participant) => {
+  const role = participant === 'predictor' ? 'inspector' : participant
   return {
     kind: 'RootSelection',
     ownerSession: null,
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: agent,
-      peerAgent: agent,
-      canonicalRole,
+      participant,
+      role,
       selectedTier: 'deep',
-      persona: personas[agent] ?? 'Unknown',
+      persona: personas[participant] ?? 'Unknown',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
     },
@@ -205,7 +204,6 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_continuation_same_claim_pa
         'busy nudge text',
         'BusyAgentNudge',
         profileFor('ses_007c'),
-        'coder',
         'Detached',
       )
       assert.equal(cont.ok, true, cont.ok ? '' : cont.error)

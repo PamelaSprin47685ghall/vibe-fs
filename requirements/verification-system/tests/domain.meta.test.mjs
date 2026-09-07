@@ -4,7 +4,7 @@
 // representation. Each assertion enters through the registered owner that owns
 // the fact: Process owns deadlines, Persistence/Journal owns the line codec,
 // Context owns context recovery folds, and Provider/Attempt/Fallback owns the
-// cursor projection. No Fable union, collection, or emitted-name helper crosses
+// provider failure projection. No Fable union, collection, or emitted-name helper crosses
 // this test boundary.
 
 import assert from 'node:assert/strict'
@@ -15,9 +15,9 @@ import * as journalCodec from '../../../dist/Persistence/Journal/CodecSurface.js
 import * as factCodec from '../../../dist/Persistence/Journal/FactCodecSurface.js'
 import * as contextFold from '../../../dist/Context/Companion/FoldSurface.js'
 import {
-  cursor as fallbackCursor,
-  fallbackProjection,
-} from '../../../dist/Participant/Provider/Attempt/Fallback/CursorSurface.js'
+  budget as providerFailureBudget,
+  providerFailureProjection,
+} from '../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js'
 
 const SESSION = 'ses_meta'
 
@@ -208,38 +208,39 @@ test('WHAT[VERIFICATION-SYSTEM-008] Context_fold_rejects_unknown_fact_cases_loud
   )
 })
 
-// ── Fallback owner: cursor projection is a named semantic result ────────────
+// ── Provider failure owner: budget + projection is a named semantic result ──
 
-test('WHAT[VERIFICATION-SYSTEM-008] Fallback_owner_exposes_cursor_and_dedupe_state', () => {
-  const initial = fallbackProjection.forAuthority('run_L', 'msg_u1')
-  const ownerIdentity = fallbackCursor.attemptIdentity(SESSION, 'run_L', 'msg_u1', 'run_owner')
-  const bloggerIdentity = fallbackCursor.attemptIdentity(SESSION, 'run_L', 'msg_u1', 'run_blog_interrupt')
-  const ownerAdvance = fallbackProjection.applyAdvance(ownerIdentity, 0, 1, 1, initial)
+test('WHAT[VERIFICATION-SYSTEM-008] ProviderFailure_owner_exposes_budget_and_dedupe_state', () => {
+  const initial = providerFailureProjection.forAuthority('run_L', 'msg_u1')
+  const ownerIdentity = providerFailureBudget.attemptIdentity(SESSION, 'run_L', 'msg_u1', 'run_owner')
+  const secondIdentity = providerFailureBudget.attemptIdentity(SESSION, 'run_L', 'msg_u1', 'run_second')
+  const ownerAdvance = providerFailureProjection.applyFailure(ownerIdentity, 1, initial)
   assert.equal(ownerAdvance.ok, true, ownerAdvance.ok ? '' : ownerAdvance.error)
-  assert.deepEqual(fallbackProjection.read(ownerAdvance.value), {
+  assert.deepEqual(providerFailureProjection.read(ownerAdvance.value), {
     logicalRun: 'run_L',
     authorityRoot: 'msg_u1',
-    offset: 1,
     failures: 1,
     dedupeKeys: 1,
     exhausted: false,
   })
 
-  const bloggerAdvance = fallbackProjection.applyAdvance(bloggerIdentity, 1, 2, 2, ownerAdvance.value)
-  assert.equal(bloggerAdvance.ok, true, bloggerAdvance.ok ? '' : bloggerAdvance.error)
-  assert.deepEqual(fallbackProjection.read(bloggerAdvance.value), {
+  const secondAdvance = providerFailureProjection.applyFailure(secondIdentity, 2, ownerAdvance.value)
+  assert.equal(secondAdvance.ok, true, secondAdvance.ok ? '' : secondAdvance.error)
+  assert.deepEqual(providerFailureProjection.read(secondAdvance.value), {
     logicalRun: 'run_L',
     authorityRoot: 'msg_u1',
-    offset: 2,
     failures: 2,
     dedupeKeys: 2,
     exhausted: false,
   })
 
-  assert.deepEqual(fallbackProjection.read(fallbackProjection.recordSuccess(ownerAdvance.value)), {
+  const duplicate = providerFailureProjection.applyFailure(ownerIdentity, 2, secondAdvance.value)
+  assert.equal(duplicate.ok, false)
+  assert.equal(duplicate.error, 'AlreadyObserved')
+
+  assert.deepEqual(providerFailureProjection.read(providerFailureProjection.recordSuccess(ownerAdvance.value)), {
     logicalRun: 'run_L',
     authorityRoot: 'msg_u1',
-    offset: 0,
     failures: 0,
     dedupeKeys: 0,
     exhausted: false,
@@ -256,8 +257,8 @@ test('WHAT[VERIFICATION-SYSTEM-008] registered_owner_surfaces_publish_their_cont
     'Journal.Codec.serialize': journalCodec.serialize,
     'Journal.FactCodec.decode': factCodec.decode,
     'Context.Fold.fold': contextFold.fold,
-    'Fallback.cursor.read': fallbackCursor.read,
-    'Fallback.projection.applyAdvance': fallbackProjection.applyAdvance,
+    'ProviderFailure.budget.read': providerFailureBudget.read,
+    'ProviderFailure.projection.applyFailure': providerFailureProjection.applyFailure,
   })) {
     assert.equal(typeof value, 'function', `${name} must be callable`)
   }

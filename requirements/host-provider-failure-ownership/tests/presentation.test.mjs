@@ -19,8 +19,7 @@ const input = (failure, change = {}) => ({
     logicalRun: 'logical-provider-presentation',
     providerRun: 'run-provider-presentation',
     requestKind: 'WorkMain',
-    retryBudget: 'Exhausted',
-    fallbackBudget: 'Available',
+    retryBudget: 'Available',
     breaker: 'Closed',
   },
   ...change,
@@ -57,7 +56,7 @@ test('WHAT[HOSTFAIL-004] non-terminal resolution leaves presentation to the Host
 test('WHAT[HOSTFAIL-006] exhaustion uses one typed final Wanxiangshu presentation', () => {
   assert.deepEqual(
     classify('ProviderPermanent', 'episode-final', {
-      provider: { ...input('ProviderPermanent').provider, fallbackBudget: 'Exhausted' },
+      provider: { ...input('ProviderPermanent').provider, retryBudget: 'Exhausted' },
     }),
     {
       mode: 'Final',
@@ -70,7 +69,7 @@ test('WHAT[HOSTFAIL-006] exhaustion uses one typed final Wanxiangshu presentatio
 
 test('WHAT[HOSTFAIL-006] terminal resolution is never retrying', () => {
   const decision = classify('ProviderPermanent', 'episode-final', {
-    provider: { ...input('ProviderPermanent').provider, fallbackBudget: 'Exhausted' },
+    provider: { ...input('ProviderPermanent').provider, retryBudget: 'Exhausted' },
   })
   assert.equal(decision.mode, 'Final')
   assert.equal(decision.hasFinalPresentation, true)

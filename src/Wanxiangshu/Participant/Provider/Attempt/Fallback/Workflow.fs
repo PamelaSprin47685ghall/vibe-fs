@@ -19,10 +19,10 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 
-/// Confirmed-failure recovery. The failed session owns the next slot:
-/// WorkMain arms one X prefix opportunity; BloggerMain may insert one BloggerSquash
-/// maintenance request before retrying main. No future unrelated X material is a
-/// recovery trigger.
+/// Confirmed-failure recovery.
+/// WorkMain retries on the next provider failure budget; BloggerMain may insert one BloggerSquash
+/// maintenance request before retrying main. No future unrelated provider material is a
+/// retry trigger.
 module ProviderRecoveryWorkflow =
 
     let private sessionHasFreshCoverage (projection: ProjectionSet) (sessionId: SessionId) =
@@ -347,11 +347,10 @@ module ProviderRecoveryWorkflow =
         (mainSessionId: SessionId)
         (continuationPrompt: string)
         (error: string)
-        (opportunity: RecoveryOpportunity)
         (squash: BloggerRequestContext option)
         (failed: BloggerRequestContext)
         : Task =
-        match RecoverySlot.nextBloggerRequest ProviderRequestKind.BloggerMain opportunity squash.IsSome, squash with
+        match BloggerRetryPolicy.nextRequest ProviderRequestKind.BloggerMain squash.IsSome, squash with
         | Ok ProviderRequestKind.BloggerSquash, Some squashCtx ->
             replaceFailedBloggerRequest
                 sessionPort
@@ -426,11 +425,10 @@ module ProviderRecoveryWorkflow =
         (mainSessionId: SessionId)
         (continuationPrompt: string)
         (error: string)
-        (opportunity: RecoveryOpportunity)
         (squash: BloggerRequestContext option)
         (failed: BloggerRequestContext)
         : Task =
-        match RecoverySlot.nextBloggerRequest ProviderRequestKind.BloggerSquash opportunity squash.IsSome with
+        match BloggerRetryPolicy.nextRequest ProviderRequestKind.BloggerSquash squash.IsSome with
         | Error _ ->
             notifyFailure eventPort turn "Blogger squash recovery produced an invalid next request kind"
             Task.FromResult(()) :> Task
@@ -462,7 +460,6 @@ module ProviderRecoveryWorkflow =
         (mainSessionId: SessionId)
         (continuationPrompt: string)
         (error: string)
-        (opportunity: RecoveryOpportunity)
         : Task =
         task {
             let current = scope.TryPeekCurrentRequest(SessionId.value turn.SessionId)
@@ -483,7 +480,6 @@ module ProviderRecoveryWorkflow =
                         mainSessionId
                         continuationPrompt
                         error
-                        opportunity
                         squash
                         failed
             | Some((BloggerRequestContext.Squash _) as failed) ->
@@ -499,7 +495,6 @@ module ProviderRecoveryWorkflow =
                         mainSessionId
                         continuationPrompt
                         error
-                        opportunity
                         squash
                         failed
         }
@@ -514,11 +509,9 @@ module ProviderRecoveryWorkflow =
         (authorization: ProviderRecoveryAuthorization)
         (continuationPrompt: string)
         (error: string)
-        (opportunity: RecoveryOpportunity)
         : Task =
         task {
-            if opportunity = RecoveryOpportunity.RecoveryAttempt then
-                do! awaitRecoveryMaterial scope durable turn.SessionId
+            do! awaitRecoveryMaterial scope durable turn.SessionId
 
             let! continuation =
                 sendRecoveryContinuation sessionPort rootWorkspace turn durable authorization continuationPrompt
@@ -536,7 +529,6 @@ module ProviderRecoveryWorkflow =
         (authorization: ProviderRecoveryAuthorization)
         (continuationPrompt: string)
         (error: string)
-        (opportunity: RecoveryOpportunity)
         : Task =
         let linkedMainSession =
             match authorization.RequestKind with
@@ -560,7 +552,6 @@ module ProviderRecoveryWorkflow =
                 mainSessionId
                 continuationPrompt
                 error
-                opportunity
         | false, (ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash), None ->
             notifyFailure eventPort turn "Confirmed Blogger provider failure has no linked main session"
             Task.FromResult(()) :> Task
@@ -575,7 +566,6 @@ module ProviderRecoveryWorkflow =
                 authorization
                 continuationPrompt
                 error
-                opportunity
         | false, ProviderRequestKind.StrengthReplica, _ ->
             notifyFailure eventPort turn "Strength replica provider failure cannot authorize automatic recovery"
             Task.FromResult(()) :> Task
@@ -596,14 +586,14 @@ module ProviderRecoveryWorkflow =
         | Error reason ->
             notifyFailure eventPort turn reason
             Task.FromResult(()) :> Task
-        | Ok ConfirmedFailureOutcome.RecoveryExhausted ->
+        | Ok FailureAdmissionOutcome.RetryExhausted ->
             notifyFailure eventPort turn error
             Task.FromResult(()) :> Task
-        | Ok ConfirmedFailureOutcome.EpisodeSuperseded -> Task.FromResult(()) :> Task
-        | Ok ConfirmedFailureOutcome.NoActiveRun ->
-            notifyFailure eventPort turn "Confirmed provider failure has no active fallback run"
+        | Ok FailureAdmissionOutcome.EpisodeSuperseded -> Task.FromResult(()) :> Task
+        | Ok FailureAdmissionOutcome.NoActiveRun ->
+            notifyFailure eventPort turn "Confirmed provider failure has no active provider run"
             Task.FromResult(()) :> Task
-        | Ok(ConfirmedFailureOutcome.RecoveryAdvanced opportunity) ->
+        | Ok FailureAdmissionOutcome.RetryAuthorized ->
             continueAdvancedFailure
                 sessionPort
                 rootWorkspace
@@ -614,20 +604,19 @@ module ProviderRecoveryWorkflow =
                 authorization
                 continuationPrompt
                 error
-                opportunity
-
-    let private fallbackBudgetOf (current: FallbackProjection) =
-        if FallbackProjection.mayContinue AgentPairCursor.DefaultAutoRecoveryBudget current then
-            ProviderRecoveryBudget.Available
-        else
-            ProviderRecoveryBudget.Exhausted
 
     let private recoveryDecision
         (turn: ReconciledTurn)
         (failure: ExecutionFailure)
-        (current: FallbackProjection)
+        (current: ProviderFailureProjection)
         (requestKind: ProviderRequestKind)
         =
+        let providerFailureBudget =
+            if ProviderFailureProjection.mayRetry ProviderFailureBudget.DefaultBudget current then
+                ProviderRecoveryBudget.Available
+            else
+                ProviderRecoveryBudget.Exhausted
+
         ExecutionFailurePolicy.decide
             { Failure = failure
               Lifecycle = DurableExecutionLifecycle.ProviderStarted
@@ -639,19 +628,17 @@ module ProviderRecoveryWorkflow =
                 { LogicalRun = current.LogicalRunId
                   ProviderRun = turn.ProviderRun
                   RequestKind = requestKind
-                  RetryBudget = ProviderRecoveryBudget.Exhausted
-                  FallbackBudget = fallbackBudgetOf current
+                  RetryBudget = providerFailureBudget
                   Breaker = ProviderBreakerState.Closed } }
 
     let private recoveryAuthorization
         (turn: ReconciledTurn)
         (failure: ExecutionFailure)
-        (current: FallbackProjection)
+        (current: ProviderFailureProjection)
         (requestKind: ProviderRequestKind)
         =
         match (recoveryDecision turn failure current requestKind).Resolution with
-        | ExecutionFailureResolution.RetryFreshAttempt authorization
-        | ExecutionFailureResolution.AdvanceFallback authorization -> Some authorization
+        | ExecutionFailureResolution.RetryFreshAttempt authorization -> Some authorization
         | ExecutionFailureResolution.PreserveCurrentFact
         | ExecutionFailureResolution.AwaitAcceptanceReconciliation _
         | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _
@@ -663,7 +650,7 @@ module ProviderRecoveryWorkflow =
         (authorization: ProviderRecoveryAuthorization)
         (error: string)
         =
-        FallbackLedger.recordAuthorizedFailure durable ownerSessionId authorization error
+        ProviderFailureLedger.recordAuthorizedFailure durable ownerSessionId authorization error
 
     let private admitCurrentFailure
         (durable: AgentJournal)
@@ -672,10 +659,10 @@ module ProviderRecoveryWorkflow =
         (failure: ExecutionFailure)
         (requestKind: ProviderRequestKind)
         (error: string)
-        (current: FallbackProjection)
+        (current: ProviderFailureProjection)
         =
         match recoveryAuthorization turn failure current requestKind with
-        | None -> Task.FromResult(Ok ConfirmedFailureOutcome.RecoveryExhausted)
+        | None -> Task.FromResult(Ok FailureAdmissionOutcome.RetryExhausted)
         | Some authorization -> admitAuthorizedFailure durable ownerSessionId authorization error
 
     let admitPolicyAuthorizedFailure
@@ -684,7 +671,7 @@ module ProviderRecoveryWorkflow =
         (failure: ExecutionFailure)
         (requestKind: ProviderRequestKind)
         (error: string)
-        : Task<Result<ConfirmedFailureOutcome, string>> =
+        : Task<Result<FailureAdmissionOutcome, string>> =
         let projection = AgentJournal.snapshot durable
 
         let ownerSessionId = recoveryOwnerSession projection turn.SessionId requestKind
@@ -692,11 +679,11 @@ module ProviderRecoveryWorkflow =
         let ownerState =
             ownerSessionId
             |> Option.bind (fun owner ->
-                FallbackEvidence.tryCurrentState owner projection
+                ProviderFailureEvidence.currentState owner projection
                 |> Option.map (fun current -> owner, current))
 
         match ownerState with
-        | None -> Task.FromResult(Ok ConfirmedFailureOutcome.NoActiveRun)
+        | None -> Task.FromResult(Ok FailureAdmissionOutcome.NoActiveRun)
         | Some(owner, current) -> admitCurrentFailure durable owner turn failure requestKind error current
 
     let private executeRecoveryResolution
@@ -718,10 +705,10 @@ module ProviderRecoveryWorkflow =
         | ExecutionFailureResolution.TerminalizeProviderStarted _ ->
             notifyFailure eventPort turn error
             Task.FromResult(()) :> Task
-        | ExecutionFailureResolution.RetryFreshAttempt authorization
-        | ExecutionFailureResolution.AdvanceFallback authorization ->
+        | ExecutionFailureResolution.RetryFreshAttempt authorization ->
             task {
-                let! admission = FallbackLedger.recordAuthorizedFailure durable ownerSessionId authorization error
+                let! admission =
+                    ProviderFailureLedger.recordAuthorizedFailure durable ownerSessionId authorization error
 
                 return!
                     settleFailureAdmission
@@ -748,7 +735,7 @@ module ProviderRecoveryWorkflow =
         (failure: ExecutionFailure)
         (continuationPrompt: string)
         (error: string)
-        (current: FallbackProjection)
+        (current: ProviderFailureProjection)
         (requestKind: ProviderRequestKind)
         =
         recoveryDecision turn failure current requestKind
@@ -804,7 +791,7 @@ module ProviderRecoveryWorkflow =
                 |> Option.bind (fun requestKind ->
                     recoveryOwnerSession projections turn.SessionId requestKind
                     |> Option.bind (fun ownerSessionId ->
-                        FallbackEvidence.tryCurrentState ownerSessionId projections
+                        ProviderFailureEvidence.currentState ownerSessionId projections
                         |> Option.map (fun current -> ownerSessionId, requestKind, current)))
 
             match hasCapacity, recoveryContext with
@@ -827,15 +814,14 @@ module ProviderRecoveryWorkflow =
                         requestKind
         }
 
-    /// FALLBACK-003 + FALLBACK-004: a settled failed turn.
+    /// Confirmed provider failure handling.
     ///
     /// The reconciled snapshot is what proves the attempt failed (HOST-004), so
-    /// this is where the cursor advances — not in the Host retry event handler,
-    /// which only wakes. `FallbackLedger` is the Application single writer.
+    /// this is where the failure budget is recorded — not in the Host retry event
+    /// handler, which only wakes. `ProviderFailureLedger` is the Application single writer.
     ///
-    /// FALLBACK-004 then decides whether a continuation follows: only when the
-    /// budget still permits one. The continuation itself produces no second
-    /// advance, which is why nothing here writes again.
+    /// Settle admission then decides whether a continuation follows: only when the
+    /// budget still permits retry.
     let continueAfterConfirmedFailure
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)

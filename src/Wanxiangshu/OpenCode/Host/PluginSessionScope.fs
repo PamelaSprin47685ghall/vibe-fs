@@ -47,17 +47,13 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
 /// Per-instance session registry state for one plugin instance (HOST-012):
-/// owned sessions, user-message bindings, companions, verdicts, nudges,
+/// owned sessions, companions, verdicts, nudges,
 /// quiescence permits and join interrupts. Shared cross-worktree state stays
 /// in SharedState; everything here is per-instance and dies with the scope.
 type PluginSessionScope() =
-    /// DSL-cross-callback-proof: physical resource — retained child identity for cleanup/finality only
-    // DSL-MUTABLE: resource — identities retained through staged Inspector finalization.
-    let retainedSessionIdentities = HashSet<string>()
-
     // HOST-012: 跨实例共享（模块级单例）——worktree 独立插件实例的 fork→verdict
-    // 链必须读写同一份。每实例独有状态（OwnedSessions、UserMessageBindings、
-    // Companions 等）保持 per-instance。
+    // 链必须读写同一份。每实例独有状态（OwnedSessions、Companions 等）保持
+    // per-instance。
     // DSL-MUTABLE: resource — alias to SharedState session directory map.
     member val SessionDirectories = SharedState.SessionDirectories
     // DSL-MUTABLE: resource — per-instance owned session set.
@@ -67,8 +63,6 @@ type PluginSessionScope() =
     /// This is cleanup bookkeeping only, never business/session authority.
     // DSL-MUTABLE: resource — per-instance routing session set.
     member val ModelRoutingSessions = HashSet<string>()
-    // DSL-MUTABLE: resource — per-instance user message binding map.
-    member val UserMessageBindings = Dictionary<string, PhysicalUserMessageId>()
     // DSL-MUTABLE: resource — alias to SharedState session parent map.
     member val SessionParents = SharedState.SessionParents
     // DSL-MUTABLE: resource — per-instance companion registry.
@@ -107,14 +101,15 @@ type PluginSessionScope() =
             // sessionId may itself be a Blogger child being deleted.
             [ sessionId ]
 
+    /// Drops the provider-language identity for this session idempotently.
     member _.DropSessionIdentity(sessionId: string) =
-        retainedSessionIdentities.Remove sessionId |> ignore
         let sid = SessionId.create sessionId
         SessionProviderLanguage.drop sid
 
     /// Session deletion drops every per-instance registry entry for this
-    /// session (mirror of DisposeSession's per-session cleanup).
-    member this.ClearSession(sessionId: string, preserveIdentity: bool) =
+    /// session (mirror of DisposeSession's per-session cleanup). Always drops
+    /// session identity.
+    member this.ClearSession(sessionId: string) =
         match this.Companions.TryGetValue sessionId with
         | true, companion ->
             this.Companions.Remove sessionId |> ignore
@@ -123,16 +118,12 @@ type PluginSessionScope() =
 
         this.OwnedSessions.Remove sessionId |> ignore
         this.ModelRoutingSessions.Remove sessionId |> ignore
-        this.UserMessageBindings.Remove sessionId |> ignore
         this.SessionParents.Remove sessionId |> ignore
         SessionExecutionBinding.drop (SessionId.create sessionId)
         this.SessionDirectories.Remove sessionId |> ignore
         let sid = SessionId.create sessionId
 
-        if preserveIdentity then
-            retainedSessionIdentities.Add sessionId |> ignore
-        else
-            this.DropSessionIdentity sessionId
+        this.DropSessionIdentity sessionId
 
         // HOST-004 Q-10: a deleted session's idle permits die forever.
         this.Quiescence.DropSession sid
@@ -147,9 +138,6 @@ type PluginSessionScope() =
             (companion :> IDisposable).Dispose()
 
         this.Companions.Clear()
-
-        for sessionId in retainedSessionIdentities |> Seq.toArray do
-            this.DropSessionIdentity sessionId
 
         let routed =
             Seq.append this.ModelRoutingSessions this.OwnedSessions

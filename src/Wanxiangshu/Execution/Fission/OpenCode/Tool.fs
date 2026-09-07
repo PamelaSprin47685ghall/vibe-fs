@@ -75,11 +75,6 @@ module FissionTool =
 
         "fission-" + identity.Substring(0, 24)
 
-    let private currentEffectiveAgent (profile: PromptAuthority.AuthorityExecutionProfile) (ctx: HostToolContext) =
-        match ctx.Agent with
-        | Some agent when agent = profile.SelectedAgent || agent = profile.PeerAgent -> agent
-        | _ -> profile.SelectedAgent
-
     let private deliveryPrompt owner completionId payload =
         let instruction =
             ProviderProse.render
@@ -151,7 +146,6 @@ module FissionTool =
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (lane: FissionStartedLane)
@@ -174,7 +168,6 @@ module FissionTool =
                         (deliveryPrompt owner completionId payload)
                         PromptAuthority.ContinuationKind.FissionHandoff
                         activeLaneProfile
-                        activeLaneProfile.SelectedAgent
                         (scope.DirectoryFor(SessionId.value lane.SessionId))
                         PromptDispatcher.AwaitMode.Detached
                         None
@@ -189,7 +182,6 @@ module FissionTool =
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (lane: FissionStartedLane)
@@ -202,14 +194,13 @@ module FissionTool =
                 let! _ = appendDelivery durable owner None groupId completionId lane.Index
                 return ()
             else
-                return! continueLiveLane scope durable profile effectiveAgent groupId owner lane completionId payload
+                return! continueLiveLane scope durable profile groupId owner lane completionId payload
         }
 
     let private deliverLaneGuarded
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (lane: FissionStartedLane)
@@ -219,18 +210,7 @@ module FissionTool =
         =
         task {
             try
-                do!
-                    deliverLaneBody
-                        scope
-                        durable
-                        profile
-                        effectiveAgent
-                        groupId
-                        owner
-                        lane
-                        completionId
-                        payload
-                        laneClosed
+                do! deliverLaneBody scope durable profile groupId owner lane completionId payload laneClosed
             finally
                 FissionRuntime.endDelivery groupId completionId lane.Index
         }
@@ -239,7 +219,6 @@ module FissionTool =
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (completionId: string)
@@ -255,18 +234,7 @@ module FissionTool =
             then
                 return ()
             else
-                return!
-                    deliverLaneGuarded
-                        scope
-                        durable
-                        profile
-                        effectiveAgent
-                        groupId
-                        owner
-                        lane
-                        completionId
-                        payload
-                        laneClosed
+                return! deliverLaneGuarded scope durable profile groupId owner lane completionId payload laneClosed
         }
 
     let private readyExceptForRetirement (durable: AgentJournal) groupId =
@@ -317,7 +285,6 @@ module FissionTool =
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (lanes: FissionStartedLane list)
@@ -326,14 +293,13 @@ module FissionTool =
         =
         task {
             for lane in lanes |> List.sortBy (fun lane -> lane.Index) do
-                do! deliverOneLane scope durable profile effectiveAgent groupId owner completionId payload lane
+                do! deliverOneLane scope durable profile groupId owner completionId payload lane
         }
 
     let private broadcastAfterBegin
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (lanes: FissionStartedLane list)
@@ -344,17 +310,7 @@ module FissionTool =
             try
                 do! ensureCompletionCaptured durable owner groupId completionId payload
 
-                do!
-                    deliverAllLaneCompletions
-                        scope
-                        durable
-                        profile
-                        effectiveAgent
-                        groupId
-                        owner
-                        lanes
-                        completionId
-                        payload
+                do! deliverAllLaneCompletions scope durable profile groupId owner lanes completionId payload
 
                 do! convergeOwnerIfNeeded scope durable owner groupId
             finally
@@ -369,7 +325,6 @@ module FissionTool =
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (lanes: FissionStartedLane list)
@@ -380,8 +335,7 @@ module FissionTool =
             if not (FissionRuntime.tryBeginDelivery groupId completionId -1) then
                 return ()
             else
-                return!
-                    broadcastAfterBegin scope durable profile effectiveAgent groupId owner lanes completionId payload
+                return! broadcastAfterBegin scope durable profile groupId owner lanes completionId payload
         }
 
     let private payloadFromWorkRecord workRecord fallback =
@@ -393,7 +347,6 @@ module FissionTool =
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (lanes: FissionStartedLane list)
@@ -405,14 +358,13 @@ module FissionTool =
             let! workRecord = scope.ChildWorkRecordFor(SessionId.value childId)
             let payload = payloadFromWorkRecord workRecord terminal.TerminalText
 
-            do! captureAndBroadcast scope durable profile effectiveAgent groupId owner lanes completionId payload
+            do! captureAndBroadcast scope durable profile groupId owner lanes completionId payload
         }
 
     let private dispatchTerminalOutcome
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (lanes: FissionStartedLane list)
@@ -427,7 +379,6 @@ module FissionTool =
                 scope
                 durable
                 profile
-                effectiveAgent
                 groupId
                 owner
                 lanes
@@ -435,24 +386,13 @@ module FissionTool =
                 (String.concat "\n" [ "status=failed"; "error=" + stop.Reason ])
             |> ignore
         | Wanxiangshu.OpenCode.TerminalOutcome.Completed terminal ->
-            captureCompletedTerminal
-                scope
-                durable
-                profile
-                effectiveAgent
-                groupId
-                owner
-                lanes
-                childId
-                completionId
-                terminal
+            captureCompletedTerminal scope durable profile groupId owner lanes childId completionId terminal
             |> ignore
 
     let private onPreAgentTerminal
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (lanes: FissionStartedLane list)
@@ -464,17 +404,7 @@ module FissionTool =
         if sessionId <> childId then
             ()
         else
-            dispatchTerminalOutcome
-                scope
-                durable
-                profile
-                effectiveAgent
-                groupId
-                owner
-                lanes
-                childId
-                completionId
-                outcome
+            dispatchTerminalOutcome scope durable profile groupId owner lanes childId completionId outcome
 
     let private ptyCompletionPayload (item: PtyJoinItem) =
         match item with
@@ -489,7 +419,6 @@ module FissionTool =
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (lanes: FissionStartedLane list)
@@ -500,7 +429,7 @@ module FissionTool =
 
             let subscription =
                 eventPort.SubscribeTerminalListener(
-                    onPreAgentTerminal scope durable profile effectiveAgent groupId owner lanes childId completionId
+                    onPreAgentTerminal scope durable profile groupId owner lanes childId completionId
                 )
 
             FissionRuntime.trackGroupResource groupId subscription
@@ -509,7 +438,6 @@ module FissionTool =
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (lanes: FissionStartedLane list)
@@ -525,7 +453,6 @@ module FissionTool =
                 scope
                 durable
                 profile
-                effectiveAgent
                 groupId
                 owner
                 lanes
@@ -537,7 +464,6 @@ module FissionTool =
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (lanes: FissionStartedLane list)
@@ -550,9 +476,7 @@ module FissionTool =
             let wanted = Set.ofList prePtys
 
             let subscription =
-                ownerRuntime.SubscribePtyCompletion(
-                    onPtyCompletion scope durable profile effectiveAgent groupId owner lanes wanted
-                )
+                ownerRuntime.SubscribePtyCompletion(onPtyCompletion scope durable profile groupId owner lanes wanted)
 
             FissionRuntime.trackGroupResource groupId subscription
 
@@ -560,7 +484,6 @@ module FissionTool =
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (groupId: string)
         (owner: SessionId)
         (lanes: FissionStartedLane list)
@@ -571,9 +494,9 @@ module FissionTool =
         match scope.EventPort with
         | None -> ()
         | Some eventPort ->
-            installAgentBroadcasts eventPort scope durable profile effectiveAgent groupId owner lanes preAgents
+            installAgentBroadcasts eventPort scope durable profile groupId owner lanes preAgents
 
-            installPtyBroadcasts scope durable profile effectiveAgent groupId owner lanes prePtys ownerRuntime
+            installPtyBroadcasts scope durable profile groupId owner lanes prePtys ownerRuntime
 
     let private parentWorkRecordPort (scope: ToolRuntimeScope) sessionId =
         task {
@@ -586,7 +509,7 @@ module FissionTool =
         (scope: ToolRuntimeScope)
         (groupId: string)
         (owner: SessionId)
-        (effectiveAgent: string)
+        (participant: string)
         (directory: string option)
         (parsedCount: int)
         (logicalOwner: SessionId)
@@ -599,7 +522,7 @@ module FissionTool =
                     logicalOwner,
                     physicalParent,
                     { Title = Some(sprintf "Fission lane %d/%d" (lane.Index + 1) parsedCount)
-                      Agent = Some effectiveAgent
+                      Agent = Some participant
                       Directory = directory }
                 )
             with
@@ -618,7 +541,6 @@ module FissionTool =
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (directory: string option)
         (laneId: SessionId)
         (startup: string)
@@ -638,7 +560,6 @@ module FissionTool =
                         startup
                         PromptAuthority.ContinuationKind.FissionHandoff
                         profile
-                        effectiveAgent
                         directory
                         PromptDispatcher.AwaitMode.Detached
                         None
@@ -747,7 +668,6 @@ module FissionTool =
         (prePtys: string list)
         =
         task {
-            let effectiveAgent = currentEffectiveAgent profile ctx
             let groupId = groupIdFor owner toolCallId
 
             let directory =
@@ -760,8 +680,8 @@ module FissionTool =
             let deps: FissionAdmissionDependencies =
                 { ParentOf = scope.Sessions.TryGetParentSession
                   OwnerWorkRecord = parentWorkRecordPort scope
-                  CreateLane = createLanePort scope groupId owner effectiveAgent directory parsed.Count
-                  StartLane = startLanePort scope durable profile effectiveAgent directory
+                  CreateLane = createLanePort scope groupId owner profile.SelectedAgent directory parsed.Count
+                  StartLane = startLanePort scope durable profile directory
                   AbortLane = abortLanePort scope
                   SilentInterruptOwner = silentInterruptOwnerPort scope }
 
@@ -782,7 +702,6 @@ module FissionTool =
                         scope
                         durable
                         profile
-                        effectiveAgent
                         groupId
                         owner
                         admission.Lanes

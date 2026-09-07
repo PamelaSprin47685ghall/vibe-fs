@@ -15,7 +15,7 @@ const preparedFactRef = 'effect-prepared-fact-ref-011'
 const ids = todo.todoWriteId(sha256, incumbency, call)
 const write = ids.todoWriteId ?? ids
 
-const cursor = (sequence) => ({ Sequence: sequence })
+const sequence = (number) => ({ Sequence: number })
 const fact = (caseName, payload) => JSON.stringify({ case: caseName, ...payload })
 const ok = (result) => {
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
@@ -43,7 +43,7 @@ const prepared = fact('TodoWritePrepared', {
   ProposedTodoDigest: 'effect-proposal-digest-011',
   PlanCompleteDeclared: false,
   ProviderInputDigest: 'effect-provider-input-digest-011',
-  ReviewFrontier: cursor(10),
+  ReviewFrontier: sequence(10),
   SemanticVersion: 'magic-v1',
 })
 

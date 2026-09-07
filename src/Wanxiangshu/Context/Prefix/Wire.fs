@@ -35,12 +35,13 @@ type XWireReconciliationDecision =
 module XWire =
 
     let selectProbe
-        (opportunity: RecoveryOpportunity)
+        (allowProbe: bool)
         (candidate: Result<PrefixProbe, NoCandidateReason>)
         : Result<PrefixProbe, NoCandidateReason> =
-        match opportunity with
-        | RecoveryOpportunity.RecoveryAttempt -> candidate
-        | RecoveryOpportunity.OrdinaryAttempt -> Error NoCandidateReason.NoCoverage
+        if allowProbe then
+            candidate
+        else
+            Error NoCandidateReason.NoCoverage
 
     let presentationHorizonForProbe (hasProbe: bool) : PrefixPresentationHorizon =
         if hasProbe then
@@ -283,11 +284,11 @@ module XWire =
             let plan =
                 AttemptPlanner.freezePreInference
                     authority
-                    AgentPairCursor.initial
                     physical
                     (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
                     ProviderRequestKind.StrengthReplica
-                    RecoveryOpportunity.OrdinaryAttempt
+                    None
+                    false
                     (fun () -> Error NoCandidateReason.NoCoverage)
 
             if
@@ -428,7 +429,7 @@ module XWire =
         (plan: AttemptPlan)
         : Task<Result<unit, string>> =
         if ProviderRequestKind.clearsFailureCountOnSuccess plan.Profile.RequestKind then
-            FallbackLedger.recordConfirmedSuccess durable sessionId providerRun
+            ProviderFailureLedger.recordConfirmedSuccess durable sessionId providerRun
         else
             Task.FromResult(Ok())
 
@@ -531,9 +532,9 @@ module XWire =
             match prefix.Snapshot with
             | None ->
                 // Even before the first Y epoch exists, XWire still owns the Host
-                // transport membrane. Otherwise every ordinary A/B slot between
+                // transport membrane. Otherwise every ordinary request between
                 // failed probes would accumulate all prior ProviderRetryAttempt
-                // rows and undo the recovery slot's cleanup.
+                // rows and undo the recovery cleanup.
                 let transformed =
                     renderPrefixMessages state rawMessages PrefixProjectionIntent.Keep PrefixPresentationHorizon.Current
 
@@ -564,11 +565,53 @@ module XWire =
         | None -> raise (InvalidOperationException "X-wire cannot apply a committed prefix without session projection")
         | Some state -> applyCommittedPrefix durable sessionId state rawMessages output
 
-    let private planArmedWorkMainRetry
+    let private authoritySummary (authority: PromptAuthority.AuthorityExecutionProfile) =
+        sprintf
+            "session=%s logical=%s root=%s kind=%A participant=%s role=%s"
+            (SessionId.value authority.SessionId)
+            (LogicalRunId.value authority.LogicalRunId)
+            (AuthorityRootUserMessageId.value authority.AuthorityRootUserMessageId)
+            authority.AuthorityKind
+            authority.SelectedAgent
+            (Roles.roleLabel authority.CanonicalRole)
+
+    let private requireAdmittedPendingPlan
+        (scope: PluginRuntimeScope)
+        (sessionId: SessionId)
+        (physical: PhysicalUserMessageId)
+        (pendingPlan: PendingAttemptPlan)
+        : PendingAttemptPlan =
+        match scope.Recovery.FreezePendingAttemptPlan sessionId physical pendingPlan with
+        | PendingAttemptPlanAdmission.Admitted plan -> plan
+        | PendingAttemptPlanAdmission.ReplayedExisting plan -> plan
+        | PendingAttemptPlanAdmission.PlanConflict(existing, attempted) when
+            PendingAttemptPlanAdmission.sameRequestIdentity existing attempted
+            ->
+            existing
+        | PendingAttemptPlanAdmission.PlanConflict(existing, attempted) ->
+            raise (
+                InvalidOperationException(
+                    sprintf
+                        "HOST-BOUNDARY-008: pending attempt plan conflict: existing=(%s) attempted=(%s)"
+                        (authoritySummary existing.Authority)
+                        (authoritySummary attempted.Authority)
+                )
+            )
+        | PendingAttemptPlanAdmission.IdentityMismatch(expectedSession, expectedPhysical, attempted) ->
+            raise (
+                InvalidOperationException(
+                    sprintf
+                        "HOST-BOUNDARY-008: pending attempt plan identity mismatch: expectedSession=%A expectedPhysical=%A attempted=%A"
+                        expectedSession
+                        expectedPhysical
+                        attempted
+                )
+            )
+
+    let private planProviderRetry
         (durable: AgentJournal)
         (scope: PluginRuntimeScope)
         (sessionId: SessionId)
-        (arming: SlotArming)
         (physical: PhysicalUserMessageId)
         (output: obj)
         (rawMessages: obj list)
@@ -578,54 +621,63 @@ module XWire =
 
             match
                 PromptAuthorityLedger.activeProfile sessionId projections.AgentProjections,
-                FallbackEvidence.tryCurrentState sessionId projections,
+                ProviderFailureEvidence.tryCurrentState sessionId projections,
                 sessionProjection durable sessionId
             with
-            | Some authority, Some fallback, Some state ->
+            | Some authority, Some _, Some state ->
                 let blog = state.Blog |> Option.defaultValue BlogProjection.empty
                 let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
                 let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
 
-                let! currentResult = XTraceMaterialization.currentProjection durable xTrace
-                let current = requireOk currentResult
+                let existingPlan =
+                    match scope.Recovery.TryPendingAttemptPlan sessionId physical with
+                    | Some existing when existing.Authority = authority -> Some existing
+                    | Some existing ->
+                        raise (
+                            InvalidOperationException(
+                                sprintf
+                                    "HOST-BOUNDARY-008: pending attempt plan authority conflict: existing=(%s) current=(%s)"
+                                    (authoritySummary existing.Authority)
+                                    (authoritySummary authority)
+                            )
+                        )
+                    | None -> None
 
-                let cutoff = requestStartCutoff physical rawMessages xTrace
-                // Reuse the arming bound before the snapshot await: a session
-                // deleted inside that window would otherwise make a second
-                // TryRecoveryArming return None and Option.get throw (TOCTOU).
-                let arming = arming
+                let! admittedPlan =
+                    match existingPlan with
+                    | Some existing -> Task.FromResult existing
+                    | None ->
+                        task {
+                            let! currentResult = XTraceMaterialization.currentProjection durable xTrace
+                            let current = requireOk currentResult
 
-                // PROJ-002: the attempt-local projection snapshot is built once
-                // and feeds both the probe proof (cutoffDigest) and the prefix
-                // decision (requiredBlob / forChoice).
-                let snapshot = { CurrentProjection = current }
+                            let cutoff = requestStartCutoff physical rawMessages xTrace
+                            // PROJ-002: the attempt-local projection snapshot is built once
+                            // and feeds both the probe proof (cutoffDigest) and the prefix
+                            // decision (requiredBlob / forChoice).
+                            let snapshot = { CurrentProjection = current }
 
-                let opportunity =
-                    if fallback.Cursor.ConsecutiveFailureCount > 0 then
-                        RecoveryOpportunity.RecoveryAttempt
-                    else
-                        RecoverySlot.opportunity arming fallback.Cursor.Offset
+                            let! candidateResult = candidate durable sessionId snapshot prefix.Snapshot state cutoff
 
-                let! candidateResult =
-                    match opportunity with
-                    | RecoveryOpportunity.RecoveryAttempt ->
-                        candidate durable sessionId snapshot prefix.Snapshot state cutoff
-                    | RecoveryOpportunity.OrdinaryAttempt -> Task.FromResult(Error NoCandidateReason.NoCoverage)
+                            let selectProbeForPlan () = selectProbe true candidateResult
 
-                let selectProbeForPlan () = selectProbe opportunity candidateResult
+                            let pendingPlan =
+                                AttemptPlanner.freezePreInference
+                                    authority
+                                    physical
+                                    (PromptAuthority.PromptOrigin.Continuation
+                                        PromptAuthority.ContinuationKind.ProviderRetryAttempt)
+                                    ProviderRequestKind.WorkMain
+                                    prefix.Snapshot
+                                    true
+                                    selectProbeForPlan
 
-                let pendingPlan =
-                    AttemptPlanner.freezePreInference
-                        authority
-                        fallback.Cursor
-                        physical
-                        (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt)
-                        ProviderRequestKind.WorkMain
-                        opportunity
-                        selectProbeForPlan
+                            // Freeze pending plan BEFORE rendering or modifying wire output.
+                            return requireAdmittedPendingPlan scope sessionId physical pendingPlan
+                        }
 
                 let presentationHorizon =
-                    pendingPlan
+                    admittedPlan
                     |> AttemptPlanner.pendingProbeOf
                     |> Option.isSome
                     |> presentationHorizonForProbe
@@ -635,15 +687,18 @@ module XWire =
                 // COMMITTED blob for a probe attempt would inject the old prefix under
                 // the candidate's id).
                 let! frozenRecordPrefixBody =
-                    readFrozenRecordPrefixBody durable pendingPlan.ProjectionChoice prefix.Snapshot
+                    readFrozenRecordPrefixBody
+                        durable
+                        admittedPlan.ProjectionChoice
+                        admittedPlan.CommittedPrefixSnapshot
 
                 let memoryPreamble =
                     ProviderProse.render (ProviderProse.languageOf sessionId) CompanionPrompt.MemoryPreamble Map.empty
 
                 let prefixIntent =
                     XPrefixProjection.forChoice
-                        pendingPlan.ProjectionChoice
-                        prefix.Snapshot
+                        admittedPlan.ProjectionChoice
+                        admittedPlan.CommittedPrefixSnapshot
                         memoryPreamble
                         frozenRecordPrefixBody
 
@@ -651,15 +706,13 @@ module XWire =
                     renderPrefixMessages state rawMessages prefixIntent presentationHorizon
 
                 Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
-
-                scope.RecordPendingAttemptPlan sessionId physical pendingPlan
                 return presentationHorizon
 
             | _ ->
                 return
                     raise (
                         InvalidOperationException
-                            "X-wire cannot plan a retry without authority, fallback, and session projections"
+                            "X-wire cannot plan a retry without authority, failure, and session projections"
                     )
         }
 
@@ -679,21 +732,17 @@ module XWire =
             // tool loop. Settle it before reading PrefixEpoch for this request.
             do! settleVisibleToolContinuations durable scope sessionId rawMessages
 
-            // Owning recovery CE consumes the typed arming permit exactly once (SW-017②, PAR-011).
-            // Host callback is only rendezvous/observation; presence no longer drives business branching
-            // outside the owning CE.
             let recoveryAttempt =
                 physical
-                |> Option.bind (fun physical ->
-                    scope.TryTakeRecoveryPermit(sessionId, physical)
-                    |> Option.map (fun arming -> physical, arming))
+                |> Option.filter (fun p ->
+                    let physicalId = PhysicalUserMessageId.value p
+                    isProviderRetryMessageId physicalId rawMessages)
 
             match recoveryAttempt with
             | None ->
                 do! applyOrdinaryCommittedPrefix durable sessionId rawMessages output
                 return PrefixPresentationHorizon.Current
-            | Some(physical, arming) ->
-                return! planArmedWorkMainRetry durable scope sessionId arming physical output rawMessages
+            | Some physical -> return! planProviderRetry durable scope sessionId physical output rawMessages
         }
 
     let private applySessionTransform

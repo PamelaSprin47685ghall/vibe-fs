@@ -67,9 +67,7 @@ module BloggerMainContext =
         (bloggerSessionId: SessionId)
         : Task<BloggerRequestContext option> =
         task {
-            let key = SessionId.value bloggerSessionId
-
-            if BloggerRuntimeHost.blocksNew (Some journal) mainSessionId scope key then
+            if BloggerRuntimeHost.blocksNew (Some journal) mainSessionId then
                 return None
             else
                 let session =

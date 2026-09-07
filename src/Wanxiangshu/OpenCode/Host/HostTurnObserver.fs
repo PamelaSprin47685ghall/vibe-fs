@@ -158,8 +158,35 @@ module HostTurnObserver =
     let private abortCauseOfTurn (scope: PluginRuntimeScope) (context: ReconciledTurnContext) : AbortCause =
         match context.Turn.Outcome with
         | ReconcileProgram.TurnAborted _ ->
-            scope.LoopSensor.ConsumeAbortCause(context.Turn.SessionId, context.Turn.Directory)
+            // DEG-OWN: exact-run owned consumption. Only an anomaly armed for this
+            // SessionId + ProviderRun transfers, so a wrong/late run can never
+            // consume a newer attempt's anomaly and session-only recovery is
+            // never authorized.
+            scope.LoopSensor.ConsumeAbortCause(context.Turn.SessionId, context.Turn.ProviderRun, context.Turn.Directory)
         | _ -> AbortCause.External
+
+    /// DEG-OWN: settle the owned interrupt/continuation task before admitting
+    /// later continuation/business observation. The owned task is awaited,
+    /// never discarded.
+    /// The wait addresses the exact current run: a mismatched run waits on
+    /// nothing while the stored run's task remains owned.
+    let private awaitOwnedInterrupt
+        (scope: PluginRuntimeScope)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        : Task =
+        task {
+            match scope.LoopSensor.ActiveInterruptTask(sessionId, providerRun) with
+            | None -> return ()
+            | Some owned -> do! owned
+        }
+
+    let private strengthSymbolName (symbol: StrengthPrimarySymbol) =
+        match symbol with
+        | StrengthPrimarySymbol.ReadonlyBatch -> "ReadonlyBatch"
+        | StrengthPrimarySymbol.MutatingOrExecuting -> "MutatingOrExecuting"
+        | StrengthPrimarySymbol.TextOnly -> "TextOnly"
+        | StrengthPrimarySymbol.Other -> "Other"
 
     let private observeApplicationTurn
         (sessionPort: ISessionHostPort)
@@ -203,7 +230,7 @@ module HostTurnObserver =
                         context
         }
 
-    let private observeFamilyReady
+    let private observeCurrentTurn
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
@@ -234,25 +261,6 @@ module HostTurnObserver =
                 do! observeApplicationTurn sessionPort rootWorkspace eventPort journal scope abortCause context
         }
 
-    let private observeAfterStrength
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
-        (journal: AgentJournal option)
-        (scope: PluginRuntimeScope)
-        (abortCause: AbortCause)
-        (context: ReconciledTurnContext)
-        : Task =
-        task {
-            let! recovery = scope.EnsureRecoveryDone context.Turn.SessionId
-
-            match recovery with
-            | FamilyRecovery.FamilyBlocked _ -> return ()
-            | FamilyRecovery.FamilyWaiting _
-            | FamilyRecovery.FamilyReady _ ->
-                return! observeFamilyReady sessionPort rootWorkspace eventPort journal scope abortCause context
-        }
-
     let private observeBusinessTurn
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
@@ -270,6 +278,10 @@ module HostTurnObserver =
         task {
             let turn = context.Turn
             let abortCause = abortCauseOfTurn scope context
+
+            // DEG-OWN: the owned interrupt/continuation settles before later
+            // business observation is admitted.
+            do! awaitOwnedInterrupt scope turn.SessionId turn.ProviderRun
 
             let strengthHandled =
                 scope.Strength.StrengthReplicaRuntime
@@ -291,12 +303,26 @@ module HostTurnObserver =
                 // STRENGTH-010: only primary (non-Replica) turns feed the
                 // counterfactual predictor. Pending shadow/control labels
                 // are target-bound inside the scope.
-                let _ =
+                // A completed pair is consumed visibly as a typed diagnostic;
+                // predictor policy itself stays inside the scope collector.
+                match
                     scope.Strength.ObserveStrengthPrimary(
                         turn.SessionId,
                         turn.ProviderRun,
                         StrengthTurnEvidence.primarySymbol turn.Parts
                     )
+                with
+                | None -> ()
+                | Some pair ->
+                    Diagnostic.emit
+                        "strength-counterfactual-observed"
+                        [ "session_id", SessionId.value turn.SessionId
+                          "provider_run", ProviderRunIdentity.value turn.ProviderRun
+                          "result",
+                          "first="
+                          + strengthSymbolName pair.FirstSymbol
+                          + " second="
+                          + strengthSymbolName pair.SecondSymbol ]
 
                 // STRENGTH-007: consumption proof closes before any later
                 // continuation can be admitted. This writer is independent
@@ -304,7 +330,11 @@ module HostTurnObserver =
                 // consumed a durable Candidate.
                 do! observeStrengthDurability strengthDurability scope turn
 
-                return! observeAfterStrength sessionPort rootWorkspace eventPort journal scope abortCause context
+                // Current-process Host observation proceeds from its exact facts.
+                // No durable-family gate is fabricated here: Join tools admit via
+                // their exact current-process permit, and explicit /continue owns
+                // future user-driven work.
+                return! observeCurrentTurn sessionPort rootWorkspace eventPort journal scope abortCause context
         }
 
     let observe

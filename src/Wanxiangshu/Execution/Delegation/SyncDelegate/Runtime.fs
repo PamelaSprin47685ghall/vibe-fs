@@ -184,7 +184,10 @@ type SyncDelegateRuntime
 
         Task.FromResult issued
 
-    let sendDelegatePrompt (call: SyncDelegateCall) (request: SyncDelegatePromptRequest) =
+    let sendDelegatePrompt
+        (call: SyncDelegateCall)
+        (request: SyncDelegatePromptRequest)
+        : Task<Result<PreparedDelegationHandoff, string>> =
         taskResult {
             let tools = toolMap (canonicalRole call.Role)
             let route = DelegationHandoffRoute.syncRole call.OwnerScope call.Role
@@ -253,7 +256,6 @@ type SyncDelegateRuntime
                         providerPrompt
                         PromptAuthority.ContinuationKind.ManagedDelegationAssignment
                         profile
-                        call.Agent
                         directory
                         PromptDispatcher.AwaitMode.Await
                         (Some(fun physical ->
@@ -531,7 +533,7 @@ type SyncDelegateRuntime
                 return! handleFailedContinuationTurn turn error
             | _ ->
                 // Fresh-root TurnFailed, TurnInProgress and TurnNeedsContinuation
-                // remain child-local for ordinary fallback recovery. A reused
+                // remain child-local for provider recovery. A reused
                 // continuation can fail only through its exact physical turn above.
                 return false
         }

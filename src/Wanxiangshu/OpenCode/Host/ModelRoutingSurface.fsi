@@ -6,7 +6,12 @@ module ModelRoutingSurface =
     val initialize: unit -> Task
 
     val acquireSharedExecutionAdmission:
-        sessionId: string -> physicalUserMessageId: string -> effectiveAgent: string -> Task<obj>
+        sessionId: string ->
+        physicalUserMessageId: string ->
+        role: string ->
+        participant: string ->
+        lenderSessionId: string ->
+            Task<obj>
 
     val sharedExecutionAdmissionTarget: token: obj -> obj
     val sharedCapacitySnapshot: unit -> obj
@@ -18,23 +23,41 @@ module ModelRoutingSurface =
     val createRuntime: scheduler: obj -> obj
 
     val acquireExecutionAdmission:
-        runtime: obj -> sessionId: string -> physicalUserMessageId: string -> effectiveAgent: string -> Task<obj>
+        runtime: obj ->
+        sessionId: string ->
+        physicalUserMessageId: string ->
+        role: string ->
+        participant: string ->
+        lenderSessionId: string ->
+            Task<obj>
 
     val beginExecutionAdmission:
-        runtime: obj -> sessionId: string -> physicalUserMessageId: string -> effectiveAgent: string -> Task<obj>
+        runtime: obj ->
+        sessionId: string ->
+        physicalUserMessageId: string ->
+        role: string ->
+        participant: string ->
+        lenderSessionId: string ->
+            Task<obj>
 
     val awaitQueuedExecutionAdmission: queueToken: obj -> Task<obj>
     val executionAdmissionTarget: runtime: obj -> token: obj -> obj
     val commitExecutionAdmission: runtime: obj -> token: obj -> observed: obj -> obj
     val releaseExecutionAdmissionBeforeProvider: runtime: obj -> token: obj -> observed: obj -> obj
     val executionAdmissionLifecycle: runtime: obj -> token: obj -> obj
-    val tryReserveManaged: runtime: obj -> sessionId: string -> agent: string -> obj
-    val tryLease: runtime: obj -> sessionId: string -> physicalUserMessageId: string -> agent: string -> obj
+    val tryReserveManaged: runtime: obj -> sessionId: string -> role: string -> lenderSessionId: string -> obj
+
+    val tryLease:
+        runtime: obj ->
+        sessionId: string ->
+        physicalUserMessageId: string ->
+        role: string ->
+        participant: string ->
+        lenderSessionId: string ->
+            obj
+
     val releasePhysicalExecution: runtime: obj -> sessionId: string -> physicalUserMessageId: string -> obj
     val cancelPendingExecution: runtime: obj -> sessionId: string -> obj
-    val bindCapacityChild: runtime: obj -> parentSessionId: string -> childSessionId: string -> unit
-    val bindCapacityCompanion: runtime: obj -> ownerSessionId: string -> bloggerSessionId: string -> unit
-    val dropCapacityLineage: runtime: obj -> sessionId: string -> unit
 
     val enterProviderStep:
         runtime: obj -> sessionId: string -> physicalUserMessageId: string -> visibleProviderRuns: string array -> Task

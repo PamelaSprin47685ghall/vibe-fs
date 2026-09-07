@@ -6,7 +6,7 @@ open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 
-/// Ordinary turn observation policy (INTERACTION-REPAIR / FALLBACK / TERMINAL-REPORT).
+/// Ordinary turn observation policy (INTERACTION-REPAIR / PROVIDER-RECOVERY / TERMINAL-REPORT).
 module OrdinaryTurnWorkflow =
 
     /// Revisit a previously delivered turn only for work whose authority comes

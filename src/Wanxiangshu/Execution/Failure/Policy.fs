@@ -62,65 +62,80 @@ module ExecutionFailurePolicy =
         | DurableExecutionLifecycle.ProviderStarted ->
             ExecutionFailureResolution.TerminalizeProviderStarted(key, disposition)
 
-    let private transientProviderResolution (key: ChatExecutionKey) (facts: ProviderRecoveryFacts) =
+    let private retryProviderResolution (key: ChatExecutionKey) (facts: ProviderRecoveryFacts) =
         let licence = authorization facts
 
-        match facts.Breaker, facts.RetryBudget, facts.FallbackBudget with
-        | ProviderBreakerState.Closed, ProviderRecoveryBudget.Available, ProviderRecoveryBudget.Available
-        | ProviderBreakerState.Closed, ProviderRecoveryBudget.Available, ProviderRecoveryBudget.Exhausted ->
+        match facts.Breaker, facts.RetryBudget with
+        | ProviderBreakerState.Closed, ProviderRecoveryBudget.Available ->
             ExecutionFailureResolution.RetryFreshAttempt licence
-        | ProviderBreakerState.Closed, ProviderRecoveryBudget.Exhausted, ProviderRecoveryBudget.Available
-        | ProviderBreakerState.Open, ProviderRecoveryBudget.Available, ProviderRecoveryBudget.Available
-        | ProviderBreakerState.Open, ProviderRecoveryBudget.Exhausted, ProviderRecoveryBudget.Available ->
-            ExecutionFailureResolution.AdvanceFallback licence
-        | ProviderBreakerState.Closed, ProviderRecoveryBudget.Exhausted, ProviderRecoveryBudget.Exhausted
-        | ProviderBreakerState.Open, ProviderRecoveryBudget.Available, ProviderRecoveryBudget.Exhausted
-        | ProviderBreakerState.Open, ProviderRecoveryBudget.Exhausted, ProviderRecoveryBudget.Exhausted ->
+        | ProviderBreakerState.Closed, ProviderRecoveryBudget.Exhausted
+        | ProviderBreakerState.Open, ProviderRecoveryBudget.Available
+        | ProviderBreakerState.Open, ProviderRecoveryBudget.Exhausted ->
             terminalResolution key ChatExecutionTerminalDisposition.Failed DurableExecutionLifecycle.ProviderStarted
 
-    let private transientResolution
+    let private providerResolution
         (lifecycle: DurableExecutionLifecycle)
         (key: ChatExecutionKey)
         (facts: ProviderRecoveryFacts)
         : ExecutionFailureResolution =
         match lifecycle, requestCanRecover facts.RequestKind with
-        | DurableExecutionLifecycle.ProviderStarted, true -> transientProviderResolution key facts
-        | _ -> terminalResolution key ChatExecutionTerminalDisposition.Failed lifecycle
-
-    let private permanentProviderResolution (key: ChatExecutionKey) (facts: ProviderRecoveryFacts) =
-        match facts.FallbackBudget with
-        | ProviderRecoveryBudget.Available -> ExecutionFailureResolution.AdvanceFallback(authorization facts)
-        | ProviderRecoveryBudget.Exhausted ->
-            terminalResolution key ChatExecutionTerminalDisposition.Failed DurableExecutionLifecycle.ProviderStarted
-
-    let private permanentResolution
-        (lifecycle: DurableExecutionLifecycle)
-        (key: ChatExecutionKey)
-        (facts: ProviderRecoveryFacts)
-        : ExecutionFailureResolution =
-        match lifecycle, requestCanRecover facts.RequestKind with
-        | DurableExecutionLifecycle.ProviderStarted, true -> permanentProviderResolution key facts
-        | _ -> terminalResolution key ChatExecutionTerminalDisposition.Failed lifecycle
+        | DurableExecutionLifecycle.ProviderStarted, true -> retryProviderResolution key facts
+        | DurableExecutionLifecycle.NoAcceptedFact, true
+        | DurableExecutionLifecycle.AcceptedBeforeProvider, true
+        | DurableExecutionLifecycle.Terminal, true
+        | DurableExecutionLifecycle.NoAcceptedFact, false
+        | DurableExecutionLifecycle.AcceptedBeforeProvider, false
+        | DurableExecutionLifecycle.ProviderStarted, false
+        | DurableExecutionLifecycle.Terminal, false ->
+            terminalResolution key ChatExecutionTerminalDisposition.Failed lifecycle
 
     let private deriveBreaker =
         function
         | ExecutionFailure.ProviderTransient -> BreakerDecision.RecordProviderTransientFailure
         | ExecutionFailure.ProviderPermanent -> BreakerDecision.RecordProviderPermanentFailure
-        | _ -> BreakerDecision.NoBreakerTransition
+        | ExecutionFailure.LocalInvariant
+        | ExecutionFailure.ProtocolRejection
+        | ExecutionFailure.AuthorizationDenied
+        | ExecutionFailure.UserCancelled
+        | ExecutionFailure.Superseded
+        | ExecutionFailure.CapacityQueueFull
+        | ExecutionFailure.AcceptanceUnknown
+        | ExecutionFailure.StreamInterruptedAfterFirstToken
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown -> BreakerDecision.NoBreakerTransition
 
     let private deriveCapacitySettlement failure lifecycle capacity =
         match failure with
         | ExecutionFailure.AcceptanceUnknown
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown -> retainCapacity capacity
-        | _ -> releaseCapacity lifecycle capacity
+        | ExecutionFailure.LocalInvariant
+        | ExecutionFailure.ProtocolRejection
+        | ExecutionFailure.AuthorizationDenied
+        | ExecutionFailure.UserCancelled
+        | ExecutionFailure.Superseded
+        | ExecutionFailure.CapacityQueueFull
+        | ExecutionFailure.ProviderTransient
+        | ExecutionFailure.ProviderPermanent
+        | ExecutionFailure.StreamInterruptedAfterFirstToken
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed -> releaseCapacity lifecycle capacity
 
     let private deriveFatality =
         function
-        | ExecutionFailure.LocalInvariant -> FatalityDecision.FatalAfterSettlement
+        | ExecutionFailure.LocalInvariant
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown -> FatalityDecision.FatalAfterSettlement
-        | _ -> FatalityDecision.NoFatality
+        | ExecutionFailure.ProtocolRejection
+        | ExecutionFailure.AuthorizationDenied
+        | ExecutionFailure.UserCancelled
+        | ExecutionFailure.Superseded
+        | ExecutionFailure.CapacityQueueFull
+        | ExecutionFailure.ProviderTransient
+        | ExecutionFailure.ProviderPermanent
+        | ExecutionFailure.AcceptanceUnknown
+        | ExecutionFailure.StreamInterruptedAfterFirstToken
+        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted -> FatalityDecision.NoFatality
 
     [<Sealed>]
     type private ExecutionFailureDecisionBuilder
@@ -152,9 +167,9 @@ module ExecutionFailurePolicy =
             | ExecutionFailure.CapacityQueueFull ->
                 return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Failed input.Lifecycle
             | ExecutionFailure.ProviderTransient ->
-                return transientResolution input.Lifecycle input.ExecutionKey input.Provider
+                return providerResolution input.Lifecycle input.ExecutionKey input.Provider
             | ExecutionFailure.ProviderPermanent ->
-                return permanentResolution input.Lifecycle input.ExecutionKey input.Provider
+                return providerResolution input.Lifecycle input.ExecutionKey input.Provider
             | ExecutionFailure.AcceptanceUnknown ->
                 return ExecutionFailureResolution.AwaitAcceptanceReconciliation input.ExecutionKey
             | ExecutionFailure.StreamInterruptedAfterFirstToken ->

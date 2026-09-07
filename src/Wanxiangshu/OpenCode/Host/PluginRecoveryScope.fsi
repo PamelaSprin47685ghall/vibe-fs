@@ -8,36 +8,53 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 
+/// Result of admitting a pending attempt plan under exact physical identity.
+[<RequireQualifiedAccess>]
+type PendingAttemptPlanAdmission =
+    | Admitted of PendingAttemptPlan
+    | ReplayedExisting of PendingAttemptPlan
+    | IdentityMismatch of
+        expectedSession: SessionId *
+        expectedPhysical: PhysicalUserMessageId *
+        attempted: PendingAttemptPlan
+    | PlanConflict of existing: PendingAttemptPlan * attempted: PendingAttemptPlan
+
+module PendingAttemptPlanAdmission =
+    /// Exact equality for immutable admitted request evidence.
+    val areSemanticallyEqual: existing: PendingAttemptPlan -> attempted: PendingAttemptPlan -> bool
+
+    /// Same exact physical request identity, independent of its already-frozen projection choice.
+    val sameRequestIdentity: existing: PendingAttemptPlan -> attempted: PendingAttemptPlan -> bool
+
+    /// Same accepted physical authority before a more specific request owner freezes its request kind.
+    val samePhysicalAuthority: existing: PendingAttemptPlan -> attempted: PendingAttemptPlan -> bool
+
+    val requestIdentitySummary: plan: PendingAttemptPlan -> string
+
 /// Binding error when a pending attempt plan cannot be found at bind time.
 [<RequireQualifiedAccess>]
 type TransformAttemptPlanBindingError =
     | PendingAttemptPlanMissing of SessionId * PhysicalUserMessageId * ProviderRunIdentity
 
-/// Family recovery coordination (PROMPT-011 + C5 + RECOVERY-FAMILY) and
-/// attempt planning state for one plugin instance: recovery ports attachment,
-/// per-session arming and per-provider-run attempt plans.
+/// Process-local join admission, immutable attempt evidence, and manual
+/// recovery diagnostics for one plugin instance.
 type PluginRecoveryScope =
     new: journal: AgentJournal option -> PluginRecoveryScope
 
-    /// Certifies this process's join attempt for family recovery.
-    member RequireFamilyRecovery: root: SessionId -> Task<FamilyRecovery>
-
-    /// Idempotent alias for RequireFamilyRecovery.
-    member EnsureRecoveryDone: root: SessionId -> Task<FamilyRecovery>
-
-    /// Arms a one-shot recovery permit after PromptIngress acceptance.
-    member ArmRecovery: sessionId: SessionId * physicalUserMessageId: PhysicalUserMessageId -> unit
-
-    /// Consumes the arming exactly once.
-    member TryTakeRecoveryPermit:
-        sessionId: SessionId * physicalUserMessageId: PhysicalUserMessageId -> SlotArming option
+    /// Admits this process's join attempt only. Mints an empty-closure
+    /// current-process permit; never recovers durable closure state.
+    member RequireCurrentProcessJoin: root: SessionId -> Task<FamilyRecovery>
 
     /// Freezes a pre-inference attempt plan under the exact physical user message.
     member FreezePendingAttemptPlan:
         sessionId: SessionId ->
         physicalUserMessageId: PhysicalUserMessageId ->
         plan: PendingAttemptPlan ->
-            Result<unit, 'a>
+            PendingAttemptPlanAdmission
+
+    /// Reads the immutable plan already frozen for this exact physical request.
+    member TryPendingAttemptPlan:
+        sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> PendingAttemptPlan option
 
     /// Freezes a pre-inference attempt plan, throwing on conflict.
     member RecordPendingAttemptPlan:
@@ -62,15 +79,13 @@ type PluginRecoveryScope =
     /// Read-only peek alias.
     member TryAttemptPlan: sessionId: SessionId -> providerRun: ProviderRunIdentity -> AttemptPlan option
 
-    member PublishPendingChatResume: request: PreProviderResumeRequest -> unit
-
     member PublishManualChatIntervention: request: ManualInterventionRequest -> unit
 
-    /// Returns the currently published recovery ownership requests.
-    member PendingChatRecoveryOwnership:
-        unit ->
-            {| Resumes: PreProviderResumeRequest[]
-               ManualInterventions: ManualInterventionRequest[] |}
+    /// Returns the exact manual intervention observations held process-locally.
+    member ManualChatInterventions: unit -> ManualInterventionRequest[]
+
+    /// Revokes the exact manual intervention entry for a terminally settled key.
+    member RevokeManualIntervention: key: ChatExecutionKey -> unit
 
     /// Session deletion drops arming and attempt plans for this session.
     member ClearSession: sessionId: string -> unit

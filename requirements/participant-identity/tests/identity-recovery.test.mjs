@@ -13,10 +13,8 @@ const rootSeed = {
   ownerLogicalRun: null,
   ownerAuthorityRoot: null,
   participantIdentity: {
-    selectedAgent: 'coder',
-    peerAgent: 'coder',
-    canonicalRole: 'coder',
-    selectedTier: 'deep',
+    participant: 'coder',
+    role: 'coder',
     persona: 'Coder',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
@@ -105,6 +103,8 @@ const authorityCase = (value) => {
   return null
 }
 
+// The only legacy-shaped bytes in this file: flat pre-v2 fields prove the
+// one-way upgrade path. The decoded current payload never contains them.
 const legacyHumanRootLine = (profile) => {
   const current = JSON.parse(factCodec.encode(authorityFact(profile)))
   const tagged = authorityCase(current)
@@ -151,6 +151,7 @@ test('WHAT[PID-008] current v2 durable identity recovers exact participant and o
 test('WHAT[PID-008] supported legacy HumanRoot deterministically recovers its upgraded identity', () => {
   const profile = createRoot()
   const legacy = legacyHumanRootLine(profile)
+  assert.match(legacy, /PeerAgent/)
   const first = factCodec.decode(legacy)
   const second = factCodec.decode(legacy)
   assert.equal(first.ok, true, first.ok ? '' : first.error)
@@ -164,6 +165,7 @@ test('WHAT[PID-008] supported legacy HumanRoot deterministically recovers its up
     AuthorityKind: profile.authorityKind,
     IdentitySeed: rootSeed,
   })
+  assert.equal(JSON.stringify(first.payload).includes('PeerAgent'), false)
 
   assert.deepEqual(authority.recoverActiveIdentity(register(profileFromPayload(first.payload))), {
     ok: true,

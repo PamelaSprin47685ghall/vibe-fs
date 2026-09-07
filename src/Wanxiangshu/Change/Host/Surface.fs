@@ -259,7 +259,7 @@ module OrchestratorHostSurface =
                     return plainUnitResult value
                 }
           FfMerge =
-            fun path target expected ->
+            fun path target expected pinned ->
                 task {
                     let! value =
                         invokeRawTask
@@ -267,7 +267,8 @@ module OrchestratorHostSurface =
                             "FfMerge"
                             [| box (WorktreePath.value path)
                                box (TargetRef.value target)
-                               box (CommitHash.value expected) |]
+                               box (CommitHash.value expected)
+                               box (CommitHash.value pinned) |]
 
                     return plainResult value commitValue
                 }
@@ -349,6 +350,7 @@ module OrchestratorHostSurface =
               OnChildCreated = fun _ _ _ -> ()
               RegisterChildDirectory = fun _ _ -> ()
               OnRunStarted = fun _ _ _ -> ()
+              ContinueManagerLoop = fun _ _ -> Task.FromResult(Ok())
               RepoPath = stringOf (field options "repoPath")
               TargetBranch = stringOf (field options "targetBranch")
               ParentWorkRecordFor = fun _ -> Task.FromResult None

@@ -67,7 +67,6 @@ module PromptAuthorityLedger =
                ContinuationKind: string
                LogicalRunId: LogicalRunId option
                AuthorityRootUserMessageId: AuthorityRootUserMessageId option
-               EffectiveAgent: string option
                IdentitySeed: PromptIdentitySeed
                PayloadDigest: string |})
         =
@@ -90,7 +89,6 @@ module PromptAuthorityLedger =
                   Origin = resolvedOrigin
                   LogicalRunId = fact.LogicalRunId
                   AuthorityRootUserMessageId = fact.AuthorityRootUserMessageId
-                  EffectiveAgent = fact.EffectiveAgent
                   IdentitySeed = fact.IdentitySeed
                   PayloadDigest = fact.PayloadDigest
                   // PROMPT-005: `Claimed` precedes the Host call, so no transport

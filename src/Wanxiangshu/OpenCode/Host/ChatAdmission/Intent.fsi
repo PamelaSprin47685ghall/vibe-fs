@@ -35,14 +35,12 @@ module ChatAdmissionIntent =
         | PromptKeyNotClaimed of PromptKey
         | AgentOwnerRootPromptNotClaimed of PromptKey * PromptAuthority.IdentitySeed
         | PromptClaimSessionMismatch of expectedSessionId: SessionId * claimedSessionId: SessionId
-        | PromptClaimMissingManagedEffectiveAgent of PromptKey
         | PromptClaimOriginNotAdmissible of PromptKey * PromptAuthority.PromptOrigin
         | UnknownOriginWhileActive
 
     type ExternalRootEvidence =
         { Key: ExecutionKey
           ExplicitAgent: string
-          EffectiveAgent: string
           Origin: PromptAuthority.PromptOrigin
           IdentitySeed: PromptAuthority.IdentitySeed }
 
@@ -50,13 +48,11 @@ module ChatAdmissionIntent =
         { Key: ExecutionKey
           PromptKey: PromptKey
           Claim: PromptAuthority.PromptClaim
-          EffectiveAgent: string
           Origin: PromptAuthority.PromptOrigin
           IdentitySeed: PromptAuthority.IdentitySeed }
 
     type ActiveHumanContinuationEvidence =
         { Key: ExecutionKey
-          EffectiveAgent: string
           Origin: PromptAuthority.PromptOrigin
           Authority: PromptAuthority.AuthorityExecutionProfile }
 

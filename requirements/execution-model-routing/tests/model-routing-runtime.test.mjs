@@ -6,14 +6,14 @@ import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 const {
   createRuntime,
   acquireExecutionAdmission,
+  beginExecutionAdmission,
+  awaitQueuedExecutionAdmission,
   executionAdmissionTarget,
   commitExecutionAdmission,
   tryReserveManaged,
   tryLease,
   releasePhysicalExecution,
   cancelPendingExecution,
-  bindCapacityChild,
-  bindCapacityCompanion,
   enterProviderStep,
   endProviderStep,
   takeProviderRunTarget,
@@ -25,12 +25,14 @@ const {
 
 const target = (model = 'provider/shared', reasoning = 'none') => ({ model, reasoning })
 const key = (value) => `${value.model}|${value.reasoning}`
-const acquireManaged = async (runtime, sessionId, physicalUserMessageId, agent) => {
+const acquireManaged = async (runtime, sessionId, physicalUserMessageId, role, participant, lenderSessionId = null) => {
   const acquisition = await acquireExecutionAdmission(
     runtime,
     sessionId,
     physicalUserMessageId,
-    agent,
+    role,
+    participant,
+    lenderSessionId,
   )
   if (acquisition.kind !== 'Acquired') return { kind: acquisition.kind, target: null }
 
@@ -38,7 +40,8 @@ const acquireManaged = async (runtime, sessionId, physicalUserMessageId, agent) 
   const observed = {
     sessionId,
     physicalUserMessageId,
-    effectiveAgent: agent,
+    role,
+    participant,
     target: projected,
   }
   const settlement = commitExecutionAdmission(runtime, acquisition.lease, observed)
@@ -54,9 +57,9 @@ const acquireTarget = async (...args) => {
 test('WHAT[EMR-003] EMR_003_each_active_physical_execution_contributes_one_running_occurrence', async () => {
   const runtime = createRuntime(() => target())
 
-  const first = await acquireTarget(runtime, 'session-a', 'msg-a', 'coder')
-  const same = await acquireTarget(runtime, 'session-a', 'msg-a', 'coder')
-  const otherExecution = await acquireTarget(runtime, 'session-b', 'msg-b', 'coder')
+  const first = await acquireTarget(runtime, 'session-a', 'msg-a', 'coder', 'alice')
+  const same = await acquireTarget(runtime, 'session-a', 'msg-a', 'coder', 'alice')
+  const otherExecution = await acquireTarget(runtime, 'session-b', 'msg-b', 'coder', 'bob')
 
   assert.equal(key(first), 'provider/shared|none')
   assert.equal(key(same), 'provider/shared|none')
@@ -71,67 +74,85 @@ test('WHAT[EMR-006] EMR_006_same_physical_message_retry_reuses_target_without_sc
     return target()
   })
 
-  await acquireTarget(runtime, 'session-a', 'msg-1', 'coder')
-  await acquireTarget(runtime, 'session-a', 'msg-1', 'coder')
-  await acquireTarget(runtime, 'session-a', 'msg-2', 'coder')
+  await acquireTarget(runtime, 'session-a', 'msg-1', 'coder', 'alice')
+  await acquireTarget(runtime, 'session-a', 'msg-1', 'coder', 'alice')
+  await acquireTarget(runtime, 'session-a', 'msg-2', 'coder', 'alice')
 
-  assert.deepEqual(seen, [[], []], 'same physical material reuses; newer material supersedes and schedules fresh')
+  assert.deepEqual(seen, [[], ['provider/shared|none']], 'same physical material reuses without a scheduler rerun; the superseding fresh schedule observes the replaced occupancy')
 })
 
 test('WHAT[EMR-006] EMR_006_new_physical_message_supersedes_old_A_B_occupancy_without_idle', async () => {
   const runtime = createRuntime((role) => target(`provider/${role}`))
 
-  const a = await acquireTarget(runtime, 'session', 'msg-a', 'coder')
+  const a = await acquireTarget(runtime, 'session', 'msg-a', 'coder', 'alice')
   assert.equal(a.model, 'provider/coder')
   assert.equal(snapshotOccupied(runtime).length, 1)
 
-  const b = await acquireTarget(runtime, 'session', 'msg-b', 'inspector')
+  const b = await acquireTarget(runtime, 'session', 'msg-b', 'inspector', 'alice')
   assert.equal(b.model, 'provider/inspector')
   assert.equal(snapshotOccupied(runtime).length, 1, 'one reusable session can own only one current physical execution slot')
-  assert.equal(tryLease(runtime, 'session', 'msg-a', 'coder'), null, 'superseded physical material no longer owns a lease')
-  assert.equal(key(tryLease(runtime, 'session', 'msg-b', 'inspector')), 'provider/inspector|none')
+  assert.equal(tryLease(runtime, 'session', 'msg-a', 'coder', 'alice', null), null, 'superseded physical material no longer owns a lease')
+  assert.equal(key(tryLease(runtime, 'session', 'msg-b', 'inspector', 'alice', null)), 'provider/inspector|none')
 })
 
-test('WHAT[EMR-006] EMR_006_retarget_clears_superseded_inflight_step_before_new_provider_step', async () => {
+test('WHAT[EMR-006] EMR_006_supersede_replaces_the_exact_capacity_owner', async () => {
   const runtime = createRuntime((role) => target(`provider/${role}`))
 
-  await acquireTarget(runtime, 'session', 'msg-a', 'coder')
-  await enterProviderStep(runtime, 'session', 'msg-a', [])
-  await acquireTarget(runtime, 'session', 'msg-b', 'inspector')
+  await acquireTarget(runtime, 'session', 'msg-a', 'coder', 'alice')
+  await acquireTarget(runtime, 'session', 'msg-b', 'inspector', 'alice')
 
   const snapshot = capacitySnapshot(runtime)
-  assert.deepEqual(snapshot.tokenStateCounts, { idle: 1, inFlight: 0, retiring: 0 })
+  assert.equal(snapshot.tokens.length, 1)
   assert.deepEqual(snapshot.tokens[0].owner, {
     sessionId: 'session',
     physicalUserMessageId: 'msg-b',
-    effectiveAgent: 'inspector',
+    role: 'inspector',
+    participant: 'alice',
   })
+  assert.deepEqual(snapshot.executions, [
+    {
+      sessionId: 'session',
+      physicalUserMessageId: 'msg-b',
+      role: 'inspector',
+      participant: 'alice',
+    },
+  ])
 })
 
-test('WHAT[EMR-006] provider failure can consume only its exact current run target', async () => {
+test('WHAT[EMR-006] EMR_006_only_the_current_run_witness_resolves_a_target', async () => {
   let scheduled = 0
   const runtime = createRuntime(() => target(`provider-${++scheduled}/model`))
 
-  await acquireTarget(runtime, 'session', 'msg-a', 'manager')
-  await enterProviderStep(runtime, 'session', 'msg-a', [])
+  await acquireTarget(runtime, 'session', 'msg-a', 'manager', 'alice')
   endProviderStep(runtime, 'session', 'msg-a', 'run-a')
 
-  const current = await acquireTarget(runtime, 'session', 'msg-b', 'manager')
-  await enterProviderStep(runtime, 'session', 'msg-b', ['run-a'])
+  const current = await acquireTarget(runtime, 'session', 'msg-b', 'manager', 'alice')
   endProviderStep(runtime, 'session', 'msg-b', 'run-b')
 
   assert.equal(takeProviderRunTarget(runtime, 'run-a'), null, 'superseded run cannot poison the current target')
   assert.equal(takeProviderRunTarget(runtime, 'run-b').model, current.model)
   assert.equal(takeProviderRunTarget(runtime, 'run-b'), null, 'the exact witness is single-consumption')
+  assert.equal(takeProviderRunTarget(runtime, 'no-such-run'), null, 'an unknown run resolves nothing')
 })
 
-test('WHAT[EMR-006] EMR_006_same_physical_message_cannot_change_effective_agent', async () => {
+test('WHAT[EMR-006] EMR_006_same_physical_message_cannot_change_role', async () => {
   const runtime = createRuntime(() => target())
-  await acquireTarget(runtime, 'session', 'msg-1', 'coder')
+  await acquireTarget(runtime, 'session', 'msg-1', 'coder', 'alice')
 
   await assert.rejects(
-    acquireTarget(runtime, 'session', 'msg-1', 'inspector'),
-    /physical execution .* changed agent/i,
+    acquireTarget(runtime, 'session', 'msg-1', 'inspector', 'alice'),
+    /physical execution .* changed role/i,
+  )
+  assert.equal(snapshotOccupied(runtime).length, 1)
+})
+
+test('WHAT[EMR-006] EMR_006_same_physical_message_cannot_change_participant', async () => {
+  const runtime = createRuntime(() => target())
+  await acquireTarget(runtime, 'session', 'msg-1', 'coder', 'alice')
+
+  await assert.rejects(
+    acquireTarget(runtime, 'session', 'msg-1', 'coder', 'bob'),
+    /physical execution .* changed participant/i,
   )
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
@@ -142,9 +163,9 @@ test('WHAT[EMR-004] EMR_004_required_null_waits_for_an_occupancy_event_then_retr
     : null
   const runtime = createRuntime(route)
 
-  await acquireTarget(runtime, 'holder', 'msg-holder', 'coder')
+  await acquireTarget(runtime, 'holder', 'msg-holder', 'coder', 'alice')
   let settled = false
-  const waiting = acquireTarget(runtime, 'waiter', 'msg-waiter', 'coder').then((value) => {
+  const waiting = acquireTarget(runtime, 'waiter', 'msg-waiter', 'coder', 'bob').then((value) => {
     settled = true
     return value
   })
@@ -160,14 +181,14 @@ test('WHAT[EMR-004] EMR_004_required_null_waits_for_an_occupancy_event_then_retr
 })
 
 test('WHAT[EMR-004] EMR_004_newer_physical_message_cancels_superseded_pending_demand', async () => {
-  const runtime = createRuntime((role) => role === 'blocked' ? null : target(`provider/${role}`))
+  const runtime = createRuntime((role) => role === 'inspector' ? null : target(`provider/${role}`))
 
-  const old = acquireManaged(runtime, 'same-session', 'msg-old', 'blocked')
+  const old = acquireManaged(runtime, 'same-session', 'msg-old', 'inspector', 'alice')
   await Promise.resolve()
   assert.equal(pendingCount(runtime), 1)
 
-  const fresh = await acquireTarget(runtime, 'same-session', 'msg-new', 'free')
-  assert.equal(fresh.model, 'provider/free')
+  const fresh = await acquireTarget(runtime, 'same-session', 'msg-new', 'coder', 'alice')
+  assert.equal(fresh.model, 'provider/coder')
   const oldOutcome = await old
   assert.equal(oldOutcome.kind, 'Superseded')
   assert.equal(oldOutcome.target, null)
@@ -176,14 +197,14 @@ test('WHAT[EMR-004] EMR_004_newer_physical_message_cancels_superseded_pending_de
 })
 
 test('WHAT[EMR-004] EMR_004_an_earlier_null_waiter_does_not_head_of_line_block_another_role', async () => {
-  const runtime = createRuntime((role) => role === 'blocked' ? null : target(`provider/${role}`))
+  const runtime = createRuntime((role) => role === 'inspector' ? null : target(`provider/${role}`))
 
-  const blocked = acquireManaged(runtime, 'blocked-session', 'msg-blocked', 'blocked')
+  const blocked = acquireManaged(runtime, 'blocked-session', 'msg-blocked', 'inspector', 'alice')
   await Promise.resolve()
   assert.equal(pendingCount(runtime), 1)
 
-  const free = await acquireTarget(runtime, 'free-session', 'msg-free', 'free')
-  assert.equal(key(free), 'provider/free|none')
+  const free = await acquireTarget(runtime, 'free-session', 'msg-free', 'coder', 'bob')
+  assert.equal(key(free), 'provider/coder|none')
   assert.equal(pendingCount(runtime), 1)
 
   cancelPendingExecution(runtime, 'blocked-session')
@@ -194,7 +215,7 @@ test('WHAT[EMR-004] EMR_004_an_earlier_null_waiter_does_not_head_of_line_block_a
 
 test('WHAT[EMR-004] EMR_004_optional_null_is_k0_not_a_pending_demand', () => {
   const runtime = createRuntime(() => null)
-  assert.equal(tryReserveManaged(runtime, 'replica', 'coder'), null)
+  assert.equal(tryReserveManaged(runtime, 'replica', 'coder', null), null)
   assert.equal(pendingCount(runtime), 0)
   assert.deepEqual(snapshotOccupied(runtime), [])
 })
@@ -206,57 +227,105 @@ test('WHAT[EMR-004] EMR_004_strength_reservation_is_adopted_by_chat_message_with
     return target('provider/replica')
   })
 
-  const reserved = tryReserveManaged(runtime, 'replica', 'coder')
+  const reserved = tryReserveManaged(runtime, 'replica', 'coder', null)
   assert.equal(key(reserved), 'provider/replica|none')
   assert.equal(snapshotOccupied(runtime).length, 1)
 
-  const adopted = await acquireTarget(runtime, 'replica', 'msg-replica', 'coder')
+  const adopted = await acquireTarget(runtime, 'replica', 'msg-replica', 'coder', 'alice')
   assert.equal(key(adopted), 'provider/replica|none')
   assert.equal(calls, 1, 'physical acceptance adopts the reservation without another scheduler decision')
   assert.equal(snapshotOccupied(runtime).length, 1, 'reservation and physical execution are one capacity occurrence')
-  assert.equal(key(tryLease(runtime, 'replica', 'msg-replica', 'coder')), 'provider/replica|none')
+  assert.equal(key(tryLease(runtime, 'replica', 'msg-replica', 'coder', 'alice', null)), 'provider/replica|none')
+})
+
+test('WHAT[EMR-004] EMR_004_reservation_adoption_binds_role_and_participant', async () => {
+  const runtime = createRuntime(() => target('provider/replica'))
+  tryReserveManaged(runtime, 'replica', 'coder', null)
+
+  await acquireTarget(runtime, 'replica', 'msg-replica', 'coder', 'alice')
+  await assert.rejects(
+    acquireTarget(runtime, 'replica', 'msg-replica', 'coder', 'bob'),
+    /physical execution .* changed participant/i,
+    'the first adopter binds the participant for that exact physical execution',
+  )
+
+  const rerouted = createRuntime(() => target('provider/replica'))
+  tryReserveManaged(rerouted, 'replica', 'coder', null)
+  await assert.rejects(
+    acquireTarget(rerouted, 'replica', 'msg-replica', 'inspector', 'alice'),
+    /physical execution .* changed role/i,
+    'a reservation carries its Role until adoption',
+  )
 })
 
 test('WHAT[EMR-006] EMR_006_lease_is_stable_only_for_one_physical_user_material', async () => {
   let calls = 0
   const runtime = createRuntime(() => target(`provider/model-${++calls}`, 'low'))
 
-  const first = await acquireTarget(runtime, 'session', 'msg-1', 'coder')
-  const retry = await acquireTarget(runtime, 'session', 'msg-1', 'coder')
+  const first = await acquireTarget(runtime, 'session', 'msg-1', 'coder', 'alice')
+  const retry = await acquireTarget(runtime, 'session', 'msg-1', 'coder', 'alice')
 
   assert.equal(first.model, 'provider/model-1')
   assert.equal(retry.model, 'provider/model-1')
   assert.equal(calls, 1)
 
-  const nextMaterial = await acquireTarget(runtime, 'session', 'msg-2', 'coder')
+  const nextMaterial = await acquireTarget(runtime, 'session', 'msg-2', 'coder', 'alice')
   assert.equal(nextMaterial.model, 'provider/model-2', 'new physical material gets a fresh lease even without idle')
   assert.equal(calls, 2)
 })
 
-test('WHAT[EMR-006] EMR_006_continuation_passes_previous_target_but_new_session_passes_null', async () => {
-  let next = 0
+test('WHAT[EMR-006] EMR_006_fresh_physical_receives_the_replaced_target_as_previous', async () => {
   const seenPrevious = []
+  let next = 0
   const runtime = createRuntime((_role, _running, previous) => {
     seenPrevious.push(previous)
     return previous ?? target(`provider/model-${++next}`, 'low')
   })
 
-  const first = await acquireTarget(runtime, 'continued', 'msg-1', 'coder')
+  const first = await acquireTarget(runtime, 'continued', 'msg-1', 'coder', 'alice')
   assert.equal(first.model, 'provider/model-1')
+
+  const continued = await acquireTarget(runtime, 'continued', 'msg-2', 'coder', 'alice')
+  assert.deepEqual(continued, first, 'the atomically replaced active physical supplies the previous target')
+  assert.deepEqual(seenPrevious, [null, first])
+})
+
+test('WHAT[EMR-006] EMR_006_released_session_supplies_no_previous_target', async () => {
+  const seenPrevious = []
+  let next = 0
+  const runtime = createRuntime((_role, _running, previous) => {
+    seenPrevious.push(previous)
+    return previous ?? target(`provider/model-${++next}`, 'low')
+  })
+
+  await acquireTarget(runtime, 'continued', 'msg-1', 'coder', 'alice')
   releasePhysicalExecution(runtime, 'continued', 'msg-1')
 
-  const continued = await acquireTarget(runtime, 'continued', 'msg-2', 'coder')
-  assert.deepEqual(continued, first, 'exact terminal releases capacity but preserves continuation preference')
+  const rebuilt = await acquireTarget(runtime, 'continued', 'msg-2', 'coder', 'alice')
+  assert.equal(rebuilt.model, 'provider/model-2', 'no session-history cache survives an exact terminal release')
+  assert.deepEqual(seenPrevious, [null, null])
+})
 
-  const fresh = await acquireTarget(runtime, 'new-session', 'msg-1', 'coder')
-  assert.equal(fresh.model, 'provider/model-2')
-  assert.deepEqual(seenPrevious, [null, first, null])
+test('WHAT[EMR-006] EMR_006_unrelated_session_supplies_no_previous_target', async () => {
+  const seenPrevious = []
+  let next = 0
+  const runtime = createRuntime((_role, _running, previous) => {
+    seenPrevious.push(previous)
+    return previous ?? target(`provider/model-${++next}`, 'low')
+  })
+
+  const first = await acquireTarget(runtime, 'session-a', 'msg-1', 'coder', 'alice')
+  assert.equal(first.model, 'provider/model-1')
+
+  const fresh = await acquireTarget(runtime, 'session-b', 'msg-1', 'coder', 'bob')
+  assert.equal(fresh.model, 'provider/model-2', 'another session never inherits a previous target')
+  assert.deepEqual(seenPrevious, [null, null])
 })
 
 test('WHAT[EMR-007] EMR_007_execution_release_is_idempotent_and_wakes_waiters_once', async () => {
   const runtime = createRuntime((_role, running) => running.length === 0 ? target('provider/one') : null)
-  await acquireTarget(runtime, 'holder', 'msg-holder', 'coder')
-  const waiting = acquireTarget(runtime, 'waiter', 'msg-waiter', 'inspector')
+  await acquireTarget(runtime, 'holder', 'msg-holder', 'coder', 'alice')
+  const waiting = acquireTarget(runtime, 'waiter', 'msg-waiter', 'inspector', 'bob')
 
   releasePhysicalExecution(runtime, 'holder', 'msg-holder')
   const acquired = await waiting
@@ -270,12 +339,12 @@ test('WHAT[EMR-007] EMR_007_execution_release_is_idempotent_and_wakes_waiters_on
 test('WHAT[EMR-007] EMR_007_late_terminal_for_superseded_physical_execution_cannot_release_current_lease', async () => {
   const runtime = createRuntime((role) => target(`provider/${role}`))
 
-  await acquireTarget(runtime, 'reused-session', 'msg-old', 'coder')
-  await acquireTarget(runtime, 'reused-session', 'msg-current', 'inspector')
+  await acquireTarget(runtime, 'reused-session', 'msg-old', 'coder', 'alice')
+  await acquireTarget(runtime, 'reused-session', 'msg-current', 'inspector', 'alice')
 
   releasePhysicalExecution(runtime, 'reused-session', 'msg-old')
   assert.equal(
-    key(tryLease(runtime, 'reused-session', 'msg-current', 'inspector')),
+    key(tryLease(runtime, 'reused-session', 'msg-current', 'inspector', 'alice', null)),
     'provider/inspector|none',
     'late exact terminal evidence for the old physical material must not touch the current lease',
   )
@@ -287,18 +356,18 @@ test('WHAT[EMR-007] EMR_007_late_terminal_for_superseded_physical_execution_cann
 
 test('WHAT[EMR-002] EMR_002_scheduler_program_error_poisons_pending_and_future_demands', async () => {
   const runtime = createRuntime((role) => {
-    if (role === 'waiting') return null
+    if (role === 'inspector') return null
     throw new Error('bad scheduler program')
   })
 
-  const waiting = acquireTarget(runtime, 'waiter', 'msg-waiting', 'waiting')
+  const waiting = acquireTarget(runtime, 'waiter', 'msg-waiting', 'inspector', 'alice')
   const waitingRejected = assert.rejects(waiting, /bad scheduler program/)
   await Promise.resolve()
   assert.equal(pendingCount(runtime), 1)
 
-  await assert.rejects(acquireTarget(runtime, 'boom', 'msg-boom', 'boom-role'), /bad scheduler program/)
+  await assert.rejects(acquireTarget(runtime, 'boom', 'msg-boom', 'manager', 'bob'), /bad scheduler program/)
   await waitingRejected
-  await assert.rejects(acquireTarget(runtime, 'later', 'msg-later', 'waiting'), /bad scheduler program/)
+  await assert.rejects(acquireTarget(runtime, 'later', 'msg-later', 'inspector', 'carol'), /bad scheduler program/)
   assert.equal(pendingCount(runtime), 0)
 })
 
@@ -311,170 +380,80 @@ const providerLimited = (limits, routes) => (role, running, previous) => {
   return candidates.find(available) ?? null
 }
 
-test('WHAT[EMR-010] EMR_010_lineage_credit_is_free_only_to_descendants_not_global_waiters', async () => {
+test('WHAT[EMR-010] EMR_010_explicit_lender_credit_is_free_only_to_borrowers_not_global_waiters', async () => {
   const only = target('provider/only')
-  const runtime = createRuntime(providerLimited({ provider: 1 }, { parent: [only], child: [only], stranger: [only] }))
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { coder: [only], manager: [only], inspector: [only] }))
 
-  await acquireTarget(runtime, 'parent', 'msg-parent', 'parent')
-  bindCapacityChild(runtime, 'parent', 'child')
-  assert.equal(key(await acquireTarget(runtime, 'child', 'msg-child', 'child')), key(only))
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'coder', 'alice')
+  assert.equal(key(await acquireTarget(runtime, 'child', 'msg-child', 'manager', 'bob', 'parent')), key(only))
   assert.equal(snapshotOccupied(runtime).length, 1, 'borrowing never creates a second provider token')
 
   let settled = false
-  const stranger = acquireManaged(runtime, 'stranger', 'msg-stranger', 'stranger').then((value) => {
+  const stranger = acquireManaged(runtime, 'stranger', 'msg-stranger', 'inspector', 'carol').then((value) => {
     settled = true
     return value
   })
   await Promise.resolve()
-  assert.equal(settled, false, 'unrelated sessions still see the ancestor token as occupied')
+  assert.equal(settled, false, 'a session without an explicit lender still sees the token as occupied')
   cancelPendingExecution(runtime, 'stranger')
   assert.equal((await stranger).kind, 'Cancelled')
 })
 
-test('WHAT[EMR-010] EMR_010_provider_step_handoff_makes_the_same_credit_available_to_a_waiting_descendant', async () => {
+test('WHAT[EMR-010] EMR_010_absent_lender_queues_without_borrowing', async () => {
   const only = target('provider/only')
-  const runtime = createRuntime(providerLimited({ provider: 1 }, { parent: [only], child: [only] }))
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { coder: [only], manager: [only] }))
 
-  await acquireTarget(runtime, 'parent', 'msg-parent', 'parent')
-  bindCapacityChild(runtime, 'parent', 'child')
-  await enterProviderStep(runtime, 'parent', 'msg-parent', [])
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'coder', 'alice')
+  const ghost = await beginExecutionAdmission(runtime, 'child', 'msg-child', 'manager', 'bob', 'ghost')
+  assert.equal(ghost.kind, 'Queued', 'a lender with no credit authorizes nothing')
 
-  assert.equal(
-    key(await acquireTarget(runtime, 'child', 'msg-child', 'child')),
-    key(only),
-    'the descendant may reserve the ancestor credit without creating another provider occurrence',
-  )
-
-  let childEntered = false
-  const childStep = enterProviderStep(runtime, 'child', 'msg-child', []).then(() => {
-    childEntered = true
-  })
-
-  await Promise.resolve()
-  assert.equal(childEntered, false, 'an actually in-flight ancestor provider step is not overbooked')
+  cancelPendingExecution(runtime, 'child')
+  assert.equal((await awaitQueuedExecutionAdmission(ghost.queue)).kind, 'Cancelled')
   assert.equal(snapshotOccupied(runtime).length, 1)
+})
 
-  endProviderStep(runtime, 'parent', 'msg-parent', 'run-parent')
-  await childStep
+test('WHAT[EMR-010] EMR_010_borrowed_step_handoff_reuses_the_same_credit', async () => {
+  const only = target('provider/only')
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { coder: [only], manager: [only] }))
 
-  assert.equal(childEntered, true, 'the causal step boundary, not elapsed time, releases the descendant')
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'coder', 'alice')
+  await acquireTarget(runtime, 'child', 'msg-child', 'manager', 'bob', 'parent')
+  await enterProviderStep(runtime, 'child', 'msg-child', [])
+
   assert.equal(snapshotOccupied(runtime).length, 1, 'handoff reuses the same real provider credit')
-})
-
-test('WHAT[EMR-010] EMR_010_ancestor_recall_waits_for_descendant_step_end_without_overbooking', async () => {
-  const only = target('provider/only')
-  const runtime = createRuntime(providerLimited({ provider: 1 }, { parent: [only], child: [only] }))
-
-  await acquireTarget(runtime, 'parent', 'msg-parent', 'parent')
-  bindCapacityChild(runtime, 'parent', 'child')
-  await acquireTarget(runtime, 'child', 'msg-child', 'child')
-
-  await enterProviderStep(runtime, 'child', 'msg-child', [])
-  let parentEntered = false
-  const parentStep = enterProviderStep(runtime, 'parent', 'msg-parent', []).then(() => { parentEntered = true })
-  await Promise.resolve()
-  assert.equal(parentEntered, false)
-  assert.equal(snapshotOccupied(runtime).length, 1, 'recall cannot exceed the hard provider limit')
-
-  endProviderStep(runtime, 'child', 'msg-child', 'run-child-1')
-  await parentStep
-  let childEntered = false
-  const childStep = enterProviderStep(runtime, 'child', 'msg-child', ['run-child-1']).then(() => { childEntered = true })
-  await Promise.resolve()
-  assert.equal(childEntered, false, 'recalled child blocks at its next transform')
-
-  endProviderStep(runtime, 'parent', 'msg-parent', 'run-parent-1')
-  await childStep
-})
-
-test('WHAT[EMR-010] EMR_010_late_old_terminal_cannot_release_a_new_provider_step', async () => {
-  const only = target('provider/only')
-  const runtime = createRuntime(providerLimited({ provider: 1 }, { parent: [only], child: [only] }))
-
-  await acquireTarget(runtime, 'parent', 'msg-parent', 'parent')
-  bindCapacityChild(runtime, 'parent', 'child')
-  await acquireTarget(runtime, 'child', 'msg-child', 'child')
-  await enterProviderStep(runtime, 'child', 'msg-child', [])
-  endProviderStep(runtime, 'child', 'msg-child', 'run-child-1')
-  await enterProviderStep(runtime, 'child', 'msg-child', ['run-child-1'])
-
-  let recalled = false
-  const parentStep = enterProviderStep(runtime, 'parent', 'msg-parent', []).then(() => { recalled = true })
-  endProviderStep(runtime, 'child', 'msg-child', 'run-child-1')
-  await Promise.resolve()
-  assert.equal(recalled, false, 'the previous assistant id is fenced out of the new step')
-
-  endProviderStep(runtime, 'child', 'msg-child', 'run-child-2')
-  await parentStep
-})
-
-test('WHAT[EMR-010] EMR_010_confirmed_pre_dispatch_suppression_returns_the_step_token', async () => {
-  const only = target('provider/only')
-  const runtime = createRuntime(providerLimited({ provider: 1 }, { parent: [only], child: [only] }))
-
-  await acquireTarget(runtime, 'parent', 'msg-parent', 'parent')
-  bindCapacityChild(runtime, 'parent', 'child')
-  await acquireTarget(runtime, 'child', 'msg-child', 'child')
-  await enterProviderStep(runtime, 'child', 'msg-child', [])
-
-  let recalled = false
-  const parentStep = enterProviderStep(runtime, 'parent', 'msg-parent', []).then(() => { recalled = true })
-  await Promise.resolve()
-  assert.equal(recalled, false)
 
   suppressProviderStep(runtime, 'child', 'msg-child')
-  await parentStep
-  assert.equal(recalled, true)
+  assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 1, inFlight: 0, retiring: 0 })
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
 
-test('WHAT[EMR-010] EMR_010_recalled_child_may_take_new_ordinary_capacity_for_exact_target', async () => {
+test('WHAT[EMR-010] EMR_010_older_borrowed_step_precedes_later_owned_step', async () => {
   const only = target('provider/only')
-  const runtime = createRuntime(providerLimited({ provider: 2 }, { parent: [only], child: [only] }))
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { coder: [only], manager: [only] }))
 
-  await acquireTarget(runtime, 'parent', 'msg-parent', 'parent')
-  bindCapacityChild(runtime, 'parent', 'child')
-  await acquireTarget(runtime, 'child', 'msg-child', 'child')
-  await enterProviderStep(runtime, 'child', 'msg-child', [])
-  const parentStep = enterProviderStep(runtime, 'parent', 'msg-parent', [])
-  endProviderStep(runtime, 'child', 'msg-child', 'run-child-1')
-  await parentStep
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'coder', 'alice')
+  await acquireTarget(runtime, 'child', 'msg-child', 'manager', 'bob', 'parent')
+  await enterProviderStep(runtime, 'parent', 'msg-parent', [])
 
-  await enterProviderStep(runtime, 'child', 'msg-child', ['run-child-1'])
-  assert.equal(snapshotOccupied(runtime).length, 2)
-})
+  const childStep = enterProviderStep(runtime, 'child', 'msg-child', [])
+  const parentNextStep = enterProviderStep(runtime, 'parent', 'msg-parent', [])
+  assert.deepEqual(
+    capacitySnapshot(runtime).waiters.map((waiter) => waiter.sessionId),
+    ['child', 'parent'],
+  )
 
-test('WHAT[EMR-010] EMR_010_owner_priority_beats_multiple_children_and_nested_borrowers', async () => {
-  const only = target('provider/only')
-  const runtime = createRuntime(providerLimited(
-    { provider: 1 },
-    { root: [only], childA: [only], childB: [only], grandchild: [only] },
-  ))
+  endProviderStep(runtime, 'parent', 'msg-parent', 'run-parent')
+  assert.deepEqual(
+    capacitySnapshot(runtime).waiters.map((waiter) => waiter.sessionId),
+    ['parent'],
+    'owned identity selects its exact token but grants no priority over an older eligible borrower',
+  )
 
-  await acquireTarget(runtime, 'root', 'msg-root', 'root')
-  bindCapacityChild(runtime, 'root', 'child-a')
-  bindCapacityChild(runtime, 'root', 'child-b')
-  bindCapacityChild(runtime, 'child-a', 'grandchild')
-  await acquireTarget(runtime, 'child-a', 'msg-a', 'childA')
-  await acquireTarget(runtime, 'child-b', 'msg-b', 'childB')
-  await acquireTarget(runtime, 'grandchild', 'msg-g', 'grandchild')
-
-  await enterProviderStep(runtime, 'grandchild', 'msg-g', [])
-  const order = []
-  const childA = enterProviderStep(runtime, 'child-a', 'msg-a', []).then(() => order.push('child-a'))
-  const childB = enterProviderStep(runtime, 'child-b', 'msg-b', []).then(() => order.push('child-b'))
-  const root = enterProviderStep(runtime, 'root', 'msg-root', []).then(() => order.push('root'))
-  await Promise.resolve()
-
-  endProviderStep(runtime, 'grandchild', 'msg-g', 'run-g-1')
-  await root
-  assert.deepEqual(order, ['root'])
-  endProviderStep(runtime, 'root', 'msg-root', 'run-root-1')
-  await childA
-  assert.deepEqual(order.slice(0, 2), ['root', 'child-a'])
-  endProviderStep(runtime, 'child-a', 'msg-a', 'run-a-1')
-  await childB
-  assert.deepEqual(order, ['root', 'child-a', 'child-b'])
+  await childStep
+  suppressProviderStep(runtime, 'child', 'msg-child')
+  await parentNextStep
+  suppressProviderStep(runtime, 'parent', 'msg-parent')
+  assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 1, inFlight: 0, retiring: 0 })
 })
 
 test('WHAT[EMR-010] EMR_010_credit_never_crosses_provider_boundary', async () => {
@@ -482,122 +461,25 @@ test('WHAT[EMR-010] EMR_010_credit_never_crosses_provider_boundary', async () =>
   const b = target('provider-b/model')
   const runtime = createRuntime(providerLimited(
     { 'provider-a': 1, 'provider-b': 1 },
-    { parent: [a], blocker: [b], child: [b] },
+    { coder: [a], manager: [b] },
   ))
 
-  await acquireTarget(runtime, 'parent', 'msg-parent', 'parent')
-  await acquireTarget(runtime, 'blocker', 'msg-blocker', 'blocker')
-  bindCapacityChild(runtime, 'parent', 'child')
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'coder', 'alice')
+  const child = await beginExecutionAdmission(runtime, 'child', 'msg-child', 'manager', 'bob', 'parent')
+  assert.equal(child.kind, 'Acquired', 'a borrower needing another provider takes ordinary capacity')
+  assert.equal(key(executionAdmissionTarget(runtime, child.lease)), 'provider-b/model|none')
+  assert.equal(snapshotOccupied(runtime).length, 2, 'no provider token is shared across providers')
 
-  let settled = false
-  const child = acquireManaged(runtime, 'child', 'msg-child', 'child').then((value) => {
-    settled = true
-    return value
-  })
-  await Promise.resolve()
-  assert.equal(settled, false)
   cancelPendingExecution(runtime, 'child')
-  assert.equal((await child).kind, 'Cancelled')
 })
 
-test('WHAT[EMR-010] EMR_010_multi_provider_credit_requires_one_token_attribution', async () => {
-  const a = target('provider-a/model')
-  const b = target('provider-b/model')
-  const runtime = createRuntime((role, running) => {
-    if (role === 'root') return a
-    if (role === 'middle') return b
-    if (role !== 'leaf') return null
-    const occupied = new Set(running.map((item) => provider(item.model)))
-    return !occupied.has('provider-a') && !occupied.has('provider-b') ? a : null
-  })
+test('WHAT[EMR-010] EMR_010_reservation_borrowing_shares_one_token', async () => {
+  const runtime = createRuntime(() => target('provider/shared'))
 
-  await acquireTarget(runtime, 'root', 'msg-root', 'root')
-  bindCapacityChild(runtime, 'root', 'middle')
-  await acquireTarget(runtime, 'middle', 'msg-middle', 'middle')
-  bindCapacityChild(runtime, 'middle', 'leaf')
-
-  let settled = false
-  const leaf = acquireManaged(runtime, 'leaf', 'msg-leaf', 'leaf').then((value) => {
-    settled = true
-    return value
-  })
-  await Promise.resolve()
-  assert.equal(settled, false, 'a schedule requiring two hidden providers cannot consume one borrowed token')
-  assert.equal(snapshotOccupied(runtime).length, 2)
-  cancelPendingExecution(runtime, 'leaf')
-  assert.equal((await leaf).kind, 'Cancelled')
-})
-
-test('WHAT[EMR-010] EMR_010_blogger_borrows_the_lender_blogger_when_main_is_borrowed', async () => {
-  const main = target('provider-main/model')
-  const blogger = target('provider-blog/model')
-  const runtime = createRuntime(providerLimited(
-    { 'provider-main': 1, 'provider-blog': 1 },
-    {
-      parentMain: [main],
-      childMain: [main],
-      parentBlogger: [blogger],
-      childBlogger: [blogger],
-    },
-  ))
-
-  await acquireTarget(runtime, 'parent-main', 'msg-parent-main', 'parentMain')
-  await acquireTarget(runtime, 'parent-blogger', 'msg-parent-blogger', 'parentBlogger')
-  bindCapacityCompanion(runtime, 'parent-main', 'parent-blogger')
-
-  bindCapacityChild(runtime, 'parent-main', 'child-main')
-  await acquireTarget(runtime, 'child-main', 'msg-child-main', 'childMain')
-  bindCapacityCompanion(runtime, 'child-main', 'child-blogger')
-
-  assert.equal(
-    key(await acquireTarget(runtime, 'child-blogger', 'msg-child-blogger', 'childBlogger')),
-    key(blogger),
-  )
-  assert.equal(snapshotOccupied(runtime).length, 2, 'main + blogger borrowing preserves the two real lender tokens')
-
-  await enterProviderStep(runtime, 'child-blogger', 'msg-child-blogger', [])
-  let parentRecalled = false
-  const recall = enterProviderStep(runtime, 'parent-blogger', 'msg-parent-blogger', []).then(() => {
-    parentRecalled = true
-  })
-  await Promise.resolve()
-  assert.equal(parentRecalled, false, 'parent blogger recall waits for the borrowed blogger step boundary')
-
-  endProviderStep(runtime, 'child-blogger', 'msg-child-blogger', 'run-child-blogger-1')
-  await recall
-  assert.equal(parentRecalled, true)
-})
-
-test('WHAT[EMR-010] EMR_010_blogger_gets_no_companion_credit_when_main_did_not_borrow', async () => {
-  const parentMain = target('provider-parent-main/model')
-  const childMain = target('provider-child-main/model')
-  const blogger = target('provider-blog/model')
-  const runtime = createRuntime(providerLimited(
-    { 'provider-parent-main': 1, 'provider-child-main': 1, 'provider-blog': 1 },
-    {
-      parentMain: [parentMain],
-      childMain: [childMain],
-      parentBlogger: [blogger],
-      childBlogger: [blogger],
-    },
-  ))
-
-  await acquireTarget(runtime, 'parent-main', 'msg-parent-main', 'parentMain')
-  await acquireTarget(runtime, 'parent-blogger', 'msg-parent-blogger', 'parentBlogger')
-  bindCapacityCompanion(runtime, 'parent-main', 'parent-blogger')
-
-  bindCapacityChild(runtime, 'parent-main', 'child-main')
-  await acquireTarget(runtime, 'child-main', 'msg-child-main', 'childMain')
-  bindCapacityCompanion(runtime, 'child-main', 'child-blogger')
-
-  let settled = false
-  const childBlogger = acquireManaged(runtime, 'child-blogger', 'msg-child-blogger', 'childBlogger').then((value) => {
-    settled = true
-    return value
-  })
-  await Promise.resolve()
-  assert.equal(settled, false, 'a Main that acquired ordinary capacity does not activate companion borrowing')
-
-  cancelPendingExecution(runtime, 'child-blogger')
-  assert.equal((await childBlogger).kind, 'Cancelled')
+  const first = tryReserveManaged(runtime, 'parent', 'coder', null)
+  const second = tryReserveManaged(runtime, 'child', 'coder', 'parent')
+  assert.equal(key(first), 'provider/shared|none')
+  assert.equal(key(second), 'provider/shared|none')
+  assert.equal(capacitySnapshot(runtime).ledgerEntries.length, 1, 'an explicit lender reservation duplicates no capacity')
+  assert.equal(snapshotOccupied(runtime).length, 1)
 })

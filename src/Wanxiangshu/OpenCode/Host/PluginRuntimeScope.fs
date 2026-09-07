@@ -207,17 +207,15 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         | None -> invalidOp "LoopSensor must be attached by Host composition before use"
 
     /// Current-process join admission only; no cross-process tool recovery.
-    member this.RequireFamilyRecovery(root: SessionId) : Task<FamilyRecovery> = recovery.RequireFamilyRecovery root
+    member this.RequireCurrentProcessJoin(root: SessionId) : Task<FamilyRecovery> =
+        recovery.RequireCurrentProcessJoin root
 
-    /// Await family recovery before business effects. Returns FamilyRecovery so
-    /// callers must match FamilyBlocked (P0-RECOVERY-JOIN-001: no collapse to unit).
-    member this.EnsureRecoveryDone(root: SessionId) : Task<FamilyRecovery> = recovery.EnsureRecoveryDone root
+    member _.PublishManualChatIntervention(request: ManualInterventionRequest) =
+        recovery.PublishManualChatIntervention request
 
-    member this.ArmRecovery(sessionId: SessionId, physicalUserMessageId: PhysicalUserMessageId) =
-        recovery.ArmRecovery(sessionId, physicalUserMessageId)
+    member _.ManualChatInterventions() : ManualInterventionRequest[] = recovery.ManualChatInterventions()
 
-    member this.TryTakeRecoveryPermit(sessionId: SessionId, physicalUserMessageId: PhysicalUserMessageId) =
-        recovery.TryTakeRecoveryPermit(sessionId, physicalUserMessageId)
+    member _.RevokeManualIntervention(key: ChatExecutionKey) : unit = recovery.RevokeManualIntervention key
 
     member this.RecordPendingAttemptPlan
         (sessionId: SessionId)
@@ -386,7 +384,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         | Some active -> active.CancelSessionChildren sessionId
         | None -> Task.FromResult(()) :> Task
 
-    member private this.DisposeSessionCore(sessionId: string, preserveIdentity: bool) : Task =
+    member this.DisposeSession(sessionId: string) : Task =
         task {
             let owner = lock toolRuntimeGate (fun () -> toolRuntime)
 
@@ -397,7 +395,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             // C6 item 27: waiters are keyed by BloggerSessionId. When the MAIN is
             // deleted, cancel the linked Blogger's parked waiter + request slots too.
             let linkedBloggerKeys = sessions.LinkedBloggerKeys sessionId
-            sessions.ClearSession(sessionId, preserveIdentity)
+            sessions.ClearSession sessionId
             recovery.ClearSession sessionId
             strength.ClearSession sessionId
             this.LoopSensor.DropSession(SessionId.create sessionId)
@@ -407,19 +405,13 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
             for key in cancelKeys do
                 (blogger :> IBloggerRuntimeHost).CancelParked key
+                blogger.CancelEpisodesForSession key
 
                 lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.Remove key |> ignore)
 
-                blogger.DropDrainWindow key
                 recovery.ClearAttemptPlansFor key
         }
         :> Task
-
-    member this.DisposeSession(sessionId: string) =
-        this.DisposeSessionCore(sessionId, false)
-
-    member this.DisposeSessionPreservingIdentity(sessionId: string) =
-        this.DisposeSessionCore(sessionId, true)
 
     member _.DropSessionIdentity(sessionId: string) = sessions.DropSessionIdentity sessionId
 
@@ -479,6 +471,9 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             remember (captureSyncFailure (fun () -> syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())))
             syncDelegateRuntime <- None
             remember (captureSyncFailure (fun () -> strength.Dispose()))
+
+            let! repairDrainFailure = captureTaskFailure (blogger.DrainRepairEpisodes())
+            remember repairDrainFailure
 
             // MANAGED-SESSION-018: the shared durable substrate is the last owner
             // released, after scheduler/background/process-local detach drains.

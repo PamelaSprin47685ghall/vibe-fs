@@ -47,7 +47,11 @@ module OrchestratorFact =
         payload:
             {| ManagerJobId: ManagerJobId
                TargetRef: TargetRef
-               ExpectedHead: CommitHash |} ->
+               RebasedCommit: CommitHash
+               ExpectedHead: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId
+               QualityCertificateId: QualityCertificateId
+               AuthorityRevision: AuthorityRevision |} ->
             AgentFact
 
     val inline Published:

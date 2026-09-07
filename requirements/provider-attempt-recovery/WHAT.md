@@ -1,83 +1,182 @@
 # provider-attempt-recovery — WHAT
 
-## PAR-001: Fallback 属于 Logical Run
+## PAR-001: Failure budget belongs to a Logical Run
 
-Fallback 是 Logical Run 的生命周期状态，而非 Session 的永久属性或模型槽位。新的 Authority Root 开启全新的 Fallback 生命周期（Offset 归零，A 侧由 SelectedAgent 承接）。跨 Logical Run 严禁继承上一次的连续失败计数或侧边状态。
+Provider failure accounting is lifecycle state of one Logical Run, not a
+permanent Session attribute. Each Logical Run binds a fixed participant
+(SelectedAgent + Role) with its Persona identity and keeps it unchanged across
+all retries. A new Logical Run never inherits the previous run's consecutive
+failure count.
 
-## PAR-002: Cursor 是 modulo-4 封闭 DU，损坏字节 fail-closed
+## PAR-002: Budget counts consecutive failures only, corrupt bytes fail closed
 
-FallbackOffset 仅存在 `Fork0 | Fork1 | Fork2 | Fork3` 四个合法取值。反序列化遇到非法字节必须返回解码错误并拒绝损坏的 envelope，严禁抛出未捕获异常或将解码失败伪造为提交未知。
+ProviderFailureProjection tracks one number: the consecutive failure count.
+Deserialization meeting illegal bytes returns a decode error and refuses the
+corrupt envelope; it never throws uncaptured and never forges a decode failure
+into an unknown submission.
 
-## PAR-003: 唯一写入口、同一失败只推进一次且恢复可重放
+## PAR-003: Single writer, one failure advances once, replay replays
 
-FallbackLedger 是唯一允许提交 `FallbackCursorAdvanced` 与 `FallbackExhausted` 的写入口。同一已确认失败（基于 SessionId、LogicalRunId、AuthorityRootUserMessageId 与 ProviderRun 唯一去重）最多推进 cursor 一次；若它仍是最新失败，重复观察不写事实、不推进游标，但必须重放相同 `RecoveryAdvanced` 或 `RecoveryExhausted` 结论，使 workflow 重入同一 durable prompt claim。更旧的失败返回 `EpisodeSuperseded`，不得启动恢复。exact recovery gate 以 `ProviderRecoveryDecisionId + source ProviderRunIdentity` 标识；相同失败最多一次物理发送，不同 failed ProviderRun 即使 agent/text 相同也必须取得不同 claim 并发送。
+ProviderFailureLedger is the only writer allowed to record a confirmed
+provider failure or exhaustion. One confirmed failure (deduped by SessionId,
+LogicalRunId, AuthorityRootUserMessageId, ProviderRun) advances the failure
+count at most once; when it is still the latest failure, repeat observation
+writes no fact and adds no count but replays the same admission. An older
+failure returns `EpisodeSuperseded` and starts no recovery. Each retry creates
+a fresh physical attempt identity (new PhysicalUserMessageId and
+ProviderRunIdentity); one failure causes at most one physical send.
 
-## PAR-004: 推进不变量与成功归一化
+## PAR-004: Advance invariant and success reset
 
-任意一次已确认失败将 Offset 沿模 4 环前进一格且使连续失败计数加 1。A/A′/B/B′ 只描述 participant/context recovery 槽，不代表物理 provider 池：失败物理 provider 由 `ModelRouting` 独立永久 poison，后续新 ProviderRun 从剩余候选选择；cursor 不得反向复活该 provider。主业务请求成功写入 `FallbackSucceeded` 事实并将连续失败计数归零，同时关闭当前 primed recovery 子槽（归一化至同侧普通槽，偶数普通槽保持不变），确保后续失败能直接获取恢复机会。
+One confirmed failure adds 1 to the consecutive failure count and, while the
+budget is not spent, yields an exact typed failure licence. The failed
+physical provider is handled by ModelRouting; the budget never switches
+roles and never stands for the physical provider pool. A main business
+request success writes a success fact and resets the consecutive failure
+count to zero.
 
-失败恢复的 request kind 只能从匹配 `SessionId + PhysicalUserMessageId` 的 durable `ChatExecutionState.ProviderStarted.RequestKind` 读取；同一物理请求的 tool continuation 继承这一冻结种类，当前 `ProviderRunIdentity` 另由 recovery authorization 精确约束。通用 parent↔child session association 与 active role 都不能推断请求种类；只有已证明的 `BloggerMain | BloggerSquash` 才能用 association 查找记账 main session。manager、coder 等普通 child 即使存在 association 也必须保持其 durable `WorkMain`。
+The request kind of a failure recovery is read only from the durable
+`ChatExecutionState.ProviderStarted.RequestKind` matching
+`SessionId + PhysicalUserMessageId`; a tool continuation of the same physical
+request inherits that frozen kind, while the current `ProviderRunIdentity` is
+constrained separately by exact recovery authorization. Generic
+parent↔child session association and the active role never imply a request
+kind; only a proven `BloggerMain | BloggerSquash` may use the association to
+locate the owning main session. Manager, coder and other ordinary children
+keep their durable `WorkMain` even when an association exists.
 
-## PAR-005: 有限自动恢复预算
+## PAR-005: Bounded automatic retry budget
 
-A/A′/B/B′ participant/context 槽循环在结构上无界，但自动恢复预算严格有界（默认为 12 次连续失败）。连续失败达到预算时写入 `FallbackExhausted` 并停止自动发出物理请求，后续恢复必须依赖新 Authority Root 或用户显式动作。
+Automatic retry and recovery are strictly bounded (default consecutive
+failure limit). When consecutive failures reach the budget the run is
+exhausted and no further automatic physical request is issued; later recovery
+needs a new Authority Root or an explicit user action.
 
-## PAR-006: 侧序列与预算的维度分离
+## PAR-006: Fixed participant, decoupled model routing
 
-Offset 每次失败前进一格（映射至 A/A′/B/B′ participant/context 槽循环，与物理 provider 健康表正交）。第 12 次连续失败落在 Offset=3 并前进至 0，此时立即判定为 final 耗尽，严禁自动发起第 13 次请求。
+Each logical run has a fixed participant (Role) and system prompt. No retry
+changes the participant; when execution model routing changes target it is a
+scheduler backend choice for the same participant, not a domain identity
+change. At consecutive-failure budget the run is exhausted at once; no
+over-budget request is ever issued.
 
-## PAR-007: Fold 拒绝条件
+## PAR-007: Fold rejection conditions
 
-FallbackProjection 必须严格拒绝不合法的游标跃迁：非法的上一 Offset、非模 4 后继的下一 Offset、非单调递增的失败计数、超出预算的计数，以及已耗尽后的再次推进。拒绝必须 fail-closed 停止重放。
+ProviderFailureProjection strictly refuses illegal budget records:
+a consecutive failure count that is not the valid successor, a count beyond
+the budget, and any further advance after exhaustion. Refusal is fail-closed
+and stops the replay.
 
-## PAR-008: 空 / XML-only terminal 不计入推进
+## PAR-008: Empty / XML-only terminal never advances
 
-空 terminal 或纯 XML terminal 属于回应内容不可用而非 provider 请求失败：最多触发一次有界的 Interaction Repair，严禁推进 fallback cursor 或消耗 provider 失败预算。
+An empty terminal or an XML-only terminal means the response content is
+unusable, not that the provider request failed: at most one bounded
+Interaction Repair follows; advancing the failure budget on it is forbidden.
 
-## PAR-009: Host Attempt 不是领域计数
+## PAR-009: Host attempt number is not the domain count
 
-Host 传输层的重试序号是宿主内部状态，不得写入领域连续失败计数，不得用于预算判定或 Offset 推导。
+The Host transport retry sequence is Host-internal state. It is never written
+into the domain consecutive failure count and never drives budget judgement
+or identity derivation.
 
-## PAR-010: 槽内维护子请求
+## PAR-010: Maintenance sub-request and retry dispatch
 
-一个已确认失败先通过 `FallbackLedger` 推进到下一槽；若该新槽为 primed Blogger 槽且存在 durable frames，则该槽的第一物理请求必须是维护子请求 `BloggerSquash`，严禁先重发 BloggerMain。Squash 成功不清零失败计数，并在同槽继续 `BloggerMain`；Squash 失败即结束该槽、记录下一次 advance，严禁在同一槽继续 Main。没有 squash 材料的槽直接发送 Main。每个失败槽恰好产生一次 `FallbackCursorAdvanced`。
+A confirmed BloggerMain failure with retry permission, when durable frames
+exist and the retry policy allows maintenance, retries first with the
+maintenance sub-request `BloggerSquash`; resending BloggerMain first is
+forbidden. A Squash success does not clear the consecutive failure count and
+the run continues to `BloggerMain`; a Squash failure records the failure and
+the policy continues with the next physical retry. With no squash material
+the retry sends Main directly.
 
-## PAR-011: typed recovery opportunity、精确物理绑定与 stale-primed 陷阱
+## PAR-011: Material-based immutable retry policy with exact physical binding
 
-`RecoveryOpportunity` 仅由“本次已确认失败刚刚 advance”与“该次 advance 得到的新 Offset 为 primed”共同产生；`FallbackLedger` 必须把这一本次 advance 的 typed opportunity 作为 admission 结果向后传递，后继 workflow 严禁再次读取 durable cursor 奇偶来重建 opportunity。材料资格由后续候选/frames 证明，不得提前折叠进 opportunity。Opportunity 只属于紧随该 advance 的一个物理 attempt，发送普通请求也会消费它；新 Run 或崩溃重启后安全归零。WorkMain recovery 的 process-local permit 只能在 Host 已持久确认 `ProviderRetryAttempt` 的 `PhysicalUserMessageId` 后建立，并且消费时必须与当前 transform 的 exact physical user id 相等；仅凭 `SessionId` presence、发送意图或尚未被 Host 接受的 PromptKey 均不得领取该许可。正常成功会按 PAR-004 关闭 primed 子槽；但进程可能在 failure advance 后、成功结算前崩溃，因此 durable odd Offset 仍不能单独证明当前请求 armed。严禁仅凭持久化奇数 Offset 重新 arm，严禁 NoCoverage 后把许可跨 attempt re-arm。
+Whether a physical retry carries a prefix probe or a maintenance request is
+an immutable per-plan decision of that AttemptPlan, derived from the request
+type and the persisted material state — never from transient cross-callback
+state. No transient cross-callback channel may carry a recovery permission;
+each retry gets an independent physical message identity and the plan freeze
+admission completes before rendering.
 
-## PAR-012: Host abort / cleanup 残留不计入推进
+## PAR-012: Host abort / cleanup residue never advances
 
-Host 因 abort 清理将工具调用标记为 interrupted 的残留记录，严禁被当作已确认的 provider attempt 失败，不得推进 cursor 或消耗预算。
+Host abort cleanup marking in-flight tool calls interrupted is residue, not a
+confirmed provider attempt failure: it never advances the failure budget.
 
-## PAR-013: 换 Provider = 换执行者，不换身份
+## PAR-013: New provider target is a new executor, not a new identity
 
-Fallback 轮换仅改变下一次执行的物理 provider/model 目标。同一 durable logical participant run 的 immutable `ParticipantIdentity`（包括本名 Role、稳定 Persona 与 provenance/version）、SessionProviderLanguage、system prompt、CanonicalRole 与 Authority identity 在所有 retry/fallback attempt 中保持严格不变；Persona 与 provenance/version 必须从该 run 的 durable identity evidence 继承。只有该 run 已 exact terminal closure 后建立的新 run 才能取得新 identity，且机器代数严禁泄漏进 provider horizon。
+Failure and retry dispatch only change the next execution's physical
+provider/model target. The durable logical participant run's immutable
+`ParticipantIdentity` (own Role, stable Persona, provenance/version),
+SessionProviderLanguage, system prompt, CanonicalRole and Authority identity
+stay strictly unchanged across all retry attempts; Persona and
+provenance/version inherit from that run's durable identity evidence. Each
+participant binds one remote LLM target in the current execution. Only a new
+run built after the exact terminal closure of the old run may take a new
+identity, and machine bookkeeping never leaks into the provider horizon.
 
-## PAR-014: continuation 只在失败记账后、预算允许时
+## PAR-014: Continuation only after recorded failure within budget
 
-仅当 Host 已停止自动重试且预算允许时，才允许发送同一 Logical Run 的 continuation。Continuation 发送不触发二次游标推进，不重置计数。
+A continuation of the same Logical Run may be sent only after the Host has
+stopped automatic retry and the budget still allows it. Sending the
+continuation advances nothing and resets nothing.
 
-## PAR-015: StrengthReplica 不进 owner 的 FallbackController
+## PAR-015: StrengthReplica stays out of the owner budget
 
-StrengthReplica attempt 的成功或失败属于投机调查分支，严禁进入 owner Logical Run 的 FallbackController，不推进游标，亦不清零失败计数。
+A StrengthReplica attempt success or failure belongs to a speculative branch;
+it never enters the owner Logical Run budget, advances nothing, and clears
+nothing.
 
-## PAR-016: RequestKind 决定成功记账
+## PAR-016: RequestKind decides success accounting
 
-成功 provider attempt 是否写 `FallbackSucceeded` 必须由可证明的 `ProviderRequestKind` 决定：`WorkMain | BloggerMain` 的有效成功清零连续失败计数；`BloggerSquash | InteractionRepair | StrengthReplica` 不清零。`finish=tool-calls` 是 provider attempt 的有效成功而非失败/未完成；它可以在 Host turn 继续执行工具的同时结算本次 provider recovery。Blogger 的 RequestKind 优先由当前 typed request / `BloggerCycleReceipt` 证明，Continuation kind 由 `AcceptedContinuationIds` 证明；禁止仅凭 Role 或 terminal 文本把维护请求误记为业务成功。
+Whether a successful provider attempt writes `SuccessRecorded` is decided by
+the provable `ProviderRequestKind`: a valid `WorkMain | BloggerMain` success
+clears the consecutive failure count; `BloggerSquash | InteractionRepair |
+StrengthReplica` does not. `finish=tool-calls` is a valid provider attempt
+success, not a failure; it may settle this provider recovery while the Host
+turn continues with tools. Blogger RequestKind is proven first by the current
+typed request / `BloggerCycleReceipt`, Continuation kind by
+`AcceptedContinuationIds`; Role or terminal text alone never reclassifies a
+maintenance request as a business success.
 
-## PAR-017: Blogger retry 必须更换物理绑定
+## PAR-017: Blogger retry replaces the exact physical binding
 
-Blogger provider attempt 失败后，旧 `BloggerRequestMaterialized` 必须先以 `BloggerRequestAbandoned` 关闭。任何自动 retry（包括相同 Main context 的 retry、Main→Squash、Squash→下一槽 Main）都必须重新 materialize typed context 并绑定新 `PromptKey`，严禁让旧 PromptKey 跨物理 retry 继续充当所有权证明。
+After a Blogger provider attempt failure the old `BloggerRequestMaterialized`
+closes first as `BloggerRequestAbandoned`. Every automatic retry (same Main
+context retry, Main→Squash, Squash→Main) re-materializes the typed context
+and binds a new agent-free `PromptKey`; the old PromptKey never proves
+ownership across a physical retry.
 
-## PAR-018: recovery continuation 只由 durable 事件解锁
+## PAR-018: Recovery continuation unlocks only on durable events
 
-WorkMain 失败进入 primed recovery opportunity 后，若 linked Blogger 已有 durable open request 且尚无严格更新的 prefix coverage，则 recovery continuation 必须等待该 journal stream 的下一次已提交事实并重算条件；open request 的 commit/abandon 或 coverage advance 是唯一解锁事件。禁止 timer、deadline、sleep、polling、process-local flight/pending 状态参与该等待。若没有 durable open producer，则立即进入本次物理 retry，不等待未来材料。
+After a WorkMain failure, when the linked Blogger holds a durable open
+request without strictly newer prefix coverage, the recovery continuation
+waits for the next committed fact of that journal stream and re-evaluates;
+the open request commit/abandon or a coverage advance is the only unlock
+event. Timers, deadlines, sleeps, polling and process-local flight/pending
+state take no part in the wait. With no durable open producer the physical
+retry proceeds at once without waiting for future material.
 
-## PAR-019: 只消费 typed provider recovery licence
+## PAR-019: Only a typed provider recovery licence authorizes retry
 
-FallbackController 只接受 `execution-failure-policy` 针对 `ProviderTransient | ProviderPermanent` 产生的 typed `RetryFreshAttempt` / `AdvanceFallback` licence；licence 必须绑定 exact `ProviderRunIdentity`、request kind 与 policy decision identity，controller 只验证当前 attempt 匹配，不重复计算 budget、breaker 或 failure class。`LocalInvariant`、`ProtocolRejection`、`AuthorizationDenied`、`UserCancelled`、`Superseded`、`CapacityQueueFull`、`AcceptanceUnknown`、`StreamInterruptedAfterFirstToken` 与任一 `PersistenceFailure` 均不得推进 cursor、消耗 provider 失败预算或创建 retry/fallback attempt。严禁 wildcard retry、按异常/terminal 文本重分类，或将未决 acceptance 当作 provider failure。
+The recovery path accepts only the `execution-failure-policy` typed
+`RetryFreshAttempt` licence for `ProviderTransient | ProviderPermanent`,
+bound to the exact `ProviderRunIdentity`, request kind and policy decision
+identity; the ledger verifies the current attempt matches and never
+recomputes budget, breaker or failure class. `LocalInvariant`,
+`ProtocolRejection`, `AuthorizationDenied`, `UserCancelled`, `Superseded`,
+`CapacityQueueFull`, `AcceptanceUnknown`,
+`StreamInterruptedAfterFirstToken` and any `PersistenceFailure` never advance
+the budget, never spend the provider failure budget, and never create a
+retry attempt. Wildcard retry, reclassification by exception/terminal text,
+or treating a pending acceptance as a provider failure are forbidden.
 
-## PAR-020: Fallback cursor 是 durable domain evidence，不是 resume authority
+## PAR-020: Failure budget is durable domain evidence, not resume authority
 
-Fallback cursor 只能由已提交的 Authority Root、typed provider failure 与 eligible business-main success 事实折叠得出，并只表达当前 logical run 的 side、连续失败预算与派生 EffectiveAgent。它不得携带或恢复 callback、continuation、next action、process-local recovery opportunity、物理请求许可或 workflow 入口。相同 durable facts 的 replay 必须得到相同 cursor view；仅有 cursor，尤其是 primed Offset，不得授权 retry、fallback、squash、continuation 或任一物理请求。所有推进仍须消费 exact typed failure licence，本次 recovery opportunity 仍须由当次成功提交的 failure advance 产生。
+The failure budget folds only from the committed Authority Root, typed
+provider failures and eligible business-main successes, and expresses only
+the current logical run's consecutive failure budget and fixed participant.
+It carries no callback, continuation, next action, physical request
+permission or workflow entry. Replaying the same durable facts yields the
+same budget view. Every retry still consumes its exact typed failure licence
+and the retry policy still decides the execution content.

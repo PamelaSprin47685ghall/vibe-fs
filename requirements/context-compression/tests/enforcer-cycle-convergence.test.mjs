@@ -5,7 +5,6 @@ import test from 'node:test'
 import * as runtime from '../../../dist/Context/Companion/RuntimeSurface.js'
 import * as frames from '../../../dist/Context/Companion/Blogger/FrameSurface.js'
 import * as compression from '../../../dist/Context/Companion/CompressionSurface.js'
-import * as crash from '../../../dist/Context/Companion/Blogger/BloggerCrashSurface.js'
 
 const request = (toml = 'work') => runtime.main({
   requestId: 'req-1',
@@ -39,17 +38,10 @@ const commit = (state, value) => {
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_blog_tool_without_CurrentRequest_rejects_not_ok', () => {
   const scope = runtime.scope()
   assert.equal(runtime.currentRequest(scope, 'ses-blog'), null)
-  assert.equal(runtime.hasFlight(scope, 'ses-blog'), false)
   runtime.dispose(scope)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_historical_completed_blog_after_idle_is_noop', () => {
-  assert.equal(crash.classifyOpenRequest(false, true, true), 'ReceiptedIdle')
-  assert.equal(runtime.blocksNewRequest(true, false, false), true)
-})
-
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_live_blog_without_CurrentRequest_and_without_open_is_fatal', () => {
-  assert.equal(crash.classifyOpenRequest(false, true, false), 'AbandonedUnsent')
   const scope = runtime.scope()
   assert.equal(runtime.currentRequest(scope, 'ses-blog'), null)
   runtime.dispose(scope)
@@ -94,7 +86,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_resolveCycleContext_prefers_live_in
   runtime.claimCurrentRequest(scope, 'ses-blog', request('live'))
   const live = runtime.currentRequest(scope, 'ses-blog')
   assert.equal(live.toml, 'live')
-  assert.equal(runtime.hasFlight(scope, 'ses-blog'), true)
+  assert.notEqual(runtime.currentRequest(scope, 'ses-blog'), null)
   runtime.dispose(scope)
 })
 

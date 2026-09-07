@@ -7,37 +7,24 @@ import * as temporal from '../../../dist/Verification/TemporalSurface.js'
 const hash = (value) => `H(${value})`
 const session = 'ses-reusable-physical-container'
 
-const rootSeed = ({ selectedAgent, peerAgent, canonicalRole, selectedTier, persona }) => ({
+// Canonical participant+Role/Persona/provenance seed. No PeerAgent,
+// EffectiveAgent, tier selection or cursor fields anywhere in this file.
+const rootSeed = ({ participant, role, persona }) => ({
   kind: 'RootSelection',
   ownerSession: null,
   ownerLogicalRun: null,
   ownerAuthorityRoot: null,
   participantIdentity: {
-    selectedAgent,
-    peerAgent,
-    canonicalRole,
-    selectedTier,
+    participant,
+    role,
     persona,
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
   },
 })
 
-const managerSeed = rootSeed({
-  selectedAgent: 'manager',
-  peerAgent: 'manager',
-  canonicalRole: 'manager',
-  selectedTier: 'deep',
-  persona: 'Lead',
-})
-
-const coderSeed = rootSeed({
-  selectedAgent: 'coder',
-  peerAgent: 'coder',
-  canonicalRole: 'coder',
-  selectedTier: 'deep',
-  persona: 'Coder',
-})
+const managerSeed = rootSeed({ participant: 'manager', role: 'manager', persona: 'Lead' })
+const coderSeed = rootSeed({ participant: 'coder', role: 'coder', persona: 'Coder' })
 
 const createRoot = (physical, seed) => {
   const result = authority.createAuthorityRoot(
@@ -52,6 +39,9 @@ const createRoot = (physical, seed) => {
   return result.value
 }
 
+// Durable fact encoding mirrors identitySeedToJs: capitalized IdentitySeed
+// keys with the canonical participant/role/Persona/PersonaCatalogVersion/Origin
+// identity. Legacy flat peer/tier fields are never encoded.
 const acceptedFact = (profile) => ({
   family: 'Prompt',
   case: 'AuthorityRootAccepted',
@@ -67,10 +57,8 @@ const acceptedFact = (profile) => ({
       OwnerLogicalRunId: profile.identitySeed.ownerLogicalRun,
       OwnerAuthorityRootUserMessageId: profile.identitySeed.ownerAuthorityRoot,
       ParticipantIdentity: {
-        SelectedAgent: profile.participantIdentity.selectedAgent,
-        PeerAgent: profile.participantIdentity.peerAgent,
-        Role: profile.participantIdentity.canonicalRole,
-        InitialTier: profile.participantIdentity.selectedTier,
+        participant: profile.participantIdentity.participant,
+        role: profile.participantIdentity.role,
         Persona: profile.participantIdentity.persona,
         PersonaCatalogVersion: profile.participantIdentity.personaCatalogVersion,
         Origin: profile.participantIdentity.origin,
@@ -171,4 +159,5 @@ test('WHAT[PID-009] reuses SessionId with a fresh closed-run identity', () => {
     replayedCurrent.participantIdentity,
     acceptedFact(first).payload.IdentitySeed.ParticipantIdentity,
   )
+  assert.equal(JSON.stringify(scenario.online).includes('eerAgent'), false)
 })

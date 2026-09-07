@@ -84,7 +84,7 @@ export function deliveryOutcome(fault, attempt) {
 
 // ── rendering a fault the Host will actually classify ───────────────────────
 //
-// A fault declares `retryable`, and FALLBACK-009 turns on it: a retryable failure means
+// A fault declares `retryable`, and PAR-019 turns on it: a retryable failure means
 // the HOST drives the retries and the plugin sends no continuation; a non-retryable one
 // means the Host gives up and `TurnCompletionProgram` must carry the Logical Run forward.
 // Declaring it is only half the job — the response body has to make the Host agree.
@@ -103,9 +103,9 @@ export function deliveryOutcome(fault, attempt) {
 // `parseStreamError` bailed and the retry decision fell through to the AI SDK's own
 // `e.isRetryable`, derived from the HTTP status.
 //
-// So `isRetryable` in those bodies was decoration: `fallback.json` got its Host-driven
-// retries from the 500, and `fallback-aabb-trace.json` got its plugin continuations from
-// the 400 — the field agreeing with the status by luck in both cases. A scenario that
+// So `isRetryable` in those bodies was decoration: Host-driven retries came from the 500,
+// while plugin continuations came from the 400 — the field agreeing with the status by
+// luck in both cases. A scenario that
 // declared 500 + `isRetryable: false` would have silently behaved as retryable.
 //
 // Synthesising the body from the declaration removes the second source of truth.

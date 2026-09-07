@@ -45,7 +45,6 @@ const evidenceSeed = (sessionId, physicalId) => ({
     ownerAuthorityRoot: null,
     participantIdentity: {
       selectedAgent: 'coder',
-      peerAgent: 'coder',
       canonicalRole: 'coder',
       selectedTier: 'deep',
       persona: 'Coder',
@@ -55,7 +54,6 @@ const evidenceSeed = (sessionId, physicalId) => ({
   },
   providerRun: `provider-${sessionId}`,
   origin: 'HumanRoot',
-  effectiveAgent: 'coder',
   requestKind: 'work-main',
   projectionChoice: { kind: 'UseCommittedEpoch' },
 })

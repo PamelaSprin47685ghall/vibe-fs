@@ -5,21 +5,21 @@
 `interaction-authority` 通过纯函数式事实折叠维护唯一的权威状态投影：
 
 1. **Ingress 授权把关**：
-   `PromptIngress.handle` 是外部物理消息升级为权限实体的唯一入口。仅当当前无活跃 Profile 且消息显式指定合法 managed agent 时，Ingress 才向 `participant-identity` owner 请求为 exact root 准备 typed `ParticipantIdentityEvidence`。Authority 校验 exact keys/owner witness 后只执行一次 durable append：`AuthorityRootAccepted { root keys; ExpectedClosureKind; ParticipantIdentityEvidence; initial execution selection }`。该单一 fact 同时安装 identity 与接受 root；append 未提交时不发布 identity、root 或 profile，不存在可孤立的 identity write。活跃 run、缺失 evidence 或 evidence/run 不匹配一律 `UnknownOrigin`。
+   `PromptIngress.handle` 是外部物理消息升级为权限实体的唯一入口。仅当当前无活跃 Profile 且消息显式指定合法 participant 时，Ingress 才向 `participant-identity` owner 请求为 exact root 准备 typed `ParticipantIdentityEvidence`。Authority 校验 exact keys/owner witness 后只执行一次 durable append：`AuthorityRootAccepted { root keys; ExpectedClosureKind; ParticipantIdentityEvidence; initial per-physical target/lease }`。该单一 fact 同时安装 identity 与接受 root；append 未提交时不发布 identity、root 或 profile，不存在可孤立的 identity write。活跃 run、缺失 evidence 或 evidence/run 不匹配一律 `UnknownOrigin`。显式 external agent 只作为与 participant 比对的输入，绝不独立进入 authority。
 
 2. **来源判定管线（Resolution Pipeline）**：
    按固定顺序扫描 durable authority facts：
    - 物理确认接收的消息（`AcceptedContinuationIds`）→ 对应 Continuation 与原 identity evidence
-   - 挂起的 PromptKey Claim → 已登记的意图来源
+   - 挂起的 agent-free PromptKey Claim → 已登记的意图来源
    - Host 压缩/合成提示 → HostInternal
    - 已注册 `AgentOwnerRoot` + exact typed owner-derived identity evidence → child/attached/InternalLeaf Root
    - 证明合法的物理用户输入 + identity owner 返回的 fresh evidence → HumanRoot
    - 未命中任何规则 → fail-closed `UnknownOrigin`
 
-   Session cache、Host physical parent、agent 名称拆解与消息字段形态不进入 resolution。
+   Session cache、Host physical parent 与消息字段形态不进入 resolution；显式 external agent 只作为与 participant 比对的输入。
 
 3. **权威事实折叠（Authority Fold）**：
-   identity 与 authority 投影严格从同一 `AuthorityRootAccepted` 重放 `(SessionId, LogicalRunId, AuthorityRootId, ExpectedClosureKind, ParticipantIdentityEvidence, execution selection)`，内存不维护独立可变 authority/identity 副本。它向 Host 与 execution 发布 exact profile view，而不复制身份解析规则；stable SelectedAgent 来自 evidence，当前 EffectiveAgent/provider/model/lease 来自 execution binding。
+   identity 与 authority 投影严格从同一 `AuthorityRootAccepted` 重放 `(SessionId, LogicalRunId, AuthorityRootId, ExpectedClosureKind, ParticipantIdentityEvidence, per-physical target/lease)`，内存不维护独立可变 authority/identity 副本。它向 Host 与 execution 发布 exact profile view，而不复制身份解析规则；固定 participant/Role 来自 evidence，当前 per-physical target/lease 来自 execution binding。
 
 4. **Durable closure interpreter**：
    HumanRoot Manager 由 `Composition/Durable/Fold.fs` 在 `RetirementCommitted.QualityCandidateAccepted=true` 时原子关闭 authority；需要后继的退休保留 active LogicalRun、claims 与 continuation mappings。`HostSessionNudge` 只读取 active profile，正式 managed chat admission 再校验同一 exact identity，不能回退历史 profile。

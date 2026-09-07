@@ -13,7 +13,7 @@ test('WHAT[HOST-BOUNDARY-025] known typed failure emits one redacted JSON line w
       sessionId: 'session-2',
       physicalUserMessageId: 'message-3',
       providerRunIdentity: 'provider-4',
-      effectiveAgent: 'coder',
+      participant: 'coder',
       role: 'Coder',
       providerRequestKind: 'work-main',
       transition: { from: 'ProviderStarted', to: 'Terminal' },

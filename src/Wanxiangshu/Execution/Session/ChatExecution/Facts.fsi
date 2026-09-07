@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
 open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt
@@ -17,11 +18,12 @@ type AcceptedChatExecutionEvidence =
       AuthorityKind: PromptRootAuthorityKind
       IdentitySeed: PromptIdentitySeed
       PhysicalUserMessageId: PhysicalUserMessageId
-      Origin: PromptOrigin
-      EffectiveAgent: string }
+      Origin: PromptOrigin }
 
 [<RequireQualifiedAccess>]
 module AcceptedChatExecutionEvidence =
+    val participant: evidence: AcceptedChatExecutionEvidence -> string
+    val canonicalRole: evidence: AcceptedChatExecutionEvidence -> Role
     val validate: evidence: AcceptedChatExecutionEvidence -> Result<unit, string>
 
 type ProviderStartedEvidence =

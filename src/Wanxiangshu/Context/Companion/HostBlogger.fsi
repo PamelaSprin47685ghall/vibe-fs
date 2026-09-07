@@ -15,7 +15,7 @@ module internal CompanionHostBlogger =
           Gate: obj
           Companion: Companion
           Journal: AgentJournal option
-          EffectiveAgent: string }
+          Participant: string }
 
     val coveredFrameCount: frameCount: int -> int
 

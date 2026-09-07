@@ -33,7 +33,7 @@ type SessionRecoveryHost
         match event with
         | ChatExecutionRecoveryLifecycleEvent.ExactAssistantStarted started -> Some(keyOfStarted started)
         | ChatExecutionRecoveryLifecycleEvent.ExactAssistantTerminal(started, _) -> Some(keyOfStarted started)
-        | ChatExecutionRecoveryLifecycleEvent.SessionAborted key
+        | ChatExecutionRecoveryLifecycleEvent.SessionAborted key -> Some key
         | ChatExecutionRecoveryLifecycleEvent.SessionDeleted key
         | ChatExecutionRecoveryLifecycleEvent.SessionCancelled key -> Some key
         | _ -> None
@@ -95,7 +95,6 @@ type SessionRecoveryHost
                   ProviderRun = started.ProviderRun
                   RequestKind = started.RequestKind
                   RetryBudget = ProviderRecoveryBudget.Exhausted
-                  FallbackBudget = ProviderRecoveryBudget.Exhausted
                   Breaker = ProviderBreakerState.Closed } }
         |> RecoveryPolicyEvidence.FailureDecision
 
@@ -133,7 +132,9 @@ type SessionRecoveryHost
                         state.Evidence
                         ChatExecutionTerminalDisposition.Cancelled
 
-                return completedLifecycleSettlement state settled
+                let completed = completedLifecycleSettlement state settled
+                scope.RevokeManualIntervention state.Key
+                return completed
             | _ -> return state
         }
 
@@ -187,6 +188,7 @@ type SessionRecoveryHost
 
                 requirePersistence "terminal" result
                 do! release key
+                scope.RevokeManualIntervention key
             }
             :> Task
 
@@ -204,20 +206,39 @@ type SessionRecoveryHost
                         disposition
             }
             :> Task
-        | PhysicalReconciliationRequest.ReleaseTerminalResource(key, _, _) -> release key
+        | PhysicalReconciliationRequest.ReleaseTerminalResource(key, _, _) ->
+            task {
+                do! release key
+                scope.RevokeManualIntervention key
+            }
+            :> Task
+
+    let publishNoAuthorizedDisposition (request: PreProviderResumeRequest) =
+        let state =
+            currentState
+                { Key = request.ExecutionKey
+                  Evidence = request.AcceptedEvidence
+                  ProviderStarted = None
+                  TerminalEvidence = None
+                  Lifecycle = ChatExecutionLifecycle.Accepted }
+
+        scope.PublishManualChatIntervention
+            { ExecutionState = state
+              ProviderObservation = ProviderPhysicalObservation.ProviderAbsent request.ExecutionKey
+              ResourceObservation = ModelRouting.observePhysicalResource request.ExecutionKey
+              InterventionReason = ManualInterventionReason.NoAuthorizedProviderDisposition }
+
+    let tryResumeAccepted (request: PreProviderResumeRequest) : Task<bool> =
+        match acceptedMessageRecovery with
+        | Some port -> port.ResumeAccepted request
+        | None -> Task.FromResult false
 
     let resume (request: PreProviderResumeRequest) =
-        let publish =
-            function
-            | true -> ()
-            | false -> scope.PublishPendingChatResume request
-
         task {
-            match acceptedMessageRecovery with
-            | Some port ->
-                let! resumed = port.ResumeAccepted request
-                publish resumed
-            | None -> scope.PublishPendingChatResume request
+            let! resumed = tryResumeAccepted request
+
+            if not resumed then
+                publishNoAuthorizedDisposition request
         }
         :> Task
 
@@ -324,3 +345,13 @@ type SessionRecoveryHost
             Task.FromResult(()) :> Task
         else
             waitForDrain sessionId
+
+    /// Typed single-resume entry for the JS semantic boundary. Delegates to
+    /// the same recovery action ports as Signal-driven recovery; the port
+    /// answers remain test inputs owned by the caller.
+    member _.ResumePreProvider(request: PreProviderResumeRequest) : Task = actions.ResumePreProvider request
+
+    /// Typed terminal finalization entry for the JS semantic boundary.
+    /// Persists the terminal, releases the physical resource and revokes the
+    /// manual intervention through the shared recovery ports.
+    member _.Finalize(request: TerminalFinalizationRequest) : Task = actions.Finalize request

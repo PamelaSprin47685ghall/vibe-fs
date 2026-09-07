@@ -76,7 +76,7 @@ type ToolRuntimeScope =
 
     member RoleFor: ctx: HostToolContext -> Role option
     member EnsureRoleFor: ctx: HostToolContext -> Task<Role option>
-    member ManagerPhaseFor: sessionId: string -> ManagerCapabilityPhase
+    member ManagerCapabilityFactsFor: sessionId: string -> ManagerCapabilityFacts
     member TryFreezeRetirement: sessionId: string * incumbentId: IncumbencyId -> bool
     member UnfreezeRetirement: sessionId: string -> unit
     member IsRetirementFrozen: sessionId: string -> bool
@@ -87,16 +87,16 @@ type ToolRuntimeScope =
 
     member IsRole: ctx: HostToolContext * expected: Role -> bool
 
-    /// Wire PluginRuntimeScope.RequireFamilyRecovery (or test double).
-    member AttachFamilyRecovery: fn: (SessionId -> Task<FamilyRecovery>) -> unit
+    /// Wire PluginRuntimeScope.RequireCurrentProcessJoin (or test double).
+    member AttachCurrentProcessJoin: fn: (SessionId -> Task<FamilyRecovery>) -> unit
 
     /// EXEC-017: share PluginRuntimeScope.JoinAttempts with JoinTool.
     member AttachJoinAttempts: registry: IJoinAttemptRegistry -> unit
 
     member JoinAttempts: IJoinAttemptRegistry
 
-    /// P0-RECOVERY-JOIN-001: join / JoinPublishedAvailable require FamilyReady. Missing attach → FamilyBlocked.
-    member RequireFamilyRecovery: root: SessionId -> Task<FamilyRecovery>
+    /// Process-local join admission: join / JoinPublishedAvailable require FamilyReady. Missing attach → FamilyBlocked.
+    member RequireCurrentProcessJoin: root: SessionId -> Task<FamilyRecovery>
 
     member RuntimeFor: ctx: HostToolContext -> Result<HostForkRuntime, string>
 

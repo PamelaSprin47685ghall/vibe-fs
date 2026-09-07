@@ -243,7 +243,7 @@ module ToolRegistry =
 
             let executeManager args (ctx: HostToolContext) =
                 task {
-                    let phase = runtime.ManagerPhaseFor ctx.SessionId
+                    let facts = runtime.ManagerCapabilityFactsFor ctx.SessionId
                     let frozen = runtime.IsRetirementFrozen ctx.SessionId
 
                     match managerPermission with
@@ -253,7 +253,7 @@ module ToolRegistry =
                         && permission <> ToolPermission.Finality
                         ->
                         return denyTaskState ctx
-                    | Some permission when not (OfficeCapability.isAllowedForPhase Role.Manager (Some phase) permission) ->
+                    | Some permission when not (OfficeCapability.isAllowedForManagerFacts facts permission) ->
                         return denyTaskState ctx
                     | _ -> return! original args ctx
                 }

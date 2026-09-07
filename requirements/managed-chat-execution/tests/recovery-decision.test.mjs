@@ -13,7 +13,6 @@ const matrix = [
   ['ProviderTerminalCancelled', 'Finalize', 'PersistTerminal', 'Cancelled'],
   ['ProviderTerminalRejected', 'Finalize', 'PersistTerminal', 'Rejected'],
   ['RetryEligible', 'Ignore', 'ProviderRecoveryOwned', null],
-  ['FallbackEligible', 'Ignore', 'ProviderRecoveryOwned', null],
   ['RetryExhausted', 'Finalize', 'PersistTerminal', 'Failed'],
   ['Superseded', 'Finalize', 'PersistTerminal', 'Cancelled'],
   ['MissingReceipt', 'MarkManualIntervention', 'MissingExternalReceipt', null],

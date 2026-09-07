@@ -49,7 +49,7 @@ type SessionAgentProjection =
         /// both would make each change look like it moved the other.
         PrefixEpoch: ActivePrefixEpoch option
         Handles: AgentLinkageProjection option
-        Fallback: FallbackProjection option
+        ProviderFailures: ProviderFailureProjection option
         PromptAuthority: PromptAuthority.PromptAuthorityProjection option
         /// ENFORCER-044/045/154: committed Blogger enforcement cycles for this
         /// session's Companion. Per-session because a cycle belongs to one
@@ -116,7 +116,7 @@ module AgentProjection =
           Blog = None
           PrefixEpoch = None
           Handles = None
-          Fallback = None
+          ProviderFailures = None
           PromptAuthority = None
           Enforcement = None
           BloggerCycles = None
@@ -161,9 +161,7 @@ module AgentProjection =
     /// Update one session when the change itself may be refused.
     ///
     /// Threads the rejection out rather than swallowing it. A projection that
-    /// silently ignores an invalid fact cannot fail closed, and FALLBACK-007's
-    /// modulo-4 validation and REVIEW-003's causal proof both require exactly
-    /// that.
+    /// silently ignores an invalid fact cannot fail closed.
     let tryUpdate
         (sessionId: SessionId)
         (apply: SessionAgentProjection -> Result<SessionAgentProjection, 'rejection>)

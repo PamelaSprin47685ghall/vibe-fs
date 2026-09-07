@@ -27,7 +27,6 @@ const evidence = (overrides = {}) => ({
     ownerAuthorityRoot: null,
     participantIdentity: {
       selectedAgent: 'coder',
-      peerAgent: 'coder',
       canonicalRole: 'coder',
       selectedTier: 'deep',
       persona: 'Coder',
@@ -36,7 +35,6 @@ const evidence = (overrides = {}) => ({
     },
   },
   origin: 'HumanRoot',
-  effectiveAgent: 'coder',
   ...overrides,
 })
 
@@ -69,7 +67,6 @@ const rootIdentity = {
   ownerAuthorityRoot: null,
   participantIdentity: {
     selectedAgent: 'manager',
-    peerAgent: 'manager',
     canonicalRole: 'manager',
     selectedTier: 'deep',
     persona: 'Lead',
@@ -132,7 +129,16 @@ test('WHAT[CHATEXEC-004] durable acceptance is projected before its witness exis
   assert.equal(result.ok, true, JSON.stringify(result.error))
   assert.deepEqual(result.trace, ['Read', 'Append', 'Committed', 'ReRead', 'Witness'])
   assert.deepEqual(result.witness.key, key)
-  assert.deepEqual(result.witness.evidence, evidence())
+  assert.equal(result.witness.evidence.participant, 'coder')
+  assert.equal(result.witness.evidence.role, 'coder')
+  assert.equal('effectiveAgent' in result.witness.evidence, false, 'witness carries no EffectiveAgent')
+  assert.deepEqual(result.witness.evidence.identitySeed.participantIdentity, {
+    origin: 'ResolvedAtRoot',
+    participant: 'coder',
+    persona: 'Coder',
+    personaCatalogVersion: 1,
+    role: 'coder',
+  })
   assert.equal(result.acceptanceAppendCount, 1)
   assert.equal(result.capacityEffectCount, 0)
   assert.equal(result.hostEffectCount, 0)

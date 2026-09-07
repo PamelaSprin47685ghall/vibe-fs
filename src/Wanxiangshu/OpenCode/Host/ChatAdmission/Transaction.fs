@@ -167,7 +167,8 @@ module internal ChatAdmissionTransaction =
           ExplicitAgent =
             match intent with
             | ChatAdmissionIntent.Decision.ExternalRootIntent evidence -> Some evidence.ExplicitAgent
-            | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence -> Some evidence.EffectiveAgent
+            | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
+                Some evidence.Authority.SelectedAgent
             | ChatAdmissionIntent.Decision.PendingPromptIntent _ -> None
             | _ -> invalidArg "intent" "managed chat transaction requires a managed intent" }
 
@@ -179,7 +180,8 @@ module internal ChatAdmissionTransaction =
 
         { SessionId = SessionId.value evidence.SessionId
           PhysicalUserMessageId = PhysicalUserMessageId.value evidence.PhysicalUserMessageId
-          EffectiveAgent = evidence.EffectiveAgent
+          Role = AcceptedChatExecutionEvidence.canonicalRole evidence
+          Participant = AcceptedChatExecutionEvidence.participant evidence
           Target = target }
 
     let private keyOfEvidence (evidence: AcceptedChatExecutionEvidence) : ChatExecutionKey =
@@ -562,20 +564,20 @@ module internal ChatAdmissionTransaction =
             SessionExecutionBinding.acceptExternalExecution
                 intentEvidence.Key.SessionId
                 intentEvidence.Key.PhysicalUserMessageId
-                evidence.EffectiveAgent
+                (AcceptedChatExecutionEvidence.participant evidence)
                 model
         | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent intentEvidence ->
             SessionExecutionBinding.acceptExternalExecution
                 intentEvidence.Key.SessionId
                 intentEvidence.Key.PhysicalUserMessageId
-                evidence.EffectiveAgent
+                (AcceptedChatExecutionEvidence.participant evidence)
                 model
         | ChatAdmissionIntent.Decision.PendingPromptIntent intentEvidence ->
             SessionExecutionBinding.acceptPromptExecution
                 intentEvidence.Key.SessionId
                 intentEvidence.PromptKey
                 intentEvidence.Key.PhysicalUserMessageId
-                evidence.EffectiveAgent
+                (AcceptedChatExecutionEvidence.participant evidence)
                 model
         | _ -> invalidArg "intent" "managed chat transaction requires a managed intent"
 
@@ -595,11 +597,17 @@ module internal ChatAdmissionTransaction =
                     let evidence = ManagedChatAcceptanceWitness.evidence witness
 
                     try
+                        let lenderSessionId =
+                            PromptAuthority.identitySeedOwner evidence.IdentitySeed
+                            |> Option.map (fun (ownerSession, _, _) -> SessionId.value ownerSession)
+
                         let! acquired =
                             ModelRouting.acquireExecutionAdmission
                                 evidence.SessionId
                                 evidence.PhysicalUserMessageId
-                                evidence.EffectiveAgent
+                                (AcceptedChatExecutionEvidence.canonicalRole evidence)
+                                (AcceptedChatExecutionEvidence.participant evidence)
+                                lenderSessionId
 
                         return Ok acquired
                     with error ->

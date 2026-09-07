@@ -27,16 +27,15 @@ type ToolPermission =
     | Sphinx
 
 [<RequireQualifiedAccess>]
-type ManagerCapabilityPhase =
-    | AuditPending
-    | WorkOwned
-    | PerfectAwaitingRetirement
-    | RetirementCleanupBlocked
-    | Retired
+type ManagerCapabilityFacts =
+    { HasActiveIncumbency: bool
+      HasAssessment: bool
+      HasValidBoundCertificate: bool
+      CleanupBlockerDigest: string option }
 
 [<RequireQualifiedAccess>]
 module OfficeCapability =
     val permissions: role: Role -> ToolPermission Set
     val isAllowed: role: Role -> permission: ToolPermission -> bool
-    val permissionsForPhase: role: Role -> phase: ManagerCapabilityPhase option -> ToolPermission Set
-    val isAllowedForPhase: role: Role -> phase: ManagerCapabilityPhase option -> permission: ToolPermission -> bool
+    val permissionsForManagerFacts: facts: ManagerCapabilityFacts -> ToolPermission Set
+    val isAllowedForManagerFacts: facts: ManagerCapabilityFacts -> permission: ToolPermission -> bool

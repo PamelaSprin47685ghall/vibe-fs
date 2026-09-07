@@ -557,3 +557,111 @@ module ReconcileSurface =
 
             return formatObserved snapshotReads observed
         }
+
+    /// R17 dist-backed resource bound: same-session burst against the real
+    /// Scheduler. First snapshot read blocks on a manual gate while thousands
+    /// of same-session kicks/projection edges arrive, StopAndDrain is issued
+    /// against the live pass, then ClearSession invalidates the queued burst
+    /// and the gate releases. Post-stop kicks must be rejected. No timers.
+    let schedulerBurstBoundScenario () : Task<obj> =
+        task {
+            let sessionId = SessionId.create "scheduler-burst-session"
+            let physical = PhysicalUserMessageId.create "scheduler-burst-user"
+            let store = TurnBinding.Store()
+            store.BindUserMessage(sessionId, physical)
+
+            // DSL-MUTABLE: algorithm-scratch — exact production snapshot read count.
+            let mutable snapshotReads = 0
+            // DSL-MUTABLE: algorithm-scratch — exact production turn delivery count.
+            let mutable delivered = 0
+            // DSL-MUTABLE: algorithm-scratch — first-read gate flag, not workflow position.
+            let mutable firstRead = true
+            // DSL-MUTABLE: algorithm-scratch — stop-completion witness, not workflow position.
+            let mutable stopNotified = false
+            let blockPass = TaskCompletionSource<unit>()
+            let passEntered = TaskCompletionSource<unit>()
+
+            let messages =
+                [ schedulerMessage "scheduler-burst-user" "user" None None None false [||]
+                  schedulerMessage
+                      "scheduler-burst-run"
+                      "assistant"
+                      (Some "scheduler-burst-user")
+                      (Some "tool-calls")
+                      None
+                      false
+                      [||] ]
+
+            let snapshot =
+                { new ISessionSnapshotPort with
+                    member _.GetMessages _ =
+                        task {
+                            snapshotReads <- snapshotReads + 1
+
+                            if firstRead then
+                                firstRead <- false
+                                AsyncSupport.trySetResult passEntered () |> ignore
+                                do! blockPass.Task
+
+                            return Ok messages
+                        } }
+
+            let onTurn (_: ReconciledTurnContext) : Task =
+                delivered <- delivered + 1
+                Task.FromResult(()) :> Task
+
+            let scheduler = Reconciler.Scheduler(snapshot, store, onTurn)
+
+            let retrySignal =
+                ProviderRetry
+                    { SessionId = sessionId
+                      Attempt = "burst-attempt"
+                      Failure = ExecutionFailure.ProviderTransient
+                      Diagnostic = "burst retry" }
+
+            scheduler.Signal retrySignal
+            do! passEntered.Task
+
+            let kickCount = 3000
+            let edgeCount = 3000
+
+            for _ = 1 to kickCount do
+                scheduler.Signal retrySignal
+
+            for _ = 1 to edgeCount do
+                scheduler.NotifyProjectionChanged(sessionId, physical)
+
+            let stopTask = scheduler.StopAndDrain()
+            // Attach before yielding: an already-completed stop notifies within
+            // microtasks, while a stop owned by the live pass stays pending.
+            let _watcher =
+                task {
+                    do! stopTask
+                    stopNotified <- true
+                }
+
+            do! Task.FromResult(())
+            let stopWaited = not stopNotified
+
+            scheduler.ClearSession(sessionId)
+            AsyncSupport.trySetResult blockPass () |> ignore
+            do! stopTask
+
+            let readsAfterStop = snapshotReads
+            let deliveredAfterStop = delivered
+
+            scheduler.Signal retrySignal
+            scheduler.NotifyProjectionChanged(sessionId, physical)
+            scheduler.Kick(sessionId, ReconcileProgram.ReconcileWake.RetryWake)
+            do! scheduler.StopAndDrain()
+            do! Task.FromResult(())
+
+            return
+                box
+                    {| snapshotReads = snapshotReads
+                       kickCount = kickCount
+                       edgeCount = edgeCount
+                       delivered = delivered
+                       stopWaited = stopWaited
+                       postStopRejected = ((snapshotReads = readsAfterStop) && (delivered = deliveredAfterStop)) |}
+        }

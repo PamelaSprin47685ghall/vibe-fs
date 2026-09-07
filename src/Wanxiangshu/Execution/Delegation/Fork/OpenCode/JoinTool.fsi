@@ -4,7 +4,7 @@ open Wanxiangshu.OpenCode
 
 /// join() waits for the owning runtime's next physical completion batch.
 /// Orchestrator join routes to ManagerJob verdict mailbox by authority role.
-/// P0-RECOVERY-JOIN-001: FamilyReady permit → Join.joinAvailable (no bare Join, no AST).
+/// Process-local join admission: FamilyReady permit → HostForkJoin.joinAvailableWithPermit (no bare Join, no AST).
 /// EXEC-017: tool abort → JoinInterrupt.Signal only (≠ runtime.Cancel).
 /// DevOps join: 10s timeout budget (NodeTiming.timerTask 10000). Orch/Manager join remains untimed.
 module JoinTool =

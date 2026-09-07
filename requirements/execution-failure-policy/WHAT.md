@@ -29,7 +29,6 @@ ExecutionFailureResolution =
   | PreserveCurrentFact
   | AwaitAcceptanceReconciliation of ChatExecutionKey
   | RetryFreshAttempt of ProviderRecoveryAuthorization
-  | AdvanceFallback of ProviderRecoveryAuthorization
   | TerminalizeAcceptedPreProvider of ChatExecutionKey * ChatExecutionTerminalDisposition
   | TerminalizeProviderStarted of ChatExecutionKey * ChatExecutionTerminalDisposition
 
@@ -39,15 +38,15 @@ ExecutionFailureResolution =
   Fatality: FatalityDecision }
 ```
 
-彻底开除独立的 `RetryDecision`、`FallbackDecision` 与 `MessageDisposition` 维度及其非法积状态空间；`ExecutionFailureResolution` 是互斥和类型，每个失败回合严格收敛为一个继续分支（`RetryFreshAttempt` 或 `AdvanceFallback`）或一个终结分支（`TerminalizeAcceptedPreProvider`、`TerminalizeProviderStarted`、`AwaitAcceptanceReconciliation`、`PreserveCurrentFact`），严禁“既不重试也不终结”或“既重试又终结”的矛盾局面。Breaker、capacity settlement 与 fatality 均作为单次求值的正交不可变事实与 Resolution 一同给出。调用方只能解释这一个 decision，严禁任一边界另算其中某项、按异常文本覆盖结果，或以 wildcard 给出默认 retry/fallback。
+彻底开除独立的 `RetryDecision` 与 `MessageDisposition` 维度及其非法积状态空间；`ExecutionFailureResolution` 是互斥和类型，每个失败回合严格收敛为一个继续分支（`RetryFreshAttempt`）或一个终结分支（`TerminalizeAcceptedPreProvider`、`TerminalizeProviderStarted`、`AwaitAcceptanceReconciliation`、`PreserveCurrentFact`），严禁“既不重试也不终结”或“既重试又终结”的矛盾局面。Breaker、capacity settlement 与 fatality 均作为单次求值的正交不可变事实与 Resolution 一同给出。调用方只能解释这一个 decision，严禁任一边界另算其中某项、按异常文本覆盖结果，或以 wildcard 给出默认 retry。
 
-`PersistenceFailure(NotCommitted)` 的穷尽结果固定为：`Resolution = PreserveCurrentFact`、`Breaker = NoBreakerTransition`、`CapacitySettlement = RetainExactFence(exact fence)`（未持有 fence 时为 `NoCapacitySettlement`）、`Fatality = NoFatality`。它表示当前 transaction step 明确未提交，因此保留当前 durable phase 与已持有的 exact fence，并停止在所有后继边界之前；后续只能由新的 typed persistence/recovery event 重新裁决。该分支不得改变 provider retry/fallback 规则。
+`PersistenceFailure(NotCommitted)` 的穷尽结果固定为：`Resolution = PreserveCurrentFact`、`Breaker = NoBreakerTransition`、`CapacitySettlement = RetainExactFence(exact fence)`（未持有 fence 时为 `NoCapacitySettlement`）、`Fatality = NoFatality`。它表示当前 transaction step 明确未提交，因此保留当前 durable phase 与已持有的 exact fence，并停止在所有后继边界之前；后续只能由新的 typed persistence/recovery event 重新裁决。该分支不得改变 provider retry 规则。
 
-## EXECFAIL-003: 只有 provider 类别可授权 retry 与 fallback
+## EXECFAIL-003: 只有已确认 provider 类别可授权 retry
 
-`ProviderTransient` 与 `ProviderPermanent` 是仅有可进入 provider retry/fallback 裁决的类别。策略还必须结合 durable budget、breaker 与 request kind 明确选择 `NoRetry | RetryFreshAttempt` 及 `NoFallback | AdvanceFallback`；类别本身不保证一定继续。其余类别始终输出 `NoRetry + NoFallback`。特别地，`AcceptanceUnknown` 只能进入 durable reconciliation，`StreamInterruptedAfterFirstToken` 不得自动重放可能已产生可见 token 的 effect。
+`ProviderTransient` 与 `ProviderPermanent` 是仅有可进入 provider retry 裁决的类别。`ProviderRecoveryFacts` 只携带一个 `RetryBudget（Available | Exhausted）`、一个 `Breaker（Closed | Open）`、`ProviderRequestKind` 与两个 run identity，不存在第二预算维度。已确认 provider 失败在 `ProviderStarted × Closed × Available × 可恢复 request kind` 时输出 `RetryFreshAttempt`；`Open` 或 `Exhausted` 时输出 terminal；`NoAcceptedFact`、`AcceptedBeforeProvider`、`Terminal` phase 永不重试；`StrengthReplica` 永不消耗 owner recovery。类别本身不保证一定继续。其余类别始终不输出 retry。特别地，`AcceptanceUnknown` 只能进入 durable reconciliation，`StreamInterruptedAfterFirstToken` 不得自动重放可能已产生可见 token 的 effect；解码为非 provider 类别的 unknown、timeout 文案、cancel、tool-policy、join-control、pre-accept refusal 永不进入 retry 裁决。
 
-任一 `RetryFreshAttempt` / `AdvanceFallback` 必须携带不可由 caller 构造的 authorization，精确绑定一个稳定 logical operation (`LogicalRunId`)、本次 physical attempt (`ProviderRunIdentity`)、request kind 与稳定 policy decision identity。Provider 恢复 prompt 标识精确包含 `ProviderRecoveryDecisionId` 与源 `ProviderRunIdentity`，对外可见文本保持完全一致。同一失败事件的重复回放只重入同一持久 claim，绝不发出第二次物理请求；新的失败 provider run 建立新 claim 并发送新的物理请求。
+任一 `RetryFreshAttempt` 必须携带不可由 caller 构造的 sealed authorization，精确绑定一个稳定 logical operation (`LogicalRunId`)、本次 physical attempt (`ProviderRunIdentity`)、request kind 与由三者纯派生的稳定 policy decision identity。Provider 恢复 prompt 标识精确包含 `ProviderRecoveryDecisionId` 与源 `ProviderRunIdentity`，对外可见文本保持完全一致。同一 typed decision 重放得到相同 decision identity；新的失败 provider run 建立新 identity。相同 authorization identity 的重复物理发射由 ledger owner 去重，不由 Policy 去重。
 
 ## EXECFAIL-004: 容量结算只作用于 exact opaque fence
 
@@ -65,8 +64,8 @@ ExecutionFailureResolution =
 
 ## EXECFAIL-007: 提交未知保持未知且禁止重复 effect
 
-`AcceptanceUnknown` 与 `PersistenceFailure(Unknown)` 必须保留显式 uncertainty，依靠 durable read/reconciliation 或外部 physical evidence 收敛。它们不得被映射为 `NotCommitted`、“未发生”、provider transient、retryable 或成功；在收敛前不得重复发送消息、重复 provider attempt、重复获取或释放容量或推进 fallback。只有明确证明本次 append 未写入事实的 receipt 才可形成 `PersistenceFailure(NotCommitted)`。
+`AcceptanceUnknown` 与 `PersistenceFailure(Unknown)` 必须保留显式 uncertainty，依靠 durable read/reconciliation 或外部 physical evidence 收敛。它们不得被映射为 `NotCommitted`、“未发生”、provider transient、retryable 或成功；在收敛前不得重复发送消息、重复 provider attempt、重复获取或释放容量。只有明确证明本次 append 未写入事实的 receipt 才可形成 `PersistenceFailure(NotCommitted)`。
 
 ## EXECFAIL-008: 决策与恢复时间无关
 
-policy 与 interpreter 的推进仅由 typed input、durable fact、capacity event、Host terminal evidence 或 persistence result 驱动。deadline、sleep、elapsed time、轮询次数与错误文本不得授权 retry、fallback、breaker transition、capacity settlement、terminal resolution 或 fatality。
+policy 与 interpreter 的推进仅由 typed input、durable fact、capacity event、Host terminal evidence 或 persistence result 驱动。deadline、sleep、elapsed time、轮询次数与错误文本不得授权 retry、breaker transition、capacity settlement、terminal resolution 或 fatality。

@@ -34,13 +34,6 @@ type private CapacityCreditSource =
 type internal BorrowingCapacity<'target>
     (ledger: CapacityLedger<'target>, providerOf: 'target -> string, sameTarget: 'target -> 'target -> bool) =
     let gate = obj ()
-    /// DSL-cross-callback-proof: physical resource — capacity lineage used only to route token borrowing/recall
-    // DSL-MUTABLE: resource — capacity-only session lineage
-    let parents = Dictionary<string, string>()
-    // DSL-MUTABLE: resource — capacity-only Main → Blogger companion association
-    let companionSessionByOwner = Dictionary<string, string>()
-    // DSL-MUTABLE: resource — capacity-only Blogger → Main companion association
-    let companionOwnerBySession = Dictionary<string, string>()
     /// DSL-cross-callback-proof: physical resource — exact execution-to-lender token ownership
     // DSL-MUTABLE: resource — exact borrowed execution → actual lender token
     let creditSourceByExecution = Dictionary<string, CapacityCreditSource>()
@@ -61,7 +54,8 @@ type internal BorrowingCapacity<'target>
 
         { SessionId = key.Substring(0, separator)
           PhysicalUserMessageId = key.Substring(separator + 1)
-          EffectiveAgent = None }
+          Role = None
+          Participant = None }
 
     let tokenStateName =
         function
@@ -125,61 +119,6 @@ type internal BorrowingCapacity<'target>
 
         provider.Trim()
 
-    let nextAncestor current distance visited =
-        match parents.TryGetValue current with
-        | true, parent -> Some(parent, distance + 1, Set.add current visited)
-        | false, _ -> None
-
-    let ancestorDistance ancestor descendant =
-        let rec loop current distance visited =
-            if current = ancestor then
-                Some distance
-            elif Set.contains current visited then
-                None
-            else
-                nextAncestor current distance visited
-                |> Option.bind (fun (parent, nextDistance, nextVisited) -> loop parent nextDistance nextVisited)
-
-        loop descendant 0 Set.empty
-
-    let isAncestor ancestor descendant =
-        ancestorDistance ancestor descendant |> Option.isSome
-
-    let tryCompanionOwner sessionId =
-        match companionOwnerBySession.TryGetValue sessionId with
-        | true, owner -> Some owner
-        | false, _ -> None
-
-    let tryCompanionSession ownerSessionId =
-        match companionSessionByOwner.TryGetValue ownerSessionId with
-        | true, companion -> Some companion
-        | false, _ -> None
-
-    let companionLender (requester: string) : (string * int) option =
-        currentCreditSource requester
-        |> Option.map (fun source -> source.LenderSessionId, source.Distance)
-        |> Option.orElseWith (fun () ->
-            tryCompanionOwner requester
-            |> Option.bind currentCreditSource
-            |> Option.bind (fun source ->
-                tryCompanionSession source.LenderSessionId
-                |> Option.map (fun lenderCompanion -> lenderCompanion, source.Distance)))
-
-    let matchingLenderDistance lenderSessionId (candidateLender, distance) =
-        if candidateLender = lenderSessionId then
-            Some distance
-        else
-            None
-
-    let creditDistance lenderSessionId requester =
-        if lenderSessionId = requester then
-            Some 0
-        elif companionOwnerBySession.ContainsKey requester then
-            companionLender requester
-            |> Option.bind (matchingLenderDistance lenderSessionId)
-        else
-            ancestorDistance lenderSessionId requester
-
     let isRetiring token =
         match token.State with
         | CapacityCreditState.Retiring _ -> true
@@ -215,30 +154,36 @@ type internal BorrowingCapacity<'target>
             retireTokenId tokenId
         | false, _ -> ()
 
-    let creditTokens requester =
-        tokens.Values
-        |> Seq.choose (fun token ->
-            if isRetiring token then
-                None
-            else
-                creditDistance token.OwnerSessionId requester
-                |> Option.map (fun distance -> token, distance))
-        |> Seq.groupBy (fun (token, _) -> token.Provider)
-        |> Seq.map (fun (provider, candidates) ->
-            let token, _ =
-                candidates
-                |> Seq.sortBy (fun (token, distance) -> distance, token.Credit)
-                |> Seq.head
+    let creditPair lender (token: CapacityCredit<'target>) =
+        match isRetiring token, token.OwnerSessionId = lender with
+        | true, _
+        | _, false -> None
+        | false, true -> Some(token, 1)
 
-            provider, token)
-        |> Map.ofSeq
+    let cheapestPerProvider (provider: string, candidates: (CapacityCredit<'target> * int) seq) =
+        let token, _ =
+            candidates
+            |> Seq.sortBy (fun (token, distance) -> distance, token.Credit)
+            |> Seq.head
+
+        provider, token
+
+    let creditTokens (lenderSessionId: string option) =
+        match lenderSessionId with
+        | None -> Map.empty
+        | Some lender ->
+            tokens.Values
+            |> Seq.choose (creditPair lender)
+            |> Seq.groupBy (fun (token, _) -> token.Provider)
+            |> Seq.map cheapestPerProvider
+            |> Map.ofSeq
 
     let withoutTokens tokenIds =
         ledger.Entries()
         |> Array.choose (fun (token, target) -> if Set.contains token tokenIds then None else Some target)
 
-    let schedulingView requester =
-        let credits = creditTokens requester
+    let schedulingView (lenderSessionId: string option) =
+        let credits = creditTokens lenderSessionId
 
         let hidden =
             credits |> Seq.map (fun (KeyValue(_, token)) -> token.Credit) |> Set.ofSeq
@@ -265,8 +210,8 @@ type internal BorrowingCapacity<'target>
     /// provider credits were hidden, the chosen target must still be reproducible
     /// with exactly its own provider token hidden; otherwise no single token can
     /// legally pay for that decision.
-    let routeDecision requester route : ('target * CapacityCredit<'target> option) option =
-        let borrowedView, credits = schedulingView requester
+    let routeDecision (lenderSessionId: string option) route : ('target * CapacityCredit<'target> option) option =
+        let borrowedView, credits = schedulingView lenderSessionId
         let borrowed = route borrowedView
 
         match Map.isEmpty credits, borrowed with
@@ -331,21 +276,11 @@ type internal BorrowingCapacity<'target>
                 finishStep token
             | _ -> ())
 
-    let rememberGrantedCredit (token: CapacityCredit<'target>) (demand: CapacityStepDemand<'target>) =
-        match creditDistance token.OwnerSessionId demand.SessionId with
-        | Some distance ->
-            rememberCreditSource
-                (executionKey demand.SessionId (Some demand.PhysicalUserMessageId))
-                demand.SessionId
-                token
-                distance
-        | None -> invalidOp "execution-model-routing: granted capacity token is not a legal credit source"
 
     let grant (token: CapacityCredit<'target>) (demand: CapacityStepDemand<'target>) =
         match token.State with
         | CapacityCreditState.Idle ->
             ledger.Retarget(token.Credit, demand.Target) |> ignore
-            rememberGrantedCredit token demand
 
             token.State <-
                 CapacityCreditState.InFlight
@@ -365,45 +300,87 @@ type internal BorrowingCapacity<'target>
             waiters.Remove demand |> ignore
             AsyncSupport.trySetCanceled demand.Completion |> ignore)
 
+    let tryOwnedTokenId key =
+        match ownedTokenByExecution.TryGetValue key with
+        | true, tokenId -> Some tokenId
+        | false, _ -> None
+
+    let tryFindToken tokenId =
+        match tokens.TryGetValue tokenId with
+        | true, token -> Some token
+        | false, _ -> None
+
+    let isOwnedGrant (demand: CapacityStepDemand<'target>) (token: CapacityCredit<'target>) =
+        token.State = CapacityCreditState.Idle
+        && sameTarget token.OwnerTarget demand.Target
+
+    let ownedPair (demand: CapacityStepDemand<'target>) =
+        executionKey demand.SessionId (Some demand.PhysicalUserMessageId)
+        |> tryOwnedTokenId
+        |> Option.bind tryFindToken
+        |> Option.filter (isOwnedGrant demand)
+        |> Option.map (fun token -> demand.Sequence, token.Credit, demand, token)
+
+    let tryGrantOwned demand =
+        ownedPair demand
+        |> Option.map (fun (_, _, demand, token) ->
+            grant token demand
+            true)
+        |> Option.defaultValue false
+
+    let tryExecutionSource (demand: CapacityStepDemand<'target>) =
+        match
+            creditSourceByExecution.TryGetValue(executionKey demand.SessionId (Some demand.PhysicalUserMessageId))
+        with
+        | true, source -> Some source
+        | false, _ -> None
+
+    let isBorrowGrant provider (token: CapacityCredit<'target>) (source: CapacityCreditSource) =
+        source.Credit = token.Credit
+        && token.OwnerSessionId = source.LenderSessionId
+        && token.Provider = provider
+
     let borrowPair (demand: CapacityStepDemand<'target>) (token: CapacityCredit<'target>) =
         let provider = normalizeProvider demand.Target
 
-        match token.State, creditDistance token.OwnerSessionId demand.SessionId with
-        | CapacityCreditState.Idle, Some distance when token.Provider = provider ->
-            Some(distance, demand.Sequence, token.Credit, demand, token)
+        match token.State, tryExecutionSource demand with
+        | CapacityCreditState.Idle, Some source when isBorrowGrant provider token source ->
+            Some(source.Distance, demand.Sequence, token.Credit, demand, token)
         | _ -> None
 
-    let idleBorrowPairs () =
-        waiters.Snapshot()
-        |> Seq.collect (fun demand -> tokens.Values |> Seq.choose (borrowPair demand))
-        |> Seq.toList
-
-    let tryGrantBorrowed () =
-        match
-            idleBorrowPairs ()
-            |> List.sortBy (fun (distance, sequence, token, _, _) -> distance, sequence, token)
-        with
-        | [] -> false
-        | (_, _, _, demand, token) :: _ ->
+    let tryGrantBorrowed demand =
+        tokens.Values
+        |> Seq.choose (borrowPair demand)
+        |> Seq.sortBy (fun (distance, _, token, _, _) -> distance, token)
+        |> Seq.tryHead
+        |> Option.map (fun (_, _, _, demand, token) ->
             grant token demand
-            true
+            true)
+        |> Option.defaultValue false
 
     let demandOwnsToken (demand: CapacityStepDemand<'target>) =
         ownedTokenByExecution.ContainsKey(executionKey demand.SessionId (Some demand.PhysicalUserMessageId))
 
-    let tryGrantOrdinary () =
-        waiters.Snapshot()
-        |> Seq.sortBy _.Sequence
-        |> Seq.tryFind (fun demand -> not (demandOwnsToken demand) && demand.TryOrdinary(ledger.Snapshot()))
-        |> Option.map (fun demand ->
+    let tryGrantOrdinary demand =
+        if demandOwnsToken demand || not (demand.TryOrdinary(ledger.Snapshot())) then
+            false
+        else
             acquireOwnedToken demand.SessionId (Some demand.PhysicalUserMessageId) demand.Target
             |> fun token -> grant token demand
 
-            true)
-        |> Option.defaultValue false
+            true
+
+    let tryGrantDemand demand =
+        tryGrantOwned demand || tryGrantBorrowed demand || tryGrantOrdinary demand
 
     let rec drain () =
-        if tryGrantBorrowed () || tryGrantOrdinary () then
+        let granted =
+            waiters.Snapshot()
+            |> Seq.sortBy _.Sequence
+            |> Seq.tryFind tryGrantDemand
+            |> Option.isSome
+
+        if granted then
             drain ()
 
     let acquireForRoute sessionId physicalUserMessageId target (credit: CapacityCredit<'target> option) =
@@ -411,20 +388,11 @@ type internal BorrowingCapacity<'target>
         | Some _ -> ()
         | None -> acquireOwnedToken sessionId physicalUserMessageId target |> ignore
 
-    let requiredCreditDistance failure lenderSessionId requester =
-        match creditDistance lenderSessionId requester with
-        | Some distance -> distance
-        | None -> invalidOp failure
-
-    let recordRoutedCredit sessionId key (credit: CapacityCredit<'target> option) =
-        match credit with
-        | Some token ->
-            requiredCreditDistance
-                "execution-model-routing: routed credit is not legal for requester"
-                token.OwnerSessionId
-                sessionId
-            |> rememberCreditSource key sessionId token
-        | None -> clearCreditSource key
+    let recordRoutedCredit sessionId key lenderSessionId (credit: CapacityCredit<'target> option) =
+        match credit, lenderSessionId with
+        | None, _ -> clearCreditSource key
+        | Some token, Some lender when lender = token.OwnerSessionId -> rememberCreditSource key sessionId token 1
+        | Some _, _ -> invalidOp "execution-model-routing: routed credit is not legal for requester"
 
     let applyRoutedToken
         sessionId
@@ -441,10 +409,10 @@ type internal BorrowingCapacity<'target>
             acquireForRoute sessionId (Some newPhysicalUserMessageId) target credit
             oldKey |> Option.iter retireExecution
 
-    let commitRoutedTarget sessionId oldKey newKey newPhysicalUserMessageId target credit =
+    let commitRoutedTarget sessionId oldKey newKey newPhysicalUserMessageId target lenderSessionId credit =
         applyRoutedToken sessionId oldKey newKey newPhysicalUserMessageId target credit
         oldKey |> Option.iter clearCreditSource
-        recordRoutedCredit sessionId newKey credit
+        recordRoutedCredit sessionId newKey lenderSessionId credit
         target
 
     let ensureReservationToken sessionId target (credit: CapacityCredit<'target> option) =
@@ -452,111 +420,23 @@ type internal BorrowingCapacity<'target>
         | Some _ -> ()
         | None -> acquireOwnedToken sessionId None target |> ignore
 
-    let recordReservationCredit sessionId key (credit: CapacityCredit<'target> option) =
-        match credit with
-        | Some token ->
-            requiredCreditDistance
-                "execution-model-routing: reserved credit is not legal for requester"
-                token.OwnerSessionId
-                sessionId
-            |> rememberCreditSource key sessionId token
-        | None -> clearCreditSource key
+    let recordReservationCredit sessionId key lenderSessionId (credit: CapacityCredit<'target> option) =
+        match credit, lenderSessionId with
+        | None, _ -> clearCreditSource key
+        | Some token, Some lender when lender = token.OwnerSessionId -> rememberCreditSource key sessionId token 1
+        | Some _, _ -> invalidOp "execution-model-routing: reserved credit is not legal for requester"
 
     let adoptOwnedToken oldKey newKey target tokenId =
         match tokens.TryGetValue tokenId with
         | true, token -> moveOwnedToken oldKey newKey target token
         | false, _ -> ownedTokenByExecution.Remove oldKey |> ignore
 
-    let dropOwnedCompanion sessionId =
-        match companionSessionByOwner.TryGetValue sessionId with
-        | true, blogger ->
-            companionSessionByOwner.Remove sessionId |> ignore
-            companionOwnerBySession.Remove blogger |> ignore
-        | false, _ -> ()
-
-    let clearOwnedCompanionIfMatches owner sessionId =
-        match companionSessionByOwner.TryGetValue owner with
-        | true, blogger when blogger = sessionId -> companionSessionByOwner.Remove owner |> ignore
-        | _ -> ()
-
-    let dropCompanionOwner sessionId =
-        match companionOwnerBySession.TryGetValue sessionId with
-        | true, owner ->
-            companionOwnerBySession.Remove sessionId |> ignore
-            clearOwnedCompanionIfMatches owner sessionId
-        | false, _ -> ()
-
-    member _.BindChild(parentSessionId: string, childSessionId: string) =
-        lock gate (fun () ->
-            if
-                String.IsNullOrWhiteSpace parentSessionId
-                || String.IsNullOrWhiteSpace childSessionId
-            then
-                invalidArg "sessionId" "execution-model-routing: capacity lineage requires non-empty session ids"
-
-            let parent = parentSessionId.Trim()
-            let child = childSessionId.Trim()
-
-            if parent = child || isAncestor child parent then
-                invalidOp "execution-model-routing: capacity lineage cycle"
-
-            match parents.TryGetValue child with
-            | true, existing when existing <> parent ->
-                invalidOp (sprintf "execution-model-routing: capacity child %s changed parent" child)
-            | _ -> parents.[child] <- parent)
-
-    member _.BindCompanion(ownerSessionId: string, bloggerSessionId: string) =
-        lock gate (fun () ->
-            if
-                String.IsNullOrWhiteSpace ownerSessionId
-                || String.IsNullOrWhiteSpace bloggerSessionId
-            then
-                invalidArg "sessionId" "execution-model-routing: capacity companion requires non-empty session ids"
-
-            let owner = ownerSessionId.Trim()
-            let blogger = bloggerSessionId.Trim()
-
-            if owner = blogger then
-                invalidOp "execution-model-routing: capacity companion cannot own itself"
-
-            match companionOwnerBySession.TryGetValue blogger with
-            | true, existing when existing <> owner ->
-                invalidOp (sprintf "execution-model-routing: blogger %s changed companion owner" blogger)
-            | _ -> ()
-
-            match companionSessionByOwner.TryGetValue owner with
-            | true, existing when existing <> blogger -> companionOwnerBySession.Remove existing |> ignore
-            | _ -> ()
-
-            companionSessionByOwner.[owner] <- blogger
-            companionOwnerBySession.[blogger] <- owner)
-
-    member _.DropLineage(sessionId: string) =
-        lock gate (fun () ->
-            parents.Remove sessionId |> ignore
-
-            parents.Keys
-            |> Seq.filter (fun child -> parents.[child] = sessionId)
-            |> Seq.toArray
-            |> Array.iter (fun child -> parents.Remove child |> ignore)
-
-            dropOwnedCompanion sessionId
-            dropCompanionOwner sessionId
-
-            creditSourceByExecution
-            |> Seq.choose (fun (KeyValue(key, source)) ->
-                if source.LenderSessionId = sessionId then
-                    Some key
-                else
-                    None)
-            |> Seq.toArray
-            |> Array.iter clearCreditSource)
-
     member _.RouteFresh
         (
             sessionId: string,
             oldPhysicalUserMessageId: string option,
             newPhysicalUserMessageId: string,
+            lenderSessionId: string option,
             route: 'target array -> 'target option
         ) =
         lock gate (fun () ->
@@ -566,23 +446,23 @@ type internal BorrowingCapacity<'target>
 
             let newKey = executionKey sessionId (Some newPhysicalUserMessageId)
 
-            match routeDecision sessionId route with
+            match routeDecision lenderSessionId route with
             | None ->
                 oldKey |> Option.iter retireExecution
                 None
             | Some(target, credit) ->
-                commitRoutedTarget sessionId oldKey newKey newPhysicalUserMessageId target credit
+                commitRoutedTarget sessionId oldKey newKey newPhysicalUserMessageId target lenderSessionId credit
                 |> Some)
 
-    member _.ReserveFresh(sessionId: string, route: 'target array -> 'target option) =
+    member _.ReserveFresh(sessionId: string, lenderSessionId: string option, route: 'target array -> 'target option) =
         lock gate (fun () ->
-            match routeDecision sessionId route with
+            match routeDecision lenderSessionId route with
             | None -> None
             | Some(target, credit) ->
                 ensureReservationToken sessionId target credit
 
                 let key = executionKey sessionId None
-                recordReservationCredit sessionId key credit
+                recordReservationCredit sessionId key lenderSessionId credit
                 Some target)
 
     member _.AdoptReservation(sessionId: string, physicalUserMessageId: string, target: 'target) =
@@ -771,26 +651,13 @@ type internal BorrowingCapacity<'target>
                     { Owner =
                         { SessionId = waiter.SessionId
                           PhysicalUserMessageId = waiter.PhysicalUserMessageId
-                          EffectiveAgent = None }
+                          Role = None
+                          Participant = None }
                       Sequence = waiter.Sequence
                       Kind = "ProviderStep" })
                 |> Array.sortBy _.Sequence
 
-            let lineage =
-                seq {
-                    for KeyValue(child, parent) in parents do
-                        yield
-                            { ParentSessionId = parent
-                              ChildSessionId = child }
-
-                    for KeyValue(owner, companion) in companionSessionByOwner do
-                        yield
-                            { ParentSessionId = owner
-                              ChildSessionId = companion }
-                }
-                |> Seq.distinct
-                |> Seq.sortBy (fun edge -> edge.ChildSessionId, edge.ParentSessionId)
-                |> Seq.toArray
+            let lineage: CapacityLineageSnapshot array = Array.empty
 
             { LedgerEntries = ledgerEntries
               Tokens = tokenSnapshots

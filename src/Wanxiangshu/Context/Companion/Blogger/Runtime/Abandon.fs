@@ -44,7 +44,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// VERIFY-005 single writer for BloggerRequestAbandoned (protocol fail + send-fail + crash-A).
-/// Coordinator / EnforcerHost / BloggerCrashRecovery call here; they do not construct the fact.
+/// Coordinator / EnforcerHost call here; they do not construct the fact.
 module BloggerAbandon =
 
     /// Abandon by explicit RequestId (crash-window A / supersede known open).

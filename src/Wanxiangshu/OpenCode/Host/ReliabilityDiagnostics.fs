@@ -39,7 +39,7 @@ type CausalDiagnosticRecord =
       PhysicalUserMessageId: PhysicalUserMessageId option
       PromptKey: PromptKey option
       ProviderRunIdentity: ProviderRunIdentity option
-      EffectiveAgent: string option
+      Participant: string option
       Role: Role option
       ProviderRequestKind: ProviderRequestKind option
       Transition: DiagnosticStateTransition

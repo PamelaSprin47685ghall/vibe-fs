@@ -21,7 +21,7 @@ open Wanxiangshu.Process
 
 /// join() waits for the owning runtime's next physical completion batch.
 /// Orchestrator join routes to ManagerJob verdict mailbox by authority role.
-/// P0-RECOVERY-JOIN-001: FamilyReady permit → Join.joinAvailable (no bare Join, no AST).
+/// Process-local join admission: FamilyReady permit → HostForkJoin.joinAvailableWithPermit (no bare Join, no AST).
 /// EXEC-017: tool abort → JoinInterrupt.Signal only (≠ runtime.Cancel).
 /// DevOps join: 10s timeout budget (NodeTiming.timerTask 10000). Orch/Manager join remains untimed.
 module JoinTool =
@@ -112,7 +112,7 @@ module JoinTool =
         match fissionMembership with
         | Some(groupId, laneIndex) ->
             HostForkJoin.joinAvailableForFissionLane runtime groupId laneIndex JoinBatch.Max waitTask
-        | None -> Join.joinAvailable runtime permit JoinBatch.Max waitTask
+        | None -> HostForkJoin.joinAvailableWithPermit runtime permit JoinBatch.Max waitTask
 
     let private liveAgentName (runtime: HostForkRuntime) (agentId: string) =
         match runtime.TryFindAgent agentId with
@@ -264,9 +264,9 @@ module JoinTool =
         (sessionId: SessionId)
         =
         task {
-            // EXEC-017: Begin the attempt first — before RequireFamilyRecovery and
+            // EXEC-017: Begin the attempt first — before RequireCurrentProcessJoin and
             // before the mailbox wait — so a user-message signal that lands while
-            // recovery or setup is still running is recorded on THIS attempt's own
+            // join admission or setup is still running is recorded on THIS attempt's own
             // TCS. There is no session-level future latch; Dispose unregisters.
             let attempt = scope.JoinAttempts.Begin(sessionId, context.ToolCallId)
             let detachAbort = context.AttachAbort attempt.SignalOperatorAbort
@@ -278,15 +278,15 @@ module JoinTool =
                     member _.Dispose() = detachAbort () }
 
             let root = scope.LogicalOwnerFor sessionId
-            let! recovery = scope.RequireFamilyRecovery root
+            let! admission = scope.RequireCurrentProcessJoin root
 
-            match recovery with
+            match admission with
             | FamilyRecovery.FamilyBlocked blocks -> return recoveryBlocked language blocks
             | FamilyRecovery.FamilyWaiting _ ->
-                // EXEC-023: no permit while waiting — must not drain durable agent
-                // finals via bare JoinAvailable. Surface retryable RECOVERY_WAITING
-                // so Manager re-invokes join after RestoreHandles advances to Ready
-                // or Blocked. Align ExecutorTool FamilyWaiting → RECOVERY_WAITING.
+                // Process-local join admission: no permit while waiting — must not drain
+                // completions via a permit-gated join. Surface retryable RECOVERY_WAITING
+                // so Manager re-invokes join after the next admission advances to Ready
+                // or Blocked. Waiting stays non-effectful and retryable.
                 return consequence (ProviderProse.instructionLines language Path.RecoveryWaiting Map.empty)
             | FamilyRecovery.FamilyReady permit ->
                 return! executeWhenReady scope context language sessionId attempt permit

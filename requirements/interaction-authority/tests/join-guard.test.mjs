@@ -10,16 +10,15 @@ const personas = {
   manager: 'Lead',
 }
 const rootSelection = (agent) => {
-  const canonicalRole = agent === 'predictor' ? 'inspector' : agent
+  const role = agent === 'predictor' ? 'inspector' : agent
   return {
     kind: 'RootSelection',
     ownerSession: null,
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: agent,
-      peerAgent: agent,
-      canonicalRole,
+      participant: agent,
+      role,
       selectedTier: 'deep',
       persona: personas[agent] ?? 'Unknown',
       personaCatalogVersion: 1,
@@ -57,7 +56,7 @@ test('WHAT[INTERACTION-AUTHORITY-019] gate_nudge_is_exact_terminal_idempotent_an
   const digest1 = authority.gateNudgePayloadDigest('missing-final-report', 'run-1')
   assert.equal(authority.gateNudgeAlreadyAdmitted('ses_jg', root.logicalRun, 'InteractionRepair', 'missing-final-report', 'run-1', state), false)
   state = authority.registerClaim(
-    authority.claimContinuation('pk-repair', 'ses_jg', 'InteractionRepair', root, 'coder', digest1),
+    authority.claimContinuation('pk-repair', 'ses_jg', 'InteractionRepair', root, digest1),
     state,
   )
   assert.equal(authority.gateNudgeAlreadyAdmitted('ses_jg', root.logicalRun, 'InteractionRepair', 'missing-final-report', 'run-1', state), true)
@@ -71,7 +70,7 @@ test('WHAT[INTERACTION-AUTHORITY-019] gate_nudge_is_exact_terminal_idempotent_an
   )
 
   state = authority.registerClaim(
-    authority.claimContinuation('pk-repair-retry', 'ses_jg', 'InteractionRepair', root, 'coder', digest1),
+    authority.claimContinuation('pk-repair-retry', 'ses_jg', 'InteractionRepair', root, digest1),
     state,
   )
   state = authority.acceptClaim('pk-repair-retry', 'msg-repair-retry', state)

@@ -9,8 +9,6 @@ type StrengthOpportunity =
       RequestKind: ProviderRequestKind
       CanonicalRole: Role
       SelectedAgent: string
-      EffectiveAgent: string
-      IsFallbackRetry: bool
       HasPrefixProbe: bool
       IsAttachedOrInternalLeaf: bool
       OwnerCancelled: bool

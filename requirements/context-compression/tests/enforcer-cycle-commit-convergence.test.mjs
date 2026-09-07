@@ -35,17 +35,19 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_same_run_after_squash_rejected_as_k
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_without_promptkey_binding_is_unexpected_end', () => {
-  assert.equal(runtime.decideMaterial(false, false, false, runtime.main({ toml: 'open' })), 'Start')
-  assert.equal(runtime.blocksNewRequest(false, false, false), false)
+  const scope = runtime.scope()
+  assert.equal(runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ toml: 'open' })), 'Claimed')
+  assert.equal(runtime.currentRequest(scope, 'ses-blog').toml, 'open')
+  runtime.dispose(scope)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_bound_promptkey_commits_and_clears_open', () => {
   const scope = runtime.scope()
   runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ requestId: 'req-open', toml: 'bound' }))
-  assert.equal(runtime.hasFlight(scope, 'ses-blog'), true)
+  assert.notEqual(runtime.currentRequest(scope, 'ses-blog'), null)
   assert.equal(runtime.currentRequest(scope, 'ses-blog').toml, 'bound')
   runtime.releaseCurrentRequest(scope, 'ses-blog', 'req-open')
-  assert.equal(runtime.hasFlight(scope, 'ses-blog'), false)
+  assert.equal(runtime.currentRequest(scope, 'ses-blog'), null)
   runtime.dispose(scope)
 })
 
@@ -61,30 +63,33 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_catchup_drains_next_window_after_id
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_cancel_is_the_only_non_material_wake', async () => {
   const scope = runtime.scope()
   const parked = runtime.park(scope, 'ses-blog')
-  assert.equal(runtime.hasParked(scope, 'ses-blog'), true)
   runtime.cancelParked(scope, 'ses-blog')
   assert.deepEqual(await parked, { kind: 'Cancelled', context: null })
-  assert.equal(runtime.hasParked(scope, 'ses-blog'), false)
   runtime.dispose(scope)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier', () => {
-  assert.equal(runtime.decideMaterial(false, true, false, runtime.main({ toml: 'future' })), 'Offer')
-  assert.equal(runtime.blocksNewRequest(false, false, false), false)
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier', async () => {
+  const scope = runtime.scope()
+  const parked = runtime.park(scope, 'ses-blog')
+  assert.equal(runtime.offerParked(scope, 'ses-blog', runtime.main({ toml: 'future' })), 'Delivered')
+  const wake = await parked
+  assert.equal(wake.kind, 'MaterialAvailable')
+  assert.equal(wake.context.toml, 'future')
+  runtime.dispose(scope)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_with_flight_projects_directly', () => {
   const scope = runtime.scope()
-  runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ toml: 'restartable' }))
-  assert.equal(runtime.hasFlight(scope, 'ses-blog'), true)
-  assert.equal(runtime.decideMaterial(true, false, true, runtime.currentRequest(scope, 'ses-blog')), 'Skip')
+  assert.equal(runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ requestId: 'req-live', toml: 'restartable' })), 'Claimed')
+  assert.notEqual(runtime.currentRequest(scope, 'ses-blog'), null)
+  assert.equal(runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ requestId: 'req-resumed', toml: 'resumed' })), 'Conflict:req-live')
+  assert.equal(runtime.currentRequest(scope, 'ses-blog').toml, 'restartable')
   runtime.dispose(scope)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-023] ENFORCER_park_never_expires_without_an_event', async () => {
   const scope = runtime.scope()
   const parked = runtime.park(scope, 'ses-blog')
-  assert.equal(runtime.hasParked(scope, 'ses-blog'), true)
   assert.equal(runtime.offerParked(scope, 'ses-blog', runtime.main({ toml: 'fresh' })), 'Delivered')
   const wake = await parked
   assert.equal(wake.kind, 'MaterialAvailable')
@@ -93,7 +98,10 @@ test('WHAT[CONTEXT-COMPRESSION-023] ENFORCER_park_never_expires_without_an_event
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_no_journal_projects_raw_messages', () => {
-  assert.equal(runtime.decideMaterial(false, false, false, runtime.main({ toml: 'raw' })), 'Start')
+  const scope = runtime.scope()
+  assert.equal(runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ toml: 'raw' })), 'Claimed')
+  assert.equal(runtime.currentRequest(scope, 'ses-blog').toml, 'raw')
+  runtime.dispose(scope)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_no_journal_empty_messages_is_empty_projection_fatal', () => {

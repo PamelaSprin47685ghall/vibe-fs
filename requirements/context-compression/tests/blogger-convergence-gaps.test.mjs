@@ -49,35 +49,38 @@ const rel = (abs) => abs.slice(ROOT.length)
 // ── production authority ────────────────────────────────────────────────────
 
 test('WHAT[CONTEXT-COMPRESSION-018] C0_blogger_lifecycle_authority_is_physical_ownership', () => {
-  // PR7 (Blogger runtime) migration is complete: the lifecycle authority is the
-  // pure router decideMaterial (parked waiter + physical flight ownership), NOT
-  // the transition cell. onMaterial having zero production callers is the
-  // correct, expected direction — it locks the deletion of the transition DU.
-  // 1. The pure router decideMaterial MUST be the production lifecycle authority.
-  const routerCallers = filesContaining(/BloggerRuntime\.decideMaterial\b/)
+  // Blogger/Runtime/State.fs is deleted: the pure router decideMaterial and the
+  // DrainWindow/openDrain/blocksNewRequest helpers have zero production consumers.
+  // The lifecycle authority is physical flight ownership held by the coordinator
+  // through the host scope — not a pure routing function and not a transition cell.
+  // 1. The deleted router symbols must have zero production references outside
+  //    their own deleted definition file (deletion lock).
+  const routerRefs = filesContaining(/decideMaterial|\bDrainWindow\b|openDrain|blocksNewRequest/)
     .map(rel)
-    .filter((path) => !path.endsWith('Session/BloggerRuntimeState.fs'))
-  assert.ok(
-    routerCallers.length > 0,
-    'BloggerRuntime.decideMaterial has zero production call sites — the pure router is not the lifecycle authority',
+    .filter((path) => !path.endsWith('Blogger/Runtime/State.fs') && !path.endsWith('Blogger/Runtime/State.fsi'))
+  assert.deepEqual(
+    routerRefs,
+    [],
+    `deleted router symbols still referenced: ${routerRefs.join(', ')}`,
   )
-  // 2. The transition API onMaterial must have ZERO production callers outside
-  //    BloggerRuntimeState.fs (its own definition + comment). This is the
-  //    correct assertion now that the migration is done; it locks the deletion
-  //    direction for the transition module.
-  const transitionCallers = filesContaining(/BloggerRuntime\.onMaterial\b/)
-    .map(rel)
-    .filter((path) => !path.endsWith('Session/BloggerRuntimeState.fs'))
-  assert.equal(
-    transitionCallers.length,
-    0,
-    `BloggerRuntime.onMaterial still has production callers: ${transitionCallers.join(', ')} — lifecycle authority must be physical ownership, not the transition cell`,
+  // 2. The transition API onMaterial must have ZERO production callers.
+  //    This locks the deletion direction for the transition module.
+  const transitionCallers = filesContaining(/BloggerRuntime\.onMaterial\b/).map(rel)
+  assert.deepEqual(
+    transitionCallers,
+    [],
+    `BloggerRuntime.onMaterial still referenced: ${transitionCallers.join(', ')} — lifecycle authority must be physical ownership, not the transition cell`,
   )
-  // 3. The coordinator must route via decideMaterial and must not reference the
-  //    shadow state (Get/SetBloggerRuntime, BloggerRuntimeState, cell .State).
+  // 3. The coordinator must route via physical flight ownership and must not
+  //    reference the deleted router or the shadow state
+  //    (Get/SetBloggerRuntime, BloggerRuntimeState, cell .State).
   const coordinator = prodText('src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs')
-  assert.match(coordinator, /BloggerRuntime\.decideMaterial/,
-    'BloggerCoordinator must route via decideMaterial')
+  assert.match(coordinator, /claimFlight|claimCurrentRequest|releaseCurrentRequest/,
+    'BloggerCoordinator must route via physical flight ownership')
+  assert.match(coordinator, /exactFlightMatches|foreignFlightReason/,
+    'BloggerCoordinator must guard claims with the RequestId-aware conflict check')
+  assert.doesNotMatch(coordinator, /decideMaterial|onMaterial|DrainWindow/,
+    'BloggerCoordinator must not reference the deleted router')
   assert.equal(
     /GetBloggerRuntime|SetBloggerRuntime|BloggerRuntimeState\b/.test(coordinator),
     false,
@@ -91,10 +94,21 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_blogger_lifecycle_authority_is_physical_o
     0,
     `BloggerCoordinator must not reference cell .State in code: ${codeStateRefs.join('; ')}`,
   )
+  // 4. The dead router definition file itself must stay deleted.
+  assert.equal(
+    existsSync(join(ROOT, 'src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs')),
+    false,
+    'dead router State.fs must stay deleted',
+  )
+  assert.equal(
+    existsSync(join(ROOT, 'src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fsi')),
+    false,
+    'dead router State.fsi must stay deleted',
+  )
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] C0_physical_HasFlight_is_the_only_busy_definition', () => {
-  // Companion send Task must not decide busy. Production busy is host HasFlight only.
+test('WHAT[CONTEXT-COMPRESSION-018] C0_exact_flight_lease_is_the_only_busy_definition', () => {
+  // Companion send Task must not decide busy. Production busy is exact shared flight ownership only.
   // PR7 D6: BloggerRuntimeState/Cell deleted — zero residual shadow ownership.
   const companion = prodText('src/Wanxiangshu/Context/Companion/Runtime.fs')
   assert.equal(
@@ -110,20 +124,17 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_physical_HasFlight_is_the_only_busy_defin
   const coordinator = prodText('src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs')
   assert.match(
     coordinator,
-    /scope\.HasFlight key/,
-    'onMainMaterial busy must use HasFlight',
+    /TryGetFlight/,
+    'coordinator busy must read the physical flight registry via TryGetFlight',
   )
-  const runtimeSrc = prodText('src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs')
-  assert.doesNotMatch(runtimeSrc, /BloggerRuntimeState\b/, 'BloggerRuntimeState DU must be deleted')
-  assert.doesNotMatch(runtimeSrc, /BloggerRuntimeCell\b/, 'BloggerRuntimeCell must be deleted')
   const scope = prodText('src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs')
   assert.doesNotMatch(scope, /GetBloggerRuntime|SetBloggerRuntime/, 'scope must not expose cell Get/Set')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
-  // Dual slots: PendingOffer dictionary + flight ownership registry.
+test('WHAT[CONTEXT-COMPRESSION-018] C0_material_mailbox_and_flight_lease_are_separate_resources', () => {
+  // Separate physical resources: pending material mailbox + exact flight registry.
   // Forbidden: a second `currentRequest` dict or InFlight shadow fallback.
-  // Blogger parking/flight/drain state moved to PluginBloggerScope (Wave 2).
+  // Blogger mailbox and flight ownership live in PluginBloggerScope.
   const scope = prodText('src/Wanxiangshu/Context/Companion/Blogger/OpenCode/PluginScope.fs')
   assert.equal(/parkedOffer/.test(scope), false, 'parkedOffer single-slot is forbidden')
   assert.match(scope, /pendingOffer/, 'PendingOffer dictionary required')
@@ -139,7 +150,6 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_CurrentRequest_and_PendingOffer_are_separ
     /BloggerRuntime\.inFlightContext|inFlightContext \(this\.GetBloggerRuntimeUnlocked|GetBloggerRuntimeUnlocked/,
     'TryPeekCurrentRequest must not fall back to InFlight shadow / GetBloggerRuntime',
   )
-  assert.match(scope, /HasFlight/, 'HasFlight ownership API required')
   assert.match(
     scope,
     /SharedState\.BloggerFlights\.TryGetValue/,
@@ -168,13 +178,6 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_commit_uses_live_InFlight_only_not_open_h
     ),
     false,
     'resolveCycleContext must not heal InFlight via SetCurrentRequest',
-  )
-  assert.equal(
-    /PreviousCoverableTurnCutoffExclusive = 0\s*\n\s*NextCoverableTurnCutoffExclusive = 0/.test(
-      prodText('src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs'),
-    ),
-    false,
-    'crash recovery must not zero cutoff/digest when reloading Main context',
   )
 })
 
@@ -262,7 +265,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_park_only_after_KnownCommitted', () => {
   // CommitUnknown/AbandonThenCatchUp); park lives only under Committed.
   assert.match(host, /type CycleDisposition/,
     'commit outcomes must collapse into CycleDisposition before park')
-  // Committed → finishCommitted → drain → finishCaughtUpAfterCommit →
+  // Committed → finishCommitted → durable refresh → finishCaughtUpAfterCommit →
   // parkAfterCatchUpClear → ParkTransform. Helpers are defined above the
   // disposition match, so source-order "ParkTransform after Committed arm"
   // is the wrong probe.
@@ -271,7 +274,11 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_park_only_after_KnownCommitted', () => {
     /CycleDisposition\.Committed afterSquashMain -> finishCommitted/,
     'Committed arm must enter finishCommitted',
   )
-  assert.match(host, /return! drainAfterCommitMaterial/, 'finishCommitted drains before park')
+  assert.match(
+    host,
+    /let! refreshed = ctx\.RefreshMainContext[\s\S]{0,180}return! catchUpAfterCommitMaterial/,
+    'finishCommitted refreshes durable coverage before park',
+  )
   assert.match(host, /None, None -> return! finishCaughtUpAfterCommit/)
   assert.match(host, /return! parkAfterCatchUpClear/)
   const parkFn = host.indexOf('let private parkAfterCatchUpClear')
@@ -304,28 +311,26 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_park_only_after_KnownCommitted', () => {
     'not-committed paths must still return ContinuationOutcome')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] C0_commit_drains_via_tryRefresh_before_park', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] C0_commit_refreshes_durable_coverage_before_park', () => {
   // One external wake may need many ≤200 KiB cycles. After BlogObservationCommitted the
   // continuation must re-chunk from durable coverage (tryRefresh) and continue
-  // without waiting for a new main-session wake. Stale PendingOffer is not enough.
+  // without waiting for a new main-session wake. Stale pending material is not enough.
   const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
   // EnforcerHost injects the re-chunk through ctx.RefreshMainContext; the
   // commit branch must use it before parking.
-  const refresh = host.lastIndexOf('RefreshMainContext', host.indexOf('ParkTransform'))
-  const park = host.indexOf('ParkTransform')
-  assert.ok(refresh >= 0 && park > refresh,
-    'post-commit path must tryRefresh (catch-up drain) before ParkTransform')
+  const finishStart = host.indexOf('let private finishCommitted')
+  const finishEnd = host.indexOf('let private finishOwnedDisposition', finishStart)
+  const finish = host.slice(finishStart, finishEnd)
+  const refresh = finish.indexOf('RefreshMainContext')
+  const catchUp = finish.indexOf('catchUpAfterCommitMaterial')
+  assert.ok(refresh >= 0 && catchUp > refresh,
+    'post-commit path must refresh durable coverage before choosing catch-up or park')
   assert.match(
     host,
-    /resumeCatchUp|Catch-up drain/,
+    /resumeCatchUp|catchUpAfterCommitMaterial/,
     'already-committed / catch-up arm must re-chunk from coverage',
   )
-  // Stale PendingOffer must not be preferred over re-chunk.
-  assert.match(
-    host,
-    /TryTakePendingOffer \w+ \|> ignore[\s\S]{0,400}RefreshMainContext/,
-    'PendingOffer is discarded; next window always re-chunks from coverage',
-  )
+  assert.doesNotMatch(host, /TryTakePendingOffer/, 'parent code cannot peek and interpret mailbox state')
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] C0_caught_up_is_parked_not_completed_and_wake_rechecks_live_Current', () => {

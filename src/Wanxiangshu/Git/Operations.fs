@@ -172,18 +172,32 @@ module GitOperations =
         (worktree: WorktreePath)
         (target: TargetRef)
         (expectedHead: CommitHash)
+        (pinnedCandidate: CommitHash)
         : Task<Result<CommitHash, string>> =
         taskResult {
             let! candidate = revParse runner (WorktreePath.value worktree) "HEAD" "candidate HEAD is empty"
+            // R12: the physical FF is bound to the durable pin. The worktree
+            // candidate must equal the pin; the merge itself runs on the pin
+            // so a worktree move after the read cannot redirect the publish.
+            do!
+                if candidate <> pinnedCandidate then
+                    Error(
+                        sprintf
+                            "worktree HEAD %s does not match pinned candidate %s"
+                            (CommitHash.value candidate)
+                            (CommitHash.value pinnedCandidate)
+                    )
+                else
+                    Ok()
             // ORCH-008: the publish target is frozen at fork time. If the repo has
             // since moved to another branch, refuse rather than publish to whichever
             // branch happens to be checked out.
             do! requirePublishBranch runner repoPath target
             let! currentHead = revParse runner repoPath (targetSpec target) "target branch not found"
             do! assertExpectedHead currentHead expectedHead
-            do! requireAncestor runner repoPath currentHead candidate
+            do! requireAncestor runner repoPath currentHead pinnedCandidate
             do! verifyClean runner repoPath
-            return! mergeFf runner repoPath candidate
+            return! mergeFf runner repoPath pinnedCandidate
         }
 
     let private continueRebase (runner: Command -> Task<int * string * string>) dir =

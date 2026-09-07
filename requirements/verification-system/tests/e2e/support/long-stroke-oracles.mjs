@@ -17,7 +17,7 @@
  *
  * §21 checklist (mirrors long-stroke.toml comments + ADVERSITY_CHECKLIST export):
  *   [x] provider transient failure          — assertProviderTransientFailure
- *   [x] fallback                            — assertFallbackContinuation
+ *   [x] provider failure continuation       — assertProviderFailureContinuation
  *   [x] join blocked then causally awakened — assertJoinWakePath
  *   [x] non-10 assessment assigns work      — assertAssessmentAssignsWork
  *   [x] interrupted/aborted child or session— assertInterruptedJoin (+ holdChildC1UntilLabor)
@@ -157,7 +157,7 @@ export async function awaitNamedFact(workDir, waitFact, { timeoutMs = WAIT_FACT_
 
 /** §21: consecutive provider failures advance two exact recovery episodes. */
 export async function assertProviderTransientFailure(workDir, label = 'long-stroke') {
-  const facts = factPayloads(workDir, 'FallbackCursorAdvanced');
+  const facts = factPayloads(workDir, 'FailureRecorded');
   assert.equal(
     facts.length,
     2,
@@ -165,12 +165,12 @@ export async function assertProviderTransientFailure(workDir, label = 'long-stro
   );
 }
 
-/** §21: fallback — same Logical Run continuation; both failed ProviderRuns are accounted. */
-export async function assertFallbackContinuation(workDir, label = 'long-stroke') {
+/** §21: provider failure continuation — same Logical Run; both failed ProviderRuns are accounted. */
+export async function assertProviderFailureContinuation(workDir, label = 'long-stroke') {
   assert.equal(
-    countFactCase(workDir, 'FallbackCursorAdvanced'),
+    countFactCase(workDir, 'FailureRecorded'),
     2,
-    `${label}: FallbackCursorAdvanced count must be 2 after consecutive recovery`,
+    `${label}: FailureRecorded count must be 2 after consecutive recovery`,
   );
 }
 
@@ -197,7 +197,7 @@ function assertConsecutiveRecoveryEpisodes(scenario, ctx, lines) {
   }
 
   assert.equal(
-    factPayloads(lines, 'FallbackExhausted').length,
+    factPayloads(lines, 'RetryExhausted').length,
     0,
     'long-stroke: no terminal exhaustion may race either admitted recovery',
   );
@@ -270,9 +270,9 @@ export function assertRetirementNeedsIteration(workDir, label = 'long-stroke') {
   );
 }
 
-/** §21: durable recovery/continuation — cursor fact survives; no Host reboot. */
+/** §21: durable recovery/continuation — provider failure fact survives; no Host reboot. */
 export async function assertDurableRecovery(workDir, label = 'long-stroke') {
-  await assertFallbackContinuation(workDir, label);
+  await assertProviderFailureContinuation(workDir, label);
   assert.ok(
     journalEventLines(workDir).length >= 1,
     `${label}: durable EventStore journal required for recovery/continuation`,
@@ -290,21 +290,10 @@ export function assertPublishConflict(workDir, label = 'long-stroke') {
   );
 }
 
-/** §21 / MANAGED-SESSION-020: subagent reuse — same child session reused across distinct task runs. */
-export function assertSubagentReuse(workDir, label = 'long-stroke') {
-  const linked = factPayloads(workDir, 'HandleLinked');
-  const proofFinisherLinks = linked.filter((p) => p.Byname === 'Proof Writer' || p.Byname === 'Proof Finisher');
-  assert.ok(
-    proofFinisherLinks.length >= 2,
-    `${label}: Proof Writer must be linked at least twice for subagent reuse (got ${proofFinisherLinks.length})`,
-  );
-  const firstChild = proofFinisherLinks[0].ChildSessionId;
-  const secondChild = proofFinisherLinks[1].ChildSessionId;
-  assert.deepEqual(
-    firstChild,
-    secondChild,
-    `${label}: subagent reuse must preserve the same physical child session (first=${firstChild}, second=${secondChild})`,
-  );
+/** §21 / MANAGED-SESSION-020: serial Inspector work reuses one physical child session. */
+export function assertSubagentReuse(scenario) {
+  const { inspectorSessionId } = assertG2InspectorPrefixLaw(scenario);
+  assert.ok(inspectorSessionId, 'long-stroke: Inspector reuse must preserve one physical child session');
 }
 
 /** §21: successful reconciliation — Orchestrator Published case exactly once. */
@@ -359,10 +348,9 @@ export async function holdChildC1UntilLabor(scenario) {
 }
 
 /**
- * Script the reusable manager-loop iterations without inventing a Reviewer identity.
- * ONE reusable turn family per authority (manager-loop.*, humanroot-loop.*) is
- * delivered several times with the same lane/authority/steps; the binder varies
- * the review scores and resume/suicide actions by causal delivery count:
+ * Script the owner-driven Manager incarnations without inventing a Reviewer identity.
+ * The initial authority prompt and later manager-assess resource keep separate
+ * declarations; the reopened owner resource closes the audit turn by delivery:
  * initial-low→work, candidate-perfect→finish, conflict-low→repair,
  * repaired-perfect→finish, rebased-perfect→finish. HumanRoot:
  * low→Continue, perfect→Accepted.
@@ -380,8 +368,19 @@ export async function bindManagerLoopSequence(scenario) {
   const loopAction = runtime.scenario.entries.find(
     (entry) => entry.turnId === 'manager-loop' && entry.step === 1,
   );
+  const loopJoin = runtime.scenario.entries.find(
+    (entry) => entry.turnId === 'manager-loop' && entry.step === 2,
+  );
   assert.ok(loopAudit, 'long-stroke: manager-loop audit entry is required');
   assert.ok(loopAction, 'long-stroke: manager-loop action entry is required');
+  assert.ok(loopJoin, 'long-stroke: manager-loop join entry is required');
+  const initialLoopAction = loopAction.respond;
+  const initialLoopJoin = loopJoin.respond;
+  const currentActionTodo = runtime.scenario.entries.find(
+    (entry) => entry.turnId === 'manager-current-action' && entry.step === 0,
+  );
+  assert.ok(currentActionTodo, 'long-stroke: Manager current-action todowrite is required');
+  const currentActionTodoResponse = currentActionTodo.respond;
   const humanAudit = runtime.scenario.entries.find(
     (entry) => entry.turnId === 'humanroot-loop' && entry.step === 0,
   );
@@ -416,28 +415,56 @@ export async function bindManagerLoopSequence(scenario) {
     args: scores('PERFECT'),
   });
   const retire = () => ({ type: 'tool-call', tool: 'suicide', args: {} });
-  const repairResume = () => ({
-    type: 'tool-call',
-    tool: 'resume',
-    args: {
-      name: 'Proof Writer',
-      charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
-    },
-  });
+  const joinOwnedWork = () => ({ type: 'tool-call', tool: 'join', args: {} });
   // Initial deliveries stay as declared (low audit + work fork; HumanRoot low).
-  // Later responses are selected by this declaration's causal delivery count,
-  // never by prompt text or a distinct iteration route.
+  // Later responses are selected by the new incarnation's audit delivery count.
+  let latestManagerAuditAttempt = 0;
+  let managerTodoDelivered = false;
+  let initialWorkJoined = false;
+  let repairWorkJoined = false;
   const consume = runtime.consume;
   const originalConsume = (body, selection, context) => consume.call(runtime, body, selection, context);
   runtime.consume = (body, selection, context) => {
     const { entry, attempt } = selection ?? {};
     if (entry?.id === 'manager-loop.0') {
-      if (attempt === 2 || attempt === 4 || attempt === 5) entry.respond = candidatePerfect();
-      else if (attempt === 3) entry.respond = repairAudit();
+      latestManagerAuditAttempt = attempt;
+      if (attempt > 1) entry.respond = attempt === 3 ? repairAudit() : candidatePerfect();
     } else if (entry?.id === 'manager-loop.1') {
-      if (attempt === 2 || attempt === 4 || attempt === 5) entry.respond = retire();
-      else if (attempt === 3) entry.respond = repairResume();
-    } else if (entry?.id === 'humanroot-loop.0' && attempt === 2) {
+      entry.respond = latestManagerAuditAttempt === 1
+        ? initialLoopAction
+        : latestManagerAuditAttempt === 3
+          ? {
+              type: 'tool-call',
+              tool: 'fork',
+              args: {
+                calling: 'coder',
+                name: 'Conflict Resolver',
+                charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
+              },
+            }
+          : retire();
+    } else if (entry?.id === 'manager-loop.2') {
+      entry.respond = latestManagerAuditAttempt === 1
+        ? initialLoopJoin
+        : latestManagerAuditAttempt === 3
+          ? { type: 'text', text: 'Repair dispatched; await the owner work resource.' }
+          : retire();
+    } else if (entry?.id === 'manager-t1-commitment.0') {
+      managerTodoDelivered = true;
+    } else if (entry?.turnId === 'manager-current-action') {
+      if (!managerTodoDelivered) {
+        entry.respond = currentActionTodoResponse;
+        managerTodoDelivered = true;
+      } else if (latestManagerAuditAttempt === 1 && !initialWorkJoined) {
+        entry.respond = joinOwnedWork();
+        initialWorkJoined = true;
+      } else if (latestManagerAuditAttempt === 3 && !repairWorkJoined) {
+        entry.respond = joinOwnedWork();
+        repairWorkJoined = true;
+      } else {
+        entry.respond = retire();
+      }
+    } else if (entry?.id === 'humanroot-loop.0' && attempt > 1) {
       entry.respond = humanPerfect();
     }
     originalConsume(body, selection, context);
@@ -517,13 +544,13 @@ export async function oracleLongStroke(scenario, ctx) {
   assertJoinWakePath(workDir);
   assertInterruptedJoin(scenario);
   await assertProviderTransientFailure(workDir);
-  await assertFallbackContinuation(workDir);
+  await assertProviderFailureContinuation(workDir);
   await assertDurableRecovery(workDir);
   assertAssessmentAssignsWork(workDir);
   assertRetirementNeedsIteration(workDir);
   assertRetirementCommitted(workDir);
   assertPublishConflict(workDir);
-  assertSubagentReuse(workDir);
+  assertSubagentReuse(scenario);
   assertSuccessfulReconciliation(workDir);
   assertNativeReadProbeTimeline(scenario);
 
@@ -537,13 +564,17 @@ export async function oracleLongStroke(scenario, ctx) {
     const loopTransactions = factPayloads(workDir, 'TransactionCommitted')
       .filter((payload) => payload?.RoadId?.[1] === currentLoopId);
     const loopCases = loopTransactions.flatMap((payload) => payload?.Transaction?.[1] ?? []);
-    const retirements = loopCases
+    const logicalLoopCases = [...new Map(
+      loopCases.map((event) => [JSON.stringify(event), event]),
+    ).values()];
+    const retirements = logicalLoopCases
       .filter((event) => event?.[0] === 'RetirementCommitted')
       .map((event) => event[1]);
+    const openings = logicalLoopCases.filter((event) => event?.[0] === 'IncumbencyOpened');
     assert.equal(
-      loopCases.filter((event) => event?.[0] === 'IncumbencyOpened').length,
+      openings.length,
       5,
-      'long-stroke: current loop must durably open all five iterations',
+      'long-stroke: exact replay may repeat an envelope, but current loop must own five logical iterations',
     );
     assert.equal(retirements.length, 5, 'long-stroke: every current-loop iteration must retire');
     assert.equal(
@@ -575,22 +606,18 @@ export async function oracleLongStroke(scenario, ctx) {
   assert.equal(
     scenario.provider.matchCount('manager-loop.0'),
     5,
-    'long-stroke determinism: reusable manager-loop audit must be delivered 5× (low, perfect, repair-low, repaired-perfect, rebased-perfect)',
+    'long-stroke determinism: initial, candidate, repair, repaired, and rebased snapshots each receive one authority audit',
   );
+  const linkedByname = factPayloads(workDir, 'HandleLinked').map((payload) => payload?.Byname);
   assert.equal(
-    scenario.provider.matchCount('manager-loop.1'),
-    5,
-    'long-stroke determinism: reusable manager-loop action must be delivered 5× (work, finish, repair, finish, finish)',
-  );
-  assert.equal(
-    scenario.provider.matchCount('manager-loop.2'),
-    2,
-    'long-stroke determinism: reusable manager-loop join must be delivered 2× (initial work + repair, first faults)',
-  );
-  assert.equal(
-    scenario.provider.matchCount('manager-loop.3'),
+    linkedByname.filter((name) => name === 'Proof Writer').length,
     1,
-    'long-stroke determinism: reusable manager-loop close must be delivered once (repair suicide)',
+    'long-stroke: initial implementation must create one exact Proof Writer handle',
+  );
+  assert.equal(
+    linkedByname.filter((name) => name === 'Conflict Resolver').length,
+    1,
+    'long-stroke: conflict repair must create one exact Conflict Resolver handle',
   );
   assert.equal(
     scenario.provider.matchCount('continue.1'),
@@ -609,11 +636,6 @@ export async function oracleLongStroke(scenario, ctx) {
     managerJoinResults.filter((text) => text.startsWith('# Something nearer has arrived.\n')).length,
     1,
     'long-stroke: provider recovery must not manufacture another interrupted or terminal join result',
-  );
-  assert.equal(
-    scenario.provider.matchCount('manager-resume.0'),
-    1,
-    'long-stroke determinism: manager-resume.0 must be delivered exactly once',
   );
   const guardedSuffix = Array.from({ length: 10 }, (_, index) => `manager-join-guard.${index}`);
   const guardedDeliveries = guardedSuffix.reduce(
@@ -643,7 +665,7 @@ export async function oracleLongStroke(scenario, ctx) {
 /** waitFact presets mirroring long-stroke.toml flow barriers. */
 export const PLANNED_WAIT_FACTS = Object.freeze({
   handleCompleted: waitFactShape('HandleCompleted', { gte: 1 }),
-  fallbackCursor: waitFactShape('FallbackCursorAdvanced', { eq: 2 }),
+  providerFailure: waitFactShape('FailureRecorded', { eq: 2 }),
   assessmentCommitted: waitFactShape('AssessmentCommitted', { gte: 1 }),
   retirementCommitted: waitFactShape('RetirementCommitted', { gte: 1 }),
   incumbencyOpened: waitFactShape('IncumbencyOpened', { gte: 1 }),
@@ -666,10 +688,10 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
     oracle: 'assertProviderTransientFailure',
   },
   {
-    id: 'fallback',
+    id: 'provider-failure-continuation',
     covered: true,
     injection: 'non-retryable provider-error on manager.1 followed by continue.0',
-    oracle: 'assertFallbackContinuation',
+    oracle: 'assertProviderFailureContinuation',
   },
   {
     id: 'join-blocked-then-causally-awakened',
@@ -698,7 +720,7 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
   {
     id: 'durable-recovery-continuation',
     covered: true,
-    injection: 'FallbackCursorAdvanced in same OpenCode PID (no restart=true)',
+    injection: 'FailureRecorded in same OpenCode PID (no restart=true)',
     oracle: 'assertDurableRecovery',
   },
   {
@@ -710,7 +732,7 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
   {
     id: 'subagent-session-reuse',
     covered: true,
-    injection: 'iteration-3 reuses Proof Writer on same child session',
+    injection: 'G2 Q1→Q2→Q3 and simultaneous batch reuse one Inspector child session',
     oracle: 'assertSubagentReuse',
   },
   {
@@ -730,7 +752,7 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
 /** Named oracle table imported by entry.test.mjs for each adversity stroke. */
 export const ADVERSITY_ORACLES = Object.freeze({
   assertProviderTransientFailure,
-  assertFallbackContinuation,
+  assertProviderFailureContinuation,
   assertJoinWakePath,
   assertInterruptedJoin,
   assertAssessmentAssignsWork,
@@ -984,9 +1006,9 @@ const providerPlanOf = (request) => ({
 });
 
 /**
- * Assert every fresh iteration preserves the provider-visible authority:
- * same normalized system/tools plan, same typed authority user sequence in order,
- * carrying only the current iteration with the internal wake stripped.
+ * Assert every fresh iteration preserves the provider-visible authority prefix:
+ * same normalized system/tools plan and same typed authority users in order.
+ * Later incarnations may append exactly the owner-controlled assessment resource.
  * Compares message structure only.
  */
 export function assertManagerLoopAuthorityPreserved(scenario, sessionId) {
@@ -998,16 +1020,23 @@ export function assertManagerLoopAuthorityPreserved(scenario, sessionId) {
   const baselinePlan = providerPlanOf(firsts[0]);
   const baselineUsers = messageTextsByRole(firsts[0], 'user');
   assert.ok(baselineUsers.length >= 1, 'manager-loop: initial iteration must carry typed authority user messages');
+  const assessmentResource = '# Establish read-only evidence about the current delivery through the entitled offices.';
   for (const [index, request] of firsts.entries()) {
     assert.deepEqual(
       providerPlanOf(request),
       baselinePlan,
       `manager-loop: iteration #${index + 1} must keep the same normalized system/tools plan as the initial iteration`,
     );
+    const users = messageTextsByRole(request, 'user');
     assert.deepEqual(
-      messageTextsByRole(request, 'user'),
+      users.slice(0, baselineUsers.length),
       baselineUsers,
-      `manager-loop: iteration #${index + 1} must carry the same typed authority user sequence as the initial iteration`,
+      `manager-loop: iteration #${index + 1} must preserve the typed authority user prefix`,
+    );
+    assert.ok(
+      users.length === baselineUsers.length
+        || (users.length === baselineUsers.length + 1 && users.at(-1)?.startsWith(assessmentResource)),
+      `manager-loop: iteration #${index + 1} may append only the exact assessment resource`,
     );
   }
 }

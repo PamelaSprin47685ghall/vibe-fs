@@ -46,8 +46,6 @@
     <Compile Include="Context/Companion/ProjectionSurface.fs"/>
     <Compile Include="Context/Companion/CompressionSurface.fsi"/>
     <Compile Include="Context/Companion/CompressionSurface.fs"/>
-    <Compile Include="Context/Companion/Blogger/BloggerCrashSurface.fsi"/>
-    <Compile Include="Context/Companion/Blogger/BloggerCrashSurface.fs"/>
     <Compile Include="Context/Companion/RuntimeSurface.fsi"/>
     <Compile Include="Context/Companion/RuntimeSurface.fs"/>
   </ItemGroup>

@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
 
 export const PRODUCTION_ROOT = 'src/Wanxiangshu'
+export const COMPILER_EVIDENCE_SCHEMA_VERSION = 1
+export const APPLICATION_USE_KEYS = ['consumerPath', 'startLine', 'startColumn', 'resolvedTarget', 'inferredType']
 const norm = (p) => p.replace(/\\/g, '/')
 
 /**
@@ -126,7 +128,6 @@ export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Change/Surface.fs',
   'src/Wanxiangshu/Change/Host/Surface.fs',
   'src/Wanxiangshu/Composition/Turn/Workflow.fs',
-  'src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs',
   'src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs',
   'src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs',
   'src/Wanxiangshu/Context/Companion/Host.fs',
@@ -158,7 +159,6 @@ export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs',
   'src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs',
   'src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fs',
-  'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs',
   'src/Wanxiangshu/Execution/Session/SessionStartedAtLedger.fs',
   'src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs',
   'src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs',
@@ -261,7 +261,7 @@ export const FORBIDDEN = [
     // Domain evidence DUs / pure queries ending in Pending|Spent|Phase are allowlisted.
     // Physical/algorithm names that merely contain a suffix (EstimatedRunningSeconds,
     // Already* fold rejections, Pending* durable fields) are allowlisted.
-    // Protocol phases (IncumbencyPhase, ManagerCapabilityPhase, RecoveryStageProbe)
+    // Protocol phases such as IncumbencyPhase
     // must be registered in NARROW_PHASE_EXEMPTIONS rather than globally ignored.
     // Verb-named functions (`let clearStalePending agentId =`) are skipped in scanText.
     pattern:
@@ -301,16 +301,6 @@ export const FORBIDDEN = [
  */
 export const NARROW_PHASE_EXEMPTIONS = new Map([
   [
-    'RecoveryStageProbe',
-    {
-      owner: 'blogger-enforcer',
-      allowedFiles: new Set([
-        'src/Wanxiangshu/Enforcer/Continuation.fs',
-      ]),
-      migrationNote: 'R04: stage probe alias pending PR-03 Blogger repair convergence',
-    },
-  ],
-  [
     'IncumbencyPhase',
     {
       owner: 'relay-mission',
@@ -318,24 +308,8 @@ export const NARROW_PHASE_EXEMPTIONS = new Map([
         'src/Wanxiangshu/Mission/Relay/Contract.fs',
         'src/Wanxiangshu/Mission/Relay/Fold.fs',
         'src/Wanxiangshu/Mission/Relay/Surface.fs',
-        'src/Wanxiangshu/Mission/Manager/Workflow.fs',
-        'src/Wanxiangshu/Change/Host/Host.fs',
-        'src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs',
       ]),
-      migrationNote: 'R07/R08: relay incumbency phase pending PR-04 Manager clean break',
-    },
-  ],
-  [
-    'ManagerCapabilityPhase',
-    {
-      owner: 'office-capability',
-      allowedFiles: new Set([
-        'src/Wanxiangshu/Foundation/OfficeCapability.fs',
-        'src/Wanxiangshu/Mission/Relay/Fold.fs',
-        'src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs',
-        'src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs',
-      ]),
-      migrationNote: 'R07: capability phase mapping pending PR-04 Manager clean break',
+      migrationNote: 'R07/R08: durable relay protocol fact; no external effect-selection consumer',
     },
   ],
 ])
@@ -348,17 +322,12 @@ export const DUP_CASES_EXEMPT = new Set([
   // Exact paths:
   'src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs:ChildResolution',
   'src/Wanxiangshu/OpenCode/Tools/ManagedAgent.fs:ManagedAgentParseError',
-  'src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs:BloggerToolRecovery',
-  'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs:InvalidTerminalRepairState',
-  'src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs:DrainWindow',
   'src/Wanxiangshu/Execution/Failure/Model.fs:ProviderBreakerState',
   'src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs:GateContinuationOutcome',
   'src/Wanxiangshu/Interaction/Repair/Port.fs:InteractionRepairSendOutcome',
   // Relative test fixture keys:
   'ChildRecovery.fs:ChildResolution',
   'ManagedAgent.fs:ManagedAgentParseError',
-  'MagicTodo.fs:ProcessReviewVerdict',
-  'Model.fs:ProcessReviewVerdict',
 ])
 
 export const GATE_NAMES = FORBIDDEN.map((item) => item.gate)
@@ -1313,6 +1282,74 @@ export const groupByGate = (violations) => {
 /**
  * Split findings into lexical vs compiler-resolved tiers.
  */
+const isValidApplicationUse = (row) => {
+  if (row === null || typeof row !== 'object' || Array.isArray(row)) return false
+  if (Object.keys(row).sort().join('\0') !== [...APPLICATION_USE_KEYS].sort().join('\0')) return false
+  return (
+    typeof row.consumerPath === 'string' && row.consumerPath.length > 0 &&
+    Number.isSafeInteger(row.startLine) && row.startLine >= 1 &&
+    Number.isSafeInteger(row.startColumn) && row.startColumn >= 0 &&
+    typeof row.resolvedTarget === 'string' && row.resolvedTarget.length > 0 &&
+    typeof row.inferredType === 'string'
+  )
+}
+
+/** Fail-closed shape check for compiler evidence. Bare `{symbolUses,applicationUses}`
+ * test doubles pass when `applicationUses` is a valid array; full FCS observations
+ * must additionally carry `schemaVersion: 1` and `declarationUses`. */
+export const validateCompilerEvidence = (evidence) => {
+  if (evidence === undefined || evidence === null) return { ok: false, reason: 'missing-evidence' }
+  if (typeof evidence !== 'object' || Array.isArray(evidence)) return { ok: false, reason: 'schema-mismatch' }
+  if (!Array.isArray(evidence.applicationUses)) return { ok: false, reason: 'missing-application-uses' }
+  if (!evidence.applicationUses.every(isValidApplicationUse)) return { ok: false, reason: 'schema-mismatch' }
+  if (evidence.symbolUses !== undefined && !Array.isArray(evidence.symbolUses)) return { ok: false, reason: 'schema-mismatch' }
+  if ('schemaVersion' in evidence && evidence.schemaVersion !== COMPILER_EVIDENCE_SCHEMA_VERSION) {
+    return { ok: false, reason: 'schema-mismatch' }
+  }
+  if ('declarationUses' in evidence && !Array.isArray(evidence.declarationUses)) {
+    return { ok: false, reason: 'schema-mismatch' }
+  }
+  return { ok: true, reason: 'compiler-evidence-valid' }
+}
+
+/** Project full FCS observations onto the `{symbolUses,applicationUses}` contract
+ * consumed by `scanExecutionPositions`. Declaration uses carry no inferred result
+ * type, so they map to symbol references with an empty `inferredType`; the
+ * effectful-call branch reads `applicationUses` where the real FCS traversal
+ * records `inferredType` per resolved call. */
+export const buildCompilerEvidence = (observations) => {
+  if (!observations || typeof observations !== 'object') throw new Error('dsl-ownership: missing compiler evidence')
+  const check = validateCompilerEvidence(observations)
+  if (!check.ok) throw new Error(`dsl-ownership: invalid compiler evidence (${check.reason})`)
+  const symbolUses = [
+    ...(Array.isArray(observations.symbolUses) ? observations.symbolUses : []),
+    ...(Array.isArray(observations.declarationUses)
+      ? observations.declarationUses.map((row) => ({
+        consumerPath: row.consumerPath,
+        symbol: row.symbol,
+        line: row.line,
+        column: row.column,
+        inferredType: '',
+      }))
+      : []),
+  ]
+  return { symbolUses, applicationUses: observations.applicationUses }
+}
+
+/** Resolve compiler evidence once per check run. `--lexical-only` opts into the
+ * explicitly uncovered mode; otherwise `--compiler-evidence=<path>` (or
+ * `DSL_COMPILER_EVIDENCE`) supplies a JSON payload, falling back to a single
+ * live FCS scan. Throws fail-closed when strict evidence is required. */
+export const loadCompilerEvidence = async ({ lexicalOnly = false, evidencePath = undefined } = {}) => {
+  if (lexicalOnly) return { mode: 'lexical-only', evidence: undefined }
+  const fromFile = evidencePath ?? process.env.DSL_COMPILER_EVIDENCE
+  if (fromFile) {
+    const parsed = JSON.parse(readFileSync(fromFile, 'utf8'))
+    return { mode: 'compiler-resolved', evidence: buildCompilerEvidence(parsed) }
+  }
+  const scanned = await import('./locality-dependencies.mjs').then((mod) => mod.scanCompilerObservationsV1())
+  return { mode: 'compiler-resolved', evidence: buildCompilerEvidence(scanned) }
+}
 export const scanTiers = (entries, compilerEvidence = undefined) => {
   const violations = scanFiles(entries, compilerEvidence)
   const hasCompilerEvidence = Boolean(
@@ -1337,16 +1374,32 @@ export const evaluateThreshold = (violationCount, threshold) => {
   return { ok: false, reason: 'fail-closed' }
 }
 
-const runCli = () => {
+const runCli = async () => {
   const thresholdArg = process.argv.find((arg) => arg.startsWith('--threshold='))
   const threshold = thresholdArg ? Number(thresholdArg.split('=')[1]) : -1
+  const lexicalOnly = process.argv.includes('--lexical-only')
+  const evidenceArg = process.argv.find((arg) => arg.startsWith('--compiler-evidence='))
+  const evidencePath = evidenceArg ? evidenceArg.split('=').slice(1).join('=') : undefined
+  const strict = process.argv.includes('--require-compiler-evidence')
 
   const productionFiles = walk(PRODUCTION_ROOT, ['.fs']).map(norm).filter(isProgramFile)
   const entries = productionFiles.map((file) => ({
     file,
     text: readFileSync(file, 'utf8'),
   }))
-  const tierResult = scanTiers(entries, undefined)
+  let compilerEvidence
+  let evidenceMode = 'lexical-only'
+  try {
+    const loaded = await loadCompilerEvidence({ lexicalOnly, evidencePath })
+    evidenceMode = loaded.mode
+    compilerEvidence = loaded.evidence
+  } catch (error) {
+    if (strict || !lexicalOnly) {
+      console.error(`dsl-ownership: compiler evidence unavailable — ${error instanceof Error ? error.message : String(error)}`)
+      process.exit(1)
+    }
+  }
+  const tierResult = scanTiers(entries, compilerEvidence)
   const violations = tierResult.violations
   const byGate = groupByGate(violations)
   const write = threshold >= 0 ? console.log : console.error
@@ -1374,14 +1427,14 @@ const runCli = () => {
 
   if (violations.length === 0) {
     if (!tierResult.hasCompilerEvidence) {
-      write(`dsl-ownership: uncovered (lexical-only) — ${productionFiles.length} Program/Domain files, zero lexical violations (compiler tier uncovered)`)
+      write(`dsl-ownership: uncovered (lexical-only) — ${productionFiles.length} Program/Domain files, lexical 0 / compiler uncovered (tier lexical-only; compiler evidence absent)`)
     } else {
-      write(`dsl-ownership: OK — ${productionFiles.length} Program/Domain files (compiler tier resolved)`)
+      write(`dsl-ownership: OK — ${productionFiles.length} Program/Domain files, lexical ${tierResult.lexicalViolations.length} / compiler ${tierResult.compilerViolations.length} (tier compiler-resolved)`)
     }
     process.exit(0)
   }
 
-  write(`dsl-ownership: ${violations.length} violation(s) — ${productionFiles.length} files\n`)
+  write(`dsl-ownership: ${violations.length} violation(s) — ${productionFiles.length} files, lexical ${tierResult.lexicalViolations.length} / compiler ${tierResult.compilerViolations.length} (tier ${tierResult.tier})\n`)
   for (const [gate, items] of byGate) {
     write(`${gate} (${items.length})`)
     for (const v of items) {
@@ -1412,5 +1465,8 @@ const isMain =
   process.argv[1] !== undefined &&
   resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])
 
-if (isMain) runCli()
+if (isMain) runCli().catch((error) => {
+  console.error(`dsl-ownership: compiler evidence unavailable — ${error instanceof Error ? error.message : String(error)}`)
+  process.exit(1)
+})
 

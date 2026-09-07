@@ -292,6 +292,15 @@ test('WHAT[STRUCTURED-WORKFLOW-004] PluginTransforms_accepts_typed_mode_and_stat
   assert.deepEqual(scanPluginTransforms(source, 'PluginTransforms.fs'), [])
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-004] PluginTransforms_cannot_call_the_Manager_delivery_primitive', () => {
+  const source = [
+    'module PluginTransforms',
+    'let apply value =',
+    '    ManagerWorkflow.maybeDeliverLoop value',
+  ].join('\n')
+  assert.ok(scanPluginTransforms(source, 'PluginTransforms.fs').some((hit) => hit.kind === 'foreign-effect'))
+})
+
 test('WHAT[STRUCTURED-WORKFLOW-004] PluginTransforms_order_requires_executable_calls', () => {
   const source = readFixture('fake-plugin-transform-order.fs')
   assert.ok(scanPluginTransforms(source, 'fake-plugin-transform-order.fs').some((hit) => hit.kind === 'ordering'))

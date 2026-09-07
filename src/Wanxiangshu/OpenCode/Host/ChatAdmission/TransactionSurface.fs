@@ -62,7 +62,6 @@ module TransactionSurface =
 
         PromptAuthority.buildAttemptExecutionProfile
             authority
-            AgentPairCursor.initial
             physicalId
             (ProviderRunIdentity.create (requiredText "providerRun" value?providerRun))
             (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot)
@@ -200,11 +199,7 @@ module TransactionSurface =
             let profile: PromptAuthority.AttemptExecutionProfile = profileOf evidenceValue
 
             let evidence: AcceptedChatExecutionEvidence =
-                ManagedChatAcceptance.evidenceFromIntent
-                    profile.Authority
-                    profile.PhysicalUserMessageId
-                    profile.Origin
-                    profile.EffectiveAgent
+                ManagedChatAcceptance.evidenceFromIntent profile.Authority profile.PhysicalUserMessageId profile.Origin
             // DSL-MUTABLE: algorithm-scratch
             let mutable state: ChatExecutionState option = initialState stateLabel evidence
             let trace = ResizeArray<string>()
@@ -271,9 +266,10 @@ module TransactionSurface =
                   Reasoning = "high" }
 
             let exactIdentity: ExecutionAdmissionExactIdentity =
-                { SessionId = SessionId.value profile.SessionId
-                  PhysicalUserMessageId = PhysicalUserMessageId.value profile.PhysicalUserMessageId
-                  EffectiveAgent = profile.EffectiveAgent
+                { SessionId = SessionId.value evidence.SessionId
+                  PhysicalUserMessageId = PhysicalUserMessageId.value evidence.PhysicalUserMessageId
+                  Role = AcceptedChatExecutionEvidence.canonicalRole evidence
+                  Participant = AcceptedChatExecutionEvidence.participant evidence
                   Target = target }
 
             let lease =
@@ -298,9 +294,15 @@ module TransactionSurface =
                             return! ManagedChatAcceptance.acceptWith persistence key evidence
                         }
                   Acquire =
-                    fun _ ->
+                    fun witness ->
                         task {
                             acquireCount <- acquireCount + 1
+
+                            let witnessEvidence = ManagedChatAcceptanceWitness.evidence witness
+
+                            let _lenderSessionId: string option =
+                                PromptAuthority.identitySeedOwner witnessEvidence.IdentitySeed
+                                |> Option.map (fun (ownerSession, _, _) -> SessionId.value ownerSession)
 
                             if failurePoint = "AcquireLease" then
                                 return Error(InvalidOperationException "injected acquisition failure")
@@ -399,14 +401,13 @@ module TransactionSurface =
                         providerBinding <- 0 }
 
             let key: ChatAdmissionIntent.ExecutionKey =
-                { SessionId = profile.SessionId
-                  PhysicalUserMessageId = profile.PhysicalUserMessageId }
+                { SessionId = evidence.SessionId
+                  PhysicalUserMessageId = evidence.PhysicalUserMessageId }
 
             let intent =
                 ChatAdmissionIntent.Decision.ExternalRootIntent
                     { Key = key
                       ExplicitAgent = ParticipantIdentity.selectedAgent profile.Authority.ParticipantIdentity
-                      EffectiveAgent = profile.EffectiveAgent
                       Origin = profile.Origin
                       IdentitySeed = profile.Authority.IdentitySeed }
 
@@ -482,12 +483,8 @@ module TransactionSurface =
         task {
             let profile = profileOf evidenceValue
 
-            let acceptedEvidence =
-                ManagedChatAcceptance.evidenceFromIntent
-                    profile.Authority
-                    profile.PhysicalUserMessageId
-                    profile.Origin
-                    profile.EffectiveAgent
+            let acceptedEvidence: AcceptedChatExecutionEvidence =
+                ManagedChatAcceptance.evidenceFromIntent profile.Authority profile.PhysicalUserMessageId profile.Origin
 
             let key: ChatExecutionKey =
                 { SessionId = acceptedEvidence.SessionId
@@ -552,7 +549,7 @@ module TransactionSurface =
                 |> apply
                 |> Result.defaultWith (fun error -> invalidOp (JournalAppendFailure.describe error))
 
-            let attemptedEvidence =
+            let attemptedEvidence: AcceptedChatExecutionEvidence =
                 if acceptanceConflict then
                     { acceptedEvidence with
                         LogicalRunId = LogicalRunId.create "run-conflict" }
@@ -569,7 +566,8 @@ module TransactionSurface =
             let exactIdentity: ExecutionAdmissionExactIdentity =
                 { SessionId = SessionId.value key.SessionId
                   PhysicalUserMessageId = PhysicalUserMessageId.value key.PhysicalUserMessageId
-                  EffectiveAgent = acceptedEvidence.EffectiveAgent
+                  Role = AcceptedChatExecutionEvidence.canonicalRole acceptedEvidence
+                  Participant = AcceptedChatExecutionEvidence.participant acceptedEvidence
                   Target = target }
 
             let lease =
@@ -596,12 +594,10 @@ module TransactionSurface =
                               Origin = acceptedEvidence.Origin
                               LogicalRunId = Some acceptedEvidence.LogicalRunId
                               AuthorityRootUserMessageId = Some acceptedEvidence.AuthorityRootUserMessageId
-                              EffectiveAgent = Some acceptedEvidence.EffectiveAgent
                               IdentitySeed = acceptedEvidence.IdentitySeed
                               PayloadDigest = "plugin-replay"
                               Receipt = None
                               ClaimedAtRuntimeStartCount = 0 }
-                          EffectiveAgent = acceptedEvidence.EffectiveAgent
                           Origin = acceptedEvidence.Origin
                           IdentitySeed = acceptedEvidence.IdentitySeed }
                 else
@@ -609,8 +605,7 @@ module TransactionSurface =
                         { Key =
                             { SessionId = key.SessionId
                               PhysicalUserMessageId = key.PhysicalUserMessageId }
-                          ExplicitAgent = acceptedEvidence.EffectiveAgent
-                          EffectiveAgent = acceptedEvidence.EffectiveAgent
+                          ExplicitAgent = AcceptedChatExecutionEvidence.participant acceptedEvidence
                           Origin = acceptedEvidence.Origin
                           IdentitySeed = acceptedEvidence.IdentitySeed }
 
@@ -621,19 +616,25 @@ module TransactionSurface =
                         key.SessionId
                         intent.PromptKey
                         key.PhysicalUserMessageId
-                        acceptedEvidence.EffectiveAgent
+                        (AcceptedChatExecutionEvidence.participant acceptedEvidence)
                         model
                 | _ ->
                     SessionExecutionBinding.acceptExternalExecution
                         key.SessionId
                         key.PhysicalUserMessageId
-                        acceptedEvidence.EffectiveAgent
+                        (AcceptedChatExecutionEvidence.participant acceptedEvidence)
                         model
 
             let ports: ChatAdmissionTransactionPorts =
                 { Accept = accept
                   Acquire =
-                    fun _ ->
+                    fun witness ->
+                        let witnessEvidence = ManagedChatAcceptanceWitness.evidence witness
+
+                        let _lenderSessionId: string option =
+                            PromptAuthority.identitySeedOwner witnessEvidence.IdentitySeed
+                            |> Option.map (fun (ownerSession, _, _) -> SessionId.value ownerSession)
+
                         if failureKind = "Supersession" then
                             Task.FromResult(Ok ExecutionAdmissionAcquisition.Superseded)
                         else

@@ -11,8 +11,7 @@ module ProviderFailurePresentation =
 
     let classify (decision: ExecutionFailureDecision) (episodeId: string) : Presentation =
         match decision.Resolution with
-        | ExecutionFailureResolution.RetryFreshAttempt _
-        | ExecutionFailureResolution.AdvanceFallback _ -> Presentation.Recovery episodeId
+        | ExecutionFailureResolution.RetryFreshAttempt _ -> Presentation.Recovery episodeId
         | ExecutionFailureResolution.TerminalizeProviderStarted _ -> Presentation.Final episodeId
         | ExecutionFailureResolution.PreserveCurrentFact
         | ExecutionFailureResolution.AwaitAcceptanceReconciliation _

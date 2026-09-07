@@ -14,14 +14,14 @@ const MANAGED = [
   'inquiry',
   'blogger',
   'distiller',
-  'bookkeeper',
-  'predictor',
 ]
 
 test('WHAT[EMR-001] EMR_001_recommended_resource_is_directly_executable_and_uses_full_model_selectors', async () => {
   const source = await readFile(templateUrl, 'utf8')
   assert.match(source, /export default function route/)
-  const { default: route } = await import(`${templateUrl.href}?test=${Date.now()}`)
+  const { default: scheduler } = await import(`${templateUrl.href}?test=${Date.now()}`)
+  const { invokeScheduler } = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
+  const route = (role, running, previous = null) => invokeScheduler(scheduler, role, running, previous)
 
   for (const role of MANAGED) {
     const selected = route(role, [])
@@ -30,23 +30,27 @@ test('WHAT[EMR-001] EMR_001_recommended_resource_is_directly_executable_and_uses
     assert.ok(selected.reasoning.length > 0)
   }
 
-  assert.match(route('browser', []).model, /minimax-m3/)
+  assert.match(route('browser', [], null).model, /minimax-m3/)
   // Tiered aliases no longer exist: unknown roles fail closed.
   assert.throws(() => route('fast-browser', []), /unknown model-routing role/)
   assert.throws(() => route('deep-coder', []), /unknown model-routing role/)
 })
 
 test('WHAT[EMR-005] EMR_005_recommended_resource_is_only_a_policy_template', async () => {
-  const { default: route } = await import(`${templateUrl.href}?policy=${Date.now()}`)
+  const { default: scheduler } = await import(`${templateUrl.href}?policy=${Date.now()}`)
+  const { invokeScheduler } = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
+  const route = (role, running, previous = null) => invokeScheduler(scheduler, role, running, previous)
   const first = route('coder', [])
   const occupied = Array.from({ length: 8 }, () => ({ ...first }))
   const next = route('coder', occupied)
 
-  assert.notDeepEqual(next, first, 'the template itself, not runtime, owns capacity/fallback policy')
+  assert.notDeepEqual(next, first, 'the template itself, not runtime, owns capacity policy')
 })
 
 test('WHAT[EMR-005] EMR_005_recommended_template_counts_capacity_by_provider_across_models', async () => {
-  const { default: route } = await import(`${templateUrl.href}?provider=${Date.now()}`)
+  const { default: scheduler } = await import(`${templateUrl.href}?provider=${Date.now()}`)
+  const { invokeScheduler } = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
+  const route = (role, running, previous = null) => invokeScheduler(scheduler, role, running, previous)
   // Canonical browser pool spans ollama-cloud (limit 16) + opencode-go (limit 8).
   // Filling only opencode-go leaves the ollama-cloud candidate available.
   const opencodeFull = Array.from({ length: 8 }, () => ({
@@ -75,7 +79,9 @@ test('WHAT[EMR-005] EMR_005_recommended_template_counts_capacity_by_provider_acr
 })
 
 test('WHAT[EMR-006] EMR_006_recommended_template_prefers_previous_candidate_when_provider_has_capacity', async () => {
-  const { default: route } = await import(`${templateUrl.href}?previous=${Date.now()}`)
+  const { default: scheduler } = await import(`${templateUrl.href}?previous=${Date.now()}`)
+  const { invokeScheduler } = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
+  const route = (role, running, previous = null) => invokeScheduler(scheduler, role, running, previous)
   const previous = { model: 'neuralwatt/glm-5.2-flex', reasoning: 'high' }
 
   assert.deepEqual(route('coder', [], previous), previous)
@@ -87,6 +93,6 @@ test('WHAT[EMR-006] EMR_006_recommended_template_prefers_previous_candidate_when
   assert.equal(
     route('coder', neuralwattFull, previous).model,
     'cursor/cursor-grok-4.6-xhigh',
-    'when the previous provider is full, normal candidate fallback still applies',
+    'when the previous provider is full, the next template candidate applies',
   )
 })

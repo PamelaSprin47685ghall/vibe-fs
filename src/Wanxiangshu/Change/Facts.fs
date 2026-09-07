@@ -34,7 +34,11 @@ type OrchestratorFactCases =
     | PublishClaimed of
         {| ManagerJobId: ManagerJobId
            TargetRef: TargetRef
-           ExpectedHead: CommitHash |}
+           RebasedCommit: CommitHash
+           ExpectedHead: CommitHash
+           WorkspaceSnapshotId: WorkspaceSnapshotId
+           QualityCertificateId: QualityCertificateId
+           AuthorityRevision: AuthorityRevision |}
     | Published of
         {| ManagerJobId: ManagerJobId
            CandidateCommit: CommitHash

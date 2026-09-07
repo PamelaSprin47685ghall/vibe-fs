@@ -7,7 +7,8 @@ const target = (model = 'provider/shared', reasoning = 'none') => ({ model, reas
 const identity = (overrides = {}) => ({
   sessionId: 'session-a',
   physicalUserMessageId: 'message-a',
-  effectiveAgent: 'coder',
+  role: 'coder',
+  participant: 'alice',
   target: target(),
   ...overrides,
 })
@@ -17,7 +18,9 @@ const acquire = async (runtime, exact = identity()) => {
     runtime,
     exact.sessionId,
     exact.physicalUserMessageId,
-    exact.effectiveAgent,
+    exact.role,
+    exact.participant,
+    exact.lenderSessionId ?? null,
   )
   assert.equal(outcome.kind, 'Acquired')
   return outcome.lease
@@ -55,6 +58,24 @@ test('WHAT[EMR-012] admission lease permits one terminal transition and idempote
   conflict(routing.commitExecutionAdmission(runtime, released, releasedIdentity))
 })
 
+test('WHAT[EMR-012] rejects commit with the wrong role', async () => {
+  const runtime = routing.createRuntime(() => target())
+  const lease = await acquire(runtime)
+
+  conflict(routing.commitExecutionAdmission(runtime, lease, identity({ role: 'inspector' })))
+  assert.equal(routing.snapshotOccupied(runtime).length, 1, 'wrong role cannot settle capacity')
+  assert.deepEqual(routing.commitExecutionAdmission(runtime, lease, identity()), { kind: 'Applied' })
+})
+
+test('WHAT[EMR-012] rejects commit with the wrong participant', async () => {
+  const runtime = routing.createRuntime(() => target())
+  const lease = await acquire(runtime)
+
+  conflict(routing.commitExecutionAdmission(runtime, lease, identity({ participant: 'bob' })))
+  assert.equal(routing.snapshotOccupied(runtime).length, 1, 'wrong participant cannot settle capacity')
+  assert.deepEqual(routing.commitExecutionAdmission(runtime, lease, identity()), { kind: 'Applied' })
+})
+
 test('WHAT[EMR-012] rejects release from another physical message and every wrong exact identity field', async () => {
   const runtime = routing.createRuntime(() => target())
   const lease = await acquire(runtime)
@@ -62,7 +83,8 @@ test('WHAT[EMR-012] rejects release from another physical message and every wron
   for (const change of [
     { sessionId: 'other-session' },
     { physicalUserMessageId: 'other-message' },
-    { effectiveAgent: 'inspector' },
+    { role: 'inspector' },
+    { participant: 'bob' },
     { target: { model: 'provider/other', reasoning: 'none' } },
   ]) {
     conflict(routing.releaseExecutionAdmissionBeforeProvider(runtime, lease, identity(change)))

@@ -54,22 +54,15 @@ const EXCLUSIVE_PRIVATE_KNOWLEDGE = Object.freeze([
   // Private mutable state / dictionary resources
   'ownedTokenByExecution',
   'creditSourceByExecution',
-  'companionSessionByOwner',
-  'companionOwnerBySession',
   'nextCapacityDemandSequence',
 
-  // Private borrowing, recall, credit distance & reservation algorithm helpers
-  'ancestorDistance',
+  // Private borrowing, recall & reservation algorithm helpers
   'currentCreditSource',
   'clearCreditSource',
   'clearCreditSourcesForToken',
   'clearCreditSourcesForSession',
   'rememberCreditSource',
   'moveCreditSource',
-  'nextAncestor',
-  'companionLender',
-  'matchingLenderDistance',
-  'creditDistance',
   'isRetiring',
   'releaseToken',
   'retireToken',
@@ -86,22 +79,18 @@ const EXCLUSIVE_PRIVATE_KNOWLEDGE = Object.freeze([
   'moveOwnedToken',
   'finishStep',
   'reconcileFence',
-  'rememberGrantedCredit',
-  'idleBorrowPairs',
+  'tryGrantOwned',
   'tryGrantBorrowed',
   'demandOwnsToken',
   'tryGrantOrdinary',
+  'tryGrantDemand',
   'acquireForRoute',
-  'requiredCreditDistance',
   'recordRoutedCredit',
   'applyRoutedToken',
   'commitRoutedTarget',
   'ensureReservationToken',
   'recordReservationCredit',
   'adoptOwnedToken',
-  'dropOwnedCompanion',
-  'clearOwnedCompanionIfMatches',
-  'dropCompanionOwner',
 ])
 
 /**
@@ -213,7 +202,7 @@ test('WHAT[EMR-010] EMR_010_exclusivity_test_is_refutable_and_fails_closed_on_vi
   // Test refutability: simulate a leaked knowledge identifier in non-owner content
   const simulatedLeakedContent = `
     namespace Wanxiangshu.SomeModule
-    let checkDistance = ancestorDistance "parent" "child"
+    let decide = routeDecision None route
   `
 
   const checkContent = (content, identifiers) => {
@@ -229,7 +218,7 @@ test('WHAT[EMR-010] EMR_010_exclusivity_test_is_refutable_and_fails_closed_on_vi
   const detected = checkContent(simulatedLeakedContent, EXCLUSIVE_PRIVATE_KNOWLEDGE)
   assert.deepEqual(
     detected,
-    ['ancestorDistance'],
+    ['routeDecision'],
     'Exclusivity detector must reliably catch leaked identifiers'
   )
 

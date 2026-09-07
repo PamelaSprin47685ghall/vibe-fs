@@ -4,32 +4,69 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Composition.Durable.ProjectionUpdate
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Relay
 
 module OrchestratorFactFold =
 
     let private reject = FoldRejection.reject
 
+    let private foldRebasedCandidateReady
+        (payload:
+            {| ManagerJobId: ManagerJobId
+               RebasedCommit: CommitHash
+               TargetHeadSnapshot: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId |})
+        (projection: AgentProjectionSet)
+        : Result<AgentProjectionSet, FoldRejection> =
+        // Journal is append-only: the projection keeps the latest appended
+        // RebasedCandidateReady as the current view. Exact replay is
+        // idempotent; a later differing event supersedes because the prior
+        // CAS/target observation proved that attempt did not land.
+        Ok(
+            updateOrchestrator
+                (OrchestratorProjection.recordRebasedCandidateReady
+                    payload.ManagerJobId
+                    {| RebasedCommit = payload.RebasedCommit
+                       TargetHeadSnapshot = payload.TargetHeadSnapshot
+                       WorkspaceSnapshotId = payload.WorkspaceSnapshotId |})
+                projection
+        )
+
     let private foldPublishClaimed
         (payload:
             {| ManagerJobId: ManagerJobId
                TargetRef: TargetRef
-               ExpectedHead: CommitHash |})
+               RebasedCommit: CommitHash
+               ExpectedHead: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId
+               QualityCertificateId: QualityCertificateId
+               AuthorityRevision: AuthorityRevision |})
         (projection: AgentProjectionSet)
         : Result<AgentProjectionSet, FoldRejection> =
         match
             OrchestratorProjection.tryFind payload.ManagerJobId projection.Orchestrator
-            |> Option.bind (fun job -> job.RebasedCandidateReady |> Option.map (fun r -> r.RebasedCommit))
+            |> Option.bind (fun job -> job.RebasedCandidateReady)
         with
         | None -> reject "PublishClaimed" "publish claimed for a job with no rebased candidate (ORCH-004)"
-        | Some commit ->
-            Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.recordPublishClaimed
-                        payload.ManagerJobId
-                        {| RebasedCommit = commit
-                           ExpectedHead = payload.ExpectedHead |})
-                    projection
-            )
+        | Some rebasedReady ->
+            if payload.RebasedCommit <> rebasedReady.RebasedCommit then
+                reject "PublishClaimed" "publish claimed commit does not match admitted rebased commit"
+            else
+                // Latest appended claim is the current view: a retried publish
+                // under a fresh certificate carries a new ExpectedHead and
+                // evidence, which supersedes the CAS-missed attempt.
+                Ok(
+                    updateOrchestrator
+                        (OrchestratorProjection.recordPublishClaimed
+                            payload.ManagerJobId
+                            {| TargetRef = payload.TargetRef
+                               RebasedCommit = payload.RebasedCommit
+                               ExpectedHead = payload.ExpectedHead
+                               WorkspaceSnapshotId = payload.WorkspaceSnapshotId
+                               QualityCertificateId = payload.QualityCertificateId
+                               AuthorityRevision = payload.AuthorityRevision |})
+                        projection
+                )
 
     let fold
         (projection: AgentProjectionSet)
@@ -60,16 +97,7 @@ module OrchestratorFactFold =
                            DiagnosticsDigest = payload.DiagnosticsDigest |})
                     projection
             )
-        | OrchestratorFactCases.RebasedCandidateReady payload ->
-            Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.recordRebasedCandidateReady
-                        payload.ManagerJobId
-                        {| RebasedCommit = payload.RebasedCommit
-                           TargetHeadSnapshot = payload.TargetHeadSnapshot
-                           WorkspaceSnapshotId = payload.WorkspaceSnapshotId |})
-                    projection
-            )
+        | OrchestratorFactCases.RebasedCandidateReady payload -> foldRebasedCandidateReady payload projection
         | OrchestratorFactCases.PublishClaimed payload -> foldPublishClaimed payload projection
         | OrchestratorFactCases.Published payload ->
             Ok(

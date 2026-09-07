@@ -437,10 +437,10 @@ module HostForkRunLifecycle =
             // Observation only. Keep pending run Active for a later proven terminal.
             Task.FromResult(())
         | Completed result when not result.IsValid ->
-            // FALLBACK-008 / P0-RECOVERY-JOIN-001: an empty / XML-only terminal is
+            // PAR-008 / P0-RECOVERY-JOIN-001: an empty / XML-only terminal is
             // not a proven failure. The subagent auto-retries and continues — its
-            // reconcile loop repairs the missing final report (RepairOnce /
-            // AbandonRoundProduct, never FailSlot). Concluding MISSING_FINAL_REPORT
+            // reconcile loop performs the bounded missing-final-report repair.
+            // Concluding MISSING_FINAL_REPORT
             // here would fail the run before the last effort. Observation only.
             Task.FromResult(())
         | Completed result when not (completionBelongsToRun run result) -> Task.FromResult(())
@@ -477,7 +477,7 @@ module HostForkRunLifecycle =
             stop.Reason = "MISSING_FINAL_REPORT"
             || stop.Reason.Contains("MISSING_FINAL_REPORT")
             ->
-            // FALLBACK-008 / P0-RECOVERY-JOIN-001: a missing final report is not a
+            // PAR-008 / P0-RECOVERY-JOIN-001: a missing final report is not a
             // proven terminal failure. The subagent auto-retries and continues (its
             // reconcile loop keeps repairing the empty terminal); delivering a
             // proven MISSING_FINAL_REPORT failure here concludes the run before the

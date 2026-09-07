@@ -173,12 +173,9 @@ module ChatExecutionRecovery =
         match decision.Resolution with
         | ExecutionFailureResolution.RetryFreshAttempt authorization when authorizationMatches authorization ->
             ChatExecutionRecoveryDecision.Ignore(evidence.ExecutionState.Key, IgnoreReason.ProviderRecoveryOwned)
-        | ExecutionFailureResolution.AdvanceFallback authorization when authorizationMatches authorization ->
-            ChatExecutionRecoveryDecision.Ignore(evidence.ExecutionState.Key, IgnoreReason.ProviderRecoveryOwned)
         | ExecutionFailureResolution.TerminalizeProviderStarted(key, disposition) when key = evidence.ExecutionState.Key ->
             finalize started disposition
         | ExecutionFailureResolution.RetryFreshAttempt _
-        | ExecutionFailureResolution.AdvanceFallback _
         | ExecutionFailureResolution.TerminalizeProviderStarted _ ->
             ChatExecutionRecoveryDecision.Ignore(evidence.ExecutionState.Key, IgnoreReason.StalePolicyEvidence)
         | ExecutionFailureResolution.PreserveCurrentFact

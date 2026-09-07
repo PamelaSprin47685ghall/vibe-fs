@@ -44,7 +44,7 @@ const validateCapacity = (snapshot) => {
   keysExactly(snapshot.tokenStateCounts, ['idle', 'inFlight', 'retiring'], 'capacity tokenStateCounts')
   keysExactly(snapshot.counters, ['duplicate', 'stale', 'conflict'], 'capacity counters')
   const target = (value) => keysExactly(value, ['model', 'reasoning'], 'capacity target')
-  const owner = (value) => keysExactly(value, ['sessionId', 'physicalUserMessageId', 'effectiveAgent'], 'capacity owner')
+  const owner = (value) => keysExactly(value, ['sessionId', 'physicalUserMessageId', 'role', 'participant'], 'capacity owner')
   for (const entry of snapshot.ledgerEntries) {
     keysExactly(entry, ['credit', 'target'], 'capacity ledger entry')
     target(entry.target)
@@ -59,7 +59,7 @@ const validateCapacity = (snapshot) => {
     owner(custody.owner)
   }
   for (const entry of [...snapshot.executions, ...snapshot.owners]) owner(entry)
-  for (const waiter of snapshot.waiters) keysExactly(waiter, ['sessionId', 'physicalUserMessageId', 'effectiveAgent', 'sequence', 'kind'], 'capacity waiter')
+  for (const waiter of snapshot.waiters) keysExactly(waiter, ['sessionId', 'physicalUserMessageId', 'role', 'participant', 'sequence', 'kind'], 'capacity waiter')
   for (const edge of snapshot.lineage) keysExactly(edge, ['parentSessionId', 'childSessionId'], 'capacity lineage')
 }
 

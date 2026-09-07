@@ -44,7 +44,8 @@ const acceptedPayload = (wire) => wire[1][1][1]
 
 test('WHAT[CHATEXEC-002] schema v1 Accepted ProviderStarted and Terminal round-trip canonically', () => {
   const acceptedCanonical = canonicalize(fixture)
-  assert.equal(acceptedCanonical, fixture, 'fixture must already be canonical production FactCodec bytes')
+  assert.doesNotMatch(acceptedCanonical, /PeerAgent|EffectiveAgent/, 'canonical encoding drops raw v1 legacy agent fields')
+  assert.equal(canonicalize(acceptedCanonical), acceptedCanonical, 'canonical bytes are a fixed point')
 
   const history = [acceptedCanonical, canonicalize(started), canonicalize(terminal)]
   for (const line of history) assert.equal(canonicalize(line), line)
@@ -67,18 +68,17 @@ test('WHAT[CHATEXEC-002] schema v1 Accepted ProviderStarted and Terminal round-t
           ownerLogicalRun: null,
           ownerAuthorityRoot: null,
           participantIdentity: {
-            selectedAgent: 'coder',
-            peerAgent: 'coder',
-            canonicalRole: 'coder',
-            selectedTier: 'deep',
+            origin: 'ResolvedAtRoot',
+            participant: 'coder',
             persona: 'Coder',
             personaCatalogVersion: 1,
-            origin: 'ResolvedAtRoot',
+            role: 'coder',
           },
         },
         providerRun: 'provider-chat-fixture',
         origin: 'HumanRoot',
-        effectiveAgent: 'coder',
+        participant: 'coder',
+        role: 'coder',
         requestKind: 'work-main',
         projectionChoice: { kind: 'UseCommittedEpoch' },
       },

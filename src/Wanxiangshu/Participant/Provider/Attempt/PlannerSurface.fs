@@ -85,21 +85,21 @@ module AttemptPlannerSurface =
         |> Result.map (fun authority ->
             AttemptPlanner.plan
                 authority
-                AgentPairCursor.initial
                 (PhysicalUserMessageId.create "surface-user")
                 (ProviderRunIdentity.create "surface-provider-run")
                 (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot)
                 requestKind
-                RecoveryOpportunity.OrdinaryAttempt
+                false
                 (fun () -> Error NoCandidateReason.NoCoverage))
 
     let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
         let selected = ParticipantIdentity.selectedAgent identity
 
         box
-            {| selectedAgent = selected
-               peerAgent = selected
+            {| participant = selected
+               selectedAgent = selected
                canonicalRole = ParticipantIdentity.roleLabel identity
+               role = ParticipantIdentity.roleLabel identity
                selectedTier = "deep"
                persona = ParticipantIdentity.persona identity
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
@@ -123,7 +123,9 @@ module AttemptPlannerSurface =
 
                 box
                     {| ok = true
+                       participant = profile.Authority.SelectedAgent
                        canonicalRole = Roles.roleLabel profile.CanonicalRole
+                       role = Roles.roleLabel profile.CanonicalRole
                        participantIdentity = participantIdentityToJs profile.Authority.ParticipantIdentity
                        systemPromptId = SystemPromptId.value profile.SystemPromptId
                        toolCapabilities =
@@ -132,7 +134,11 @@ module AttemptPlannerSurface =
                         |> List.map permissionLabel
                         |> List.sort
                         |> List.toArray
-                       requestKind = ProviderRequestKind.label profile.RequestKind |}
+                       requestKind = ProviderRequestKind.label profile.RequestKind
+                       projectionChoice =
+                        match profile.ProjectionChoice with
+                        | XProjectionChoice.UseCommittedEpoch -> "UseCommittedEpoch"
+                        | XProjectionChoice.UsePrefixProbe probe -> $"UsePrefixProbe({probe.ProbeId})" |}
         | None, _ -> box {| ok = false; error = "unknown role" |}
         | _, None ->
             box

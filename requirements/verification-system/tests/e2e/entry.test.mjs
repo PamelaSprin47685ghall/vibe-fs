@@ -62,7 +62,7 @@ import {
 
 // Retain named imports so entry ↔ §21 oracle mapping cannot drift silently.
 assert.equal(typeof ADVERSITY_ORACLES.assertProviderTransientFailure, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertFallbackContinuation, 'function');
+assert.equal(typeof ADVERSITY_ORACLES.assertProviderFailureContinuation, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertJoinWakePath, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertInterruptedJoin, 'function');
 assert.equal(typeof ADVERSITY_ORACLES.assertAssessmentAssignsWork, 'function');

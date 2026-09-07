@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Foundation
 
 type ModelRoutingTarget = { Model: string; Reasoning: string }
 
@@ -34,7 +35,8 @@ module internal CapacityFence =
 type internal ExecutionAdmissionExactIdentity =
     { SessionId: string
       PhysicalUserMessageId: string
-      EffectiveAgent: string
+      Role: Role
+      Participant: string
       Target: ModelRoutingTarget }
 
 type internal ExecutionAdmissionLease
@@ -103,7 +105,8 @@ type internal ExecutionAdmissionRejection =
     | StaleLease
     | WrongSession
     | WrongPhysicalUserMessage
-    | WrongEffectiveAgent
+    | WrongRole
+    | WrongParticipant
     | WrongTarget
     | IllegalTransition
     | OppositeTerminalConflict
@@ -147,7 +150,8 @@ type internal CapacityTransitionCounters() =
 type internal CapacityExactOwnerSnapshot =
     { SessionId: string
       PhysicalUserMessageId: string
-      EffectiveAgent: string option }
+      Role: Role option
+      Participant: string option }
 
 type internal CapacityLedgerEntrySnapshot<'target> = { Credit: int64; Target: 'target }
 
@@ -211,7 +215,7 @@ type internal CapacityReconciliationDecision =
 
 module internal CapacityReconciliation =
     let private ownerKey owner =
-        owner.SessionId, owner.PhysicalUserMessageId, owner.EffectiveAgent
+        owner.SessionId, owner.PhysicalUserMessageId, owner.Role, owner.Participant
 
     let decide (evidence: CapacityInvariantEvidence) =
         let owners = evidence.Owners |> Array.map ownerKey |> Set.ofArray
@@ -319,8 +323,10 @@ module internal ExecutionCapacityLifecycle =
             Error ExecutionAdmissionRejection.WrongSession
         elif observed.PhysicalUserMessageId <> lease.Identity.PhysicalUserMessageId then
             Error ExecutionAdmissionRejection.WrongPhysicalUserMessage
-        elif observed.EffectiveAgent <> lease.Identity.EffectiveAgent then
-            Error ExecutionAdmissionRejection.WrongEffectiveAgent
+        elif observed.Role <> lease.Identity.Role then
+            Error ExecutionAdmissionRejection.WrongRole
+        elif observed.Participant <> lease.Identity.Participant then
+            Error ExecutionAdmissionRejection.WrongParticipant
         elif observed.Target <> lease.Identity.Target then
             Error ExecutionAdmissionRejection.WrongTarget
         else

@@ -32,10 +32,6 @@ export function integrationNodeTestSteps(root) {
       files: [path.join(root, 'requirements/behavior-diagnosis/tests/integration/resources/enforcer-rulebook.test.mjs')],
     },
     {
-      label: 'blogger-nudge-plugin-repro.test.mjs (behavior-diagnosis)',
-      files: [path.join(root, 'requirements/behavior-diagnosis/tests/integration/blogger-nudge-plugin-repro.test.mjs')],
-    },
-    {
       label: 'plugin contracts (capability-enforcement)',
       files: [
         path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs'),

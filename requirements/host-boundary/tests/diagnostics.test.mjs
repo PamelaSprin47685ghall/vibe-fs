@@ -17,7 +17,7 @@ const causalRecord = {
   physicalUserMessageId: 'message-11',
   promptKey: null,
   providerRunIdentity: 'provider-13',
-  effectiveAgent: 'coder',
+  participant: 'coder',
   role: 'coder',
   providerRequestKind: 'work-main',
   transition: { from: 'ProviderStarted', to: 'Terminal' },
@@ -55,11 +55,11 @@ test('WHAT[HOST-BOUNDARY-025] causal diagnostics reject payload fields and redac
 
   const projected = projectRecord({
     ...causalRecord,
-    effectiveAgent: 'Bearer secret-value at /home/alice/private/key',
+    participant: 'Bearer secret-value at /home/alice/private/key',
   })
-  assert.equal(projected.effectiveAgent.includes('secret-value'), false)
-  assert.equal(projected.effectiveAgent.includes('/home/alice'), false)
-  assert.match(projected.effectiveAgent, /\[REDACTED\]/)
+  assert.equal(projected.participant.includes('secret-value'), false)
+  assert.equal(projected.participant.includes('/home/alice'), false)
+  assert.match(projected.participant, /\[REDACTED\]/)
 })
 
 test('WHAT[HOST-BOUNDARY-025] missing observation counters are process-local monotonic immutable snapshots', () => {

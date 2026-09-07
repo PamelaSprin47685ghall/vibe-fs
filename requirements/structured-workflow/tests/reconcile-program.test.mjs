@@ -234,3 +234,43 @@ test('WHAT[STRUCTURED-WORKFLOW-009] operator abort is a control-plane wake, neve
   assert.equal(reconcileSurface.isPublishableOutcome('AbortWake'), false)
   assert.equal(reconcileSurface.isPublishableOutcome('TurnFailed'), true)
 })
+// ── scheduler resource bounds (R17, dist-backed) ─────────────────────────────
+//
+// One compiled-Scheduler scenario drives 6000 same-session causal edges
+// (3000 kicks + 3000 projection edges) against a manually gated live pass,
+// issues StopAndDrain while the pass is blocked, invalidates the burst with
+// ClearSession, releases, then probes post-stop kicks. No timers; the only
+// yields are microtask turns. Bounds below come from production semantics:
+// single-flight coalescing (N kicks → ≤1 admitted pass), edge batching (M
+// edges → ≤1 extra read), generation invalidation (ClearSession → stale work
+// dropped), shutdown admission latch (post-stop kicks → no work). The tests
+// assert the returned counts/flags only and never reimplement that policy.
+
+test('WHAT[STRUCTURED-WORKFLOW-010] RECONCILE_SCHEDULER_BOUND_001: same-session burst coalesces and stale work is invalidated', async () => {
+  const result = await reconcileSurface.schedulerBurstBoundScenario()
+
+  assert.equal(result.kickCount, 3000)
+  assert.equal(result.edgeCount, 3000)
+  // Single-flight: thousands of same-session kicks collapse into one live pass.
+  // Edge batching + ClearSession invalidation: no second read for the burst.
+  assert.equal(result.snapshotReads, 1)
+  assert.ok(result.snapshotReads <= 2, 'at most one extra read per edge batch')
+  // RetryWake + provisional never publishes, and the stale burst is dropped by
+  // the ClearSession generation bump before the gate releases.
+  assert.equal(result.delivered, 0)
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-010] RECONCILE_SCHEDULER_BOUND_002: stop waits for the live pass and drains to zero observable work', async () => {
+  const result = await reconcileSurface.schedulerBurstBoundScenario()
+
+  // StopAndDrain was issued while the pass was blocked and completed only
+  // after release; the scenario itself cannot resolve otherwise.
+  assert.equal(result.stopWaited, true)
+  assert.equal(result.delivered, 0)
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-010] RECONCILE_SCHEDULER_BOUND_003: kicks after stop do nothing', async () => {
+  const result = await reconcileSurface.schedulerBurstBoundScenario()
+
+  assert.equal(result.postStopRejected, true)
+})

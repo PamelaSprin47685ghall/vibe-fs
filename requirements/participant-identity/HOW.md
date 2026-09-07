@@ -5,22 +5,24 @@
 `participant-identity` 在 Domain/Kernel 层独占身份解析与不可变性：
 
 ```text
-合法 root input / typed owner-derived evidence
-                       │
-                       ▼
+合法 root input / typed owner-derived IdentitySeed
+                          │
+                          ▼
 resolve(Role, persona provenance/version, canonical catalog)
-                       │
-                       ▼
+                          │
+                          ▼
 prepared ParticipantIdentityEvidence {
-  SelectedAgent; PeerAgent; Role; Persona; PersonaEvidence
+  SelectedAgent; Role; Persona; PersonaEvidence  (immutable per logical run)
 }
-                       │
-                       ▼
+                          │
+                          ▼
 AuthorityRootAccepted { exact root keys; ParticipantIdentityEvidence }  ← single durable append
-                       │
-                       └──► system-prompt / authority / capability consumers
-
-exact execution request ───► ExecutionBinding { EffectiveAgent; provider/model; lease }
+                          │
+                          ├──► system-prompt / authority / capability consumers
+                          │
+                          ▼ (fresh physical execution routes fixed Role via MJS scheduler)
+ExecutionBinding { target: ModelTarget; fence: CapacityFence; lease }
+  (capacity exact identity = session + physical + Role + Participant + target + fence)
 ```
 
 1. **Root identity acceptance**：identity owner 只接受合法 root input 或 exact owner-derived evidence，并纯计算/校验完整 `ParticipantIdentityEvidence`。Authority 把它作为 `AuthorityRootAccepted` 的必填 payload 单次原子追加；该追加同时是 identity installation 与 root acceptance 的唯一 durable fact。禁止独立 identity-installation write。child、attached 与 InternalLeaf 若缺少 evidence，或 evidence 的 owner/run 不精确匹配，必须 fail-closed；append 未提交时不得发布任一状态。
@@ -29,11 +31,11 @@ exact execution request ───► ExecutionBinding { EffectiveAgent; provider
 
 3. **Container reuse**：fresh root acceptance 必须先观察 exact `AuthorityLogicalRunClosed`，其 key 精确匹配旧 `(SessionId, LogicalRunId, AuthorityRootId)`，且 authority fold 已由该事实释放旧 active identity binding。缺少该 closure、仅有 lifecycle terminal/association removal/idle/timeout 或仍有 active run 时不得替换。同一 SessionId 的后继 run 从合法 root input 重新 resolve，不读取旧 run identity。
 
-4. **Execution separation**：canonical SelectedAgent/PeerAgent 是 immutable identity evidence；fallback、Strength、Peer 路由与 provider lease 只生成含当前 EffectiveAgent/provider/model/lease 的新 `ExecutionBinding`。system prompt、authority profile 与 capability projection 消费同一 durable identity evidence，不反向解析或改写身份。内部 Role 使用私有 catalog 分支，不进入 public `Role`。
+4. **Execution separation**：canonical Role/Persona/SelectedAgent 是 immutable identity evidence（由 `IdentitySeed` 派生并在 logical run 内恒定不变；`PeerAgent` 与游标选择的 `EffectiveAgent` 语义均不存在）。每次 fresh physical execution 将固定 Role 经 MJS scheduler 路由至 model target，并签发包含 target/lease/fence 的 `ExecutionBinding`（binding 仅改变 target 与 lease，不得改写身份）。system prompt、authority profile 与 capability projection 消费同一 durable identity evidence，不反向解析或改写身份。内部 Role 使用私有 catalog 分支，不进入 public `Role`。
 
 5. **typed evidence 与所有权切割**：
-   - `ParticipantIdentityEvidence` 是私有构造的完整值；root resolve、owner-derived inheritance 与 durable rehydration 都必须校验 canonical agent/peer、Role、Persona、catalog version 与 provenance，不能逐字段补写。
-   - `SessionPersona`、`SessionSurface`、Host `PersonaBinding` 与 `RoleIdentity` 均不存在；身份不能落入 `SessionId` keyed process cache，也不能由显示字符串授权。
+   - `ParticipantIdentityEvidence` 是私有构造的完整值；root resolve、owner-derived inheritance 与 durable rehydration 都必须校验 canonical Role、Persona、SelectedAgent、catalog version 与 provenance，不能逐字段补写。
+   - `SessionPersona`、`SessionSurface`、Host `PersonaBinding` 与 `RoleIdentity` 均不存在；身份不能落入 `SessionId` keyed process cache，也不能由显示字符串授权；PeerAgent 与 cursor-selected EffectiveAgent 语义已彻底删除。
    - `Roles.fs` 不含 `ToolPermission`、权限矩阵或 capability 判断；这些事实只在 `Foundation/OfficeCapability.fs`。
 
 ## 验证与测试落点
@@ -43,9 +45,9 @@ exact execution request ───► ExecutionBinding { EffectiveAgent; provider
 | PID-001 | `requirements/participant-identity/tests/participant-identity.test.mjs::WHAT[PID-001] resolves every canonical participant identity and persona`；`requirements/participant-identity/tests/identity-boundary-gate.test.mjs::WHAT[PID-001] rejects SessionId keyed identity cache` |
 | PID-002 | `requirements/participant-identity/tests/catalog.test.mjs::WHAT[PID-002] persona_catalog_maps_roles_to_single_persona`；`requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-002] ProviderAttempt carries its ParticipantIdentity as one nested value` |
 | PID-003 | `requirements/participant-identity/tests/participant-identity.test.mjs::WHAT[PID-003] rejects blank Persona and unsupported catalog version` |
-| PID-004 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-004] terminal dispatch preserves the exact IdentitySeed`；`requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-004] Strength replica inherits owner Persona and version with the same EffectiveAgent` |
+| PID-004 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-004] terminal dispatch preserves the exact IdentitySeed`；`requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-004] Strength replica inherits owner Persona and version with the same participant`；`requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-004] raw legacy PeerAgent/EffectiveAgent/cursor fields are ignored and never re-encoded` |
 | PID-005 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-005] provider planning selects the system prompt and tool set from profile Role` |
-| PID-006 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-006] fallback preserves ParticipantIdentity` |
+| PID-006 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-006] fresh physical retries preserve ParticipantIdentity while the failure budget advances`；`requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-006] durable provider failure fold preserves the exact IdentitySeed` |
 | PID-007 | `requirements/participant-identity/tests/participant-identity-consumers.test.mjs::WHAT[PID-007] Bookkeeper has private identity and no public Role` |
-| PID-008 | `requirements/participant-identity/tests/identity-lineage.test.mjs::WHAT[PID-008] inherited identity records the exact durable owner witness`；`requirements/participant-identity/tests/identity-lineage.test.mjs::WHAT[PID-008] rejects stale owner identity evidence`；`requirements/participant-identity/tests/identity-recovery.test.mjs::WHAT[PID-008] current v2 durable identity recovers exact participant and owner provenance`；`requirements/participant-identity/tests/identity-recovery.test.mjs::WHAT[PID-008] supported legacy HumanRoot deterministically recovers its upgraded identity`；`requirements/participant-identity/tests/identity-recovery.test.mjs::WHAT[PID-008] missing active authority rejects even when LastAuthorityProfile is present`；`requirements/participant-identity/tests/identity-recovery.test.mjs::WHAT[PID-008] rejects corrupt identity provenance`；`requirements/participant-identity/tests/identity-recovery.test.mjs::WHAT[PID-008] closed exact run cannot be recovered as current`；`requirements/participant-identity/tests/session-execution-binding.test.mjs::WHAT[PID-008] root_requires_external_agent_proof_then_model_is_scheduler_owned`；`requirements/participant-identity/tests/session-execution-binding.test.mjs::WHAT[PID-008] parented_session_uses_stable_agent_lease_and_authorized_peer_only`；`requirements/participant-identity/tests/session-execution-binding.test.mjs::WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease` |
+| PID-008 | `requirements/participant-identity/tests/identity-lineage.test.mjs::WHAT[PID-008] inherited identity records the exact durable owner witness`；`requirements/participant-identity/tests/identity-lineage.test.mjs::WHAT[PID-008] rejects stale owner identity evidence`；`requirements/participant-identity/tests/identity-recovery.test.mjs::WHAT[PID-008] current v2 durable identity recovers exact participant and owner provenance`；`requirements/participant-identity/tests/identity-recovery.test.mjs::WHAT[PID-008] supported legacy HumanRoot deterministically recovers its upgraded identity`；`requirements/participant-identity/tests/identity-recovery.test.mjs::WHAT[PID-008] missing active authority rejects even when LastAuthorityProfile is present`；`requirements/participant-identity/tests/identity-recovery.test.mjs::WHAT[PID-008] rejects corrupt identity provenance`；`requirements/participant-identity/tests/identity-recovery.test.mjs::WHAT[PID-008] closed exact run cannot be recovered as current`；`requirements/participant-identity/tests/session-execution-binding.test.mjs::WHAT[PID-008] root_requires_external_participant_proof_then_model_is_scheduler_owned`；`requirements/participant-identity/tests/session-execution-binding.test.mjs::WHAT[PID-008] parented_session_uses_stable_participant_lease_and_authorized_peer_only`；`requirements/participant-identity/tests/session-execution-binding.test.mjs::WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease` |
 | PID-009 | `requirements/participant-identity/tests/session-reuse-identity.test.mjs::WHAT[PID-009] reuses SessionId with a fresh closed-run identity`；`requirements/participant-identity/tests/session-reuse-composition.test.mjs::WHAT[PID-009] production plugin replaces identity only after exact durable Manager closure` |

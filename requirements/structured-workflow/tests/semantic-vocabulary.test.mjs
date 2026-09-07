@@ -31,7 +31,6 @@ const VOCABULARY_SURFACES = {
   'Mission/Manager/Workflow': ['observe', 'observeIdle'],
   'Participant/Provider/Attempt/Fallback/Ledger': ['recordAuthorizedFailure'],
   'Participant/Provider/Attempt/Fallback/Workflow': ['continueAfterConfirmedFailure'],
-  'Execution/Session/Recovery/Workflow': ['recoverFamilyDirect'],
   'Change/Program': ['run'],
 }
 
@@ -85,7 +84,6 @@ test('WHAT[STRUCTURED-WORKFLOW-007] every vocabulary binds owner_law_relation_an
     ['ManagerWorkflow.observeIdle', 'Mission/Manager/Workflow.fs', 'Mission.Manager'],
     ['FallbackLedger.recordAuthorizedFailure', 'Participant/Provider/Attempt/Fallback/Ledger.fs', 'Participant.Provider'],
     ['ProviderRecoveryWorkflow.continueAfterConfirmedFailure', 'Participant/Provider/Attempt/Fallback/Workflow.fs', 'Participant.Provider'],
-    ['SessionRecoveryWorkflow.recoverFamilyDirect', 'Execution/Session/Recovery/Workflow.fs', 'Execution.Session'],
     ['OrchestratorProgram.run', 'Change/Program.fs', 'Change'],
   ]
 

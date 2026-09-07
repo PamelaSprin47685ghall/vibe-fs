@@ -21,7 +21,7 @@ open Wanxiangshu.Foundation.Identity
 type AttemptPlan =
     {
         Profile: PromptAuthority.AttemptExecutionProfile
-        /// `None` when this slot built no probe. CTX-011 lists five ordinary reasons for
+        /// `None` when this attempt built no probe. CTX-011 lists five ordinary reasons for
         /// that, and the caller treats them alike — it is kept so a diagnostic can say
         /// which one happened (HOST-007).
         NoProbeReason: NoCandidateReason option
@@ -32,16 +32,16 @@ type AttemptPlan =
 /// The purpose plan is frozen before binding the Host-created assistant message;
 /// ProviderRunIdentity therefore cannot be an input to this constructor. The
 /// remaining decision is nevertheless immutable:
-/// authority/cursor/physical request identity/request kind/prefix choice are all
+/// authority/physical request identity/request kind/prefix choice are all
 /// frozen here, then bound exactly once from the Host-created assistant message
 /// present at the transform admission boundary.
 type PendingAttemptPlan =
     { Authority: PromptAuthority.AuthorityExecutionProfile
-      Cursor: AgentPairCursor.FallbackCursor
       PhysicalUserMessageId: PhysicalUserMessageId
       Origin: PromptAuthority.PromptOrigin
       RequestKind: ProviderRequestKind
       ProjectionChoice: XProjectionChoice
+      CommittedPrefixSnapshot: PrefixSnapshot option
       NoProbeReason: NoCandidateReason option }
 
 [<RequireQualifiedAccess>]
@@ -55,14 +55,14 @@ module AttemptPlanner =
 
     let private chooseProjection
         (requestKind: ProviderRequestKind)
-        (opportunity: RecoveryOpportunity)
+        (allowProbe: bool)
         (selectProbe: unit -> Result<PrefixProbe, NoCandidateReason>)
         =
         let probe =
-            match opportunity, ProviderRequestKind.mayCarryProbe requestKind with
-            | RecoveryOpportunity.RecoveryAttempt, true -> Some(selectProbe ())
-            | RecoveryOpportunity.OrdinaryAttempt, _
-            | RecoveryOpportunity.RecoveryAttempt, false -> None
+            if allowProbe && ProviderRequestKind.mayCarryProbe requestKind then
+                Some(selectProbe ())
+            else
+                None
 
         match probe with
         | Some(Ok value) -> XProjectionChoice.UsePrefixProbe value, None
@@ -73,21 +73,21 @@ module AttemptPlanner =
     /// assistant run is deliberately absent: the Host has not created it yet.
     let freezePreInference
         (authority: PromptAuthority.AuthorityExecutionProfile)
-        (cursor: AgentPairCursor.FallbackCursor)
         (physicalUserMessageId: PhysicalUserMessageId)
         (origin: PromptAuthority.PromptOrigin)
         (requestKind: ProviderRequestKind)
-        (opportunity: RecoveryOpportunity)
+        (committedPrefixSnapshot: PrefixSnapshot option)
+        (allowProbe: bool)
         (selectProbe: unit -> Result<PrefixProbe, NoCandidateReason>)
         : PendingAttemptPlan =
-        let choice, noProbeReason = chooseProjection requestKind opportunity selectProbe
+        let choice, noProbeReason = chooseProjection requestKind allowProbe selectProbe
 
         { Authority = authority
-          Cursor = cursor
           PhysicalUserMessageId = physicalUserMessageId
           Origin = origin
           RequestKind = requestKind
           ProjectionChoice = choice
+          CommittedPrefixSnapshot = committedPrefixSnapshot
           NoProbeReason = noProbeReason }
 
     let freezeOrdinary
@@ -101,20 +101,13 @@ module AttemptPlanner =
             accepted.AuthorityKind
             accepted.IdentitySeed
         |> Result.map (fun authority ->
-            let fallbackCursor =
-                if accepted.EffectiveAgent = authority.SelectedAgent then
-                    AgentPairCursor.initial
-                else
-                    { AgentPairCursor.initial with
-                        Offset = AgentPairCursor.FallbackOffset.Fork2 }
-
             freezePreInference
                 authority
-                fallbackCursor
                 accepted.PhysicalUserMessageId
                 accepted.Origin
                 requestKind
-                RecoveryOpportunity.OrdinaryAttempt
+                None
+                false
                 (fun () -> Error NoCandidateReason.NoCoverage))
 
     /// Complete the immutable attempt profile once Host observation exposes the
@@ -123,7 +116,6 @@ module AttemptPlanner =
         { Profile =
             PromptAuthority.buildAttemptExecutionProfile
                 pending.Authority
-                pending.Cursor
                 pending.PhysicalUserMessageId
                 providerRun
                 pending.Origin
@@ -138,21 +130,19 @@ module AttemptPlanner =
 
     /// PROMPT-008: build the profile for one attempt.
     ///
-    /// `opportunity` says only whether the attempt is the primed slot reached by a
-    /// real failure. Material is not a second boolean. WorkMain proves material by
+    /// Material is proven by
     /// running `selectProbe`; `Error NoCoverage` is therefore an explicit ordinary
     /// no-probe result rather than an unreachable branch.
     let plan
         (authority: PromptAuthority.AuthorityExecutionProfile)
-        (cursor: AgentPairCursor.FallbackCursor)
         (physicalUserMessageId: PhysicalUserMessageId)
         (providerRun: ProviderRunIdentity)
         (origin: PromptAuthority.PromptOrigin)
         (requestKind: ProviderRequestKind)
-        (opportunity: RecoveryOpportunity)
+        (allowProbe: bool)
         (selectProbe: unit -> Result<PrefixProbe, NoCandidateReason>)
         : AttemptPlan =
-        freezePreInference authority cursor physicalUserMessageId origin requestKind opportunity selectProbe
+        freezePreInference authority physicalUserMessageId origin requestKind None allowProbe selectProbe
         |> bindProviderRun providerRun
 
     /// CTX-010: the probe this attempt carries, if any.

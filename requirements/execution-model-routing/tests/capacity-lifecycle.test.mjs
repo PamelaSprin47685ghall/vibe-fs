@@ -7,7 +7,8 @@ const target = { model: 'provider/shared', reasoning: 'none' }
 const identity = (overrides = {}) => ({
   sessionId: 'session-a',
   physicalUserMessageId: 'message-a',
-  effectiveAgent: 'coder',
+  role: 'coder',
+  participant: 'alice',
   target,
   ...overrides,
 })
@@ -17,7 +18,9 @@ const acquire = async (runtime, exact = identity()) => {
     runtime,
     exact.sessionId,
     exact.physicalUserMessageId,
-    exact.effectiveAgent,
+    exact.role,
+    exact.participant,
+    exact.lenderSessionId ?? null,
   )
   assert.equal(outcome.kind, 'Acquired')
   return outcome.lease

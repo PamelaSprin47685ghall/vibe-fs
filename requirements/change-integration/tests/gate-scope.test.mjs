@@ -15,12 +15,14 @@ test('WHAT[CHGINT-001] fresh quality candidate runs the full publish lifecycle t
     'fact:CandidateReady',
     'invalidate:InitialRebaseRequired',
     'git:rebase',
+    'git:read-head:rebased-1',
     'fact:RebasedCandidateReady',
     'continue:surface-loop-1',
     'await:Candidate',
     'gate:acquire',
+    'git:read-head:rebased-1',
     'fact:PublishClaimed',
-    'git:ff',
+    'git:ff:rebased-1',
     'fact:Published',
     'relay:terminate',
     'gate:release',
@@ -121,4 +123,41 @@ test('WHAT[CHGINT-001] retirement without a valid certificate continues the loop
   assert.equal(observation.timeline[0], 'await:Continue')
   assert.equal(observation.timeline[1], 'continue:surface-loop-1')
   assert.equal(observation.timeline[2], 'await:ExceptionalTerminal')
+})
+
+test('WHAT[CHGINT-010] 10,000 Continue signals complete the real manager loop with exact effects and balanced resources', async () => {
+  const observation = await change.observeManagerLoopBurst(10000)
+
+  assert.deepEqual(observation.verdict, { kind: 'IntegrationFailed', detail: 'burst-complete' })
+  assert.equal(observation.continuationCount, 10000)
+  assert.equal(observation.signalCount, 10001)
+  assert.equal(observation.gateAcquireCount, 0)
+  assert.equal(observation.gateReleaseCount, 0)
+  assert.equal(observation.gateHeldAfterRun, false)
+  assert.equal(observation.factCount, 0)
+  assert.equal(observation.gitCallCount, 0)
+  assert.equal(observation.continuations, undefined)
+  assert.equal(observation.timeline, undefined)
+})
+
+test('WHAT[CHGINT-013] CAS miss appends the complete claim then a superseding rebased record, continues once, publishes at most once', async () => {
+  const observation = await change.observeRelayProgram('cas-miss')
+
+  assert.deepEqual(observation.facts, ['PublishClaimed', 'RebasedCandidateReady'])
+  assert.deepEqual(observation.invalidations, ['PublishCasMissed'])
+  assert.deepEqual(observation.continuations, ['surface-loop-1'])
+  assert.ok(observation.ffCalls <= 1)
+  assert.equal(observation.facts.includes('Published'), false)
+  assert.equal(observation.gateAcquireCount, 1)
+  assert.equal(observation.gateReleaseCount, 1)
+})
+
+test('WHAT[CHGINT-013] target movement appends a superseding rebased record and continues once without publishing', async () => {
+  const observation = await change.observeRelayProgram('target-moved')
+
+  assert.deepEqual(observation.facts, ['CandidateReady', 'RebasedCandidateReady'])
+  assert.deepEqual(observation.invalidations, ['TargetAdvanced'])
+  assert.deepEqual(observation.continuations, ['surface-loop-1'])
+  assert.equal(observation.facts.includes('Published'), false)
+  assert.equal(observation.gateAcquireCount, 0)
 })

@@ -447,7 +447,6 @@ test('WHAT[CRASH-012] P0_RECOVERY_JOIN_GATE_production_sources_are_green', () =>
     'src/Wanxiangshu/Execution/Session/Recovery/Model.fs',
     'src/Wanxiangshu/Execution/Delegation/Facts.fs',
     'src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs',
-    'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs',
     'src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs',
     'src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs',
     'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs',
@@ -491,17 +490,6 @@ test('WHAT[CRASH-012] P0_RECOVERY_JOIN_GATE_positive_mailbox_pulse_shape_present
 })
 
 test('WHAT[CRASH-002] P0_RECOVERY_JOIN_GATE_positive_session_ports_shapes_present', () => {
-  const ports = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs'),
-    'utf8',
-  )
-  for (const id of ['session-ports-restore-handles-mandatory', 'session-ports-recover-jobs-mandatory']) {
-    const hits = scanText(ports, 'SessionRecoveryWorkflow.fs')
-    assert.ok(
-      !hits.some((h) => h.id === id),
-      `positive rule ${id} must be satisfied in SessionRecoveryWorkflow.fs; hits=${hits.filter((h) => h.id === id).map((h) => h.text).join('|')}`,
-    )
-  }
 })
 
 test('WHAT[CRASH-011] P0_RECOVERY_JOIN_GATE_positive_join_program_requires_permit_shape_present', () => {

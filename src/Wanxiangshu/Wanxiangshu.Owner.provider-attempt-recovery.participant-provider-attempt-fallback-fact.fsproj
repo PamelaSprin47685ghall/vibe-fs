@@ -11,10 +11,10 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fs"/>
-    <Compile Include="Participant/Provider/Attempt/Cursor.fsi"/>
-    <Compile Include="Participant/Provider/Attempt/Cursor.fs"/>
-    <Compile Include="Participant/Provider/Attempt/RecoverySlot.fsi"/>
-    <Compile Include="Participant/Provider/Attempt/RecoverySlot.fs"/>
+    <Compile Include="Participant/Provider/Attempt/FailureBudget.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/FailureBudget.fs"/>
+    <Compile Include="Participant/Provider/Attempt/RetryPolicy.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/RetryPolicy.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fs"/>
   </ItemGroup>

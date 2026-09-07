@@ -351,7 +351,7 @@ export const deliveryCases = [
   // ── rendering a fault the Host will actually classify ─────────────────────
 
   {
-    name: 'FALLBACK-009 a retryable fault renders a body the Host retries',
+    name: 'PAR-019 a retryable fault renders a body the Host retries',
     fn: () => {
       // `../opencode/packages/opencode/src/session/message-v2.ts:706` hands the body to
       // `ProviderError.parseStreamError`, which (`provider/error.ts:102`) returns undefined
@@ -365,11 +365,11 @@ export const deliveryCases = [
   },
 
   {
-    name: 'FALLBACK-009 a non-retryable fault renders a body the Host gives up on',
+    name: 'PAR-019 a non-retryable fault renders a body the Host gives up on',
     fn: () => {
       // `invalid_prompt` yields `isRetryable: false`, so the Host stops and the plugin must
       // continue the Logical Run itself (`src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs:92`).
-      // That is the mechanism `fallback-aabb-trace` depends on to observe four attempts.
+      // That is the mechanism the provider-recovery trace uses for a fresh attempt.
       const body = faultBody({ kind: 'provider-error', status: 400, retryable: false });
 
       assertEq(body.type, 'error');
@@ -378,7 +378,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'FALLBACK-009 the retired isRetryable body field was never read',
+    name: 'PAR-019 the retired isRetryable body field was never read',
     fn: () => {
       // Measured in K9. Every JSON fault wrote its intent as `body.error.isRetryable`:
       //

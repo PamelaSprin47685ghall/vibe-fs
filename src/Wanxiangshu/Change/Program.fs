@@ -18,6 +18,49 @@ module OrchestratorProgram =
         | TargetMoved
         | Landed of CommitHash
 
+    type private PublicationEvidence =
+        { ManagerJobId: ManagerJobId
+          TargetRef: TargetRef
+          ExpectedHead: CommitHash
+          CandidateCommit: CommitHash
+          QualityCertificateId: QualityCertificateId
+          AuthorityRevision: AuthorityRevision
+          WorkspaceSnapshotId: WorkspaceSnapshotId }
+
+    let private buildPublicationEvidence
+        (job: ManagerJob)
+        (rebasedReady:
+            {| RebasedCommit: CommitHash
+               TargetHeadSnapshot: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId |})
+        (certificate: QualityCertificate)
+        : PublicationEvidence =
+        { ManagerJobId = job.JobId
+          TargetRef = job.TargetRef
+          ExpectedHead = rebasedReady.TargetHeadSnapshot
+          CandidateCommit = rebasedReady.RebasedCommit
+          QualityCertificateId = certificate.Id
+          AuthorityRevision = certificate.AuthorityRevision
+          WorkspaceSnapshotId = rebasedReady.WorkspaceSnapshotId }
+
+    let private buildClaimPublicationEvidence
+        (job: ManagerJob)
+        (claim:
+            {| TargetRef: TargetRef
+               RebasedCommit: CommitHash
+               ExpectedHead: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId
+               QualityCertificateId: QualityCertificateId
+               AuthorityRevision: AuthorityRevision |})
+        : PublicationEvidence =
+        { ManagerJobId = job.JobId
+          TargetRef = claim.TargetRef
+          ExpectedHead = claim.ExpectedHead
+          CandidateCommit = claim.RebasedCommit
+          QualityCertificateId = claim.QualityCertificateId
+          AuthorityRevision = claim.AuthorityRevision
+          WorkspaceSnapshotId = claim.WorkspaceSnapshotId }
+
     let private failed (job: ManagerJob) details =
         OrchestratorVerdict.IntegrationFailed(job.JobId, details)
 
@@ -60,6 +103,18 @@ module OrchestratorProgram =
     let private continueLoop (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         deps.Relay.ContinueLoop job.JobId
         |> mapTaskError (fun error -> failed job (sprintf "Manager loop continuation failed: %s" error))
+
+    let private captureSnapshotResult (deps: OrchestratorProgramDeps) (job: ManagerJob) details =
+        deps.Relay.CaptureSnapshot job.JobId
+        |> mapTaskError (fun error -> failed job (sprintf "%s: %s" details error))
+
+    let private conflictedFilesResult (deps: OrchestratorProgramDeps) (job: ManagerJob) =
+        deps.Git.ConflictedFiles job.Worktree.Path
+        |> mapTaskError (fun error -> failed job (sprintf "Conflict-file lookup failed: %s" error))
+
+    let private prepareCandidateResult (deps: OrchestratorProgramDeps) (job: ManagerJob) =
+        deps.Relay.PrepareCandidate job.JobId
+        |> mapTaskError (fun error -> failed job (sprintf "Candidate admission failed: %s" error))
 
     let private recordCandidate
         (deps: OrchestratorProgramDeps)
@@ -117,60 +172,307 @@ module OrchestratorProgram =
                    ConflictFiles = files
                    DiagnosticsDigest = HostDigest.sha256Hex (String.Join("\n", files)) |})
 
-    let private completeClaimAndFf (deps: OrchestratorProgramDeps) (job: ManagerJob) (current: CommitHash) =
-        taskResult {
-            do!
-                append
-                    deps
+    let private publicationIdentityVerdict
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (current: CommitHash)
+        : Result<unit, OrchestratorVerdict> =
+        if evidence.ManagerJobId <> job.JobId then
+            Error(failed job "Publication evidence job mismatch; refusing publish")
+        elif evidence.TargetRef <> job.TargetRef then
+            Error(failed job "Publication evidence target mismatch; refusing publish")
+        elif current <> evidence.ExpectedHead then
+            Error(failed job "Publish CAS head does not match publication evidence; refusing publish")
+        else
+            Ok()
+
+    let private gateSnapshotVerdict
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (snapshot: WorkspaceSnapshotId)
+        : Result<unit, OrchestratorVerdict> =
+        if snapshot <> evidence.WorkspaceSnapshotId then
+            Error(failed job "Workspace snapshot changed inside publish gate; refusing publish")
+        else
+            Ok()
+
+    let private worktreePinVerdict
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (worktreeHead: CommitHash)
+        : Result<unit, OrchestratorVerdict> =
+        if worktreeHead <> evidence.CandidateCommit then
+            Error(
+                failed
                     job
-                    (OrchestratorFact.PublishClaimed
-                        {| ManagerJobId = job.JobId
-                           TargetRef = job.TargetRef
-                           ExpectedHead = current |})
+                    (sprintf
+                        "Worktree HEAD %s does not match candidate commit %s"
+                        (CommitHash.value worktreeHead)
+                        (CommitHash.value evidence.CandidateCommit))
+            )
+        else
+            Ok()
 
-            let! merge = deps.Git.FfMerge job.Worktree.Path job.TargetRef current |> TaskResultCE.ofTask
+    let private prePublishConflictsVerdict
+        (job: ManagerJob)
+        (conflicts: string list)
+        : Result<unit, OrchestratorVerdict> =
+        if List.isEmpty conflicts then
+            Ok()
+        else
+            Error(failed job (sprintf "Worktree has unmerged conflicts before publish: %A" conflicts))
 
-            match merge with
-            | Error error when error = OrchestratorConstants.targetRefMovedError -> return TargetMoved
-            | Error error -> return! Error(failed job (sprintf "FF merge failed: %s" error))
-            | Ok landed ->
-                do!
-                    append
-                        deps
-                        job
-                        (OrchestratorFact.Published
-                            {| ManagerJobId = job.JobId
-                               CandidateCommit = landed
-                               ResultingTargetHead = landed |})
+    let private ffMergeVerdict
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (merge: Result<CommitHash, string>)
+        : Result<CommitHash option, OrchestratorVerdict> =
+        match merge with
+        | Error error when error = OrchestratorConstants.targetRefMovedError -> Ok None
+        | Error error -> Error(failed job (sprintf "FF merge failed: %s" error))
+        | Ok landed when landed <> evidence.CandidateCommit ->
+            Error(
+                failed
+                    job
+                    (sprintf
+                        "FF merge landed %s which does not match pinned candidate %s"
+                        (CommitHash.value landed)
+                        (CommitHash.value evidence.CandidateCommit))
+            )
+        | Ok landed -> Ok(Some landed)
 
-                do! deps.Relay.TerminateRoadResources job.JobId |> TaskResultCE.ofTask
-                return Landed landed
+    let private appendPublishClaimed (deps: OrchestratorProgramDeps) (job: ManagerJob) (evidence: PublicationEvidence) =
+        append
+            deps
+            job
+            (OrchestratorFact.PublishClaimed
+                {| ManagerJobId = evidence.ManagerJobId
+                   TargetRef = evidence.TargetRef
+                   RebasedCommit = evidence.CandidateCommit
+                   ExpectedHead = evidence.ExpectedHead
+                   WorkspaceSnapshotId = evidence.WorkspaceSnapshotId
+                   QualityCertificateId = evidence.QualityCertificateId
+                   AuthorityRevision = evidence.AuthorityRevision |})
+
+    let private appendPublishedEvidence
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (landed: CommitHash)
+        =
+        append
+            deps
+            job
+            (OrchestratorFact.Published
+                {| ManagerJobId = evidence.ManagerJobId
+                   CandidateCommit = evidence.CandidateCommit
+                   ResultingTargetHead = landed |})
+
+    let private finalizePublishedLanding
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (landed: CommitHash)
+        =
+        task {
+            match! appendPublishedEvidence deps job evidence landed with
+            | Error verdict -> return Error verdict
+            | Ok() ->
+                do! deps.Relay.TerminateRoadResources job.JobId
+                return Ok(Landed landed)
         }
 
-    let private claimAndFf (deps: OrchestratorProgramDeps) (job: ManagerJob) (expectedHead: CommitHash) =
-        taskResult {
-            let! current = targetHead deps job
-
-            if current <> expectedHead then
-                return TargetMoved
-            else
-                return! completeClaimAndFf deps job current
+    let private continueMergeAfterClassification
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (classified: Result<CommitHash option, OrchestratorVerdict>)
+        =
+        task {
+            match classified with
+            | Error verdict -> return Error verdict
+            | Ok None -> return Ok TargetMoved
+            | Ok(Some landed) -> return! finalizePublishedLanding deps job evidence landed
         }
 
-    let private publishUnderGate (deps: OrchestratorProgramDeps) (job: ManagerJob) (expectedHead: CommitHash) =
+    let private runPublishFfMerge
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (current: CommitHash)
+        =
+        task {
+            let! merge = deps.Git.FfMerge job.Worktree.Path job.TargetRef current evidence.CandidateCommit
+            return! continueMergeAfterClassification deps job evidence (ffMergeVerdict job evidence merge)
+        }
+
+    let private claimRebasedForPublish
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (current: CommitHash)
+        =
+        task {
+            match! appendPublishClaimed deps job evidence with
+            | Error verdict -> return Error verdict
+            | Ok() -> return! runPublishFfMerge deps job evidence current
+        }
+
+    let private continuePublishAfterConflicts
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (current: CommitHash)
+        (conflicts: string list)
+        =
+        task {
+            match prePublishConflictsVerdict job conflicts with
+            | Error verdict -> return Error verdict
+            | Ok() -> return! claimRebasedForPublish deps job evidence current
+        }
+
+    let private verifyPublishWorktreeClean
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (current: CommitHash)
+        =
+        task {
+            match! conflictedFilesResult deps job with
+            | Error verdict -> return Error verdict
+            | Ok conflicts -> return! continuePublishAfterConflicts deps job evidence current conflicts
+        }
+
+    let private continuePublishAfterWorktreeHead
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (current: CommitHash)
+        (worktreeHead: CommitHash)
+        =
+        task {
+            match worktreePinVerdict job evidence worktreeHead with
+            | Error verdict -> return Error verdict
+            | Ok() -> return! verifyPublishWorktreeClean deps job evidence current
+        }
+
+    let private verifyPublishWorktreePin
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (current: CommitHash)
+        =
+        task {
+            match! readHead deps job with
+            | Error verdict -> return Error verdict
+            | Ok worktreeHead -> return! continuePublishAfterWorktreeHead deps job evidence current worktreeHead
+        }
+
+    let private continuePublishAfterGateSnapshot
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (current: CommitHash)
+        (snapshot: WorkspaceSnapshotId)
+        =
+        task {
+            match gateSnapshotVerdict job evidence snapshot with
+            | Error verdict -> return Error verdict
+            | Ok() -> return! verifyPublishWorktreePin deps job evidence current
+        }
+
+    let private capturePublishGateSnapshot
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (current: CommitHash)
+        =
+        task {
+            match! deps.Relay.CaptureSnapshot job.JobId with
+            | Error error -> return Error(failed job (sprintf "Publish gate snapshot failed: %s" error))
+            | Ok snapshot -> return! continuePublishAfterGateSnapshot deps job evidence current snapshot
+        }
+
+    let private completeClaimAndFf
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (current: CommitHash)
+        =
+        task {
+            match publicationIdentityVerdict job evidence current with
+            | Error verdict -> return Error verdict
+            | Ok() -> return! capturePublishGateSnapshot deps job evidence current
+        }
+
+    let private claimExpectationVerdict
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (expectedHead: CommitHash)
+        : Result<unit, OrchestratorVerdict> =
+        if expectedHead <> evidence.ExpectedHead then
+            Error(failed job "Publish CAS expectation does not match publication evidence")
+        else
+            Ok()
+
+    let private continueClaimWithCurrent
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (current: CommitHash)
+        =
+        if current <> evidence.ExpectedHead then
+            Task.FromResult(Ok TargetMoved)
+        else
+            completeClaimAndFf deps job evidence current
+
+    let private fetchClaimCurrentAndContinue
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        =
+        task {
+            match! targetHead deps job with
+            | Error verdict -> return Error verdict
+            | Ok current -> return! continueClaimWithCurrent deps job evidence current
+        }
+
+    let private claimAndFf
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (expectedHead: CommitHash)
+        =
+        task {
+            match claimExpectationVerdict job evidence expectedHead with
+            | Error verdict -> return Error verdict
+            | Ok() -> return! fetchClaimCurrentAndContinue deps job evidence
+        }
+
+    let private publishUnderGate
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (expectedHead: CommitHash)
+        =
         task {
             let! gate = deps.AcquirePublishGate()
 
             let! outcome =
                 task {
                     try
-                        return! claimAndFf deps job expectedHead
-                    with error ->
-                        return Error(failed job (sprintf "Publish window failed: %s" error.Message))
+                        let! res = claimAndFf deps job evidence expectedHead
+                        return Choice1Of2 res
+                    with ex ->
+                        return Choice2Of2 ex
                 }
 
             do! gate.Release()
-            return outcome
+
+            match outcome with
+            | Choice1Of2 res -> return res
+            | Choice2Of2(:? OperationCanceledException as oce) -> return raise oce
+            | Choice2Of2 error -> return Error(failed job (sprintf "Publish window failed: %s" error.Message))
         }
 
     let private releaseTerminalWorktree (deps: OrchestratorProgramDeps) (job: ManagerJob) =
@@ -183,8 +485,7 @@ module OrchestratorProgram =
         task {
             match! releaseTerminalWorktree deps job with
             | Ok() -> return OrchestratorVerdict.Published(job.JobId, commit)
-            | Error error ->
-                return failed job (sprintf "Published %s but cleanup failed: %s" (CommitHash.value commit) error)
+            | Error error -> return OrchestratorVerdict.PublishedPendingCleanup(job.JobId, commit, error)
         }
 
     let private backfillPublished
@@ -193,8 +494,8 @@ module OrchestratorProgram =
         (candidate: CommitHash)
         (resultingHead: CommitHash)
         =
-        taskResult {
-            do!
+        task {
+            match!
                 append
                     deps
                     job
@@ -202,16 +503,10 @@ module OrchestratorProgram =
                         {| ManagerJobId = job.JobId
                            CandidateCommit = candidate
                            ResultingTargetHead = resultingHead |})
-
-            do!
-                releaseTerminalWorktree deps job
-                |> mapTaskError (fun error -> failed job (sprintf "Published cleanup failed: %s" error))
-
-            return OrchestratorVerdict.Published(job.JobId, resultingHead)
+            with
+            | Error verdict -> return verdict
+            | Ok() -> return! settleLanded deps job resultingHead
         }
-        |> mapTask (function
-            | Ok verdict -> verdict
-            | Error verdict -> verdict)
 
     let private currentRecord (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         OrchestratorProjection.tryFind job.JobId (deps.Snapshot()).AgentProjections.Orchestrator
@@ -235,18 +530,6 @@ module OrchestratorProgram =
             let! _ = continueLoop deps job
             return ()
         }
-
-    let private captureSnapshotResult (deps: OrchestratorProgramDeps) (job: ManagerJob) details =
-        deps.Relay.CaptureSnapshot job.JobId
-        |> mapTaskError (fun error -> failed job (sprintf "%s: %s" details error))
-
-    let private conflictedFilesResult (deps: OrchestratorProgramDeps) (job: ManagerJob) =
-        deps.Git.ConflictedFiles job.Worktree.Path
-        |> mapTaskError (fun error -> failed job (sprintf "Conflict-file lookup failed: %s" error))
-
-    let private prepareCandidateResult (deps: OrchestratorProgramDeps) (job: ManagerJob) =
-        deps.Relay.PrepareCandidate job.JobId
-        |> mapTaskError (fun error -> failed job (sprintf "Candidate admission failed: %s" error))
 
     let rec private runManagerLoop (deps: OrchestratorProgramDeps) (job: ManagerJob) : Task<OrchestratorVerdict> =
         task {
@@ -324,7 +607,87 @@ module OrchestratorProgram =
             | Landed commit -> settleLanded deps job commit
             | TargetMoved -> targetHead deps job |> continueResult afterTargetRefresh
 
-        publishUnderGate deps job expectedHead |> continueResult handlePublishAttempt
+        let continueValidatedPublish (evidence: PublicationEvidence) =
+            task {
+                match! publishUnderGate deps job evidence evidence.ExpectedHead with
+                | Error verdict -> return verdict
+                | Ok attempt -> return! handlePublishAttempt attempt
+            }
+
+        let handleStaleSnapshotBeforePublish () =
+            task {
+                match! requestAfterBindingChange deps job "WorkspaceChangedAfterAssessment" with
+                | Error verdict -> return verdict
+                | Ok() -> return! runManagerLoop deps job
+            }
+
+        let continueValidatedWithSnapshot (evidence: PublicationEvidence) (snapshot: WorkspaceSnapshotId) =
+            if snapshot <> evidence.WorkspaceSnapshotId then
+                handleStaleSnapshotBeforePublish ()
+            else
+                continueValidatedPublish evidence
+
+        let publishValidated (evidence: PublicationEvidence) =
+            task {
+                match! deps.Relay.CaptureSnapshot job.JobId with
+                | Error error ->
+                    return failed job (sprintf "Workspace snapshot capture failed before publish: %s" error)
+                | Ok snapshot -> return! continueValidatedWithSnapshot evidence snapshot
+            }
+
+        let certifiedEvidence
+            (rebasedReady:
+                {| RebasedCommit: CommitHash
+                   TargetHeadSnapshot: CommitHash
+                   WorkspaceSnapshotId: WorkspaceSnapshotId |})
+            : Result<PublicationEvidence, OrchestratorVerdict> =
+            if candidate <> rebasedReady.RebasedCommit then
+                Error(
+                    failed
+                        job
+                        (sprintf
+                            "Candidate %s does not match rebased evidence pin %s"
+                            (CommitHash.value candidate)
+                            (CommitHash.value rebasedReady.RebasedCommit))
+                )
+            elif expectedHead <> rebasedReady.TargetHeadSnapshot then
+                Error(
+                    failed
+                        job
+                        (sprintf
+                            "Target head %s does not match rebased evidence snapshot %s"
+                            (CommitHash.value expectedHead)
+                            (CommitHash.value rebasedReady.TargetHeadSnapshot))
+                )
+            elif certificate.SnapshotId <> rebasedReady.WorkspaceSnapshotId then
+                Error(failed job "Live certificate snapshot does not match rebased evidence snapshot")
+            else
+                Ok(buildPublicationEvidence job rebasedReady certificate)
+
+        let continueCertifiedWithRebased
+            (rebasedReady:
+                {| RebasedCommit: CommitHash
+                   TargetHeadSnapshot: CommitHash
+                   WorkspaceSnapshotId: WorkspaceSnapshotId |})
+            =
+            task {
+                match certifiedEvidence rebasedReady with
+                | Error verdict -> return verdict
+                | Ok evidence -> return! publishValidated evidence
+            }
+
+        let continueCertifiedWithRecord (record: ManagerJobProjection) =
+            task {
+                match record.RebasedCandidateReady with
+                | None -> return failed job "Missing RebasedCandidateReady evidence for certified publish"
+                | Some rebasedReady -> return! continueCertifiedWithRebased rebasedReady
+            }
+
+        task {
+            match currentRecord deps job with
+            | None -> return failed job "No record found for certified publish"
+            | Some record -> return! continueCertifiedWithRecord record
+        }
 
     and private handleQualityCandidate
         (deps: OrchestratorProgramDeps)
@@ -406,9 +769,14 @@ module OrchestratorProgram =
         artifactSnapshotMatches deps job certificate
         |> continueResult handleSnapshotAdmission
 
-    let private resumePublishReady (deps: OrchestratorProgramDeps) (job: ManagerJob) (expectedHead: CommitHash) =
+    let private resumePublishReady
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (expectedHead: CommitHash)
+        =
         task {
-            match! publishUnderGate deps job expectedHead with
+            match! publishUnderGate deps job evidence expectedHead with
             | Error verdict -> return verdict
             | Ok(Landed commit) -> return! settleLanded deps job commit
             | Ok TargetMoved -> return! runManagerLoop deps job
@@ -417,35 +785,187 @@ module OrchestratorProgram =
     let private resumePublishReality
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
-        (rebasedCommit: CommitHash)
-        (expectedHead: CommitHash)
+        (evidence: PublicationEvidence)
         (current: CommitHash)
         (reality: PublishClaimReality)
         =
         match reality with
         | PublishClaimReality.HeadUnreadable ->
             Task.FromResult(failed job "GetTargetHead failed during publish recovery")
-        | PublishClaimReality.AlreadyFastForwarded -> backfillPublished deps job rebasedCommit current
-        | PublishClaimReality.PublishReady -> resumePublishReady deps job expectedHead
+        | PublishClaimReality.AlreadyFastForwarded -> backfillPublished deps job evidence.CandidateCommit current
+        | PublishClaimReality.PublishReady -> resumePublishReady deps job evidence evidence.ExpectedHead
         | PublishClaimReality.ClaimExpired -> runManagerLoop deps job
+
+    let private reentryClaimTargetVerdict (job: ManagerJob) (targetRef: TargetRef) : Result<unit, OrchestratorVerdict> =
+        if targetRef <> job.TargetRef then
+            Error(failed job "Publish claim target mismatch; refusing publish recovery")
+        else
+            Ok()
+
+    let private reentryRebasedMatches
+        (rebasedCommit: CommitHash)
+        (expectedHead: CommitHash)
+        (workspaceSnapshotId: WorkspaceSnapshotId)
+        (rebasedReady:
+            {| RebasedCommit: CommitHash
+               TargetHeadSnapshot: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId |})
+        =
+        rebasedCommit = rebasedReady.RebasedCommit
+        && expectedHead = rebasedReady.TargetHeadSnapshot
+        && workspaceSnapshotId = rebasedReady.WorkspaceSnapshotId
+
+    let private continueReentryWithTarget
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (current: CommitHash)
+        =
+        let reality =
+            OrchestratorProjection.classifyPublishClaim (Some current) evidence.CandidateCommit evidence.ExpectedHead
+
+        resumePublishReality deps job evidence current reality
+
+    let private resolveReentryTarget (deps: OrchestratorProgramDeps) (job: ManagerJob) (evidence: PublicationEvidence) =
+        task {
+            let! targetResult = deps.Git.GetTargetHead job.TargetRef
+
+            match targetResult with
+            | Error _ -> return failed job "GetTargetHead failed; refusing publish recovery"
+            | Ok current -> return! continueReentryWithTarget deps job evidence current
+        }
+
+    let private continueReentryAfterHead
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (worktreeHead: CommitHash)
+        =
+        if worktreeHead <> evidence.CandidateCommit then
+            Task.FromResult(
+                failed
+                    job
+                    (sprintf
+                        "Worktree HEAD %s does not match claimed rebased commit %s"
+                        (CommitHash.value worktreeHead)
+                        (CommitHash.value evidence.CandidateCommit))
+            )
+        else
+            resolveReentryTarget deps job evidence
+
+    let private verifyReentryHead (deps: OrchestratorProgramDeps) (job: ManagerJob) (evidence: PublicationEvidence) =
+        task {
+            match! readHead deps job with
+            | Error err -> return err
+            | Ok worktreeHead -> return! continueReentryAfterHead deps job evidence worktreeHead
+        }
+
+    let private handleStaleReentrySnapshot (deps: OrchestratorProgramDeps) (job: ManagerJob) =
+        task {
+            match! requestAfterBindingChange deps job "WorkspaceChangedAfterAssessment" with
+            | Error verdict -> return verdict
+            | Ok() -> return! runManagerLoop deps job
+        }
+
+    let private continueReentryAfterSnapshot
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        (currentSnapshot: WorkspaceSnapshotId)
+        =
+        if currentSnapshot <> evidence.WorkspaceSnapshotId then
+            handleStaleReentrySnapshot deps job
+        else
+            verifyReentryHead deps job evidence
+
+    let private verifyReentrySnapshot
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        =
+        task {
+            match! deps.Relay.CaptureSnapshot job.JobId with
+            | Error err -> return failed job (sprintf "Workspace snapshot capture failed during reentry: %s" err)
+            | Ok currentSnapshot -> return! continueReentryAfterSnapshot deps job evidence currentSnapshot
+        }
+
+    let private continueReentryWithEvidence
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (evidence: PublicationEvidence)
+        =
+        verifyReentrySnapshot deps job evidence
+
+    let private continueReentryWithRebased
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (claim:
+            {| TargetRef: TargetRef
+               RebasedCommit: CommitHash
+               ExpectedHead: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId
+               QualityCertificateId: QualityCertificateId
+               AuthorityRevision: AuthorityRevision |})
+        (rebasedReady:
+            {| RebasedCommit: CommitHash
+               TargetHeadSnapshot: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId |})
+        =
+        if reentryRebasedMatches claim.RebasedCommit claim.ExpectedHead claim.WorkspaceSnapshotId rebasedReady then
+            continueReentryWithEvidence deps job (buildClaimPublicationEvidence job claim)
+        else
+            runManagerLoop deps job
+
+    let private continueReentryWithRecord
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (claim:
+            {| TargetRef: TargetRef
+               RebasedCommit: CommitHash
+               ExpectedHead: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId
+               QualityCertificateId: QualityCertificateId
+               AuthorityRevision: AuthorityRevision |})
+        (record: ManagerJobProjection)
+        =
+        task {
+            match record.RebasedCandidateReady with
+            | None -> return failed job "Missing RebasedCandidateReady evidence for publish claim reentry"
+            | Some rebasedReady -> return! continueReentryWithRebased deps job claim rebasedReady
+        }
+
+    let private fetchReentryRecordAndContinue
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (claim:
+            {| TargetRef: TargetRef
+               RebasedCommit: CommitHash
+               ExpectedHead: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId
+               QualityCertificateId: QualityCertificateId
+               AuthorityRevision: AuthorityRevision |})
+        =
+        task {
+            match currentRecord deps job with
+            | None -> return failed job "No record found for publish claim reentry"
+            | Some record -> return! continueReentryWithRecord deps job claim record
+        }
 
     let private reenterPublishClaim
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
         (claim:
-            {| RebasedCommit: CommitHash
-               ExpectedHead: CommitHash |})
+            {| TargetRef: TargetRef
+               RebasedCommit: CommitHash
+               ExpectedHead: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId
+               QualityCertificateId: QualityCertificateId
+               AuthorityRevision: AuthorityRevision |})
         =
         task {
-            let! headResult = deps.Git.GetTargetHead job.TargetRef
-
-            match headResult with
-            | Error _ -> return failed job "GetTargetHead failed; refusing publish recovery"
-            | Ok current ->
-                let reality =
-                    OrchestratorProjection.classifyPublishClaim (Some current) claim.RebasedCommit claim.ExpectedHead
-
-                return! resumePublishReality deps job claim.RebasedCommit claim.ExpectedHead current reality
+            match reentryClaimTargetVerdict job claim.TargetRef with
+            | Error verdict -> return verdict
+            | Ok() -> return! fetchReentryRecordAndContinue deps job claim
         }
 
     let private cleanUp (deps: OrchestratorProgramDeps) (job: ManagerJob) =
@@ -466,6 +986,6 @@ module OrchestratorProgram =
             try
                 return! program deps job
             with
-            | :? OperationCanceledException -> return failed job "cancelled"
+            | :? OperationCanceledException -> return OrchestratorVerdict.Cancelled job.JobId
             | error -> return failed job (sprintf "%A" error)
         }

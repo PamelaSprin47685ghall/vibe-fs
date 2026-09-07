@@ -13,16 +13,15 @@ const personas = {
   devops: 'Operator',
 }
 const rootSelection = (agent) => {
-  const canonicalRole = agent === 'predictor' ? 'inspector' : agent
+  const role = agent === 'predictor' ? 'inspector' : agent
   return {
     kind: 'RootSelection',
     ownerSession: null,
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: agent,
-      peerAgent: agent,
-      canonicalRole,
+      participant: agent,
+      role,
       selectedTier: 'deep',
       persona: personas[agent] ?? 'Unknown',
       personaCatalogVersion: 1,
@@ -41,27 +40,26 @@ const profile = (value) => ({
   logicalRun: value.logicalRun,
   authorityRoot: value.authorityRoot,
   authorityKind: value.authorityKind,
-  selectedAgent: value.participantIdentity.selectedAgent,
-  peerAgent: value.participantIdentity.peerAgent,
-  canonicalRole: value.participantIdentity.canonicalRole,
-  selectedTier: value.participantIdentity.selectedTier,
+  participant: value.participantIdentity.participant,
+  role: value.participantIdentity.role,
 })
 
 const register = (root) => authority.registerAuthority(root, authority.empty)
-const continuation = (key, root, kind = 'ManagerGuard', agent = 'coder', payload = 'payload') =>
-  authority.claimContinuation(key, 'ses_a', kind, root, agent, payload)
+const continuation = (key, root, kind = 'ManagerGuard', payload = 'payload') =>
+  authority.claimContinuation(key, 'ses_a', kind, root, payload)
 
 test('WHAT[INTERACTION-AUTHORITY-003] IA_003_malformed_profile_role_and_root_kind_fail_closed_tier_is_compat', () => {
   const root = rootFor()
   const identity = root.identitySeed.participantIdentity
   const malformed = [
-    [{ ...root, identitySeed: { ...root.identitySeed, participantIdentity: { ...identity, canonicalRole: 'unknown' } } }, /unknown role/],
+    [{ ...root, identitySeed: { ...root.identitySeed, participantIdentity: { ...identity, role: 'unknown' } } }, /unknown role/],
     [{ ...root, authorityKind: 'unknown' }, /unknown authority root kind/],
   ]
-  // selectedTier is a compat view field: unknown values are normalized to deep, not rejected.
+  // selectedTier is accepted on input but is not part of the fixed authority view: it is dropped, never stored.
   const tierCompat = { ...root, identitySeed: { ...root.identitySeed, participantIdentity: { ...identity, selectedTier: 'unknown' } } }
   const tierResult = authority.registerAuthority(tierCompat, authority.empty)
-  assert.equal(tierResult.activeLogicalRun.participantIdentity.selectedTier, 'deep')
+  assert.equal(Object.hasOwn(tierResult.activeLogicalRun.participantIdentity, 'selectedTier'), false)
+  assert.deepEqual(profile(tierResult.activeLogicalRun), profile(root))
   for (const [candidate, expected] of malformed) {
     const result = authority.registerAuthority(candidate, authority.empty)
     assert.equal(result.ok, false)
@@ -87,20 +85,16 @@ test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_carries_resolved_participant_i
     logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
     authorityRoot: 'msg_u1',
     authorityKind: 'HumanRoot',
-    selectedAgent: 'coder',
-    peerAgent: 'coder',
-    canonicalRole: 'coder',
-    selectedTier: 'deep',
+    participant: 'coder',
+    role: 'coder',
   })
   assert.deepEqual(profile(rootFor('manager')), {
     session: 'ses_a',
     logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
     authorityRoot: 'msg_u1',
     authorityKind: 'HumanRoot',
-    selectedAgent: 'manager',
-    peerAgent: 'manager',
-    canonicalRole: 'manager',
-    selectedTier: 'deep',
+    participant: 'manager',
+    role: 'manager',
   })
 })
 
@@ -165,7 +159,6 @@ test('WHAT[INTERACTION-AUTHORITY-010] IA_010_terminal_repair_identity_is_exactly
     'ses_a',
     'InteractionRepair',
     root,
-    'coder',
     authority.repairPayloadDigest('req-empty', 'run_term', 'empty'),
   )
   state = authority.registerClaim(repair, state)
@@ -190,9 +183,10 @@ test('WHAT[INTERACTION-AUTHORITY-016] IA_016_agent_owner_root_has_no_run_before_
       label: claim.value.originLabel,
       hasRun: claim.value.logicalRun !== null,
       hasRoot: claim.value.authorityRoot !== null,
-      effectiveAgent: claim.value.effectiveAgent,
+      participant: claim.value.identitySeed.participantIdentity.participant,
+      role: claim.value.identitySeed.participantIdentity.role,
     },
-    { origin: 'AuthorityRoot', label: 'AgentOwnerRoot', hasRun: false, hasRoot: false, effectiveAgent: 'manager' },
+    { origin: 'AuthorityRoot', label: 'AgentOwnerRoot', hasRun: false, hasRoot: false, participant: 'manager', role: 'manager' },
   )
 
   let state = authority.registerClaim(claim.value, register(owner))
@@ -221,13 +215,15 @@ test('WHAT[INTERACTION-AUTHORITY-012] IA_005_degeneration_guard_is_continuation'
 
 test('WHAT[INTERACTION-AUTHORITY-013] continuation preserves logical run and root authority profile', () => {
   const root = rootFor()
-  const state = authority.registerClaim(continuation('pk_c', root, 'DegenerationGuard', 'coder', 'pd-n'), register(root))
+  const state = authority.registerClaim(continuation('pk_c', root, 'DegenerationGuard', 'pd-n'), register(root))
   assert.deepEqual(profile(state.activeLogicalRun), profile(root))
+  assert.equal(state.activeLogicalRun.participantIdentity.participant, 'coder')
+  assert.equal(state.activeLogicalRun.participantIdentity.role, 'coder')
 })
 
 test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_remains_the_source_for_continuations', () => {
   const root = rootFor()
-  const state = authority.registerClaim(continuation('pk_c', root, 'BusyAgentNudge', 'coder', 'pd-n'), register(root))
+  const state = authority.registerClaim(continuation('pk_c', root, 'BusyAgentNudge', 'pd-n'), register(root))
   assert.deepEqual(profile(state.activeLogicalRun), profile(root))
   assert.deepEqual(profile(state.lastAuthorityProfile), profile(root))
 })

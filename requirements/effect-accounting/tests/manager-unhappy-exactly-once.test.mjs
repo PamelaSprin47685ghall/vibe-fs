@@ -1,29 +1,26 @@
-// Effect-accounting laws through the production fallback and handle owners.
+// Effect-accounting laws through the production provider-failure and handle owners.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { cursor, fallbackProjection } from '../../../dist/Participant/Provider/Attempt/Fallback/CursorSurface.js'
+import { budget, providerFailureProjection } from '../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js'
 import * as handles from '../../../dist/Execution/Delegation/Handle/Surface.js'
 
-const ROOT = new URL('../../../', import.meta.url).pathname
-const OWNER = cursor.attemptIdentity('ses_mgr', 'run_L', 'msg_u1', 'run_owner')
-const BLOGGER = cursor.attemptIdentity('ses_mgr', 'run_L', 'msg_u1', 'run_blog_interrupt')
+const OWNER = budget.attemptIdentity('ses_mgr', 'run_L', 'msg_u1', 'run_owner')
+const BLOGGER = budget.attemptIdentity('ses_mgr', 'run_L', 'msg_u1', 'run_blog_interrupt')
 
-const initialFallback = () => fallbackProjection.forAuthority('run_L', 'msg_u1')
+const initialFailures = () => providerFailureProjection.forAuthority('run_L', 'msg_u1')
 
-const advance = (state, identity, previousOffset, nextOffset, failures) => {
-  const receipt = fallbackProjection.applyAdvance(identity, previousOffset, nextOffset, failures, state)
+const advance = (state, identity, consecutiveFailureCount) => {
+  const receipt = providerFailureProjection.applyFailure(identity, consecutiveFailureCount, state)
   assert.equal(receipt.ok, true, receipt.ok ? '' : receipt.error)
   return receipt.value
 }
 
-const fallbackState = (state) => fallbackProjection.read(state)
+const failureState = (state) => providerFailureProjection.read(state)
 
-const observeOwnerFailure = (state) => advance(state, OWNER, 0, 1, 1)
+const observeOwnerFailure = (state) => advance(state, OWNER, failureState(state).failures + 1)
 
 const observeDuplicateOwnerFailure = (state) => {
-  const duplicate = fallbackProjection.applyAdvance(OWNER, 0, 1, 1, state)
+  const duplicate = providerFailureProjection.applyFailure(OWNER, failureState(state).failures, state)
   assert.deepEqual(duplicate, { ok: false, error: 'AlreadyObserved' })
   return state
 }
@@ -56,26 +53,26 @@ const applyHandle = (state, command) => handles.apply(state, { handle: 'agent:h1
 
 test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_owner_failure_blogger_interrupt_interleavings_at_most_once', () => {
   for (const observations of interleavings) {
-    const state = observations.reduce(applyObservedOwnerDecision, initialFallback())
+    const state = observations.reduce(applyObservedOwnerDecision, initialFailures())
     assert.deepEqual(
-      (({ offset, failures, dedupeKeys }) => ({ offset, failures, dedupeKeys }))(fallbackState(state)),
-      { offset: 1, failures: 1, dedupeKeys: 1 },
+      (({ failures, dedupeKeys }) => ({ failures, dedupeKeys }))(failureState(state)),
+      { failures: 1, dedupeKeys: 1 },
     )
   }
 })
 
 test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_owner_failure_alone_still_exactly_once_under_duplicate_observation', () => {
-  const first = observeOwnerFailure(initialFallback())
+  const first = observeOwnerFailure(initialFailures())
   const afterDuplicate = observeDuplicateOwnerFailure(first)
-  assert.deepEqual(fallbackState(afterDuplicate), fallbackState(first))
+  assert.deepEqual(failureState(afterDuplicate), failureState(first))
 })
 
 test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_counterfactual_blogger_advance_on_owner_would_double_count', () => {
-  const ownerAdvanced = observeOwnerFailure(initialFallback())
-  const doubleCounted = advance(ownerAdvanced, BLOGGER, 1, 2, 2)
+  const ownerAdvanced = observeOwnerFailure(initialFailures())
+  const doubleCounted = advance(ownerAdvanced, BLOGGER, failureState(ownerAdvanced).failures + 1)
   assert.deepEqual(
-    (({ offset, failures, dedupeKeys }) => ({ offset, failures, dedupeKeys }))(fallbackState(doubleCounted)),
-    { offset: 2, failures: 2, dedupeKeys: 2 },
+    (({ failures, dedupeKeys }) => ({ failures, dedupeKeys }))(failureState(doubleCounted)),
+    { failures: 2, dedupeKeys: 2 },
   )
 })
 
@@ -106,17 +103,32 @@ test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_join_guard_fold_absorbs_duplicate_comp
   assert.equal(handles.read(retired.state, 'agent:h1').lifecycle, 'Retired')
 })
 
-test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_manager_lifecycle_activation_and_life_completed_exactly_once', () => {
-  const source = readFileSync(join(ROOT, 'src/Wanxiangshu/Mission/Relay/Fold.fs'), 'utf8')
-  assert.match(source, /RetirementCommitted/)
-  assert.match(source, /RetiredProviderRunIds/)
-  assert.match(source, /RetiredIncumbencies/)
-})
+test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_single_retry_budget_twelfth_consecutive_failure_is_terminal', () => {
+  assert.equal(budget.defaultBudget, 12)
+  let failures = budget.initial
+  for (let attempt = 1; attempt <= 11; attempt += 1) {
+    failures = budget.recordFailure(failures)
+    assert.equal(budget.verdict(budget.defaultBudget, failures), 'MayRetry')
+  }
+  assert.deepEqual(budget.read(failures), { failures: 11 })
+  failures = budget.recordFailure(failures)
+  assert.equal(budget.verdict(budget.defaultBudget, failures), 'Exhausted')
 
-test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_owner_advance_and_blogger_residue_permutations_confluent', () => {
-  const states = interleavings.map((observations) =>
-    fallbackState(observations.reduce(applyObservedOwnerDecision, initialFallback())),
+  let projection = initialFailures()
+  for (let attempt = 1; attempt <= 11; attempt += 1) {
+    const identity = budget.attemptIdentity('ses_mgr', 'run_L', 'msg_u1', `run_owner_${attempt}`)
+    projection = advance(projection, identity, attempt)
+    assert.equal(providerFailureProjection.mayRetry(budget.defaultBudget, projection), true)
+  }
+  const terminal = providerFailureProjection.applyExhausted(projection)
+  assert.equal(providerFailureProjection.mayRetry(budget.defaultBudget, terminal), false)
+  assert.equal(providerFailureProjection.read(terminal).exhausted, true)
+
+  const recovered = providerFailureProjection.recordSuccess(terminal)
+  assert.deepEqual(
+    ((state) => ({ failures: state.failures, dedupeKeys: state.dedupeKeys }))(
+      providerFailureProjection.read(recovered),
+    ),
+    { failures: 0, dedupeKeys: 0 },
   )
-  assert.equal(states.length, 6)
-  assert.ok(states.every((state) => state.failures === 1 && state.offset === 1 && state.dedupeKeys === 1))
 })

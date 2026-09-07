@@ -16,7 +16,7 @@
 
 ### 外部 effect reconciliation registry
 
-`scripts/checks/external-effect-contracts.json` 是闭合的 12 项高价值 effect census；每行同时记录 owner/WHAT、四阶段 typed contract、物理 identity、有限歧义与安全重试律、普通 CE 重入点及分级 proof portfolio。`scripts/checks/external-effect-reconciliation.mjs` 复用 canonical requirement-trace parser 解析 WHAT 与 executable test title，精确核对 source symbol/proof anchor，并对重入源扫描隐藏 recovery program counter。Admission 仅可为 process-local 或明确不适用；registry 不保存 capability，也不读取 feature history 来发明恢复位置。
+`scripts/checks/external-effect-contracts.json` 是闭合的 11 项高价值 effect census；每行同时记录 owner/WHAT、四阶段 typed contract、物理 identity、有限歧义与安全重试律、普通 CE 重入点及分级 proof portfolio。`scripts/checks/external-effect-reconciliation.mjs` 复用 canonical requirement-trace parser 解析 WHAT 与 executable test title，精确核对 source symbol/proof anchor，并对重入源扫描隐藏 recovery program counter。Admission 仅可为 process-local 或明确不适用；registry 不保存 capability，也不读取 feature history 来发明恢复位置。
 
 ## 依赖关系
 
@@ -45,7 +45,7 @@ DEPENDS ON:
 | CRASH-013 | `requirements/crash-reconciliation/tests/session-recovery-combine.test.mjs::WHAT[CRASH-013] RECOVERY_COMBINE_blocked_dominates` |
 | CRASH-014 | `requirements/crash-reconciliation/tests/recovery-closure-permit.test.mjs::WHAT[CRASH-014] CRASH_CLOSURE_validate_accepts_unique_sessions_and_keeps_order` |
 | CRASH-015 | `requirements/crash-reconciliation/tests/host-fork-restart.test.mjs::WHAT[CRASH-015] HFR_restart_multiple_children_recovered_in_link_order` |
-| CRASH-016 | `requirements/crash-reconciliation/tests/blogger-crash-recovery.test.mjs::WHAT[CRASH-016] C5_classify_open_request_window_A_unsent` |
-| CRASH-017 | `requirements/crash-reconciliation/tests/blogger-crash-recovery.test.mjs::WHAT[CRASH-017] C5_crash_recovery_library_is_not_wired_into_ordinary_plugin_lifecycle` |
+| CRASH-016 | `requirements/crash-reconciliation/tests/blogger-live-owner-crash.test.mjs::WHAT[CRASH-016] CRASH_016_blogger_flight_lease_dies_with_the_process_scope` |
+| CRASH-017 | `requirements/crash-reconciliation/tests/session-recovery-family.test.mjs::WHAT[CRASH-017] RECOVERY_FAMILY_plugin_load_only_attaches_physical_recovery_wiring_and_join_uses_current_process_permit` |
 | CRASH-018 | `requirements/crash-reconciliation/tests/explicit-continue.test.mjs::WHAT[CRASH-018] CRASH_018_real_command_material_materializes_briefing_and_stays_disclosure_only` |
-| CRASH-019 | `requirements/crash-reconciliation/tests/external-effect-reconciliation.test.mjs::external_effect_registry_accepts_the_closed_12_row_contract` |
+| CRASH-019 | `requirements/crash-reconciliation/tests/external-effect-reconciliation.test.mjs::WHAT[CRASH-019] external_effect_registry_accepts_the_closed_11_row_contract` |

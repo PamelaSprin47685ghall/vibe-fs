@@ -13,16 +13,15 @@ const personas = {
   inspector: 'Investigator',
 }
 const rootSelection = (agent) => {
-  const canonicalRole = agent === 'predictor' ? 'inspector' : agent
+  const role = agent === 'predictor' ? 'inspector' : agent
   return {
     kind: 'RootSelection',
     ownerSession: null,
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: agent,
-      peerAgent: agent,
-      canonicalRole,
+      participant: agent,
+      role,
       selectedTier: 'deep',
       persona: personas[agent] ?? 'Unknown',
       personaCatalogVersion: 1,
@@ -55,29 +54,31 @@ const profile = (value) => ({
   logicalRun: value.logicalRun,
   authorityRoot: value.authorityRoot,
   authorityKind: value.authorityKind,
-  selectedAgent: value.selectedAgent,
-  peerAgent: value.peerAgent,
+  participant: value.participantIdentity.participant,
+  role: value.participantIdentity.role,
 })
 const register = (root) => authority.registerAuthority(root, authority.empty)
 
-// INTERACTION-AUTHORITY-004: a continuation inherits run/root and changes only effective agent.
+// INTERACTION-AUTHORITY-004: a continuation inherits run/root and preserves participant; only the per-physical target/lease may change.
 test('WHAT[INTERACTION-AUTHORITY-004] IA_004_continuation_inherits_run_and_root', () => {
   const root = rootFor()
   const before = register(root)
-  const claim = authority.claimContinuation('pk_c', 'ses_a', 'ProviderRetryAttempt', root, 'coder', 'pd-retry')
+  const claim = authority.claimContinuation('pk_c', 'ses_a', 'ProviderRetryAttempt', root, 'pd-retry')
 
   assert.deepEqual(
     {
       origin: claim.origin,
       logicalRun: claim.logicalRun,
       authorityRoot: claim.authorityRoot,
-      effectiveAgent: claim.effectiveAgent,
+      participant: claim.identitySeed.participantIdentity.participant,
+      role: claim.identitySeed.participantIdentity.role,
     },
     {
       origin: 'Continuation',
       logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
       authorityRoot: 'msg_u1',
-      effectiveAgent: 'coder',
+      participant: 'coder',
+      role: 'coder',
     },
   )
 
@@ -111,9 +112,9 @@ test('WHAT[INTERACTION-AUTHORITY-008] IA_008_resolution_order_is_accepted_then_c
   const root = rootFor('coder', 'msg_u1', 'AgentOwnerRoot')
   let state = register(root)
 
-  const claimed = authority.claimContinuation('pk_claimed', 'ses_a', 'ManagerGuard', root, 'coder', 'pd-c')
+  const claimed = authority.claimContinuation('pk_claimed', 'ses_a', 'ManagerGuard', root, 'pd-c')
   state = authority.registerClaim(claimed, state)
-  const accepted = authority.claimContinuation('pk_accepted', 'ses_a', 'BusyAgentNudge', root, 'coder', 'pd-a')
+  const accepted = authority.claimContinuation('pk_accepted', 'ses_a', 'BusyAgentNudge', root, 'pd-a')
   state = authority.registerClaim(accepted, state)
   state = authority.acceptClaim('pk_accepted', 'msg_accepted', state)
 
@@ -139,7 +140,7 @@ test('WHAT[INTERACTION-AUTHORITY-008] IA_008_accepted_continuation_outranks_comp
   const root = rootFor()
   let state = register(root)
   state = authority.registerClaim(
-    authority.claimContinuation('pk_both', 'ses_a', 'ManagerGuard', root, 'coder', 'pd-b'),
+    authority.claimContinuation('pk_both', 'ses_a', 'ManagerGuard', root, 'pd-b'),
     state,
   )
   state = authority.acceptClaim('pk_both', 'msg_both', state)

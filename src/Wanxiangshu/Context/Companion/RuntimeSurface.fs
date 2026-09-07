@@ -239,29 +239,30 @@ module CompanionRuntimeSurface =
     let cancelParked (scope: obj) (sessionId: string) : unit =
         hostOf scope |> fun host -> host.CancelParked sessionId
 
-    let hasParked (scope: obj) (sessionId: string) : bool =
-        hostOf scope |> fun host -> host.HasParked sessionId
-
     let offerMaterial (scope: obj) (sessionId: string) (context: obj) : string =
         hostOf scope
         |> fun host -> host.OfferMaterial(sessionId, contextOfJs context)
         |> offerDispositionName
 
-    let consumeStaged (scope: obj) (sessionId: string) : obj =
-        match hostOf scope |> fun host -> host.TryTakePendingOffer sessionId with
-        | None -> null
-        | Some value -> contextToJs value
-
     let private flightClaimName (claim: BloggerFlightClaim) =
         match claim with
-        | BloggerFlightClaim.Claimed -> "Claimed"
-        | BloggerFlightClaim.Refreshed -> "Refreshed"
+        | BloggerFlightClaim.Claimed _ -> "Claimed"
+        | BloggerFlightClaim.Refreshed _ -> "Refreshed"
         | BloggerFlightClaim.Conflict existing -> "Conflict:" + BloggerRequestId.value existing
 
     let claimCurrentRequest (scope: obj) (sessionId: string) (context: obj) : string =
         hostOf scope
         |> fun host -> host.ClaimCurrentRequest(sessionId, contextOfJs context)
         |> flightClaimName
+
+    let claimFlight (scope: obj) (sessionId: string) (context: obj) : obj =
+        match
+            hostOf scope
+            |> fun host -> host.ClaimCurrentRequest(sessionId, contextOfJs context)
+        with
+        | BloggerFlightClaim.Claimed lease
+        | BloggerFlightClaim.Refreshed lease -> box lease
+        | BloggerFlightClaim.Conflict _ -> null
 
     let acquireMaterialization (scope: obj) (sessionId: string) : Task<obj> =
         task {
@@ -283,8 +284,27 @@ module CompanionRuntimeSurface =
         |> fun host -> host.ReleaseCurrentRequest(sessionId, BloggerRequestId.create requestId)
         |> flightReleaseName
 
-    let hasFlight (scope: obj) (sessionId: string) : bool =
-        hostOf scope |> fun host -> host.HasFlight sessionId
+    let beginBloggerShutdown (scope: obj) : unit = (scopeOf scope).Blogger.BeginShutdown()
+
+    let claimRepairEpisode
+        (scope: obj)
+        (requestId: string)
+        (authorityRoot: string)
+        (mainSessionId: string)
+        (bloggerSessionId: string)
+        : string =
+        let identity =
+            { RequestId = BloggerRequestId.create requestId
+              AuthorityRoot = AuthorityRootUserMessageId.create authorityRoot
+              MainSessionId = SessionId.create mainSessionId
+              BloggerSessionId = SessionId.create bloggerSessionId }
+
+        match hostOf scope |> fun host -> host.ClaimRepairEpisode identity with
+        | Ok _ -> "Claimed"
+        | Error error -> "Error:" + error
+
+    let drainRepairEpisodes (scope: obj) : Task =
+        hostOf scope |> fun host -> host.DrainRepairEpisodes()
 
     let currentRequest (scope: obj) (sessionId: string) : obj =
         match hostOf scope |> fun host -> host.TryPeekCurrentRequest sessionId with
@@ -300,38 +320,6 @@ module CompanionRuntimeSurface =
     let tryGetFlight (scope: obj) (sessionId: string) : obj = currentRequest scope sessionId
 
     let peekCurrentRequest (scope: obj) (sessionId: string) : obj = currentRequest scope sessionId
-
-    let openDrain (root: string) : obj =
-        box (BloggerRuntime.openDrain (AuthorityRootUserMessageId.create root))
-
-    let closedDrain () : obj = box DrainWindow.Closed
-
-
-    let setDrainWindow (scope: obj) (sessionId: string) (window: obj) : unit =
-        hostOf scope
-        |> fun host -> host.SetDrainWindow(sessionId, unbox<DrainWindow> window)
-
-    let isDrainOpen (scope: obj) (sessionId: string) : bool =
-        hostOf scope |> fun host -> host.IsDrainOpen sessionId
-
-    let sealRuntime (scope: obj) (sessionId: string) : unit =
-        BloggerRuntimeHost.forceSealRuntime (hostOf scope) sessionId
-
-    let blocksNewRequest (durableSealed: bool) (hasFlightValue: bool) (drainOpenValue: bool) : bool =
-        BloggerRuntime.blocksNewRequest durableSealed hasFlightValue drainOpenValue
-
-    let decideMaterial
-        (hasOpenProducerValue: bool)
-        (hasParkedValue: bool)
-        (hasFlightValue: bool)
-        (context: obj)
-        : string =
-        match
-            BloggerRuntime.decideMaterial hasOpenProducerValue hasParkedValue hasFlightValue (contextOfJs context)
-        with
-        | BloggerRuntime.Decision.Start _ -> "Start"
-        | BloggerRuntime.Decision.Skip -> "Skip"
-        | BloggerRuntime.Decision.Offer _ -> "Offer"
 
     let createCompanion (sessionId: string) : obj =
         box (Companion(?sessionId = Some(SessionId.create sessionId)))

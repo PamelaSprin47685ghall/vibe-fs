@@ -407,8 +407,6 @@ module StrengthSurface =
                   RequestKind = requestKind
                   CanonicalRole = canonicalRole
                   SelectedAgent = textOf value?selectedAgent
-                  EffectiveAgent = textOf value?effectiveAgent
-                  IsFallbackRetry = unbox<bool> value?isFallbackRetry
                   HasPrefixProbe = unbox<bool> value?hasPrefixProbe
                   IsAttachedOrInternalLeaf = unbox<bool> value?isAttachedOrInternalLeaf
                   OwnerCancelled = unbox<bool> value?ownerCancelled
@@ -1204,6 +1202,19 @@ module StrengthSurface =
     let predictorCreate () : obj =
         PredictorHandle StrengthPredictor.empty :> obj
 
+    let private symbolToJs symbol =
+        match symbol with
+        | StrengthPrimarySymbol.ReadonlyBatch -> "ReadonlyBatch"
+        | StrengthPrimarySymbol.MutatingOrExecuting -> "MutatingOrExecuting"
+        | StrengthPrimarySymbol.TextOnly -> "TextOnly"
+        | StrengthPrimarySymbol.Other -> "Other"
+
+    let private featureToJs (feature: StrengthFeatureKey) : obj =
+        box
+            {| canonicalRole = roleLabel feature.CanonicalRole
+               recentPrimary = feature.RecentPrimary |> List.map symbolToJs |> List.toArray
+               visibleByteBucket = feature.VisibleByteBucket |}
+
     let private predictorOf value = unbox<PredictorHandle> value
 
     let private symbolResult (value: obj) : Result<StrengthPrimarySymbol, string> =
@@ -1379,6 +1390,67 @@ module StrengthSurface =
     let scopeClearSession (scope: obj) (session: string) = (scopeOf scope).ClearSession session
     let scopeDispose (scope: obj) = (scopeOf scope).Dispose()
 
+    /// Feature key read from the real scope (recent-primary window included).
+    let scopeFeature (scope: obj) (session: string) (role: string) (visibleBytes: int) : obj =
+        match roleResult (box role) with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok role ->
+            (scopeOf scope).StrengthFeature(SessionId.create session, role, visibleBytes)
+            |> featureToJs
+
+    /// Prediction read from the real scope predictor evidence.
+    let scopePredict (scope: obj) (feature: obj) : obj =
+        match featureOf feature with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok feature ->
+            let prediction = (scopeOf scope).StrengthPrediction feature
+
+            box
+                {| P1 = prediction.P1
+                   P2 = prediction.P2
+                   evidenceCount = prediction.EvidenceCount |}
+
+    /// Raw evidence bucket read from the real scope predictor evidence.
+    /// Proves same-run duplicates never inflate counters.
+    let scopeBucket (scope: obj) (feature: obj) : obj =
+        match featureOf feature with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok feature ->
+            let bucket = (scopeOf scope).StrengthBucket feature
+
+            box
+                {| opportunities = bucket.Opportunities
+                   readonlyFirst = bucket.ReadonlyFirst
+                   secondObservations = bucket.SecondObservations
+                   readonlySecond = bucket.ReadonlySecond |}
+
+    /// Arm a counterfactual target on the real scope collector.
+    let scopeArm (scope: obj) (session: string) (targetRun: string) (feature: obj) : obj =
+        match featureOf feature with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok feature ->
+            (scopeOf scope)
+                .ArmStrengthCounterfactual(SessionId.create session, ProviderRunIdentity.create targetRun, feature)
+
+            box {| ok = true |}
+
+    /// Observe one primary symbol on the real scope collector. Returns null
+    /// until a distinct second run completes the counterfactual pair.
+    let scopeObserve (scope: obj) (session: string) (providerRun: string) (symbol: string) : obj =
+        match symbolResult (box symbol) with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok symbol ->
+            match
+                (scopeOf scope)
+                    .ObserveStrengthPrimary(SessionId.create session, ProviderRunIdentity.create providerRun, symbol)
+            with
+            | None -> null
+            | Some pair ->
+                box
+                    {| feature = featureToJs pair.Feature
+                       firstSymbol = symbolToJs pair.FirstSymbol
+                       secondSymbol = symbolToJs pair.SecondSymbol |}
+
     let private bindingOf (value: obj) : Result<StrengthReplicaBinding, string> =
         match roleResult value?canonicalRole, budgetResult value?budget with
         | Ok role, Ok budget ->
@@ -1528,3 +1600,262 @@ module StrengthSurface =
 
             return transformOutcomeToJs outcome (box messages) aborted
         }
+
+    let private registerErrorName error =
+        match error with
+        | StrengthRuntimeRegisterError.OwnerAlreadyHasReplica _ -> "OwnerAlreadyHasReplica"
+        | StrengthRuntimeRegisterError.ReplicaAlreadyBound _ -> "ReplicaAlreadyBound"
+        | StrengthRuntimeRegisterError.RoleIneligible _ -> "RoleIneligible"
+        | StrengthRuntimeRegisterError.EmptyBudget -> "EmptyBudget"
+
+    /// Register a binding into the real scope live registry (orphan setup).
+    let scopeRuntimeRegister (scope: obj) (binding: obj) : obj =
+        match bindingOf binding with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok binding ->
+            match (scopeOf scope).StrengthRuntime.Register(binding) with
+            | Ok() -> box {| ok = true |}
+            | Error error ->
+                box
+                    {| ok = false
+                       error = registerErrorName error |}
+
+    /// Live-registry lookup on the real scope (orphan assertions).
+    let scopeRuntimeFindByReplica (scope: obj) (replica: string) =
+        match (scopeOf scope).StrengthRuntime.TryFindByReplica(SessionId.create replica) with
+        | Some binding -> bindingToJs binding
+        | None -> null
+
+    /// Opaque handle over a real StrengthReplicaRuntime whose only stubbed
+    /// ports are the Host physical ones (session abort/child records and the
+    /// model lease tracker). Attach/turn/transform/delete/dispose paths are
+    /// the production paths; Start* bootstrap is out of scope for the handle
+    /// because it needs a journal-backed dispatcher.
+    type private ReplicaHandle
+        (
+            runtime: StrengthReplicaRuntime,
+            live: StrengthRuntime,
+            aborted: ResizeArray<string>,
+            released: ResizeArray<string>
+        ) =
+        member _.Runtime = runtime
+        member _.Live = live
+        member _.Aborted = aborted
+        member _.Released = released
+
+    let private replicaOf value = unbox<ReplicaHandle> value
+
+    let replicaRuntimeCreate (maxFrameBytes: int) : obj =
+        let aborted = ResizeArray<string>()
+        let released = ResizeArray<string>()
+
+        let sessions =
+            { new ISessionHostPort with
+                member _.SubscribeTerminal(_, _) =
+                    { new IDisposable with
+                        member _.Dispose() = () }
+
+                member _.SubscribeFutureTerminal(_, _) =
+                    { new IDisposable with
+                        member _.Dispose() = () }
+
+                member _.SendPrompt(_, _, _) =
+                    Task.FromResult(Outcome.Retryable "unused")
+
+                member _.AbortSession(sessionId) =
+                    aborted.Add(SessionId.value sessionId)
+                    Task.FromResult(Ok())
+
+                member _.InterruptAttempt(_) = Task.FromResult(Ok())
+                member _.IsManagedChild(_) = true
+                member _.AbortChildren(_) = AsyncSupport.completedTask ()
+                member _.CreateSiblingSession(_, _, _) = Task.FromResult(Error "unused")
+                member _.TryGetParentSession(_) = Task.FromResult(Ok None)
+                member _.CreateChildSession(_, _) = Task.FromResult(Error "unused")
+                member _.ListChildren(_) = Task.FromResult(Ok [])
+                member _.FamilyRootOf(sessionId) = sessionId }
+
+        // Never invoked on attach/turn/transform/delete/dispose paths; the
+        // handle exists so tests drive those real paths with only Host
+        // physical ports stubbed.
+        let dispatcher: Wanxiangshu.Interaction.Dispatch.PromptDispatcher.Runtime =
+            Unchecked.defaultof<_>
+
+        let live = StrengthRuntime()
+
+        let runtime =
+            new StrengthReplicaRuntime(
+                sessions,
+                dispatcher,
+                live,
+                (fun _ _ _ -> ()),
+                ?maxFrameBytes = Some maxFrameBytes,
+                ?releaseModel = Some(fun sessionId -> released.Add(SessionId.value sessionId))
+            )
+
+        ReplicaHandle(runtime, live, aborted, released) :> obj
+
+    /// Attach an already-live binding to the real coordinator. Returns the
+    /// immutable-outcome completion task (JS-awaitable) on success.
+    let replicaAttach (handle: obj) (binding: obj) (purpose: string) : obj =
+        let h = replicaOf handle
+
+        match bindingOf binding with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok binding ->
+            let parsed =
+                match purpose with
+                | "DryRun" -> Ok StrengthReplicaPurpose.DryRun
+                | "Treatment" -> Ok StrengthReplicaPurpose.Treatment
+                | unknown -> Error(sprintf "unknown replica purpose: %s" unknown)
+
+            match parsed with
+            | Error error -> box {| ok = false; error = error |}
+            | Ok purpose ->
+                match h.Runtime.AttachLiveDecision(binding, purpose) with
+                | Ok completion ->
+                    box
+                        {| ok = true
+                           value = box {| completion = completion |} |}
+                | Error error -> box {| ok = false; error = error |}
+
+    /// Register a binding directly into the handle live registry (orphan
+    /// setup: binding present, no local decision state).
+    let replicaLiveRegister (handle: obj) (binding: obj) : obj =
+        match bindingOf binding with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok binding ->
+            match (replicaOf handle).Live.Register(binding) with
+            | Ok() -> box {| ok = true |}
+            | Error error ->
+                box
+                    {| ok = false
+                       error = registerErrorName error |}
+
+    /// Live-registry lookup on the handle (orphan assertions).
+    let replicaLiveFind (handle: obj) (replica: string) =
+        match (replicaOf handle).Live.TryFindByReplica(SessionId.create replica) with
+        | Some binding -> bindingToJs binding
+        | None -> null
+
+    let private terminalToJs terminal =
+        match terminal with
+        | StrengthReplicaTerminal.BudgetReached ->
+            box
+                {| kind = "BudgetReached"
+                   reason = null |}
+        | StrengthReplicaTerminal.TextCompleted ->
+            box
+                {| kind = "TextCompleted"
+                   reason = null |}
+        | StrengthReplicaTerminal.Cancelled -> box {| kind = "Cancelled"; reason = null |}
+        | StrengthReplicaTerminal.Failed reason -> box {| kind = "Failed"; reason = reason |}
+        | StrengthReplicaTerminal.InvalidFrame reason ->
+            box
+                {| kind = "InvalidFrame"
+                   reason = reason |}
+
+    let private outcomeToJs (outcome: StrengthReplicaOutcome) : obj =
+        box
+            {| replicaSessionId = SessionId.value outcome.ReplicaSessionId
+               requestsAdmitted = outcome.RequestsAdmitted
+               batches = outcome.Batches |> List.map batchToJs |> List.toArray
+               terminal = terminalToJs outcome.Terminal |}
+
+    /// Await an attach completion task and map the immutable outcome to JS.
+    let replicaAwaitOutcome (completion: obj) : Task<obj> =
+        task {
+            let! outcome = unbox<Task<StrengthReplicaOutcome>> completion
+            return outcomeToJs outcome
+        }
+
+    let private replicaTurnOf (value: obj) : Result<ReconciledTurn, string> =
+        let parts =
+            if isNullish value?parts then
+                Ok [||]
+            else
+                arrayOf value?parts
+                |> Array.toList
+                |> List.fold
+                    (fun state item ->
+                        match state, partResult item with
+                        | Ok current, Ok part -> Ok(part :: current)
+                        | Error error, _ -> Error error
+                        | _, Error error -> Error error)
+                    (Ok [])
+                |> Result.map (List.rev >> List.toArray)
+
+        let textOr fallback v =
+            if isNullish v then fallback else textOf v
+
+        match parts, turnOutcomeResult value?outcome with
+        | Ok parts, Ok outcome ->
+            Ok
+                { SessionId = SessionId.create (textOf value?sessionId)
+                  PhysicalUserMessageId =
+                    PhysicalUserMessageId.create (textOr "replica-test-physical" value?physicalUserMessageId)
+                  AuthorityRootUserMessageId =
+                    AuthorityRootUserMessageId.create (textOr "replica-test-root" value?authorityRootUserMessageId)
+                  ProviderRun = ProviderRunIdentity.create (textOr "replica-test-run" value?providerRun)
+                  Role = None
+                  Directory = None
+                  Parts = parts
+                  Finish = None
+                  ErrorName = None
+                  Model = None
+                  Outcome = outcome
+                  Observation = None }
+        | Error error, _
+        | _, Error error -> Error error
+
+    /// Drive a turn through the real HandleTurn path. Returns handled bool.
+    let replicaHandleTurn (handle: obj) (turn: obj) : obj =
+        match replicaTurnOf turn with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok turn -> box ((replicaOf handle).Runtime.HandleTurn turn)
+
+    /// Drive transform output through the real HandleTransform path.
+    /// Returns handled bool; admission counts are visible via replicaPeek.
+    let replicaHandleTransform (handle: obj) (output: obj) : Task<obj> =
+        task {
+            let! handled = (replicaOf handle).Runtime.HandleTransform output
+            return box handled
+        }
+
+    /// Drive the real HandleSessionDeleted path (live state or orphan).
+    let replicaSessionDeleted (handle: obj) (session: string) =
+        (replicaOf handle).Runtime.HandleSessionDeleted(SessionId.create session)
+
+    /// Drive the real CancelOwner path.
+    let replicaCancelOwner (handle: obj) (owner: string) : Task =
+        task { do! (replicaOf handle).Runtime.CancelOwner(SessionId.create owner) }
+
+    /// Drive the real CloseDryRunAtTargetTerminal path.
+    let replicaCloseDryRun (handle: obj) (turn: obj) : Task<obj> =
+        task {
+            match replicaTurnOf turn with
+            | Error error -> return box {| ok = false; error = error |}
+            | Ok turn ->
+                do! (replicaOf handle).Runtime.CloseDryRunAtTargetTerminal turn
+                return box {| ok = true |}
+        }
+
+    /// Read-only peek at live decision state; null once physically retired.
+    let replicaPeek (handle: obj) (replica: string) : obj =
+        match (replicaOf handle).Runtime.TryPeek(SessionId.create replica) with
+        | None -> null
+        | Some peek ->
+            box
+                {| requestsAdmitted = peek.RequestsAdmitted
+                   batches = peek.Batches |> List.map batchToJs |> List.toArray
+                   terminal = peek.SemanticTerminal |> Option.map terminalToJs |> Option.toObj |}
+
+    let replicaIsReplica (handle: obj) (session: string) : bool =
+        (replicaOf handle).Runtime.IsReplica(SessionId.create session)
+
+    let replicaDispose (handle: obj) = (replicaOf handle).Runtime.Dispose()
+
+    /// Host-port observations: aborted sessions and released model leases.
+    let replicaAborted (handle: obj) : string array = (replicaOf handle).Aborted.ToArray()
+
+    let replicaReleased (handle: obj) : string array = (replicaOf handle).Released.ToArray()

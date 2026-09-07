@@ -1,35 +1,23 @@
 namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Participant.Provider.Attempt
 
-/// Durable fallback evidence. Read-only; FallbackLedger is the only writer.
-module FallbackEvidence =
+/// Durable provider failure evidence. Read-only; ProviderFailureLedger is the only writer.
+module ProviderFailureEvidence =
 
-    let tryCurrentState (sessionId: SessionId) (projection: ProjectionSet) : FallbackProjection option =
+    let currentState (sessionId: SessionId) (projection: ProjectionSet) : ProviderFailureProjection option =
         AgentProjection.tryFind sessionId projection.AgentProjections
-        |> Option.bind (fun session -> session.Fallback)
+        |> Option.bind (fun session -> session.ProviderFailures)
 
-    let currentCursor (sessionId: SessionId) (projection: ProjectionSet) : AgentPairCursor.FallbackCursor option =
-        tryCurrentState sessionId projection
-        |> Option.map (fun fallback -> fallback.Cursor)
+    let tryCurrentState (sessionId: SessionId) (projection: ProjectionSet) : ProviderFailureProjection option =
+        currentState sessionId projection
 
-    let currentSide (sessionId: SessionId) (projection: ProjectionSet) : AgentPairCursor.ModelSide option =
-        currentCursor sessionId projection
-        |> Option.map (fun cursor -> AgentPairCursor.side cursor.Offset)
+    let currentBudget (sessionId: SessionId) (projection: ProjectionSet) : ProviderFailureBudget.FailureBudget option =
+        currentState sessionId projection |> Option.map (fun failure -> failure.Budget)
 
-    let effectiveAgent
-        (sessionId: SessionId)
-        (projection: ProjectionSet)
-        (profile: PromptAuthority.AuthorityExecutionProfile)
-        : string =
-        currentCursor sessionId projection
-        |> Option.map (PromptAuthority.effectiveAgentFor profile)
-        |> Option.defaultValue profile.SelectedAgent
-
-    let mayContinue (budget: int) (sessionId: SessionId) (projection: ProjectionSet) : bool =
-        tryCurrentState sessionId projection
-        |> Option.map (FallbackProjection.mayContinue budget)
+    let mayRetry (budgetLimit: int) (sessionId: SessionId) (projection: ProjectionSet) : bool =
+        currentState sessionId projection
+        |> Option.map (ProviderFailureProjection.mayRetry budgetLimit)
         |> Option.defaultValue false

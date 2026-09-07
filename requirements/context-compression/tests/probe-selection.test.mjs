@@ -1,8 +1,8 @@
 // tests/unit/Context/probe-selection.test.mjs — CTX-011 candidate selection.
 //
-// The nine steps that decide whether an armed slot gets a probe at all.
-//
-// Every refusal here is a NORMAL outcome, not an error: CTX-011 says an armed slot
+// The nine steps that decide whether an allowed attempt gets a probe at all.
+
+// Every refusal here is a NORMAL outcome, not an error: CTX-011 says an allowed attempt
 // with no candidate sends its ordinary main request. So the tests assert which reason
 // fired, not that something failed — the caller treats all reasons alike, and the
 // distinction exists only so a diagnostic can say what happened.

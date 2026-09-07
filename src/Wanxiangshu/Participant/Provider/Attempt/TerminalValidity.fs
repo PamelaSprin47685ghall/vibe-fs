@@ -11,7 +11,7 @@ open System.Text.RegularExpressions
 /// nothing about providers, error names or context limits.
 ///
 /// Single owner. Every consumer that needs "was this terminal usable" calls
-/// here: the turn classifier (FALLBACK-008 repair), the Companion entry writer
+/// here: the turn classifier (PAR-008 repair), the Companion entry writer
 /// and the squash writer (CTX-007), and the probe promote gate (CTX-012). A
 /// second copy could answer differently for the same text, which would let one
 /// caller commit a fact another caller would have refused.

@@ -78,10 +78,18 @@ type PluginBloggerScope() =
     /// DSL-cross-callback-proof: physical — one-shot inbound material buffer owned by Blogger convergence
     // DSL-MUTABLE: resource — pending offer registry by session id
     let pendingOffer = Dictionary<string, BloggerRequestContext>()
-    // Physical Blogger flight ownership lives in SharedState (cross worktree/root).
-    /// DSL-cross-callback-proof: physical quiescence-permit — DrainWindow.Open carries an unforgeable DrainPermit
-    // DSL-MUTABLE: single-flight — physical drain-window slot
-    let drainWindows = Dictionary<string, DrainWindow>()
+    /// DSL-cross-callback-proof: physical episode gate — guards episodes and completions
+    let episodeGate = obj ()
+    /// DSL-MUTABLE: resource — live repair episode registry by BloggerSessionId
+    let episodes = Dictionary<SessionId, BloggerRepairRendezvous>()
+    /// DSL-MUTABLE: resource — stored episode completions to await on drain
+    let episodeCompletions = List<Task>()
+
+    let repairEpisodeForSession (bloggerSessionId: SessionId) =
+        lock episodeGate (fun () ->
+            match episodes.TryGetValue bloggerSessionId with
+            | true, rendezvous -> Some rendezvous
+            | false, _ -> None)
 
     let parkExistingOrCreate sessionId =
         match parked.TryGetValue sessionId with
@@ -90,6 +98,119 @@ type PluginBloggerScope() =
             let created = ParkedTransform(sessionId)
             parked.[sessionId] <- created
             created.Completion
+
+    let createFlightLease
+        (thisHost: IBloggerRuntimeHost)
+        (sessionId: string)
+        (requestId: BloggerRequestId)
+        : IBloggerFlightLease =
+        let leaseGate = obj ()
+        // DSL-MUTABLE: resource — one-shot flight lease dispose latch
+        let mutable disposed = false
+
+        { new IBloggerFlightLease with
+            member _.RequestId = requestId
+
+            member _.Dispose() =
+                let shouldRelease =
+                    lock leaseGate (fun () ->
+                        if disposed then
+                            false
+                        else
+                            disposed <- true
+                            true)
+
+                if shouldRelease then
+                    thisHost.ReleaseCurrentRequest(sessionId, requestId) |> ignore }
+
+    let isSameRepairEpisode (existing: BloggerRepairRendezvous) (identity: BloggerRepairEpisodeIdentity) =
+        existing.Identity = identity
+
+    let removeOwnedRepairEpisode (bloggerSid: SessionId) (identity: BloggerRepairEpisodeIdentity) =
+        lock episodeGate (fun () ->
+            match episodes.TryGetValue bloggerSid with
+            | true, current when isSameRepairEpisode current identity ->
+                episodes.Remove bloggerSid |> ignore
+                episodeCompletions.Remove current.Completion |> ignore
+            | _ -> ())
+
+    let createRegisteredRepairEpisode (bloggerSid: SessionId) (identity: BloggerRepairEpisodeIdentity) =
+        let onCompleted () =
+            removeOwnedRepairEpisode bloggerSid identity
+
+        let created = BloggerRepairRendezvous(identity, onCompleted)
+        episodes.Add(bloggerSid, created)
+        episodeCompletions.Add(created.Completion)
+        created
+
+    let decideRepairEpisodeSlot (bloggerSid: SessionId) (identity: BloggerRepairEpisodeIdentity) =
+        match episodes.TryGetValue bloggerSid with
+        | true, existing when isSameRepairEpisode existing identity -> Ok existing
+        | true, existing ->
+            Error
+                $"Conflicting episode already active for {SessionId.value bloggerSid}: existing req {BloggerRequestId.value existing.Identity.RequestId} root {AuthorityRootUserMessageId.value existing.Identity.AuthorityRoot}"
+        | false, _ -> Ok(createRegisteredRepairEpisode bloggerSid identity)
+
+    let claimRepairEpisodeSlot (bloggerSid: SessionId) (identity: BloggerRepairEpisodeIdentity) =
+        lock episodeGate (fun () ->
+            if shutdown.IsCancellationRequested then
+                Error "Blogger runtime is shutting down"
+            else
+                decideRepairEpisodeSlot bloggerSid identity)
+
+    let admitFlightRepairEpisode
+        (bloggerSid: SessionId)
+        (identity: BloggerRepairEpisodeIdentity)
+        (flightCtx: BloggerRequestContext)
+        =
+        let flightReqId = BloggerRequestContext.requestId flightCtx
+
+        if flightReqId <> identity.RequestId then
+            Error
+                $"Claimed request {BloggerRequestId.value identity.RequestId} does not match active flight {BloggerRequestId.value flightReqId}"
+        else
+            claimRepairEpisodeSlot bloggerSid identity
+
+    let decideFlightRepairClaim (sidStr: string) (bloggerSid: SessionId) (identity: BloggerRepairEpisodeIdentity) =
+        match SharedState.BloggerFlights.TryGetValue sidStr with
+        | false, _ -> Error $"No active flight for blogger session {sidStr}"
+        | true, flightCtx -> admitFlightRepairEpisode bloggerSid identity flightCtx
+
+    let snapshotRepairCompletions () : Task array =
+        lock episodeGate (fun () -> episodeCompletions |> Seq.toArray)
+
+    let forgetRepairCompletions (tasksToAwait: Task array) =
+        lock episodeGate (fun () ->
+            for completed in tasksToAwait do
+                episodeCompletions.Remove completed |> ignore)
+
+    let combineDrainFault (firstFault: exn option) (ex: exn) : exn option =
+        match firstFault with
+        | Some _ -> firstFault
+        | None -> Some ex
+
+    let settleDrainOne (head: Task) (firstFault: exn option) : Task<exn option> =
+        task {
+            try
+                do! head
+                return firstFault
+            with ex ->
+                return combineDrainFault firstFault ex
+        }
+
+    let rec drainAllRepair (remaining: Task list) (firstFault: exn option) : Task<exn option> =
+        task {
+            match remaining with
+            | [] -> return firstFault
+            | head :: tail ->
+                let! next = settleDrainOne head firstFault
+                return! drainAllRepair tail next
+        }
+
+    let raiseDrainFault (firstFault: exn option) =
+        match firstFault with
+        | Some ex -> raise ex
+        | None -> ()
 
     interface IBloggerRuntimeHost with
         member _.Cancellation = shutdown.Token
@@ -112,13 +233,6 @@ type PluginBloggerScope() =
 
                 pendingOffer.Remove sessionId |> ignore)
 
-        member this.HasParked(sessionId: string) : bool =
-            lock parkedGate (fun () -> parked.ContainsKey sessionId)
-
-        // Physical flight ownership (PR7 knife 1): entry present = single-flight request.
-        member this.HasFlight(sessionId: string) : bool =
-            lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.ContainsKey sessionId)
-
         member this.TryGetFlight(sessionId: string) : BloggerRequestContext option =
             lock SharedState.BloggerFlightGate (fun () ->
                 match SharedState.BloggerFlights.TryGetValue sessionId with
@@ -126,16 +240,16 @@ type PluginBloggerScope() =
                 | false, _ -> None)
 
         member this.ClaimCurrentRequest(sessionId: string, context: BloggerRequestContext) : BloggerFlightClaim =
+            let reqId = BloggerRequestContext.requestId context
+
             lock SharedState.BloggerFlightGate (fun () ->
                 match SharedState.BloggerFlights.TryGetValue sessionId with
                 | false, _ ->
                     SharedState.BloggerFlights.Add(sessionId, context)
-                    BloggerFlightClaim.Claimed
-                | true, existing when
-                    BloggerRequestContext.requestId existing = BloggerRequestContext.requestId context
-                    ->
+                    BloggerFlightClaim.Claimed(createFlightLease this sessionId reqId)
+                | true, existing when BloggerRequestContext.requestId existing = reqId ->
                     SharedState.BloggerFlights.[sessionId] <- context
-                    BloggerFlightClaim.Refreshed
+                    BloggerFlightClaim.Refreshed(createFlightLease this sessionId reqId)
                 | true, existing -> BloggerFlightClaim.Conflict(BloggerRequestContext.requestId existing))
 
         member this.TryPeekCurrentRequest(sessionId: string) : BloggerRequestContext option =
@@ -145,18 +259,47 @@ type PluginBloggerScope() =
                 | false, _ -> None)
 
         member this.ReleaseCurrentRequest(sessionId: string, requestId: BloggerRequestId) : BloggerFlightRelease =
-            lock SharedState.BloggerFlightGate (fun () ->
-                match SharedState.BloggerFlights.TryGetValue sessionId with
-                | false, _ -> BloggerFlightRelease.Missing
-                | true, existing when BloggerRequestContext.requestId existing = requestId ->
-                    SharedState.BloggerFlights.Remove sessionId |> ignore
-                    BloggerFlightRelease.Released
-                | true, existing -> BloggerFlightRelease.Conflict(BloggerRequestContext.requestId existing))
+            let release, repairEpisode =
+                lock SharedState.BloggerFlightGate (fun () ->
+                    match SharedState.BloggerFlights.TryGetValue sessionId with
+                    | false, _ -> BloggerFlightRelease.Missing, None
+                    | true, existing when BloggerRequestContext.requestId existing = requestId ->
+                        SharedState.BloggerFlights.Remove sessionId |> ignore
+
+                        let exactEpisode =
+                            repairEpisodeForSession (SessionId.create sessionId)
+                            |> Option.filter (fun rendezvous -> rendezvous.Identity.RequestId = requestId)
+
+                        BloggerFlightRelease.Released, exactEpisode
+                    | true, existing -> BloggerFlightRelease.Conflict(BloggerRequestContext.requestId existing), None)
+
+            repairEpisode |> Option.iter _.Cancel()
+            release
 
         member _.AcquireMaterialization(sessionId: string) : Task<BloggerMaterializationLease> =
             SharedState.BloggerMaterializationAdmission.Acquire sessionId
 
+        member _.TryDeliverMaterial(sessionId: string, context: BloggerRequestContext) : bool =
+            let parkedTransform =
+                lock parkedGate (fun () ->
+                    match parked.TryGetValue sessionId with
+                    | true, entry ->
+                        parked.Remove sessionId |> ignore
+                        Some entry
+                    | false, _ -> None)
+
+            match parkedTransform with
+            | Some entry ->
+                entry.TryResume context
+                true
+            | None -> false
+
         member this.OfferMaterial(sessionId: string, context: BloggerRequestContext) : MaterialOfferDisposition =
+            // Explicit newest-covers business rule:
+            // If a transform is parked awaiting material, deliver immediately and resume the waiter.
+            // If no transform is currently parked, stage into pendingOffer; any previously staged
+            // material for this session is cleanly superseded (newest covers unread material).
+            // Mailbox provides atomic delivery without slot-peeking or race conditions.
             lock parkedGate (fun () ->
                 match parked.TryGetValue sessionId with
                 | true, entry ->
@@ -167,39 +310,47 @@ type PluginBloggerScope() =
                     pendingOffer.[sessionId] <- context
                     MaterialOfferDisposition.Staged)
 
-        member this.TryTakePendingOffer(sessionId: string) : BloggerRequestContext option =
-            lock parkedGate (fun () ->
-                match pendingOffer.TryGetValue sessionId with
-                | true, context ->
-                    pendingOffer.Remove sessionId |> ignore
-                    Some context
-                | false, _ -> None)
+        member this.ClaimRepairEpisode
+            (identity: BloggerRepairEpisodeIdentity)
+            : Result<BloggerRepairRendezvous, string> =
+            let bloggerSid = identity.BloggerSessionId
+            let sidStr = SessionId.value bloggerSid
 
-        member this.GetDrainWindow(sessionId: string) : DrainWindow =
-            lock parkedGate (fun () -> this.GetDrainWindowUnlocked sessionId)
+            // Under one gate (episodeGate nested inside BloggerFlightGate or episodeGate alone):
+            // Claim requires current exact Blogger flight request id, replays same identity,
+            // rejects any foreign request/root identity without overwrite; no peek-before-claim TOCTOU.
+            lock SharedState.BloggerFlightGate (fun () -> decideFlightRepairClaim sidStr bloggerSid identity)
 
-        member this.SetDrainWindow(sessionId: string, window: DrainWindow) : unit =
-            lock parkedGate (fun () -> drainWindows.[sessionId] <- window)
+        member this.TryGetRepairEpisode(identity: BloggerRepairEpisodeIdentity) : BloggerRepairRendezvous option =
+            let bloggerSid = identity.BloggerSessionId
 
-        member this.IsDrainOpen(sessionId: string) : bool =
-            lock parkedGate (fun () ->
-                match this.GetDrainWindowUnlocked sessionId with
-                | DrainWindow.Open _ -> true
-                | DrainWindow.Closed -> false)
+            lock episodeGate (fun () ->
+                match episodes.TryGetValue bloggerSid with
+                | true, existing when existing.Identity = identity -> Some existing
+                | _ -> None)
 
-    member private _.GetDrainWindowUnlocked(sessionId: string) : DrainWindow =
-        match drainWindows.TryGetValue sessionId with
-        | true, window -> window
-        | false, _ -> DrainWindow.Closed
+        member this.CancelRepairEpisode(identity: BloggerRepairEpisodeIdentity) : unit =
+            repairEpisodeForSession identity.BloggerSessionId
+            |> Option.filter (fun existing -> existing.Identity = identity)
+            |> Option.iter _.Cancel()
 
-    /// Session deletion drops the drain slot (unlike CancelParked, which
-    /// preserves it). Mirrors DisposeSession's per-session cleanup.
-    member _.DropDrainWindow(sessionId: string) =
-        lock parkedGate (fun () -> drainWindows.Remove sessionId |> ignore)
+        member this.DrainRepairEpisodes() : Task =
+            let tasksToAwait = snapshotRepairCompletions ()
+
+            task {
+                let! firstFault = drainAllRepair (tasksToAwait |> Array.toList) None
+                forgetRepairCompletions tasksToAwait
+                return raiseDrainFault firstFault
+            }
+            :> Task
 
     member _.BeginShutdown() =
-        if not shutdown.IsCancellationRequested then
-            shutdown.Cancel()
+        let activeEpisodes =
+            lock episodeGate (fun () ->
+                if not shutdown.IsCancellationRequested then
+                    shutdown.Cancel()
+
+                episodes.Values |> Seq.toList)
 
         lock parkedGate (fun () ->
             for entry in parked.Values |> Seq.toList do
@@ -208,12 +359,16 @@ type PluginBloggerScope() =
             parked.Clear()
             pendingOffer.Clear())
 
+        for rendezvous in activeEpisodes do
+            rendezvous.Cancel()
+
+    member this.CancelEpisodesForSession(sessionId: string) : unit =
+        repairEpisodeForSession (SessionId.create sessionId) |> Option.iter _.Cancel()
+
+    member this.DrainRepairEpisodes() : Task =
+        (this :> IBloggerRuntimeHost).DrainRepairEpisodes()
+
     /// ENFORCER-162: plugin dispose emits Cancelled to every material waiter.
     member this.Dispose() =
         this.BeginShutdown()
-
-        lock parkedGate (fun () ->
-            // BloggerFlights are SharedState — do not clear on one instance dispose.
-            drainWindows.Clear())
-
         shutdown.Dispose()

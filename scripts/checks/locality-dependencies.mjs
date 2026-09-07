@@ -32,18 +32,25 @@ const siteValid = (site) => exactKeys(site, ['sourcePath', 'semanticDeclarationA
   && Number.isSafeInteger(site.sameAnchorOccurrenceOrdinal)
   && site.sameAnchorOccurrenceOrdinal >= 0
 const compilerObservationsValid = (value) => {
-  const topLevelKeys = ['schemaVersion', 'projectFile', 'productionFiles', 'signatureFiles', 'declarationUses', 'externalSymbolUses', 'fsharpNodes', 'fableInterop', 'signatureExports', 'diagnostics', 'elapsedMilliseconds']
-  const arrays = topLevelKeys.slice(2, -1)
-  if (!exactKeys(value, topLevelKeys)
+  const extendedTopLevelKeys = ['schemaVersion', 'projectFile', 'productionFiles', 'signatureFiles', 'declarationUses', 'externalSymbolUses', 'applicationUses', 'fsharpNodes', 'fableInterop', 'signatureExports', 'diagnostics', 'elapsedMilliseconds']
+  const extendedArrays = ['productionFiles', 'signatureFiles', 'declarationUses', 'externalSymbolUses', 'applicationUses', 'fsharpNodes', 'fableInterop', 'signatureExports']
+  if (!exactKeys(value, extendedTopLevelKeys)
     || value.schemaVersion !== 1
     || typeof value.projectFile !== 'string'
     || !Number.isSafeInteger(value.elapsedMilliseconds)
     || value.elapsedMilliseconds < 0
-    || arrays.some((key) => !Array.isArray(value[key]))) return false
+    || extendedArrays.some((key) => !Array.isArray(value[key]))) return false
   const declarationKeys = ['consumerPath', 'providerPaths', 'symbol', 'symbolKind', 'assembly', 'isNamespace', 'isModule', 'line', 'column', 'isFromOpenStatement', 'isFromPattern', 'isFromType', 'isFromUse']
   if (!value.declarationUses.every((row) => exactKeys(row, declarationKeys)
     && typeof row.consumerPath === 'string'
     && Array.isArray(row.providerPaths))) return false
+  const applicationKeys = ['consumerPath', 'startLine', 'startColumn', 'resolvedTarget', 'inferredType']
+  if (!value.applicationUses.every((row) => exactKeys(row, applicationKeys)
+    && typeof row.consumerPath === 'string' && row.consumerPath.length > 0
+    && Number.isSafeInteger(row.startLine) && row.startLine >= 1
+    && Number.isSafeInteger(row.startColumn) && row.startColumn >= 0
+    && typeof row.resolvedTarget === 'string' && row.resolvedTarget.length > 0
+    && typeof row.inferredType === 'string')) return false
   if (!value.externalSymbolUses.every((row) => exactKeys(row, ['assembly', 'fullyQualifiedSymbol', 'symbolKind', 'site']) && siteValid(row.site))) return false
   if (!value.fsharpNodes.every((row) => exactKeys(row, ['nodeKind', 'semanticIdentity', 'site']) && siteValid(row.site))) return false
   if (!value.signatureExports.every((row) => exactKeys(row, ['exportKind', 'declarationIdentity', 'site']) && siteValid(row.site))) return false
@@ -139,6 +146,10 @@ export function scanCompilerObservationsV1({ aggregate = AGGREGATE, productionRo
         consumerPath: repositoryPath(entry.consumerPath),
         providerPaths: entry.providerPaths.map(repositoryPath),
       })),
+      applicationUses: parsed.applicationUses.map((entry) => ({
+        ...entry,
+        consumerPath: repositoryPath(entry.consumerPath),
+      })),
       externalSymbolUses: parsed.externalSymbolUses.map((entry) => ({ ...entry, site: mapSite(entry.site) })),
       fsharpNodes: parsed.fsharpNodes.map((entry) => ({ ...entry, site: mapSite(entry.site) })),
       fableInterop: parsed.fableInterop.map((entry) => ({ ...entry, site: mapSite(entry.site) })),
@@ -178,7 +189,7 @@ function printResult(result) {
   const { census } = result.analysis
   const observations = result.compilerObservations
   process.stdout.write(
-    `locality-dependencies: ${result.analysis.violations.length === 0 ? 'OK' : 'BLOCKED'} — ${census.localities} localities, ${census.sources} sources, ${census.actualSourceEdges} actual source edges, ${census.missingClosureEdges} missing closure edges; observations ${observations.declarationUses.length} declaration / ${observations.externalSymbolUses.length} external / ${observations.fsharpNodes.length} F# nodes / ${observations.fableInterop.length} interop / ${observations.signatureExports.length} exports / ${observations.diagnostics.length} diagnostics; compiler ${observations.elapsedMilliseconds}ms\n`,
+    `locality-dependencies: ${result.analysis.violations.length === 0 ? 'OK' : 'BLOCKED'} — ${census.localities} localities, ${census.sources} sources, ${census.actualSourceEdges} actual source edges, ${census.missingClosureEdges} missing closure edges; observations ${observations.declarationUses.length} declaration / ${observations.applicationUses.length} application / ${observations.externalSymbolUses.length} external / ${observations.fsharpNodes.length} F# nodes / ${observations.fableInterop.length} interop / ${observations.signatureExports.length} exports / ${observations.diagnostics.length} diagnostics; compiler ${observations.elapsedMilliseconds}ms\n`,
   )
   for (const violation of result.analysis.violations.slice(0, 50))
     process.stderr.write(

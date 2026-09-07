@@ -6,6 +6,7 @@ open Wanxiangshu.Change
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System
+open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
@@ -213,6 +214,9 @@ module PromptDispatcher =
     /// report `Ok` for facts it silently dropped, and PROMPT-005 is a durability
     /// claim before it is a sequencing one.
     type Runtime(journal: AgentJournal) =
+        /// DSL-cross-callback-proof: physical single-flight — one exact gate-nudge Host send
+        let gateNudgeFlights =
+            Dictionary<string, TaskCompletionSource<Result<PromptKey, string>>>()
 
         member _.RuntimeId = AgentJournal.runtimeId journal
 
@@ -221,6 +225,53 @@ module PromptDispatcher =
             AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
             |> Option.bind (fun session -> session.PromptAuthority)
             |> Option.defaultValue PromptAuthority.empty
+
+        member private _.ReleaseGateNudge(scope: string, completion) =
+            lock gateNudgeFlights (fun () ->
+                match gateNudgeFlights.TryGetValue scope with
+                | true, current when obj.ReferenceEquals(current, completion) ->
+                    gateNudgeFlights.Remove scope |> ignore
+                | _ -> ())
+
+        member private _.SettleGateNudge(completion: TaskCompletionSource<Result<PromptKey, string>>, send) : Task =
+            task {
+                try
+                    let! result = send ()
+                    completion.SetResult(result)
+                with error ->
+                    completion.SetException(error)
+            }
+            :> Task
+
+        member private this.StartGateNudge(scope, completion, send) =
+            task {
+                try
+                    do! this.SettleGateNudge(completion, send)
+                finally
+                    this.ReleaseGateNudge(scope, completion)
+            }
+            |> ignore
+
+        member internal this.RunGateNudgeOnce
+            (scope: string, send: unit -> Task<Result<PromptKey, string>>)
+            : Task<Result<PromptKey, string>> =
+            let completion, ownsFlight =
+                lock gateNudgeFlights (fun () ->
+                    match gateNudgeFlights.TryGetValue scope with
+                    | true, running -> running, false
+                    | false, _ ->
+                        let created =
+                            TaskCompletionSource<Result<PromptKey, string>>(
+                                TaskCreationOptions.RunContinuationsAsynchronously
+                            )
+
+                        gateNudgeFlights.Add(scope, created)
+                        created, true)
+
+            if ownsFlight then
+                this.StartGateNudge(scope, completion, send)
+
+            completion.Task
 
         member private _.AppendManagedPromptAccepted
             (promptKey: PromptKey)
@@ -349,9 +400,9 @@ module PromptDispatcher =
         member this.AcceptManagedChatIntent
             (intent: ChatAdmissionIntent.Decision)
             : Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>> =
-            let accept profile physicalMessageId origin effectiveAgent =
+            let accept profile physicalMessageId origin =
                 let evidence =
-                    ManagedChatAcceptance.evidenceFromIntent profile physicalMessageId origin effectiveAgent
+                    ManagedChatAcceptance.evidenceFromIntent profile physicalMessageId origin
 
                 ManagedChatAcceptance.accept
                     journal
@@ -363,14 +414,14 @@ module PromptDispatcher =
             | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
                 taskResult {
                     let! profile = this.AcceptExternalManagedRoot evidence
-                    return! accept profile evidence.Key.PhysicalUserMessageId evidence.Origin evidence.EffectiveAgent
+                    return! accept profile evidence.Key.PhysicalUserMessageId evidence.Origin
                 }
             | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
-                accept evidence.Authority evidence.Key.PhysicalUserMessageId evidence.Origin evidence.EffectiveAgent
+                accept evidence.Authority evidence.Key.PhysicalUserMessageId evidence.Origin
             | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
                 taskResult {
                     let! profile = this.AcceptPendingManagedPrompt evidence
-                    return! accept profile evidence.Key.PhysicalUserMessageId evidence.Origin evidence.EffectiveAgent
+                    return! accept profile evidence.Key.PhysicalUserMessageId evidence.Origin
                 }
             | _ ->
                 Task.FromResult(
@@ -664,7 +715,7 @@ module PromptDispatcher =
                 terminalProviderRun
                 (this.ProjectionFor profile.SessionId)
 
-        /// FALLBACK-008: has this Blogger request + terminal occasion already spent its one interaction repair.
+        /// PAR-008: has this Blogger request + terminal occasion already spent its one interaction repair.
         ///
         /// A read, not a claim. The previous `TryClaimInteractionRepair` mutated a
         /// `RepairClaims` set that no fact ever wrote, so the at-most-once guarantee

@@ -32,7 +32,7 @@ module Fact =
     [<RequireQualifiedAccess>]
     type AgentFact =
         | Prompt of PromptFactCases
-        | Fallback of FallbackFactCases
+        | ProviderFailure of ProviderFailureFactCases
         | Relay of RelayFactCases
         | Execution of ExecutionFactCases
         | Orchestrator of OrchestratorFactCases

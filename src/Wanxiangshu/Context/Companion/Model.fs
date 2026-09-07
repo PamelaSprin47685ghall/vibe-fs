@@ -31,8 +31,8 @@ type CompanionMemory =
 /// now has exactly two movers — `PrefixRebaseCommitted` (CTX-012) and
 /// `ContextReanchored` (HOST-006) — and neither goes through this port: they are
 /// written by the recovery path against `Context/Prefix/Epoch`, which is the
-/// single owner. A recovery slot either has a candidate or does not, so there is no
-/// enable flag left to persist.
+/// single owner. Each exact retry plan either carries a candidate or does not, so
+/// there is no enable flag left to persist.
 type ICompanionDurablePort =
     abstract Load: SessionId -> Task<Result<CompanionMemory option, string>>
 

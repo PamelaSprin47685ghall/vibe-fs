@@ -88,7 +88,6 @@ module ManagedChatAcceptance =
         authority: PromptAuthority.AuthorityExecutionProfile ->
         physicalUserMessageId: PhysicalUserMessageId ->
         origin: PromptOrigin ->
-        effectiveAgent: string ->
             AcceptedChatExecutionEvidence
 
     val internal persistenceError: failure: JournalAppendFailure -> ManagedChatAcceptanceError

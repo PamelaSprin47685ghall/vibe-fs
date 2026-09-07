@@ -106,7 +106,7 @@ export const CANARY_READY_MS = 10000;
 export const READINESS_STAGE_MS = 4000;
 
 /**
- * Fallback ceiling for one Host process: the 兜底 VERIFY-004 permits so long as it is not the
+ * Provider-failure backstop ceiling for one Host process: the 兜底 VERIFY-004 permits so long as it is not the
  * primary criterion, which the watchdog is. Restart-heavy strokes need roughly 45s solo headroom;
  * the bound stays generous as a backstop only. Still overridable through the CANARY_TIMEOUT_MS
  * environment variable; the env read stays at the call site so this module reads no process state.

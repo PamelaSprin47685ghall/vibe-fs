@@ -597,9 +597,9 @@ const malformedFaults = (scenario) =>
 /**
  * A `provider-error` fault must say whether the Host should retry it.
  *
- * This is the load-bearing bit of a fallback scenario and it is invisible in the
+ * This is the load-bearing bit of a provider-recovery scenario and it is invisible in the
  * response body: a retryable 500 means the HOST drives the retries, a non-retryable 400
- * means the Host gives up and the plugin must send a continuation (FALLBACK-009). Get it
+ * means the Host gives up and the plugin must send a continuation (PAR-019). Get it
  * wrong and the scenario still runs, just proving a different clause than its author
  * believes. So it is required rather than defaulted.
  */
@@ -614,7 +614,7 @@ const providerErrorProblems = (scenario) =>
     if (typeof fault.retryable !== 'boolean') {
       problems.push(
         `fault[${index}]: a provider-error must declare retryable; ` +
-          'it decides whether the Host retries or the plugin continues the Logical Run (FALLBACK-009)',
+          'it decides whether the Host retries or the plugin continues the Logical Run (PAR-019)',
       );
     }
     return problems;

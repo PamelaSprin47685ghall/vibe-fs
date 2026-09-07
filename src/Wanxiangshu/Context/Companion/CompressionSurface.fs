@@ -11,9 +11,8 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
-/// Context-compression decision owner. Attempt choice, recovery-slot dispatch
+/// Context-compression decision owner. Attempt choice, retry request dispatch
 /// and terminal validity cross this JSON boundary; prefix selection and epoch
 /// behavior are owned by `PrefixSurface`.
 [<RequireQualifiedAccess>]
@@ -91,62 +90,18 @@ module CompressionSurface =
             | Some requestKind -> Ok requestKind
             | None -> Error(sprintf "unknown request kind: %s" (text value))
 
-    let private armingOf (value: string) =
-        if value = "ArmedByAdvance" then
-            SlotArming.ArmedByAdvance
-        else
-            SlotArming.NotArmed
-
-    let private offsetOf (value: int) =
-        match ((value % 4) + 4) % 4 with
-        | 1 -> AgentPairCursor.FallbackOffset.Fork1
-        | 2 -> AgentPairCursor.FallbackOffset.Fork2
-        | 3 -> AgentPairCursor.FallbackOffset.Fork3
-        | _ -> AgentPairCursor.FallbackOffset.Fork0
-
-    let private cursorOfJs (value: obj) : AgentPairCursor.FallbackCursor =
-        if isNullish value then
-            AgentPairCursor.initial
-        else
-            { Offset = offsetOf (intValue value?offset)
-              ConsecutiveFailureCount = intValue value?failures }
-
-    let private cursorView (cursor: AgentPairCursor.FallbackCursor) : obj =
-        box
-            {| offset = int (AgentPairCursor.FallbackOffsetCodec.toByte cursor.Offset)
-               failures = cursor.ConsecutiveFailureCount |}
-
-    let beginSequence: string = "NotArmed"
-    let afterFailureAdvance: string = "ArmedByAdvance"
-    let afterRestart: string = "NotArmed"
-    let isArmed (value: string) : bool = RecoverySlot.isArmed (armingOf value)
-
-    let mayRecover (arming: string) (offset: int) (hasMaterial: bool) : bool =
-        RecoverySlot.mayRecover (armingOf arming) (offsetOf offset) hasMaterial
-
-    let recoveryOpportunity (arming: string) (offset: int) : string =
-        match RecoverySlot.opportunity (armingOf arming) (offsetOf offset) with
-        | RecoveryOpportunity.OrdinaryAttempt -> "OrdinaryAttempt"
-        | RecoveryOpportunity.RecoveryAttempt -> "RecoveryAttempt"
-
-    let private bloggerDispatchErrorName (error: BloggerSlotDispatchError) : string =
+    let private bloggerRetryErrorName (error: BloggerRetryError) : string =
         match error with
-        | BloggerSlotDispatchError.MissingProjection -> "MissingProjection"
-        | BloggerSlotDispatchError.NoActiveBloggerRun -> "NoActiveBloggerRun"
+        | BloggerRetryError.MissingProjection -> "MissingProjection"
+        | BloggerRetryError.NoActiveBloggerRun -> "NoActiveBloggerRun"
 
-    let nextBloggerRequest (failedKind: string) (opportunity: string) (hasSquashMaterial: bool) : string =
-        let nextOpportunity =
-            if opportunity = "RecoveryAttempt" then
-                RecoveryOpportunity.RecoveryAttempt
-            else
-                RecoveryOpportunity.OrdinaryAttempt
-
+    let nextBloggerRequest (failedKind: string) (hasSquashMaterial: bool) : string =
         match requestKindOf failedKind with
-        | None -> bloggerDispatchErrorName BloggerSlotDispatchError.MissingProjection
+        | None -> bloggerRetryErrorName BloggerRetryError.MissingProjection
         | Some kind ->
-            match RecoverySlot.nextBloggerRequest kind nextOpportunity hasSquashMaterial with
+            match BloggerRetryPolicy.nextRequest kind hasSquashMaterial with
             | Ok next -> ProviderRequestKind.label next
-            | Error error -> bloggerDispatchErrorName error
+            | Error error -> bloggerRetryErrorName error
 
     let private outcomeResult (value: obj) : Result<AttemptOutcome, string> =
         match text value with
@@ -155,47 +110,6 @@ module CompressionSurface =
         | "Failed" -> Ok AttemptOutcome.Failed
         | "Aborted" -> Ok AttemptOutcome.Aborted
         | unknown -> Error(sprintf "unknown attempt outcome: %s" unknown)
-
-    let private decisionName (decision: SlotDecision) : string =
-        match decision with
-        | SlotDecision.CommitSquashThenMain -> "CommitSquashThenMain"
-        | SlotDecision.MainWithoutSquash -> "MainWithoutSquash"
-        | SlotDecision.CommitMain _ -> "CommitMain"
-        | SlotDecision.RepairOnce -> "RepairOnce"
-        | SlotDecision.AbandonRoundProduct -> "AbandonRoundProduct"
-        | SlotDecision.FailSlot -> "FailSlot"
-
-    let private decisionToJs (decision: SlotDecision) : obj =
-        box
-            {| name = decisionName decision
-               advancesCursor = RecoverySlot.advancesCursor decision
-               nextArmingName =
-                if RecoverySlot.nextArming decision = SlotArming.ArmedByAdvance then
-                    "ArmedByAdvance"
-                else
-                    "NotArmed"
-               clearsFailureCount =
-                match decision with
-                | SlotDecision.CommitMain clears -> clears
-                | _ -> false |}
-
-    let onSquash (outcome: string) : obj =
-        match outcomeResult (box outcome) with
-        | Error error -> box {| ok = false; error = error |}
-        | Ok outcome -> RecoverySlot.onSquashOutcome outcome |> decisionToJs
-
-    let onMain (value: obj) : obj =
-        match requestKindResult value?kind, outcomeResult value?outcome with
-        | Ok kind, Ok outcome ->
-            let consumed = not (isNullish value?aabbConsumed) && unbox<bool> value?aabbConsumed
-            RecoverySlot.onMainOutcome kind consumed outcome |> decisionToJs
-        | Error error, _
-        | _, Error error -> box {| ok = false; error = error |}
-
-    let armingName (value: string) : string = value
-
-    let cursor =
-        box {| isRecoverySlot = (fun offset -> AgentPairCursor.isRecoverySlot (offsetOf offset)) |}
 
 
     let private roleResult value : Result<Role, string> =
@@ -230,15 +144,12 @@ module CompressionSurface =
             |> Result.map (fun authority ->
                 AttemptPlanner.plan
                     authority
-                    (cursorOfJs value?cursor)
                     (PhysicalUserMessageId.create "surface-user")
                     (ProviderRunIdentity.create "surface-provider-run")
                     (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot)
                     requestKind
-                    (if not (isNullish value?mayRecover) && unbox<bool> value?mayRecover then
-                         RecoveryOpportunity.RecoveryAttempt
-                     else
-                         RecoveryOpportunity.OrdinaryAttempt)
+                    (not (isNullish value?policyAllowsProbe) && unbox<bool> value?policyAllowsProbe
+                     || not (isNullish value?mayRecover) && unbox<bool> value?mayRecover)
                     selectProbe)
         | Error error, _
         | _, Error error -> Error error
@@ -271,9 +182,10 @@ module CompressionSurface =
 
     let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
         box
-            {| selectedAgent = ParticipantIdentity.selectedAgent identity
-               peerAgent = ParticipantIdentity.peerAgent identity
+            {| participant = ParticipantIdentity.selectedAgent identity
+               selectedAgent = ParticipantIdentity.selectedAgent identity
                canonicalRole = ParticipantIdentity.roleLabel identity
+               role = ParticipantIdentity.roleLabel identity
                selectedTier = "deep"
                persona = ParticipantIdentity.persona identity
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
@@ -292,7 +204,11 @@ module CompressionSurface =
             {| choice = choice
                probeId = optionObj probeId
                noProbeReason = optionObj (plan.NoProbeReason |> Option.map reasonName)
-               effectiveAgent = plan.Profile.EffectiveAgent
+               participant = plan.Profile.Authority.SelectedAgent
+               canonicalRole = Roles.roleLabel plan.Profile.CanonicalRole
+               role = Roles.roleLabel plan.Profile.CanonicalRole
+               requestKind = ProviderRequestKind.label plan.Profile.RequestKind
+               projectionChoice = choice
                participantIdentity = participantIdentityToJs plan.Profile.Authority.ParticipantIdentity
                systemPromptId = SystemPromptId.value plan.Profile.SystemPromptId
                toolCapabilities =
@@ -324,7 +240,11 @@ module CompressionSurface =
                 {| choice = viewObject?choice
                    probeId = viewObject?probeId
                    noProbeReason = viewObject?noProbeReason
-                   effectiveAgent = viewObject?effectiveAgent
+                   participant = viewObject?participant
+                   canonicalRole = viewObject?canonicalRole
+                   role = viewObject?role
+                   requestKind = viewObject?requestKind
+                   projectionChoice = viewObject?projectionChoice
                    participantIdentity = viewObject?participantIdentity
                    systemPromptId = viewObject?systemPromptId
                    toolCapabilities = viewObject?toolCapabilities

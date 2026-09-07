@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Foundation
 
 type ModelRoutingTarget = { Model: string; Reasoning: string }
 
@@ -34,7 +35,8 @@ module internal CapacityFence =
 type internal ExecutionAdmissionExactIdentity =
     { SessionId: string
       PhysicalUserMessageId: string
-      EffectiveAgent: string
+      Role: Role
+      Participant: string
       Target: ModelRoutingTarget }
 
 type internal ExecutionAdmissionLease =
@@ -114,7 +116,8 @@ type internal ExecutionAdmissionRejection =
     | StaleLease
     | WrongSession
     | WrongPhysicalUserMessage
-    | WrongEffectiveAgent
+    | WrongRole
+    | WrongParticipant
     | WrongTarget
     | IllegalTransition
     | OppositeTerminalConflict
@@ -139,7 +142,8 @@ type internal CapacityTransitionCounters =
 type internal CapacityExactOwnerSnapshot =
     { SessionId: string
       PhysicalUserMessageId: string
-      EffectiveAgent: string option }
+      Role: Role option
+      Participant: string option }
 
 type internal CapacityLedgerEntrySnapshot<'target> = { Credit: int64; Target: 'target }
 

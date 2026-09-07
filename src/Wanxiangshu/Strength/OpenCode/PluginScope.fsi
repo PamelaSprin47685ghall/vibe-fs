@@ -26,6 +26,7 @@ type PluginStrengthScope =
     member StrengthFeature: sessionId: SessionId * role: Role * visibleBytes: int -> StrengthFeatureKey
 
     member StrengthPrediction: feature: StrengthFeatureKey -> StrengthPrediction
+    member StrengthBucket: feature: StrengthFeatureKey -> StrengthPredictorBucket
     member TripStrengthFuse: reason: string -> unit
     member StrengthFuseReason: string option
     member StrengthFuse: Result<unit, string>

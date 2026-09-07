@@ -150,272 +150,85 @@ module InteractionRepairWorkflow =
             (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
         |> ignore
 
-    let private exhaustBloggerProtocol
-        (host: IBloggerRuntimeHost)
-        (eventPort: IEventObservationPort)
-        (journal: AgentJournal)
-        (context: ReconciledTurnContext)
-        (reason: string)
-        : Task =
-        task {
-            let turn = context.Turn
-            let key = SessionId.value turn.SessionId
-            let live = host.TryPeekCurrentRequest key
-
-            match live with
-            | Some request ->
-                do!
-                    BloggerAbandon.openRequest
-                        journal
-                        (BloggerRequestContext.mainSessionId request)
-                        turn.SessionId
-                        (Some request)
-                        reason
-
-                BloggerRuntimeHost.requireReleaseCurrentRequest host key request
-            | None -> ()
-
-            notifyBloggerProtocolFailure eventPort turn reason
-        }
-        :> Task
-
-    type private BloggerAabbFailureDecision =
-        | SendAabb
-        | IgnoreSuperseded
-        | ExhaustProtocol
-        | FailProtocol of string
-
-    let private decideBloggerAabbFailure
-        (guaranteedFirstAabb: bool)
-        (outcome: Result<ConfirmedFailureOutcome, string>)
-        : BloggerAabbFailureDecision =
-        match outcome with
-        | Error error -> FailProtocol error
-        | Ok ConfirmedFailureOutcome.NoActiveRun -> FailProtocol "blogger AABB has no active logical run"
-        // The nudge failure has already earned one protocol AABB attempt.
-        // A generic fallback boundary reached by this same failure may not
-        // retroactively steal that first send.
-        | Ok ConfirmedFailureOutcome.RecoveryExhausted when guaranteedFirstAabb -> SendAabb
-        | Ok ConfirmedFailureOutcome.RecoveryExhausted -> ExhaustProtocol
-        | Ok ConfirmedFailureOutcome.EpisodeSuperseded -> IgnoreSuperseded
-        | Ok(ConfirmedFailureOutcome.RecoveryAdvanced _) -> SendAabb
-
-    let private sendBloggerAabbAfterPermitConsumed
-        (host: IBloggerRuntimeHost)
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
-        (journal: AgentJournal)
-        (context: ReconciledTurnContext)
-        (requestId: BloggerRequestId)
-        (requestKind: ProviderRequestKind)
-        (guaranteedFirstAabb: bool)
-        (reason: string)
-        : Task =
-        task {
-            let turn = context.Turn
-
-            let sendAabb () =
-                task {
-                    match!
-                        HostSessionNudge.trySendInteractionRepair
-                            sessionPort
-                            rootWorkspace
-                            turn.SessionId
-                            EnforcerRepair.RepairInstruction
-                            turn.Directory
-                            (Some journal)
-                            requestId
-                            turn.ProviderRun
-                            BloggerRecoveryProbe.BloggerAabbRepairKind
-                    with
-                    | InteractionRepairSendOutcome.Sent _
-                    | InteractionRepairSendOutcome.AlreadyAdmitted
-                    | InteractionRepairSendOutcome.Retired -> ()
-                    | InteractionRepairSendOutcome.Failed error ->
-                        notifyBloggerProtocolFailure eventPort turn ("blogger AABB send failed: " + error)
-                }
-
-            let! confirmedFailure =
-                ProviderRecoveryWorkflow.admitPolicyAuthorizedFailure
-                    journal
-                    turn
-                    ExecutionFailure.ProviderTransient
-                    requestKind
-                    reason
-
-            match decideBloggerAabbFailure guaranteedFirstAabb confirmedFailure with
-            | SendAabb -> do! sendAabb ()
-            | IgnoreSuperseded -> ()
-            | ExhaustProtocol ->
-                do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
-            | FailProtocol error -> notifyBloggerProtocolFailure eventPort turn error
-        }
-        :> Task
-
-    let private admitPermit
-        (quiescence: ISessionQuiescenceGate)
-        (permit: QuiescencePermit)
-        : Result<QuiescencePermit, QuiescencePermitFailure> =
-        quiescence.TryConsume permit |> Result.map (fun () -> permit)
-
-    let private consumeThenSendBloggerAabb
-        (host: IBloggerRuntimeHost)
-        (quiescence: ISessionQuiescenceGate)
-        (context: ReconciledTurnContext)
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
-        (journal: AgentJournal)
-        (requestId: BloggerRequestId)
-        (requestKind: ProviderRequestKind)
-        (guaranteedFirstAabb: bool)
-        (reason: string)
-        : Task =
-        match context.Quiescence |> Option.map (admitPermit quiescence) with
-        | Some(Ok _) ->
-            sendBloggerAabbAfterPermitConsumed
-                host
-                sessionPort
-                rootWorkspace
-                eventPort
-                journal
-                context
-                requestId
-                requestKind
-                guaranteedFirstAabb
-                reason
-        | Some(Error _)
-        | None -> AsyncSupport.completedTask ()
-
-    let private sendBloggerNudge
-        (host: IBloggerRuntimeHost)
-        (quiescence: ISessionQuiescenceGate)
-        (context: ReconciledTurnContext)
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
-        (journal: AgentJournal)
-        (requestId: BloggerRequestId)
-        (requestKind: ProviderRequestKind)
-        : Task =
-        task {
-            match context.Quiescence with
-            | None -> ()
-            | Some permit ->
-                match!
-                    HostSessionNudge.trySendIdleInteractionRepair
-                        quiescence
-                        permit
-                        sessionPort
-                        rootWorkspace
-                        context.Turn.SessionId
-                        EnforcerRepair.RepairInstruction
-                        context.Turn.Directory
-                        (Some journal)
-                        requestId
-                        context.Turn.ProviderRun
-                        BloggerRecoveryProbe.BloggerMissingToolRepairKind
-                with
-                | HostSessionNudge.IdleContinuationOutcome.Sent _
-                | HostSessionNudge.IdleContinuationOutcome.AdmissionRejected _
-                | HostSessionNudge.IdleContinuationOutcome.AlreadyAdmitted
-                | HostSessionNudge.IdleContinuationOutcome.Retired -> ()
-                | HostSessionNudge.IdleContinuationOutcome.NotSent error
-                | HostSessionNudge.IdleContinuationOutcome.Failed error ->
-                    do!
-                        sendBloggerAabbAfterPermitConsumed
-                            host
-                            sessionPort
-                            rootWorkspace
-                            eventPort
-                            journal
-                            context
-                            requestId
-                            requestKind
-                            true
-                            ("blogger nudge failed: " + error)
-        }
-        :> Task
-
-    let private isInteractionRepairContinuation (durable: AgentJournal) (turn: ReconciledTurn) =
-        continuationKindOf (Some durable) turn = Some PromptAuthority.ContinuationKind.InteractionRepair
-
-    let private bloggerProviderRequestKind (request: BloggerRequestContext) =
-        match request with
-        | BloggerRequestContext.Main _ -> ProviderRequestKind.BloggerMain
-        | BloggerRequestContext.Squash _ -> ProviderRequestKind.BloggerSquash
-
-    let private repairRequestKind (durable: AgentJournal) (turn: ReconciledTurn) (request: BloggerRequestContext) =
-        if isInteractionRepairContinuation durable turn then
-            ProviderRequestKind.InteractionRepair
-        else
-            bloggerProviderRequestKind request
-
-    let private repairOwnedBloggerProtocol
-        (host: IBloggerRuntimeHost)
-        (quiescence: ISessionQuiescenceGate)
-        (context: ReconciledTurnContext)
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
-        (durable: AgentJournal)
-        (request: BloggerRequestContext)
-        : Task =
-        let requestId = BloggerRequestContext.requestId request
-
-        let requestKind = repairRequestKind durable context.Turn request
-
-        match
-            BloggerRecoveryProbe.repairStateForInvalidTerminal
-                durable
-                context.Turn.SessionId
-                requestId
-                context.Turn.ProviderRun
-        with
-        | BloggerRecoveryProbe.InvalidTerminalRepairState.NoRecovery ->
-            sendBloggerNudge host quiescence context sessionPort rootWorkspace eventPort durable requestId requestKind
-        | BloggerRecoveryProbe.InvalidTerminalRepairState.InteractionNudgeIssued issuedRun when
-            issuedRun = context.Turn.ProviderRun
-            ->
-            AsyncSupport.completedTask ()
-        | BloggerRecoveryProbe.InvalidTerminalRepairState.InteractionNudgeIssued _ ->
-            consumeThenSendBloggerAabb
-                host
-                quiescence
-                context
-                sessionPort
-                rootWorkspace
-                eventPort
-                durable
-                requestId
-                requestKind
-                true
-                "blogger missing chronicle after interaction nudge"
-        | BloggerRecoveryProbe.InvalidTerminalRepairState.AabbRepairIssued issuedRun when
-            issuedRun = context.Turn.ProviderRun
-            ->
-            AsyncSupport.completedTask ()
-        | BloggerRecoveryProbe.InvalidTerminalRepairState.AabbRepairIssued _ ->
-            consumeThenSendBloggerAabb
-                host
-                quiescence
-                context
-                sessionPort
-                rootWorkspace
-                eventPort
-                durable
-                requestId
-                requestKind
-                false
-                "blogger invalid terminal after AABB"
 
     /// Blogger has a stricter terminal protocol than ordinary agents: prose-only
     /// completion is not a closing report. Idle is the only guaranteed wake after
-    /// a zero-tool terminal, so it owns the missing-chronicle nudge → AABB state
-    /// machine instead of the generic MissingClosingReport continuation.
+    /// a zero-tool terminal, so idle forwards the exact observation to
+    /// BloggerCoordinator.observeIdleRepair, which owns the missing-chronicle
+    /// sequence instead of the generic MissingClosingReport
+    /// continuation.
     /// Historical/unowned idle is observation only: without the exact live
     /// BloggerRequest there is no protocol budget to spend.
+    let private consumeBloggerRepairOutcome (outcome: BloggerRepairOutcome) : unit =
+        match outcome with
+        | BloggerRepairOutcome.NudgeSent _
+        | BloggerRepairOutcome.AabbSent _
+        | BloggerRepairOutcome.RepairInjected _
+        | BloggerRepairOutcome.PendingRepairWait
+        | BloggerRepairOutcome.UnownedIdleIgnored
+        | BloggerRepairOutcome.SupersededIgnored
+        | BloggerRepairOutcome.AbandonedExhausted
+        | BloggerRepairOutcome.Completed -> ()
+
+    let private sendOwnedBloggerRepair
+        (host: IBloggerRuntimeHost)
+        (durable: AgentJournal)
+        (request: BloggerRequestContext)
+        (quiescence: ISessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
+        (eventPort: IEventObservationPort)
+        : Task =
+        task {
+            let! outcome =
+                BloggerCoordinator.observeIdleRepair
+                    host
+                    (Some durable)
+                    request
+                    quiescence
+                    context
+                    sessionPort
+                    rootWorkspace
+                    eventPort
+
+            consumeBloggerRepairOutcome outcome
+            return ()
+        }
+        :> Task
+
+    let private forwardOwnedBloggerRepair
+        (host: IBloggerRuntimeHost)
+        (durable: AgentJournal)
+        (request: BloggerRequestContext)
+        (quiescence: ISessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
+        (eventPort: IEventObservationPort)
+        : Task =
+        task {
+            match
+                BloggerRecoveryProbe.terminalRequestOwnershipForPhysicalMessage
+                    durable
+                    context.Turn.SessionId
+                    request
+                    context.Turn.PhysicalUserMessageId
+            with
+            | BloggerTerminalRequestOwnership.Superseded ->
+                Diagnostic.emit
+                    "blogger-protocol-repair-superseded"
+                    [ "session_id", SessionId.value context.Turn.SessionId
+                      "result", "terminal belongs to an older Blogger request" ]
+
+                return ()
+            | BloggerTerminalRequestOwnership.Current
+            | BloggerTerminalRequestOwnership.Unproven ->
+                return!
+                    sendOwnedBloggerRepair host durable request quiescence context sessionPort rootWorkspace eventPort
+        }
+        :> Task
+
     let repairBloggerProtocol
         (host: IBloggerRuntimeHost)
         (quiescence: ISessionQuiescenceGate)
@@ -439,28 +252,12 @@ module InteractionRepairWorkflow =
 
             AsyncSupport.completedTask ()
         | Some durable, Some request ->
-            match
-                BloggerRecoveryProbe.terminalRequestOwnershipForPhysicalMessage
-                    durable
-                    context.Turn.SessionId
-                    request
-                    context.Turn.PhysicalUserMessageId
-            with
-            | BloggerTerminalRequestOwnership.Superseded ->
-                Diagnostic.emit
-                    "blogger-protocol-repair-superseded"
-                    [ "session_id", SessionId.value context.Turn.SessionId
-                      "result", "terminal belongs to an older Blogger request" ]
-
-                AsyncSupport.completedTask ()
-            | BloggerTerminalRequestOwnership.Current
-            | BloggerTerminalRequestOwnership.Unproven ->
-                repairOwnedBloggerProtocol host quiescence context sessionPort rootWorkspace eventPort durable request
+            forwardOwnedBloggerRepair host durable request quiescence context sessionPort rootWorkspace eventPort
 
     /// CTX-010 recovery continue owns the physical run until its own terminal is
     /// published. Missing-final-report / interaction-repair on that run hijacks the
-    /// recovery slot: the interleaved idle reads finish=None (Unknown) or a
-    /// provisional NeedsContinuation while the probe response is still on the wire,
+    /// exact retry: the interleaved idle reads finish=None (Unknown) or a
+    /// provisional NeedsContinuation while the retry response is still on the wire,
     /// and a fresh SessionIdle of the *same* provider attempt mints a valid
     /// quiescence permit (BeginProviderAttempt already ran for the probe itself).
     /// Stale-permit gating cannot suppress that race — the permit is not stale.
@@ -482,9 +279,9 @@ module InteractionRepairWorkflow =
     /// report is reminded once per exact terminal occasion, and only when the
     /// pass carried idle evidence. If the reminder itself reaches another invalid
     /// terminal, that fresh occasion may remind again until the closing-report
-    /// gate is satisfied. ProviderRetryAttempt
-    /// continues own the recovery slot — suppress missing-final-report so the
-    /// probe's own terminal can promote.
+    /// gate is satisfied. ProviderRetryAttempt continuations own their exact
+    /// physical request — suppress missing-final-report so that request's terminal
+    /// can promote its frozen prefix choice.
     let repairMissingFinalReport
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
@@ -509,8 +306,8 @@ module InteractionRepairWorkflow =
                 (ProviderProse.documentFor context.Turn.SessionId RuntimeNudge.MissingClosingReport Map.empty)
                 "missing-final-report"
 
-    /// Incomplete in-progress interaction: classify then idle-repair, unless a
-    /// ProviderRetryAttempt continue owns the recovery slot.
+    /// Incomplete in-progress interaction: classify then idle-repair, unless the
+    /// exact request is a ProviderRetryAttempt continuation.
     let repairIncompleteInteraction
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)

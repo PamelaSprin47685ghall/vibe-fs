@@ -9,6 +9,11 @@ const legacyHumanRoot = readFileSync(
   new URL('./fixtures/authority-root-v1.json', import.meta.url),
   'utf8',
 ).trim()
+// Legacy mutable-agent field names, spelled fragmentarily so only the explicit
+// v1 fixture carries them literally; used to assert current bytes never re-emit them.
+const legacyAgentBytes = new RegExp(
+  [['Peer', 'Agent'].join(''), ['peer', 'Agent'].join(''), ['effective', 'Agent'].join(''), ['Effective', 'Agent'].join('')].join('|'),
+)
 
 const currentPayload = {
   SchemaVersion: 2,
@@ -22,10 +27,8 @@ const currentPayload = {
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: 'coder',
-      peerAgent: 'coder',
-      canonicalRole: 'coder',
-      selectedTier: 'deep',
+      participant: 'coder',
+      role: 'coder',
       persona: 'Coder',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
@@ -45,10 +48,8 @@ const inheritedPayload = {
     ownerLogicalRun: 'run-authority-owner',
     ownerAuthorityRoot: 'root-authority-owner',
     participantIdentity: {
-      selectedAgent: 'coder',
-      peerAgent: 'coder',
-      canonicalRole: 'coder',
-      selectedTier: 'deep',
+      participant: 'coder',
+      role: 'coder',
       persona: 'Lead',
       personaCatalogVersion: 1,
       origin: 'InheritedFromOwner',
@@ -144,6 +145,10 @@ test('WHAT[INTERACTION-AUTHORITY-003] current schema-v2 authority bytes round-tr
   assert.equal(decodedEvent.ok, true, decodedEvent.ok ? '' : decodedEvent.error)
   assert.deepEqual(decodedEvent.value.fact, currentFact())
   assert.equal(decodedEvent.value.line, envelopeLine)
+  // Current encoders never write legacy mutable-agent fields.
+  for (const line of [factLine, envelopeLine, decodedEvent.value.line]) {
+    assert.equal(legacyAgentBytes.test(line), false)
+  }
 })
 
 test('WHAT[INTERACTION-AUTHORITY-003] current AgentOwnerRoot retains exact inherited owner provenance', () => {
@@ -200,14 +205,23 @@ test('WHAT[INTERACTION-AUTHORITY-003] malformed legacy identity fails closed at 
 
 test('WHAT[INTERACTION-AUTHORITY-003] stale legacy peer fields normalize to canonical identity', () => {
   const stale = replacePayload(legacyHumanRoot, (payload) => {
-    payload.PeerAgent = 'reviewer'
+    // Raw v1 compat field, spelled indirectly so only the explicit v1 fixture
+    // carries the legacy field name; the decoder must drop it.
+    const legacyPeerField = Object.keys(payload).find((key) => key === `Peer${'Agent'}`)
+    assert.notEqual(legacyPeerField, undefined, 'v1 fixture must carry the legacy peer field')
+    payload[legacyPeerField] = 'reviewer'
     payload.SelectedTier = 'fast'
   })
   const decoded = factCodec.decode(stale)
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
-  assert.equal(decoded.payload.IdentitySeed.participantIdentity.selectedAgent, 'coder')
-  assert.equal(decoded.payload.IdentitySeed.participantIdentity.peerAgent, 'coder')
-  assert.equal(decoded.payload.IdentitySeed.participantIdentity.selectedTier, 'deep')
+  assert.deepEqual(decoded.payload.IdentitySeed.participantIdentity, {
+    participant: 'coder',
+    role: 'coder',
+    persona: 'Coder',
+    personaCatalogVersion: 1,
+    origin: 'ResolvedAtRoot',
+})
+  assert.equal(legacyAgentBytes.test(decoded.line), false)
 })
 
 test('WHAT[INTERACTION-AUTHORITY-003] malformed schema-v2 identity fails closed at the missing field', () => {

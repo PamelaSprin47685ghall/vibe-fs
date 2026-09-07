@@ -27,6 +27,16 @@ type StrengthDryRunStart =
     { ReplicaSessionId: SessionId
       Completion: Task<StrengthReplicaOutcome> }
 
+[<RequireQualifiedAccess>]
+type StrengthReplicaPurpose =
+    | Treatment
+    | DryRun
+
+type StrengthReplicaPeek =
+    { RequestsAdmitted: int
+      Batches: StrengthRequestBatch list
+      SemanticTerminal: StrengthReplicaTerminal option }
+
 type StrengthReplicaRuntime =
     new:
         sessions: ISessionHostPort *
@@ -43,6 +53,12 @@ type StrengthReplicaRuntime =
     member IsReplica: sessionId: SessionId -> bool
     member TryOwner: sessionId: SessionId -> SessionId option
     member TryDecision: sessionId: SessionId -> StrengthDecisionId option
+    member TryPeek: replicaSessionId: SessionId -> StrengthReplicaPeek option
+
+    member AttachLiveDecision:
+        binding: StrengthReplicaBinding * purpose: StrengthReplicaPurpose ->
+            Result<Task<StrengthReplicaOutcome>, string>
+
     member HandleTransform: output: obj -> Task<bool>
     member HandleTurn: turn: ReconciledTurn -> bool
     member HandleSessionDeleted: sessionId: SessionId -> unit

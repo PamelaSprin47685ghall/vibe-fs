@@ -14,11 +14,11 @@
 
 ## DISPATCH-PROTOCOL-004: physical acceptance 只由真实物理证据建立
 
-`PhysicalAccepted` 状态必须且只能由真实的物理消息证据确立（例如运行时捕获明确的物理消息 ID，或在恢复阶段在宿主历史中匹配到包含完全一致 `PromptKey` 的物理用户消息）。
+`PhysicalAccepted` 状态必须且只能由真实的物理消息证据确立（例如运行时捕获明确的物理消息 ID，或在恢复阶段在宿主历史中匹配到包含完全一致的 agent-free `PromptKey` 的物理用户消息）。旧版包含 agent 的历史 PromptKey 仅保留只读单向历史解码用于恢复匹配，绝对禁止双写或作为新调度证据。
 
 ## DISPATCH-PROTOCOL-005: PromptKey 是确定性幂等身份
 
-`PromptKey` 是由 SessionId、LogicalRunId、AuthorityRootId、Origin、EffectiveAgent、载荷摘要及 ClaimSequence 派生的确定性哈希，禁止使用随机数生成。相同逻辑交互在任何进程中派生完全一致的 Key，任意要素变动均会导致 Key 发生迁移。
+`PromptKey` 是由 SessionId、LogicalRunId、AuthorityRootId、Origin、载荷摘要（PayloadDigest）及 ClaimSequence 派生的确定性哈希，禁止使用随机数生成，亦不哈入任何 agent、peer 或 model。相同逻辑交互在任何进程中派生完全一致的 Key，任意要素变动均会导致 Key 发生迁移。旧版包含 EffectiveAgent 的历史 PromptKey 仅作为只读历史解码兼容，绝对禁止向新调度双写或派生。
 
 ## DISPATCH-PROTOCOL-006: 同 payload 的两个独立 logical act 仍可区分
 
@@ -30,7 +30,7 @@
 
 ## DISPATCH-PROTOCOL-008: at-most-one logical effect 不虚构 exactly-once
 
-协议坚守至多一次（at-most-one）逻辑执行保障与未知结果 fail-closed 原则。禁止伪造物理投递的 exactly-once，禁止以时间窗口粗暴替代 PromptKey 校验，禁止为消除挂起状态而盲目重发。
+协议坚守至多一次（at-most-one）逻辑执行保障与未知结果 fail-closed 原则。terminal-scoped gate nudge 的 `(SessionId, LogicalRunId, Origin, PayloadDigest)` exact occasion 在同一 dispatcher runtime 内只允许一条 claim→send flight；并发观察者必须等待同一个 PromptKey 与结果，不能各自消费 ClaimSequence、写 claim 或调用 Host。flight 完成后，只有 durable projection 证明前次已明确 Abandoned 才能开启新 sequence；Pending、Submitted、PhysicalAccepted 均不可重发。禁止伪造物理投递的 exactly-once，禁止以时间窗口粗暴替代 PromptKey 校验，禁止为消除挂起状态而盲目重发。
 
 ## DISPATCH-PROTOCOL-009: Detached 在 durable claim 后立即交还控制
 
@@ -39,6 +39,7 @@
 ## DISPATCH-PROTOCOL-010: Root 与 dispatch 不得选择、等待或覆盖 model
 
 调度与 Authority Root 阶段严禁指定、修改或等待底层物理模型 ID。发送参数固定为未指定模型，具体的模型分配与算力租赁严格延迟至宿主执行准入阶段由专门路由模块裁决。
+发送的 Host `agent` 固定为不可变的 `participant`，`model` 固定为 null；continuation 保持 participant 不变，fresh physical target 路由永不改变 participant。显式外部 agent 仍作为输入保留，并与 participant 做一致性校验。
 
 ## DISPATCH-PROTOCOL-011: 插件 user-shaped message 一律经 PROMPT-005
 
@@ -46,7 +47,7 @@
 
 ## DISPATCH-PROTOCOL-012: PhysicalAccepted 后只交接 exact identity
 
-Dispatch 在建立 `PhysicalAccepted` 后只向 `managed-chat-execution` 交接 exact `(SessionId, PhysicalUserMessageId)`、`PromptKey` 与 `interaction-authority` 发布的原子 `AttemptExecutionProfile`；该 profile 必须包含完整版本化 `ParticipantIdentityEvidence`，不得退化为可重新推导的 authority metadata。Turn reconciliation 在 process-local binding 缺字段时必须从同一 durable authority profile 恢复 canonical role/identity；显式 Host 证据优先，但 `Role=None` 不得遮蔽 durable canonical role，否则同一 Manager continuation 会被误路由为 Ordinary。`managed-chat-execution` 独占 durable execution acceptance、provider start、terminal 与 settlement；dispatch 不复制其 transition law，不获取容量，不建立 execution binding，不解释 provider failure。
+Dispatch 在建立 `PhysicalAccepted` 后只向 `managed-chat-execution` 交接 exact `(SessionId, PhysicalUserMessageId)`、agent-free `PromptKey` 与 `interaction-authority` 发布的原子 `AttemptExecutionProfile`；该 profile 必须直接包含由 `IdentitySeed` 派生且在 logical run 内不可变的 `ParticipantIdentityEvidence`（原子包含固定的 participant、role、persona、personaCatalogVersion 与 provenance evidence；continuation 保持 participant 不变，不存在 peer/effective agent 轮换语义），不得退化为可重新推导的 authority metadata。每个 fresh physical execution 将固定的 role 经 MJS scheduler 路由至模型 target，且 capacity exact identity 严格绑定为 `session + physical + role + participant + target + fence`。Turn reconciliation 在 process-local binding 缺字段时必须从同一 durable authority profile 恢复 participant/role；显式 Host agent 证据优先，但缺席的 role 不得遮蔽 durable role，否则同一 Manager continuation 会被误路由为 Ordinary。Accepted execution evidence 只暴露由 `IdentitySeed` 派生的 participant+role，不含 effectiveAgent。`managed-chat-execution` 独占 durable execution acceptance、provider start、terminal 与 settlement；dispatch 不复制其 transition law，不获取容量，不建立 execution binding，不解释 provider failure。
 
 ## DISPATCH-PROTOCOL-013: Construction 纯 wiring，recovery 晚于 durability activation
 
@@ -58,4 +59,4 @@ Dispatch 在建立 `PhysicalAccepted` 后只向 `managed-chat-execution` 交接 
 
 ## DISPATCH-PROTOCOL-015: chat.message 身份 carrier 是封闭且无歧义的 wire 代数
 
-`PromptIngressCodec`只接受JSON record中的正式carrier。每个字符串carrier必须是原始字节保持不变的非空白字符串；`SessionId`支持`sessionID`、`sessionId`、字符串`session`及plain own-property record `session.id/sessionID/sessionId`，并在`input`、`output`、`output.message`、`output.info`四个正式source中统一收集。任一显式carrier类型非法、对象不是plain record、继承字段冒充own field、或两个合法carrier原始字节不同，整个SessionId投影必须fail-closed；缺失与非法不得合并为同一状态。多个同值carrier只产生一个opaque `SessionId`，禁止trim、字符串化、truthiness或值前缀猜测。agent与PromptKey的多carrier投影遵循同一typed、同值唯一规则。
+`PromptIngressCodec`只接受JSON record中的正式carrier。每个字符串carrier必须是原始字节保持不变的非空白字符串；`SessionId`支持`sessionID`、`sessionId`、字符串`session`及plain own-property record `session.id/sessionID/sessionId`，并在`input`、`output`、`output.message`、`output.info`四个正式source中统一收集。任一显式carrier类型非法、对象不是plain record、继承字段冒充own field、或两个合法carrier原始字节不同，整个SessionId投影必须fail-closed；缺失与非法不得合并为同一状态。多个同值carrier只产生一个opaque `SessionId`，禁止trim、字符串化、truthiness或值前缀猜测。wire 上正式传输的 PromptKey carrier 必须是无 agent 的 `PromptKey`；PromptKey 与单向只读历史解码保留的 agent 多 carrier 投影遵循同一 typed、同值唯一规则。旧版含 agent 的 PromptKey 仅在读取旧持久化载荷时做单向解码，绝对不向新写回写或双写；新 dispatch 严禁携带或投影 peer/side/fallback agent。

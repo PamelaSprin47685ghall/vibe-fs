@@ -2,12 +2,12 @@ namespace Wanxiangshu.Mission.Manager
 
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 
-/// Manager current-action guidance: schedule only the immediate completion nudge
-/// for the active iteration.
+/// Manager current-action guidance and retired-idle continuation ownership.
 module ManagerWorkflow =
 
     val observeIdle:
@@ -27,3 +27,27 @@ module ManagerWorkflow =
         observeOrdinary: (ReconciledTurnContext -> Task) ->
         context: ReconciledTurnContext ->
             Task
+
+    val ensureManagerRoadOpened:
+        journal: AgentJournal option ->
+        workspaceDirectory: string option ->
+        sessionIdTextOpt: string option ->
+        providerRunIdOpt: ProviderRunIdentity option ->
+            Task<unit>
+
+    val maybeDeliverLoop:
+        sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
+        journal: AgentJournal option ->
+        workspaceDirectory: string option ->
+        sessionIdTextOpt: string option ->
+            Task<unit>
+
+    val continueAfterRetiredAttempt:
+        sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
+        journal: AgentJournal option ->
+        workspaceDirectory: string option ->
+        stopRetiredAttempt: (SessionId -> Task<unit>) ->
+        sessionId: SessionId ->
+            Task<unit>

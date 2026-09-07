@@ -70,9 +70,7 @@ const rootSeed = (agent) => {
     ownerAuthorityRoot: null,
     participantIdentity: {
       selectedAgent: resolved.identity.name,
-      peerAgent: resolved.identity.name,
-      canonicalRole: resolved.identity.role,
-      selectedTier: 'deep',
+      role: resolved.identity.role,
       persona: resolved.identity.persona,
       personaCatalogVersion: resolved.identity.catalogVersion,
       origin: resolved.identity.origin,
@@ -108,16 +106,35 @@ const childProfile = (scenario, childAgent, parent) => {
   return { profile: result.value, seed: issued.value }
 }
 
+const participantOf = (profile) =>
+  profile.participantIdentity.participant ?? profile.participantIdentity.selectedAgent
+
+const roleOf = (profile) => profile.participantIdentity.role
+
 const executionEvidence = (profile, physicalUserMessageId, providerRun) => ({
   sessionId: profile.session,
   physicalUserMessageId,
   logicalRunId: profile.logicalRun,
   authorityRootUserMessageId: profile.authorityRoot,
   authorityKind: profile.authorityKind,
-  identitySeed: profile.identitySeed,
+  // TransactionSurface still keys the attempt profile on selectedAgent, while the
+  // fixed authority profile exposes participant/role; project the fixed identity
+  // forward so the compiled surface accepts the same durable run.
+  identitySeed: {
+    ...profile.identitySeed,
+    participantIdentity: {
+      ...profile.identitySeed.participantIdentity,
+      selectedAgent: participantOf(profile),
+      role: roleOf(profile),
+      // ChatExecution/Surface still keys the role on canonicalRole; project the
+      // fixed role forward so the compiled surface accepts the same run.
+      canonicalRole: roleOf(profile),
+    },
+  },
   providerRun,
   origin: profile.authorityKind,
-  effectiveAgent: profile.participantIdentity.selectedAgent,
+  role: roleOf(profile),
+  participant: participantOf(profile),
   requestKind: 'work-main',
   projectionChoice: { kind: 'UseCommittedEpoch' },
 })
@@ -140,16 +157,19 @@ const lifecycleActions = (evidence, duplicateDelivery, terminal = false, provide
 const exactCapacityIdentity = (evidence, target) => ({
   sessionId: evidence.sessionId,
   physicalUserMessageId: evidence.physicalUserMessageId,
-  effectiveAgent: evidence.effectiveAgent,
+  role: evidence.role,
+  participant: evidence.participant,
   target,
 })
 
-const acquireCommitted = async (runtime, evidence, target) => {
+const acquireCommitted = async (runtime, evidence, target, lenderSessionId = null) => {
   const acquisition = await routing.acquireExecutionAdmission(
     runtime,
     evidence.sessionId,
     evidence.physicalUserMessageId,
-    evidence.effectiveAgent,
+    evidence.role,
+    evidence.participant,
+    lenderSessionId,
   )
   assert.equal(acquisition.kind, 'Acquired')
   assert.deepEqual(routing.executionAdmissionTarget(runtime, acquisition.lease), target)
@@ -170,7 +190,8 @@ const canonicalAuthority = (profile) => ({
 const assertOwner = (owner, evidence) => {
   assert.equal(owner.sessionId, evidence.sessionId)
   assert.equal(owner.physicalUserMessageId, evidence.physicalUserMessageId)
-  assert.equal(owner.effectiveAgent, evidence.effectiveAgent)
+  assert.equal(owner.role ?? owner.Role, evidence.role)
+  assert.equal(owner.participant ?? owner.Participant, evidence.participant)
 }
 
 export const defaultFamily = Object.freeze({
@@ -250,13 +271,12 @@ export const runInterleaving = async (schedule, family = defaultFamily) => {
           value: child.seed.participantIdentity,
           error: null,
         })
-        routing.bindCapacityChild(runtime, parent.session, child.profile.session)
         childEvidence = executionEvidence(
           child.profile,
           `child-physical-${scenario}`,
           `child-provider-${scenario}`,
         )
-        childLease = await acquireCommitted(runtime, childEvidence, target)
+        childLease = await acquireCommitted(runtime, childEvidence, target, parent.session)
         durableChildActions = lifecycleActions(childEvidence, family.duplicateDelivery)
         dispatchResult = await chat.providerLifecycleScenario(durableChildActions)
         assert.equal(dispatchResult.ok, true, JSON.stringify(dispatchResult.error))
@@ -354,13 +374,6 @@ export const runInterleaving = async (schedule, family = defaultFamily) => {
   for (const token of capacity.tokens) assertOwner(token.owner, parentCurrentEvidence)
   for (const custody of capacity.custodies) assertOwner(custody.owner, parentCurrentEvidence)
 
-  assert.ok(
-    capacity.lineage.some(
-      ({ parentSessionId, childSessionId }) =>
-        parentSessionId === parent.session && childSessionId === child.profile.session,
-    ) || processGeneration > 0,
-  )
-
   const admission = routing.admissionSnapshot(
     runtime,
     childEvidence.sessionId,
@@ -375,7 +388,7 @@ export const runInterleaving = async (schedule, family = defaultFamily) => {
   })
 
   assert.notEqual(parent.session, child.profile.session)
-  assert.notEqual(parent.participantIdentity.selectedAgent, child.profile.participantIdentity.selectedAgent)
+  assert.notEqual(participantOf(parent), participantOf(child.profile))
   assert.deepEqual(child.seed.participantIdentity, child.profile.participantIdentity)
   assert.equal(child.seed.ownerSession, parent.session)
   assert.equal(child.seed.ownerLogicalRun, parent.logicalRun)

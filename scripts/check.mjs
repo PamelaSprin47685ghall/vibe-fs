@@ -47,7 +47,7 @@ const checks = [
 
 for (const script of checks) {
   const args = [script]
-  if (script.endsWith('dsl-ownership.mjs')) args.push('--threshold=0')
+  if (script.endsWith('dsl-ownership.mjs')) args.push('--threshold=0', '--require-compiler-evidence')
   if (script.endsWith('fsharp-control-pyramid.mjs')) args.push('--root=src/Wanxiangshu')
   const result = spawnSync(process.execPath, args, { stdio: 'inherit', env: process.env })
   if (result.status !== 0) process.exit(result.status ?? 1)

@@ -129,8 +129,25 @@ module BloggerRuntimeHost =
         (context: BloggerRequestContext)
         : Result<unit, string> =
         match scope.ClaimCurrentRequest(bloggerKey, context) with
-        | BloggerFlightClaim.Claimed
-        | BloggerFlightClaim.Refreshed -> Ok()
+        | BloggerFlightClaim.Claimed _
+        | BloggerFlightClaim.Refreshed _ -> Ok()
+        | BloggerFlightClaim.Conflict existing ->
+            Error(
+                sprintf
+                    "Blogger flight %s already belongs to request %s; cannot claim request %s"
+                    bloggerKey
+                    (BloggerRequestId.value existing)
+                    (BloggerRequestId.value (BloggerRequestContext.requestId context))
+            )
+
+    let claimFlight
+        (scope: IBloggerRuntimeHost)
+        (bloggerKey: string)
+        (context: BloggerRequestContext)
+        : Result<IBloggerFlightLease, string> =
+        match scope.ClaimCurrentRequest(bloggerKey, context) with
+        | BloggerFlightClaim.Claimed lease
+        | BloggerFlightClaim.Refreshed lease -> Ok lease
         | BloggerFlightClaim.Conflict existing ->
             Error(
                 sprintf
@@ -168,58 +185,10 @@ module BloggerRuntimeHost =
                     (BloggerRequestId.value requestId)
             )
 
-    let requireReleaseCurrentRequest
-        (scope: IBloggerRuntimeHost)
-        (bloggerKey: string)
-        (context: BloggerRequestContext)
-        : unit =
-        match releaseCurrentRequest scope bloggerKey context with
-        | Ok() -> ()
-        | Error reason -> FatalProcess.trip "blogger-flight-release-conflict" reason
-
-    let requireReleaseObservedCurrentRequest (scope: IBloggerRuntimeHost) (bloggerKey: string) : unit =
-        match scope.TryPeekCurrentRequest bloggerKey with
-        | None -> ()
-        | Some context -> requireReleaseCurrentRequest scope bloggerKey context
-
     let durableSealed (journal: AgentJournal option) (mainSessionId: SessionId) : bool =
         match journal with
         | None -> false
         | Some j -> AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot j).AgentProjections
 
-    /// Durable handle sealed + drain closed → block new Y work.
-    /// Busy uses physical flight ownership (`HasFlight`).
-    /// Drain uses the physical drain slot (`IsDrainOpen`).
-    let blocksNew
-        (journal: AgentJournal option)
-        (mainSessionId: SessionId)
-        (scope: IBloggerRuntimeHost)
-        (bloggerKey: string)
-        : bool =
-        BloggerRuntime.blocksNewRequest
-            (durableSealed journal mainSessionId)
-            (scope.HasFlight bloggerKey)
-            (scope.IsDrainOpen bloggerKey)
-
-    /// Close drain + drop PendingOffer + cancel park waiter.
-    /// Existing physical flight ownership survives until its terminal owner clears it.
-    let forceSealRuntime (scope: IBloggerRuntimeHost) (bloggerKey: string) : unit =
-        scope.SetDrainWindow(bloggerKey, DrainWindow.Closed)
-        scope.TryTakePendingOffer bloggerKey |> ignore
-        scope.CancelParked bloggerKey
-
-    /// Close drain + drop pending offer (keep CurrentRequest until caller clears).
-    let forceSealCellDropOffer (scope: IBloggerRuntimeHost) (bloggerKey: string) : unit =
-        scope.SetDrainWindow(bloggerKey, DrainWindow.Closed)
-        scope.TryTakePendingOffer bloggerKey |> ignore
-
-    /// New Authority Root: reopen the drain window for next material. The root
-    /// identity is recorded on the window so a stale reactivation (an older root
-    /// arriving after a newer seal) cannot reopen a window it no longer owns.
-    let reactivateAfterNewRoot
-        (scope: IBloggerRuntimeHost)
-        (bloggerSessionId: SessionId)
-        (root: AuthorityRootUserMessageId)
-        : unit =
-        let key = SessionId.value bloggerSessionId
-        scope.SetDrainWindow(key, BloggerRuntime.openDrain root)
+    /// Durable handle sealed → block new Y work.
+    let blocksNew (journal: AgentJournal option) (mainSessionId: SessionId) : bool = durableSealed journal mainSessionId

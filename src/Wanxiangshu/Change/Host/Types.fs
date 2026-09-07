@@ -16,6 +16,7 @@ type OrchestratorHostDeps =
       OnChildCreated: string -> Role -> SessionId -> unit
       RegisterChildDirectory: SessionId -> string -> unit
       OnRunStarted: SessionId -> Role -> string option -> unit
+      ContinueManagerLoop: SessionId -> string -> Task<Result<unit, string>>
       RepoPath: string
       TargetBranch: string
       ParentWorkRecordFor: SessionId -> Task<string option>

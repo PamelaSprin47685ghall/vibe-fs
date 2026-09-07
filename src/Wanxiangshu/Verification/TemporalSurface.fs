@@ -53,7 +53,7 @@ module TemporalSurface =
                 disposed <- true
                 (journal :> IDisposable).Dispose()
 
-    type private FallbackHandle(state: FallbackProjection) =
+    type private ProviderFailureHandle(state: ProviderFailureProjection) =
         member _.State = state
 
     [<Emit("$0==null")>]
@@ -80,13 +80,17 @@ module TemporalSurface =
         if isNullish value then None else Some(providerRunOf value)
 
     let private participantIdentityOfJs (value: obj) : ParticipantIdentityEvidence =
+        let roleText =
+            if not (isNullish value?role) then text value?role
+            elif not (isNullish value?Role) then text value?Role
+            else ""
+
         let role =
-            if isNullish (value?Role) then
+            if String.IsNullOrEmpty roleText then
                 None
             else
-                Roles.tryParseRole (text (value?Role))
-                |> Option.defaultWith (fun () ->
-                    failwith $"TemporalSurface: unknown participant role '{text (value?Role)}'")
+                Roles.tryParseRole roleText
+                |> Option.defaultWith (fun () -> failwith $"TemporalSurface: unknown participant role '{roleText}'")
                 |> Some
 
         let originLabel = text (value?Origin)
@@ -97,7 +101,15 @@ module TemporalSurface =
             | "InheritedFromOwner" -> PersonaOrigin.InheritedFromOwner
             | _ -> failwith $"TemporalSurface: unknown participant origin '{originLabel}'"
 
-        { SelectedAgent = text (value?SelectedAgent)
+        let selectedAgent =
+            if not (isNullish value?participant) then
+                text value?participant
+            elif not (isNullish value?SelectedAgent) then
+                text value?SelectedAgent
+            else
+                ""
+
+        { SelectedAgent = selectedAgent
           Role = role
           Persona = text (value?Persona)
           PersonaCatalogVersion = intValue (value?PersonaCatalogVersion)
@@ -109,10 +121,8 @@ module TemporalSurface =
         let identity = ParticipantIdentity.toInput evidence
 
         box
-            {| SelectedAgent = identity.SelectedAgent
-               PeerAgent = ParticipantIdentity.peerAgent evidence
-               Role = identity.Role |> Option.map Roles.roleLabel |> Option.toObj
-               InitialTier = "deep"
+            {| participant = identity.SelectedAgent
+               role = identity.Role |> Option.map Roles.roleLabel |> Option.toObj
                Persona = identity.Persona
                PersonaCatalogVersion = identity.PersonaCatalogVersion
                Origin =
@@ -198,26 +208,31 @@ module TemporalSurface =
                       AuthorityKind = text (payload?AuthorityKind)
                       IdentitySeed = identitySeedOfJs (payload?IdentitySeed) }
             )
-        | "Fallback", "FallbackCursorAdvanced" ->
-            AgentFact.Fallback(
-                FallbackFactCases.FallbackCursorAdvanced
+        | "ProviderFailure", "FailureRecorded" ->
+            AgentFact.ProviderFailure(
+                ProviderFailureFactCases.FailureRecorded
                     {| SessionId = sessionIdOf (payload?SessionId)
                        LogicalRunId = logicalRunOf (payload?LogicalRunId)
                        AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
                        ProviderRun = providerRunOf (payload?ProviderRun)
-                       PreviousOffset = byte (intValue (payload?PreviousOffset))
-                       NextOffset = byte (intValue (payload?NextOffset))
                        ConsecutiveFailureCount = intValue (payload?ConsecutiveFailureCount)
                        Reason = text (payload?Reason) |}
             )
-        | "Fallback", "FallbackExhausted" ->
-            AgentFact.Fallback(
-                FallbackFactCases.FallbackExhausted
+        | "ProviderFailure", "RetryExhausted" ->
+            AgentFact.ProviderFailure(
+                ProviderFailureFactCases.RetryExhausted
                     {| SessionId = sessionIdOf (payload?SessionId)
                        LogicalRunId = logicalRunOf (payload?LogicalRunId)
                        AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
-                       FinalConsecutiveFailureCount = intValue (payload?FinalConsecutiveFailureCount)
-                       FinalOffset = byte (intValue (payload?FinalOffset)) |}
+                       FinalConsecutiveFailureCount = intValue (payload?FinalConsecutiveFailureCount) |}
+            )
+        | "ProviderFailure", "SuccessRecorded" ->
+            AgentFact.ProviderFailure(
+                ProviderFailureFactCases.SuccessRecorded
+                    {| SessionId = sessionIdOf (payload?SessionId)
+                       LogicalRunId = logicalRunOf (payload?LogicalRunId)
+                       AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
+                       ProviderRun = providerRunOf (payload?ProviderRun) |}
             )
         | "Companion", "CompanionBloggerClosed" ->
             AgentFact.Companion(
@@ -264,12 +279,11 @@ module TemporalSurface =
           ProviderRun = optionalProviderRun (value?run)
           Fact = fact }
 
-    let private fallbackToJs (state: FallbackProjection) : obj =
+    let private providerFailureToJs (state: ProviderFailureProjection) : obj =
         box
             {| logicalRun = LogicalRunId.value state.LogicalRunId
                authorityRoot = AuthorityRootUserMessageId.value state.AuthorityRootUserMessageId
-               offset = AgentPairCursor.FallbackOffsetCodec.toByte state.Cursor.Offset
-               failures = state.Cursor.ConsecutiveFailureCount
+               failures = state.Budget.ConsecutiveFailureCount
                dedupeKeys = state.RecentFailureKeys.Length
                exhausted = state.Exhausted |}
 
@@ -287,10 +301,10 @@ module TemporalSurface =
 
     let private sessionToJs (session: SessionAgentProjection) : obj =
         box
-            {| fallback =
-                match session.Fallback with
+            {| providerFailures =
+                match session.ProviderFailures with
                 | None -> null
-                | Some value -> fallbackToJs value
+                | Some value -> providerFailureToJs value
                activeLogicalRun =
                 session.PromptAuthority
                 |> Option.bind (fun authority -> authority.ActiveLogicalRun)
@@ -339,10 +353,10 @@ module TemporalSurface =
                             AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
                            AuthorityKind = payload.AuthorityKind
                            IdentitySeed = identitySeedToJs payload.IdentitySeed |} |}
-        | Fact.Agent(AgentFact.Fallback(FallbackFactCases.FallbackCursorAdvanced payload)) ->
+        | Fact.Agent(AgentFact.ProviderFailure(ProviderFailureFactCases.FailureRecorded payload)) ->
             box
-                {| family = "Fallback"
-                   case = "FallbackCursorAdvanced"
+                {| family = "ProviderFailure"
+                   case = "FailureRecorded"
                    payload =
                     box
                         {| SessionId = SessionId.value payload.SessionId
@@ -350,22 +364,30 @@ module TemporalSurface =
                            AuthorityRootUserMessageId =
                             AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
                            ProviderRun = ProviderRunIdentity.value payload.ProviderRun
-                           PreviousOffset = int payload.PreviousOffset
-                           NextOffset = int payload.NextOffset
                            ConsecutiveFailureCount = payload.ConsecutiveFailureCount
                            Reason = payload.Reason |} |}
-        | Fact.Agent(AgentFact.Fallback(FallbackFactCases.FallbackExhausted payload)) ->
+        | Fact.Agent(AgentFact.ProviderFailure(ProviderFailureFactCases.RetryExhausted payload)) ->
             box
-                {| family = "Fallback"
-                   case = "FallbackExhausted"
+                {| family = "ProviderFailure"
+                   case = "RetryExhausted"
                    payload =
                     box
                         {| SessionId = SessionId.value payload.SessionId
                            LogicalRunId = LogicalRunId.value payload.LogicalRunId
                            AuthorityRootUserMessageId =
                             AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
-                           FinalConsecutiveFailureCount = payload.FinalConsecutiveFailureCount
-                           FinalOffset = int payload.FinalOffset |} |}
+                           FinalConsecutiveFailureCount = payload.FinalConsecutiveFailureCount |} |}
+        | Fact.Agent(AgentFact.ProviderFailure(ProviderFailureFactCases.SuccessRecorded payload)) ->
+            box
+                {| family = "ProviderFailure"
+                   case = "SuccessRecorded"
+                   payload =
+                    box
+                        {| SessionId = SessionId.value payload.SessionId
+                           LogicalRunId = LogicalRunId.value payload.LogicalRunId
+                           AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                           ProviderRun = ProviderRunIdentity.value payload.ProviderRun |} |}
         | Fact.Agent(AgentFact.Companion(CompanionFactCases.CompanionBloggerClosed payload)) ->
             box
                 {| family = "Companion"
@@ -798,51 +820,43 @@ module TemporalSurface =
 
         loop Fold.empty (envelopes |> Array.toList)
 
-    // ── FallbackProjection's typed transition, exposed as opaque state ───────
+    // ── ProviderFailureProjection's typed transition, exposed as opaque state ─
 
-    let private fallbackIdentity (value: obj) : FallbackAttemptIdentity =
+    let private providerFailureIdentity (value: obj) : FailedProviderAttemptIdentity =
         { SessionId = sessionIdOf (value?session)
           LogicalRunId = logicalRunOf (value?logicalRun)
           AuthorityRootUserMessageId = authorityRootOf (value?authorityRoot)
           ProviderRun = providerRunOf (value?providerRun) }
 
-    let private fallbackError (error: FallbackAdvanceRejection) =
+    let private providerFailureError (error: ProviderFailureAdvanceRejection) =
         match error with
-        | FallbackAdvanceRejection.AlreadyObserved -> "AlreadyObserved"
-        | FallbackAdvanceRejection.AlreadyExhausted -> "AlreadyExhausted"
-        | FallbackAdvanceRejection.DifferentRun -> "DifferentRun"
-        | FallbackAdvanceRejection.NoCursor -> "NoCursor"
-        | FallbackAdvanceRejection.InvalidTransition -> "InvalidTransition"
-        | FallbackAdvanceRejection.InvalidFallbackOffset _ -> "InvalidFallbackOffset"
+        | ProviderFailureAdvanceRejection.AlreadyObserved -> "AlreadyObserved"
+        | ProviderFailureAdvanceRejection.AlreadyExhausted -> "AlreadyExhausted"
+        | ProviderFailureAdvanceRejection.DifferentRun -> "DifferentRun"
+        | ProviderFailureAdvanceRejection.NoActiveBudget -> "NoActiveBudget"
+        | ProviderFailureAdvanceRejection.InvalidTransition -> "InvalidTransition"
 
-    let fallbackForAuthority (logicalRun: string) (authorityRoot: string) : obj =
-        FallbackHandle(FallbackProjection.forAuthority (logicalRunOf logicalRun) (authorityRootOf authorityRoot)) :> obj
+    let providerFailureForAuthority (logicalRun: string) (authorityRoot: string) : obj =
+        ProviderFailureHandle(
+            ProviderFailureProjection.forAuthority (logicalRunOf logicalRun) (authorityRootOf authorityRoot)
+        )
+        :> obj
 
-    let fallbackApplyAdvance (identity: obj) (previousOffset: int) (nextOffset: int) (count: int) (current: obj) : obj =
-        let state = (current :?> FallbackHandle).State
+    let applyFailure (identity: obj) (count: int) (current: obj) : obj =
+        let state = (current :?> ProviderFailureHandle).State
 
-        let decodeOffset value =
-            AgentPairCursor.FallbackOffsetCodec.ofByte (byte value)
-
-        match decodeOffset previousOffset, decodeOffset nextOffset with
-        | Error _, _
-        | _, Error _ ->
+        match ProviderFailureProjection.applyFailure (providerFailureIdentity identity) count state with
+        | Ok updated ->
+            box
+                {| ok = true
+                   value = ProviderFailureHandle updated |}
+        | Error error ->
             box
                 {| ok = false
-                   error = "InvalidFallbackOffset" |}
-        | Ok previous, Ok next ->
-            match FallbackProjection.applyAdvance (fallbackIdentity identity) previous next count state with
-            | Ok updated ->
-                box
-                    {| ok = true
-                       value = FallbackHandle updated |}
-            | Error error ->
-                box
-                    {| ok = false
-                       error = fallbackError error |}
+                   error = providerFailureError error |}
 
-    let fallbackRead (current: obj) : obj =
-        (current :?> FallbackHandle).State |> fallbackToJs
+    let providerFailureRead (current: obj) : obj =
+        (current :?> ProviderFailureHandle).State |> providerFailureToJs
 
     let sessionReuseIdentityScenario (firstAccepted: obj) (secondAccepted: obj) : obj =
         let firstFact = Fact.Agent(agentFactOfJs firstAccepted)

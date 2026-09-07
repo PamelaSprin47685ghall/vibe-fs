@@ -12,8 +12,6 @@ type StrengthOpportunity =
       RequestKind: ProviderRequestKind
       CanonicalRole: Role
       SelectedAgent: string
-      EffectiveAgent: string
-      IsFallbackRetry: bool
       HasPrefixProbe: bool
       IsAttachedOrInternalLeaf: bool
       OwnerCancelled: bool
@@ -55,10 +53,6 @@ module StrengthPolicy =
             StrengthEligibility.Ineligible "not-work-main"
         elif not (Set.contains opportunity.CanonicalRole eligibleRoles) then
             StrengthEligibility.Ineligible "role-ineligible"
-        elif not (String.Equals(opportunity.SelectedAgent, opportunity.EffectiveAgent, StringComparison.Ordinal)) then
-            StrengthEligibility.Ineligible "effective-agent-not-selected"
-        elif opportunity.IsFallbackRetry then
-            StrengthEligibility.Ineligible "fallback-retry"
         elif opportunity.HasPrefixProbe then
             StrengthEligibility.Ineligible "prefix-probe"
         elif opportunity.IsAttachedOrInternalLeaf then

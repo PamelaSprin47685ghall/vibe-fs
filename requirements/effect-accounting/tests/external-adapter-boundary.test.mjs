@@ -23,9 +23,8 @@ const ownerRootSelection = {
   ownerLogicalRun: null,
   ownerAuthorityRoot: null,
   participantIdentity: {
-    selectedAgent: 'manager',
-    peerAgent: 'manager',
-    canonicalRole: 'manager',
+    participant: 'manager',
+    role: 'manager',
     selectedTier: 'deep',
     persona: 'Lead',
     personaCatalogVersion: 1,

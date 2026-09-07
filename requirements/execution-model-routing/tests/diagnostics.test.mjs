@@ -5,7 +5,7 @@ import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import { createCounters, queryReliability, snapshot } from '../../../dist/OpenCode/Host/ReliabilityDiagnosticsSurface.js'
 
 const target = { model: 'provider/shared', reasoning: 'none' }
-const identity = { sessionId: 'session-a', physicalUserMessageId: 'message-a', effectiveAgent: 'coder' }
+const identity = { sessionId: 'session-a', physicalUserMessageId: 'message-a', role: 'coder', participant: 'alice' }
 
 test('WHAT[EMR-015] diagnostic query reuses capacity snapshot queue and fence counters without duplicate formula', async () => {
   const runtime = routing.createRuntime(() => target)
@@ -13,7 +13,9 @@ test('WHAT[EMR-015] diagnostic query reuses capacity snapshot queue and fence co
     runtime,
     identity.sessionId,
     identity.physicalUserMessageId,
-    identity.effectiveAgent,
+    identity.role,
+    identity.participant,
+    null,
   )
   assert.equal(acquired.kind, 'Acquired')
   routing.releaseExecutionAdmissionBeforeProvider(runtime, acquired.lease, { ...identity, target })

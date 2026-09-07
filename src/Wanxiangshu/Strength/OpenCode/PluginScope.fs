@@ -16,64 +16,75 @@ type CounterfactualPair =
 
 type private CounterfactualFirst =
     { Feature: StrengthFeatureKey
-      Symbol: StrengthPrimarySymbol }
+      Symbol: StrengthPrimarySymbol
+      FirstRun: ProviderRunIdentity }
 
-/// Physical adapter — collects two primary observations into one CounterfactualPair.
-/// No cross-callback program counter: armed targets and buffered firsts are
-/// independent physical resource registries, not a phased await state machine.
-/// Observe returns the completed pair directly; no separate TryTake/consume API.
-/// DSL-cross-callback-proof: physical — armed target registry and buffered
-/// first-observation registry are physical resources consumed once by Observe.
+/// Bounded observation fold — one episode per exact session id.
+/// AwaitingFirst carries the armed target run, its exact feature and every seen run;
+/// AwaitingSecond carries the immutable first observation and every seen run.
+/// Illegal mixed states (an armed target beside an unrelated first, two buffered
+/// firsts) are unrepresentable: a session holds exactly one episode.
+/// All Arm/Observe/Clear transitions run under one lock, so concurrent or
+/// reentrant calls serialize. Losing this cache on restart or drop conservatively
+/// degrades evidence count back toward K0; it never authorizes a business effect.
+/// Business observes only the completed CounterfactualPair, never this episode.
+type private CounterfactualEpisode =
+    | AwaitingFirst of TargetRun: ProviderRunIdentity * Feature: StrengthFeatureKey * SeenRuns: Set<string>
+    | AwaitingSecond of First: CounterfactualFirst * SeenRuns: Set<string>
+
 type private CounterfactualCollector() =
-    /// DSL-cross-callback-proof: physical single-flight — target identity for one two-observation collector
-    // DSL-MUTABLE: resource — armed counterfactual target by session (physical adapter)
-    let armedTargets = Dictionary<string, ProviderRunIdentity * StrengthFeatureKey>()
-    /// DSL-cross-callback-proof: physical resource — first observation buffer; business receives only completed pair
-    // DSL-MUTABLE: resource — buffered first observation by session (physical adapter)
-    let observedFirsts = Dictionary<string, CounterfactualFirst>()
+    // Single bounded observation fold keyed by exact session id.
+    let episodes = Dictionary<string, CounterfactualEpisode>()
+    let gate = obj ()
 
     member _.Arm(sessionId: SessionId, targetRun: ProviderRunIdentity, feature: StrengthFeatureKey) =
         let key = SessionId.value sessionId
 
-        if not (armedTargets.ContainsKey key) then
-            armedTargets.[key] <- (targetRun, feature)
+        lock gate (fun () ->
+            if not (episodes.ContainsKey key) then
+                episodes.[key] <- AwaitingFirst(targetRun, feature, Set.empty))
 
-    member private _.ObserveFirst
-        (key: string, feature: StrengthFeatureKey, symbol: StrengthPrimarySymbol, state: StrengthPredictorState)
+    member private _.ObserveLocked
+        (key: string, providerRun: ProviderRunIdentity, symbol: StrengthPrimarySymbol, state: StrengthPredictorState)
         : StrengthPredictorState * CounterfactualPair option =
-        let next, firstReadonly = StrengthPredictor.observeFirst feature symbol state
-        armedTargets.Remove key |> ignore
+        let runVal = ProviderRunIdentity.value providerRun
 
-        if firstReadonly then
-            observedFirsts.[key] <- { Feature = feature; Symbol = symbol }
+        match episodes.TryGetValue key with
+        | false, _ ->
+            // No episode for this exact session: deterministic no-op.
+            state, None
+        | true, AwaitingFirst(_, _, seen) when Set.contains runVal seen ->
+            // Explicit no-op law for repeated identical observation.
+            state, None
+        | true, AwaitingFirst(targetRun, feature, seen) when targetRun = providerRun ->
+            let next, _ = StrengthPredictor.observeFirst feature symbol state
 
-        next, None
+            episodes.[key] <-
+                AwaitingSecond(
+                    { Feature = feature
+                      Symbol = symbol
+                      FirstRun = providerRun },
+                    Set.add runVal seen
+                )
 
-    member private _.CompletePair(key: string, feature: StrengthFeatureKey, symbol: StrengthPrimarySymbol) =
-        match observedFirsts.TryGetValue key with
-        | true, first ->
-            observedFirsts.Remove key |> ignore
+            next, None
+        | true, AwaitingFirst(targetRun, feature, seen) ->
+            // Unrelated observation before the target: record the seen run, keep waiting.
+            episodes.[key] <- AwaitingFirst(targetRun, feature, Set.add runVal seen)
+            state, None
+        | true, AwaitingSecond(first, seen) when first.FirstRun = providerRun || Set.contains runVal seen ->
+            // Same run can never serve as its own second sample; repeats are idempotent no-ops.
+            state, None
+        | true, AwaitingSecond(first, _) ->
+            let next = StrengthPredictor.observeSecond first.Feature symbol state
+            episodes.Remove key |> ignore
 
             let pair =
-                { Feature = feature
+                { Feature = first.Feature
                   FirstSymbol = first.Symbol
                   SecondSymbol = symbol }
 
-            Some pair
-        | false, _ -> None
-
-    member private this.ObserveSecond
-        (key: string, feature: StrengthFeatureKey, symbol: StrengthPrimarySymbol, state: StrengthPredictorState)
-        : StrengthPredictorState * CounterfactualPair option =
-        let next = StrengthPredictor.observeSecond feature symbol state
-        next, this.CompletePair(key, feature, symbol)
-
-    member private this.ObserveFromFirstSeen
-        (key: string, symbol: StrengthPrimarySymbol, state: StrengthPredictorState)
-        : StrengthPredictorState * CounterfactualPair option =
-        match observedFirsts.TryGetValue key with
-        | true, first -> this.ObserveSecond(key, first.Feature, symbol, state)
-        | false, _ -> state, None
+            next, Some pair
 
     member this.Observe
         (
@@ -84,13 +95,14 @@ type private CounterfactualCollector() =
         ) : StrengthPredictorState * CounterfactualPair option =
         let key = SessionId.value sessionId
 
-        match armedTargets.TryGetValue key with
-        | true, (targetRun, feature) when targetRun = providerRun -> this.ObserveFirst(key, feature, symbol, state)
-        | _ -> this.ObserveFromFirstSeen(key, symbol, state)
+        lock gate (fun () -> this.ObserveLocked(key, providerRun, symbol, state))
 
     member _.ClearSession(sessionId: string) =
-        armedTargets.Remove sessionId |> ignore
-        observedFirsts.Remove sessionId |> ignore
+        lock gate (fun () -> episodes.Remove sessionId |> ignore)
+
+    /// Drop every process-local collector episode (all sessions). The fuse is
+    /// process-lifetime and lives on PluginStrengthScope, so it is untouched.
+    member _.ClearAll() = lock gate (fun () -> episodes.Clear())
 
 /// STRENGTH-*: decision-local replica ownership/capability registry plus bounded
 /// predictor evidence for one plugin instance. Durable causality stays in
@@ -109,14 +121,15 @@ type PluginStrengthScope() =
     let mutable strengthPredictorState = StrengthPredictor.empty
     /// DSL-cross-callback-proof: physical resource — bounded restart-discardable predictor evidence cache
     let strengthRecentPrimary = Dictionary<string, StrengthPrimarySymbol list>()
-    // Physical adapter collector — no DU state machine, business observes only CounterfactualPair
+    // Bounded observation fold — business observes only the completed CounterfactualPair
     // DSL-MUTABLE: resource — counterfactual collector (physical adapter, typed outcome)
     let collector = CounterfactualCollector()
 
-    /// Fuse is a Result error latch, not a string option. Ok = operational,
-    /// Error reason = tripped. TripStrengthFuse is one-shot idempotent: the
-    /// first Error wins, matching the former IsNone guard. The Result type
-    /// lets callers participate in Result.bind / CE short-circuit flows.
+    /// SPEC-INV-011: Fuse is a process-wide monotonic Result error latch owned by PluginStrengthScope
+    /// (single safety owner). Ok() = operational; Error reason = permanently tripped (K0 fail-closed).
+    /// One-shot idempotent: once tripped, it can never be cleared by session cleanup, turn reconciliation,
+    /// or caller reset. Losing predictor cache on restart conservatively reverts to K0; the fuse ensures
+    /// corrupted bundles or invariant violations freeze speculation for the remainder of the process.
     // DSL-MUTABLE: resource — strength fuse latch (Ok=operational, Error=tripped)
     let mutable strengthFuse: Result<unit, string> = Ok()
 
@@ -137,6 +150,9 @@ type PluginStrengthScope() =
 
     member _.StrengthPrediction(feature: StrengthFeatureKey) =
         StrengthPredictor.predict feature strengthPredictorState
+
+    member _.StrengthBucket(feature: StrengthFeatureKey) =
+        StrengthPredictor.bucket feature strengthPredictorState
 
     member _.TripStrengthFuse(reason: string) =
         match strengthFuse with
@@ -176,10 +192,33 @@ type PluginStrengthScope() =
 
     /// Session deletion drops the decision-local Strength evidence for that session
     /// (mirror of DisposeSession's per-session cleanup in PluginRuntimeScope).
-    member _.ClearSession(sessionId: string) =
+    member private _.RetireOrphanSessionBinding(replicaId: SessionId) =
+        match strengthRuntime.TryFindByReplica replicaId with
+        | Some _ -> strengthRuntime.Retire replicaId |> ignore
+        | None ->
+            strengthRuntime.TryFindByOwner replicaId
+            |> Option.iter (fun binding -> strengthRuntime.Retire binding.ReplicaSessionId |> ignore)
+
+    member this.ClearSession(sessionId: string) =
         strengthRecentPrimary.Remove sessionId |> ignore
         collector.ClearSession sessionId
+        // The strength fuse is a process-lifetime latch and is never cleared here.
+        // Retire this session's live-registry side (as replica, else as owner)
+        // so no orphan binding survives the session. Model-lease release stays
+        // with the attached StrengthReplicaRuntime, which shares this registry.
+        let replicaId = SessionId.create sessionId
+
+        match strengthReplicaRuntime with
+        | Some runtime -> runtime.HandleSessionDeleted replicaId
+        | None -> this.RetireOrphanSessionBinding replicaId
 
     member _.Dispose() =
         strengthReplicaRuntime |> Option.iter (fun runtime -> runtime.Dispose())
         strengthReplicaRuntime <- None
+        // Drop every process-local cache: collector, recent-primary window,
+        // predictor evidence and the live ownership registry. The strength fuse
+        // is a process-lifetime latch and is never cleared here.
+        collector.ClearAll()
+        strengthRecentPrimary.Clear()
+        strengthPredictorState <- StrengthPredictor.empty
+        strengthRuntime.Clear()

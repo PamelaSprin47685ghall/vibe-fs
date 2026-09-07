@@ -129,32 +129,6 @@
       }
     },
     {
-      "file": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
-      "symbol": "DrainPermit",
-      "anchor": "type DrainPermit = private DrainPermit of AuthorityRootUserMessageId",
-      "classification": "Authority",
-      "class": "Capability",
-      "owner": "context-compression",
-      "what": "ENF-014, ENF-017",
-      "scope": "one AuthorityRoot drain window",
-      "freshness": "minted only when that root opens the current window",
-      "multiplicity": "one open physical drain slot",
-      "consume": "pattern-matched only through DrainWindow.Open",
-      "durability": "process-local physical admission",
-      "issuers": [
-        {
-          "file": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
-          "symbol": "openDrain",
-          "anchor": "let openDrain (root: AuthorityRootUserMessageId)",
-          "owner": "context-compression"
-        }
-      ],
-      "whatOwners": {
-        "ENF-014": "capability-enforcement",
-        "ENF-017": "capability-enforcement"
-      }
-    },
-    {
       "file": "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
       "symbol": "RecoveryReceipt",
       "anchor": "type RecoveryReceipt =",
@@ -178,33 +152,6 @@
       "whatOwners": {
         "ENF-013": "capability-enforcement",
         "ENF-015": "capability-enforcement"
-      }
-    },
-    {
-      "file": "src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs",
-      "symbol": "RecoveryArmingPermit",
-      "anchor": "type private RecoveryArmingPermit =",
-      "classification": "Authority",
-      "class": "Capability",
-      "owner": "host-boundary",
-      "what": "ENF-014, ENF-017, ENF-019",
-      "scope": "SessionId + exact PhysicalUserMessageId + SlotArming",
-      "freshness": "armed only after durable PromptIngress acceptance",
-      "multiplicity": "one-shot TryTake by the owning recovery CE",
-      "consume": "absence or mismatched physical material has no effect",
-      "durability": "process-local and crash-zero; never a recovery PC",
-      "issuers": [
-        {
-          "file": "src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs",
-          "symbol": "ArmRecovery",
-          "anchor": "member _.ArmRecovery(sessionId: SessionId, physicalUserMessageId: PhysicalUserMessageId) =",
-          "owner": "host-boundary"
-        }
-      ],
-      "whatOwners": {
-        "ENF-014": "capability-enforcement",
-        "ENF-017": "capability-enforcement",
-        "ENF-019": "capability-enforcement"
       }
     },
     {

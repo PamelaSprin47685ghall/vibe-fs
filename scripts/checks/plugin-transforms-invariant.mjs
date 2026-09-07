@@ -46,6 +46,10 @@ const FOREIGN_DECISION_HELPERS = Object.freeze([
   /\blet\s+private\s+maintain[A-Z]\w*/,
 ])
 
+const FOREIGN_OWNER_EFFECTS = Object.freeze([
+  /\bManagerWorkflow\.maybeDeliverLoop\b/,
+])
+
 const IMPLICIT_MODE_HELPERS = Object.freeze([
   /\blet\s+private\s+strengthReplicaRuntime\b/,
   /\blet\s+private\s+isExplicitResumeProviderMaterial\b/,
@@ -162,6 +166,9 @@ export const scanPluginTransforms = (text, file = PLUGIN_TRANSFORMS_FILE) => {
   }
   for (const pattern of FOREIGN_DECISION_HELPERS) {
     if (pattern.test(executable)) add('foreign-decision', `foreign domain decision helper: ${pattern}`)
+  }
+  for (const pattern of FOREIGN_OWNER_EFFECTS) {
+    if (pattern.test(executable)) add('foreign-effect', `foreign owner effect: ${pattern}`)
   }
   for (const pattern of IMPLICIT_MODE_HELPERS) {
     if (pattern.test(executable)) add('implicit-mode', `implicit mode helper: ${pattern}`)

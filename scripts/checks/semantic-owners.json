@@ -191,14 +191,6 @@
       "owner": "relay-retirement"
     },
     {
-      "path": "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs",
-      "owner": "context-compression"
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashSurface.fs",
-      "owner": "context-compression"
-    },
-    {
       "path": "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
       "owner": "context-compression"
     },
@@ -256,10 +248,6 @@
     },
     {
       "path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs",
-      "owner": "context-compression"
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
       "owner": "context-compression"
     },
     {
@@ -941,10 +929,6 @@
     {
       "path": "src/Wanxiangshu/Execution/Session/Recovery/Surface.fs",
       "owner": "managed-session-lifecycle"
-    },
-    {
-      "path": "src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs",
-      "owner": "dispatch-protocol"
     },
     {
       "path": "src/Wanxiangshu/Execution/Session/RecoveryClosureProjection.fs",
@@ -1663,6 +1647,10 @@
       "owner": "host-boundary"
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/PluginRecoveryScopeSurface.fs",
+      "owner": "host-boundary"
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs",
       "owner": "managed-session-lifecycle"
     },
@@ -1736,6 +1724,10 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs",
+      "owner": "managed-chat-execution"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/SessionRecoveryHostSurface.fs",
       "owner": "managed-chat-execution"
     },
     {
@@ -2011,7 +2003,7 @@
       "owner": "participant-identity"
     },
     {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/FailureBudget.fs",
       "owner": "provider-attempt-recovery"
     },
     {
@@ -2027,7 +2019,7 @@
       "owner": "execution-failure-policy"
     },
     {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fs",
       "owner": "provider-attempt-recovery"
     },
     {
@@ -2043,7 +2035,7 @@
       "owner": "provider-attempt-recovery"
     },
     {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ProviderFailureFactFold.fs",
       "owner": "provider-attempt-recovery"
     },
     {
@@ -2067,7 +2059,7 @@
       "owner": "execution-model-routing"
     },
     {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs",
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/RetryPolicy.fs",
       "owner": "provider-attempt-recovery"
     },
     {

@@ -18,7 +18,7 @@
 #     ↓
 #   external user_message wakes join (interrupted / reason=user_message)
 #     ↓
-#   harvest → provider-error → recovery provider-error → FallbackCursorAdvanced eq 2 → success
+#   harvest → provider-error → recovery provider-error → FailureRecorded eq 2 → success
 #     ↓
 #   Iteration #1: audit assigns work on low dimension → current-action nudge → RetirementCommitted(Continue) → IncumbencyOpened
 #     ↓
@@ -35,14 +35,14 @@
 # ── §21 adversity checklist (one representative path each) ───────────────────
 #
 #   [x] provider transient failure          — [[fault]] provider-error + assertProviderTransientFailure
-#   [x] fallback                            — manager.1→continue.0 + assertFallbackContinuation
+#   [x] provider failure continuation       — manager.1→continue.0 + assertProviderFailureContinuation
 #   [x] join blocked then causally awakened — flow.prompt wake + assertJoinWakePath
 #   [x] non-10 assessment assigns work      — AssessmentCommitted + assertAssessmentAssignsWork
 #   [x] interrupted/aborted child or session— holdChildC1UntilLabor + assertInterruptedJoin
 #   [x] retirement needs next iteration     — non-10 blocks publication + Continue → fresh IncumbencyOpened + assertRetirementNeedsIteration
-#   [x] durable recovery/continuation       — same PID FallbackCursorAdvanced + assertDurableRecovery
+#   [x] durable recovery/continuation       — same PID FailureRecorded + assertDurableRecovery
 #   [x] publish conflict / stale target     — gitConflictProof on manager-loop.1 (no restart) + assertPublishConflict
-#   [x] subagent session reuse              — iteration-3 reuses Proof Writer child + assertSubagentReuse
+#   [x] subagent session reuse              — G2 Inspector Q1→Q2→Q3 + batch reuse + assertSubagentReuse
 #   [x] successful reconciliation           — Orchestrator-tagged Published eq 1 + assertSuccessfulReconciliation
 #   [x] later successful retirement         — RetirementCommitted after resources converge + assertRetirementCommitted
 #   [x] simultaneous Inspector batch        — streamed 3× inspect + assertG2InspectorBatchCoalescing
@@ -81,17 +81,15 @@ export default function route(role, running, previous) {
 '''
 
 # Event ceilings (fail-closed on dead loops; primary over silence watchdog):
-#   maxJournalEvents — complete 63-step legal stroke after explicit preflow authority, real K2
+#   maxJournalEvents — complete 56-step legal stroke after explicit preflow authority, real K2
 #                      StrengthReplica traffic, detached Bookkeeper finalization, and direct
-#                      same-physical iteration re-audit. The consecutive-recovery traversal measured
-#                      420 envelopes; 630 catches unconfirmed roster growth
-#                      before it can hide behind a widened timeout.
-#   maxSseEvents     — OpenCode SSE excluding server.heartbeat for the same traversals measured
-#                      2068 frames; 3100 preserves a narrow Host-ordering allowance.
-#                      Both pins are machine-checked runaway ceilings, not wall-clock budgets; a
-#                      future legitimate topology change must re-measure the complete stroke first.
+#                      same-physical iteration re-audit. Complete canaries measured ≤466 envelopes.
+#   maxSseEvents     — OpenCode SSE excluding server.heartbeat; complete canaries measured ≤2234 frames.
+#                      Pins 699/3351 retain 50% above observed maxima while failing fast on loops.
+#                      Both are machine-checked runaway ceilings, not wall-clock budgets; a future
+#                      legitimate topology change must re-measure the complete stroke first.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-replica-continue", "strength-canary-owner", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g2-inspector-batch", "g6-bookkeeper-title", "g6-bookkeeper-finalize", "humanroot-manager-title", "humanroot-loop"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 630, maxSseEvents = 3100, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-replica-continue", "strength-canary-owner", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g2-inspector-batch", "g6-bookkeeper-title", "g6-bookkeeper-finalize", "humanroot-manager-title", "humanroot-loop"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 699, maxSseEvents = 3351, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "orchestrator", bind = ["title", "orchestrator"] }
 prompt = { agent = "orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -109,12 +107,8 @@ must = [
   "manager-loop.0",
   "manager-loop.1",
   "manager-loop.2",
-  "manager-loop.3",
   "continue.0",
   "continue.1",
-  "manager-resume.0",
-  "manager-current-action.0",
-  "manager-current-action.1",
   "coder.0",
   "coder.1",
   "coder.2",
@@ -149,6 +143,7 @@ flow = [
   # the root session idle strictly after that baseline.
   { armIdle = { id = "orch.2" } },
   { armIdle = { id = "coder.3" } },
+  { armIdle = { id = "manager-interrupt.1" } },
 
   # Stale-head AFTER manager worktree exists (orch-unhappy / restart-conflict canary note).
   # gitConflictProof ONLY — zero restart fields (§12 one OpenCode lifetime).
@@ -165,13 +160,8 @@ flow = [
   # advertise builtin todowrite on Manager provider tools — requiring tools=["todowrite"]
   # here fails toolsGate. A/E/G/H assert uses wire evidence.
   # All Manager prompts MUST use session="child" (bindChild); default session is Orchestrator.
-  # ONE reusable manager-loop family per authority: manager-loop.0 (audit) is
-  # delivered 5× (low, perfect, repair-low, repaired-perfect, rebased-perfect)
-  # with the same authority;
-  # the binder varies the review scores by causal delivery count. Provider waits
-  # below barrier only first deliveries; later iterations are ordered by durable
-  # IncumbencyOpened/Retirement/Assessment facts, with reusable counts proven in
-  # oracleLongStroke (matchCount gte) so iterations are not distinguished by text.
+  # The initial HumanRoot prompt and every owner-opened incarnation reuse the same
+  # authority-first manager-loop entry; the binder varies review results by durable attempt.
   { wait = "manager-loop.0" },
   # HumanRoot preflow baseline: +2 AssessmentCommitted before the main spine, so the
   # first main assessment lands at 3. Preserves the main-spine delta (exactly one new).
@@ -183,21 +173,20 @@ flow = [
   { wait = "coder.0", timeoutMs = 60000 },
   { wait = "manager-loop.2", timeoutMs = 60000 },
   { wait = "continue.0", attempts = 2, timeoutMs = 60000 },
-  { waitFact = { name = "FallbackCursorAdvanced", eq = 2 }, timeoutMs = 60000 },
+  { waitFact = { name = "FailureRecorded", eq = 2 }, timeoutMs = 60000 },
   # EXEC-017 stimulus must target an ACTIVE join attempt. Provider expectation only
   # proves the model returned a join call; wait for the real Host ToolPart running
   # event before injecting the external user message, or the wake is correctly dropped.
   { custom = "awaitManagerJoinRunning" },
-  { prompt = { agent = "manager", text = "Interrupt the active join.", resumeAfterIdleText = "Continue after the interrupted join." }, session = "child", timeoutMs = 60000 },
+  { prompt = { agent = "manager", text = "Interrupt the active join.", releaseHeldChildAfterAccepted = true }, session = "child", timeoutMs = 60000 },
+  { wait = "manager-interrupt.1", timeoutMs = 60000 },
   { wait = "coder.3", timeoutMs = 60000 },
   { awaitIdle = { after = "coder.3" }, timeoutMs = 60000 },
+  { awaitIdle = { after = "manager-interrupt.1" }, timeoutMs = 60000 },
   { waitFact = { name = "HandleCompleted", gte = 1 }, timeoutMs = 60000 },
-  { wait = "manager-resume.0", timeoutMs = 60000 },
 
-  # An incumbent with owned work that stops normally receives the typed
-  # current-action nudge. Record final obligations via todowrite, then cleanly suicide.
-  { wait = "manager-current-action.0", timeoutMs = 60000 },
-  { wait = "manager-current-action.1", timeoutMs = 60000 },
+  # Bounded current-action cursors are verified by durable retirement and the
+  # Host todowrite canary rather than one incidental transport step number.
   # HumanRoot preflow baseline: +2 RetirementCommitted(Continue+Accepted) / +2 IncumbencyOpened.
   # A Continue retirement is followed by another ordinary IncumbencyOpened event
   # and a physically observed provider request; Accepted exits.
@@ -209,24 +198,25 @@ flow = [
   # user messages and current workspace.
   # That quality candidate reaches Change; the stale target forces rebase and the
   # deliberately conflicting target edit yields the machine ConflictDetected fact.
-  # Reusable manager-loop.0/.1 already satisfied by iteration #1; iteration #2
-  # is ordered by durable facts below, with reusable delivery counts proven in
-  # the oracle (no text-distinguished iteration ids).
+  # The Manager owner opens iteration #2 through the same manager-assess resource.
+  # Durable facts order every later incarnation; prompt text never encodes an index.
   { waitFact = { name = "AssessmentCommitted", gte = 4 }, timeoutMs = 60000 },
   { waitFact = { name = "RetirementCommitted", gte = 4 }, timeoutMs = 60000 },
   { waitFact = { name = "CandidateReady", eq = 1 }, timeoutMs = 60000 },
   { waitFact = { name = "ConflictDetected", gte = 1 }, timeoutMs = 60000 },
 
   # Iteration #3 is a fresh IncumbencyOpened on the same authority. Its low
-  # assessment assigns work; it reuses the original Proof Writer child to
-  # repair the conflict, then retires with Outcome Continue. A retired iteration
+  # assessment assigns a fresh Conflict Resolver child to repair the conflict,
+  # then retires with Outcome Continue. A retired iteration
   # never resumes; each iteration-first carries only the current iteration, with
-  # the internal wake stripped.
+  # the exact owner-controlled assessment resource after the authority prefix.
   { waitFact = { name = "IncumbencyOpened", gte = 5 }, timeoutMs = 60000 },
   { waitFact = { name = "AssessmentCommitted", gte = 5 }, timeoutMs = 60000 },
   { wait = "coder-resolve.0", timeoutMs = 60000 },
   { wait = "coder-resolve.1", timeoutMs = 60000 },
-  # manager-loop.2/.3 reusable counts (initial + repair) proven in the oracle.
+  { awaitIdle = { after = "coder-resolve.1" }, timeoutMs = 60000 },
+  # The conflict repair uses the same manager-work resource and a fresh owned handle;
+  # the owner harvests and retires it without an external continuation prompt.
   { waitFact = { name = "RetirementCommitted", gte = 5 }, timeoutMs = 60000 },
 
   # Iteration #4 independently re-audits the repaired snapshot at 8×10 from the
@@ -496,12 +486,8 @@ user = "# The account is not yet ready to entrust."
   [[turn.step]]
   respond = { type = "text", text = "T1 commitment recorded." }
 
-# ONE reusable manager-loop family per authority: same lane/authority/steps
-# reused for all five iterations. The binder varies audit/action by causal delivery
-# count (initial-low→work, candidate-perfect→finish, conflict-low→repair,
-# repaired-perfect→finish, rebased-perfect→finish). Provider-visible user stays the original authority
-# because the wake is stripped. Iterations are not distinguished by prompt text.
-# tools cover the Manager surface used here (review for audits, fork/resume/join for work).
+# The initial authority prompt drives iteration #1. Later incarnations use the
+# owner-controlled manager-assess resource below; both carry the same Manager tools.
 [[turn]]
 id = "manager-loop"
 lane = "manager"
@@ -520,13 +506,22 @@ tools = ["fork", "resume", "join", "horizon", "review", "suicide"]
   runtimeStep = 2
   respond = { type = "tool-call", tool = "join", args = {} }
 
+# The authority-first audit stays on manager-loop.0. If the accepted assessment's
+# finish resource wins the post-review race, only its continuation response lands here.
+[[turn]]
+id = "manager-reopened-loop"
+internal = true
+user = "# Establish read-only evidence about the current delivery through the entitled offices. Judge it independently on all eight dimensions, then submit the review tool once."
+tools = ["fork", "resume", "join", "horizon", "review", "suicide"]
+
   [[turn.step]]
-  runtimeStep = 3
+  runtimeStep = 1
+  optional = true
   respond = { type = "tool-call", tool = "suicide", args = {} }
 
-# A fresh Manager terminal can race with the externally injected manager-resume
-# continuation while its child is still outstanding. INTERACTION-AUTHORITY-014
-# then requires this exact JoinGuard on the same Manager session. It is separate
+# A fresh Manager terminal can race with the externally injected interruption
+# while its child is still outstanding. INTERACTION-AUTHORITY-014 then requires
+# this exact JoinGuard on the same Manager session. It is separate
 # from manager-loop.2, which remains the sole provider-fault owner above.
 [[turn]]
 id = "manager-join-guard"
@@ -601,38 +596,68 @@ optional = true
   respond = { type = "text", text = "Interruption handled; continue the durable Manager job." }
 
 [[turn]]
-id = "manager-resume"
-lane = "manager"
-user = "Continue after the interrupted join."
-tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "join", args = {} }
-
-  [[turn.step]]
-  optional = true
-  respond = { type = "text", text = "The interrupted child has returned; this incumbency now stops normally and awaits the exit protocol." }
-
-[[turn]]
 id = "manager-current-action"
 internal = true
 user = "# Repair is assigned to you: fix every material issue established by your assessment"
 tools = ["join", "todowrite", "suicide"]
 
-  # A nudge that lands on a clean stop opens at step 1 (assistant dot was inserted).
-  # Record the final obligation account via todowrite, then cleanly suicide at step 2.
+  # Host tips and owner nudges can place this exact resource at any bounded runtime
+  # cursor. The binder maps the first observed cursor to todowrite, one cursor per
+  # work episode to join, and every later cursor to suicide.
   [[turn.step]]
-  runtimeStep = 1
+  runtimeStep = 0
+  optional = true
   respond = { type = "tool-call", tool = "todowrite", args = { planComplete = true, workingOn = "long-stroke", obligations = [{ name = "long-stroke", horizon = "near", work = "Run the long stroke through publish_proof.txt." }] } }
 
   [[turn.step]]
+  runtimeStep = 1
+  optional = true
+  respond = { type = "tool-call", tool = "suicide", args = {} }
+
+  [[turn.step]]
   runtimeStep = 2
+  optional = true
   respond = { type = "tool-call", tool = "suicide", args = {} }
 
   [[turn.step]]
   runtimeStep = 3
   optional = true
-  respond = { type = "tool-call", tool = "join", args = {} }
+  respond = { type = "tool-call", tool = "suicide", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 4
+  optional = true
+  respond = { type = "tool-call", tool = "suicide", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 5
+  optional = true
+  respond = { type = "tool-call", tool = "suicide", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 6
+  optional = true
+  respond = { type = "tool-call", tool = "suicide", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 7
+  optional = true
+  respond = { type = "tool-call", tool = "suicide", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 8
+  optional = true
+  respond = { type = "tool-call", tool = "suicide", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 9
+  optional = true
+  respond = { type = "tool-call", tool = "suicide", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 10
+  optional = true
+  respond = { type = "tool-call", tool = "suicide", args = {} }
 
 [[turn]]
 id = "coder"
@@ -1151,10 +1176,8 @@ status = 400
 retryable = false
 attempts = [1]
 
-# Pure loop: ordinary append-only continuations take no boundary; only a fresh
-# iteration after a Continue retirement reseals via manager-loop carrying the
-# same system/plan and authoritative user messages for independent assessment,
-# with the internal wake stripped.
+# Pure loop: each owner-opened incarnation reseals at the exact assessment
+# resource while preserving the authoritative user prefix and provider plan.
 [[epoch]]
 turn = "manager-loop"
 step = 0

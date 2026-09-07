@@ -24,13 +24,13 @@ module ChatAdmissionIntentSurface =
         optionalString value
         |> Option.defaultWith (fun () -> invalidArg name (name + " must be non-empty"))
 
-    let private rootIdentity (agent: string) : ParticipantIdentityEvidence =
-        ParticipantIdentity.resolveAtRoot agent
+    let private rootIdentity (participant: string) : ParticipantIdentityEvidence =
+        ParticipantIdentity.resolveAtRoot participant
         |> Result.bind (fun identity ->
             match ParticipantIdentity.role identity with
             | Some _ -> Ok identity
             | None -> Error ParticipantIdentityError.OwnerRequired)
-        |> Result.defaultWith (fun _ -> invalidArg "selectedAgent" "selectedAgent must name a managed public agent")
+        |> Result.defaultWith (fun _ -> invalidArg "participant" "participant must name a managed public agent")
 
     let private originOf (label: string) : PromptAuthority.PromptOrigin =
         match label with
@@ -63,8 +63,9 @@ module ChatAdmissionIntentSurface =
         (snapshot: obj)
         (sessionId: SessionId)
         : PromptAuthority.AuthorityExecutionProfile option =
-        optionalString snapshot?activeAgent
-        |> Option.map (fun agent ->
+        optionalString snapshot?activeParticipant
+        |> Option.orElseWith (fun () -> optionalString snapshot?activeAgent)
+        |> Option.map (fun participant ->
             match optionalString snapshot?activeKind with
             | Some "AgentOwnerRoot" ->
                 let owner =
@@ -77,8 +78,9 @@ module ChatAdmissionIntentSurface =
                     |> Result.defaultWith invalidOp
 
                 let inherited =
-                    PromptAuthority.issueInheritedIdentitySeed agent owner
-                    |> Result.defaultWith (fun _ -> invalidArg "activeAgent" "invalid owner-derived active agent")
+                    PromptAuthority.issueInheritedIdentitySeed participant owner
+                    |> Result.defaultWith (fun _ ->
+                        invalidArg "activeParticipant" "invalid owner-derived active participant")
 
                 PromptAuthority.createAuthorityExecutionProfileFromSeed
                     sessionId
@@ -94,14 +96,18 @@ module ChatAdmissionIntentSurface =
                     (LogicalRunId.create "run-surface-active")
                     (AuthorityRootUserMessageId.create "root-surface-active")
                     PromptAuthority.RootAuthorityKind.HumanRoot
-                    (PromptAuthority.IdentitySeed.RootSelection(rootIdentity agent))
+                    (PromptAuthority.IdentitySeed.RootSelection(rootIdentity participant))
                 |> Result.defaultWith invalidOp
             | Some kind -> invalidArg "activeKind" ("unknown active authority kind: " + kind))
 
     let private claimOf (value: obj) : PromptAuthority.PromptClaim =
         let sessionId = requiredString "claim.sessionId" value?sessionId |> SessionId.create
         let promptKey = requiredString "claim.promptKey" value?promptKey |> PromptKey.create
-        let selectedAgent = requiredString "claim.selectedAgent" value?selectedAgent
+
+        let participant =
+            optionalString value?participant
+            |> Option.orElseWith (fun () -> optionalString value?selectedAgent)
+            |> Option.defaultWith (fun () -> invalidArg "claim.participant" "claim.participant must be non-empty")
 
         let claim: PromptAuthority.PromptClaim =
             { PromptKey = promptKey
@@ -109,8 +115,7 @@ module ChatAdmissionIntentSurface =
               Origin = requiredString "claim.origin" value?origin |> originOf
               LogicalRunId = Some(LogicalRunId.create "run-surface-claim")
               AuthorityRootUserMessageId = Some(AuthorityRootUserMessageId.create "root-surface-claim")
-              EffectiveAgent = optionalString value?effectiveAgent
-              IdentitySeed = PromptAuthority.IdentitySeed.RootSelection(rootIdentity selectedAgent)
+              IdentitySeed = PromptAuthority.IdentitySeed.RootSelection(rootIdentity participant)
               PayloadDigest = "surface-payload"
               Receipt = None
               ClaimedAtRuntimeStartCount = 0 }
@@ -169,7 +174,9 @@ module ChatAdmissionIntentSurface =
           PhysicalUserMessageId =
             optionalString value?physicalUserMessageId
             |> Option.map PhysicalUserMessageId.create
-          ExplicitAgent = optionalString value?explicitAgent
+          ExplicitAgent =
+            optionalString value?explicitParticipant
+            |> Option.orElseWith (fun () -> optionalString value?explicitAgent)
           PromptKey = optionalString value?promptKey |> Option.map PromptKey.create
           IsHostCompaction =
             if isNull value?hostCompaction then
@@ -193,8 +200,6 @@ module ChatAdmissionIntentSurface =
         | ChatAdmissionIntent.Rejection.PromptKeyNotClaimed _ -> "PromptKeyNotClaimed"
         | ChatAdmissionIntent.Rejection.AgentOwnerRootPromptNotClaimed _ -> "AgentOwnerRootPromptNotClaimed"
         | ChatAdmissionIntent.Rejection.PromptClaimSessionMismatch _ -> "PromptClaimSessionMismatch"
-        | ChatAdmissionIntent.Rejection.PromptClaimMissingManagedEffectiveAgent _ ->
-            "PromptClaimMissingManagedEffectiveAgent"
         | ChatAdmissionIntent.Rejection.PromptClaimOriginNotAdmissible _ -> "PromptClaimOriginNotAdmissible"
         | ChatAdmissionIntent.Rejection.UnknownOriginWhileActive -> "UnknownOriginWhileActive"
 
@@ -212,39 +217,40 @@ module ChatAdmissionIntentSurface =
                    reason = "AlreadyAcceptedHostMessage"
                    origin = originName (PromptAuthority.PromptOrigin.Continuation continuation) |}
         | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
+            let participant =
+                evidence.IdentitySeed
+                |> PromptAuthority.identitySeedParticipantIdentity
+                |> ParticipantIdentity.selectedAgent
+
             box
                 {| ``case`` = "ExternalRootIntent"
                    sessionId = SessionId.value evidence.Key.SessionId
                    physicalUserMessageId = PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId
                    explicitAgent = evidence.ExplicitAgent
-                   effectiveAgent = evidence.EffectiveAgent
                    origin = originName evidence.Origin
                    identitySeed = identitySeedName evidence.IdentitySeed
-                   selectedAgent =
-                    evidence.IdentitySeed
-                    |> PromptAuthority.identitySeedParticipantIdentity
-                    |> ParticipantIdentity.selectedAgent |}
+                   participant = participant |}
         | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
             box
                 {| ``case`` = "ActiveHumanContinuationIntent"
                    sessionId = SessionId.value evidence.Key.SessionId
                    physicalUserMessageId = PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId
-                   effectiveAgent = evidence.EffectiveAgent
                    origin = originName evidence.Origin
-                   selectedAgent = evidence.Authority.SelectedAgent |}
+                   participant = evidence.Authority.SelectedAgent |}
         | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
+            let participant =
+                evidence.IdentitySeed
+                |> PromptAuthority.identitySeedParticipantIdentity
+                |> ParticipantIdentity.selectedAgent
+
             box
                 {| ``case`` = "PendingPromptIntent"
                    sessionId = SessionId.value evidence.Key.SessionId
                    physicalUserMessageId = PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId
                    promptKey = PromptKey.value evidence.PromptKey
-                   effectiveAgent = evidence.EffectiveAgent
                    origin = originName evidence.Origin
                    identitySeed = identitySeedName evidence.IdentitySeed
-                   selectedAgent =
-                    evidence.IdentitySeed
-                    |> PromptAuthority.identitySeedParticipantIdentity
-                    |> ParticipantIdentity.selectedAgent |}
+                   participant = participant |}
         | ChatAdmissionIntent.Decision.HostInternal evidence ->
             box
                 {| ``case`` = "HostInternal"

@@ -31,7 +31,7 @@
 | Package | 一句话 WHY |
 |---|---|
 | `participant-identity` | Role、Persona、ExecutionBinding 必须分离，使换执行者不等于换人。 |
-| `execution-model-routing` | EffectiveAgent 与物理模型策略必须分离；唯一 MJS scheduler 以 `role + running` 决定 ModelTarget，runtime 只维护 lease occupancy。 |
+| `execution-model-routing` | 固定 Role 身份与物理模型策略必须分离；唯一 MJS scheduler 以 `role + running` 决定 ModelTarget，runtime 只维护 lease occupancy。 |
 | `office-capability` | office 必须由有资格产生的后果定义，而不是 persona 名或工具白名单。 |
 | `capability-enforcement` | provider 看见的 capability 与 runtime 真能执行的 capability 必须同源且不扩大 office entitlement。 |
 | `participant-horizon` | machine knowledge 大于 participant experience；只有会改变合法行动的最小事实应穿过 horizon。 |

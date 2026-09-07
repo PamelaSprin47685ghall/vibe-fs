@@ -85,7 +85,7 @@ module Identity =
     ///
     /// One Host assistant message is one provider request is one attempt, so
     /// there is exactly one type for it. SSOT used to name the concept twice
-    /// (`ProviderAttemptIdentity` in PROMPT-008 and FALLBACK-007); the wording is
+    /// (`ProviderAttemptIdentity` in PROMPT-008 and PAR-007); the wording is
     /// now unified, because two types would make "are these two identities of the
     /// same attempt equal" an askable but meaningless question.
     type ProviderRunIdentity = private ProviderRunIdentity of string
@@ -374,26 +374,3 @@ module Identity =
     module CommitHash =
         let create (value: string) = CommitHash value
         let value (CommitHash v) = v
-
-    /// Dedupe key for one failed provider attempt (FALLBACK-003). The same
-    /// failure observed twice — a retry signal plus an idle reconcile — must
-    /// advance the cursor once.
-    ///
-    /// Scoped by Logical Run and Authority Root so a new Authority Root starts a
-    /// fresh cursor (FALLBACK-001) without any explicit reset.
-    type FallbackAttemptIdentity =
-        { SessionId: SessionId
-          LogicalRunId: LogicalRunId
-          AuthorityRootUserMessageId: AuthorityRootUserMessageId
-          ProviderRun: ProviderRunIdentity }
-
-    module FallbackAttemptIdentity =
-        /// Stable string form for set membership in a projection.
-        let dedupeKey (identity: FallbackAttemptIdentity) =
-            String.Join(
-                "\u001f",
-                [| SessionId.value identity.SessionId
-                   LogicalRunId.value identity.LogicalRunId
-                   AuthorityRootUserMessageId.value identity.AuthorityRootUserMessageId
-                   ProviderRunIdentity.value identity.ProviderRun |]
-            )

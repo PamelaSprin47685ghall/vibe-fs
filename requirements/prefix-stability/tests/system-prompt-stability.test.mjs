@@ -1,5 +1,5 @@
 // PREFIX-STABILITY-007 / PROMPT-019 — system-prompt identity is role-owned,
-// while attempt tier/cursor metadata selects the effective agent and capabilities.
+// while participant identity and capabilities remain fixed across tiers.
 // The registered Authority, Planner, Strength and Delegation surfaces are the
 // only boundaries this proof needs; no Fable Role/Identity representation crosses.
 
@@ -42,20 +42,20 @@ test('WHAT[PREFIX-STABILITY-007] PROMPT_019_each_canonical_role_has_one_stable_p
   assert.equal(ids.size, roles.length, 'canonical roles must not alias prompt identities')
 })
 
-test('WHAT[PREFIX-STABILITY-007] PROMPT_019_effective_agent_preserved_across_tiers_not_prompt_identity', () => {
+test('WHAT[PREFIX-STABILITY-007] PROMPT_019_participant_identity_preserved_across_tiers_not_prompt_identity', () => {
   const inspectorFast = delegation.vocabulary('Inspector', 'Fast', OWNER)
   const inspectorDeep = delegation.vocabulary('Inspector', 'Deep', OWNER)
   const coderFast = delegation.vocabulary('Coder', 'Fast', OWNER)
   const coderDeep = delegation.vocabulary('Coder', 'Deep', OWNER)
 
-  // Single-version world: the effective agent is the selected agent on every
-  // tier — identity is preserved, provider rotation happens at model level.
+  // Single-version world: participant and role identity are fixed on every
+  // tier — identity is preserved without tying prompt bytes to physical tier.
   assert.equal(inspectorFast.agent, 'inspector')
   assert.equal(inspectorDeep.agent, 'inspector')
   assert.equal(coderFast.agent, 'coder')
   assert.equal(coderDeep.agent, 'coder')
   for (const attempt of [profile('Inspector', 'Fast'), profile('Inspector', 'Deep'), profile('Coder', 'Fast'), profile('Coder', 'Deep')]) {
-    assert.equal(attempt.participantIdentity.selectedAgent, attempt.participantIdentity.peerAgent)
+    assert.equal(attempt.participantIdentity.participant, attempt.participant)
     assert.equal(attempt.participantIdentity.selectedTier, 'deep')
   }
   assert.equal(profile('Manager', 'Fast').systemPromptId, profile('Manager', 'Deep').systemPromptId)

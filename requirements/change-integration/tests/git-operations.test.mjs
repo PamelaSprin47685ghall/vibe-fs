@@ -199,11 +199,11 @@ const ffAnswers = ({ candidate = 'cafe01', targetHead = 'beef02', branch = 'main
   ['merge --ff-only', [0, '', '']],
 ]
 
-const ff = (answers) => change.gitFfMerge(git(fakeRunner(answers).runner), WORKTREE, 'main', 'beef02')
+const ff = (answers) => change.gitFfMerge(git(fakeRunner(answers).runner), WORKTREE, 'main', 'beef02', 'cafe01')
 
 test('WHAT[CHGINT-008] GIT_ff_merge_happy_path_advances_to_candidate', async () => {
   const fake = fakeRunner(ffAnswers())
-  const result = await change.gitFfMerge(git(fake.runner), WORKTREE, 'main', 'beef02')
+  const result = await change.gitFfMerge(git(fake.runner), WORKTREE, 'main', 'beef02', 'cafe01')
   assert.equal(ok(result), 'cafe01')
   assert.deepEqual(fake.calls.map((call) => call.args[0]), ['rev-parse', 'symbolic-ref', 'rev-parse', 'merge-base', 'status', 'merge', 'rev-parse'])
 })
@@ -272,7 +272,7 @@ test('WHAT[CHGINT-008] GIT_ff_merge_verify_head_mismatch_reports_actual', async 
     ['rev-parse refs/heads/main', [0, 'beef02\n', '']],
     ['rev-parse HEAD', [[0, 'cafe01\n', ''], [0, 'wrong00\n', '']]],
   ])
-  const result = await change.gitFfMerge(git(fake.runner), WORKTREE, 'main', 'beef02')
+  const result = await change.gitFfMerge(git(fake.runner), WORKTREE, 'main', 'beef02', 'cafe01')
   assert.equal(result.ok, false)
   assert.match(result.error, /ff-only merge did not advance HEAD to candidate cafe01 \(got wrong00\)/)
 })

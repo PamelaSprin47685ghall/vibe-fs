@@ -12,6 +12,12 @@
 // production source — build-verification (guide-contract.test.mjs) proves the
 // emitted modules load and export callable functions.
 
+// NOTE (static lexical scope): PROVIDER_RECOVERY_GATE_FIXTURES below are
+// synthetic source strings that exercise the static lexical checker in
+// scripts/checks/p0-recovery-join.mjs. Hitting a fixture id proves the
+// checker rejects that regression text — never runtime proof of the
+// production behavior itself.
+
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -41,8 +47,8 @@ const PROVIDER_RECOVERY_GATE_FIXTURES = [
   },
   {
     id: 'no-active-run-continues-recovery',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs',
-    source: '| ConfirmedFailureOutcome.NoActiveRun -> RecoveryAdmission.ContinueRecovery',
+    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
+    source: '| FailureAdmissionOutcome.NoActiveRun -> continueAdvancedFailure turn error',
   },
   {
     id: 'provider-recovery-time-control',
@@ -52,21 +58,23 @@ const PROVIDER_RECOVERY_GATE_FIXTURES = [
   {
     id: 'provider-recovery-process-local-success',
     file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs',
-    source: 'if recoveryFlight.ContainsKey sessionId then return Ok ConfirmedFailureOutcome.RecoveryAdvanced',
+    source: 'if recoveryFlight.ContainsKey sessionId then return Ok FailureAdmissionOutcome.RetryAuthorized',
   },
   {
     id: 'old-fallback-surface-import',
-    file: 'src/Wanxiangshu/Repository/Programming/Js/ProviderRecovery.fs',
-    source: 'open Wanxiangshu.Participant.Provider.Attempt.Fallback.HandleSurface',
+    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
+    source: 'open Wanxiangshu.Participant.Provider.Attempt.Fallback.CursorSurface',
   },
   {
     id: 'old-fallback-surface-compile-entry',
     file: 'src/Wanxiangshu/Wanxiangshu.fsproj',
-    source: '<Compile Include="Participant\\Provider\\Attempt\\Fallback\\Surface.fs" />',
+    source: '<Compile Include="Participant\\Provider\\Attempt\\Fallback\\CursorSurface.fs" />',
   },
   {
-    id: 'confirmed-failure-outcome-contract',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs',
+    // Stale algebra RED fixtures (never positive): the exact-stale contract
+    // text must trip the stale-algebras static check.
+    id: 'stale-provider-failure-algebra',
+    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs',
     source: [
       'type ConfirmedFailureOutcome =',
       '    | RecoveryAdvanced of RecoveryOpportunity',
@@ -78,7 +86,27 @@ const PROVIDER_RECOVERY_GATE_FIXTURES = [
     ].join('\n'),
   },
   {
-    id: 'workflow-confirmed-failure-exhaustive',
+    id: 'stale-provider-failure-algebra',
+    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
+    source: 'FallbackLedger.recordAuthorizedFailure durable turn.SessionId authorization error',
+  },
+  {
+    // Near-miss RED fixtures for the exact-contract positives: each lacks the
+    // live FailureAdmissionOutcome/ProviderFailureLedger shape, so the
+    // positive reports it missing — static lexical rejection, not runtime proof.
+    id: 'failure-admission-outcome-contract',
+    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs',
+    source: [
+      'type ConfirmedFailureOutcome =',
+      '    | RecoveryAdvanced of RecoveryOpportunity',
+      '    | RecoveryExhausted',
+      '    | AlreadyRecorded',
+      '    | NoActiveRun',
+      '    | RetryScheduled',
+    ].join('\n'),
+  },
+  {
+    id: 'workflow-failure-admission-exhaustive',
     file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
     source: 'let settle = function | ConfirmedFailureOutcome.RecoveryAdvanced opportunity -> opportunity',
   },
@@ -91,7 +119,7 @@ const PROVIDER_RECOVERY_GATE_FIXTURES = [
     ].join('\n'),
   },
   {
-    id: 'interaction-repair-main-session-failure-owner',
+    id: 'interaction-repair-no-direct-failure-ledger',
     file: 'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs',
     source: 'FallbackLedger.recordAuthorizedFailure journal turn.SessionId authorization reason',
   },
@@ -159,7 +187,6 @@ test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_recovery_surface_drives_ordinary_work
   // (guide-contract.test.mjs) proves the emitted modules load and the
   // entrypoints are callable.
   const entrypoints = [
-    ['src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs', 'recoverFamilyDirect'],
     ['src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs', 'continueAfterConfirmedFailure'],
     ['src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs', 'awaitRecoveryMaterial'],
     ['src/Wanxiangshu/Composition/Turn/Workflow.fs', 'observe'],

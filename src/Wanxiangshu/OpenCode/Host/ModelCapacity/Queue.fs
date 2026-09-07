@@ -18,7 +18,9 @@ type internal ExecutionAdmissionDemand =
     { Sequence: int64
       SessionId: string
       PhysicalUserMessageId: string
-      EffectiveAgent: string
+      Role: Role
+      Participant: string
+      LenderSessionId: string option
       PreviousTarget: ModelRoutingTarget option
       Node: ExecutionAdmissionQueueNode }
 
@@ -116,7 +118,7 @@ type internal ExecutionAdmissionQueue(owner: obj, counters: CapacityTransitionCo
         else
             QueueBoundDecision.Full
 
-    let enqueueFresh sessionId physicalUserMessageId effectiveAgent previousTarget =
+    let enqueueFresh sessionId physicalUserMessageId role participant lenderSessionId previousTarget =
         match queueBoundDecision demands.Count with
         | QueueBoundDecision.Full -> ExecutionAdmissionAcquisition.QueueFull
         | QueueBoundDecision.HasRoom ->
@@ -141,7 +143,9 @@ type internal ExecutionAdmissionQueue(owner: obj, counters: CapacityTransitionCo
                 { Sequence = nextAdmissionDemandSequence
                   SessionId = sessionId
                   PhysicalUserMessageId = physicalUserMessageId
-                  EffectiveAgent = effectiveAgent
+                  Role = role
+                  Participant = participant
+                  LenderSessionId = lenderSessionId
                   PreviousTarget = previousTarget
                   Node = node }
 
@@ -153,16 +157,18 @@ type internal ExecutionAdmissionQueue(owner: obj, counters: CapacityTransitionCo
         (
             sessionId: string,
             physicalUserMessageId: string,
-            effectiveAgent: string,
+            role: Role,
+            participant: string,
+            lenderSessionId: string option,
             previousTarget: ModelRoutingTarget option
         ) : ExecutionAdmissionAcquisition =
         match enqueueEvidence sessionId physicalUserMessageId with
         | EnqueueEvidence.SameLogicalOperation node -> ExecutionAdmissionAcquisition.Queued node
         | EnqueueEvidence.NewLogicalOperation ->
-            enqueueFresh sessionId physicalUserMessageId effectiveAgent previousTarget
+            enqueueFresh sessionId physicalUserMessageId role participant lenderSessionId previousTarget
         | EnqueueEvidence.NewerPhysicalGeneration existing ->
             complete ExecutionAdmissionAcquisition.Superseded existing |> ignore
-            enqueueFresh sessionId physicalUserMessageId effectiveAgent previousTarget
+            enqueueFresh sessionId physicalUserMessageId role participant lenderSessionId previousTarget
 
     member _.Snapshot() =
         demands |> Seq.sortBy _.Sequence |> Seq.toArray

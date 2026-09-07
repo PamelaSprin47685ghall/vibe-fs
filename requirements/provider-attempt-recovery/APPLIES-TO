@@ -3,15 +3,16 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/Participant/Provider/Attempt/Fallback/**
-/src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs
-/src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs
+/src/Wanxiangshu/Participant/Provider/Attempt/FailureBudget.fs
+/src/Wanxiangshu/Participant/Provider/Attempt/RetryPolicy.fs
 /src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs
 /src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs
 /src/Wanxiangshu/Enforcer/Continuation.fs
 /src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs
 /src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs
 /src/Wanxiangshu/OpenCode/Host/ModelRouting.fs
-/requirements/context-compression/tests/recovery-slot.test.mjs
+/src/Wanxiangshu/Persistence/Journal/CodecSurface.fs
+/requirements/context-compression/tests/retry-policy.test.mjs
 /requirements/verification-system/tests/retry-owner.test.mjs
 /scripts/checks/retry-owner.mjs
 

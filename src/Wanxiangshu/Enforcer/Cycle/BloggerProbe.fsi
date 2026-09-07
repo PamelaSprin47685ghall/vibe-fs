@@ -44,17 +44,42 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 module BloggerRecoveryProbe =
 
-    [<RequireQualifiedAccess>]
-    type InvalidTerminalRepairState =
-        | NoRecovery
-        | InteractionNudgeIssued of ProviderRunIdentity
-        | AabbRepairIssued of ProviderRunIdentity
-
     [<Literal>]
     val BloggerMissingToolRepairKind: string = "blogger-missing-tool"
 
     [<Literal>]
     val BloggerAabbRepairKind: string = "blogger-aabb"
+
+    val repairClaimedForKind:
+        journal: Wanxiangshu.Persistence.Journal.AgentJournal ->
+        bloggerSessionId: Wanxiangshu.Foundation.Identity.SessionId ->
+        requestId: Wanxiangshu.Foundation.Identity.BloggerRequestId ->
+        terminalRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
+        repairKind: string ->
+            bool
+
+    val repairClaimedFor:
+        journal: Wanxiangshu.Persistence.Journal.AgentJournal ->
+        bloggerSessionId: Wanxiangshu.Foundation.Identity.SessionId ->
+        requestId: Wanxiangshu.Foundation.Identity.BloggerRequestId ->
+        terminalRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
+            bool
+
+    val repairDispatchExists:
+        projections: Wanxiangshu.Composition.Durable.AgentProjectionSet ->
+        bloggerSessionId: Wanxiangshu.Foundation.Identity.SessionId ->
+        requestId: Wanxiangshu.Foundation.Identity.BloggerRequestId ->
+        terminalRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
+        repairKind: string ->
+            bool
+
+    val repairIssuedForKind:
+        journal: Wanxiangshu.Persistence.Journal.AgentJournal ->
+        bloggerSessionId: Wanxiangshu.Foundation.Identity.SessionId ->
+        requestId: Wanxiangshu.Foundation.Identity.BloggerRequestId ->
+        terminalRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
+        repairKind: string ->
+            bool
 
     val terminalRequestOwnershipForPhysicalMessage:
         Wanxiangshu.Persistence.Journal.AgentJournal ->
@@ -71,22 +96,8 @@ module BloggerRecoveryProbe =
         obj list ->
             Wanxiangshu.Context.Companion.Blogger.BloggerTerminalRequestOwnership
 
-    val rejudgeFromEvidence:
-        string option -> (string * bool) list -> Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerToolRecovery
+    val isCompletedChronicle: part: Wanxiangshu.OpenCode.SessionToolPart -> bool
 
-    val repairStateForInvalidTerminal:
-        Wanxiangshu.Persistence.Journal.AgentJournal ->
-        Wanxiangshu.Foundation.Identity.SessionId ->
-        Wanxiangshu.Foundation.Identity.BloggerRequestId ->
-        Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
-            InvalidTerminalRepairState
+    val hasExactlyOneCompletedChronicle: parts: Wanxiangshu.OpenCode.SessionToolPart array -> bool
 
-    val rejudgeToolRecovery: AgentJournal -> SessionId -> BloggerRequestId -> SessionMessage list -> BloggerToolRecovery
-
-    val repairState:
-        Wanxiangshu.Persistence.Journal.AgentJournal ->
-        Wanxiangshu.Foundation.Identity.SessionId ->
-        string ->
-        Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
-        obj list ->
-            Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerToolRecovery
+    val completedAssistantEvidence: messages: Wanxiangshu.OpenCode.SessionMessage list -> (string * bool) list

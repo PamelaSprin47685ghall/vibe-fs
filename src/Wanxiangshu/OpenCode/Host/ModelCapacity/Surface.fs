@@ -48,7 +48,8 @@ type internal ExecutionCapacityOwner(counters: CapacityTransitionCounters) =
             CapacityTransitionOutcome.StaleFence
         | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.WrongSession
         | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.WrongPhysicalUserMessage
-        | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.WrongEffectiveAgent
+        | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.WrongRole
+        | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.WrongParticipant
         | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.WrongTarget
         | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.IllegalTransition
         | ExecutionCapacityDecision.Rejected ExecutionAdmissionRejection.OppositeTerminalConflict ->

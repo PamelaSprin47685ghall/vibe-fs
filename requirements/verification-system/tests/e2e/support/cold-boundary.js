@@ -6,7 +6,7 @@
  * the scenario to say WHERE each happens:
  *
  *   COMPANION-009  epoch switch — new SealRoot, one explicit prefix rebase
- *   FALLBACK-004   fallback side switch — EffectiveAgent moves, so the model does
+ *   PROVIDER-RETRY model rotation — fixed Role routes to a new model target, so the banner does
  *   CTX-010        prefix probe — attempt-local head, fixed tool set
  *   ENFORCER-030   frame commit — Blogger frame list grows, fixed system/tools
  *   SyncDelegate   request-kind switch — per-request tool map swap, same transcript
@@ -18,15 +18,15 @@
  * ANY body rewrite — which is most of what a wrong prefix replacement looks like. It
  * passed exactly the mutations it existed to catch.
  *
- * ── the fallback boundary is narrower than the old exemption claimed ─────────
+ * ── the provider-rotation boundary is narrower than the old exemption claimed ─
  *
  * `modelSideCold` allowed arbitrary system rewrites whenever the model id changed.
  * OpenCode 1.18.29 injects one exact model banner into the system message, so a real
- * provider fallback changes that banner by construction. The seal normalizes only
+ * provider retry changes that banner by construction. The seal normalizes only
  * that Host-owned sentence; every other system byte and every conversation part
  * remains protected.
  *
- * That makes `FallbackSide` a far tighter admission than a prefix rebase: messages
+ * That makes the provider-rotation declaration a far tighter admission than a prefix rebase: messages
  * must still satisfy the ordinary seal, and only the model may move. A scenario that
  * declares it cannot use it to smuggle a message rewrite past the barrier.
  */

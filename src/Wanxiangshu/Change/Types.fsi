@@ -9,6 +9,8 @@ open Wanxiangshu.Persistence.Journal
 
 type OrchestratorVerdict =
     | Published of jobId: ManagerJobId * head: CommitHash
+    | PublishedPendingCleanup of jobId: ManagerJobId * head: CommitHash * cleanupError: string
+    | Cancelled of jobId: ManagerJobId
     | RejectedDirty of reason: string
     | IntegrationFailed of jobId: ManagerJobId * errorDetails: string
     | Empty
@@ -22,7 +24,7 @@ type GitPort =
       CreateWorktree: ManagerJobId -> WorktreePath -> Task<Result<WorktreeIdentity, string>>
       FreezeTargetBranch: unit -> Task<Result<TargetRef, string>>
       Rebase: WorktreePath -> TargetRef -> Task<Result<unit, string>>
-      FfMerge: WorktreePath -> TargetRef -> CommitHash -> Task<Result<CommitHash, string>>
+      FfMerge: WorktreePath -> TargetRef -> CommitHash -> CommitHash -> Task<Result<CommitHash, string>>
       ConflictedFiles: WorktreePath -> Task<Result<string list, string>>
       RemoveWorktree: WorktreePath -> Task<Result<unit, string>>
       HasRebaseHead: WorktreePath -> Task<bool>

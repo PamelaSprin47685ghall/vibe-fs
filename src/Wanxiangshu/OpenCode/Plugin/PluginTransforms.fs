@@ -28,6 +28,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.Relay.OpenCode
+open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Participant.Provider
@@ -223,10 +224,48 @@ module PluginTransforms =
 
         let freezeProviderAttemptPlan projectionSessionIdOpt outObj =
             task {
+                let conflictingPlan existing attempted =
+                    invalidOp (
+                        sprintf
+                            "HOST-BOUNDARY-008: pending attempt plan conflict: existing=(%s) attempted=(%s)"
+                            (PendingAttemptPlanAdmission.requestIdentitySummary existing)
+                            (PendingAttemptPlanAdmission.requestIdentitySummary attempted)
+                    )
+
+                let replaySpecificPlan existing attempted =
+                    if PendingAttemptPlanAdmission.samePhysicalAuthority existing attempted then
+                        Ok()
+                    else
+                        conflictingPlan existing attempted
+
+                let freezeAbsentPlan sessionId physicalUserMessageId plan =
+                    match scope.Recovery.FreezePendingAttemptPlan sessionId physicalUserMessageId plan with
+                    | PendingAttemptPlanAdmission.Admitted _
+                    | PendingAttemptPlanAdmission.ReplayedExisting _ -> Ok()
+                    | PendingAttemptPlanAdmission.PlanConflict(existing, attempted) when
+                        PendingAttemptPlanAdmission.samePhysicalAuthority existing attempted
+                        ->
+                        Ok()
+                    | PendingAttemptPlanAdmission.PlanConflict(existing, attempted) ->
+                        conflictingPlan existing attempted
+                    | PendingAttemptPlanAdmission.IdentityMismatch(expectedSession, expectedPhysical, attempted) ->
+                        invalidOp (
+                            sprintf
+                                "HOST-BOUNDARY-008: pending attempt plan identity mismatch: expectedSession=%A expectedPhysical=%A attempted=%A"
+                                expectedSession
+                                expectedPhysical
+                                attempted
+                        )
+
+                let adaptedFreezeAttemptPlan sessionId physicalUserMessageId plan =
+                    match scope.Recovery.TryPendingAttemptPlan sessionId physicalUserMessageId with
+                    | Some existing -> replaySpecificPlan existing plan
+                    | None -> freezeAbsentPlan sessionId physicalUserMessageId plan
+
                 match!
                     SessionExecutionBinding.freezeProviderAttemptPlanForTransform
                         journal
-                        scope.Recovery.FreezePendingAttemptPlan
+                        adaptedFreezeAttemptPlan
                         projectionSessionIdOpt
                         outObj
                 with
@@ -241,163 +280,6 @@ module PluginTransforms =
                         )
             }
 
-        let captureSnapshot dirOpt =
-            match dirOpt |> Option.filter (String.IsNullOrWhiteSpace >> not) with
-            | Some dir -> WorkspaceSnapshot.capture dir
-            | None -> invalidOp "MANAGER-LOOP-001: workspace directory unavailable for snapshot capture"
-
-        let commitOpeningTransaction
-            (durable: AgentJournal)
-            sessionId
-            providerRunIdOpt
-            roadId
-            (transaction: RelayTransaction)
-            =
-            task {
-                let fact =
-                    AgentFact.Relay(
-                        RelayFactCases.TransactionCommitted
-                            {| RoadId = roadId
-                               Transaction = transaction |}
-                    )
-
-                match! AgentJournal.appendAgent (StreamId.Session sessionId) providerRunIdOpt fact durable with
-                | Ok _ -> return ()
-                | Error failure ->
-                    return
-                        invalidOp (
-                            sprintf
-                                "MANAGER-LOOP-002: opening commit failed: %s"
-                                (JournalAppendFailure.describe failure)
-                        )
-            }
-
-        let decideOpeningAction sessionIdTextOpt =
-            sessionIdTextOpt
-            |> Option.filter (String.IsNullOrWhiteSpace >> not)
-            |> Option.bind (fun sessionIdText ->
-                journal
-                |> Option.bind (fun durable ->
-                    let sessionId = SessionId.create sessionIdText
-                    let snapshot = AgentJournal.snapshot durable
-                    let roadId = RoadId.create sessionIdText
-
-                    let roadView =
-                        AgentProjection.tryFind sessionId snapshot.AgentProjections
-                        |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
-                        |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
-
-                    let profileOpt =
-                        PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
-
-                    match roadView, profileOpt with
-                    | None, Some profile when profile.CanonicalRole = Role.Manager ->
-                        let rootUserMsg =
-                            AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
-
-                        let opening =
-                            IncumbencyOpening.initial
-                                sessionId
-                                (PhysicalUserMessageId.create rootUserMsg)
-                                (captureSnapshot workspaceDirectory)
-
-                        Some(durable, sessionId, opening.RoadId, opening.Transaction)
-                    | _ -> None))
-
-        let ensureManagerRoadOpened
-            (sessionIdTextOpt: string option)
-            (providerRunIdOpt: ProviderRunIdentity option)
-            : Task<unit> =
-            task {
-                match decideOpeningAction sessionIdTextOpt with
-                | None -> return ()
-                | Some(durable, sessionId, roadId, transaction) ->
-                    do! commitOpeningTransaction durable sessionId providerRunIdOpt roadId transaction
-            }
-
-        let deliverLoopPrompt (durable: AgentJournal) sessionId retirement =
-            task {
-                let loopPromptText =
-                    ProviderProse.documentFor sessionId "runtime/manager-assess" Map.empty
-
-                let terminalRun = ProviderRunIdentity.create retirement.ProjectionCut.ProviderRunId
-
-                match!
-                    HostSessionNudge.trySendGateContinuation
-                        sessionPort
-                        host.RootWorkspace
-                        sessionId
-                        loopPromptText
-                        PromptAuthority.ContinuationKind.ManagerGuard
-                        workspaceDirectory
-                        (Some durable)
-                        (ManagerLoopGate.gateKind retirement.Id)
-                        terminalRun
-                with
-                | HostSessionNudge.GateContinuationOutcome.Sent _
-                | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted -> return ()
-                | HostSessionNudge.GateContinuationOutcome.Retired ->
-                    return
-                        invalidOp (
-                            sprintf
-                                "MANAGER-LOOP-003: loop gate retired for retirement %s"
-                                (RetirementId.value retirement.Id)
-                        )
-                | HostSessionNudge.GateContinuationOutcome.Failed error ->
-                    return invalidOp (sprintf "MANAGER-LOOP-003: loop gate nudge failed: %s" error)
-            }
-
-        let isContinueRetirement (retirement: RetirementSummary) =
-            match retirement.Outcome with
-            | RetirementOutcome.Continue -> true
-            | RetirementOutcome.Accepted _ -> false
-
-        let isHumanRootSession sessionId agentProjections =
-            PromptAuthorityLedger.activeProfile sessionId agentProjections
-            |> Option.exists (fun profile -> profile.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot)
-
-        let loopContextFor (durable: AgentJournal) sidText =
-            let sessionId = SessionId.create sidText
-            let roadId = RoadId.create sidText
-            let snapshot = AgentJournal.snapshot durable
-
-            let roadOpt =
-                AgentProjection.tryFind sessionId snapshot.AgentProjections
-                |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
-                |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
-
-            match roadOpt, isHumanRootSession sessionId snapshot.AgentProjections with
-            | Some road, true ->
-                road.LatestRetirement
-                |> Option.filter isContinueRetirement
-                |> Option.map (fun retirement ->
-                    durable, sessionId, roadId, road.AuthorityRevision, retirement, road.ActiveIncumbency.IsNone)
-            | _ -> None
-
-        let decideLoopContext sessionIdTextOpt =
-            match sessionIdTextOpt, journal with
-            | Some sidText, Some durable when not (String.IsNullOrWhiteSpace sidText) -> loopContextFor durable sidText
-            | _ -> None
-
-        let ensureLoopOpening durable sessionId roadId authorityRevision retirement needsOpening =
-            task {
-                match needsOpening with
-                | true ->
-                    let snapshot = captureSnapshot workspaceDirectory
-                    let opening = IncumbencyOpening.next roadId retirement.Id authorityRevision snapshot
-                    do! commitOpeningTransaction durable sessionId None opening.RoadId opening.Transaction
-                | false -> return ()
-            }
-
-        let maybeDeliverLoop sessionIdTextOpt =
-            task {
-                match decideLoopContext sessionIdTextOpt with
-                | Some(durable, sessionId, roadId, authorityRevision, retirement, needsOpening) ->
-                    do! ensureLoopOpening durable sessionId roadId authorityRevision retirement needsOpening
-                    do! deliverLoopPrompt durable sessionId retirement
-                | None -> return ()
-            }
-
         { BeginPhysicalProviderAttempt =
             SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
                 scope.Sessions.Quiescence.BeginProviderAttempt
@@ -407,7 +289,7 @@ module PluginTransforms =
           ApplyRelayProjection =
             fun sidOpt outObj ->
                 task {
-                    do! ensureManagerRoadOpened sidOpt None
+                    do! ManagerWorkflow.ensureManagerRoadOpened journal workspaceDirectory sidOpt None
 
                     let physicalUserMessageId =
                         outObj
@@ -418,16 +300,28 @@ module PluginTransforms =
                         RelayNarrativeTransform.apply
                             journal
                             (fun sid ->
-                                task {
-                                    physicalUserMessageId
-                                    |> Option.iter (fun physical ->
-                                        ModelRouting.suppressProviderStep sid physical
-                                        ModelRouting.releasePhysicalExecution sid physical |> ignore)
+                                ManagerWorkflow.continueAfterRetiredAttempt
+                                    sessionPort
+                                    host.RootWorkspace
+                                    journal
+                                    workspaceDirectory
+                                    (fun exactSessionId ->
+                                        task {
+                                            match physicalUserMessageId with
+                                            | None ->
+                                                return
+                                                    invalidOp
+                                                        "MANAGER-LOOP-004: retired attempt has no exact physical user message"
+                                            | Some physical ->
+                                                ModelRouting.suppressProviderStep exactSessionId physical
 
-                                    let! _ = sessionPort.InterruptAttempt sid
-                                    do! maybeDeliverLoop (Some(SessionId.value sid))
-                                    return ()
-                                })
+                                                ModelRouting.releasePhysicalExecution exactSessionId physical
+                                                |> ignore
+
+                                                let! _ = sessionPort.InterruptAttempt exactSessionId
+                                                return ()
+                                        })
+                                    sid)
                             sidOpt
                             outObj
                 }

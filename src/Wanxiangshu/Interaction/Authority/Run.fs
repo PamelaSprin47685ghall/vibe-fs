@@ -57,26 +57,24 @@ module PromptAuthorityRun =
         : Result<PromptAuthority.PromptClaim, string> =
         requireInheritedOwnerIdentity identitySeed
         |> Result.bind admitPublicRole
-        |> Result.map (fun participantIdentity ->
+        |> Result.map (fun _ ->
             { PromptKey = key
               SessionId = sessionId
               Origin = PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot
               LogicalRunId = None
               AuthorityRootUserMessageId = None
-              EffectiveAgent = Some(ParticipantIdentity.selectedAgent participantIdentity)
               IdentitySeed = identitySeed
               PayloadDigest = payloadDigest
               Receipt = None
               ClaimedAtRuntimeStartCount = 0 })
 
     /// Claim a continuation (PROMPT-003). It inherits the run and the root, and
-    /// carries the EffectiveAgent the current fallback cursor selected.
+    /// preserves the authority profile's identity seed.
     let claimContinuation
         (key: PromptKey)
         (sessionId: SessionId)
         (continuation: PromptAuthority.ContinuationKind)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string)
         (payloadDigest: string)
         : PromptAuthority.PromptClaim =
         { PromptKey = key
@@ -84,7 +82,6 @@ module PromptAuthorityRun =
           Origin = PromptAuthority.PromptOrigin.Continuation continuation
           LogicalRunId = Some profile.LogicalRunId
           AuthorityRootUserMessageId = Some profile.AuthorityRootUserMessageId
-          EffectiveAgent = Some effectiveAgent
           IdentitySeed = profile.IdentitySeed
           PayloadDigest = payloadDigest
           Receipt = None

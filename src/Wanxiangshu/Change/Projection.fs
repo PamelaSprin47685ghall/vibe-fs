@@ -36,8 +36,12 @@ type ManagerJobProjection =
              TargetHeadSnapshot: CommitHash
              WorkspaceSnapshotId: WorkspaceSnapshotId |} option
       PublishClaimed:
-          {| RebasedCommit: CommitHash
-             ExpectedHead: CommitHash |} option
+          {| TargetRef: TargetRef
+             RebasedCommit: CommitHash
+             ExpectedHead: CommitHash
+             WorkspaceSnapshotId: WorkspaceSnapshotId
+             QualityCertificateId: QualityCertificateId
+             AuthorityRevision: AuthorityRevision |} option
       Terminal: TerminalOutcome option }
 
 [<RequireQualifiedAccess>]
@@ -302,6 +306,9 @@ module OrchestratorProjection =
                WorkspaceSnapshotId: WorkspaceSnapshotId |})
         (projection: OrchestratorProjection)
         =
+        // Latest-event view mirroring Fold: exact replay is idempotent and a
+        // later differing record supersedes. Terminal guard stays in
+        // updateActiveJob so Published still settles the effect.
         updateActiveJob
             jobId
             (fun job ->
@@ -312,10 +319,17 @@ module OrchestratorProjection =
     let recordPublishClaimed
         (jobId: ManagerJobId)
         (payload:
-            {| RebasedCommit: CommitHash
-               ExpectedHead: CommitHash |})
+            {| TargetRef: TargetRef
+               RebasedCommit: CommitHash
+               ExpectedHead: CommitHash
+               WorkspaceSnapshotId: WorkspaceSnapshotId
+               QualityCertificateId: QualityCertificateId
+               AuthorityRevision: AuthorityRevision |})
         (projection: OrchestratorProjection)
         =
+        // Latest-event view mirroring Fold: a retried publish with fresh
+        // evidence supersedes the CAS-missed claim. Terminal guard stays in
+        // updateActiveJob so Published still blocks replay.
         updateActiveJob
             jobId
             (fun job ->

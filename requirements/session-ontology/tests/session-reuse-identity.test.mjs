@@ -23,10 +23,8 @@ const root = (session, physicalMessageId, agent) => {
       ownerLogicalRun: null,
       ownerAuthorityRoot: null,
       participantIdentity: {
-        selectedAgent: identity.identity.name,
-        peerAgent: identity.identity.peer,
-        canonicalRole: identity.identity.role,
-        selectedTier: identity.identity.initialTier,
+        participant: identity.identity.name,
+        role: identity.identity.role,
         persona: identity.identity.persona,
         personaCatalogVersion: identity.identity.catalogVersion,
         origin: identity.identity.origin,
@@ -52,10 +50,8 @@ const acceptedFact = (profile) => ({
       OwnerLogicalRunId: profile.identitySeed.ownerLogicalRun,
       OwnerAuthorityRootUserMessageId: profile.identitySeed.ownerAuthorityRoot,
       ParticipantIdentity: {
-        SelectedAgent: profile.participantIdentity.selectedAgent,
-        PeerAgent: profile.participantIdentity.peerAgent,
-        Role: profile.participantIdentity.canonicalRole,
-        InitialTier: `${profile.participantIdentity.selectedTier[0].toUpperCase()}${profile.participantIdentity.selectedTier.slice(1)}`,
+        participant: profile.participantIdentity.participant,
+        role: profile.participantIdentity.role,
         Persona: profile.participantIdentity.persona,
         PersonaCatalogVersion: profile.participantIdentity.personaCatalogVersion,
         Origin: profile.participantIdentity.origin,
@@ -78,7 +74,7 @@ test('WHAT[SESSION-ONTOLOGY-015] physical SessionId reuse requires durable logic
   assert.equal(scenario.afterLife.sessions[session].activeLogicalRun, null)
   assert.equal(scenario.online.sessions[session].activeLogicalRun.session, session)
   assert.equal(scenario.online.sessions[session].activeLogicalRun.logicalRun, second.logicalRun)
-  assert.equal(scenario.online.sessions[session].activeLogicalRun.participantIdentity.Role, 'coder')
+  assert.equal(scenario.online.sessions[session].activeLogicalRun.participantIdentity.role, 'coder')
   assert.notEqual(first.logicalRun, second.logicalRun)
   assert.deepEqual(scenario.replayed, scenario.online)
 })

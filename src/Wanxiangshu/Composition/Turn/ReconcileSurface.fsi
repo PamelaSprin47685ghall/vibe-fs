@@ -79,3 +79,5 @@ module ReconcileSurface =
     val failureProjectionEdgeScenario: unit -> Task<obj>
 
     val failureWitnessCurrentAssistantScenario: unit -> Task<obj>
+
+    val schedulerBurstBoundScenario: unit -> Task<obj>

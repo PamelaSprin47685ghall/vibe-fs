@@ -8,7 +8,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-fact.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptsurface.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj" />
-    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-foldsurface.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj" />
@@ -37,8 +36,6 @@
     <Compile Include="Interaction/Dispatch/Recovery.fs" />
     <Compile Include="Interaction/Repair/Port.fsi" />
     <Compile Include="Interaction/Repair/Port.fs" />
-    <Compile Include="Execution/Session/Recovery/Workflow.fsi" />
-    <Compile Include="Execution/Session/Recovery/Workflow.fs" />
     <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fsi" />
     <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fs" />
     <Compile Include="Composition/Turn/Binding.fsi" />

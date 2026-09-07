@@ -71,7 +71,7 @@ module Fold =
         // through its own branch so no fold depends on the whole catalogue.
         match fact with
         | AgentFact.Prompt prompt -> PromptFactFold.fold projection prompt
-        | AgentFact.Fallback fallback -> FallbackFactFold.fold projection fallback
+        | AgentFact.ProviderFailure failure -> ProviderFailureFactFold.fold projection failure
         | AgentFact.Relay relay -> foldRelay projection relay
         | AgentFact.Execution execution -> ExecutionFactFold.fold projection execution
         | AgentFact.ChatExecution chatExecution ->

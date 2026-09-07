@@ -91,7 +91,6 @@ module ReliabilityDiagnosticsSurface =
             | Some key -> ExecutionFailureResolution.AwaitAcceptanceReconciliation key
             | None -> invalidArg "resolution" "AwaitAcceptanceReconciliation requires execution key"
         | "RetryFreshAttempt" -> ExecutionFailureResolution.RetryFreshAttempt(authorization ())
-        | "AdvanceFallback" -> ExecutionFailureResolution.AdvanceFallback(authorization ())
         | "TerminalizeAcceptedPreProvider" ->
             match executionKey () with
             | Some key ->
@@ -152,7 +151,7 @@ module ReliabilityDiagnosticsSurface =
                   "physicalUserMessageId"
                   "promptKey"
                   "providerRunIdentity"
-                  "effectiveAgent"
+                  "participant"
                   "role"
                   "providerRequestKind"
                   "transition"
@@ -244,7 +243,7 @@ module ReliabilityDiagnosticsSurface =
             |> Option.map PhysicalUserMessageId.create
           PromptKey = optionalText "promptKey" value?promptKey |> Option.map PromptKey.create
           ProviderRunIdentity = providerRunIdentity
-          EffectiveAgent = optionalText "effectiveAgent" value?effectiveAgent
+          Participant = optionalText "participant" value?participant
           Role =
             optionalText "role" value?role
             |> Option.map (fun role ->
@@ -318,7 +317,6 @@ module ReliabilityDiagnosticsSurface =
         | ExecutionFailureResolution.PreserveCurrentFact -> "PreserveCurrentFact"
         | ExecutionFailureResolution.AwaitAcceptanceReconciliation _ -> "AwaitAcceptanceReconciliation"
         | ExecutionFailureResolution.RetryFreshAttempt _ -> "RetryFreshAttempt"
-        | ExecutionFailureResolution.AdvanceFallback _ -> "AdvanceFallback"
         | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _ -> "TerminalizeAcceptedPreProvider"
         | ExecutionFailureResolution.TerminalizeProviderStarted _ -> "TerminalizeProviderStarted"
 
@@ -339,7 +337,7 @@ module ReliabilityDiagnosticsSurface =
                physicalUserMessageId = optionObject PhysicalUserMessageId.value record.PhysicalUserMessageId
                promptKey = optionObject PromptKey.value record.PromptKey
                providerRunIdentity = optionObject ProviderRunIdentity.value record.ProviderRunIdentity
-               effectiveAgent = optionObject redactText record.EffectiveAgent
+               participant = optionObject redactText record.Participant
                role = optionObject Roles.roleLabel record.Role
                providerRequestKind = optionObject ProviderRequestKind.label record.ProviderRequestKind
                transition =

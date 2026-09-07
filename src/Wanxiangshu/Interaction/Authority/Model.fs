@@ -20,9 +20,8 @@ module PromptAuthority =
 
     /// What an Authority Root fixes for the whole Logical Run (PROMPT-002).
     ///
-    /// FALLBACK-004: SelectedAgent, PeerAgent, and CanonicalRole
-    /// never change here. Fallback moves EffectiveAgent, which lives on the
-    /// per-attempt profile instead — that separation is the clause.
+    /// SelectedAgent and CanonicalRole are fixed for the Logical Run.
+    /// Fixed participant identity and fresh physical requests are strictly bound.
     ///
     /// PROMPT-002 also forbids a model id: there is deliberately no field for
     /// one, so "Authority Root overrides the model" is not expressible.
@@ -46,7 +45,6 @@ module PromptAuthority =
             | InheritedFromOwner witness -> witness.ParticipantIdentity
 
         member this.SelectedAgent = ParticipantIdentity.selectedAgent this.ParticipantIdentity
-        member this.PeerAgent = ParticipantIdentity.peerAgent this.ParticipantIdentity
 
         member this.CanonicalRole =
             match ParticipantIdentity.role this.ParticipantIdentity with
@@ -167,9 +165,6 @@ module PromptAuthority =
             PhysicalUserMessageId: PhysicalUserMessageId
             ProviderRun: ProviderRunIdentity
             Origin: PromptOrigin
-            /// FALLBACK-002: the side the cursor currently selects. The only field
-            /// fallback may move (FALLBACK-004).
-            EffectiveAgent: string
             /// AGENT-001: Canonical role shares one system prompt, so this
             /// is derived from CanonicalRole alone.
             SystemPromptId: SystemPromptId
@@ -182,7 +177,7 @@ module PromptAuthority =
             ///
             /// Real request semantics, not a flow stage (ARCH-001). It decides which
             /// projection is built, which instruction is sent, and — through CTX-007
-            /// — what a success does to the fallback cursor.
+            /// — whether success resets the provider failure budget.
             RequestKind: ProviderRequestKind
             /// CTX-010: which prefix this attempt sends.
             ///
@@ -194,13 +189,11 @@ module PromptAuthority =
         }
 
         /// Convenience projections. Reading through the authority profile keeps
-        /// FALLBACK-004 visible: these never change for the Logical Run, while
-        /// EffectiveAgent does.
+        /// participant and role visible for the Logical Run.
         member this.SessionId = this.Authority.SessionId
         member this.LogicalRunId = this.Authority.LogicalRunId
         member this.AuthorityRootUserMessageId = this.Authority.AuthorityRootUserMessageId
         member this.SelectedAgent = this.Authority.SelectedAgent
-        member this.PeerAgent = this.Authority.PeerAgent
         member this.CanonicalRole = this.Authority.CanonicalRole
 
     /// A dispatched prompt before the Host has confirmed anything (PROMPT-005
@@ -221,7 +214,6 @@ module PromptAuthority =
             Origin: PromptOrigin
             LogicalRunId: LogicalRunId option
             AuthorityRootUserMessageId: AuthorityRootUserMessageId option
-            EffectiveAgent: string option
             IdentitySeed: IdentitySeed
             /// PROMPT-005 requires the payload digest at claim time so recovery can
             /// tell two dispatches of the same shape apart.
@@ -391,10 +383,6 @@ module PromptAuthority =
             )
         )
 
-    let agentPair (profile: AuthorityExecutionProfile) : AgentPairCursor.AuthorityAgentPair =
-        { AgentPairCursor.AuthorityAgentPair.SelectedAgent =
-            ParticipantIdentity.selectedAgent profile.ParticipantIdentity
-          AgentPairCursor.AuthorityAgentPair.PeerAgent = ParticipantIdentity.peerAgent profile.ParticipantIdentity }
 
     // ── PromptKey derivation (PROMPT-011) ───────────────────────────────────
     //
@@ -454,7 +442,6 @@ module PromptAuthority =
         (logicalRunId: LogicalRunId option)
         (authorityRoot: AuthorityRootUserMessageId option)
         (origin: PromptOrigin)
-        (effectiveAgent: string option)
         (payloadDigest: string)
         (claimSequence: int)
         : PromptKey =
@@ -466,17 +453,12 @@ module PromptAuthority =
                        digestField (logicalRunId |> Option.map LogicalRunId.value)
                        digestField (authorityRoot |> Option.map AuthorityRootUserMessageId.value)
                        originLabel origin
-                       digestField effectiveAgent
                        payloadDigest
                        string claimSequence |]
                 )
             )
         )
 
-    /// FALLBACK-001: the profile's agent pair for a given cursor.
-    let effectiveAgentFor (profile: AuthorityExecutionProfile) (cursor: AgentPairCursor.FallbackCursor) : string =
-        ignore cursor
-        profile.SelectedAgent
 
     /// Blogger-request + terminal-scoped repair identity used by the exact-one
     /// chronicle nudge→AABB state machine. Both axes matter: terminal identity
@@ -561,7 +543,7 @@ module PromptAuthority =
             && dispatch.PayloadDigest = payloadDigest)
         |> Option.map (fun dispatch -> dispatch.PhysicalUserMessageId)
 
-    /// FALLBACK-008: has this Blogger request + terminal occasion already spent its one repair.
+    /// PAR-008: has this Blogger request + terminal occasion already spent its one repair.
     /// Blogger protocol repair deliberately uses both axes: request identity
     /// prevents cross-request leakage on a long-lived run, while terminal identity
     /// distinguishes same-terminal re-entry from a new invalid terminal.
@@ -629,19 +611,14 @@ module PromptAuthority =
     /// The ONLY way to build an AttemptExecutionProfile (PROMPT-008).
     ///
     /// Everything a provider request needs is derived here from two inputs: the
-    /// authority profile fixed by the Authority Root, and the fallback cursor
-    /// that selects a side. Nothing is passed in that could be derived, so a
+    /// authority profile fixed by the Authority Root, and the physical request identity.
+    /// Nothing is passed in that could be derived, so a
     /// caller cannot supply a CanonicalRole that disagrees with the agent name,
     /// or a tool set that disagrees with the role.
     ///
-    /// FALLBACK-014 / AGENT-029: `EffectiveAgent` may move to PeerAgent on B-side;
-    /// `SystemPromptId` and ParticipantIdentity stay fixed by the Authority Root
-    /// IdentitySeed, while SessionProviderLanguage stays session bind-once. None
-    /// follows EffectiveAgent name.
-    ///
     /// That is the whole clause. The previous code assembled these fields from a
     /// mutable session cache, the last user message, a Role map and the fallback
-    /// projection — four sources that can disagree, and did (the B-side request
+    /// projection — four sources that can disagree, and did (the provider request
     /// occasionally carried the wrong tool set).
     ///
     /// `requestKind` and `choice` cannot be derived and so must be supplied. The
@@ -650,7 +627,6 @@ module PromptAuthority =
     /// request carrying a probe is not expressible rather than merely discouraged.
     let buildAttemptExecutionProfile
         (authority: AuthorityExecutionProfile)
-        (cursor: AgentPairCursor.FallbackCursor)
         (physicalUserMessageId: PhysicalUserMessageId)
         (providerRun: ProviderRunIdentity)
         (origin: PromptOrigin)
@@ -661,7 +637,6 @@ module PromptAuthority =
           PhysicalUserMessageId = physicalUserMessageId
           ProviderRun = providerRun
           Origin = origin
-          EffectiveAgent = effectiveAgentFor authority cursor
           SystemPromptId = systemPromptIdFor authority.CanonicalRole
           ToolCapabilitySet = toolCapabilitiesFor authority.CanonicalRole requestKind
           RequestKind = requestKind

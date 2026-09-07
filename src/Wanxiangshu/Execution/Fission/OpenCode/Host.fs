@@ -352,7 +352,6 @@ module FissionHost =
                     (takeoverPrompt aggregate)
                     PromptAuthority.ContinuationKind.FissionHandoff
                     authority
-                    authority.SelectedAgent
                     (directoryFor laneSessionId)
                     PromptDispatcher.AwaitMode.Await
                     None
@@ -536,8 +535,6 @@ module FissionHost =
         completionId
         (payload: string)
         =
-        let effectiveAgent = authority.SelectedAgent
-
         let prompt =
             LlmFacing.instructions
                 [ "A completion that was already outstanding before Fission now belongs to every present of this same participant."
@@ -554,7 +551,6 @@ module FissionHost =
             prompt
             PromptAuthority.ContinuationKind.FissionHandoff
             authority
-            effectiveAgent
             (directoryFor laneSessionId)
             PromptDispatcher.AwaitMode.Detached
             None

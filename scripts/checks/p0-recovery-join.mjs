@@ -393,75 +393,98 @@ export const RULES = [
     pathHint: 'src/Wanxiangshu/',
     allowedPathPrefix: 'src/Wanxiangshu/Participant/Provider/Attempt/',
     pattern: /\btype\s+ProviderRequestKind\b/,
-    label: 'ProviderRequestKind may only be defined under Participant/Provider/Attempt',
+    label: 'static check: ProviderRequestKind may only be defined under Participant/Provider/Attempt',
   },
   {
     id: 'provider-recovery-role-classification',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
-    fileHint: 'Workflow.fs|Ledger.fs|ConfirmedFailurePort.fs',
+    fileHint: 'Workflow.fs|Ledger.fs|Evidence.fs',
     pattern: /\b(?:Provider|Participant|Persona)?Role\b|\.Role\b/,
-    label: 'provider recovery must use typed attempt identity, not role classification',
+    label: 'static check: provider failure workflow must use typed attempt identity, not role classification',
   },
   {
     id: 'provider-recovery-error-string-classification',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
-    fileHint: 'Workflow.fs|Ledger.fs|ConfirmedFailurePort.fs',
+    fileHint: 'Workflow.fs|Ledger.fs|Evidence.fs',
     pattern:
       /\b(?:error|reason)\b\s*\.\s*(?:Contains|StartsWith|EndsWith|IndexOf)\b|\b(?:Regex\.)?IsMatch\s*\(\s*(?:error|reason)\b|\bmatch\s+(?:error|reason)\s+with\b|\bif\s+(?:error|reason)\s*=\s*["']/i,
-    label: 'provider recovery must not classify attempts from error strings',
+    label: 'static check: provider failure workflow must not classify attempts from error strings',
   },
   {
     id: 'no-active-run-continues-recovery',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
-    fileHint: 'Workflow.fs|Ledger.fs|ConfirmedFailurePort.fs',
+    fileHint: 'Workflow.fs|Ledger.fs',
     pattern:
-      /\|\s*(?:Ok\s+)?(?:ConfirmedFailureOutcome\.)?NoActiveRun\b(?:(?!\n\s*\|)[\s\S]){0,300}->(?:(?!\n\s*\|)[\s\S]){0,300}\bContinueRecovery\b/,
-    label: 'ConfirmedFailureOutcome.NoActiveRun must never continue recovery',
+      /\|\s*(?:Ok\s+)?(?:FailureAdmissionOutcome\.)?NoActiveRun\b(?:(?!\n\s*\|)[\s\S]){0,300}->(?:(?!\n\s*\|)[\s\S]){0,300}\b(?:ContinueRecovery|continueAdvancedFailure|RetryAuthorized)\b/,
+    label: 'static check: FailureAdmissionOutcome.NoActiveRun must never continue the provider failure workflow',
   },
   {
     id: 'provider-recovery-time-control',
     pathHint: 'Participant/Provider/Attempt/',
     pattern:
       /\b(?:DateTime|DateTimeOffset|TimeSpan|PeriodicTimer|Timer|time|deadline|sleep|poll(?:ing)?)\b|\bTask\.Delay\b|\bThread\.Sleep\b/i,
-    label: 'provider recovery must be durable-fact-driven, never time/timer/deadline/sleep/poll driven',
+    label: 'static check: provider failure workflow must be durable-fact-driven, never time/timer/deadline/sleep/poll driven',
   },
   {
     id: 'provider-recovery-process-local-success',
     pathHint: 'Participant/Provider/Attempt/',
     pattern:
-      /\b\w*(?:registry|waiter|flight)\w*\b[\s\S]{0,180}\b(?:FallbackSucceeded|recordConfirmedSuccess|RecoveryAdvanced|ContinueRecovery|success|succeeded)\b|\b(?:FallbackSucceeded|recordConfirmedSuccess|RecoveryAdvanced|ContinueRecovery|success|succeeded)\b[\s\S]{0,180}\b\w*(?:registry|waiter|flight)\w*\b/i,
-    label: 'process-local registry/waiter/flight state must not prove provider recovery success',
+      /\b\w*(?:registry|waiter|flight)\w*\b[\s\S]{0,180}\b(?:SuccessRecorded|recordConfirmedSuccess|RetryAuthorized)\b|\b(?:SuccessRecorded|recordConfirmedSuccess|RetryAuthorized)\b[\s\S]{0,180}\b\w*(?:registry|waiter|flight)\w*\b/i,
+    label:
+      'static check: process-local registry/waiter/flight state must not prove provider failure success (SuccessRecorded/recordConfirmedSuccess/RetryAuthorized)',
   },
   {
     id: 'old-fallback-surface-import',
     pathHint: 'src/Wanxiangshu/',
     pattern:
-      /(?:\bopen\s+|\bimport\s+.*?from\s+["']|\brequire\s*\(\s*["'])[^\n"']*Participant[./\\]Provider[./\\]Attempt[./\\]Fallback[./\\](?:HandleSurface|Surface)\b/,
-    label: 'old Fallback HandleSurface/Surface imports are forbidden; use CursorSurface',
+      /(?:\bopen\s+|\bimport\s+.*?from\s+["']|\brequire\s*\(\s*["'])[^\n"']*Participant[./\\]Provider[./\\]Attempt[./\\]Fallback[./\\](?:HandleSurface|Surface|CursorSurface)\b/,
+    label:
+      'static check: old Fallback HandleSurface/Surface/CursorSurface imports are forbidden; use ProviderFailureSurface',
   },
   {
     id: 'old-fallback-surface-compile-entry',
     fileHint: 'Wanxiangshu.fsproj',
     pattern:
-      /<Compile\s+Include=["'][^"']*Participant[\\/]Provider[\\/]Attempt[\\/]Fallback[\\/](?:HandleSurface|Surface)\.fs["']/,
-    label: 'old Fallback HandleSurface/Surface compile entries are forbidden; compile CursorSurface only',
+      /<Compile\s+Include=["'][^"']*Participant[\\/]Provider[\\/]Attempt[\\/]Fallback[\\/](?:HandleSurface|Surface|CursorSurface)\.fs["']/,
+    label:
+      'static check: old Fallback HandleSurface/Surface/CursorSurface compile entries are forbidden; compile ProviderFailureSurface only',
   },
   {
-    id: 'confirmed-failure-outcome-contract',
-    fileHint: 'ConfirmedFailurePort.fs',
+    // Stale provider-failure DU algebra (RED only, never positive): the
+    // ConfirmedFailure/RecoveryAdvanced/RecoveryOpportunity/FallbackLedger
+    // vocabulary was replaced by FailureAdmissionOutcome + ProviderFailureLedger.
+    // Any reintroduction fails this static lexical check. (CursorSurface
+    // stays covered by the old-fallback-surface import/compile-entry rules,
+    // whose production file/path hints match real sources only.)
+    id: 'stale-provider-failure-algebra',
+    pathHint: 'src/Wanxiangshu/',
+    pattern:
+      /\bConfirmedFailureOutcome\b|\bConfirmedFailurePort\b|\bRecoveryAdvanced\b|\bRecoveryOpportunity\b|\bFallbackLedger\b/,
+    label:
+      'static check: stale ConfirmedFailure/RecoveryAdvanced/RecoveryOpportunity/FallbackLedger algebra is forbidden; use FailureAdmissionOutcome + ProviderFailureLedger',
+  },
+  {
+    id: 'failure-admission-outcome-contract',
+    fileHint: 'Ledger.fs',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
     pattern:
-      /type\s+ConfirmedFailureOutcome\s*=\s*\r?\n\s*\|\s*RecoveryAdvanced\s+of\s+RecoveryOpportunity\s*\r?\n\s*\|\s*RecoveryExhausted\s*\r?\n\s*\|\s*EpisodeSuperseded\s*\r?\n\s*\|\s*NoActiveRun\s*\r?\n(?:\s*\r?\n|\s*\/\/\/[^\n]*\r?\n)*\s*type\s+ConfirmedFailurePort\s*=[^\n]*Task\s*<\s*Result\s*<\s*ConfirmedFailureOutcome\s*,\s*string\s*>\s*>/,
-    label: 'ConfirmedFailurePort must own the exact typed four-case ConfirmedFailureOutcome contract',
+      /(?=[\s\S]*type\s+FailureAdmissionOutcome\s*=\s*\r?\n\s*\|\s*RetryAuthorized\s*\r?\n\s*\|\s*RetryExhausted\s*\r?\n\s*\|\s*EpisodeSuperseded\s*\r?\n\s*\|\s*NoActiveRun\b)(?=[\s\S]*Task\s*<\s*Result\s*<\s*FailureAdmissionOutcome\s*,\s*string\s*>>)/,
+    label:
+      'static check: Ledger must own the exact typed four-case FailureAdmissionOutcome contract (RetryAuthorized/RetryExhausted/EpisodeSuperseded/NoActiveRun)',
     positive: true,
   },
   {
-    id: 'workflow-confirmed-failure-exhaustive',
+    // The workflow settles one admission value: RetryExhausted notifies,
+    // EpisodeSuperseded drops, NoActiveRun notifies, and only RetryAuthorized
+    // continues — in exactly that production order, admitted via
+    // ProviderFailureLedger. Static lexical ordering check, not runtime proof.
+    id: 'workflow-failure-admission-exhaustive',
     fileHint: 'Workflow.fs',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
     pattern:
-      /\bmatch\s+\w+\s+with\b[\s\S]{0,1200}\bConfirmedFailureOutcome\.RecoveryExhausted\b[\s\S]{0,500}\bConfirmedFailureOutcome\.EpisodeSuperseded\b[\s\S]{0,500}\bConfirmedFailureOutcome\.NoActiveRun\b[\s\S]{0,500}\bConfirmedFailureOutcome\.RecoveryAdvanced\b/,
-    label: 'Fallback Workflow must exhaustively handle every ConfirmedFailureOutcome case',
+      /(?=[\s\S]*ProviderFailureLedger\.recordAuthorizedFailure\b)(?=[\s\S]*match\s+admission\s+with\b[\s\S]{0,600}FailureAdmissionOutcome\.RetryExhausted\b[\s\S]{0,400}FailureAdmissionOutcome\.EpisodeSuperseded\b[\s\S]{0,400}FailureAdmissionOutcome\.NoActiveRun\b[\s\S]{0,600}FailureAdmissionOutcome\.RetryAuthorized\b)/,
+    label:
+      'static check: Provider failure workflow must exhaustively handle every FailureAdmissionOutcome case in order via ProviderFailureLedger',
     positive: true,
   },
   {
@@ -472,21 +495,24 @@ export const RULES = [
     fileHint: 'Workflow.fs',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
     pattern:
-      /(?=[\s\S]*\blet\s+private\s+recoveryOwnerSession\b[\s\S]{0,1000}ProviderRequestKind\.BloggerMain[\s\S]{0,300}SessionAssociationProjection\.tryMainSessionOf\s+failedSessionId[\s\S]{0,500}ProviderRequestKind\.WorkMain[\s\S]{0,200}Some\s+failedSessionId)(?=[\s\S]*\blet\s+private\s+requestKindFor\b[\s\S]{0,500}ChatExecutionProjection\.byKey[\s\S]{0,400}ProviderStarted[\s\S]{0,200}RequestKind)(?=[\s\S]*\bFallbackLedger\.recordAuthorizedFailure\s+durable\s+ownerSessionId\s+authorization\s+error\b)/,
-    label: 'Fallback Workflow must append only to a resolved Blogger main or durably proven WorkMain owner',
+      /(?=[\s\S]*\blet\s+private\s+recoveryOwnerSession\b[\s\S]{0,1000}ProviderRequestKind\.BloggerMain[\s\S]{0,300}SessionAssociationProjection\.tryMainSessionOf\s+failedSessionId[\s\S]{0,500}ProviderRequestKind\.WorkMain[\s\S]{0,200}Some\s+failedSessionId)(?=[\s\S]*\blet\s+private\s+requestKindFor\b[\s\S]{0,500}ChatExecutionProjection\.byKey[\s\S]{0,400}ProviderStarted[\s\S]{0,200}RequestKind)(?=[\s\S]*\bProviderFailureLedger\.recordAuthorizedFailure\s+durable\s+ownerSessionId\s+authorization\s+error\b)/,
+    label:
+      'static check: Provider failure workflow must append only to a resolved Blogger main or durably proven WorkMain owner',
     positive: true,
   },
   {
-    // InteractionRepair owns no second owner-resolution formula: it records the
-    // confirmed provider failure through the one workflow entry that resolves
-    // the exact main-session owner and consumes the typed policy licence.
-    id: 'interaction-repair-main-session-failure-owner',
+    // InteractionRepair owns no failure admission: it must never record a
+    // provider failure directly. Admission is owned by
+    // ProviderRecoveryWorkflow.admitPolicyAuthorizedFailure, which resolves the
+    // exact main-session owner and admits through ProviderFailureLedger.
+    // Static lexical check, not runtime proof.
+    id: 'interaction-repair-no-direct-failure-ledger',
     fileHint: 'InteractionRepair.fs',
     pathHint: 'Interaction/Repair/',
     pattern:
-      /\bProviderRecoveryWorkflow\.admitPolicyAuthorizedFailure\s*\r?\n\s*journal\s*\r?\n\s*turn\s*\r?\n\s*ExecutionFailure\.ProviderTransient\s*\r?\n\s*requestKind\s*\r?\n\s*reason\b/,
-    label: 'InteractionRepair must resolve the exact main-session owner before recording failure',
-    positive: true,
+      /\b(?:FallbackLedger|ProviderFailureLedger)\s*\.\s*(?:recordAuthorizedFailure|recordConfirmedSuccess)\b|\bConfirmedFailureOutcome\b|\bRecoveryAdvanced\b/,
+    label:
+      'static check: InteractionRepair must not record provider failures directly; admission is owned by ProviderRecoveryWorkflow.admitPolicyAuthorizedFailure via ProviderFailureLedger',
   },
 ]
 

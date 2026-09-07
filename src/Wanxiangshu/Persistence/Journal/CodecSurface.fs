@@ -42,12 +42,28 @@ module JournalCodecSurface =
         | other -> failwith $"JournalCodecSurface: unknown persona origin '{other}'"
 
     let private identityInputOfJs (value: obj) =
-        { SelectedAgent = text (value?selectedAgent)
+        let selected =
+            let p = text (value?participant)
+
+            if System.String.IsNullOrWhiteSpace p then
+                text (value?selectedAgent)
+            else
+                p
+
+        let roleVal =
+            let r = text (value?role)
+
+            if System.String.IsNullOrWhiteSpace r then
+                text (value?canonicalRole)
+            else
+                r
+
+        { SelectedAgent = selected
           Role =
-            if text (value?canonicalRole) = "bookkeeper" then
+            if roleVal = "bookkeeper" then
                 None
             else
-                Some(roleOf (value?canonicalRole))
+                Some(roleOf roleVal)
           Persona = text (value?persona)
           PersonaCatalogVersion = unbox<int> (value?personaCatalogVersion)
           Origin = originOf (value?origin) }
@@ -69,10 +85,8 @@ module JournalCodecSurface =
 
     let private identityToJs evidence =
         box
-            {| selectedAgent = ParticipantIdentity.selectedAgent evidence
-               peerAgent = ParticipantIdentity.peerAgent evidence
-               canonicalRole = ParticipantIdentity.roleLabel evidence
-               selectedTier = "deep"
+            {| participant = ParticipantIdentity.selectedAgent evidence
+               role = ParticipantIdentity.roleLabel evidence
                persona = ParticipantIdentity.persona evidence
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion evidence
                origin =

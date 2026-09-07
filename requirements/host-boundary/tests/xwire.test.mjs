@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as XWireSurface from '../../../dist/Context/Prefix/XWireSurface.js'
 
@@ -10,7 +9,7 @@ import * as XWireSurface from '../../../dist/Context/Prefix/XWireSurface.js'
 // inputs are the observable facts the production function reads from the
 // journal, the session snapshot port, and the plugin runtime scope; the
 // outputs are the decisions it makes (no-op, fail-closed, render synthetic
-// prefix, consume arming, promote prefix rebase).
+// prefix, consume the exact accepted retry, promote prefix rebase).
 
 const baseProjection = {
   messages: [
@@ -19,14 +18,13 @@ const baseProjection = {
   ],
 }
 
-const armedInput = (overrides = {}) => ({
+const acceptedRetryInput = (overrides = {}) => ({
   journal: true,
   sessionId: 'ses_x',
-  armed: true,
+  acceptedRetry: true,
   prefixEpoch: 0,
-  offset: 1, // Fork1 — a recovery slot
   physicalUser: 'user-1',
-  armedPhysicalUser: 'user-1',
+  acceptedPhysicalUser: 'user-1',
   snapshotPort: true,
   currentProjection: baseProjection,
   committedSnapshot: null,
@@ -51,7 +49,7 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_covered_prefix_digest_is_sha256', () => {
 })
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_no_journal_is_a_noop', () => {
-  const result = XWireSurface.transform(armedInput({ journal: false }))
+  const result = XWireSurface.transform(acceptedRetryInput({ journal: false }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, true)
   assert.equal(result.changed, false)
@@ -59,24 +57,24 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_no_journal_is_a_noop', () => {
 })
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_no_session_id_in_output_is_a_noop', () => {
-  const result = XWireSurface.transform(armedInput({ sessionId: '' }))
+  const result = XWireSurface.transform(acceptedRetryInput({ sessionId: '' }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, true)
   assert.equal(result.changed, false)
   assert.equal(result.consumed, false)
 })
 
-test('WHAT[HOST-BOUNDARY-021] XWIRE_unarmed_session_is_a_noop', () => {
-  const result = XWireSurface.transform(armedInput({ armed: false }))
+test('WHAT[HOST-BOUNDARY-021] XWIRE_unaccepted_retry_is_a_noop', () => {
+  const result = XWireSurface.transform(acceptedRetryInput({ acceptedRetry: false }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, true)
   assert.equal(result.changed, false)
   assert.equal(result.consumed, false)
 })
 
-test('WHAT[PAR-011] XWIRE_recovery_permit_cannot_be_consumed_by_other_physical_material_in_the_same_session', () => {
-  const result = XWireSurface.transform(armedInput({
-    armedPhysicalUser: 'retry-user-1',
+test('WHAT[PAR-011] XWIRE_accepted_retry_cannot_be_consumed_by_other_physical_material_in_the_same_session', () => {
+  const result = XWireSurface.transform(acceptedRetryInput({
+    acceptedPhysicalUser: 'retry-user-1',
     physicalUser: 'ordinary-user-2',
   }))
 
@@ -86,46 +84,24 @@ test('WHAT[PAR-011] XWIRE_recovery_permit_cannot_be_consumed_by_other_physical_m
   assert.equal(result.consumed, false)
 })
 
-test('WHAT[HOST-BOUNDARY-008] XWIRE_pre_inference_transform_freezes_a_pending_plan_without_waiting_for_assistant_run', () => {
-  const production = readFileSync(
-    new URL('../../../src/Wanxiangshu/Context/Prefix/Wire.fs', import.meta.url),
-    'utf8',
-  )
-  const planning = production.slice(
-    production.indexOf('let private planArmedWorkMainRetry'),
-    production.indexOf('let private applyNonReplicaTransform'),
-  )
-  const replicaPlanning = production.slice(
-    production.indexOf('let private applyStrengthReplicaPlan'),
-    production.indexOf('let private observeHostReanchor'),
-  )
-
-  assert.doesNotMatch(planning, /bindProviderRunAfterProjectionCatchup/)
-  assert.doesNotMatch(planning, /ProviderRunBinding\.observeBindableRun/)
-  assert.match(planning, /RecordPendingAttemptPlan/)
-  assert.doesNotMatch(replicaPlanning, /GetMessages|ProviderRunBinding/)
-  assert.match(replicaPlanning, /freezePreInference/)
-  assert.match(replicaPlanning, /RecordPendingAttemptPlan/)
-})
-
 // ── HOST-BOUNDARY-020: fail-closed only after exact physical ownership ──
 
-test('WHAT[PAR-011] XWIRE_missing_current_physical_user_cannot_consume_the_accepted_retry_permit', () => {
-  const result = XWireSurface.transform(armedInput({ physicalUser: '' }))
+test('WHAT[PAR-011] XWIRE_missing_current_physical_user_cannot_consume_the_accepted_retry', () => {
+  const result = XWireSurface.transform(acceptedRetryInput({ physicalUser: '' }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, true)
   assert.equal(result.consumed, false)
 })
 
 test('WHAT[HOST-BOUNDARY-008] XWIRE_pre_inference_retry_does_not_require_a_public_session_snapshot', () => {
-  const result = XWireSurface.transform(armedInput({ snapshotPort: false }))
+  const result = XWireSurface.transform(acceptedRetryInput({ snapshotPort: false }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, false)
   assert.equal(result.consumed, true)
 })
 
 test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_prefix_epoch_fail_closed', () => {
-  const withoutEpoch = armedInput()
+  const withoutEpoch = acceptedRetryInput()
   delete withoutEpoch.prefixEpoch
   const result = XWireSurface.transform(withoutEpoch)
   assert.equal(result.ok, false)
@@ -134,21 +110,21 @@ test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_prefix_epoch_fail_closed', () => {
 })
 
 test('WHAT[HOST-BOUNDARY-020] XWIRE_malformed_prefix_epoch_fail_closed', () => {
-  const result = XWireSurface.transform(armedInput({ prefixEpoch: 'not-an-epoch' }))
+  const result = XWireSurface.transform(acceptedRetryInput({ prefixEpoch: 'not-an-epoch' }))
   assert.equal(result.ok, false)
   assert.equal(result.noop, false)
   assert.match(result.error, /prefix epoch/)
 })
 
 test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_frozen_prefix_body_fail_closed', () => {
-  const result = XWireSurface.transform(armedInput({ frozenRecordPrefixBody: undefined }))
+  const result = XWireSurface.transform(acceptedRetryInput({ frozenRecordPrefixBody: undefined }))
   assert.equal(result.ok, false)
   assert.equal(result.noop, false)
   assert.match(result.error, /frozen record prefix body/)
 })
 
 test('WHAT[HOST-BOUNDARY-020] XWIRE_covered_digest_mismatch_refuses_the_probe_fail_closed', () => {
-  const result = XWireSurface.transform(armedInput({ coveredDigest: 'not-the-current-prefix-digest' }))
+  const result = XWireSurface.transform(acceptedRetryInput({ coveredDigest: 'not-the-current-prefix-digest' }))
   assert.equal(result.ok, true)
   assert.equal(result.consumed, true)
   assert.equal(result.changed, false)
@@ -156,14 +132,14 @@ test('WHAT[HOST-BOUNDARY-020] XWIRE_covered_digest_mismatch_refuses_the_probe_fa
   assert.equal(result.probe, null)
 })
 
-// ── HOST-BOUNDARY-021: armed + material → probe renders synthetic prefix ─
+// ── HOST-BOUNDARY-021: accepted retry + material → synthetic prefix ──────
 
-test('WHAT[HOST-BOUNDARY-021] XWIRE_armed_with_material_renders_synthetic_prefix', () => {
-  const result = XWireSurface.transform(armedInput({ coverableCutoff: 2 }))
+test('WHAT[HOST-BOUNDARY-021] XWIRE_accepted_retry_with_material_renders_synthetic_prefix', () => {
+  const result = XWireSurface.transform(acceptedRetryInput({ coverableCutoff: 2 }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, false)
   // When a probe is selected and the prefix intent renders a synthetic prefix,
-  // the transform changes the projection and consumes the arming.
+  // the transform changes the projection and consumes this accepted retry.
   assert.equal(result.consumed, true)
   // The output should differ from the input when a synthetic prefix is rendered.
   if (result.changed) {
@@ -172,14 +148,14 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_armed_with_material_renders_synthetic_prefix
   }
 })
 
-// ── HOST-BOUNDARY-021: armed + no material → no probe, no change ─────────
+// ── HOST-BOUNDARY-021: accepted retry + no material → no probe ───────────
 
-test('WHAT[HOST-BOUNDARY-021] XWIRE_armed_without_material_no_probe', () => {
-  const result = XWireSurface.transform(armedInput({ coverableCutoff: 0 }))
+test('WHAT[HOST-BOUNDARY-021] XWIRE_accepted_retry_without_material_has_no_probe', () => {
+  const result = XWireSurface.transform(acceptedRetryInput({ coverableCutoff: 0 }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, false)
-  // RecoveryOpportunity belongs to this physical attempt. NoCoverage sends the
-  // ordinary projection but must not leak arming into a later parked odd cursor.
+  // NoCoverage sends the ordinary projection; this request's choice cannot
+  // migrate into a later physical retry.
   assert.equal(result.consumed, true)
   assert.equal(result.changed, false)
   assert.ok(result.noProbeReason, 'should have a no-probe reason')
@@ -188,7 +164,7 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_armed_without_material_no_probe', () => {
 // ── HOST-BOUNDARY-021: reconcile — completed + probe → promote ───────────
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_completed_attempt_with_probe_promotes_prefix_rebase', () => {
-  const result = XWireSurface.transform(armedInput({ outcome: 'completed', coverableCutoff: 2 }))
+  const result = XWireSurface.transform(acceptedRetryInput({ outcome: 'completed', coverableCutoff: 2 }))
   assert.equal(result.ok, true)
   assert.equal(result.promoted, true)
 })
@@ -206,7 +182,7 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_stale_probe_does_not_promote_after_prefix_re
 })
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_failed_attempt_does_not_promote', () => {
-  const result = XWireSurface.transform(armedInput({ outcome: 'failed', coverableCutoff: 2 }))
+  const result = XWireSurface.transform(acceptedRetryInput({ outcome: 'failed', coverableCutoff: 2 }))
   assert.equal(result.ok, true)
   assert.equal(result.promoted, false)
 })
@@ -231,26 +207,6 @@ test('WHAT[CONTEXT-COMPRESSION-011] XWIRE_tool_call_provider_success_promotes_an
   assert.equal(result.promoted, true)
   assert.equal(result.cleared, true)
   assert.equal(result.keptPlan, false)
-})
-
-test('WHAT[CONTEXT-COMPRESSION-011] XWIRE_ordinary_request_keeps_committed_prefix_instead_of_resurrecting_raw_x', () => {
-  const source = readFileSync(
-    new URL('../../../src/Wanxiangshu/Context/Prefix/Wire.fs', import.meta.url),
-    'utf8',
-  )
-  const committed = source.slice(
-    source.indexOf('let private applyOrdinaryCommittedPrefix'),
-    source.indexOf('let private planArmedWorkMainRetry'),
-  )
-  const ordinary = source.slice(
-    source.indexOf('let private applyNonReplicaTransform'),
-    source.indexOf('let private applySessionTransform'),
-  )
-
-  assert.match(ordinary, /settleVisibleToolContinuations/)
-  assert.match(ordinary, /TryTakeRecoveryPermit\(sessionId, physical\)/)
-  assert.match(ordinary, /\| None ->[\s\S]*?applyOrdinaryCommittedPrefix/)
-  assert.match(committed, /applyCommittedPrefix durable sessionId state rawMessages output/)
 })
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_completed_without_probe_clears_without_promoting', () => {
@@ -282,14 +238,14 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_no_plan_is_inert', () => {
 
 // ── Mutation sensitivity: wrong physical ownership must not consume ──────
 //
-// A session-scoped boolean arming regression would consume this permit even
-// though the current physical user is unrelated.
+// A session-scoped acceptance regression would consume this request even when
+// the current physical user is unrelated.
 
-test('WHAT[PAR-011] XWIRE_mutation_sensitive_unrelated_physical_user_must_not_consume_recovery', () => {
-  const result = XWireSurface.transform(armedInput({
-    armedPhysicalUser: 'retry-user-1',
+test('WHAT[PAR-011] XWIRE_mutation_sensitive_unrelated_physical_user_must_not_consume_accepted_retry', () => {
+  const result = XWireSurface.transform(acceptedRetryInput({
+    acceptedPhysicalUser: 'retry-user-1',
     physicalUser: 'unrelated-user-9',
   }))
   assert.equal(result.consumed, false,
-    'mutation guard: session presence alone must never consume a physical recovery permit')
+    'mutation guard: session presence alone must never consume an accepted physical retry')
 })

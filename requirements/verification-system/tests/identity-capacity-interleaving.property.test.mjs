@@ -54,7 +54,8 @@ test('WHAT[VERIFICATION-SYSTEM-007] deterministic families preserve replay, rest
   assert.ok(
     results.every(
       ({ parent, child }) =>
-        parent.participantIdentity.selectedAgent !== child.participantIdentity.selectedAgent,
+        (parent.participantIdentity.participant ?? parent.participantIdentity.selectedAgent) !==
+          (child.participantIdentity.participant ?? child.participantIdentity.selectedAgent),
     ),
   )
 })

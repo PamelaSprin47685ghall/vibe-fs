@@ -78,4 +78,8 @@ Witness、Capability 与 Receipt 的合同必须声明 subject、版本/序列�
 
 ## ENF-020: 配置不变量fatal使用mandatory injected fuse
 
-invalid managed-agent configuration必须先收敛为capability-enforcement拥有的typed incident；解释该incident的composition必须显式注入fatal capability。validator/runtime不得直接引用fatal physical adapter，不得持有optional/default/global fallback；同一incident只允许一次report与一次kill。此边界不把普通可预期admission rejection升级为fatal。
+此边界不把普通可预期admission rejection升级为fatal。
+
+## ENF-021: Blogger repair 单一 owner 发行物理效果：同 episode 幂等、quiescence 门控、耗尽一次性 abandon
+
+Blogger 缺失工具修复的认领与物理发送只能由 `BloggerCoordinator.observeTransformRepair / observeIdleRepair` 这一唯一 compiled owner 发行。同一 repair episode 内重复观察必须幂等等待、不重复认领亦不重复发送；非 quiescent 观察不产生认领、不消耗发送预算；nudge 与 aabb 各至多发送一次，耗尽后一次性 abandon 并释放 flight；journal 缺失时直接 abandon 且零物理发送。runtime shutdown 必须与 episode admission 原子关闸，关闸后新认领被拒，已认领 episode 被取消并可 drain。

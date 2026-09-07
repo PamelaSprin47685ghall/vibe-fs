@@ -278,10 +278,8 @@ export const ROOT_SELECTION_IDENTITY_SEED = {
   OwnerLogicalRunId: null,
   OwnerAuthorityRootUserMessageId: null,
   ParticipantIdentity: {
-    SelectedAgent: 'coder',
-    PeerAgent: 'coder',
-    Role: 'coder',
-    InitialTier: 'Deep',
+    participant: 'coder',
+    role: 'coder',
     Persona: 'Coder',
     PersonaCatalogVersion: 1,
     Origin: 'ResolvedAtRoot',
@@ -320,30 +318,27 @@ export const fallbackFacts = {
     },
   }),
 
-  advance: ({ session = 'ses_a', logical = 'run_L', root = 'msg_u1', run, previous, next, count, reason = 'provider_error' } = {}) => ({
-    family: 'Fallback',
-    case: 'FallbackCursorAdvanced',
+  advance: ({ session = 'ses_a', logical = 'run_L', root = 'msg_u1', run, count, reason = 'provider_error' } = {}) => ({
+    family: 'ProviderFailure',
+    case: 'FailureRecorded',
     payload: {
       SessionId: session,
       LogicalRunId: logical,
       AuthorityRootUserMessageId: root,
       ProviderRun: run,
-      PreviousOffset: previous,
-      NextOffset: next,
       ConsecutiveFailureCount: count,
       Reason: reason,
     },
   }),
 
-  exhausted: ({ session = 'ses_a', logical = 'run_L', root = 'msg_u1', count, offset } = {}) => ({
-    family: 'Fallback',
-    case: 'FallbackExhausted',
+  exhausted: ({ session = 'ses_a', logical = 'run_L', root = 'msg_u1', count } = {}) => ({
+    family: 'ProviderFailure',
+    case: 'RetryExhausted',
     payload: {
       SessionId: session,
       LogicalRunId: logical,
       AuthorityRootUserMessageId: root,
       FinalConsecutiveFailureCount: count,
-      FinalOffset: offset,
     },
   }),
 }
@@ -387,7 +382,7 @@ export const assertPureConfluence = (envelopeSeqA, envelopeSeqB, projectionReade
 
 export const nextCEWiringTargets = [
   'RelayWorkflow.tryObserve',
-  'TurnCompletionProgram+FallbackController',
+  'TurnCompletionProgram+ProviderFailureController',
   'RetirementAdmission',
   'OrchestratorProgram+SessionRecovery',
 ]

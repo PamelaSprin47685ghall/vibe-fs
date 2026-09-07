@@ -22,8 +22,7 @@ module RecoveryRuntimeSurface =
           AuthorityKind = PromptRootAuthorityKind.HumanRoot
           IdentitySeed = RootSelection identity
           PhysicalUserMessageId = PhysicalUserMessageId.create $"message-{suffix}"
-          Origin = PromptOrigin.AuthorityRoot PromptRootAuthorityKind.HumanRoot
-          EffectiveAgent = "coder" }
+          Origin = PromptOrigin.AuthorityRoot PromptRootAuthorityKind.HumanRoot }
 
     let private keyOf (accepted: AcceptedChatExecutionEvidence) : ChatExecutionKey =
         { SessionId = accepted.SessionId
@@ -65,7 +64,6 @@ module RecoveryRuntimeSurface =
     let private failurePolicy
         (failure: ExecutionFailure)
         (retry: ProviderRecoveryBudget)
-        (fallback: ProviderRecoveryBudget)
         (evidence: ProviderStartedEvidence)
         : RecoveryPolicyEvidence =
         ExecutionFailurePolicy.decide
@@ -78,7 +76,6 @@ module RecoveryRuntimeSurface =
                   ProviderRun = evidence.ProviderRun
                   RequestKind = evidence.RequestKind
                   RetryBudget = retry
-                  FallbackBudget = fallback
                   Breaker = ProviderBreakerState.Closed } }
         |> RecoveryPolicyEvidence.FailureDecision
 
@@ -129,11 +126,7 @@ module RecoveryRuntimeSurface =
                 (ProviderPhysicalObservation.ProviderAbsent key)
                 absent
                 PersistenceCommitment.NotCommitted
-                (failurePolicy
-                    ExecutionFailure.ProviderTransient
-                    ProviderRecoveryBudget.Available
-                    ProviderRecoveryBudget.Exhausted
-                    started)
+                (failurePolicy ExecutionFailure.ProviderTransient ProviderRecoveryBudget.Available started)
         | "ProviderTerminalCompleted" ->
             pending
                 (startedState started)
@@ -188,11 +181,7 @@ module RecoveryRuntimeSurface =
                 (ProviderPhysicalObservation.ProviderAbsent key)
                 absent
                 PersistenceCommitment.NotCommitted
-                (failurePolicy
-                    ExecutionFailure.ProviderTransient
-                    ProviderRecoveryBudget.Available
-                    ProviderRecoveryBudget.Exhausted
-                    staleStarted)
+                (failurePolicy ExecutionFailure.ProviderTransient ProviderRecoveryBudget.Available staleStarted)
         | unknown -> invalidArg "scenario" $"unknown lifecycle recovery scenario '{unknown}'"
 
     let private dispositionName (disposition: ChatExecutionTerminalDisposition) =
@@ -260,7 +249,6 @@ module RecoveryRuntimeSurface =
     let interpretFailurePolicy
         (failureLabel: string)
         (retryBudget: string)
-        (fallbackBudget: string)
         (commitment: string)
         (observation: string)
         : Task<obj> =
@@ -293,12 +281,7 @@ module RecoveryRuntimeSurface =
             let started = providerStarted $"provider-policy-{failureLabel}" acceptedEvidence
             let key = keyOf acceptedEvidence
 
-            let policy =
-                failurePolicy
-                    failure
-                    (budget "retryBudget" retryBudget)
-                    (budget "fallbackBudget" fallbackBudget)
-                    started
+            let policy = failurePolicy failure (budget "retryBudget" retryBudget) started
 
             let providerObservation =
                 match observation with

@@ -107,7 +107,6 @@ module Surface =
           ProviderRun = ProviderRunIdentity.create (requiredText "provider.providerRun" value?providerRun)
           RequestKind = requestKindOf value?requestKind
           RetryBudget = budgetOf "provider.retryBudget" value?retryBudget
-          FallbackBudget = budgetOf "provider.fallbackBudget" value?fallbackBudget
           Breaker = breakerOf value?breaker }
 
     let internal inputOf (value: obj) =
@@ -182,7 +181,6 @@ module Surface =
                 "AwaitAcceptanceReconciliation", null, null, keyView key
             | ExecutionFailureResolution.RetryFreshAttempt auth ->
                 "RetryFreshAttempt", authorizationView auth, null, null
-            | ExecutionFailureResolution.AdvanceFallback auth -> "AdvanceFallback", authorizationView auth, null, null
             | ExecutionFailureResolution.TerminalizeAcceptedPreProvider(key, disposition) ->
                 "TerminalizeAcceptedPreProvider", null, terminalDispositionLabel disposition, keyView key
             | ExecutionFailureResolution.TerminalizeProviderStarted(key, disposition) ->

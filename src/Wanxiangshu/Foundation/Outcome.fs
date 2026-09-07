@@ -68,10 +68,7 @@ module Outcome =
     type SessionError =
         | NoProgress of reason: string
         | SessionCancelled
-        /// FALLBACK-005: the automatic recovery budget is spent. Named for the
-        /// budget rather than the cycle, because the A/A/B/B cursor itself never
-        /// ends — and because `FallbackExhausted` is the journal fact, and one
-        /// name for two concepts is how a double model starts.
+        /// PAR-005: the bounded automatic provider-recovery budget is spent.
         | AutoRecoveryExhausted
         | ReviewExhausted
         /// A dispatched prompt whose physical acceptance could not be proven.

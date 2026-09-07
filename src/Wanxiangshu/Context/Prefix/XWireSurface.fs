@@ -3,8 +3,12 @@ namespace Wanxiangshu.Context.Prefix
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
+open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
@@ -15,7 +19,7 @@ open Wanxiangshu.Participant.Provider.Attempt
 /// The production `XWire.applyTransform` is async and coupled to `AgentJournal`,
 /// `PluginRuntimeScope`, and `ISessionSnapshotPort` — it orchestrates blob reads,
 /// session-snapshot awaits, and in-place message replacement. The *decisions* it
-/// makes are pure: `RecoverySlot.mayRecover`, `PrefixProbeSelection.select`, and
+/// makes are pure: `PrefixProbeSelection.select`, and
 /// `XPrefixProjection.forChoice` / `XPrefixProjection.render`. This surface exposes that decision pipeline
 /// as a single JS-callable function with JS-native input/output, so the
 /// fail-closed and no-op laws can be proven without a live runtime.
@@ -226,10 +230,10 @@ module XWireSurface =
     /// Input fields (JS object):
     ///   journal:       truthy = a durable journal is available.
     ///   sessionId:     the managed session id found in the transform output.
-    ///   armed:         true when the recovery slot is armed.
+    ///   acceptedRetry: true when Host accepted this physical retry.
     ///   prefixEpoch:   current durable prefix epoch (the probe's base epoch).
-    ///   offset:        fallback cursor offset (0-3). Recovery slots are 1 and 3.
-    ///   physicalUser:  the physical user message id (required when armed).
+    ///   physicalUser:  the current physical user message id.
+    ///   acceptedPhysicalUser: the exact Host-accepted retry message id.
     ///   snapshotPort:  truthy = the public session snapshot port is available.
     ///   currentProjection: X provider-visible semantic projection (messages array).
     ///   committedSnapshot: committed prefix snapshot (or null).
@@ -278,15 +282,17 @@ module XWireSurface =
                        error = null
                        output = input?currentProjection |}
             else
-                // ── PAR-011: only the exact Host-accepted physical retry owns arming ──
-                let armed = not (isNullish input?armed) && (input?armed |> unbox<bool>)
+                // ── PAR-011: only the exact Host-accepted physical retry may plan ──
+                let acceptedRetry =
+                    not (isNullish input?acceptedRetry) && (input?acceptedRetry |> unbox<bool>)
+
                 let physicalUser = text input?physicalUser
-                let armedPhysicalUser = text input?armedPhysicalUser
+                let acceptedPhysicalUser = text input?acceptedPhysicalUser
 
                 if
-                    not armed
+                    not acceptedRetry
                     || String.IsNullOrEmpty physicalUser
-                    || not (String.Equals(physicalUser, armedPhysicalUser, StringComparison.Ordinal))
+                    || not (String.Equals(physicalUser, acceptedPhysicalUser, StringComparison.Ordinal))
                 then
                     box
                         {| ok = true
@@ -330,20 +336,7 @@ module XWireSurface =
                                error = error
                                output = null |}
                     else
-                        // ── Recovery decision: failure-local slot opportunity (CTX-006) ──
-                        let offsetByte =
-                            if isNullish input?offset then
-                                0uy
-                            else
-                                byte (intValue input?offset)
-
-                        let offset =
-                            match AgentPairCursor.FallbackOffsetCodec.ofByte offsetByte with
-                            | Ok o -> o
-                            | Error _ -> AgentPairCursor.FallbackOffset.Fork0
-
                         let coverableCutoff = intValue input?coverableCutoff
-                        let opportunity = RecoverySlot.opportunity SlotArming.ArmedByAdvance offset
 
                         // ── Probe selection (CTX-011) ──
                         let committedSnapshot = snapshotOptionOfJs input?committedSnapshot
@@ -374,7 +367,7 @@ module XWireSurface =
                                 frozenDigest
                                 recomputeDigest
 
-                        let probeResult = XWire.selectProbe opportunity candidateResult
+                        let probeResult = XWire.selectProbe true candidateResult
 
                         // ── Prefix intent (CTX-010) ──
                         let choice, noProbeReason =
@@ -396,8 +389,8 @@ module XWireSurface =
                             | PrefixRendered.Synthetic _ -> true
                             | PrefixRendered.Physical -> false
 
-                        // The typed permit was consumed before this attempt was built.
-                        // No probe result can leak arming into a later physical request.
+                        // The exact accepted retry is consumed by this plan.
+                        // No probe result can migrate to a later physical request.
                         let consumed = true
 
                         // ── Reconcile: promotableProbe (CTX-012) ──
@@ -501,3 +494,183 @@ module XWireSurface =
             {| promoted = decision.Promoted
                cleared = decision.Cleared
                keptPlan = decision.KeptPlan |}
+
+    // ── R02: real attempt-plan construction + typed owner bridges ───────────
+    //
+    // Plan construction below delegates to the compiled production
+    // implementation: `AttemptPlanner.freezePreInference` (with a production
+    // authority built by `ParticipantIdentity.resolveAtRoot` +
+    // `PromptAuthority.createAuthorityExecutionProfile`). Binding is the real
+    // `AttemptPlanner.bindProviderRun`; observations are plain projections of
+    // the real plans. The surface holds no policy of its own and never names
+    // the OpenCode recovery owner.
+    //
+    // Admission/binding/record/peek/consume/ownership live in the OpenCode
+    // owner surface (`PluginRecoveryScopeSurface`), which delegates to the real
+    // recovery scope behind the opaque scope handle. The typed bridges below are
+    // the only seam: they wrap/unwrap the opaque JS handles and project the
+    // JSON views, so the owner surface never copies plan equality or binding.
+
+    type private PendingPlanHandle(plan: PendingAttemptPlan) =
+        member _.Value = plan
+
+    type private BoundPlanHandle(plan: AttemptPlan) =
+        member _.Value = plan
+
+    let private probeOfSurfaceJs (value: obj) : PrefixProbe =
+        { ProbeId = text value?probeId
+          BasedOnEpochId = PrefixEpochId.create (int64 (text value?basedOnEpoch))
+          Candidate = snapshotOfJs value?candidate }
+
+    let private requestKindOfSurfaceJs (value: obj) : Result<ProviderRequestKind, string> =
+        match text value |> fun value -> value.ToLowerInvariant() with
+        | ""
+        | "workmain"
+        | "work-main" -> Ok ProviderRequestKind.WorkMain
+        | "interactionrepair"
+        | "interaction-repair" -> Ok ProviderRequestKind.InteractionRepair
+        | unknown -> Error(sprintf "unknown request kind: %s" unknown)
+
+    /// Project a real pending plan to its semantic JSON view. The view carries
+    /// authority/probe/request-kind evidence only; lifecycle counters stay out.
+    let internal pendingPlanView (plan: PendingAttemptPlan) : obj =
+        let choice, probe =
+            match plan.ProjectionChoice with
+            | XProjectionChoice.UseCommittedEpoch -> "UseCommittedEpoch", null
+            | XProjectionChoice.UsePrefixProbe probe ->
+                "UsePrefixProbe",
+                box
+                    {| probeId = probe.ProbeId
+                       basedOnEpoch = string (PrefixEpochId.value probe.BasedOnEpochId)
+                       cutoff = probe.Candidate.CutoffExclusive
+                       coveredDigest = probe.Candidate.CoveredPrefixDigest
+                       frozenDigest = BlobDigest.value probe.Candidate.FrozenRecordPrefixDigest |}
+
+        box
+            {| session = SessionId.value plan.Authority.SessionId
+               logicalRunId = LogicalRunId.value plan.Authority.LogicalRunId
+               root = AuthorityRootUserMessageId.value plan.Authority.AuthorityRootUserMessageId
+               physical = PhysicalUserMessageId.value plan.PhysicalUserMessageId
+               agent = plan.Authority.SelectedAgent
+               role = Roles.roleLabel plan.Authority.CanonicalRole
+               kind = ProviderRequestKind.label plan.RequestKind
+               choice = choice
+               probe = probe |}
+
+    /// Project a real bound plan to its semantic JSON view.
+    let internal boundPlanView (plan: AttemptPlan) : obj =
+        let choice, probe =
+            match plan.Profile.ProjectionChoice with
+            | XProjectionChoice.UseCommittedEpoch -> "UseCommittedEpoch", null
+            | XProjectionChoice.UsePrefixProbe probe ->
+                "UsePrefixProbe",
+                box
+                    {| probeId = probe.ProbeId
+                       basedOnEpoch = string (PrefixEpochId.value probe.BasedOnEpochId)
+                       cutoff = probe.Candidate.CutoffExclusive
+                       coveredDigest = probe.Candidate.CoveredPrefixDigest
+                       frozenDigest = BlobDigest.value probe.Candidate.FrozenRecordPrefixDigest |}
+
+        box
+            {| session = SessionId.value plan.Profile.SessionId
+               logicalRunId = LogicalRunId.value plan.Profile.LogicalRunId
+               root = AuthorityRootUserMessageId.value plan.Profile.AuthorityRootUserMessageId
+               physical = PhysicalUserMessageId.value plan.Profile.PhysicalUserMessageId
+               providerRun = ProviderRunIdentity.value plan.Profile.ProviderRun
+               agent = plan.Profile.SelectedAgent
+               role = Roles.roleLabel plan.Profile.CanonicalRole
+               kind = ProviderRequestKind.label plan.Profile.RequestKind
+               choice = choice
+               probe = probe |}
+
+    /// Typed owner bridges: wrap/unwrap the opaque JS handles without copying
+    /// any admission or binding policy. The owner surface passes handles back;
+    /// only these bridges see the typed plans.
+    let internal wrapPendingPlan (plan: PendingAttemptPlan) : obj = box (PendingPlanHandle plan)
+
+    let internal unwrapPendingPlan (handle: obj) : PendingAttemptPlan = (unbox<PendingPlanHandle> handle).Value
+
+    let internal wrapBoundPlan (plan: AttemptPlan) : obj = box (BoundPlanHandle plan)
+
+    let internal unwrapBoundPlan (handle: obj) : AttemptPlan = (unbox<BoundPlanHandle> handle).Value
+
+    /// Build a real `PendingAttemptPlan` via the production planner. Input fields:
+    /// session, logicalRun, root, physical, kind ("WorkMain" | "InteractionRepair"),
+    /// probe (null or { probeId, basedOnEpoch, candidate: { ref, frozenDigest, cutoff,
+    /// prefixDigest, sealRoot, syntheticId } }), agent/role (optional canonical
+    /// managed name overriding the default coder identity, resolved through the
+    /// real `ParticipantIdentity.resolveAtRoot`).
+    let pendingPlan (input: obj) : obj =
+        match requestKindOfSurfaceJs input?kind with
+        | Error error ->
+            box
+                {| ok = false
+                   error = error
+                   handle = null
+                   view = null |}
+        | Ok requestKind ->
+            let session = SessionId.create (text input?session)
+            let logicalRun = LogicalRunId.create (text input?logicalRun)
+            let root = AuthorityRootUserMessageId.create (text input?root)
+            let physical = PhysicalUserMessageId.create (text input?physical)
+
+            let canonicalName =
+                let agent = text input?agent
+                let role = text input?role
+
+                if not (String.IsNullOrEmpty agent) then agent
+                elif not (String.IsNullOrEmpty role) then role
+                else ManagedAgentCatalog.nameOf Role.Coder
+
+            let authorityResult =
+                ParticipantIdentity.resolveAtRoot canonicalName
+                |> Result.mapError (fun error -> sprintf "invalid participant identity: %A" error)
+                |> Result.bind (fun participantIdentity ->
+                    PromptAuthority.createAuthorityExecutionProfile
+                        session
+                        logicalRun
+                        root
+                        PromptAuthority.RootAuthorityKind.HumanRoot
+                        participantIdentity
+                    |> Result.mapError (fun error -> sprintf "invalid authority: %s" error))
+
+            match authorityResult with
+            | Error error ->
+                box
+                    {| ok = false
+                       error = error
+                       handle = null
+                       view = null |}
+            | Ok authority ->
+                let selectProbe () =
+                    if isNullish input?probe then
+                        Error NoCandidateReason.NoCoverage
+                    else
+                        Ok(probeOfSurfaceJs input?probe)
+
+                let plan =
+                    AttemptPlanner.freezePreInference
+                        authority
+                        physical
+                        (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt)
+                        requestKind
+                        None
+                        true
+                        selectProbe
+
+                box
+                    {| ok = true
+                       error = null
+                       handle = wrapPendingPlan plan
+                       view = pendingPlanView plan |}
+
+    /// Bind a pending handle to a run via the real `AttemptPlanner.bindProviderRun`.
+    let bindProviderRun (pending: obj) (providerRun: string) : obj =
+        let plan = unwrapPendingPlan pending
+
+        let bound =
+            AttemptPlanner.bindProviderRun (ProviderRunIdentity.create providerRun) plan
+
+        box
+            {| view = boundPlanView bound
+               handle = wrapBoundPlan bound |}

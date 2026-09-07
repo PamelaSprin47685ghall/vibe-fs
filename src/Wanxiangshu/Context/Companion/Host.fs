@@ -300,7 +300,7 @@ type CompanionHost
     let gate = obj ()
     let bloggerCreated = defaultArg onBloggerCreated (fun _ -> ())
 
-    let bloggerEffectiveAgent = ManagedAgent.nameOf Role.Blogger
+    let bloggerParticipant = ManagedAgent.nameOf Role.Blogger
 
     // DSL-MUTABLE: single-flight — memoized blogger create task
     let mutable bloggerCreateTask: Task<SessionId> option = None
@@ -344,14 +344,13 @@ type CompanionHost
                         durable
                         companion.RecordBloggerLinked
                         primaryId
-                        bloggerEffectiveAgent
+                        bloggerParticipant
                         bloggerDirectory
                         currentRestoredBloggerId
                         (fun () -> bloggerId)
                         (fun sid ->
                             bloggerId <- Some sid
                             bloggerCreateFailed <- false
-                            ModelRouting.bindCapacityCompanion primaryId sid
                             bloggerCreated sid)
                         (fun () -> restoredBloggerIdOpt <- None)
                         (fun () ->
@@ -369,7 +368,7 @@ type CompanionHost
           Gate = gate
           Companion = companion
           Journal = journal
-          EffectiveAgent = bloggerEffectiveAgent }
+          Participant = bloggerParticipant }
 
     /// Ensure the Blogger child exists (create or restore). Key for runtime cell.
     member this.EnsureBloggerAsync() : Task<SessionId> = ensureBlogger ()
@@ -416,7 +415,7 @@ type CompanionHost
                         sessions
                         durable
                         primaryId
-                        bloggerEffectiveAgent
+                        bloggerParticipant
                         bloggerDirectory
                         childId
 

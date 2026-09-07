@@ -14,7 +14,7 @@ test('WHAT[SPEC-INV-004] STRENGTH_004_each_unsupported_replica_is_fail_closed', 
   }
 })
 
-test('WHAT[SPEC-INV-004] STRENGTH_004_019_replica_is_never_owner_fallback_or_prefix_probe_evidence', () => {
+test('WHAT[SPEC-INV-004] STRENGTH_004_019_replica_never_clears_owner_failure_budget_or_carries_prefix_probe', () => {
   assert.equal(Strength.clearsFailureCountOnSuccess('strength-replica'), false)
   assert.equal(Strength.mayCarryProbe('strength-replica'), false)
   assert.equal(Strength.clearsFailureCountOnSuccess('work-main'), true)
@@ -33,10 +33,7 @@ const base = {
   requestKind: 'work-main',
   canonicalRole: 'coder',
   selectedAgent: 'coder',
-  effectiveAgent: 'coder',
-  isFallbackRetry: false,
   hasPrefixProbe: false,
-  isReviewerOrFinality: false,
   isAttachedOrInternalLeaf: false,
   ownerCancelled: false,
   targetProviderRunBound: true,
@@ -49,7 +46,7 @@ const prediction = { P1: 0.9, P2: 0.8, evidenceCount: 100 }
 const values = { V0: 0, V1: 5, V2: 8 }
 const config = { K1Margin: 1, K2Margin: 2, K2MinimumEvidence: 20 }
 
-test('WHAT[SPEC-INV-002] STRENGTH_002_010_policy_rejects_unknown_role_tier_and_request_kind', () => {
+test('WHAT[SPEC-INV-002] STRENGTH_002_010_policy_rejects_unknown_role_and_request_kind', () => {
   for (const field of ['canonicalRole', 'requestKind']) {
     const result = Strength.policyDecide({ ...base, [field]: 'unknown' }, false, false, prediction, values, config)
     assert.equal(result.ok, false)
@@ -57,9 +54,9 @@ test('WHAT[SPEC-INV-002] STRENGTH_002_010_policy_rejects_unknown_role_tier_and_r
   }
 })
 
-test('WHAT[SPEC-INV-002] STRENGTH_002_010_policy_is_fail_closed_and_only_treats_proven_deep_opportunities', () => {
+test('WHAT[SPEC-INV-002] STRENGTH_002_010_policy_is_fail_closed_and_only_treats_proven_fixed_identity_opportunities', () => {
   assert.equal(Strength.policyDecide(base, false, false, prediction, values, config).kind, 'Speculate')
-  assert.equal(Strength.policyDecide({ ...base, effectiveAgent: 'inspector' }, false, false, prediction, values, config).kind, 'Skip')
+  assert.equal(Strength.policyDecide({ ...base, isRootWork: false }, false, false, prediction, values, config).kind, 'Skip')
   assert.equal(Strength.policyDecide({ ...base, predictorAvailable: false }, false, false, prediction, values, config).kind, 'Skip')
   assert.equal(Strength.policyDecide({ ...base, costModelAvailable: false }, false, false, prediction, values, config).kind, 'Skip')
   assert.equal(Strength.policyDecide(base, true, false, prediction, values, config).kind, 'ControlHoldout')

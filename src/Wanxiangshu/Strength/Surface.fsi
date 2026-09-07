@@ -208,6 +208,20 @@ module StrengthSurface =
 
     val scopeDispose: scope: obj -> unit
 
+    val scopeFeature: scope: obj -> session: string -> role: string -> visibleBytes: int -> obj
+
+    val scopePredict: scope: obj -> feature: obj -> obj
+
+    val scopeBucket: scope: obj -> feature: obj -> obj
+
+    val scopeArm: scope: obj -> session: string -> targetRun: string -> feature: obj -> obj
+
+    val scopeObserve: scope: obj -> session: string -> providerRun: string -> symbol: string -> obj
+
+    val scopeRuntimeRegister: scope: obj -> binding: obj -> obj
+
+    val scopeRuntimeFindByReplica: scope: obj -> replica: string -> obj
+
     val runtimeCreate: unit -> obj
 
     val runtimeBinding:
@@ -229,3 +243,33 @@ module StrengthSurface =
     val runtimeRetire: runtime: obj -> replica: string -> obj
 
     val transformApply: sha256: (string -> string) -> runtime: obj -> output: obj -> Task<obj>
+
+    val replicaRuntimeCreate: maxFrameBytes: int -> obj
+
+    val replicaAttach: handle: obj -> binding: obj -> purpose: string -> obj
+
+    val replicaLiveRegister: handle: obj -> binding: obj -> obj
+
+    val replicaLiveFind: handle: obj -> replica: string -> obj
+
+    val replicaAwaitOutcome: completion: obj -> Task<obj>
+
+    val replicaHandleTurn: handle: obj -> turn: obj -> obj
+
+    val replicaHandleTransform: handle: obj -> output: obj -> Task<obj>
+
+    val replicaSessionDeleted: handle: obj -> session: string -> unit
+
+    val replicaCancelOwner: handle: obj -> owner: string -> Task
+
+    val replicaCloseDryRun: handle: obj -> turn: obj -> Task<obj>
+
+    val replicaPeek: handle: obj -> replica: string -> obj
+
+    val replicaIsReplica: handle: obj -> session: string -> bool
+
+    val replicaDispose: handle: obj -> unit
+
+    val replicaAborted: handle: obj -> string array
+
+    val replicaReleased: handle: obj -> string array

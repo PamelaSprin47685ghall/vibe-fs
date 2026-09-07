@@ -25,7 +25,7 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Resources
 
-/// Ordinary turn observation policy (INTERACTION-REPAIR / FALLBACK / TERMINAL-REPORT).
+/// Ordinary turn observation policy (INTERACTION-REPAIR / PROVIDER-RECOVERY / TERMINAL-REPORT).
 module OrdinaryTurnWorkflow =
 
     let private bloggerReceiptKind (journal: AgentJournal) (turn: ReconciledTurn) =
@@ -45,7 +45,7 @@ module OrdinaryTurnWorkflow =
         match continuationKind, turn.Role with
         | Some PromptAuthority.ContinuationKind.InteractionRepair, _ -> Some ProviderRequestKind.InteractionRepair
         // A Blogger terminal without a durable cycle receipt did not prove a
-        // business Main or maintenance Squash success. Never clear fallback
+        // business Main or maintenance Squash success. Never clear the failure budget
         // from Role alone.
         | _, Some Role.Blogger -> None
         | _ -> Some ProviderRequestKind.WorkMain
@@ -67,7 +67,7 @@ module OrdinaryTurnWorkflow =
         task {
             match successClearingRequest journal turn with
             | Some durable ->
-                let! _ = FallbackLedger.recordConfirmedSuccess durable turn.SessionId turn.ProviderRun
+                let! _ = ProviderFailureLedger.recordConfirmedSuccess durable turn.SessionId turn.ProviderRun
                 return ()
             | None -> return ()
         }
@@ -283,7 +283,7 @@ module OrdinaryTurnWorkflow =
                 journal
         | ReconcileProgram.TurnNeedsContinuation _ ->
             // Absorb text and reasoning into the XTrace even though this turn is
-            // not completable, then ask for the missing report. Still not fallback.
+            // not completable, then ask for the missing report. Still not provider recovery.
             // (The XTrace parts are captured at the transform boundary.)
             InteractionRepairWorkflow.repairMissingFinalReport
                 quiescence

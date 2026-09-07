@@ -21,8 +21,7 @@ module RecoverySurface =
           AuthorityKind = PromptRootAuthorityKind.HumanRoot
           IdentitySeed = RootSelection identity
           PhysicalUserMessageId = PhysicalUserMessageId.create $"message-{suffix}"
-          Origin = PromptOrigin.AuthorityRoot PromptRootAuthorityKind.HumanRoot
-          EffectiveAgent = "coder" }
+          Origin = PromptOrigin.AuthorityRoot PromptRootAuthorityKind.HumanRoot }
 
     let private keyOf (accepted: AcceptedChatExecutionEvidence) : ChatExecutionKey =
         { SessionId = accepted.SessionId
@@ -64,7 +63,6 @@ module RecoverySurface =
     let private policy
         (failure: ExecutionFailure)
         (retry: ProviderRecoveryBudget)
-        (fallback: ProviderRecoveryBudget)
         (started: ProviderStartedEvidence)
         : RecoveryPolicyEvidence =
         ExecutionFailurePolicy.decide
@@ -77,7 +75,6 @@ module RecoverySurface =
                   ProviderRun = started.ProviderRun
                   RequestKind = started.RequestKind
                   RetryBudget = retry
-                  FallbackBudget = fallback
                   Breaker = ProviderBreakerState.Closed } }
         |> RecoveryPolicyEvidence.FailureDecision
 
@@ -164,44 +161,21 @@ module RecoverySurface =
                 (ProviderPhysicalObservation.ProviderAbsent key)
                 absent
                 PersistenceCommitment.NotCommitted
-                (policy
-                    ExecutionFailure.ProviderTransient
-                    ProviderRecoveryBudget.Available
-                    ProviderRecoveryBudget.Exhausted
-                    started)
-        | "FallbackEligible" ->
-            pending
-                (startedState started)
-                (ProviderPhysicalObservation.ProviderAbsent key)
-                absent
-                PersistenceCommitment.NotCommitted
-                (policy
-                    ExecutionFailure.ProviderPermanent
-                    ProviderRecoveryBudget.Exhausted
-                    ProviderRecoveryBudget.Available
-                    started)
+                (policy ExecutionFailure.ProviderTransient ProviderRecoveryBudget.Available started)
         | "RetryExhausted" ->
             pending
                 (startedState started)
                 (ProviderPhysicalObservation.ProviderAbsent key)
                 absent
                 PersistenceCommitment.NotCommitted
-                (policy
-                    ExecutionFailure.ProviderTransient
-                    ProviderRecoveryBudget.Exhausted
-                    ProviderRecoveryBudget.Exhausted
-                    started)
+                (policy ExecutionFailure.ProviderTransient ProviderRecoveryBudget.Exhausted started)
         | "Superseded" ->
             pending
                 (startedState started)
                 (ProviderPhysicalObservation.ProviderAbsent key)
                 absent
                 PersistenceCommitment.NotCommitted
-                (policy
-                    ExecutionFailure.Superseded
-                    ProviderRecoveryBudget.Available
-                    ProviderRecoveryBudget.Available
-                    started)
+                (policy ExecutionFailure.Superseded ProviderRecoveryBudget.Available started)
         | "MissingReceipt" ->
             pending
                 (startedState started)
@@ -261,11 +235,7 @@ module RecoverySurface =
                 (ProviderPhysicalObservation.ProviderAbsent key)
                 absent
                 PersistenceCommitment.NotCommitted
-                (policy
-                    ExecutionFailure.ProviderTransient
-                    ProviderRecoveryBudget.Available
-                    ProviderRecoveryBudget.Exhausted
-                    staleStarted)
+                (policy ExecutionFailure.ProviderTransient ProviderRecoveryBudget.Available staleStarted)
         | "TerminalResourceHeld" ->
             pending
                 (terminalState ChatExecutionTerminalDisposition.Completed started)

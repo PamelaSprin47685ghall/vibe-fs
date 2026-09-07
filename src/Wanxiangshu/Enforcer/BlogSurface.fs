@@ -17,12 +17,22 @@ open Wanxiangshu.Resources
 
 /// JS-native owner boundary for the Blogger/chronicle contract and recovery
 /// evidence. It exposes semantic outcomes only; Host tool records, journal
-/// facts, typed identities and BloggerToolRecovery stay private.
+/// facts and typed identities stay private.
 [<RequireQualifiedAccess>]
 module BlogSurface =
 
     [<Emit("$0 == null")>]
     let private isNullish (value: obj) : bool = jsNative
+
+    [<Emit("$0[$1](...$2)")>]
+    let private invokeRawTask (value: obj) (name: string) (args: obj array) : System.Threading.Tasks.Task<obj> =
+        jsNative
+
+    [<Emit("$0[$1](...$2)")>]
+    let private invokeRawDisposable (value: obj) (name: string) (args: obj array) : IDisposable = jsNative
+
+    [<Emit("$0[$1](...$2)")>]
+    let private invokeRawValue (value: obj) (name: string) (args: obj array) : obj = jsNative
 
     let private text (value: obj) : string =
         if isNullish value then "" else string value
@@ -32,6 +42,9 @@ module BlogSurface =
 
     let private optionText (value: obj) : string option =
         if isNullish value then None else Some(text value)
+
+    let private intValue (value: obj) : int = int (text value)
+    let private int64Value (value: obj) : int64 = int64 (text value)
 
     let private resultToJs (ok: 'a -> obj) (error: 'e -> obj) (result: Result<'a, 'e>) : obj =
         match result with
@@ -99,71 +112,358 @@ module BlogSurface =
     let tipFieldNames () =
         EnforcerCatalog.fieldNames (EnforcerCatalogResource.load ()) |> List.toArray
 
-    /// Rejudge transcript evidence. One completed chronicle only proves
-    /// recovery; any other terminal is still the nudge stage.
-    let rejudgeFromEvidence (claimedRun: obj) (terminals: obj array) : obj =
-        let claimed = optionText claimedRun
+    /// Live Blogger host owns the process-local flight/episode rendezvous.
+    /// Tests hand the opaque PluginRuntimeScope; only the host crosses here.
+    let private hostOf (value: obj) : IBloggerRuntimeHost =
+        (unbox<Wanxiangshu.OpenCode.PluginRuntimeScope> value).BloggerRuntimeHost
 
-        let evidence =
-            terminals
-            |> Array.toList
-            |> List.map (fun item -> text item?id, not (isNullish item?hasChronicle) && unbox<bool> item?hasChronicle)
+    /// Real Blogger request context from a plain descriptor (Main/Squash shape
+    /// shared with CompanionRuntimeSurface). Authority still comes from the
+    /// durable profile; this only carries the exact live material.
+    let private requestOf (value: obj) : BloggerRequestContext =
+        match text value?kind with
+        | "Squash" ->
+            BloggerRequestContext.Squash
+                { RequestId = BloggerRequestId.create (text value?requestId)
+                  MainSessionId = SessionId.create (text value?mainSession)
+                  BloggerSessionId = SessionId.create (text value?bloggerSession)
+                  FrameEpochId = FrameEpochId.create (int64Value value?frameEpoch)
+                  CoveredFrameCount = intValue value?coveredFrameCount
+                  FrameDigests =
+                    (if isNullish value?digests then
+                         [||]
+                     else
+                         unbox<string array> value?digests)
+                    |> Array.toList
+                    |> List.map BlobDigest.create
+                  ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
+        | _ ->
+            let items =
+                match BloggerDeltaItemWire.tryListOfJs value?items with
+                | Ok parsed -> parsed
+                | Error error -> invalidArg "items" error
 
-        BloggerRecoveryProbe.rejudgeFromEvidence claimed evidence
-        |> function
-            | BloggerToolRecovery.NoRecovery -> box {| state = "NoRecovery"; run = null |}
-            | BloggerToolRecovery.InteractionNudgeIssued run ->
-                box
-                    {| state = "InteractionNudgeIssued"
-                       run = ProviderRunIdentity.value run |}
-            | BloggerToolRecovery.AabbRepairIssued run ->
-                box
-                    {| state = "AabbRepairIssued"
-                       run = ProviderRunIdentity.value run |}
+            BloggerRequestContext.Main
+                { RequestId = BloggerRequestId.create (text value?requestId)
+                  MainSessionId = SessionId.create (text value?mainSession)
+                  BloggerSessionId = SessionId.create (text value?bloggerSession)
+                  Items = items
+                  Toml = text value?toml
+                  PreviousIngestedThroughSequence = int64Value value?previousIngested
+                  NextIngestedThroughSequence = int64Value value?nextIngested
+                  PreviousCoverableTurnCutoffExclusive = intValue value?previousCutoff
+                  NextCoverableTurnCutoffExclusive = intValue value?nextCutoff
+                  NextCoveredPrefixDigest = text value?nextDigest
+                  FrameEpochId = FrameEpochId.create (int64Value value?frameEpoch)
+                  DeltaDigest = BlobDigest.create (text value?deltaDigest)
+                  ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
 
-    /// Rejudge named chronicle tool-part evidence from a compact semantic
-    /// transcript. `chronicleCount` counts raw named calls, while
-    /// `completedChronicleCount` proves exactly-one completion.
-    let rejudgeChronicleEvidence (claimedRun: obj) (terminals: obj array) : obj =
-        let normalized =
-            terminals
-            |> Array.map (fun item ->
-                box
-                    {| id = text item?id
-                       hasChronicle =
-                        let count = int (text item?chronicleCount)
-                        let completed = int (text item?completedChronicleCount)
-                        count = 1 && completed = 1 |})
+    /// Opaque journal capability from JS. `JournalSurface_boot` hands out a
+    /// handle whose `Journal` member is internal to this assembly, so the
+    /// handle is read structurally: this file compiles before
+    /// Persistence.Journal.Surface and cannot name its type.
+    let private journalOf (value: obj) : AgentJournal option =
+        if isNullish value then
+            None
+        else
+            let nested = value?Journal
 
-        rejudgeFromEvidence claimedRun normalized
+            if isNullish nested then
+                Some(unbox<AgentJournal> value)
+            else
+                Some(unbox<AgentJournal> nested)
 
-    /// Compact request-scoped recovery evidence. A claim is active only when
-    /// its request matches and it was not abandoned; an older request cannot
-    /// consume a new request's repair budget.
-    let repairState (value: obj) : obj =
-        let request = text value?requestId
-        let claims = arrayOf value?claims
-
-        let activeClaim kind =
-            claims
-            |> Array.tryFind (fun claim ->
-                text claim?requestId = request
-                && text claim?kind = kind
-                && text claim?run <> ""
-                && text claim?status <> "Abandoned")
-
-        match activeClaim "blogger-aabb" with
-        | Some claim ->
+    /// Complete reconciled turn for the idle repair entry. Only the fields the
+    /// coordinator reads (session, physical message, run, directory,
+    /// quiescence permit, delivery) cross the boundary; classification parts
+    /// stay empty. JS sees only primitive identity strings: session/event
+    /// callbacks cross as plain strings and plain outcome snapshots, and the
+    /// typed Host contracts are rebuilt here so every decision still comes
+    /// from BloggerCoordinator.
+    let private terminalSnapshot (outcome: Wanxiangshu.OpenCode.TerminalOutcome) : obj =
+        match outcome with
+        | Wanxiangshu.OpenCode.TerminalOutcome.Completed result ->
             box
-                {| state = "AabbRepairIssued"
-                   run = text claim?run |}
-        | None ->
-            match activeClaim "blogger-missing-tool" with
-            | Some claim ->
-                box
-                    {| state = "InteractionNudgeIssued"
-                       run = text claim?run |}
-            | None -> box {| state = "NoRecovery"; run = null |}
+                {| kind = "Completed"
+                   providerRun = ProviderRunIdentity.value result.ProviderRun
+                   text = result.TerminalText |}
+        | Wanxiangshu.OpenCode.TerminalOutcome.Aborted stop ->
+            box
+                {| kind = "Aborted"
+                   text = stop.Reason
+                   authorityRoot =
+                    stop.AuthorityRootUserMessageId
+                    |> Option.map AuthorityRootUserMessageId.value
+                    |> Option.defaultValue "" |}
+        | Wanxiangshu.OpenCode.TerminalOutcome.Failed stop ->
+            box
+                {| kind = "Failed"
+                   text = stop.Reason
+                   authorityRoot =
+                    stop.AuthorityRootUserMessageId
+                    |> Option.map AuthorityRootUserMessageId.value
+                    |> Option.defaultValue "" |}
+
+    let private terminalOfJs (value: obj) : Wanxiangshu.OpenCode.TerminalOutcome =
+        match text value?kind with
+        | "Completed" ->
+            let sessionId = SessionId.create (text value?sessionId)
+            let run = text value?providerRun
+
+            Wanxiangshu.OpenCode.TerminalOutcome.Completed
+                { SessionId = sessionId
+                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text value?authorityRoot)
+                  ProviderRun =
+                    ProviderRunIdentity.create (
+                        if String.IsNullOrWhiteSpace run then
+                            "unidentified"
+                        else
+                            run
+                    )
+                  Role = Role.Blogger
+                  Directory = None
+                  TerminalText = text value?text
+                  TurnFormalText = text value?text }
+        | "Aborted" ->
+            Wanxiangshu.OpenCode.TerminalOutcome.Aborted(Wanxiangshu.OpenCode.TerminalStop.session (text value?text))
+        | _ -> Wanxiangshu.OpenCode.TerminalOutcome.Failed(Wanxiangshu.OpenCode.TerminalStop.session (text value?text))
+
+    /// Plain JS session port: session ids cross as strings, completions as
+    /// snapshots. SendPrompt answers stay opaque production outcomes so the
+    /// dispatcher keeps its real transport evidence.
+    type private JsSessionPort(raw: obj) =
+        interface Wanxiangshu.OpenCode.ISessionHostPort with
+            member _.SubscribeTerminal(sessionId, listener) =
+                let callback =
+                    fun (rawSession: obj) (rawOutcome: obj) ->
+                        listener (SessionId.create (text rawSession)) (terminalOfJs rawOutcome)
+
+                invokeRawDisposable raw "SubscribeTerminal" [| box (SessionId.value sessionId); box callback |]
+
+            member _.SubscribeFutureTerminal(sessionId, listener) =
+                let callback =
+                    fun (rawSession: obj) (rawOutcome: obj) ->
+                        listener (SessionId.create (text rawSession)) (terminalOfJs rawOutcome)
+
+                invokeRawDisposable raw "SubscribeFutureTerminal" [| box (SessionId.value sessionId); box callback |]
+
+            member _.SendPrompt(sessionId, promptText, options) =
+                task {
+                    let! value =
+                        invokeRawTask
+                            raw
+                            "SendPrompt"
+                            [| box (SessionId.value sessionId); box promptText; box options |]
+
+                    return unbox<Outcome.SendOutcome> value
+                }
+
+            member _.AbortSession _ =
+                System.Threading.Tasks.Task.FromResult(Ok())
+
+            member _.InterruptAttempt _ =
+                System.Threading.Tasks.Task.FromResult(Ok())
+
+            member _.IsManagedChild _ = false
+
+            member _.AbortChildren _ : System.Threading.Tasks.Task =
+                (task { return () } :> System.Threading.Tasks.Task)
+
+            member _.CreateSiblingSession(_, _, _) =
+                System.Threading.Tasks.Task.FromResult(Error "unsupported")
+
+            member _.TryGetParentSession _ =
+                System.Threading.Tasks.Task.FromResult(Ok None)
+
+            member _.CreateChildSession(_, _) =
+                System.Threading.Tasks.Task.FromResult(Error "unsupported")
+
+            member _.ListChildren _ =
+                System.Threading.Tasks.Task.FromResult(Ok [])
+
+            member _.FamilyRootOf(sessionId) = sessionId
+
+    /// Plain JS event port: NotifyTerminal receives the string session id and
+    /// a primitive snapshot, never a Fable DU.
+    type private JsEventPort(raw: obj) =
+        interface Wanxiangshu.OpenCode.IEventObservationPort with
+            member _.SubscribeTerminalListener(listener) =
+                let callback =
+                    fun (rawSession: obj) (rawOutcome: obj) ->
+                        listener (SessionId.create (text rawSession)) (terminalOfJs rawOutcome)
+
+                invokeRawDisposable raw "SubscribeTerminalListener" [| box callback |]
+
+            member _.SubscribeFutureTerminalListener(listener) =
+                let callback =
+                    fun (rawSession: obj) (rawOutcome: obj) ->
+                        listener (SessionId.create (text rawSession)) (terminalOfJs rawOutcome)
+
+                invokeRawDisposable raw "SubscribeFutureTerminalListener" [| box callback |]
+
+            member _.NotifyTerminal sessionId outcome =
+                unbox<bool> (
+                    invokeRawValue raw "NotifyTerminal" [| box (SessionId.value sessionId); terminalSnapshot outcome |]
+                )
+
+    let private rootReaderOf (raw: obj) : Wanxiangshu.OpenCode.IRootWorkspaceReader =
+        { new Wanxiangshu.OpenCode.IRootWorkspaceReader with
+            member _.TryRead() =
+                let value = invokeRawValue raw "TryRead" [||]
+                if isNullish value then None else Some(string value) }
+
+    let private turnContextOf (value: obj) permit : Wanxiangshu.Composition.Turn.ReconciledTurnContext =
+        if isNullish value then
+            invalidArg "context" "idle repair observation requires a reconciled turn context"
+
+        let turn: Wanxiangshu.Composition.Turn.ReconciledTurn =
+            { SessionId = SessionId.create (text value?sessionId)
+              PhysicalUserMessageId = PhysicalUserMessageId.create (text value?physicalUserMessageId)
+              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text value?authorityRoot)
+              ProviderRun = ProviderRunIdentity.create (text value?providerRun)
+              Role = None
+              Directory = optionText value?directory
+              Parts = [||]
+              Finish = None
+              ErrorName = None
+              Model = None
+              Outcome = Wanxiangshu.Composition.Turn.ReconcileProgram.TurnCompleted
+              Observation = None }
+
+        let delivery =
+            let d =
+                if isNullish value?delivery then
+                    value?Delivery
+                else
+                    value?delivery
+
+            match text d with
+            | "IdleRevisit" -> Wanxiangshu.Composition.Turn.ReconciledTurnDelivery.IdleRevisit
+            | _ -> Wanxiangshu.Composition.Turn.ReconciledTurnDelivery.Observation
+
+        { Turn = turn
+          Failure = None
+          Quiescence = permit
+          Delivery = delivery }
+
+    /// Coordinator repair verdict rendered as a plain outcome object. The name
+    /// is the production result; no stage is reconstructed here.
+    let private repairOutcomeToJs (outcome: BloggerRepairOutcome) : obj =
+        match outcome with
+        | BloggerRepairOutcome.NudgeSent key ->
+            box
+                {| outcome = "NudgeSent"
+                   promptKey = key |> Option.map PromptKey.value |> Option.toObj |}
+        | BloggerRepairOutcome.AabbSent key ->
+            box
+                {| outcome = "AabbSent"
+                   promptKey = key |> Option.map PromptKey.value |> Option.toObj |}
+        | BloggerRepairOutcome.RepairInjected messages ->
+            box
+                {| outcome = "RepairInjected"
+                   messages = messages |> List.toArray |}
+        | BloggerRepairOutcome.PendingRepairWait -> box {| outcome = "PendingRepairWait" |}
+        | BloggerRepairOutcome.UnownedIdleIgnored -> box {| outcome = "UnownedIdleIgnored" |}
+        | BloggerRepairOutcome.SupersededIgnored -> box {| outcome = "SupersededIgnored" |}
+        | BloggerRepairOutcome.AbandonedExhausted -> box {| outcome = "AbandonedExhausted" |}
+        | BloggerRepairOutcome.Completed -> box {| outcome = "Completed" |}
+
+    /// Drive the real transform repair entry: observed terminal/tool facts in,
+    /// coordinator verdict out. The exact live request and terminal run cross
+    /// explicitly; `rawMessages` is the plain Host transcript.
+    let observeTransformRepair
+        (scope: obj)
+        (journal: obj)
+        (request: obj)
+        (terminalRun: string)
+        (rawMessages: obj)
+        : System.Threading.Tasks.Task<obj> =
+        task {
+            let! outcome =
+                BloggerCoordinator.observeTransformRepair
+                    (hostOf scope)
+                    (journalOf journal)
+                    (requestOf request)
+                    (ProviderRunIdentity.create terminalRun)
+                    (arrayOf rawMessages |> Array.toList)
+
+            return repairOutcomeToJs outcome
+        }
+
+    /// Drive the real idle repair entry. The observation states quiescence
+    /// explicitly: when quiescent the surface
+    /// begins the exact provider attempt on a real SessionQuiescenceGate,
+    /// observes its idle, and places the resulting permit in the reconciled
+    /// turn; otherwise the turn carries no permit. Session, workspace and
+    /// event ports arrive as plain JS stubs over primitive strings; only
+    /// their exercised calls take effect. The run is read from the turn itself.
+    let observeIdleRepair
+        (scope: obj)
+        (journal: obj)
+        (request: obj)
+        (observation: obj)
+        : System.Threading.Tasks.Task<obj> =
+        task {
+            let contextValue = observation?context
+            let sessionId = SessionId.create (text contextValue?sessionId)
+            let gate = Wanxiangshu.OpenCode.SessionQuiescenceGate()
+
+            let permit =
+                if isNullish observation?quiescent || not (unbox<bool> observation?quiescent) then
+                    None
+                else
+                    gate.BeginProviderAttempt sessionId
+                    Some(gate.ObserveIdle sessionId)
+
+            let! outcome =
+                BloggerCoordinator.observeIdleRepair
+                    (hostOf scope)
+                    (journalOf journal)
+                    (requestOf request)
+                    (gate :> Wanxiangshu.OpenCode.ISessionQuiescenceGate)
+                    (turnContextOf contextValue permit)
+                    (JsSessionPort(observation?sessionPort) :> Wanxiangshu.OpenCode.ISessionHostPort)
+                    (rootReaderOf observation?rootWorkspace)
+                    (JsEventPort(observation?eventPort) :> Wanxiangshu.OpenCode.IEventObservationPort)
+
+            return repairOutcomeToJs outcome
+        }
+
+    /// Durable repair-claim facts read through the production probe. No stage
+    /// is derived here; the coordinator owns repair sequencing.
+    let repairClaimedForKind
+        (journal: obj)
+        (bloggerSessionId: string)
+        (requestId: string)
+        (terminalRun: string)
+        (repairKind: string)
+        : bool =
+        match journalOf journal with
+        | None -> false
+        | Some durable ->
+            BloggerRecoveryProbe.repairClaimedForKind
+                durable
+                (SessionId.create bloggerSessionId)
+                (BloggerRequestId.create requestId)
+                (ProviderRunIdentity.create terminalRun)
+                repairKind
+
+    let repairIssuedForKind
+        (journal: obj)
+        (bloggerSessionId: string)
+        (requestId: string)
+        (terminalRun: string)
+        (repairKind: string)
+        : bool =
+        match journalOf journal with
+        | None -> false
+        | Some durable ->
+            BloggerRecoveryProbe.repairIssuedForKind
+                durable
+                (SessionId.create bloggerSessionId)
+                (BloggerRequestId.create requestId)
+                (ProviderRunIdentity.create terminalRun)
+                repairKind
 
     let private id (value: obj) = text value
 
@@ -445,52 +745,3 @@ module BlogSurface =
             box
                 {| state = "ProjectMessages"
                    fatal = "exactly one chronicle call required" |}
-
-    /// Bounded repair transition. A pure terminal first receives one nudge;
-    /// subsequent different invalid terminals stay in AABB until the shared
-    /// provider fallback budget is actually exhausted.
-    let repairProtocol (value: obj) : obj =
-        let prior = text value?priorState
-        let terminal = text value?terminalRun
-
-        let nudgeSucceeded =
-            not (isNullish value?nudgeSucceeded) && unbox<bool> value?nudgeSucceeded
-
-        let sameTerminal = text value?repairTerminalRun = terminal
-
-        let fallbackExhausted =
-            not (isNullish value?fallbackExhausted) && unbox<bool> value?fallbackExhausted
-
-        match prior with
-        | "NoRecovery" ->
-            if nudgeSucceeded then
-                box
-                    {| state = "InteractionNudgeIssued"
-                       run = terminal |}
-            else
-                box
-                    {| state = "AabbRepairIssued"
-                       run = terminal |}
-        | "InteractionNudgeIssued" ->
-            if sameTerminal then
-                box
-                    {| state = "InteractionNudgeIssued"
-                       run = terminal |}
-            else
-                box
-                    {| state = "AabbRepairIssued"
-                       run = terminal |}
-        | "AabbRepairIssued" ->
-            if sameTerminal then
-                box
-                    {| state = "AabbRepairIssued"
-                       run = terminal |}
-            elif fallbackExhausted then
-                box
-                    {| state = "ProtocolExhausted"
-                       run = null |}
-            else
-                box
-                    {| state = "AabbRepairIssued"
-                       run = terminal |}
-        | _ -> box {| state = "NoRecovery"; run = null |}

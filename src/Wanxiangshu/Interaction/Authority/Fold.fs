@@ -103,9 +103,11 @@ module PromptFactFold =
                 (fun session ->
                     { session with
                         PromptAuthority = Some authority
-                        Fallback =
+                        ProviderFailures =
                             Some(
-                                FallbackProjection.forAuthority payload.LogicalRunId payload.AuthorityRootUserMessageId
+                                ProviderFailureProjection.forAuthority
+                                    payload.LogicalRunId
+                                    payload.AuthorityRootUserMessageId
                             ) })
                 projection
             |> Ok
@@ -122,7 +124,6 @@ module PromptFactFold =
                       Origin = resolvedOrigin
                       LogicalRunId = payload.LogicalRunId
                       AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
-                      EffectiveAgent = payload.EffectiveAgent
                       IdentitySeed = payload.IdentitySeed
                       PayloadDigest = payload.PayloadDigest
                       Receipt = None

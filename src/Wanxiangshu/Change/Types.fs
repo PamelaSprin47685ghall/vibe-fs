@@ -13,6 +13,8 @@ open Wanxiangshu.Persistence.Journal
 /// session and Git binding.
 type OrchestratorVerdict =
     | Published of jobId: ManagerJobId * head: CommitHash
+    | PublishedPendingCleanup of jobId: ManagerJobId * head: CommitHash * cleanupError: string
+    | Cancelled of jobId: ManagerJobId
     | RejectedDirty of reason: string
     | IntegrationFailed of jobId: ManagerJobId * errorDetails: string
     | Empty
@@ -51,7 +53,11 @@ type GitPort =
         /// gate against a head that was just read. An optional expectation made
         /// "publish without checking" expressible, and that is the lost-update the
         /// gate exists to prevent.
-        FfMerge: WorktreePath -> TargetRef -> CommitHash -> Task<Result<CommitHash, string>>
+        /// `pinnedCandidate` is the exact rebased commit the worktree must still hold;
+        /// the merge runs on the pin, never on whatever HEAD happens to be checked out.
+        /// CAS (`expectedHead`) and pin (`pinnedCandidate`) stay separate arguments
+        /// so a caller cannot conflate "target has not moved" with "candidate is bound".
+        FfMerge: WorktreePath -> TargetRef -> CommitHash -> CommitHash -> Task<Result<CommitHash, string>>
 
         ConflictedFiles: WorktreePath -> Task<Result<string list, string>>
         RemoveWorktree: WorktreePath -> Task<Result<unit, string>>

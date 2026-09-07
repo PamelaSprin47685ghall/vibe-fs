@@ -39,7 +39,7 @@ export const scanRetryOwnership = (root) => {
     if (/FallbackLedger\.(?:record|admit)AuthorizedFailure/.test(text)) {
       const allowed =
         path === 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs' ||
-        path === 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs'
+        path === 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fs'
       if (!allowed) violations.push(`${path}: unauthorized fallback ledger caller`)
     }
 
@@ -74,7 +74,6 @@ export const scanRetryOwnership = (root) => {
   for (const hostPath of [
     'src/Wanxiangshu/OpenCode/Signals/HostSignal.fs',
     'src/Wanxiangshu/Composition/Turn/Scheduler.fs',
-    'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs',
     'src/Wanxiangshu/Interaction/Dispatch/Send.fs',
   ]) {
     const text = files.find(({ path }) => path === hostPath)?.text ?? ''

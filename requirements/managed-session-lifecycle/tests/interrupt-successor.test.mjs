@@ -93,19 +93,6 @@ test('WHAT[MANAGED-SESSION-017] raw InterruptAttempt callers are restricted to w
   assert.deepEqual(new Set(callers), allowed)
 })
 
-test('WHAT[MANAGED-SESSION-017] failed Host abort rolls back Loop one-shot causes', () => {
-  const loop = read('src/Wanxiangshu/OpenCode/Host/LoopSensor.fs')
-
-  const loopOutcome = loop.match(/member private this\.ApplyInterruptOutcome([\s\S]*?)member private this\.RunInterrupt/)
-  assert.ok(loopOutcome, 'Loop abort outcome classifier must be inspectable')
-  assert.match(loopOutcome[1], /\| Error _ ->[\s\S]*?this\.RollbackArm sessionId/)
-
-  const loopAbort = loop.match(/member private this\.RunInterrupt([\s\S]*?)member private this\.Interrupt/)
-  assert.ok(loopAbort, 'Loop abort observation must be inspectable')
-  assert.match(loopAbort[1], /this\.ApplyInterruptOutcome/)
-  assert.match(loopAbort[1], /with ex ->[\s\S]*?this\.RollbackArm sessionId/)
-})
-
 test('WHAT[MANAGED-SESSION-017] fatal termination never stores cross-callback cause state', () => {
   const sources = walkFs('src/Wanxiangshu').map((path) => [path, read(path)])
   for (const [path, source] of sources) {

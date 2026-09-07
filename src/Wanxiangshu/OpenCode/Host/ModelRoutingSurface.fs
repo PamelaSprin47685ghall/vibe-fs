@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Execution.Failure
@@ -75,6 +76,13 @@ module ModelRoutingSurface =
     let private optionalText (value: obj) : string option =
         if isNullish value then None else Some(text value)
 
+    let private normalizeRoleText (value: obj) : Role =
+        let raw = text value
+
+        match Roles.tryParseRole raw with
+        | Some role -> role
+        | None -> invalidArg "role" (sprintf "unknown role: %s" raw)
+
     let private optionalObject (value: obj) : obj option =
         if isNullish value then None else Some value
 
@@ -97,7 +105,8 @@ module ModelRoutingSurface =
     let private admissionIdentityOf (value: obj) : ExecutionAdmissionExactIdentity =
         { SessionId = text (field value [ "sessionId"; "SessionId" ])
           PhysicalUserMessageId = text (field value [ "physicalUserMessageId"; "PhysicalUserMessageId" ])
-          EffectiveAgent = text (field value [ "effectiveAgent"; "EffectiveAgent" ])
+          Role = normalizeRoleText (field value [ "role"; "Role" ])
+          Participant = text (field value [ "participant"; "Participant" ])
           Target = targetOf (field value [ "target"; "Target" ]) }
 
     let private int64Of (value: obj) : int64 = value |> unbox<float> |> int64
@@ -110,13 +119,30 @@ module ModelRoutingSurface =
     let private ownerObject (owner: CapacityExactOwnerSnapshot) : obj =
         box
             {| sessionId = owner.SessionId
-               physicalUserMessageId = owner.PhysicalUserMessageId
-               effectiveAgent = owner.EffectiveAgent |> Option.map box |> Option.defaultValue null |}
+               physicalUserMessageId =
+                if System.String.IsNullOrEmpty owner.PhysicalUserMessageId then
+                    null
+                else
+                    owner.PhysicalUserMessageId
+               role =
+                owner.Role
+                |> Option.map Roles.roleLabel
+                |> Option.map box
+                |> Option.defaultValue null
+               participant = owner.Participant |> Option.map box |> Option.defaultValue null |}
 
     let private ownerOf (value: obj) : CapacityExactOwnerSnapshot =
+        let rawRole = optionalText (field value [ "role"; "Role" ])
+
+        let roleOpt =
+            match rawRole with
+            | Some r when not (System.String.IsNullOrWhiteSpace r) -> Roles.tryParseRole r
+            | _ -> None
+
         { SessionId = text (field value [ "sessionId"; "SessionId" ])
           PhysicalUserMessageId = text (field value [ "physicalUserMessageId"; "PhysicalUserMessageId" ])
-          EffectiveAgent = optionalText (field value [ "effectiveAgent"; "EffectiveAgent" ]) }
+          Role = roleOpt
+          Participant = optionalText (field value [ "participant"; "Participant" ]) }
 
     let private invariantEvidenceOf (value: obj) : CapacityInvariantEvidence =
         let ledgerEntries =
@@ -216,7 +242,12 @@ module ModelRoutingSurface =
                 box
                     {| sessionId = waiter.Owner.SessionId
                        physicalUserMessageId = waiter.Owner.PhysicalUserMessageId
-                       effectiveAgent = waiter.Owner.EffectiveAgent |> Option.map box |> Option.defaultValue null
+                       role =
+                        waiter.Owner.Role
+                        |> Option.map Roles.roleLabel
+                        |> Option.map box
+                        |> Option.defaultValue null
+                       participant = waiter.Owner.Participant |> Option.map box |> Option.defaultValue null
                        sequence = numberOfInt64 waiter.Sequence
                        kind = waiter.Kind |})
 
@@ -406,14 +437,24 @@ module ModelRoutingSurface =
     let acquireSharedExecutionAdmission
         (sessionId: string)
         (physicalUserMessageId: string)
-        (effectiveAgent: string)
+        (role: string)
+        (participant: string)
+        (lenderSessionId: string)
         : Task<obj> =
         task {
             let! acquisition =
                 ModelRouting.acquireExecutionAdmission
                     (SessionId.create sessionId)
                     (PhysicalUserMessageId.create physicalUserMessageId)
-                    effectiveAgent
+                    (normalizeRoleText (box role))
+                    participant
+                    (if
+                         isNullish (box lenderSessionId)
+                         || System.String.IsNullOrWhiteSpace lenderSessionId
+                     then
+                         None
+                     else
+                         Some lenderSessionId)
 
             let! completed = awaitAdmission acquisition
             return acquireAdmissionObject completed
@@ -479,12 +520,26 @@ module ModelRoutingSurface =
         (runtime: obj)
         (sessionId: string)
         (physicalUserMessageId: string)
-        (effectiveAgent: string)
+        (role: string)
+        (participant: string)
+        (lenderSessionId: string)
         : Task<obj> =
         task {
             let! acquisition =
                 (runtimeOf runtime)
-                    .AcquireExecutionAdmission(sessionId, physicalUserMessageId, effectiveAgent)
+                    .AcquireExecutionAdmission(
+                        sessionId,
+                        physicalUserMessageId,
+                        normalizeRoleText (box role),
+                        participant,
+                        (if
+                             isNullish (box lenderSessionId)
+                             || System.String.IsNullOrWhiteSpace lenderSessionId
+                         then
+                             None
+                         else
+                             Some lenderSessionId)
+                    )
 
             let! completed = awaitAdmission acquisition
             return acquireAdmissionObject completed
@@ -494,12 +549,26 @@ module ModelRoutingSurface =
         (runtime: obj)
         (sessionId: string)
         (physicalUserMessageId: string)
-        (effectiveAgent: string)
+        (role: string)
+        (participant: string)
+        (lenderSessionId: string)
         : Task<obj> =
         task {
             let! acquisition =
                 (runtimeOf runtime)
-                    .AcquireExecutionAdmission(sessionId, physicalUserMessageId, effectiveAgent)
+                    .AcquireExecutionAdmission(
+                        sessionId,
+                        physicalUserMessageId,
+                        normalizeRoleText (box role),
+                        participant,
+                        (if
+                             isNullish (box lenderSessionId)
+                             || System.String.IsNullOrWhiteSpace lenderSessionId
+                         then
+                             None
+                         else
+                             Some lenderSessionId)
+                    )
 
             return acquireAdmissionObject acquisition
         }
@@ -552,13 +621,44 @@ module ModelRoutingSurface =
             | Ok name -> box name
             | Error _ -> null
 
-    let tryReserveManaged (runtime: obj) (sessionId: string) (agent: string) : obj =
-        (runtimeOf runtime).TryReserveManaged(sessionId, agent)
+    let tryReserveManaged (runtime: obj) (sessionId: string) (role: string) (lenderSessionId: string) : obj =
+        (runtimeOf runtime)
+            .TryReserveManaged(
+                sessionId,
+                normalizeRoleText (box role),
+                (if
+                     isNullish (box lenderSessionId)
+                     || System.String.IsNullOrWhiteSpace lenderSessionId
+                 then
+                     None
+                 else
+                     Some lenderSessionId)
+            )
         |> Option.map targetObject
         |> Option.defaultValue null
 
-    let tryLease (runtime: obj) (sessionId: string) (physicalUserMessageId: string) (agent: string) : obj =
-        (runtimeOf runtime).TryLease(sessionId, physicalUserMessageId, agent)
+    let tryLease
+        (runtime: obj)
+        (sessionId: string)
+        (physicalUserMessageId: string)
+        (role: string)
+        (participant: string)
+        (lenderSessionId: string)
+        : obj =
+        (runtimeOf runtime)
+            .TryLease(
+                sessionId,
+                physicalUserMessageId,
+                normalizeRoleText (box role),
+                participant,
+                (if
+                     isNullish (box lenderSessionId)
+                     || System.String.IsNullOrWhiteSpace lenderSessionId
+                 then
+                     None
+                 else
+                     Some lenderSessionId)
+            )
         |> Option.map targetObject
         |> Option.defaultValue null
 
@@ -568,15 +668,6 @@ module ModelRoutingSurface =
 
     let cancelPendingExecution (runtime: obj) (sessionId: string) : obj =
         (runtimeOf runtime).CancelPendingExecution(sessionId) |> transitionOutcomeObject
-
-    let bindCapacityChild (runtime: obj) (parentSessionId: string) (childSessionId: string) : unit =
-        (runtimeOf runtime).BindCapacityChild(parentSessionId, childSessionId)
-
-    let bindCapacityCompanion (runtime: obj) (ownerSessionId: string) (bloggerSessionId: string) : unit =
-        (runtimeOf runtime).BindCapacityCompanion(ownerSessionId, bloggerSessionId)
-
-    let dropCapacityLineage (runtime: obj) (sessionId: string) : unit =
-        (runtimeOf runtime).DropCapacityLineage(sessionId)
 
     let enterProviderStep
         (runtime: obj)

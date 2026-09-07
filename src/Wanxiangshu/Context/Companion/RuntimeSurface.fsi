@@ -18,28 +18,27 @@ module CompanionRuntimeSurface =
     val dispose: scope: obj -> unit
     val park: scope: obj -> sessionId: string -> Task<obj>
     val cancelParked: scope: obj -> sessionId: string -> unit
-    val hasParked: scope: obj -> sessionId: string -> bool
     val offerMaterial: scope: obj -> sessionId: string -> context: obj -> string
-    val consumeStaged: scope: obj -> sessionId: string -> obj
     val claimCurrentRequest: scope: obj -> sessionId: string -> context: obj -> string
+    val claimFlight: scope: obj -> sessionId: string -> context: obj -> obj
     val acquireMaterialization: scope: obj -> sessionId: string -> Task<obj>
     val releaseMaterialization: lease: obj -> unit
     val releaseCurrentRequest: scope: obj -> sessionId: string -> requestId: string -> string
-    val hasFlight: scope: obj -> sessionId: string -> bool
+    val beginBloggerShutdown: scope: obj -> unit
+
+    val claimRepairEpisode:
+        scope: obj ->
+        requestId: string ->
+        authorityRoot: string ->
+        mainSessionId: string ->
+        bloggerSessionId: string ->
+            string
+
+    val drainRepairEpisodes: scope: obj -> Task
     val currentRequest: scope: obj -> sessionId: string -> obj
     val scope: unit -> obj
     val setPendingOffer: scope: obj -> sessionId: string -> context: obj -> string
     val offerParked: scope: obj -> sessionId: string -> context: obj -> string
     val tryGetFlight: scope: obj -> sessionId: string -> obj
     val peekCurrentRequest: scope: obj -> sessionId: string -> obj
-    val openDrain: root: string -> obj
-    val closedDrain: unit -> obj
-    val setDrainWindow: scope: obj -> sessionId: string -> window: obj -> unit
-    val isDrainOpen: scope: obj -> sessionId: string -> bool
-    val sealRuntime: scope: obj -> sessionId: string -> unit
-    val blocksNewRequest: durableSealed: bool -> hasFlightValue: bool -> drainOpenValue: bool -> bool
-
-    val decideMaterial:
-        hasOpenProducerValue: bool -> hasParkedValue: bool -> hasFlightValue: bool -> context: obj -> string
-
     val createCompanion: sessionId: string -> obj

@@ -153,15 +153,12 @@ module Surface =
           IdentitySeed = identitySeedOf value?identitySeed
           PhysicalUserMessageId =
             PhysicalUserMessageId.create (requiredText "physicalUserMessageId" value?physicalUserMessageId)
-          Origin = originOf value?origin
-          EffectiveAgent = requiredText "effectiveAgent" value?effectiveAgent }
+          Origin = originOf value?origin }
 
     let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
         box
-            {| selectedAgent = ParticipantIdentity.selectedAgent identity
-               peerAgent = ParticipantIdentity.peerAgent identity
-               canonicalRole = ParticipantIdentity.roleLabel identity
-               selectedTier = "deep"
+            {| participant = ParticipantIdentity.selectedAgent identity
+               role = ParticipantIdentity.roleLabel identity
                persona = ParticipantIdentity.persona identity
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
                origin =
@@ -230,7 +227,8 @@ module Surface =
                authorityKind = authorityKindLabel evidence.AuthorityKind
                identitySeed = identitySeedToJs evidence.IdentitySeed
                origin = PromptAuthority.originLabel evidence.Origin
-               effectiveAgent = evidence.EffectiveAgent |}
+               participant = AcceptedChatExecutionEvidence.participant evidence
+               role = Roles.roleLabel (AcceptedChatExecutionEvidence.canonicalRole evidence) |}
 
     let private stateToJs (state: ChatExecutionState) : obj =
         let phase, disposition =
@@ -255,7 +253,8 @@ module Surface =
                     |> Option.map (fun evidence -> ProviderRunIdentity.value evidence.ProviderRun)
                     |> Option.toObj
                    origin = PromptAuthority.originLabel state.Evidence.Origin
-                   effectiveAgent = state.Evidence.EffectiveAgent
+                   participant = AcceptedChatExecutionEvidence.participant state.Evidence
+                   role = Roles.roleLabel (AcceptedChatExecutionEvidence.canonicalRole state.Evidence)
                    requestKind =
                     state.ProviderStarted
                     |> Option.map (fun evidence -> ProviderRequestKind.label evidence.RequestKind)

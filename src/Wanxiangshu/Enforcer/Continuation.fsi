@@ -17,11 +17,11 @@ type SessionTermination = SessionId -> string -> Task<Result<unit, string>>
 /// dispatcher (ENFORCER-044).
 ///
 /// Branch 1 (emptyCallsBranch): pending/running blog, abort cleanup, pure prose
-/// terminal, and AABB repair — nothing is committed here. The first physical
-/// protocol nudge is idle-owned; transform must never queue one behind a live
-/// Host tool loop.
+/// terminal — nothing is committed here. Invalid terminals route through
+/// BloggerCoordinator.observeTransformRepair (the single repair owner); transform
+/// must never queue a physical protocol nudge behind a live Host tool loop.
 /// Branch 2 (commitBranch): ENFORCER-044 merge/commit on completed blog tool
-/// parts, then drain / park / inject-repair disposition.
+/// parts, then park / inject-repair disposition.
 /// Branch 3 (firstRequestBranch): COMPANION-005 first request / non-tool step —
 /// rebuild only from durable frames + typed CurrentRequest.
 module EnforcerContinuation =
@@ -43,13 +43,6 @@ module EnforcerContinuation =
         | ProjectMessages of obj list
         | StopPhysicalRun of messages: obj list * reason: string
 
-    /// ENFORCER-153 / DSL-003: the recovery stage probe, injected by the caller
-    /// (Application layer owns the derivation; Session cannot reference it by
-    /// compile order). Derived from the durable repair claim + provider-visible
-    /// transcript on every read — recovery is never stored on a runtime cell
-    /// mirror, and this module must never grow one.
-    type RecoveryStageProbe = BloggerRequestContext -> BloggerToolRecovery
-
     /// Closed context shared by the branches: EnforcerHost (the thin dispatcher)
     /// injects every dependency the branch bodies touch, so the branches are pure
     /// transforms with no ambient module state.
@@ -60,7 +53,6 @@ module EnforcerContinuation =
           Owner: SessionId
           BloggerSessionId: SessionId
           RawMessages: obj list
-          RecoveryProbe: AgentJournal -> SessionId -> obj list -> RecoveryStageProbe
           Project: obj list -> ContinuationOutcome
           Stop: string -> ContinuationOutcome
           RefreshMainContext: SessionId -> SessionId -> Task<BloggerRequestContext option>
@@ -123,7 +115,6 @@ module EnforcerContinuation =
     val handleContinuation:
         scope: IBloggerRuntimeHost ->
         journal: AgentJournal option ->
-        recoveryProbe: (AgentJournal -> SessionId -> obj list -> RecoveryStageProbe) ->
         bloggerSessionId: SessionId ->
         rawMessages: obj list ->
             Task<ContinuationOutcome>

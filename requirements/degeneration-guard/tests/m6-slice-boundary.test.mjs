@@ -23,14 +23,15 @@ test('WHAT[DG-013] diagnostic failure cannot alter loop guard arm interrupt cons
     continue: (session, kind) => continuations.push([session, kind]),
   })
 
-  loopSensor.observe(sensor, loopSensor.textDelta('session-1', ' retry'.repeat(2000)))
-  await new Promise(setImmediate)
+  const providerRun = 'provider-run-1'
+  loopSensor.observe(sensor, loopSensor.textDelta('session-1', ' retry'.repeat(2000), providerRun))
+  await loopSensor.activeTask(sensor, 'session-1', providerRun)
   assert.deepEqual(aborts, ['session-1'])
-  assert.deepEqual(loopSensor.consumeAbortCause(sensor, 'session-1'), {
+  assert.deepEqual(loopSensor.consumeAbortCause(sensor, 'session-1', providerRun), {
     cause: 'DegenerationGuard',
     anomaly: 'TooRepetitive',
   })
-  await new Promise(setImmediate)
+  await loopSensor.activeTask(sensor, 'session-1', providerRun)
   assert.deepEqual(continuations, [['session-1', 'TooRepetitive']])
   assert.deepEqual(diagnostics, ['degeneration-guard', 'degeneration-guard', 'degeneration-guard'])
   await assertOptionalObservationNoninterference()

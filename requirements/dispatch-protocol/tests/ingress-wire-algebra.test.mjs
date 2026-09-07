@@ -2,6 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { decodeIngress } from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 
+// Wire carriers: SessionId algebra is exact conflict-closed and byte-preserving.
+// The PromptKey carrier is agent-free; the explicit external agent carrier stays
+// a plain input and is checked against the durable participant downstream.
+
 test('WHAT[DISPATCH-PROTOCOL-015] ingress identity carrier algebra is exact conflict closed and byte preserving', () => {
   const value = '  session opaque  '
   const decoded = decodeIngress(

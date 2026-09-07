@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Foundation
 
 type internal CapacityStepDemand<'target> =
     { Sequence: int64
@@ -16,7 +17,9 @@ type internal ExecutionAdmissionDemand =
     { Sequence: int64
       SessionId: string
       PhysicalUserMessageId: string
-      EffectiveAgent: string
+      Role: Role
+      Participant: string
+      LenderSessionId: string option
       PreviousTarget: ModelRoutingTarget option
       Node: ExecutionAdmissionQueueNode }
 
@@ -42,7 +45,9 @@ type internal ExecutionAdmissionQueue =
     member Enqueue:
         sessionId: string *
         physicalUserMessageId: string *
-        effectiveAgent: string *
+        role: Role *
+        participant: string *
+        lenderSessionId: string option *
         previousTarget: ModelRoutingTarget option ->
             ExecutionAdmissionAcquisition
 

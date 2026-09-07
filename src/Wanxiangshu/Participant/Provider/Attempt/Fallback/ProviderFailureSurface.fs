@@ -11,18 +11,19 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.ChatExecution
 
-/// JSON/opaque owner boundary for the pure fallback cursor and its durable fold.
-/// Cursor/projection identities and journal facts never cross as Fable records,
+/// JSON/opaque owner boundary for the pure provider failure budget and its durable fold.
+/// Budget/projection identities and journal facts never cross as Fable records,
 /// maps, lists or union cases; projection handles remain opaque between calls.
 [<RequireQualifiedAccess>]
-module CursorSurface =
+module ProviderFailureSurface =
 
-    type private ProjectionHandle(projection: FallbackProjection) =
+    type private ProjectionHandle(projection: ProviderFailureProjection) =
         member _.Value = projection
 
     [<Emit("$0 == null")>]
@@ -133,9 +134,10 @@ module CursorSurface =
 
     let private participantIdentityView (identity: ParticipantIdentityEvidence) : obj =
         box
-            {| selectedAgent = ParticipantIdentity.selectedAgent identity
-               peerAgent = ParticipantIdentity.peerAgent identity
+            {| participant = ParticipantIdentity.selectedAgent identity
+               selectedAgent = ParticipantIdentity.selectedAgent identity
                canonicalRole = ParticipantIdentity.roleLabel identity
+               role = ParticipantIdentity.roleLabel identity
                selectedTier = "deep"
                persona = ParticipantIdentity.persona identity
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
@@ -164,34 +166,16 @@ module CursorSurface =
                    ownerAuthorityRoot = AuthorityRootUserMessageId.value ownerAuthorityRoot
                    participantIdentity = participantIdentity |}
 
-    let private offsetOf (value: obj) : AgentPairCursor.FallbackOffset =
-        match intValue value with
-        | 0 -> AgentPairCursor.FallbackOffset.Fork0
-        | 1 -> AgentPairCursor.FallbackOffset.Fork1
-        | 2 -> AgentPairCursor.FallbackOffset.Fork2
-        | 3 -> AgentPairCursor.FallbackOffset.Fork3
-        | _ -> invalidArg "offset" "fallback offset must be in 0..3"
-
-    let private offsetValue (offset: AgentPairCursor.FallbackOffset) : int =
-        int (AgentPairCursor.FallbackOffsetCodec.toByte offset)
-
-    let private cursorOf (value: obj) : AgentPairCursor.FallbackCursor =
+    let private budgetOf (value: obj) : ProviderFailureBudget.FailureBudget =
         if isNullish value then
-            AgentPairCursor.initial
+            ProviderFailureBudget.initial
         else
-            { Offset = offsetOf (firstField value [ "offset"; "Offset" ])
-              ConsecutiveFailureCount = intValue (firstField value [ "failures"; "ConsecutiveFailureCount" ]) }
+            { ConsecutiveFailureCount = intValue (firstField value [ "failures"; "ConsecutiveFailureCount" ]) }
 
-    let private cursorView (cursor: AgentPairCursor.FallbackCursor) : obj =
-        box
-            {| offset = offsetValue cursor.Offset
-               failures = cursor.ConsecutiveFailureCount |}
+    let private budgetView (budget: ProviderFailureBudget.FailureBudget) : obj =
+        box {| failures = budget.ConsecutiveFailureCount |}
 
-    let private pairOf (value: obj) : AgentPairCursor.AuthorityAgentPair =
-        { SelectedAgent = text (firstField value [ "selectedAgent"; "SelectedAgent" ])
-          PeerAgent = text (firstField value [ "peerAgent"; "PeerAgent" ]) }
-
-    let private identityOf (value: obj) : FallbackAttemptIdentity =
+    let private identityOf (value: obj) : FailedProviderAttemptIdentity =
         { SessionId = SessionId.create (text (firstField value [ "session"; "SessionId" ]))
           LogicalRunId = LogicalRunId.create (text (firstField value [ "run"; "logicalRun"; "LogicalRunId" ]))
           AuthorityRootUserMessageId =
@@ -200,33 +184,31 @@ module CursorSurface =
             )
           ProviderRun = ProviderRunIdentity.create (text (firstField value [ "attempt"; "ProviderRun" ])) }
 
-    let private identityView (identity: FallbackAttemptIdentity) : obj =
+    let private identityView (identity: FailedProviderAttemptIdentity) : obj =
         box
             {| session = SessionId.value identity.SessionId
                run = LogicalRunId.value identity.LogicalRunId
                root = AuthorityRootUserMessageId.value identity.AuthorityRootUserMessageId
                attempt = ProviderRunIdentity.value identity.ProviderRun |}
 
-    let private projectionView (projection: FallbackProjection) : obj =
+    let private projectionView (projection: ProviderFailureProjection) : obj =
         box
             {| logicalRun = LogicalRunId.value projection.LogicalRunId
                authorityRoot = AuthorityRootUserMessageId.value projection.AuthorityRootUserMessageId
-               offset = offsetValue projection.Cursor.Offset
-               failures = projection.Cursor.ConsecutiveFailureCount
+               failures = projection.Budget.ConsecutiveFailureCount
                dedupeKeys = List.length projection.RecentFailureKeys
                exhausted = projection.Exhausted |}
 
-    let private projectionHandleView (projection: FallbackProjection) : obj =
+    let private projectionHandleView (projection: ProviderFailureProjection) : obj =
         box
             {| logicalRun = LogicalRunId.value projection.LogicalRunId
                authorityRoot = AuthorityRootUserMessageId.value projection.AuthorityRootUserMessageId
-               offset = offsetValue projection.Cursor.Offset
-               failures = projection.Cursor.ConsecutiveFailureCount
+               failures = projection.Budget.ConsecutiveFailureCount
                dedupeKeys = List.length projection.RecentFailureKeys
                exhausted = projection.Exhausted
                handle = box (ProjectionHandle projection) |}
 
-    let private projectionOf (value: obj) : FallbackProjection =
+    let private projectionOf (value: obj) : ProviderFailureProjection =
         let handle = field value "handle"
 
         if not (isNullish handle) then
@@ -234,9 +216,7 @@ module CursorSurface =
         else
             { LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
               AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
-              Cursor =
-                { Offset = offsetOf (field value "offset")
-                  ConsecutiveFailureCount = intValue (field value "failures") }
+              Budget = { ConsecutiveFailureCount = intValue (field value "failures") }
               RecentFailureKeys = []
               LastTransitionWasSuccess = false
               Exhausted =
@@ -244,24 +224,16 @@ module CursorSurface =
                 | value when isNullish value -> false
                 | value -> unbox<bool> value }
 
-    let private rejectionName (rejection: FallbackAdvanceRejection) : string =
+    let private rejectionName (rejection: ProviderFailureAdvanceRejection) : string =
         match rejection with
-        | FallbackAdvanceRejection.AlreadyObserved -> "AlreadyObserved"
-        | FallbackAdvanceRejection.AlreadyExhausted -> "AlreadyExhausted"
-        | FallbackAdvanceRejection.DifferentRun -> "DifferentRun"
-        | FallbackAdvanceRejection.NoCursor -> "NoCursor"
-        | FallbackAdvanceRejection.InvalidTransition -> "InvalidTransition"
-        | FallbackAdvanceRejection.InvalidFallbackOffset _ -> "InvalidFallbackOffset"
+        | ProviderFailureAdvanceRejection.AlreadyObserved -> "AlreadyObserved"
+        | ProviderFailureAdvanceRejection.AlreadyExhausted -> "AlreadyExhausted"
+        | ProviderFailureAdvanceRejection.DifferentRun -> "DifferentRun"
+        | ProviderFailureAdvanceRejection.NoActiveBudget -> "NoActiveBudget"
+        | ProviderFailureAdvanceRejection.InvalidTransition -> "InvalidTransition"
 
-    let private applyAdvance (identity: obj) (previousOffset: int) (nextOffset: int) (count: int) (current: obj) : obj =
-        match
-            FallbackProjection.applyAdvance
-                (identityOf identity)
-                (offsetOf (box previousOffset))
-                (offsetOf (box nextOffset))
-                count
-                (projectionOf current)
-        with
+    let private applyFailure (identity: obj) (count: int) (current: obj) : obj =
+        match ProviderFailureProjection.applyFailure (identityOf identity) count (projectionOf current) with
         | Ok projection ->
             box
                 {| ok = true
@@ -271,32 +243,21 @@ module CursorSurface =
                 {| ok = false
                    error = rejectionName rejection |}
 
-    /// Pure cursor API. Every method accepts/returns JSON values; only the
-    /// identity key helper intentionally consumes an opaque semantic identity.
-    let cursor =
+    /// Pure provider failure budget API. Every method accepts/returns JSON values;
+    /// only the identity key helper intentionally consumes an opaque semantic identity.
+    let budget =
         box
-            {| initial = cursorView AgentPairCursor.initial
-               atOffset = (fun offset -> cursorView (AgentPairCursor.atOffset (offsetOf (box offset))))
-               advance = (fun offset -> offsetValue (AgentPairCursor.advance (offsetOf (box offset))))
-               recordFailure = (fun value -> cursorOf value |> AgentPairCursor.recordFailure |> cursorView)
-               recordSuccess = (fun value -> cursorOf value |> AgentPairCursor.recordSuccess |> cursorView)
-               side = (fun offset -> AgentPairCursor.side (offsetOf (box offset)) |> string)
-               sideSequence = (fun count -> AgentPairCursor.sideSequence count |> List.map string |> List.toArray)
-               effectiveAgent = (fun pair value -> AgentPairCursor.effectiveAgent (pairOf pair) (cursorOf value))
-               isValidAdvance =
-                (fun previousOffset nextOffset previousCount nextCount ->
-                    AgentPairCursor.isValidAdvance
-                        (offsetOf (box previousOffset))
-                        (offsetOf (box nextOffset))
-                        previousCount
-                        nextCount)
-               isRecoverySlot = (fun offset -> AgentPairCursor.isRecoverySlot (offsetOf (box offset)))
-               recoveryVerdict =
-                (fun budget value ->
-                    match AgentPairCursor.recoveryVerdict budget (cursorOf value) with
-                    | AgentPairCursor.MayContinue _ -> "MayContinue"
-                    | AgentPairCursor.Exhausted _ -> "Exhausted")
-               defaultBudget = AgentPairCursor.DefaultAutoRecoveryBudget
+            {| initial = budgetView ProviderFailureBudget.initial
+               recordFailure = (fun value -> budgetOf value |> ProviderFailureBudget.recordFailure |> budgetView)
+               recordSuccess = (fun value -> budgetOf value |> ProviderFailureBudget.recordSuccess |> budgetView)
+               isValidRecord =
+                (fun previousCount nextCount -> ProviderFailureBudget.isValidRecord previousCount nextCount)
+               verdict =
+                (fun budgetLimit value ->
+                    match ProviderFailureBudget.verdict budgetLimit (budgetOf value) with
+                    | ProviderFailureBudget.MayRetry _ -> "MayRetry"
+                    | ProviderFailureBudget.Exhausted _ -> "Exhausted")
+               defaultBudget = ProviderFailureBudget.DefaultBudget
                attemptIdentity =
                 (fun session logicalRun authorityRoot providerRun ->
                     identityView
@@ -304,29 +265,32 @@ module CursorSurface =
                           LogicalRunId = LogicalRunId.create logicalRun
                           AuthorityRootUserMessageId = AuthorityRootUserMessageId.create authorityRoot
                           ProviderRun = ProviderRunIdentity.create providerRun })
-               dedupeKey = (fun value -> identityOf value |> FallbackAttemptIdentity.dedupeKey)
-               read = (fun value -> cursorOf value |> cursorView) |}
+               dedupeKey = (fun value -> identityOf value |> FailedProviderAttemptIdentity.dedupeKey)
+               read = (fun value -> budgetOf value |> budgetView) |}
 
-    /// Durable fallback projection API. The projection state itself is carried
+    /// Durable provider failure projection API. The projection state itself is carried
     /// by an opaque handle so its bounded dedupe keys never become public JSON.
-    let fallbackProjection =
+    let providerFailureProjection =
         box
             {| forAuthority =
                 (fun logicalRun authorityRoot ->
-                    FallbackProjection.forAuthority
+                    ProviderFailureProjection.forAuthority
                         (LogicalRunId.create logicalRun)
                         (AuthorityRootUserMessageId.create authorityRoot)
                     |> projectionHandleView)
-               applyAdvance =
-                (fun identity previous next count current -> applyAdvance identity previous next count current)
+               applyFailure = (fun identity count current -> applyFailure identity count current)
                applyExhausted =
                 (fun current ->
                     projectionOf current
-                    |> FallbackProjection.applyExhausted
+                    |> ProviderFailureProjection.applyExhausted
                     |> projectionHandleView)
                recordSuccess =
-                (fun current -> projectionOf current |> FallbackProjection.recordSuccess |> projectionHandleView)
-               mayContinue = (fun budget current -> FallbackProjection.mayContinue budget (projectionOf current))
+                (fun current ->
+                    projectionOf current
+                    |> ProviderFailureProjection.recordSuccess
+                    |> projectionHandleView)
+               mayRetry =
+                (fun budgetLimit current -> ProviderFailureProjection.mayRetry budgetLimit (projectionOf current))
                read = (fun current -> projectionOf current |> projectionView) |}
 
     let authorityRootAccepted (value: obj) : obj =
@@ -349,33 +313,30 @@ module CursorSurface =
                authorityKind = authorityKind
                identitySeed = identitySeedView identitySeed |}
 
-    let fallbackCursorAdvanced (value: obj) : obj =
+    let providerFailureRecorded (value: obj) : obj =
         box
-            {| kind = "FallbackCursorAdvanced"
+            {| kind = "FailureRecorded"
                session = text (field value "session")
                logicalRun = text (field value "logicalRun")
                authorityRoot = text (field value "authorityRoot")
                providerRun = text (field value "providerRun")
-               previousOffset = intValue (field value "previousOffset")
-               nextOffset = intValue (field value "nextOffset")
                consecutiveFailureCount = intValue (field value "consecutiveFailureCount")
                reason =
                 match text (field value "reason") with
                 | "" -> "provider_error"
                 | value -> value |}
 
-    let fallbackExhausted (value: obj) : obj =
+    let providerRetryExhausted (value: obj) : obj =
         box
-            {| kind = "FallbackExhausted"
+            {| kind = "RetryExhausted"
                session = text (field value "session")
                logicalRun = text (field value "logicalRun")
                authorityRoot = text (field value "authorityRoot")
-               finalConsecutiveFailureCount = intValue (field value "finalConsecutiveFailureCount")
-               finalOffset = intValue (field value "finalOffset") |}
+               finalConsecutiveFailureCount = intValue (field value "finalConsecutiveFailureCount") |}
 
-    let fallbackSucceeded (value: obj) : obj =
+    let providerSuccessRecorded (value: obj) : obj =
         box
-            {| kind = "FallbackSucceeded"
+            {| kind = "SuccessRecorded"
                session = text (field value "session")
                logicalRun = text (field value "logicalRun")
                authorityRoot = text (field value "authorityRoot")
@@ -398,30 +359,27 @@ module CursorSurface =
                   AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
                   AuthorityKind = text (field value "authorityKind")
                   IdentitySeed = identitySeedOf (field value "identitySeed") }
-        | "FallbackCursorAdvanced" ->
-            FallbackFact.FallbackCursorAdvanced
+        | "FailureRecorded" ->
+            ProviderFailureFact.FailureRecorded
                 {| SessionId = SessionId.create (text (field value "session"))
                    LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
                    AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
                    ProviderRun = ProviderRunIdentity.create (text (field value "providerRun"))
-                   PreviousOffset = byte (intValue (field value "previousOffset"))
-                   NextOffset = byte (intValue (field value "nextOffset"))
                    ConsecutiveFailureCount = intValue (field value "consecutiveFailureCount")
                    Reason = text (field value "reason") |}
-        | "FallbackExhausted" ->
-            FallbackFact.FallbackExhausted
+        | "RetryExhausted" ->
+            ProviderFailureFact.RetryExhausted
                 {| SessionId = SessionId.create (text (field value "session"))
                    LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
                    AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
-                   FinalConsecutiveFailureCount = intValue (field value "finalConsecutiveFailureCount")
-                   FinalOffset = byte (intValue (field value "finalOffset")) |}
-        | "FallbackSucceeded" ->
-            FallbackFact.FallbackSucceeded
+                   FinalConsecutiveFailureCount = intValue (field value "finalConsecutiveFailureCount") |}
+        | "SuccessRecorded" ->
+            ProviderFailureFact.SuccessRecorded
                 {| SessionId = SessionId.create (text (field value "session"))
                    LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
                    AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
                    ProviderRun = ProviderRunIdentity.create (text (field value "providerRun")) |}
-        | other -> failwith $"CursorSurface: unsupported fallback fact '{other}'"
+        | other -> failwith $"ProviderFailureSurface: unsupported provider failure fact '{other}'"
 
     let private envelopeOf (value: obj) : Envelope =
         let session = SessionId.create (text (field value "session"))
@@ -431,18 +389,18 @@ module CursorSurface =
             optionalText (field value "providerRun")
             |> Option.map ProviderRunIdentity.create
 
-        { RuntimeId = RuntimeId.create "rt-fallback-surface"
+        { RuntimeId = RuntimeId.create "rt-provider-failure-surface"
           LocalSeq = LocalSeq.create sequence
           ObservedAt = Unchecked.defaultof<_>
-          EventId = EventId.create ($"fallback-{sequence}")
+          EventId = EventId.create ($"provider-failure-{sequence}")
           Stream = StreamId.Session session
           ProviderRun = providerRun
           Fact = Fact.Agent(factOf (field value "fact")) }
 
-    let private fallbackIn (projection: ProjectionSet) : obj =
+    let private providerFailureIn (projection: ProjectionSet) : obj =
         projection.AgentProjections.Sessions
         |> Map.toList
-        |> List.tryPick (fun (_, session) -> session.Fallback |> Option.map projectionHandleView)
+        |> List.tryPick (fun (_, session) -> session.ProviderFailures |> Option.map projectionHandleView)
         |> optionObj
 
     let private foldTyped (values: Envelope list) : Result<ProjectionSet, FoldRejection> =
@@ -461,7 +419,7 @@ module CursorSurface =
         | Ok projection ->
             box
                 {| ok = true
-                   value = fallbackIn projection |}
+                   value = providerFailureIn projection |}
         | Error failure ->
             box
                 {| ok = false
@@ -470,15 +428,15 @@ module CursorSurface =
                         {| Fact = failure.Fact
                            Reason = failure.Reason |} |}
 
-    /// Fold fallback owner envelopes through the production durable fold.
+    /// Fold provider failure owner envelopes through the production durable fold.
     let fold (values: obj array) : obj =
         values |> Array.toList |> List.map envelopeOf |> foldTyped |> foldResult
 
-    let fallbackFactCaseNames: string array =
-        [| "FallbackCursorAdvanced"; "FallbackExhausted"; "FallbackSucceeded" |]
+    let providerFailureFactCaseNames: string array =
+        [| "FailureRecorded"; "RetryExhausted"; "SuccessRecorded" |]
 
     /// Open the first logical run through the existing PromptDispatcher owner.
-    /// The JournalHandle is opaque to callers; only this fallback boundary unwraps
+    /// The JournalHandle is opaque to callers; only this failure boundary unwraps
     /// it for the production dispatcher.
     let acceptHumanRoot
         (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
@@ -514,14 +472,15 @@ module CursorSurface =
 
     let private outcomeName outcome =
         match outcome with
-        | ConfirmedFailureOutcome.RecoveryAdvanced _ -> "Advanced"
-        | ConfirmedFailureOutcome.RecoveryExhausted -> "Exhausted"
-        | ConfirmedFailureOutcome.EpisodeSuperseded -> "EpisodeSuperseded"
-        | ConfirmedFailureOutcome.NoActiveRun -> "NoActiveRun"
+        | FailureAdmissionOutcome.RetryAuthorized -> "RetryAuthorized"
+        | FailureAdmissionOutcome.RetryExhausted -> "RetryExhausted"
+        | FailureAdmissionOutcome.EpisodeSuperseded -> "EpisodeSuperseded"
+        | FailureAdmissionOutcome.NoActiveRun -> "NoActiveRun"
 
     /// Record one confirmed provider failure through the production ledger using
     /// an opaque JournalHandle. Only `ExecutionFailurePolicy` may licence the
-    /// advance, and no F# Result/DU crosses the boundary.
+    /// advance against the single `ProviderFailureBudget.DefaultBudget`, and no
+    /// F# Result/DU crosses the boundary.
     let recordConfirmedFailure
         (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
         (budget: int)
@@ -534,13 +493,13 @@ module CursorSurface =
             let providerRunId = ProviderRunIdentity.create providerRun
 
             let! result =
-                match FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot handle.Journal) with
-                | None -> Task.FromResult(Ok ConfirmedFailureOutcome.NoActiveRun)
-                | Some _ when budget <> AgentPairCursor.DefaultAutoRecoveryBudget ->
-                    Task.FromResult(Error "provider recovery budget must equal the declared default")
+                match ProviderFailureEvidence.currentState sessionId (AgentJournal.snapshot handle.Journal) with
+                | None -> Task.FromResult(Ok FailureAdmissionOutcome.NoActiveRun)
+                | Some _ when budget <> ProviderFailureBudget.DefaultBudget ->
+                    Task.FromResult(Error "provider failure budget must equal the declared default")
                 | Some current ->
-                    let available =
-                        if FallbackProjection.mayContinue AgentPairCursor.DefaultAutoRecoveryBudget current then
+                    let providerFailureBudget =
+                        if ProviderFailureProjection.mayRetry ProviderFailureBudget.DefaultBudget current then
                             ProviderRecoveryBudget.Available
                         else
                             ProviderRecoveryBudget.Exhausted
@@ -557,19 +516,17 @@ module CursorSurface =
                                 { LogicalRun = current.LogicalRunId
                                   ProviderRun = providerRunId
                                   RequestKind = ProviderRequestKind.WorkMain
-                                  RetryBudget = ProviderRecoveryBudget.Exhausted
-                                  FallbackBudget = available
+                                  RetryBudget = providerFailureBudget
                                   Breaker = ProviderBreakerState.Closed } }
 
                     match decision.Resolution with
-                    | ExecutionFailureResolution.RetryFreshAttempt authorization
-                    | ExecutionFailureResolution.AdvanceFallback authorization ->
-                        FallbackLedger.recordAuthorizedFailure handle.Journal sessionId authorization reason
+                    | ExecutionFailureResolution.RetryFreshAttempt authorization ->
+                        ProviderFailureLedger.recordAuthorizedFailure handle.Journal sessionId authorization reason
                     | ExecutionFailureResolution.PreserveCurrentFact
                     | ExecutionFailureResolution.AwaitAcceptanceReconciliation _
                     | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _
                     | ExecutionFailureResolution.TerminalizeProviderStarted _ ->
-                        Task.FromResult(Ok ConfirmedFailureOutcome.RecoveryExhausted)
+                        Task.FromResult(Ok FailureAdmissionOutcome.RetryExhausted)
 
             return
                 match result with
@@ -580,13 +537,14 @@ module CursorSurface =
                 | Error error -> box {| ok = false; error = error |}
         }
 
-    /// Read the durable fallback cursor for one session without exposing the
-    /// projection record, map, or closed offset representation.
+    /// Read the durable provider failure budget for one session without exposing the
+    /// projection record, map, or closed budget representation.
     let snapshot (handle: Wanxiangshu.Persistence.Journal.JournalHandle) (session: string) : obj =
-        match FallbackEvidence.tryCurrentState (SessionId.create session) (AgentJournal.snapshot handle.Journal) with
+        match
+            ProviderFailureEvidence.currentState (SessionId.create session) (AgentJournal.snapshot handle.Journal)
+        with
         | None -> null
         | Some current ->
             box
-                {| offset = AgentPairCursor.FallbackOffsetCodec.toByte current.Cursor.Offset
-                   failures = current.Cursor.ConsecutiveFailureCount
+                {| failures = current.Budget.ConsecutiveFailureCount
                    exhausted = current.Exhausted |}

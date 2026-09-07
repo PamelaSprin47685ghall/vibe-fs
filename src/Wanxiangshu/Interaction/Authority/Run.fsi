@@ -25,7 +25,6 @@ module PromptAuthorityRun =
         sessionId: SessionId ->
         continuation: PromptAuthority.ContinuationKind ->
         profile: PromptAuthority.AuthorityExecutionProfile ->
-        effectiveAgent: string ->
         payloadDigest: string ->
             PromptAuthority.PromptClaim
 

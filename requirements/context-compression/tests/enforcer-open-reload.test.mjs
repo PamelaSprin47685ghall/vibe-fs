@@ -7,7 +7,6 @@ import { resolve } from 'node:path'
 import test from 'node:test'
 import * as runtime from '../../../dist/Context/Companion/RuntimeSurface.js'
 import * as frames from '../../../dist/Context/Companion/Blogger/FrameSurface.js'
-import * as crash from '../../../dist/Context/Companion/Blogger/BloggerCrashSurface.js'
 
 const mainJson = (overrides = {}) => ({
   requestId: 'req-main',
@@ -86,20 +85,12 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_derives_delta_digest_from_co
   assert.equal(m.deltaDigest, 'context-digest')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_unreadable_blob_returns_none', () => {
-  assert.equal(crash.classifyOpenRequest(false, false, false), 'AbandonedUnsent')
-})
-
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_corrupt_json_returns_none', () => {
-  assert.equal(crash.classifyOpenRequest(false, false, false), 'AbandonedUnsent')
-})
-
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_resolve_cycle_prefers_live_request_over_open', () => {
   const scope = runtime.scope()
   runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main(mainJson({ toml: 'live-toml' })))
   const live = runtime.currentRequest(scope, 'ses-blog')
   assert.equal(live.toml, 'live-toml')
-  assert.equal(runtime.hasFlight(scope, 'ses-blog'), true)
+  assert.notEqual(runtime.currentRequest(scope, 'ses-blog'), null)
   runtime.dispose(scope)
 })
 
@@ -134,7 +125,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_frame_digests_mismatch_aband
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_other_blogger_session_abandons', () => {
   const scope = runtime.scope()
   runtime.claimCurrentRequest(scope, 'ses-other-blog', runtime.squash(squashJson({ bloggerSession: 'ses-other-blog' })))
-  assert.equal(runtime.hasFlight(scope, 'ses-other-blog'), true)
+  assert.notEqual(runtime.currentRequest(scope, 'ses-other-blog'), null)
   assert.equal(runtime.currentRequest(scope, 'ses-other-blog').kind, 'Squash')
   runtime.dispose(scope)
 })

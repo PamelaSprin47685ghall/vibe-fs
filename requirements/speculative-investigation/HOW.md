@@ -12,7 +12,7 @@
 [K0 / Shadow / 熔断]: 不启动投机，直接执行主请求
 [DryRun]: 异步启动真实 Replica 子会话，记录审计日志，主路径立即无等待继续
 [Treatment (K1/K2)]:
-  启动短生命周期 Replica (predictor 便宜模型 + 只读工具约束)
+  启动短生命周期 Replica (固定继承 Role 的唯一远端模型 + 只读工具约束)
   ↓
   批量收割只读 call/result → 校验完整配对与字节上限
   ↓
@@ -60,9 +60,9 @@
 | 命题 | 落点测试 |
 |---|---|
 | SPEC-INV-001 | `requirements/speculative-investigation/tests/host-canary-k0.test.mjs::WHAT[SPEC-INV-001] STRENGTH_002_011_policy_k0_default_when_host_canary_or_cost_is_unproven` |
-| SPEC-INV-002 | `requirements/speculative-investigation/tests/authority-policy.test.mjs::WHAT[SPEC-INV-002] STRENGTH_002_010_policy_is_fail_closed_and_only_treats_proven_deep_opportunities`；`requirements/speculative-investigation/tests/strength-speculate-surface.test.mjs::WHAT[SPEC-INV-002] StrengthSpeculate owns tryApply entry point for transform speculation` |
+| SPEC-INV-002 | `requirements/speculative-investigation/tests/authority-policy.test.mjs::WHAT[SPEC-INV-002] STRENGTH_002_010_policy_is_fail_closed_and_only_treats_proven_fixed_identity_opportunities`；`requirements/speculative-investigation/tests/strength-speculate-surface.test.mjs::WHAT[SPEC-INV-002] StrengthSpeculate owns tryApply entry point for transform speculation` |
 | SPEC-INV-003 | `requirements/speculative-investigation/tests/batch-collector.test.mjs::WHAT[SPEC-INV-003] STRENGTH_003_005_collector_preserves_provider_request_batches_and_concurrent_order` |
-| SPEC-INV-004 | `requirements/speculative-investigation/tests/authority-policy.test.mjs::WHAT[SPEC-INV-004] STRENGTH_004_019_replica_is_never_owner_fallback_or_prefix_probe_evidence` |
+| SPEC-INV-004 | `requirements/speculative-investigation/tests/authority-policy.test.mjs::WHAT[SPEC-INV-004] STRENGTH_004_019_replica_never_clears_owner_failure_budget_or_carries_prefix_probe` |
 | SPEC-INV-005 | `requirements/speculative-investigation/tests/frame-projection.test.mjs::WHAT[SPEC-INV-005] STRENGTH_005_frame_bundle_accepts_only_complete_read_glob_grep_batches` |
 | SPEC-INV-006 | `requirements/speculative-investigation/tests/commit-promotion.test.mjs::WHAT[SPEC-INV-006] STRENGTH_006_prepared_commit_unknown_is_resolved_without_guessing` |
 | SPEC-INV-007 | `requirements/speculative-investigation/tests/turn-evidence.test.mjs::WHAT[SPEC-INV-007] STRENGTH_007_provider_output_evidence_is_not_host_bookkeeping` |

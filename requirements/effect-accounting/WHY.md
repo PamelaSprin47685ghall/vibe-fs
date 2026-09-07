@@ -5,7 +5,7 @@
 与纯内部事件不同，外部副作用（如发起网络 Prompt、创建 worktree、发布 Git 分支、写入持久化 Checkpoint 等）的执行结局由外部世界决定。若将副作用状态简化为一个布尔值或内存标识，系统在崩溃或中断窗口内会出现严重破坏：
 1. **重复副作用（Duplicate Effect）**：已持久化请求（Requested）但在物理确认（Accepted）前崩溃。若系统将其当成“未发生”直接重试，会导致两次重复调用或重复创建分支。
 2. **虚假成功（False Success）**：若系统跳过外部物理证据核对，直接将已发起的请求假设为已完成，会导致后续逻辑建立在未完成的副作用之上。
-3. **取消冒充终态（False Finality）**：将控制面的取消（aborted）错误地视作业务终态，导致恢复与 Fallback 流程走入错误分支。
+3. **取消冒充终态（False Finality）**：将控制面的取消（aborted）错误地视作业务终态，导致恢复与 provider-failure 记账流程走入错误分支。
 
 `effect-accounting` 确立了通用的外部副作用记账公理：
 - **明确分型**：区分 Requested（已发起意图）与 Accepted/Created/Published（已物理确认）；

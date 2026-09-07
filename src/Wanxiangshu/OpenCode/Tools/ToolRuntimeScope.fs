@@ -15,6 +15,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
@@ -62,6 +63,22 @@ type ToolRuntimeScope
     let parentRecord = defaultArg parentWorkRecordFor (fun _ -> Task.FromResult None)
     let childRecord = defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
 
+    let continueManagerLoop managerSessionId managerWorkspace =
+        task {
+            try
+                do!
+                    ManagerWorkflow.maybeDeliverLoop
+                        sessions
+                        rootWorkspace
+                        journal
+                        (Some managerWorkspace)
+                        (Some(SessionId.value managerSessionId))
+
+                return Ok()
+            with ex ->
+                return Error ex.Message
+        }
+
     let childRecordForRun sessionId range providerRun =
         LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun journal sessionId range providerRun
 
@@ -84,9 +101,9 @@ type ToolRuntimeScope
     let mutable ownedWorkDrainWaiter: TaskCompletionSource<unit> option = None
     // DSL-MUTABLE: resource — first tool-owned callback failure for shutdown propagation.
     let mutable ownedWorkFailure: exn option = None
-    /// P0-RECOVERY-JOIN-001: family recovery before join / publish consume.
-    // DSL-MUTABLE: resource — family recovery callback attachment
-    let mutable familyRecovery: (SessionId -> Task<FamilyRecovery>) option = None
+    /// Process-local join admission before join / publish consume.
+    // DSL-MUTABLE: resource — current-process join admission callback attachment
+    let mutable currentProcessJoin: (SessionId -> Task<FamilyRecovery>) option = None
 
     /// EXEC-017 attempt-scoped join interrupt registry (PluginRuntimeScope or local default).
     // DSL-MUTABLE: resource — join attempt registry attachment
@@ -343,10 +360,8 @@ type ToolRuntimeScope
 
     /// The managed agent the Authority Root selected for this session.
     ///
-    /// `SelectedAgent`, not `EffectiveAgent`: a PTY belongs to the Logical Run, and
-    /// PROMPT-002 fixes SelectedAgent for its whole duration, whereas FALLBACK-002
-    /// moves EffectiveAgent per attempt. A PTY labelled with whichever side the
-    /// cursor happened to be on would change identity mid-run.
+    /// A PTY belongs to the Logical Run and uses the fixed participant identity
+    /// from SelectedAgent for its entire duration.
     let managedAgentFor (ctx: HostToolContext) =
         sessionIdOf ctx
         |> Option.bind activeProfileFor
@@ -365,6 +380,27 @@ type ToolRuntimeScope
             AgentProjection.tryFind (SessionId.create sessionId) (AgentJournal.snapshot durable).AgentProjections)
         |> Option.bind (fun session -> session.Relay)
         |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay roadId)
+
+    let hasValidBoundCertificate (view: RoadView) : bool =
+        match view.ActiveIncumbency, view.ActiveSnapshotId, view.ActiveAuthorityRevision, view.Certificate with
+        | Some active, Some snapshot, Some authority, Some certificate ->
+            certificate.Valid
+            && certificate.IncumbencyId = active
+            && certificate.SnapshotId = snapshot
+            && certificate.AuthorityRevision = authority
+        | _ -> false
+
+    let factsForRoadView (view: RoadView) : ManagerCapabilityFacts =
+        { HasActiveIncumbency = view.ActiveIncumbency.IsSome
+          HasAssessment = view.AcceptedAssessmentTransport.IsSome
+          HasValidBoundCertificate = hasValidBoundCertificate view
+          CleanupBlockerDigest = view.ActiveCleanupBlockerDigest }
+
+    let emptyManagerFacts: ManagerCapabilityFacts =
+        { HasActiveIncumbency = false
+          HasAssessment = false
+          HasValidBoundCertificate = false
+          CleanupBlockerDigest = None }
 
     member _.Sessions = sessions
     member _.WaitObserver = waitObserver
@@ -408,20 +444,16 @@ type ToolRuntimeScope
     member _.RoleFor(ctx: HostToolContext) = roleFor ctx
     member _.EnsureRoleFor(ctx: HostToolContext) = ensureRoleFor ctx
 
-    member _.ManagerPhaseFor(sessionId: string) =
-        let roadView = relayRoadView sessionId
-
-        let managerPhaseOfView (view: RoadView) =
-            match view.ActivePhase with
-            | Some IncumbencyPhase.AuditPending -> ManagerCapabilityPhase.AuditPending
-            | Some IncumbencyPhase.WorkOwned -> ManagerCapabilityPhase.WorkOwned
-            | Some IncumbencyPhase.PerfectAwaitingRetirement -> ManagerCapabilityPhase.PerfectAwaitingRetirement
-            | Some IncumbencyPhase.RetirementCleanupBlocked -> ManagerCapabilityPhase.RetirementCleanupBlocked
-            | None -> ManagerCapabilityPhase.Retired
-
-        roadView
-        |> Option.map managerPhaseOfView
-        |> Option.defaultValue ManagerCapabilityPhase.AuditPending
+    /// Manager authorization facts for the capability gate, derived purely
+    /// from the objective RoadView. The certificate counts as valid only when
+    /// it is marked Valid and its incumbency, snapshot, and authority revision
+    /// exactly equal the active facts, so a mismatched or stale certificate
+    /// can never open the finish window. The cleanup blocker digest is the
+    /// stored objective evidence, passed through verbatim.
+    member _.ManagerCapabilityFactsFor(sessionId: string) : ManagerCapabilityFacts =
+        relayRoadView sessionId
+        |> Option.map factsForRoadView
+        |> Option.defaultValue emptyManagerFacts
 
     member _.TryFreezeRetirement(sessionId: string, incumbentId: IncumbencyId) =
         lock gate (fun () ->
@@ -515,18 +547,18 @@ type ToolRuntimeScope
 
     member this.IsRole(ctx: HostToolContext, expected: Role) = this.RoleFor ctx = Some expected
 
-    /// Wire PluginRuntimeScope.RequireFamilyRecovery (or test double).
-    member _.AttachFamilyRecovery(fn: SessionId -> Task<FamilyRecovery>) = familyRecovery <- Some fn
+    /// Wire PluginRuntimeScope.RequireCurrentProcessJoin (or test double).
+    member _.AttachCurrentProcessJoin(fn: SessionId -> Task<FamilyRecovery>) = currentProcessJoin <- Some fn
 
     /// EXEC-017: share PluginRuntimeScope.JoinAttempts with JoinTool.
     member _.AttachJoinAttempts(registry: IJoinAttemptRegistry) = joinAttempts <- registry
 
     member _.JoinAttempts = joinAttempts
 
-    /// P0-RECOVERY-JOIN-001: join / JoinPublishedAvailable require FamilyReady. Missing attach → FamilyBlocked.
-    member _.RequireFamilyRecovery(root: SessionId) : Task<FamilyRecovery> =
+    /// Process-local join admission: join / JoinPublishedAvailable require FamilyReady. Missing attach → FamilyBlocked.
+    member _.RequireCurrentProcessJoin(root: SessionId) : Task<FamilyRecovery> =
         task {
-            match familyRecovery with
+            match currentProcessJoin with
             | None ->
                 return FamilyRecovery.FamilyBlocked(NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root))
             | Some fn -> return! fn root
@@ -588,6 +620,7 @@ type ToolRuntimeScope
                           RegisterChildDirectory =
                             fun childId path -> sessionDirectories.[SessionId.value childId] <- path
                           OnRunStarted = onStarted
+                          ContinueManagerLoop = continueManagerLoop
                           RepoPath = defaultArg workspaceDirectory "."
                           TargetBranch = ""
                           ParentWorkRecordFor = (fun sid -> parentRecord (SessionId.value sid))

@@ -279,7 +279,9 @@ module SuicideTool =
             runBlocked prepared blockers
 
     let private unfreezeUnlessRetired (scope: ToolRuntimeScope) (context: HostToolContext) =
-        if scope.ManagerPhaseFor context.SessionId <> ManagerCapabilityPhase.Retired then
+        let facts = scope.ManagerCapabilityFactsFor context.SessionId
+
+        if facts.HasActiveIncumbency then
             scope.UnfreezeRetirement context.SessionId
 
     let private finishOutcome (scope: ToolRuntimeScope) (context: HostToolContext) outcome =

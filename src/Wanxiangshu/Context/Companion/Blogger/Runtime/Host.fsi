@@ -27,25 +27,15 @@ module BloggerRuntimeHost =
     val requireCurrentRequest:
         scope: IBloggerRuntimeHost -> bloggerKey: string -> context: BloggerRequestContext -> unit
 
+    val claimFlight:
+        scope: IBloggerRuntimeHost ->
+        bloggerKey: string ->
+        context: BloggerRequestContext ->
+            Result<IBloggerFlightLease, string>
+
     val releaseCurrentRequest:
         scope: IBloggerRuntimeHost -> bloggerKey: string -> context: BloggerRequestContext -> Result<unit, string>
 
-    val requireReleaseCurrentRequest:
-        scope: IBloggerRuntimeHost -> bloggerKey: string -> context: BloggerRequestContext -> unit
-
-    val requireReleaseObservedCurrentRequest: scope: IBloggerRuntimeHost -> bloggerKey: string -> unit
-
     val durableSealed: journal: AgentJournal option -> mainSessionId: SessionId -> bool
 
-    val blocksNew:
-        journal: AgentJournal option ->
-        mainSessionId: SessionId ->
-        scope: IBloggerRuntimeHost ->
-        bloggerKey: string ->
-            bool
-
-    val forceSealRuntime: scope: IBloggerRuntimeHost -> bloggerKey: string -> unit
-    val forceSealCellDropOffer: scope: IBloggerRuntimeHost -> bloggerKey: string -> unit
-
-    val reactivateAfterNewRoot:
-        scope: IBloggerRuntimeHost -> bloggerSessionId: SessionId -> root: AuthorityRootUserMessageId -> unit
+    val blocksNew: journal: AgentJournal option -> mainSessionId: SessionId -> bool

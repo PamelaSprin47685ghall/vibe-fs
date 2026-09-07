@@ -1,8 +1,11 @@
 // DISPATCH-PROTOCOL package proof — claim lifecycle and deterministic dispatch identity.
 //
-// PROMPT-005 four-state lifecycle, transport receipt shape, PromptKey identity,
+// Four-state lifecycle, transport receipt shape, agent-free PromptKey identity,
 // ClaimSequence registration, runtime-start audit stamps, and the single
 // PromptDispatcher writer are observed through production JSON surfaces.
+// Identity inputs/views use fixed participant+role (`origin` is the JS wire name
+// for provenance); raw v1 fixtures may still carry peer/selectedAgent/
+// canonicalRole fields and the decoder folds them into canonical participant.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -21,19 +24,18 @@ const personas = {
   coder: 'Coder',
   manager: 'Lead',
 }
-const rootSelection = (agent) => {
-  const canonicalRole = agent === 'predictor' ? 'inspector' : agent
+const rootSelection = (participant) => {
+  const role = participant === 'predictor' ? 'inspector' : participant
   return {
     kind: 'RootSelection',
     ownerSession: null,
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: agent,
-      peerAgent: agent,
-      canonicalRole,
+      participant,
+      role,
       selectedTier: 'deep',
-      persona: personas[agent] ?? 'Unknown',
+      persona: personas[participant] ?? 'Unknown',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
     },
@@ -72,7 +74,7 @@ const profileOf = () => {
 test('WHAT[DISPATCH-PROTOCOL-002] DP_002_submit_records_the_receipt_without_resolving_the_claim', () => {
   const root = profileOf()
   const key = 'pk_s'
-  const claim = authority.claimContinuation(key, SESSION, 'ManagerGuard', root, 'coder', 'pd-1')
+  const claim = authority.claimContinuation(key, SESSION, 'ManagerGuard', root, 'pd-1')
 
   let projection = authority.registerAuthority(root, authority.empty)
   projection = authority.registerClaim(claim, projection)
@@ -98,7 +100,7 @@ test('WHAT[DISPATCH-PROTOCOL-002] DP_002_abandon_removes_the_claim_and_leaves_th
   const key = 'pk_x'
   let projection = authority.registerAuthority(root, authority.empty)
   projection = authority.registerClaim(
-    authority.claimContinuation(key, SESSION, 'BusyAgentNudge', root, 'coder', 'pd-n'),
+    authority.claimContinuation(key, SESSION, 'BusyAgentNudge', root, 'pd-n'),
     projection,
   )
 
@@ -115,7 +117,7 @@ test('WHAT[DISPATCH-PROTOCOL-006] DP_006_abandon_keeps_the_claim_sequence_consum
   const key = 'pk_x'
   let projection = authority.registerAuthority(root, authority.empty)
   projection = authority.registerClaim(
-    authority.claimContinuation(key, SESSION, 'BusyAgentNudge', root, 'coder', 'pd-n'),
+    authority.claimContinuation(key, SESSION, 'BusyAgentNudge', root, 'pd-n'),
     projection,
   )
 
@@ -144,7 +146,6 @@ test('WHAT[DISPATCH-PROTOCOL-005] DP_005_prompt_key_is_deterministic_and_moves_w
     run: root.logicalRun,
     authorityRootId: root.authorityRoot,
     origin: promptOrigin('ManagerGuard'),
-    agent: 'coder',
     payload: 'pd-1',
     sequence: 1,
   }
@@ -156,28 +157,46 @@ test('WHAT[DISPATCH-PROTOCOL-005] DP_005_prompt_key_is_deterministic_and_moves_w
       value.run,
       value.authorityRootId,
       value.origin,
-      value.agent,
       value.payload,
       value.sequence,
     )
 
   assert.equal(
     derive(base),
-    `H(${['ses_a', 'H(rt_1\nses_a\nmsg_u1)', 'msg_u1', 'ManagerGuard', 'coder', 'pd-1', '1'].join('\u001f')})`,
+    `H(${['ses_a', 'H(rt_1\nses_a\nmsg_u1)', 'msg_u1', 'ManagerGuard', 'pd-1', '1'].join('\u001f')})`,
   )
   assert.equal(derive(base), derive(base), 'same logical dispatch is deterministic')
 
   const variants = {
     session: { ...base, session: 'ses_b' },
     origin: { ...base, origin: promptOrigin('DegenerationGuard') },
-    agent: { ...base, agent: 'devops' },
     payload: { ...base, payload: 'pd-2' },
     sequence: { ...base, sequence: 2 },
   }
 
-  for (const name of ['session', 'origin', 'agent', 'payload', 'sequence']) {
+  for (const name of ['session', 'origin', 'payload', 'sequence']) {
     assert.notEqual(derive(variants[name]), derive(base), `${name} must participate in PromptKey`)
   }
+
+  // PromptKey is participant-blind: the same logical dispatch under a different
+  // participant derives the identical key.
+  const otherRoot = (() => {
+    const built = authority.createAuthorityRoot(
+      H,
+      RUNTIME,
+      SESSION,
+      'HumanRoot',
+      'msg_u1',
+      rootSelection('manager'),
+    )
+    assert.equal(built.ok, true, built.ok ? '' : built.error)
+    return built.value
+  })()
+  assert.equal(
+    authority.derivePromptKey(H, SESSION, otherRoot.logicalRun, otherRoot.authorityRoot, promptOrigin('ManagerGuard'), 'pd-1', 1),
+    derive(base),
+    'participant must not participate in PromptKey',
+  )
 })
 
 test('WHAT[DISPATCH-PROTOCOL-005] DP_005_claim_scope_names_exactly_session_run_origin_and_payload', () => {
@@ -210,7 +229,7 @@ test('WHAT[DISPATCH-PROTOCOL-006] DP_006_claim_sequence_advances_on_registration
   assert.equal(authority.nextClaimSequence(scope, projection), 1)
 
   const claimAt = (n) =>
-    authority.claimContinuation(`pk_${n}`, SESSION, 'DegenerationGuard', root, 'coder', 'pd-same')
+    authority.claimContinuation(`pk_${n}`, SESSION, 'DegenerationGuard', root, 'pd-same')
 
   projection = authority.registerClaim(claimAt(1), projection)
   assert.equal(authority.nextClaimSequence(scope, projection), 2)
@@ -228,11 +247,12 @@ test('WHAT[DISPATCH-PROTOCOL-007] DP_007_runtime_start_stamp_is_audit_only_not_r
   const root = profileOf()
   const key = 'pk_r'
   const projection = authority.registerClaim(
-    authority.claimContinuation(key, SESSION, 'ManagerGuard', root, 'coder', 'pd-r'),
+    authority.claimContinuation(key, SESSION, 'ManagerGuard', root, 'pd-r'),
     authority.registerAuthority(root, authority.empty),
   )
-  const claim = findClaim(projection, key)
 
+
+  const claim = findClaim(projection, key)
   assert.equal(claim.claimedAtRuntimeStartCount, 0)
   assert.deepEqual(dispatch.runtimeStartPolicy(), {
     claimStamp: 'workspace-runtime-start-count',
@@ -261,7 +281,7 @@ test('WHAT[DISPATCH-PROTOCOL-010] DP_010_authority_root_profile_cannot_express_a
 
 // ── DISPATCH-PROTOCOL-002: root claim carries payload digest ──
 
-test('WHAT[DISPATCH-PROTOCOL-002] DP_002_claim_records_payload_digest_and_effective_agent', () => {
+test('WHAT[DISPATCH-PROTOCOL-002] DP_002_claim_records_payload_digest_and_participant', () => {
   const claim = authority.claimAgentOwnerRoot(
     'pk_o',
     SESSION,
@@ -273,10 +293,91 @@ test('WHAT[DISPATCH-PROTOCOL-002] DP_002_claim_records_payload_digest_and_effect
     {
       origin: claim.value.origin,
       payloadDigest: claim.value.payloadDigest,
-      effectiveAgent: claim.value.effectiveAgent,
       receipt: claim.value.receipt,
     },
-    { origin: 'AuthorityRoot', payloadDigest: 'pd-owner', effectiveAgent: 'manager', receipt: null },
+    { origin: 'AuthorityRoot', payloadDigest: 'pd-owner', receipt: null },
+  )
+  assert.deepEqual(
+    claim.value.identitySeed.participantIdentity,
+    {
+      origin: 'InheritedFromOwner',
+      participant: 'manager',
+      persona: 'Lead',
+      personaCatalogVersion: 1,
+      role: 'manager',
+    },
+    'the owner-root claim carries the fixed participant+role, never an effective agent',
+  )
+})
+
+// ── DISPATCH-PROTOCOL-005: raw v1 fixtures keep peer/effective-era fields; the
+// decoder folds them into canonical participant and never re-encodes them ──
+
+test('WHAT[DISPATCH-PROTOCOL-005] DP_005_legacy_identity_fields_are_dropped_never_reencoded', () => {
+  const legacyIdentity = {
+    participant: 'coder',
+    selectedAgent: 'stale-selected',
+    peerAgent: 'stale-peer',
+    role: 'coder',
+    canonicalRole: 'stale-role',
+    selectedTier: 'deep',
+    persona: 'Coder',
+    personaCatalogVersion: 1,
+    origin: 'ResolvedAtRoot',
+  }
+  const built = authority.createAuthorityRoot(
+    H,
+    RUNTIME,
+    SESSION,
+    'HumanRoot',
+    'msg_legacy',
+    {
+      kind: 'RootSelection',
+      ownerSession: null,
+      ownerLogicalRun: null,
+      ownerAuthorityRoot: null,
+      participantIdentity: legacyIdentity,
+    },
+  )
+  assert.equal(built.ok, true, built.ok ? '' : built.error)
+  assert.deepEqual(
+    built.value.participantIdentity,
+    {
+      origin: 'ResolvedAtRoot',
+      participant: 'coder',
+      persona: 'Coder',
+      personaCatalogVersion: 1,
+      role: 'coder',
+    },
+    'legacy peer/selectedAgent/canonicalRole fields must fold into canonical participant',
+  )
+
+  const legacySeed = {
+    kind: 'InheritedFromOwner',
+    ownerSession: 'ses-owner',
+    ownerLogicalRun: 'run-owner',
+    ownerAuthorityRoot: 'msg-owner',
+    effectiveAgent: 'stale-effective',
+    participantIdentity: { ...legacyIdentity, origin: 'InheritedFromOwner' },
+  }
+  const rehydrated = authority.rehydrateIdentitySeed(JSON.stringify(legacySeed))
+  assert.equal(rehydrated.ok, true, rehydrated.ok ? '' : rehydrated.error)
+  const serialized = authority.serializeIdentitySeed(rehydrated.value)
+  assert.equal(serialized.ok, true, serialized.ok ? '' : serialized.error)
+  const reparsed = JSON.parse(serialized.value)
+  for (const field of ['peerAgent', 'selectedAgent', 'canonicalRole', 'effectiveAgent', 'PeerAgent', 'EffectiveAgent']) {
+    assert.equal(Object.hasOwn(reparsed, field), false, `${field} must not be re-encoded at seed top level`)
+    assert.equal(Object.hasOwn(reparsed.participantIdentity, field), false, `${field} must not be re-encoded in participantIdentity`)
+  }
+  assert.deepEqual(
+    reparsed.participantIdentity,
+    {
+      origin: 'InheritedFromOwner',
+      participant: 'coder',
+      persona: 'Coder',
+      personaCatalogVersion: 1,
+      role: 'coder',
+    },
   )
 })
 

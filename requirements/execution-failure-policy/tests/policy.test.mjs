@@ -15,7 +15,6 @@ const provider = {
   providerRun: 'provider-failure-policy',
   requestKind: 'WorkMain',
   retryBudget: 'Available',
-  fallbackBudget: 'Available',
   breaker: 'Closed',
 }
 
@@ -54,44 +53,44 @@ const capacityCases = [null, capacityFence]
 
 const providerCases = [
   {
-    label: 'transient retry',
+    label: 'transient retry on Closed and Available',
     failure: 'ProviderTransient',
     facts: provider,
     resolution: 'RetryFreshAttempt',
     breaker: 'RecordProviderTransientFailure',
   },
   {
-    label: 'transient fallback after retry exhaustion',
+    label: 'transient terminal after retry exhaustion',
     failure: 'ProviderTransient',
     facts: { ...provider, retryBudget: 'Exhausted' },
-    resolution: 'AdvanceFallback',
-    breaker: 'RecordProviderTransientFailure',
-  },
-  {
-    label: 'transient fallback around an open breaker',
-    failure: 'ProviderTransient',
-    facts: { ...provider, breaker: 'Open' },
-    resolution: 'AdvanceFallback',
-    breaker: 'RecordProviderTransientFailure',
-  },
-  {
-    label: 'transient terminal after all budgets are exhausted',
-    failure: 'ProviderTransient',
-    facts: { ...provider, retryBudget: 'Exhausted', fallbackBudget: 'Exhausted' },
     resolution: 'TerminalizeProviderStarted',
     breaker: 'RecordProviderTransientFailure',
   },
   {
-    label: 'permanent failure advances fallback without retry',
+    label: 'transient terminal around an open breaker',
+    failure: 'ProviderTransient',
+    facts: { ...provider, breaker: 'Open' },
+    resolution: 'TerminalizeProviderStarted',
+    breaker: 'RecordProviderTransientFailure',
+  },
+  {
+    label: 'permanent retry on Closed and Available',
     failure: 'ProviderPermanent',
     facts: provider,
-    resolution: 'AdvanceFallback',
+    resolution: 'RetryFreshAttempt',
     breaker: 'RecordProviderPermanentFailure',
   },
   {
-    label: 'permanent terminal after fallback exhaustion',
+    label: 'permanent terminal after retry exhaustion',
     failure: 'ProviderPermanent',
-    facts: { ...provider, fallbackBudget: 'Exhausted' },
+    facts: { ...provider, retryBudget: 'Exhausted' },
+    resolution: 'TerminalizeProviderStarted',
+    breaker: 'RecordProviderPermanentFailure',
+  },
+  {
+    label: 'permanent terminal around an open breaker',
+    failure: 'ProviderPermanent',
+    facts: { ...provider, breaker: 'Open' },
     resolution: 'TerminalizeProviderStarted',
     breaker: 'RecordProviderPermanentFailure',
   },
@@ -153,7 +152,6 @@ test('WHAT[EXECFAIL-003] rejects illegal retry and breaker policy mutations', ()
   for (const failure of nonProviderFailures) {
     const decision = decide({ failure })
     assert.notEqual(decision.resolution, 'RetryFreshAttempt')
-    assert.notEqual(decision.resolution, 'AdvanceFallback')
     assert.equal(decision.breaker.kind, 'NoBreakerTransition')
   }
 
@@ -162,7 +160,7 @@ test('WHAT[EXECFAIL-003] rejects illegal retry and breaker policy mutations', ()
     assert.equal(decision.resolution, scenario.resolution, scenario.label)
     assert.equal(decision.breaker.kind, scenario.breaker, scenario.label)
 
-    if (decision.resolution === 'RetryFreshAttempt' || decision.resolution === 'AdvanceFallback') {
+    if (decision.resolution === 'RetryFreshAttempt') {
       const authorization = decision.authorization
       assert.ok(authorization)
       assert.equal(authorization.providerRun, scenario.facts.providerRun)
@@ -170,6 +168,8 @@ test('WHAT[EXECFAIL-003] rejects illegal retry and breaker policy mutations', ()
       assert.equal(authorization.requestKind, scenario.facts.requestKind)
       assert.equal(typeof authorization.decisionId, 'string')
       assert.notEqual(authorization.decisionId, '')
+    } else {
+      assert.equal(decision.authorization, null, scenario.label)
     }
   }
 
@@ -184,7 +184,12 @@ test('WHAT[EXECFAIL-003] rejects illegal retry and breaker policy mutations', ()
 
   const wrongPhase = decide({ failure: 'ProviderTransient', phase: 'AcceptedBeforeProvider' })
   assert.notEqual(wrongPhase.resolution, 'RetryFreshAttempt')
-  assert.notEqual(wrongPhase.resolution, 'AdvanceFallback')
+
+  const openBreaker = decide({ failure: 'ProviderPermanent', provider: { ...provider, breaker: 'Open' } })
+  assert.notEqual(openBreaker.resolution, 'RetryFreshAttempt')
+
+  const exhausted = decide({ failure: 'ProviderPermanent', provider: { ...provider, retryBudget: 'Exhausted' } })
+  assert.notEqual(exhausted.resolution, 'RetryFreshAttempt')
 })
 
 test('WHAT[EXECFAIL-004] capacity settlement preserves the exact opaque fence reference', () => {

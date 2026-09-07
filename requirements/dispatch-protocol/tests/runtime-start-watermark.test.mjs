@@ -14,9 +14,8 @@ const inheritedIdentitySeed = (session) => ({
   ownerLogicalRun: `run-${session}-owner`,
   ownerAuthorityRoot: `root-${session}-owner`,
   participantIdentity: {
-    selectedAgent: 'coder',
-    peerAgent: 'coder',
-    canonicalRole: 'coder',
+    participant: 'coder',
+    role: 'coder',
     selectedTier: 'deep',
     persona: 'Lead',
     personaCatalogVersion: 1,
@@ -33,7 +32,6 @@ const claim = (session, key, seq) => ({
   continuationKind: 'ManagerGuard',
   logicalRun: `run-${seq}`,
   authorityRoot: `root-${seq}`,
-  effectiveAgent: 'coder',
   identitySeed: inheritedIdentitySeed(session),
   payloadDigest: `pd-${seq}`,
 })

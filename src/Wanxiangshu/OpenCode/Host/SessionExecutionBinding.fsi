@@ -39,7 +39,7 @@ module SessionExecutionBinding =
     val acceptExternalExecution:
         sessionId: SessionId ->
         physicalUserMessageId: PhysicalUserMessageId ->
-        effectiveAgent: string ->
+        participant: string ->
         model: OpencodeModel ->
             unit
 
@@ -47,7 +47,7 @@ module SessionExecutionBinding =
         sessionId: SessionId ->
         promptKey: PromptKey ->
         physicalUserMessageId: PhysicalUserMessageId ->
-        effectiveAgent: string ->
+        participant: string ->
         model: OpencodeModel ->
             unit
 
@@ -84,7 +84,7 @@ module SessionExecutionBinding =
 
     val validateObservedProvider: sessionId: SessionId -> agent: string -> model: OpencodeModel -> Result<bool, string>
 
-    val effectiveAgent: sessionId: SessionId -> opts: OpenCodePromptOptions -> Result<string, string>
+    val participantAgent: sessionId: SessionId -> opts: OpenCodePromptOptions -> Result<string, string>
 
     val prepareManagedPrompt:
         sessionId: SessionId -> opts: OpenCodePromptOptions -> Result<OpenCodePromptOptions, string>

@@ -71,7 +71,7 @@ module ExecutorToolSurface =
             )
 
     let private attachRecovery (scope: ToolRuntimeScope) (mode: string) =
-        scope.AttachFamilyRecovery(fun root -> Task.FromResult(recoveryOf root mode))
+        scope.AttachCurrentProcessJoin(fun root -> Task.FromResult(recoveryOf root mode))
 
     /// Plain metadata for the provider-visible run contract.
     let describeRun (toolModule: obj) : obj =

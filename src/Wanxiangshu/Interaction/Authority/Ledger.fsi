@@ -24,7 +24,6 @@ module PromptAuthorityLedger =
                ContinuationKind: string
                LogicalRunId: LogicalRunId option
                AuthorityRootUserMessageId: AuthorityRootUserMessageId option
-               EffectiveAgent: string option
                IdentitySeed: PromptIdentitySeed
                PayloadDigest: string |} ->
             PromptAuthority.PromptAuthorityProjection

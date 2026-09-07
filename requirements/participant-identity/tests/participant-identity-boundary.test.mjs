@@ -22,7 +22,7 @@ const SURFACE_MANIFEST = 'scripts/lib/test-surface-scan.mjs'
 const violation = (file, line, rule, message) => ({ file, line, rule, message })
 
 // Line 1 namespace, 2 ParticipantIdentity, 3 ParticipantIdentityEvidence,
-// 4 module, 5..13 the nine owner API members.
+// 4 module, 5..12 the eight owner API members.
 const identityOwner = [
   'namespace Wanxiangshu.Participant.Persona',
   'type ParticipantIdentity = private { Value: string }',
@@ -32,10 +32,9 @@ const identityOwner = [
   '    let inheritFromOwner value owner = value, owner',
   '    let rehydrate owner input = owner, input',
   '    let selectedAgent value = value',
-  '    let peerAgent value = value',
   '    let role value = value',
-  '    let initialTier value = value',
   '    let persona value = value',
+  '    let personaCatalogVersion value = value',
   '    let origin value = value',
 ].join('\n')
 

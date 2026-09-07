@@ -57,7 +57,6 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 open CompanionProjection
 
@@ -253,7 +252,6 @@ module PluginHostInterop =
                   LogicalRun = LogicalRunId.create "host-hook-before-provider"
                   RequestKind = ProviderRequestKind.WorkMain
                   RetryBudget = ProviderRecoveryBudget.Exhausted
-                  FallbackBudget = ProviderRecoveryBudget.Exhausted
                   Breaker = ProviderBreakerState.Closed } }
 
     let internal interpretHookFailure outcome =
@@ -263,7 +261,6 @@ module PluginHostInterop =
         | (ExecutionFailureResolution.PreserveCurrentFact | ExecutionFailureResolution.AwaitAcceptanceReconciliation _ | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _ | ExecutionFailureResolution.TerminalizeProviderStarted _),
           BreakerDecision.NoBreakerTransition -> ()
         | ExecutionFailureResolution.RetryFreshAttempt _, _
-        | ExecutionFailureResolution.AdvanceFallback _, _
         | _, BreakerDecision.RecordProviderTransientFailure
         | _, BreakerDecision.RecordProviderPermanentFailure ->
             invalidOp "hook membrane cannot own provider retry, fallback, or breaker transitions"
@@ -282,8 +279,7 @@ module PluginHostInterop =
             | CapacitySettlement.ReleaseExactFence _, ExecutionFailureResolution.TerminalizeAcceptedPreProvider _
             | CapacitySettlement.ReleaseExactFence _, ExecutionFailureResolution.TerminalizeProviderStarted _
             | CapacitySettlement.ReleaseExactFence _, ExecutionFailureResolution.AwaitAcceptanceReconciliation _
-            | _, ExecutionFailureResolution.RetryFreshAttempt _
-            | _, ExecutionFailureResolution.AdvanceFallback _ -> true
+            | _, ExecutionFailureResolution.RetryFreshAttempt _ -> true
 
         match decision.Fatality, outcome.Settlement, decisionStillRequiresSettlement with
         | FatalityDecision.NoFatality, _, _ -> HookFailurePolicy.RethrowUnchanged
@@ -385,8 +381,8 @@ module PluginHostInterop =
                 casebookToolSpecs
                 jsTransactionPersistence
 
-        // P0-RECOVERY-JOIN-001: JoinTool RequireFamilyRecovery → PluginRuntimeScope.
-        registration.Runtime.AttachFamilyRecovery(fun root -> scope.RequireFamilyRecovery root)
+        // Process-local join admission: JoinTool RequireCurrentProcessJoin → PluginRuntimeScope.
+        registration.Runtime.AttachCurrentProcessJoin(fun root -> scope.RequireCurrentProcessJoin root)
         // EXEC-017: JoinTool Begin(user-message wake) shares this process-local
         // attempt-scoped registry.
         registration.Runtime.AttachJoinAttempts scope.Sessions.JoinInterrupts

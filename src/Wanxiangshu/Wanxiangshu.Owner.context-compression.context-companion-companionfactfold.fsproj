@@ -35,8 +35,6 @@
     <Compile Include="Context/Companion/Model.fs"/>
     <Compile Include="Context/Companion/Runtime.fsi"/>
     <Compile Include="Context/Companion/Runtime.fs"/>
-    <Compile Include="Context/Companion/Blogger/Runtime/State.fsi"/>
-    <Compile Include="Context/Companion/Blogger/Runtime/State.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/ParkedTransform.fsi"/>
     <Compile Include="Context/Companion/Blogger/Runtime/ParkedTransform.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Host.fsi"/>

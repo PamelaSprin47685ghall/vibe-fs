@@ -7,12 +7,7 @@ module RecoveryRuntimeSurface =
     val recoverAcrossRestart: scenarios: string array -> Task<obj>
 
     val interpretFailurePolicy:
-        failureLabel: string ->
-        retryBudget: string ->
-        fallbackBudget: string ->
-        commitment: string ->
-        observation: string ->
-            Task<obj>
+        failureLabel: string -> retryBudget: string -> commitment: string -> observation: string -> Task<obj>
 
     val admissionCrashPointScenarios:
         cuts: string array -> restartKind: string -> commitment: string -> capacityOutcome: string -> Task<obj>

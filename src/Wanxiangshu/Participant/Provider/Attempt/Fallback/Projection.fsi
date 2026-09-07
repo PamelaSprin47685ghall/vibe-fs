@@ -3,33 +3,31 @@ namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Attempt
 
-type FallbackProjection =
+type ProviderFailureProjection =
     { LogicalRunId: LogicalRunId
       AuthorityRootUserMessageId: AuthorityRootUserMessageId
-      Cursor: AgentPairCursor.FallbackCursor
+      Budget: ProviderFailureBudget.FailureBudget
       RecentFailureKeys: string list
       Exhausted: bool
       LastTransitionWasSuccess: bool }
 
-type FallbackAdvanceRejection =
+type ProviderFailureAdvanceRejection =
     | AlreadyObserved
     | AlreadyExhausted
     | DifferentRun
-    | NoCursor
+    | NoActiveBudget
     | InvalidTransition
-    | InvalidFallbackOffset of AgentPairCursor.FallbackOffsetDecodeError
 
-module FallbackProjection =
-    val forAuthority: logicalRunId: LogicalRunId -> authorityRoot: AuthorityRootUserMessageId -> FallbackProjection
+module ProviderFailureProjection =
+    val forAuthority:
+        logicalRunId: LogicalRunId -> authorityRoot: AuthorityRootUserMessageId -> ProviderFailureProjection
 
-    val applyAdvance:
-        identity: FallbackAttemptIdentity ->
-        previousOffset: AgentPairCursor.FallbackOffset ->
-        nextOffset: AgentPairCursor.FallbackOffset ->
+    val applyFailure:
+        identity: FailedProviderAttemptIdentity ->
         consecutiveFailureCount: int ->
-        current: FallbackProjection ->
-            Result<FallbackProjection, FallbackAdvanceRejection>
+        current: ProviderFailureProjection ->
+            Result<ProviderFailureProjection, ProviderFailureAdvanceRejection>
 
-    val applyExhausted: current: FallbackProjection -> FallbackProjection
-    val recordSuccess: current: FallbackProjection -> FallbackProjection
-    val mayContinue: budget: int -> current: FallbackProjection -> bool
+    val applyExhausted: current: ProviderFailureProjection -> ProviderFailureProjection
+    val recordSuccess: current: ProviderFailureProjection -> ProviderFailureProjection
+    val mayRetry: budgetLimit: int -> current: ProviderFailureProjection -> bool

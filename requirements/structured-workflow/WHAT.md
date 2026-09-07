@@ -18,9 +18,11 @@ DU 与数据字段仅允许表示封闭的领域词汇（如角色、终态类�
 
 SW-003 vs SW-009 消歧：若恢复时将 projection fold 成唯一「最新 case」，等价于恢复一个隐藏的 durable resume-address，此举为 SW-009 禁止；合法的模式必须是 semantic entry 从一组 durable facts 与当前物理现实重新证明 outstanding obligation，随后直接调用普通业务流程。
 
+SW-003 与 RELAY 状态机跨包裁定：RELAY-002/004/006 所述 Phase（如 `AuditPending`、`WorkOwned` 等）与 `RoadView.ActivePhase` 仅为诊断视图与只读投影，绝非 next-action 调度或效果选择 API。所有业务执行与流程控制决策必须由 Structured Workflow 与领域 owner CE 独占；消费方（如权限分配、门禁准入、提示词派发）必须直接基于客观领域事实（活跃任期事实、评审记录、质量证书有效性、未决义务）进行约束判定，严禁以 `ActivePhase` 相等性分支选择副作用。若存在只读外部观测或诊断协议需暴露 phase，必须严格注册为 narrow protocol-state exemption，且该 exemption 严禁反向渗入任何业务执行或编排决策。
+
 ## STRUCTURED-WORKFLOW-004: 纯决策与物理效果显式分缝
 
-代码目录必须按照拥有者（owner）成树组织，严禁设立全局分层的顶层根目录（如 `Domain/`、`Application/`、`Infrastructure/`）。纯决策计算、具名语义词汇、端口装饰器与物理适配器属于 owner 内部的实现种类。composition root 必须宽而浅，只能承担 construction、typed topology/mode selection、fixed order、routing、lifetime、drain 与 disposal；`PluginBoot`、`HostSignalBootstrap`、`PluginTransforms`、`ToolRegistry` 等 root 严禁实现 owner-specific decision/recovery/classification、存储 PC 或动态 pipeline。此约束不得退化为 LOC/import-count 规则。领域操作必须通过具名 capability 调用副作用，严禁使用泛化的执行总线抹平强类型边界。控制分支（如 `match`、`if`、`try`）内部严禁嵌套产生第二层及更深的控制决策树（lexical pyramid）。嵌套错误处理与短路逻辑必须通过标准的 `Result` / `Option` 组合子（如 `result { }`、`taskResult { }`、`traverse`）进行扁平化表达，复杂的领域决策必须提取为独立的具名决策责任。
+代码目录必须按照拥有者（owner）成树组织，严禁设立全局分层的顶层根目录（如 `Domain/`、`Application/`、`Infrastructure/`）。纯决策计算、具名语义词汇、端口装饰器与物理适配器属于 owner 内部的实现种类。composition root 必须宽而浅，只能承担 construction、typed topology/mode selection、fixed order、routing、lifetime、drain 与 disposal；`PluginBoot`、`HostSignalBootstrap`、`PluginTransforms`、`ToolRegistry` 等 root 严禁实现 owner-specific decision/recovery/classification、存储 PC 或动态 pipeline。例如在 Relay/Manager 流程中，composition root（如 `PluginTransforms`）严禁拥有或内联任何 owner 本地决策、循环判定（如 `decideOpeningAction`、`loopContextFor`）或恢复续发逻辑；所有迭代流转与自动评审/工作/收尾时序必须内聚于领域拥有者内部的单一 CE（如 `ManagerWorkflow`），composition root 仅保留固定的拓扑装配、生命周期挂接与按固定顺序调用端口能力。此约束不得退化为 LOC/import-count 规则。领域操作必须通过具名 capability 调用副作用，严禁使用泛化的执行总线抹平强类型边界。控制分支（如 `match`、`if`、`try`）内部严禁嵌套产生第二层及更深的控制决策树（lexical pyramid）。嵌套错误处理与短路逻辑必须通过标准的 `Result` / `Option` 组合子（如 `result { }`、`taskResult { }`、`traverse`）进行扁平化表达，复杂的领域决策必须提取为独立的具名决策责任。
 
 ## STRUCTURED-WORKFLOW-005: 可变存储仅承载物理资源、投影缓存或算法草稿
 

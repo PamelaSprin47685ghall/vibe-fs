@@ -25,7 +25,6 @@ const acceptedWire = (physicalUserMessageId, overrides = {}) => {
       {
         InitialTier: 'deep',
         Origin: 'ResolvedAtRoot',
-        PeerAgent: 'coder',
         Persona: 'Coder',
         PersonaCatalogVersion: 1,
         Role: 'coder',
@@ -34,7 +33,6 @@ const acceptedWire = (physicalUserMessageId, overrides = {}) => {
     ],
     PhysicalUserMessageId: tagged('PhysicalUserMessageId', physicalUserMessageId),
     Origin: ['AuthorityRoot', 'HumanRoot'],
-    EffectiveAgent: 'coder',
     ...overrides.Evidence,
   }
 
@@ -129,10 +127,21 @@ test('WHAT[CHATEXEC-004] identical Accepted replay is idempotent and conflicting
     mustFold([accepted, startedWire('msg-replay')]),
   )
 
-  const conflict = acceptedWire('msg-replay', { Evidence: { EffectiveAgent: 'reviewer' } })
+  const conflict = acceptedWire('msg-replay', { Evidence: { LogicalRunId: tagged('LogicalRunId', 'run-other') } })
   const rejected = fold([accepted, conflict])
   assert.equal(rejected.ok, false)
   assert.notEqual(rejected.error, '')
+
+  const legacyOnly = acceptedWire('msg-replay')
+  const parsed = JSON.parse(legacyOnly)
+  parsed[1][1][1].Evidence.EffectiveAgent = 'reviewer'
+  parsed[1][1][1].Evidence.IdentitySeed[1].PeerAgent = 'reviewer'
+  const canonicalOf = (wire) => {
+    const result = chatExecution.canonicalize(wire)
+    assert.equal(result.ok, true, result.ok ? '' : result.error)
+    return result.value
+  }
+  assert.equal(canonicalOf(JSON.stringify(parsed)), canonicalOf(legacyOnly), 'legacy agent fields cannot alter canonical participant')
 })
 
 test('WHAT[CHATEXEC-005] ProviderStarted enforces acceptance provider run and terminal fences', () => {
@@ -198,7 +207,7 @@ test('WHAT[CHATEXEC-007] pre-provider failure cancellation and rejection settle 
 })
 
 test('WHAT[CHATEXEC-010] cancel and delete settle every exact projected execution before capacity is drained', async () => {
-  const targetFor = (effectiveAgent) => ({ model: `provider/${effectiveAgent}`, reasoning: 'none' })
+  const targetFor = (role) => ({ model: `provider/${role}`, reasoning: 'none' })
   const signals = new Set(recovery.lifecycleSignals())
 
   for (const [lifecycle, signal] of [
@@ -208,19 +217,23 @@ test('WHAT[CHATEXEC-010] cancel and delete settle every exact projected executio
     assert.equal(signals.has(signal), true)
     const sessionId = `ses-${lifecycle}-drain`
     const messageIds = [`msg-${lifecycle}-a`, `msg-${lifecycle}-b`]
-    const effectiveAgents = ['coder', 'reviewer']
+    const identities = [
+      { role: 'coder', participant: 'coder' },
+      { role: 'inspector', participant: 'inspector' },
+    ]
     const runtimes = new Map()
     const facts = []
 
     for (const [index, physicalUserMessageId] of messageIds.entries()) {
-      const effectiveAgent = effectiveAgents[index]
-      const exact = { sessionId, physicalUserMessageId, effectiveAgent, target: targetFor(effectiveAgent) }
-      const runtime = routing.createRuntime((agent) => targetFor(agent))
+      const { role, participant } = identities[index]
+      const exact = { sessionId, physicalUserMessageId, role, participant, target: targetFor(role) }
+      const runtime = routing.createRuntime((scheduledRole) => targetFor(scheduledRole))
       const acquired = await routing.acquireExecutionAdmission(
         runtime,
         sessionId,
         physicalUserMessageId,
-        exact.effectiveAgent,
+        exact.role,
+        exact.participant,
       )
       assert.equal(acquired.kind, 'Acquired')
       assert.deepEqual(routing.commitExecutionAdmission(runtime, acquired.lease, exact), { kind: 'Applied' })

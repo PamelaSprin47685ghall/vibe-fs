@@ -50,7 +50,15 @@ const rebasedEvent = (
 })
 const publishClaimedEvent = (jobId, expectedHead = 'h1') => ({
   kind: 'PublishClaimed',
-  payload: { jobId, targetRef: 'refs/heads/main', expectedHead },
+  payload: {
+    jobId,
+    targetRef: 'refs/heads/main',
+    rebasedCommit: 'r1',
+    expectedHead,
+    workspaceSnapshotId: 'snapshot-rebased',
+    qualityCertificateId: 'certificate-1',
+    authorityRevision: 'authority-1',
+  },
 })
 const publishedEvent = (jobId, candidateCommit = 'c1', resultingTargetHead = 'r1') => ({
   kind: 'Published',
@@ -155,6 +163,21 @@ test('WHAT[CHGINT-003] THEOREM_publish_claimed_without_rebased_candidate_is_reje
   const result = change.fold([createEvent(JOB_A, 'ses_orch_a'), candidateEvent(JOB_A), publishClaimedEvent(JOB_A)])
   assert.equal(result.ok, false)
   assert.match(result.error, /no rebased candidate/)
+})
+
+test('WHAT[CHGINT-003] THEOREM_publish_claimed_with_incomplete_evidence_is_rejected', () => {
+  const incomplete = {
+    kind: 'PublishClaimed',
+    payload: { jobId: JOB_A, targetRef: 'refs/heads/main', rebasedCommit: 'r1', expectedHead: 'h1' },
+  }
+  const result = change.fold([
+    createEvent(JOB_A, 'ses_orch_a'),
+    candidateEvent(JOB_A),
+    rebasedEvent(JOB_A),
+    incomplete,
+  ])
+  assert.equal(result.ok, false)
+  assert.match(result.error, /Incomplete PublishClaimed payload/)
 })
 
 test('WHAT[CHGINT-005] THEOREM_drop_ephemeral_preserves_conflict_evidence', () => {

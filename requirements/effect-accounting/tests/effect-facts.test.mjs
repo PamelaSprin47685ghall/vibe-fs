@@ -29,7 +29,18 @@ const rebased = {
   kind: 'RebasedCandidateReady',
   payload: { jobId: JOB, rebasedCommit: 'r1', targetHeadSnapshot: 'h1', workspaceSnapshotId: 'snap_2' },
 }
-const claimed = { kind: 'PublishClaimed', payload: { jobId: JOB, expectedHead: 'h1' } }
+const claimed = {
+  kind: 'PublishClaimed',
+  payload: {
+    jobId: JOB,
+    targetRef: 'refs/heads/main',
+    rebasedCommit: 'r1',
+    expectedHead: 'h1',
+    workspaceSnapshotId: 'snap_2',
+    qualityCertificateId: 'cert_ea',
+    authorityRevision: 'rev_ea',
+  },
+}
 
 const fold = (events) => {
   const result = change.fold(events)

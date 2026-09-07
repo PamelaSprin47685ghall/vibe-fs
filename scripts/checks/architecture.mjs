@@ -183,7 +183,6 @@ for (const file of productionFs) {
 {
   const forbiddenCallers = [
     'PromptRecovery.RecoveryGate',
-    'BloggerCrashRecovery.RecoveryGate',
     'AttachRecoveryGate',
     'AttachBloggerRecoveryGate',
   ]

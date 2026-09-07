@@ -64,19 +64,18 @@ const arbitraryExecutionFailureInput = fc.record({
     providerRun: fc.string({ minLength: 1, maxLength: 32 }).map((suffix) => `provider-${suffix}`),
     requestKind: arbitraryRequestKind,
     retryBudget: arbitraryBudget,
-    fallbackBudget: arbitraryBudget,
     breaker: arbitraryBreaker,
   }),
 })
 
 const isRecoveryResolution = (resolution) =>
-  resolution === 'RetryFreshAttempt' || resolution === 'AdvanceFallback'
+  resolution === 'RetryFreshAttempt'
 
 const isTerminalResolution = (resolution) =>
   resolution === 'TerminalizeAcceptedPreProvider' || resolution === 'TerminalizeProviderStarted'
 
 test('WHAT[EXECFAIL-003] finite provider budget matrix fixes policy and recovery outcomes', async () => {
-  // Dense model property: temporal invariants over arbitrary failure, phase, budgets, breaker, capacity
+  // Dense model property: temporal invariants over arbitrary failure, phase, budget, breaker, capacity
   fc.assert(
     fc.property(arbitraryExecutionFailureInput, (input) => {
       const decision = policy.decide(input)
@@ -87,12 +86,11 @@ test('WHAT[EXECFAIL-003] finite provider budget matrix fixes policy and recovery
         'PreserveCurrentFact',
         'AwaitAcceptanceReconciliation',
         'RetryFreshAttempt',
-        'AdvanceFallback',
         'TerminalizeAcceptedPreProvider',
         'TerminalizeProviderStarted',
       ].includes(decision.resolution))
 
-      // Invariant 2: Recover implies no terminal; authorization present iff recovery
+      // Invariant 2: Recovery implies no terminal; authorization present iff recovery
       if (isRecoveryResolution(decision.resolution)) {
         assert.equal(decision.terminalDisposition, null)
         assert.ok(decision.authorization)
@@ -101,23 +99,41 @@ test('WHAT[EXECFAIL-003] finite provider budget matrix fixes policy and recovery
         assert.equal(decision.authorization.requestKind, input.provider.requestKind)
         assert.equal(typeof decision.authorization.decisionId, 'string')
         assert.notEqual(decision.authorization.decisionId, '')
+      } else {
+        assert.equal(decision.authorization, null)
       }
 
-      // Invariant 3: Terminal implies no recover; terminalDisposition present iff terminal
+      // Invariant 3: Terminal implies no recovery; terminalDisposition present iff terminal
       if (isTerminalResolution(decision.resolution)) {
         assert.equal(decision.authorization, null)
         assert.ok(['Completed', 'Cancelled', 'Rejected', 'Failed'].includes(decision.terminalDisposition))
         assert.deepEqual(decision.executionKey, executionKey)
       }
 
-      // Invariant 4: Cancellation/protocol/local invariant/non-provider failure never recover
+      // Invariant 4: Non-provider failure, non-ProviderStarted phase, or StrengthReplica never recovers
       const isProviderFailure =
         input.failure === 'ProviderTransient' || input.failure === 'ProviderPermanent'
       if (!isProviderFailure || input.phase !== 'ProviderStarted' || input.provider.requestKind === 'StrengthReplica') {
-        assert.ok(!isRecoveryResolution(decision.resolution), `${input.failure}/${input.phase} must not recover`)
+        assert.ok(!isRecoveryResolution(decision.resolution), `${JSON.stringify(input.failure)}/${input.phase} must not recover`)
       }
 
-      // Invariant 5: LocalInvariant / ProtocolRejection / UserCancelled / Superseded invariant rules
+      // Invariant 4b: Open breaker or exhausted single budget never recovers
+      if (input.provider.breaker === 'Open' || input.provider.retryBudget === 'Exhausted') {
+        assert.ok(!isRecoveryResolution(decision.resolution), 'open or exhausted single budget must not recover')
+      }
+
+      // Invariant 4c: Closed + Available + recoverable provider failure at ProviderStarted always retries
+      if (
+        isProviderFailure &&
+        input.phase === 'ProviderStarted' &&
+        input.provider.requestKind !== 'StrengthReplica' &&
+        input.provider.breaker === 'Closed' &&
+        input.provider.retryBudget === 'Available'
+      ) {
+        assert.equal(decision.resolution, 'RetryFreshAttempt')
+      }
+
+      // Invariant 5: LocalInvariant / ProtocolRejection / AuthorizationDenied invariant rules
       if (input.failure === 'LocalInvariant' || input.failure === 'ProtocolRejection' || input.failure === 'AuthorizationDenied') {
         if (input.phase === 'AcceptedBeforeProvider') {
           assert.equal(decision.resolution, 'TerminalizeAcceptedPreProvider')
@@ -160,8 +176,7 @@ test('WHAT[EXECFAIL-003] finite provider budget matrix fixes policy and recovery
           provider: {
             ...baseProvider,
             providerRun: `provider-${runA}`,
-            retryBudget: 'Exhausted',
-            fallbackBudget: 'Available',
+            retryBudget: 'Available',
           },
         })
         const decisionB = policy.decide({
@@ -172,13 +187,12 @@ test('WHAT[EXECFAIL-003] finite provider budget matrix fixes policy and recovery
           provider: {
             ...baseProvider,
             providerRun: `provider-${runB}`,
-            retryBudget: 'Exhausted',
-            fallbackBudget: 'Available',
+            retryBudget: 'Available',
           },
         })
 
-        assert.equal(decisionA.resolution, 'AdvanceFallback')
-        assert.equal(decisionB.resolution, 'AdvanceFallback')
+        assert.equal(decisionA.resolution, 'RetryFreshAttempt')
+        assert.equal(decisionB.resolution, 'RetryFreshAttempt')
         assert.notEqual(decisionA.authorization.decisionId, decisionB.authorization.decisionId)
       },
     ),
@@ -190,24 +204,21 @@ test('WHAT[EXECFAIL-003] finite provider budget matrix fixes policy and recovery
   const transientOutcome = await recovery.interpretFailurePolicy(
     'ProviderTransient',
     'Available',
-    'Available',
     'NotCommitted',
     'ExactAbsent',
   )
   assert.deepEqual(transientOutcome, { decision: 'Ignore', effects: [] })
 
-  const fallbackOutcome = await recovery.interpretFailurePolicy(
+  const permanentOutcome = await recovery.interpretFailurePolicy(
     'ProviderPermanent',
-    'Exhausted',
     'Available',
     'NotCommitted',
     'ExactAbsent',
   )
-  assert.deepEqual(fallbackOutcome, { decision: 'Ignore', effects: [] })
+  assert.deepEqual(permanentOutcome, { decision: 'Ignore', effects: [] })
 
   const terminalOutcome = await recovery.interpretFailurePolicy(
     'ProviderPermanent',
-    'Exhausted',
     'Exhausted',
     'NotCommitted',
     'ExactAbsent',

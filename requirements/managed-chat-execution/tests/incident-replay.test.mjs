@@ -30,7 +30,7 @@ const input = {
   diagnostics: [{
     operation: 'AcceptedPersisted', logicalRunId: 'run-chat-fixture', sessionId: 'ses-chat-fixture',
     authorityRootUserMessageId: 'msg-chat-root', physicalUserMessageId: 'msg-chat-fixture', promptKey: null,
-    providerRunIdentity: null, effectiveAgent: 'coder', role: 'coder', providerRequestKind: 'work-main',
+    providerRunIdentity: null, participant: 'coder', role: 'coder', providerRequestKind: 'work-main',
     transition: { from: null, to: 'Accepted' }, failureClass: null, resolution: null,
     capacityState: 'Released', capacityFence: null, hook: 'chat.message',
     policyClass: 'Workflow', recoveryDecision: 'ResumeAdmission', persistenceCommitment: 'Committed',
@@ -59,7 +59,7 @@ test('WHAT[CHATEXEC-014] replay reconstructs the canonical projection and emits 
   assert.deepEqual(replayed.mutations, [])
 })
 
-test('WHAT[CHATEXEC-014] redacted agent-028 reproduces legacy session binding conflict and replays through current owners', async () => {
+test('WHAT[CHATEXEC-014] agent-028 session-only binding is hostile; current owners fold exact keys with fixed participant', async () => {
   assert.equal(agent028.historicalModel.first.bindingKey, agent028.historicalModel.second.bindingKey)
   assert.notEqual(
     agent028.historicalModel.first.physicalUserMessageId,
@@ -76,8 +76,42 @@ test('WHAT[CHATEXEC-014] redacted agent-028 reproduces legacy session binding co
       { sessionId: 'session-agent-028', physicalUserMessageId: 'message-agent-028-b', phase: 'Accepted' },
     ],
   )
+  for (const entry of projected.value) {
+    assert.equal(entry.identity.participant, 'coder')
+    assert.equal(entry.identity.role, 'coder')
+    assert.equal('effectiveAgent' in entry.identity, false, 'projection carries no EffectiveAgent')
+  }
   const recovery = await recoverScenarios([agent028.currentModel.recoveryScenario])
   assert.deepEqual(recovery.decisions, [agent028.currentModel.expectedDecision])
+})
+
+test('WHAT[CHATEXEC-014] agent-028 legacy agent fields are hostile: dropped on re-encoding and inert on replay', () => {
+  const hostileFact = (physicalUserMessageId, legacyAgent) => {
+    const parsed = JSON.parse(agent028.currentModel.facts[0])
+    const payload = parsed[1][1][1]
+    payload.Evidence.PhysicalUserMessageId = ['PhysicalUserMessageId', physicalUserMessageId]
+    payload.Evidence.EffectiveAgent = legacyAgent
+    payload.Evidence.IdentitySeed[1].PeerAgent = legacyAgent
+    payload.Key.PhysicalUserMessageId = ['PhysicalUserMessageId', physicalUserMessageId]
+    return JSON.stringify(parsed)
+  }
+  const canonicalOf = (wire) => {
+    const result = canonicalize(wire)
+    assert.equal(result.ok, true, result.ok ? '' : result.error)
+    return result.value
+  }
+
+  const coderLegacy = canonicalOf(hostileFact('message-agent-028-a', 'coder'))
+  const reviewerLegacy = canonicalOf(hostileFact('message-agent-028-a', 'reviewer'))
+  assert.equal(coderLegacy, reviewerLegacy, 'legacy-only agent difference must vanish on re-encoding')
+  assert.doesNotMatch(coderLegacy, /PeerAgent|EffectiveAgent/, 'current encoding drops legacy agent fields')
+
+  const folded = fold([coderLegacy, reviewerLegacy])
+  assert.equal(folded.ok, true, folded.ok ? '' : folded.error)
+  assert.equal(folded.value.length, 1)
+  assert.equal(folded.value[0].phase, 'Accepted')
+  assert.equal(folded.value[0].identity.participant, 'coder', 'conflicting legacy fields cannot alter canonical participant')
+  assert.equal(folded.value[0].identity.role, 'coder')
 })
 
 test('WHAT[CHATEXEC-014] duplicate replay is idempotent and does not accumulate authority', async () => {

@@ -28,13 +28,13 @@ test('WHAT[EMR-010] EMR_010_borrowing_complexity_is_owned_only_by_the_capacity_d
 
   assert.match(capacity, /type internal CapacityLedger<'target>/)
   assert.match(capacity, /type internal BorrowingCapacity<'target>/)
-  assert.match(capacity, /ancestorDistance/)
+  assert.match(capacity, /routeDecision/)
   assert.match(capacity, /CapacityCreditState/)
   assert.match(routing, /BorrowingCapacity<ModelRoutingTarget>/)
-  assert.doesNotMatch(routing, /let ancestorDistance|type private CapacityCreditState|type private CapacityStepDemand/)
+  assert.doesNotMatch(routing, /routeDecision|recordRoutedCredit|ownedTokenByExecution|creditSourceByExecution/)
 
   for (const main of [sessions, binding, transform, host]) {
-    assert.doesNotMatch(main, /ancestorDistance|CapacityCreditState|CapacityStepDemand|ownedTokenByExecution/)
+    assert.doesNotMatch(main, /routeDecision|recordRoutedCredit|ownedTokenByExecution|creditSourceByExecution|CapacityCreditState|CapacityStepDemand/)
   }
   assert.doesNotMatch(scheduler, /borrow|recall|lineage|parentSession|childSession/i)
 })
@@ -90,7 +90,7 @@ test('WHAT[EMR-007] EMR_007_exact_terminal_identity_releases_capacity_not_coarse
   assert.match(codec, /isMessageUpdated\s*=\s*not \(isNull raw\) && HostEventEnvelope\.eventTypeOf raw = "message\.updated"/)
   assert.match(codec, /info\?parentID/)
   assert.match(recovery, /let release \(key: ChatExecutionKey\) =[\s\S]*ModelRouting\.releasePhysicalExecution key\.SessionId key\.PhysicalUserMessageId/)
-  assert.match(recovery, /PhysicalReconciliationRequest\.ReleaseTerminalResource\(key, _, _\) -> release key/)
+  assert.match(recovery, /PhysicalReconciliationRequest\.ReleaseTerminalResource\(key, _, _\) ->[\s\S]{0,160}release key/)
   assert.doesNotMatch(recovery, /SessionIdle sessionId[\s\S]{0,260}ModelRouting\.releaseExecution sessionId/)
   assert.doesNotMatch(recovery, /AttemptAborted sessionId[\s\S]{0,260}ModelRouting\.releaseExecution sessionId/)
   assert.doesNotMatch(ordinary, /ModelRouting\.(releaseExecution|releaseSession)/,

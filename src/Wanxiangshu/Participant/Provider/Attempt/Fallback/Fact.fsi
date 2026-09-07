@@ -3,29 +3,26 @@ namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 
-module FallbackFact =
-    val inline FallbackCursorAdvanced:
+module ProviderFailureFact =
+    val inline FailureRecorded:
         payload:
             {| SessionId: SessionId
                LogicalRunId: LogicalRunId
                AuthorityRootUserMessageId: AuthorityRootUserMessageId
                ProviderRun: ProviderRunIdentity
-               PreviousOffset: byte
-               NextOffset: byte
                ConsecutiveFailureCount: int
                Reason: string |} ->
             AgentFact
 
-    val inline FallbackExhausted:
+    val inline RetryExhausted:
         payload:
             {| SessionId: SessionId
                LogicalRunId: LogicalRunId
                AuthorityRootUserMessageId: AuthorityRootUserMessageId
-               FinalConsecutiveFailureCount: int
-               FinalOffset: byte |} ->
+               FinalConsecutiveFailureCount: int |} ->
             AgentFact
 
-    val inline FallbackSucceeded:
+    val inline SuccessRecorded:
         payload:
             {| SessionId: SessionId
                LogicalRunId: LogicalRunId

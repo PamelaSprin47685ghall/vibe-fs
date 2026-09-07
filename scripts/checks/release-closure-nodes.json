@@ -369,7 +369,6 @@
       "proofs": [
         "requirements/context-compression/tests/attempt-plan-probe-eligibility.test.mjs",
         "requirements/context-compression/tests/companion-projection.test.mjs",
-        "requirements/context-compression/tests/companion-recovery-slot.test.mjs",
         "requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs",
         "requirements/context-compression/tests/ctx-opening-floor.test.mjs",
         "requirements/context-compression/tests/ctx014.test.mjs",
@@ -377,7 +376,7 @@
         "requirements/context-compression/tests/injected-context-reanchor.test.mjs",
         "requirements/context-compression/tests/probe-selection.test.mjs",
         "requirements/context-compression/tests/projection-algebra-blogframes.test.mjs",
-        "requirements/context-compression/tests/recovery-slot.test.mjs",
+        "requirements/context-compression/tests/retry-policy.test.mjs",
         "requirements/context-compression/tests/terminal-validity.test.mjs",
         "requirements/durable-events/tests/fold-context-recovery.test.mjs"
       ],
@@ -673,8 +672,6 @@
       "id": "context-compression-blogger-compaction-keep",
       "state": "DONE",
       "files": [
-        "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs",
-        "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashSurface.fs",
         "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
         "src/Wanxiangshu/Context/Companion/Blogger/Delta.fs",
         "src/Wanxiangshu/Context/Companion/Blogger/DeltaSurface.fs",
@@ -690,7 +687,6 @@
         "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleSurface.fs",
         "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Host.fs",
         "src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs",
-        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
         "src/Wanxiangshu/Context/Companion/Blogger/Toml.fs",
         "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
         "src/Wanxiangshu/Host/CompactionPolicy.fs",
@@ -709,7 +705,6 @@
         "requirements/context-compression/tests/blogger-seal-reactivate.test.mjs",
         "requirements/context-compression/tests/companion-ordinary-material-surface.test.mjs",
         "requirements/context-compression/tests/companion-projection.test.mjs",
-        "requirements/context-compression/tests/companion-recovery-slot.test.mjs",
         "requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs",
         "requirements/context-compression/tests/ctx-opening-floor.test.mjs",
         "requirements/context-compression/tests/ctx014.test.mjs",
@@ -722,9 +717,9 @@
         "requirements/context-compression/tests/parked-transform.test.mjs",
         "requirements/context-compression/tests/probe-selection.test.mjs",
         "requirements/context-compression/tests/projection-algebra-blogframes.test.mjs",
-        "requirements/context-compression/tests/recovery-slot.test.mjs",
+        "requirements/context-compression/tests/retry-policy.test.mjs",
         "requirements/context-compression/tests/terminal-validity.test.mjs",
-        "requirements/crash-reconciliation/tests/blogger-crash-recovery.test.mjs",
+        "requirements/capability-enforcement/tests/blogger-repair-trace.test.mjs",
         "requirements/effect-accounting/tests/external-adapter-boundary.test.mjs",
         "requirements/host-boundary/tests/host-capability-observation.test.mjs"
       ],
@@ -738,25 +733,23 @@
       "id": "provider-attempt-recovery-cutover",
       "state": "DONE",
       "files": [
-        "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/FailureBudget.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ProviderFailureFactFold.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs"
+        "src/Wanxiangshu/Participant/Provider/Attempt/RetryPolicy.fs"
       ],
       "proofs": [
         "requirements/provider-attempt-recovery/tests/abort-residue.test.mjs",
         "requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs",
-        "requirements/provider-attempt-recovery/tests/cursor.test.mjs",
         "requirements/provider-attempt-recovery/tests/fallback-aabb-confluence.test.mjs",
         "requirements/provider-attempt-recovery/tests/fallback-ledger.test.mjs",
-        "requirements/context-compression/tests/companion-recovery-slot.test.mjs",
         "requirements/structured-workflow/tests/recovery-reentry.test.mjs"
       ],
       "publishes": [
@@ -1344,8 +1337,7 @@
         "src/Wanxiangshu/Composition/Turn/ReconcilePass.fs",
         "src/Wanxiangshu/Composition/Turn/ReconcileSurface.fs",
         "src/Wanxiangshu/Composition/Turn/TurnReconcile.fs",
-        "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
-        "src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs"
+        "src/Wanxiangshu/Execution/Session/Recovery/Model.fs"
       ],
       "proofs": [
         "requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs"

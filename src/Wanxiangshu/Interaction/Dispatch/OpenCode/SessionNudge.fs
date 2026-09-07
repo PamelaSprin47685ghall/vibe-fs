@@ -13,7 +13,6 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 /// Continuation sends against an already-accepted Authority Root.
 ///
@@ -28,22 +27,7 @@ module HostSessionNudge =
         |> Option.bind (fun j ->
             PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot j).AgentProjections)
 
-    /// Look up the agent the current cursor selects.
-    ///
-    /// Named for the lookup, not the algorithm: FALLBACK-002's side selection is
-    /// owned by AgentPairCursor, and this only fetches the cursor and asks. A
-    /// second `effectiveAgent` here would read as a competing implementation.
-    ///
-    /// No cursor means no accepted Authority Root (FALLBACK-001), so there is no
-    /// fallback state to consult and SelectedAgent is the only defensible answer.
-    let private agentForActiveCursor
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        (profile: PromptAuthority.AuthorityExecutionProfile)
-        =
-        journal
-        |> Option.map (fun j -> FallbackEvidence.effectiveAgent sessionId (AgentJournal.snapshot j) profile)
-        |> Option.defaultValue profile.SelectedAgent
+    let activeParticipant (profile: PromptAuthority.AuthorityExecutionProfile) : string = profile.SelectedAgent
 
     /// The continuation target directory.
     ///
@@ -81,7 +65,6 @@ module HostSessionNudge =
             | false, None, _ -> return Error "No journal: a continuation cannot be claimed"
             | false, Some _, None -> return Error "No active authority profile"
             | false, Some durable, Some profile ->
-                let agent = agentForActiveCursor journal sessionId profile
                 let rt = PromptDispatcher.forJournal durable
 
                 return!
@@ -91,7 +74,6 @@ module HostSessionNudge =
                         prompt
                         kind
                         profile
-                        agent
                         (liveDirectory rootWorkspace directory)
                         awaitMode
                         onAccepted
@@ -148,8 +130,6 @@ module HostSessionNudge =
         if rt.GateNudgeAlreadyAdmitted profile continuation gateKind terminalProviderRun then
             Task.FromResult GateContinuationOutcome.AlreadyAdmitted
         else
-            let agent = agentForActiveCursor journal sessionId profile
-
             rt.SendGateNudge
                 sessionPort
                 sessionId
@@ -158,7 +138,6 @@ module HostSessionNudge =
                 gateKind
                 terminalProviderRun
                 profile
-                agent
                 (liveDirectory rootWorkspace directory)
                 PromptDispatcher.AwaitMode.Await
                 onAccepted
@@ -315,8 +294,6 @@ module HostSessionNudge =
         if rt.RepairAlreadyClaimed profile requestId terminalProviderRun repairKind then
             Task.FromResult InteractionRepairSendOutcome.AlreadyAdmitted
         else
-            let agent = agentForActiveCursor journal sessionId profile
-
             // Blogger repair must know whether Host transport accepted or
             // refused this nudge so a hard refusal can immediately advance
             // to AABB. Await waits only the SendPrompt transport result; it
@@ -329,13 +306,12 @@ module HostSessionNudge =
                 terminalProviderRun
                 repairKind
                 profile
-                agent
                 (liveDirectory rootWorkspace directory)
                 PromptDispatcher.AwaitMode.Await
                 None
             |> TaskValue.map interactionRepairOutcomeOfResult
 
-    /// FALLBACK-008: an empty / XML-only terminal earns at most one repair.
+    /// PAR-008: an empty / XML-only terminal earns at most one repair.
     ///
     /// `requestId + terminalProviderRun` names the exact Blogger repair occasion.
     /// Neither the long-lived session nor LogicalRun alone may spend another
@@ -442,8 +418,6 @@ module HostSessionNudge =
         if rt.GateNudgeAlreadyAdmitted profile continuation gateKind terminalProviderRun then
             Task.FromResult IdleContinuationOutcome.AlreadyAdmitted
         else
-            let agent = agentForActiveCursor journal sessionId profile
-
             rt.SendIdleGateNudge
                 sessionPort
                 sessionId
@@ -452,7 +426,6 @@ module HostSessionNudge =
                 gateKind
                 terminalProviderRun
                 profile
-                agent
                 (liveDirectory rootWorkspace directory)
                 awaitMode
                 physicalAdmission
@@ -579,8 +552,6 @@ module HostSessionNudge =
         if rt.RepairAlreadyClaimed profile requestId terminalProviderRun repairKind then
             Task.FromResult IdleContinuationOutcome.AlreadyAdmitted
         else
-            let agent = agentForActiveCursor journal sessionId profile
-
             rt.SendIdleInteractionRepair
                 sessionPort
                 sessionId
@@ -589,7 +560,6 @@ module HostSessionNudge =
                 terminalProviderRun
                 repairKind
                 profile
-                agent
                 (liveDirectory rootWorkspace directory)
                 PromptDispatcher.AwaitMode.Await
                 (fun () -> quiescence.TryConsume permit)

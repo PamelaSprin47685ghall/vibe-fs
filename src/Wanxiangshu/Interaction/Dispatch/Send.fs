@@ -56,7 +56,6 @@ module PromptDispatcherSend =
         (logicalRunId: LogicalRunId option)
         (authorityRoot: AuthorityRootUserMessageId option)
         (origin: PromptAuthority.PromptOrigin)
-        (effectiveAgent: string option)
         (payloadDigest: string)
         : PromptKey =
         PromptAuthority.claimScopeDigest sessionId logicalRunId origin payloadDigest
@@ -67,7 +66,6 @@ module PromptDispatcherSend =
             logicalRunId
             authorityRoot
             origin
-            effectiveAgent
             payloadDigest
 
     let private handleAdmittedPhysical
@@ -289,7 +287,7 @@ module PromptDispatcherSend =
                     PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot
 
                 let key =
-                    deriveKey (this.ProjectionFor sessionId) sessionId None None origin (Some agent) payloadDigest
+                    deriveKey (this.ProjectionFor sessionId) sessionId None None origin payloadDigest
 
                 let! claim = PromptAuthorityRun.claimAgentOwnerRoot key sessionId payloadDigest identitySeed
 
@@ -300,7 +298,6 @@ module PromptDispatcherSend =
                            ContinuationKind = PromptDispatcher.originLabel origin
                            LogicalRunId = None
                            AuthorityRootUserMessageId = None
-                           EffectiveAgent = claim.EffectiveAgent
                            IdentitySeed = claim.IdentitySeed
                            PayloadDigest = payloadDigest |}
 
@@ -395,13 +392,10 @@ module PromptDispatcherSend =
 
         /// PROMPT-003: a continuation of an existing Logical Run.
         ///
-        /// Inherits the run and root from the profile, so its key derivation has
-        /// both. `effectiveAgent` is the fallback cursor's current choice
-        /// (FALLBACK-004) and participates in the key: the same text retried on the
-        /// other side of the pair is a different logical act.
+        /// Inherits the run and root from the profile, so its key derivation has both.
         ///
         /// `payloadDigest` is a parameter rather than `sha256 text` computed here,
-        /// because FALLBACK-008 needs one continuation kind to digest something
+        /// because PAR-008 needs one continuation kind to digest something
         /// other than its text. See `SendInteractionRepair`.
         member private this.SendClaimedContinuation
             (port: ISessionHostPort)
@@ -409,7 +403,6 @@ module PromptDispatcherSend =
             (text: string)
             (originLabel: string)
             (profile: PromptAuthority.AuthorityExecutionProfile)
-            (effectiveAgent: string)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
@@ -420,19 +413,13 @@ module PromptDispatcherSend =
             task {
                 use _listener = this.SubscribeNoOp port sessionId
 
-                let bindingIntent =
-                    if effectiveAgent = profile.SelectedAgent then
-                        SessionBindingIntent.Preserve
-                    else
-                        SessionBindingIntent.ExplicitExecutionOverride
-
                 let options =
                     { Model = None
-                      Agent = Some effectiveAgent
+                      Agent = Some profile.SelectedAgent
                       Directory = directory
                       Metadata = Some(this.Metadata key originLabel (Some profile.LogicalRunId))
                       Tools = tools
-                      BindingIntent = bindingIntent }
+                      BindingIntent = SessionBindingIntent.Preserve }
 
                 match awaitMode, onAccepted with
                 | PromptDispatcher.AwaitMode.Await, Some callback -> PromptPhysicalAcceptance.register key callback
@@ -488,7 +475,6 @@ module PromptDispatcherSend =
             (payloadDigest: string)
             (continuation: PromptAuthority.ContinuationKind)
             (profile: PromptAuthority.AuthorityExecutionProfile)
-            (effectiveAgent: string)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
@@ -506,11 +492,10 @@ module PromptDispatcherSend =
                         (Some profile.LogicalRunId)
                         (Some profile.AuthorityRootUserMessageId)
                         origin
-                        (Some effectiveAgent)
                         payloadDigest
 
                 let claim =
-                    PromptAuthorityRun.claimContinuation key sessionId continuation profile effectiveAgent payloadDigest
+                    PromptAuthorityRun.claimContinuation key sessionId continuation profile payloadDigest
 
                 let claimed =
                     PromptFact.PluginPromptClaimed
@@ -519,7 +504,6 @@ module PromptDispatcherSend =
                            ContinuationKind = originLabel
                            LogicalRunId = claim.LogicalRunId
                            AuthorityRootUserMessageId = claim.AuthorityRootUserMessageId
-                           EffectiveAgent = claim.EffectiveAgent
                            IdentitySeed = claim.IdentitySeed
                            PayloadDigest = payloadDigest |}
 
@@ -533,7 +517,6 @@ module PromptDispatcherSend =
                             text
                             originLabel
                             profile
-                            effectiveAgent
                             directory
                             awaitMode
                             onAccepted
@@ -549,7 +532,6 @@ module PromptDispatcherSend =
             (payloadDigest: string)
             (continuation: PromptAuthority.ContinuationKind)
             (profile: PromptAuthority.AuthorityExecutionProfile)
-            (effectiveAgent: string)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
@@ -562,7 +544,6 @@ module PromptDispatcherSend =
                 payloadDigest
                 continuation
                 profile
-                effectiveAgent
                 directory
                 awaitMode
                 onAccepted
@@ -576,7 +557,6 @@ module PromptDispatcherSend =
             (text: string)
             (continuation: PromptAuthority.ContinuationKind)
             (profile: PromptAuthority.AuthorityExecutionProfile)
-            (effectiveAgent: string)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
@@ -588,7 +568,6 @@ module PromptDispatcherSend =
                 (HostDigest.sha256Hex text)
                 continuation
                 profile
-                effectiveAgent
                 directory
                 awaitMode
                 onAccepted
@@ -605,23 +584,35 @@ module PromptDispatcherSend =
             (gateKind: string)
             (terminalProviderRun: ProviderRunIdentity)
             (profile: PromptAuthority.AuthorityExecutionProfile)
-            (effectiveAgent: string)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             : Task<Result<PromptKey, string>> =
-            this.SendContinuationWithDigest
-                port
-                sessionId
-                text
-                (PromptAuthority.gateNudgePayloadDigest gateKind terminalProviderRun)
-                continuation
-                profile
-                effectiveAgent
-                directory
-                awaitMode
-                onAccepted
-                None
+            let payloadDigest =
+                PromptAuthority.gateNudgePayloadDigest gateKind terminalProviderRun
+
+            let scope =
+                PromptAuthority.claimScopeDigest
+                    sessionId
+                    (Some profile.LogicalRunId)
+                    (PromptAuthority.PromptOrigin.Continuation continuation)
+                    payloadDigest
+
+            this.RunGateNudgeOnce(
+                scope,
+                fun () ->
+                    this.SendContinuationWithDigest
+                        port
+                        sessionId
+                        text
+                        payloadDigest
+                        continuation
+                        profile
+                        directory
+                        awaitMode
+                        onAccepted
+                        None
+            )
 
         member this.SendContinuationWithTools
             (port: ISessionHostPort)
@@ -629,7 +620,6 @@ module PromptDispatcherSend =
             (text: string)
             (continuation: PromptAuthority.ContinuationKind)
             (profile: PromptAuthority.AuthorityExecutionProfile)
-            (effectiveAgent: string)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
@@ -642,13 +632,12 @@ module PromptDispatcherSend =
                 (HostDigest.sha256Hex text)
                 continuation
                 profile
-                effectiveAgent
                 directory
                 awaitMode
                 onAccepted
                 (Some tools)
 
-        /// FALLBACK-008: the one Blogger-request + terminal-scoped interaction repair an unusable terminal earns.
+        /// PAR-008: the one Blogger-request + terminal-scoped interaction repair an unusable terminal earns.
         ///
         /// Its payload digest names the occasion (BloggerRequestId + terminal
         /// provider run + repair kind), not the prompt text. Request identity
@@ -666,7 +655,6 @@ module PromptDispatcherSend =
             (terminalProviderRun: ProviderRunIdentity)
             (repairKind: string)
             (profile: PromptAuthority.AuthorityExecutionProfile)
-            (effectiveAgent: string)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
@@ -678,7 +666,6 @@ module PromptDispatcherSend =
                 (PromptAuthority.repairPayloadDigest requestId terminalProviderRun repairKind)
                 PromptAuthority.ContinuationKind.InteractionRepair
                 profile
-                effectiveAgent
                 directory
                 awaitMode
                 onAccepted
@@ -694,7 +681,6 @@ module PromptDispatcherSend =
             (text: string)
             (continuation: PromptAuthority.ContinuationKind)
             (profile: PromptAuthority.AuthorityExecutionProfile)
-            (effectiveAgent: string)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
@@ -707,7 +693,6 @@ module PromptDispatcherSend =
                 (HostDigest.sha256Hex text)
                 continuation
                 profile
-                effectiveAgent
                 directory
                 awaitMode
                 onAccepted
@@ -724,7 +709,6 @@ module PromptDispatcherSend =
             (gateKind: string)
             (terminalProviderRun: ProviderRunIdentity)
             (profile: PromptAuthority.AuthorityExecutionProfile)
-            (effectiveAgent: string)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
@@ -736,7 +720,6 @@ module PromptDispatcherSend =
                 (PromptAuthority.gateNudgePayloadDigest gateKind terminalProviderRun)
                 continuation
                 profile
-                effectiveAgent
                 directory
                 awaitMode
                 None
@@ -751,7 +734,6 @@ module PromptDispatcherSend =
             (terminalProviderRun: ProviderRunIdentity)
             (repairKind: string)
             (profile: PromptAuthority.AuthorityExecutionProfile)
-            (effectiveAgent: string)
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
@@ -763,7 +745,6 @@ module PromptDispatcherSend =
                 (PromptAuthority.repairPayloadDigest requestId terminalProviderRun repairKind)
                 PromptAuthority.ContinuationKind.InteractionRepair
                 profile
-                effectiveAgent
                 directory
                 awaitMode
                 None

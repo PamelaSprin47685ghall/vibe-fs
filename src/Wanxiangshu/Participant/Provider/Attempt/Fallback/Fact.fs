@@ -2,14 +2,14 @@ namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open Wanxiangshu.Composition.Durable.Fact
 
-/// Fallback fact constructors — bridge from Fallback-owned FallbackFactCases
+/// Provider failure fact constructors — bridge from ProviderFailure-owned fact cases
 /// into the Composition-owned AgentFact outer routing union.
-module FallbackFact =
-    let inline FallbackCursorAdvanced payload =
-        AgentFact.Fallback(FallbackFactCases.FallbackCursorAdvanced payload)
+module ProviderFailureFact =
+    let inline FailureRecorded payload =
+        AgentFact.ProviderFailure(ProviderFailureFactCases.FailureRecorded payload)
 
-    let inline FallbackExhausted payload =
-        AgentFact.Fallback(FallbackFactCases.FallbackExhausted payload)
+    let inline RetryExhausted payload =
+        AgentFact.ProviderFailure(ProviderFailureFactCases.RetryExhausted payload)
 
-    let inline FallbackSucceeded payload =
-        AgentFact.Fallback(FallbackFactCases.FallbackSucceeded payload)
+    let inline SuccessRecorded payload =
+        AgentFact.ProviderFailure(ProviderFailureFactCases.SuccessRecorded payload)

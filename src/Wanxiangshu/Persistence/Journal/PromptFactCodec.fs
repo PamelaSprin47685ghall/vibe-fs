@@ -76,7 +76,6 @@ module PromptFactCodec =
         Encode.object
             [ "InitialTier", Encode.string "deep"
               "Origin", Encode.string (originLabel input.Origin)
-              "PeerAgent", Encode.string (ParticipantIdentity.peerAgent evidence)
               "Persona", Encode.string input.Persona
               "PersonaCatalogVersion", Encode.int input.PersonaCatalogVersion
               "Role", roleEncoder input.Role
@@ -145,6 +144,9 @@ module PromptFactCodec =
 
     let private identityInputDecoder =
         Decode.object (fun get ->
+            let _ = get.Optional.Field "PeerAgent" Decode.string
+            let _ = get.Optional.Field "EffectiveAgent" Decode.string
+
             { SelectedAgent = get.Required.Field "SelectedAgent" Decode.string
               Role = get.Required.Field "Role" roleDecoder
               Persona = get.Required.Field "Persona" Decode.string
@@ -207,6 +209,9 @@ module PromptFactCodec =
                 get.Required.Field
                     "AuthorityRootUserMessageId"
                     (taggedStringDecoder "AuthorityRootUserMessageId" AuthorityRootUserMessageId.create)
+
+            let _ = get.Optional.Field "PeerAgent" Decode.string
+            let _ = get.Optional.Field "EffectiveAgent" Decode.string
 
             let identity =
                 { AuthorityKind = get.Required.Field "AuthorityKind" Decode.string

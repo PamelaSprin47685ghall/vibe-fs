@@ -205,7 +205,8 @@ module RelayNarrativeTransform =
         task {
             // A retirement with no active admitted loop prompt means this request
             // continues the retired run itself. Interrupt it before any network
-            // request. The callback opens only Continue; Accepted remains closed.
+            // request. The callback delegates stop -> continuation to the Manager
+            // owner; projection then empties the retired request context.
             // Once a later iteration and its gate are both present, projection
             // proceeds from the durable cut.
             match staleRetirement journal sessionId road with

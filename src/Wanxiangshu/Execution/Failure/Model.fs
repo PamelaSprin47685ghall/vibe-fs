@@ -57,7 +57,6 @@ type ProviderRecoveryFacts =
       ProviderRun: ProviderRunIdentity
       RequestKind: ProviderRequestKind
       RetryBudget: ProviderRecoveryBudget
-      FallbackBudget: ProviderRecoveryBudget
       Breaker: ProviderBreakerState }
 
 type ExecutionFailureInput =
@@ -106,7 +105,6 @@ type ExecutionFailureResolution =
     | PreserveCurrentFact
     | AwaitAcceptanceReconciliation of ChatExecutionKey
     | RetryFreshAttempt of ProviderRecoveryAuthorization
-    | AdvanceFallback of ProviderRecoveryAuthorization
     | TerminalizeAcceptedPreProvider of ChatExecutionKey * ChatExecutionTerminalDisposition
     | TerminalizeProviderStarted of ChatExecutionKey * ChatExecutionTerminalDisposition
 

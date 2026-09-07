@@ -28,7 +28,6 @@ const plainEvidence = (key = durableKey) => ({
     ownerAuthorityRoot: null,
     participantIdentity: {
       selectedAgent: 'coder',
-      peerAgent: 'coder',
       canonicalRole: 'coder',
       selectedTier: 'deep',
       persona: 'Coder',
@@ -37,7 +36,6 @@ const plainEvidence = (key = durableKey) => ({
     },
   },
   origin: 'HumanRoot',
-  effectiveAgent: 'coder',
 })
 
 const evidenceWire = (evidence) => ({
@@ -53,7 +51,6 @@ const evidenceWire = (evidence) => ({
     {
       InitialTier: 'deep',
       Origin: 'ResolvedAtRoot',
-      PeerAgent: evidence.identitySeed.participantIdentity.peerAgent,
       Persona: evidence.identitySeed.participantIdentity.persona,
       PersonaCatalogVersion: evidence.identitySeed.participantIdentity.personaCatalogVersion,
       Role: evidence.identitySeed.participantIdentity.canonicalRole,
@@ -62,7 +59,6 @@ const evidenceWire = (evidence) => ({
   ],
   PhysicalUserMessageId: tagged('PhysicalUserMessageId', evidence.physicalUserMessageId),
   Origin: ['AuthorityRoot', evidence.origin],
-  EffectiveAgent: evidence.effectiveAgent,
 })
 
 const acceptedWire = (evidence) =>
@@ -118,7 +114,7 @@ const otherKey = {
 }
 const exactMessage = { ...durableKey, explicitAgent: null }
 const conflictEvidence = { ...durableEvidence, logicalRunId: 'run-conflicting' }
-const invalidEvidence = { ...durableEvidence, effectiveAgent: ' ' }
+const invalidEvidence = { ...durableEvidence, logicalRunId: ' ' }
 
 const cases = [
   {
@@ -221,7 +217,20 @@ test('WHAT[CHATEXEC-004] fixed admission counterworlds distinguish every intent 
         `${row.label}: terminal disposition`,
       )
     } else {
-      assert.deepEqual(result.intent?.evidence, row.expected.evidence, `${row.label}: intent evidence`)
+      assert.equal(result.intent?.evidence.participant, 'coder', `${row.label}: intent participant`)
+      assert.equal(result.intent?.evidence.role, 'coder', `${row.label}: intent role`)
+      assert.equal('effectiveAgent' in result.intent?.evidence, false, `${row.label}: intent carries no EffectiveAgent`)
+      assert.deepEqual(
+        result.intent?.evidence.identitySeed.participantIdentity,
+        {
+          origin: 'ResolvedAtRoot',
+          participant: 'coder',
+          persona: 'Coder',
+          personaCatalogVersion: 1,
+          role: 'coder',
+        },
+        `${row.label}: intent identity`,
+      )
     }
   }
 

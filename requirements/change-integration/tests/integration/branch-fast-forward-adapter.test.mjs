@@ -53,7 +53,7 @@ test('WHAT[CHGINT-008] Adapter_ffMerge_clean_fast_forward_returns_exact_candidat
   const fx = fixture()
 
   try {
-    const result = await change.gitFfMerge(fx.gitAdapter, fx.candidate, 'main', fx.expectedHead)
+    const result = await change.gitFfMerge(fx.gitAdapter, fx.candidate, 'main', fx.expectedHead, fx.candidateHead)
 
     assert.deepEqual(result, { ok: true, value: fx.candidateHead })
     assert.equal(git(fx.repo, 'symbolic-ref', '--short', 'HEAD'), 'main')
@@ -68,7 +68,7 @@ test('WHAT[CHGINT-002] Adapter_ffMerge_dirty_target_fails_closed_without_advanci
 
   try {
     writeFileSync(join(fx.repo, 'shared.txt'), 'dirty\n')
-    const result = await change.gitFfMerge(fx.gitAdapter, fx.candidate, 'main', fx.expectedHead)
+    const result = await change.gitFfMerge(fx.gitAdapter, fx.candidate, 'main', fx.expectedHead, fx.candidateHead)
 
     assert.deepEqual(result, { ok: false, error: 'target worktree is dirty; refusing ff-only merge' })
     assert.equal(git(fx.repo, 'rev-parse', 'refs/heads/main'), fx.expectedHead)
@@ -83,7 +83,7 @@ test('WHAT[CHGINT-008] Adapter_ffMerge_moved_head_fails_closed_without_advancing
 
   try {
     const movedHead = commit(fx.repo, 'moved.txt', 'moved\n', 'move target')
-    const result = await change.gitFfMerge(fx.gitAdapter, fx.candidate, 'main', fx.expectedHead)
+    const result = await change.gitFfMerge(fx.gitAdapter, fx.candidate, 'main', fx.expectedHead, fx.candidateHead)
 
     assert.deepEqual(result, { ok: false, error: 'target ref moved' })
     assert.equal(git(fx.repo, 'rev-parse', 'refs/heads/main'), movedHead)

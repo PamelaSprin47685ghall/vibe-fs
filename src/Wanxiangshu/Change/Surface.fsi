@@ -37,11 +37,14 @@ module ChangeSurface =
 
     val gitIsDirty: git: obj -> path: string -> Task<bool>
 
+
+    val observeManagerLoopBurst: count: int -> Task<obj>
     val gitFreezeTargetBranch: git: obj -> Task<obj>
 
     val gitRebase: git: obj -> path: string -> targetRef: string -> Task<obj>
 
-    val gitFfMerge: git: obj -> path: string -> targetRef: string -> expectedHead: string -> Task<obj>
+    val gitFfMerge:
+        git: obj -> path: string -> targetRef: string -> expectedHead: string -> pinnedCandidate: string -> Task<obj>
 
     val gitConflictedFiles: git: obj -> path: string -> Task<obj>
 

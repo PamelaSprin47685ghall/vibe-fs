@@ -2,6 +2,7 @@ namespace Wanxiangshu.Execution.Session.ChatExecution
 
 open System
 open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -19,32 +20,27 @@ type AcceptedChatExecutionEvidence =
       AuthorityKind: PromptRootAuthorityKind
       IdentitySeed: PromptIdentitySeed
       PhysicalUserMessageId: PhysicalUserMessageId
-      Origin: PromptOrigin
-      EffectiveAgent: string }
+      Origin: PromptOrigin }
 
 [<RequireQualifiedAccess>]
 module AcceptedChatExecutionEvidence =
+
+    let participant (evidence: AcceptedChatExecutionEvidence) : string =
+        let identity = PromptIdentitySeed.participantIdentity evidence.IdentitySeed
+        ParticipantIdentity.selectedAgent identity
+
+    let canonicalRole (evidence: AcceptedChatExecutionEvidence) : Role =
+        let identity = PromptIdentitySeed.participantIdentity evidence.IdentitySeed
+
+        match ParticipantIdentity.role identity with
+        | Some role -> role
+        | None -> invalidOp "Attempt execution evidence requires a public participant role"
 
     let private validatePublicRole identity =
         if ParticipantIdentity.role identity |> Option.isSome then
             Ok()
         else
             Error "Attempt execution evidence requires a public participant role"
-
-    let private validateEffectiveAgentIsPresent effectiveAgent =
-        if String.IsNullOrWhiteSpace effectiveAgent then
-            Error "Attempt execution evidence effective agent cannot be blank"
-        else
-            Ok()
-
-    let private validateEffectiveAgentBelongsToIdentity effectiveAgent identity =
-        if
-            effectiveAgent = ParticipantIdentity.selectedAgent identity
-            || effectiveAgent = ParticipantIdentity.peerAgent identity
-        then
-            Ok()
-        else
-            Error "Attempt execution evidence effective agent is outside the authority agent pair"
 
     let private validateAuthorityIdentity
         (authorityKind: PromptRootAuthorityKind)
@@ -67,8 +63,6 @@ module AcceptedChatExecutionEvidence =
         let identity = PromptIdentitySeed.participantIdentity evidence.IdentitySeed
 
         validatePublicRole identity
-        |> Result.bind (fun () -> validateEffectiveAgentIsPresent evidence.EffectiveAgent)
-        |> Result.bind (fun () -> validateEffectiveAgentBelongsToIdentity evidence.EffectiveAgent identity)
         |> Result.bind (fun () -> validateAuthorityIdentity evidence.AuthorityKind evidence.IdentitySeed identity)
 
 type ProviderStartedEvidence =

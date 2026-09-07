@@ -14,7 +14,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Strength
@@ -456,17 +455,10 @@ module StrengthSpeculate =
         | StrengthRolloutMode.Off -> task { return () }
         | StrengthRolloutMode.Treatment -> applyTreatment surface
 
-    let private planEvidence
-        (scope: PluginRuntimeScope)
-        (owner: SessionId)
-        (target: ProviderRunIdentity)
-        (projections: ProjectionSet)
-        (authority: PromptAuthority.AuthorityExecutionProfile)
-        =
+    let private planEvidence (scope: PluginRuntimeScope) (owner: SessionId) (target: ProviderRunIdentity) =
         match scope.TryAttemptPlan owner target with
-        | Some plan ->
-            plan.Profile.RequestKind, plan.Profile.EffectiveAgent, AttemptPlanner.probeOf plan |> Option.isSome
-        | None -> ProviderRequestKind.WorkMain, FallbackEvidence.effectiveAgent owner projections authority, false
+        | Some plan -> plan.Profile.RequestKind, AttemptPlanner.probeOf plan |> Option.isSome
+        | None -> ProviderRequestKind.WorkMain, false
 
     let private buildOpportunity
         (scope: PluginRuntimeScope)
@@ -477,7 +469,6 @@ module StrengthSpeculate =
         (durable: AgentJournal)
         (rawMessages: obj list)
         (requestKind: ProviderRequestKind)
-        (effectiveAgent: string)
         (hasPrefixProbe: bool)
         (predictorAvailable: bool)
         : StrengthOpportunity =
@@ -505,8 +496,6 @@ module StrengthSpeculate =
           RequestKind = requestKind
           CanonicalRole = authority.CanonicalRole
           SelectedAgent = authority.SelectedAgent
-          EffectiveAgent = effectiveAgent
-          IsFallbackRetry = not (String.Equals(authority.SelectedAgent, effectiveAgent, StringComparison.Ordinal))
           HasPrefixProbe = hasPrefixProbe
           IsAttachedOrInternalLeaf = not isRootWork
           OwnerCancelled = false
@@ -530,8 +519,7 @@ module StrengthSpeculate =
         (rawMessages: obj list)
         (output: obj)
         : OpportunitySurface =
-        let requestKind, effectiveAgent, hasPrefixProbe =
-            planEvidence scope owner target projections authority
+        let requestKind, hasPrefixProbe = planEvidence scope owner target
 
         let replicaAgent = Some(Roles.roleLabel authority.CanonicalRole)
 
@@ -545,7 +533,6 @@ module StrengthSpeculate =
                 ports.Durable
                 rawMessages
                 requestKind
-                effectiveAgent
                 hasPrefixProbe
                 replicaAgent.IsSome
 

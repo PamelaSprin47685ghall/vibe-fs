@@ -5,7 +5,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as frames from '../../../dist/Context/Companion/Blogger/FrameSurface.js'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
-import * as crash from '../../../dist/Context/Companion/Blogger/BloggerCrashSurface.js'
 
 const entry = (overrides = {}) => ({
   epoch: 0,
@@ -26,7 +25,6 @@ const commit = (state, request) => {
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_missing_association', () => {
   assert.equal(frames.frameCount(frames.empty), 0)
-  assert.equal(crash.classifyOpenRequest(false, false, false), 'AbandonedUnsent')
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_empty_ok', () => {
@@ -45,12 +43,11 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_resolves_comm
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_missing_blob_fails_closed', () => {
   // A persisted frame has an opaque blob reference; an absent body is never
-  // replaced with fabricated text. The crash classifier remains fail-closed.
+  // replaced with fabricated text.
   const state = commit(frames.empty, entry({ frame: frames.frame({ kind: 'Entry', digest: 'missing', ref: 'gone' }) }))
   const [frame] = frames.frames(state)
   assert.equal(frame.ref, 'gone')
   assert.equal(frame.body, undefined)
-  assert.equal(crash.classifyOpenRequest(false, true, false), 'AbandonedUnsent')
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_digest_mismatch_fails_closed', () => {

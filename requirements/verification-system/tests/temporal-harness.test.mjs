@@ -55,22 +55,20 @@ const streamA = { kind: 'Session', session: SESSION_A }
 
 const rootAgentFact = () => fallbackFacts.authorityRoot({ session: SESSION_A })
 
-const advanceAgentFact = (run, previous, next, count) => ({
-  family: 'Fallback',
-  case: 'FallbackCursorAdvanced',
+const advanceAgentFact = (run, count) => ({
+  family: 'ProviderFailure',
+  case: 'FailureRecorded',
   payload: {
     SessionId: SESSION_A,
     LogicalRunId: 'run_L',
     AuthorityRootUserMessageId: 'msg_u1',
     ProviderRun: run,
-    PreviousOffset: previous,
-    NextOffset: next,
     ConsecutiveFailureCount: count,
     Reason: 'provider_error',
   },
 })
 
-const fallbackOf = (projection) => projection?.sessions?.[SESSION_A]?.fallback
+const providerFailureOf = (projection) => projection?.sessions?.[SESSION_A]?.providerFailures
 
 test('WHAT[VERIFICATION-SYSTEM-007] runTrace advances clock and appends durably', async () => {
   const world = await createDurableWorld({ directory: 'temporal-runtrace', runtime: 'rt_trace', pid: 4242 })
@@ -84,7 +82,7 @@ test('WHAT[VERIFICATION-SYSTEM-007] runTrace advances clock and appends durably'
   const events = [
     DurableTraceEvents.appendAgentFact(streamA, undefined, rootAgentFact()),
     DurableTraceEvents.advanceClock(30),
-    DurableTraceEvents.appendAgentFact(streamA, 'run_1', advanceAgentFact('run_1', 0, 1, 1)),
+    DurableTraceEvents.appendAgentFact(streamA, 'run_1', advanceAgentFact('run_1', 1)),
     DurableTraceEvents.advanceClock(20),
   ]
   await runTrace(world, events)
@@ -92,9 +90,9 @@ test('WHAT[VERIFICATION-SYSTEM-007] runTrace advances clock and appends durably'
   assert.equal(fired, 1, '50ms timer must fire after two advances totalling 50ms')
 
   const snapshot = temporal.journalSnapshot(world.journal)
-  const fallback = fallbackOf(snapshot)
-  assert.ok(fallback, 'fallback must exist after runTrace appends')
-  assert.equal(fallback.failures, 1)
+  const providerFailure = providerFailureOf(snapshot)
+  assert.ok(providerFailure, 'provider failure must exist after runTrace appends')
+  assert.equal(providerFailure.failures, 1)
   world.dispose()
 })
 

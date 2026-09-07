@@ -17,10 +17,8 @@ const rootSelection = (agent) => {
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: resolved.identity.name,
-      peerAgent: resolved.identity.peer,
-      canonicalRole: resolved.identity.role,
-      selectedTier: resolved.identity.initialTier.toLowerCase(),
+      participant: resolved.identity.name,
+      role: resolved.identity.role,
       persona: resolved.identity.persona,
       personaCatalogVersion: resolved.identity.catalogVersion,
       origin: resolved.identity.origin,
@@ -77,9 +75,8 @@ test('WHAT[PID-008] SyncDelegate identity inherits its exact owner Persona and v
 
   assert.deepEqual(
     {
-      selectedAgent: issued.value.participantIdentity.selectedAgent,
-      canonicalRole: issued.value.participantIdentity.canonicalRole,
-      selectedTier: issued.value.participantIdentity.selectedTier,
+      participant: issued.value.participantIdentity.participant,
+      role: issued.value.participantIdentity.role,
       persona: issued.value.participantIdentity.persona,
       personaCatalogVersion: issued.value.participantIdentity.personaCatalogVersion,
       ownerSession: issued.value.ownerSession,
@@ -87,9 +84,8 @@ test('WHAT[PID-008] SyncDelegate identity inherits its exact owner Persona and v
       ownerAuthorityRoot: issued.value.ownerAuthorityRoot,
     },
     {
-      selectedAgent: 'inspector',
-      canonicalRole: 'inspector',
-      selectedTier: 'deep',
+      participant: 'inspector',
+      role: 'inspector',
       persona: owner.participantIdentity.persona,
       personaCatalogVersion: owner.participantIdentity.personaCatalogVersion,
       ownerSession: owner.session,

@@ -24,3 +24,7 @@ type SessionRecoveryHost =
         sessionId: SessionId * eventOf: (ChatExecutionKey -> ChatExecutionRecoveryLifecycleEvent) -> Task
 
     member Drain: sessionId: SessionId -> Task
+
+    member ResumePreProvider: request: PreProviderResumeRequest -> Task
+
+    member Finalize: request: TerminalFinalizationRequest -> Task

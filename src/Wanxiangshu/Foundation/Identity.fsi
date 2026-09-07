@@ -186,12 +186,3 @@ module Identity =
     module CommitHash =
         val create: value: string -> CommitHash
         val value: hash: CommitHash -> string
-
-    type FallbackAttemptIdentity =
-        { SessionId: SessionId
-          LogicalRunId: LogicalRunId
-          AuthorityRootUserMessageId: AuthorityRootUserMessageId
-          ProviderRun: ProviderRunIdentity }
-
-    module FallbackAttemptIdentity =
-        val dedupeKey: identity: FallbackAttemptIdentity -> string

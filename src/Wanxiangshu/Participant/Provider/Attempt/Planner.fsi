@@ -11,11 +11,11 @@ type AttemptPlan =
 
 type PendingAttemptPlan =
     { Authority: PromptAuthority.AuthorityExecutionProfile
-      Cursor: AgentPairCursor.FallbackCursor
       PhysicalUserMessageId: PhysicalUserMessageId
       Origin: PromptAuthority.PromptOrigin
       RequestKind: ProviderRequestKind
       ProjectionChoice: XProjectionChoice
+      CommittedPrefixSnapshot: PrefixSnapshot option
       NoProbeReason: NoCandidateReason option }
 
 [<RequireQualifiedAccess>]
@@ -24,11 +24,11 @@ module AttemptPlanner =
 
     val freezePreInference:
         authority: PromptAuthority.AuthorityExecutionProfile ->
-        cursor: AgentPairCursor.FallbackCursor ->
         physicalUserMessageId: PhysicalUserMessageId ->
         origin: PromptAuthority.PromptOrigin ->
         requestKind: ProviderRequestKind ->
-        opportunity: RecoveryOpportunity ->
+        committedPrefixSnapshot: PrefixSnapshot option ->
+        allowProbe: bool ->
         selectProbe: (unit -> Result<PrefixProbe, NoCandidateReason>) ->
             PendingAttemptPlan
 
@@ -42,12 +42,11 @@ module AttemptPlanner =
 
     val plan:
         authority: PromptAuthority.AuthorityExecutionProfile ->
-        cursor: AgentPairCursor.FallbackCursor ->
         physicalUserMessageId: PhysicalUserMessageId ->
         providerRun: ProviderRunIdentity ->
         origin: PromptAuthority.PromptOrigin ->
         requestKind: ProviderRequestKind ->
-        opportunity: RecoveryOpportunity ->
+        allowProbe: bool ->
         selectProbe: (unit -> Result<PrefixProbe, NoCandidateReason>) ->
             AttemptPlan
 

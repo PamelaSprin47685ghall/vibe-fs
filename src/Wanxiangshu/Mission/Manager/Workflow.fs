@@ -2,12 +2,15 @@ namespace Wanxiangshu.Mission.Manager
 
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Relay.OpenCode
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
@@ -42,20 +45,27 @@ module ManagerWorkflow =
         |> Option.bind (fun durable -> currentView durable sessionId)
         |> Option.exists (fun road -> Set.contains (ProviderRunIdentity.value providerRun) road.RetiredProviderRunIds)
 
-    let private resourceForCurrentAction phase =
-        match phase with
-        | IncumbencyPhase.AuditPending -> assessPath
-        | IncumbencyPhase.WorkOwned -> workPath
-        | IncumbencyPhase.PerfectAwaitingRetirement
-        | IncumbencyPhase.RetirementCleanupBlocked -> finishPath
+    let private resourceForCurrentAction (road: RoadView) =
+        // Structured-workflow: auto assess/work/finish sequence is derived purely
+        // from concrete immutable facts (active incumbency, assessment receipt, exact certificate binding),
+        // never from an execution-position program counter or ActivePhase enum.
+        let isBoundCertificate (active: IncumbencyId) (cert: QualityCertificate) =
+            // A stale certificate from a previous incumbency, snapshot, or authority
+            // revision must not select finish; only the exact bound certificate does.
+            cert.Valid
+            && cert.IncumbencyId = active
+            && road.ActiveSnapshotId = Some cert.SnapshotId
+            && road.ActiveAuthorityRevision = Some cert.AuthorityRevision
 
-    let private selectedAction (road: RoadView) =
-        match road.ActiveIncumbency, road.ActivePhase with
-        | Some _, Some phase -> Some phase
-        | _ -> None
+        match road.ActiveIncumbency, road.AcceptedAssessmentTransport, road.Certificate with
+        | Some _, None, _ -> Some assessPath
+        | Some active, Some _, Some cert when isBoundCertificate active cert -> Some finishPath
+        | Some _, Some _, _ -> Some workPath
+        | None, _, _ -> None
+
 
     let private activeResourcePath (view: RoadView option) =
-        view |> Option.bind selectedAction |> Option.map resourceForCurrentAction
+        view |> Option.bind resourceForCurrentAction
 
     let private sendNudge
         (sessionPort: ISessionHostPort)
@@ -93,6 +103,229 @@ module ManagerWorkflow =
             | None -> return ()
         }
         :> Task
+
+    let private captureSnapshot (dirOpt: string option) =
+        match dirOpt |> Option.filter (System.String.IsNullOrWhiteSpace >> not) with
+        | Some dir -> WorkspaceSnapshot.capture dir
+        | None -> invalidOp "MANAGER-LOOP-001: workspace directory unavailable for snapshot capture"
+
+    let private commitOpeningTransaction
+        (durable: AgentJournal)
+        sessionId
+        providerRunIdOpt
+        roadId
+        (transaction: RelayTransaction)
+        =
+        task {
+            let fact =
+                AgentFact.Relay(
+                    RelayFactCases.TransactionCommitted
+                        {| RoadId = roadId
+                           Transaction = transaction |}
+                )
+
+            match! AgentJournal.appendAgent (StreamId.Session sessionId) providerRunIdOpt fact durable with
+            | Ok _ -> return ()
+            | Error failure ->
+                return
+                    invalidOp (
+                        sprintf "MANAGER-LOOP-002: opening commit failed: %s" (JournalAppendFailure.describe failure)
+                    )
+        }
+
+    let private decideOpeningAction journal (workspaceDirectory: string option) sessionIdTextOpt =
+        sessionIdTextOpt
+        |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
+        |> Option.bind (fun sessionIdText ->
+            journal
+            |> Option.bind (fun durable ->
+                let sessionId = SessionId.create sessionIdText
+                let snapshot = AgentJournal.snapshot durable
+                let roadId = RoadId.create sessionIdText
+
+                let roadView =
+                    AgentProjection.tryFind sessionId snapshot.AgentProjections
+                    |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
+                    |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
+
+                let profileOpt =
+                    PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
+
+                match roadView, profileOpt with
+                | None, Some profile when profile.CanonicalRole = Role.Manager ->
+                    let rootUserMsg =
+                        AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId
+
+                    let opening =
+                        IncumbencyOpening.initial
+                            sessionId
+                            (PhysicalUserMessageId.create rootUserMsg)
+                            (captureSnapshot workspaceDirectory)
+
+                    Some(durable, sessionId, opening.RoadId, opening.Transaction)
+                | _ -> None))
+
+    let ensureManagerRoadOpened
+        (journal: AgentJournal option)
+        (workspaceDirectory: string option)
+        (sessionIdTextOpt: string option)
+        (providerRunIdOpt: ProviderRunIdentity option)
+        : Task<unit> =
+        task {
+            match decideOpeningAction journal workspaceDirectory sessionIdTextOpt with
+            | None -> return ()
+            | Some(durable, sessionId, roadId, transaction) ->
+                do! commitOpeningTransaction durable sessionId providerRunIdOpt roadId transaction
+        }
+
+    let private deliverLoopPrompt
+        sessionPort
+        rootWorkspace
+        workspaceDirectory
+        (durable: AgentJournal)
+        sessionId
+        (retirement: RetirementSummary)
+        =
+        task {
+            let loopPromptText =
+                ProviderProse.documentFor sessionId "runtime/manager-assess" Map.empty
+
+            let terminalRun = ProviderRunIdentity.create retirement.ProjectionCut.ProviderRunId
+
+            match!
+                HostSessionNudge.trySendGateContinuation
+                    sessionPort
+                    rootWorkspace
+                    sessionId
+                    loopPromptText
+                    PromptAuthority.ContinuationKind.ManagerGuard
+                    workspaceDirectory
+                    (Some durable)
+                    (ManagerLoopGate.gateKind retirement.Id)
+                    terminalRun
+            with
+            | HostSessionNudge.GateContinuationOutcome.Sent _
+            | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted -> return ()
+            | HostSessionNudge.GateContinuationOutcome.Retired ->
+                return
+                    invalidOp (
+                        sprintf
+                            "MANAGER-LOOP-003: loop gate retired for retirement %s"
+                            (RetirementId.value retirement.Id)
+                    )
+            | HostSessionNudge.GateContinuationOutcome.Failed error ->
+                return invalidOp (sprintf "MANAGER-LOOP-003: loop gate nudge failed: %s" error)
+        }
+
+    let private requiresContinuation (road: RoadView) (retirement: RetirementSummary) =
+        match retirement.Outcome, road.Certificate with
+        | RetirementOutcome.Continue, _ -> true
+        | RetirementOutcome.Accepted certificateId, Some certificate ->
+            certificate.Id = certificateId && not certificate.Valid
+        | RetirementOutcome.Accepted _, None -> false
+
+    let private loopContextFor (durable: AgentJournal) sidText =
+        let sessionId = SessionId.create sidText
+        let roadId = RoadId.create sidText
+        let snapshot = AgentJournal.snapshot durable
+
+        let roadOpt =
+            AgentProjection.tryFind sessionId snapshot.AgentProjections
+            |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
+            |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
+
+        match roadOpt with
+        | Some road ->
+            road.LatestRetirement
+            |> Option.filter (requiresContinuation road)
+            |> Option.map (fun retirement ->
+                durable, sessionId, roadId, road.AuthorityRevision, retirement, road.ActiveIncumbency.IsNone)
+        | _ -> None
+
+    let private decideLoopContext journal sessionIdTextOpt =
+        match sessionIdTextOpt, journal with
+        | Some sidText, Some durable when not (System.String.IsNullOrWhiteSpace sidText) ->
+            loopContextFor durable sidText
+        | _ -> None
+
+    let private ensureLoopOpening
+        workspaceDirectory
+        durable
+        sessionId
+        roadId
+        authorityRevision
+        (retirement: RetirementSummary)
+        needsOpening
+        =
+        task {
+            match needsOpening with
+            | true ->
+                let snapshot = captureSnapshot workspaceDirectory
+                let opening = IncumbencyOpening.next roadId retirement.Id authorityRevision snapshot
+                do! commitOpeningTransaction durable sessionId None opening.RoadId opening.Transaction
+            | false -> return ()
+        }
+
+    let private deliverLoopContext
+        sessionPort
+        rootWorkspace
+        workspaceDirectory
+        (context: AgentJournal * SessionId * RoadId * AuthorityRevision * RetirementSummary * bool)
+        =
+        task {
+            let durable, sessionId, _, _, retirement, _ = context
+
+            match decideLoopContext (Some durable) (Some(SessionId.value sessionId)) with
+            | Some(_, _, currentRoadId, currentAuthority, currentRetirement, needsOpening) when
+                currentRetirement.Id = retirement.Id
+                ->
+                do!
+                    ensureLoopOpening
+                        workspaceDirectory
+                        durable
+                        sessionId
+                        currentRoadId
+                        currentAuthority
+                        currentRetirement
+                        needsOpening
+
+                do! deliverLoopPrompt sessionPort rootWorkspace workspaceDirectory durable sessionId currentRetirement
+            | _ -> return ()
+        }
+
+    let maybeDeliverLoop
+        sessionPort
+        rootWorkspace
+        (journal: AgentJournal option)
+        (workspaceDirectory: string option)
+        (sessionIdTextOpt: string option)
+        : Task<unit> =
+        task {
+            match decideLoopContext journal sessionIdTextOpt with
+            | Some context -> do! deliverLoopContext sessionPort rootWorkspace workspaceDirectory context
+            | None -> return ()
+        }
+
+    let continueAfterRetiredAttempt
+        sessionPort
+        rootWorkspace
+        (journal: AgentJournal option)
+        (workspaceDirectory: string option)
+        (stopRetiredAttempt: SessionId -> Task<unit>)
+        (sessionId: SessionId)
+        : Task<unit> =
+        task {
+            let loopContext = decideLoopContext journal (Some(SessionId.value sessionId))
+
+            do! stopRetiredAttempt sessionId
+
+            match
+                loopContext
+                |> Option.orElseWith (fun () -> decideLoopContext journal (Some(SessionId.value sessionId)))
+            with
+            | Some context -> do! deliverLoopContext sessionPort rootWorkspace workspaceDirectory context
+            | None -> return ()
+        }
 
     let observeIdle
         (sessionPort: ISessionHostPort)

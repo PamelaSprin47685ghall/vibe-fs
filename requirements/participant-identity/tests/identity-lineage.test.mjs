@@ -4,25 +4,26 @@ import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.j
 import * as persona from '../../../dist/Participant/Persona/Surface.js'
 
 const H = (value) => `H(${value})`
-const rootSelection = (agent) => {
+
+const canonicalIdentityOf = (agent) => {
   const resolved = persona.resolveParticipantIdentityAtRoot(agent)
   assert.equal(resolved.ok, true, resolved.ok ? '' : resolved.error)
   return {
-    kind: 'RootSelection',
-    ownerSession: null,
-    ownerLogicalRun: null,
-    ownerAuthorityRoot: null,
-    participantIdentity: {
-      selectedAgent: resolved.identity.name,
-      peerAgent: resolved.identity.peer,
-      canonicalRole: resolved.identity.role,
-      selectedTier: resolved.identity.initialTier.toLowerCase(),
-      persona: resolved.identity.persona,
-      personaCatalogVersion: resolved.identity.catalogVersion,
-      origin: resolved.identity.origin,
-    },
+    participant: resolved.identity.name,
+    role: resolved.identity.role,
+    persona: resolved.identity.persona,
+    personaCatalogVersion: resolved.identity.catalogVersion,
+    origin: resolved.identity.origin,
   }
 }
+
+const rootSelection = (agent) => ({
+  kind: 'RootSelection',
+  ownerSession: null,
+  ownerLogicalRun: null,
+  ownerAuthorityRoot: null,
+  participantIdentity: canonicalIdentityOf(agent),
+})
 
 const rootProfile = (
   session = 'ses_owner',
@@ -67,17 +68,15 @@ test('WHAT[PID-008] inherited identity records the exact durable owner witness',
   )
   assert.deepEqual(
     {
-      selectedAgent: seed.participantIdentity.selectedAgent,
-      canonicalRole: seed.participantIdentity.canonicalRole,
-      selectedTier: seed.participantIdentity.selectedTier,
+      participant: seed.participantIdentity.participant,
+      role: seed.participantIdentity.role,
       persona: seed.participantIdentity.persona,
       personaCatalogVersion: seed.participantIdentity.personaCatalogVersion,
       origin: seed.participantIdentity.origin,
     },
     {
-      selectedAgent: 'coder',
-      canonicalRole: 'coder',
-      selectedTier: 'deep',
+      participant: 'coder',
+      role: 'coder',
       persona: owner.participantIdentity.persona,
       personaCatalogVersion: owner.participantIdentity.personaCatalogVersion,
       origin: 'InheritedFromOwner',
@@ -178,4 +177,32 @@ test('WHAT[PID-008] durable inherited seed round-trips without re-resolution', (
     value: seed.participantIdentity,
     error: null,
   })
+})
+
+test('WHAT[PID-008] raw legacy PeerAgent fields are ignored and never re-encoded', () => {
+  const canonical = canonicalIdentityOf('inspector')
+  const legacySeed = {
+    kind: 'RootSelection',
+    ownerSession: null,
+    ownerLogicalRun: null,
+    ownerAuthorityRoot: null,
+    participantIdentity: { ...canonical, peerAgent: 'inspector', PeerAgent: 'inspector' },
+  }
+  const created = authority.createAuthorityRoot(
+    H,
+    'runtime-identity-lineage',
+    'ses_legacy_drop',
+    'HumanRoot',
+    'msg_legacy_drop',
+    legacySeed,
+  )
+  assert.equal(created.ok, true, created.ok ? '' : created.error)
+  assert.deepEqual(created.value.participantIdentity, {
+    participant: canonical.participant,
+    role: canonical.role,
+    persona: canonical.persona,
+    personaCatalogVersion: canonical.personaCatalogVersion,
+    origin: canonical.origin,
+  })
+  assert.equal(JSON.stringify(created.value).includes('eerAgent'), false)
 })

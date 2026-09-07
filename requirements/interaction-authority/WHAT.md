@@ -12,24 +12,24 @@
 
 `AuthorityRoot` 具有独占权限：
 1. 创建新的 Logical Run；
-2. 提交显式 managed-agent 选择，并绑定 `participant-identity` owner 为该 exact run 准备的版本化 `ParticipantIdentityEvidence`；
+2. 提交显式 participant 选择，并绑定 `participant-identity` owner 为该 exact run 准备的版本化 `ParticipantIdentityEvidence`；
 3. 成为新的 Fallback 根节点；
 4. 重置 Interaction Repair 预算；
 5. 成为后续 execution binding 的延续基准。
 
-`AuthorityRootAccepted { SessionId; LogicalRunId; AuthorityRootId; RootKind; ParticipantIdentityEvidence; initial execution selection }` 是 root acceptance 与 identity installation 的唯一 durable fact payload，必须以一次原子 append 接受或拒绝。Authority 不得先持久化 identity 再接受 root，也不得从 agent 名称推导或拥有 canonical SelectedAgent、Role、Persona 或 provenance/version；它只校验 evidence 的 exact key/owner witness 并保管 payload。append 成功后的同一 fold 原子建立新 active root、绑定 exact evidence、清空已关闭 prior run 的 claims/continuation 映射/序列号并重置 Fallback 游标；append 未提交则两者均不存在。
+`AuthorityRootAccepted { SessionId; LogicalRunId; AuthorityRootId; RootKind; ParticipantIdentityEvidence; initial per-physical target/lease }` 是 root acceptance 与 identity installation 的唯一 durable fact payload，必须以一次原子 append 接受或拒绝。Authority 不得先持久化 identity 再接受 root，也不得依据显式 agent 文本自行推导或拥有 participant、Role、Persona 或 provenance/version；它只校验 evidence 的 exact key/owner witness 并保管 payload。append 成功后的同一 fold 原子建立新 active root、绑定 exact evidence、清空已关闭 prior run 的 claims/continuation 映射/序列号；append 未提交则两者均不存在。
 
 ## INTERACTION-AUTHORITY-004: Continuation 禁区
 
-所有类型的 Continuation 仅用于延续已存在的 Logical Run，绝对禁止执行 Root 独占操作：不得新建 RunId、不得替换或字段级修改 `ParticipantIdentityEvidence`、不得更新底层 AuthorityProfile、不得重置 Fallback 或 repair 预算。Continuation 必须完整继承宿主 Run、Root 标识与 exact identity evidence；必要的 EffectiveAgent 变化只属于 execution binding。
+所有类型的 Continuation 仅用于延续已存在的 Logical Run，绝对禁止执行 Root 独占操作：不得新建 RunId、不得替换或字段级修改 `ParticipantIdentityEvidence`、不得更新底层 AuthorityProfile、不得重置 Fallback 或 repair 预算。Continuation 必须完整继承宿主 Run、Root 标识与 exact identity evidence；按 per-physical target/lease 规则的 execution binding 变化只改变物理目标与 lease，participant 保持不变。
 
 ## INTERACTION-AUTHORITY-005: 四类 provenance 与两种 Root
 
 系统严格区分四类来源形式：`AuthorityRoot`（包含 `HumanRoot` 与 `AgentOwnerRoot`）、`Continuation`、`HostInternal` 与 `UnknownOrigin`。该分类为闭集合；`AgentOwnerRoot` 必须携带 participant-identity owner 为 exact child/attached/InternalLeaf run 准备的 typed owner-derived identity evidence，且 OwnerLogicalRunId、LogicalRunId 与 root key 必须精确匹配。任何 Continuation 均不可被解析为 Root，反之亦然；缺失、wrong-owner 或 wrong-run evidence 一律归入 `UnknownOrigin`。
 
-## INTERACTION-AUTHORITY-006: HumanRoot 必须显式命名 managed agent
+## INTERACTION-AUTHORITY-006: HumanRoot 必须显式命名 participant
 
-`HumanRoot` 必须显式指定合法的 managed agent 本名。该名称只是交给 participant-identity owner 的 root identity 请求，不是 Authority 自行推导 Persona/Role 的依据。省略名称、使用 legacy 名称、连字符/大小写变形、格式错误或缺少 owner 返回的版本化 identity evidence 必须 fail-closed，禁止静默猜测或从 Session cache 补全。
+`HumanRoot` 必须显式指定合法 participant 本名。该名称只是交给 participant-identity owner 的 root identity 请求中的期望 participant，由 owner 校验并返回版本化 identity evidence，不是 Authority 自行推导 Persona/Role 的依据。省略名称、使用 legacy 名称、连字符/大小写变形、格式错误或缺少 owner 返回的版本化 identity evidence 必须 fail-closed，禁止静默猜测或从 Session cache 补全。
 
 ## INTERACTION-AUTHORITY-007: UnknownOrigin fail-closed
 
@@ -37,11 +37,11 @@
 
 ## INTERACTION-AUTHORITY-008: 来源解析优先级
 
-消息来源按固定优先级严格判定：已确认的 Host 消息 > 已 Claim 的 PromptKey > Host 内部 Compaction/Synthetic > 已注册的 AgentOwnerRoot > 外部证明合法的 HumanRoot > UnknownOrigin。优先级顺序本身构成安全边界，避免真实业务消息被内部机制降级或冒充。
+消息来源按固定优先级严格判定：已确认的 Host 消息 > 已 Claim 的 agent-free PromptKey > Host 内部 Compaction/Synthetic > 已注册的 AgentOwnerRoot > 外部证明合法的 HumanRoot > UnknownOrigin。优先级顺序本身构成安全边界，避免真实业务消息被内部机制降级或冒充。
 
 ## INTERACTION-AUTHORITY-009: 纯函数永不推断 HumanRoot
 
-来源判定中的纯计算函数绝不推断返回新的 `HumanRoot`。`HumanRoot` 只能在激活 Profile 缺席且携带合法显式 agent 时由 Ingress 边界授予；活跃 Run 中携带同一合法 agent 的外部用户消息只能成为绑定既有 Profile 的 `HumanMessage` continuation，缺失或漂移 agent 的未知消息必须拒绝，绝不可抬升为 Root。continuation 接纳后，Host 当前物理 user-message binding 必须推进到该消息，供 reconciler/provider-start 观察 exact 新 execution；既有 Authority Root identity 不变。
+来源判定中的纯计算函数绝不推断返回新的 `HumanRoot`。`HumanRoot` 只能在激活 Profile 缺席且携带合法显式 participant 时由 Ingress 边界授予；活跃 Run 中携带同一 participant 的外部用户消息只能成为绑定既有 Profile 的 `HumanMessage` continuation，缺失或漂移 participant 的未知消息必须拒绝，绝不可抬升为 Root。continuation 接纳后，Host 当前物理 user-message binding 必须推进到该消息，供 reconciler/provider-start 观察 exact 新物理目标；既有 Authority Root identity 不变。
 
 ## INTERACTION-AUTHORITY-010: 自动 repair 稳定 exact occasion identity
 
@@ -49,15 +49,15 @@
 
 ## INTERACTION-AUTHORITY-011: authority 是原子 profile 内的稳定子记录
 
-每次执行的 `AttemptExecutionProfile` 必须原子携带 exact SessionId、LogicalRunId、AuthorityRootId、当前 `ExecutionBinding` selection，以及 `AuthorityRootAccepted` 中 participant-identity owner 准备的完整版本化 `ParticipantIdentityEvidence`。Authority fold 向 Host/execution 消费者逐字段精确暴露 stable SelectedAgent、Role、稳定 Persona 与 provenance/version，但不拥有、重新解析或修改这些字段；当前 EffectiveAgent/provider/model/lease 只来自 execution binding。禁止从 Session cache、物理 parent、agent 名称或分散消息拼装 profile。
+每次执行的 `AttemptExecutionProfile` 必须原子携带 exact SessionId、LogicalRunId、AuthorityRootId、当前 per-physical target/lease，以及 `AuthorityRootAccepted` 中 participant-identity owner 准备的完整版本化 `ParticipantIdentityEvidence`。Authority fold 向 Host/execution 消费者逐字段精确暴露固定 participant、Role、稳定 Persona 与 provenance/version，但不拥有、重新解析或修改这些字段；当前 per-physical target/lease 只来自 execution binding。禁止从 Session cache、物理 parent、显式 agent 文本或分散消息拼装 profile。
 
 ## INTERACTION-AUTHORITY-012: degeneration-guard 是 continuation 而非 fallback 失败
 
-degeneration-guard 自恢复消息（`DegenerationGuard`）等属于强类型 Continuation。它们延续当前 LogicalRun，复用既有 Root 与 Profile，不得建立新 Root、不得重置 Fallback 游标、亦不得计入模型重试失败次数。`DegenerationGuard` 不得伪装成 `ProviderRetryAttempt`。
+degeneration-guard 自恢复消息（`DegenerationGuard`）等属于强类型 Continuation。它们延续当前 LogicalRun，复用既有 Root 与 Profile，不得建立新 Root、不得改变 per-physical target/lease、亦不得计入模型重试失败次数。`DegenerationGuard` 不得伪装成 `ProviderRetryAttempt`。
 
 ## INTERACTION-AUTHORITY-013: 显式 continuation 绑定保持 authority continuity
 
-同一 LogicalRun 下的强类型 continuation 推进属于权限连续演进：仅 execution binding 的 EffectiveAgent 可按规则变化；Root、identity evidence、Profile 关联与游标位置全部保持不变。SessionId 相同但 LogicalRun 不同不构成 continuity。
+同一 LogicalRun 下的强类型 continuation 推进属于权限连续演进：仅 execution binding 的 per-physical target/lease 可按规则变化；participant、Root、identity evidence 与 Profile 关联全部保持不变。SessionId 相同但 LogicalRun 不同不构成 continuity。新物理目标的路由绝不改变 participant。
 
 ## INTERACTION-AUTHORITY-014: Nudge 与 JoinGuard 是 Continuation
 
@@ -87,4 +87,4 @@ Authority 的 durable terminal interpreter 校验 source witness 与 accepted ro
 
 ## INTERACTION-AUTHORITY-020: repair fatal绑定exact claim settlement与注入fuse
 
-只有typed repair invariant incident可以请求fatal；当前PromptKey claim、Submitted/PhysicalAccepted与fresh terminal判定必须先形成exact settlement evidence。InteractionRepair不得直接引用fatal physical adapter、optional/default/global fallback；composition注入mandatory capability。同一incident只允许一次report与kill，普通exhaustion或可恢复send failure不得升级为fatal。
+只有typed repair invariant incident可以请求fatal；当前 agent-free PromptKey claim、Submitted/PhysicalAccepted与fresh terminal判定必须先形成exact settlement evidence。InteractionRepair不得直接引用fatal physical adapter、optional/default/global fallback；composition注入mandatory capability。同一incident只允许一次report与kill，普通exhaustion或可恢复send failure不得升级为fatal。

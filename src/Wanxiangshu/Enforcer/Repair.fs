@@ -100,7 +100,7 @@ module EnforcerRepair =
     /// tool `status=error` + `metadata.interrupted=true`
     /// (`../opencode/packages/opencode/src/session/processor.ts:589`). That is the
     /// owner turn being killed, not the Blogger producing a bad cycle, so LOOP-006
-    /// forbids it from spending the primary A/A/B/B budget.
+    /// forbids it from spending the provider failure budget.
     let hasAbortedBlogAttempt (rawMessages: obj list) : bool =
         match EnforcerCycleDecode.lastAssistantStep rawMessages with
         | None -> false

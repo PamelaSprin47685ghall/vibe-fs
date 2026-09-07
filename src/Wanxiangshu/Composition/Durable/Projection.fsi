@@ -29,7 +29,7 @@ type SessionAgentProjection =
       Blog: BlogProjectionState option
       PrefixEpoch: ActivePrefixEpoch option
       Handles: AgentLinkageProjection option
-      Fallback: FallbackProjection option
+      ProviderFailures: ProviderFailureProjection option
       PromptAuthority: PromptAuthority.PromptAuthorityProjection option
       Enforcement: EnforcementProjectionState option
       BloggerCycles: BloggerCycleProjectionState option

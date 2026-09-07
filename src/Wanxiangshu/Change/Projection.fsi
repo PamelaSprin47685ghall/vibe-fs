@@ -35,8 +35,12 @@ type ManagerJobProjection =
              TargetHeadSnapshot: CommitHash
              WorkspaceSnapshotId: WorkspaceSnapshotId |} option
       PublishClaimed:
-          {| RebasedCommit: CommitHash
-             ExpectedHead: CommitHash |} option
+          {| TargetRef: TargetRef
+             RebasedCommit: CommitHash
+             ExpectedHead: CommitHash
+             WorkspaceSnapshotId: WorkspaceSnapshotId
+             QualityCertificateId: QualityCertificateId
+             AuthorityRevision: AuthorityRevision |} option
       Terminal: TerminalOutcome option }
 
 [<RequireQualifiedAccess>]
@@ -151,8 +155,12 @@ module OrchestratorProjection =
 
     val recordPublishClaimed:
         ManagerJobId ->
-        {| RebasedCommit: CommitHash
-           ExpectedHead: CommitHash |} ->
+        {| TargetRef: TargetRef
+           RebasedCommit: CommitHash
+           ExpectedHead: CommitHash
+           WorkspaceSnapshotId: WorkspaceSnapshotId
+           QualityCertificateId: QualityCertificateId
+           AuthorityRevision: AuthorityRevision |} ->
         OrchestratorProjection ->
             OrchestratorProjection
 

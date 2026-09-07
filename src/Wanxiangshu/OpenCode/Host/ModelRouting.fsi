@@ -29,7 +29,11 @@ module ModelRouting =
         new: scheduler: obj -> ModelRoutingRuntime
 
         member AcquireExecutionAdmission:
-            sessionId: string * physicalUserMessageId: string * effectiveAgent: string ->
+            sessionId: string *
+            physicalUserMessageId: string *
+            role: Role *
+            participant: string *
+            lenderSessionId: string option ->
                 Task<ExecutionAdmissionAcquisition>
 
         member ExecutionAdmissionTarget:
@@ -44,8 +48,17 @@ module ModelRouting =
         member ExecutionAdmissionLifecycle:
             lease: ExecutionAdmissionLease -> Result<string, ExecutionAdmissionRejection>
 
-        member TryReserveManaged: sessionId: string * agent: string -> ModelRoutingTarget option
-        member TryLease: sessionId: string * physicalUserMessageId: string * agent: string -> ModelRoutingTarget option
+        member TryReserveManaged:
+            sessionId: string * role: Role * lenderSessionId: string option -> ModelRoutingTarget option
+
+        member TryLease:
+            sessionId: string *
+            physicalUserMessageId: string *
+            role: Role *
+            participant: string *
+            lenderSessionId: string option ->
+                ModelRoutingTarget option
+
         member internal ReleaseExecution: sessionId: string -> CapacityTransitionOutcome
 
         member internal ReleasePhysicalExecution:
@@ -53,9 +66,6 @@ module ModelRouting =
 
         member CancelPendingExecution: sessionId: string -> CapacityTransitionOutcome
         member CapacitySnapshot: unit -> CapacityInvariantEvidence
-        member BindCapacityChild: parentSessionId: string * childSessionId: string -> unit
-        member BindCapacityCompanion: ownerSessionId: string * bloggerSessionId: string -> unit
-        member DropCapacityLineage: sessionId: string -> unit
 
         member EnterProviderStep:
             sessionId: string * physicalUserMessageId: string * visibleProviderRuns: Set<string> -> Task
@@ -70,7 +80,6 @@ module ModelRouting =
 
     val initialize: unit -> Task
 
-    val internal lastPhysicalTarget: sessionId: string -> ModelRoutingTarget option
     val internal takeProviderRunTarget: providerRun: ProviderRunIdentity -> ModelRoutingTarget option
     val internal markProviderFailed: provider: string -> unit
     val internal hasTheoreticalCapacity: role: string -> bool
@@ -78,7 +87,9 @@ module ModelRouting =
     val internal acquireExecutionAdmission:
         sessionId: SessionId ->
         physicalUserMessageId: PhysicalUserMessageId ->
-        effectiveAgent: string ->
+        role: Role ->
+        participant: string ->
+        lenderSessionId: string option ->
             Task<ExecutionAdmissionAcquisition>
 
     val internal executionAdmissionTarget:
@@ -91,12 +102,16 @@ module ModelRouting =
         lease: ExecutionAdmissionLease -> observed: ExecutionAdmissionExactIdentity -> CapacityTransitionOutcome
 
     val hasRuntime: unit -> bool
-    val tryReserveManaged: sessionId: SessionId -> agent: string -> ModelRoutingTarget option
+
+    val tryReserveManaged:
+        sessionId: SessionId -> role: Role -> lenderSessionId: string option -> ModelRoutingTarget option
 
     val tryLease:
         sessionId: SessionId ->
         physicalUserMessageId: PhysicalUserMessageId ->
-        agent: string ->
+        role: Role ->
+        participant: string ->
+        lenderSessionId: string option ->
             ModelRoutingTarget option
 
     val internal releaseExecution: sessionId: SessionId -> CapacityTransitionOutcome
@@ -107,9 +122,6 @@ module ModelRouting =
     val internal observePhysicalResource: key: ChatExecutionKey -> PhysicalResourceObservation
     val internal cancelUnacquiredExecution: sessionId: SessionId -> CapacityTransitionOutcome
     val internal capacitySnapshot: unit -> CapacityInvariantEvidence
-    val bindCapacityChild: parentSessionId: SessionId -> childSessionId: SessionId -> unit
-    val bindCapacityCompanion: ownerSessionId: SessionId -> bloggerSessionId: SessionId -> unit
-    val dropCapacityLineage: sessionId: SessionId -> unit
 
     val enterProviderStep:
         sessionId: SessionId ->

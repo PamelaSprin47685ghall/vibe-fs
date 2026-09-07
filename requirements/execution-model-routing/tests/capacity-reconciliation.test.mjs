@@ -4,10 +4,11 @@ import test from 'node:test'
 import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 
 const target = { model: 'provider/shared', reasoning: 'none' }
-const identity = (sessionId, physicalUserMessageId, effectiveAgent = 'coder') => ({
+const identity = (sessionId, physicalUserMessageId, role = 'coder', participant = `${sessionId}-owner`) => ({
   sessionId,
   physicalUserMessageId,
-  effectiveAgent,
+  role,
+  participant,
   target,
 })
 
@@ -16,7 +17,9 @@ const acquire = async (runtime, exact) => {
     runtime,
     exact.sessionId,
     exact.physicalUserMessageId,
-    exact.effectiveAgent,
+    exact.role,
+    exact.participant,
+    null,
   )
   assert.equal(outcome.kind, 'Acquired')
   return outcome.lease
@@ -24,13 +27,12 @@ const acquire = async (runtime, exact) => {
 
 const exactKey = ({ sessionId, physicalUserMessageId }) => `${sessionId}\u001f${physicalUserMessageId}`
 
-test('WHAT[EMR-014] valid immutable snapshot is a reconciliation no-op with traceable tokens, waiters, and lineage', async () => {
+test('WHAT[EMR-014] valid immutable snapshot is a reconciliation no-op with traceable tokens and waiters', async () => {
   const runtime = routing.createRuntime((_role, running) => (running.length === 0 ? target : null))
   const holder = identity('holder', 'physical-holder')
   const holderLease = await acquire(runtime, holder)
   assert.deepEqual(routing.commitExecutionAdmission(runtime, holderLease, holder), { kind: 'Applied' })
-  routing.bindCapacityChild(runtime, 'holder', 'lineage-child')
-  const queued = await routing.beginExecutionAdmission(runtime, 'waiting', 'physical-waiting', 'coder')
+  const queued = await routing.beginExecutionAdmission(runtime, 'waiting', 'physical-waiting', 'manager', 'waiting-owner', null)
   assert.equal(queued.kind, 'Queued')
 
   const snapshot = routing.capacitySnapshot(runtime)
@@ -46,7 +48,7 @@ test('WHAT[EMR-014] valid immutable snapshot is a reconciliation no-op with trac
   for (const token of snapshot.tokens) assert.ok(executionKeys.has(exactKey(token.owner)), 'token owner is exact and traceable')
   for (const waiter of snapshot.waiters)
     assert.ok(snapshot.owners.some((owner) => exactKey(owner) === exactKey(waiter)), 'waiter owner is traceable')
-  assert.deepEqual(snapshot.lineage, [{ childSessionId: 'lineage-child', parentSessionId: 'holder' }])
+  assert.deepEqual(snapshot.lineage, [], 'explicit lender borrowing leaves no ambient lineage edge')
   assert.deepEqual(routing.reconcileCapacityEvidence(snapshot), { kind: 'NoOp' })
   assert.deepEqual(routing.capacitySnapshot(runtime), snapshot, 'reconciliation is read-only')
 

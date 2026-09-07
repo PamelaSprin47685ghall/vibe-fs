@@ -15,15 +15,15 @@
 ## CRASH-004: 恢复复用普通 workflow 入口，不发明程序计数器
 
 恢复过程遵循 `Journal facts → Fold → 纯恢复决策 → 普通 workflow 合法入口`。严禁恢复 Program 节点、continuation 或执行步数，严禁引入 `RecoveryStage` 等第二状态机。
-
+所有工具与执行中断均由 CRASH-017 / CRASH-018 约束：工具不设隐式崩溃恢复 owner，严禁在新进程启动时自动重放、补写完成态或隐式修复；用户显式 `/continue` 是唯一的会话续传入口。
 ## CRASH-005: ambiguous / multiple / missing 证据 fail closed
 
 恢复证据不足、冲突或缺失时，系统必须显式停留在 `Waiting`、`Blocked` 或 `RecoveryIncomplete` 分支，严禁猜测继续。
-
+Waiting 分支仅代表瞬态等待（例如等待新 turn 或观察稳定），任何消费端在处于 Waiting 状态时严禁执行 Ready 分支的副作用操作（不得发送请求、不得发布完成态、不得虚假声明就绪），只读观察必须与 effectful observe 严格分离。
 ## CRASH-006: 没有 fresh evidence 就没有自动 effect
 
 恢复闭合后，所有副作用操作必须持有有效证明：持有 `FamilyRecoveryPermit` 才能执行 join；持有保持 fresh 的 `QuiescencePermit` 才能发送 idle-derived continuation。quiescence 是物理条件的合取：当前 provider attempt 已被 Host 观测为 idle，且该 SessionId 没有仍在执行的 tool body；Host 的 `SessionIdle` 若先于 tool completion 到达，只能建立待静止证据，permit 在最后一个 active tool 结束前不可消费。新的物理用户输入到达时立即幂等撤销旧的静止许可。permit 在物理发送边界被消费；若 Host 明确证明 acceptance 前拒绝、且同一 attempt serial 仍未被更新材料取代，则允许把该 exact permit 从 `IdleConsumed` 原子归还为 `Idle`，使仍未满足的 gate 可重试。任何更新的 provider attempt、物理用户材料或 acceptance-unknown 都使归还失败。
-
+当前进程 join/admission 凭据仅证明本进程内的准入合法性，跨进程恢复证明已由 CRASH-017/018 显式续传取代；持有 `FamilyRecoveryPermit` 才能执行 join（保留 exact membership 闭包检查）。
 ## CRASH-007: TurnUnknown 是 reconciliation 私有观测
 
 `TurnUnknown` 仅为 reconciliation 内部观测，严禁作为正式的 `TurnOutcome` 对外发布。
@@ -43,7 +43,7 @@ Child 终态仅包含 `Succeeded | Failed | Abandoned`，不存在 Aborted 终�
 ## CRASH-011: 线性序 permit → join，每 join 重新验证
 
 每次执行 join 之前必须重新验证 `FamilyRecoveryPermit`。Permit 携带恢复闭包的成员集合；若已恢复成员丢失则拒绝执行，恢复后新增成员允许单调准入。
-
+跨进程与当前进程 join 的证据接口必须在类型和语义上与真正核对结果一致，禁止伪造全量家族恢复完成凭证。
 ## CRASH-012: completion 单一 owner
 
 HandleController 的 `recordCompletion` 是提交完成态的唯一入口，采用 blob 先于事实的原则，拒绝重复 claim，并通过 retire 墓碑保证重启后完成态不重复投递。
@@ -60,9 +60,9 @@ HandleController 的 `recordCompletion` 是提交完成态的唯一入口，采�
 
 重启后附加子会话恢复时：匹配唯一关联 ID、agent 与 title 时复用；关联不存在时新建；发生冲突或多重匹配时 fail-closed 阻断。Replacement 必须先证明旧物理会话消失，显式执行 Close 后再 Link 新会话。
 
-## CRASH-016: Blogger 崩溃窗口按 durable + snapshot 分类
+## CRASH-016: Blogger 修复只属于当前进程的 live owner
 
-对未完成的 Blogger 请求窗口，严格基于 durable 事件与 Host 快照（最新 assistant 的唯一 completed chronicle）分类为 unsent、in-flight 或 tool-present，快照不可读时阻断。
+Blogger 的 nudge/AABB 修复 episode、等待者与 flight lease 均为当前进程的物理所有权。进程死亡后这些能力消失；durable dispatch/terminal facts 仅供核对与诊断，严禁从其重建修复阶段或自动续发。新进程只能按 CRASH-017/018 的显式续传规则重新准入。
 
 ## CRASH-017: 工具中断不恢复；未来 session 续传必须显式
 

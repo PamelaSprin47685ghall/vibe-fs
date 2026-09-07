@@ -35,18 +35,21 @@ after(async () => {
 })
 
 const model = { providerID: 'openai', modelID: 'gpt-5' }
-const modelFromLease = async (sessionId, physicalUserMessageId, agent) => {
+const modelFromLease = async (sessionId, physicalUserMessageId, role, participant, lenderSessionId) => {
   const outcome = await routing.acquireSharedExecutionAdmission(
     sessionId,
     physicalUserMessageId,
-    agent,
+    role,
+    participant,
+    lenderSessionId,
   )
   assert.equal(outcome.kind, 'Acquired')
   const target = routing.sharedExecutionAdmissionTarget(outcome.lease)
   const settlement = routing.commitSharedExecutionAdmission(outcome.lease, {
     sessionId,
     physicalUserMessageId,
-    effectiveAgent: agent,
+    role,
+    participant,
     target,
   })
   assert.ok(['Applied', 'AlreadyApplied'].includes(settlement.kind))
@@ -65,7 +68,7 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_user_facing_agent_is_not_session_authorit
 
 test('WHAT[HOST-BOUNDARY-006] HOST-006_accept_prompt_execution_binds_physical_prompt_and_provider_model', async () => {
   binding.drop('ses_binding_2')
-  const leasedModel = await modelFromLease('ses_binding_2', 'physical-1', 'coder')
+  const leasedModel = await modelFromLease('ses_binding_2', 'physical-1', 'coder', 'coder', undefined)
   binding.acceptPromptExecution('ses_binding_2', 'prompt-1', 'physical-1', 'coder', leasedModel)
   const began = binding.beginProviderAttempt('ses_binding_2', 'physical-1', 'prompt-1')
   assert.equal(began.ok, true)
@@ -74,10 +77,10 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_accept_prompt_execution_binds_physical_pr
   assert.equal(allowed.value, true)
 })
 
-test('WHAT[HOST-BOUNDARY-006] HOST-006_external_acceptance_immediately_binds_effective_agent', async () => {
+test('WHAT[HOST-BOUNDARY-006] HOST-006_external_acceptance_immediately_binds_participant', async () => {
   const session = 'ses_binding_external_acceptance'
   binding.drop(session)
-  const leasedModel = await modelFromLease(session, 'physical-external', 'coder')
+  const leasedModel = await modelFromLease(session, 'physical-external', 'coder', 'coder', undefined)
 
   binding.acceptExternalExecution(session, 'physical-external', 'coder', leasedModel)
 
@@ -100,8 +103,8 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_stale_physical_terminal_cannot_strip_the_
   const session = 'ses_binding_stale_terminal'
   binding.drop(session)
 
-  await modelFromLease(session, 'physical-old', 'coder')
-  const currentModel = await modelFromLease(session, 'physical-current', 'coder')
+  await modelFromLease(session, 'physical-old', 'coder', 'coder', undefined)
+  const currentModel = await modelFromLease(session, 'physical-current', 'coder', 'coder', undefined)
 
   routing.releasePhysical(session, 'physical-old')
   binding.acceptPromptExecution(session, 'prompt-current', 'physical-current', 'coder', currentModel)

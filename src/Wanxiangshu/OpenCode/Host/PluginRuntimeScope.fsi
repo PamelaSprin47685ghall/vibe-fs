@@ -84,16 +84,15 @@ type PluginRuntimeScope =
     member LoopSensor: LoopSensor
 
     /// Current-process join admission only; no cross-process tool recovery.
-    member RequireFamilyRecovery: root: SessionId -> Task<FamilyRecovery>
+    member RequireCurrentProcessJoin: root: SessionId -> Task<FamilyRecovery>
 
-    /// Await family recovery before business effects. Returns FamilyRecovery so
-    /// callers must match FamilyBlocked (P0-RECOVERY-JOIN-001: no collapse to unit).
-    member EnsureRecoveryDone: root: SessionId -> Task<FamilyRecovery>
+    member PublishManualChatIntervention: request: ManualInterventionRequest -> unit
 
-    member ArmRecovery: sessionId: SessionId * physicalUserMessageId: PhysicalUserMessageId -> unit
+    /// Exact manual intervention observations held process-locally.
+    member ManualChatInterventions: unit -> ManualInterventionRequest[]
 
-    member TryTakeRecoveryPermit:
-        sessionId: SessionId * physicalUserMessageId: PhysicalUserMessageId -> SlotArming option
+    /// Revokes the exact manual intervention entry for a terminally settled key.
+    member RevokeManualIntervention: key: ChatExecutionKey -> unit
 
     member RecordPendingAttemptPlan:
         sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> plan: PendingAttemptPlan -> unit
@@ -156,8 +155,6 @@ type PluginRuntimeScope =
     member CancelSessionChildren: sessionId: string -> Task
 
     member DisposeSession: sessionId: string -> Task
-
-    member DisposeSessionPreservingIdentity: sessionId: string -> Task
 
     member DropSessionIdentity: sessionId: string -> unit
 

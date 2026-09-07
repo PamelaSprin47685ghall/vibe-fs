@@ -2,7 +2,7 @@
 //
 // PAR-012: Host abort / cleanup 残留不计入推进。Host 因 abort 清理把在途工具调用
 // 标记为失败(status=error 且 metadata.interrupted=true)不是已确认的 provider
-// attempt 失败:不得推进任何 cursor,也不得消耗自动恢复预算。判据只看 Host 标记
+// attempt 失败:不得推进失败预算,也不得消耗自动恢复预算。判据只看 Host 标记
 // (Session/EnforcerRepair.fs 的 interrupted 判定),不看错误散文。status=error 且
 // 无 interrupted(工具本身失败)才推进。
 //

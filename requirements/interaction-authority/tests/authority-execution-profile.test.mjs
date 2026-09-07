@@ -13,10 +13,18 @@ const rootSelection = (participantIdentity) => ({
 })
 
 const coderIdentity = {
-  selectedAgent: 'coder',
-  peerAgent: 'coder',
-  canonicalRole: 'coder',
+  participant: 'coder',
+  role: 'coder',
   selectedTier: 'deep',
+  persona: 'Coder',
+  personaCatalogVersion: 1,
+  origin: 'ResolvedAtRoot',
+}
+
+// Fixed authority view: selectedTier is input-only compat and never re-emitted.
+const coderIdentityView = {
+  participant: 'coder',
+  role: 'coder',
   persona: 'Coder',
   personaCatalogVersion: 1,
   origin: 'ResolvedAtRoot',
@@ -54,8 +62,10 @@ test('WHAT[INTERACTION-AUTHORITY-003] valid authority profiles carry one atomic 
       authorityKind: 'HumanRoot',
     },
   )
-  assert.deepEqual(profile.identitySeed, rootSelection(coderIdentity))
+  assert.equal(profile.identitySeed.kind, 'RootSelection')
+  assert.deepEqual(profile.identitySeed.participantIdentity, coderIdentityView)
   assert.deepEqual(profile.participantIdentity, identityOf(profile))
+  assert.deepEqual(profile.participantIdentity, coderIdentityView)
   for (const field of Object.keys(profile.participantIdentity)) {
     assert.equal(Object.hasOwn(profile, field), false, `${field} was duplicated outside participantIdentity`)
   }
@@ -64,8 +74,8 @@ test('WHAT[INTERACTION-AUTHORITY-003] valid authority profiles carry one atomic 
 test('WHAT[INTERACTION-AUTHORITY-003] rejects hand-built mismatched profile', () => {
   const valid = createRoot()
   const mismatches = {
-    selectedAgent: 'reviewer',
-    canonicalRole: 'reviewer',
+    participant: 'reviewer',
+    role: 'reviewer',
     persona: 'Auditor',
   }
 
@@ -92,9 +102,8 @@ test('WHAT[INTERACTION-AUTHORITY-003] Bookkeeper cannot enter a public authority
     'HumanRoot',
     'msg-profile',
     rootSelection({
-      selectedAgent: 'bookkeeper',
-      peerAgent: 'bookkeeper',
-      canonicalRole: 'bookkeeper',
+      participant: 'bookkeeper',
+      role: 'bookkeeper',
       selectedTier: 'deep',
       persona: 'Curator',
       personaCatalogVersion: 1,

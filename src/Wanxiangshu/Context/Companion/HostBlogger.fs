@@ -53,7 +53,7 @@ open Wanxiangshu.Resources
 
 module internal CompanionHostBlogger =
 
-    /// DSL-class: PhysicalHandle — Host dispatch handles only: `Sessions`/`Durable` own the Host session and durable ports, `PrimaryId`/`EffectiveAgent` are physical dispatch coordinates, `EnsureBlogger` owns the child session creation task, `Gate` is the process-local lock object, `Companion` is the process-local runtime cell, `Journal` owns the durable journal writer; owner context-compression, law CONTEXT-COMPRESSION-024, proof blogger-runtime.
+    /// DSL-class: PhysicalHandle — Host dispatch handles only: `Sessions`/`Durable` own the Host session and durable ports, `PrimaryId`/`Participant` are physical dispatch coordinates, `EnsureBlogger` owns the child session creation task, `Gate` is the process-local lock object, `Companion` is the process-local runtime cell, `Journal` owns the durable journal writer; owner context-compression, law CONTEXT-COMPRESSION-024, proof blogger-runtime.
     type BloggerDeps =
         { Sessions: ISessionHostPort
           PrimaryId: SessionId
@@ -62,7 +62,7 @@ module internal CompanionHostBlogger =
           Gate: obj
           Companion: Companion
           Journal: AgentJournal option
-          EffectiveAgent: string }
+          Participant: string }
 
     /// CTX-012: covered frame count = ceil(m / 2).
     let coveredFrameCount (frameCount: int) : int =
@@ -122,9 +122,7 @@ module internal CompanionHostBlogger =
         (dispatcher: PromptDispatcher.Runtime)
         : Task<Result<PromptKey, string>> =
         task {
-            match
-                HostForkRunLifecycle.issueCurrentOwnerIdentitySeed (Some journal) deps.PrimaryId deps.EffectiveAgent
-            with
+            match HostForkRunLifecycle.issueCurrentOwnerIdentitySeed (Some journal) deps.PrimaryId deps.Participant with
             | Error error -> return Error error
             | Ok identitySeed ->
                 // PROMPT-007 Detached: Blogger dispatch does not wait for PhysicalAccepted.
@@ -155,7 +153,6 @@ module internal CompanionHostBlogger =
                 prompt
                 PromptAuthority.ContinuationKind.ManagedDelegationAssignment
                 profile
-                profile.SelectedAgent
                 None
                 PromptDispatcher.AwaitMode.Detached
                 None

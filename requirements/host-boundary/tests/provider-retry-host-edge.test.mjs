@@ -6,19 +6,22 @@ import * as signals from '../../../dist/OpenCode/Host/HostSignalSurface.js'
 
 const target = { model: 'provider/retry-stable', reasoning: 'none' }
 
-const admit = async (runtime, sessionId, physicalUserMessageId, agent) => {
+const admit = async (runtime, sessionId, physicalUserMessageId, role, participant, lenderSessionId) => {
   const acquisition = await routing.acquireExecutionAdmission(
     runtime,
     sessionId,
     physicalUserMessageId,
-    agent,
+    role,
+    participant,
+    lenderSessionId,
   )
   assert.equal(acquisition.kind, 'Acquired')
   const projected = routing.executionAdmissionTarget(runtime, acquisition.lease)
   const settlement = routing.commitExecutionAdmission(runtime, acquisition.lease, {
     sessionId,
     physicalUserMessageId,
-    effectiveAgent: agent,
+    role,
+    participant,
     target: projected,
   })
   assert.ok(['Applied', 'AlreadyApplied'].includes(settlement.kind))
@@ -28,9 +31,10 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_failed_provider_step_keeps_same_physical_
   const runtime = routing.createRuntime(() => target)
   const sessionId = 'session-retry'
   const physicalUserMessageId = 'msg-retry'
-  const agent = 'coder'
+  const role = 'coder'
+  const participant = 'coder'
 
-  await admit(runtime, sessionId, physicalUserMessageId, agent)
+  await admit(runtime, sessionId, physicalUserMessageId, role, participant, undefined)
   await routing.enterProviderStep(runtime, sessionId, physicalUserMessageId, [])
 
   const failedAssistant = {
@@ -62,7 +66,7 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_failed_provider_step_keeps_same_physical_
   }
 
   await routing.enterProviderStep(runtime, sessionId, physicalUserMessageId, ['run-failed'])
-  assert.deepEqual(routing.tryLease(runtime, sessionId, physicalUserMessageId, agent), target)
+  assert.deepEqual(routing.tryLease(runtime, sessionId, physicalUserMessageId, role, participant, undefined), target)
 })
 
 test('WHAT[HOST-BOUNDARY-001] HOST_001_ambiguous_finish_keeps_same_physical_execution_binding_for_host_retry', async () => {
@@ -71,9 +75,10 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_ambiguous_finish_keeps_same_physical_exec
     const sessionId = `session-retry-${finish}`
     const physicalUserMessageId = `msg-retry-${finish}`
     const providerRun = `run-${finish}`
-    const agent = 'coder'
+    const role = 'coder'
+    const participant = 'coder'
 
-    await admit(runtime, sessionId, physicalUserMessageId, agent)
+    await admit(runtime, sessionId, physicalUserMessageId, role, participant, undefined)
     await routing.enterProviderStep(runtime, sessionId, physicalUserMessageId, [])
 
     // OpenCode can normalize an upstream streaming failure into a completed
@@ -105,6 +110,6 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_ambiguous_finish_keeps_same_physical_exec
     }
 
     await routing.enterProviderStep(runtime, sessionId, physicalUserMessageId, [providerRun])
-    assert.deepEqual(routing.tryLease(runtime, sessionId, physicalUserMessageId, agent), target)
+    assert.deepEqual(routing.tryLease(runtime, sessionId, physicalUserMessageId, role, participant, undefined), target)
   }
 })

@@ -207,9 +207,7 @@ type InjectedSessionPort
         match agent with
         | Some name when ManagedAgentCatalog.isBookkeeperName name ->
             SessionExecutionBinding.bind ownerSessionId laneId agent
-        | _ ->
-            SessionExecutionBinding.bindInternalRoot laneId agent
-            ModelRouting.bindCapacityChild ownerSessionId laneId
+        | _ -> SessionExecutionBinding.bindInternalRoot laneId agent
 
         ProviderLanguageBinding.ensureInherited ownerSessionId laneId |> ignore
 

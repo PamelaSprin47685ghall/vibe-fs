@@ -294,6 +294,8 @@ module JoinResultRenderer =
         let path =
             match verdict with
             | OrchestratorVerdict.Published _ -> Path.OrchestratorPublished
+            | OrchestratorVerdict.PublishedPendingCleanup _ -> Path.OrchestratorPublished
+            | OrchestratorVerdict.Cancelled _ -> Path.OrchestratorEmpty
             | OrchestratorVerdict.RejectedDirty _ -> Path.OrchestratorRejectedDirty
             | OrchestratorVerdict.IntegrationFailed _ -> Path.OrchestratorIntegrationFailed
             | OrchestratorVerdict.Empty -> Path.OrchestratorEmpty

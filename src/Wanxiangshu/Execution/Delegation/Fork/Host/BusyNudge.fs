@@ -52,14 +52,6 @@ module HostForkBusyNudge =
     /// used to fall through to `sessions.SendChildPromptFireAndForget`, which reaches
     /// the Host prompt endpoint directly with no claim, no PromptKey and no recovery
     /// anchor — the exact bypass package A removed elsewhere. It fails closed instead.
-    let private managedBusyAgent (profile: PromptAuthority.AuthorityExecutionProfile) (agent: string) : string =
-        let trimmed = if String.IsNullOrWhiteSpace agent then "" else agent.Trim()
-
-        if trimmed = profile.SelectedAgent || trimmed = profile.PeerAgent then
-            trimmed
-        else
-            profile.SelectedAgent
-
     let private sendResult sent : Result<unit, string> =
         match sent with
         | Ok _ -> Ok()
@@ -70,12 +62,10 @@ module HostForkBusyNudge =
         (j: AgentJournal)
         (childId: SessionId)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (agent: string)
         (directory: string option)
         (prompt: string)
         =
         task {
-            let busyAgent = managedBusyAgent profile agent
             let rt = PromptDispatcher.forJournal j
             let syntheticPrompt = LlmFacing.renderInstruction prompt
 
@@ -86,7 +76,6 @@ module HostForkBusyNudge =
                     syntheticPrompt
                     PromptAuthority.ContinuationKind.BusyAgentNudge
                     profile
-                    busyAgent
                     directory
                     PromptDispatcher.AwaitMode.Detached
                     None
@@ -98,7 +87,6 @@ module HostForkBusyNudge =
         (sessions: ISessionHostPort)
         (j: AgentJournal)
         (childId: SessionId)
-        (agent: string)
         (directory: string option)
         (prompt: string)
         =
@@ -107,7 +95,7 @@ module HostForkBusyNudge =
 
             match PromptAuthorityLedger.activeProfile childId snapshot.AgentProjections with
             | None -> return Error "Busy nudge requires ActiveLogicalRun on child session"
-            | Some profile -> return! sendWithProfile sessions j childId profile agent directory prompt
+            | Some profile -> return! sendWithProfile sessions j childId profile directory prompt
         }
 
     let send
@@ -124,7 +112,7 @@ module HostForkBusyNudge =
             match journal with
             | None ->
                 return Error "Busy nudge requires an AgentJournal: PROMPT-005 admits no sender outside the Dispatcher"
-            | Some j -> return! sendWithJournal sessions j childId agent directory prompt
+            | Some j -> return! sendWithJournal sessions j childId directory prompt
         }
 
     let sender sessions parentId journal (directoryOf: string -> string option) =

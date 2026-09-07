@@ -28,7 +28,7 @@ const causalRecord = {
   physicalUserMessageId: 'msg-chat-fixture',
   promptKey: null,
   providerRunIdentity: null,
-  effectiveAgent: 'Bearer operator-secret at /home/operator/private/key',
+  participant: 'Bearer operator-secret at /home/operator/private/key',
   role: 'coder',
   providerRequestKind: 'work-main',
   transition: { from: null, to: 'Accepted' },
@@ -75,7 +75,8 @@ test('WHAT[CHATEXEC-014] capture redacts known failures and rejects payload or s
   const evidence = await captureEvidence(captureInput(), surfaces)
   const serialized = serializeEvidence(evidence)
   assert.doesNotMatch(serialized, /operator-secret|\/home\/operator|stack trace/i)
-  assert.match(evidence.diagnostics[0].effectiveAgent, /\[REDACTED\]/)
+  assert.match(evidence.diagnostics[0].participant, /\[REDACTED\]/)
+  assert.equal('effectiveAgent' in evidence.diagnostics[0], false, 'diagnostic view carries no EffectiveAgent')
 
   await assert.rejects(
     captureEvidence({ ...captureInput(), prompt: 'raw user message' }, surfaces),

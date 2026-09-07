@@ -12,12 +12,17 @@ import {
   DSL_CLASSES,
   LARGE_DU_THRESHOLD,
   NARROW_PHASE_EXEMPTIONS,
+  APPLICATION_USE_KEYS,
+  COMPILER_EVIDENCE_SCHEMA_VERSION,
+  buildCompilerEvidence,
   evaluateThreshold,
   isHostBoundaryOpenPath,
+  scanExecutionPositions,
   scanFiles,
   scanTiers,
   scanLargeDus,
   scanText,
+  validateCompilerEvidence,
 } from '../../../scripts/checks/dsl-ownership.mjs'
 
 const readFixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
@@ -316,22 +321,14 @@ test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_relay_domain_phases_are_not_be
   const source = [
     'module Sample',
     'type IncumbencyPhase = | AuditPending | WorkOwned | Retired',
-    'type ManagerCapabilityPhase = | AuditPending | WorkOwned | Retired',
     'type RoadView = { ActivePhase: IncumbencyPhase option }',
-    'let permissionsForPhase phase = Set.empty',
-    'let isAllowedForPhase role permission phase = permissionsForPhase phase |> Set.contains permission',
-    'let denyRelayPhase ctx phase = ()',
     'let current = RoadView.ActivePhase',
-    'let deniedPath = DeniedRelayPhase',
-    'let permissionCheck = isAllowedForPhase role permission phase',
-    'let denial = denyRelayPhase ctx phase',
-    'let projected = match role with | Role.Manager, Some managerPhase -> managerPhase | _ -> ManagerCapabilityPhase.Retired',
     'let rejection = Error "AssessmentNotAllowedInCurrentPhase"',
   ].join('\n')
   const hits = scanText(source, 'src/Wanxiangshu/Mission/Relay/Fold.fs')
   assert.ok(
     !hits.some((h) => h.gate === 'behaviour-bool'),
-    'Relay incumbency/capability phase vocabulary is durable domain evidence rather than an execution-position latch',
+    'Relay incumbency phase vocabulary is durable domain evidence rather than an execution-position latch',
   )
 })
 
@@ -883,4 +880,114 @@ test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_cross_file_duplicate_case_set_
     },
   ])
   assert.ok(!hits.some((v) => v.gate === 'dup-cases'))
+})
+
+// ── R18: lexical vs compiler tiers stay distinct ────────────────────────────
+
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_tiers_split_lexical_and_compiler_findings', () => {
+  const file = 'src/Wanxiangshu/Session/Sample.fs'
+  const entries = [{
+    file,
+    text: ['module Sample', 'type State = { HasPendingCompletion: bool }'].join('\n'),
+  }]
+  const lexical = scanTiers(entries, undefined)
+  assert.equal(lexical.tier, 'lexical-only')
+  assert.equal(lexical.hasCompilerEvidence, false)
+  assert.equal(lexical.lexicalViolations.length, 1)
+  assert.equal(lexical.lexicalViolations[0]?.gate, 'behaviour-bool')
+  assert.equal(lexical.compilerViolations.length, 0)
+  const evidence = {
+    symbolUses: [],
+    applicationUses: [{
+      consumerPath: file,
+      startLine: 2,
+      startColumn: 0,
+      resolvedTarget: 'Foreign.Port.Send',
+      inferredType: 'System.String -> Microsoft.FSharp.Core.unit',
+    }],
+  }
+  const resolved = scanTiers(entries, evidence)
+  assert.equal(resolved.tier, 'compiler-resolved')
+  assert.equal(resolved.hasCompilerEvidence, true)
+  assert.deepEqual(resolved.violations, lexical.violations)
+  assert.equal(resolved.lexicalViolations.length, 1)
+  assert.equal(resolved.compilerViolations.length, 0)
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_effectful_resolved_call_marks_execution_position', () => {
+  const file = 'src/Wanxiangshu/Domain/Profile.fs'
+  const source = [
+    'type Profile = { IsVerified: bool }',
+    'let badge profile =',
+    '    match profile.IsVerified with',
+    '    | true -> Foreign.badge "verified"',
+    '    | false -> Foreign.badge "unverified"',
+  ].join('\n')
+  const effectful = {
+    symbolUses: [],
+    applicationUses: [4, 5].map((line) => ({
+      consumerPath: file,
+      resolvedTarget: 'Foreign.Port.Send',
+      startLine: line,
+      startColumn: 14,
+      inferredType: 'System.String -> Microsoft.FSharp.Core.unit',
+    })),
+  }
+  assert.ok(
+    scanExecutionPositions(source, file, effectful).some((hit) => hit.gate === 'program-counter'),
+    'a discriminant selecting resolved unit-returning calls is an execution position',
+  )
+  const pure = {
+    symbolUses: [],
+    applicationUses: [4, 5].map((line) => ({
+      consumerPath: file,
+      resolvedTarget: 'Foreign.badge',
+      startLine: line,
+      startColumn: 14,
+      inferredType: 'System.String -> Domain.Badge',
+    })),
+  }
+  assert.deepEqual(scanExecutionPositions(source, file, pure), [])
+  assert.deepEqual(scanExecutionPositions(source, file, undefined), [])
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_narrow_phase_boundary_rejects_unlisted_consumer', () => {
+  const source = ['module Sample', 'type Phase = | IncumbencyPhase | Other'].join('\n')
+  assert.ok(
+    scanText(source, 'src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs').some((h) => h.gate === 'behaviour-bool'),
+    'IncumbencyPhase outside its relay-mission owner set must fire behaviour-bool',
+  )
+  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Mission/Relay/Fold.fs').filter((h) => h.gate === 'behaviour-bool'), [])
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_missing_or_mismatched_evidence_fails_closed', () => {
+  assert.equal(COMPILER_EVIDENCE_SCHEMA_VERSION, 1)
+  assert.deepEqual(APPLICATION_USE_KEYS, ['consumerPath', 'startLine', 'startColumn', 'resolvedTarget', 'inferredType'])
+  assert.equal(validateCompilerEvidence(undefined).ok, false)
+  assert.equal(validateCompilerEvidence(undefined).reason, 'missing-evidence')
+  assert.equal(validateCompilerEvidence({}).ok, false)
+  assert.equal(validateCompilerEvidence({ applicationUses: [], schemaVersion: 2 }).reason, 'schema-mismatch')
+  assert.equal(
+    validateCompilerEvidence({ applicationUses: [{ consumerPath: 'a.fs', startLine: 0, startColumn: 0, resolvedTarget: 'F.g', inferredType: '' }] }).reason,
+    'schema-mismatch',
+  )
+  assert.equal(
+    validateCompilerEvidence({ applicationUses: [{ consumerPath: 'a.fs', startLine: 1, startColumn: 0, resolvedTarget: '', inferredType: '' }] }).reason,
+    'schema-mismatch',
+  )
+  const valid = {
+    schemaVersion: 1,
+    declarationUses: [],
+    applicationUses: [{
+      consumerPath: 'src/Wanxiangshu/Domain/Alpha.fs',
+      startLine: 4,
+      startColumn: 8,
+      resolvedTarget: 'Foreign.Port.Send',
+      inferredType: 'System.String -> Microsoft.FSharp.Core.unit',
+    }],
+  }
+  assert.equal(validateCompilerEvidence(valid).ok, true)
+  const built = buildCompilerEvidence(valid)
+  assert.equal(built.applicationUses.length, 1)
+  assert.throws(() => buildCompilerEvidence({ applicationUses: [{ bogus: true }] }), /invalid compiler evidence/)
 })

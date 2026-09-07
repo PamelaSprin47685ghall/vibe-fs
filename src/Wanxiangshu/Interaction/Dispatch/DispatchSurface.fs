@@ -139,11 +139,27 @@ module DispatchSurface =
         if isNull value then "" else string value
 
     let private participantIdentityOf (value: obj) : Result<ParticipantIdentityEvidence, string> =
+        let participant =
+            let raw = text value?participant
+
+            if String.IsNullOrWhiteSpace raw then
+                text value?selectedAgent
+            else
+                raw
+
         let role =
-            if text value?canonicalRole = "bookkeeper" then
+            let roleRaw =
+                let raw = text value?role
+
+                if String.IsNullOrWhiteSpace raw then
+                    text value?canonicalRole
+                else
+                    raw
+
+            if roleRaw = "bookkeeper" then
                 Some None
             else
-                Roles.tryParseRole (text value?canonicalRole) |> Option.map Some
+                Roles.tryParseRole roleRaw |> Option.map Some
 
         let origin =
             match text value?origin with
@@ -155,7 +171,7 @@ module DispatchSurface =
         | None, _ -> Error(sprintf "Unknown role: %s" (text value?canonicalRole))
         | _, Error error -> Error error
         | Some role, Ok origin ->
-            { SelectedAgent = text value?selectedAgent
+            { SelectedAgent = participant
               Role = role
               Persona = text value?persona
               PersonaCatalogVersion = unbox<int> value?personaCatalogVersion
@@ -311,7 +327,6 @@ module DispatchSurface =
         (text: string)
         (continuation: string)
         (profile: obj)
-        (effectiveAgent: string)
         (awaitMode: string)
         : Task<obj> =
         task {
@@ -327,7 +342,6 @@ module DispatchSurface =
                         text
                         kind
                         authorityProfile
-                        effectiveAgent
                         None
                         (awaitModeOf awaitMode)
                         None
@@ -362,6 +376,71 @@ module DispatchSurface =
                            observation = null |}
         }
 
+    let sendGateNudgesConcurrently
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (continuation: string)
+        (gateKind: string)
+        (terminalProviderRun: string)
+        (profile: obj)
+        : Task<obj> =
+        task {
+            match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
+            | Some kind, Ok authorityProfile ->
+                let runtime = PromptDispatcher.forJournal handle.Journal
+                let adapter = PlainSessionPort(port)
+
+                let send () =
+                    runtime.SendGateNudge
+                        (adapter :> Wanxiangshu.OpenCode.ISessionHostPort)
+                        (SessionId.create session)
+                        text
+                        kind
+                        gateKind
+                        (ProviderRunIdentity.create terminalProviderRun)
+                        authorityProfile
+                        None
+                        PromptDispatcher.AwaitMode.Await
+                        None
+
+                let first = send ()
+                let second = send ()
+                let! firstResult = first
+                let! secondResult = second
+                let results = [| firstResult; secondResult |]
+
+                return
+                    results
+                    |> Array.map (function
+                        | Ok key ->
+                            box
+                                {| ok = true
+                                   key = PromptKey.value key
+                                   error = null |}
+                        | Error error ->
+                            box
+                                {| ok = false
+                                   key = null
+                                   error = error |})
+                    |> box
+            | None, _ ->
+                return
+                    box
+                        [| box
+                               {| ok = false
+                                  key = null
+                                  error = "Unknown continuation kind" |} |]
+            | _, Error error ->
+                return
+                    box
+                        [| box
+                               {| ok = false
+                                  key = null
+                                  error = error |} |]
+        }
+
     /// HOST-004 / DISPATCH-PROTOCOL-002: exercise the dispatch-owned final
     /// physical-send admission without exposing Quiescence internals to this
     /// package's JS tests. Crash-reconciliation proves when the admission turns
@@ -374,7 +453,6 @@ module DispatchSurface =
         (text: string)
         (continuation: string)
         (profile: obj)
-        (effectiveAgent: string)
         (physicalAdmission: obj)
         : Task<obj> =
         task {
@@ -390,7 +468,6 @@ module DispatchSurface =
                         text
                         kind
                         authorityProfile
-                        effectiveAgent
                         None
                         PromptDispatcher.AwaitMode.Await
                         None
@@ -450,10 +527,8 @@ module DispatchSurface =
 
     let private participantIdentityView (identity: ParticipantIdentityEvidence) : obj =
         box
-            {| selectedAgent = ParticipantIdentity.selectedAgent identity
-               peerAgent = ParticipantIdentity.peerAgent identity
-               canonicalRole = ParticipantIdentity.roleLabel identity
-               selectedTier = "deep"
+            {| participant = ParticipantIdentity.selectedAgent identity
+               role = ParticipantIdentity.roleLabel identity
                persona = ParticipantIdentity.persona identity
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
                origin =
@@ -593,7 +668,8 @@ module DispatchSurface =
                    sessionId = SessionId.value evidence.SessionId
                    physicalUserMessageId = PhysicalUserMessageId.value evidence.PhysicalUserMessageId
                    origin = PromptAuthority.originLabel evidence.Origin
-                   effectiveAgent = evidence.EffectiveAgent |}
+                   participant = AcceptedChatExecutionEvidence.participant evidence
+                   role = Roles.roleLabel (AcceptedChatExecutionEvidence.canonicalRole evidence) |}
         | Error error ->
             let kind =
                 match error with
@@ -614,7 +690,8 @@ module DispatchSurface =
                    sessionId = null
                    physicalUserMessageId = null
                    origin = null
-                   effectiveAgent = null |}
+                   participant = null
+                   role = null |}
 
     let private acceptManagedDecision
         (handle: JournalHandle)
@@ -709,7 +786,9 @@ module DispatchSurface =
                 claim.AuthorityRootUserMessageId
                 |> Option.map AuthorityRootUserMessageId.value
                 |> Option.defaultValue null
-               effectiveAgent = claim.EffectiveAgent |> Option.defaultValue null
+               participant =
+                ParticipantIdentity.selectedAgent (PromptAuthority.identitySeedParticipantIdentity claim.IdentitySeed)
+               role = ParticipantIdentity.roleLabel (PromptAuthority.identitySeedParticipantIdentity claim.IdentitySeed)
                identitySeed = identitySeedView claim.IdentitySeed
                payloadDigest = claim.PayloadDigest
                receipt = claim.Receipt |> Option.map TransportReceipt.value |> Option.defaultValue null
@@ -810,13 +889,6 @@ module DispatchSurface =
                                     None
                                 else
                                     Some(AuthorityRootUserMessageId.create authorityRoot)
-                               EffectiveAgent =
-                                let agent = watermarkText value?effectiveAgent
-
-                                if System.String.IsNullOrWhiteSpace agent then
-                                    None
-                                else
-                                    Some agent
                                IdentitySeed = identitySeed
                                PayloadDigest = watermarkText value?payloadDigest |}
                     )

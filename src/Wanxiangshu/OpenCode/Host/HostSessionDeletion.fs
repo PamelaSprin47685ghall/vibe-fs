@@ -72,7 +72,7 @@ module HostSessionDeletion =
 
             SessionDeletionPreparation(resolvedParent, inspectorStaged, inspectorToFinalize)
 
-    /// Finalize the retained Inspector case before later session cleanup drops its
+    /// Finalize the staged Inspector case before later session cleanup drops its
     /// physical identity. Failure is diagnostic and process-fatal.
     let private finalizeInspectorAtRoot
         (finalizeInspector: string -> string -> Task<Result<unit, string>>)
@@ -102,7 +102,7 @@ module HostSessionDeletion =
         | Some root -> finalizeInspectorAtRoot finalizeInspector root inspectorId
         | None -> Task.FromResult() :> Task
 
-    let private finalizeRetainedInspector
+    let private finalizeStagedInspector
         (scope: PluginRuntimeScope)
         (workspaceDirectory: string option)
         (finalizeInspector: string -> string -> Task<Result<unit, string>>)
@@ -122,7 +122,7 @@ module HostSessionDeletion =
         (SessionDeletionPreparation(_, _, inspectorToFinalize))
         : Task =
         inspectorToFinalize
-        |> Option.map (finalizeRetainedInspector scope workspaceDirectory finalizeInspector)
+        |> Option.map (finalizeStagedInspector scope workspaceDirectory finalizeInspector)
         |> Option.defaultValue (Task.FromResult() :> Task)
 
     let private cleanupRuntime
@@ -172,10 +172,7 @@ module HostSessionDeletion =
             scope.Sessions.Quiescence.DropSession sessionId
             ExplicitResumeSuppression.dropSession sessionId
 
-            if stagedInspector then
-                do! scope.DisposeSessionPreservingIdentity(SessionId.value sessionId)
-            else
-                do! scope.DisposeSession(SessionId.value sessionId)
+            do! scope.DisposeSession(SessionId.value sessionId)
 
             signalReconciler signal
         }

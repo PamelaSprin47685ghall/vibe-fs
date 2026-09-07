@@ -82,9 +82,8 @@ module ProviderProjection =
     /// status, finish reason, cost and usage. Comparable across Sessions and
     /// across restarts, which is what makes a fixture reusable.
     ///
-    /// Provider and model are NOT excluded: they are configuration, not identity,
-    /// and FALLBACK-002's A/B switch changes the model, so a fixture that could
-    /// not see it would be unable to distinguish the two sides.
+    /// Provider and model are NOT excluded: they are physical execution
+    /// configuration, so a fixture must distinguish target changes.
     type ProviderSemanticProjection =
         { ProviderId: string option
           ModelId: string option

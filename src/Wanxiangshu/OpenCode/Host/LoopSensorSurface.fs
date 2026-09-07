@@ -103,7 +103,13 @@ module LoopSensorSurface =
         if not (isFunction value) then
             invalidArg "options" "LoopSensorSurface.create requires a diagnostic callback"
 
-        fun operation fields -> apply2 value (box operation) (box fields) |> ignore
+        fun operation fields ->
+            fields
+            |> List.map (fun (name, fieldValue) -> [| box name; box fieldValue |])
+            |> List.toArray
+            |> box
+            |> apply2 value (box operation)
+            |> ignore
 
     let create (options: obj) : obj =
         let owned = property options "owned"
@@ -117,10 +123,10 @@ module LoopSensorSurface =
     let observe (sensor: obj) (raw: obj) : unit =
         (sensor :?> SensorHandle).Sensor.Observe raw
 
-    let consumeAbortCause (sensor: obj) (session: string) : obj =
+    let consumeAbortCause (sensor: obj) (session: string) (run: string) : obj =
         match
             (sensor :?> SensorHandle)
-                .Sensor.ConsumeAbortCause(SessionId.create session, None)
+                .Sensor.ConsumeAbortCause(SessionId.create session, ProviderRunIdentity.create run, None)
         with
         | AbortCause.External -> box {| cause = "External" |}
         | AbortCause.DegenerationGuard kind ->
@@ -128,18 +134,34 @@ module LoopSensorSurface =
                 {| cause = "DegenerationGuard"
                    anomaly = LoopSensor.kindName kind |}
 
+    /// Owned interrupt/continuation task for the exact requested run, exposed
+    /// as an awaitable. Null when no task is owned for that run; a mismatched
+    /// run never observes the stored run's task.
+    let activeTask (sensor: obj) (session: string) (run: string) : obj =
+        match
+            (sensor :?> SensorHandle)
+                .Sensor.ActiveInterruptTask(SessionId.create session, ProviderRunIdentity.create run)
+        with
+        | None -> null
+        | Some owned -> box owned
+
     let dropSession (sensor: obj) (session: string) : unit =
         (sensor :?> SensorHandle).Sensor.DropSession(SessionId.create session)
 
     let resetDetector (sensor: obj) (session: string) : unit =
         (sensor :?> SensorHandle).Sensor.ResetDetector(SessionId.create session)
 
-    let textDelta (session: string) (text: string) : obj =
+    /// Streaming delta for the exact provider run. A nullish message id
+    /// produces a delta without a run: observed into detector scratch only,
+    /// never arming an anomaly.
+    let textDelta (session: string) (text: string) (messageId: obj) : obj =
+        let messageField = if isNullish messageId then null else string messageId
+
         box
             {| ``type`` = "message.part.delta"
                properties =
                 {| sessionID = session
-                   messageID = "msg_a"
+                   messageID = messageField
                    partID = "prt_1"
                    field = "text"
                    delta = text |} |}

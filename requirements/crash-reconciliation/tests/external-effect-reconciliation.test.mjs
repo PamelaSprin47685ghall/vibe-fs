@@ -26,7 +26,7 @@ const assertOwnedDiagnostic = (item, effect, owner, law) => {
   assert.match(item.message, new RegExp(`^${effect} owner=${owner} law=${law.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`))
 }
 
-test('WHAT[CRASH-019] external_effect_registry_accepts_the_closed_12_row_contract', () => {
+test('WHAT[CRASH-019] external_effect_registry_accepts_the_closed_11_row_contract', () => {
   assert.deepEqual(validateExternalEffectRegistry(registry, context), [])
   assert.deepEqual(registry.effects.map((effect) => effect.id), [
     'canonical-append',
@@ -34,7 +34,6 @@ test('WHAT[CRASH-019] external_effect_registry_accepts_the_closed_12_row_contrac
     'worktree-create',
     'branch-fast-forward',
     'prompt-dispatch',
-    'blogger-request',
     'todo-write',
     'js-transaction',
     'provider-execution',
@@ -58,8 +57,6 @@ test('WHAT[CRASH-019] effect phases name the actual admission and physical opera
   assert.deepEqual(row(registry, 'branch-fast-forward').physical_receipt.symbols, ['ffMerge'])
   assert.deepEqual(row(registry, 'todo-write').admission.symbols, ['runBeforeTodo', 'PreparedBridge'])
   assert.deepEqual(row(registry, 'todo-write').physical_receipt.symbols, ['runAfterTodo', 'PhysicalSuccessEvidence.LiveAfterSuccess'])
-  assert.ok(row(registry, 'blogger-request').proof_portfolio.some((proof) =>
-    proof.title === 'WHAT[EFFECT-ACCOUNTING-008] C5_entry_commit_records_receipt_and_clears_open_request'))
 })
 
 test('WHAT[CRASH-019] duplicate_and_malformed_effect_rows_fail_closed', () => {

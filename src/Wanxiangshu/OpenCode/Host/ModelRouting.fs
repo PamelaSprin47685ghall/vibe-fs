@@ -13,8 +13,8 @@ open Wanxiangshu.Execution.Session.ChatExecution
 
 type private ExecutionLease =
     { PhysicalUserMessageId: string option
-      Agent: string
-      RoutingAgent: string
+      Participant: string option
+      RoutingRole: Role
       Target: ModelRoutingTarget }
 
 module ModelRouting =
@@ -217,7 +217,7 @@ module ModelRouting =
 
     /// A SessionId is a reusable container. Model occupancy belongs to the exact
     /// physical user material that caused the provider execution, never to the
-    /// session lifecycle or to an EffectiveAgent pair. Strength may reserve one
+    /// session lifecycle or to a cursor-selected identity. Strength may reserve one
     /// target before its physical prompt exists; chat.message later adopts that
     /// reservation into the exact PhysicalUserMessageId without double-counting.
     let private failedTask<'T> (error: exn) : Task<'T> =
@@ -227,20 +227,20 @@ module ModelRouting =
         completion.SetException(error)
         completion.Task
 
-    let private normalizeReservationInput sessionId agent =
+    let private normalizeReservationInput sessionId (role: Role) =
         if String.IsNullOrWhiteSpace sessionId then
             Error(ArgumentException("sessionId must be non-empty") :> exn)
-        elif String.IsNullOrWhiteSpace agent then
-            Error(ArgumentException("agent must be non-empty") :> exn)
         else
-            Ok(sessionId.Trim(), agent.Trim())
+            Ok(sessionId.Trim(), role)
 
-    let private normalizeExecutionInput sessionId physicalUserMessageId agent =
-        match normalizeReservationInput sessionId agent with
+    let private normalizeExecutionInput sessionId physicalUserMessageId (role: Role) (participant: string) =
+        match normalizeReservationInput sessionId role with
         | Error error -> Error error
         | Ok(normSessionId, normAgent) when String.IsNullOrWhiteSpace physicalUserMessageId ->
             Error(ArgumentException("physicalUserMessageId must be non-empty") :> exn)
-        | Ok(normSessionId, normAgent) -> Ok(normSessionId, physicalUserMessageId.Trim(), normAgent)
+        | Ok(normSessionId, normRole) when String.IsNullOrWhiteSpace participant ->
+            Error(ArgumentException("participant must be non-empty") :> exn)
+        | Ok(normSessionId, normRole) -> Ok(normSessionId, physicalUserMessageId.Trim(), normRole, participant.Trim())
 
     let private normalizeSessionId sessionId =
         if String.IsNullOrWhiteSpace sessionId then
@@ -265,8 +265,6 @@ module ModelRouting =
             BorrowingCapacity<ModelRoutingTarget>(CapacityLedger<ModelRoutingTarget>(), targetProvider, (=))
         // DSL-MUTABLE: resource — active execution lease map per session
         let activeBySession = Dictionary<string, ExecutionLease>()
-        // DSL-MUTABLE: resource — last physical target map per session
-        let lastPhysicalTargetBySession = Dictionary<string, ModelRoutingTarget>()
         // DSL-MUTABLE: resource — one exact provider-run witness per live session
         let targetByProviderRun = Dictionary<string, struct (string * ModelRoutingTarget)>()
         let latestProviderRunBySession = Dictionary<string, string>()
@@ -287,18 +285,18 @@ module ModelRouting =
             else
                 scheduler?hasTheoreticalCapacity
 
-        let hasTheoreticalCapacityLocked (agent: string) : bool =
+        let hasTheoreticalCapacityLocked (role: string) : bool =
             if not (isNull hasCapFn) && isFunction hasCapFn then
-                unbox<bool> (callScheduler hasCapFn agent [||] null)
+                unbox<bool> (callScheduler hasCapFn role [||] null)
             else
                 true
 
         let running () = capacity.Snapshot()
 
-        let previousTarget sessionId =
-            match lastPhysicalTargetBySession.TryGetValue sessionId with
-            | true, target -> Some target
-            | false, _ -> None
+        let activePhysicalTarget sessionId =
+            match activeBySession.TryGetValue sessionId with
+            | true, lease when lease.PhysicalUserMessageId.IsSome -> Some lease.Target
+            | _ -> None
 
         let retireProviderRunTarget sessionId =
             match latestProviderRunBySession.TryGetValue sessionId with
@@ -335,28 +333,40 @@ module ModelRouting =
             capacity.Fail error
             admissionQueue.Fail error
 
-        let scheduleOrPoison running agent previous =
+        let scheduleOrPoison running (role: Role) previous =
             try
-                invokeScheduler scheduler agent running previous
+                invokeScheduler scheduler (Roles.roleLabel role) running previous
             with ex ->
                 poison ex
                 raise ex
 
-        let routeFreshOrPoison sessionId oldPhysicalUserMessageId physicalUserMessageId agent previous =
+        let routeFreshOrPoison
+            sessionId
+            oldPhysicalUserMessageId
+            physicalUserMessageId
+            (role: Role)
+            lenderSessionId
+            previous
+            =
             try
                 capacity.RouteFresh(
                     sessionId,
                     oldPhysicalUserMessageId,
                     physicalUserMessageId,
-                    fun running -> scheduleOrPoison running agent previous
+                    lenderSessionId,
+                    fun running -> scheduleOrPoison running role previous
                 )
             with ex ->
                 poison ex
                 raise ex
 
-        let reserveFreshOrPoison sessionId agent previous =
+        let reserveFreshOrPoison sessionId (role: Role) lenderSessionId previous =
             try
-                capacity.ReserveFresh(sessionId, (fun running -> scheduleOrPoison running agent previous))
+                capacity.ReserveFresh(
+                    sessionId,
+                    lenderSessionId,
+                    (fun running -> scheduleOrPoison running role previous)
+                )
             with ex ->
                 poison ex
                 raise ex
@@ -364,11 +374,9 @@ module ModelRouting =
         let rememberExecution (demand: ExecutionAdmissionDemand) (target: ModelRoutingTarget) =
             activeBySession.[demand.SessionId] <-
                 { PhysicalUserMessageId = Some demand.PhysicalUserMessageId
-                  Agent = demand.EffectiveAgent
-                  RoutingAgent = demand.EffectiveAgent
+                  Participant = Some demand.Participant
+                  RoutingRole = demand.Role
                   Target = target }
-
-            lastPhysicalTargetBySession.[demand.SessionId] <- target
 
         let commit (demand: ExecutionAdmissionDemand) (target: ModelRoutingTarget) =
             rememberExecution demand target
@@ -376,7 +384,8 @@ module ModelRouting =
             let identity: ExecutionAdmissionExactIdentity =
                 { SessionId = demand.SessionId
                   PhysicalUserMessageId = demand.PhysicalUserMessageId
-                  EffectiveAgent = demand.EffectiveAgent
+                  Role = demand.Role
+                  Participant = demand.Participant
                   Target = target }
 
             let lease =
@@ -397,7 +406,8 @@ module ModelRouting =
                 demand.SessionId
                 None
                 demand.PhysicalUserMessageId
-                demand.EffectiveAgent
+                demand.Role
+                demand.LenderSessionId
                 demand.PreviousTarget
             |> commitScheduled demand
 
@@ -438,68 +448,92 @@ module ModelRouting =
             if changed && fatalError.IsNone then
                 drainDemands ()
 
-        let requireSameAgent sessionId physicalUserMessageId expected observed =
-            // Predictor is a routing-only label for cheap Strength models, never an
-            // identity: a predictor reservation is adopted by the replica's own
-            // canonical agent at first physical execution.
-            if expected <> observed && expected <> "predictor" then
+        let requireSameIdentity
+            sessionId
+            physicalUserMessageId
+            (expectedRole: Role)
+            (expectedParticipant: string option)
+            (observedRole: Role)
+            (observedParticipant: string)
+            =
+            if expectedRole <> observedRole then
                 invalidOp (
                     sprintf
-                        "execution-model-routing: physical execution %s/%s changed agent (%s -> %s)"
+                        "execution-model-routing: physical execution %s/%s changed role (%s -> %s)"
+                        sessionId
+                        physicalUserMessageId
+                        (Roles.roleLabel expectedRole)
+                        (Roles.roleLabel observedRole)
+                )
+
+            match expectedParticipant with
+            | Some expected when expected <> observedParticipant ->
+                invalidOp (
+                    sprintf
+                        "execution-model-routing: physical execution %s/%s changed participant (%s -> %s)"
                         sessionId
                         physicalUserMessageId
                         expected
-                        observed
+                        observedParticipant
                 )
+            | _ -> ()
 
-        let issueAdmission sessionId physicalUserMessageId effectiveAgent target =
+        let issueAdmission sessionId physicalUserMessageId (role: Role) (participant: string) target =
             let identity: ExecutionAdmissionExactIdentity =
                 { SessionId = sessionId
                   PhysicalUserMessageId = physicalUserMessageId
-                  EffectiveAgent = effectiveAgent
+                  Role = role
+                  Participant = participant
                   Target = target }
 
             capacity.ExactCredit(sessionId, physicalUserMessageId)
             |> fun credit -> admissionOwner.Issue(identity, credit)
             |> ExecutionAdmissionAcquisition.Admitted
 
-        // Predictor reservations carry a routing-only label: adoption transfers
-        // the cheap-model target to the replica's own canonical agent.
-        let adoptedAgent (lease: ExecutionLease) (agent: string) : string =
-            if lease.Agent = "predictor" then agent else lease.Agent
 
-        let reuseOrAdoptActiveExecution sessionId physicalUserMessageId agent (lease: ExecutionLease) =
+        let reuseOrAdoptActiveExecution
+            sessionId
+            physicalUserMessageId
+            (role: Role)
+            (participant: string)
+            (lease: ExecutionLease)
+            =
             match lease.PhysicalUserMessageId with
             | Some current when current = physicalUserMessageId ->
-                requireSameAgent sessionId physicalUserMessageId lease.Agent agent
-                Some(issueAdmission sessionId physicalUserMessageId agent lease.Target)
+                requireSameIdentity sessionId physicalUserMessageId lease.RoutingRole lease.Participant role participant
+                Some(issueAdmission sessionId physicalUserMessageId role participant lease.Target)
             | None ->
-                requireSameAgent sessionId physicalUserMessageId lease.Agent agent
+                requireSameIdentity sessionId physicalUserMessageId lease.RoutingRole lease.Participant role participant
 
                 capacity.AdoptReservation(sessionId, physicalUserMessageId, lease.Target)
 
                 activeBySession.[sessionId] <-
                     { lease with
                         PhysicalUserMessageId = Some physicalUserMessageId
-                        Agent = adoptedAgent lease agent }
+                        Participant = Some participant }
 
-                lastPhysicalTargetBySession.[sessionId] <- lease.Target
-
-                Some(issueAdmission sessionId physicalUserMessageId agent lease.Target)
+                Some(issueAdmission sessionId physicalUserMessageId role participant lease.Target)
             | Some _ -> None
 
-        let reusePendingExecution sessionId physicalUserMessageId agent =
+        let reusePendingExecution sessionId physicalUserMessageId (role: Role) (participant: string) =
             match admissionQueue.TryCurrent sessionId with
             | Some demand when demand.PhysicalUserMessageId = physicalUserMessageId ->
-                requireSameAgent sessionId physicalUserMessageId demand.EffectiveAgent agent
+                requireSameIdentity
+                    sessionId
+                    physicalUserMessageId
+                    demand.Role
+                    (Some demand.Participant)
+                    role
+                    participant
+
                 Some(ExecutionAdmissionAcquisition.Queued demand.Node)
             | Some _
             | None -> None
 
-        let currentExecutionOutcome sessionId physicalUserMessageId agent =
+        let currentExecutionOutcome sessionId physicalUserMessageId (role: Role) (participant: string) =
             match activeBySession.TryGetValue sessionId with
-            | true, lease -> reuseOrAdoptActiveExecution sessionId physicalUserMessageId agent lease
-            | false, _ -> reusePendingExecution sessionId physicalUserMessageId agent
+            | true, lease -> reuseOrAdoptActiveExecution sessionId physicalUserMessageId role participant lease
+            | false, _ -> reusePendingExecution sessionId physicalUserMessageId role participant
 
         let currentPhysicalUserMessageId sessionId =
             match activeBySession.TryGetValue sessionId with
@@ -510,119 +544,209 @@ module ModelRouting =
             if admissionQueue.ContainsSession sessionId then
                 admissionQueue.SupersedeSession sessionId |> ignore
 
-        let acquireFreshDemand sessionId oldPhysicalUserMessageId physicalUserMessageId agent =
-            let previous = previousTarget sessionId
-
-            match routeFreshOrPoison sessionId oldPhysicalUserMessageId physicalUserMessageId agent previous with
+        let acquireFreshDemand
+            sessionId
+            oldPhysicalUserMessageId
+            physicalUserMessageId
+            (role: Role)
+            (participant: string)
+            (lenderSessionId: string option)
+            (previous: ModelRoutingTarget option)
+            =
+            match
+                routeFreshOrPoison
+                    sessionId
+                    oldPhysicalUserMessageId
+                    physicalUserMessageId
+                    role
+                    lenderSessionId
+                    previous
+            with
             | Some target ->
                 activeBySession.[sessionId] <-
                     { PhysicalUserMessageId = Some physicalUserMessageId
-                      Agent = agent
-                      RoutingAgent = agent
+                      Participant = Some participant
+                      RoutingRole = role
                       Target = target }
 
-                lastPhysicalTargetBySession.[sessionId] <- target
-
                 drainDemands ()
-                issueAdmission sessionId physicalUserMessageId agent target
-            | None -> admissionQueue.Enqueue(sessionId, physicalUserMessageId, agent, previous)
+                issueAdmission sessionId physicalUserMessageId role participant target
+            | None ->
+                admissionQueue.Enqueue(sessionId, physicalUserMessageId, role, participant, lenderSessionId, previous)
 
-        let acquireFreshOrAdopt sessionId physicalUserMessageId agent =
-            match currentExecutionOutcome sessionId physicalUserMessageId agent with
+        let acquireFreshOrAdopt
+            sessionId
+            physicalUserMessageId
+            (role: Role)
+            (participant: string)
+            (lenderSessionId: string option)
+            =
+            match currentExecutionOutcome sessionId physicalUserMessageId role participant with
             | Some current -> current
             | None ->
                 let oldPhysicalUserMessageId = currentPhysicalUserMessageId sessionId
+                let previous = activePhysicalTarget sessionId
                 activeBySession.Remove sessionId |> ignore
                 supersedeCurrentDemand sessionId
-                acquireFreshDemand sessionId oldPhysicalUserMessageId physicalUserMessageId agent
 
-        let acquireManagedTask sessionId physicalUserMessageId agent =
+                acquireFreshDemand
+                    sessionId
+                    oldPhysicalUserMessageId
+                    physicalUserMessageId
+                    role
+                    participant
+                    lenderSessionId
+                    previous
+
+        let acquireManagedTask
+            sessionId
+            physicalUserMessageId
+            (role: Role)
+            (participant: string)
+            (lenderSessionId: string option)
+            =
             lock gate (fun () ->
                 ensureHealthy ()
 
-                if not (hasTheoreticalCapacityLocked agent) then
+                if not (hasTheoreticalCapacityLocked (Roles.roleLabel role)) then
                     ExecutionAdmissionAcquisition.QueueFull
                 else
-                    acquireFreshOrAdopt sessionId physicalUserMessageId agent)
+                    acquireFreshOrAdopt sessionId physicalUserMessageId role participant lenderSessionId)
 
-        let acquireManagedSafe sessionId physicalUserMessageId agent =
+        let acquireManagedSafe
+            sessionId
+            physicalUserMessageId
+            (role: Role)
+            (participant: string)
+            (lenderSessionId: string option)
+            =
             try
-                acquireManagedTask sessionId physicalUserMessageId agent |> Task.FromResult
+                acquireManagedTask sessionId physicalUserMessageId role participant lenderSessionId
+                |> Task.FromResult
             with ex ->
                 failedTask<ExecutionAdmissionAcquisition> ex
 
-        let tryReserveFresh sessionId agent =
-            match reserveFreshOrPoison sessionId agent (previousTarget sessionId) with
+        let tryReserveFresh sessionId (role: Role) (lenderSessionId: string option) =
+            let previous = activePhysicalTarget sessionId
+
+            match reserveFreshOrPoison sessionId role lenderSessionId previous with
             | None -> None
             | Some target ->
                 activeBySession.[sessionId] <-
                     { PhysicalUserMessageId = None
-                      Agent = agent
-                      RoutingAgent = agent
+                      Participant = None
+                      RoutingRole = role
                       Target = target }
 
                 drainDemands ()
                 Some target
 
-        let tryReserveLocked sessionId agent =
+        let tryReserveLocked sessionId (role: Role) (lenderSessionId: string option) =
             ensureHealthy ()
 
             match activeBySession.TryGetValue sessionId, admissionQueue.ContainsSession sessionId with
-            | (true, lease), _ when lease.PhysicalUserMessageId.IsNone && lease.Agent = agent -> Some lease.Target
+            | (true, lease), _ when lease.PhysicalUserMessageId.IsNone && lease.RoutingRole = role -> Some lease.Target
             | (true, _), _ -> None
             | (false, _), true -> None
-            | (false, _), false -> tryReserveFresh sessionId agent
+            | (false, _), false -> tryReserveFresh sessionId role lenderSessionId
 
-        let adoptExistingReservation sessionId physicalUserMessageId agent (lease: ExecutionLease) =
+        let adoptExistingReservation
+            sessionId
+            physicalUserMessageId
+            (role: Role)
+            (participant: string)
+            (lease: ExecutionLease)
+            =
+            if lease.RoutingRole <> role then
+                invalidOp (
+                    sprintf
+                        "execution-model-routing: physical execution %s/%s changed role (%s -> %s)"
+                        sessionId
+                        physicalUserMessageId
+                        (Roles.roleLabel lease.RoutingRole)
+                        (Roles.roleLabel role)
+                )
+
+            match lease.Participant with
+            | Some expected when expected <> participant ->
+                invalidOp (
+                    sprintf
+                        "execution-model-routing: physical execution %s/%s changed participant (%s -> %s)"
+                        sessionId
+                        physicalUserMessageId
+                        expected
+                        participant
+                )
+            | _ -> ()
+
             capacity.AdoptReservation(sessionId, physicalUserMessageId, lease.Target)
 
             let updated =
                 { lease with
                     PhysicalUserMessageId = Some physicalUserMessageId
-                    Agent = adoptedAgent lease agent }
+                    Participant = Some participant }
 
             activeBySession.[sessionId] <- updated
-            lastPhysicalTargetBySession.[sessionId] <- lease.Target
             Some lease.Target
 
-        let routeFreshOrNone sessionId physicalUserMessageId agent previous =
-            match routeFreshOrPoison sessionId None physicalUserMessageId agent previous with
+        let routeFreshOrNone
+            sessionId
+            physicalUserMessageId
+            (role: Role)
+            (participant: string)
+            lenderSessionId
+            previous
+            =
+            match routeFreshOrPoison sessionId None physicalUserMessageId role lenderSessionId previous with
             | Some target ->
                 activeBySession.[sessionId] <-
                     { PhysicalUserMessageId = Some physicalUserMessageId
-                      Agent = agent
-                      RoutingAgent = agent
+                      Participant = Some participant
+                      RoutingRole = role
                       Target = target }
 
-                lastPhysicalTargetBySession.[sessionId] <- target
                 drainDemands ()
                 Some target
             | None -> None
 
-        let tryAcquireFreshLease sessionId physicalUserMessageId agent =
+        let tryAcquireFreshLease
+            sessionId
+            physicalUserMessageId
+            (role: Role)
+            (participant: string)
+            (lenderSessionId: string option)
+            =
             if admissionQueue.ContainsSession sessionId then
                 None
             else
-                let previous = previousTarget sessionId
-                routeFreshOrNone sessionId physicalUserMessageId agent previous
+                let previous = activePhysicalTarget sessionId
+                routeFreshOrNone sessionId physicalUserMessageId role participant lenderSessionId previous
 
-        let tryLeaseLocked sessionId physicalUserMessageId agent =
+        let tryLeaseLocked
+            sessionId
+            physicalUserMessageId
+            (role: Role)
+            (participant: string)
+            (lenderSessionId: string option)
+            =
             match activeBySession.TryGetValue sessionId with
             | true, lease when
                 lease.PhysicalUserMessageId = Some physicalUserMessageId
-                && (lease.Agent = agent || lease.Agent = "predictor")
+                && lease.RoutingRole = role
+                && (lease.Participant = Some participant || lease.Participant.IsNone)
                 ->
                 Some lease.Target
             | true, lease when
                 lease.PhysicalUserMessageId.IsNone
-                && (lease.Agent = agent || lease.Agent = "predictor")
+                && lease.RoutingRole = role
+                && (lease.Participant = Some participant || lease.Participant.IsNone)
                 ->
-                adoptExistingReservation sessionId physicalUserMessageId agent lease
+                adoptExistingReservation sessionId physicalUserMessageId role participant lease
             | true, _ -> None
-            | false, _ -> tryAcquireFreshLease sessionId physicalUserMessageId agent
+            | false, _ -> tryAcquireFreshLease sessionId physicalUserMessageId role participant lenderSessionId
 
-        let exactTargetAvailable agent target running =
-            match scheduleOrPoison running agent (Some target) with
+        let exactTargetAvailable (role: Role) target running =
+            match scheduleOrPoison running role (Some target) with
             | Some candidate -> candidate = target
             | None -> false
 
@@ -636,7 +760,7 @@ module ModelRouting =
                     physicalUserMessageId,
                     lease.Target,
                     fence,
-                    fun running -> exactTargetAvailable lease.RoutingAgent lease.Target running
+                    fun running -> exactTargetAvailable lease.RoutingRole lease.Target running
                 )
             | _ ->
                 failedTask<unit> (
@@ -653,8 +777,8 @@ module ModelRouting =
             if fatalError.IsNone then
                 drainDemands ()
 
-        let normalizeAdmissionInput sessionId physicalUserMessageId effectiveAgent =
-            normalizeExecutionInput sessionId physicalUserMessageId effectiveAgent
+        let normalizeAdmissionInput sessionId physicalUserMessageId (role: Role) (participant: string) =
+            normalizeExecutionInput sessionId physicalUserMessageId role participant
 
         let completePhysicalRelease sessionId physicalUserMessageId =
             function
@@ -682,23 +806,25 @@ module ModelRouting =
                     |> Option.map (fun physicalUserMessageId ->
                         ({ SessionId = sessionId
                            PhysicalUserMessageId = physicalUserMessageId
-                           EffectiveAgent = Some execution.Agent }
+                           Role = Some execution.RoutingRole
+                           Participant = execution.Participant }
                         : CapacityExactOwnerSnapshot)))
                 |> Seq.sortBy (fun owner -> owner.SessionId, owner.PhysicalUserMessageId)
                 |> Seq.toArray
 
-            let effectiveAgentByExecution: Map<string * string, string> =
+            let identityByExecution: Map<string * string, Role option * string option> =
                 executions
-                |> Array.choose (fun owner ->
-                    owner.EffectiveAgent
-                    |> Option.map (fun agent -> (owner.SessionId, owner.PhysicalUserMessageId), agent))
+                |> Array.map (fun owner ->
+                    (owner.SessionId, owner.PhysicalUserMessageId), (owner.Role, owner.Participant))
                 |> Map.ofArray
 
             let enrichOwner (owner: CapacityExactOwnerSnapshot) : CapacityExactOwnerSnapshot =
-                { owner with
-                    EffectiveAgent =
-                        Map.tryFind (owner.SessionId, owner.PhysicalUserMessageId) effectiveAgentByExecution
-                        |> Option.orElse owner.EffectiveAgent }
+                match Map.tryFind (owner.SessionId, owner.PhysicalUserMessageId) identityByExecution with
+                | Some(role, participant) ->
+                    { owner with
+                        Role = role |> Option.orElse owner.Role
+                        Participant = participant |> Option.orElse owner.Participant }
+                | None -> owner
 
             let tokens: CapacityTokenSnapshot<ModelRoutingTarget> array =
                 physical.Tokens
@@ -718,7 +844,8 @@ module ModelRouting =
                     ({ Owner =
                         ({ SessionId = demand.SessionId
                            PhysicalUserMessageId = demand.PhysicalUserMessageId
-                           EffectiveAgent = Some demand.EffectiveAgent }
+                           Role = Some demand.Role
+                           Participant = Some demand.Participant }
                         : CapacityExactOwnerSnapshot)
                        Sequence = demand.Sequence
                        Kind = "Admission" }
@@ -757,12 +884,18 @@ module ModelRouting =
               Counters = transitionCounters.Snapshot() }
 
         member _.AcquireExecutionAdmission
-            (sessionId: string, physicalUserMessageId: string, effectiveAgent: string)
-            : Task<ExecutionAdmissionAcquisition> =
-            match normalizeAdmissionInput sessionId physicalUserMessageId effectiveAgent with
+            (
+                sessionId: string,
+                physicalUserMessageId: string,
+                role: Role,
+                participant: string,
+                lenderSessionId: string option
+            ) : Task<ExecutionAdmissionAcquisition> =
+            match normalizeAdmissionInput sessionId physicalUserMessageId role participant with
             | Error error -> failedTask<ExecutionAdmissionAcquisition> error
-            | Ok(normSessionId, normPhysicalUserMessageId, normEffectiveAgent) ->
-                acquireManagedSafe normSessionId normPhysicalUserMessageId normEffectiveAgent
+            | Ok(normSessionId, normPhysicalUserMessageId, normRole, normParticipant) ->
+                let normLender = lenderSessionId |> Option.bind normalizeSessionId
+                acquireManagedSafe normSessionId normPhysicalUserMessageId normRole normParticipant normLender
 
         member _.ExecutionAdmissionTarget(lease: ExecutionAdmissionLease) = admissionOwner.Target lease
 
@@ -785,16 +918,30 @@ module ModelRouting =
         /// Strength-only nonwaiting reservation. It is capacity-bearing, but not
         /// yet a provider execution identity. The exact chat.message later adopts
         /// it without another scheduler decision or another running occurrence.
-        member _.TryReserveManaged(sessionId: string, agent: string) : ModelRoutingTarget option =
-            match normalizeReservationInput sessionId agent with
+        member _.TryReserveManaged
+            (sessionId: string, role: Role, lenderSessionId: string option)
+            : ModelRoutingTarget option =
+            match normalizeReservationInput sessionId role with
             | Error _ -> None
-            | Ok(normSessionId, normAgent) -> lock gate (fun () -> tryReserveLocked normSessionId normAgent)
+            | Ok(normSessionId, normRole) ->
+                let normLender = lenderSessionId |> Option.bind normalizeSessionId
+                lock gate (fun () -> tryReserveLocked normSessionId normRole normLender)
 
-        member _.TryLease(sessionId: string, physicalUserMessageId: string, agent: string) : ModelRoutingTarget option =
-            match normalizeExecutionInput sessionId physicalUserMessageId agent with
+        member _.TryLease
+            (
+                sessionId: string,
+                physicalUserMessageId: string,
+                role: Role,
+                participant: string,
+                lenderSessionId: string option
+            ) : ModelRoutingTarget option =
+            match normalizeExecutionInput sessionId physicalUserMessageId role participant with
             | Error _ -> None
-            | Ok(normSessionId, normPhysicalUserMessageId, normAgent) ->
-                lock gate (fun () -> tryLeaseLocked normSessionId normPhysicalUserMessageId normAgent)
+            | Ok(normSessionId, normPhysicalUserMessageId, normRole, normParticipant) ->
+                let normLender = lenderSessionId |> Option.bind normalizeSessionId
+
+                lock gate (fun () ->
+                    tryLeaseLocked normSessionId normPhysicalUserMessageId normRole normParticipant normLender)
 
         /// Physical end signals are cleanup evidence, not the sole correctness
         /// mechanism. A newer chat.message also supersedes this lease atomically.
@@ -813,7 +960,6 @@ module ModelRouting =
                     | CapacityTransitionOutcome.StaleFence
                     | CapacityTransitionOutcome.Conflict -> ()
 
-                    lastPhysicalTargetBySession.Remove normSessionId |> ignore
                     outcome))
             |> Option.defaultValue CapacityTransitionOutcome.Conflict
 
@@ -831,16 +977,6 @@ module ModelRouting =
             |> Option.defaultValue CapacityTransitionOutcome.Conflict
 
         member _.CapacitySnapshot() = lock gate capacitySnapshotLocked
-
-        member _.BindCapacityChild(parentSessionId: string, childSessionId: string) =
-            lock gate (fun () -> capacity.BindChild(parentSessionId, childSessionId))
-
-        member _.BindCapacityCompanion(ownerSessionId: string, bloggerSessionId: string) =
-            lock gate (fun () -> capacity.BindCompanion(ownerSessionId, bloggerSessionId))
-
-        member _.DropCapacityLineage(sessionId: string) =
-            normalizeSessionId sessionId
-            |> Option.iter (fun normSessionId -> lock gate (fun () -> capacity.DropLineage normSessionId))
 
         member _.EnterProviderStep
             (sessionId: string, physicalUserMessageId: string, visibleProviderRuns: Set<string>)
@@ -881,9 +1017,6 @@ module ModelRouting =
         member _.PendingCount = lock gate (fun () -> admissionQueue.Count)
         member _.PendingBound = ModelCapacityQueue.MaximumPendingDemands
         member _.PendingContractVersion = ModelCapacityQueue.ContractVersion
-
-        member _.LastPhysicalTarget(sessionId: string) : ModelRoutingTarget option =
-            lock gate (fun () -> previousTarget sessionId)
 
         member _.TakeProviderRunTarget(providerRun: string) : ModelRoutingTarget option =
             lock gate (fun () -> takeProviderRunTarget providerRun)
@@ -930,9 +1063,6 @@ module ModelRouting =
         | Some runtime -> runtime
         | None -> invalidOp "execution-model-routing: scheduler runtime was not initialized during plugin load"
 
-    let internal lastPhysicalTarget (sessionId: string) : ModelRoutingTarget option =
-        current().LastPhysicalTarget sessionId
-
     let internal takeProviderRunTarget (providerRun: ProviderRunIdentity) : ModelRoutingTarget option =
         current().TakeProviderRunTarget(ProviderRunIdentity.value providerRun)
 
@@ -943,13 +1073,17 @@ module ModelRouting =
     let internal acquireExecutionAdmission
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId)
-        (effectiveAgent: string)
+        (role: Role)
+        (participant: string)
+        (lenderSessionId: string option)
         =
         current()
             .AcquireExecutionAdmission(
                 SessionId.value sessionId,
                 PhysicalUserMessageId.value physicalUserMessageId,
-                effectiveAgent
+                role,
+                participant,
+                lenderSessionId
             )
 
     let internal executionAdmissionTarget (lease: ExecutionAdmissionLease) =
@@ -967,15 +1101,27 @@ module ModelRouting =
     let hasRuntime () : bool =
         lock sharedGate (fun () -> sharedRuntime.IsSome)
 
-    let tryReserveManaged (sessionId: SessionId) (agent: string) =
+    let tryReserveManaged (sessionId: SessionId) (role: Role) (lenderSessionId: string option) =
         match lock sharedGate (fun () -> sharedRuntime) with
-        | Some runtime -> runtime.TryReserveManaged(SessionId.value sessionId, agent)
+        | Some runtime -> runtime.TryReserveManaged(SessionId.value sessionId, role, lenderSessionId)
         | None -> None
 
-    let tryLease (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) (agent: string) =
+    let tryLease
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (role: Role)
+        (participant: string)
+        (lenderSessionId: string option)
+        =
         match lock sharedGate (fun () -> sharedRuntime) with
         | Some runtime ->
-            runtime.TryLease(SessionId.value sessionId, PhysicalUserMessageId.value physicalUserMessageId, agent)
+            runtime.TryLease(
+                SessionId.value sessionId,
+                PhysicalUserMessageId.value physicalUserMessageId,
+                role,
+                participant,
+                lenderSessionId
+            )
         | None -> None
 
     let internal releaseExecution (sessionId: SessionId) =
@@ -1023,22 +1169,6 @@ module ModelRouting =
         | None -> CapacityTransitionOutcome.AlreadyApplied
 
     let internal capacitySnapshot () = current().CapacitySnapshot()
-
-    let bindCapacityChild (parentSessionId: SessionId) (childSessionId: SessionId) =
-        match lock sharedGate (fun () -> sharedRuntime) with
-        | Some runtime -> runtime.BindCapacityChild(SessionId.value parentSessionId, SessionId.value childSessionId)
-        | None -> ()
-
-    let bindCapacityCompanion (ownerSessionId: SessionId) (bloggerSessionId: SessionId) =
-        match lock sharedGate (fun () -> sharedRuntime) with
-        | Some runtime ->
-            runtime.BindCapacityCompanion(SessionId.value ownerSessionId, SessionId.value bloggerSessionId)
-        | None -> ()
-
-    let dropCapacityLineage (sessionId: SessionId) =
-        match lock sharedGate (fun () -> sharedRuntime) with
-        | Some runtime -> runtime.DropCapacityLineage(SessionId.value sessionId)
-        | None -> ()
 
     let enterProviderStep
         (sessionId: SessionId)

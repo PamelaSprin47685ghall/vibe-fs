@@ -6,7 +6,7 @@
 
 ## CHATEXEC-002: Versioned durable fact vocabulary
 
-每个 execution 的历史只由带 schema version 的 `Accepted`、`ProviderStarted` 与 terminal disposition 事实构成。`Accepted` 携带 pre-provider `AcceptedChatExecutionEvidence`：exact key、IdentitySeed、EffectiveAgent、PromptOrigin 与 authority evidence，禁止包含尚未存在的 ProviderRun。`ProviderStarted` 携带 `ProviderStartedExecutionEvidence`：完整 accepted evidence 加 Host 实际观察到的 ProviderRunIdentity、ProviderRequestKind 与 projection choice。terminal evidence 是 closed DU：`PreProvider` 携带 accepted evidence，或 `AfterProviderStart` 携带 started evidence；不得用 option/bool 拼接阶段。旧版本必须经纯、确定、逐级升级后再折叠；进程状态、日志文字与 Host mutable projection 均不得冒充 durable fact。
+`Accepted` 携带 pre-provider `AcceptedChatExecutionEvidence`：exact key、由 IdentitySeed 派生且在 logical run 内不可变的固定 participant+role（含 persona、personaCatalogVersion 与 provenance evidence）、PromptOrigin 与 authority evidence，禁止包含尚未存在的 ProviderRun。系统中不存在 PeerAgent，亦无可变的 EffectiveAgent 身份字段；provider retry 只由单一连续失败预算拥有，managed-chat 恢复不重试。`ProviderStarted` 携带 `ProviderStartedExecutionEvidence`：完整 accepted evidence 加 Host 实际观察到的 ProviderRunIdentity、ProviderRequestKind 与 projection choice。terminal evidence 是 closed DU：`PreProvider` 携带 accepted evidence，或 `AfterProviderStart` 携带 started evidence；不得用 option/bool 拼接阶段。旧版本必须经纯、确定、逐级升级后再折叠；进程状态、日志文字与 Host mutable projection 均不得冒充 durable fact。
 
 ## CHATEXEC-003: 固定 transaction order
 
@@ -44,21 +44,22 @@ logical cancel 与 session delete 必须枚举 durable projection 中该作用�
 
 ## CHATEXEC-011: Acceptance 原子消费 pre-provider authority evidence
 
-`Accepted` 必须原子消费 Task14 frozen managed intent 与 `interaction-authority` 发布的 current authority evidence，建立 exact `AcceptedChatExecutionEvidence`，包括完整版本化 `ParticipantIdentityEvidence`，但不包含 ProviderRunIdentity。Provider-start owner 随后只能把 Host-observed ProviderRunIdentity 与 accepted evidence 组合成 `ProviderStartedExecutionEvidence`。两阶段均只逐字段投影 owner-issued evidence；不得从 agent 名称、Session cache、Host parent、model 或旧 execution 推导、补全、改写或独立缓存 Role、initial Tier、Persona、Peer、provenance/version 或物理 run。复用 `SessionId` 时，LogicalRunId 与 evidence 必须属于 durable exact prior-run closure 之后安装的当前 run；不匹配即 fail closed。
+`Accepted` 必须原子消费 Task14 frozen managed intent 与 `interaction-authority` 发布的 current authority evidence，建立 exact `AcceptedChatExecutionEvidence`，包括完整版本化 `ParticipantIdentityEvidence`，但不包含 ProviderRunIdentity。Provider-start owner 随后只能把 Host-observed ProviderRunIdentity 与 accepted evidence 组合成 `ProviderStartedExecutionEvidence`。
+两阶段均只逐字段投影 owner-issued evidence；不得从显式 agent 文本、Session cache、Host parent、model 或旧 execution 推导、补全、改写或独立缓存 participant、Role、initial Tier、Persona、provenance/version 或物理 run。显式外部 agent 仍作为输入保留并与 participant 做一致性校验；continuation 保持 participant 不变，fresh physical target 路由永不改变 participant。
 
 ## CHATEXEC-012: Recovery decision 只由 durable execution 与显式 physical evidence 决定
 
 `managed-chat-execution` 独占纯 `Evidence → Decision` 公式。Evidence 只包含 canonical `ChatExecutionState`、exact public provider receipt observation（missing、ambiguous、absent、alive、terminal）、exact physical resource observation、typed persistence commitment，以及 `execution-failure-policy` 已发布的 terminal decision 与失败决议。Decision 是封闭代数：`Ignore | ReconcilePhysical | ResumePreProvider | Finalize | MarkManualIntervention`；彻底废止 `RequeueEligible` 门面——managed-chat 崩溃与资源恢复不拥有 provider retry/fallback 解释权，严禁启动 provider 工作或发布惰性的 requeue 请求。所有 provider-started retry 与 fallback 唯一由 `Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderRecoveryWorkflow` 解释。每个 effectful case 携带所需的 exact execution evidence，但本公式不执行 effect。
 
-`Accepted` 且 exact provider absent 才可恢复 pre-provider admission；observed provider 必须先 reconcile durable started/terminal facts。`ProviderStarted` 且 provider alive 只观察，exact terminal 才 finalize，exact absent 只由 failure policy 发布 terminal 并进行终态结算，不通过 managed-chat 重试；typed supersession 因而只能使用 policy 发布的 exact cancelled terminal。durable terminal 若 physical resource 仍 held 则请求 exact reconciliation，否则幂等忽略。missing/ambiguous receipt、unknown persistence/resource、无 policy authorization 均 fail closed 为 manual intervention；stale external evidence 不得改写当前 execution。禁止 Role、error text、terminal prose、idle、timer、process age、cursor、registry presence 或 process-local capacity state参与判断。同一 Evidence 必须永远产生同一 Decision。
+`Accepted` 且 exact provider absent 才可恢复 pre-provider admission；跨进程崩溃恢复与普通会话续传必须服从 CRASH-017 与 CRASH-018：新进程不得自动重放中断的工具或无边界自发推进执行，用户显式 `/continue` 是唯一的会话续传入口。若宿主提供 `ExactAcceptedMessageRecoveryPort`，仅且仅在此 port 明确接受（返回 true）时才代表 exact 准入被接管，且 failure policy 绝不重算；若未提供 port（production `None` 构造）或 port 拒绝接管，恢复决策绝不产生后台隐式消费的假象，而是生成明确、可观察的 manual/blocked 处置事实并记录 briefing。observed provider 必须先 reconcile durable started/terminal facts。`ProviderStarted` 且 provider alive 只观察，exact terminal 才 finalize，exact absent 只由 failure policy 发布 terminal 并进行终态结算，不通过 managed-chat 重试；typed supersession 因而只能使用 policy 发布的 exact cancelled terminal。durable terminal 若 physical resource 仍 held 则请求 exact reconciliation，否则幂等忽略。missing/ambiguous receipt、unknown persistence/resource、无 policy authorization 均 fail closed 为 manual intervention；stale external evidence 不得改写当前 execution。禁止 Role、error text、terminal prose、idle、timer、process age、cursor、registry presence 或 process-local capacity state参与判断。同一 Evidence 必须永远产生同一 Decision。
 
 排列、重复事件与 crash cut proof 必须调用已注册 production Surface。测试内重建 decision、terminal、release 或 dispatch 公式并 mutation 该副本，不构成本命题的 executable proof。
 
 Recovery Surface 的 port observation 必须逐次追加每个真实 invocation，不得在 observer 内去重。process restart 两侧必须创建独立 observer；跨重启幂等只能由 durable owner 实现，测试观察器不得代替 owner 吞掉重复请求。
 
-## CHATEXEC-013: Execution reliability query 只投影 canonical lifecycle
+## CHATEXEC-013: Execution reliability query 与 diagnostic 表生命周期
 
-`Accepted without Terminal`、`ProviderStarted without Terminal` 与每个 `LogicalRunId` 的 physical attempt 数只能从 canonical `ChatExecutionProjection` 只读导出。查询返回不可变 process-local snapshot，不写 durable fact，不 terminalize execution，不授权 retry/fallback，不读取 diagnostic counter 作为恢复 evidence。Recovery pending/manual intervention 只投影 `PluginRecoveryScope.PendingChatRecoveryOwnership()` 的 typed ownership，不复制或清理其状态。
+`Accepted without Terminal`、`ProviderStarted without Terminal` 与每个 `LogicalRunId` 的 physical attempt 数只能从 canonical `ChatExecutionProjection` 只读导出。查询返回不可变 process-local snapshot，不写 durable fact，不 terminalize execution，不授权 retry/fallback，不读取 diagnostic counter 作为恢复 evidence。Recovery pending/manual intervention 只投影 `PluginRecoveryScope.PendingChatRecoveryOwnership()` 的 typed ownership，不复制或清理其状态；且 manual intervention DTO 是纯报告与处置事实，绝不是进程间恢复命令。当 exact execution 达到真实终态时，其对应的 pending 与 manual 诊断登记必须立即被撤销，禁止已失效的请求永久驻留诊断快照中。
 
 ## CHATEXEC-014: Incident evidence capture 与 replay 无 correctness authority
 

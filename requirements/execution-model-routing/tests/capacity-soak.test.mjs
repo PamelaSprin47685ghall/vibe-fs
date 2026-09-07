@@ -9,6 +9,8 @@ const queueWidth = 32
 const lineageCycles = 64
 const capacity = 4
 const admissionRetainedBound = 84
+const ELIGIBLE = 'coder'
+const BLOCKED = 'inspector'
 const lineageRetainedComposition = Object.freeze({
   ledgerEntries: 1,
   token: 1,
@@ -16,7 +18,7 @@ const lineageRetainedComposition = Object.freeze({
   executions: 2,
   pendingProviderWaiter: 1,
   owners: 2,
-  lineage: 1,
+  lineage: 0,
 })
 const lineageRetainedBound = Object.values(lineageRetainedComposition).reduce((sum, count) => sum + count, 0)
 const target = { model: 'provider/shared', reasoning: 'none' }
@@ -120,13 +122,14 @@ const createAuditor = (runtime, retainedBound) => {
   }
 }
 
-const begin = (runtime, sessionId, physicalUserMessageId, effectiveAgent) =>
-  routing.beginExecutionAdmission(runtime, sessionId, physicalUserMessageId, effectiveAgent)
+const begin = (runtime, sessionId, physicalUserMessageId, role, participant, lenderSessionId = null) =>
+  routing.beginExecutionAdmission(runtime, sessionId, physicalUserMessageId, role, participant, lenderSessionId)
 
 const observedIdentity = (runtime, lease, record) => ({
   sessionId: record.sessionId,
   physicalUserMessageId: record.physicalUserMessageId,
-  effectiveAgent: record.effectiveAgent,
+  role: record.role,
+  participant: record.participant,
   target: routing.executionAdmissionTarget(runtime, lease),
 })
 
@@ -135,7 +138,7 @@ test('WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact r
   let blockedEligible = false
   const runtime = routing.createRuntime((role, running) => {
     if (running.length >= capacity) return null
-    if (role.startsWith('blocked-') && !blockedEligible) return null
+    if (role === BLOCKED && !blockedEligible) return null
     return target
   })
   const auditor = createAuditor(runtime, admissionRetainedBound)
@@ -167,9 +170,10 @@ test('WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact r
       const record = {
         sessionId: `holder-${index}`,
         physicalUserMessageId: `holder-${round}-${index}`,
-        effectiveAgent: `eligible-holder-${index}`,
+        role: 'manager',
+        participant: `holder-owner-${index}`,
       }
-      const outcome = await begin(runtime, record.sessionId, record.physicalUserMessageId, record.effectiveAgent)
+      const outcome = await begin(runtime, record.sessionId, record.physicalUserMessageId, record.role, record.participant)
       assert.equal(outcome.kind, 'Acquired')
       auditor.operation()
       commit(record, outcome.lease)
@@ -180,17 +184,20 @@ test('WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact r
       runtime,
       staleRecord.sessionId,
       staleRecord.physicalUserMessageId,
-      staleRecord.effectiveAgent,
+      staleRecord.role,
+      staleRecord.participant,
     )
     assert.equal(staleLeaseOutcome.kind, 'Acquired')
     auditor.operation()
     const staleIdentity = observedIdentity(runtime, staleLeaseOutcome.lease, staleRecord)
+    release(staleRecord)
     const replacement = { ...staleRecord, physicalUserMessageId: `${staleRecord.physicalUserMessageId}-new` }
     const replacementOutcome = await begin(
       runtime,
       replacement.sessionId,
       replacement.physicalUserMessageId,
-      replacement.effectiveAgent,
+      replacement.role,
+      replacement.participant,
     )
     assert.equal(replacementOutcome.kind, 'Acquired')
     auditor.operation()
@@ -210,7 +217,8 @@ test('WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact r
       runtime,
       committed.sessionId,
       committed.physicalUserMessageId,
-      committed.effectiveAgent,
+      committed.role,
+      committed.participant,
     )
     assert.equal(committedLease.kind, 'Acquired')
     auditor.operation()
@@ -230,12 +238,13 @@ test('WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact r
       const record = {
         sessionId: `waiter-${index}`,
         physicalUserMessageId: `waiter-${round}-${index}`,
-        effectiveAgent:
+        role:
           position === 0 || (position !== 1 && (next() & 3) === 0)
-            ? `blocked-${index}`
-            : `eligible-${index}`,
+            ? BLOCKED
+            : ELIGIBLE,
+        participant: `waiter-owner-${index}`,
       }
-      const outcome = await begin(runtime, record.sessionId, record.physicalUserMessageId, record.effectiveAgent)
+      const outcome = await begin(runtime, record.sessionId, record.physicalUserMessageId, record.role, record.participant)
       assert.equal(outcome.kind, 'Queued')
       auditor.operation()
       record.queue = outcome.queue
@@ -253,7 +262,8 @@ test('WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact r
         runtime,
         replacementRecord.sessionId,
         replacementRecord.physicalUserMessageId,
-        replacementRecord.effectiveAgent,
+        replacementRecord.role,
+        replacementRecord.participant,
       )
       assert.equal(replacementOutcome.kind, 'Queued')
       auditor.operation()
@@ -263,7 +273,7 @@ test('WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact r
       records.set(exactKey(replacementRecord), replacementRecord)
     }
 
-    const overflow = await begin(runtime, `overflow-${round}`, `overflow-physical-${round}`, 'eligible-overflow')
+    const overflow = await begin(runtime, `overflow-${round}`, `overflow-physical-${round}`, ELIGIBLE, 'overflow-owner')
     assert.deepEqual(
       { kind: overflow.kind, failure: overflow.failure },
       { kind: 'QueueFull', failure: 'CapacityQueueFull' },
@@ -273,7 +283,7 @@ test('WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact r
 
     const cancellationRecords = shuffled(queueWidth, next)
       .map((index) => [...records.values()].find((candidate) => candidate.sessionId === `waiter-${index}`))
-      .filter((record) => record?.effectiveAgent.startsWith('eligible-'))
+      .filter((record) => record?.role === ELIGIBLE)
       .slice(0, 4)
     assert.equal(cancellationRecords.length, 4)
     for (const record of cancellationRecords) {
@@ -288,7 +298,7 @@ test('WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact r
     const admitOldestEligible = async (eligible) => {
       const snapshot = routing.capacitySnapshot(runtime)
       const expected = snapshot.waiters
-        .filter((waiter) => waiter.kind === 'Admission' && eligible(waiter.effectiveAgent))
+        .filter((waiter) => waiter.kind === 'Admission' && eligible(waiter.role))
         .sort((left, right) => left.sequence - right.sequence)[0]
       if (!expected) return false
       const released = active.shift()
@@ -302,7 +312,7 @@ test('WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact r
       return true
     }
 
-    while (await admitOldestEligible((role) => role.startsWith('eligible-'))) {}
+    while (await admitOldestEligible((role) => role === ELIGIBLE)) {}
     assert.ok(records.size > 0, 'the seeded schedule retains an ineligible head')
 
     blockedEligible = true
@@ -333,9 +343,10 @@ test('WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact r
   const exact = {
     sessionId: 'impossible-holder',
     physicalUserMessageId: 'impossible-physical',
-    effectiveAgent: 'eligible-impossible',
+    role: ELIGIBLE,
+    participant: 'impossible-owner',
   }
-  const acquired = await begin(impossibleRuntime, exact.sessionId, exact.physicalUserMessageId, exact.effectiveAgent)
+  const acquired = await begin(impossibleRuntime, exact.sessionId, exact.physicalUserMessageId, exact.role, exact.participant)
   assert.equal(acquired.kind, 'Acquired')
   const valid = impossibleAuditor.operation()
   const impossible = { ...valid, ledgerEntries: [] }
@@ -350,15 +361,25 @@ test('WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact r
   )
 })
 
-test('WHAT[EMR-010] seeded lineage soak recalls one physical credit without lost wake or retained settlement nodes', async (context) => {
+test('WHAT[EMR-010] seeded lender soak shares one physical credit without retained settlement nodes', async (context) => {
   const runtime = routing.createRuntime((_role, running) => (running.length === 0 ? target : null))
   const auditor = createAuditor(runtime, lineageRetainedBound)
 
   for (let cycle = 0; cycle < lineageCycles; cycle += 1) {
-    const parent = { sessionId: `parent-${cycle}`, physicalUserMessageId: `parent-physical-${cycle}`, effectiveAgent: 'parent' }
-    const child = { sessionId: `child-${cycle}`, physicalUserMessageId: `child-physical-${cycle}`, effectiveAgent: 'child' }
+    const parent = {
+      sessionId: `parent-${cycle}`,
+      physicalUserMessageId: `parent-physical-${cycle}`,
+      role: 'coder',
+      participant: `parent-owner-${cycle}`,
+    }
+    const child = {
+      sessionId: `child-${cycle}`,
+      physicalUserMessageId: `child-physical-${cycle}`,
+      role: 'manager',
+      participant: `child-owner-${cycle}`,
+    }
 
-    const parentOutcome = await begin(runtime, parent.sessionId, parent.physicalUserMessageId, parent.effectiveAgent)
+    const parentOutcome = await begin(runtime, parent.sessionId, parent.physicalUserMessageId, parent.role, parent.participant)
     assert.equal(parentOutcome.kind, 'Acquired')
     auditor.operation()
     assert.deepEqual(
@@ -367,9 +388,14 @@ test('WHAT[EMR-010] seeded lineage soak recalls one physical credit without lost
     )
     auditor.operation()
 
-    routing.bindCapacityChild(runtime, parent.sessionId, child.sessionId)
-    auditor.operation()
-    const childOutcome = await begin(runtime, child.sessionId, child.physicalUserMessageId, child.effectiveAgent)
+    const childOutcome = await begin(
+      runtime,
+      child.sessionId,
+      child.physicalUserMessageId,
+      child.role,
+      child.participant,
+      parent.sessionId,
+    )
     assert.equal(childOutcome.kind, 'Acquired')
     auditor.operation()
     assert.deepEqual(
@@ -377,28 +403,19 @@ test('WHAT[EMR-010] seeded lineage soak recalls one physical credit without lost
       { kind: 'Applied' },
     )
     auditor.operation()
-    assert.equal(routing.capacitySnapshot(runtime).ledgerEntries.length, 1, 'lineage borrowing does not duplicate capacity')
+    assert.equal(routing.capacitySnapshot(runtime).ledgerEntries.length, 1, 'explicit lender borrowing does not duplicate capacity')
+    assert.deepEqual(routing.capacitySnapshot(runtime).lineage, [], 'borrowing leaves no ambient lineage edge')
 
     await routing.enterProviderStep(runtime, child.sessionId, child.physicalUserMessageId, [])
     auditor.operation()
-    let recalled = false
-    const recall = routing.enterProviderStep(runtime, parent.sessionId, parent.physicalUserMessageId, []).then(() => {
-      recalled = true
-    })
-    await Promise.resolve()
-    assert.equal(recalled, false)
-    auditor.operation()
-
+    assert.equal(routing.capacitySnapshot(runtime).activeCount, 1, 'the borrowed step holds the one real credit')
     routing.endProviderStep(runtime, child.sessionId, child.physicalUserMessageId, `child-run-${cycle}`)
     auditor.operation()
-    await recall
-    assert.equal(recalled, true, 'one causal provider-step end wakes the waiting owner')
+    assert.equal(routing.capacitySnapshot(runtime).activeCount, 0, 'the causal step end releases the borrowed credit')
     routing.endProviderStep(runtime, child.sessionId, child.physicalUserMessageId, `child-run-${cycle}`)
     auditor.operation()
-    assert.equal(routing.capacitySnapshot(runtime).activeCount, 1, 'duplicate old end cannot release the recalled step')
+    assert.equal(routing.capacitySnapshot(runtime).activeCount, 0, 'a duplicate old end cannot release anything twice')
 
-    routing.endProviderStep(runtime, parent.sessionId, parent.physicalUserMessageId, `parent-run-${cycle}`)
-    auditor.operation()
     assert.deepEqual(routing.releasePhysicalExecution(runtime, child.sessionId, child.physicalUserMessageId), {
       kind: 'Applied',
     })
@@ -407,7 +424,6 @@ test('WHAT[EMR-010] seeded lineage soak recalls one physical credit without lost
       kind: 'Applied',
     })
     auditor.operation()
-    routing.dropCapacityLineage(runtime, child.sessionId)
     const drained = auditor.operation()
     assert.equal(drained.ledgerEntries.length, 0)
     assert.equal(drained.tokens.length, 0)
@@ -420,6 +436,6 @@ test('WHAT[EMR-010] seeded lineage soak recalls one physical credit without lost
 
   const report = auditor.report()
   context.diagnostic(
-    `task36 lineage seed=${seed} cycles=${lineageCycles} operations=${report.operations} maxRetained=${report.maxRetained} retainedBound=${lineageRetainedBound} retainedComposition=${JSON.stringify(lineageRetainedComposition)}`,
+    `task36 lender seed=${seed} cycles=${lineageCycles} operations=${report.operations} maxRetained=${report.maxRetained} retainedBound=${lineageRetainedBound} retainedComposition=${JSON.stringify(lineageRetainedComposition)}`,
   )
 })

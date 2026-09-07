@@ -155,7 +155,6 @@ module ManagedChatAcceptance =
         (authority: PromptAuthority.AuthorityExecutionProfile)
         (physicalUserMessageId: PhysicalUserMessageId)
         (origin: PromptOrigin)
-        (effectiveAgent: string)
         : AcceptedChatExecutionEvidence =
         { SessionId = authority.SessionId
           LogicalRunId = authority.LogicalRunId
@@ -163,8 +162,7 @@ module ManagedChatAcceptance =
           AuthorityKind = authority.AuthorityKind
           IdentitySeed = authority.IdentitySeed
           PhysicalUserMessageId = physicalUserMessageId
-          Origin = origin
-          EffectiveAgent = effectiveAgent }
+          Origin = origin }
 
     type private AcceptanceDecision =
         | ExistingWitness of ManagedChatAcceptanceWitness

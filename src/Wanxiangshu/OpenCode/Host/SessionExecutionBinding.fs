@@ -141,16 +141,6 @@ module SessionExecutionBinding =
             )
         | _ -> agents.[sessionKey] <- proposed
 
-    let private tryPeerName (agentName: string) : string option =
-        let trimmed = agentName.Trim()
-
-        if String.IsNullOrWhiteSpace trimmed then
-            None
-        elif ManagedAgentCatalog.isBookkeeperName trimmed then
-            Some trimmed
-        else
-            Some trimmed
-
     let private sameModel (left: OpencodeModel) (right: OpencodeModel) =
         left.providerID = right.providerID
         && left.modelID = right.modelID
@@ -177,8 +167,6 @@ module SessionExecutionBinding =
             | false, Some proposed -> rememberAgent childKey proposed
             | false, None -> ())
 
-        if not privateHostChild then
-            ModelRouting.bindCapacityChild parentId childId
 
     let restore (parentId: SessionId) (childId: SessionId) (agent: string option) = bind parentId childId agent
 
@@ -219,8 +207,8 @@ module SessionExecutionBinding =
     let observeHostAuxiliaryChild (sessionId: SessionId) =
         lock gate (fun () -> hostAuxiliaryChildren.Add(SessionId.value sessionId) |> ignore)
 
-    /// A real external managed user message may choose a new EffectiveAgent. Its model
-    /// is deliberately ignored; chat.message routing replaces that field from ModelRouting.
+    /// A real external managed user message observes the participant agent. Its model
+    /// is deliberately ignored; model routing replaces that field from ModelRouting.
     let observeUserFacingAgent (sessionId: SessionId) (agent: string) =
         lock gate (fun () ->
             let key = SessionId.value sessionId
@@ -229,8 +217,8 @@ module SessionExecutionBinding =
                 agents.[key] <- agent.Trim())
 
     /// PROMPT-006: chat.message has physically accepted one plugin-owned prompt.
-    /// The caller supplies EffectiveAgent from the still-pending PromptClaim, not
-    /// from the Host message. This survives SendPrompt returning, but is addressed
+    /// The caller supplies the fixed participant from the accepted evidence/claim,
+    /// not from the Host message. This survives SendPrompt returning, but is addressed
     /// by PromptKey and therefore cannot bless an unrelated later request.
     let private exactBinding physicalUserMessageId agent model =
         { PhysicalUserMessageId = physicalUserMessageId
@@ -240,11 +228,11 @@ module SessionExecutionBinding =
     let acceptExternalExecution
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId)
-        (effectiveAgent: string)
+        (participant: string)
         (model: OpencodeModel)
         : unit =
-        match nonEmpty effectiveAgent with
-        | None -> invalidOp "PROMPT-006: accepted external execution has no EffectiveAgent"
+        match nonEmpty participant with
+        | None -> invalidOp "PROMPT-006: accepted external execution has no participant"
         | Some agent ->
             lock gate (fun () ->
                 let sessionKey = SessionId.value sessionId
@@ -255,11 +243,11 @@ module SessionExecutionBinding =
         (sessionId: SessionId)
         (promptKey: PromptKey)
         (physicalUserMessageId: PhysicalUserMessageId)
-        (effectiveAgent: string)
+        (participant: string)
         (model: OpencodeModel)
         : unit =
-        match nonEmpty effectiveAgent with
-        | None -> invalidOp "PROMPT-006: accepted plugin prompt has no EffectiveAgent"
+        match nonEmpty participant with
+        | None -> invalidOp "PROMPT-006: accepted plugin prompt has no participant"
         | Some agent ->
             lock gate (fun () ->
                 let sessionKey = SessionId.value sessionId
@@ -322,6 +310,11 @@ module SessionExecutionBinding =
             | true, agent -> Some agent
             | false, _ -> None)
 
+    let private roleOfParticipant (participant: string) : Role option =
+        match ManagedAgent.tryParse participant with
+        | Some managed -> Some managed.Role
+        | None -> Roles.tryParseRole (participant.Trim())
+
     let private rememberExternalAttempt sessionId physical agent target =
         let sessionKey = SessionId.value sessionId
 
@@ -334,7 +327,14 @@ module SessionExecutionBinding =
         Ok()
 
     let private bindExternalExecutionLease sessionId physical agent =
-        match ModelRouting.tryLease sessionId physical agent with
+        let roleOpt = roleOfParticipant agent
+
+        let leaseOpt =
+            match roleOpt with
+            | Some role -> ModelRouting.tryLease sessionId physical role agent None
+            | None -> None
+
+        match leaseOpt with
         | None ->
             Error(
                 sprintf
@@ -570,7 +570,6 @@ module SessionExecutionBinding =
                 authority
                 key.PhysicalUserMessageId
                 (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.HumanMessage)
-                authority.SelectedAgent
 
         ManagedChatAcceptance.accept durable key evidence
 
@@ -605,7 +604,6 @@ module SessionExecutionBinding =
                       AuthorityRootUserMessageId = rootUserMsgId
                       AuthorityKind = PromptRootAuthorityKind.HumanRoot
                       PhysicalUserMessageId = key.PhysicalUserMessageId
-                      EffectiveAgent = agent
                       IdentitySeed = PromptAuthority.IdentitySeed.RootSelection identity
                       Origin = PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot }
 
@@ -752,7 +750,6 @@ module SessionExecutionBinding =
             clearAcceptedPromptBindingsForSession key)
 
         ModelRouting.releaseExecution sessionId |> ignore
-        ModelRouting.dropCapacityLineage sessionId
 
     let cancelUnacquired (sessionId: SessionId) =
         ModelRouting.cancelUnacquiredExecution sessionId |> ignore
@@ -765,7 +762,14 @@ module SessionExecutionBinding =
         (agent: string)
         (model: OpencodeModel)
         =
-        match ModelRouting.tryLease sessionId physicalUserMessageId agent with
+        let roleOpt = roleOfParticipant agent
+
+        let leaseOpt =
+            match roleOpt with
+            | Some role -> ModelRouting.tryLease sessionId physicalUserMessageId role agent None
+            | None -> None
+
+        match leaseOpt with
         | None ->
             Error(
                 sprintf
@@ -840,32 +844,39 @@ module SessionExecutionBinding =
             Error "PROMPT-006: managed provider run has no exact physical execution binding"
         | ProviderExpectation.Unbound -> Ok false
 
-    let effectiveAgent (sessionId: SessionId) (opts: OpenCodePromptOptions) : Result<string, string> =
+    let participantAgent (sessionId: SessionId) (opts: OpenCodePromptOptions) : Result<string, string> =
         let baseAgent = tryAgent sessionId |> Option.bind nonEmpty
         let requested = opts.Agent |> Option.bind nonEmpty
 
         match opts.BindingIntent, baseAgent, requested with
-        | SessionBindingIntent.Preserve, None, _ -> Error "PROMPT-006: session has no frozen/observed agent binding"
+        | SessionBindingIntent.Preserve, None, _ ->
+            Error "PROMPT-006: session has no frozen/observed participant binding"
         | SessionBindingIntent.Preserve, Some agent, Some requested when requested <> agent ->
-            Error(sprintf "PROMPT-006: preserve agent drift (%s -> %s)" agent requested)
+            Error(sprintf "PROMPT-006: preserve participant drift (%s -> %s)" agent requested)
         | SessionBindingIntent.Preserve, Some agent, _ -> Ok agent
-        | SessionBindingIntent.ExplicitExecutionOverride, _, Some agent -> Ok agent
+        | SessionBindingIntent.ExplicitExecutionOverride, Some baseParticipant, Some requested when
+            requested <> baseParticipant
+            ->
+            Error(
+                sprintf
+                    "PROMPT-006: explicit execution agent '%s' must equal authority participant '%s'"
+                    requested
+                    baseParticipant
+            )
+        | SessionBindingIntent.ExplicitExecutionOverride, Some baseParticipant, _ -> Ok baseParticipant
+        | SessionBindingIntent.ExplicitExecutionOverride, None, Some agent -> Ok agent
         | SessionBindingIntent.ExplicitExecutionOverride, _, None ->
-            Error "PROMPT-006: execution override requires an explicit managed agent"
+            Error "PROMPT-006: execution override requires an explicit managed participant"
 
     let private validateExecutionIntent label baseAgent intent agent : Result<unit, string> =
         match intent with
-        | SessionBindingIntent.Preserve when agent <> baseAgent ->
-            Error(sprintf "PROMPT-006: %s agent drift (%s -> %s)" label baseAgent agent)
-        | SessionBindingIntent.ExplicitExecutionOverride when
-            agent <> baseAgent && not (tryPeerName baseAgent |> Option.exists ((=) agent))
-            ->
-            Error(sprintf "PROMPT-006: execution override is not the peer of '%s': %s" baseAgent agent)
+        | _ when agent <> baseAgent ->
+            Error(sprintf "PROMPT-006: %s participant drift (%s -> %s)" label baseAgent agent)
         | _ -> Ok()
 
     let private prepareForBaseAgent label (sessionId: SessionId) (baseAgent: string) (opts: OpenCodePromptOptions) =
         result {
-            let! agent = effectiveAgent sessionId opts
+            let! agent = participantAgent sessionId opts
             do! validateExecutionIntent label baseAgent opts.BindingIntent agent
             // EMR: dispatching a user message is not provider execution admission.
             // Model capacity is acquired exactly once later at chat.message, when

@@ -43,10 +43,16 @@ module ChronicleTool =
         else
             Ok trimmed
 
-    let hasLiveCycle (bloggerHost: IBloggerRuntimeHost option) (sessionId: string) : bool =
+    let private tryCurrentRequest (bloggerHost: IBloggerRuntimeHost option) (sessionId: string) =
         match bloggerHost with
-        | None -> false
-        | Some host -> host.HasFlight sessionId
+        | None -> None
+        | Some host -> host.TryPeekCurrentRequest sessionId
+
+    let hasLiveCycle (bloggerHost: IBloggerRuntimeHost option) (sessionId: string) : bool =
+        // Live-cycle authority is the exact current Blogger request context,
+        // never a bare session boolean: only a live request may authorize
+        // chronicle effects, and only its own release may end them.
+        (tryCurrentRequest bloggerHost sessionId).IsSome
 
     let private enforcerRules () =
         RuntimeResources.current().EnforcerRules
@@ -98,10 +104,9 @@ module ChronicleTool =
         : System.Threading.Tasks.Task<ChronicleExecution> =
         task {
             let execution =
-                if hasLiveCycle bloggerHost ctx.SessionId then
-                    ChronicleExecution.decide true (executeValidEntry language args)
-                else
-                    ChronicleExecution.decide false ""
+                match tryCurrentRequest bloggerHost ctx.SessionId with
+                | Some _ -> ChronicleExecution.decide true (executeValidEntry language args)
+                | None -> ChronicleExecution.decide false ""
 
             match execution with
             | ChronicleExecution.Completed _ -> return execution

@@ -156,7 +156,6 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_RECOVERY_JOIN_GATE_production_sources_are_g
     'src/Wanxiangshu/Execution/Session/Recovery/Model.fs',
     'src/Wanxiangshu/Execution/Delegation/Facts.fs',
     'src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs',
-    'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs',
     'src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs',
     'src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs',
     'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs',

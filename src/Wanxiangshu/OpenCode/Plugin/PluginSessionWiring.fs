@@ -182,6 +182,12 @@ module PluginSessionWiring =
 
                 bindStrengthReplica replicaId agent
 
+            let tryParentKey sessionId =
+                let found, parentKey =
+                    scope.Sessions.SessionParents.TryGetValue(SessionId.value sessionId)
+
+                if found then Some parentKey else None
+
             let strengthReplicaRuntime =
                 new StrengthReplicaRuntime(
                     sessionPort,
@@ -191,7 +197,11 @@ module PluginSessionWiring =
                     ?workspaceDirectory = workspaceDirectory,
                     ?tryAcquireModel =
                         Some(fun sessionId agent ->
-                            ModelRouting.tryReserveManaged sessionId agent
+                            let role = roleForAgent agent
+
+                            let lenderSessionId = tryParentKey sessionId
+
+                            ModelRouting.tryReserveManaged sessionId role lenderSessionId
                             |> Option.map ModelRouting.toOpenCodeModel),
                     ?releaseModel = Some(fun sessionId -> ModelRouting.releaseExecution sessionId |> ignore)
                 )

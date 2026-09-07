@@ -55,7 +55,9 @@ test('WHAT[CHATEXEC-007] each typed pre-provider failure settles the exact accep
   }
 })
 
-test('WHAT[CHATEXEC-007] rejects raw AGENT-028 before it can enter a legal managed flow', async () => {
+test('WHAT[CHATEXEC-007] rejects hostile legacy AGENT-028 membrane input before it can enter a legal managed flow', async () => {
+  // effectiveAgent is not a current builder field: it is injected here solely as
+  // raw hostile legacy evidence and must fail closed with zero admission effects.
   const result = await transaction.preProviderSettlementScenario(
     evidence('raw-agent', { effectiveAgent: 'AGENT-028' }),
     'FatalMembraneInput',

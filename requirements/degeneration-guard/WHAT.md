@@ -36,11 +36,11 @@ Detector 的时间尺度固定为 `256` 个 `o200k_base` token；half-life 不�
 
 ## DG-008: armed 异常是进程内局部事实
 
-Armed anomaly 仅存在当前进程内存，不写 Journal；崩溃重启后安全丢失。它只用于把随后 reconciled `TurnAborted` 与本次 guard interruption 对齐。
+Armed anomaly 仅存在当前进程内存，不写 Journal；崩溃重启后安全丢失。它只用于把随后 reconciled `TurnAborted` 与本次 guard interruption 对齐。Armed 状态由 exact `(SessionId * ProviderRunIdentity)` 唯一确定，严禁退化为 session-only 猜测；任何来自旧 attempt、不同 provider run 或错误 physical message 的 abort 只能作为 stale 外部中止被忽略或观察，严禁消费新 attempt 的 armed 异常。
 
 ## DG-009: guard 自己拥有 TurnAborted 后的接续
 
-reconcile 消费匹配的 armed anomaly 时，LoopSensor 自己在该既有时点发送 exactly-one continuation，并返回 typed `DegenerationGuard` abort cause。下游 turn/fission workflow 对该 cause 只能 yield/no-op，禁止再调用 nudge、repair、`FallbackController.recordConfirmedFailure` 或任何 AABB 路径。发送失败只作为 guard continuation failure 诊断，不改道 fallback。
+reconcile 消费匹配的 exact `(SessionId * ProviderRunIdentity)` armed anomaly 时，LoopSensor 自己在该既有时点发送 exactly-one continuation，并返回 typed `DegenerationGuard` abort cause。下游 turn/fission workflow 对该 cause 只能 yield/no-op，禁止再调用 nudge、repair、`FallbackController.recordConfirmedFailure` 或任何 AABB 路径。发送失败只作为 guard continuation failure 诊断，不改道 fallback。所有 interrupt 与 continuation 异步任务纳入明确的 owned-work 生命周期，确保可等待、取消与汇报，严禁无感知丢弃；发送失败、未知 acceptance 与确定未接受必须严格区分，禁止通过删除内存记录假定续发成功。
 
 ## DG-010: 作用域与豁免
 

@@ -77,3 +77,47 @@ test('WHAT[RELAY-004] low-score assessor takes work ownership in place without a
     retired: [],
   })
 })
+
+test('WHAT[RELAY-002] repeat-round has same meaning, assessment replay is idempotent, conflicting-snapshot assessment fails', () => {
+  const first = open(relay.empty())
+  const assessed = relay.assess(
+    first.state,
+    'road-1',
+    'inc-1',
+    'assessment-1',
+    'snapshot-1',
+    'authority-1',
+    ...Array(8).fill('PERFECT'),
+  )
+  assert.equal(assessed.ok, true)
+
+  // Assessment replay with exact same binding/scores is idempotent (Ok)
+  const replay = relay.assess(
+    assessed.state,
+    'road-1',
+    'inc-1',
+    'assessment-1',
+    'snapshot-1',
+    'authority-1',
+    ...Array(8).fill('PERFECT'),
+  )
+  assert.equal(replay.ok, true)
+
+  // Conflicting snapshot assessment fails
+  const conflict = relay.assess(
+    assessed.state,
+    'road-1',
+    'inc-1',
+    'assessment-conflict',
+    'snapshot-stale',
+    'authority-1',
+    ...Array(8).fill('PERFECT'),
+  )
+  assert.equal(conflict.ok, false)
+
+  // Old authority advancement fails
+  const staleAuth = relay.advanceAuthority(
+    first.state, 'road-1', 'inc-1', 'authority-old', 'authority-new', 'phys-auth', 'snapshot-1'
+  )
+  assert.equal(staleAuth.ok, false)
+})

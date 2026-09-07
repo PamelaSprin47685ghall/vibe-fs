@@ -12,6 +12,7 @@ type RoadView =
       ActivePhase: IncumbencyPhase option
       ActiveSnapshotId: WorkspaceSnapshotId option
       ActiveAuthorityRevision: AuthorityRevision option
+      ActiveCleanupBlockerDigest: string option
       AcceptedAssessmentTransport: (string * string) option
       RetiredIncumbencies: IncumbencyId list
       RetiredProviderRunIds: Set<string>

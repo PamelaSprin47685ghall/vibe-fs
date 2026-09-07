@@ -58,7 +58,7 @@
 
 ### 7. Root workspace effect隔离
 
-- `Host.RootWorkspace.Contract`只发布`IRootWorkspaceBinder`与`IRootWorkspaceReader`。binder只表达`TryBind(Some non-blank path)`的first-bind；reader只表达当前process-local结果。selector同时拒绝空白live candidate与空白fallback。
+- `Host.RootWorkspace.Contract`只发布`IRootWorkspaceBinder`与`IRootWorkspaceReader`。binder只表达`TryBind(Some non-blank path)`的first-bind；reader只表达当前process-local结果。selector同时拒绝空白live candidate与空白后续候选。
 - `Host.RootWorkspace.Runtime`私有持有cell。`None`、空串与纯空白不占位；首次非空白`Some`返回true，后续候选返回false且reader保持首值。
 - `PluginHostWiring`是process runtime的唯一production acquisition point。它先绑定boot workspace，再把reader注入Causal diagnostic、provider transform与Host workflow；普通consumer不引用runtime project。
 - `SharedStateSurface`只投影同一production runtime的bind/read行为，用“None→first→second”固定反例；不再公开set/clear或测试镜像cell。

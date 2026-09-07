@@ -242,8 +242,8 @@
     <Compile Include="Foundation/Temporal.fs"/>
     <Compile Include="Participant/Provider/Language.fsi"/>
     <Compile Include="Participant/Provider/Language.fs"/>
-    <Compile Include="Participant/Provider/Attempt/Cursor.fsi"/>
-    <Compile Include="Participant/Provider/Attempt/Cursor.fs"/>
+    <Compile Include="Participant/Provider/Attempt/FailureBudget.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/FailureBudget.fs"/>
     <Compile Include="Participant/Provider/Attempt/TerminalValidity.fsi"/>
     <Compile Include="Participant/Provider/Attempt/TerminalValidity.fs"/>
     <Compile Include="Enforcer/Catalog.fsi"/>
@@ -256,8 +256,8 @@
     <Compile Include="Enforcer/ChronicleExecution.fs"/>
     <Compile Include="Enforcer/Cycle/Model.fsi" />
     <Compile Include="Enforcer/Cycle/Model.fs"/>
-    <Compile Include="Participant/Provider/Attempt/RecoverySlot.fsi"/>
-    <Compile Include="Participant/Provider/Attempt/RecoverySlot.fs"/>
+    <Compile Include="Participant/Provider/Attempt/RetryPolicy.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/RetryPolicy.fs"/>
     <Compile Include="Execution/Session/Recovery/Model.fsi"/>
     <Compile Include="Execution/Session/Recovery/Model.fs"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecovery.fsi"/>
@@ -542,8 +542,8 @@
     <Compile Include="Composition/Durable/ProjectionUpdate.fs"/>
     <Compile Include="Interaction/Authority/Fold.fsi"/>
     <Compile Include="Interaction/Authority/Fold.fs"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/FallbackFactFold.fsi"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/FallbackFactFold.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureFactFold.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureFactFold.fs"/>
     <Compile Include="Execution/Delegation/ExecutionFactFold.fsi"/>
     <Compile Include="Execution/Delegation/ExecutionFactFold.fs"/>
     <Compile Include="Change/Fold.fsi"/>
@@ -986,8 +986,6 @@
     <Compile Include="Execution/Delegation/Fork/Host/Pty.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/HostForkPtySurface.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Host/HostForkPtySurface.fs"/>
-    <Compile Include="Context/Companion/Blogger/Runtime/State.fsi"/>
-    <Compile Include="Context/Companion/Blogger/Runtime/State.fs"/>
     <Compile Include="Interaction/Repair/Port.fsi"/>
     <Compile Include="Interaction/Repair/Port.fs"/>
 
@@ -1029,14 +1027,8 @@
     <Compile Include="Execution/Session/Recovery/Coordinator.fs"/>
     <Compile Include="Enforcer/Cycle/BloggerProbe.fsi" />
     <Compile Include="Enforcer/Cycle/BloggerProbe.fs"/>
-    <Compile Include="Context/Companion/Blogger/BloggerCrashRecovery.fsi"/>
-    <Compile Include="Context/Companion/Blogger/BloggerCrashRecovery.fs"/>
-    <Compile Include="Context/Companion/Blogger/BloggerCrashSurface.fsi"/>
-    <Compile Include="Context/Companion/Blogger/BloggerCrashSurface.fs"/>
     <Compile Include="Enforcer/ObservationSurface.fsi" />
     <Compile Include="Enforcer/ObservationSurface.fs"/>
-    <Compile Include="Execution/Session/Recovery/Workflow.fsi"/>
-    <Compile Include="Execution/Session/Recovery/Workflow.fs"/>
     <Compile Include="Execution/Session/Recovery/Surface.fsi"/>
     <Compile Include="Execution/Session/Recovery/Surface.fs"/>
     <Compile Include="Execution/Delegation/Join.fsi"/>
@@ -1119,6 +1111,8 @@
     <Compile Include="Context/Prefix/Wire.fs"/>
     <Compile Include="Context/Prefix/XWireSurface.fsi"/>
     <Compile Include="Context/Prefix/XWireSurface.fs"/>
+    <Compile Include="OpenCode/Host/PluginRecoveryScopeSurface.fsi"/>
+    <Compile Include="OpenCode/Host/PluginRecoveryScopeSurface.fs"/>
     <Compile Include="OpenCode/Host/TurnRuntimePreparation.fsi"/>
     <Compile Include="OpenCode/Host/TurnRuntimePreparation.fs"/>
     <Compile Include="Execution/Fission/OpenCode/Host.fsi"/>
@@ -1321,14 +1315,16 @@
     <Compile Include="OpenCode/Tools/FileMutationSurface.fs"/>
     <Compile Include="Persistence/Journal/Surface.fsi"/>
     <Compile Include="Persistence/Journal/Surface.fs"/>
+    <Compile Include="OpenCode/Host/SessionRecoveryHostSurface.fsi"/>
+    <Compile Include="OpenCode/Host/SessionRecoveryHostSurface.fs"/>
     <Compile Include="Execution/Session/ChatExecution/StatusSurface.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/StatusSurface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGroundingRepositorySurface.fsi"/>
     <Compile Include="OpenCode/Host/RequirementGroundingRepositorySurface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGroundingSurface.fsi"/>
     <Compile Include="OpenCode/Host/RequirementGroundingSurface.fs"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/CursorSurface.fsi"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/CursorSurface.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtSurface.fsi"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtSurface.fs"/>
     <Compile Include="Persistence/Journal/ObligationJournalSurface.fsi"/>

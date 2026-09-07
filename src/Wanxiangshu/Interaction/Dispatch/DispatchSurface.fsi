@@ -48,8 +48,18 @@ module DispatchSurface =
         text: string ->
         continuation: string ->
         profile: obj ->
-        effectiveAgent: string ->
         awaitMode: string ->
+            Task<obj>
+
+    val sendGateNudgesConcurrently:
+        port: obj ->
+        handle: JournalHandle ->
+        session: string ->
+        text: string ->
+        continuation: string ->
+        gateKind: string ->
+        terminalProviderRun: string ->
+        profile: obj ->
             Task<obj>
 
     /// HOST-004 / DISPATCH-PROTOCOL-002: exercise the dispatch-owned final
@@ -64,7 +74,6 @@ module DispatchSurface =
         text: string ->
         continuation: string ->
         profile: obj ->
-        effectiveAgent: string ->
         physicalAdmission: obj ->
             Task<obj>
 

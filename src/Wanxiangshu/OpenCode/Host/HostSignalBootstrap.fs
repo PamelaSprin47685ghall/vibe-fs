@@ -155,13 +155,13 @@ module HostSignalBootstrap =
 
                 reconciler.Signal signal
 
-            /// FALLBACK-003: no Host signal may name the failed ProviderRun.
+            /// PAR-003: no Host signal may name the failed ProviderRun.
             ///
             /// `ProviderFailure` and `ProviderRetry` used to run their own writers here
-            /// — a second and third writer of the durable cursor, each deciding from
+            /// — a second and third writer of the durable failure budget, each deciding from
             /// event fields whether an attempt had failed. Both are gone: the
-            /// reconciled snapshot supplies exact run identity, and FallbackController
-            /// performs the advance. ProviderFailure contributes only failure finality;
+            /// reconciled snapshot supplies exact run identity, and ProviderFailureLedger
+            /// performs the admission. ProviderFailure contributes only failure finality;
             /// Scheduler freezes the current physical identity at signal admission and
             /// reconciliation must match it to the snapshot assistant before publishing.
             let onSignal (signal: HostSignal) =
@@ -427,7 +427,6 @@ module HostSignalBootstrap =
                 then
                     let sid = SessionId.create sessionId
                     let physical = PhysicalUserMessageId.create messageId
-                    scope.Sessions.UserMessageBindings.[sessionId] <- physical
 
                     let agentRole =
                         HostSessionNudge.tryActiveProfile journal sid
@@ -451,7 +450,6 @@ module HostSignalBootstrap =
                     not (String.IsNullOrWhiteSpace sessionId)
                     && not (String.IsNullOrWhiteSpace messageId)
                 then
-                    scope.Sessions.UserMessageBindings.[sessionId] <- PhysicalUserMessageId.create messageId
                     bindContinuationMessage sessionId messageId
 
             let bindActiveRun (sessionId: SessionId) (role: Role) (directory: string option) =
@@ -461,10 +459,7 @@ module HostSignalBootstrap =
                 // A host-registered run knows its physical opening message; the
                 // Authority Root is derived from it by PROMPT-002 promotion rather than
                 // read out of a second binding table.
-                let physical =
-                    match scope.Sessions.UserMessageBindings.TryGetValue key with
-                    | true, bound -> Some bound
-                    | false, _ -> None
+                let physical = reconciler.TryPhysicalUserMessage sessionId
 
                 reconciler.BindActiveRun
                     { SessionId = sessionId
@@ -518,11 +513,6 @@ module HostSignalBootstrap =
                 requireDurabilityActivation ()
                 JoinWake.observeChatMessage scope.Sessions.JoinInterrupts intent
 
-            let observePendingContinuation (evidence: ChatAdmissionIntent.PendingPromptEvidence) =
-                match evidence.Origin with
-                | PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt ->
-                    scope.ArmRecovery(evidence.Key.SessionId, evidence.Key.PhysicalUserMessageId)
-                | _ -> ()
 
             let continueManagedChatMessage intent output =
                 match intent with
@@ -547,7 +537,6 @@ module HostSignalBootstrap =
                     scope.Sessions.ModelRoutingSessions.Add sessionId |> ignore
                     bindContinuationMessage sessionId physicalId
                     registerOwned sessionId
-                    observePendingContinuation evidence
                 | _ -> ()
 
                 FissionHostRequestProjection.projectPendingManaged hasPhysicalParent intent output

@@ -10,9 +10,8 @@ import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as obligationJournal from '../../../dist/Persistence/Journal/ObligationJournalSurface.js'
 
 const participantIdentity = {
-  selectedAgent: 'manager',
-  peerAgent: 'manager',
-  canonicalRole: 'manager',
+  participant: 'manager',
+  role: 'manager',
   selectedTier: 'deep',
   persona: 'Lead',
   personaCatalogVersion: 1,
@@ -106,7 +105,14 @@ test('WHAT[INTERACTION-AUTHORITY-003] HumanRoot persists identity before provide
     const projection = dispatch.projectionObservation(handle, 'ses-human-explicit')
 
     assert.equal(result.ok, true, result.ok ? '' : result.error)
-    assert.deepEqual(result.profile.identitySeed, rootSelection)
+    assert.equal(result.profile.identitySeed.kind, 'RootSelection')
+    assert.deepEqual(result.profile.identitySeed.participantIdentity, {
+      participant: 'manager',
+      role: 'manager',
+      persona: 'Lead',
+      personaCatalogVersion: 1,
+      origin: 'ResolvedAtRoot',
+    })
     assert.deepEqual(projection.activeLogicalRun, result.profile)
   })
 })
@@ -126,7 +132,8 @@ test('WHAT[INTERACTION-AUTHORITY-015] matching external user ingress continues w
 
     assert.equal(ingress.ok, true)
     assert.equal(ingress.origin, 'HumanMessage')
-    assert.equal(ingress.effectiveAgent, 'manager')
+    assert.equal(ingress.participant, 'manager')
+    assert.equal(ingress.role, 'manager')
     assert.deepEqual(after.activeLogicalRun, active)
     assert.equal(after.activeLogicalRun.logicalRun, before.activeLogicalRun.logicalRun)
     assert.equal(after.runtimeStartCount, before.runtimeStartCount)

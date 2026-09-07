@@ -30,7 +30,6 @@ module PromptAuthority =
         member IdentitySeed: IdentitySeed
         member ParticipantIdentity: ParticipantIdentityEvidence
         member SelectedAgent: string
-        member PeerAgent: string
         member CanonicalRole: Role
         member Persona: string
         member PersonaCatalogVersion: int
@@ -73,7 +72,6 @@ module PromptAuthority =
           PhysicalUserMessageId: PhysicalUserMessageId
           ProviderRun: ProviderRunIdentity
           Origin: PromptOrigin
-          EffectiveAgent: string
           SystemPromptId: SystemPromptId
           ToolCapabilitySet: Set<ToolPermission>
           RequestKind: ProviderRequestKind
@@ -83,7 +81,6 @@ module PromptAuthority =
         member LogicalRunId: LogicalRunId
         member AuthorityRootUserMessageId: AuthorityRootUserMessageId
         member SelectedAgent: string
-        member PeerAgent: string
         member CanonicalRole: Role
 
     type PromptClaim =
@@ -92,7 +89,6 @@ module PromptAuthority =
           Origin: PromptOrigin
           LogicalRunId: LogicalRunId option
           AuthorityRootUserMessageId: AuthorityRootUserMessageId option
-          EffectiveAgent: string option
           IdentitySeed: IdentitySeed
           PayloadDigest: string
           Receipt: TransportReceipt option
@@ -137,7 +133,6 @@ module PromptAuthority =
         authorityRoot: AuthorityRootUserMessageId ->
             LogicalRunId
 
-    val agentPair: profile: AuthorityExecutionProfile -> AgentPairCursor.AuthorityAgentPair
     val RecoveryTailWindow: int
 
     val claimScopeDigest:
@@ -155,12 +150,9 @@ module PromptAuthority =
         logicalRunId: LogicalRunId option ->
         authorityRoot: AuthorityRootUserMessageId option ->
         origin: PromptOrigin ->
-        effectiveAgent: string option ->
         payloadDigest: string ->
         claimSequence: int ->
             PromptKey
-
-    val effectiveAgentFor: profile: AuthorityExecutionProfile -> cursor: AgentPairCursor.FallbackCursor -> string
 
     val repairPayloadDigest:
         requestId: BloggerRequestId -> terminalProviderRun: ProviderRunIdentity -> repairKind: string -> string
@@ -199,7 +191,6 @@ module PromptAuthority =
 
     val buildAttemptExecutionProfile:
         authority: AuthorityExecutionProfile ->
-        cursor: AgentPairCursor.FallbackCursor ->
         physicalUserMessageId: PhysicalUserMessageId ->
         providerRun: ProviderRunIdentity ->
         origin: PromptOrigin ->

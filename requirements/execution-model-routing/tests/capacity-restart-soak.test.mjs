@@ -40,12 +40,15 @@ assert.deepEqual(afterReload, initial, 'plugin reload preserves the process sing
 const exact = {
   sessionId: 'restart-session-' + cycle,
   physicalUserMessageId: 'restart-physical-' + cycle,
-  effectiveAgent: 'restart-agent',
+  role: 'coder',
+  participant: 'restart-owner',
 }
 const first = await routing.acquireSharedExecutionAdmission(
   exact.sessionId,
   exact.physicalUserMessageId,
-  exact.effectiveAgent,
+  exact.role,
+  exact.participant,
+  null,
 )
 assert.equal(first.kind, 'Acquired')
 const afterAcquire = audit()
@@ -63,7 +66,9 @@ assert.deepEqual(beforeDuplicateReload, observed)
 const duplicate = await routing.acquireSharedExecutionAdmission(
   exact.sessionId,
   exact.physicalUserMessageId,
-  exact.effectiveAgent,
+  exact.role,
+  exact.participant,
+  null,
 )
 assert.equal(duplicate.kind, 'Acquired')
 assert.equal(duplicate.lease, first.lease, 'plugin reload reuses the exact physical admission fence')

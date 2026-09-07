@@ -33,31 +33,22 @@ test('WHAT[CRASH-017] RECOVERY_FAMILY_plugin_load_only_attaches_physical_recover
   const wiring = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs'), 'utf8')
   const spike = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs'), 'utf8')
   const scope = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs'), 'utf8')
-  const ports = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs'), 'utf8')
-
   assert.match(spike, /PluginRecoveryWiring\.attach boot/)
   assert.match(wiring, /scope\.AttachDurabilityActivation\(fun \(\) ->\s*scope\.RunBackground/)
   assert.doesNotMatch(spike, /SignalChatRecovery|FamilyRecoveryCoordinator\.runOnce|recoverFamilyDirect|AttachFamilyRecoveryPorts/)
   assert.doesNotMatch(wiring, /restoreLinkedChildren|recoverFamilyDirect|defaultRecoverPromptClaims|defaultRecoverBlogger/)
   assert.match(scope, /FamilyRecoveryPermit\.currentProcess/)
   assert.doesNotMatch(scope, /FamilyRecoveryCoordinator\.runOnce|recoverFamilyDirect/)
-  assert.match(ports, /type SessionRecoveryPorts/)
-  assert.match(ports, /RestoreHandles:\s*SessionId\s*->\s*Task<HandleFamilyRecovery>/)
-  assert.match(ports, /recoverFamilyDirect/)
 })
 
 test('WHAT[CRASH-013] RECOVERY_FAMILY_combine_and_coordinator_ownership_moved', () => {
   const domain = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
-  const workflow = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs'), 'utf8')
   const coordinator = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Coordinator.fs'), 'utf8')
   const fsproj = readFileSync(join(ROOT, 'src/Wanxiangshu/Wanxiangshu.fsproj'), 'utf8')
   assert.match(domain, /let combine \(outcomes: SessionRecovery list\)/)
-  assert.match(workflow, /\bcombine\b/)
-  assert.doesNotMatch(workflow, /let private mergeOutcomes/)
   assert.match(coordinator, /module FamilyRecoveryCoordinator/)
   assert.match(coordinator, /let runOnce/)
   assert.doesNotMatch(coordinator, /recoverFamilyDirect|SessionRecoveryPorts|authorizeFamilyResume/)
-  assert.doesNotMatch(workflow, /module Coordinator/)
   assert.match(fsproj, /Execution\/Session\/Recovery\/Coordinator\.fs/)
 })
 
@@ -109,4 +100,72 @@ test('WHAT[CRASH-005] RECOVERY_FAMILY_handle_family_waiting_maps_to_waiting_not_
 
 test('WHAT[CRASH-006] RECOVERY_FAMILY_ready_before_business_is_type_enforced', () => {
   assert.equal(recovery.authorize('p', 7, []).state, 'FamilyReady')
+})
+
+// CRASH-018 / R10: explicit /continue owns resume. The host below is the
+// compiled production owner behind the registered SessionRecoveryHostSurface
+// (opaque host/scope/journal handles, plain-JSON resume views); only the
+// accept/reject port answer is a test input. Publications are counted on the
+// production registry, never emulated in JS.
+import { mkdtempSync as recoveryMkdtemp, rmSync as recoveryRm } from 'node:fs'
+import { tmpdir as recoveryTmpdir } from 'node:os'
+import { join as recoveryJoin } from 'node:path'
+import * as recoveryHost from '../../../dist/OpenCode/Host/SessionRecoveryHostSurface.js'
+
+const withContinueHost = async (label, portOutcome, action) => {
+  const directory = recoveryMkdtemp(recoveryJoin(recoveryTmpdir(), `wxs-continue-${label}-`))
+  const host = await recoveryHost.bootRecoveryHost(directory, portOutcome)
+
+  try {
+    await action(host)
+  } finally {
+    recoveryHost.disposeRecoveryHost(host)
+    recoveryRm(directory, { recursive: true, force: true })
+  }
+}
+
+const continueSessionOf = (suffix) => `ses-continue-${suffix}`
+const continuePhysicalOf = (suffix) => `msg-continue-${suffix}`
+
+test('WHAT[CRASH-018] CRASH_018_absent_port_blocks_with_one_manual_and_no_background_command', async () => {
+  await withContinueHost('absent', 'absent', async (host) => {
+    const result = await recoveryHost.resumeAccepted(
+      host,
+      continueSessionOf('absent'),
+      continuePhysicalOf('absent'),
+    )
+
+    assert.equal(result.calls, 0, 'absent port makes no acceptance call')
+    assert.equal(result.manuals.length, 1)
+    assert.equal(result.manuals[0].reason, 'NoAuthorizedProviderDisposition')
+    assert.equal(result.manuals[0].observation, 'ProviderAbsent')
+  })
+})
+
+test('WHAT[CRASH-018] CRASH_018_duplicate_continue_keeps_a_single_manual', async () => {
+  await withContinueHost('duplicate', 'absent', async (host) => {
+    await recoveryHost.resumeAccepted(host, continueSessionOf('duplicate'), continuePhysicalOf('duplicate'))
+    const result = await recoveryHost.resumeAccepted(
+      host,
+      continueSessionOf('duplicate'),
+      continuePhysicalOf('duplicate'),
+    )
+
+    assert.equal(result.manuals.length, 1)
+    assert.equal(result.manuals[0].reason, 'NoAuthorizedProviderDisposition')
+    assert.equal(result.manuals[0].observation, 'ProviderAbsent')
+  })
+})
+
+test('WHAT[CRASH-018] CRASH_018_accepted_continue_emits_no_manual_block', async () => {
+  await withContinueHost('accept', 'accept', async (host) => {
+    const result = await recoveryHost.resumeAccepted(
+      host,
+      continueSessionOf('accept'),
+      continuePhysicalOf('accept'),
+    )
+
+    assert.equal(result.calls, 1, 'acceptance must be awaited exactly once')
+    assert.deepEqual(result.manuals, [])
+  })
 })

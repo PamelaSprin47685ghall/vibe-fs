@@ -11,7 +11,9 @@ import * as factCodec from '../../../dist/Persistence/Journal/FactCodecSurface.j
 test('WHAT[PID-001] registered identity surfaces load and expose their narrow contracts', async () => {
   const coder = identity.resolveParticipantIdentityAtRoot('coder')
   assert.equal(coder.ok, true)
-  assert.equal(coder.identity.peer, 'coder')
+  assert.equal(coder.identity.name, 'coder')
+  assert.equal(coder.identity.role, 'coder')
+  assert.equal(coder.identity.persona, 'Coder')
   assert.equal(authority.promotePhysical('msg_identity_surface_smoke'), 'msg_identity_surface_smoke')
   assert.equal(journalCodec.deserialize('{}').ok, false)
   assert.equal(factCodec.containsLegacyFallbackFields('{}'), false)

@@ -132,7 +132,7 @@ function countFact(workDir, factName) {
 
 async function sendPrompt(scenario, sessionId, prompt) {
   // Omit model when prompt.model is null/undefined so Host + plugin continue
-  // from durable LastAuthority / Fallback Side (session does not own a model).
+  // from durable LastAuthority / provider target (session does not own a model).
   // Explicit prompt.model always wins.
   const body = {
     agent: prompt.agent,
@@ -148,16 +148,22 @@ async function sendPrompt(scenario, sessionId, prompt) {
   const response = await scenario.client.request('POST', `/session/${sessionId}/prompt_async`, { body });
   assert.ok(response.ok, `prompt failed: ${JSON.stringify(response.data)}`);
 
-  if (prompt.resumeAfterIdleText !== undefined) {
+  const releaseHeldChildAfterAccepted =
+    prompt.resumeAfterIdleText !== undefined || prompt.releaseHeldChildAfterAccepted === true;
+
+  if (releaseHeldChildAfterAccepted) {
     await scenario.events.awaitEvent((event) => {
       const eventSession = event.sessionID ?? event.properties?.sessionID;
       const role = event.properties?.info?.role ?? event.properties?.role;
       return event.seq > afterSeq && event.type === 'message.updated' && eventSession === sessionId && role === 'user';
     }, prompt.acceptTimeoutMs ?? 10000);
     assert.equal(typeof scenario.releaseHeldChild, 'function', 'active prompt requires a held-child release');
-    const beforeIdle = scenario.events.lastSeq;
     scenario.releaseHeldChild();
     scenario.releaseHeldChild = null;
+  }
+
+  if (prompt.resumeAfterIdleText !== undefined) {
+    const beforeIdle = scenario.events.lastSeq;
     await scenario.events.awaitEvent((event) => {
       const eventSession = event.sessionID ?? event.properties?.sessionID;
       return event.seq > beforeIdle && eventSession === sessionId && isIdleEvent(event);
@@ -647,10 +653,10 @@ async function runFlow(scenario, doc, ctx) {
       return;
     }
     if (step.assertModelTrajectory) {
-      // FALLBACK-002's provider-visible A/A/B/B evidence, as an assertion rather than a
+      // Provider-visible physical target trajectory is an assertion rather than a
       // matching input. PROMPT-008 makes `AttemptExecutionProfile` the only source of the
       // effective model, so the model on the wire is a CONCLUSION of the run — a scenario
-      // that matched on it would silently agree with whatever the cursor did.
+      // that matched on it would silently agree with whatever the scheduler did.
       //
       // The lane is resolved through the session binding, so this counts only requests that
       // belong to the Logical Run under test. The old scenario filtered by two hard-coded

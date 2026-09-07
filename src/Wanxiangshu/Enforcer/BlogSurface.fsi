@@ -2,7 +2,7 @@ namespace Wanxiangshu.Enforcer
 
 /// JS-native owner boundary for the Blogger/chronicle contract and recovery
 /// evidence. It exposes semantic outcomes only; Host tool records, journal
-/// facts, typed identities and BloggerToolRecovery stay private.
+/// facts and typed identities stay private.
 [<RequireQualifiedAccess>]
 module BlogSurface =
 
@@ -22,19 +22,45 @@ module BlogSurface =
 
     val tipFieldNames: unit -> string array
 
-    /// Rejudge transcript evidence. One completed chronicle only proves
-    /// recovery; any other terminal is still the nudge stage.
-    val rejudgeFromEvidence: claimedRun: obj -> terminals: obj array -> obj
+    /// Drive the real transform repair entry: observed terminal/tool facts in,
+    /// coordinator verdict out. The exact live request and terminal run cross
+    /// explicitly; `rawMessages` is the plain Host transcript.
+    val observeTransformRepair:
+        scope: obj ->
+        journal: obj ->
+        request: obj ->
+        terminalRun: string ->
+        rawMessages: obj ->
+            System.Threading.Tasks.Task<obj>
 
-    /// Rejudge named chronicle tool-part evidence from a compact semantic
-    /// transcript. `chronicleCount` counts raw named calls, while
-    /// `completedChronicleCount` proves exactly-one completion.
-    val rejudgeChronicleEvidence: claimedRun: obj -> terminals: obj array -> obj
+    /// Drive the real idle repair entry. The observation states quiescence
+    /// explicitly (`quiescent: bool`): when
+    /// quiescent the surface begins the exact provider attempt on a real
+    /// SessionQuiescenceGate, observes its idle, and places the resulting
+    /// permit in the reconciled turn; otherwise the turn carries no permit.
+    /// Session, workspace and event ports arrive as plain JS stubs over
+    /// primitive identity strings; only their exercised calls take effect.
+    /// The run is read from the turn itself.
+    val observeIdleRepair:
+        scope: obj -> journal: obj -> request: obj -> observation: obj -> System.Threading.Tasks.Task<obj>
 
-    /// Compact request-scoped recovery evidence. A claim is active only when
-    /// its request matches and it was not abandoned; an older request cannot
-    /// consume a new request's repair budget.
-    val repairState: value: obj -> obj
+    /// Durable repair-claim facts read through the production probe. No stage
+    /// is derived here; the coordinator owns repair sequencing.
+    val repairClaimedForKind:
+        journal: obj ->
+        bloggerSessionId: string ->
+        requestId: string ->
+        terminalRun: string ->
+        repairKind: string ->
+            bool
+
+    val repairIssuedForKind:
+        journal: obj ->
+        bloggerSessionId: string ->
+        requestId: string ->
+        terminalRun: string ->
+        repairKind: string ->
+            bool
 
     /// Serialize the two observation facts with the production FactCodec.
     val serializeFact: value: obj -> string
@@ -72,8 +98,3 @@ module BlogSurface =
 
     /// Protocol transition for one terminal assistant step.
     val protocol: value: obj -> obj
-
-    /// Bounded repair transition. A pure terminal first receives one nudge;
-    /// subsequent different invalid terminals stay in AABB until the shared
-    /// provider fallback budget is actually exhausted.
-    val repairProtocol: value: obj -> obj

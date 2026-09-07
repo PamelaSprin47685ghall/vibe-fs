@@ -189,9 +189,9 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
 
     /// Append one fact and fold it.
     ///
-    /// Deduplication is deliberately absent here. FALLBACK-003 names the
-    /// FallbackController as the single place that decides whether a failed
-    /// attempt advances the cursor, and REVIEW-004 gives review dedupe to the
+    /// Deduplication is deliberately absent here. PAR-003 names the
+    /// ProviderFailureLedger as the single place that decides whether a failed
+    /// attempt advances the failure budget, and REVIEW-004 gives review dedupe to the
     /// projection. A second dedupe at the append boundary would be the same
     /// knowledge in a second place — and the previous version proved the cost: it
     /// re-implemented the dedupe key as `sprintf "%s|%s|%s"`, so the journal and

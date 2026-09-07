@@ -2,11 +2,11 @@
 
 ## SPEC-INV-001: 优化目标与零影响基线
 
-投机机制仅用于在符合条件的 deep Work provider 请求前进行机械只读调查。在投机禁用、熔断触发、证据不足或策略判定为 K0 时，普通 Work Session 的 provider 可见字节、工具权限、Fallback 流程、评审终结逻辑与控制流必须与无投机状态完全一致，投机绝不作为任务正确性的必要条件。
+投机机制仅用于在符合条件的 Work provider 请求前进行机械只读调查。在投机禁用、熔断触发、证据不足或策略判定为 K0 时，普通 Work Session 的 provider 可见字节、工具权限、retry 流程、评审终结逻辑与控制流必须与无投机状态完全一致，投机绝不作为任务正确性的必要条件。
 
 ## SPEC-INV-002: Eligible Opportunity 判定
 
-实际投机仅在同时满足以下条件时被允许：根会话为 `SessionExecutionClass.Work`；请求类型为 `ProviderRequestKind.WorkMain`；角色属于 `{coder, inspector, devops, inquiry}`；Authority 为 canonical single-version (`selectedTier` 为 `deep` 且 `EffectiveAgent = SelectedAgent`)；非 Fallback 分支、非交互修复、非前缀探测、非 Reviewer/Finality、非 Attached/InternalLeaf；Owner 未取消；可唯一绑定即将消费输入的 `TargetProviderRun`；predictor 便宜模型可用 (`PredictorAvailable`) 且显式成本模型判定收益为正；EventStore 与宿主 Canary 均健康。任一条件未知或不满足立即判定为 K0。
+实际投机仅在同时满足以下条件时被允许：根会话为 `SessionExecutionClass.Work`；请求类型为 `ProviderRequestKind.WorkMain`；已冻结 Authority 的固定 Role 属于 `{coder, inspector, devops, inquiry}` 且 participant 与该 Role 一致；非交互修复、非前缀探测、非 Attached/InternalLeaf；Owner 未取消；可唯一绑定即将消费输入的 `TargetProviderRun`；该固定 Role 的唯一远端模型可用 (`PredictorAvailable`) 且显式成本模型判定收益为正；EventStore 与宿主 Canary 均健康。任一条件未知或不满足立即判定为 K0。
 
 ## SPEC-INV-003: 预算单位 K
 
@@ -14,7 +14,7 @@
 
 ## SPEC-INV-004: Replica Authority 结构约束
 
-Replica 构造为 `InternalLeaf × Attached(owner, StrengthReplica)`，通过 owner-derived `ParticipantIdentity` evidence 继承 Owner logical run 的 Persona 与 provenance/version，并继承 Owner 的 SessionProviderLanguage，仅将执行绑定切换至 predictor 便宜模型角色 (`predictor`，`PredictorAvailable`)，其物理执行目标由调度器解析。Replica 拥有短生命周期，完成即释放，不跨决策复用；无 Companion、无嵌套投机、无深度 Fallback 或权限交互。其可见工具 Schema 与底层执行门禁严格同源且仅允许 `read/glob/grep`，任何其他工具调用直接 fail closed。
+Replica 构造为 `InternalLeaf × Attached(owner, StrengthReplica)`，通过 owner-derived `ParticipantIdentity` evidence 继承 Owner logical run 的固定 participant、Role、Persona 与 provenance/version，并继承 Owner 的 SessionProviderLanguage；模型调度只能解析该固定 Role 的唯一远端目标，不能为同一物理请求切换到 `predictor` 或其他角色。Replica 拥有短生命周期，完成即释放，不跨决策复用；无 Companion、无嵌套投机、无 provider failure budget 或权限交互。其可见工具 Schema 与底层执行门禁严格同源且仅允许 `read/glob/grep`，任何其他工具调用直接 fail closed。
 
 ## SPEC-INV-005: Candidate Frame 确定性规范化
 

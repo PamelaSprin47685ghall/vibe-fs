@@ -30,7 +30,6 @@ const action = (kind, cut, extra = {}) => ({
       ownerAuthorityRoot: null,
       participantIdentity: {
         selectedAgent: 'coder',
-        peerAgent: 'coder',
         canonicalRole: 'coder',
         selectedTier: 'deep',
         persona: 'Coder',
@@ -39,7 +38,6 @@ const action = (kind, cut, extra = {}) => ({
       },
     },
     origin: 'HumanRoot',
-    effectiveAgent: 'coder',
     requestKind: 'work-main',
     projectionChoice: { kind: 'UseCommittedEpoch' },
   },

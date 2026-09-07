@@ -9,102 +9,167 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
-type ConfirmedFailureOutcome =
-    | RecoveryAdvanced of RecoveryOpportunity
-    | RecoveryExhausted
+type FailureAdmissionOutcome =
+    | RetryAuthorized
+    | RetryExhausted
     | EpisodeSuperseded
     | NoActiveRun
 
-/// FALLBACK-003 single writer: policy-authorized provider failure → durable
-/// dedupe → cursor advance/exhaust.
-module FallbackLedger =
+/// Single writer: policy-authorized provider failure → durable dedupe → budget advance/exhaust.
+module ProviderFailureLedger =
 
-    let private invalidOffsetMessage decodeError =
-        match decodeError with
-        | AgentPairCursor.FallbackOffsetDecodeError.InvalidFallbackOffset value ->
-            $"Fallback advance rejected: corrupt offset byte {value} (FALLBACK-002)"
-
-    let private replayLatestFailure budget (identity: FallbackAttemptIdentity) (current: FallbackProjection) =
+    let private replayLatestFailure
+        (budgetLimit: int)
+        (identity: FailedProviderAttemptIdentity)
+        (current: ProviderFailureProjection)
+        =
         let exactLatest =
             current.RecentFailureKeys
             |> List.tryHead
-            |> Option.contains (FallbackAttemptIdentity.dedupeKey identity)
+            |> Option.contains (FailedProviderAttemptIdentity.dedupeKey identity)
 
-        match exactLatest, FallbackProjection.mayContinue budget current with
-        | true, true ->
-            RecoverySlot.opportunity RecoverySlot.afterFailureAdvance current.Cursor.Offset
-            |> ConfirmedFailureOutcome.RecoveryAdvanced
-        | true, false -> ConfirmedFailureOutcome.RecoveryExhausted
-        | false, _ -> ConfirmedFailureOutcome.EpisodeSuperseded
+        match exactLatest, ProviderFailureProjection.mayRetry budgetLimit current with
+        | true, true -> FailureAdmissionOutcome.RetryAuthorized
+        | true, false -> FailureAdmissionOutcome.RetryExhausted
+        | false, _ -> FailureAdmissionOutcome.EpisodeSuperseded
 
     let private appendExhausted
         (journal: AgentJournal)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
-        (current: FallbackProjection)
-        (next: AgentPairCursor.FallbackCursor)
-        : Task<Result<ConfirmedFailureOutcome, string>> =
+        (current: ProviderFailureProjection)
+        (finalCount: int)
+        : Task<Result<FailureAdmissionOutcome, string>> =
         task {
             let exhausted =
-                FallbackFact.FallbackExhausted
+                ProviderFailureFact.RetryExhausted
                     {| SessionId = sessionId
                        LogicalRunId = current.LogicalRunId
                        AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
-                       FinalConsecutiveFailureCount = next.ConsecutiveFailureCount
-                       FinalOffset = AgentPairCursor.FallbackOffsetCodec.toByte next.Offset |}
+                       FinalConsecutiveFailureCount = finalCount |}
 
             let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) exhausted journal
 
             return
                 appended
-                |> Result.map (fun _ -> ConfirmedFailureOutcome.RecoveryExhausted)
+                |> Result.map (fun _ -> FailureAdmissionOutcome.RetryExhausted)
                 |> Result.mapError JournalAppendFailure.describe
         }
 
     let private completeAdvance
         (journal: AgentJournal)
-        (budget: int)
+        (budgetLimit: int)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
-        (current: FallbackProjection)
-        (next: AgentPairCursor.FallbackCursor)
-        : Task<Result<ConfirmedFailureOutcome, string>> =
+        (current: ProviderFailureProjection)
+        (nextBudget: ProviderFailureBudget.FailureBudget)
+        : Task<Result<FailureAdmissionOutcome, string>> =
         task {
-            match AgentPairCursor.recoveryVerdict budget next with
-            | AgentPairCursor.MayContinue _ ->
-                let opportunity =
-                    RecoverySlot.opportunity RecoverySlot.afterFailureAdvance next.Offset
-
-                return Ok(ConfirmedFailureOutcome.RecoveryAdvanced opportunity)
-            | AgentPairCursor.Exhausted _ -> return! appendExhausted journal sessionId providerRun current next
+            match ProviderFailureBudget.verdict budgetLimit nextBudget with
+            | ProviderFailureBudget.MayRetry _ -> return Ok FailureAdmissionOutcome.RetryAuthorized
+            | ProviderFailureBudget.Exhausted _ ->
+                return! appendExhausted journal sessionId providerRun current nextBudget.ConsecutiveFailureCount
         }
 
-    let private appendAdvanced
+    let private appendFailureRecorded
         (journal: AgentJournal)
-        (budget: int)
+        (budgetLimit: int)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (reason: string)
-        (current: FallbackProjection)
-        (next: AgentPairCursor.FallbackCursor)
-        : Task<Result<ConfirmedFailureOutcome, string>> =
+        (current: ProviderFailureProjection)
+        (nextCount: int)
+        : Task<Result<FailureAdmissionOutcome, string>> =
         task {
-            let advanced =
-                FallbackFact.FallbackCursorAdvanced
+            let recorded =
+                ProviderFailureFact.FailureRecorded
                     {| SessionId = sessionId
                        LogicalRunId = current.LogicalRunId
                        AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
                        ProviderRun = providerRun
-                       PreviousOffset = AgentPairCursor.FallbackOffsetCodec.toByte current.Cursor.Offset
-                       NextOffset = AgentPairCursor.FallbackOffsetCodec.toByte next.Offset
-                       ConsecutiveFailureCount = next.ConsecutiveFailureCount
+                       ConsecutiveFailureCount = nextCount
                        Reason = reason |}
 
-            let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) advanced journal
+            let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) recorded journal
 
             match appended with
             | Error failure -> return Error(JournalAppendFailure.describe failure)
-            | Ok _ -> return! completeAdvance journal budget sessionId providerRun current next
+            | Ok _ ->
+                return!
+                    completeAdvance
+                        journal
+                        budgetLimit
+                        sessionId
+                        providerRun
+                        current
+                        { ConsecutiveFailureCount = nextCount }
+        }
+
+    let private checkRecoveryLicence
+        (authorization: ProviderRecoveryAuthorization)
+        (current: ProviderFailureProjection)
+        : Result<ProviderFailureProjection, string> =
+        if current.LogicalRunId <> authorization.LogicalRun then
+            Error "Provider recovery licence belongs to a different logical run"
+        else
+            Ok current
+
+    let private outcomeForAdvanceRejection
+        (identity: FailedProviderAttemptIdentity)
+        (current: ProviderFailureProjection)
+        (rejection: ProviderFailureAdvanceRejection)
+        : Result<FailureAdmissionOutcome, string> =
+        match rejection with
+        | ProviderFailureAdvanceRejection.AlreadyObserved ->
+            Ok(replayLatestFailure ProviderFailureBudget.DefaultBudget identity current)
+        | ProviderFailureAdvanceRejection.AlreadyExhausted -> Ok FailureAdmissionOutcome.RetryExhausted
+        | ProviderFailureAdvanceRejection.DifferentRun
+        | ProviderFailureAdvanceRejection.NoActiveBudget -> Ok FailureAdmissionOutcome.NoActiveRun
+        | ProviderFailureAdvanceRejection.InvalidTransition ->
+            Error "Provider failure advance violates validation (consecutive failure count is not the successor)"
+
+    let private recordReadyFailure
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (reason: string)
+        (current: ProviderFailureProjection)
+        : Task<Result<FailureAdmissionOutcome, string>> =
+        task {
+            let identity =
+                ProviderFailureBudget.attemptIdentity
+                    sessionId
+                    current.LogicalRunId
+                    current.AuthorityRootUserMessageId
+                    providerRun
+
+            let nextCount = current.Budget.ConsecutiveFailureCount + 1
+
+            match ProviderFailureProjection.applyFailure identity nextCount current with
+            | Error rejection -> return outcomeForAdvanceRejection identity current rejection
+            | Ok _ ->
+                return!
+                    appendFailureRecorded
+                        journal
+                        ProviderFailureBudget.DefaultBudget
+                        sessionId
+                        providerRun
+                        reason
+                        current
+                        nextCount
+        }
+
+    let private recordAfterLicenceCheck
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (authorization: ProviderRecoveryAuthorization)
+        (reason: string)
+        (current: ProviderFailureProjection)
+        : Task<Result<FailureAdmissionOutcome, string>> =
+        task {
+            match checkRecoveryLicence authorization current with
+            | Error message -> return Error message
+            | Ok ready -> return! recordReadyFailure journal sessionId authorization.ProviderRun reason ready
         }
 
     let recordAuthorizedFailure
@@ -112,62 +177,22 @@ module FallbackLedger =
         (sessionId: SessionId)
         (authorization: ProviderRecoveryAuthorization)
         (reason: string)
-        : Task<Result<ConfirmedFailureOutcome, string>> =
+        : Task<Result<FailureAdmissionOutcome, string>> =
         task {
-            match FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot journal) with
-            | None -> return Ok ConfirmedFailureOutcome.NoActiveRun
-            | Some current when current.LogicalRunId <> authorization.LogicalRun ->
-                return Error "Provider recovery licence belongs to a different logical run"
-            | Some current ->
-                let providerRun = authorization.ProviderRun
-
-                let identity =
-                    AgentPairCursor.attemptIdentity
-                        sessionId
-                        current.LogicalRunId
-                        current.AuthorityRootUserMessageId
-                        providerRun
-
-                let next = AgentPairCursor.recordFailure current.Cursor
-
-                match
-                    FallbackProjection.applyAdvance
-                        identity
-                        current.Cursor.Offset
-                        next.Offset
-                        next.ConsecutiveFailureCount
-                        current
-                with
-                | Error FallbackAdvanceRejection.AlreadyObserved ->
-                    return Ok(replayLatestFailure AgentPairCursor.DefaultAutoRecoveryBudget identity current)
-                | Error FallbackAdvanceRejection.AlreadyExhausted -> return Ok ConfirmedFailureOutcome.RecoveryExhausted
-                | Error FallbackAdvanceRejection.DifferentRun
-                | Error FallbackAdvanceRejection.NoCursor -> return Ok ConfirmedFailureOutcome.NoActiveRun
-                | Error FallbackAdvanceRejection.InvalidTransition ->
-                    return Error "Fallback advance violates FALLBACK-007 (offset or count is not the successor)"
-                | Error(FallbackAdvanceRejection.InvalidFallbackOffset decodeError) ->
-                    return Error(invalidOffsetMessage decodeError)
-                | Ok _ ->
-                    return!
-                        appendAdvanced
-                            journal
-                            AgentPairCursor.DefaultAutoRecoveryBudget
-                            sessionId
-                            providerRun
-                            reason
-                            current
-                            next
+            match ProviderFailureEvidence.currentState sessionId (AgentJournal.snapshot journal) with
+            | None -> return Ok FailureAdmissionOutcome.NoActiveRun
+            | Some current -> return! recordAfterLicenceCheck journal sessionId authorization reason current
         }
 
     let private appendSuccessFact
         (journal: AgentJournal)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
-        (current: FallbackProjection)
+        (current: ProviderFailureProjection)
         : Task<Result<unit, string>> =
         task {
             let succeeded =
-                FallbackFact.FallbackSucceeded
+                ProviderFailureFact.SuccessRecorded
                     {| SessionId = sessionId
                        LogicalRunId = current.LogicalRunId
                        AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
@@ -185,9 +210,9 @@ module FallbackLedger =
         (journal: AgentJournal)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
-        (current: FallbackProjection)
+        (current: ProviderFailureProjection)
         : Task<Result<unit, string>> =
-        if current.Cursor.ConsecutiveFailureCount = 0 then
+        if current.Budget.ConsecutiveFailureCount = 0 then
             Task.FromResult(Ok())
         else
             appendSuccessFact journal sessionId providerRun current
@@ -198,7 +223,7 @@ module FallbackLedger =
         (providerRun: ProviderRunIdentity)
         : Task<Result<unit, string>> =
         task {
-            match FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot journal) with
-            | None -> return Error "NoActiveRun: no cursor for session"
+            match ProviderFailureEvidence.currentState sessionId (AgentJournal.snapshot journal) with
+            | None -> return Error "NoActiveRun: no provider failure state for session"
             | Some current -> return! recordSuccessForCurrent journal sessionId providerRun current
         }

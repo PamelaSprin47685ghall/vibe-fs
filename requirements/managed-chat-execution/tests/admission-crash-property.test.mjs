@@ -34,7 +34,6 @@ const evidence = {
     ownerAuthorityRoot: null,
     participantIdentity: {
       selectedAgent: 'coder',
-      peerAgent: 'coder',
       canonicalRole: 'coder',
       selectedTier: 'deep',
       persona: 'Coder',
@@ -44,7 +43,6 @@ const evidence = {
   },
   providerRun: 'provider-crash-property',
   origin: 'HumanRoot',
-  effectiveAgent: 'coder',
   requestKind: 'work-main',
   projectionChoice: { kind: 'UseCommittedEpoch' },
 }

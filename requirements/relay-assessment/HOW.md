@@ -6,7 +6,7 @@
 - `src/Wanxiangshu/Mission/Relay/Assessment/Model.fs(.fsi)`：八维校验与 obligation derivation（Quality Ledger 写入）。
 - `src/Wanxiangshu/Mission/Relay/Assessment/Admission.fs(.fsi)`：一次性 admission 与 atomic transaction。
 - `src/Wanxiangshu/Mission/Relay/OpenCode/ReviewTool.fs(.fsi)`：OpenCode schema/codec；`spec.Description` 只用 `tool/review/description`，`acceptedResult` 按 `allPerfect` 在 `runtime/manager-work` 与 `runtime/manager-finish` 之间二选一；领域判断委托给 assessment owner。
-- `src/Wanxiangshu/Mission/Manager/Workflow.fs(.fsi)`：`resourceForPhase` 按 phase 选择 nudge 文档：AuditPending 配 `runtime/manager-assess`，WorkOwned 配 `runtime/manager-work`，PerfectAwaitingRetirement/RetirementCleanupBlocked 配 `runtime/manager-finish`。
+- `src/Wanxiangshu/Mission/Manager/Workflow.fs(.fsi)`：`resourceForCurrentAction` 只从 active incumbent、accepted assessment transport 与 exact bound certificate 选择 nudge 文档：无 assessment 配 `runtime/manager-assess`，未持有效证书配 `runtime/manager-work`，exact valid certificate 配 `runtime/manager-finish`。
 - `src/Wanxiangshu/Mission/Relay/Assessment/Surface.fs(.fsi)`：唯一 JS proof surface（schema parse）。
 
 ## 依赖关系

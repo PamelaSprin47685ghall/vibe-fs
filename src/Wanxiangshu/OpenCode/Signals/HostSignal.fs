@@ -9,8 +9,8 @@ type HostFailureObservation =
       Failure: ExecutionFailure
       Diagnostic: string }
 
-/// FALLBACK-010: `Attempt` is the Host's own retry counter. Diagnostics only —
-/// it may not reach ConsecutiveFailureCount, the budget test, Offset, or the
+/// PAR-009: `Attempt` is the Host's own retry counter. Diagnostics only —
+/// it may not reach ConsecutiveFailureCount, the budget test, or the
 /// decision to send a continuation.
 type RetrySignal =
     { SessionId: SessionId
@@ -18,10 +18,10 @@ type RetrySignal =
       Failure: ExecutionFailure
       Diagnostic: string }
 
-/// FALLBACK-003: Host signals never carry provider-run identity.
+/// PAR-003: Host signals never carry provider-run identity.
 ///
 /// No message id on any case. A retry event's `messageID` was previously read as
-/// the failed assistant message and written into the cursor, which is deriving a
+/// the failed assistant message and written into the failure ledger, which is deriving a
 /// domain fact from an event field. The failed provider run comes from the
 /// reconciled snapshot instead (HOST-004). ProviderFailure contributes only a
 /// typed physical failure witness; it becomes TurnFailed only when reconciliation
@@ -37,7 +37,7 @@ type HostSignal =
     | SessionDeleted of sessionId: SessionId * parentSessionId: SessionId option
     /// HOST-002/004: operator abort (MessageAbortedError / AbortError) is a
     /// typed signal that revokes the current attempt's idle-derived continuation
-    /// capability. It is NOT ProviderFailure (it never advances fallback); it
+    /// capability. It is NOT ProviderFailure (it never advances the failure budget); it
     /// only means the attempt is no longer eligible to mint/consume a
     /// QuiescencePermit for a missing-final-report / interaction repair.
     | AttemptAborted of HostFailureObservation

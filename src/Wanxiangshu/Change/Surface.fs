@@ -38,6 +38,22 @@ module ChangeSurface =
     [<Emit("$0($1)")>]
     let private apply1 (fn: obj) (arg: obj) : obj = jsNative
 
+    /// Production cancellation control outcome. Fable erases
+    /// `new OperationCanceledException` to `System.Exception`, which the
+    /// production `OrchestratorProgram.run` catch (`:? OperationCanceledException`)
+    /// would no longer recognize — so cancellation doubles throw this exact
+    /// runtime class (the same module instance the production catch matches).
+    /// Coupled to the pinned Fable 5.13.0 toolchain (see .config/dotnet-tools.json):
+    /// a Fable bump renames the fable-library path below.
+    /// Fable resolves this path against the source file and re-bases it against
+    /// the emitted file, so it is written source-relative to land on
+    /// `dist/fable_modules/...` at runtime (same module instance Program.js uses).
+    [<Import("OperationCanceledException", "../../../dist/fable_modules/fable-library-js.5.13.0/AsyncBuilder.js")>]
+    let private operationCanceledCtor (message: string) : obj = jsNative
+
+    [<Emit("throw new $0($1)")>]
+    let private throwProductionCancellation (ctor: obj) (message: string) : 'T = jsNative
+
     let private property (value: obj) (name: string) : obj = emitJsExpr (value, name) "$0[$1]"
 
     [<Emit("undefined")>]
@@ -76,11 +92,65 @@ module ChangeSurface =
     let private certificateId value =
         QualityCertificateId.create (stringOf value)
 
+    let private authorityRevision value =
+        AuthorityRevision.create (stringOf value)
+
     let private worktreeIdentityValue value =
         WorktreeIdentity.create (stringOf value)
 
     let private worktreePathValue value = WorktreePath.create (stringOf value)
     let private target value = TargetRef.create (stringOf value)
+
+    let private tryField (value: obj) (names: string list) : obj option =
+        if isNullish value then
+            None
+        else
+            names
+            |> List.tryPick (fun name ->
+                let result = property value name
+                if isNullish result then None else Some result)
+
+    let private decodePublishClaimed (jobOpt: ManagerJobProjection option) (payload: obj) =
+        let targetRefStr =
+            tryField payload [ "targetRef"; "TargetRef" ]
+            |> Option.map stringOf
+            |> Option.orElse (jobOpt |> Option.map (fun j -> TargetRef.value j.TargetRef))
+
+        let rebasedCommitStr =
+            tryField payload [ "rebasedCommit"; "RebasedCommit" ] |> Option.map stringOf
+
+        let expectedHeadStr =
+            tryField payload [ "expectedHead"; "ExpectedHead" ] |> Option.map stringOf
+
+        let snapshotStr =
+            tryField payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]
+            |> Option.map stringOf
+
+        let certStr =
+            tryField payload [ "qualityCertificateId"; "QualityCertificateId" ]
+            |> Option.map stringOf
+
+        let authorityStr =
+            tryField payload [ "authorityRevision"; "AuthorityRevision" ]
+            |> Option.map stringOf
+
+        match targetRefStr, rebasedCommitStr, expectedHeadStr, snapshotStr, certStr, authorityStr with
+        | Some tr, Some rc, Some eh, Some ws, Some qc, Some ar when
+            not (String.IsNullOrWhiteSpace tr)
+            && not (String.IsNullOrWhiteSpace rc)
+            && not (String.IsNullOrWhiteSpace eh)
+            && not (String.IsNullOrWhiteSpace ws)
+            && not (String.IsNullOrWhiteSpace qc)
+            && not (String.IsNullOrWhiteSpace ar)
+            ->
+            Ok
+                {| TargetRef = target tr
+                   RebasedCommit = commit rc
+                   ExpectedHead = commit eh
+                   WorkspaceSnapshotId = snapshotId ws
+                   QualityCertificateId = certificateId qc
+                   AuthorityRevision = authorityRevision ar |}
+        | _ -> Error "Incomplete PublishClaimed payload: missing required publication evidence"
 
     let private factKindAndPayload (value: obj) =
         stringField value [ "kind"; "case"; "name" ], field value [ "payload"; "value"; "data" ]
@@ -121,11 +191,11 @@ module ChangeSurface =
                    WorkspaceSnapshotId = snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]) |}
                 projection
         | "PublishClaimed" ->
-            OrchestratorProjection.recordPublishClaimed
-                managerJobId
-                {| RebasedCommit = commit (field payload [ "rebasedCommit"; "RebasedCommit" ])
-                   ExpectedHead = commit (field payload [ "expectedHead"; "ExpectedHead" ]) |}
-                projection
+            let job = OrchestratorProjection.tryFind managerJobId projection
+
+            match decodePublishClaimed job payload with
+            | Ok claim -> OrchestratorProjection.recordPublishClaimed managerJobId claim projection
+            | Error err -> invalidArg "fact" err
         | "Published" ->
             OrchestratorProjection.recordTerminal
                 managerJobId
@@ -326,19 +396,21 @@ module ChangeSurface =
             box {| kind = "Reject"; reason = reason |}
 
     let private foldPublishClaimed (projection: OrchestratorProjection) (managerJobId: ManagerJobId) (payload: obj) =
-        match
-            OrchestratorProjection.tryFind managerJobId projection
-            |> Option.bind (fun job -> job.RebasedCandidateReady)
-        with
-        | Some rebased ->
-            Ok(
-                OrchestratorProjection.recordPublishClaimed
-                    managerJobId
-                    {| RebasedCommit = rebased.RebasedCommit
-                       ExpectedHead = commit (field payload [ "expectedHead"; "ExpectedHead" ]) |}
-                    projection
-            )
-        | None -> Error "publish claimed for a job with no rebased candidate (ORCH-004)"
+        match OrchestratorProjection.tryFind managerJobId projection with
+        | None -> Error "publish claimed for unknown job"
+        | Some job ->
+            match job.RebasedCandidateReady with
+            | None -> Error "publish claimed for a job with no rebased candidate (ORCH-004)"
+            | Some rebased ->
+                match decodePublishClaimed (Some job) payload with
+                | Error err -> Error err
+                | Ok claim ->
+                    if claim.RebasedCommit <> rebased.RebasedCommit then
+                        Error "publish claimed commit does not match admitted rebased commit"
+                    else
+                        // Latest-event view identical to Fold: a retried publish
+                        // with fresh evidence supersedes the earlier claim.
+                        Ok(OrchestratorProjection.recordPublishClaimed managerJobId claim projection)
 
     let private applyEvent (projection: OrchestratorProjection) (event: obj) : Result<OrchestratorProjection, string> =
         let kind = stringField event [ "kind"; "case"; "type" ]
@@ -424,7 +496,15 @@ module ChangeSurface =
           TargetReads: string list
           RebaseResults: ProgramScenarioRebase list
           ConflictReads: string list list
-          FfResults: ProgramScenarioFf list }
+          FfResults: ProgramScenarioFf list
+          SeededCandidateReady: (string * string * string) option
+          SeededRebasedReady: (string * string * string) option
+          SeededPublishClaimed: (string * string * string * string * string * string) option
+          SeededPublished: (string * string) option
+          WorktreeReads: string list
+          FailPublishedAppend: bool
+          GateCancelled: bool
+          CleanupFails: bool }
 
     let private programScenario name =
         match name with
@@ -435,11 +515,24 @@ module ChangeSurface =
               Signals =
                 [ ProgramScenarioSignal.QualityCandidate "snapshot-1"
                   ProgramScenarioSignal.QualityCandidate "snapshot-rebased-1" ]
-              Snapshots = [ "snapshot-1"; "snapshot-rebased-1"; "snapshot-rebased-1" ]
+              Snapshots =
+                [ "snapshot-1"
+                  "snapshot-rebased-1"
+                  "snapshot-rebased-1"
+                  "snapshot-rebased-1"
+                  "snapshot-rebased-1" ]
               TargetReads = [ "target-1"; "target-1"; "target-1" ]
               RebaseResults = [ ProgramScenarioRebase.Ok "rebased-1" ]
-              ConflictReads = [ []; [] ]
-              FfResults = [ ProgramScenarioFf.Ok "rebased-1" ] }
+              ConflictReads = [ []; []; [] ]
+              FfResults = [ ProgramScenarioFf.Ok "rebased-1" ]
+              SeededCandidateReady = None
+              SeededRebasedReady = None
+              SeededPublishClaimed = None
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1"; "rebased-1" ]
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
         | "rebase-conflict" ->
             { InitialHead = "candidate-1"
               InitialTarget = "target-1"
@@ -451,7 +544,15 @@ module ChangeSurface =
               TargetReads = [ "target-1" ]
               RebaseResults = [ ProgramScenarioRebase.Error "rebase conflict" ]
               ConflictReads = [ []; [ "conflict.fs" ] ]
-              FfResults = [] }
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = None
+              SeededPublishClaimed = None
+              SeededPublished = None
+              WorktreeReads = []
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
         | "target-moved" ->
             { InitialHead = "rebased-1"
               InitialTarget = "target-2"
@@ -463,7 +564,15 @@ module ChangeSurface =
               TargetReads = [ "target-2" ]
               RebaseResults = [ ProgramScenarioRebase.Ok "rebased-2" ]
               ConflictReads = [ [] ]
-              FfResults = [] }
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = None
+              SeededPublishClaimed = None
+              SeededPublished = None
+              WorktreeReads = []
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
         | "cas-miss" ->
             { InitialHead = "rebased-1"
               InitialTarget = "target-1"
@@ -471,11 +580,43 @@ module ChangeSurface =
               Signals =
                 [ ProgramScenarioSignal.QualityCandidate "snapshot-rebased-1"
                   ProgramScenarioSignal.Exceptional "scenario-complete" ]
-              Snapshots = [ "snapshot-rebased-1"; "snapshot-rebased-2" ]
+              Snapshots =
+                [ "snapshot-rebased-1"
+                  "snapshot-rebased-1"
+                  "snapshot-rebased-1"
+                  "snapshot-rebased-2" ]
               TargetReads = [ "target-1"; "target-1"; "target-2" ]
               RebaseResults = [ ProgramScenarioRebase.Ok "rebased-2" ]
-              ConflictReads = [ [] ]
-              FfResults = [ ProgramScenarioFf.TargetMoved ] }
+              ConflictReads = [ []; [] ]
+              FfResults = [ ProgramScenarioFf.TargetMoved ]
+              SeededCandidateReady = None
+              SeededRebasedReady = None
+              SeededPublishClaimed = None
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1"; "rebased-2" ]
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
+        | "rebase-reuse-old-cert" ->
+            { InitialHead = "candidate-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals =
+                [ ProgramScenarioSignal.QualityCandidate "snapshot-1"
+                  ProgramScenarioSignal.QualityCandidate "snapshot-1" ]
+              Snapshots = [ "snapshot-1"; "snapshot-rebased-1"; "snapshot-1" ]
+              TargetReads = [ "target-1"; "target-1" ]
+              RebaseResults = [ ProgramScenarioRebase.Ok "rebased-1" ]
+              ConflictReads = [ []; [] ]
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = None
+              SeededPublishClaimed = None
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1" ]
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
         | "stale-certificate" ->
             { InitialHead = "candidate-1"
               InitialTarget = "target-1"
@@ -487,7 +628,15 @@ module ChangeSurface =
               TargetReads = []
               RebaseResults = []
               ConflictReads = []
-              FfResults = [] }
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = None
+              SeededPublishClaimed = None
+              SeededPublished = None
+              WorktreeReads = []
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
         | "artifact-conflict" ->
             { InitialHead = "candidate-1"
               InitialTarget = "target-1"
@@ -499,7 +648,15 @@ module ChangeSurface =
               TargetReads = [ "target-1" ]
               RebaseResults = []
               ConflictReads = [ [ "conflict.fs" ] ]
-              FfResults = [] }
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = None
+              SeededPublishClaimed = None
+              SeededPublished = None
+              WorktreeReads = []
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
         | "retired" ->
             { InitialHead = "candidate-1"
               InitialTarget = "target-1"
@@ -511,7 +668,292 @@ module ChangeSurface =
               TargetReads = []
               RebaseResults = []
               ConflictReads = []
-              FfResults = [] }
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = None
+              SeededPublishClaimed = None
+              SeededPublished = None
+              WorktreeReads = []
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
+        | "cleanup-failed" ->
+            { InitialHead = "candidate-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals =
+                [ ProgramScenarioSignal.QualityCandidate "snapshot-1"
+                  ProgramScenarioSignal.QualityCandidate "snapshot-rebased-1" ]
+              Snapshots =
+                [ "snapshot-1"
+                  "snapshot-rebased-1"
+                  "snapshot-rebased-1"
+                  "snapshot-rebased-1"
+                  "snapshot-rebased-1" ]
+              TargetReads = [ "target-1"; "target-1"; "target-1" ]
+              RebaseResults = [ ProgramScenarioRebase.Ok "rebased-1" ]
+              ConflictReads = [ []; []; [] ]
+              FfResults = [ ProgramScenarioFf.Ok "rebased-1" ]
+              SeededCandidateReady = None
+              SeededRebasedReady = None
+              SeededPublishClaimed = None
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1"; "rebased-1" ]
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = true }
+        | "cancelled-program" ->
+            { InitialHead = "candidate-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals = []
+              Snapshots = []
+              TargetReads = []
+              RebaseResults = []
+              ConflictReads = []
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = None
+              SeededPublishClaimed = None
+              SeededPublished = None
+              WorktreeReads = []
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
+        | "reentry-valid" ->
+            { InitialHead = "rebased-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals = []
+              Snapshots = [ "snapshot-rebased-1"; "snapshot-rebased-1" ]
+              TargetReads = [ "target-1" ]
+              RebaseResults = []
+              ConflictReads = [ [] ]
+              FfResults = [ ProgramScenarioFf.Ok "rebased-1" ]
+              SeededCandidateReady = None
+              SeededRebasedReady = Some("rebased-1", "target-1", "snapshot-rebased-1")
+              SeededPublishClaimed =
+                Some("refs/heads/main", "rebased-1", "target-1", "snapshot-rebased-1", "certificate-1", "authority-1")
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1"; "rebased-1" ]
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
+        | "reentry-wrong-snapshot" ->
+            { InitialHead = "rebased-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals = [ ProgramScenarioSignal.Exceptional "scenario-complete" ]
+              Snapshots = [ "snapshot-1" ]
+              TargetReads = []
+              RebaseResults = []
+              ConflictReads = []
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = Some("rebased-1", "target-1", "snapshot-rebased-1")
+              SeededPublishClaimed =
+                Some("refs/heads/main", "rebased-1", "target-1", "snapshot-rebased-1", "certificate-1", "authority-1")
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1" ]
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
+        | "reentry-missing-rebased" ->
+            { InitialHead = "rebased-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals = []
+              Snapshots = [ "snapshot-rebased-1" ]
+              TargetReads = []
+              RebaseResults = []
+              ConflictReads = []
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = None
+              SeededPublishClaimed =
+                Some("refs/heads/main", "rebased-1", "target-1", "snapshot-rebased-1", "certificate-1", "authority-1")
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1" ]
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
+        | "reentry-claim-snapshot-mismatch" ->
+            { InitialHead = "rebased-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals = [ ProgramScenarioSignal.Exceptional "scenario-complete" ]
+              Snapshots = [ "snapshot-rebased-1" ]
+              TargetReads = []
+              RebaseResults = []
+              ConflictReads = []
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = Some("rebased-1", "target-1", "snapshot-rebased-1")
+              SeededPublishClaimed =
+                Some("refs/heads/main", "rebased-1", "target-1", "snapshot-rebased-2", "certificate-1", "authority-1")
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1" ]
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
+        | "reentry-claim-target-mismatch" ->
+            { InitialHead = "rebased-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals = []
+              Snapshots = [ "snapshot-rebased-1" ]
+              TargetReads = []
+              RebaseResults = []
+              ConflictReads = []
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = Some("rebased-1", "target-1", "snapshot-rebased-1")
+              SeededPublishClaimed =
+                Some("refs/heads/other", "rebased-1", "target-1", "snapshot-rebased-1", "certificate-1", "authority-1")
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1" ]
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
+        | "reentry-candidate-moved" ->
+            { InitialHead = "rebased-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals = []
+              Snapshots = [ "snapshot-rebased-1"; "snapshot-rebased-1" ]
+              TargetReads = [ "target-1" ]
+              RebaseResults = []
+              ConflictReads = [ [] ]
+              FfResults = [ ProgramScenarioFf.Ok "rebased-1" ]
+              SeededCandidateReady = None
+              SeededRebasedReady = Some("rebased-1", "target-1", "snapshot-rebased-1")
+              SeededPublishClaimed =
+                Some("refs/heads/main", "rebased-1", "target-1", "snapshot-rebased-1", "certificate-1", "authority-1")
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1"; "rebased-2" ]
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
+        | "reentry-landed-mismatch" ->
+            { InitialHead = "rebased-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals = []
+              Snapshots = [ "snapshot-rebased-1"; "snapshot-rebased-1" ]
+              TargetReads = [ "target-1" ]
+              RebaseResults = []
+              ConflictReads = [ [] ]
+              FfResults = [ ProgramScenarioFf.Ok "other-landed" ]
+              SeededCandidateReady = None
+              SeededRebasedReady = Some("rebased-1", "target-1", "snapshot-rebased-1")
+              SeededPublishClaimed =
+                Some("refs/heads/main", "rebased-1", "target-1", "snapshot-rebased-1", "certificate-1", "authority-1")
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1"; "rebased-1" ]
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
+        | "reentry-gate-cancelled" ->
+            { InitialHead = "rebased-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals = []
+              Snapshots = [ "snapshot-rebased-1" ]
+              TargetReads = []
+              RebaseResults = []
+              ConflictReads = []
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = Some("rebased-1", "target-1", "snapshot-rebased-1")
+              SeededPublishClaimed =
+                Some("refs/heads/main", "rebased-1", "target-1", "snapshot-rebased-1", "certificate-1", "authority-1")
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1" ]
+              FailPublishedAppend = false
+              GateCancelled = true
+              CleanupFails = false }
+        | "reentry-published-append-failed" ->
+            { InitialHead = "rebased-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals = []
+              Snapshots = [ "snapshot-rebased-1"; "snapshot-rebased-1" ]
+              TargetReads = [ "target-1" ]
+              RebaseResults = []
+              ConflictReads = [ [] ]
+              FfResults = [ ProgramScenarioFf.Ok "rebased-1" ]
+              SeededCandidateReady = None
+              SeededRebasedReady = Some("rebased-1", "target-1", "snapshot-rebased-1")
+              SeededPublishClaimed =
+                Some("refs/heads/main", "rebased-1", "target-1", "snapshot-rebased-1", "certificate-1", "authority-1")
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1"; "rebased-1" ]
+              FailPublishedAppend = true
+              GateCancelled = false
+              CleanupFails = false }
+        | "reentry-cleanup-failed" ->
+            { InitialHead = "rebased-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals = []
+              Snapshots = [ "snapshot-rebased-1"; "snapshot-rebased-1" ]
+              TargetReads = [ "target-1" ]
+              RebaseResults = []
+              ConflictReads = [ [] ]
+              FfResults = [ ProgramScenarioFf.Ok "rebased-1" ]
+              SeededCandidateReady = None
+              SeededRebasedReady = Some("rebased-1", "target-1", "snapshot-rebased-1")
+              SeededPublishClaimed =
+                Some("refs/heads/main", "rebased-1", "target-1", "snapshot-rebased-1", "certificate-1", "authority-1")
+              SeededPublished = None
+              WorktreeReads = [ "rebased-1"; "rebased-1" ]
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = true }
+        | "reentry-published-unsettled" ->
+            { InitialHead = "rebased-1"
+              InitialTarget = "rebased-1"
+              InitialRebasedTarget = None
+              Signals = []
+              Snapshots = []
+              TargetReads = []
+              RebaseResults = []
+              ConflictReads = []
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = Some("rebased-1", "target-1", "snapshot-rebased-1")
+              SeededPublishClaimed =
+                Some("refs/heads/main", "rebased-1", "target-1", "snapshot-rebased-1", "certificate-1", "authority-1")
+              SeededPublished = Some("rebased-1", "rebased-1")
+              WorktreeReads = []
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
+        | "reentry-stale-claim-superseded" ->
+            // Crash-window regression (R12): durable state holds the CAS-missed
+            // R1 claim beside the superseding R2 rebased record. Reentry must treat
+            // the stale claim as expired and re-enter the manager loop — never FF
+            // on the old pin and never fail closed without consuming signals.
+            { InitialHead = "rebased-1"
+              InitialTarget = "target-1"
+              InitialRebasedTarget = None
+              Signals =
+                [ ProgramScenarioSignal.Retired
+                  ProgramScenarioSignal.Exceptional "scenario-complete" ]
+              Snapshots = []
+              TargetReads = []
+              RebaseResults = []
+              ConflictReads = []
+              FfResults = []
+              SeededCandidateReady = None
+              SeededRebasedReady = Some("rebased-2", "target-2", "snapshot-rebased-2")
+              SeededPublishClaimed =
+                Some("refs/heads/main", "rebased-1", "target-1", "snapshot-rebased-1", "certificate-1", "authority-1")
+              SeededPublished = None
+              WorktreeReads = []
+              FailPublishedAppend = false
+              GateCancelled = false
+              CleanupFails = false }
         | unknown -> invalidArg "scenario" ("unknown Change program scenario: " + unknown)
 
     let private programFactName fact =
@@ -563,6 +1005,14 @@ module ChangeSurface =
             box
                 {| kind = "Published"
                    detail = CommitHash.value head |}
+        | OrchestratorVerdict.PublishedPendingCleanup(_, head, cleanupError) ->
+            box
+                {| kind = "PublishedPendingCleanup"
+                   detail = sprintf "Published %s; cleanup pending: %s" (CommitHash.value head) cleanupError |}
+        | OrchestratorVerdict.Cancelled _ ->
+            box
+                {| kind = "Cancelled"
+                   detail = "cancelled" |}
         | OrchestratorVerdict.RejectedDirty reason ->
             box
                 {| kind = "RejectedDirty"
@@ -576,20 +1026,45 @@ module ChangeSurface =
     /// Executes the real OrchestratorProgram against deterministic in-memory
     /// ports. The surface exposes domain effects, not old review stages, so
     /// integration requirements can prove invalidation/loop-continuation/Git/CAS order.
-    let observeRelayProgram (scenarioName: string) : Task<obj> =
+    /// Signal input for program observations. Queued replays a named scenario;
+    /// Burst feeds a countdown of Continue signals then one terminal without
+    /// materializing a signal queue, keeping long manager-loop proofs bounded.
+    [<RequireQualifiedAccess>]
+    type private ManagerLoopSignalInput =
+        | Queued of Queue<ProgramScenarioSignal>
+        | Burst of remaining: int ref * terminalSent: bool ref * terminalReason: string
+
+    /// Scalar effect counters shared by every program observation. Burst runs
+    /// return only these scalars; per-step strings stay behind collectStepStrings.
+    type private ProgramRunCounters =
+        { SignalCount: int
+          ContinuationCount: int
+          FactCount: int
+          GitCallCount: int
+          GateAcquireCount: int
+          GateReleaseCount: int
+          GateHeld: bool }
+
+    /// Shared physical-port doubles around the real OrchestratorProgram.
+    /// Full observations keep per-step strings; burst runs count only.
+    let private executeProgram
+        (scenario: ProgramScenario)
+        (scenarioName: string)
+        (signalInput: ManagerLoopSignalInput)
+        (collectStepStrings: bool)
+        : Task<obj * ProgramRunCounters> =
         task {
-            let scenario = programScenario scenarioName
             let jobId = ManagerJobId.create "surface-job"
             let sessionId = SessionId.create "surface-manager-session"
             let worktreePath = WorktreePath.create "/tmp/wanxiangshu-change-surface"
             let worktreeIdentity = WorktreeIdentity.create "manager/surface-job"
             let targetRef = TargetRef.create "refs/heads/main"
-            let signals = Queue<ProgramScenarioSignal>(scenario.Signals)
             let snapshots = Queue<string>(scenario.Snapshots)
             let targetReads = Queue<string>(scenario.TargetReads)
             let rebaseResults = Queue<ProgramScenarioRebase>(scenario.RebaseResults)
             let conflictReads = Queue<string list>(scenario.ConflictReads)
             let ffResults = Queue<ProgramScenarioFf>(scenario.FfResults)
+            let worktreeReads = Queue<string>(scenario.WorktreeReads)
             let facts = ResizeArray<string>()
             let invalidations = ResizeArray<string>()
             let continuations = ResizeArray<string>()
@@ -597,6 +1072,7 @@ module ChangeSurface =
             let rebaseGateHeld = ResizeArray<bool>()
             let ffGateHeld = ResizeArray<bool>()
             let ffExpectedHeads = ResizeArray<string>()
+            let ffPinnedCandidates = ResizeArray<string>()
             let worktreeHead = ref scenario.InitialHead
             let targetHead = ref scenario.InitialTarget
             let gateHeld = ref false
@@ -604,21 +1080,43 @@ module ChangeSurface =
             let gateReleaseCount = ref 0
             let signalIndex = ref 0
 
+            let signalCount = ref 0
+            let continuationCount = ref 0
+            let factCount = ref 0
+            let gitCallCount = ref 0
+            let burstIncumbency = IncumbencyId.create "burst-loop"
+
             let nextSignal () =
-                if signals.Count = 0 then
-                    Error "scenario signal queue exhausted"
-                else
-                    signalIndex.Value <- signalIndex.Value + 1
-                    let value = scenarioSignal signalIndex.Value (signals.Dequeue())
+                match signalInput with
+                | ManagerLoopSignalInput.Burst(remaining, terminalSent, terminalReason) ->
+                    if remaining.Value > 0 then
+                        remaining.Value <- remaining.Value - 1
+                        signalCount.Value <- signalCount.Value + 1
+                        Ok ManagerLoopSignal.Continue
+                    elif not terminalSent.Value then
+                        terminalSent.Value <- true
+                        signalCount.Value <- signalCount.Value + 1
+                        Ok(ManagerLoopSignal.ExceptionalTerminal terminalReason)
+                    else
+                        Error "burst signal queue exhausted"
+                | ManagerLoopSignalInput.Queued queue ->
+                    if queue.Count = 0 then
+                        Error "scenario signal queue exhausted"
+                    else
+                        signalIndex.Value <- signalIndex.Value + 1
+                        signalCount.Value <- signalCount.Value + 1
+                        let value = scenarioSignal signalIndex.Value (queue.Dequeue())
 
-                    let label =
-                        match value with
-                        | ManagerLoopSignal.Candidate _ -> "Candidate"
-                        | ManagerLoopSignal.Continue -> "Continue"
-                        | ManagerLoopSignal.ExceptionalTerminal _ -> "ExceptionalTerminal"
+                        let label =
+                            match value with
+                            | ManagerLoopSignal.Candidate _ -> "Candidate"
+                            | ManagerLoopSignal.Continue -> "Continue"
+                            | ManagerLoopSignal.ExceptionalTerminal _ -> "ExceptionalTerminal"
 
-                    timeline.Add("await:" + label)
-                    Ok value
+                        if collectStepStrings then
+                            timeline.Add("await:" + label)
+
+                        Ok value
 
             let git: GitPort =
                 { IsDirty = fun _ -> Task.FromResult false
@@ -627,6 +1125,7 @@ module ChangeSurface =
                   Rebase =
                     fun _ _ ->
                         task {
+                            gitCallCount.Value <- gitCallCount.Value + 1
                             rebaseGateHeld.Add gateHeld.Value
                             timeline.Add "git:rebase"
 
@@ -640,11 +1139,13 @@ module ChangeSurface =
                                 | ProgramScenarioRebase.Error reason -> return Error reason
                         }
                   FfMerge =
-                    fun _ _ expected ->
+                    fun _ _ expected pinned ->
                         task {
+                            gitCallCount.Value <- gitCallCount.Value + 1
                             ffGateHeld.Add gateHeld.Value
                             ffExpectedHeads.Add(CommitHash.value expected)
-                            timeline.Add "git:ff"
+                            ffPinnedCandidates.Add(CommitHash.value pinned)
+                            timeline.Add("git:ff:" + CommitHash.value pinned)
 
                             if ffResults.Count = 0 then
                                 return Error "scenario ff queue exhausted"
@@ -662,12 +1163,26 @@ module ChangeSurface =
                             Task.FromResult(Error "scenario conflict queue exhausted")
                         else
                             Task.FromResult(Ok(conflictReads.Dequeue()))
-                  RemoveWorktree = fun _ -> Task.FromResult(Ok())
+                  RemoveWorktree =
+                    fun _ ->
+                        if scenario.CleanupFails then
+                            Task.FromResult(Error "disk detached")
+                        else
+                            Task.FromResult(Ok())
                   HasRebaseHead = fun _ -> Task.FromResult false
                   ListWorktrees = fun () -> Task.FromResult(Ok [])
                   ListManagerBranches = fun () -> Task.FromResult(Ok [])
                   DeleteBranch = fun _ -> Task.FromResult(Ok())
-                  ReadHead = fun _ -> Task.FromResult(Ok(CommitHash.create worktreeHead.Value))
+                  ReadHead =
+                    fun _ ->
+                        let value =
+                            if worktreeReads.Count = 0 then
+                                worktreeHead.Value
+                            else
+                                worktreeReads.Dequeue()
+
+                        timeline.Add("git:read-head:" + value)
+                        Task.FromResult(Ok(CommitHash.create value))
                   GetTargetHead =
                     fun _ ->
                         let value =
@@ -701,15 +1216,73 @@ module ChangeSurface =
                     Wanxiangshu.Composition.Durable.Fold.empty.AgentProjections.Orchestrator
 
             let initialOrchestrator =
-                match scenario.InitialRebasedTarget with
-                | None -> created
-                | Some targetSnapshot ->
-                    OrchestratorProjection.recordRebasedCandidateReady
-                        jobId
-                        {| RebasedCommit = CommitHash.create scenario.InitialHead
-                           TargetHeadSnapshot = CommitHash.create targetSnapshot
-                           WorkspaceSnapshotId = WorkspaceSnapshotId.create "snapshot-rebased-1" |}
-                        created
+                let withLegacyRebased current =
+                    match scenario.InitialRebasedTarget with
+                    | None -> current
+                    | Some targetSnapshot ->
+                        OrchestratorProjection.recordRebasedCandidateReady
+                            jobId
+                            {| RebasedCommit = CommitHash.create scenario.InitialHead
+                               TargetHeadSnapshot = CommitHash.create targetSnapshot
+                               WorkspaceSnapshotId = WorkspaceSnapshotId.create "snapshot-rebased-1" |}
+                            current
+
+                let withCandidate current =
+                    match scenario.SeededCandidateReady with
+                    | None -> current
+                    | Some(candidate, snapshot, cert) ->
+                        OrchestratorProjection.recordCandidateReady
+                            jobId
+                            {| CandidateCommit = CommitHash.create candidate
+                               WorkspaceSnapshotId = WorkspaceSnapshotId.create snapshot
+                               QualityCertificateId = QualityCertificateId.create cert |}
+                            current
+
+                let withRebased current =
+                    match scenario.SeededRebasedReady with
+                    | None -> current
+                    | Some(rebased, targetSnap, workspaceSnap) ->
+                        OrchestratorProjection.recordRebasedCandidateReady
+                            jobId
+                            {| RebasedCommit = CommitHash.create rebased
+                               TargetHeadSnapshot = CommitHash.create targetSnap
+                               WorkspaceSnapshotId = WorkspaceSnapshotId.create workspaceSnap |}
+                            current
+
+                let withClaim current =
+                    match scenario.SeededPublishClaimed with
+                    | None -> current
+                    | Some(targetRef, rebased, expected, workspaceSnap, cert, authority) ->
+                        OrchestratorProjection.recordPublishClaimed
+                            jobId
+                            {| TargetRef = TargetRef.create targetRef
+                               RebasedCommit = CommitHash.create rebased
+                               ExpectedHead = CommitHash.create expected
+                               WorkspaceSnapshotId = WorkspaceSnapshotId.create workspaceSnap
+                               QualityCertificateId = QualityCertificateId.create cert
+                               AuthorityRevision = AuthorityRevision.create authority |}
+                            current
+
+                let withPublished current =
+                    match scenario.SeededPublished with
+                    | None -> current
+                    | Some(candidate, resulting) ->
+                        OrchestratorProjection.recordTerminal
+                            jobId
+                            (TerminalOutcome.Published
+                                {| CandidateCommit = CommitHash.create candidate
+                                   ResultingTargetHead = CommitHash.create resulting |})
+                            current
+
+                // Seed order mirrors durable write order: candidate, rebased,
+                // claim, then terminal. Physical doubles only replay queued
+                // observations; they never read source files or copy the model.
+                created
+                |> withLegacyRebased
+                |> withCandidate
+                |> withRebased
+                |> withClaim
+                |> withPublished
 
             let initialProjection = Wanxiangshu.Composition.Durable.Fold.empty
 
@@ -722,24 +1295,37 @@ module ChangeSurface =
 
             let appendFact _ fact =
                 task {
+                    factCount.Value <- factCount.Value + 1
                     let name = programFactName fact
-                    facts.Add name
-                    timeline.Add("fact:" + name)
 
-                    match Wanxiangshu.Composition.Durable.Fold.foldAgentFact projection.Value.AgentProjections fact with
-                    | Error rejection -> return Error(sprintf "%A" rejection)
-                    | Ok agents ->
-                        projection.Value <-
-                            { projection.Value with
-                                AgentProjections = agents }
+                    if scenario.FailPublishedAppend && name = "Published" then
+                        timeline.Add "fact-failed:Published"
+                        return Error "injected Published append failure"
+                    else
+                        facts.Add name
+                        timeline.Add("fact:" + name)
 
-                        return Ok()
+                        match
+                            Wanxiangshu.Composition.Durable.Fold.foldAgentFact projection.Value.AgentProjections fact
+                        with
+                        | Error rejection -> return Error(sprintf "%A" rejection)
+                        | Ok agents ->
+                            projection.Value <-
+                                { projection.Value with
+                                    AgentProjections = agents }
+
+                            return Ok()
                 }
 
             let relay: RelayPort =
                 { CreateManagerSession = fun _ -> Task.FromResult(Ok sessionId)
                   ActivateManager = fun _ -> Task.FromResult(Ok())
-                  AwaitLoopSignal = fun _ -> Task.FromResult(nextSignal ())
+                  AwaitLoopSignal =
+                    fun _ ->
+                        if scenarioName = "cancelled-program" then
+                            throwProductionCancellation operationCanceledCtor "manager task cancelled"
+
+                        Task.FromResult(nextSignal ())
                   InvalidateCertificate =
                     fun _ reason ->
                         invalidations.Add reason
@@ -747,12 +1333,17 @@ module ChangeSurface =
                         Task.FromResult(Ok())
                   ContinueLoop =
                     fun _ ->
-                        let nextId =
-                            IncumbencyId.create ("surface-loop-" + string (continuations.Count + 1))
+                        continuationCount.Value <- continuationCount.Value + 1
 
-                        continuations.Add(IncumbencyId.value nextId)
-                        timeline.Add("continue:" + IncumbencyId.value nextId)
-                        Task.FromResult(Ok nextId)
+                        if collectStepStrings then
+                            let nextId =
+                                IncumbencyId.create ("surface-loop-" + string (continuations.Count + 1))
+
+                            continuations.Add(IncumbencyId.value nextId)
+                            timeline.Add("continue:" + IncumbencyId.value nextId)
+                            Task.FromResult(Ok nextId)
+                        else
+                            Task.FromResult(Ok burstIncumbency)
                   CaptureSnapshot =
                     fun _ ->
                         if snapshots.Count = 0 then
@@ -775,6 +1366,10 @@ module ChangeSurface =
                         Task.FromResult() }
 
             let acquireGate () =
+                if scenario.GateCancelled then
+                    timeline.Add "gate:cancelled"
+                    throwProductionCancellation operationCanceledCtor "publish gate cancelled"
+
                 gateAcquireCount.Value <- gateAcquireCount.Value + 1
                 gateHeld.Value <- true
                 timeline.Add "gate:acquire"
@@ -797,19 +1392,102 @@ module ChangeSurface =
 
             let! verdict = OrchestratorProgram.run deps job
 
-            return
-                box
-                    {| verdict = verdictObject verdict
-                       facts = facts.ToArray()
-                       invalidations = invalidations.ToArray()
-                       continuations = continuations.ToArray()
-                       timeline = timeline.ToArray()
-                       rebaseGateHeld = rebaseGateHeld.ToArray()
-                       ffGateHeld = ffGateHeld.ToArray()
-                       ffExpectedHeads = ffExpectedHeads.ToArray()
-                       gateAcquireCount = gateAcquireCount.Value
-                       gateReleaseCount = gateReleaseCount.Value
-                       gateHeldAfterRun = gateHeld.Value |}
+            let counters =
+                { SignalCount = signalCount.Value
+                  ContinuationCount = continuationCount.Value
+                  FactCount = factCount.Value
+                  GitCallCount = gitCallCount.Value
+                  GateAcquireCount = gateAcquireCount.Value
+                  GateReleaseCount = gateReleaseCount.Value
+                  GateHeld = gateHeld.Value }
+
+            let observation =
+                if collectStepStrings then
+                    box
+                        {| verdict = verdictObject verdict
+                           facts = facts.ToArray()
+                           invalidations = invalidations.ToArray()
+                           continuations = continuations.ToArray()
+                           timeline = timeline.ToArray()
+                           rebaseGateHeld = rebaseGateHeld.ToArray()
+                           ffGateHeld = ffGateHeld.ToArray()
+                           ffExpectedHeads = ffExpectedHeads.ToArray()
+                           ffPinnedCandidates = ffPinnedCandidates.ToArray()
+                           ffCalls = ffGateHeld.Count
+                           signalCount = counters.SignalCount
+                           continuationCount = counters.ContinuationCount
+                           factCount = counters.FactCount
+                           gitCallCount = counters.GitCallCount
+                           gateAcquireCount = counters.GateAcquireCount
+                           gateReleaseCount = counters.GateReleaseCount
+                           gateHeldAfterRun = counters.GateHeld |}
+                else
+                    box
+                        {| verdict = verdictObject verdict
+                           continuationCount = counters.ContinuationCount
+                           signalCount = counters.SignalCount
+                           gateAcquireCount = counters.GateAcquireCount
+                           gateReleaseCount = counters.GateReleaseCount
+                           gateHeldAfterRun = counters.GateHeld
+                           factCount = counters.FactCount
+                           gitCallCount = counters.GitCallCount |}
+
+            return (observation, counters)
+        }
+
+    /// Executes the real OrchestratorProgram against deterministic in-memory
+    /// ports. The surface exposes domain effects, not old review stages, so
+    /// integration requirements can prove invalidation/loop-continuation/Git/CAS order.
+    let observeRelayProgram (scenarioName: string) : Task<obj> =
+        task {
+            let scenario = programScenario scenarioName
+
+            let! observation, _ =
+                executeProgram
+                    scenario
+                    scenarioName
+                    (ManagerLoopSignalInput.Queued(Queue<ProgramScenarioSignal>(scenario.Signals)))
+                    true
+
+            return observation
+        }
+
+    /// Feeds count Continue signals then one ExceptionalTerminal through the
+    /// real OrchestratorProgram. Countdown source plus scalar-only observation
+    /// keeps 10,000-iteration proofs in bounded memory: no signal queue, no
+    /// timeline, no per-step continuation strings.
+    let observeManagerLoopBurst (count: int) : Task<obj> =
+        task {
+            if count < 0 then
+                invalidArg "count" "burst count must be non-negative"
+
+            let scenario: ProgramScenario =
+                { InitialHead = "candidate-1"
+                  InitialTarget = "target-1"
+                  InitialRebasedTarget = None
+                  Signals = []
+                  Snapshots = []
+                  TargetReads = []
+                  RebaseResults = []
+                  ConflictReads = []
+                  FfResults = []
+                  SeededCandidateReady = None
+                  SeededRebasedReady = None
+                  SeededPublishClaimed = None
+                  SeededPublished = None
+                  WorktreeReads = []
+                  FailPublishedAppend = false
+                  GateCancelled = false
+                  CleanupFails = false }
+
+            let! observation, _ =
+                executeProgram
+                    scenario
+                    "manager-loop-burst"
+                    (ManagerLoopSignalInput.Burst(ref count, ref false, "burst-complete"))
+                    false
+
+            return observation
         }
 
     let private commandObject (command: Command) : obj =
@@ -849,13 +1527,20 @@ module ChangeSurface =
             return resultObject result (fun _ -> null)
         }
 
-    let gitFfMerge (git: obj) (path: string) (targetRef: string) (expectedHead: string) : Task<obj> =
+    let gitFfMerge
+        (git: obj)
+        (path: string)
+        (targetRef: string)
+        (expectedHead: string)
+        (pinnedCandidate: string)
+        : Task<obj> =
         task {
             let! result =
                 (git :?> GitHandle).Port.FfMerge
                     (WorktreePath.create path)
                     (TargetRef.create targetRef)
                     (CommitHash.create expectedHead)
+                    (CommitHash.create pinnedCandidate)
 
             return resultObject result (fun value -> box (CommitHash.value value))
         }

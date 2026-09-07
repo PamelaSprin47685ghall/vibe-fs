@@ -27,10 +27,9 @@ const writePassingBoundary = (root) => {
       '    let inheritFromOwner value owner = value, owner',
       '    let rehydrate owner input = owner, input',
       '    let selectedAgent value = value',
-      '    let peerAgent value = value',
       '    let role value = value',
-      '    let initialTier value = value',
       '    let persona value = value',
+      '    let personaCatalogVersion value = value',
       '    let origin value = value',
     ].join('\n'),
   )

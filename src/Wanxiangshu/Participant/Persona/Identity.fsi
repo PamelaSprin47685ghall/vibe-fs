@@ -45,7 +45,6 @@ module ParticipantIdentity =
     val selectedAgent: ParticipantIdentityEvidence -> string
     val role: ParticipantIdentityEvidence -> Role option
     val roleLabel: ParticipantIdentityEvidence -> string
-    val peerAgent: ParticipantIdentityEvidence -> string
     val persona: ParticipantIdentityEvidence -> string
     val personaCatalogVersion: ParticipantIdentityEvidence -> int
     val origin: ParticipantIdentityEvidence -> PersonaOrigin

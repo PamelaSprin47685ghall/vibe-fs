@@ -7,7 +7,7 @@ open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Foundation.Identity
 
 /// Per-instance session registry state for one plugin instance (HOST-012):
-/// owned sessions, user-message bindings, companions, verdicts, nudges,
+/// owned sessions, companions, verdicts, nudges,
 /// quiescence permits and join interrupts. Shared cross-worktree state stays
 /// in SharedState; everything here is per-instance and dies with the scope.
 type PluginSessionScope =
@@ -21,9 +21,6 @@ type PluginSessionScope =
 
     /// Per-plugin-instance routing demands.
     member ModelRoutingSessions: HashSet<string>
-
-    /// Per-instance user message binding map.
-    member UserMessageBindings: Dictionary<string, PhysicalUserMessageId>
 
     /// Cross-instance session parent map alias.
     member SessionParents: Dictionary<string, string>
@@ -51,10 +48,11 @@ type PluginSessionScope =
     /// a Main with a linked Blogger).
     member LinkedBloggerKeys: sessionId: string -> string list
 
+    /// Drops the provider-language identity for this session idempotently.
     member DropSessionIdentity: sessionId: string -> unit
 
     /// Session deletion drops every per-instance registry entry for this session.
-    member ClearSession: sessionId: string * preserveIdentity: bool -> unit
+    member ClearSession: sessionId: string -> unit
 
     /// Plugin dispose releases every companion host and every routing demand/lease.
     member Dispose: unit -> unit

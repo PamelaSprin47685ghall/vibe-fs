@@ -25,13 +25,7 @@ module RuntimeSurface =
     val registerAuthority: profile: obj -> projection: obj -> obj
 
     val claimContinuation:
-        promptKey: string ->
-        session: string ->
-        kind: string ->
-        profile: obj ->
-        effectiveAgent: string ->
-        payloadDigest: string ->
-            obj
+        promptKey: string -> session: string -> kind: string -> profile: obj -> payloadDigest: string -> obj
 
     val claimAgentOwnerRoot: promptKey: string -> session: string -> payloadDigest: string -> seedValue: obj -> obj
     val registerClaim: claim: obj -> projection: obj -> obj
@@ -47,7 +41,6 @@ module RuntimeSurface =
         logicalRun: obj ->
         authorityRoot: obj ->
         origin: obj ->
-        effectiveAgent: obj ->
         payloadDigest: string ->
         claimSequence: int ->
             string

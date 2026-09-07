@@ -57,6 +57,6 @@ test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_the_only_allowed_byte_metric_is_the_
   // anywhere in the compression domain files.
   const probe = fs.readFileSync(path.join(NEXT_DIR, 'Context', 'Prefix', 'ProbeSelection.fs'), 'utf8')
   assert.ok(!probe.includes('Window'), 'probe selection must not reference a model window')
-  const slot = fs.readFileSync(path.join(NEXT_DIR, 'Participant', 'Provider', 'Attempt', 'RecoverySlot.fs'), 'utf8')
-  assert.ok(!slot.includes('Window'), 'recovery slot must not reference a model window')
+  const retryPolicy = fs.readFileSync(path.join(NEXT_DIR, 'Participant', 'Provider', 'Attempt', 'RetryPolicy.fs'), 'utf8')
+  assert.ok(!retryPolicy.includes('Window'), 'retry policy must not reference a model window')
 })

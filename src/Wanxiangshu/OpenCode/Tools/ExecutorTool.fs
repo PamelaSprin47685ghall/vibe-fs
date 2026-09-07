@@ -192,7 +192,7 @@ module ExecutorTool =
 
     let private familyPermit (scope: ToolRuntimeScope) (root: SessionId) : Task<Result<FamilyRecoveryPermit, string>> =
         task {
-            let! recovery = scope.RequireFamilyRecovery root
+            let! recovery = scope.RequireCurrentProcessJoin root
 
             match recovery with
             | FamilyRecovery.FamilyBlocked _ -> return Error "RECOVERY_BLOCKED:"

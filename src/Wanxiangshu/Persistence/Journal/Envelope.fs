@@ -197,8 +197,55 @@ module Envelope =
     let private promptFactDecoder =
         Decode.Auto.generateDecoderCached<PromptFactCases> (extra = extra)
 
-    let private fallbackFactDecoder =
-        Decode.Auto.generateDecoderCached<FallbackFactCases> (extra = extra)
+    [<RequireQualifiedAccess>]
+    type private LegacyFallbackDto =
+        | FallbackCursorAdvanced of
+            {| SessionId: SessionId
+               LogicalRunId: LogicalRunId
+               AuthorityRootUserMessageId: AuthorityRootUserMessageId
+               ProviderRun: ProviderRunIdentity
+               PreviousOffset: byte
+               NextOffset: byte
+               ConsecutiveFailureCount: int
+               Reason: string |}
+        | FallbackExhausted of
+            {| SessionId: SessionId
+               LogicalRunId: LogicalRunId
+               AuthorityRootUserMessageId: AuthorityRootUserMessageId
+               FinalConsecutiveFailureCount: int
+               FinalOffset: byte |}
+        | FallbackSucceeded of
+            {| SessionId: SessionId
+               LogicalRunId: LogicalRunId
+               AuthorityRootUserMessageId: AuthorityRootUserMessageId
+               ProviderRun: ProviderRunIdentity |}
+
+    let private providerFailureFactDecoder =
+        Decode.Auto.generateDecoderCached<ProviderFailureFactCases> (extra = extra)
+
+    let private legacyFallbackDecoder: Decoder<ProviderFailureFactCases> =
+        Decode.Auto.generateDecoderCached<LegacyFallbackDto> (extra = extra)
+        |> Decode.map (function
+            | LegacyFallbackDto.FallbackCursorAdvanced payload ->
+                ProviderFailureFactCases.FailureRecorded
+                    {| SessionId = payload.SessionId
+                       LogicalRunId = payload.LogicalRunId
+                       AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
+                       ProviderRun = payload.ProviderRun
+                       ConsecutiveFailureCount = payload.ConsecutiveFailureCount
+                       Reason = payload.Reason |}
+            | LegacyFallbackDto.FallbackExhausted payload ->
+                ProviderFailureFactCases.RetryExhausted
+                    {| SessionId = payload.SessionId
+                       LogicalRunId = payload.LogicalRunId
+                       AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
+                       FinalConsecutiveFailureCount = payload.FinalConsecutiveFailureCount |}
+            | LegacyFallbackDto.FallbackSucceeded payload ->
+                ProviderFailureFactCases.SuccessRecorded
+                    {| SessionId = payload.SessionId
+                       LogicalRunId = payload.LogicalRunId
+                       AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
+                       ProviderRun = payload.ProviderRun |})
 
     let private relayFactDecoder =
         Decode.Auto.generateDecoderCached<RelayFactCases> (extra = extra)
@@ -249,7 +296,8 @@ module Envelope =
         Decode.index 0 Decode.string
         |> Decode.andThen (function
             | "Prompt" -> familyCase promptFactDecoder AgentFact.Prompt
-            | "Fallback" -> familyCase fallbackFactDecoder AgentFact.Fallback
+            | "ProviderFailure" -> familyCase providerFailureFactDecoder AgentFact.ProviderFailure
+            | "Fallback" -> familyCase legacyFallbackDecoder AgentFact.ProviderFailure
             | "Relay" -> familyCase relayFactDecoder AgentFact.Relay
             | "Execution" -> familyCase executionFactDecoder AgentFact.Execution
             | "Orchestrator" -> familyCase orchestratorFactDecoder AgentFact.Orchestrator

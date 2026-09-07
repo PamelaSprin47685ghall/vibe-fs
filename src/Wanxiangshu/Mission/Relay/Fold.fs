@@ -15,7 +15,8 @@ type private ActiveIncumbency =
       SnapshotId: WorkspaceSnapshotId
       AuthorityRevision: AuthorityRevision
       Phase: IncumbencyPhase
-      Assessment: AssessmentRecord option }
+      Assessment: AssessmentRecord option
+      CleanupBlockerDigest: string option }
 
 type private RoadState =
     { AuthorityRevision: AuthorityRevision
@@ -38,6 +39,7 @@ type RoadView =
       ActivePhase: IncumbencyPhase option
       ActiveSnapshotId: WorkspaceSnapshotId option
       ActiveAuthorityRevision: AuthorityRevision option
+      ActiveCleanupBlockerDigest: string option
       AcceptedAssessmentTransport: (string * string) option
       RetiredIncumbencies: IncumbencyId list
       RetiredProviderRunIds: Set<string>
@@ -499,7 +501,8 @@ module private Internal =
           SnapshotId = snapshotId
           AuthorityRevision = current.AuthorityRevision
           Phase = IncumbencyPhase.AuditPending
-          Assessment = None }
+          Assessment = None
+          CleanupBlockerDigest = None }
 
     let private commitPendingIncumbency roadId state (current: RoadState) incumbentId snapshotId =
         update
@@ -572,23 +575,24 @@ module private Internal =
         | None -> Error "AssessmentRequired"
         | Some _ -> Ok()
 
-    let private commitBlockedCleanup roadId state (current: RoadState) (active: ActiveIncumbency) =
+    let private commitBlockedCleanup roadId state (current: RoadState) (active: ActiveIncumbency) blockerDigest =
         update
             roadId
             { current with
                 Active =
                     Some
                         { active with
-                            Phase = IncumbencyPhase.RetirementCleanupBlocked } }
+                            Phase = IncumbencyPhase.RetirementCleanupBlocked
+                            CleanupBlockerDigest = Some blockerDigest } }
             state
         |> Ok
 
-    let private blockRetirementCleanup roadId state incumbencyId =
+    let private blockRetirementCleanup roadId state incumbencyId blockerDigest =
         result {
             let! current = road roadId state |> require "RoadNotOpen"
             let! active = requireBlockTarget current incumbencyId
             do! requireBlockAssessment active
-            return! commitBlockedCleanup roadId state current active
+            return! commitBlockedCleanup roadId state current active blockerDigest
         }
 
     let applyEvent roadId state event =
@@ -624,7 +628,8 @@ module private Internal =
             }
         | RelayEvent.QualityCertificateInvalidated(certificateId, reason) ->
             invalidateCertificate roadId state certificateId reason
-        | RelayEvent.RetirementCleanupBlocked(incumbencyId, _) -> blockRetirementCleanup roadId state incumbencyId
+        | RelayEvent.RetirementCleanupBlocked(incumbencyId, blockerDigest) ->
+            blockRetirementCleanup roadId state incumbencyId blockerDigest
         | RelayEvent.RetirementCommitted retirement ->
             result {
                 let! current = road roadId state |> require "RoadNotOpen"
@@ -653,6 +658,7 @@ module Fold =
               ActivePhase = road.Active |> Option.map (fun active -> active.Phase)
               ActiveSnapshotId = road.Active |> Option.map (fun active -> active.SnapshotId)
               ActiveAuthorityRevision = road.Active |> Option.map (fun active -> active.AuthorityRevision)
+              ActiveCleanupBlockerDigest = road.Active |> Option.bind (fun active -> active.CleanupBlockerDigest)
               AcceptedAssessmentTransport =
                 road.Active
                 |> Option.bind (fun active ->

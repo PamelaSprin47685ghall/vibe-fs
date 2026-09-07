@@ -34,12 +34,11 @@ type ToolPermission =
     | Sphinx
 
 [<RequireQualifiedAccess>]
-type ManagerCapabilityPhase =
-    | AuditPending
-    | WorkOwned
-    | PerfectAwaitingRetirement
-    | RetirementCleanupBlocked
-    | Retired
+type ManagerCapabilityFacts =
+    { HasActiveIncumbency: bool
+      HasAssessment: bool
+      HasValidBoundCertificate: bool
+      CleanupBlockerDigest: string option }
 
 [<RequireQualifiedAccess>]
 module OfficeCapability =
@@ -103,19 +102,22 @@ module OfficeCapability =
     let isAllowed (role: Role) (permission: ToolPermission) : bool =
         permissions role |> Set.contains permission
 
-    let private managerPermissions phase =
-        match phase with
-        | ManagerCapabilityPhase.AuditPending
-        | ManagerCapabilityPhase.WorkOwned -> permissions Role.Manager
-        | ManagerCapabilityPhase.PerfectAwaitingRetirement -> set [ ToolPermission.Join; ToolPermission.Finality ]
-        | ManagerCapabilityPhase.RetirementCleanupBlocked -> set [ ToolPermission.Join; ToolPermission.Finality ]
-        | ManagerCapabilityPhase.Retired -> Set.empty
+    /// Manager gate over exact RoadView facts. No phase enum crosses this
+    /// boundary: retired/no-active grants nothing, a cleanup blocker confines
+    /// to the Join+Finality finish window, a valid bound certificate confines
+    /// to the same finish window, and all other active facts keep the full
+    /// Manager set. A mismatched or stale certificate leaves
+    /// HasValidBoundCertificate false, so it never confines to (or grants)
+    /// the finish window.
+    let permissionsForManagerFacts (facts: ManagerCapabilityFacts) : ToolPermission Set =
+        if not facts.HasActiveIncumbency then
+            Set.empty
+        elif facts.CleanupBlockerDigest.IsSome then
+            set [ ToolPermission.Join; ToolPermission.Finality ]
+        elif facts.HasValidBoundCertificate then
+            set [ ToolPermission.Join; ToolPermission.Finality ]
+        else
+            permissions Role.Manager
 
-    let permissionsForPhase role phase =
-        match role, phase with
-        | Role.Manager, Some managerPhase -> managerPermissions managerPhase
-        | Role.Manager, None -> managerPermissions ManagerCapabilityPhase.AuditPending
-        | _ -> permissions role
-
-    let isAllowedForPhase role phase permission =
-        permissionsForPhase role phase |> Set.contains permission
+    let isAllowedForManagerFacts (facts: ManagerCapabilityFacts) (permission: ToolPermission) : bool =
+        permissionsForManagerFacts facts |> Set.contains permission

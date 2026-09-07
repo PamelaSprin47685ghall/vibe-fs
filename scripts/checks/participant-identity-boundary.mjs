@@ -208,7 +208,7 @@ export const scanRepo = (root = process.cwd()) => {
       'ParticipantIdentityEvidence must remain opaque',
       failures,
     )
-    for (const member of ['resolveAtRoot', 'inheritFromOwner', 'rehydrate', 'selectedAgent', 'peerAgent', 'role', 'persona', 'origin']) {
+    for (const member of ['resolveAtRoot', 'inheritFromOwner', 'rehydrate', 'selectedAgent', 'role', 'persona', 'personaCatalogVersion', 'origin']) {
       requirePattern(
         identity,
         new RegExp(`\\blet\\s+${member}\\b`),

@@ -57,11 +57,10 @@ module TemporalSurface =
 
     val sessionReuseIdentityScenario: firstAccepted: obj -> secondAccepted: obj -> obj
 
-    // ── FallbackProjection's typed transition, exposed as opaque state ───────
+    // ── ProviderFailureProjection's typed transition, exposed as opaque state ─
 
-    val fallbackForAuthority: logicalRun: string -> authorityRoot: string -> obj
+    val providerFailureForAuthority: logicalRun: string -> authorityRoot: string -> obj
 
-    val fallbackApplyAdvance:
-        identity: obj -> previousOffset: int -> nextOffset: int -> count: int -> current: obj -> obj
+    val applyFailure: identity: obj -> count: int -> current: obj -> obj
 
-    val fallbackRead: current: obj -> obj
+    val providerFailureRead: current: obj -> obj

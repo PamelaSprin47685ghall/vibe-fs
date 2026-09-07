@@ -37,7 +37,19 @@ const fact = {
       targetHeadSnapshot,
       workspaceSnapshotId,
     }),
-  publishClaimed: () => change.fact('PublishClaimed', { rebasedCommit: 'r1', expectedHead: 'h1' }),
+  publishClaimed: (
+    workspaceSnapshotId = 'snapshot-rebased',
+    qualityCertificateId = 'certificate-1',
+    authorityRevision = 'authority-1',
+  ) =>
+    change.fact('PublishClaimed', {
+      targetRef: 'refs/heads/main',
+      rebasedCommit: 'r1',
+      expectedHead: 'h1',
+      workspaceSnapshotId,
+      qualityCertificateId,
+      authorityRevision,
+    }),
   published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   failed: (reason = 'boom') => change.fact('JobFailed', { reason }),
   abandoned: () => change.fact('JobAbandoned', null),
@@ -191,6 +203,11 @@ test('WHAT[CHGINT-003] ORCH_007_each_durable_fact_has_one_projection_slot', () =
     'RebasedCandidateReady',
     'PublishClaimed',
   ])
+})
+
+test('WHAT[CHGINT-003] ORCH_007_incomplete_publish_claimed_evidence_is_rejected', () => {
+  const incomplete = change.fact('PublishClaimed', { rebasedCommit: 'r1', expectedHead: 'h1' })
+  assert.throws(() => change.recordFact(created(), JOB, incomplete), /Incomplete PublishClaimed payload/)
 })
 
 // ── durable fold and typed worktree effect ───────────────────────────────────

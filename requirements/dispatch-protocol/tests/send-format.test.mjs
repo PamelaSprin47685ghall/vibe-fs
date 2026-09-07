@@ -1,8 +1,8 @@
 // Moved from tests/unit/prompt/send-format.test.mjs (cutover Wave 2a); owner: dispatch-protocol.
 //
-// PROMPT-006: every dispatch carries the effective Agent, no Model, untouched
-// Directory, and PromptKey metadata. DispatchSurface returns the normalized
-// JSON observation from the production Host boundary.
+// PROMPT-006: every dispatch carries the fixed participant as Agent, no Model,
+// untouched Directory, and agent-free PromptKey metadata. DispatchSurface
+// returns the normalized JSON observation from the production Host boundary.
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -26,27 +26,26 @@ const personas = {
   coder: 'Coder',
   manager: 'Lead',
 }
-const rootSelection = (agent) => {
-  const canonicalRole = agent === 'predictor' ? 'inspector' : agent
+const rootSelection = (participant) => {
+  const role = participant === 'predictor' ? 'inspector' : participant
   return {
     kind: 'RootSelection',
     ownerSession: null,
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: agent,
-      peerAgent: agent,
-      canonicalRole,
+      participant,
+      role,
       selectedTier: 'deep',
-      persona: personas[agent] ?? 'Unknown',
+      persona: personas[participant] ?? 'Unknown',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
     },
   }
 }
 
-const profileFor = (runtime = 'rt-send', session = 'ses_006', physical = 'msg_u1', agent = 'coder') => {
-  const built = authority.createAuthorityRoot(hash, runtime, session, 'HumanRoot', physical, rootSelection(agent))
+const profileFor = (runtime = 'rt-send', session = 'ses_006', physical = 'msg_u1', participant = 'coder') => {
+  const built = authority.createAuthorityRoot(hash, runtime, session, 'HumanRoot', physical, rootSelection(participant))
   assert.equal(built.ok, true, built.ok ? '' : built.error)
   return built.value
 }
@@ -81,7 +80,6 @@ test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_unknown_authority_kind_fails_closed
         'reject malformed profile',
         'ProviderRetryAttempt',
         { ...profileFor(), authorityKind: 'UnknownRoot' },
-        'coder',
         'Await',
       )
       assert.equal(result.ok, false)
@@ -94,7 +92,7 @@ test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_unknown_authority_kind_fails_closed
   }
 })
 
-test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_agent_and_no_model', async () => {
+test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_participant_and_no_model', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-send-format-'))
   try {
     const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-send', 'rt-send', 4242, '2026-01-01T00:00:00Z')
@@ -113,10 +111,9 @@ test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_agent_and_no_m
         capturingPort(),
         opened.journal,
         'ses_006',
-        'retry on the other side',
+        'retry the fixed participant',
         'ProviderRetryAttempt',
         profileFor(),
-        'coder',
         'Await',
       )
       const captured = [observation(ownerRoot), observation(continuation)]
@@ -125,19 +122,19 @@ test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_agent_and_no_m
         captured.map((value) => ({ session: value.session, text: value.text })),
         [
           { session: 'ses_006', text: 'dispatch this' },
-          { session: 'ses_006', text: 'retry on the other side' },
+          { session: 'ses_006', text: 'retry the fixed participant' },
         ],
       )
 
       assert.deepEqual(
         { agent: captured[0].agent, model: captured[0].model },
         { agent: 'coder', model: null },
-        'SendAgentOwnerRoot must carry Agent = Some agent and Model = None',
+        'SendAgentOwnerRoot must carry Agent = fixed participant and Model = None',
       )
       assert.deepEqual(
         { agent: captured[1].agent, model: captured[1].model },
         { agent: 'coder', model: null },
-        'SendContinuation must carry Agent = Some effectiveAgent and Model = None',
+        'SendContinuation must carry Agent = fixed participant and Model = None',
       )
 
       assert.equal(captured[0].directory, null, 'no directory was given')
@@ -168,15 +165,58 @@ test('WHAT[DISPATCH-PROTOCOL-011] PROMPT_006_send_payload_carries_prompt_key_met
         capturingPort(),
         opened.journal,
         'ses_006m',
-        'retry on the other side',
+        'retry the fixed participant',
         'ProviderRetryAttempt',
         profileFor('rt-send-meta', 'ses_006m', 'msg_u1', 'coder'),
-        'coder',
         'Await',
       )
 
       assert.ok(observation(ownerRoot).metadata, 'owner-root send must carry Metadata')
       assert.ok(observation(continuation).metadata, 'continuation send must carry Metadata')
+    } finally {
+      journal.JournalSurface_dispose(opened.journal)
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DISPATCH-PROTOCOL-008] DP_008_concurrent_exact_gate_nudges_share_one_claim_and_send', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-gate-single-flight-'))
+  try {
+    const opened = await journal.JournalSurface_bootWithWriterId(
+      base,
+      'writer-gate-single-flight',
+      'rt-gate-single-flight',
+      4242,
+      '2026-01-01T00:00:00Z',
+    )
+    assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+    try {
+      const sends = []
+      const port = {
+        SubscribeTerminal: () => ({ Dispose: () => {} }),
+        SendPrompt: async (session, text, options) => {
+          sends.push({ session, text, options })
+          return dispatch.admittedWithReceipt('accepted-gate')
+        },
+      }
+      const session = 'ses_gate'
+      const results = await dispatch.sendGateNudgesConcurrently(
+        port,
+        opened.journal,
+        session,
+        'continue this exact terminal',
+        'ManagerGuard',
+        'ManagerAction',
+        'run_terminal',
+        profileFor('rt-gate-single-flight', session, 'msg_gate', 'manager'),
+      )
+
+      assert.deepEqual(results.map((result) => result.ok), [true, true])
+      assert.equal(results[0].key, results[1].key, 'both observers await the same logical dispatch')
+      assert.equal(sends.length, 1, 'one exact terminal occasion reaches Host once')
+      assert.equal(dispatch.projectionObservation(opened.journal, session).pendingClaims.length, 1)
     } finally {
       journal.JournalSurface_dispose(opened.journal)
     }
@@ -215,13 +255,11 @@ test('WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_i
       assert.equal(claimed[0].promptKey, sent.key)
       assert.deepEqual(claimed[0].identitySeed, inherited.value)
       assert.deepEqual(claimed[0].identitySeed.participantIdentity, {
-        selectedAgent: 'coder',
-        peerAgent: 'coder',
-        canonicalRole: 'coder',
-        selectedTier: 'deep',
+        origin: 'InheritedFromOwner',
+        participant: 'coder',
         persona: 'Lead',
         personaCatalogVersion: 1,
-        origin: 'InheritedFromOwner',
+        role: 'coder',
       })
 
       const wrongClaim = await dispatch.acceptManagedPromptClaim(
@@ -249,9 +287,10 @@ test('WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_i
           sessionId: 'ses_dispatch_handoff',
           physicalUserMessageId: 'msg_dispatch_handoff',
           origin: 'AgentOwnerRoot',
-          effectiveAgent: 'coder',
+          participant: 'coder',
+          role: 'coder',
         },
-        'the durable managed-execution witness must carry the exact physical identity and accepted profile',
+        'the durable managed-execution witness must carry the exact physical identity and participant+role',
       )
       assert.equal(dispatch.pendingClaimCount(opened.journal, 'ses_dispatch_handoff'), 0)
     } finally {
@@ -288,7 +327,6 @@ test('WHAT[DISPATCH-PROTOCOL-002] HOST_004_stale_idle_repair_is_abandoned_at_the
         'repair stale terminal',
         'InteractionRepair',
         accepted.profile,
-        'blogger',
         'Superseded',
       )
 

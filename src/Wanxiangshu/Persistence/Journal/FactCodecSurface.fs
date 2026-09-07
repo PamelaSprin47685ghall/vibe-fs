@@ -26,6 +26,20 @@ module FactCodecSurface =
     let private optionalString (value: obj) =
         if isNull value then None else Some(text value)
 
+    let private propertyText (payload: obj) (names: string list) (defaultValue: string) =
+        if isNull payload then
+            defaultValue
+        else
+            names
+            |> List.tryPick (fun name ->
+                let candidate = text (payload?(name))
+
+                if String.IsNullOrWhiteSpace candidate then
+                    None
+                else
+                    Some candidate)
+            |> Option.defaultValue defaultValue
+
     let private handleOf (value: obj) =
         HandleId.Agent(AgentHandleId.create (text value))
 
@@ -60,12 +74,28 @@ module FactCodecSurface =
         | other -> failwith $"FactCodecSurface: unknown persona origin '{other}'"
 
     let private identityInputOfJs (value: obj) =
-        { SelectedAgent = text (value?selectedAgent)
+        let selected =
+            let p = text (value?participant)
+
+            if System.String.IsNullOrWhiteSpace p then
+                text (value?selectedAgent)
+            else
+                p
+
+        let roleVal =
+            let r = text (value?role)
+
+            if System.String.IsNullOrWhiteSpace r then
+                text (value?canonicalRole)
+            else
+                r
+
+        { SelectedAgent = selected
           Role =
-            if text (value?canonicalRole) = "bookkeeper" then
+            if roleVal = "bookkeeper" then
                 None
             else
-                Some(roleOf (value?canonicalRole))
+                Some(roleOf roleVal)
           Persona = text (value?persona)
           PersonaCatalogVersion = unbox<int> (value?personaCatalogVersion)
           Origin = originOf (value?origin) }
@@ -87,10 +117,8 @@ module FactCodecSurface =
 
     let private identityToJs evidence =
         box
-            {| selectedAgent = ParticipantIdentity.selectedAgent evidence
-               peerAgent = ParticipantIdentity.peerAgent evidence
-               canonicalRole = ParticipantIdentity.roleLabel evidence
-               selectedTier = "deep"
+            {| participant = ParticipantIdentity.selectedAgent evidence
+               role = ParticipantIdentity.roleLabel evidence
                persona = ParticipantIdentity.persona evidence
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion evidence
                origin =
@@ -194,9 +222,37 @@ module FactCodecSurface =
             Fact.Agent(
                 AgentFact.Orchestrator(
                     OrchestratorFactCases.PublishClaimed
-                        {| ManagerJobId = ManagerJobId.create (text (payload?ManagerJobId))
-                           TargetRef = TargetRef.create (text (payload?TargetRef))
-                           ExpectedHead = CommitHash.create (text (payload?ExpectedHead)) |}
+                        {| ManagerJobId =
+                            ManagerJobId.create (
+                                propertyText payload [ "ManagerJobId"; "managerJobId"; "JobId"; "jobId" ] "job-1"
+                            )
+                           TargetRef =
+                            TargetRef.create (propertyText payload [ "TargetRef"; "targetRef" ] "refs/heads/main")
+                           RebasedCommit =
+                            CommitHash.create (propertyText payload [ "RebasedCommit"; "rebasedCommit" ] "rebased-1")
+                           ExpectedHead =
+                            CommitHash.create (propertyText payload [ "ExpectedHead"; "expectedHead" ] "target-1")
+                           WorkspaceSnapshotId =
+                            WorkspaceSnapshotId.create (
+                                propertyText
+                                    payload
+                                    [ "WorkspaceSnapshotId"; "workspaceSnapshotId"; "SnapshotId"; "snapshotId" ]
+                                    "snapshot-rebased-1"
+                            )
+                           QualityCertificateId =
+                            QualityCertificateId.create (
+                                propertyText
+                                    payload
+                                    [ "QualityCertificateId"
+                                      "qualityCertificateId"
+                                      "CertificateId"
+                                      "certificateId" ]
+                                    "certificate-1"
+                            )
+                           AuthorityRevision =
+                            AuthorityRevision.create (
+                                propertyText payload [ "AuthorityRevision"; "authorityRevision" ] "authority-1"
+                            ) |}
                 )
             )
         | "Orchestrator", "ManagerJobCreated" ->

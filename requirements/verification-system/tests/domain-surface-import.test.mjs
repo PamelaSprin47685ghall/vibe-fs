@@ -3,16 +3,16 @@ import test from 'node:test'
 
 import {
   acceptHumanRoot,
-  cursor,
-  fallbackProjection,
+  budget,
+  providerFailureProjection,
   fold,
   recordConfirmedFailure,
   snapshot,
-} from '../../../dist/Participant/Provider/Attempt/Fallback/CursorSurface.js'
+} from '../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js'
 
-test('WHAT[VERIFICATION-SYSTEM-008] fallback recovery has one importable production surface', () => {
-  assert.equal(typeof cursor, 'object')
-  assert.equal(typeof fallbackProjection, 'object')
+test('WHAT[VERIFICATION-SYSTEM-008] provider failure has one importable production surface', () => {
+  assert.equal(typeof budget, 'object')
+  assert.equal(typeof providerFailureProjection, 'object')
   assert.equal(typeof fold, 'function')
   assert.equal(typeof acceptHumanRoot, 'function')
   assert.equal(typeof recordConfirmedFailure, 'function')

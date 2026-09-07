@@ -775,7 +775,7 @@ attempts = []
   {
     name: 'VERIFY-003 a provider-error must declare status and retryable',
     fn: () => {
-      // FALLBACK-009. `retryable` decides WHO drives the retry: a retryable 500 means
+      // PAR-019. `retryable` decides WHO drives the retry: a retryable 500 means
       // the Host does it and no continuation is ever sent; a non-retryable 400 means the
       // Host gives up and the plugin must carry the Logical Run forward. Both run
       // silently, proving different clauses — so neither may be defaulted.
@@ -839,8 +839,8 @@ attempts = [2]
     fn: () => {
       // The effective model is a CONCLUSION of the run (PROMPT-008 makes
       // `AttemptExecutionProfile` its only source), so a scenario asserts it and never
-      // matches on it. The old `fallback-aabb-trace` matched `model` per edge, which let
-      // the scenario silently agree with whatever the cursor happened to do.
+      // matches on it. The old scenario matched `model` per edge, which let
+      // it silently agree with whatever the scheduler happened to do.
       const claiming = (claim) => `scenario = "probe"
 
 flow = [

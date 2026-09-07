@@ -40,14 +40,12 @@ module ChatAdmissionIntent =
         | PromptKeyNotClaimed of PromptKey
         | AgentOwnerRootPromptNotClaimed of PromptKey * PromptAuthority.IdentitySeed
         | PromptClaimSessionMismatch of expectedSessionId: SessionId * claimedSessionId: SessionId
-        | PromptClaimMissingManagedEffectiveAgent of PromptKey
         | PromptClaimOriginNotAdmissible of PromptKey * PromptAuthority.PromptOrigin
         | UnknownOriginWhileActive
 
     type ExternalRootEvidence =
         { Key: ExecutionKey
           ExplicitAgent: string
-          EffectiveAgent: string
           Origin: PromptAuthority.PromptOrigin
           IdentitySeed: PromptAuthority.IdentitySeed }
 
@@ -55,13 +53,11 @@ module ChatAdmissionIntent =
         { Key: ExecutionKey
           PromptKey: PromptKey
           Claim: PromptAuthority.PromptClaim
-          EffectiveAgent: string
           Origin: PromptAuthority.PromptOrigin
           IdentitySeed: PromptAuthority.IdentitySeed }
 
     type ActiveHumanContinuationEvidence =
         { Key: ExecutionKey
-          EffectiveAgent: string
           Origin: PromptAuthority.PromptOrigin
           Authority: PromptAuthority.AuthorityExecutionProfile }
 
@@ -90,13 +86,6 @@ module ChatAdmissionIntent =
 
         Decision.HostInternal evidence
 
-    let private tryManagedAgent (value: string option) =
-        value
-        |> Option.map (fun agent -> agent.Trim())
-        |> Option.filter (fun agent ->
-            not (String.IsNullOrWhiteSpace agent)
-            && (ManagedAgent.requiredNames |> List.contains agent))
-
     let private tryRootIdentity (value: string) =
         ParticipantIdentity.resolveAtRoot value
         |> Result.toOption
@@ -118,19 +107,27 @@ module ChatAdmissionIntent =
         | PromptAuthority.PromptOrigin.HostInternal
         | PromptAuthority.PromptOrigin.UnknownOrigin -> false
 
-    let private pendingPrompt (key: ExecutionKey) (promptKey: PromptKey) (claim: PromptAuthority.PromptClaim) =
-        match
-            claim.SessionId = key.SessionId, claimOriginAdmissible claim.Origin, tryManagedAgent claim.EffectiveAgent
-        with
+    let private pendingPrompt
+        (key: ExecutionKey)
+        (promptKey: PromptKey)
+        (claim: PromptAuthority.PromptClaim)
+        (explicitAgentOpt: string option)
+        =
+        let selectedParticipant =
+            claim.IdentitySeed
+            |> PromptAuthority.identitySeedParticipantIdentity
+            |> ParticipantIdentity.selectedAgent
+
+        match claim.SessionId = key.SessionId, claimOriginAdmissible claim.Origin, explicitAgentOpt with
         | false, _, _ -> Decision.Reject(Rejection.PromptClaimSessionMismatch(key.SessionId, claim.SessionId))
         | true, false, _ -> Decision.Reject(Rejection.PromptClaimOriginNotAdmissible(promptKey, claim.Origin))
-        | true, true, None -> Decision.Reject(Rejection.PromptClaimMissingManagedEffectiveAgent promptKey)
-        | true, true, Some effectiveAgent ->
+        | true, true, Some explicitAgent when explicitAgent <> selectedParticipant ->
+            Decision.Reject(Rejection.InvalidExplicitAgent explicitAgent)
+        | true, true, _ ->
             Decision.PendingPromptIntent
                 { Key = key
                   PromptKey = promptKey
                   Claim = claim
-                  EffectiveAgent = effectiveAgent
                   Origin = claim.Origin
                   IdentitySeed = claim.IdentitySeed }
 
@@ -144,17 +141,14 @@ module ChatAdmissionIntent =
         | Some identity, Some authority when ParticipantIdentity.selectedAgent identity = authority.SelectedAgent ->
             Decision.ActiveHumanContinuationIntent
                 { Key = key
-                  EffectiveAgent = authority.SelectedAgent
                   Origin = PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.HumanMessage
                   Authority = authority }
         | Some _, Some _ -> Decision.Reject Rejection.UnknownOriginWhileActive
         | Some identity, None ->
-            let effectiveAgent = ParticipantIdentity.selectedAgent identity
 
             Decision.ExternalRootIntent
                 { Key = key
-                  ExplicitAgent = effectiveAgent
-                  EffectiveAgent = effectiveAgent
+                  ExplicitAgent = ParticipantIdentity.selectedAgent identity
                   Origin = PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
                   IdentitySeed = PromptAuthority.IdentitySeed.RootSelection identity }
 
@@ -208,7 +202,7 @@ module ChatAdmissionIntent =
         match knownEvidence message projection physicalMessageId with
         | KnownEvidence.Accepted continuation ->
             Decision.NoManagedExecution(NoManagedExecutionReason.AlreadyAcceptedHostMessage continuation)
-        | KnownEvidence.Pending claim -> pendingPrompt key claim.PromptKey claim
+        | KnownEvidence.Pending claim -> pendingPrompt key claim.PromptKey claim message.ExplicitAgent
         | KnownEvidence.HostInternal -> hostInternal message
         | KnownEvidence.Unaccepted -> resolveUnaccepted key message projection
 
@@ -246,8 +240,6 @@ module ChatAdmissionIntent =
                 "Prompt claim session mismatch: expected %s, claimed %s"
                 (SessionId.value expectedSessionId)
                 (SessionId.value claimedSessionId)
-        | Rejection.PromptClaimMissingManagedEffectiveAgent promptKey ->
-            sprintf "PromptKey %s has no managed EffectiveAgent" (PromptKey.value promptKey)
         | Rejection.PromptClaimOriginNotAdmissible(promptKey, _) ->
             sprintf "PromptKey %s has a non-admissible origin" (PromptKey.value promptKey)
         | Rejection.UnknownOriginWhileActive -> "UnknownOrigin cannot enter an active Logical Run"

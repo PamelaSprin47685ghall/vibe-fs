@@ -55,9 +55,21 @@ module RuntimeSurface =
             roleResult value |> Result.map Some
 
     let private participantIdentityResult (value: obj) : Result<ParticipantIdentityEvidence, string> =
-        match identityRoleResult value?canonicalRole, originResult value?origin with
+        let roleVal =
+            if isNull value?role then
+                value?canonicalRole
+            else
+                value?role
+
+        let participantVal =
+            if isNull value?participant then
+                value?selectedAgent
+            else
+                value?participant
+
+        match identityRoleResult roleVal, originResult value?origin with
         | Ok role, Ok origin ->
-            { SelectedAgent = text value?selectedAgent
+            { SelectedAgent = text participantVal
               Role = role
               Persona = text value?persona
               PersonaCatalogVersion = unbox<int> value?personaCatalogVersion
@@ -128,10 +140,8 @@ module RuntimeSurface =
 
     let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
         box
-            {| selectedAgent = ParticipantIdentity.selectedAgent identity
-               peerAgent = ParticipantIdentity.peerAgent identity
-               canonicalRole = ParticipantIdentity.roleLabel identity
-               selectedTier = "deep"
+            {| participant = ParticipantIdentity.selectedAgent identity
+               role = ParticipantIdentity.roleLabel identity
                persona = ParticipantIdentity.persona identity
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
                origin =
@@ -199,7 +209,6 @@ module RuntimeSurface =
                 claim.AuthorityRootUserMessageId
                 |> Option.map AuthorityRootUserMessageId.value
                 |> Option.defaultValue null
-               effectiveAgent = claim.EffectiveAgent |> Option.defaultValue null
                identitySeed = identitySeedToJs claim.IdentitySeed
                payloadDigest = claim.PayloadDigest
                receipt = claim.Receipt |> Option.map TransportReceipt.value |> Option.defaultValue null
@@ -221,7 +230,6 @@ module RuntimeSurface =
           AuthorityRootUserMessageId =
             optionalString value?authorityRoot
             |> Option.map AuthorityRootUserMessageId.create
-          EffectiveAgent = optionalString value?effectiveAgent
           IdentitySeed = identitySeed
           PayloadDigest = text value?payloadDigest
           Receipt = optionalString value?receipt |> Option.map TransportReceipt.create
@@ -559,10 +567,8 @@ module RuntimeSurface =
                     {| ok = true
                        value =
                         box
-                            {| name = ParticipantIdentity.selectedAgent identity
-                               role = Roles.roleLabel role
-                               tier = "deep"
-                               peer = ParticipantIdentity.selectedAgent identity |}
+                            {| participant = ParticipantIdentity.selectedAgent identity
+                               role = Roles.roleLabel role |}
                        error = null |}
             | None ->
                 box
@@ -609,7 +615,6 @@ module RuntimeSurface =
         (session: string)
         (kind: string)
         (profile: obj)
-        (effectiveAgent: string)
         (payloadDigest: string)
         : obj =
         match continuationKindResult kind, profileResult profile with
@@ -619,7 +624,6 @@ module RuntimeSurface =
                 (SessionId.create session)
                 continuationKind
                 profile
-                effectiveAgent
                 payloadDigest
             |> claimToJs
         | Error error, _
@@ -698,7 +702,6 @@ module RuntimeSurface =
         (logicalRun: obj)
         (authorityRoot: obj)
         (origin: obj)
-        (effectiveAgent: obj)
         (payloadDigest: string)
         (claimSequence: int)
         : string =
@@ -708,7 +711,6 @@ module RuntimeSurface =
             (optionalString logicalRun |> Option.map LogicalRunId.create)
             (optionalString authorityRoot |> Option.map AuthorityRootUserMessageId.create)
             (originOf (text origin?kind) (text origin?label))
-            (optionalString effectiveAgent)
             payloadDigest
             claimSequence
         |> PromptKey.value

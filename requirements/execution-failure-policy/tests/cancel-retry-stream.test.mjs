@@ -8,16 +8,15 @@ import * as hooks from '../../../dist/OpenCode/Host/PluginHooksSurface.js'
 import * as transaction from '../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js'
 
 const executionKey = {
-  sessionId: 'ses-cancel-retry-fallback-stream',
-  physicalUserMessageId: 'msg-cancel-retry-fallback-stream',
+  sessionId: 'ses-cancel-retry-stream',
+  physicalUserMessageId: 'msg-cancel-retry-stream',
 }
-const capacityFence = { reference: 'fence-cancel-retry-fallback-stream' }
+const capacityFence = { reference: 'fence-cancel-retry-stream' }
 const provider = {
-  logicalRun: 'logical-cancel-retry-fallback-stream',
-  providerRun: 'provider-cancel-retry-fallback-stream',
+  logicalRun: 'logical-cancel-retry-stream',
+  providerRun: 'provider-cancel-retry-stream',
   requestKind: 'WorkMain',
   retryBudget: 'Available',
-  fallbackBudget: 'Available',
   breaker: 'Closed',
 }
 const input = (failure, change = {}) => ({
@@ -57,7 +56,6 @@ const transactionEvidence = (suffix) => ({
 const assertNoRecovery = (decision) => {
   assert.equal(decision.authorization, null)
   assert.notEqual(decision.resolution, 'RetryFreshAttempt')
-  assert.notEqual(decision.resolution, 'AdvanceFallback')
 }
 
 const assertSingleRecovery = (decision, expected) => {
@@ -65,7 +63,7 @@ const assertSingleRecovery = (decision, expected) => {
   assert.ok(decision.authorization)
 }
 
-test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by registered owners', async () => {
+test('WHAT[EXECFAIL-002] cancel/retry/stream matrix is interpreted by registered owners', async () => {
   const cancelled = decide('UserCancelled')
   assertNoRecovery(cancelled)
   assert.equal(cancelled.resolution, 'TerminalizeProviderStarted')
@@ -111,15 +109,14 @@ test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by r
     await recovery.interpretFailurePolicy(
       'ProviderTransient',
       'Available',
-      'Available',
       'NotCommitted',
       'ExactAbsent',
     ),
     { decision: 'Ignore', effects: [] },
   )
 
-  const permanentFallback = decide('ProviderPermanent')
-  assertSingleRecovery(permanentFallback, 'AdvanceFallback')
+  const permanentRetry = decide('ProviderPermanent')
+  assertSingleRecovery(permanentRetry, 'RetryFreshAttempt')
   assert.deepEqual(hostSignals.tryDecodeExactProviderTerminal(terminal({ error: { name: 'ProviderError' } })), {
     sessionId: executionKey.sessionId,
     physicalUserMessageId: executionKey.physicalUserMessageId,
@@ -128,8 +125,17 @@ test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by r
     failure: 'ProviderPermanent',
     disposition: '',
   })
+  assert.deepEqual(
+    await recovery.interpretFailurePolicy(
+      'ProviderPermanent',
+      'Available',
+      'NotCommitted',
+      'ExactAbsent',
+    ),
+    { decision: 'Ignore', effects: [] },
+  )
   const permanentTerminal = decide('ProviderPermanent', {
-    provider: { ...provider, fallbackBudget: 'Exhausted' },
+    provider: { ...provider, retryBudget: 'Exhausted' },
   })
   assertNoRecovery(permanentTerminal)
   assert.equal(permanentTerminal.resolution, 'TerminalizeProviderStarted')
@@ -137,7 +143,6 @@ test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by r
   assert.deepEqual(
     await recovery.interpretFailurePolicy(
       'ProviderPermanent',
-      'Available',
       'Exhausted',
       'NotCommitted',
       'ExactAbsent',
@@ -194,7 +199,6 @@ test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by r
     await recovery.interpretFailurePolicy(
       'StreamInterruptedAfterFirstToken',
       'Available',
-      'Available',
       'NotCommitted',
       'ExactAbsent',
     ),
@@ -225,7 +229,6 @@ test('WHAT[EXECFAIL-002] cancel/retry/fallback/stream matrix is interpreted by r
   assert.deepEqual(
     await recovery.interpretFailurePolicy(
       'LocalInvariant',
-      'Available',
       'Available',
       'NotCommitted',
       'ExactAbsent',

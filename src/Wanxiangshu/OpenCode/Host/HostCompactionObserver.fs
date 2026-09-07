@@ -76,14 +76,9 @@ module HostCompactionObserver =
         (messages: SessionMessage list)
         : Task =
         task {
-            // RECOVERY-FAMILY: family recovery before compaction probe effects.
-            let! recovery = scope.EnsureRecoveryDone sessionId
-
-            match recovery with
-            | FamilyRecovery.FamilyBlocked _ -> return ()
-            | FamilyRecovery.FamilyWaiting _
-            | FamilyRecovery.FamilyReady _ -> ()
-
+            // Current-process compaction observation proceeds from its exact facts.
+            // No durable-family gate is fabricated here, and Waiting is never
+            // treated as Ready.
             // HOST-006 prevention layer's second half: the runtime probe.
             observeStartupProbe scope sessionId messages
 

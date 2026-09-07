@@ -217,45 +217,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         | _, Error error -> Error error
         | Some journal, Ok record -> Ok(journal, record)
 
-    let loopPrompt (sessionId: SessionId) =
-        ProviderProse.documentFor sessionId "runtime/manager-assess" Map.empty
-
-    let ensureLoopDispatch (record: ManagerJobProjection) (retirement: RetirementSummary) : Task<Result<unit, string>> =
-        task {
-            let prompt = loopPrompt record.ManagerSessionId
-            let terminalRun = ProviderRunIdentity.create retirement.ProjectionCut.ProviderRunId
-
-            let! outcome =
-                HostSessionNudge.trySendGateContinuation
-                    deps.Sessions
-                    deps.RootWorkspace
-                    record.ManagerSessionId
-                    prompt
-                    PromptAuthority.ContinuationKind.ManagerGuard
-                    (Some(WorktreePath.value record.WorktreePath))
-                    deps.Journal
-                    (ManagerLoopGate.gateKind retirement.Id)
-                    terminalRun
-
-            match outcome with
-            | HostSessionNudge.GateContinuationOutcome.Sent _
-            | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted -> return Ok()
-            | HostSessionNudge.GateContinuationOutcome.Retired -> return Error "manager loop gate retired"
-            | HostSessionNudge.GateContinuationOutcome.Failed error -> return Error error
-        }
-
-    let activeRetirementForDispatch projection record =
-        relayView projection record
-        |> Option.bind (fun road ->
-            match road.ActiveIncumbency, road.LatestRetirement with
-            | Some _, Some retirement -> Some retirement
-            | _ -> None)
-
-    let dispatchActiveRetirement record projection =
-        match activeRetirementForDispatch projection record with
-        | None -> Task.FromResult(Ok())
-        | Some retirement -> ensureLoopDispatch record retirement
-
     let rec awaitLoopSignalFromJournal
         (jobId: ManagerJobId)
         (journal: AgentJournal)
@@ -269,9 +230,12 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             | None -> return! awaitDispatchedWait jobId journal record projection revision
         }
 
-    and awaitDispatchedWait jobId journal record projection revision =
+    and awaitDispatchedWait jobId journal record _projection revision =
         task {
-            match! dispatchActiveRetirement record projection with
+            // ManagerWorkflow owns the sole physical send for the
+            // `ManagerLoopGate.gateKind retirement.Id` occasion; Change only awaits
+            // the durable loop signal admitted through the PromptAuthority gate.
+            match! deps.ContinueManagerLoop record.ManagerSessionId (WorktreePath.value record.WorktreePath) with
             | Error error -> return Error error
             | Ok() ->
                 let! _ = AgentJournal.awaitChangeFrom revision journal
@@ -382,14 +346,17 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let! road = requireOpenRoad journal record
             let! retirement = requireCommittedRetirement road
 
-            match retirement.Outcome, road.Certificate with
-            | RetirementOutcome.Continue, _ -> return! activateNextIfAbsent journal record road retirement
-            | RetirementOutcome.Accepted certificateId, Some certificate when
-                certificate.Id = certificateId && not certificate.Valid
-                ->
-                return! activateNextIfAbsent journal record road retirement
-            | RetirementOutcome.Accepted _, _ ->
-                return! Error "Manager loop continuation requires an invalidated Accepted certificate"
+            let! incumbent =
+                match retirement.Outcome, road.Certificate with
+                | RetirementOutcome.Continue, _ -> activateNextIfAbsent journal record road retirement
+                | RetirementOutcome.Accepted certificateId, Some certificate when
+                    certificate.Id = certificateId && not certificate.Valid
+                    ->
+                    activateNextIfAbsent journal record road retirement
+                | RetirementOutcome.Accepted _, _ ->
+                    Task.FromResult(Error "Manager loop continuation requires an invalidated Accepted certificate")
+
+            return incumbent
         }
 
     let finalizeRegisteredWorktree (agentId: string) =
@@ -586,10 +553,15 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         }
 
     let requireActiveWorkOwnedIncumbent (road: RoadView) : Result<IncumbencyId, string> =
-        match road.ActiveIncumbency, road.ActivePhase with
-        | Some active, Some IncumbencyPhase.WorkOwned -> Ok active
-        | Some _, Some phase -> Error(sprintf "Relay incumbency cannot take new charge in phase %A" phase)
-        | _ -> Error "Manager session has no active incumbent"
+        match road.ActiveIncumbency with
+        | None -> Error "Manager session has no active incumbent"
+        | Some active when List.contains active road.RetiredIncumbencies ->
+            Error(sprintf "Relay incumbency %s is already retired" (IncumbencyId.value active))
+        | Some _ when road.AcceptedAssessmentTransport.IsNone ->
+            Error "Relay incumbency cannot take new charge before assessment is recorded"
+        | Some _ when road.Certificate |> Option.exists (fun cert -> cert.Valid) ->
+            Error "Relay incumbency cannot take new charge after perfect assessment yields valid certificate"
+        | Some active -> Ok active
 
     let advanceAuthorityRevision
         (journal: AgentJournal)

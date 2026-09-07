@@ -169,7 +169,9 @@ module ChildRunProgram =
 
                 return! completeValidated run work ct now identityResult
             with
-            | :? OperationCanceledException -> return Error AgentError.ParentCancelled
+            | :? OperationCanceledException when ct.IsCancellationRequested -> return Error AgentError.ParentCancelled
+            | :? OperationCanceledException as oce ->
+                return Error(AgentError.HostFailure(sprintf "Child attempt cancelled internally: %s" oce.Message))
             | ex -> return Error(AgentError.HostFailure ex.Message)
         }
 

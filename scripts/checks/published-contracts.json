@@ -944,11 +944,6 @@
       "justification": "Detached prompt claim reconciliation over durable PromptAuthority projection and an injected Host snapshot; it proves pending claims from physical evidence or leaves them pending, owns no runtime authority, and never resends."
     },
     {
-      "path": "src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs",
-      "owner": "dispatch-protocol",
-      "justification": "Direct-CE family recovery workflow that composes prompt-claim recovery, blogger crash recovery, handle and job family queries through injected ports; it carries no independent runtime authority or physical effect."
-    },
-    {
       "path": "src/Wanxiangshu/Mission/WorkRecord/Surface.fs",
       "owner": "work-record",
       "justification": "Signed JS-native WorkRecord surface over durable XTrace capture, blogger observation, and lifecycle projection; dynamic object decoding and trace internals remain private."
@@ -1029,9 +1024,9 @@
       "justification": "Signed JS-native facade over the canonical MagicTodo membrane; host boxing and response projection remain boundary mechanics only."
     },
     {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fs",
       "owner": "provider-attempt-recovery",
-      "justification": "Signed JS-native fallback cursor projection over the canonical attempt cursor and recovery-slot algebra; typed cursor representation remains signature-hidden."
+      "justification": "Signed JS-native provider failure projection over the canonical provider failure budget and Blogger retry policy; typed budget representation remains signature-hidden."
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Tools/ExecutorToolSurface.fs",
@@ -1187,11 +1182,6 @@
       "path": "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
       "owner": "context-compression",
       "justification": "Signed JS-native compression decision surface for attempt choice and recovery-slot dispatch; internal compression state and decision logic remain private."
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashSurface.fs",
-      "owner": "context-compression",
-      "justification": "Signed JS-native crash-window classifier surface returning stable failure case names; request identifiers and provider details remain private."
     },
     {
       "path": "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs",
@@ -1474,6 +1464,11 @@
       "justification": "Signed JS-native transaction surface for chat admission and pre-provider settlement scenarios; settlement logic remains private."
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/SessionRecoveryHostSurface.fs",
+      "owner": "managed-chat-execution",
+      "justification": "Signed JS-native recovery host surface for resume/manual-disposition/terminal-revocation proofs over opaque handles; host wiring and journal mechanics remain private."
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Session/ChatExecution/StatusSurface.fs",
       "owner": "managed-chat-execution",
       "justification": "Signed JS-native status query surface evaluating journal handles and serialized facts; journal inspection remains signature-hidden."
@@ -1502,6 +1497,11 @@
       "path": "src/Wanxiangshu/Context/Prefix/XWireSurface.fs",
       "owner": "prefix-stability",
       "justification": "Signed JS-native XWire surface for covered prefix digests and presentation horizons; projection models and retry calculations stay private."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/PluginRecoveryScopeSurface.fs",
+      "owner": "host-boundary",
+      "justification": "Signed JS-native owner surface for PAR-011/PAR-020 admitted-plan freeze, bind, record, peek, consume and manual-only ownership; plan construction and JSON views stay in the prefix-stability bridge."
     },
     {
       "path": "src/Wanxiangshu/Participant/Provider/LanguageSurface.fs",
@@ -3197,29 +3197,6 @@
       "justification": "Relay.TurnWorkflow publishes the sole application turn entry consumed by managed-session-lifecycle; Manager terminal handling delegates to Relay retirement while ordinary and SyncDelegate ownership remain explicit."
     },
     {
-      "path": "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs",
-      "owner": "context-compression",
-      "node": "context-compression-blogger-compaction-keep",
-      "contract": "Context.CompanionContract",
-      "kind": "published-contract",
-      "consumers": [
-        "dispatch-protocol"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome",
-        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.AbandonedUnsent",
-        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.AlreadyLive",
-        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.PendingMaterial",
-        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.ReceiptedIdle",
-        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.Recommitted",
-        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.RestoredInFlight",
-        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.Superseded",
-        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.Unreadable",
-        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.reconcile"
-      ],
-      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
-    },
-    {
       "path": "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
       "owner": "context-compression",
       "node": "context-compression-blogger-compaction-keep",
@@ -3297,8 +3274,7 @@
       "symbols": [
         "Wanxiangshu.Context.Companion.Blogger.OpenCode.PluginBloggerScope",
         "Wanxiangshu.Context.Companion.Blogger.OpenCode.PluginBloggerScope.BeginShutdown",
-        "Wanxiangshu.Context.Companion.Blogger.OpenCode.PluginBloggerScope.Dispose",
-        "Wanxiangshu.Context.Companion.Blogger.OpenCode.PluginBloggerScope.DropDrainWindow"
+        "Wanxiangshu.Context.Companion.Blogger.OpenCode.PluginBloggerScope.Dispose"
       ],
       "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
     },
@@ -3491,7 +3467,6 @@
         "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.ProducerSettlement.NoOpenProducer",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.awaitOpenProducerSettlement",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.blocksNew",
-        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.forceSealCellDropOffer",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.forceSealRuntime",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.requireCurrentRequest",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.requireReleaseCurrentRequest",
@@ -3520,31 +3495,11 @@
         "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.CancelParked",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.Cancellation",
-        "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.HasFlight",
-        "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.IsDrainOpen",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.ParkTransform",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.TryPeekCurrentRequest",
-        "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.TryTakePendingOffer",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.ParkWake",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.ParkWake.Cancelled",
         "Wanxiangshu.Context.Companion.Blogger.Runtime.ParkWake.MaterialAvailable"
-      ],
-      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
-      "owner": "context-compression",
-      "node": "context-compression-blogger-compaction-keep",
-      "contract": "Context.CompanionContract",
-      "kind": "published-contract",
-      "consumers": [
-        "behavior-diagnosis"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerToolRecovery",
-        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerToolRecovery.AabbRepairIssued",
-        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerToolRecovery.InteractionNudgeIssued",
-        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerToolRecovery.NoRecovery"
       ],
       "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
     },
@@ -4840,8 +4795,7 @@
         "Wanxiangshu.OpenCode.PluginRuntimeScope.TrackReconcileShutdown",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.TryAttemptPlan",
         "Wanxiangshu.OpenCode.PluginRuntimeScope.TryBindAttemptPlan",
-        "Wanxiangshu.OpenCode.PluginRuntimeScope.TryClaimStartupProbe",
-        "Wanxiangshu.OpenCode.PluginRuntimeScope.TryTakeRecoveryPermit"
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.TryClaimStartupProbe"
       ],
       "justification": "Session.Lifecycle publishes exactly these symbols to the listed owners; every unlisted sibling remains private to managed-session-lifecycle."
     },
@@ -5310,17 +5264,17 @@
       "justification": "The provider-language owner supplies an approved relative path; this distribution adapter alone performs the packaged-byte existence and read operations without language policy."
     },
     {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/FailureBudget.fs",
       "owner": "provider-attempt-recovery",
       "node": "provider-attempt-recovery-cutover",
       "contract": "Provider.AttemptRecovery",
       "kind": "semantic-evidence",
       "law": "WHAT[PAR-020]",
       "proof": {
-        "path": "requirements/provider-attempt-recovery/tests/cursor.test.mjs",
-        "title": "WHAT[PAR-020] fallback_cursor_replay_exposes_domain_evidence_without_resume_authority",
+        "path": "requirements/provider-attempt-recovery/tests/failure-budget.test.mjs",
+        "title": "WHAT[PAR-020] budget_replay_exposes_domain_evidence_without_resume_authority",
         "what_id": "PAR-020",
-        "surface_module": "Participant/Provider/Attempt/Fallback/CursorSurface.js"
+        "surface_module": "Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js"
       },
       "consumers": [
         "context-compression",
@@ -5331,24 +5285,23 @@
         "verification-system"
       ],
       "symbols": [
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.AuthorityAgentPair",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.AuthorityAgentPair.PeerAgent",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.AuthorityAgentPair.SelectedAgent",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackCursor",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackCursor.ConsecutiveFailureCount",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackCursor.Offset",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffset",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffset.Fork0",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffset.Fork1",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffset.Fork2",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffset.Fork3",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffsetCodec.ofByte",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffsetCodec.toByte",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.effectiveAgent",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.initial",
-        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.isRecoverySlot"
+        "Wanxiangshu.Participant.Provider.Attempt.FailedProviderAttemptIdentity",
+        "Wanxiangshu.Participant.Provider.Attempt.FailedProviderAttemptIdentity.dedupeKey",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderFailureBudget.FailureBudget",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderFailureBudget.FailureBudget.ConsecutiveFailureCount",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderFailureBudget.DefaultBudget",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderFailureBudget.Verdict",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderFailureBudget.Verdict.MayRetry",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderFailureBudget.Verdict.Exhausted",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderFailureBudget.initial",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderFailureBudget.recordFailure",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderFailureBudget.recordSuccess",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderFailureBudget.verdict",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderFailureBudget.forNewAuthorityRoot",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderFailureBudget.isValidRecord",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderFailureBudget.attemptIdentity"
       ],
-      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Cursor symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed provider failure budget symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
     },
     {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
@@ -5376,8 +5329,10 @@
         "speculative-investigation"
       ],
       "symbols": [
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackEvidence.effectiveAgent",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackEvidence.tryCurrentState"
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureEvidence.currentState",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureEvidence.tryCurrentState",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureEvidence.currentBudget",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureEvidence.mayRetry"
       ],
       "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Evidence symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
     },
@@ -5395,32 +5350,16 @@
         "AuthorityRootUserMessageId",
         "ConsecutiveFailureCount",
         "FinalConsecutiveFailureCount",
-        "FinalOffset",
         "LogicalRunId",
-        "NextOffset",
-        "PreviousOffset",
         "ProviderRun",
         "Reason",
         "SessionId",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackFactCases",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackFactCases.FallbackCursorAdvanced",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackFactCases.FallbackExhausted"
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureFactCases",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureFactCases.FailureRecorded",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureFactCases.RetryExhausted",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureFactCases.SuccessRecorded"
       ],
-      "justification": "Provider.AttemptRecovery publishes the source-pure fallback fact vocabulary exactly to durable-events and verification-system; the RequestKind locality no longer grants this sibling vocabulary."
-    },
-    {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
-      "owner": "provider-attempt-recovery",
-      "node": "provider-attempt-recovery-cutover",
-      "contract": "Provider.AttemptRecovery",
-      "kind": "published-contract",
-      "consumers": [
-        "durable-events"
-      ],
-      "symbols": [
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackFactFold.fold"
-      ],
-      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed FallbackFactFold symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+      "justification": "Provider.AttemptRecovery publishes the source-pure provider failure fact vocabulary exactly to durable-events and verification-system; the RequestKind locality no longer grants this sibling vocabulary."
     },
     {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
@@ -5433,12 +5372,13 @@
         "prefix-stability"
       ],
       "symbols": [
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.EpisodeSuperseded",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.NoActiveRun",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.RecoveryAdvanced",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.RecoveryExhausted",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackLedger.recordConfirmedSuccess"
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FailureAdmissionOutcome",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FailureAdmissionOutcome.RetryAuthorized",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FailureAdmissionOutcome.RetryExhausted",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FailureAdmissionOutcome.EpisodeSuperseded",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FailureAdmissionOutcome.NoActiveRun",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureLedger.recordAuthorizedFailure",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureLedger.recordConfirmedSuccess"
       ],
       "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Ledger symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
     },
@@ -5455,23 +5395,40 @@
         "verification-system"
       ],
       "symbols": [
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection.AlreadyExhausted",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection.AlreadyObserved",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection.DifferentRun",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection.InvalidFallbackOffset",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection.InvalidTransition",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection.NoCursor",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjection",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjection.AuthorityRootUserMessageId",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjection.Cursor",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjection.Exhausted",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjection.LogicalRunId",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjection.RecentFailureKeys",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjectionModule.applyAdvance",
-        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjectionModule.forAuthority"
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureAdvanceRejection",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureAdvanceRejection.AlreadyObserved",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureAdvanceRejection.AlreadyExhausted",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureAdvanceRejection.DifferentRun",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureAdvanceRejection.NoActiveBudget",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureAdvanceRejection.InvalidTransition",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureProjection",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureProjection.LogicalRunId",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureProjection.AuthorityRootUserMessageId",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureProjection.Budget",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureProjection.RecentFailureKeys",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureProjection.Exhausted",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureProjection.LastTransitionWasSuccess",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureProjection.forAuthority",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureProjection.applyFailure",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureProjection.applyExhausted",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureProjection.recordSuccess",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureProjection.mayRetry"
       ],
       "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Projection symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ProviderFailureFactFold.fs",
+      "owner": "provider-attempt-recovery",
+      "node": "provider-attempt-recovery-cutover",
+      "contract": "Provider.AttemptRecovery",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ProviderFailureFactFold.fold"
+      ],
+      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed ProviderFailureFactFold symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
     },
     {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
@@ -5506,7 +5463,7 @@
       "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Planner symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
     },
     {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs",
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/RetryPolicy.fs",
       "owner": "provider-attempt-recovery",
       "node": "provider-attempt-recovery-cutover",
       "contract": "Provider.AttemptRecovery",
@@ -5522,34 +5479,9 @@
         "Wanxiangshu.Participant.Provider.Attempt.AttemptOutcome.Aborted",
         "Wanxiangshu.Participant.Provider.Attempt.AttemptOutcome.Completed",
         "Wanxiangshu.Participant.Provider.Attempt.AttemptOutcome.CompletedInvalid",
-        "Wanxiangshu.Participant.Provider.Attempt.AttemptOutcome.Failed",
-        "Wanxiangshu.Participant.Provider.Attempt.BloggerSlotDispatchError",
-        "Wanxiangshu.Participant.Provider.Attempt.BloggerSlotDispatchError.MissingProjection",
-        "Wanxiangshu.Participant.Provider.Attempt.BloggerSlotDispatchError.NoActiveBloggerRun",
-        "Wanxiangshu.Participant.Provider.Attempt.RecoveryOpportunity",
-        "Wanxiangshu.Participant.Provider.Attempt.RecoveryOpportunity.OrdinaryAttempt",
-        "Wanxiangshu.Participant.Provider.Attempt.RecoveryOpportunity.RecoveryAttempt",
-        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.advancesCursor",
-        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.afterFailureAdvance",
-        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.isArmed",
-        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.mayRecover",
-        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.nextArming",
-        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.nextBloggerRequest",
-        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.onMainOutcome",
-        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.onSquashOutcome",
-        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.opportunity",
-        "Wanxiangshu.Participant.Provider.Attempt.SlotArming",
-        "Wanxiangshu.Participant.Provider.Attempt.SlotArming.ArmedByAdvance",
-        "Wanxiangshu.Participant.Provider.Attempt.SlotArming.NotArmed",
-        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision",
-        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision.AbandonRoundProduct",
-        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision.CommitMain",
-        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision.CommitSquashThenMain",
-        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision.FailSlot",
-        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision.MainWithoutSquash",
-        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision.RepairOnce"
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptOutcome.Failed"
       ],
-      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed RecoverySlot symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Blogger retry policy symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
     },
     {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/TerminalValidity.fs",
@@ -6380,12 +6312,10 @@
         "Wanxiangshu.Strength.StrengthOpportunity",
         "Wanxiangshu.Strength.StrengthOpportunity.CanonicalRole",
         "Wanxiangshu.Strength.StrengthOpportunity.CostModelAvailable",
-        "Wanxiangshu.Strength.StrengthOpportunity.EffectiveAgent",
         "Wanxiangshu.Strength.StrengthOpportunity.EventStoreHealthy",
         "Wanxiangshu.Strength.StrengthOpportunity.HasPrefixProbe",
         "Wanxiangshu.Strength.StrengthOpportunity.HostCanaryHealthy",
         "Wanxiangshu.Strength.StrengthOpportunity.IsAttachedOrInternalLeaf",
-        "Wanxiangshu.Strength.StrengthOpportunity.IsFallbackRetry",
         "Wanxiangshu.Strength.StrengthOpportunity.IsRootWork",
         "Wanxiangshu.Strength.StrengthOpportunity.OwnerCancelled",
         "Wanxiangshu.Strength.StrengthOpportunity.RequestKind",
@@ -7431,12 +7361,6 @@
         "Wanxiangshu.Foundation.Identity.EventId",
         "Wanxiangshu.Foundation.Identity.EventIdModule.create",
         "Wanxiangshu.Foundation.Identity.EventIdModule.value",
-        "Wanxiangshu.Foundation.Identity.FallbackAttemptIdentity",
-        "Wanxiangshu.Foundation.Identity.FallbackAttemptIdentity.AuthorityRootUserMessageId",
-        "Wanxiangshu.Foundation.Identity.FallbackAttemptIdentity.LogicalRunId",
-        "Wanxiangshu.Foundation.Identity.FallbackAttemptIdentity.ProviderRun",
-        "Wanxiangshu.Foundation.Identity.FallbackAttemptIdentity.SessionId",
-        "Wanxiangshu.Foundation.Identity.FallbackAttemptIdentityModule.dedupeKey",
         "Wanxiangshu.Foundation.Identity.FinalityRequestIdModule.create",
         "Wanxiangshu.Foundation.Identity.FinalityRequestIdModule.value",
         "Wanxiangshu.Foundation.Identity.FrameEpochId",
@@ -8038,7 +7962,6 @@
         "Wanxiangshu.OpenCode.ExecutionAdmissionAcquisition.Queued",
         "Wanxiangshu.OpenCode.ExecutionAdmissionAcquisition.Superseded",
         "Wanxiangshu.OpenCode.ExecutionAdmissionExactIdentity",
-        "Wanxiangshu.OpenCode.ExecutionAdmissionExactIdentity.EffectiveAgent",
         "Wanxiangshu.OpenCode.ExecutionAdmissionExactIdentity.PhysicalUserMessageId",
         "Wanxiangshu.OpenCode.ExecutionAdmissionExactIdentity.SessionId",
         "Wanxiangshu.OpenCode.ExecutionAdmissionExactIdentity.Target",
@@ -8270,7 +8193,6 @@
         "Wanxiangshu.Execution.Failure.ProviderRecoveryBudget.Available",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryBudget.Exhausted",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.Breaker",
-        "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.FallbackBudget",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.LogicalRun",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.ProviderRun",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.RequestKind",
@@ -8362,7 +8284,6 @@
         "Wanxiangshu.Execution.Failure.ProviderRecoveryDecisionId",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryDecisionId.Create",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.Breaker",
-        "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.FallbackBudget",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.LogicalRun",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.ProviderRun",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.RequestKind",
@@ -8435,7 +8356,6 @@
         "Wanxiangshu.Execution.Failure.ProviderRecoveryBudget.Available",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryBudget.Exhausted",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.Breaker",
-        "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.FallbackBudget",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.LogicalRun",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.ProviderRun",
         "Wanxiangshu.Execution.Failure.ProviderRecoveryFacts.RequestKind",
@@ -10130,7 +10050,6 @@
       ],
       "symbols": [
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.Authority",
-        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.EffectiveAgent",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.Key",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.Origin",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision",
@@ -10149,13 +10068,11 @@
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey.PhysicalUserMessageId",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey.SessionId",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence",
-        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.EffectiveAgent",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.IdentitySeed",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.Key",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.Origin",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Claim",
-        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.EffectiveAgent",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.IdentitySeed",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Key",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Origin",
@@ -10194,7 +10111,6 @@
         "managed-chat-execution"
       ],
       "symbols": [
-        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.EffectiveAgent",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ActiveHumanContinuationEvidence.Key",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent",
@@ -10203,13 +10119,11 @@
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey.PhysicalUserMessageId",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExecutionKey.SessionId",
-        "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.EffectiveAgent",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.ExplicitAgent",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.IdentitySeed",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.Key",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.ExternalRootEvidence.Origin",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Claim",
-        "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.EffectiveAgent",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.IdentitySeed",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Key",
         "Wanxiangshu.OpenCode.ChatAdmissionIntent.PendingPromptEvidence.Origin",
@@ -10759,7 +10673,6 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.IdentitySeed",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.LogicalRunId",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.PeerAgent",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SessionId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection",
@@ -10808,7 +10721,6 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.AuthorityRootUserMessageId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.ClaimedAtRuntimeStartCount",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.EffectiveAgent",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.IdentitySeed",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.LogicalRunId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.Origin",
@@ -10857,7 +10769,6 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.AcceptedContinuationIds",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.buildAttemptExecutionProfile",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.createAuthorityExecutionProfileFromSeed",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.effectiveAgentFor",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedOwner",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.identitySeedParticipantIdentity"
       ],
@@ -10877,7 +10788,6 @@
         "PromptOrigin",
         "RootAuthorityKind",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.Authority",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.EffectiveAgent",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.ProjectionChoice",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.SystemPromptId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.ToolCapabilitySet",
@@ -10971,7 +10881,6 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityRootUserMessageId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.IdentitySeed",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.PeerAgent",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptAuthorityProjection.PendingClaims",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim",
@@ -11000,7 +10909,6 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityRootUserMessageId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.CanonicalRole",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.PeerAgent",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SelectedAgent"
       ],
       "justification": "interaction-authority.Contract publishes exactly these symbols to 'intra-participant-parallelism'; every unlisted sibling remains private to interaction-authority."
@@ -11019,7 +10927,6 @@
         "RootAuthorityKind",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.Authority",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.EffectiveAgent",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.Origin",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.PhysicalUserMessageId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.SessionId",
@@ -11032,7 +10939,6 @@
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.SessionId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.AuthorityRootUserMessageId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.ClaimedAtRuntimeStartCount",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.EffectiveAgent",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.IdentitySeed",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.LogicalRunId",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.PromptClaim.Origin",
@@ -11186,7 +11092,6 @@
       ],
       "symbols": [
         "IdentitySeed",
-        "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.EffectiveAgent",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AttemptExecutionProfile.RequestKind",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile",
         "Wanxiangshu.Interaction.Authority.PromptAuthority.AuthorityExecutionProfile.AuthorityRootUserMessageId",
@@ -12892,7 +12797,6 @@
         "dispatch-protocol"
       ],
       "symbols": [
-        "Wanxiangshu.Execution.Session.ChatExecution.AcceptedChatExecutionEvidence.EffectiveAgent",
         "Wanxiangshu.Execution.Session.ChatExecution.AcceptedChatExecutionEvidence.Origin",
         "Wanxiangshu.Execution.Session.ChatExecution.AcceptedChatExecutionEvidence.PhysicalUserMessageId",
         "Wanxiangshu.Execution.Session.ChatExecution.AcceptedChatExecutionEvidence.SessionId",
@@ -12991,7 +12895,6 @@
         "Wanxiangshu.Execution.Session.ChatExecution.AcceptedChatExecutionEvidence",
         "Wanxiangshu.Execution.Session.ChatExecution.AcceptedChatExecutionEvidence.AuthorityKind",
         "Wanxiangshu.Execution.Session.ChatExecution.AcceptedChatExecutionEvidence.AuthorityRootUserMessageId",
-        "Wanxiangshu.Execution.Session.ChatExecution.AcceptedChatExecutionEvidence.EffectiveAgent",
         "Wanxiangshu.Execution.Session.ChatExecution.AcceptedChatExecutionEvidence.IdentitySeed",
         "Wanxiangshu.Execution.Session.ChatExecution.AcceptedChatExecutionEvidence.LogicalRunId",
         "Wanxiangshu.Execution.Session.ChatExecution.AcceptedChatExecutionEvidence.Origin",
@@ -13286,11 +13189,6 @@
       "symbols": [
         "Wanxiangshu.Enforcer.Cycle.BloggerRecoveryProbe.BloggerAabbRepairKind",
         "Wanxiangshu.Enforcer.Cycle.BloggerRecoveryProbe.BloggerMissingToolRepairKind",
-        "Wanxiangshu.Enforcer.Cycle.BloggerRecoveryProbe.InvalidTerminalRepairState",
-        "Wanxiangshu.Enforcer.Cycle.BloggerRecoveryProbe.InvalidTerminalRepairState.AabbRepairIssued",
-        "Wanxiangshu.Enforcer.Cycle.BloggerRecoveryProbe.InvalidTerminalRepairState.InteractionNudgeIssued",
-        "Wanxiangshu.Enforcer.Cycle.BloggerRecoveryProbe.InvalidTerminalRepairState.NoRecovery",
-        "Wanxiangshu.Enforcer.Cycle.BloggerRecoveryProbe.repairStateForInvalidTerminal",
         "Wanxiangshu.Enforcer.Cycle.BloggerRecoveryProbe.terminalRequestOwnershipForPhysicalMessage"
       ],
       "justification": "behavior-diagnosis.Contract publishes exactly these symbols to 'interaction-authority'; every unlisted sibling remains private to behavior-diagnosis."
@@ -15821,7 +15719,6 @@
       ],
       "symbols": [
         "Wanxiangshu.OpenCode.PluginRecoveryScope",
-        "Wanxiangshu.OpenCode.PluginRecoveryScope.ArmRecovery",
         "Wanxiangshu.OpenCode.PluginRecoveryScope.ClearAttemptPlansFor",
         "Wanxiangshu.OpenCode.PluginRecoveryScope.ClearSession",
         "Wanxiangshu.OpenCode.PluginRecoveryScope.ConsumeAttemptPlan",
@@ -15830,8 +15727,7 @@
         "Wanxiangshu.OpenCode.PluginRecoveryScope.RecordPendingAttemptPlan",
         "Wanxiangshu.OpenCode.PluginRecoveryScope.RequireFamilyRecovery",
         "Wanxiangshu.OpenCode.PluginRecoveryScope.TryAttemptPlan",
-        "Wanxiangshu.OpenCode.PluginRecoveryScope.TryBindAttemptPlan",
-        "Wanxiangshu.OpenCode.PluginRecoveryScope.TryTakeRecoveryPermit"
+        "Wanxiangshu.OpenCode.PluginRecoveryScope.TryBindAttemptPlan"
       ],
       "justification": "host-boundary.Contract publishes exactly these symbols to 'managed-session-lifecycle'; every unlisted sibling remains private to host-boundary."
     },
@@ -18156,7 +18052,6 @@
           "symbols": [
             "Wanxiangshu.OpenCode.PluginRuntimeScope",
             "Wanxiangshu.OpenCode.PluginRuntimeScope.ActivateDurability",
-            "Wanxiangshu.OpenCode.PluginRuntimeScope.ArmRecovery",
             "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachLoopSensor",
             "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachMessageVisibility",
             "Wanxiangshu.OpenCode.PluginRuntimeScope.LoopSensor",

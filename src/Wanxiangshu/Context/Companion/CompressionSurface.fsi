@@ -1,22 +1,12 @@
 namespace Wanxiangshu.Context.Companion
 
-/// Context-compression decision owner. Attempt choice, recovery-slot dispatch
+/// Context-compression decision owner. Attempt choice, retry request dispatch
 /// and terminal validity cross this JSON boundary; prefix selection and epoch
 /// behavior are owned by `PrefixSurface`.
 [<RequireQualifiedAccess>]
 module CompressionSurface =
 
-    val beginSequence: string
-    val afterFailureAdvance: string
-    val afterRestart: string
-    val isArmed: value: string -> bool
-    val mayRecover: arming: string -> offset: int -> hasMaterial: bool -> bool
-    val recoveryOpportunity: arming: string -> offset: int -> string
-    val nextBloggerRequest: failedKind: string -> opportunity: string -> hasSquashMaterial: bool -> string
-    val onSquash: outcome: string -> obj
-    val onMain: value: obj -> obj
-    val armingName: value: string -> string
-    val cursor: obj
+    val nextBloggerRequest: failedKind: string -> hasSquashMaterial: bool -> string
 
     /// Build the production AttemptPlan from plain request labels. The caller
     /// supplies either a probe or a named no-candidate result; the planner itself

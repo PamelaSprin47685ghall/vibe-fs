@@ -20,9 +20,9 @@
 
 控制流仅识别快照的 `Outcome`（`Completed | Failed | Aborted`），严禁根据错误字符串或异常类型细分溢出、网络或限流等原因。
 
-## CONTEXT-COMPRESSION-006: 恢复机会一次性消费，恢复动作 = opportunity ∧ hasMaterial
+## CONTEXT-COMPRESSION-006: 重试材料当次决策，失败预算有界
 
-真实失败被 `FallbackLedger` 接受并推进 cursor 后，只有新 Offset 为奇数时才产生一次 `RecoveryOpportunity`；它是 `armedByFailure ∧ primed` 的类型化结果，不得与 `hasMaterial` 折叠成一个布尔值。X 在该机会中必须实际执行候选选择，由 `PrefixProbeSelection` 的 `Ok probe | Error NoCandidateReason` 证明材料是否可用；Y 则以当前 typed Blogger request 与 durable frames 判定是否先执行 squash。若本次物理 attempt 没有可用材料，则发送普通主请求并消费该机会，严禁把 arming 留给未来无关请求，也严禁通过进程内 waiter 等待未来 X material 再补做 recovery。primed 槽中的业务主请求一旦成功，PAR-004 必须把 cursor 归一到同侧普通槽；因此下一次 live failure 会再次直接进入同侧 primed recovery，而不是先产生第二个无恢复动作的 context-overflow 请求。崩溃可在成功前留下 durable primed Offset，故 arming 仍不得由 parity 重建。
+每个物理 retry attempt 拥有全新 physical identity；其是否包含 prefix/squash 恢复材料是由当前 attempt 的 retry-policy 从 journal 已提交事实（是否允许 probe/squash 以及材料是否可用）做出的不可变决策，不依赖历史位置、奇偶或跨回调瞬态状态。X 在 retry policy 允许 probe 时实际执行候选选择，由 `PrefixProbeSelection` 的 `Ok probe | Error NoCandidateReason` 证明材料是否可用；Y 则以当前 typed Blogger request 与 durable frames 判定是否先执行 squash（`BloggerRetryPolicy.nextRequest` 纯函数）。若本次物理 attempt 没有可用材料，则发送普通主请求，严禁将恢复决策留给未来无关请求，也严禁等待未来 X material 再补做 retry。每次确认失败经 `ProviderFailureLedger` 记账并推进 `ProviderFailureBudget` 连续失败计数；`verdict` 为 `Exhausted`（单一 `DefaultBudget`）时停止自动重试。业务主请求（`WorkMain | BloggerMain` 的有效成功）一旦成功，清零连续失败计数。
 
 ## CONTEXT-COMPRESSION-007: 按 RequestKind 分派结局
 
@@ -34,15 +34,15 @@
 
 ## CONTEXT-COMPRESSION-009: 候选未提交不是事实
 
-恢复槽中尝试替换 X 前缀时，候选前缀仅作为 attempt-local 的执行配置，不修改已提交的 `ActivePrefixEpoch`。Probe 失败则直接丢弃候选，不产生任何持久化事实，亦无需回滚。
+尝试替换 X 前缀时，候选前缀仅作为 attempt-local 的执行配置，不修改已提交的 `ActivePrefixEpoch`。Probe 失败则直接丢弃候选，不产生任何持久化事实，亦无需回滚。
 
 ## CONTEXT-COMPRESSION-010: 候选选择严格新于已提交 epoch
 
-候选前缀必须在 coverage 证明上严格新于当前已提交的 epoch：cutoff 游标不得回退，与已提交前缀不可区分的候选必须直接拒绝，无候选时不构造空 probe 而发送普通请求。
+候选前缀必须在 coverage 证明上严格新于当前已提交的 epoch：cutoff 不得回退，与已提交前缀不可区分的候选必须直接拒绝，无候选时不构造空 probe 而发送普通请求。
 
 ## CONTEXT-COMPRESSION-011: 提交语义分型
 
-X probe 的**物理 provider attempt** 一旦产生可用成功（包括 `finish=tool-calls`：Host turn 尚未结束、但该 provider attempt 已成功），必须先原子提交新 epoch 并继承 SealRoot，再允许下一次 provider request 组装；失败或不可用回应则无 rebase 事实。`PrefixRebaseCommitted` 的 durable append 成功是消费 attempt-local probe plan 的前置条件，append 失败必须 fail-closed，严禁“plan 已消费但 epoch 未提交”。一旦 epoch 已提交，后续每一个普通 `WorkMain` 都必须继续投影该 committed prefix；无 `RecoveryOpportunity` 只表示本次不得构造新 probe，绝不表示退回 raw X 历史。Y squash 成功时提交 squashed observation 并使 FrameEpoch 递增，失败时不修改现有 frames 与 coverage。`m=1` 时仍允许 `k=1` 的真实 rewrite；新的 squash terminal blob 是新的历史表示，其 `TextDigest` 可以且通常应与被替换 Entry 不同，不得把 digest 相等误作单帧 squash 的 PERSIST-010 条件。
+X probe 的**物理 provider attempt** 一旦产生可用成功（包括 `finish=tool-calls`：Host turn 尚未结束、但该 provider attempt 已成功），必须先原子提交新 epoch 并继承 SealRoot，再允许下一次 provider request 组装；失败或不可用回应则无 rebase 事实。`PrefixRebaseCommitted` 的 durable append 成功是消费 attempt-local probe plan 的前置条件，append 失败必须 fail-closed，严禁“plan 已消费但 epoch 未提交”。一旦 epoch 已提交，后续每一个普通 `WorkMain` 都必须继续投影该 committed prefix；retry-policy 未允许 probe 只表示本次不得构造新 probe，绝不表示退回 raw X 历史。Y squash 成功时提交 squashed observation 并使 FrameEpoch 递增，失败时不修改现有 frames 与 coverage。`m=1` 时仍允许 `k=1` 的真实 rewrite；新的 squash terminal blob 是新的历史表示，其 `TextDigest` 可以且通常应与被替换 Entry 不同，不得把 digest 相等误作单帧 squash 的 PERSIST-010 条件。
 
 ## CONTEXT-COMPRESSION-012: Blogger delta TOML 合同
 
@@ -50,7 +50,7 @@ Blogger delta 以 data-only TOML 形式冻结于 blob，指令头部仅在投影
 
 ## CONTEXT-COMPRESSION-013: 诊断不是控制输入
 
-可观测诊断日志严禁作为控制流输入，不得使用任何诊断字段驱动 Fallback、probe 或 squash 的分支决策。
+可观测诊断日志严禁作为控制流输入，不得使用任何诊断字段驱动 retry、probe 或 squash 的分支决策。
 
 ## CONTEXT-COMPRESSION-014: squash 只处理本 X 的 frames
 
@@ -80,24 +80,24 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 
 ## CONTEXT-COMPRESSION-020: `todowrite` 所在回合永远保留 X 原文
 
-任何包含 `todowrite` tool call 的 Host 消息，以及与该 call id 对应的 tool result 消息，都不得被 Y 前缀替换删除。Prefix cutoff 可以越过这些回合并压缩其余历史，但写回 provider context 时必须从被 drop 的 X 前缀中提取这些消息并原样保留；该规则不依赖 Manager 的 T1/T2 阶段，也适用于 AABB/recovery 后形成的 Y replacement。
+任何包含 `todowrite` tool call 的 Host 消息，以及与该 call id 对应的 tool result 消息，都不得被 Y 前缀替换删除。Prefix cutoff 可以越过这些回合并压缩其余历史，但写回 provider context 时必须从被 drop 的 X 前缀中提取这些消息并原样保留；该规则不依赖 Manager 的 T1/T2 阶段，也适用于 recovery 后形成的 Y replacement。
 
-## CONTEXT-COMPRESSION-021: Y recovery 由失败会话当场拥有，禁止未来 X material 代触发
+## CONTEXT-COMPRESSION-021: Y retry 由失败会话当场拥有，禁止等待未来 X material
 
-`BloggerMain` 的已确认失败在 Fallback advance 后若进入 primed Offset 且当前 X 存在可 squash frames，则该 Blogger 的下一次 continuation 必须先物化 `BloggerRequestContext.Squash` 并发送 `BloggerSquash`；不得先重发失败的 BloggerMain，也不得注册 process-local recovery waiter 等待未来主 X transform。`BloggerSquash` 成功提交后，下一次 provider step 必须从 durable Blog + XTrace 重新派生 BloggerMain；Squash 失败则结束该槽、再次 advance 后才允许进入下一槽。失败 request 的 durable open materialization 必须在任何 retry 前关闭，新物理 retry 必须重新绑定自己的 PromptKey。
+`BloggerMain` 的已确认失败在重试时，若 `BloggerRetryPolicy` 选中 Squash（存在可 squash frames），则该 Blogger 的下一次 continuation 必须先物化 `BloggerRequestContext.Squash` 并发送 `BloggerSquash`；不得先重发失败的 BloggerMain，也不得等待未来主 X transform 再补做 retry。`BloggerSquash` 成功提交后，下一次 provider step 必须从 durable Blog + XTrace 重新派生 BloggerMain；Squash 失败则记账失败并按策略继续后续物理重试。失败 request 的 durable open materialization 必须在任何 retry 前关闭，新物理 retry 必须重新绑定自己的 PromptKey。
 
 ## CONTEXT-COMPRESSION-022: BloggerMainContext 是唯一重建公式，canonical XTrace 是唯一输入宇宙
 
-正常 catch-up、squash 成功后的 Main、失败后的 Main retry 与 crash/AABB refresh 必须共用同一个 `BloggerMainContext` 推导：同一 Opening floor、同一 XTrace generation、同一 ingest cursor、同一 200 KiB chunk 与同一 coverage digest 规则。所有路径先通过 `XTraceMaterialization.currentProjection` 得到 canonical X，再进入 `BloggerMainContext`；严禁 normal transform 从 request-local provider presentation 计算 digest、而 recovery 从 XTrace 重建，也严禁在 Coordinator、Enforcer 或 recovery workflow 中复制第二套 next-main 算法。
+正常 catch-up、squash 成功后的 Main、失败后的 Main retry 与 crash refresh 必须共用同一个 `BloggerMainContext` 推导：同一 Opening floor、同一 XTrace generation、同一 ingest 位置、同一 200 KiB chunk 与同一 coverage digest 规则。所有路径先通过 `XTraceMaterialization.currentProjection` 得到 canonical X，再进入 `BloggerMainContext`；严禁 normal transform 从 request-local provider presentation 计算 digest、而 retry 路径从 XTrace 重建，也严禁在 Coordinator、Enforcer 或 retry workflow 中复制第二套 next-main 算法。
 
-## CONTEXT-COMPRESSION-023: recovery/park 全事件驱动且时间无关
+## CONTEXT-COMPRESSION-023: retry/park 全事件驱动且时间无关
 
-Context compression 与 provider recovery 的 correctness path 严禁读取 wall clock、构造 `TimeSpan`、调用 timer/deadline/Delay 或以超时作为状态转换。Blogger park 的完成值必须携带 typed event，而非 `bool` 再从第二个槽位取 material。WorkMain recovery 若需要等待正在生产的 Y，只能以 durable `BloggerRequestMaterialized` open request 证明 producer 存在，并订阅 `AgentJournal` 的已提交 change；每个 change 后重新读取 projection，直到出现严格更新的 coverage 或该 durable open request 被 commit/abandon 关闭。`HasFlight`、PendingOffer、进程内 waiter 与时间窗口均不得作为 recovery correctness 证明。
+Context compression 与 provider retry 的 correctness path 严禁读取 wall clock、构造 `TimeSpan`、调用 timer/deadline/Delay 或以超时作为状态转换。Blogger park 的完成值必须携带 typed event，而非 `bool` 再从第二处取 material。WorkMain retry 若需要等待正在生产的 Y，只能以 durable `BloggerRequestMaterialized` open request 证明 producer 存在，并订阅 `AgentJournal` 的已提交 change；每个 change 后重新读取 projection，直到出现严格更新的 coverage 或该 durable open request 被 commit/abandon 关闭。live flight、staged offer 与时间窗口均不得作为 retry correctness 证明。
 
 ## CONTEXT-COMPRESSION-024: Blogger materialization admission 串行；flight 不得跨 RequestId 覆盖
 
-同一 BloggerSession 的 `BloggerRequestMaterialized` / PromptKey bind / `BloggerRequestAbandoned` 命令必须通过跨 plugin instance 的 process-local materialization admission 串行化；每次取得 admission 后必须重新读取 canonical journal projection 再决定 abandon/materialize，禁止 snapshot-check 与 append 之间存在并发竞态。该 admission 仅保护命令临界区，不是 durable producer proof。live flight claim 必须原子：空槽可建立、同 RequestId 可刷新、不同 RequestId 必须返回 typed conflict 且保留原 owner，严禁覆盖写。normal start、provider retry 与 crash recovery 必须共享这一条 claim/admission 语义。旧 provider terminal / idle callback 在执行 commit、protocol repair、AABB 或 refresh 前，必须用 assistant `parentID` 对应的 physical prompt durable evidence 证明它仍属于当前 durable open RequestId；若 newer RequestId 已接管，同一 callback 只能视为 superseded/no-op，不得消费新请求的 recovery budget、不得 abandon/release 新 owner，也不得把 canonical Main refresh 重新 claim 到当前 flight。
+同一 BloggerSession 的 `BloggerRequestMaterialized` / PromptKey bind / `BloggerRequestAbandoned` 命令必须通过跨 plugin instance 的 process-local materialization admission 串行化；每次取得 admission 后必须重新读取 canonical journal projection 再决定 abandon/materialize，禁止 snapshot-check 与 append 之间存在并发竞态。该 admission 仅保护命令临界区，不是 durable producer proof。live flight claim 必须原子：无 owner 时可建立、同 RequestId 可刷新、不同 RequestId 必须返回 typed conflict 且保留原 owner，严禁覆盖写。normal start、provider retry 与 crash recovery 必须共享这一条 claim/admission 语义。旧 provider terminal / idle callback 在执行 commit、protocol repair 或 refresh 前，必须用 assistant `parentID` 对应的 physical prompt durable evidence 证明它仍属于当前 durable open RequestId；若 newer RequestId 已接管，同一 callback 只能视为 superseded/no-op，不得消费新请求的 failure budget、不得 abandon/release 新 owner，也不得把 canonical Main refresh 重新 claim 到当前 flight。
 
 ## CONTEXT-COMPRESSION-025: compression fatal保留exact request settlement并经注入fuse执行
 
-Blogger claim/release conflict、semantic cut与compression invariant必须携带exact BloggerSession/RequestId及当前durable settlement evidence形成typed incident；superseded callback无权fatal。runtime只接受composition注入的mandatory fatal capability，不得直接引用physical adapter、optional/default/global fallback。同一incident只有一次report与kill，fatal不得改写flight或durable projection。
+Blogger claim/release conflict、semantic cut与compression invariant必须携带exact BloggerSession/RequestId及当前durable settlement evidence形成typed incident；superseded callback无权fatal。runtime只接受composition注入的mandatory fatal capability，不得直接引用physical adapter。同一incident只有一次report与kill，fatal不得改写flight或durable projection。

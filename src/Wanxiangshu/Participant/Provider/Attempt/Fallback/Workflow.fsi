@@ -18,7 +18,7 @@ module ProviderRecoveryWorkflow =
         failure: ExecutionFailure ->
         requestKind: ProviderRequestKind ->
         error: string ->
-            Task<Result<ConfirmedFailureOutcome, string>>
+            Task<Result<FailureAdmissionOutcome, string>>
 
     val continueAfterConfirmedFailure:
         sessionPort: ISessionHostPort ->

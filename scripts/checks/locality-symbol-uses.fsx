@@ -51,6 +51,12 @@ type ExtractionDiagnosticRecord =
       Line: int
       Column: int
       RawIdentity: string }
+type ApplicationUseRecord =
+    { ConsumerPath: string
+      StartLine: int
+      StartColumn: int
+      ResolvedTarget: string
+      InferredType: string }
 
 type ScanResult =
     { SchemaVersion: int
@@ -59,6 +65,7 @@ type ScanResult =
       SignatureFiles: string array
       DeclarationUses: DeclarationUseRecord array
       ExternalSymbolUses: ExternalSymbolUseRecord array
+      ApplicationUses: ApplicationUseRecord array
       FsharpNodes: FSharpNodeRecord array
       FableInterop: obj array
       SignatureExports: SignatureExportRecord array
@@ -858,6 +865,7 @@ let constantString expression =
     | _ -> None
 
 let fsharpNodesOut = ResizeArray<FSharpNodeRecord>()
+let applicationUsesOut = ResizeArray<ApplicationUseRecord>()
 let fableInteropOut = ResizeArray<obj>()
 let fableInteropKeys = HashSet<string>(StringComparer.Ordinal)
 
@@ -886,6 +894,11 @@ let rec visitExpression sourcePath anchor expression =
     let line, column =
         let _, line, column = sourceRange expression
         line, column
+    let inferredResultType () =
+        try
+            let fullType = propertyValue expression "Type"
+            if isNull fullType then "" else fullType.ToString()
+        with _ -> ""
     match expressionPattern expression with
     | None ->
         diagnostic "unsupported-fsharp-expression" sourcePath anchor "unknown" line column (expression.GetType().FullName)
@@ -906,6 +919,22 @@ let rec visitExpression sourcePath anchor expression =
             { NodeKind = nodeKind
               SemanticIdentity = identity
               Site = observationSite sourcePath anchor "fsharp-node" [ nodeKind; identity ] }
+        match patternName with
+        | "Application"
+        | "Call"
+        | "TraitCall" ->
+            match tryPayloadSymbol payload with
+            | Some symbol ->
+                let target = symbolName symbol
+                if not (String.IsNullOrWhiteSpace target) then
+                    applicationUsesOut.Add
+                        { ConsumerPath = sourcePath
+                          StartLine = line
+                          StartColumn = column
+                          ResolvedTarget = target
+                          InferredType = inferredResultType () }
+            | None -> ()
+        | _ -> ()
         if identity.EndsWith("emitJsExpr", StringComparison.Ordinal) then
             immediateExpressions expression
             |> Array.choose constantString
@@ -1170,6 +1199,11 @@ let result =
       SignatureFiles = sourceFiles |> Array.filter (fun path -> isProductionPath path && Path.GetExtension path = ".fsi") |> Array.map normalizePath |> Array.sort
       DeclarationUses = declarationUses
       ExternalSymbolUses = externalSymbolUses
+      ApplicationUses =
+        applicationUsesOut
+        |> Seq.distinct
+        |> Seq.sortBy (fun item -> item.ConsumerPath, item.StartLine, item.StartColumn, item.ResolvedTarget)
+        |> Seq.toArray
       FsharpNodes = fsharpNodesOut |> Seq.distinct |> Seq.toArray
       FableInterop = fableInteropOut.ToArray()
       SignatureExports = signatureExports

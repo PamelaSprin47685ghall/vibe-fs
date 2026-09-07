@@ -82,15 +82,15 @@ test('WHAT[VERIFICATION-SYSTEM-003] attachEventCeilings breaches maxSseEvents wi
   assert.equal(breached.sseEvents, 3);
 });
 
-test('WHAT[VERIFICATION-SYSTEM-003] long-stroke.toml declares theoretical exact event ceilings', () => {
+test('WHAT[VERIFICATION-SYSTEM-003] long-stroke.toml pins measured exact event ceilings', () => {
   const dir = path.dirname(fileURLToPath(import.meta.url));
   const source = readFileSync(path.join(dir, 'e2e/scenarios/long-stroke.toml'), 'utf8');
   const result = compileScenario(source, { name: 'long-stroke.toml' });
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'));
-  // The consecutive-recovery traversal measured 420 durable envelopes and 2068 SSE frames.
-  // Pins 630/3100 retain Host-ordering slack while failing fast on event regressions.
-  assert.equal(result.scenario.setup.maxJournalEvents, 630);
-  assert.equal(result.scenario.setup.maxSseEvents, 3100);
+  // Complete owner-controlled conflict canaries measured at most 466 durable envelopes and 2234 SSE frames.
+  // Pins 699/3351 retain 50% above observed maxima while failing fast on event regressions.
+  assert.equal(result.scenario.setup.maxJournalEvents, 699);
+  assert.equal(result.scenario.setup.maxSseEvents, 3351);
 });
 
 test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke keeps one Manager loop and two exact consecutive failures', () => {
@@ -125,26 +125,25 @@ test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke keeps one Manager loop and two e
   const context = { sessionId: 'ses_manager' };
 
   assert.equal(
-    resolveEntry(request('Continue after the interrupted join.', 1), result.scenario.entries, bindings, context).matched?.id,
-    'manager-resume.1',
-  );
-  assert.equal(
     resolveEntry(request('# Work remains away.', 1), result.scenario.entries, bindings, context).matched?.id,
     'manager-join-guard.0',
   );
 
-  // Every action in the reusable loop family is an exact must step; the
-  // optional join-guard race turn stays out of must.
+  // Every live action in the reusable authority-first loop is exact; obsolete
+  // explicit repair-resume and the optional join-guard race stay out of must.
   assert.equal(result.scenario.flow.filter((step) => step.waitAny).length, 0);
-  for (let index = 0; index <= 3; index += 1) {
+  for (let index = 0; index <= 2; index += 1) {
     const id = `manager-loop.${index}`;
     assert.ok(result.scenario.must.includes(id), `${id} must be an exact must step`);
     assert.deepEqual(byId.get(id)?.tools, loopTools);
     assert.equal(byId.get(id)?.internal, false);
   }
 
-  assert.ok(result.scenario.must.includes('manager-resume.0'));
-  assert.ok(result.scenario.must.includes('manager-current-action.1'));
-  assert.ok(!result.scenario.must.some((id) => /^manager-resume\.(?:[1-9]|10)$/.test(id)));
+  assert.ok(!result.scenario.entries.some((entry) => entry.id.startsWith('manager-resume.')));
+  const currentActions = result.scenario.entries.filter((entry) => entry.turnId === 'manager-current-action');
+  assert.deepEqual(currentActions.map((entry) => entry.step), Array.from({ length: 11 }, (_, index) => index));
+  assert.ok(currentActions.every((entry) => entry.optional === true));
+  assert.ok(!result.scenario.must.some((id) => id.startsWith('manager-current-action.')));
+  assert.ok(!result.scenario.entries.some((entry) => entry.id.startsWith('manager-repair-resume.')));
   assert.ok(!result.scenario.must.some((id) => id.startsWith('manager-join-guard.')));
 });

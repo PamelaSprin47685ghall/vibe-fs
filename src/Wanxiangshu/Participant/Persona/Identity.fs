@@ -127,8 +127,6 @@ module ParticipantIdentity =
     let roleLabel (evidence: ParticipantIdentityEvidence) : string =
         (identity evidence).Kind |> roleLabelOfKind
 
-    let peerAgent (evidence: ParticipantIdentityEvidence) : string = selectedAgent evidence
-
     let persona (evidence: ParticipantIdentityEvidence) : string = (identity evidence).Persona
 
     let personaCatalogVersion (evidence: ParticipantIdentityEvidence) : int =

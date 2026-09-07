@@ -356,8 +356,7 @@ module HostForkChildDispatch =
     ///
     /// `cancelSignals` is invoked with parentId :: childIds so the signal router
     /// ignores further idle/retry events for the torn-down sessions. Unregistering
-    /// the routing is the whole cancellation: FALLBACK-003 leaves the cursor
-    /// advance to the reconciled snapshot, so a torn-down session simply stops
+    /// the routing is the whole cancellation: a torn-down session simply stops
     /// producing turns to reconcile.
     ///
     /// Side effects that must be visible before the call returns (ForkRuntime
