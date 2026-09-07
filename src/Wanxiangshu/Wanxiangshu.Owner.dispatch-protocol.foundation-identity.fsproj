@@ -3,7 +3,7 @@
     <WanxiangshuSemanticOwner>dispatch-protocol</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>foundation-identity</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
-    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>identity</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>
